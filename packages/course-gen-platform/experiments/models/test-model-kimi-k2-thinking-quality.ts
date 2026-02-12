@@ -225,7 +225,9 @@ Output the JSON directly (no markdown, no explanations):`;
 Output the JSON directly (no markdown, no explanations):`;
   }
 
-  private async invokeModel(prompt: string): Promise<{ content: string; duration: number; tokens: { input: number; output: number } }> {
+  private async invokeModel(
+    prompt: string
+  ): Promise<{ content: string; duration: number; tokens: { input: number; output: number } }> {
     const startTime = Date.now();
 
     try {
@@ -271,7 +273,9 @@ Output the JSON directly (no markdown, no explanations):`;
     try {
       // Build prompt
       const prompt =
-        scenario.entityId === 'metadata' ? this.buildMetadataPrompt(scenario) : this.buildLessonPrompt(scenario);
+        scenario.entityId === 'metadata'
+          ? this.buildMetadataPrompt(scenario)
+          : this.buildLessonPrompt(scenario);
 
       // Call API
       const result = await this.invokeModel(prompt);
@@ -357,7 +361,10 @@ Output the JSON directly (no markdown, no explanations):`;
 
   async runAllTests(): Promise<void> {
     section(`Quality Testing: ${this.modelName}`);
-    log(`Running ${this.scenarios.length} scenarios × ${this.runsPerScenario} runs = ${this.scenarios.length * this.runsPerScenario} total API calls`, 'info');
+    log(
+      `Running ${this.scenarios.length} scenarios × ${this.runsPerScenario} runs = ${this.scenarios.length * this.runsPerScenario} total API calls`,
+      'info'
+    );
     log(`Output directory: ${this.outputDir}`, 'info');
 
     // Create output directory
@@ -370,8 +377,10 @@ Output the JSON directly (no markdown, no explanations):`;
         this.runs.push(result);
 
         // Wait 2s between requests (rate limiting)
-        if (!(scenario === this.scenarios[this.scenarios.length - 1] && run === this.runsPerScenario)) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (
+          !(scenario === this.scenarios[this.scenarios.length - 1] && run === this.runsPerScenario)
+        ) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
     }
@@ -380,8 +389,8 @@ Output the JSON directly (no markdown, no explanations):`;
   printSummary(): void {
     section('Test Summary');
 
-    const passed = this.runs.filter((r) => r.status === 'SUCCESS').length;
-    const failed = this.runs.filter((r) => r.status === 'FAILED').length;
+    const passed = this.runs.filter(r => r.status === 'SUCCESS').length;
+    const failed = this.runs.filter(r => r.status === 'FAILED').length;
     const total = this.runs.length;
 
     console.log(`\nResults:`);
@@ -391,9 +400,9 @@ Output the JSON directly (no markdown, no explanations):`;
     }
 
     // Group by scenario
-    const byScenario = this.scenarios.map((scenario) => {
-      const scenarioRuns = this.runs.filter((r) => r.scenario === scenario.id);
-      const successCount = scenarioRuns.filter((r) => r.status === 'SUCCESS').length;
+    const byScenario = this.scenarios.map(scenario => {
+      const scenarioRuns = this.runs.filter(r => r.scenario === scenario.id);
+      const successCount = scenarioRuns.filter(r => r.status === 'SUCCESS').length;
       const avgDuration =
         scenarioRuns.reduce((sum, r) => sum + r.duration, 0) / scenarioRuns.length;
 
@@ -406,9 +415,12 @@ Output the JSON directly (no markdown, no explanations):`;
     });
 
     console.log(`\nBy Scenario:`);
-    byScenario.forEach((s) => {
-      const status = s.success === s.total ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
-      console.log(`  ${status} ${s.scenario}: ${s.success}/${s.total} passed (avg ${s.avgDuration}ms)`);
+    byScenario.forEach(s => {
+      const status =
+        s.success === s.total ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
+      console.log(
+        `  ${status} ${s.scenario}: ${s.success}/${s.total} passed (avg ${s.avgDuration}ms)`
+      );
     });
 
     console.log(`\nOutputs saved to: ${colors.cyan}${this.outputDir}${colors.reset}`);

@@ -22,6 +22,9 @@ import type { Database } from '@megacampus/shared-types';
 import { MetricEventType } from '../../../shared/types/system-metrics';
 import logger from '../../../shared/logger';
 
+/** DB enum type for metric event_type column */
+type DbMetricEventType = Database['public']['Enums']['metric_event_type'];
+
 /**
  * Trace data for LLM interactions
  * Used to capture raw prompt and completion for detailed trace logging
@@ -108,7 +111,14 @@ export interface RepairMetrics {
   /** Analysis phase where repair occurred */
   phase: string;
   /** Repair strategy that succeeded (or was attempted last) */
-  repair_strategy: 'jsonrepair_fsm' | 'as_is' | 'remove_trailing_commas' | 'add_closing_brackets' | 'fix_unquoted_keys' | 'truncate_incomplete_strings' | 'aggressive_cleanup';
+  repair_strategy:
+    | 'jsonrepair_fsm'
+    | 'as_is'
+    | 'remove_trailing_commas'
+    | 'add_closing_brackets'
+    | 'fix_unquoted_keys'
+    | 'truncate_incomplete_strings'
+    | 'aggressive_cleanup';
   /** Success flag (true = repaired successfully, false = failed) */
   success: boolean;
   /** Repair execution time in milliseconds */
@@ -148,11 +158,7 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
  * calculateCost('openai/gpt-oss-20b', 1000, 500)
  * // Returns: 0.000400 USD (1000 * 0.2/1M + 500 * 0.4/1M)
  */
-function calculateCost(
-  modelId: string,
-  tokensInput: number,
-  tokensOutput: number
-): number {
+function calculateCost(modelId: string, tokensInput: number, tokensOutput: number): number {
   const pricing = MODEL_PRICING[modelId] || { input: 0.5, output: 1.0 }; // Default fallback
 
   const inputCost = (tokensInput / 1_000_000) * pricing.input;
@@ -235,8 +241,7 @@ export async function trackPhaseExecution<T>(
     const latency_ms = endTime - startTime;
 
     // Log failure metrics to system_metrics table
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
 
     const metrics: PhaseMetrics = {
       course_id: courseId,
@@ -301,7 +306,8 @@ export async function trackRepairExecution<T>(
     const endTime = Date.now();
 
     // Extract strategy from result if it's a RepairResult
-    const repairResult = (result && typeof result === 'object') ? (result as Record<string, unknown>) : {};
+    const repairResult =
+      result && typeof result === 'object' ? (result as Record<string, unknown>) : {};
     const strategy = (repairResult.strategy as string) || 'as_is';
     const success = repairResult.success !== false; // Default to true if not specified
 
@@ -319,7 +325,7 @@ export async function trackRepairExecution<T>(
     const metrics: RepairMetrics = {
       course_id: courseId,
       phase,
-      repair_strategy: strategy as unknown as any,
+      repair_strategy: strategy as RepairMetrics['repair_strategy'],
       success,
       duration_ms: endTime - startTime,
       input_length: input.length,
@@ -364,29 +370,26 @@ async function logMetrics(
   metrics: PhaseMetrics
 ): Promise<void> {
   try {
-    // NOTE: Type assertion needed until migration 20251117102056 is applied and Database types regenerated
-    const { error } = await supabase
-      .from('system_metrics')
-      .insert({
-        event_type: MetricEventType.LLM_PHASE_EXECUTION as unknown as any,
-        severity: metrics.success ? 'info' : 'error',
-        message: metrics.success
-          ? `Phase ${metrics.phase} completed successfully`
-          : `Phase ${metrics.phase} failed: ${metrics.error_message}`,
-        metadata: {
-          course_id: metrics.course_id,
-          phase: metrics.phase,
-          model_used: metrics.model_used,
-          tokens_input: metrics.tokens_input,
-          tokens_output: metrics.tokens_output,
-          tokens_total: metrics.tokens_total,
-          cost_usd: metrics.cost_usd,
-          latency_ms: metrics.latency_ms,
-          quality_score: metrics.quality_score,
-        },
+    const { error } = await supabase.from('system_metrics').insert({
+      event_type: MetricEventType.LLM_PHASE_EXECUTION as DbMetricEventType,
+      severity: metrics.success ? 'info' : 'error',
+      message: metrics.success
+        ? `Phase ${metrics.phase} completed successfully`
+        : `Phase ${metrics.phase} failed: ${metrics.error_message}`,
+      metadata: {
         course_id: metrics.course_id,
-        timestamp: new Date().toISOString(),
-      });
+        phase: metrics.phase,
+        model_used: metrics.model_used,
+        tokens_input: metrics.tokens_input,
+        tokens_output: metrics.tokens_output,
+        tokens_total: metrics.tokens_total,
+        cost_usd: metrics.cost_usd,
+        latency_ms: metrics.latency_ms,
+        quality_score: metrics.quality_score,
+      },
+      course_id: metrics.course_id,
+      timestamp: new Date().toISOString(),
+    });
 
     if (error) {
       logger.error({ error }, 'Failed to log phase metrics to system_metrics');
@@ -409,27 +412,24 @@ async function logRepairMetrics(
   metrics: RepairMetrics
 ): Promise<void> {
   try {
-    // NOTE: Type assertion needed until migration 20251117102056 is applied and Database types regenerated
-    const { error } = await supabase
-      .from('system_metrics')
-      .insert({
-        event_type: MetricEventType.JSON_REPAIR_EXECUTION as unknown as any,
-        severity: metrics.success ? 'info' : 'warn',
-        message: metrics.success
-          ? `JSON repair succeeded using ${metrics.repair_strategy}`
-          : `JSON repair failed: ${metrics.error_message}`,
-        metadata: {
-          course_id: metrics.course_id,
-          phase: metrics.phase,
-          repair_strategy: metrics.repair_strategy,
-          duration_ms: metrics.duration_ms,
-          input_length: metrics.input_length,
-          output_length: metrics.output_length,
-          cost_usd: metrics.cost_usd,
-        },
+    const { error } = await supabase.from('system_metrics').insert({
+      event_type: MetricEventType.JSON_REPAIR_EXECUTION as DbMetricEventType,
+      severity: metrics.success ? 'info' : 'warn',
+      message: metrics.success
+        ? `JSON repair succeeded using ${metrics.repair_strategy}`
+        : `JSON repair failed: ${metrics.error_message}`,
+      metadata: {
         course_id: metrics.course_id,
-        timestamp: new Date().toISOString(),
-      });
+        phase: metrics.phase,
+        repair_strategy: metrics.repair_strategy,
+        duration_ms: metrics.duration_ms,
+        input_length: metrics.input_length,
+        output_length: metrics.output_length,
+        cost_usd: metrics.cost_usd,
+      },
+      course_id: metrics.course_id,
+      timestamp: new Date().toISOString(),
+    });
 
     if (error) {
       logger.error({ error }, 'Failed to log repair metrics to system_metrics');
@@ -462,12 +462,11 @@ export async function updateQualityScore(
   const supabase = getSupabaseAdmin();
 
   try {
-    // NOTE: Type assertion needed until migration 20251117102056 is applied and Database types regenerated
     // Find most recent phase execution for this course+phase
     const { data: recentMetric } = await supabase
       .from('system_metrics')
       .select('id, metadata')
-      .eq('event_type', MetricEventType.LLM_PHASE_EXECUTION as unknown as any)
+      .eq('event_type', MetricEventType.LLM_PHASE_EXECUTION as DbMetricEventType)
       .eq('course_id', courseId)
       .order('timestamp', { ascending: false })
       .limit(1)
@@ -475,8 +474,7 @@ export async function updateQualityScore(
 
     if (recentMetric) {
       // Update metadata with quality_score
-      const existingMetadata =
-        (recentMetric.metadata as Record<string, unknown>) || {};
+      const existingMetadata = (recentMetric.metadata as Record<string, unknown>) || {};
       const updatedMetadata = {
         ...existingMetadata,
         quality_score: qualityScore,

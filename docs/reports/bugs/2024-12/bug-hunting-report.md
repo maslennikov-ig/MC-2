@@ -29,6 +29,7 @@ modifications_made: false
 The codebase is in **excellent health** from a critical bug perspective. All TypeScript type-checking and production builds pass successfully. However, there are significant code quality improvements needed in the areas of debug code cleanup and development artifact removal.
 
 ### Key Metrics
+
 - **Critical Issues**: 0
 - **High Priority Issues**: 1 (Next.js worker thread warnings)
 - **Medium Priority Issues**: 3711 (debug code & development artifacts)
@@ -38,6 +39,7 @@ The codebase is in **excellent health** from a critical bug perspective. All Typ
 - **Changes Logged**: N/A
 
 ### Highlights
+
 - ✅ TypeScript type-check: PASSED (all packages)
 - ✅ Production build: PASSED (with warnings)
 - ✅ No hardcoded secrets in production code
@@ -54,6 +56,7 @@ The codebase is in **excellent health** from a critical bug perspective. All Typ
 **None Found** ✅
 
 All critical security checks passed:
+
 - No hardcoded API keys or secrets in production code
 - No SQL injection patterns detected
 - No eval() usage in production code
@@ -78,6 +81,7 @@ All critical security checks passed:
   4. Consider upgrading Next.js or adjusting worker configuration
 
 **Build Output**:
+
 ```
 [Error: Cannot find module '/home/me/code/mc2/packages/web/.next/server/chunks/lib/worker.js'] {
   code: 'MODULE_NOT_FOUND',
@@ -88,6 +92,7 @@ Error: the worker thread exited
 ```
 
 **Note**: Despite these errors, the build completes successfully:
+
 - 42/42 static pages generated
 - Route compilation successful
 - Build artifacts created properly
@@ -116,6 +121,7 @@ Error: the worker thread exited
      - Example files (`*.example.ts`)
 
 **High-Volume Files**:
+
 ```
 packages/course-gen-platform/tests/integration/document-processing-worker.test.ts: 157
 packages/course-gen-platform/scripts/e2e-production-grade-checks.ts: 100
@@ -135,6 +141,7 @@ packages/course-gen-platform/tools/auth/configure-auth.ts: 71
   - Reduces code maintainability
   - Can confuse developers
 - **Top Files**:
+
 ```
 packages/course-gen-platform/src/stages/stage4-analysis/utils/workflow-graph.ts: 10
 packages/shared-types/tests/analysis-schemas.test.ts: 8
@@ -144,6 +151,7 @@ packages/course-gen-platform/tests/integration/helpers/test-orgs.ts: 3
 ```
 
 **Sample Critical TODOs**:
+
 - Stage 4 workflow graph has 10 TODO markers
 - Analysis schemas have 8 TODO markers
 - Validator tests have 5 FIXME markers
@@ -173,12 +181,12 @@ packages/course-gen-platform/tests/integration/helpers/test-orgs.ts: 3
 
 ### Debug Code to Remove
 
-| Category | Count | Files Affected | Priority |
-|----------|-------|----------------|----------|
-| console.log/debug/trace/info | 3542 | 215 | Medium |
-| TODO comments | ~169 | 104 | Low |
-| FIXME comments | Included in TODO count | 104 | Medium |
-| HACK comments | Included in TODO count | 104 | High |
+| Category                     | Count                  | Files Affected | Priority |
+| ---------------------------- | ---------------------- | -------------- | -------- |
+| console.log/debug/trace/info | 3542                   | 215            | Medium   |
+| TODO comments                | ~169                   | 104            | Low      |
+| FIXME comments               | Included in TODO count | 104            | Medium   |
+| HACK comments                | Included in TODO count | 104            | High     |
 
 **Recommended Cleanup Strategy**:
 
@@ -202,12 +210,12 @@ packages/course-gen-platform/tests/integration/helpers/test-orgs.ts: 3
 
 **Analysis**: Limited dead code detected due to TypeScript strict mode enforcement.
 
-| Pattern | Estimated Count | Impact |
-|---------|----------------|---------|
-| Commented code blocks (>3 lines) | Unknown (requires manual review) | Low |
-| Unreachable code after return | <20 files | Low |
-| Empty catch blocks | 0 | None |
-| Unused imports | Minimal (TypeScript catches most) | Low |
+| Pattern                          | Estimated Count                   | Impact |
+| -------------------------------- | --------------------------------- | ------ |
+| Commented code blocks (>3 lines) | Unknown (requires manual review)  | Low    |
+| Unreachable code after return    | <20 files                         | Low    |
+| Empty catch blocks               | 0                                 | None   |
+| Unused imports                   | Minimal (TypeScript catches most) | Low    |
 
 **Note**: TypeScript's `noUnusedLocals` and `noUnusedParameters` are enabled in tsconfig, significantly reducing dead code.
 
@@ -220,6 +228,7 @@ packages/course-gen-platform/tests/integration/helpers/test-orgs.ts: 3
 ✅ **No hardcoded production secrets found**
 
 All detected "secrets" are in test files or documentation:
+
 - `process.env.AXIOM_TOKEN = 'test-token'` (test file)
 - `process.env.OPENROUTER_API_KEY = 'test-key'` (test file)
 - `process.env.JINA_API_KEY = 'test-key'` (test file)
@@ -247,6 +256,7 @@ All detected "secrets" are in test files or documentation:
 ✅ **Safe usage detected**
 
 Only 2 occurrences, both in Redis Lua scripts (legitimate use):
+
 - `packages/course-gen-platform/src/shared/locks/generation-lock.ts:229`
 - `packages/course-gen-platform/src/shared/concurrency/tracker.ts:91`
 
@@ -263,6 +273,7 @@ Only 2 occurrences, both in Redis Lua scripts (legitimate use):
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 Scope: 5 of 6 workspace projects
 packages/shared-logger type-check: Done
@@ -281,6 +292,7 @@ packages/web type-check: Done
 **Status**: ⚠️ PASSED (with warnings)
 
 **Output Summary**:
+
 - shared-logger: Built successfully
 - shared-types: Built successfully
 - trpc-client-sdk: Built successfully
@@ -288,12 +300,14 @@ packages/web type-check: Done
 - web (Next.js): Built successfully with worker thread warnings
 
 **Next.js Build Results**:
+
 - ✅ 42/42 static pages generated
 - ✅ Compilation successful
 - ⚠️ 25+ worker thread warnings (non-blocking)
 - ⚠️ Module type warning for `tailwind.config.ts`
 
 **Notable Warnings**:
+
 1. Worker thread module not found (repeats ~25 times)
 2. Tailwind config type specification recommendation
 
@@ -320,13 +334,13 @@ The codebase passes all critical validation checks. The worker thread warnings d
 
 ### Package Breakdown
 
-| Package | Console Logs | TODOs | Status |
-|---------|-------------|-------|---------|
-| shared-logger | ~30 | 2 | ✅ Clean |
-| shared-types | ~10 | 12 | ⚠️ TODOs |
-| trpc-client-sdk | ~5 | 1 | ✅ Clean |
-| course-gen-platform | ~2500 | ~100 | ⚠️ High debug code |
-| web | ~1000 | ~55 | ⚠️ Medium debug code |
+| Package             | Console Logs | TODOs | Status               |
+| ------------------- | ------------ | ----- | -------------------- |
+| shared-logger       | ~30          | 2     | ✅ Clean             |
+| shared-types        | ~10          | 12    | ⚠️ TODOs             |
+| trpc-client-sdk     | ~5           | 1     | ✅ Clean             |
+| course-gen-platform | ~2500        | ~100  | ⚠️ High debug code   |
+| web                 | ~1000        | ~55   | ⚠️ Medium debug code |
 
 ---
 
@@ -368,18 +382,21 @@ The codebase passes all critical validation checks. The worker thread warnings d
 ### 1. Immediate Actions
 
 **Worker Thread Investigation** (Critical):
+
 - Review Next.js configuration for worker threads
 - Check if custom workers are properly configured
 - Verify Next.js version compatibility
 - Test production deployment to ensure warnings don't cause runtime errors
 
 **Package.json Update** (Easy Win):
+
 - Add `"type": "module"` to `packages/web/package.json`
 - Eliminates warning and improves module resolution
 
 ### 2. Short-term Improvements (1-2 Weeks)
 
 **Logging Strategy**:
+
 1. Establish clear guidelines for console vs. logger usage
 2. Create wrapper for shared-logger with severity levels
 3. Replace production console statements with proper logging
@@ -390,6 +407,7 @@ The codebase passes all critical validation checks. The worker thread warnings d
    - Tests (debugging aid - optional)
 
 **Technical Debt Reduction**:
+
 1. Convert HACK comments to GitHub issues
 2. Address critical TODOs in stage4 and analysis code
 3. Create automated detection for new console.log in PRs
@@ -397,12 +415,14 @@ The codebase passes all critical validation checks. The worker thread warnings d
 ### 3. Long-term Refactoring (1-3 Months)
 
 **Code Quality Gates**:
+
 1. Add ESLint rule: `no-console` for production code paths
 2. Set up pre-commit hooks to detect console statements
 3. Implement automated dead code detection (knip)
 4. Add code coverage requirements for new code
 
 **Monitoring & Observability**:
+
 1. Ensure shared-logger is used consistently
 2. Add structured logging for production
 3. Implement log aggregation (Axiom integration exists)
@@ -411,6 +431,7 @@ The codebase passes all critical validation checks. The worker thread warnings d
 ### 4. Testing Gaps
 
 Current scan did not measure:
+
 - Unit test coverage
 - Integration test coverage
 - E2E test coverage
@@ -436,6 +457,7 @@ Current scan did not measure:
    - Document findings and resolution
 
 2. **Address Package.json Warning**
+
    ```bash
    # Add to packages/web/package.json
    "type": "module"
@@ -470,12 +492,14 @@ Current scan did not measure:
 ### High-Issue Packages
 
 **packages/course-gen-platform** (Backend/API):
+
 - Console statements: ~2500
 - TODO/FIXME: ~100
 - Primary areas: stages/, tests/, experiments/
 - Status: ⚠️ High debug code volume, but TypeScript clean
 
 **packages/web** (Next.js Frontend):
+
 - Console statements: ~1000
 - TODO/FIXME: ~55
 - Primary areas: components/, tests/, app/
@@ -484,16 +508,19 @@ Current scan did not measure:
 ### Clean Packages ✅
 
 **packages/shared-logger**:
+
 - Console statements: ~30 (mostly in tests)
 - TODO/FIXME: 2
 - Status: ✅ Good condition
 
 **packages/shared-types**:
+
 - Console statements: ~10
 - TODO/FIXME: 12
 - Status: ✅ TypeScript definitions clean
 
 **packages/trpc-client-sdk**:
+
 - Console statements: ~5
 - TODO/FIXME: 1
 - Status: ✅ Minimal issues
@@ -511,7 +538,7 @@ Current scan did not measure:
 
 ---
 
-*Report generated by bug-hunter agent*
-*Scan duration: ~4 minutes 30 seconds*
-*TypeScript version: 5.3.3*
-*Next.js version: 15.5.9*
+_Report generated by bug-hunter agent_
+_Scan duration: ~4 minutes 30 seconds_
+_TypeScript version: 5.3.3_
+_Next.js version: 15.5.9_

@@ -129,10 +129,13 @@ export async function cleanupCourseResources(
 
   // Validate UUIDs early
   if (!isValidUUID(courseId) || !isValidUUID(organizationId)) {
-    logger.error({
-      courseId,
-      organizationId,
-    }, '[Course Cleanup] Invalid UUID format');
+    logger.error(
+      {
+        courseId,
+        organizationId,
+      },
+      '[Course Cleanup] Invalid UUID format'
+    );
 
     return {
       courseId,
@@ -151,10 +154,13 @@ export async function cleanupCourseResources(
 
   const errors: string[] = [];
 
-  logger.info({
-    courseId,
-    organizationId,
-  }, '[Course Cleanup] Starting comprehensive course cleanup');
+  logger.info(
+    {
+      courseId,
+      organizationId,
+    },
+    '[Course Cleanup] Starting comprehensive course cleanup'
+  );
 
   // 1. Clean Qdrant vectors
   let qdrantResult = { deleted: false, vectorsDeleted: 0 };
@@ -234,15 +240,19 @@ export async function cleanupCourseResources(
       .eq('course_id', courseId);
 
     if (filesError) {
-      logger.warn({ courseId, error: filesError }, '[Course Cleanup] Failed to fetch file paths for Docling cache cleanup');
+      logger.warn(
+        { courseId, error: filesError },
+        '[Course Cleanup] Failed to fetch file paths for Docling cache cleanup'
+      );
       // Don't add to errors - this is non-critical
     } else if (files && files.length > 0) {
       // Generate absolute paths (matching how they were processed in document pipeline)
       const basePath = process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd();
-      const filePaths = files.map((f) => path.join(basePath, f.storage_path));
+      const filePaths = files.map(f => path.join(basePath, f.storage_path));
 
       // Get cache directory
-      const cacheDir = process.env.DOCLING_CACHE_PATH || path.resolve(process.cwd(), '../../.tmp/docling-cache');
+      const cacheDir =
+        process.env.DOCLING_CACHE_PATH || path.resolve(process.cwd(), '../../.tmp/docling-cache');
 
       const doclingResult = await cleanupDoclingCacheForCourse(cacheDir, filePaths);
       doclingCacheResult = {
@@ -275,12 +285,15 @@ export async function cleanupCourseResources(
       errors.push(`BullMQ cleanup: ${result.errors} jobs failed to remove`);
     }
     if (result.removed > 0 || result.orphanedCleaned > 0) {
-      logger.info({
-        courseId,
-        jobsRemoved: result.removed,
-        orphanedCleaned: result.orphanedCleaned,
-        jobErrors: result.errors,
-      }, '[Course Cleanup] BullMQ jobs and orphaned data cleaned up');
+      logger.info(
+        {
+          courseId,
+          jobsRemoved: result.removed,
+          orphanedCleaned: result.orphanedCleaned,
+          jobErrors: result.errors,
+        },
+        '[Course Cleanup] BullMQ jobs and orphaned data cleaned up'
+      );
     }
   } catch (error) {
     const errorMsg = `BullMQ cleanup failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -292,10 +305,8 @@ export async function cleanupCourseResources(
   const durationMs = Date.now() - startTime;
   // Note: Docling cache cleanup is best-effort and does not affect overall success
   // It's a performance optimization, not a data integrity requirement
-  const overallSuccess = qdrantResult.deleted &&
-                         redisResult.success &&
-                         ragResult.success &&
-                         filesResult.success;
+  const overallSuccess =
+    qdrantResult.deleted && redisResult.success && ragResult.success && filesResult.success;
 
   const result: CourseCleanupResult = {
     courseId,
@@ -311,22 +322,25 @@ export async function cleanupCourseResources(
     errors,
   };
 
-  logger.info({
-    courseId,
-    organizationId,
-    success: overallSuccess,
-    vectorsDeleted: qdrantResult.vectorsDeleted,
-    redisKeysDeleted: redisResult.keysDeleted,
-    ragEntriesDeleted: ragResult.entriesDeleted,
-    filesDeleted: filesResult.filesDeleted,
-    bytesFreed: filesResult.bytesFreed,
-    doclingCacheDeleted: doclingCacheResult.filesDeleted,
-    doclingCacheBytesFreed: doclingCacheResult.bytesFreed,
-    bullmqJobsRemoved: bullmqResult.jobsRemoved,
-    bullmqOrphanedCleaned: bullmqResult.orphanedCleaned,
-    durationMs,
-    errorCount: errors.length,
-  }, '[Course Cleanup] Cleanup complete');
+  logger.info(
+    {
+      courseId,
+      organizationId,
+      success: overallSuccess,
+      vectorsDeleted: qdrantResult.vectorsDeleted,
+      redisKeysDeleted: redisResult.keysDeleted,
+      ragEntriesDeleted: ragResult.entriesDeleted,
+      filesDeleted: filesResult.filesDeleted,
+      bytesFreed: filesResult.bytesFreed,
+      doclingCacheDeleted: doclingCacheResult.filesDeleted,
+      doclingCacheBytesFreed: doclingCacheResult.bytesFreed,
+      bullmqJobsRemoved: bullmqResult.jobsRemoved,
+      bullmqOrphanedCleaned: bullmqResult.orphanedCleaned,
+      durationMs,
+      errorCount: errors.length,
+    },
+    '[Course Cleanup] Cleanup complete'
+  );
 
   return result;
 }

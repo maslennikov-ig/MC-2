@@ -1,4 +1,3 @@
-
 {
   "course_title": "Introduction to Python Programming",
   "course_description": "This comprehensive beginner-level course introduces students to Python programming, one of the most versatile and in-demand programming languages today. Students will learn fundamental programming concepts, Python syntax, and practical applications through hands-on coding exercises and real-world projects. The course covers everything from basic variables and data types to control structures, functions, and introductory object-oriented programming concepts, preparing students for further study in software development, data science, or automation.",
@@ -6,7 +5,12 @@
   "target_audience": "Absolute beginners with no prior programming experience; students and professionals looking to add programming skills to their toolkit; career changers entering the tech industry; data analysts seeking to automate tasks; high school and college students exploring computer science; entrepreneurs wanting to understand technical aspects of their business; hobbyists interested in creating simple applications and games.",
   "estimated_duration_hours": 36,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with using a keyboard and mouse", "Understanding of basic mathematical concepts", "No prior programming experience required"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a keyboard and mouse",
+    "Understanding of basic mathematical concepts",
+    "No prior programming experience required"
+  ],
   "learning_outcomes": [
     "Define fundamental programming concepts including variables, data types, and operators",
     "Build Python programs using control structures such as conditional statements and loops",
@@ -16,5 +20,14 @@
     "Apply basic object-oriented programming principles to structure code",
     "Develop and debug simple Python applications using proper error handling techniques"
   ],
-  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Computer Science", "Software Development", "Technical Skills", "Programming Fundamentals"]
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Computer Science",
+    "Software Development",
+    "Technical Skills",
+    "Programming Fundamentals"
+  ]
 }

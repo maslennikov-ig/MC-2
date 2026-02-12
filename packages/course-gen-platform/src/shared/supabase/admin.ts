@@ -24,11 +24,14 @@ export function getSupabaseAdmin(): SupabaseClient<Database> {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      logger.error({
-        hasUrl: !!supabaseUrl,
-        hasKey: !!supabaseServiceKey,
-        urlPrefix: supabaseUrl?.substring(0, 30),
-      }, '[SupabaseAdmin] Missing configuration');
+      logger.error(
+        {
+          hasUrl: !!supabaseUrl,
+          hasKey: !!supabaseServiceKey,
+          urlPrefix: supabaseUrl?.substring(0, 30),
+        },
+        '[SupabaseAdmin] Missing configuration'
+      );
       throw new Error('Missing Supabase configuration: SUPABASE_URL or SUPABASE_SERVICE_KEY');
     }
 
@@ -36,7 +39,9 @@ export function getSupabaseAdmin(): SupabaseClient<Database> {
     const keyPayload = supabaseServiceKey.split('.')[1];
     if (keyPayload) {
       try {
-        const decoded = JSON.parse(Buffer.from(keyPayload, 'base64').toString());
+        const decoded = JSON.parse(Buffer.from(keyPayload, 'base64').toString()) as {
+          role?: string;
+        };
         logger.info({ role: decoded.role }, '[SupabaseAdmin] Initializing with role');
       } catch {
         logger.warn('[SupabaseAdmin] Could not decode key payload');

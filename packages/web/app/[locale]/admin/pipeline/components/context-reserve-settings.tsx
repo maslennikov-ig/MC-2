@@ -12,33 +12,30 @@
  * @module app/admin/pipeline/components/context-reserve-settings
  */
 
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { Loader2, Percent, Save } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
-import {
-  listContextReserveSettings,
-  updateContextReserveSetting,
-} from '@/app/actions/pipeline-admin';
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+import { Loader2, Percent, Save } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import { trpc } from '@/lib/trpc/react'
 
 interface ReserveSettings {
-  en: number;
-  ru: number;
-  any: number;
+  en: number
+  ru: number
+  any: number
 }
 
 /**
  * Format percentage for display (0.15 → "15%")
  */
 function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
+  return `${Math.round(value * 100)}%`
 }
 
 /**
@@ -46,117 +43,109 @@ function formatPercent(value: number): string {
  * Example: 128K model with 15% reserve → "109K threshold"
  */
 function calculateThresholdExample(modelSize: number, reservePercent: number): string {
-  const threshold = Math.floor(modelSize * (1 - reservePercent));
-  return `${(threshold / 1000).toFixed(0)}K`;
+  const threshold = Math.floor(modelSize * (1 - reservePercent))
+  return `${(threshold / 1000).toFixed(0)}K`
 }
 
 /**
  * Context Reserve Settings Panel
  */
 export function ContextReserveSettings() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false)
   const [settings, setSettings] = useState<ReserveSettings>({
     en: 0.15,
     ru: 0.25,
-    any: 0.20,
-  });
+    any: 0.2,
+  })
   const [originalSettings, setOriginalSettings] = useState<ReserveSettings>({
     en: 0.15,
     ru: 0.25,
-    any: 0.20,
-  });
+    any: 0.2,
+  })
 
-  // Load settings on mount
+  // tRPC query for reserve settings
+  const {
+    data: reserveData,
+    isLoading,
+    error,
+  } = trpc.pipelineAdmin.listContextReserveSettings.useQuery()
+
+  // tRPC mutation for updating
+  const updateMutation = trpc.pipelineAdmin.updateContextReserveSetting.useMutation()
+
+  // Update local state when data loads
   useEffect(() => {
-    async function load() {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const result = await listContextReserveSettings();
-        const data = result.result?.data || result.result || result;
-
-        const newSettings: ReserveSettings = {
-          en: data.find((s: { language: string }) => s.language === 'en')?.reservePercent ?? 0.15,
-          ru: data.find((s: { language: string }) => s.language === 'ru')?.reservePercent ?? 0.25,
-          any: data.find((s: { language: string }) => s.language === 'any')?.reservePercent ?? 0.20,
-        };
-
-        setSettings(newSettings);
-        setOriginalSettings(newSettings);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load context reserve settings');
-      } finally {
-        setIsLoading(false);
+    if (reserveData) {
+      const newSettings: ReserveSettings = {
+        en: reserveData.find((s) => s.language === 'en')?.reservePercent ?? 0.15,
+        ru: reserveData.find((s) => s.language === 'ru')?.reservePercent ?? 0.25,
+        any: reserveData.find((s) => s.language === 'any')?.reservePercent ?? 0.2,
       }
+      setSettings(newSettings)
+      setOriginalSettings(newSettings)
     }
-    load();
-  }, []);
+  }, [reserveData])
 
   const handleSave = async () => {
     try {
-      setIsSaving(true);
+      setIsSaving(true)
 
-      const languages = ['en', 'ru', 'any'] as const;
+      const languages = ['en', 'ru', 'any'] as const
 
       const results = await Promise.allSettled([
-        updateContextReserveSetting({ language: 'en', reservePercent: settings.en }),
-        updateContextReserveSetting({ language: 'ru', reservePercent: settings.ru }),
-        updateContextReserveSetting({ language: 'any', reservePercent: settings.any }),
-      ]);
+        updateMutation.mutateAsync({ language: 'en', reservePercent: settings.en }),
+        updateMutation.mutateAsync({ language: 'ru', reservePercent: settings.ru }),
+        updateMutation.mutateAsync({ language: 'any', reservePercent: settings.any }),
+      ])
 
       const failures = results
         .map((result, idx) => ({ result, lang: languages[idx] }))
-        .filter((item): item is { result: PromiseRejectedResult; lang: typeof languages[number] } =>
-          item.result.status === 'rejected'
-        );
+        .filter(
+          (item): item is { result: PromiseRejectedResult; lang: (typeof languages)[number] } =>
+            item.result.status === 'rejected'
+        )
 
       if (failures.length > 0) {
-        const failedLangs = failures.map(f => f.lang.toUpperCase()).join(', ');
-        // Extract error messages for debugging
+        const failedLangs = failures.map((f) => f.lang.toUpperCase()).join(', ')
         const errorDetails = failures
-          .map(f => {
-            const reason = f.result.reason;
-            return `${f.lang.toUpperCase()}: ${reason?.message || 'Unknown error'}`;
+          .map((f) => {
+            const reason = f.result.reason
+            return `${f.lang.toUpperCase()}: ${reason?.message || 'Unknown error'}`
           })
-          .join('; ');
+          .join('; ')
 
         toast.warning(`Partially saved: Failed to update ${failedLangs}. ${errorDetails}`, {
           duration: 8000,
-        });
+        })
       } else {
         // Check if any update reported cache clear failure
-        const successResults = results.filter(
-          (r): r is PromiseFulfilledResult<unknown> => r.status === 'fulfilled'
-        );
-
-        const anyCacheFailure = successResults.some(r => {
-          const data = (r.value as { result?: { data?: { cacheCleared?: boolean } } })?.result?.data;
-          return data?.cacheCleared === false;
-        });
+        const anyCacheFailure = results.some((r) => {
+          if (r.status !== 'fulfilled') return false
+          const val = r.value as { cacheCleared?: boolean }
+          return val?.cacheCleared === false
+        })
 
         if (anyCacheFailure) {
           toast.success('Settings saved. Note: Cache refresh may take up to 5 minutes.', {
             duration: 5000,
-          });
+          })
         } else {
-          toast.success('All context reserve settings saved successfully');
+          toast.success('All context reserve settings saved successfully')
         }
       }
 
-      setOriginalSettings(settings);
+      setOriginalSettings(settings)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update settings');
+      toast.error(err instanceof Error ? err.message : 'Failed to update settings')
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   const isDirty =
     settings.en !== originalSettings.en ||
     settings.ru !== originalSettings.ru ||
-    settings.any !== originalSettings.any;
+    settings.any !== originalSettings.any
 
   // Error state
   if (error) {
@@ -167,10 +156,10 @@ export function ContextReserveSettings() {
             <Percent className="h-5 w-5" />
             Failed to load context reserve settings
           </CardTitle>
-          <CardDescription className="text-destructive/80">{error}</CardDescription>
+          <CardDescription className="text-destructive/80">{error.message}</CardDescription>
         </CardHeader>
       </Card>
-    );
+    )
   }
 
   // Loading state
@@ -196,7 +185,7 @@ export function ContextReserveSettings() {
           ))}
         </CardContent>
       </Card>
-    );
+    )
   }
 
   return (
@@ -218,7 +207,7 @@ export function ContextReserveSettings() {
             <Label htmlFor="en-reserve" className="text-base font-medium">
               English (EN) Reserve
             </Label>
-            <span className="text-sm font-mono text-muted-foreground">
+            <span className="text-muted-foreground font-mono text-sm">
               {formatPercent(settings.en)}
             </span>
           </div>
@@ -231,7 +220,7 @@ export function ContextReserveSettings() {
             onValueChange={([value]) => setSettings({ ...settings, en: value })}
             className="w-full"
           />
-          <div className="text-xs text-muted-foreground space-y-1">
+          <div className="text-muted-foreground space-y-1 text-xs">
             <p>
               128K model → <strong>{calculateThresholdExample(128000, settings.en)}</strong>{' '}
               threshold
@@ -251,7 +240,7 @@ export function ContextReserveSettings() {
             <Label htmlFor="ru-reserve" className="text-base font-medium">
               Russian (RU) Reserve
             </Label>
-            <span className="text-sm font-mono text-muted-foreground">
+            <span className="text-muted-foreground font-mono text-sm">
               {formatPercent(settings.ru)}
             </span>
           </div>
@@ -264,7 +253,7 @@ export function ContextReserveSettings() {
             onValueChange={([value]) => setSettings({ ...settings, ru: value })}
             className="w-full"
           />
-          <div className="text-xs text-muted-foreground space-y-1">
+          <div className="text-muted-foreground space-y-1 text-xs">
             <p>
               128K model → <strong>{calculateThresholdExample(128000, settings.ru)}</strong>{' '}
               threshold
@@ -284,7 +273,7 @@ export function ContextReserveSettings() {
             <Label htmlFor="any-reserve" className="text-base font-medium">
               Fallback (ANY) Reserve
             </Label>
-            <span className="text-sm font-mono text-muted-foreground">
+            <span className="text-muted-foreground font-mono text-sm">
               {formatPercent(settings.any)}
             </span>
           </div>
@@ -297,7 +286,7 @@ export function ContextReserveSettings() {
             onValueChange={([value]) => setSettings({ ...settings, any: value })}
             className="w-full"
           />
-          <div className="text-xs text-muted-foreground space-y-1">
+          <div className="text-muted-foreground space-y-1 text-xs">
             <p>
               128K model → <strong>{calculateThresholdExample(128000, settings.any)}</strong>{' '}
               threshold
@@ -317,7 +306,7 @@ export function ContextReserveSettings() {
         {/* Save Button */}
         <div className="flex justify-end gap-2">
           <Button
-            onClick={handleSave}
+            onClick={() => void handleSave()}
             disabled={!isDirty || isSaving}
             className="gap-2"
           >
@@ -336,5 +325,5 @@ export function ContextReserveSettings() {
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

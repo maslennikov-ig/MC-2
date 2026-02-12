@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useMemo, useState, useCallback } from 'react'
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -17,6 +17,7 @@ import { useFieldStatusTracking } from '../../hooks/useFieldStatusTracking'
 import { useCascadeStageDelete } from '../../hooks/useCascadeStageDelete'
 import { updateFieldAction } from '@/app/actions/admin-generation'
 import type { Stage5OutputTabProps, CourseStructure } from './types'
+import { createClient } from '@/lib/supabase/client'
 
 // ============================================================================
 // TYPE GUARDS
@@ -102,13 +103,61 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   // Expanded sections state for StructureTree
   const [expandedSections, setExpandedSections] = useState<string[]>([])
 
+  // Pull-fallback: fetch course_structure directly if not available via props
+  // Retries every 3s until data is found (handles case when tab is opened before Stage 5 completes)
+  const [directFetchResult, setDirectFetchResult] = useState<unknown>(null)
+  const hasFetched = useRef(false)
+
+  useEffect(() => {
+    if (outputData) return
+    if (hasFetched.current || !courseId) return
+
+    let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    const fetchData = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('courses')
+          .select('course_structure')
+          .eq('id', courseId)
+          .single()
+
+        if (cancelled) return
+
+        if (data?.course_structure) {
+          hasFetched.current = true
+          setDirectFetchResult(data.course_structure)
+          return
+        }
+
+        // Data not yet available — retry after 3s
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void fetchData()
+        }, 3000)
+      } catch {
+        // Best-effort fallback — retry after 5s
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void fetchData()
+        }, 5000)
+      }
+    }
+
+    void fetchData()
+
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+    }
+  }, [outputData, courseId])
+
   // Parse output data - real data IS the CourseStructure directly
   const parsedData = useMemo((): CourseStructure | null => {
-    if (isCourseStructure(outputData)) {
-      return outputData
-    }
+    if (isCourseStructure(outputData)) return outputData
+    if (isCourseStructure(directFetchResult)) return directFetchResult
     return null
-  }, [outputData])
+  }, [outputData, directFetchResult])
 
   // Handle section toggle - wrapped in useCallback for optimization
   const handleToggleSection = useCallback((sectionId: string) => {

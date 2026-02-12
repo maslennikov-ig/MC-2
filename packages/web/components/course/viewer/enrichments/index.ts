@@ -9,6 +9,6 @@
  * - (Future) DocumentViewer: Document viewer
  */
 
-export { QuizPlayer } from "./QuizPlayer";
-export { AudioPlayer } from './AudioPlayer';
-export { EnrichmentErrorBoundary } from './EnrichmentErrorBoundary';
+export { QuizPlayer } from './QuizPlayer'
+export { AudioPlayer } from './AudioPlayer'
+export { EnrichmentErrorBoundary } from './EnrichmentErrorBoundary'

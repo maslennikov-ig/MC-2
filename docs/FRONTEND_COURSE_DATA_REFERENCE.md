@@ -11,6 +11,7 @@
 **Rate Limit**: 10 req/60s
 
 ### Input
+
 ```typescript
 {
   courseId: string;           // UUID, required
@@ -19,6 +20,7 @@
 ```
 
 ### Validation
+
 - Course must belong to user's organization
 - User must own the course
 
@@ -30,17 +32,19 @@
 **Rate Limit**: 5 req/60s
 
 ### Input
+
 ```typescript
 {
-  courseId: string;    // UUID, required
-  filename: string;    // 1-255 chars, required
-  fileSize: number;    // Max 100MB (104857600 bytes), required
-  mimeType: string;    // Required
+  courseId: string; // UUID, required
+  filename: string; // 1-255 chars, required
+  fileSize: number; // Max 100MB (104857600 bytes), required
+  mimeType: string; // Required
   fileContent: string; // Base64 encoded, required
 }
 ```
 
 ### Validation
+
 - Tier-based file type and count limits
 - Storage quota enforcement
 - Path traversal protection
@@ -53,14 +57,16 @@
 **Rate Limit**: 10 req/60s
 
 ### Input
+
 ```typescript
 {
-  courseId: string;          // UUID, required
-  forceRestart: boolean;     // Default: false
+  courseId: string; // UUID, required
+  forceRestart: boolean; // Default: false
 }
 ```
 
 ### Validation
+
 - Course status must be `processing_documents` or `generating_content`
 - Document summaries must exist in `file_catalog`
 
@@ -71,18 +77,18 @@
 ### Required Fields
 
 ```typescript
-id: string;                 // UUID
-title: string;              // Course title - REQUIRED, ONLY MANDATORY FIELD
-user_id: string;            // Owner UUID
-organization_id: string;    // Organization UUID
+id: string; // UUID
+title: string; // Course title - REQUIRED, ONLY MANDATORY FIELD
+user_id: string; // Owner UUID
+organization_id: string; // Organization UUID
 ```
 
 ### Optional Core Fields
 
 ```typescript
-language: string;           // ISO 639-1 (default: 'en')
-style: string;              // Content style (default: 'conversational') - see Style Types
-target_audience: string;    // Audience description (DIFFERENT from difficulty)
+language: string; // ISO 639-1 (default: 'en')
+style: string; // Content style (default: 'conversational') - see Style Types
+target_audience: string; // Audience description (DIFFERENT from difficulty)
 ```
 
 ### Optional Settings (JSONB)
@@ -103,15 +109,15 @@ settings: {
 ### Status & Progress
 
 ```typescript
-generation_status: string;  // Workflow status
+generation_status: string; // Workflow status
 generation_progress: number; // 0-100
 ```
 
 ### Generated Results
 
 ```typescript
-course_structure: object;   // JSONB - Course outline
-analysis_result: object;    // JSONB - Stage 4 analysis
+course_structure: object; // JSONB - Course outline
+analysis_result: object; // JSONB - Stage 4 analysis
 ```
 
 ---
@@ -196,14 +202,17 @@ analysis_result: object;    // JSONB - Stage 4 analysis
 ## Data Flow
 
 ### Stage 2: File Upload & Processing
+
 1. `generation.uploadFile` → Save file → Create `file_catalog` entry
 2. `generation.initiate` → Create DocumentProcessingJob per file
 
 ### Stage 3: Summarization
+
 - Updates `file_catalog.processed_content`
 - Sets `generation_status = 'generating_content'`
 
 ### Stage 4: Analysis
+
 1. `analysis.start` → Fetch document summaries
 2. Extract course settings (`topic`, `language`, `style`, `answers`, etc.)
 3. Create StructureAnalysisJob

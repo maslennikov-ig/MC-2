@@ -16,18 +16,18 @@ Test 10 alternative LLM models against current Qwen 3 Max baseline to find cheap
 
 ## Models to Test
 
-| Model ID | Context | Cost (per 1M tokens) | Special Features |
-|----------|---------|---------------------|------------------|
-| `qwen/qwen3-max` | 256K | $1.20 / $6.00 | **BASELINE** (current) |
-| `nousresearch/hermes-3-llama-3.1-405b` | 128K | $0.50 / $0.50 | **OSS 120B** (current tier 1) |
-| `moonshotai/kimi-k2-0905` | 200K | ? | Moonshot AI flagship |
-| `deepseek/deepseek-v3.2-exp` | 128K | ? | DeepSeek experimental |
-| `deepseek/deepseek-chat-v3.1` | 128K | $0.27 / $1.10 | DeepSeek production |
-| `qwen/qwen3-235b-a22b-thinking-2507` | 128K | ? | Qwen reasoning model |
-| `z-ai/glm-4.6` | 128K | ? | Z-AI GLM flagship |
-| `moonshotai/kimi-k2-thinking` | 200K | ? | Moonshot reasoning |
-| `x-ai/grok-4-fast` | 128K | ? | xAI Grok optimized |
-| `qwen/qwen3-32b` | 128K | $0.35 / $1.40 | Qwen compact |
+| Model ID                               | Context | Cost (per 1M tokens) | Special Features              |
+| -------------------------------------- | ------- | -------------------- | ----------------------------- |
+| `qwen/qwen3-max`                       | 256K    | $1.20 / $6.00        | **BASELINE** (current)        |
+| `nousresearch/hermes-3-llama-3.1-405b` | 128K    | $0.50 / $0.50        | **OSS 120B** (current tier 1) |
+| `moonshotai/kimi-k2-0905`              | 200K    | ?                    | Moonshot AI flagship          |
+| `deepseek/deepseek-v3.2-exp`           | 128K    | ?                    | DeepSeek experimental         |
+| `deepseek/deepseek-chat-v3.1`          | 128K    | $0.27 / $1.10        | DeepSeek production           |
+| `qwen/qwen3-235b-a22b-thinking-2507`   | 128K    | ?                    | Qwen reasoning model          |
+| `z-ai/glm-4.6`                         | 128K    | ?                    | Z-AI GLM flagship             |
+| `moonshotai/kimi-k2-thinking`          | 200K    | ?                    | Moonshot reasoning            |
+| `x-ai/grok-4-fast`                     | 128K    | ?                    | xAI Grok optimized            |
+| `qwen/qwen3-32b`                       | 128K    | $0.35 / $1.40        | Qwen compact                  |
 
 ---
 
@@ -38,10 +38,12 @@ Test 10 alternative LLM models against current Qwen 3 Max baseline to find cheap
 **Task**: Generate course-level metadata from analysis result
 
 **Input** (NO RAG, minimal context):
+
 - `analysis_result`: Course topic + complexity + recommended structure (~2K tokens)
 - `frontend_parameters`: User preferences (course_title override, difficulty)
 
 **Output**: JSON with:
+
 ```typescript
 {
   course_title: string,           // 5-60 chars
@@ -54,6 +56,7 @@ Test 10 alternative LLM models against current Qwen 3 Max baseline to find cheap
 ```
 
 **Test Cases** (2 total, minimal cost):
+
 1. **English, Beginner**: "Introduction to Python Programming" (simple topic, ~2K input, ~500 output tokens)
 2. **Russian, Intermediate**: "Машинное обучение для начинающих" (ML topic, ~2K input, ~500 output tokens)
 
@@ -66,11 +69,13 @@ Test 10 alternative LLM models against current Qwen 3 Max baseline to find cheap
 **Task**: Generate 1 lesson with exercises (cost-optimized: 1 lesson instead of full section)
 
 **Input** (NO RAG, minimal context):
+
 - `analysis_result`: Topic + section outline from analysis (~2K tokens)
 - `metadata`: Course metadata from Phase 1 (~500 tokens)
 - `section_index`: 0 (first section)
 
 **Output**: JSON with (1 lesson only):
+
 ```typescript
 {
   lesson_number: number,
@@ -92,6 +97,7 @@ Test 10 alternative LLM models against current Qwen 3 Max baseline to find cheap
 ```
 
 **Test Cases** (2 total, minimal cost):
+
 1. **English, Programming**: "Variables and Data Types in Python" (code-heavy, ~2.5K input, ~1500 output tokens)
 2. **Russian, Theory**: "Основы нейронных сетей" (conceptual ML, ~2.5K input, ~1200 output tokens)
 
@@ -102,22 +108,26 @@ Test 10 alternative LLM models against current Qwen 3 Max baseline to find cheap
 ## Execution Plan
 
 ### Phase 1: Setup (5 min)
+
 1. Read current prompts from `metadata-generator.ts` and `section-batch-generator.ts`
 2. Fetch OpenRouter pricing for all 10 models
 3. Create test data generator for 2 test cases per scenario (EN + RU)
 4. Set up results collection structure
 
 ### Phase 2: Parallel Execution (10-15 min)
+
 - Launch **10 parallel agents** (one per model)
 - Each agent runs **4 tests** (2 metadata + 2 lesson generation, NO RAG)
 - Total: **40 API calls** across all models (60% reduction vs original 100)
 - Estimated cost: **$4-7** (70-75% cost reduction vs $15-25)
 
 ### Phase 3: Results Collection (auto)
+
 - Save all outputs to `docs/investigations/model-evaluation-results.md`
 - Structure: Model → Test Case → Output JSON + Metadata (tokens, cost, duration)
 
 ### Phase 4: Evaluation (10 min)
+
 - Manual review of quality (schema compliance, content depth, creativity)
 - Automated scoring: JSON validity, field completeness, length constraints
 - Cost-benefit analysis: quality score / cost_per_generation
@@ -166,21 +176,24 @@ Test 10 alternative LLM models against current Qwen 3 Max baseline to find cheap
 **Final Score** = (Automated Score × 0.6 + Manual Score × 0.4) / (Cost per Generation / $0.10)
 
 Example:
+
 - Model A: Quality 0.85, Cost $0.08 → Score = 0.85 / 0.8 = **1.06**
 - Model B: Quality 0.90, Cost $0.15 → Score = 0.90 / 1.5 = **0.60**
-→ Model A wins (better cost-efficiency)
+  → Model A wins (better cost-efficiency)
 
 ---
 
 ## Success Criteria
 
 ### Minimum Viable Alternative
+
 - Quality score ≥ 0.75 (vs Qwen 3 Max baseline ≥ 0.80)
 - Cost reduction ≥ 30% ($0.63 → $0.44 per course)
 - Schema compliance rate ≥ 95%
 - No critical failures (empty outputs, crashes)
 
 ### Ideal Alternative
+
 - Quality score ≥ 0.80 (matches Qwen 3 Max)
 - Cost reduction ≥ 50% ($0.63 → $0.31 per course)
 - Schema compliance rate = 100%
@@ -194,34 +207,39 @@ Example:
 
 ```markdown
 # Model Evaluation Results
+
 Date: 2025-11-13
 
 ## Executive Summary
+
 - Models tested: 10
 - Test cases: 10 per model (100 total)
 - Total cost: $XX.XX
 - Winner: [model-id] (quality X.XX, cost $X.XX/gen, efficiency X.XX)
 
 ## Ranking
+
 1. [model-id] - Quality X.XX | Cost $X.XX | Efficiency X.XX
 2. ...
 
 ## Detailed Results
 
 ### Model: qwen/qwen3-max (BASELINE)
+
 - **Pricing**: $1.20 input / $6.00 output per 1M tokens
 - **Total cost**: $X.XX
 - **Avg quality**: 0.XX
 - **Schema compliance**: XX%
 
 #### Test 1: Metadata - English Beginner No RAG
+
 **Input**: "Introduction to Python Programming"
 **Output**:
 \`\`\`json
 {
-  "course_title": "Python Programming: From Zero to Hero",
-  "description": "Learn Python fundamentals...",
-  ...
+"course_title": "Python Programming: From Zero to Hero",
+"description": "Learn Python fundamentals...",
+...
 }
 \`\`\`
 **Metrics**: tokens=XXXX, cost=$X.XX, duration=XXs, quality=0.XX
@@ -229,6 +247,7 @@ Date: 2025-11-13
 ...
 
 ### Model: deepseek/deepseek-chat-v3.1
+
 ...
 ```
 
@@ -237,17 +256,20 @@ Date: 2025-11-13
 ## Implementation Notes
 
 ### Agent Architecture
+
 - **Orchestrator**: Main agent that launches 10 parallel workers
 - **Worker agents**: Each tests 1 model × 10 test cases
 - **Shared context**: Test prompts, evaluation criteria, result template
 
 ### Error Handling
+
 - Retry logic: 3 attempts per API call (exponential backoff)
 - Timeout: 120s per generation
 - Invalid JSON: log raw output, mark as schema compliance failure
 - API errors: log error, skip model (don't block others)
 
 ### Cost Protection
+
 - Hard limit: **$10 total spend** (reduced from $30)
 - Per-model limit: **$1.50** (reduced from $5)
 - If limit hit: stop that model, continue others
@@ -278,6 +300,7 @@ Date: 2025-11-13
 6. **OSS 120B**: Current tier 1 model, validation baseline
 
 ### Models NOT Tested (why)
+
 - **GPT-4**: Too expensive ($10+ input, $30+ output)
 - **Claude 3.5 Sonnet**: No JSON mode, high cost
 - **Gemini 2.5 Flash**: Already tier 3 fallback, tested separately
@@ -288,6 +311,7 @@ Date: 2025-11-13
 ## Appendix B: Risk Analysis
 
 ### Risks
+
 1. **Quality degradation**: New model generates low-quality courses → mitigate with A/B testing
 2. **Schema drift**: Model ignores JSON schema → add stricter validation + retry logic
 3. **Cost overrun during testing**: 10 models × 10 tests = 100 API calls → set hard limits ($30)
@@ -295,6 +319,7 @@ Date: 2025-11-13
 5. **Vendor lock-in**: Switching to proprietary model (Kimi, GLM) → prefer open alternatives
 
 ### Mitigation
+
 - Run evaluation on **test environment** first
 - Use **feature flags** for gradual production rollout
 - Monitor **quality scores** (Jina-v3 similarity) in real-time
@@ -304,22 +329,24 @@ Date: 2025-11-13
 
 ## Cost Optimization Summary
 
-| Optimization | Original Plan | Optimized Plan | Savings |
-|--------------|---------------|----------------|---------|
-| Test cases per scenario | 5 | 2 (EN + RU) | -60% |
-| Section output | Full section (2-3 lessons) | 1 lesson only | -66% |
-| RAG context | 15-40K tokens | 0 tokens (removed) | -100% |
-| **Total API calls** | **100** | **40** | **-60%** |
-| **Estimated cost** | **$15-25** | **$4-7** | **-70%** |
-| **Duration** | **40 min** | **20 min** | **-50%** |
+| Optimization            | Original Plan              | Optimized Plan     | Savings  |
+| ----------------------- | -------------------------- | ------------------ | -------- |
+| Test cases per scenario | 5                          | 2 (EN + RU)        | -60%     |
+| Section output          | Full section (2-3 lessons) | 1 lesson only      | -66%     |
+| RAG context             | 15-40K tokens              | 0 tokens (removed) | -100%    |
+| **Total API calls**     | **100**                    | **40**             | **-60%** |
+| **Estimated cost**      | **$15-25**                 | **$4-7**           | **-70%** |
+| **Duration**            | **40 min**                 | **20 min**         | **-50%** |
 
 **Key Changes**:
+
 1. ✅ Removed RAG testing (no test data available)
 2. ✅ Reduced test cases from 5 to 2 per scenario (EN + RU coverage)
 3. ✅ Generate 1 lesson instead of full section (sufficient for quality assessment)
 4. ✅ Reduced input context from 15-40K to ~2-2.5K tokens
 
 **Retained Quality**:
+
 - Still testing 10 models (full coverage)
 - Both languages tested (English + Russian)
 - Both scenarios tested (metadata + lesson generation)

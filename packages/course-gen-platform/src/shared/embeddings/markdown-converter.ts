@@ -205,13 +205,16 @@ export async function convertDocumentToMarkdown(
     // Get Markdown from Docling MCP server
     const rawMarkdown = await client.convertToMarkdown(filePath);
 
-    logger.info({
-      markdown_length: rawMarkdown.length,
-      texts_count: doclingDoc.texts?.length || 0,
-      pictures_count: doclingDoc.pictures?.length || 0,
-      tables_count: doclingDoc.tables?.length || 0,
-      pages_count: Object.keys(doclingDoc.pages || {}).length,
-    }, 'Document converted by Docling with full metadata');
+    logger.info(
+      {
+        markdown_length: rawMarkdown.length,
+        texts_count: doclingDoc.texts?.length || 0,
+        pictures_count: doclingDoc.pictures?.length || 0,
+        tables_count: doclingDoc.tables?.length || 0,
+        pages_count: Object.keys(doclingDoc.pages || {}).length,
+      },
+      'Document converted by Docling with full metadata'
+    );
 
     // Extract images metadata
     const images = extractImageMetadata(doclingDoc, opts);
@@ -248,20 +251,23 @@ export async function convertDocumentToMarkdown(
       },
     };
 
-    logger.info({
-      processing_time_ms: processingTime,
-      markdown_length: enhancedMarkdown.length,
-      images: images.length,
-      sections: structure.sections.length,
-    }, 'Markdown conversion completed');
+    logger.info(
+      {
+        processing_time_ms: processingTime,
+        markdown_length: enhancedMarkdown.length,
+        images: images.length,
+        sections: structure.sections.length,
+      },
+      'Markdown conversion completed'
+    );
 
     return result;
   } catch (error) {
-    logger.error({ err: error instanceof Error ? error.message : String(error), filePath }, 'Markdown conversion failed');
-    throw new MarkdownConversionError(
-      'Failed to convert document to markdown',
-      error
+    logger.error(
+      { err: error instanceof Error ? error.message : String(error), filePath },
+      'Markdown conversion failed'
     );
+    throw new MarkdownConversionError('Failed to convert document to markdown', error);
   }
 }
 
@@ -356,10 +362,7 @@ function extractImageMetadata(
  * This function parses the markdown text to build a hierarchical
  * structure of sections based on heading levels.
  */
-function extractDocumentStructure(
-  document: DoclingDocument,
-  markdown: string
-): DocumentStructure {
+function extractDocumentStructure(document: DoclingDocument, markdown: string): DocumentStructure {
   const lines = markdown.split('\n');
   const sections: DocumentSection[] = [];
   const heading_counts = { h1: 0, h2: 0, h3: 0, h4: 0, h5: 0, h6: 0 };
@@ -426,9 +429,10 @@ function extractDocumentStructure(
  */
 function findPageNumberForHeading(document: DoclingDocument, heading: string): number {
   // Look for text elements that match or contain the heading
-  const matchingText = document.texts.find(text =>
-    text.text.toLowerCase().includes(heading.toLowerCase()) &&
-    (text.type === 'heading' || text.type === 'title')
+  const matchingText = document.texts.find(
+    text =>
+      text.text.toLowerCase().includes(heading.toLowerCase()) &&
+      (text.type === 'heading' || text.type === 'title')
   );
 
   return matchingText?.page_no ?? 1;
@@ -443,9 +447,7 @@ function embedOCRTextInMarkdown(markdown: string, images: ImageMetadata[]): stri
   for (const image of images) {
     if (image.ocr_text && image.ocr_text.trim()) {
       // Find image reference in markdown
-      const imageRef = image.caption
-        ? `![${image.caption}]`
-        : `![Image ${image.id}]`;
+      const imageRef = image.caption ? `![${image.caption}]` : `![Image ${image.id}]`;
 
       // Add OCR text as a blockquote after image
       const ocrBlock = `\n\n> **OCR Text from Image:**\n> ${image.ocr_text.replace(/\n/g, '\n> ')}\n`;
@@ -500,10 +502,7 @@ function convertTextElementToMarkdown(
     case 'heading':
     case 'title': {
       // Determine heading level from font size or order
-      const level = Math.min(
-        determineHeadingLevel(text),
-        options.max_heading_level
-      );
+      const level = Math.min(determineHeadingLevel(text), options.max_heading_level);
       return `${'#'.repeat(level)} ${content}`;
     }
 
@@ -586,7 +585,9 @@ function convertTableToMarkdown(table: DoclingTable): string {
  */
 function convertImageToMarkdown(picture: DoclingPicture): string {
   const alt = picture.caption || `Image on page ${picture.page_no}`;
-  const path = picture.data ? `data:image/${picture.format || 'png'};base64,${picture.data}` : `image_${picture.id}.${picture.format || 'png'}`;
+  const path = picture.data
+    ? `data:image/${picture.format || 'png'};base64,${picture.data}`
+    : `image_${picture.id}.${picture.format || 'png'}`;
 
   let markdown = `![${alt}](${path})`;
 
@@ -602,7 +603,10 @@ function convertImageToMarkdown(picture: DoclingPicture): string {
  * Custom error class for markdown conversion
  */
 export class MarkdownConversionError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  constructor(
+    message: string,
+    public cause?: unknown
+  ) {
     super(message);
     this.name = 'MarkdownConversionError';
   }

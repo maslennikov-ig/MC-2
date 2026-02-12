@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 35 (no optimization needed)
+ * Current rule count: 50 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -206,6 +206,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Patcher edit failed - counted toward lock limit, will retry or escalate',
   },
   {
+    pattern: /Patcher.*REJECTED.*truncated/i,
+    reason: 'graceful_fallback',
+    description: 'Patcher detected truncated content, returns original safely - correct behavior',
+  },
+  {
     pattern: /No RAG chunks found for section/i,
     reason: 'expected_behavior',
     description: 'Course without documents - content generated without reference materials',
@@ -230,12 +235,41 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'job_lifecycle',
     description: 'Worker TTL timeout (10 min) - job exceeded max time, will be retried',
   },
+  {
+    pattern: /could not renew lock for job/i,
+    reason: 'job_lifecycle',
+    description:
+      'BullMQ lock renewal failed during long-running job - will be restarted automatically',
+  },
+  {
+    pattern: /Missing key for job.*moveToDelayed/i,
+    reason: 'job_lifecycle',
+    description: 'BullMQ race condition during job delay - job already completed or removed',
+  },
 
   // === Expected HTTP Responses ===
   {
     pattern: /\/trpc\/.*401/i,
     reason: 'expected_behavior',
     description: 'Unauthenticated tRPC request - 401 is correct response',
+  },
+  {
+    pattern: /Job \d+ not found/i,
+    reason: 'expected_behavior',
+    description: 'Frontend polls job status after job record cleanup - expected race condition',
+  },
+
+  // === Heuristic False Positives ===
+  {
+    pattern: /Critical language consistency failure/i,
+    reason: 'expected_behavior',
+    description:
+      'Language heuristic false positive - Cyrillic detected as foreign in Russian courses',
+  },
+  {
+    pattern: /Critical heuristic failures detected.*skipping LLM review/i,
+    reason: 'expected_behavior',
+    description: 'Heuristic check skipped LLM review due to false positive language detection',
   },
 
   // === Cache & Config Warnings ===
@@ -248,6 +282,97 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /ModelConfigBunker.*sync.*fail/i,
     reason: 'external_service',
     description: 'ModelConfigBunker network issue - has retry with exponential backoff',
+  },
+  {
+    pattern: /Failed to log generation trace/i,
+    reason: 'expected_behavior',
+    description: 'Trace insert failed during connection pool pressure - non-blocking telemetry',
+  },
+
+  // === Preprocessing Fallbacks ===
+  {
+    pattern: /Preprocessing failed.*using raw output/i,
+    reason: 'graceful_fallback',
+    description: 'Preprocessing failed, using raw LLM output - graceful degradation',
+  },
+
+  // === Stage 5 Model Fallbacks ===
+  {
+    pattern: /Stage 5.*Primary model attempt failed/i,
+    reason: 'cascading_repair',
+    description: 'Stage 5 primary model unavailable, will retry with fallback - expected behavior',
+  },
+
+  // === JSON Repair Exhaustion ===
+  {
+    pattern: /JSON repair failed after all strategies/i,
+    reason: 'graceful_fallback',
+    description:
+      'JSON repair exhausted all strategies - LLM output too malformed, will retry with different model',
+  },
+
+  // === ModelConfigBunker LKG File Write ===
+  {
+    pattern: /\[ModelConfigBunker\] Failed to update LKG file/i,
+    reason: 'graceful_fallback',
+    description:
+      'LKG file atomic write race condition (ENOENT on .tmp rename) - has Redis+DB fallback layers',
+  },
+
+  // === Rate Limiting ===
+  {
+    pattern: /Rate limit exceeded/i,
+    reason: 'expected_behavior',
+    description: 'tRPC rate limiter working as designed - user exceeded request quota',
+  },
+  {
+    pattern: /\/trpc\/lessonContent\.partialGenerate 429/i,
+    reason: 'expected_behavior',
+    description: 'HTTP 429 from rate limiter on partial generate - expected behavior',
+  },
+
+  // === HTTP-level Job Status Warnings ===
+  {
+    pattern: /\/trpc\/jobs\.getStatus 404/i,
+    reason: 'expected_behavior',
+    description: 'HTTP 404 from job status poll after job cleanup - expected race condition',
+  },
+
+  // === Sufficiency Verdict Fallback ===
+  {
+    pattern: /Sufficiency verdict validation failed.*defaulting/i,
+    reason: 'graceful_fallback',
+    description: 'Phase 0.5 Zod validation fallback - defaults to sufficient, non-blocking',
+  },
+
+  // === Stage 5 Section Materialization Fallbacks ===
+  {
+    pattern: /Batch section insert failed.*falling back to individual/i,
+    reason: 'graceful_fallback',
+    description:
+      'Batch section insert hit duplicate constraint - falls back to individual inserts safely',
+  },
+  {
+    pattern: /Failed to create section record \(may already exist\)/i,
+    reason: 'graceful_fallback',
+    description:
+      'Individual section insert skipped due to duplicate constraint - section already exists',
+  },
+
+  // === Content Policy Rejections ===
+  {
+    pattern: /Unavailable For Legal Reasons|content policy violation/i,
+    reason: 'content_policy',
+    description:
+      'Jina API rejected document due to content policy (PII, legal restrictions) - user-facing error, not a bug',
+  },
+
+  // === Stage 6 Content Sanity Check ===
+  {
+    pattern: /Content failed sanity check \(non-blocking/i,
+    reason: 'expected_behavior',
+    description:
+      'Content sanity check warning (e.g. NO_HEADINGS) - non-blocking, content still accepted',
   },
 ];
 

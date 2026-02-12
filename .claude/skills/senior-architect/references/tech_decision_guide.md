@@ -6,17 +6,17 @@ Decision frameworks and comparison matrices for choosing technologies in the Meg
 
 ### Comparison Matrix
 
-| Criteria | PostgreSQL (Supabase) | MongoDB | Redis | SQLite |
-|----------|----------------------|---------|-------|--------|
-| **ACID compliance** | ✅ Full | ⚠️ Limited | ❌ No | ✅ Full |
-| **Schema flexibility** | ⚠️ Rigid | ✅ Very flexible | ✅ Schemaless | ⚠️ Rigid |
-| **Query performance** | ✅ Excellent | ✅ Good | ✅ Excellent | ✅ Good |
-| **Scalability** | ✅ Vertical + Horizontal | ✅ Horizontal | ✅ Horizontal | ❌ Single file |
-| **RLS (Row Level Security)** | ✅ Native | ❌ No | ❌ No | ❌ No |
-| **Full-text search** | ✅ Built-in | ✅ Built-in | ❌ No | ✅ FTS5 |
-| **JSON support** | ✅ JSONB | ✅ Native | ✅ JSON | ✅ JSON1 |
-| **Real-time subscriptions** | ✅ Supabase | ✅ Change streams | ✅ Pub/Sub | ❌ No |
-| **Cost (managed)** | $$ | $$ | $ | Free (self-hosted) |
+| Criteria                     | PostgreSQL (Supabase)    | MongoDB           | Redis         | SQLite             |
+| ---------------------------- | ------------------------ | ----------------- | ------------- | ------------------ |
+| **ACID compliance**          | ✅ Full                  | ⚠️ Limited        | ❌ No         | ✅ Full            |
+| **Schema flexibility**       | ⚠️ Rigid                 | ✅ Very flexible  | ✅ Schemaless | ⚠️ Rigid           |
+| **Query performance**        | ✅ Excellent             | ✅ Good           | ✅ Excellent  | ✅ Good            |
+| **Scalability**              | ✅ Vertical + Horizontal | ✅ Horizontal     | ✅ Horizontal | ❌ Single file     |
+| **RLS (Row Level Security)** | ✅ Native                | ❌ No             | ❌ No         | ❌ No              |
+| **Full-text search**         | ✅ Built-in              | ✅ Built-in       | ❌ No         | ✅ FTS5            |
+| **JSON support**             | ✅ JSONB                 | ✅ Native         | ✅ JSON       | ✅ JSON1           |
+| **Real-time subscriptions**  | ✅ Supabase              | ✅ Change streams | ✅ Pub/Sub    | ❌ No              |
+| **Cost (managed)**           | $$                       | $$                | $             | Free (self-hosted) |
 
 ### Decision Tree
 
@@ -36,6 +36,7 @@ Do you need ACID transactions?
 ### Use Cases
 
 **PostgreSQL (Supabase)** - Current choice ✅
+
 - Multi-tenant applications
 - Relational data (courses, lessons, organizations)
 - Row-level security required
@@ -43,6 +44,7 @@ Do you need ACID transactions?
 - Real-time subscriptions
 
 **Redis** - For caching
+
 - Session storage
 - Rate limiting
 - Caching API responses
@@ -50,11 +52,13 @@ Do you need ACID transactions?
 - Temporary data
 
 **MongoDB** - Not recommended for this project
+
 - Rapidly changing schema
 - Document-oriented data
 - No complex joins needed
 
 **SQLite** - For local development
+
 - Embedded databases
 - Mobile apps
 - Single-user applications
@@ -63,16 +67,16 @@ Do you need ACID transactions?
 
 ### Comparison Matrix
 
-| Criteria | Zustand | Redux Toolkit | React Context | Jotai | Valtio |
-|----------|---------|---------------|---------------|-------|--------|
-| **Bundle size** | 1.2 KB | 11 KB | 0 KB | 3 KB | 4 KB |
-| **Learning curve** | Low | High | Low | Medium | Low |
-| **DevTools** | ✅ Yes | ✅ Excellent | ❌ No | ✅ Yes | ✅ Yes |
-| **TypeScript** | ✅ Excellent | ✅ Good | ✅ Good | ✅ Excellent | ✅ Good |
-| **Boilerplate** | Minimal | High | Minimal | Minimal | Minimal |
-| **Performance** | ✅ Excellent | ✅ Good | ⚠️ Re-render issues | ✅ Excellent | ✅ Good |
-| **Middleware** | ✅ Yes | ✅ Yes | ❌ No | ⚠️ Limited | ⚠️ Limited |
-| **Immer support** | ✅ Native | ✅ Built-in | ❌ Manual | ✅ Via plugin | ✅ Built-in |
+| Criteria           | Zustand      | Redux Toolkit | React Context       | Jotai         | Valtio      |
+| ------------------ | ------------ | ------------- | ------------------- | ------------- | ----------- |
+| **Bundle size**    | 1.2 KB       | 11 KB         | 0 KB                | 3 KB          | 4 KB        |
+| **Learning curve** | Low          | High          | Low                 | Medium        | Low         |
+| **DevTools**       | ✅ Yes       | ✅ Excellent  | ❌ No               | ✅ Yes        | ✅ Yes      |
+| **TypeScript**     | ✅ Excellent | ✅ Good       | ✅ Good             | ✅ Excellent  | ✅ Good     |
+| **Boilerplate**    | Minimal      | High          | Minimal             | Minimal       | Minimal     |
+| **Performance**    | ✅ Excellent | ✅ Good       | ⚠️ Re-render issues | ✅ Excellent  | ✅ Good     |
+| **Middleware**     | ✅ Yes       | ✅ Yes        | ❌ No               | ⚠️ Limited    | ⚠️ Limited  |
+| **Immer support**  | ✅ Native    | ✅ Built-in   | ❌ Manual           | ✅ Via plugin | ✅ Built-in |
 
 ### Decision Tree
 
@@ -95,6 +99,7 @@ What type of state are you managing?
 ### Use Cases
 
 **Zustand + Immer** - Current choice ✅
+
 ```typescript
 // When to use:
 // - Complex nested state
@@ -106,17 +111,19 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 const useStore = create<State>()(
-  immer((set) => ({
+  immer(set => ({
     history: [],
-    openDetail: (id) => set((state) => {
-      state.history.push(state.current);
-      state.current = { view: 'detail', id };
-    }),
+    openDetail: id =>
+      set(state => {
+        state.history.push(state.current);
+        state.current = { view: 'detail', id };
+      }),
   }))
 );
 ```
 
 **React Context** - For simple cases
+
 ```typescript
 // When to use:
 // - Theme switching
@@ -128,6 +135,7 @@ const ThemeContext = createContext<Theme>('light');
 ```
 
 **TanStack Query** - For server state
+
 ```typescript
 // When to use:
 // - API data fetching
@@ -142,6 +150,7 @@ const { data } = useQuery({
 ```
 
 **Redux Toolkit** - Not recommended unless:
+
 - Team already familiar
 - Need time-travel debugging
 - Complex state machine logic
@@ -150,16 +159,16 @@ const { data } = useQuery({
 
 ### Comparison Matrix
 
-| Criteria | tRPC | GraphQL | REST | gRPC |
-|----------|------|---------|------|------|
-| **Type safety** | ✅ End-to-end | ⚠️ Codegen needed | ❌ Manual | ✅ Protobuf |
-| **Learning curve** | Low | High | Low | High |
-| **Tooling** | Good | Excellent | Excellent | Good |
-| **Caching** | Manual | Built-in | Manual | Manual |
-| **Batching** | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes |
-| **Real-time** | ⚠️ Via WebSocket | ✅ Subscriptions | ⚠️ SSE/WebSocket | ✅ Streaming |
-| **Bundle size** | Small | Large | N/A | Medium |
-| **Public API** | ❌ No | ✅ Yes | ✅ Yes | ⚠️ Limited |
+| Criteria           | tRPC             | GraphQL           | REST             | gRPC         |
+| ------------------ | ---------------- | ----------------- | ---------------- | ------------ |
+| **Type safety**    | ✅ End-to-end    | ⚠️ Codegen needed | ❌ Manual        | ✅ Protobuf  |
+| **Learning curve** | Low              | High              | Low              | High         |
+| **Tooling**        | Good             | Excellent         | Excellent        | Good         |
+| **Caching**        | Manual           | Built-in          | Manual           | Manual       |
+| **Batching**       | ✅ Yes           | ✅ Yes            | ❌ No            | ✅ Yes       |
+| **Real-time**      | ⚠️ Via WebSocket | ✅ Subscriptions  | ⚠️ SSE/WebSocket | ✅ Streaming |
+| **Bundle size**    | Small            | Large             | N/A              | Medium       |
+| **Public API**     | ❌ No            | ✅ Yes            | ✅ Yes           | ⚠️ Limited   |
 
 ### Decision Tree
 
@@ -186,6 +195,7 @@ Do you control both client and server?
 ### Use Cases
 
 **tRPC** - Current choice ✅
+
 ```typescript
 // When to use:
 // - Monorepo with shared TypeScript
@@ -202,6 +212,7 @@ const { data } = trpc.courses.list.useQuery();
 ```
 
 **REST** - For public APIs
+
 ```typescript
 // When to use:
 // - Public API endpoints
@@ -215,6 +226,7 @@ export async function GET(request: Request) {
 ```
 
 **GraphQL** - Not recommended unless:
+
 - Complex nested data requirements
 - Mobile clients with bandwidth constraints
 - Need for real-time subscriptions
@@ -223,18 +235,19 @@ export async function GET(request: Request) {
 
 ### Comparison Matrix
 
-| Criteria | pnpm | npm | yarn | bun |
-|----------|------|-----|------|-----|
-| **Disk usage** | ✅ Minimal | ❌ High | ⚠️ Medium | ✅ Minimal |
-| **Install speed** | ✅ Fast | ⚠️ Slow | ✅ Fast | ✅ Very fast |
-| **Monorepo** | ✅ Excellent | ⚠️ Workspaces | ✅ Good | ✅ Good |
-| **Node compatibility** | ✅ Excellent | ✅ Excellent | ✅ Excellent | ⚠️ Good |
-| **Lock file merge** | ✅ Easy | ⚠️ Conflicts | ⚠️ Conflicts | ✅ Easy |
-| **Stability** | ✅ Stable | ✅ Stable | ✅ Stable | ⚠️ Beta |
+| Criteria               | pnpm         | npm           | yarn         | bun          |
+| ---------------------- | ------------ | ------------- | ------------ | ------------ |
+| **Disk usage**         | ✅ Minimal   | ❌ High       | ⚠️ Medium    | ✅ Minimal   |
+| **Install speed**      | ✅ Fast      | ⚠️ Slow       | ✅ Fast      | ✅ Very fast |
+| **Monorepo**           | ✅ Excellent | ⚠️ Workspaces | ✅ Good      | ✅ Good      |
+| **Node compatibility** | ✅ Excellent | ✅ Excellent  | ✅ Excellent | ⚠️ Good      |
+| **Lock file merge**    | ✅ Easy      | ⚠️ Conflicts  | ⚠️ Conflicts | ✅ Easy      |
+| **Stability**          | ✅ Stable    | ✅ Stable     | ✅ Stable    | ⚠️ Beta      |
 
 ### Use Cases
 
 **pnpm** - Current choice ✅
+
 ```bash
 # Why we chose pnpm:
 # 1. Monorepo support (workspace:* protocol)
@@ -252,18 +265,19 @@ pnpm add -D -w prettier
 
 ### Comparison Matrix
 
-| Criteria | Zod | Yup | Joi | io-ts |
-|----------|-----|-----|-----|-------|
-| **TypeScript** | ✅ Native | ⚠️ TS support | ⚠️ TS support | ✅ Native |
-| **Type inference** | ✅ Excellent | ⚠️ Manual | ⚠️ Manual | ✅ Good |
-| **Bundle size** | 8 KB | 16 KB | 160 KB | 12 KB |
-| **Error messages** | ✅ Good | ✅ Good | ✅ Good | ⚠️ Verbose |
-| **Schema composition** | ✅ Excellent | ✅ Good | ✅ Good | ✅ Good |
-| **Runtime safety** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| Criteria               | Zod          | Yup           | Joi           | io-ts      |
+| ---------------------- | ------------ | ------------- | ------------- | ---------- |
+| **TypeScript**         | ✅ Native    | ⚠️ TS support | ⚠️ TS support | ✅ Native  |
+| **Type inference**     | ✅ Excellent | ⚠️ Manual     | ⚠️ Manual     | ✅ Good    |
+| **Bundle size**        | 8 KB         | 16 KB         | 160 KB        | 12 KB      |
+| **Error messages**     | ✅ Good      | ✅ Good       | ✅ Good       | ⚠️ Verbose |
+| **Schema composition** | ✅ Excellent | ✅ Good       | ✅ Good       | ✅ Good    |
+| **Runtime safety**     | ✅ Yes       | ✅ Yes        | ✅ Yes        | ✅ Yes     |
 
 ### Use Cases
 
 **Zod** - Current choice ✅
+
 ```typescript
 // Why we chose Zod:
 // 1. TypeScript-first design
@@ -292,18 +306,19 @@ publicProcedure
 
 ### Comparison Matrix
 
-| Criteria | Tailwind CSS | CSS Modules | Styled Components | Emotion | Vanilla CSS |
-|----------|--------------|-------------|-------------------|---------|-------------|
-| **Bundle size** | ⚠️ Medium | ✅ None | ❌ Large | ⚠️ Medium | ✅ None |
-| **Runtime overhead** | ✅ None | ✅ None | ❌ Yes | ⚠️ Small | ✅ None |
-| **Type safety** | ❌ No | ❌ No | ✅ Yes | ✅ Yes | ❌ No |
-| **Themability** | ✅ Good | ⚠️ Manual | ✅ Excellent | ✅ Excellent | ⚠️ Manual |
-| **Developer UX** | ✅ Excellent | ✅ Good | ✅ Good | ✅ Good | ⚠️ Verbose |
-| **SSR support** | ✅ Yes | ✅ Yes | ⚠️ Config needed | ⚠️ Config needed | ✅ Yes |
+| Criteria             | Tailwind CSS | CSS Modules | Styled Components | Emotion          | Vanilla CSS |
+| -------------------- | ------------ | ----------- | ----------------- | ---------------- | ----------- |
+| **Bundle size**      | ⚠️ Medium    | ✅ None     | ❌ Large          | ⚠️ Medium        | ✅ None     |
+| **Runtime overhead** | ✅ None      | ✅ None     | ❌ Yes            | ⚠️ Small         | ✅ None     |
+| **Type safety**      | ❌ No        | ❌ No       | ✅ Yes            | ✅ Yes           | ❌ No       |
+| **Themability**      | ✅ Good      | ⚠️ Manual   | ✅ Excellent      | ✅ Excellent     | ⚠️ Manual   |
+| **Developer UX**     | ✅ Excellent | ✅ Good     | ✅ Good           | ✅ Good          | ⚠️ Verbose  |
+| **SSR support**      | ✅ Yes       | ✅ Yes      | ⚠️ Config needed  | ⚠️ Config needed | ✅ Yes      |
 
 ### Use Cases
 
 **Tailwind CSS** - Current choice ✅
+
 ```typescript
 // Why we chose Tailwind:
 // 1. Utility-first (fast development)
@@ -318,6 +333,7 @@ publicProcedure
 ```
 
 **CSS Modules** - For component-specific styles
+
 ```css
 /* CourseCard.module.css */
 .card {
@@ -327,6 +343,7 @@ publicProcedure
 ```
 
 **Styled Components** - Not recommended unless:
+
 - Need runtime theming
 - Component library development
 
@@ -334,18 +351,19 @@ publicProcedure
 
 ### Comparison Matrix
 
-| Criteria | Vitest | Jest | Playwright | Cypress |
-|----------|--------|------|------------|---------|
-| **Speed** | ✅ Very fast | ⚠️ Slower | ✅ Fast | ⚠️ Slower |
-| **Vite support** | ✅ Native | ❌ Config needed | N/A | N/A |
-| **TypeScript** | ✅ Native | ⚠️ Config needed | ✅ Good | ✅ Good |
-| **Watch mode** | ✅ Excellent | ✅ Good | ❌ No | ⚠️ Limited |
-| **E2E testing** | ❌ No | ❌ No | ✅ Excellent | ✅ Good |
-| **Parallel tests** | ✅ Yes | ✅ Yes | ✅ Yes | ⚠️ Limited |
+| Criteria           | Vitest       | Jest             | Playwright   | Cypress    |
+| ------------------ | ------------ | ---------------- | ------------ | ---------- |
+| **Speed**          | ✅ Very fast | ⚠️ Slower        | ✅ Fast      | ⚠️ Slower  |
+| **Vite support**   | ✅ Native    | ❌ Config needed | N/A          | N/A        |
+| **TypeScript**     | ✅ Native    | ⚠️ Config needed | ✅ Good      | ✅ Good    |
+| **Watch mode**     | ✅ Excellent | ✅ Good          | ❌ No        | ⚠️ Limited |
+| **E2E testing**    | ❌ No        | ❌ No            | ✅ Excellent | ✅ Good    |
+| **Parallel tests** | ✅ Yes       | ✅ Yes           | ✅ Yes       | ⚠️ Limited |
 
 ### Use Cases
 
 **Vitest** - For unit/integration tests
+
 ```typescript
 // Why we chose Vitest:
 // 1. Vite-native (no config)
@@ -363,6 +381,7 @@ describe('createCourse', () => {
 ```
 
 **Playwright** - For E2E tests
+
 ```typescript
 // Why we chose Playwright:
 // 1. Multiple browser support
@@ -384,18 +403,19 @@ test('create course flow', async ({ page }) => {
 
 ### Comparison Matrix
 
-| Criteria | Vercel | Netlify | AWS | Railway | Fly.io |
-|----------|--------|---------|-----|---------|--------|
-| **Next.js optimization** | ✅ Native | ✅ Good | ⚠️ Manual | ✅ Good | ✅ Good |
-| **Edge functions** | ✅ Yes | ✅ Yes | ✅ Lambda@Edge | ⚠️ Limited | ✅ Yes |
-| **Database hosting** | ❌ No | ❌ No | ✅ RDS | ✅ Postgres | ✅ Postgres |
-| **Cost (hobby)** | Free | Free | Pay-as-go | Free tier | Free tier |
-| **Automatic SSL** | ✅ Yes | ✅ Yes | ⚠️ ACM | ✅ Yes | ✅ Yes |
-| **Preview deployments** | ✅ Excellent | ✅ Good | ⚠️ Manual | ✅ Good | ✅ Good |
+| Criteria                 | Vercel       | Netlify | AWS            | Railway     | Fly.io      |
+| ------------------------ | ------------ | ------- | -------------- | ----------- | ----------- |
+| **Next.js optimization** | ✅ Native    | ✅ Good | ⚠️ Manual      | ✅ Good     | ✅ Good     |
+| **Edge functions**       | ✅ Yes       | ✅ Yes  | ✅ Lambda@Edge | ⚠️ Limited  | ✅ Yes      |
+| **Database hosting**     | ❌ No        | ❌ No   | ✅ RDS         | ✅ Postgres | ✅ Postgres |
+| **Cost (hobby)**         | Free         | Free    | Pay-as-go      | Free tier   | Free tier   |
+| **Automatic SSL**        | ✅ Yes       | ✅ Yes  | ⚠️ ACM         | ✅ Yes      | ✅ Yes      |
+| **Preview deployments**  | ✅ Excellent | ✅ Good | ⚠️ Manual      | ✅ Good     | ✅ Good     |
 
 ### Use Cases
 
 **Vercel** - For Next.js frontend
+
 ```bash
 # Why Vercel:
 # 1. Native Next.js support
@@ -407,6 +427,7 @@ vercel --prod
 ```
 
 **Railway** - For Node.js backend
+
 ```bash
 # Why Railway:
 # 1. Simple deployment
@@ -418,6 +439,7 @@ railway up
 ```
 
 **Supabase** - For database + auth
+
 ```bash
 # Why Supabase:
 # 1. Managed Postgres
@@ -430,13 +452,13 @@ railway up
 
 ### Comparison Matrix
 
-| Strategy | Use Case | Invalidation | Complexity |
-|----------|----------|--------------|------------|
-| **Redis** | Session, rate limiting | TTL + manual | Medium |
-| **CDN** | Static assets | Cache-Control headers | Low |
-| **React Query** | API responses | Time-based + manual | Low |
-| **Next.js ISR** | Static pages | Revalidate interval | Medium |
-| **Service Worker** | Offline support | Version-based | High |
+| Strategy           | Use Case               | Invalidation          | Complexity |
+| ------------------ | ---------------------- | --------------------- | ---------- |
+| **Redis**          | Session, rate limiting | TTL + manual          | Medium     |
+| **CDN**            | Static assets          | Cache-Control headers | Low        |
+| **React Query**    | API responses          | Time-based + manual   | Low        |
+| **Next.js ISR**    | Static pages           | Revalidate interval   | Medium     |
+| **Service Worker** | Offline support        | Version-based         | High       |
 
 ### Decision Tree
 
@@ -458,17 +480,18 @@ What are you caching?
 
 ### Comparison Matrix
 
-| Solution | Implementation | Security | Flexibility |
-|----------|---------------|----------|-------------|
-| **Supabase Auth** | Managed | ✅ Excellent | ⚠️ Limited |
-| **NextAuth.js** | Self-hosted | ✅ Good | ✅ Excellent |
-| **Auth0** | Managed | ✅ Excellent | ✅ Good |
-| **Clerk** | Managed | ✅ Excellent | ⚠️ Limited |
-| **Custom JWT** | Self-hosted | ⚠️ Complex | ✅ Full control |
+| Solution          | Implementation | Security     | Flexibility     |
+| ----------------- | -------------- | ------------ | --------------- |
+| **Supabase Auth** | Managed        | ✅ Excellent | ⚠️ Limited      |
+| **NextAuth.js**   | Self-hosted    | ✅ Good      | ✅ Excellent    |
+| **Auth0**         | Managed        | ✅ Excellent | ✅ Good         |
+| **Clerk**         | Managed        | ✅ Excellent | ⚠️ Limited      |
+| **Custom JWT**    | Self-hosted    | ⚠️ Complex   | ✅ Full control |
 
 ### Use Cases
 
 **Supabase Auth** - Current choice ✅
+
 ```typescript
 // Why Supabase Auth:
 // 1. Integrated with database (RLS)
@@ -482,41 +505,39 @@ const { data, error } = await supabase.auth.signInWithPassword({
 });
 
 // RLS automatically filters based on auth.uid()
-const { data } = await supabase
-  .from('courses')
-  .select('*'); // Only returns user's accessible courses
+const { data } = await supabase.from('courses').select('*'); // Only returns user's accessible courses
 ```
 
 ## Performance Metrics Targets
 
 ### Frontend (Web Vitals)
 
-| Metric | Target | Threshold |
-|--------|--------|-----------|
-| **FCP** (First Contentful Paint) | < 1.8s | < 3s |
-| **LCP** (Largest Contentful Paint) | < 2.5s | < 4s |
-| **FID** (First Input Delay) | < 100ms | < 300ms |
-| **CLS** (Cumulative Layout Shift) | < 0.1 | < 0.25 |
-| **TTFB** (Time to First Byte) | < 600ms | < 1.8s |
+| Metric                             | Target  | Threshold |
+| ---------------------------------- | ------- | --------- |
+| **FCP** (First Contentful Paint)   | < 1.8s  | < 3s      |
+| **LCP** (Largest Contentful Paint) | < 2.5s  | < 4s      |
+| **FID** (First Input Delay)        | < 100ms | < 300ms   |
+| **CLS** (Cumulative Layout Shift)  | < 0.1   | < 0.25    |
+| **TTFB** (Time to First Byte)      | < 600ms | < 1.8s    |
 
 ### Backend (API)
 
-| Metric | Target | Threshold |
-|--------|--------|-----------|
-| **Response time** (p95) | < 200ms | < 500ms |
-| **Database query time** (avg) | < 50ms | < 100ms |
-| **Cache hit rate** | > 80% | > 60% |
-| **Error rate** | < 0.1% | < 1% |
-| **Availability** | > 99.9% | > 99% |
+| Metric                        | Target  | Threshold |
+| ----------------------------- | ------- | --------- |
+| **Response time** (p95)       | < 200ms | < 500ms   |
+| **Database query time** (avg) | < 50ms  | < 100ms   |
+| **Cache hit rate**            | > 80%   | > 60%     |
+| **Error rate**                | < 0.1%  | < 1%      |
+| **Availability**              | > 99.9% | > 99%     |
 
 ### Database
 
-| Metric | Target | Action |
-|--------|--------|--------|
-| **Query time > 100ms** | 0 queries | Add index |
-| **Connection pool** | < 80% used | Scale up |
-| **Disk usage** | < 70% | Archive old data |
-| **Replication lag** | < 1s | Investigate |
+| Metric                 | Target     | Action           |
+| ---------------------- | ---------- | ---------------- |
+| **Query time > 100ms** | 0 queries  | Add index        |
+| **Connection pool**    | < 80% used | Scale up         |
+| **Disk usage**         | < 70%      | Archive old data |
+| **Replication lag**    | < 1s       | Investigate      |
 
 ## Troubleshooting Guide
 
@@ -525,6 +546,7 @@ const { data } = await supabase
 #### Issue: Slow API responses
 
 **Diagnosis:**
+
 ```bash
 # 1. Check database query performance
 EXPLAIN ANALYZE SELECT * FROM courses WHERE organization_id = 'uuid';
@@ -537,6 +559,7 @@ redis-cli INFO stats | grep hit_rate
 ```
 
 **Solutions:**
+
 ```sql
 -- Add index
 CREATE INDEX idx_courses_org_id ON courses(organization_id);
@@ -550,6 +573,7 @@ LEFT JOIN lessons ON lessons.course_id = courses.id;
 #### Issue: High memory usage (frontend)
 
 **Diagnosis:**
+
 ```typescript
 // Chrome DevTools -> Memory tab
 // Take heap snapshot, look for detached DOM nodes
@@ -559,6 +583,7 @@ LEFT JOIN lessons ON lessons.course_id = courses.id;
 ```
 
 **Solutions:**
+
 ```typescript
 // 1. Memoize expensive computations
 const value = useMemo(() => expensiveCalc(data), [data]);
@@ -576,12 +601,14 @@ useEffect(() => {
 #### Issue: Type errors after database migration
 
 **Diagnosis:**
+
 ```bash
 # Database types out of sync
 pnpm type-check
 ```
 
 **Solution:**
+
 ```bash
 # Regenerate types from database
 pnpm supabase gen types typescript --project-id PROJECT_REF \
@@ -602,6 +629,7 @@ Technology decisions should be based on:
 5. **Maintainability** - Long-term support, upgrade path
 
 Current stack rationale:
+
 - **PostgreSQL (Supabase)**: Multi-tenant RLS, ACID, type-safe
 - **tRPC**: End-to-end type safety, zero codegen
 - **Zustand + Immer**: Minimal boilerplate, excellent DX

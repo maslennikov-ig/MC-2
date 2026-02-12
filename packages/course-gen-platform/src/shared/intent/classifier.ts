@@ -13,7 +13,9 @@
 import { z } from 'zod';
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
+import { createHash } from 'crypto';
 import { logger } from '../logger/index.js';
+import { cache as redisCache } from '../cache/redis';
 
 // ============================================================================
 // Intent Schema (Zod + OpenRouter Structured Output)
@@ -85,6 +87,37 @@ export const LLM_REQUIRED_INTENTS = [
 
 export type DirectExecutionIntent = (typeof DIRECT_EXECUTION_INTENTS)[number];
 export type LLMRequiredIntent = (typeof LLM_REQUIRED_INTENTS)[number];
+
+// ============================================================================
+// Cache Configuration
+// ============================================================================
+
+/** TTL for intent classification cache. Override via INTENT_CACHE_TTL env var. */
+const INTENT_CACHE_TTL = parseInt(process.env.INTENT_CACHE_TTL || '3600', 10); // default: 1 hour
+const INTENT_CACHE_PREFIX = 'intent_class';
+const INTENT_CACHE_VERSION = 'v1';
+
+/**
+ * Build a deterministic cache key from user message and node context.
+ * Uses SHA-256 hash truncated to 16 hex chars (64 bits of entropy).
+ * Birthday paradox: ~4 billion keys for 50% collision probability — safe for cache.
+ *
+ * Includes path to avoid serving stale results for relative references
+ * like "delete this lesson" where the target depends on the user's current position.
+ */
+function buildIntentCacheKey(
+  userMessage: string,
+  nodeContext?: NodeContextForClassification
+): string {
+  const payload = JSON.stringify({
+    msg: userMessage,
+    ctx: nodeContext?.stageId || '',
+    et: nodeContext?.elementType || '',
+    path: nodeContext?.path || '',
+  });
+  const hash = createHash('sha256').update(payload).digest('hex').slice(0, 16);
+  return `${INTENT_CACHE_PREFIX}:${INTENT_CACHE_VERSION}:${hash}`;
+}
 
 // ============================================================================
 // Classification Prompt
@@ -166,6 +199,20 @@ export async function classifyIntent(
 
   const systemPrompt = CLASSIFICATION_SYSTEM_PROMPT.replace('{nodeContext}', contextDescription);
 
+  // Cache lookup: skip when a custom client is provided (testing mode)
+  const cacheKey = !client ? buildIntentCacheKey(userMessage, nodeContext) : null;
+  if (cacheKey) {
+    const cached = await redisCache.get<ClassifiedIntent>(cacheKey);
+    if (cached) {
+      logger.debug(
+        { cacheKey, intent: cached.intent, cacheStatus: 'hit' },
+        'Intent classification cache hit'
+      );
+      return cached;
+    }
+    logger.debug({ cacheKey, cacheStatus: 'miss' }, 'Intent classification cache miss');
+  }
+
   try {
     // Using zodResponseFormat to generate JSON Schema from Zod schema.
     // Note: We use chat.completions.create() instead of chat.completions.parse()
@@ -195,7 +242,7 @@ export async function classifyIntent(
       return { intent: 'UNKNOWN', confidence: 0 };
     }
 
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as unknown;
     const validated = IntentSchema.parse(parsed);
 
     logger.info(
@@ -207,6 +254,14 @@ export async function classifyIntent(
       },
       'Intent classified'
     );
+
+    // Cache successful classification (skip UNKNOWN results and testing mode)
+    if (cacheKey && validated.intent !== 'UNKNOWN') {
+      const cacheOk: boolean = await redisCache.set(cacheKey, validated, { ttl: INTENT_CACHE_TTL });
+      if (!cacheOk) {
+        logger.warn({ cacheKey }, 'Failed to cache intent classification');
+      }
+    }
 
     return validated;
   } catch (error) {

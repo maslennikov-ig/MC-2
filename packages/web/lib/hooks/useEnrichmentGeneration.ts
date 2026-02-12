@@ -2,27 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSupabase } from '@/lib/supabase/browser-client'
+import { TRPC_URL } from '@/lib/env-client'
 import type { OnDemandEnrichmentType, GenerationStep } from '@megacampus/shared-types'
-
-// Backend URL for tRPC calls (client-side)
-// In production: uses '/api' (nginx proxies /api/trpc to API server)
-// In development: uses env var or localhost:3456
-const BACKEND_URL = (() => {
-  // 1. If NEXT_PUBLIC_* is set → use it (CI/CD sets at build time)
-  const url = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL
-  if (url) return url // → '/api' for production builds
-
-  // 2. Fallback: runtime detection by hostname
-  if (typeof window !== 'undefined') {
-    const isProduction =
-      window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    if (isProduction) return '/api' // Relative URL - nginx proxies /api/trpc to API
-  }
-
-  // 3. Development fallback
-  return 'http://localhost:3456'
-})()
-const TRPC_URL = `${BACKEND_URL}/trpc`
 
 // Polling configuration
 const DEFAULT_POLLING_INTERVAL = 2000 // 2 seconds

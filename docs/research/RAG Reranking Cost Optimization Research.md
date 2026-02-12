@@ -18,7 +18,7 @@ The primary cost driver in modern Neural Reranking is the cross-attention mechan
 
 If we assume the current provider, Jina AI, charges approximately **$0.02 per 1 million tokens** (based on standard 2025 pricing tiers for their base multilingual models) 4, a $10 cost implies the processing of **500 million tokens** per course. Even with a generous markup or a legacy pricing model, this volume suggests that the system is likely reranking the entire retrieved context for every user query, or the "course" unit involves an immense amount of interactive dialogue where every turn triggers a full-context rerank.
 
-Alternatively, if the pipeline utilizes a "per search" pricing model similar to Cohere’s legacy tiers or specific enterprise contracts, the cost mechanism changes significantly. Cohere, for instance, charges **$2.00 per 1,000 search units**, where a "search unit" is defined as one query and up to 100 documents.5 Under this regime, the cost is driven by the *number of interactions* rather than the length of the text. If a student interacts with the course bot 5,000 times (a plausible number for an active semester-long engagement), the cost hits the $10 mark regardless of whether the documents are short or long. Understanding this distinction is critical: token-based pricing punishes long documents (textbooks), while request-based pricing punishes frequent interactions (chatbots).
+Alternatively, if the pipeline utilizes a "per search" pricing model similar to Cohere’s legacy tiers or specific enterprise contracts, the cost mechanism changes significantly. Cohere, for instance, charges **$2.00 per 1,000 search units**, where a "search unit" is defined as one query and up to 100 documents.5 Under this regime, the cost is driven by the _number of interactions_ rather than the length of the text. If a student interacts with the course bot 5,000 times (a plausible number for an active semester-long engagement), the cost hits the $10 mark regardless of whether the documents are short or long. Understanding this distinction is critical: token-based pricing punishes long documents (textbooks), while request-based pricing punishes frequent interactions (chatbots).
 
 ### **2.2 The Russian/English Linguistic Overhead**
 
@@ -30,9 +30,9 @@ Furthermore, the "semantic drift" in Russian retrieval often forces developers t
 
 The existing architecture likely follows a "Naive Reranking" pattern:
 
-1. **Query:** Student asks a question.  
-2. **Retrieval:** Qdrant performs a Dense Vector Search (HNSW) to retrieve the top 100 chunks.  
-3. **Reranking:** All 100 chunks are sent to the Jina API.  
+1. **Query:** Student asks a question.
+2. **Retrieval:** Qdrant performs a Dense Vector Search (HNSW) to retrieve the top 100 chunks.
+3. **Reranking:** All 100 chunks are sent to the Jina API.
 4. **Generation:** Top 5 chunks are sent to the LLM.
 
 The economic inefficiency here is the "middle mile"—processing documents ranked 20 through 100\. In 80-90% of cases, the relevant information is already in the top 20, or clearly identifiable via metadata. Paying to semantic-check the 95th document for every query is a redundancy that high-volume pipelines cannot afford.
@@ -64,13 +64,13 @@ A "search unit" allows for 100 documents. If your pipeline retrieves 100 documen
 
 The following table synthesizes the pricing and capabilities of the leading providers relevant to the Russian/English educational use case.
 
-| Provider | Model | Pricing Model | Unit Price | Russian Capability | Key Strength |
-| :---- | :---- | :---- | :---- | :---- | :---- |
-| **SiliconFlow** | Qwen3-Reranker-0.6B | Token-based | **$0.01 / 1M tokens** | High (Qwen base) | **Lowest Cost**, Long Context (32k) |
-| **Voyage AI** | rerank-2.5-lite | Token-based | $0.02 / 1M tokens | Very High | Instruction Following, Code Support |
-| **Jina AI** | jina-reranker-v2 | Token-based | \~$0.02 / 1M tokens | High | Sliding Window, Current Baseline |
-| **Mixedbread** | mxbai-rerank-base-v2 | Token-based | $0.15 / 1M tokens | High | Open Source Friendly, High Accuracy |
-| **Cohere** | Rerank 3.5 | Request-based | $2.00 / 1k searches | High | Enterprise Stability, Proven Quality |
+| Provider        | Model                | Pricing Model | Unit Price            | Russian Capability | Key Strength                         |
+| :-------------- | :------------------- | :------------ | :-------------------- | :----------------- | :----------------------------------- |
+| **SiliconFlow** | Qwen3-Reranker-0.6B  | Token-based   | **$0.01 / 1M tokens** | High (Qwen base)   | **Lowest Cost**, Long Context (32k)  |
+| **Voyage AI**   | rerank-2.5-lite      | Token-based   | $0.02 / 1M tokens     | Very High          | Instruction Following, Code Support  |
+| **Jina AI**     | jina-reranker-v2     | Token-based   | \~$0.02 / 1M tokens   | High               | Sliding Window, Current Baseline     |
+| **Mixedbread**  | mxbai-rerank-base-v2 | Token-based   | $0.15 / 1M tokens     | High               | Open Source Friendly, High Accuracy  |
+| **Cohere**      | Rerank 3.5           | Request-based | $2.00 / 1k searches   | High               | Enterprise Stability, Proven Quality |
 
 **Strategic Implication:** The immediate migration to SiliconFlow’s Qwen3-Reranker-0.6B or Voyage Lite offers a direct path to the 50% cost reduction floor requested. However, to reach the 80% target, architectural changes must accompany this vendor swap.
 
@@ -88,12 +88,13 @@ Qdrant’s native **Hybrid Search** capability combines dense vectors with spars
 
 **The Optimization Protocol:**
 
-1. **Dual Retrieval:** For every query, execute two parallel searches in Qdrant:  
-   * *Dense Branch:* Retrieve top 50 documents using the embedding model (e.g., text-embedding-3-small or multilingual-e5).  
-   * *Sparse Branch:* Retrieve top 50 documents using a sparse index (BM25/SPLADE) which is highly effective for Russian case-specific keywords.  
+1. **Dual Retrieval:** For every query, execute two parallel searches in Qdrant:
+   - _Dense Branch:_ Retrieve top 50 documents using the embedding model (e.g., text-embedding-3-small or multilingual-e5).
+   - _Sparse Branch:_ Retrieve top 50 documents using a sparse index (BM25/SPLADE) which is highly effective for Russian case-specific keywords.
 2. Fusion (RRF): Apply Reciprocal Rank Fusion to merge these two lists. RRF boosts documents that appear in both lists, acting as a high-confidence filter.
 
-   $$Score(d) \= \\sum\_{rank \\in \\text{Dense, Sparse}} \\frac{1}{k \+ rank}$$  
+   $$Score(d) \= \\sum\_{rank \\in \\text{Dense, Sparse}} \\frac{1}{k \+ rank}$$
+
 3. **Truncation:** Instead of sending the union of all documents (potentially 100), select the **top 20** from the fused list.
 
 **Impact:** Because the RRF list has far higher precision than either list alone, the likelihood of the "correct" answer being in the top 20 is statistically equivalent to it being in the top 100 of a pure dense search. This effectively **cuts the reranking volume by 80%** before the data even leaves the database.14
@@ -102,48 +103,48 @@ Qdrant’s native **Hybrid Search** capability combines dense vectors with spars
 
 For adaptive learning platforms, user interaction data is a goldmine often ignored in retrieval. Qdrant’s recommend API allows for "positive" and "negative" examples to steer the search vector.
 
-If a student has previously engaged with "Chapter 3: Linear Algebra" and asks a generic question about "Matrices," the system can use the vector of Chapter 3 as a positive bias. This moves the query vector in the latent space toward the relevant course section *before* retrieval.
+If a student has previously engaged with "Chapter 3: Linear Algebra" and asks a generic question about "Matrices," the system can use the vector of Chapter 3 as a positive bias. This moves the query vector in the latent space toward the relevant course section _before_ retrieval.
 
-* **Mechanism:** client.recommend(positive=\[doc\_id\_chapter3\], negative=\[doc\_id\_history\_course\]).  
-* **Economic Value:** This acts as a "Zero-Cost Reranker." By spatially refining the search query, the retrieved candidates are of higher quality, further justifying the reduction of $k$ sent to the paid reranker API.16
+- **Mechanism:** client.recommend(positive=\[doc_id_chapter3\], negative=\[doc_id_history_course\]).
+- **Economic Value:** This acts as a "Zero-Cost Reranker." By spatially refining the search query, the retrieved candidates are of higher quality, further justifying the reduction of $k$ sent to the paid reranker API.16
 
 ### **4.3 Metadata Filtering (The "Hard" Filter)**
 
-Educational content is highly structured (Course \-\> Module \-\> Lesson \-\> Transcript). Reranking documents from "Course B" when the student is asking about "Course A" is a waste of tokens. While obvious, strict metadata filtering in Qdrant ensures that the reranker *only* processes tokens that are strictly eligible for the answer.
+Educational content is highly structured (Course \-\> Module \-\> Lesson \-\> Transcript). Reranking documents from "Course B" when the student is asking about "Course A" is a waste of tokens. While obvious, strict metadata filtering in Qdrant ensures that the reranker _only_ processes tokens that are strictly eligible for the answer.
 
-* **Implementation:** Ensure every chunk in Qdrant has a payload: { "course\_id": "math101", "language": "ru" }.  
-* **Query Time:** Apply a Filter clause to restrict the HNSW traversal to the specific course ID. This prevents "semantic bleed" where a similar concept from a different course contaminates the candidate list.17
+- **Implementation:** Ensure every chunk in Qdrant has a payload: { "course_id": "math101", "language": "ru" }.
+- **Query Time:** Apply a Filter clause to restrict the HNSW traversal to the specific course ID. This prevents "semantic bleed" where a similar concept from a different course contaminates the candidate list.17
 
 ## ---
 
 **5\. The Sovereign Cloud: Self-Hosting for Infinite Scale**
 
-To completely decouple cost from volume—achieving a theoretical 100% reduction in *marginal* cost—the pipeline must move from a "rented" API model to an "owned" infrastructure model. This is feasible because open-weight rerankers have reached parity with proprietary APIs.
+To completely decouple cost from volume—achieving a theoretical 100% reduction in _marginal_ cost—the pipeline must move from a "rented" API model to an "owned" infrastructure model. This is feasible because open-weight rerankers have reached parity with proprietary APIs.
 
 ### **5.1 The Hardware Economics of Self-Hosting**
 
 The goal is to determine the crossover point where the fixed cost of a GPU instance is lower than the variable cost of the API.
 
-* **Hardware Candidate:** The **NVIDIA T4 (16GB VRAM)** is the industry workhorse for inference. It is widely available on AWS (g4dn.xlarge) or specialized clouds (Lambda, RunPod) for approximately **$0.35 \- $0.50 per hour**.18  
-* **Throughput:** A single T4 running a standard reranker (e.g., bge-reranker-v2-m3) can process roughly **30-50 queries per second** (assuming batches of 32 docs). This translates to millions of tokens per hour.19
+- **Hardware Candidate:** The **NVIDIA T4 (16GB VRAM)** is the industry workhorse for inference. It is widely available on AWS (g4dn.xlarge) or specialized clouds (Lambda, RunPod) for approximately **$0.35 \- $0.50 per hour**.18
+- **Throughput:** A single T4 running a standard reranker (e.g., bge-reranker-v2-m3) can process roughly **30-50 queries per second** (assuming batches of 32 docs). This translates to millions of tokens per hour.19
 
 **The Calculation:**
 
-* **API Cost:** $10 per course. If you host 50 active courses, monthly spend is $500.  
-* **Self-Hosted Cost:** One T4 instance running 24/7 costs \~$250/month (reserved).  
-* **Crossover:** If the platform manages more than \~25 courses, self-hosting becomes mathematically superior. For a platform with hundreds of courses, the savings exceed 90%.
+- **API Cost:** $10 per course. If you host 50 active courses, monthly spend is $500.
+- **Self-Hosted Cost:** One T4 instance running 24/7 costs \~$250/month (reserved).
+- **Crossover:** If the platform manages more than \~25 courses, self-hosting becomes mathematically superior. For a platform with hundreds of courses, the savings exceed 90%.
 
 ### **5.2 Model Selection: BGE-M3 vs. Qwen**
 
 For self-hosting, model selection is critical. The model must fit in GPU memory and handle the Russian/English mix.
 
-* **BAAI/bge-reranker-v2-m3:**  
-  * **Architecture:** XLM-RoBERTa based.  
-  * **Size:** \~560M parameters. Easily fits on a T4 (requires \<2GB VRAM in FP16).  
-  * **Multilingualism:** Specifically trained on MIRACL and supports 100+ languages. It is the de facto standard for open-source multilingual reranking.3  
-* **Mixedbread (mxbai-rerank-large-v1):**  
-  * **Size:** 1.5B parameters. Fits on T4 but with lower throughput.  
-  * **Performance:** Claims higher accuracy on code and technical domains, which may benefit computer science courses.22
+- **BAAI/bge-reranker-v2-m3:**
+  - **Architecture:** XLM-RoBERTa based.
+  - **Size:** \~560M parameters. Easily fits on a T4 (requires \<2GB VRAM in FP16).
+  - **Multilingualism:** Specifically trained on MIRACL and supports 100+ languages. It is the de facto standard for open-source multilingual reranking.3
+- **Mixedbread (mxbai-rerank-large-v1):**
+  - **Size:** 1.5B parameters. Fits on T4 but with lower throughput.
+  - **Performance:** Claims higher accuracy on code and technical domains, which may benefit computer science courses.22
 
 **Recommendation:** Start with **BGE-M3**. Its lightweight nature allows for massive throughput, and its performance on RusBEIR is top-tier for its size class.
 
@@ -151,19 +152,19 @@ For self-hosting, model selection is critical. The model must fit in GPU memory 
 
 Raw PyTorch inference is slow. To achieve the throughput required to beat API costs, one must use an optimized serving layer. Hugging Face’s **Text Embeddings Inference (TEI)** is a Rust-based optimized server specifically for BERT and Cross-Encoder models.23
 
-* **Features:** TEI implements **Flash Attention v2**, **Token Streaming**, and **Dynamic Batching**.  
-* **Quantization:** TEI supports on-the-fly quantization. Running BGE-M3 in **FP16** (half-precision) on a T4 doubles the throughput with negligible accuracy loss. Using **INT8** quantization (if supported by the specific model export) can further quadruple speed, though care must be taken with Russian morphology sensitivity.19
+- **Features:** TEI implements **Flash Attention v2**, **Token Streaming**, and **Dynamic Batching**.
+- **Quantization:** TEI supports on-the-fly quantization. Running BGE-M3 in **FP16** (half-precision) on a T4 doubles the throughput with negligible accuracy loss. Using **INT8** quantization (if supported by the specific model export) can further quadruple speed, though care must be taken with Russian morphology sensitivity.19
 
 **Deployment Command (Docker):**
 
 Bash
 
 docker run \--gpus all \-p 8080:80 \\  
-  \-v $PWD/data:/data \\  
-  \--pull always ghcr.io/huggingface/text-embeddings-inference:latest \\  
-  \--model-id BAAI/bge-reranker-v2-m3 \\  
-  \--revision main \\  
-  \--dtype float16
+ \-v $PWD/data:/data \\  
+ \--pull always ghcr.io/huggingface/text-embeddings-inference:latest \\  
+ \--model-id BAAI/bge-reranker-v2-m3 \\  
+ \--revision main \\  
+ \--dtype float16
 
 This single container replaces the entire Jina API dependency.
 
@@ -177,16 +178,16 @@ For environments where GPU availability is scarce or the budget is strictly zero
 
 Instead of sending 100 documents to a GPU or Paid API, we insert a lightweight, CPU-optimized reranker as a "gatekeeper."
 
-1. **Stage 1:** Qdrant retrieves 100 documents.  
-2. **Stage 2 (CPU):** A quantized "Tiny" model (e.g., ms-marco-TinyBERT or a distilled bge-micro) reranks the 100 documents locally on the application server.  
+1. **Stage 1:** Qdrant retrieves 100 documents.
+2. **Stage 2 (CPU):** A quantized "Tiny" model (e.g., ms-marco-TinyBERT or a distilled bge-micro) reranks the 100 documents locally on the application server.
 3. **Stage 3 (Final):** The Top-10 documents from Stage 2 are sent to the high-quality model (Voyage/Jina) for the final sort.
 
 ### **6.2 FlashRank Implementation**
 
 **FlashRank** is a Python library designed for this exact purpose. It wraps ONNX Runtime to execute quantized rerankers on consumer CPUs with sub-50ms latency.24
 
-* **Russian Challenge:** Most default FlashRank models are English-only (ms-marco). To use this for Russian, one must explicitly load a multilingual model that has been exported to ONNX, such as jina-reranker-v1-tiny-en (which despite the name has some multilingual capacity) or a quantized version of bge-m3-small.  
-* **Cost:** **Zero**. The compute runs on the existing web server sidecar.
+- **Russian Challenge:** Most default FlashRank models are English-only (ms-marco). To use this for Russian, one must explicitly load a multilingual model that has been exported to ONNX, such as jina-reranker-v1-tiny-en (which despite the name has some multilingual capacity) or a quantized version of bge-m3-small.
+- **Cost:** **Zero**. The compute runs on the existing web server sidecar.
 
 **Evaluation:** While attractive, the complexity of managing ONNX exports for Russian capability often outweighs the benefit compared to simply using the Hybrid Search filter (Section 4.1). Hybrid Search (Sparse/Dense) is usually a better "free" filter than a low-quality CPU reranker. We recommend this strategy only if Hybrid Search is insufficient.
 
@@ -200,16 +201,16 @@ The optimization of cost must not degrade the learning experience. Russian prese
 
 Russian is a fusional language. A query for "mathematics" (математика) must retrieve documents containing "mathematical" (математический), "mathematically" (математически), etc.
 
-* **Bi-Encoder Failure:** Standard embeddings (like older OpenAI ada-002) often treat these as distinct tokens with weak associations.  
-* **Cross-Encoder Success:** Rerankers like BGE-M3 and Qwen are trained on massive multilingual corpora where they learn these morphological connections deep in the attention layers. This is why removing the reranker entirely (and relying just on vector search) is not an option for this pipeline. The reranker is the "morphological normalizer".2
+- **Bi-Encoder Failure:** Standard embeddings (like older OpenAI ada-002) often treat these as distinct tokens with weak associations.
+- **Cross-Encoder Success:** Rerankers like BGE-M3 and Qwen are trained on massive multilingual corpora where they learn these morphological connections deep in the attention layers. This is why removing the reranker entirely (and relying just on vector search) is not an option for this pipeline. The reranker is the "morphological normalizer".2
 
 ### **7.2 Benchmark Evidence (RusBEIR)**
 
 The **RusBEIR** benchmark provides the ground truth for this analysis.
 
-* **Leaderboard Leaders:** BGE-M3 and mE5-large consistently score highest on Russian retrieval tasks (NDCG@10) among models under 1 billion parameters.  
-* **Voyage AI Claims:** Voyage explicitly cites performance gains on the MIRACL Russian dataset, positioning itself as a premium alternative to BGE.12  
-* **ZeroEntropy:** This provider claims to beat Cohere and BGE by using "Instruction Tuning" to bridge the modality gap. For example, telling the model "This is a query in Russian about Physics, find English definitions" significantly boosts cross-lingual retrieval.25
+- **Leaderboard Leaders:** BGE-M3 and mE5-large consistently score highest on Russian retrieval tasks (NDCG@10) among models under 1 billion parameters.
+- **Voyage AI Claims:** Voyage explicitly cites performance gains on the MIRACL Russian dataset, positioning itself as a premium alternative to BGE.12
+- **ZeroEntropy:** This provider claims to beat Cohere and BGE by using "Instruction Tuning" to bridge the modality gap. For example, telling the model "This is a query in Russian about Physics, find English definitions" significantly boosts cross-lingual retrieval.25
 
 **Conclusion:** If self-hosting, **BGE-M3** is the safe, proven choice for Russian. If using an API, **Voyage** is the verified premium option, while **SiliconFlow (Qwen)** is the cost leader with strong underlying multilingual architecture.
 
@@ -221,56 +222,56 @@ The following phased approach provides a secure path to cost reduction, allowing
 
 ### **Phase 1: Architectural Compression (Immediate, Zero Cost)**
 
-* **Action:** Modify the Qdrant query logic. Replace simple Dense Search with **Hybrid Search (Dense \+ Sparse)**.  
-* **Action:** Implement **Reciprocal Rank Fusion (RRF)** to merge results.  
-* **Action:** Reduce the number of documents sent to Jina from 100 (estimated) to **20**.  
-* **Expected Impact:** **80% Cost Reduction** immediately, as the paid API processes 1/5th the volume.  
-* **Risk:** Minimal. RRF often improves accuracy.
+- **Action:** Modify the Qdrant query logic. Replace simple Dense Search with **Hybrid Search (Dense \+ Sparse)**.
+- **Action:** Implement **Reciprocal Rank Fusion (RRF)** to merge results.
+- **Action:** Reduce the number of documents sent to Jina from 100 (estimated) to **20**.
+- **Expected Impact:** **80% Cost Reduction** immediately, as the paid API processes 1/5th the volume.
+- **Risk:** Minimal. RRF often improves accuracy.
 
 ### **Phase 2: Vendor Migration (Low Effort, High Return)**
 
-* **Action:** Replace the Jina AI API endpoint with **SiliconFlow (Qwen3-Reranker-0.6B)**.  
-* **Action:** Update the API key and endpoint URL in the RAG codebase.  
-* **Expected Impact:** A further **50% reduction** in unit cost (from $0.02 to $0.01).  
-* **Cumulative Savings:** Combined with Phase 1, the total cost drops from $10 to \~$1.00 (90% reduction).
+- **Action:** Replace the Jina AI API endpoint with **SiliconFlow (Qwen3-Reranker-0.6B)**.
+- **Action:** Update the API key and endpoint URL in the RAG codebase.
+- **Expected Impact:** A further **50% reduction** in unit cost (from $0.02 to $0.01).
+- **Cumulative Savings:** Combined with Phase 1, the total cost drops from $10 to \~$1.00 (90% reduction).
 
 ### **Phase 3: Infrastructure Sovereignty (Scale Solution)**
 
-* **Action:** Provision a GPU instance (T4) on a cloud provider.  
-* **Action:** Deploy **Text Embeddings Inference (TEI)** with the BAAI/bge-reranker-v2-m3 model.  
-* **Action:** Route all reranking traffic to this internal endpoint.  
-* **Trigger:** Execute this phase only if the aggregate API fees exceed \~$300/month. Below this threshold, the operational overhead of managing servers outweighs the API savings.
+- **Action:** Provision a GPU instance (T4) on a cloud provider.
+- **Action:** Deploy **Text Embeddings Inference (TEI)** with the BAAI/bge-reranker-v2-m3 model.
+- **Action:** Route all reranking traffic to this internal endpoint.
+- **Trigger:** Execute this phase only if the aggregate API fees exceed \~$300/month. Below this threshold, the operational overhead of managing servers outweighs the API savings.
 
 ## **9\. Conclusion**
 
-The $10/course cost barrier is an artifact of utilizing a high-fidelity reranker on a loosely filtered candidate set. It is a problem of *selection*, not just pricing. By implementing **Qdrant Hybrid Search** to intelligently filter candidates before they reach the expensive cross-encoder stage, the platform can achieve the majority of the requested savings without changing models.
+The $10/course cost barrier is an artifact of utilizing a high-fidelity reranker on a loosely filtered candidate set. It is a problem of _selection_, not just pricing. By implementing **Qdrant Hybrid Search** to intelligently filter candidates before they reach the expensive cross-encoder stage, the platform can achieve the majority of the requested savings without changing models.
 
 However, the commoditization of inference offers a second layer of optimization. Switching to **SiliconFlow’s Qwen-Reranker** or **Voyage Lite** provides a superior price-performance ratio for the specific Russian/English linguistic requirements of the platform. The recommended "Phase 2" state—Hybrid Search feeding a low-cost Qwen/Voyage endpoint—will reduce the per-course cost from **$10.00 to roughly $1.00**, surpassing the user's 80% reduction goal while likely improving retrieval accuracy through better filtering and modern model architectures.
 
 #### **Источники**
 
-1. we're releasing a new multilingual instruction-following reranker at ZeroEntropy\! \- Reddit, дата последнего обращения: декабря 6, 2025, [https://www.reddit.com/r/Rag/comments/1p2latf/were\_releasing\_a\_new\_multilingual/](https://www.reddit.com/r/Rag/comments/1p2latf/were_releasing_a_new_multilingual/)  
-2. Building Russian Benchmark for Evaluation of Information Retrieval Models, дата последнего обращения: декабря 6, 2025, [https://dialogue-conf.org/wp-content/uploads/2025/04/KovalevGetal.046.pdf](https://dialogue-conf.org/wp-content/uploads/2025/04/KovalevGetal.046.pdf)  
-3. Wikipedia-based Datasets in Russian Information Retrieval Benchmark RusBEIR \- arXiv, дата последнего обращения: декабря 6, 2025, [https://arxiv.org/html/2511.05079v1](https://arxiv.org/html/2511.05079v1)  
-4. pricing\_table.md \- AgentOps-AI/tokencost \- GitHub, дата последнего обращения: декабря 6, 2025, [https://github.com/AgentOps-AI/tokencost/blob/main/pricing\_table.md](https://github.com/AgentOps-AI/tokencost/blob/main/pricing_table.md)  
-5. Cohere AI pricing in 2025: A complete guide to real costs \- eesel AI, дата последнего обращения: декабря 6, 2025, [https://www.eesel.ai/blog/cohere-ai-pricing](https://www.eesel.ai/blog/cohere-ai-pricing)  
-6. Cohere Pricing Explained \- A Deep Dive into Integration & Development Costs | MetaCTO, дата последнего обращения: декабря 6, 2025, [https://www.metacto.com/blogs/cohere-pricing-explained-a-deep-dive-into-integration-development-costs](https://www.metacto.com/blogs/cohere-pricing-explained-a-deep-dive-into-integration-development-costs)  
-7. Building Russian Benchmark for Evaluation of Information Retrieval Models \- arXiv, дата последнего обращения: декабря 6, 2025, [https://arxiv.org/html/2504.12879v1](https://arxiv.org/html/2504.12879v1)  
-8. Ultimate Guide \- Best Reranker for Multilingual Search in 2025 \- SiliconFlow, дата последнего обращения: декабря 6, 2025, [https://www.siliconflow.com/articles/en/Best-reranker-for-multilingual-search](https://www.siliconflow.com/articles/en/Best-reranker-for-multilingual-search)  
-9. Qwen3-Reranker-0.6B \- Model Info, Parameters, Benchmarks \- SiliconFlow, дата последнего обращения: декабря 6, 2025, [https://www.siliconflow.com/models/qwen3-reranker-0-6b](https://www.siliconflow.com/models/qwen3-reranker-0-6b)  
-10. Pricing \- Introduction \- Voyage AI, дата последнего обращения: декабря 6, 2025, [https://docs.voyageai.com/docs/pricing](https://docs.voyageai.com/docs/pricing)  
-11. rerank-2.5 and rerank-2.5-lite: instruction-following rerankers \- Voyage AI, дата последнего обращения: декабря 6, 2025, [https://blog.voyageai.com/2025/08/11/rerank-2-5/](https://blog.voyageai.com/2025/08/11/rerank-2-5/)  
-12. rerank-2 and rerank-2-lite: the next generation of Voyage multilingual rerankers \- Voyage AI, дата последнего обращения: декабря 6, 2025, [https://blog.voyageai.com/2024/09/30/rerank-2/](https://blog.voyageai.com/2024/09/30/rerank-2/)  
-13. Hybrid Search and the Universal Query API \- Qdrant, дата последнего обращения: декабря 6, 2025, [https://qdrant.tech/course/essentials/day-3/hybrid-search/](https://qdrant.tech/course/essentials/day-3/hybrid-search/)  
-14. Demo: Implementing a Hybrid Search System \- Qdrant, дата последнего обращения: декабря 6, 2025, [https://qdrant.tech/course/essentials/day-3/hybrid-search-demo/](https://qdrant.tech/course/essentials/day-3/hybrid-search-demo/)  
-15. Hybrid Search Revamped \- Building with Qdrant's Query API, дата последнего обращения: декабря 6, 2025, [https://qdrant.tech/articles/hybrid-search/](https://qdrant.tech/articles/hybrid-search/)  
-16. Deliver Better Recommendations with Qdrant's new API, дата последнего обращения: декабря 6, 2025, [https://qdrant.tech/articles/new-recommendation-api/](https://qdrant.tech/articles/new-recommendation-api/)  
-17. Building Personalized Recommender Systems with Qdrant: A Comprehensive Guide | by Rayyan Shaikh | Medium, дата последнего обращения: декабря 6, 2025, [https://medium.com/@shaikhrayyan123/building-personalized-recommender-systems-with-qdrant-a-comprehensive-guide-caa366091dd6](https://medium.com/@shaikhrayyan123/building-personalized-recommender-systems-with-qdrant-a-comprehensive-guide-caa366091dd6)  
-18. Best GPUs for LLM inference in 2025 \- WhiteFiber, дата последнего обращения: декабря 6, 2025, [https://www.whitefiber.com/compare/best-gpus-for-llm-inference-in-2025](https://www.whitefiber.com/compare/best-gpus-for-llm-inference-in-2025)  
-19. Retrieval Inference for scale and performance \- Pinecone, дата последнего обращения: декабря 6, 2025, [https://www.pinecone.io/blog/optimizing-retrieval-inference/](https://www.pinecone.io/blog/optimizing-retrieval-inference/)  
-20. \`bge-reranker-v2-m3\` model throughput benchmark · Issue \#1088 · FlagOpen/FlagEmbedding \- GitHub, дата последнего обращения: декабря 6, 2025, [https://github.com/FlagOpen/FlagEmbedding/issues/1088](https://github.com/FlagOpen/FlagEmbedding/issues/1088)  
-21. BAAI/bge-reranker-v2-m3 \- Hugging Face, дата последнего обращения: декабря 6, 2025, [https://huggingface.co/BAAI/bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3)  
-22. mxbai-rerank-large-v1 \- Mixedbread, дата последнего обращения: декабря 6, 2025, [https://www.mixedbread.com/docs/models/reranking/mxbai-rerank-large-v1](https://www.mixedbread.com/docs/models/reranking/mxbai-rerank-large-v1)  
-23. text-embeddings-inference \- CodeSandbox, дата последнего обращения: декабря 6, 2025, [http://codesandbox.io/p/github/TouristShaun/text-embeddings-inference](http://codesandbox.io/p/github/TouristShaun/text-embeddings-inference)  
-24. FlashRank reranker \- Docs by LangChain, дата последнего обращения: декабря 6, 2025, [https://docs.langchain.com/oss/python/integrations/retrievers/flashrank-reranker](https://docs.langchain.com/oss/python/integrations/retrievers/flashrank-reranker)  
+1. we're releasing a new multilingual instruction-following reranker at ZeroEntropy\! \- Reddit, дата последнего обращения: декабря 6, 2025, [https://www.reddit.com/r/Rag/comments/1p2latf/were_releasing_a_new_multilingual/](https://www.reddit.com/r/Rag/comments/1p2latf/were_releasing_a_new_multilingual/)
+2. Building Russian Benchmark for Evaluation of Information Retrieval Models, дата последнего обращения: декабря 6, 2025, [https://dialogue-conf.org/wp-content/uploads/2025/04/KovalevGetal.046.pdf](https://dialogue-conf.org/wp-content/uploads/2025/04/KovalevGetal.046.pdf)
+3. Wikipedia-based Datasets in Russian Information Retrieval Benchmark RusBEIR \- arXiv, дата последнего обращения: декабря 6, 2025, [https://arxiv.org/html/2511.05079v1](https://arxiv.org/html/2511.05079v1)
+4. pricing_table.md \- AgentOps-AI/tokencost \- GitHub, дата последнего обращения: декабря 6, 2025, [https://github.com/AgentOps-AI/tokencost/blob/main/pricing_table.md](https://github.com/AgentOps-AI/tokencost/blob/main/pricing_table.md)
+5. Cohere AI pricing in 2025: A complete guide to real costs \- eesel AI, дата последнего обращения: декабря 6, 2025, [https://www.eesel.ai/blog/cohere-ai-pricing](https://www.eesel.ai/blog/cohere-ai-pricing)
+6. Cohere Pricing Explained \- A Deep Dive into Integration & Development Costs | MetaCTO, дата последнего обращения: декабря 6, 2025, [https://www.metacto.com/blogs/cohere-pricing-explained-a-deep-dive-into-integration-development-costs](https://www.metacto.com/blogs/cohere-pricing-explained-a-deep-dive-into-integration-development-costs)
+7. Building Russian Benchmark for Evaluation of Information Retrieval Models \- arXiv, дата последнего обращения: декабря 6, 2025, [https://arxiv.org/html/2504.12879v1](https://arxiv.org/html/2504.12879v1)
+8. Ultimate Guide \- Best Reranker for Multilingual Search in 2025 \- SiliconFlow, дата последнего обращения: декабря 6, 2025, [https://www.siliconflow.com/articles/en/Best-reranker-for-multilingual-search](https://www.siliconflow.com/articles/en/Best-reranker-for-multilingual-search)
+9. Qwen3-Reranker-0.6B \- Model Info, Parameters, Benchmarks \- SiliconFlow, дата последнего обращения: декабря 6, 2025, [https://www.siliconflow.com/models/qwen3-reranker-0-6b](https://www.siliconflow.com/models/qwen3-reranker-0-6b)
+10. Pricing \- Introduction \- Voyage AI, дата последнего обращения: декабря 6, 2025, [https://docs.voyageai.com/docs/pricing](https://docs.voyageai.com/docs/pricing)
+11. rerank-2.5 and rerank-2.5-lite: instruction-following rerankers \- Voyage AI, дата последнего обращения: декабря 6, 2025, [https://blog.voyageai.com/2025/08/11/rerank-2-5/](https://blog.voyageai.com/2025/08/11/rerank-2-5/)
+12. rerank-2 and rerank-2-lite: the next generation of Voyage multilingual rerankers \- Voyage AI, дата последнего обращения: декабря 6, 2025, [https://blog.voyageai.com/2024/09/30/rerank-2/](https://blog.voyageai.com/2024/09/30/rerank-2/)
+13. Hybrid Search and the Universal Query API \- Qdrant, дата последнего обращения: декабря 6, 2025, [https://qdrant.tech/course/essentials/day-3/hybrid-search/](https://qdrant.tech/course/essentials/day-3/hybrid-search/)
+14. Demo: Implementing a Hybrid Search System \- Qdrant, дата последнего обращения: декабря 6, 2025, [https://qdrant.tech/course/essentials/day-3/hybrid-search-demo/](https://qdrant.tech/course/essentials/day-3/hybrid-search-demo/)
+15. Hybrid Search Revamped \- Building with Qdrant's Query API, дата последнего обращения: декабря 6, 2025, [https://qdrant.tech/articles/hybrid-search/](https://qdrant.tech/articles/hybrid-search/)
+16. Deliver Better Recommendations with Qdrant's new API, дата последнего обращения: декабря 6, 2025, [https://qdrant.tech/articles/new-recommendation-api/](https://qdrant.tech/articles/new-recommendation-api/)
+17. Building Personalized Recommender Systems with Qdrant: A Comprehensive Guide | by Rayyan Shaikh | Medium, дата последнего обращения: декабря 6, 2025, [https://medium.com/@shaikhrayyan123/building-personalized-recommender-systems-with-qdrant-a-comprehensive-guide-caa366091dd6](https://medium.com/@shaikhrayyan123/building-personalized-recommender-systems-with-qdrant-a-comprehensive-guide-caa366091dd6)
+18. Best GPUs for LLM inference in 2025 \- WhiteFiber, дата последнего обращения: декабря 6, 2025, [https://www.whitefiber.com/compare/best-gpus-for-llm-inference-in-2025](https://www.whitefiber.com/compare/best-gpus-for-llm-inference-in-2025)
+19. Retrieval Inference for scale and performance \- Pinecone, дата последнего обращения: декабря 6, 2025, [https://www.pinecone.io/blog/optimizing-retrieval-inference/](https://www.pinecone.io/blog/optimizing-retrieval-inference/)
+20. \`bge-reranker-v2-m3\` model throughput benchmark · Issue \#1088 · FlagOpen/FlagEmbedding \- GitHub, дата последнего обращения: декабря 6, 2025, [https://github.com/FlagOpen/FlagEmbedding/issues/1088](https://github.com/FlagOpen/FlagEmbedding/issues/1088)
+21. BAAI/bge-reranker-v2-m3 \- Hugging Face, дата последнего обращения: декабря 6, 2025, [https://huggingface.co/BAAI/bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3)
+22. mxbai-rerank-large-v1 \- Mixedbread, дата последнего обращения: декабря 6, 2025, [https://www.mixedbread.com/docs/models/reranking/mxbai-rerank-large-v1](https://www.mixedbread.com/docs/models/reranking/mxbai-rerank-large-v1)
+23. text-embeddings-inference \- CodeSandbox, дата последнего обращения: декабря 6, 2025, [http://codesandbox.io/p/github/TouristShaun/text-embeddings-inference](http://codesandbox.io/p/github/TouristShaun/text-embeddings-inference)
+24. FlashRank reranker \- Docs by LangChain, дата последнего обращения: декабря 6, 2025, [https://docs.langchain.com/oss/python/integrations/retrievers/flashrank-reranker](https://docs.langchain.com/oss/python/integrations/retrievers/flashrank-reranker)
 25. Ultimate Guide to Choosing the Best Reranking Model in 2025 \- ZeroEntropy, дата последнего обращения: декабря 6, 2025, [https://www.zeroentropy.dev/articles/ultimate-guide-to-choosing-the-best-reranking-model-in-2025](https://www.zeroentropy.dev/articles/ultimate-guide-to-choosing-the-best-reranking-model-in-2025)

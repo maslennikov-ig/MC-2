@@ -2,7 +2,7 @@
  * Analysis Formatters for Stage 5 Generation
  *
  * Helper functions to format nested AnalysisResult fields for LLM prompts.
- * All enhancement fields (pedagogical_patterns, generation_guidance) are REQUIRED
+ * All enhancement fields (generation_guidance) are REQUIRED
  * as Analyze (Stage 4) always generates them.
  *
  * @module analysis-formatters
@@ -126,30 +126,6 @@ export function formatPedagogicalStrategyForPrompt(
 ): string {
   return `Assessment Approach: ${strategy.assessment_approach}
 Progression Logic: ${strategy.progression_logic}`;
-}
-
-/**
- * Format pedagogical_patterns object for LLM prompt
- *
- * Field is REQUIRED (Analyze always generates this enhancement field)
- *
- * @param patterns - Pedagogical patterns object from AnalysisResult
- * @returns Formatted string with strategy, ratio, assessment types, and key patterns
- *
- * @example
- * ```typescript
- * const formatted = formatPedagogicalPatternsForPrompt(analysis.pedagogical_patterns);
- * // Output: "Primary Strategy: problem-based learning\nTheory:Practice Ratio: 30:70..."
- * ```
- */
-export function formatPedagogicalPatternsForPrompt(
-  patterns: NonNullable<AnalysisResult['pedagogical_patterns']>
-): string {
-  return `Primary Strategy: ${patterns.primary_strategy}
-Theory:Practice Ratio: ${patterns.theory_practice_ratio}
-Assessment Types: ${patterns.assessment_types.join(', ')}
-Key Patterns:
-${patterns.key_patterns.map((pattern: string) => `  - ${pattern}`).join('\n')}`;
 }
 
 /**

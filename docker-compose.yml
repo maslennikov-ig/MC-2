@@ -5,12 +5,12 @@ services:
     container_name: megacampus-redis
     restart: unless-stopped
     ports:
-      - "127.0.0.1:6379:6379"
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 3
@@ -20,11 +20,11 @@ services:
   # Docling MCP Server for document processing (PDF, DOCX, PPTX)
   # Used by document-processing worker for text extraction
   docling-mcp:
-    image: docling-mcp-docling-mcp  # Custom image from docling-mcp project
+    image: docling-mcp-docling-mcp # Custom image from docling-mcp project
     container_name: docling-mcp-server
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8000:8000"
+      - '127.0.0.1:8000:8000'
     environment:
       - PORT=8000
     volumes:
@@ -48,7 +48,6 @@ volumes:
   redis-data:
     driver: local
   # docling-cache removed - using bind mount to .tmp/docling-cache for host access
-
 # Usage:
 #
 # Start all services:

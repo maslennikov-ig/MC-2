@@ -10,12 +10,14 @@ Real-world patterns from the MegaCampusAI monorepo codebase.
 Implement soft deletes using `deleted_at` timestamp instead of hard deletes. Combined with Supabase RLS for multi-tenant security.
 
 **When to Use:**
+
 - Multi-tenant applications (organizations, workspaces)
 - Audit trail requirements
 - Data recovery needs
 - Compliance (GDPR right to be forgotten with delayed purge)
 
 **Implementation:**
+
 ```sql
 -- Migration: Add deleted_at column
 ALTER TABLE courses ADD COLUMN deleted_at timestamptz;
@@ -39,27 +41,24 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
 **TypeScript Usage:**
+
 ```typescript
 // Soft delete
-await supabase
-  .from('courses')
-  .update({ deleted_at: new Date().toISOString() })
-  .eq('id', courseId);
+await supabase.from('courses').update({ deleted_at: new Date().toISOString() }).eq('id', courseId);
 
 // Query non-deleted (RLS handles this automatically)
-const { data } = await supabase
-  .from('courses')
-  .select('*')
-  .is('deleted_at', null); // Explicit filter for clarity
+const { data } = await supabase.from('courses').select('*').is('deleted_at', null); // Explicit filter for clarity
 ```
 
 **Benefits:**
+
 - Data recovery possible
 - Audit trail maintained
 - Foreign key integrity preserved
 - Performance: no cascading deletes
 
 **Trade-offs:**
+
 - Storage overhead (deleted records remain)
 - Query filters required (mitigated by RLS)
 - Periodic cleanup jobs needed
@@ -70,12 +69,14 @@ const { data } = await supabase
 Maintain separate admin clients for different runtime environments rather than forced unification.
 
 **When to Use:**
+
 - Different runtime environments (Node.js vs Next.js Server)
 - Different configuration requirements
 - Different type sources
 - Historical technical debt with breaking changes
 
 **Implementation (from codebase):**
+
 ```typescript
 // packages/course-gen-platform/src/shared/supabase/admin.ts
 // Node.js backend (tRPC, BullMQ)
@@ -86,7 +87,7 @@ export function getSupabaseAdmin(): SupabaseClient<Database> {
     const supabaseUrl = process.env.SUPABASE_URL; // Different env var
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY; // Different env var
     supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
+      auth: { autoRefreshToken: false, persistSession: false },
     });
   }
   return supabaseAdmin;
@@ -104,17 +105,20 @@ export const supabaseAdmin = createClient<Database>(
 ```
 
 **Benefits:**
+
 - Clear runtime separation
 - Independent configuration
 - No shared state issues
 - Easier debugging
 
 **Trade-offs:**
+
 - Code duplication (documented as intentional)
 - Synchronized updates required
 - Must document reasons in CLAUDE.md
 
 **Anti-Pattern to Avoid:**
+
 ```typescript
 // DON'T: Force unification across runtime boundaries
 // This creates complex environment detection and shared state issues
@@ -126,11 +130,13 @@ export const supabaseAdmin = createClient<Database>(
 Centralize type definitions in shared-types package, re-export from consuming packages.
 
 **When to Use:**
+
 - Monorepo with shared types
 - Database schema changes
 - Cross-package type consistency
 
 **Implementation:**
+
 ```typescript
 // packages/shared-types/src/database.types.ts (MAIN SOURCE)
 export interface Course {
@@ -148,16 +154,19 @@ export type { Database } from '@megacampus/shared-types';
 ```
 
 **Benefits:**
+
 - Single update point
 - Type consistency
 - Easier refactoring
 - Clear ownership
 
 **Trade-offs:**
+
 - Dependency coupling (shared-types changes affect all packages)
 - Build order requirements
 
 **Anti-Pattern to Avoid:**
+
 ```typescript
 // DON'T: Duplicate type definitions
 // packages/web/types/database.ts
@@ -175,11 +184,13 @@ export interface Course extends Partial<SharedCourse> { ... } // BAD: Drift risk
 Use Zustand with Immer middleware for nested state updates without spread operators.
 
 **When to Use:**
+
 - Complex nested state (navigation stacks, multi-level data)
 - Performance-critical updates
 - Multiple related state changes
 
 **Implementation (from enrichment-inspector-store.ts):**
+
 ```typescript
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -200,13 +211,13 @@ interface State {
 }
 
 export const useStore = create<State>()(
-  immer((set) => ({
+  immer(set => ({
     history: [],
     current: null,
     dirty: false,
 
-    openDetail: (enrichmentId) =>
-      set((state) => {
+    openDetail: enrichmentId =>
+      set(state => {
         // Immer allows direct mutation syntax
         if (state.current) {
           state.history.push(state.current);
@@ -215,38 +226,44 @@ export const useStore = create<State>()(
       }),
 
     goBack: () =>
-      set((state) => {
+      set(state => {
         if (state.history.length === 0) return;
         state.current = state.history.pop()!;
       }),
 
-    setDirty: (dirty) => set((state) => { state.dirty = dirty; }),
+    setDirty: dirty =>
+      set(state => {
+        state.dirty = dirty;
+      }),
   }))
 );
 
 // Selector hooks for granular subscriptions
-export const useCurrentView = () => useStore((s) => s.current?.view ?? 'root');
-export const useCanGoBack = () => useStore((s) => s.history.length > 0);
+export const useCurrentView = () => useStore(s => s.current?.view ?? 'root');
+export const useCanGoBack = () => useStore(s => s.history.length > 0);
 ```
 
 **Benefits:**
+
 - Readable nested updates (no spread hell)
 - Immutability guaranteed
 - Performance (structural sharing)
 - Type safety
 
 **Trade-offs:**
+
 - Extra dependency (immer)
 - Slight runtime overhead
 - Learning curve (draft vs actual state)
 
 **Anti-Pattern to Avoid:**
+
 ```typescript
 // DON'T: Spread operator hell
-set((state) => ({
+set(state => ({
   ...state,
   history: [...state.history, state.current],
-  current: { ...state.current, view: 'detail' }
+  current: { ...state.current, view: 'detail' },
 })); // Hard to read, error-prone
 ```
 
@@ -256,11 +273,13 @@ set((state) => ({
 Browser-like navigation with history stack for panel-based UIs.
 
 **When to Use:**
+
 - Inspector panels
 - Wizards/multi-step forms
 - Mobile-like navigation in desktop apps
 
 **Implementation:**
+
 ```typescript
 // State
 interface NavigationEntry {
@@ -276,13 +295,13 @@ interface State {
 
 // Actions
 const openRoot = (id: string) =>
-  set((state) => {
+  set(state => {
     state.history = []; // Clear history
     state.current = { view: 'root' };
   });
 
 const openCreate = (type: string) =>
-  set((state) => {
+  set(state => {
     if (state.current) {
       state.history.push(state.current); // Save current
     }
@@ -290,19 +309,21 @@ const openCreate = (type: string) =>
   });
 
 const goBack = () =>
-  set((state) => {
+  set(state => {
     if (state.history.length === 0) return;
     state.current = state.history.pop()!; // Pop previous
   });
 ```
 
 **Benefits:**
+
 - Familiar browser-like UX
 - Back button support
 - Clear state transitions
 - Deep linking support
 
 **Trade-offs:**
+
 - Memory overhead (history stack)
 - Complex state management
 - Must handle edge cases (empty history)
@@ -313,18 +334,20 @@ const goBack = () =>
 Update UI immediately, rollback on server error.
 
 **When to Use:**
+
 - Real-time collaboration
 - Perceived performance critical
 - High-latency operations
 
 **Implementation:**
+
 ```typescript
 const deleteEnrichment = async (id: string) => {
   // Save current state
   const snapshot = store.getState().enrichments;
 
   // Optimistic update
-  store.setState((state) => {
+  store.setState(state => {
     state.enrichments = state.enrichments.filter(e => e.id !== id);
   });
 
@@ -339,11 +362,13 @@ const deleteEnrichment = async (id: string) => {
 ```
 
 **Benefits:**
+
 - Instant UI feedback
 - Better perceived performance
 - Improved UX
 
 **Trade-offs:**
+
 - Rollback complexity
 - Race conditions possible
 - Must handle conflicts
@@ -356,11 +381,13 @@ const deleteEnrichment = async (id: string) => {
 Organize tRPC routers by domain with nested routers for admin vs user operations.
 
 **When to Use:**
+
 - Complex API with admin/user separation
 - Multi-tenant applications
 - Clear permission boundaries
 
 **Implementation:**
+
 ```typescript
 // Admin router (service role bypass RLS)
 const adminOrgRouter = router({
@@ -369,12 +396,10 @@ const adminOrgRouter = router({
     return admin.from('organizations').select('*');
   }),
 
-  create: publicProcedure
-    .input(z.object({ name: z.string() }))
-    .mutation(async ({ input }) => {
-      const admin = getSupabaseAdmin();
-      return admin.from('organizations').insert(input);
-    }),
+  create: publicProcedure.input(z.object({ name: z.string() })).mutation(async ({ input }) => {
+    const admin = getSupabaseAdmin();
+    return admin.from('organizations').insert(input);
+  }),
 });
 
 // Main router composition
@@ -388,12 +413,14 @@ export const appRouter = router({
 ```
 
 **Benefits:**
+
 - Clear permission separation
 - Organized by domain
 - Type-safe client
 - Easy to test
 
 **Trade-offs:**
+
 - Router nesting complexity
 - Type inference depth limits
 
@@ -403,11 +430,13 @@ export const appRouter = router({
 Token bucket algorithm with Redis for API rate limiting.
 
 **When to Use:**
+
 - Public APIs
 - AI generation endpoints (expensive operations)
 - Abuse prevention
 
 **Implementation:**
+
 ```typescript
 import { Redis } from '@upstash/redis';
 
@@ -440,7 +469,7 @@ export async function POST(req: Request) {
   if (!success) {
     return new Response('Rate limit exceeded', {
       status: 429,
-      headers: { 'X-RateLimit-Remaining': remaining.toString() }
+      headers: { 'X-RateLimit-Remaining': remaining.toString() },
     });
   }
 
@@ -449,11 +478,13 @@ export async function POST(req: Request) {
 ```
 
 **Benefits:**
+
 - Abuse prevention
 - Cost control (AI APIs)
 - Fair usage enforcement
 
 **Trade-offs:**
+
 - Redis dependency
 - Network latency
 - Clock skew issues
@@ -466,6 +497,7 @@ export async function POST(req: Request) {
 Organize packages by domain/purpose, not by type.
 
 **Current Structure:**
+
 ```
 packages/
 ├── course-gen-platform/  # Backend (Node.js, tRPC, BullMQ)
@@ -476,12 +508,14 @@ packages/
 ```
 
 **Benefits:**
+
 - Clear boundaries
 - Independent deployment
 - Team ownership
 - Easier onboarding
 
 **Trade-offs:**
+
 - Potential code duplication (intentional)
 - Build order dependencies
 
@@ -491,6 +525,7 @@ packages/
 Use timestamp-based migration files with descriptive names.
 
 **Pattern:**
+
 ```
 packages/course-gen-platform/supabase/migrations/
 ├── 20251229100000_add_course_visibility.sql
@@ -502,12 +537,14 @@ packages/course-gen-platform/supabase/migrations/
 ```
 
 **Benefits:**
+
 - Chronological ordering
 - Descriptive names
 - Multi-step migrations (same day with sequence)
 - Easy rollback identification
 
 **Trade-offs:**
+
 - Timestamp conflicts (rare)
 - Must enforce naming convention
 
@@ -519,12 +556,14 @@ packages/course-gen-platform/supabase/migrations/
 Single component with 1000+ lines handling multiple concerns.
 
 **Why Bad:**
+
 - Hard to test
 - Poor reusability
 - Difficult debugging
 - Slow re-renders
 
 **Solution:**
+
 ```typescript
 // BAD: God component
 function CourseEditor() {
@@ -550,11 +589,13 @@ function CourseEditor() {
 Passing props through 5+ component levels.
 
 **Why Bad:**
+
 - Tight coupling
 - Hard to refactor
 - TypeScript noise
 
 **Solution:**
+
 ```typescript
 // BAD: Prop drilling
 <Parent userId={userId}>
@@ -572,14 +613,16 @@ const useUser = () => useStore((s) => s.userId);
 Using `any` or `unknown` for API responses.
 
 **Why Bad:**
+
 - Runtime errors
 - No autocomplete
 - Refactoring nightmares
 
 **Solution:**
+
 ```typescript
 // BAD
-const data = await fetch('/api/courses') as any;
+const data = (await fetch('/api/courses')) as any;
 
 // GOOD: tRPC (type-safe by default)
 const data = await trpc.courses.list.query();
@@ -595,11 +638,13 @@ const data = CourseSchema.parse(await response.json());
 Single migration file with 500+ lines changing multiple tables.
 
 **Why Bad:**
+
 - Hard to review
 - Risky to rollback
 - Difficult debugging
 
 **Solution:**
+
 ```sql
 -- BAD: Single massive migration
 -- 20251230_big_refactor.sql (500 lines)
@@ -684,6 +729,7 @@ function CourseList() {
 ```
 
 **Benefits:**
+
 - Automatic caching
 - Background refetch
 - Optimistic updates
@@ -748,6 +794,7 @@ pnpm supabase gen types typescript --project-id PROJECT_REF > types.ts
 These patterns are extracted from real production code in the MegaCampusAI monorepo. They represent battle-tested solutions to common architectural challenges in modern full-stack TypeScript applications.
 
 Key takeaways:
+
 1. Intentional duplication can be better than forced abstraction
 2. Single source of truth for types prevents drift
 3. RLS provides database-level security

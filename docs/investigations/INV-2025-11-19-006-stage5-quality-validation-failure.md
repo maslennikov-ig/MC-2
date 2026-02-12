@@ -21,10 +21,12 @@
 ### 1. Архитектура Валидации
 
 **Файлы**:
+
 - `src/services/stage5/quality-validator.ts` (сервис валидации)
 - `src/services/stage5/generation-phases.ts:497-637` (Phase 4: validate_quality)
 
 **Технология**:
+
 - **Jina-v3 embeddings** (768-dimensional vectors)
 - **Cosine similarity** вычисление между векторами
 - **Language-adjusted thresholds** (русский: -0.05 adjustment)
@@ -34,6 +36,7 @@
 #### Этап 1: Metadata Similarity (40% веса)
 
 **Что сравнивается**:
+
 ```typescript
 // INPUT (retrieval.query task)
 const inputRequirements = buildInputRequirementsText(state.input);
@@ -52,15 +55,17 @@ const metadataText = concatenateMetadataFields(generatedMetadata);
 ```
 
 **Threshold для русского языка**:
+
 - Base: 0.85
 - Adjustment: -0.05
 - **Final: 0.80**
 
 **Результат в тесте**:
+
 ```json
 {
   "metadataSimilarity": 0.6927,
-  "threshold": 0.80,
+  "threshold": 0.8,
   "passed": false
 }
 ```
@@ -72,6 +77,7 @@ const metadataText = concatenateMetadataFields(generatedMetadata);
 #### Этап 2: Sections Similarity (60% веса)
 
 **Что сравнивается** (для каждой секции):
+
 ```typescript
 // EXPECTED TOPIC (retrieval.query)
 const expectedTopic = analysis_result.recommended_structure.sections_breakdown[i].area;
@@ -86,18 +92,20 @@ const sectionText = concatenateSectionFields(section);
 ```
 
 **Threshold для русского языка**:
+
 - Base: 0.75 (для sections)
 - Adjustment: -0.05
 - **Final: 0.70**
 
 **Результаты в тесте**:
+
 ```json
 {
-  "section_1": { "score": 0.7285, "passed": true },   // ✓ Только 1 прошла!
-  "section_2": { "score": 0.5434, "passed": false },  // ✗
-  "section_3": { "score": 0.6251, "passed": false },  // ✗
-  "section_4": { "score": 0.5793, "passed": false },  // ✗
-  "section_5": { "score": 0.5702, "passed": false }   // ✗
+  "section_1": { "score": 0.7285, "passed": true }, // ✓ Только 1 прошла!
+  "section_2": { "score": 0.5434, "passed": false }, // ✗
+  "section_3": { "score": 0.6251, "passed": false }, // ✗
+  "section_4": { "score": 0.5793, "passed": false }, // ✗
+  "section_5": { "score": 0.5702, "passed": false } // ✗
 }
 ```
 
@@ -108,6 +116,7 @@ const sectionText = concatenateSectionFields(section);
 #### Этап 3: Overall Weighted Average
 
 **Формула**:
+
 ```typescript
 // Если metadata есть (наш случай):
 overall = metadataSimilarity * 0.4 + sectionsAvg * 0.6;
@@ -131,6 +140,7 @@ overall = 0.2771 + 0.3656 = 0.6427 ≈ 0.6426
 **Проблема**: Модель генерирует контент, который **семантически отличается** от того, что описано в `analysis_result.recommended_structure`.
 
 **Пример из логов**:
+
 ```
 Expected topic: "Customer Journey Mapping"
 Generated section: "Основы продаж образовательных продуктов"
@@ -138,6 +148,7 @@ Similarity: 0.5434 → FAILED
 ```
 
 **Почему происходит**:
+
 1. **Analysis (Stage 4)** создаёт детальный план с английскими названиями тем
 2. **Generation (Stage 5)** генерирует контент на русском языке
 3. **Language mismatch**: "Customer Journey Mapping" vs "Картирование путешествия клиента"
@@ -152,6 +163,7 @@ Similarity: 0.5434 → FAILED
 **Проблема**: В `buildSectionPrompt()` может **не передаваться** `expected_topic` из analysis_result.
 
 **Что проверить**:
+
 ```typescript
 // src/services/stage5/section-batch-generator.ts:~756-870
 // Метод buildSectionPrompt()
@@ -175,15 +187,18 @@ Expected section:
 ### Hypothesis 3: Model Tier Selection Problem
 
 **Из логов**:
+
 ```
 Model tier selected: tier2_ru_lessons (qwen/qwen3-235b-a22b-2507)
 ```
 
 **Проблема**: Qwen 3 235B может иметь **слабую multilingual alignment** между:
+
 - Английский analysis (input)
 - Русский generation (output)
 
 **Что проверить**:
+
 - Попробовать другую модель (GPT-4o, Claude Sonnet 4.5)
 - Проверить, есть ли language code в prompt (`language: ru`)
 - Сравнить quality scores между моделями
@@ -193,11 +208,13 @@ Model tier selected: tier2_ru_lessons (qwen/qwen3-235b-a22b-2507)
 ### Hypothesis 4: Threshold Too Strict
 
 **Текущие пороги**:
+
 - Metadata: 0.80 (Russian adjusted)
 - Sections: 0.70 (Russian adjusted)
 - Overall: 0.75 (жёсткий)
 
 **Статистика из теста**:
+
 - Metadata: 0.6927 (diff: -0.1073)
 - Sections avg: 0.6093 (diff: -0.0907)
 - Overall: 0.6426 (diff: -0.1074)
@@ -205,6 +222,7 @@ Model tier selected: tier2_ru_lessons (qwen/qwen3-235b-a22b-2507)
 **Вопрос**: Возможно, для **сложных курсов** (Sales of Educational Products - узкая тема) threshold 0.75 **слишком строг**?
 
 **Сравнение с industry standards**:
+
 - RAG retrieval: 0.70-0.75 считается "good match"
 - Semantic search: 0.65-0.70 - acceptable
 - 0.75 для генерации - **очень строго**
@@ -218,31 +236,31 @@ Model tier selected: tier2_ru_lessons (qwen/qwen3-235b-a22b-2507)
 ```javascript
 [
   {
-    "area": "Foundations of Educational Product Sales",
-    "estimated_lessons": 3,
-    "key_topics": ["Product-market fit", "Stakeholder mapping", "Sales pipeline"]
+    area: 'Foundations of Educational Product Sales',
+    estimated_lessons: 3,
+    key_topics: ['Product-market fit', 'Stakeholder mapping', 'Sales pipeline'],
   },
   {
-    "area": "Crafting a Compelling Value Proposition",
-    "estimated_lessons": 3,
-    "key_topics": ["Value proposition canvas", "Competitive analysis", "Messaging"]
+    area: 'Crafting a Compelling Value Proposition',
+    estimated_lessons: 3,
+    key_topics: ['Value proposition canvas', 'Competitive analysis', 'Messaging'],
   },
   {
-    "area": "Market Segmentation and Targeting",
-    "estimated_lessons": 3,
-    "key_topics": ["Segmentation criteria", "Persona development", "Data sources"]
+    area: 'Market Segmentation and Targeting',
+    estimated_lessons: 3,
+    key_topics: ['Segmentation criteria', 'Persona development', 'Data sources'],
   },
   {
-    "area": "Sales Cycle Mastery",
-    "estimated_lessons": 3,
-    "key_topics": ["Lead qualification", "Needs assessment", "Objection handling"]
+    area: 'Sales Cycle Mastery',
+    estimated_lessons: 3,
+    key_topics: ['Lead qualification', 'Needs assessment', 'Objection handling'],
   },
   {
-    "area": "Consultative Selling Techniques",
-    "estimated_lessons": 3,
-    "key_topics": ["General concepts", "Fundamental principles", "Core techniques"]
-  }
-]
+    area: 'Consultative Selling Techniques',
+    estimated_lessons: 3,
+    key_topics: ['General concepts', 'Fundamental principles', 'Core techniques'],
+  },
+];
 ```
 
 **Проблема**: Все темы на **английском**, но generation на **русском** → language gap!
@@ -290,12 +308,13 @@ Section 5: score 0.5702 ✗ (failed by 0.1298)
 - [ ] Проверить: есть ли `language: ru` в prompt?
 - [ ] Если НЕТ → добавить `expectedTopic` в prompt
 - [ ] Пример:
+
   ```typescript
   const prompt = `
   # Target Section Topic
   You must generate content for the section: "${expectedTopic}"
   Ensure the section title, description, and lesson titles align with this topic.
-
+  
   Language: ${language}
   `;
   ```
@@ -323,6 +342,7 @@ Section 5: score 0.5702 ✗ (failed by 0.1298)
 **Где**: `src/services/stage5/section-batch-generator.ts:~756-870`
 
 **Что делать**:
+
 ```typescript
 // В buildSectionPrompt(), добавить в начало:
 const expectedTopic =
@@ -351,17 +371,17 @@ Language: ${input.frontend_parameters.language || 'en'}
 **Где**: `src/services/stage5/generation-phases.ts:545-554`
 
 **Что делать**:
+
 ```typescript
 // BEFORE validation, translate expected topics if language !== 'en'
 const expectedTopics =
   state.input.analysis_result?.recommended_structure.sections_breakdown.map(
-    (section) => section.area || 'Untitled Section'
+    section => section.area || 'Untitled Section'
   ) || [];
 
 // ADD translation step:
-const translatedTopics = language === 'ru'
-  ? await translateTopicsToRussian(expectedTopics)
-  : expectedTopics;
+const translatedTopics =
+  language === 'ru' ? await translateTopicsToRussian(expectedTopics) : expectedTopics;
 
 const sectionResults = await this.qualityValidator.validateSections(
   translatedTopics, // Use translated topics
@@ -381,6 +401,7 @@ const sectionResults = await this.qualityValidator.validateSections(
 **Где**: `src/services/stage5/generation-phases.ts:63`
 
 **Что делать**:
+
 ```typescript
 // Change from:
 const QUALITY_CONFIG = {
@@ -390,8 +411,8 @@ const QUALITY_CONFIG = {
 
 // To dynamic threshold:
 const QUALITY_CONFIG = {
-  MIN_SIMILARITY: 0.75,  // Default
-  MIN_SIMILARITY_COMPLEX: 0.70,  // For complex topics
+  MIN_SIMILARITY: 0.75, // Default
+  MIN_SIMILARITY_COMPLEX: 0.7, // For complex topics
   MIN_LESSONS: 10,
 } as const;
 
@@ -418,6 +439,7 @@ if (overall < threshold) {
 **Где**: Model tier selection в `src/shared/model-router/index.ts`
 
 **Что делать**:
+
 - Заменить `qwen/qwen3-235b-a22b-2507` на `openai/gpt-4o` или `anthropic/claude-sonnet-4.5`
 - Обе модели имеют **stronger multilingual alignment**
 - GPT-4o особенно силён в EN→RU semantic matching
@@ -433,15 +455,16 @@ if (overall < threshold) {
 **Где**: `src/services/stage5/generation-phases.ts:597`
 
 **Что делать**:
+
 ```typescript
 // Stage 1: Warning threshold (0.70)
-if (overall < 0.70) {
+if (overall < 0.7) {
   // Hard fail - quality too low
   return { ...state, errors: [...state.errors, errorMessage] };
 }
 
 // Stage 2: Review threshold (0.70-0.75)
-if (overall >= 0.70 && overall < 0.75) {
+if (overall >= 0.7 && overall < 0.75) {
   // Soft warning - proceed but flag for review
   this.logger.warn({
     msg: 'Quality below target but acceptable',
@@ -462,18 +485,13 @@ if (overall >= 0.70 && overall < 0.75) {
 ## Recommended Action Plan
 
 **Immediate (1 hour)**:
+
 1. ✅ **Solution 1**: Add `expectedTopic` to prompt in `buildSectionPrompt()`
 2. ✅ **Solution 5**: Implement two-stage validation (0.70 hard fail, 0.70-0.75 warning)
 
-**Short-term (4 hours)**:
-3. **Investigation Phase 3**: Verify prompt includes expected topics
-4. **Investigation Phase 2**: Analyze embedding similarity manually
-5. **Solution 2**: Implement translation of expected topics to Russian
+**Short-term (4 hours)**: 3. **Investigation Phase 3**: Verify prompt includes expected topics 4. **Investigation Phase 2**: Analyze embedding similarity manually 5. **Solution 2**: Implement translation of expected topics to Russian
 
-**Medium-term (8 hours)**:
-6. **Investigation Phase 4**: Test with GPT-4o/Claude Sonnet 4.5
-7. **Solution 3**: Implement dynamic threshold based on complexity
-8. A/B test: Qwen 3 235B vs GPT-4o on 10 courses
+**Medium-term (8 hours)**: 6. **Investigation Phase 4**: Test with GPT-4o/Claude Sonnet 4.5 7. **Solution 3**: Implement dynamic threshold based on complexity 8. A/B test: Qwen 3 235B vs GPT-4o on 10 courses
 
 ---
 

@@ -41,6 +41,7 @@ import { protectedProcedure } from '../../middleware/auth';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { lmsLogger } from '../../../integrations/lms/logger';
 import { LmsImportStatusSchema } from '@megacampus/shared-types/lms';
+import type { LmsImportStatus } from '@megacampus/shared-types/lms';
 import { nanoid } from 'nanoid';
 import { verifyOrganizationAccess } from './helpers';
 
@@ -51,10 +52,7 @@ import { verifyOrganizationAccess } from './helpers';
  * @param completedAt - Job completion timestamp (ISO 8601)
  * @returns Duration in milliseconds, or null if job not completed
  */
-function calculateJobDuration(
-  startedAt: string | null,
-  completedAt: string | null
-): number | null {
+function calculateJobDuration(startedAt: string | null, completedAt: string | null): number | null {
   if (!startedAt || !completedAt) return null;
   return new Date(completedAt).getTime() - new Date(startedAt).getTime();
 }
@@ -195,15 +193,14 @@ export const historyRouter = router({
           );
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'Cannot filter by both course_id and organization_id. Use course_id to filter by course, or organization_id (admin only) for organization-wide history.',
+            message:
+              'Cannot filter by both course_id and organization_id. Use course_id to filter by course, or organization_id (admin only) for organization-wide history.',
           });
         }
 
         // Step 1: Build base query
-        let query = supabase
-          .from('lms_import_jobs')
-          .select(
-            `
+        let query = supabase.from('lms_import_jobs').select(
+          `
             id,
             course_id,
             edx_course_key,
@@ -214,8 +211,8 @@ export const historyRouter = router({
             courses!inner(id, title, user_id, organization_id),
             lms_configurations!inner(id, name)
           `,
-            { count: 'exact' }
-          );
+          { count: 'exact' }
+        );
 
         // Step 2: Apply filters based on input
         // TODO: Consider using RLS (Row Level Security) policies to handle
@@ -231,7 +228,10 @@ export const historyRouter = router({
             .single();
 
           if (courseError || !course) {
-            lmsLogger.warn({ requestId, courseId: course_id, error: courseError }, 'Course not found');
+            lmsLogger.warn(
+              { requestId, courseId: course_id, error: courseError },
+              'Course not found'
+            );
             throw new TRPCError({
               code: 'NOT_FOUND',
               message: 'Course not found',
@@ -263,7 +263,13 @@ export const historyRouter = router({
             });
           }
 
-          verifyOrganizationAccess(organization_id, userOrgId, requestId, userId, 'list organization jobs');
+          verifyOrganizationAccess(
+            organization_id,
+            userOrgId,
+            requestId,
+            userId,
+            'list organization jobs'
+          );
 
           query = query.eq('courses.organization_id', organization_id);
         } else {
@@ -280,7 +286,7 @@ export const historyRouter = router({
         query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
         // Step 5: Execute query
-        const { data: jobs, error: jobsError, count } = await query;
+        const { data: jobsRaw, error: jobsError, count } = await query;
 
         if (jobsError) {
           lmsLogger.error({ requestId, error: jobsError }, 'Failed to fetch import jobs');
@@ -290,7 +296,7 @@ export const historyRouter = router({
           });
         }
 
-        if (!jobs) {
+        if (!jobsRaw) {
           lmsLogger.warn({ requestId }, 'No jobs found');
           return {
             items: [],
@@ -299,8 +305,24 @@ export const historyRouter = router({
           };
         }
 
+        type JobRow = {
+          id: string;
+          course_id: string;
+          edx_course_key: string;
+          status: LmsImportStatus;
+          created_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+          courses:
+            | { id: string; title: string; user_id: string; organization_id: string }
+            | { id: string; title: string; user_id: string; organization_id: string }[];
+          lms_configurations: { id: string; name: string } | { id: string; name: string }[];
+        };
+
+        const jobs = jobsRaw as unknown as JobRow[];
+
         // Step 6: Transform jobs to response format
-        const items = jobs.map((job) => {
+        const items = jobs.map(job => {
           const course = Array.isArray(job.courses) ? job.courses[0] : job.courses;
           const lmsConfig = Array.isArray(job.lms_configurations)
             ? job.lms_configurations[0]
@@ -434,7 +456,7 @@ export const historyRouter = router({
 
       try {
         // Step 1: Fetch job with course and LMS config information
-        const { data: job, error: jobError } = await supabase
+        const { data: jobRaw, error: jobError } = await supabase
           .from('lms_import_jobs')
           .select(
             `
@@ -459,13 +481,36 @@ export const historyRouter = router({
           .eq('id', job_id)
           .single();
 
-        if (jobError || !job) {
+        if (jobError || !jobRaw) {
           lmsLogger.warn({ requestId, jobId: job_id, error: jobError }, 'Job not found');
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Import job not found',
           });
         }
+
+        type JobDetailRow = {
+          id: string;
+          course_id: string;
+          lms_config_id: string;
+          edx_course_key: string;
+          edx_task_id: string | null;
+          status: LmsImportStatus;
+          progress_percent: number;
+          started_at: string | null;
+          completed_at: string | null;
+          error_code: string | null;
+          error_message: string | null;
+          course_url: string | null;
+          studio_url: string | null;
+          created_at: string;
+          courses:
+            | { id: string; title: string; user_id: string }
+            | { id: string; title: string; user_id: string }[];
+          lms_configurations: { id: string; name: string } | { id: string; name: string }[];
+        };
+
+        const job = jobRaw as unknown as JobDetailRow;
 
         // Step 2: Verify user has access to this job
         const course = Array.isArray(job.courses) ? job.courses[0] : job.courses;

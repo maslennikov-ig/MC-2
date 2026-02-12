@@ -55,12 +55,7 @@ export interface FetchWithFallbackResult {
 export async function fetchWithFallback(
   options: FetchWithFallbackOptions
 ): Promise<FetchWithFallbackResult> {
-  const {
-    internalUrl,
-    publicUrl,
-    timeout = 5000,
-    ...fetchOptions
-  } = options
+  const { internalUrl, publicUrl, timeout = 5000, ...fetchOptions } = options
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)

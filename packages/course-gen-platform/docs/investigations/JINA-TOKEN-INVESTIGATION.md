@@ -9,6 +9,7 @@
 ## Executive Summary
 
 Found **6 major token consumption sources** in the codebase. The main suspects are:
+
 1. **Jina Reranker** - called for every section (Stage 5) and lesson (Stage 6)
 2. **Quality Validator** - multiple embedding calls per course generation
 3. **RAG Query Embeddings** - generated for each search query (with caching)
@@ -44,12 +45,14 @@ await warmupEmbeddingCache({
 
 **File**: `src/shared/validation/quality-validator.ts`
 **Functions**:
+
 - `validateMetadata()` - 2 embedding calls (lines 188, 197)
 - `validateSections()` - 2 calls × N sections (lines 323-324)
 - `validateSummaryQuality()` - 2 embedding calls (lines 605-606)
 
 **Caching**: NONE - uses `jina-client.ts` directly
 **Per course (10 sections)**:
+
 - Metadata: 2 × ~100 tokens = ~200 tokens
 - Sections: 10 × 2 × ~100 tokens = ~2,000 tokens
 - Summaries: depends on usage
@@ -62,30 +65,35 @@ await warmupEmbeddingCache({
 
 **File**: `src/shared/jina/reranker-client.ts`
 **Called from**:
+
 - `src/stages/stage5-generation/utils/section-rag-retriever.ts:288`
 - `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts:28`
 
 **Pattern**:
+
 ```typescript
 const reranked = await rerankDocuments(
-  combinedQuery,                          // Query text
+  combinedQuery, // Query text
   sortedChunks.map(chunk => chunk.content), // ALL chunk contents
-  targetChunks                            // top_n
+  targetChunks // top_n
 );
 ```
 
 **Caching**: NONE
 **Token tracking**: NONE (no usage tracking!)
 **Per section (Stage 5)**:
+
 - Query: variable length
 - Documents: 25-100 chunk contents (~500-2000 chars each)
 - **Estimated**: 5,000-20,000 tokens per section
 
 **Per lesson (Stage 6)**:
+
 - Documents: 7-28 chunks
 - **Estimated**: 1,000-5,000 tokens per lesson
 
 **Per course (10 sections, 50 lessons)**:
+
 - Section reranking: 10 × 10,000 = ~100,000 tokens
 - Lesson reranking: 50 × 3,000 = ~150,000 tokens
 - **Total reranking: ~250,000 tokens per course!**
@@ -127,20 +135,20 @@ Check if tests are running in CI or locally with real API key.
 
 ## API Endpoints Used
 
-| API | Endpoint | Model | Tokens Per Call |
-|-----|----------|-------|-----------------|
-| Embeddings | `api.jina.ai/v1/embeddings` | jina-embeddings-v3 | ~tokens in text |
-| Reranker | `api.jina.ai/v1/rerank` | jina-reranker-v2-base-multilingual | query + all docs |
+| API        | Endpoint                    | Model                              | Tokens Per Call  |
+| ---------- | --------------------------- | ---------------------------------- | ---------------- |
+| Embeddings | `api.jina.ai/v1/embeddings` | jina-embeddings-v3                 | ~tokens in text  |
+| Reranker   | `api.jina.ai/v1/rerank`     | jina-reranker-v2-base-multilingual | query + all docs |
 
 ---
 
 ## Current Token Tracking
 
-| Component | Has Tracking? | Location |
-|-----------|---------------|----------|
-| jina-client.ts (Embeddings) | YES | `TokenUsageTracker` class |
-| reranker-client.ts | NO! | Missing |
-| generate.ts | Partial | Logs only |
+| Component                   | Has Tracking? | Location                  |
+| --------------------------- | ------------- | ------------------------- |
+| jina-client.ts (Embeddings) | YES           | `TokenUsageTracker` class |
+| reranker-client.ts          | NO!           | Missing                   |
+| generate.ts                 | Partial       | Logs only                 |
 
 ---
 
@@ -171,11 +179,14 @@ Edit `src/shared/jina/reranker-client.ts`, add after line 231:
 ```typescript
 // Track token usage (add this)
 if (data.usage?.total_tokens) {
-  logger.info({
-    tokensUsed: data.usage.total_tokens,
-    queryLength: payload.query.length,
-    documentsCount: payload.documents.length,
-  }, '[Jina Reranker] Request completed');
+  logger.info(
+    {
+      tokensUsed: data.usage.total_tokens,
+      queryLength: payload.query.length,
+      documentsCount: payload.documents.length,
+    },
+    '[Jina Reranker] Request completed'
+  );
 }
 ```
 
@@ -191,6 +202,7 @@ if (data.usage?.total_tokens) {
 ### Step 5: Count Actual Consumption
 
 During generation, count:
+
 - Number of embedding API calls
 - Number of reranker API calls
 - Total tokens per stage
@@ -202,6 +214,7 @@ During generation, count:
 ### Hypothesis 1: Reranker is the main consumer
 
 **Evidence**:
+
 - No caching on reranker
 - Called for every section AND every lesson
 - Sends ALL chunk content (not just IDs)
@@ -212,6 +225,7 @@ During generation, count:
 ### Hypothesis 2: Tests are running with real API
 
 **Evidence**:
+
 - `tests/integration/jina-embeddings.test.ts` has many test cases
 - Each test generates real embeddings
 
@@ -220,6 +234,7 @@ During generation, count:
 ### Hypothesis 3: Multiple course generations
 
 **Evidence**:
+
 - Development involves repeated test runs
 - Each run consumes tokens
 
@@ -259,12 +274,12 @@ Use mocked embeddings in tests to avoid API calls.
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/shared/jina/reranker-client.ts` | Add token tracking |
-| `src/stages/stage5-generation/utils/section-rag-retriever.ts` | Add caching for reranker |
-| `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts` | Add caching for reranker |
-| `src/shared/validation/quality-validator.ts` | Add caching or feature flag |
+| File                                                             | Change                      |
+| ---------------------------------------------------------------- | --------------------------- |
+| `src/shared/jina/reranker-client.ts`                             | Add token tracking          |
+| `src/stages/stage5-generation/utils/section-rag-retriever.ts`    | Add caching for reranker    |
+| `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts` | Add caching for reranker    |
+| `src/shared/validation/quality-validator.ts`                     | Add caching or feature flag |
 
 ---
 
@@ -301,22 +316,22 @@ redis-cli KEYS "search:*" | wc -l
 
 ### Embeddings API (`jina-embeddings-v3`)
 
-| File | Function | Caching |
-|------|----------|---------|
-| `jina-client.ts:326` | `generateEmbedding()` | NO |
-| `jina-client.ts:397` | `generateEmbeddings()` | NO |
-| `generate.ts:349` | `generateEmbeddingsWithLateChunking()` | YES (Redis) |
-| `generate.ts:556` | `generateQueryEmbedding()` | YES (Redis) |
-| `semantic-matching.ts:54` | `getEmbedding()` | In-memory only |
-| `quality-validator.ts:188,197,323,324,605,606` | Multiple calls | NO |
+| File                                           | Function                               | Caching        |
+| ---------------------------------------------- | -------------------------------------- | -------------- |
+| `jina-client.ts:326`                           | `generateEmbedding()`                  | NO             |
+| `jina-client.ts:397`                           | `generateEmbeddings()`                 | NO             |
+| `generate.ts:349`                              | `generateEmbeddingsWithLateChunking()` | YES (Redis)    |
+| `generate.ts:556`                              | `generateQueryEmbedding()`             | YES (Redis)    |
+| `semantic-matching.ts:54`                      | `getEmbedding()`                       | In-memory only |
+| `quality-validator.ts:188,197,323,324,605,606` | Multiple calls                         | NO             |
 
 ### Reranker API (`jina-reranker-v2-base-multilingual`)
 
-| File | Function | Caching |
-|------|----------|---------|
-| `reranker-client.ts:387` | `rerankDocuments()` | **YES (Redis, 1-hour TTL)** |
+| File                           | Function              | Caching                       |
+| ------------------------------ | --------------------- | ----------------------------- |
+| `reranker-client.ts:387`       | `rerankDocuments()`   | **YES (Redis, 1-hour TTL)**   |
 | `section-rag-retriever.ts:288` | Per-section reranking | **YES (via reranker-client)** |
-| `lesson-rag-retriever.ts` | Per-lesson reranking | **YES (via reranker-client)** |
+| `lesson-rag-retriever.ts`      | Per-lesson reranking  | **YES (via reranker-client)** |
 
 ---
 
@@ -327,11 +342,13 @@ redis-cli KEYS "search:*" | wc -l
 **File**: `src/shared/jina/reranker-client.ts`
 
 Added `TokenUsageTracker` class identical to `jina-client.ts`:
+
 - Tracks `totalTokens`, `requestCount`, `sessionDurationMs`
 - Logs every request with `[Jina Reranker] Request completed`
 - Exports `getRerankerTokenStats()` and `resetRerankerTokenStats()`
 
 **Log output now includes**:
+
 ```
 [Jina Reranker] Request completed {
   tokensUsed: 15234,
@@ -348,11 +365,13 @@ Added `TokenUsageTracker` class identical to `jina-client.ts`:
 **File**: `src/shared/jina/reranker-client.ts`
 
 Added Redis caching with 1-hour TTL (matching embeddings cache):
+
 - Cache key: SHA-256 hash of `query:topN:documents.join('|')`
 - Cache hits skip API call entirely
 - Cache misses make API call and store result
 
 **Expected token savings per course**:
+
 - First run: ~480,000 tokens (section + lesson reranking)
 - Retries: ~0 tokens (cache hits)
 - **Savings: 100% on retries, significant savings on similar queries**
@@ -360,10 +379,7 @@ Added Redis caching with 1-hour TTL (matching embeddings cache):
 ### New API
 
 ```typescript
-import {
-  getRerankerTokenStats,
-  resetRerankerTokenStats
-} from '@/shared/jina';
+import { getRerankerTokenStats, resetRerankerTokenStats } from '@/shared/jina';
 
 // Get current session stats
 const stats = getRerankerTokenStats();

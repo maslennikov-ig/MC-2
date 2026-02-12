@@ -26,10 +26,10 @@ const SUPABASE_SERVICE_KEY =
   process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
 
-// Test credentials
+// Test credentials — use env var or default for local development
 const TEST_USER = {
-  email: 'test-auth@megacampus.ai',
-  password: 'TestPassword123!',
+  email: process.env.TEST_AUTH_EMAIL || 'test-auth@megacampus.ai',
+  password: process.env.TEST_AUTH_PASSWORD || 'TestPassword123!',
 };
 
 async function main() {

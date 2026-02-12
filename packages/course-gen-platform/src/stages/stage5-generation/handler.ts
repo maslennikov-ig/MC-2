@@ -7,7 +7,7 @@
  * validate_quality) and stores the result in courses.course_structure
  * and courses.generation_metadata JSONB columns.
  *
- * Lesson validation (≥10 lessons) performed in performPostGenerationQualityGate after StateGraph.
+ * Lesson validation (>=10 lessons) performed in performPostGenerationQualityGate after StateGraph.
  *
  * Features:
  * - BullMQ handler for job type: STRUCTURE_GENERATION
@@ -39,461 +39,77 @@ import { QualityValidator } from '../../shared/validation/quality-validator';
 import { sanitizeCourseStructure } from './utils/sanitize';
 import { qdrantClient } from '@/shared/qdrant/client';
 import { acquireGenerationLock } from '@/shared/locks';
-import { logTrace } from '../../shared/trace-logger';
 import {
   triggerCourseCard,
   // DISABLED: triggerAllLessonCovers - lesson covers now manual via UI
 } from '../stage7-enrichments/services/auto-card-trigger';
 import { handleStageCompletion } from '@/shared/auto-approval';
 import { checkPauseAndDelay } from '../../shared/pause-check';
+import { isPipelineInterrupt } from '@/shared/errors';
+import { z } from 'zod';
+
+// Import helpers extracted from this file
 import {
-  OrchestrationFailedError,
-  ValidationFailedError,
-  QualityThresholdNotMetError,
-  MinimumLessonsNotMetError,
-  DatabaseError,
-  PipelineError,
-  isPipelineInterrupt,
-  classifyPipelineError,
-} from '@/shared/errors';
+  type StructureGenerationJobResult,
+  type GenerationErrorDetails,
+  MODEL_FALLBACK,
+  cleanupPlaceholdersInStructure,
+  classifyGenerationError,
+  isRetryableError,
+  determinePhaseFromError,
+  processWithFallback,
+  buildNonRetryableResult,
+} from './handler-helpers';
+import {
+  validateAndInitializeStage5,
+  materializeSectionsAndLessons,
+  markCourseAsFailed,
+  updateStatusForGenerationStart,
+  trackStage5Tokens,
+} from './handler-db-helpers';
+
+// Re-export types for consumers
+export type { GenerationErrorDetails, StructureGenerationJobResult };
+
+// ============================================================================
+// JOB DATA VALIDATION
+// ============================================================================
 
 /**
- * Cleanup placeholder patterns in generated content
- * Safety net for LLMs that occasionally generate placeholder text like [название], [описание]
- * Applied BEFORE Zod validation to prevent RT-006 validation failures
+ * Zod schema for GenerationJobInput validation
+ * Validates that job data contains required fields from @megacampus/shared-types
  */
-function cleanupPlaceholdersInStructure(structure: unknown): unknown {
-  const placeholderPatterns = [
-    /\[название[^\]]*\]/gi,
-    /\[описание[^\]]*\]/gi,
-    /\[текст[^\]]*\]/gi,
-    /\[insert[^\]]*\]/gi,
-    /\[TBD[^\]]*\]/gi,
-    /\[TODO[^\]]*\]/gi,
-    /\[placeholder[^\]]*\]/gi,
-    /\[пример[^\]]*\]/gi,
-    /\[добавить[^\]]*\]/gi,
-  ];
-
-  function cleanValue(value: string, fieldName: string, context: { lessonTitle?: string }): string {
-    let cleaned = value;
-    let hasPlaceholder = false;
-
-    for (const pattern of placeholderPatterns) {
-      if (pattern.test(cleaned)) {
-        hasPlaceholder = true;
-        const replacement = generateReplacement(fieldName, context);
-        cleaned = cleaned.replace(pattern, replacement);
-      }
-    }
-
-    if (hasPlaceholder) {
-      logger.warn(
-        { field: fieldName, original: value.substring(0, 50), cleaned: cleaned.substring(0, 50) },
-        'Cleaned placeholder in structure'
-      );
-    }
-
-    return cleaned;
-  }
-
-  function generateReplacement(fieldName: string, context: { lessonTitle?: string }): string {
-    const topic = context.lessonTitle || 'the topic';
-    const replacements: Record<string, string> = {
-      exercise_title: `Practice activity for ${topic}`,
-      exercise_description: `Apply the concepts learned in this lesson through hands-on practice. Focus on understanding ${topic} through practical application. Complete each step carefully, reflecting on your approach and outcomes.`,
-      exercise_type: 'practical exercise',
-      lesson_title: `Understanding ${topic}`,
-      lesson_description: `In this lesson, we explore ${topic} in detail, building practical skills and theoretical understanding.`,
-    };
-    return replacements[fieldName] || `Content for ${fieldName.replace(/_/g, ' ')}`;
-  }
-
-  function cleanObject(
-    obj: Record<string, unknown>,
-    context: { lessonTitle?: string } = {}
-  ): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-
-    for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'string') {
-        result[key] = cleanValue(value, key, context);
-      } else if (Array.isArray(value)) {
-        result[key] = value.map(item => {
-          if (typeof item === 'object' && item !== null) {
-            return cleanObject(item as Record<string, unknown>, context);
-          }
-          return item;
-        });
-      } else if (typeof value === 'object' && value !== null) {
-        // Extract context for nested objects
-        const newContext = { ...context };
-        if (key === 'lessons' || (obj.lesson_title && typeof obj.lesson_title === 'string')) {
-          newContext.lessonTitle = (obj.lesson_title as string) || context.lessonTitle;
-        }
-        result[key] = cleanObject(value as Record<string, unknown>, newContext);
-      } else {
-        result[key] = value;
-      }
-    }
-
-    return result;
-  }
-
-  if (typeof structure === 'object' && structure !== null) {
-    return cleanObject(structure as Record<string, unknown>);
-  }
-
-  return structure;
-}
+const GenerationJobInputSchema = z
+  .object({
+    course_id: z.string().uuid(),
+    organization_id: z.string().uuid(),
+    user_id: z.string().uuid(),
+  })
+  .passthrough();
 
 /**
- * Model fallback configuration for Stage 5
- * Similar to Stage 6 pattern for consistency
- *
- * @see specs/008-generation-generation-json/research-decisions/rt-004-retry-strategy.md
+ * Zod schema for job data validation
+ * Handles both wrapped format ({ input, metadata }) and flat format (GenerationJobInput)
  */
-const MODEL_FALLBACK = {
-  primary: {
-    ru: 'qwen/qwen3-235b-a22b-2507',
-    en: 'deepseek/deepseek-v3.1-terminus',
-  },
-  fallback: 'moonshotai/kimi-k2-0905',
-  maxPrimaryAttempts: 2,
-} as const;
-
-interface CourseStatusRow {
-  generation_status: string;
-  pause_at_stage_5: boolean;
-}
-
-/**
- * Error details for STRUCTURE_GENERATION jobs
- */
-export interface GenerationErrorDetails {
-  /** Error code for classification */
-  code:
-    | 'ORCHESTRATION_FAILED'
-    | 'VALIDATION_FAILED'
-    | 'QUALITY_THRESHOLD_NOT_MET'
-    | 'MINIMUM_LESSONS_NOT_MET'
-    | 'DATABASE_ERROR'
-    | 'UNKNOWN';
-
-  /** Human-readable error message */
-  message: string;
-
-  /** Phase where error occurred (if applicable) */
-  phase?: string;
-
-  /** Additional error context */
-  details?: Record<string, unknown>;
-}
-
-/**
- * Job result structure for STRUCTURE_GENERATION jobs
- *
- * Returned to BullMQ after job completion (success or failure).
- * Includes detailed error codes for troubleshooting and monitoring.
- */
-export interface StructureGenerationJobResult {
-  /** Success flag */
-  success: boolean;
-
-  /** Status message */
-  message?: string;
-
-  /** Course UUID */
-  course_id: string;
-
-  /** Complete generation result (only on success) */
-  generation_result?: GenerationResult;
-
-  /** Error details (only on failure) */
-  error?: GenerationErrorDetails;
-
-  /** Job execution metadata */
-  metadata: {
-    /** Total duration in milliseconds */
-    total_duration_ms: number;
-
-    /** Number of retry attempts */
-    retry_count: number;
-
-    /** Completion timestamp (ISO 8601) */
-    completed_at: string;
-  };
-}
-
-/**
- * Classify error into specific error codes
- *
- * Determines the appropriate error code based on error message patterns.
- * Used for monitoring, alerting, and retry decisions.
- *
- * Error codes:
- * - ORCHESTRATION_FAILED: LangGraph workflow execution failed
- * - VALIDATION_FAILED: Zod schema validation failed
- * - QUALITY_THRESHOLD_NOT_MET: Quality score < 0.75
- * - MINIMUM_LESSONS_NOT_MET: Total lessons < 10 (FR-015)
- * - DATABASE_ERROR: Supabase commit failed
- * - UNKNOWN: Unexpected error
- *
- * @param error - Error instance or string
- * @returns Error code for classification
- */
-function classifyGenerationError(
-  error: Error | string
-):
-  | 'ORCHESTRATION_FAILED'
-  | 'VALIDATION_FAILED'
-  | 'QUALITY_THRESHOLD_NOT_MET'
-  | 'MINIMUM_LESSONS_NOT_MET'
-  | 'DATABASE_ERROR'
-  | 'UNKNOWN' {
-  // PRIORITY 1: instanceof проверки для PipelineError
-  if (error instanceof OrchestrationFailedError) {
-    return 'ORCHESTRATION_FAILED';
-  }
-  if (error instanceof ValidationFailedError) {
-    return 'VALIDATION_FAILED';
-  }
-  if (error instanceof QualityThresholdNotMetError) {
-    return 'QUALITY_THRESHOLD_NOT_MET';
-  }
-  if (error instanceof MinimumLessonsNotMetError) {
-    return 'MINIMUM_LESSONS_NOT_MET';
-  }
-  if (error instanceof DatabaseError) {
-    return 'DATABASE_ERROR';
-  }
-  if (error instanceof PipelineError) {
-    // Type-safe classification for any PipelineError
-    return classifyPipelineError(error) as any;
-  }
-
-  // PRIORITY 2: string matching fallback для legacy ошибок
-  const errorMessage = error instanceof Error ? error.message : String(error);
-
-  // StateGraph execution failures
-  if (
-    errorMessage.includes('StateGraph execution failed') ||
-    errorMessage.includes('LangGraph') ||
-    errorMessage.includes('phase execution failed')
-  ) {
-    return 'ORCHESTRATION_FAILED';
-  }
-
-  // Schema validation failures
-  if (
-    errorMessage.includes('Schema validation failed') ||
-    errorMessage.includes('Zod') ||
-    errorMessage.includes('validation error') ||
-    errorMessage.includes('invalid type')
-  ) {
-    return 'VALIDATION_FAILED';
-  }
-
-  // Quality threshold failures (FR-026)
-  if (
-    errorMessage.includes('quality score') ||
-    errorMessage.includes('quality threshold') ||
-    errorMessage.includes('0.75')
-  ) {
-    return 'QUALITY_THRESHOLD_NOT_MET';
-  }
-
-  // Minimum lessons failures (FR-015)
-  if (
-    errorMessage.includes('minimum 10 lessons') ||
-    errorMessage.includes('MINIMUM_LESSONS_NOT_MET') ||
-    errorMessage.includes('Course must have minimum 10 lessons')
-  ) {
-    return 'MINIMUM_LESSONS_NOT_MET';
-  }
-
-  // Database commit failures
-  if (
-    errorMessage.includes('Database commit failed') ||
-    errorMessage.includes('Database update failed') ||
-    errorMessage.includes('Supabase')
-  ) {
-    return 'DATABASE_ERROR';
-  }
-
-  return 'UNKNOWN';
-}
-
-/**
- * Determines if an error should be retried by BullMQ.
- * VALIDATION_FAILED errors should NOT be retried as the input is invalid.
- *
- * @param errorCode - Classified error code
- * @returns true if error is retryable, false otherwise
- */
-function isRetryableError(errorCode: ReturnType<typeof classifyGenerationError>): boolean {
-  // Validation errors will never succeed on retry - invalid input stays invalid
-  if (errorCode === 'VALIDATION_FAILED') {
-    return false;
-  }
-  // All other errors might be transient (LLM issues, DB unavailable, etc.)
-  return true;
-}
-
-/**
- * Determine phase from error message
- *
- * Extracts the phase identifier from error messages for better debugging.
- *
- * @param error - Error instance
- * @returns Phase identifier (if determinable)
- */
-function determinePhaseFromError(error: Error | string): string | undefined {
-  if (!(error instanceof Error)) {
-    return undefined;
-  }
-
-  const message = error.message;
-
-  if (message.includes('validate_input') || message.includes('Phase 1')) {
-    return 'step_1_validate_input';
-  } else if (message.includes('generate_metadata') || message.includes('Phase 2')) {
-    return 'step_2_generate_metadata';
-  } else if (message.includes('generate_sections') || message.includes('Phase 3')) {
-    return 'step_3_generate_sections';
-  } else if (message.includes('validate_quality') || message.includes('Phase 4')) {
-    return 'step_4_validate_quality';
-  }
-  // Phase 5 removed - lesson validation in performPostGenerationQualityGate
-
-  return undefined;
-}
-
-/**
- * Execute generation with model fallback strategy
- *
- * Tries primary model (language-specific) up to maxPrimaryAttempts times,
- * then falls back to universal fallback model.
- *
- * @see specs/008-generation-generation-json/research-decisions/rt-004-retry-strategy.md
- *
- * @param orchestrator - GenerationOrchestrator instance
- * @param input - Generation job input
- * @param modelConfig - Model fallback configuration
- * @param phaseLogger - Pino logger instance with course context
- * @returns GenerationResult from successful execution
- * @throws Error if both primary and fallback models fail
- */
-async function processWithFallback(
-  orchestrator: GenerationOrchestrator,
-  input: GenerationJobInput,
-  modelConfig: typeof MODEL_FALLBACK,
-  phaseLogger: pino.Logger
-): Promise<GenerationResult> {
-  const courseId = input.course_id;
-  const language = input.frontend_parameters?.language || 'ru';
-  const primaryModel =
-    modelConfig.primary[language as keyof typeof modelConfig.primary] || modelConfig.primary.ru;
-
-  // Try primary model
-  for (let attempt = 1; attempt <= modelConfig.maxPrimaryAttempts; attempt++) {
-    try {
-      phaseLogger.info(
-        {
-          courseId,
-          attempt,
-          maxAttempts: modelConfig.maxPrimaryAttempts,
-          model: primaryModel,
-          source: 'primary',
-        },
-        'Stage 5: Attempting generation with primary model'
-      );
-
-      return await orchestrator.execute(input, primaryModel);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      phaseLogger.warn(
-        {
-          courseId,
-          attempt,
-          maxAttempts: modelConfig.maxPrimaryAttempts,
-          model: primaryModel,
-          error: errorMessage,
-        },
-        'Stage 5: Primary model attempt failed'
-      );
-
-      // Trace log for retry attempt
-      await logTrace({
-        courseId,
-        stage: 'stage_5',
-        phase: 'model_fallback',
-        stepName: 'primary_attempt_failed',
-        inputData: { attempt, model: primaryModel },
-        errorData: { error: errorMessage },
-        durationMs: 0,
-      });
-
-      if (attempt < modelConfig.maxPrimaryAttempts) {
-        const delayMs = 1000 * Math.pow(2, attempt - 1);
-        phaseLogger.debug({ courseId, delayMs }, 'Stage 5: Waiting before retry');
-        await new Promise(r => setTimeout(r, delayMs));
-      }
-    }
-  }
-
-  // Fallback to secondary model
-  phaseLogger.info(
-    {
-      courseId,
-      primaryModel,
-      fallbackModel: modelConfig.fallback,
-      reason: 'Primary model exhausted all attempts',
-    },
-    'Stage 5: Falling back to secondary model'
-  );
-
-  // Trace log for fallback activation
-  await logTrace({
-    courseId,
-    stage: 'stage_5',
-    phase: 'model_fallback',
-    stepName: 'fallback_activated',
-    inputData: { primaryModel, fallbackModel: modelConfig.fallback },
-    outputData: { reason: 'Primary model exhausted all attempts' },
-    durationMs: 0,
-  });
-
-  return await orchestrator.execute(input, modelConfig.fallback);
-}
+const JobDataSchema = z.union([
+  z.object({
+    input: GenerationJobInputSchema,
+    metadata: z
+      .object({
+        jobId: z.string(),
+        priority: z.number(),
+        attempt: z.number(),
+      })
+      .optional(),
+  }),
+  GenerationJobInputSchema,
+]);
 
 /**
  * Stage 5 Generation Handler
  *
- * Processes STRUCTURE_GENERATION jobs by executing the 5-phase LangGraph
+ * Processes STRUCTURE_GENERATION jobs by executing the 4-phase LangGraph
  * orchestrator and storing results in the database.
- *
- * Workflow:
- * 1. Log job start with metadata
- * 2. Execute GenerationOrchestrator.execute() (5 phases)
- * 3. Validate result with Zod schema (CourseStructureSchema)
- * 4. Sanitize for XSS with DOMPurify (FR-008)
- * 5. Atomic database commit (FR-023)
- * 6. Return success result with metadata
- * 7. On error: Classify error, update status to 'generation_failed' (FR-024), throw error
- *
- * Error Handling:
- * - ORCHESTRATION_FAILED: LangGraph workflow failed (BullMQ will retry)
- * - VALIDATION_FAILED: Schema validation failed (BullMQ will retry)
- * - QUALITY_THRESHOLD_NOT_MET: Quality < 0.75 (BullMQ will retry)
- * - MINIMUM_LESSONS_NOT_MET: < 10 lessons (BullMQ will retry)
- * - DATABASE_ERROR: Database commit failed (BullMQ will retry)
- * - UNKNOWN: Unexpected error (BullMQ will retry)
- *
- * Note: This handler doesn't extend BaseJobHandler because GenerationJobData
- * has a different structure (uses 'input' field instead of flat fields).
- * We implement the handler interface directly.
  */
 class Stage5GenerationHandler {
   /**
@@ -509,26 +125,13 @@ class Stage5GenerationHandler {
     job: Job<GenerationJobData>,
     token?: string
   ): Promise<StructureGenerationJobResult> {
-    const jobData = job.data;
-
-    return await this.execute(jobData, job, token);
+    return await this.execute(job.data, job, token);
   }
 
   /**
    * Execute the generation job
    *
-   * Core logic for processing the job:
-   * 1. Run 5-phase LangGraph orchestration
-   * 2. Validate result with Zod schema
-   * 3. Sanitize for XSS
-   * 4. Store result in database (atomic commit)
-   * 5. Log metrics and completion
-   * 6. Return structured result
-   *
-   * @param jobData - Job payload from BullMQ
-   * @param job - BullMQ job instance
-   * @param token - BullMQ job token for pause/delay operations
-   * @returns Structured job result
+   * Core logic: orchestration -> validation -> sanitization -> DB commit -> result
    */
   async execute(
     jobData: GenerationJobData,
@@ -537,13 +140,28 @@ class Stage5GenerationHandler {
   ): Promise<StructureGenerationJobResult> {
     const startTime = Date.now();
 
-    // Handle both old format (with input/metadata wrapper) and new flat format
-    const jobDataAny = jobData as unknown as Record<string, any>;
-    const input = (jobDataAny.input || jobDataAny) as GenerationJobInput;
-    const metadata = jobDataAny.metadata || {
-      jobId: job.id,
-      priority: job.opts?.priority || 1,
-      attempt: job.attemptsMade,
+    // Validate job data structure with Zod
+    const parseResult = JobDataSchema.safeParse(jobData);
+    if (!parseResult.success) {
+      logger.error(
+        { jobId: job.id, errors: parseResult.error.flatten() },
+        'Invalid job data structure'
+      );
+      throw new Error(`Job data validation failed: ${parseResult.error.message}`);
+    }
+
+    const parsed = parseResult.data;
+    const input = ('input' in parsed ? parsed.input : parsed) as GenerationJobInput;
+
+    // Extract metadata with fallback to job properties
+    const hasMetadata = 'metadata' in parsed && parsed.metadata;
+    const parsedMetadata = hasMetadata
+      ? (parsed.metadata as { jobId: string; priority: number; attempt: number })
+      : null;
+    const metadata: { jobId: string; priority: number; attempt: number } = {
+      jobId: parsedMetadata?.jobId ?? job.id ?? 'unknown',
+      priority: parsedMetadata?.priority ?? job.opts?.priority ?? 1,
+      attempt: parsedMetadata?.attempt ?? job.attemptsMade,
     };
 
     const { course_id, organization_id, user_id } = input;
@@ -567,88 +185,8 @@ class Stage5GenerationHandler {
     );
 
     try {
-      // Layer 3: Worker validation and fallback initialization for Stage 5
-      const supabaseForValidation = getSupabaseAdmin();
-      const { data } = await supabaseForValidation
-        .from('courses')
-        .select('generation_status, pause_at_stage_5')
-        .eq('id', course_id)
-        .single();
-
-      const course = data as unknown as CourseStatusRow;
-
-      if (!course) {
-        logger.error({ courseId: course_id, jobId: job.id }, 'Worker validation: Course not found');
-        throw new Error('Course not found');
-      }
-
-      // Check if Stage 5 is initialized (valid states: stage_5_init, stage_5_generating, stage_5_awaiting_approval)
-      const validStage5States = ['stage_5_init', 'stage_5_generating', 'stage_5_awaiting_approval'];
-      if (!validStage5States.includes(course.generation_status)) {
-        // If status is 'failed', do NOT reinitialize - generation already failed permanently
-        if (course.generation_status === 'failed') {
-          logger.error(
-            {
-              courseId: course_id,
-              jobId: job.id,
-              currentStatus: course.generation_status,
-            },
-            'Worker validation: Course is in failed state, refusing to retry'
-          );
-          throw new Error(`Course ${course_id} is in failed state, cannot retry automatically`);
-        }
-
-        logger.warn(
-          {
-            courseId: course_id,
-            jobId: job.id,
-            currentStatus: course.generation_status,
-          },
-          'Worker validation: Stage 5 not initialized, initializing as fallback'
-        );
-
-        try {
-          const { InitializeFSMCommandHandler } = await import(
-            '@/shared/fsm/fsm-initialization-command-handler'
-          );
-          const { metricsStore } = await import('@/orchestrator/metrics');
-
-          const commandHandler = new InitializeFSMCommandHandler();
-          await commandHandler.handle({
-            entityId: course_id,
-            userId: user_id || 'system',
-            organizationId: organization_id || 'unknown',
-            idempotencyKey: `worker-fallback-stage5-${job.id}`,
-            initiatedBy: 'WORKER',
-            initialState: 'stage_5_init',
-            data: { trigger: 'worker_fallback_stage5' },
-            jobs: [],
-          });
-
-          // Track Layer 3 success
-          metricsStore.recordLayer3Activation(true, course_id);
-
-          logger.info(
-            { courseId: course_id, jobId: job.id },
-            'Worker fallback: Stage 5 initialized successfully'
-          );
-        } catch (error) {
-          // Track Layer 3 failure
-          const { metricsStore } = await import('@/orchestrator/metrics');
-          metricsStore.recordLayer3Activation(false, course_id);
-
-          logger.warn(
-            {
-              courseId: course_id,
-              jobId: job.id,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            'Worker fallback initialization failed (continuing processing)'
-          );
-        }
-      }
-
-      // Continue normal processing...
+      // Layer 3: Worker validation and fallback initialization
+      const course = await validateAndInitializeStage5(course_id, user_id, organization_id, job.id);
 
       const jobLogger = logger.child({
         jobId: job.id,
@@ -671,293 +209,30 @@ class Stage5GenerationHandler {
         'Starting Stage 5 generation job'
       );
 
-      const supabaseAdmin = getSupabaseAdmin();
-
       try {
-        // =================================================================
-        // STEP 1: Execute 5-Phase LangGraph Orchestration
-        // =================================================================
-        jobLogger.info('Initializing GenerationOrchestrator');
+        // STEP 1: Execute generation pipeline with model fallback
+        const result = await this.executeGenerationPipeline(input, jobLogger);
 
-        // Initialize services with optional RAG context
-        const qdrantClientInstance = input.vectorized_documents ? qdrantClient : undefined;
+        // STEP 2: Validate and sanitize the result
+        const sanitizedStructure = this.validateAndSanitize(result, jobLogger);
 
-        const orchestrator = new GenerationOrchestrator(
-          new MetadataGenerator(),
-          new SectionBatchGenerator(),
-          new QualityValidator(),
-          qdrantClientInstance
-        );
-
-        // Check current status before attempting transitions (handles retry scenario)
-        const { data: currentCourse } = await supabaseAdmin
-          .from('courses')
-          .select('generation_status')
-          .eq('id', course_id)
-          .single();
-
-        const currentStatus = currentCourse?.generation_status;
-
-        // Only set stage_5_init → stage_5_generating if not already in generating state
-        // This handles BullMQ retry scenario where job failed after setting stage_5_generating
-        if (currentStatus !== 'stage_5_generating') {
-          // Update course status to 'stage_5_init' before starting generation
-          jobLogger.info('Setting course status to stage_5_init');
-          const { error: statusError } = await supabaseAdmin
-            .from('courses')
-            .update({ generation_status: 'stage_5_init' as const })
-            .eq('id', course_id);
-
-          if (statusError) {
-            throw new Error(`Failed to update status to stage_5_init: ${statusError.message}`);
-          }
-
-          // Update to stage_5_generating before orchestration
-          jobLogger.info('Setting course status to stage_5_generating');
-          const { error: generatingError } = await supabaseAdmin
-            .from('courses')
-            .update({ generation_status: 'stage_5_generating' as const })
-            .eq('id', course_id);
-
-          if (generatingError) {
-            throw new Error(
-              `Failed to update status to stage_5_generating: ${generatingError.message}`
-            );
-          }
-        } else {
-          jobLogger.info(
-            { currentStatus },
-            'Skipping status updates - already in stage_5_generating (retry scenario)'
-          );
-        }
-
-        jobLogger.info('Executing 5-phase generation pipeline');
-
-        const result: GenerationResult = await processWithFallback(
-          orchestrator,
-          input,
-          MODEL_FALLBACK,
+        // STEP 3: Commit to database and handle post-generation tasks
+        await this.commitAndFinalize(
+          course_id,
+          organization_id,
+          user_id,
+          sanitizedStructure,
+          result,
+          course,
+          lockGuard,
           jobLogger
         );
 
-        jobLogger.info(
-          {
-            sectionsCount: result.course_structure.sections.length,
-            totalLessons: result.course_structure.sections.reduce(
-              (sum, section) => sum + section.lessons.length,
-              0
-            ),
-            totalTokens: result.generation_metadata.total_tokens.total,
-            overallQuality: result.generation_metadata.quality_scores.overall,
-            costUsd: result.generation_metadata.cost_usd,
-          },
-          'Generation orchestration completed'
-        );
-
-        // =================================================================
-        // STEP 2: Cleanup Placeholders and Validate with Zod Schema
-        // =================================================================
-        jobLogger.info('Cleaning up potential LLM placeholders in course structure');
-
-        // Apply placeholder cleanup before Zod validation to prevent RT-006 failures
-        const cleanedStructure = cleanupPlaceholdersInStructure(result.course_structure);
-
-        jobLogger.info('Validating course structure with Zod schema');
-
-        const validationResult = CourseStructureSchema.safeParse(cleanedStructure);
-
-        if (!validationResult.success) {
-          const validationErrors = validationResult.error.issues
-            .map(issue => `${issue.path.join('.')}: ${issue.message}`)
-            .join('; ');
-
-          jobLogger.error(
-            {
-              validationErrors: validationResult.error.issues,
-            },
-            'Schema validation failed'
-          );
-
-          throw new Error(`Schema validation failed: ${validationErrors}`);
-        }
-
-        jobLogger.info('Schema validation passed');
-
-        // =================================================================
-        // STEP 3: Sanitize for XSS Prevention (FR-008)
-        // =================================================================
-        jobLogger.info('Sanitizing course structure for XSS prevention (FR-008)');
-
-        const sanitizedStructure = sanitizeCourseStructure(
-          cleanedStructure as typeof result.course_structure
-        );
-
-        jobLogger.info('XSS sanitization complete');
-
-        // =================================================================
-        // STEP 4: Atomic Database Commit with Multi-Step Status Update (FR-023)
-        // =================================================================
-        jobLogger.info(
-          {
-            courseId: course_id,
-            pauseAtStage5: course.pause_at_stage_5,
-          },
-          'Committing course structure to database (atomic commit)'
-        );
-
-        // Step 1: Save structure first (before auto-approval check)
-        jobLogger.info('Saving course structure to database');
-        const { error: structureError } = await supabaseAdmin
-          .from('courses')
-          .update({
-            course_structure: sanitizedStructure,
-            generation_metadata: result.generation_metadata,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', course_id);
-
-        if (structureError) {
-          throw new Error(`Failed to save structure: ${structureError.message}`);
-        }
-
-        // Step 1.5: Materialize sections and lessons from course_structure to DB tables
-        // This is required for Stage 6, Stage 7 (covers), and other features that query sections/lessons tables
-        jobLogger.info('Materializing sections and lessons to database tables');
-        try {
-          let materializedSections = 0;
-          let materializedLessons = 0;
-
-          for (const [sectionIndex, section] of sanitizedStructure.sections.entries()) {
-            const sectionNumber = section.section_number ?? sectionIndex + 1;
-
-            // Create section record
-            const { data: newSection, error: sectionInsertError } = await supabaseAdmin
-              .from('sections')
-              .insert({
-                course_id: course_id,
-                title: section.section_title,
-                order_index: sectionNumber,
-              })
-              .select('id')
-              .single();
-
-            if (sectionInsertError || !newSection) {
-              jobLogger.warn(
-                {
-                  courseId: course_id,
-                  sectionNumber,
-                  error: sectionInsertError?.message,
-                },
-                'Failed to create section record (may already exist)'
-              );
-              continue;
-            }
-
-            materializedSections++;
-
-            // Create lesson records for this section
-            for (const [lessonIndex, lesson] of section.lessons.entries()) {
-              const lessonNumber = lesson.lesson_number ?? lessonIndex + 1;
-
-              const { error: lessonInsertError } = await supabaseAdmin.from('lessons').insert({
-                section_id: newSection.id,
-                title: lesson.lesson_title,
-                order_index: lessonNumber,
-                lesson_type: 'text',
-                duration_minutes: lesson.estimated_duration_minutes || 15,
-                objectives: lesson.lesson_objectives || [],
-              });
-
-              if (lessonInsertError) {
-                jobLogger.warn(
-                  {
-                    courseId: course_id,
-                    sectionNumber,
-                    lessonNumber,
-                    error: lessonInsertError.message,
-                  },
-                  'Failed to create lesson record'
-                );
-              } else {
-                materializedLessons++;
-              }
-            }
-          }
-
-          jobLogger.info(
-            {
-              courseId: course_id,
-              materializedSections,
-              materializedLessons,
-            },
-            'Sections and lessons materialized successfully'
-          );
-        } catch (materializeError) {
-          // Non-fatal: log warning but don't fail the job
-          // Stage 6 can still work with course_structure JSONB
-          jobLogger.warn(
-            {
-              courseId: course_id,
-              error:
-                materializeError instanceof Error
-                  ? materializeError.message
-                  : String(materializeError),
-            },
-            'Failed to materialize sections/lessons (non-fatal, Stage 6 will use JSONB)'
-          );
-        }
-
-        // Clear heartbeat - lock will be released in finally block
-        clearInterval(lockGuard.heartbeatInterval);
-
-        // Step 2: Handle stage completion (checks generation_mode)
-        // If automatic: auto-approves and queues Stage 6
-        // If semi_automatic: sets status to stage_5_awaiting_approval
-        const { autoApproved } = await handleStageCompletion(course_id, 5);
-        jobLogger.info(
-          { courseId: course_id, autoApproved },
-          autoApproved ? 'Stage 5 auto-approved → Stage 6 queued' : 'Stage 5 awaiting approval'
-        );
-
-        jobLogger.info(
-          {
-            courseId: course_id,
-          },
-          'Course structure committed successfully'
-        );
-
-        // =================================================================
-        // STEP 5: Calculate Final Metrics
-        // =================================================================
+        // STEP 4: Return success result
         const totalDurationMs = Date.now() - startTime;
+        this.logSuccessMetrics(result, totalDurationMs, jobLogger);
 
-        jobLogger.info(
-          {
-            duration_ms: totalDurationMs,
-            sections_count: result.course_structure.sections.length,
-            total_lessons: result.course_structure.sections.reduce(
-              (sum, section) => sum + section.lessons.length,
-              0
-            ),
-            estimated_hours: result.course_structure.estimated_duration_hours,
-            difficulty: result.course_structure.difficulty_level,
-            learning_outcomes: result.course_structure.learning_outcomes.length,
-            total_cost_usd: result.generation_metadata.cost_usd,
-            total_tokens: result.generation_metadata.total_tokens.total,
-            overall_quality: result.generation_metadata.quality_scores.overall,
-            model_metadata: result.generation_metadata.model_used.metadata,
-            model_sections: result.generation_metadata.model_used.sections,
-            batch_count: result.generation_metadata.batch_count,
-            retry_metadata: result.generation_metadata.retry_count.metadata,
-            retry_sections: result.generation_metadata.retry_count.sections,
-          },
-          'Stage 5 generation job completed successfully'
-        );
-
-        // =================================================================
-        // STEP 5.5: Auto-trigger Course Card Generation (non-blocking)
-        // Course card is auto-generated, lesson covers are manual via UI
-        // =================================================================
+        // Auto-trigger Course Card Generation (non-blocking)
         triggerCourseCard({
           courseId: course_id,
           userId: user_id,
@@ -969,45 +244,6 @@ class Stage5GenerationHandler {
           );
         });
 
-        // =================================================================
-        // DISABLED: Auto lesson cover generation too expensive (~$0.04/image via OpenRouter)
-        // Course card still generated above, lesson covers can be added manually if needed
-        // =================================================================
-        // triggerAllLessonCovers({
-        //   courseId: course_id,
-        //   userId: user_id,
-        //   organizationId: organization_id,
-        // })
-        //   .then(coverResult => {
-        //     jobLogger.info(
-        //       {
-        //         courseId: course_id,
-        //         triggeredCovers: coverResult.succeeded.length,
-        //         failedCovers: coverResult.failed.length,
-        //         skippedCovers: coverResult.skipped.length,
-        //       },
-        //       'Cover generation trigger completed'
-        //     );
-        //     if (coverResult.succeeded.length === 0 && coverResult.failed.length > 0) {
-        //       jobLogger.warn(
-        //         {
-        //           courseId: course_id,
-        //           failedLessons: coverResult.failed.map(f => f.lessonId),
-        //         },
-        //         'All cover triggers failed - covers will not be generated'
-        //       );
-        //     }
-        //   })
-        //   .catch(err => {
-        //     jobLogger.warn(
-        //       { courseId: course_id, error: err instanceof Error ? err.message : String(err) },
-        //       'Non-blocking: Failed to trigger lesson cover generation'
-        //     );
-        //   });
-
-        // =================================================================
-        // STEP 6: Return Success Result
-        // =================================================================
         return {
           success: true,
           message: 'Generation completed successfully',
@@ -1020,213 +256,282 @@ class Stage5GenerationHandler {
           },
         };
       } catch (error) {
-        // =================================================================
-        // ERROR HANDLING
-        // =================================================================
-        // Interrupts are control flow, not errors (for future use)
-        if (isPipelineInterrupt(error)) {
-          jobLogger.info({ code: error.code }, 'Pipeline paused');
-          throw error; // Re-throw for handler
-        }
-
-        const totalDurationMs = Date.now() - startTime;
-
-        jobLogger.error(
-          {
-            error: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
-            duration_ms: totalDurationMs,
-            attemptsMade: job.attemptsMade,
-          },
-          'Stage 5 generation job failed'
-        );
-
-        // Classify error for monitoring and retry decisions
-        const errorCode = classifyGenerationError(error instanceof Error ? error : String(error));
-        const shouldRetry = isRetryableError(errorCode);
-
-        jobLogger.info(
-          {
-            errorCode,
-            shouldRetry,
-            attemptsMade: job.attemptsMade,
-            maxAttempts: job.opts.attempts || 3,
-          },
-          'Error classified'
-        );
-
-        // Determine phase from error message (if available)
-        const phase = determinePhaseFromError(error instanceof Error ? error : String(error));
-
-        if (phase) {
-          jobLogger.info(
-            {
-              phase,
-            },
-            'Error occurred in specific phase'
-          );
-        }
-
-        // =================================================================
-        // FR-024: Update courses.generation_status = 'failed'
-        // IMPORTANT: Only mark as failed on the LAST retry attempt
-        // to allow BullMQ retries to actually work
-        // =================================================================
-        const maxAttempts = job.opts.attempts || 3;
-        const isLastAttempt = job.attemptsMade >= maxAttempts - 1;
-
-        if (isLastAttempt) {
-          jobLogger.info(
-            {
-              courseId: course_id,
-              errorCode,
-              attemptsMade: job.attemptsMade,
-              maxAttempts,
-            },
-            'Last retry attempt - Updating generation_status to failed (FR-024)'
-          );
-
-          try {
-            const { error: statusUpdateError } = await supabaseAdmin
-              .from('courses')
-              .update({
-                generation_status: 'failed', // FR-024: Mark generation as failed
-                failed_at_stage: 5, // Track which stage failed
-                error_code: errorCode as any, // Classified error code
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', course_id);
-
-            if (statusUpdateError) {
-              jobLogger.error(
-                {
-                  error: statusUpdateError,
-                  courseId: course_id,
-                },
-                'Failed to update generation_status to failed'
-              );
-            } else {
-              jobLogger.info(
-                {
-                  courseId: course_id,
-                },
-                'Generation status updated to failed'
-              );
-            }
-          } catch (statusError) {
-            jobLogger.error(
-              {
-                error: statusError instanceof Error ? statusError.message : String(statusError),
-                courseId: course_id,
-              },
-              'Exception while updating course status'
-            );
-          }
-        } else {
-          jobLogger.info(
-            {
-              courseId: course_id,
-              errorCode,
-              attemptsMade: job.attemptsMade,
-              maxAttempts,
-              remainingAttempts: maxAttempts - job.attemptsMade - 1,
-            },
-            'Not last attempt - Keeping status for BullMQ retry'
-          );
-        }
-
-        // Handle non-retryable errors immediately (don't waste retry attempts)
-        if (!shouldRetry) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-
-          jobLogger.warn(
-            {
-              errorCode,
-              phase,
-              error: errorMessage,
-            },
-            'Non-retryable error - marking job as failed without retry'
-          );
-
-          // Update DB immediately for non-retryable errors
-          try {
-            const { error: statusUpdateError } = await supabaseAdmin
-              .from('courses')
-              .update({
-                generation_status: 'failed',
-                failed_at_stage: 5,
-                error_code: errorCode as any, // Classified error code
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', course_id);
-
-            if (statusUpdateError) {
-              jobLogger.error(
-                { error: statusUpdateError },
-                'Failed to update course status for non-retryable error'
-              );
-            }
-          } catch (dbError) {
-            jobLogger.error(
-              { error: dbError },
-              'Exception updating course status for non-retryable error'
-            );
-          }
-
-          // Return failed result (don't throw - job completes as failed without retry)
-          const endTime = performance.now();
-          return {
-            success: false,
-            message: `Non-retryable error: ${errorMessage}`,
-            course_id,
-            error: {
-              code: errorCode,
-              message: errorMessage,
-              phase,
-            },
-            metadata: {
-              total_duration_ms: Math.round(endTime - startTime),
-              retry_count: job.attemptsMade,
-              completed_at: new Date().toISOString(),
-            },
-          };
-        }
-
-        // Log error classification for monitoring (retryable errors)
-        jobLogger.warn(
-          {
-            errorCode,
-            phase,
-            shouldRetry,
-          },
-          'Generation error - BullMQ will retry per job configuration'
-        );
-
-        // Re-throw error to let BullMQ handle retries
-        // BullMQ will retry based on job configuration (maxAttempts, backoff, etc.)
-        // The error result will be constructed by BullMQ's failure handler
-        throw error;
+        return await this.handleExecutionError(error, course_id, startTime, job, jobLogger);
       }
     } finally {
       // Release generation lock (FR-037: always release in finally)
       await lockGuard.release();
     }
   }
+
+  /**
+   * Execute the generation pipeline with model fallback
+   */
+  private async executeGenerationPipeline(
+    input: GenerationJobInput,
+    jobLogger: pino.Logger
+  ): Promise<GenerationResult> {
+    jobLogger.info('Initializing GenerationOrchestrator');
+
+    // Initialize services with optional RAG context
+    const qdrantClientInstance = input.vectorized_documents ? qdrantClient : undefined;
+
+    const orchestrator = new GenerationOrchestrator(
+      new MetadataGenerator(),
+      new SectionBatchGenerator(),
+      new QualityValidator(),
+      qdrantClientInstance
+    );
+
+    // Update status transitions
+    await updateStatusForGenerationStart(input.course_id, jobLogger);
+
+    jobLogger.info('Executing 4-phase generation pipeline');
+
+    const result: GenerationResult = await processWithFallback(
+      orchestrator,
+      input,
+      MODEL_FALLBACK,
+      jobLogger
+    );
+
+    jobLogger.info(
+      {
+        sectionsCount: result.course_structure.sections.length,
+        totalLessons: result.course_structure.sections.reduce(
+          (sum, section) => sum + section.lessons.length,
+          0
+        ),
+        totalTokens: result.generation_metadata.total_tokens.total,
+        overallQuality: result.generation_metadata.quality_scores.overall,
+        costUsd: result.generation_metadata.cost_usd,
+      },
+      'Generation orchestration completed'
+    );
+
+    return result;
+  }
+
+  /**
+   * Validate with Zod schema and sanitize for XSS
+   */
+  private validateAndSanitize(
+    result: GenerationResult,
+    jobLogger: pino.Logger
+  ): typeof result.course_structure {
+    // Cleanup placeholders before validation
+    jobLogger.info('Cleaning up potential LLM placeholders in course structure');
+    const cleanedStructure = cleanupPlaceholdersInStructure(result.course_structure);
+
+    // Validate with Zod schema
+    jobLogger.info('Validating course structure with Zod schema');
+    const validationResult = CourseStructureSchema.safeParse(cleanedStructure);
+
+    if (!validationResult.success) {
+      const validationErrors = validationResult.error.issues
+        .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+        .join('; ');
+
+      jobLogger.error(
+        { validationErrors: validationResult.error.issues },
+        'Schema validation failed'
+      );
+
+      throw new Error(`Schema validation failed: ${validationErrors}`);
+    }
+
+    jobLogger.info('Schema validation passed');
+
+    // Sanitize for XSS Prevention (FR-008)
+    jobLogger.info('Sanitizing course structure for XSS prevention (FR-008)');
+    const sanitizedStructure = sanitizeCourseStructure(
+      cleanedStructure as typeof result.course_structure
+    );
+    jobLogger.info('XSS sanitization complete');
+
+    return sanitizedStructure;
+  }
+
+  /**
+   * Commit structure to database and handle post-generation tasks
+   */
+  private async commitAndFinalize(
+    courseId: string,
+    _organizationId: string | undefined,
+    _userId: string | undefined,
+    sanitizedStructure: GenerationResult['course_structure'],
+    result: GenerationResult,
+    course: { pause_at_stage_5: boolean },
+    lockGuard: { heartbeatInterval: ReturnType<typeof setInterval>; release: () => Promise<void> },
+    jobLogger: pino.Logger
+  ): Promise<void> {
+    const supabaseAdmin = getSupabaseAdmin();
+
+    jobLogger.info(
+      { courseId, pauseAtStage5: course.pause_at_stage_5 },
+      'Committing course structure to database (atomic commit)'
+    );
+
+    // Save structure
+    const { error: structureError } = await supabaseAdmin
+      .from('courses')
+      .update({
+        course_structure: sanitizedStructure,
+        generation_metadata: result.generation_metadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId);
+
+    if (structureError) {
+      throw new Error(`Failed to save structure: ${structureError.message}`);
+    }
+
+    // Materialize sections and lessons to DB tables (non-fatal on failure)
+    jobLogger.info('Materializing sections and lessons to database tables');
+    try {
+      await materializeSectionsAndLessons(courseId, sanitizedStructure, jobLogger);
+    } catch (materializeError) {
+      jobLogger.warn(
+        {
+          courseId,
+          error:
+            materializeError instanceof Error ? materializeError.message : String(materializeError),
+        },
+        'Failed to materialize sections/lessons (non-fatal, Stage 6 will use JSONB)'
+      );
+    }
+
+    // Clear heartbeat - lock will be released in finally block
+    clearInterval(lockGuard.heartbeatInterval);
+
+    // Track tokens in generation_progress
+    const stage5Tokens = result.generation_metadata?.total_tokens?.total;
+    await trackStage5Tokens(courseId, stage5Tokens, jobLogger);
+
+    // Handle stage completion (checks generation_mode)
+    const { autoApproved } = await handleStageCompletion(courseId, 5);
+    jobLogger.info(
+      { courseId, autoApproved },
+      autoApproved ? 'Stage 5 auto-approved -> Stage 6 queued' : 'Stage 5 awaiting approval'
+    );
+
+    jobLogger.info({ courseId }, 'Course structure committed successfully');
+  }
+
+  /**
+   * Log success metrics after generation completes
+   */
+  private logSuccessMetrics(
+    result: GenerationResult,
+    totalDurationMs: number,
+    jobLogger: pino.Logger
+  ): void {
+    jobLogger.info(
+      {
+        duration_ms: totalDurationMs,
+        sections_count: result.course_structure.sections.length,
+        total_lessons: result.course_structure.sections.reduce(
+          (sum, section) => sum + section.lessons.length,
+          0
+        ),
+        estimated_hours: result.course_structure.estimated_duration_hours,
+        difficulty: result.course_structure.difficulty_level,
+        learning_outcomes: result.course_structure.learning_outcomes.length,
+        total_cost_usd: result.generation_metadata.cost_usd,
+        total_tokens: result.generation_metadata.total_tokens.total,
+        overall_quality: result.generation_metadata.quality_scores.overall,
+        model_metadata: result.generation_metadata.model_used.metadata,
+        model_sections: result.generation_metadata.model_used.sections,
+        batch_count: result.generation_metadata.batch_count,
+        retry_metadata: result.generation_metadata.retry_count.metadata,
+        retry_sections: result.generation_metadata.retry_count.sections,
+      },
+      'Stage 5 generation job completed successfully'
+    );
+  }
+
+  /**
+   * Handle execution errors: classify, update DB status, decide retry
+   */
+  private async handleExecutionError(
+    error: unknown,
+    courseId: string,
+    startTime: number,
+    job: Job<GenerationJobData>,
+    jobLogger: pino.Logger
+  ): Promise<StructureGenerationJobResult> {
+    // Interrupts are control flow, not errors
+    if (isPipelineInterrupt(error)) {
+      jobLogger.info({ code: (error as { code: string }).code }, 'Pipeline paused');
+      throw error;
+    }
+
+    const totalDurationMs = Date.now() - startTime;
+
+    jobLogger.error(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        duration_ms: totalDurationMs,
+        attemptsMade: job.attemptsMade,
+      },
+      'Stage 5 generation job failed'
+    );
+
+    // Classify error
+    const errorCode = classifyGenerationError(error instanceof Error ? error : String(error));
+    const shouldRetry = isRetryableError(errorCode);
+    const phase = determinePhaseFromError(error instanceof Error ? error : String(error));
+
+    jobLogger.info({ errorCode, shouldRetry, phase }, 'Error classified');
+
+    // FR-024: Mark as failed on last attempt or non-retryable
+    const maxAttempts = job.opts.attempts || 3;
+    const isLastAttempt = job.attemptsMade >= maxAttempts - 1;
+
+    if (isLastAttempt) {
+      jobLogger.info(
+        { courseId, errorCode, attemptsMade: job.attemptsMade, maxAttempts },
+        'Last retry attempt - Updating generation_status to failed (FR-024)'
+      );
+      await markCourseAsFailed(courseId, errorCode, jobLogger);
+    } else {
+      jobLogger.info(
+        {
+          courseId,
+          errorCode,
+          attemptsMade: job.attemptsMade,
+          remainingAttempts: maxAttempts - job.attemptsMade - 1,
+        },
+        'Not last attempt - Keeping status for BullMQ retry'
+      );
+    }
+
+    // Handle non-retryable errors immediately
+    if (!shouldRetry) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      jobLogger.warn({ errorCode, phase, error: errorMessage }, 'Non-retryable error');
+
+      await markCourseAsFailed(courseId, errorCode, jobLogger);
+
+      return buildNonRetryableResult(
+        courseId,
+        errorCode,
+        errorMessage,
+        phase,
+        startTime,
+        job.attemptsMade
+      );
+    }
+
+    // Re-throw for BullMQ retry
+    jobLogger.warn({ errorCode, phase, shouldRetry }, 'Generation error - BullMQ will retry');
+    throw error;
+  }
 }
 
 /**
  * Export singleton instance
- *
- * Used by worker.ts to register the handler:
- * ```typescript
- * import { stage5GenerationHandler } from './handlers/stage5-generation';
- *
- * worker.on('active', (job) => {
- *   if (job.name === 'STRUCTURE_GENERATION') {
- *     await stage5GenerationHandler.process(job);
- *   }
- * });
- * ```
  */
 export const stage5GenerationHandler = new Stage5GenerationHandler();
 

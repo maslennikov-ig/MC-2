@@ -23,6 +23,7 @@ Beads Init → Audit → Create Issues → Update by Priority → Close Issues �
 ## Phase 1: Pre-flight & Beads Init
 
 1. **Setup directories**:
+
    ```bash
    mkdir -p .tmp/current/{plans,changes,backups}
    ```
@@ -33,6 +34,7 @@ Beads Init → Audit → Create Issues → Update by Priority → Close Issues �
    - Check lockfile exists (pnpm-lock.yaml, package-lock.json, yarn.lock)
 
 3. **Create Beads wisp**:
+
    ```bash
    bd mol wisp exploration --vars "question=Dependency audit and update"
    ```
@@ -42,14 +44,34 @@ Beads Init → Audit → Create Issues → Update by Priority → Close Issues �
 4. **Initialize TodoWrite**:
    ```json
    [
-     {"content": "Dependency audit", "status": "in_progress", "activeForm": "Auditing dependencies"},
-     {"content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues"},
-     {"content": "Fix critical dependency issues", "status": "pending", "activeForm": "Fixing critical deps"},
-     {"content": "Fix high priority dependency issues", "status": "pending", "activeForm": "Fixing high deps"},
-     {"content": "Fix medium priority dependency issues", "status": "pending", "activeForm": "Fixing medium deps"},
-     {"content": "Fix low priority dependency issues", "status": "pending", "activeForm": "Fixing low deps"},
-     {"content": "Verification audit", "status": "pending", "activeForm": "Verifying updates"},
-     {"content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp"}
+     {
+       "content": "Dependency audit",
+       "status": "in_progress",
+       "activeForm": "Auditing dependencies"
+     },
+     { "content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues" },
+     {
+       "content": "Fix critical dependency issues",
+       "status": "pending",
+       "activeForm": "Fixing critical deps"
+     },
+     {
+       "content": "Fix high priority dependency issues",
+       "status": "pending",
+       "activeForm": "Fixing high deps"
+     },
+     {
+       "content": "Fix medium priority dependency issues",
+       "status": "pending",
+       "activeForm": "Fixing medium deps"
+     },
+     {
+       "content": "Fix low priority dependency issues",
+       "status": "pending",
+       "activeForm": "Fixing low deps"
+     },
+     { "content": "Verification audit", "status": "pending", "activeForm": "Verifying updates" },
+     { "content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp" }
    ]
    ```
 
@@ -77,6 +99,7 @@ prompt: |
 ```
 
 **After dependency-auditor returns**:
+
 1. Read `dependency-scan-report.md`
 2. Parse issue counts by priority
 3. If zero issues → skip to Phase 7 (Final Summary)
@@ -136,11 +159,13 @@ pnpm build
 2. **Update TodoWrite**: mark current priority in_progress
 
 3. **Claim issues in Beads**:
+
    ```bash
    bd update {issue_id} --status in_progress
    ```
 
 4. **Invoke dependency-updater** via Task tool:
+
    ```
    subagent_type: "dependency-updater"
    description: "Update {priority} dependencies"
@@ -160,6 +185,7 @@ pnpm build
    ```
 
 5. **Quality Gate** (inline):
+
    ```bash
    pnpm type-check
    pnpm build
@@ -169,6 +195,7 @@ pnpm build
    - If PASS → continue
 
 6. **Close updated issues in Beads**:
+
    ```bash
    bd close {issue_id_1} {issue_id_2} ... --reason "Dependency updated"
    ```
@@ -186,6 +213,7 @@ After all priorities updated:
 1. **Update TodoWrite**: mark verification in_progress
 
 2. **Invoke dependency-auditor** (verification mode):
+
    ```
    subagent_type: "dependency-auditor"
    description: "Verification audit"
@@ -209,6 +237,7 @@ After all priorities updated:
 ## Phase 7: Final Summary & Beads Complete
 
 1. **Complete Beads wisp**:
+
    ```bash
    # If all updated
    bd mol squash {wisp_id}
@@ -218,6 +247,7 @@ After all priorities updated:
    ```
 
 2. **Create issues for remaining items** (if any):
+
    ```bash
    bd create "DEP REMAINING: {package} - {issue}" -t chore -p {priority} \
      -d "Not updated in audit. May require manual intervention. See dependency-scan-report.md"
@@ -233,26 +263,31 @@ After all priorities updated:
 **Status**: {SUCCESS/PARTIAL}
 
 ### Results
+
 - Found: {total} dependency issues
 - Fixed: {fixed} ({percentage}%)
 - Remaining: {remaining}
 
 ### By Priority
+
 - Critical: {fixed}/{total}
 - High: {fixed}/{total}
 - Medium: {fixed}/{total}
 - Low: {fixed}/{total}
 
 ### Beads Issues
+
 - Created: {count}
 - Closed: {count}
 - Remaining: {count}
 
 ### Validation
+
 - Type Check: {status}
 - Build: {status}
 
 ### Artifacts
+
 - Audit: `dependency-scan-report.md`
 - Updates: `dependency-updates-implemented.md`
 ```
@@ -274,6 +309,7 @@ After all priorities updated:
 ## Error Handling
 
 **If quality gate fails**:
+
 ```
 Rollback available: .tmp/current/changes/deps-changes.json
 
@@ -285,12 +321,14 @@ To rollback:
 ```
 
 **If worker fails**:
+
 - Report error to user
 - Keep Beads wisp open for manual completion
 - Suggest manual intervention
 - Exit workflow
 
 **If Beads command fails**:
+
 - Log error but continue workflow
 - Beads tracking is enhancement, not blocker
 
@@ -298,11 +336,11 @@ To rollback:
 
 ## Quick Reference
 
-| Phase | Beads Action |
-|-------|--------------|
-| 1. Pre-flight | `bd mol wisp exploration` |
-| 3. After audit | `bd create` for each issue |
+| Phase            | Beads Action                     |
+| ---------------- | -------------------------------- |
+| 1. Pre-flight    | `bd mol wisp exploration`        |
+| 3. After audit   | `bd create` for each issue       |
 | 5. Before update | `bd update --status in_progress` |
-| 5. After update | `bd close --reason "Updated"` |
-| 7. Complete | `bd mol squash/burn` |
-| 7. Remaining | `bd create` for failed updates |
+| 5. After update  | `bd close --reason "Updated"`    |
+| 7. Complete      | `bd mol squash/burn`             |
+| 7. Remaining     | `bd create` for failed updates   |

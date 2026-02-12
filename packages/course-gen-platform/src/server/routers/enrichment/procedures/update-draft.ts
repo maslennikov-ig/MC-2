@@ -13,6 +13,7 @@ import { updateDraftInputSchema } from '../schemas';
 import { verifyEnrichmentAccess, isTwoStageType } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import type { Json } from '@megacampus/shared-types';
 
 /**
  * Update draft content for two-stage enrichments
@@ -52,11 +53,14 @@ export const updateDraft = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      enrichmentId,
-      userId: currentUser.id,
-    }, 'Update draft request');
+    logger.info(
+      {
+        requestId,
+        enrichmentId,
+        userId: currentUser.id,
+      },
+      'Update draft request'
+    );
 
     try {
       // Step 1: Verify enrichment access and get current data
@@ -69,11 +73,14 @@ export const updateDraft = protectedProcedure
 
       // Step 2: Verify this is a two-stage enrichment type
       if (!isTwoStageType(enrichment.enrichment_type)) {
-        logger.warn({
-          requestId,
-          enrichmentId,
-          enrichmentType: enrichment.enrichment_type,
-        }, 'Update draft not applicable for this enrichment type');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            enrichmentType: enrichment.enrichment_type,
+          },
+          'Update draft not applicable for this enrichment type'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -83,11 +90,14 @@ export const updateDraft = protectedProcedure
 
       // Step 3: Check if enrichment is in draft_ready status
       if (enrichment.status !== 'draft_ready') {
-        logger.warn({
-          requestId,
-          enrichmentId,
-          currentStatus: enrichment.status,
-        }, 'Cannot update draft with current status');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            currentStatus: enrichment.status,
+          },
+          'Cannot update draft with current status'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -97,11 +107,14 @@ export const updateDraft = protectedProcedure
 
       // Step 3.5: Validate draft content structure
       if (!draftContent || typeof draftContent !== 'object') {
-        logger.error({
-          requestId,
-          enrichmentId,
-          draftContent,
-        }, 'Invalid draft content structure');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            draftContent,
+          },
+          'Invalid draft content structure'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -114,13 +127,15 @@ export const updateDraft = protectedProcedure
 
       // Merge new draft content with existing content (preserving other fields)
       // Cast to a serializable type that satisfies Json
-      const existingContent = enrichment.content ?? {};
-      const updatedContent = JSON.parse(JSON.stringify({
-        ...existingContent,
-        draft: draftContent,
-        draft_updated_at: new Date().toISOString(),
-        draft_updated_by: currentUser.id,
-      }));
+      const existingContent = (enrichment.content as Record<string, unknown>) ?? {};
+      const updatedContent = JSON.parse(
+        JSON.stringify({
+          ...existingContent,
+          draft: draftContent,
+          draft_updated_at: new Date().toISOString(),
+          draft_updated_by: currentUser.id,
+        })
+      ) as Json;
 
       const { error: updateError } = await supabase
         .from('lesson_enrichments')
@@ -131,11 +146,14 @@ export const updateDraft = protectedProcedure
         .eq('id', enrichmentId);
 
       if (updateError) {
-        logger.error({
-          requestId,
-          enrichmentId,
-          error: updateError.message,
-        }, 'Failed to update draft content');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            error: updateError.message,
+          },
+          'Failed to update draft content'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -143,11 +161,14 @@ export const updateDraft = protectedProcedure
         });
       }
 
-      logger.info({
-        requestId,
-        enrichmentId,
-        enrichmentType: enrichment.enrichment_type,
-      }, 'Draft content updated');
+      logger.info(
+        {
+          requestId,
+          enrichmentId,
+          enrichmentType: enrichment.enrichment_type,
+        },
+        'Draft content updated'
+      );
 
       return {
         success: true,
@@ -159,11 +180,14 @@ export const updateDraft = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        enrichmentId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Update draft failed');
+      logger.error(
+        {
+          requestId,
+          enrichmentId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Update draft failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

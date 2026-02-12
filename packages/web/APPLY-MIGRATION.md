@@ -13,6 +13,7 @@
 ### 1. Применить миграцию в Supabase
 
 **Опция A: Через Supabase Dashboard (рекомендуется)**
+
 ```bash
 # 1. Открыть https://supabase.com/dashboard/project/mmtpvtoifqpdcgiwwdvj
 # 2. SQL Editor → New Query
@@ -21,6 +22,7 @@
 ```
 
 **Опция B: Через Supabase CLI**
+
 ```bash
 cd courseai-next
 supabase db push
@@ -34,12 +36,13 @@ npx supabase gen types typescript --project-id mmtpvtoifqpdcgiwwdvj > types/data
 ```
 
 **Проверить результат:**
+
 ```typescript
 // types/database.generated.ts должен содержать:
 courses: {
   Row: {
     // ...
-    lesson_duration_minutes: number  // NEW
+    lesson_duration_minutes: number // NEW
   }
 }
 ```
@@ -47,9 +50,11 @@ courses: {
 ### 3. Обновить backend workflows (n8n)
 
 Следовать инструкциям из:
+
 - `/home/me/code/courseai_n8n/n8n/MIGRATION-LESSON-DURATION.md`
 
 **Файлы для обновления:**
+
 1. Main Entry (17).json
 2. Course Structure Analyze (22).json
 3. Course Structure Generate (26).json
@@ -61,22 +66,26 @@ courses: {
 После применения миграции:
 
 1. **Frontend тест:**
+
    ```bash
    cd courseai-next
    pnpm dev
    ```
+
    - Открыть форму создания курса
    - Проверить что поле "Длительность урока" отображается
    - Выбрать "Микрообучение" → должно auto-set 3 минуты
    - Создать тестовый курс
 
 2. **Database тест:**
+
    ```sql
    SELECT id, title, lesson_duration_minutes
    FROM courses
    ORDER BY created_at DESC
    LIMIT 5;
    ```
+
    Должно показать lesson_duration_minutes = 5 (или выбранное значение)
 
 3. **n8n workflow тест:**

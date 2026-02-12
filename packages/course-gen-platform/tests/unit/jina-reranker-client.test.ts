@@ -22,11 +22,43 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 // Test Setup and Mocking
 // ============================================================================
 
-// Create mock BEFORE any imports
-const mockFetch = vi.fn();
+// Mock jinaConcurrencyLimiter BEFORE any imports
+vi.mock('@/shared/embeddings/jina-client', () => ({
+  jinaConcurrencyLimiter: {
+    acquire: vi.fn().mockResolvedValue(undefined),
+    release: vi.fn(),
+    getStats: vi.fn().mockReturnValue({
+      running: 0,
+      queued: 0,
+      maxConcurrency: 2,
+      totalWaitTimeMs: 0,
+      avgWaitTimeMs: 0,
+    }),
+    reset: vi.fn(),
+  },
+  ConcurrencyLimiter: vi.fn(),
+  getJinaConcurrencyStats: vi.fn(),
+  resetJinaConcurrencyStats: vi.fn(),
+}));
 
-// Mock fetch at module level - this runs before vitest processes imports
-vi.stubGlobal('fetch', mockFetch);
+// Mock logger BEFORE any imports
+vi.mock('@/shared/logger', () => ({
+  default: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: vi.fn().mockReturnValue({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
+}));
+
+// Import mockFetch from setup-unit.ts (global mock)
+import { mockFetch } from '../setup-unit';
 
 // Dynamic import after mocking to ensure mock is in place
 let rerankDocuments: typeof import('../../src/shared/jina/reranker-client').rerankDocuments;

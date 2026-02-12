@@ -22,7 +22,7 @@ Implement a comprehensive Admin Monitoring Page to visualize and control the cou
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - [x] **Context-First**: Spec includes detailed tech decisions and context.
 - [x] **Single Source of Truth**: shared-types will be used for schemas.
@@ -78,5 +78,5 @@ packages/web/
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| N/A | | |
+| --------- | ---------- | ------------------------------------ |
+| N/A       |            |                                      |

@@ -9,11 +9,11 @@
 
 ## 🎉 ИСПРАВЛЕНИЯ ВЫПОЛНЕНЫ
 
-| Фаза | Задачи | Статус |
-|------|--------|--------|
+| Фаза        | Задачи                                                     | Статус  |
+| ----------- | ---------------------------------------------------------- | ------- |
 | **Phase 1** | Замена NodeDetailsModal → NodeDetailsDrawer + editable fix | ✅ DONE |
-| **Phase 2** | Quick Actions, StaleDataIndicator, Delete button | ✅ DONE |
-| **Phase 3** | Удаление NodeDetailsModal + финальная валидация | ✅ DONE |
+| **Phase 2** | Quick Actions, StaleDataIndicator, Delete button           | ✅ DONE |
+| **Phase 3** | Удаление NodeDetailsModal + финальная валидация            | ✅ DONE |
 
 ### Выполненные исправления:
 
@@ -28,15 +28,15 @@
 
 ## Executive Summary
 
-| Metric | Status |
-|--------|--------|
-| Type-check | ✅ PASS |
-| Build | ✅ PASS |
-| Unit Tests (regeneration) | ✅ 75/75 PASS |
-| Tasks Completed | 63/63 |
-| Critical Issues | ✅ **0 (fixed)** |
-| Medium Issues | ✅ **0 (fixed)** |
-| Minor Issues | 3 (deferred) |
+| Metric                    | Status           |
+| ------------------------- | ---------------- |
+| Type-check                | ✅ PASS          |
+| Build                     | ✅ PASS          |
+| Unit Tests (regeneration) | ✅ 75/75 PASS    |
+| Tasks Completed           | 63/63            |
+| Critical Issues           | ✅ **0 (fixed)** |
+| Medium Issues             | ✅ **0 (fixed)** |
+| Minor Issues              | 3 (deferred)     |
 
 **Verdict**: Реализация завершена на **~98%**. Все критические и средние issues исправлены.
 
@@ -45,12 +45,14 @@
 ## Что сделано хорошо ✅
 
 ### 1. Инфраструктура и типы
+
 - ✅ `regeneration-types.ts` и `dependency-graph.ts` в shared-types
 - ✅ AbortController в `useRefinement.ts` (T007) - корректная отмена запросов
 - ✅ `trpc-response-validator.ts` (T008) - Zod валидация responses
 - ✅ `phase-names.ts` с полной RU/EN локализацией
 
 ### 2. View компоненты
+
 - ✅ `AnalysisResultView.tsx` - все 6 секций реализованы:
   - Классификация курса
   - Анализ темы
@@ -63,12 +65,14 @@
 - ✅ ReadOnly mode с баннером "Режим просмотра"
 
 ### 3. Editing компоненты
+
 - ✅ `EditableField.tsx` - поддержка text, textarea, number, toggle, select
 - ✅ `EditableChips.tsx` - добавление/удаление элементов списков
 - ✅ `useAutoSave.ts` с debounce и статусами (idle/saving/saved/error)
 - ✅ `SaveStatusIndicator.tsx` с Sonner toast
 
 ### 4. Regeneration система
+
 - ✅ `smart-context-router.ts` - 4 уровня: atomic/local/structural/global
 - ✅ `context-assembler.ts` - сборка контекста по tier
 - ✅ `bloom-validator.ts` - валидация Bloom's Taxonomy
@@ -78,12 +82,14 @@
 - ✅ `context-cache-manager.ts` - кеширование контекста
 
 ### 5. Dependencies система
+
 - ✅ `dependency-graph-builder.ts` - построение графа зависимостей
 - ✅ `StaleDataIndicator.tsx` - green/yellow/red индикаторы
 - ✅ `ImpactAnalysisModal.tsx` - danger zone styling для critical impact
 - ✅ `cascadeUpdate` endpoint с 3 опциями
 
 ### 6. Backend endpoints
+
 - ✅ `generation.updateField` - обновление полей
 - ✅ `generation.deleteElement` - удаление с smart confirmation
 - ✅ `generation.addElement` - AI-assisted добавление
@@ -92,6 +98,7 @@
 - ✅ `generation.cascadeUpdate` - каскадное обновление
 
 ### 7. Polish
+
 - ✅ Framer Motion анимации в `sheet.tsx`
 - ✅ Keyboard shortcuts (Ctrl+S, Ctrl+Z, Escape)
 - ✅ Undo/Redo через `useEditHistoryStore`
@@ -117,9 +124,11 @@
 **Файл**: `packages/web/components/generation-graph/panels/output/InlineRegenerateChat.tsx:36-48`
 
 **Спецификация требует** (FR-014):
+
 > "Упростить", "Расширить", "Сократить", "Добавить примеры", "Добавить профессионализм"
 
 **Реализовано**:
+
 ```typescript
 const quickActions = {
   ru: [
@@ -135,14 +144,23 @@ const quickActions = {
 **Лишнее**: "Сменить тон"
 
 **Рекомендация**: Заменить Quick Actions на точное соответствие FR-014:
+
 ```typescript
 const quickActions = {
   ru: [
     { label: 'Упростить', instruction: 'Сделай проще, понятнее для начинающих', icon: Minimize2 },
     { label: 'Расширить', instruction: 'Добавь больше деталей и примеров', icon: ArrowsUpFromLine },
     { label: 'Сократить', instruction: 'Сократи без потери смысла', icon: Minimize2 },
-    { label: 'Добавить примеры', instruction: 'Добавь практические примеры использования', icon: BookOpen },
-    { label: 'Профессионализм', instruction: 'Сделай более формальным и профессиональным', icon: Briefcase },
+    {
+      label: 'Добавить примеры',
+      instruction: 'Добавь практические примеры использования',
+      icon: BookOpen,
+    },
+    {
+      label: 'Профессионализм',
+      instruction: 'Сделай более формальным и профессиональным',
+      icon: Briefcase,
+    },
   ],
 };
 ```
@@ -154,9 +172,11 @@ const quickActions = {
 **Файл**: `packages/web/components/generation-graph/panels/output/StaleDataIndicator.tsx:66-69`
 
 **Спецификация требует** (FR-019):
+
 > "Зелёная рамка — элемент согласован, Жёлтая рамка — рекомендуется проверка, Красная рамка — требуется обязательная проверка"
 
 **Реализовано**:
+
 ```typescript
 className={cn(
   'border-l-2 pl-2',  // ❌ Только левая граница
@@ -166,6 +186,7 @@ className={cn(
 ```
 
 **Рекомендация**: Изменить на полную рамку или ring:
+
 ```typescript
 className={cn(
   'rounded-md p-2',
@@ -176,6 +197,7 @@ className={cn(
 ```
 
 Или использовать `border` вместо `border-l`:
+
 ```typescript
 className={cn(
   'border-2 rounded-md p-2',
@@ -191,11 +213,13 @@ className={cn(
 **Файл**: `packages/web/components/generation-graph/panels/output/LessonRow.tsx`
 
 **Спецификация** (FR-011a):
+
 > "Система ДОЛЖНА показывать confirmation dialog перед удалением урока, только если урок содержит контент (цели обучения, ключевые темы). Пустые уроки удаляются без подтверждения."
 
 **Текущее состояние**: Backend endpoint `deleteElement` реализует smart confirmation логику, но на frontend в `LessonRow.tsx` нет кнопки удаления урока и соответствующего confirmation dialog.
 
 **Рекомендация**: Добавить кнопку удаления урока в `LessonRow.tsx`:
+
 ```tsx
 // В LessonRow.tsx добавить:
 import { Trash2 } from 'lucide-react';
@@ -206,25 +230,27 @@ const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 const hasContent = lesson.lesson_objectives.length > 0 || lesson.key_topics.length > 0;
 
 // Добавить кнопку и диалог:
-{canEdit && (
-  <>
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => hasContent ? setShowDeleteConfirm(true) : handleDelete()}
-    >
-      <Trash2 className="h-4 w-4 text-slate-500" />
-    </Button>
-    {showDeleteConfirm && (
-      <ConfirmDialog
-        title="Удалить урок?"
-        description="Урок содержит цели и темы. Действие нельзя отменить."
-        onConfirm={handleDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-      />
-    )}
-  </>
-)}
+{
+  canEdit && (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => (hasContent ? setShowDeleteConfirm(true) : handleDelete())}
+      >
+        <Trash2 className="h-4 w-4 text-slate-500" />
+      </Button>
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Удалить урок?"
+          description="Урок содержит цели и темы. Действие нельзя отменить."
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+    </>
+  );
+}
 ```
 
 ---
@@ -238,19 +264,22 @@ const hasContent = lesson.lesson_objectives.length > 0 || lesson.key_topics.leng
 **Текущее состояние**: `OutputTab.tsx` не импортирует и не использует `PhaseSelector`. Компонент создан (`PhaseSelector.tsx`), но не интегрирован.
 
 **Рекомендация**: Интегрировать `PhaseSelector` в `NodeDetailsDrawer.tsx` или `OutputTab.tsx`:
+
 ```tsx
 import { PhaseSelector } from './PhaseSelector';
 
 // В компоненте:
-{phases.length > 1 && (
-  <PhaseSelector
-    stageId={stageId}
-    phases={phases}
-    selectedPhase={selectedPhase}
-    onSelectPhase={setSelectedPhase}
-    locale={locale}
-  />
-)}
+{
+  phases.length > 1 && (
+    <PhaseSelector
+      stageId={stageId}
+      phases={phases}
+      selectedPhase={selectedPhase}
+      onSelectPhase={setSelectedPhase}
+      locale={locale}
+    />
+  );
+}
 ```
 
 ---
@@ -260,6 +289,7 @@ import { PhaseSelector } from './PhaseSelector';
 #### Issue #5: Дублирование translations объектов
 
 **Файлы**:
+
 - `AnalysisResultView.tsx:47-128`
 - `CourseStructureView.tsx:64-113`
 - `InlineRegenerateChat.tsx:51-74`
@@ -268,6 +298,7 @@ import { PhaseSelector } from './PhaseSelector';
 **Проблема**: Каждый компонент имеет свой объект `translations`. Это усложняет поддержку и может привести к рассинхронизации.
 
 **Рекомендация**: Вынести все переводы в единый файл `translations.ts` или использовать существующий `packages/web/lib/generation-graph/translations.ts`:
+
 ```typescript
 // В translations.ts:
 export const OUTPUT_TRANSLATIONS = {
@@ -300,55 +331,56 @@ currentValue: _currentValue,  // Prefixed with _ but never used
 **Файл**: `packages/web/components/generation-graph/panels/output/AnalysisResultView.tsx:271-272`
 
 ```typescript
-options: ['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']
+options: ['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'];
 ```
 
 **Рекомендация**: Вынести опции в типы shared-types и использовать Zod enum:
+
 ```typescript
 import { courseCategorySchema } from '@megacampus/shared-types';
-options: courseCategorySchema.options
+options: courseCategorySchema.options;
 ```
 
 ---
 
 ## Проверка соответствия функциональным требованиям
 
-| FR | Описание | Статус | Примечание |
-|----|----------|--------|------------|
-| FR-001 | Структурированное отображение Stage 4 | ✅ | 6 секций |
-| FR-002 | Иерархия секции → уроки | ✅ | SectionAccordion + LessonRow |
-| FR-003 | Понятные названия этапов | ✅ | phase-names.ts |
-| FR-004 | Авто-открытие панели | ✅ | GraphView.tsx |
-| FR-005 | Редактирование текстовых полей | ✅ | EditableField |
-| FR-006 | Add/remove list items | ✅ | EditableChips |
-| FR-007 | Select для enum полей | ✅ | EditableField type='select' |
-| FR-008 | Autosave через 1 сек | ✅ | useAutoSave debounceMs=1000 |
-| FR-009 | Статус сохранения | ✅ | SaveStatusIndicator |
-| FR-010 | Пересчёт длительности | ✅ | course-structure-editor.ts |
-| FR-011 | Min 10 уроков для AI | ✅ | Backend validation |
-| FR-011a | Smart confirmation | ⚠️ | Backend есть, frontend нет |
-| FR-011b | AI-assisted добавление | ✅ | AddElementChat |
-| FR-012 | Кнопка перегенерации | ✅ | Wand2 icon в EditableField |
-| FR-013 | Мини-чат под блоком | ✅ | InlineRegenerateChat |
-| FR-014 | Quick Actions | ⚠️ | 4/5 actions, несоответствие |
-| FR-015 | Перегенерация только блока | ✅ | smart-context-router |
-| FR-016 | Semantic diff | ✅ | SemanticDiff.tsx |
-| FR-017 | Accept/Cancel regeneration | ✅ | SemanticDiffViewer |
-| FR-018 | Отслеживание зависимостей | ✅ | dependency-graph-builder |
-| FR-019 | Визуальные индикаторы | ⚠️ | border-l вместо full border |
-| FR-020 | Предупреждение о cascade | ✅ | ImpactAnalysisModal |
-| FR-021 | Варианты cascade actions | ✅ | 3 опции |
-| FR-022 | RefinementChat expanded | ✅ | isOpen=true по умолчанию |
-| FR-023 | RU/EN локализация | ✅ | Все компоненты |
-| FR-024 | Keyboard navigation | ✅ | Tab, Enter, Escape |
-| FR-025 | ARIA labels | ✅ | Проверено |
-| FR-026 | Visible focus | ✅ | Стандартные стили |
-| FR-027 | Owner-only editing | ✅ | instructorProcedure |
-| FR-028 | Admin read-only | ✅ | readOnly prop |
-| FR-029-032 | Token billing | N/A | Deferred to v2 |
-| FR-033 | Virtualization секций | ✅ | VirtualizedSectionsList |
-| FR-034 | Virtualization уроков | ✅ | threshold >15 |
-| FR-035 | Lazy render контента | ✅ | isExpanded в LessonRow |
+| FR         | Описание                              | Статус | Примечание                   |
+| ---------- | ------------------------------------- | ------ | ---------------------------- |
+| FR-001     | Структурированное отображение Stage 4 | ✅     | 6 секций                     |
+| FR-002     | Иерархия секции → уроки               | ✅     | SectionAccordion + LessonRow |
+| FR-003     | Понятные названия этапов              | ✅     | phase-names.ts               |
+| FR-004     | Авто-открытие панели                  | ✅     | GraphView.tsx                |
+| FR-005     | Редактирование текстовых полей        | ✅     | EditableField                |
+| FR-006     | Add/remove list items                 | ✅     | EditableChips                |
+| FR-007     | Select для enum полей                 | ✅     | EditableField type='select'  |
+| FR-008     | Autosave через 1 сек                  | ✅     | useAutoSave debounceMs=1000  |
+| FR-009     | Статус сохранения                     | ✅     | SaveStatusIndicator          |
+| FR-010     | Пересчёт длительности                 | ✅     | course-structure-editor.ts   |
+| FR-011     | Min 10 уроков для AI                  | ✅     | Backend validation           |
+| FR-011a    | Smart confirmation                    | ⚠️     | Backend есть, frontend нет   |
+| FR-011b    | AI-assisted добавление                | ✅     | AddElementChat               |
+| FR-012     | Кнопка перегенерации                  | ✅     | Wand2 icon в EditableField   |
+| FR-013     | Мини-чат под блоком                   | ✅     | InlineRegenerateChat         |
+| FR-014     | Quick Actions                         | ⚠️     | 4/5 actions, несоответствие  |
+| FR-015     | Перегенерация только блока            | ✅     | smart-context-router         |
+| FR-016     | Semantic diff                         | ✅     | SemanticDiff.tsx             |
+| FR-017     | Accept/Cancel regeneration            | ✅     | SemanticDiffViewer           |
+| FR-018     | Отслеживание зависимостей             | ✅     | dependency-graph-builder     |
+| FR-019     | Визуальные индикаторы                 | ⚠️     | border-l вместо full border  |
+| FR-020     | Предупреждение о cascade              | ✅     | ImpactAnalysisModal          |
+| FR-021     | Варианты cascade actions              | ✅     | 3 опции                      |
+| FR-022     | RefinementChat expanded               | ✅     | isOpen=true по умолчанию     |
+| FR-023     | RU/EN локализация                     | ✅     | Все компоненты               |
+| FR-024     | Keyboard navigation                   | ✅     | Tab, Enter, Escape           |
+| FR-025     | ARIA labels                           | ✅     | Проверено                    |
+| FR-026     | Visible focus                         | ✅     | Стандартные стили            |
+| FR-027     | Owner-only editing                    | ✅     | instructorProcedure          |
+| FR-028     | Admin read-only                       | ✅     | readOnly prop                |
+| FR-029-032 | Token billing                         | N/A    | Deferred to v2               |
+| FR-033     | Virtualization секций                 | ✅     | VirtualizedSectionsList      |
+| FR-034     | Virtualization уроков                 | ✅     | threshold >15                |
+| FR-035     | Lazy render контента                  | ✅     | isExpanded в LessonRow       |
 
 **Итого**: 31/35 FR соответствует, 4 FR отложены (v2), 3 частично реализованы.
 
@@ -357,14 +389,17 @@ options: courseCategorySchema.options
 ## Рекомендуемые действия
 
 ### Приоритет 1 (Блокеры релиза)
+
 1. **[Issue #1]** Исправить Quick Actions в InlineRegenerateChat согласно FR-014
 2. **[Issue #3]** Добавить кнопку удаления урока с confirmation dialog в LessonRow
 3. **[Issue #4]** Интегрировать PhaseSelector в UI
 
 ### Приоритет 2 (До релиза)
+
 4. **[Issue #2]** Изменить StaleDataIndicator на full border/ring
 
 ### Приоритет 3 (После релиза)
+
 5. **[Issue #5]** Консолидировать translations
 6. **[Issue #6]** Удалить неиспользуемый currentValue из InlineRegenerateChat
 7. **[Issue #7]** Вынести опции в shared-types
@@ -373,13 +408,13 @@ options: courseCategorySchema.options
 
 ## Итоговая оценка
 
-| Критерий | Оценка |
-|----------|--------|
-| Соответствие спецификации | 92% |
-| Качество кода | 95% |
-| Покрытие тестами | 85% |
-| Производительность | 95% |
-| Accessibility | 90% |
+| Критерий                  | Оценка |
+| ------------------------- | ------ |
+| Соответствие спецификации | 92%    |
+| Качество кода             | 95%    |
+| Покрытие тестами          | 85%    |
+| Производительность        | 95%    |
+| Accessibility             | 90%    |
 
 **Общая готовность к релизу**: **90%**
 
@@ -387,4 +422,4 @@ options: courseCategorySchema.options
 
 ---
 
-*Report generated by Claude Code Orchestrator*
+_Report generated by Claude Code Orchestrator_

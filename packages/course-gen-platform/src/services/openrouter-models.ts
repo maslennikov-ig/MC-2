@@ -119,9 +119,7 @@ let cache: CachedModels | null = null;
  * }
  * ```
  */
-export async function getOpenRouterModels(
-  forceRefresh = false
-): Promise<OpenRouterModelsResponse> {
+export async function getOpenRouterModels(forceRefresh = false): Promise<OpenRouterModelsResponse> {
   const now = Date.now();
 
   // Check cache validity
@@ -165,7 +163,7 @@ export async function getOpenRouterModels(
     } else {
       logger.warn(
         'OPENROUTER_API_KEY environment variable is not set. ' +
-        'API requests will be rate-limited. Set OPENROUTER_API_KEY for production use.'
+          'API requests will be rate-limited. Set OPENROUTER_API_KEY for production use.'
       );
     }
 
@@ -277,28 +275,25 @@ export async function getOpenRouterModels(
  * });
  * ```
  */
-export function filterModels(
-  models: OpenRouterModel[],
-  filter: ModelFilter
-): OpenRouterModel[] {
+export function filterModels(models: OpenRouterModel[], filter: ModelFilter): OpenRouterModel[] {
   let result = models;
 
   // Filter by providers
   if (filter.providers && filter.providers.length > 0) {
-    result = result.filter((m) => filter.providers!.includes(m.provider));
+    result = result.filter(m => filter.providers!.includes(m.provider));
   }
 
   // Filter by context length range
   if (filter.minContextLength !== undefined) {
-    result = result.filter((m) => m.contextLength >= filter.minContextLength!);
+    result = result.filter(m => m.contextLength >= filter.minContextLength!);
   }
   if (filter.maxContextLength !== undefined) {
-    result = result.filter((m) => m.contextLength <= filter.maxContextLength!);
+    result = result.filter(m => m.contextLength <= filter.maxContextLength!);
   }
 
   // Filter by price (USD per million tokens)
   if (filter.maxPricePerMillion !== undefined) {
-    result = result.filter((m) => {
+    result = result.filter(m => {
       // Calculate average price per million tokens
       const avgPricePerToken = (m.pricing.prompt + m.pricing.completion) / 2;
       const pricePerMillion = avgPricePerToken * 1_000_000;
@@ -310,7 +305,7 @@ export function filterModels(
   if (filter.search && filter.search.trim() !== '') {
     const searchLower = filter.search.toLowerCase();
     result = result.filter(
-      (m) =>
+      m =>
         m.id.toLowerCase().includes(searchLower) ||
         m.name.toLowerCase().includes(searchLower) ||
         (m.description && m.description.toLowerCase().includes(searchLower))
@@ -335,7 +330,7 @@ export function filterModels(
  * ```
  */
 export function getUniqueProviders(models: OpenRouterModel[]): string[] {
-  const providers = new Set(models.map((m) => m.provider));
+  const providers = new Set(models.map(m => m.provider));
   return Array.from(providers).sort();
 }
 

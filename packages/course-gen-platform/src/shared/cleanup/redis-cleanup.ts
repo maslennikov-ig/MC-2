@@ -61,6 +61,7 @@ async function scanAndDelete(pattern: string): Promise<number> {
  * Patterns cleaned:
  * - idempotency:generation-{courseId}-* (generation idempotency)
  * - rag:{courseId}:* (RAG context cache)
+ * - doc_class:v*:{courseId}:* (document classification cache)
  *
  * @param courseId - Course UUID to clean up
  * @returns Cleanup result with count of deleted keys
@@ -75,12 +76,16 @@ export async function cleanupRedisForCourse(courseId: string): Promise<RedisClea
   const patterns = [
     `idempotency:generation-${courseId}-*`,
     `rag:${courseId}:*`,
+    `doc_class:v*:${courseId}:*`,
   ];
 
-  logger.info({
-    courseId,
-    patterns,
-  }, '[Redis Cleanup] Starting course cleanup');
+  logger.info(
+    {
+      courseId,
+      patterns,
+    },
+    '[Redis Cleanup] Starting course cleanup'
+  );
 
   let totalDeleted = 0;
   const processedPatterns: string[] = [];
@@ -92,17 +97,23 @@ export async function cleanupRedisForCourse(courseId: string): Promise<RedisClea
       processedPatterns.push(pattern);
 
       if (deleted > 0) {
-        logger.debug({
-          pattern,
-          deleted,
-        }, '[Redis Cleanup] Pattern cleaned');
+        logger.debug(
+          {
+            pattern,
+            deleted,
+          },
+          '[Redis Cleanup] Pattern cleaned'
+        );
       }
     }
 
-    logger.info({
-      courseId,
-      totalDeleted,
-    }, '[Redis Cleanup] Course cleanup complete');
+    logger.info(
+      {
+        courseId,
+        totalDeleted,
+      },
+      '[Redis Cleanup] Course cleanup complete'
+    );
 
     return {
       success: true,
@@ -112,12 +123,15 @@ export async function cleanupRedisForCourse(courseId: string): Promise<RedisClea
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    logger.error({
-      courseId,
-      error: errorMessage,
-      processedPatterns,
-      totalDeleted,
-    }, '[Redis Cleanup] Course cleanup failed');
+    logger.error(
+      {
+        courseId,
+        error: errorMessage,
+        processedPatterns,
+        totalDeleted,
+      },
+      '[Redis Cleanup] Course cleanup failed'
+    );
 
     return {
       success: false,

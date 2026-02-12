@@ -28,11 +28,11 @@ Hourly Cleanup Job (pg_cron + Edge Function)
 
 ## Documentation Structure
 
-| File | Purpose | Audience | Last Updated |
-|------|---------|----------|--------------|
-| **[draft-cleanup-monitoring.md](./draft-cleanup-monitoring.md)** | Monitoring guide with metrics definitions | DevOps, SRE | 2025-11-08 |
-| **[draft-cleanup-queries.sql](./draft-cleanup-queries.sql)** | SQL query library (11 queries + 1 helper function) | Engineers, Analysts | 2025-11-08 |
-| **[alerting-rules.md](./alerting-rules.md)** | Alert definitions and escalation procedures | On-call, SRE | 2025-11-08 |
+| File                                                             | Purpose                                            | Audience            | Last Updated |
+| ---------------------------------------------------------------- | -------------------------------------------------- | ------------------- | ------------ |
+| **[draft-cleanup-monitoring.md](./draft-cleanup-monitoring.md)** | Monitoring guide with metrics definitions          | DevOps, SRE         | 2025-11-08   |
+| **[draft-cleanup-queries.sql](./draft-cleanup-queries.sql)**     | SQL query library (11 queries + 1 helper function) | Engineers, Analysts | 2025-11-08   |
+| **[alerting-rules.md](./alerting-rules.md)**                     | Alert definitions and escalation procedures        | On-call, SRE        | 2025-11-08   |
 
 ---
 
@@ -51,6 +51,7 @@ FROM courses;
 ```
 
 **Expected Result:**
+
 - `total_drafts`: < 20 (HEALTHY)
 - `pollution_percentage`: < 10% (TARGET), < 30% (ACCEPTABLE)
 
@@ -70,6 +71,7 @@ WHERE jobname = 'cleanup-old-drafts-hourly';
 ```
 
 **Expected Result:**
+
 - `hours_since_last_run`: < 1.5 (HEALTHY)
 
 ---
@@ -86,6 +88,7 @@ WHERE status = 'draft'
 ```
 
 **Expected Result:**
+
 - `old_drafts_count`: 0 (HEALTHY), < 5 (ACCEPTABLE)
 
 ---
@@ -94,36 +97,36 @@ WHERE status = 'draft'
 
 ### Real-time Metrics (Dashboard)
 
-| Metric | Query | Threshold | Frequency |
-|--------|-------|-----------|-----------|
-| **Total Drafts** | Query 1 | < 20 | 5 min |
-| **Pollution %** | Query 1 | < 10% | 5 min |
-| **Pending Cleanup** | Query 6 | 0 | 15 min |
-| **Job Status** | Query 3 | < 1.5h since run | 5 min |
-| **Age Distribution** | Query 2 | No "> 24h" | 15 min |
+| Metric               | Query   | Threshold        | Frequency |
+| -------------------- | ------- | ---------------- | --------- |
+| **Total Drafts**     | Query 1 | < 20             | 5 min     |
+| **Pollution %**      | Query 1 | < 10%            | 5 min     |
+| **Pending Cleanup**  | Query 6 | 0                | 15 min    |
+| **Job Status**       | Query 3 | < 1.5h since run | 5 min     |
+| **Age Distribution** | Query 2 | No "> 24h"       | 15 min    |
 
 ### Historical Metrics (Trends)
 
-| Metric | Query | Frequency | Display |
-|--------|-------|-----------|---------|
-| **Daily Trend** | Query 5 | Daily | Line chart |
-| **Usage Rate** | Query 5 | Daily | Percentage |
-| **Top Organizations** | Query 4 | Hourly | Table |
-| **Pre/Post Comparison** | Query 10 | Weekly | Summary |
+| Metric                  | Query    | Frequency | Display    |
+| ----------------------- | -------- | --------- | ---------- |
+| **Daily Trend**         | Query 5  | Daily     | Line chart |
+| **Usage Rate**          | Query 5  | Daily     | Percentage |
+| **Top Organizations**   | Query 4  | Hourly    | Table      |
+| **Pre/Post Comparison** | Query 10 | Weekly    | Summary    |
 
 ---
 
 ## Alert Summary
 
-| Alert | Severity | Threshold | Response Time |
-|-------|----------|-----------|---------------|
-| **Critical Pollution** | 🔴 HIGH | > 50% | 30 min |
-| **High Pollution** | 🟡 MEDIUM | > 30% | 4 hours |
-| **Cleanup Job Stalled** | 🔴 HIGH | > 2h gap | 30 min |
-| **Old Drafts Pending** | 🟡 MEDIUM | > 5 drafts | 2 hours |
-| **Traffic Spike** | 🟡 MEDIUM | > 100/hour | 1 hour |
-| **Redis Down** | 🔴 HIGH | Connection fail | 15 min |
-| **Job Failures** | 🔴 HIGH | 3 consecutive | 30 min |
+| Alert                   | Severity  | Threshold       | Response Time |
+| ----------------------- | --------- | --------------- | ------------- |
+| **Critical Pollution**  | 🔴 HIGH   | > 50%           | 30 min        |
+| **High Pollution**      | 🟡 MEDIUM | > 30%           | 4 hours       |
+| **Cleanup Job Stalled** | 🔴 HIGH   | > 2h gap        | 30 min        |
+| **Old Drafts Pending**  | 🟡 MEDIUM | > 5 drafts      | 2 hours       |
+| **Traffic Spike**       | 🟡 MEDIUM | > 100/hour      | 1 hour        |
+| **Redis Down**          | 🔴 HIGH   | Connection fail | 15 min        |
+| **Job Failures**        | 🔴 HIGH   | 3 consecutive   | 30 min        |
 
 **See:** [alerting-rules.md](./alerting-rules.md) for complete definitions and runbooks
 
@@ -132,61 +135,73 @@ WHERE status = 'draft'
 ## Query Library Overview
 
 ### Query 1: System Health Dashboard
+
 **Purpose:** Current snapshot of draft pollution
 **Performance:** < 100ms
 **Use:** Dashboard gauge display
 
 ### Query 2: Drafts by Age Distribution
+
 **Purpose:** Identify cleanup delays by age bucket
 **Performance:** < 100ms
 **Use:** Bar chart showing age distribution
 
 ### Query 3: Cleanup Job Performance
+
 **Purpose:** Monitor job execution status
 **Performance:** < 50ms
 **Use:** Job health indicator
 
 ### Query 4: Organization Leaderboard
+
 **Purpose:** Find organizations with most unused drafts
 **Performance:** < 200ms
 **Use:** Identify abuse or training needs
 
 ### Query 5: Daily Trend Analysis
+
 **Purpose:** 30-day trend of draft creation and abandonment
 **Performance:** < 300ms
 **Use:** Time series charts
 
 ### Query 6: Pending Cleanup Audit
+
 **Purpose:** Detailed list of drafts pending cleanup
 **Performance:** < 200ms
 **Use:** Troubleshooting old drafts
 
 ### Query 7: Hourly Traffic Pattern Analysis
+
 **Purpose:** Identify peak usage hours
 **Performance:** < 250ms
 **Use:** Capacity planning
 
 ### Query 8: Redis Session Consistency Check
+
 **Purpose:** Verify Redis implementation working correctly
 **Performance:** < 150ms
 **Use:** Weekly audit
 
 ### Query 9: Cleanup Job Effectiveness Report
+
 **Purpose:** Measure cleanup job performance over time
 **Performance:** < 300ms
 **Use:** Monthly executive reports
 
 ### Query 10: Pre vs Post Redis Comparison
+
 **Purpose:** Demonstrate ROI of Redis implementation
 **Performance:** < 200ms
 **Use:** Before/after analysis
 
 ### Query 11: User Behavior Analysis
+
 **Purpose:** Understand session duration patterns
 **Performance:** < 250ms
 **Use:** UX optimization insights
 
 ### Helper Function: Manual Cleanup Trigger
+
 **Purpose:** Emergency manual cleanup
 **Usage:** `SELECT * FROM trigger_manual_cleanup();`
 **Use Case:** Backup/emergency
@@ -218,16 +233,19 @@ WHERE status = 'draft'
 ### Essential Dashboard Panels
 
 **Top Row (System Health):**
+
 - Gauge: Total Drafts (green < 20, red > 50)
 - Gauge: Pollution % (green < 10%, red > 30%)
 - Stat: Job Status (hours since last run)
 
 **Middle Row (Trends):**
+
 - Time Series: Drafts Created vs Cleaned (7 days)
 - Bar Chart: Age Distribution
 - Table: Top 5 Organizations
 
 **Bottom Row (Performance):**
+
 - Histogram: Session Duration
 - Counter: Job Success Rate
 - Log Panel: Recent Errors
@@ -239,10 +257,12 @@ WHERE status = 'draft'
 ### Issue: High Pollution Rate
 
 **Symptoms:**
+
 - Pollution > 30%
 - Unused drafts increasing
 
 **Quick Check:**
+
 ```bash
 # 1. Check Redis
 redis-cli ping
@@ -261,10 +281,12 @@ psql -c "SELECT * FROM trigger_manual_cleanup();"
 ### Issue: Cleanup Job Not Running
 
 **Symptoms:**
+
 - `hours_since_last_run > 2`
 - Old drafts accumulating
 
 **Quick Check:**
+
 ```sql
 -- Check job active status
 SELECT jobname, active, last_run FROM cron.job
@@ -275,6 +297,7 @@ SELECT status, return_message FROM public.cleanup_job_monitoring LIMIT 3;
 ```
 
 **Solutions:**
+
 1. Re-enable job if inactive
 2. Re-deploy Edge Function
 3. Restart pg_cron
@@ -287,10 +310,12 @@ SELECT status, return_message FROM public.cleanup_job_monitoring LIMIT 3;
 ### Issue: Redis Sessions Not Working
 
 **Symptoms:**
+
 - New drafts still created in PostgreSQL immediately
 - Pollution not decreasing
 
 **Quick Check:**
+
 ```bash
 # Check Redis running
 docker ps | grep redis
@@ -303,6 +328,7 @@ docker logs courseai-next --tail 50 | grep -i redis
 ```
 
 **Solutions:**
+
 1. Verify `NEXT_PUBLIC_FEATURE_REDIS_SESSIONS=true`
 2. Check `DraftSessionManager` integration
 3. Review application error logs
@@ -393,9 +419,9 @@ docker logs courseai-next --tail 50 | grep -i redis
 
 ## Changelog
 
-| Date | Version | Changes | Author |
-|------|---------|---------|--------|
-| 2025-11-08 | 1.0 | Initial monitoring system created | Claude Code Agent |
+| Date       | Version | Changes                           | Author            |
+| ---------- | ------- | --------------------------------- | ----------------- |
+| 2025-11-08 | 1.0     | Initial monitoring system created | Claude Code Agent |
 
 ---
 

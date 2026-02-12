@@ -1,12 +1,12 @@
 // Phase name translations for Stage 4 and Stage 5
 
 export interface PhaseInfo {
-  ru: string;
-  en: string;
+  ru: string
+  en: string
   description: {
-    ru: string;
-    en: string;
-  };
+    ru: string
+    en: string
+  }
 }
 
 export const PHASE_NAMES: Record<string, Record<string, PhaseInfo>> = {
@@ -52,11 +52,11 @@ export const PHASE_NAMES: Record<string, Record<string, PhaseInfo>> = {
       },
     },
     phase_6: {
-      ru: 'RAG-планирование',
-      en: 'RAG Planning',
+      ru: 'Подготовка (устарело)',
+      en: 'Preparation (deprecated)',
       description: {
-        ru: 'Связывание документов с модулями курса',
-        en: 'Mapping documents to course modules',
+        ru: 'Устаревшая фаза — используется векторный поиск',
+        en: 'Deprecated phase — vector search used instead',
       },
     },
     phase_5: {
@@ -142,12 +142,16 @@ export const PHASE_NAMES: Record<string, Record<string, PhaseInfo>> = {
       },
     },
   },
-};
-
-export function getPhaseName(stageId: string, phaseId: string, locale: 'ru' | 'en' = 'ru'): string {
-  return PHASE_NAMES[stageId]?.[phaseId]?.[locale] ?? phaseId;
 }
 
-export function getPhaseDescription(stageId: string, phaseId: string, locale: 'ru' | 'en' = 'ru'): string {
-  return PHASE_NAMES[stageId]?.[phaseId]?.description[locale] ?? '';
+export function getPhaseName(stageId: string, phaseId: string, locale: 'ru' | 'en' = 'ru'): string {
+  return PHASE_NAMES[stageId]?.[phaseId]?.[locale] ?? phaseId
+}
+
+export function getPhaseDescription(
+  stageId: string,
+  phaseId: string,
+  locale: 'ru' | 'en' = 'ru'
+): string {
+  return PHASE_NAMES[stageId]?.[phaseId]?.description[locale] ?? ''
 }

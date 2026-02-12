@@ -8,29 +8,31 @@
 
 ## Executive Summary
 
-| Category | Count | Status |
-|----------|-------|--------|
-| **Resolved this session** | 16 | ✅ Fixed |
-| **Remaining - Future Features** | ~25 | Documented |
-| **Remaining - Real Debt** | 3 | To address |
+| Category                        | Count | Status     |
+| ------------------------------- | ----- | ---------- |
+| **Resolved this session**       | 16    | ✅ Fixed   |
+| **Remaining - Future Features** | ~25   | Documented |
+| **Remaining - Real Debt**       | 3     | To address |
 
 ---
 
 ## ✅ RESOLVED (This Session)
 
 ### Dead Code Removed
-| Item | Description |
-|------|-------------|
-| `workflow-graph.ts` | 445 lines of unused LangGraph STUB code deleted |
-| `getUntypedClient()` | Removed from 4 organization API routes |
+
+| Item                 | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `workflow-graph.ts`  | 445 lines of unused LangGraph STUB code deleted |
+| `getUntypedClient()` | Removed from 4 organization API routes          |
 
 ### TODOs Fixed
-| TODO | Fix Applied |
-|------|-------------|
-| Hardcoded `locale: 'ru'` (7 files, 8 locations) | Now reads from `course.language` with fallback |
-| `organization_members` type workaround | Deleted - types already available in shared-types |
-| `platformVersion: '0.22.3'` hardcoded | Now reads dynamically from package.json |
-| Stage 7 `llm_model_config` lookup (3 handlers) | Implemented ModelConfigService integration |
+
+| TODO                                            | Fix Applied                                       |
+| ----------------------------------------------- | ------------------------------------------------- |
+| Hardcoded `locale: 'ru'` (7 files, 8 locations) | Now reads from `course.language` with fallback    |
+| `organization_members` type workaround          | Deleted - types already available in shared-types |
+| `platformVersion: '0.22.3'` hardcoded           | Now reads dynamically from package.json           |
+| Stage 7 `llm_model_config` lookup (3 handlers)  | Implemented ModelConfigService integration        |
 
 ---
 
@@ -39,6 +41,7 @@
 These require actual implementation work:
 
 ### DEBT-001: Token-Aware Embedding Batching
+
 **Priority**: HIGH
 **File**: `packages/course-gen-platform/src/shared/embeddings/generate.ts:369`
 
@@ -53,6 +56,7 @@ const BATCH_SIZE = 5;
 ---
 
 ### DEBT-002: Graceful Shutdown Cleanup
+
 **Priority**: MEDIUM
 **File**: `packages/course-gen-platform/src/server/index.ts:435`
 
@@ -68,6 +72,7 @@ const BATCH_SIZE = 5;
 ---
 
 ### DEBT-003: Docling Client Document Retrieval
+
 **Priority**: LOW
 **File**: `packages/course-gen-platform/src/stages/stage2-document-processing/docling/client.ts:312`
 
@@ -84,35 +89,39 @@ const BATCH_SIZE = 5;
 These are legitimate future work items, NOT debt:
 
 ### Backend Features
-| File | Description |
-|------|-------------|
-| `summarization.ts:190` | SuperAdmin cross-org analytics |
+
+| File                           | Description                                           |
+| ------------------------------ | ----------------------------------------------------- |
+| `summarization.ts:190`         | SuperAdmin cross-org analytics                        |
 | `error-handler.ts:199,222,244` | Job notifications, stalled recovery, timeout handling |
-| `dependencies.router.ts:300` | BullMQ regeneration job queuing |
-| `cascade-evaluator.ts:208` | Exercise validation (needs smoother implementation) |
-| `user-preferences.ts:71,130` | Supabase user_preferences table integration |
+| `dependencies.router.ts:300`   | BullMQ regeneration job queuing                       |
+| `cascade-evaluator.ts:208`     | Exercise validation (needs smoother implementation)   |
+| `user-preferences.ts:71,130`   | Supabase user_preferences table integration           |
 
 ### UI Features (Not Started)
-| Component | Feature |
-|-----------|---------|
-| `EnrichmentsPanel.tsx:376` | Video playback URL storage helper |
-| `stage-detail-sheet.tsx:112` | Document handler not implemented |
-| `ModuleDashboard.tsx:127-164` | Retry/pause/play actions, model tier from settings |
-| `NodeDetailsDrawer.tsx` | Edit mode, retry failed, export, regenerate, improve quality |
-| `Stage6InspectorContent.tsx:243` | Diff support for content comparison |
+
+| Component                        | Feature                                                      |
+| -------------------------------- | ------------------------------------------------------------ |
+| `EnrichmentsPanel.tsx:376`       | Video playback URL storage helper                            |
+| `stage-detail-sheet.tsx:112`     | Document handler not implemented                             |
+| `ModuleDashboard.tsx:127-164`    | Retry/pause/play actions, model tier from settings           |
+| `NodeDetailsDrawer.tsx`          | Edit mode, retry failed, export, regenerate, improve quality |
+| `Stage6InspectorContent.tsx:243` | Diff support for content comparison                          |
 
 ### Tests
-| File | Feature |
-|------|---------|
-| `lms-status.test.ts:899` | Multi-org test fixtures |
-| `t053-synergy-sales-course.test.ts` | Style comparison, RAG tests |
-| `test-orgs.ts:166,176` | Qdrant vectors & storage cleanup |
+
+| File                                | Feature                          |
+| ----------------------------------- | -------------------------------- |
+| `lms-status.test.ts:899`            | Multi-org test fixtures          |
+| `t053-synergy-sales-course.test.ts` | Style comparison, RAG tests      |
+| `test-orgs.ts:166,176`              | Qdrant vectors & storage cleanup |
 
 ---
 
 ## 🚫 SKIPPED: LMS Integration (Per User Request)
 
 These TODO items in LMS integration files are excluded from cleanup:
+
 - `openedx/adapter.ts:281` - Open edX Course API
 - `course-mapper.ts:259` - Asset extraction
 - `history.router.ts:221` - RLS policies
@@ -124,6 +133,7 @@ These TODO items in LMS integration files are excluded from cleanup:
 Issues noticed during audit that should be addressed:
 
 ### OBS-001: Inconsistent Locale Pattern
+
 **Severity**: LOW
 **Location**: Multiple routers
 
@@ -134,10 +144,12 @@ Some files use `course.language`, others use `settings.language`. Should standar
 ---
 
 ### OBS-002: Mixed Import Patterns
+
 **Severity**: LOW
 **Location**: `export-import.ts`
 
 Using `createRequire` for JSON import works but could use native JSON import with assertion:
+
 ```typescript
 import packageJson from '../../../../package.json' with { type: 'json' };
 ```
@@ -147,6 +159,7 @@ import packageJson from '../../../../package.json' with { type: 'json' };
 ---
 
 ### OBS-003: Stage 7 Handlers Duplicate Pattern
+
 **Severity**: LOW
 **Location**: `video-handler.ts`, `presentation-handler.ts`, `quiz-handler.ts`
 
@@ -191,4 +204,4 @@ All three handlers have identical model config fetching logic. Could be extracte
 
 ---
 
-*Document maintained as part of technical debt tracking*
+_Document maintained as part of technical debt tracking_

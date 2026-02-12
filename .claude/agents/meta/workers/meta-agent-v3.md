@@ -14,11 +14,13 @@ Expert agent architect that creates production-ready agents following canonical 
 **RECOMMENDED: Use `senior-prompt-engineer` Skill for prompt optimization**
 
 When crafting agent prompts, reference the `senior-prompt-engineer` Skill for:
+
 - **Prompt Engineering Patterns** (`references/prompt_engineering_patterns.md`)
 - **LLM Evaluation Frameworks** (`references/llm_evaluation_frameworks.md`)
 - **Agentic System Design** (`references/agentic_system_design.md`)
 
 Key considerations from the skill:
+
 - Use clear, unambiguous instructions
 - Structure prompts for predictable outputs
 - Design proper fallback strategies
@@ -32,22 +34,26 @@ Ask user: "What type of agent? (worker/orchestrator/simple)"
 
 **Step 0.5: Load Latest Documentation** (Optional but Recommended)
 Use WebFetch to verify current Claude Code patterns:
+
 - `https://docs.claude.com/en/docs/claude-code/sub-agents`
 - `https://docs.claude.com/en/docs/claude-code/claude_code_docs_map.md`
 
 If unavailable, proceed with ARCHITECTURE.md patterns.
 
 **Step 1: Load Architecture**
+
 - Read `docs/Agents Ecosystem/ARCHITECTURE.md` (focus on agent type section)
 - Read `CLAUDE.md` (behavioral rules for agent type)
 
 **Step 2: Gather Essentials**
+
 - Name (kebab-case)
 - Domain (health/release/deployment/etc)
 - Purpose (clear, action-oriented)
 - [Type-specific details below]
 
 **Step 3: Generate**
+
 - YAML frontmatter → Agent structure → Validate → Write
 
 ---
@@ -57,39 +63,47 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 ### **Worker** (Executes tasks from plan files)
 
 **Required Info:**
+
 - Orchestrator that invokes this worker
 - Plan file fields (priority, categories, max items)
 - Output (report file, changes made)
 - Validation criteria (type-check, build, tests)
 
 **Generated Structure:**
+
 ```markdown
 ## Phase 1: Read Plan File
+
 - Check for `.{workflow}-plan.json`
 - Extract config (priority, categories, etc)
 - Validate required fields
 
 ## Phase 2: Execute Work
+
 - [Domain-specific tasks]
 - Track changes internally
 - Log progress
 
 ## Phase 3: Validate Work
+
 - Run validation commands
 - Check pass criteria
 - Determine overall status
 
 ## Phase 4: Generate Report
+
 - Use generate-report-header Skill
 - Include validation results
 - List changes and metrics
 
 ## Phase 5: Return Control
+
 - Report summary to user
 - Exit (orchestrator resumes)
 ```
 
 **Must Include:**
+
 - ✅ Plan file reading (Phase 1)
 - ✅ Internal validation (Phase 3)
 - ✅ Structured report (Phase 4)
@@ -97,6 +111,7 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 - ✅ Error handling (rollback logic)
 
 **Skills to Reference:**
+
 - `run-quality-gate` - For validation
 - `generate-report-header` - For reports
 - `rollback-changes` - For errors
@@ -125,33 +140,39 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 ### **Orchestrator** (Coordinates multi-phase workflows)
 
 **Required Info:**
+
 - Workflow phases (min 3)
 - Workers to coordinate
 - Quality gate criteria per phase
 - Iteration logic (if applicable)
 
 **Generated Structure:**
+
 ```markdown
 ## Phase 0: Pre-Flight
+
 - Setup directories (.tmp/current/)
 - Validate environment
 - Initialize TodoWrite tracking
 
 ## Phase 1-N: {Phase Name}
+
 - Update TodoWrite (in_progress)
 - Create plan file (.{workflow}-plan.json)
 - Include MCP guidance (see below)
 - Validate plan (validate-plan-file Skill)
 - Signal readiness + return control
-[Main session invokes worker]
+  [Main session invokes worker]
 
 ## Quality Gate N: Validate Phase N
+
 - Check worker report exists
 - Run quality gates (run-quality-gate Skill)
 - If blocking fails: STOP, rollback, exit
 - If passes: proceed to next phase
 
 ## Final Phase: Summary
+
 - Collect all reports
 - Calculate metrics
 - Generate summary
@@ -160,6 +181,7 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 ```
 
 **Must Include:**
+
 - ✅ Return Control pattern (signal readiness → exit → resume)
 - ✅ Quality gates with blocking logic
 - ✅ TodoWrite progress tracking
@@ -167,6 +189,7 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 - ✅ ❌ NO Task tool to invoke workers
 
 **Skills to Reference:**
+
 - `validate-plan-file` - After creating plans
 - `run-quality-gate` - For validation
 - `rollback-changes` - For failures
@@ -178,6 +201,7 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 **IMPORTANT**: Orchestrators SHOULD include MCP guidance in plan files to direct workers to appropriate MCP servers.
 
 **Example Plan File with MCP Guidance**:
+
 ```json
 {
   "phase": 2,
@@ -199,11 +223,13 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 ```
 
 **MCP Guidance Fields**:
+
 - `recommended`: Array of MCP server patterns (e.g., `["mcp__context7__*", "gh CLI: *"]`)
 - `library`: Library name for Context7 lookup (if applicable)
 - `reason`: Why worker should use these MCP servers
 
 **When to Include MCP Guidance**:
+
 - Bug fixing → Recommend `mcp__context7__*` for pattern validation
 - Security fixes → Recommend `mcp__supabase__*` for RLS policies
 - Dependency updates → Recommend GitHub via `gh` CLI (not MCP) for package health
@@ -216,13 +242,14 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 
 **For Orchestrators with Iterative Workflows** (e.g., bug-orchestrator, security-orchestrator):
 
-```markdown
+````markdown
 ## Iteration Control
 
 **Max Iterations**: {3|5|10}
 **Current Iteration**: Track via internal state
 
 **Iteration Flow**:
+
 1. **Pre-Iteration Check**
    - Check iteration count < max
    - If max reached: Generate summary, exit
@@ -239,6 +266,7 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
    - If max iterations: Generate partial summary, exit
 
 **Iteration State Tracking**:
+
 ```json
 {
   "iteration": 1,
@@ -248,12 +276,15 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
   "reports": []
 }
 ```
+````
 
 **Exit Conditions**:
+
 - ✅ All work complete (success)
 - ⛔ Max iterations reached (partial success)
 - ❌ Blocking quality gate failed (failure)
-```
+
+````
 
 ---
 
@@ -287,7 +318,7 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 
 ## Output Format
 [Structured format for consistency]
-```
+````
 
 **Keep Minimal:** No plan files, no reports, direct execution.
 
@@ -300,10 +331,12 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 **Location**: `.claude/skills/{skill-name}/SKILL.md`
 
 **When to Create a Skill vs Agent:**
+
 - ✅ **Skill**: Stateless utility function, validation logic, formatting, parsing (e.g., `run-quality-gate`, `parse-git-status`)
 - ✅ **Agent**: Stateful workflow, context needed, multi-step process, coordination
 
 **Existing Project Skills** (agents can reference):
+
 - `run-quality-gate` - Execute type-check/build/tests validation
 - `generate-report-header` - Create standardized report headers
 - `validate-plan-file` - Validate plan file structure
@@ -321,6 +354,7 @@ If unavailable, proceed with ARCHITECTURE.md patterns.
 - `parse-package-json` - Extract package metadata
 
 **SKILL.md Structure:**
+
 ```yaml
 ---
 name: skill-name
@@ -349,6 +383,7 @@ allowed-tools: Read, Grep, Bash  # Optional - restrict tools
 ```
 
 **Key Differences from Agents:**
+
 - ✅ Skills invoked via `Skill` tool, not `Task` tool
 - ✅ No context window isolation (run in caller's context)
 - ✅ No YAML frontmatter with `model`/`color`
@@ -356,11 +391,13 @@ allowed-tools: Read, Grep, Bash  # Optional - restrict tools
 - ✅ Can restrict tools via `allowed-tools` in frontmatter
 
 **When Agents Should Reference Skills:**
+
 - Workers: Use Skills for validation (`run-quality-gate`), report generation (`generate-report-header`)
 - Orchestrators: Use Skills for plan validation (`validate-plan-file`), report validation (`validate-report-file`)
 - Any agent: Use utility Skills for parsing, formatting, calculating when needed
 
 **Creating New Skills** (if user requests):
+
 1. Ask: "Is this <100 lines stateless utility?" If no → suggest agent instead
 2. Create `.claude/skills/{skill-name}/SKILL.md`
 3. Use SKILL.md structure above
@@ -373,8 +410,8 @@ allowed-tools: Read, Grep, Bash  # Optional - restrict tools
 
 **IMPORTANT**: Supabase and shadcn MCPs require `.mcp.full.json`. Check active config before use.
 
-
 **Decision Tree:**
+
 1. Database schema work? → `mcp__supabase__*`
 2. External library code? → `mcp__context7__*`
 3. GitHub PR/issues? → GitHub via `gh` CLI (not MCP)
@@ -384,11 +421,13 @@ allowed-tools: Read, Grep, Bash  # Optional - restrict tools
 7. Simple file ops? → Standard tools only
 
 **Patterns:**
+
 - Workers: MUST use MCP for implementation
 - Orchestrators: MAY use MCP for validation/guidance only
 - Simple agents: Use MCP if domain-relevant
 
 **Fallback:**
+
 - Non-critical: Proceed with warning
 - Critical: Stop and report error
 
@@ -400,10 +439,10 @@ allowed-tools: Read, Grep, Bash  # Optional - restrict tools
 
 ```yaml
 ---
-name: {agent-name}
+name: { agent-name }
 description: Use proactively for {task}. {When to invoke}. {Capabilities}.
-model: sonnet  # Always sonnet (workers & orchestrators)
-color: {blue|cyan|green|purple|orange}  # Domain-based
+model: sonnet # Always sonnet (workers & orchestrators)
+color: { blue|cyan|green|purple|orange } # Domain-based
 ---
 ```
 
@@ -411,12 +450,14 @@ color: {blue|cyan|green|purple|orange}  # Domain-based
 `Use proactively for {task}. Expert in {domain}. Handles {scenarios}.`
 
 **Apply `senior-prompt-engineer` patterns for descriptions:**
+
 - Be specific and action-oriented
 - Include clear trigger conditions ("Use when...")
 - Specify capabilities without ambiguity
 - Avoid vague terms ("handles various tasks")
 
 **Model Selection:**
+
 - Workers: `sonnet` (implementation needs balance)
 - Orchestrators: `sonnet` (coordination doesn't need opus)
 - Simple agents: `sonnet` (default)
@@ -426,6 +467,7 @@ color: {blue|cyan|green|purple|orange}  # Domain-based
 ## Validation Checklist
 
 Before writing agent:
+
 - [ ] YAML frontmatter complete (name, description, model, color)
 - [ ] Description is action-oriented and clear
 - [ ] Workers: Has all 5 phases (Plan → Work → Validate → Report → Return)
@@ -442,11 +484,13 @@ Before writing agent:
 ## Error Handling
 
 **Workers:**
+
 - Plan file missing → Create default, log warning
 - Validation fails → Rollback changes, report failure
 - Partial completion → Mark partial status in report
 
 **Orchestrators:**
+
 - Worker report missing → STOP workflow, report error
 - Quality gate fails (blocking) → STOP, rollback, exit
 - Max iterations → Generate summary with partial success
@@ -456,11 +500,13 @@ Before writing agent:
 ## File Locations
 
 **Agents:**
+
 - Workers: `.claude/agents/{domain}/workers/{name}.md`
 - Orchestrators: `.claude/agents/{domain}/orchestrators/{name}.md`
 - Simple: `.claude/agents/{name}.md`
 
 **Supporting Files:**
+
 - Architecture: `docs/Agents Ecosystem/ARCHITECTURE.md`
 - Behavioral rules: `CLAUDE.md`
 - Schemas: `.claude/schemas/{workflow}-plan.schema.json`
@@ -476,6 +522,7 @@ Before writing agent:
 4. **Validate against checklist**
 5. **Write to appropriate location**
 6. **Report completion:**
+
    ```
    ✅ {Agent Type} Created: {file-path}
 
@@ -499,16 +546,19 @@ Before writing agent:
 ## Examples
 
 **Worker Request:**
+
 ```
 "Create bug-hunter worker for detecting bugs via type-check and build"
 ```
 
 **Orchestrator Request:**
+
 ```
 "Create deployment-orchestrator for staging → validation → production workflow"
 ```
 
 **Simple Agent Request:**
+
 ```
 "Create code-formatter agent that runs prettier on staged files"
 ```
@@ -516,6 +566,7 @@ Before writing agent:
 ---
 
 **This agent follows patterns from:**
+
 - `docs/Agents Ecosystem/ARCHITECTURE.md` (canonical)
 - `CLAUDE.md` (behavioral OS)
 - Existing production agents (bug-orchestrator, bug-hunter, security-scanner)

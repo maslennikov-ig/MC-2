@@ -135,9 +135,7 @@ export function formatRAGContextXML(
   const availableTokens = maxTokens - wrapperOverhead;
 
   // Sort by relevance score (highest first)
-  const sortedChunks = [...chunks].sort(
-    (a, b) => b.relevance_score - a.relevance_score
-  );
+  const sortedChunks = [...chunks].sort((a, b) => b.relevance_score - a.relevance_score);
 
   for (const chunk of sortedChunks) {
     const escapedContent = escapeXml(chunk.content);
@@ -205,26 +203,19 @@ export function filterChunksForSection(
 ): RAGChunk[] {
   // Handle null/empty section ID - return top chunks by relevance
   if (!sectionRagId) {
-    return ragChunks
-      .sort((a, b) => b.relevance_score - a.relevance_score)
-      .slice(0, 3);
+    return ragChunks.sort((a, b) => b.relevance_score - a.relevance_score).slice(0, 3);
   }
 
   // Filter chunks that match the section's RAG context
   const matchingChunks = ragChunks.filter(
-    (chunk) =>
-      chunk.metadata?.rag_context_id === sectionRagId ||
-      chunk.chunk_id.includes(sectionRagId)
+    chunk =>
+      chunk.metadata?.rag_context_id === sectionRagId || chunk.chunk_id.includes(sectionRagId)
   );
 
   if (matchingChunks.length > 0) {
-    return matchingChunks
-      .sort((a, b) => b.relevance_score - a.relevance_score)
-      .slice(0, 5);
+    return matchingChunks.sort((a, b) => b.relevance_score - a.relevance_score).slice(0, 5);
   }
 
   // Fallback: return top chunks by relevance
-  return ragChunks
-    .sort((a, b) => b.relevance_score - a.relevance_score)
-    .slice(0, 3);
+  return ragChunks.sort((a, b) => b.relevance_score - a.relevance_score).slice(0, 3);
 }

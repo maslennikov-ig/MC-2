@@ -92,14 +92,14 @@ When [+] is clicked, floating menu appears:
 
 ### Ratings
 
-| Criterion | Score | Rationale |
-|-----------|-------|-----------|
-| Discoverability | **5** | Plus icons universally understood; n8n pattern proven highly discoverable |
-| Scalability | **3** | Excellent for adding; managing many attachments requires complementary pattern |
-| Visual Clarity | **4** | Compact icon presence; menu disappears after selection |
-| Learning Curve | **5** | Immediate comprehension; familiar pattern from Notion, Google Docs, etc. |
-| Mobile/Tablet | **5** | Tap-native; avoids hover-dependent interactions |
-| Implementation | **Low** | Floating menu + icon button; well-documented React component libraries |
+| Criterion       | Score   | Rationale                                                                      |
+| --------------- | ------- | ------------------------------------------------------------------------------ |
+| Discoverability | **5**   | Plus icons universally understood; n8n pattern proven highly discoverable      |
+| Scalability     | **3**   | Excellent for adding; managing many attachments requires complementary pattern |
+| Visual Clarity  | **4**   | Compact icon presence; menu disappears after selection                         |
+| Learning Curve  | **5**   | Immediate comprehension; familiar pattern from Notion, Google Docs, etc.       |
+| Mobile/Tablet   | **5**   | Tap-native; avoids hover-dependent interactions                                |
+| Implementation  | **Low** | Floating menu + icon button; well-documented React component libraries         |
 
 ---
 
@@ -179,14 +179,14 @@ Legend: ⠿ = drag handle  ✓ = complete  ● = in progress  ○ = not started 
 
 ### Ratings
 
-| Criterion | Score | Rationale |
-|-----------|-------|-----------|
-| Discoverability | **3** | Requires understanding click-to-select; panel itself is visible but requires action |
-| Scalability | **5** | Unlimited attachments; scrolling list with full metadata support |
-| Visual Clarity | **5** | Attachments hidden in panel; graph remains clean regardless of attachment count |
-| Learning Curve | **4** | Familiar from Figma/Canva; slight learning curve for node selection model |
-| Mobile/Tablet | **3** | Works on tablets with drawer pattern; phones need full-screen modal adaptation |
-| Implementation | **Medium** | React sidebar components available; state management for selection sync |
+| Criterion       | Score      | Rationale                                                                           |
+| --------------- | ---------- | ----------------------------------------------------------------------------------- |
+| Discoverability | **3**      | Requires understanding click-to-select; panel itself is visible but requires action |
+| Scalability     | **5**      | Unlimited attachments; scrolling list with full metadata support                    |
+| Visual Clarity  | **5**      | Attachments hidden in panel; graph remains clean regardless of attachment count     |
+| Learning Curve  | **4**      | Familiar from Figma/Canva; slight learning curve for node selection model           |
+| Mobile/Tablet   | **3**      | Works on tablets with drawer pattern; phones need full-screen modal adaptation      |
+| Implementation  | **Medium** | React sidebar components available; state management for selection sync             |
 
 ---
 
@@ -279,14 +279,14 @@ QUICK POPOVER (when badge clicked):
 
 ### Ratings
 
-| Criterion | Score | Rationale |
-|-----------|-------|-----------|
-| Discoverability | **4** | Visible indicators prompt exploration; warning states draw attention |
-| Scalability | **3** | Works well up to 5-6 attachment types; needs truncation strategy beyond that |
-| Visual Clarity | **5** | Compact indicators maintain clean graph; semantic zoom controls density |
-| Learning Curve | **5** | Universal pattern; users understand badges from email, notifications, etc. |
-| Mobile/Tablet | **4** | Touch-friendly tap targets; works well with popover management |
-| Implementation | **Low** | Icon components + conditional rendering; accessibility considerations |
+| Criterion       | Score   | Rationale                                                                    |
+| --------------- | ------- | ---------------------------------------------------------------------------- |
+| Discoverability | **4**   | Visible indicators prompt exploration; warning states draw attention         |
+| Scalability     | **3**   | Works well up to 5-6 attachment types; needs truncation strategy beyond that |
+| Visual Clarity  | **5**   | Compact indicators maintain clean graph; semantic zoom controls density      |
+| Learning Curve  | **5**   | Universal pattern; users understand badges from email, notifications, etc.   |
+| Mobile/Tablet   | **4**   | Touch-friendly tap targets; works well with popover management               |
+| Implementation  | **Low** | Icon components + conditional rendering; accessibility considerations        |
 
 ---
 
@@ -342,14 +342,14 @@ Deliverables: Responsive panel behavior, touch optimization, accessibility audit
 
 ### Ratings summary for hybrid approach
 
-| Criterion | Score | Rationale |
-|-----------|-------|-----------|
-| Discoverability | **5** | Plus buttons + visible badges ensure all users find attachment features |
-| Scalability | **5** | Inspector panel handles unlimited attachments; badges summarize at scale |
-| Visual Clarity | **5** | Clean graph with compact badges; complexity contained in panel |
-| Learning Curve | **5** | Familiar patterns from Canva, Notion, Figma; no novel paradigms |
-| Mobile/Tablet | **4** | Panel adapts to drawer; plus menu touch-friendly; badges work well |
-| Implementation | **Medium** | Three connected systems; straightforward with component libraries |
+| Criterion       | Score      | Rationale                                                                |
+| --------------- | ---------- | ------------------------------------------------------------------------ |
+| Discoverability | **5**      | Plus buttons + visible badges ensure all users find attachment features  |
+| Scalability     | **5**      | Inspector panel handles unlimited attachments; badges summarize at scale |
+| Visual Clarity  | **5**      | Clean graph with compact badges; complexity contained in panel           |
+| Learning Curve  | **5**      | Familiar patterns from Canva, Notion, Figma; no novel paradigms          |
+| Mobile/Tablet   | **4**      | Panel adapts to drawer; plus menu touch-friendly; badges work well       |
+| Implementation  | **Medium** | Three connected systems; straightforward with component libraries        |
 
 ---
 

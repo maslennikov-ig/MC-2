@@ -2,37 +2,34 @@
  * Organization Helpers - Shared utilities for organization management
  *
  * Consolidates common patterns used across organization API routes including:
- * - UUID validation (re-exported from validation-utils)
+ * - UUID validation (re-exported from validation)
  * - Role-based access control checks
  * - Email domain validation
  */
 
-import { getAdminClient } from '@/lib/supabase/client-factory';
-import type { OrgRole } from '@megacampus/shared-types';
+import { getAdminClient } from '@/lib/supabase/client-factory'
+import type { OrgRole } from '@megacampus/shared-types'
 
-// Re-export UUID validation from centralized validation-utils (ISSUE-005)
-export { uuidSchema, validateUUID, isValidUUID, UUID_REGEX } from '@/lib/validation-utils';
+// Re-export UUID validation from lightweight module (avoids pulling DOMPurify/jsdom into API routes)
+export { uuidSchema, validateUUID, isValidUUID, UUID_REGEX } from '@/lib/uuid-validation'
 
 /**
  * Get user's role in a specific organization
  */
-export async function getUserOrgRole(
-  userId: string,
-  orgId: string
-): Promise<OrgRole | null> {
-  const adminClient = getAdminClient();
+export async function getUserOrgRole(userId: string, orgId: string): Promise<OrgRole | null> {
+  const adminClient = getAdminClient()
   const { data, error } = await adminClient
     .from('organization_members')
     .select('role')
     .eq('organization_id', orgId)
     .eq('user_id', userId)
-    .single();
+    .single()
 
   if (error || !data) {
-    return null;
+    return null
   }
 
-  return data.role as OrgRole;
+  return data.role as OrgRole
 }
 
 /**
@@ -42,9 +39,9 @@ export async function requireOrgAdminAccess(
   userId: string,
   orgId: string
 ): Promise<{ authorized: boolean; role: OrgRole | null }> {
-  const role = await getUserOrgRole(userId, orgId);
-  const authorized = role === 'owner' || role === 'manager';
-  return { authorized, role };
+  const role = await getUserOrgRole(userId, orgId)
+  const authorized = role === 'owner' || role === 'manager'
+  return { authorized, role }
 }
 
 /**
@@ -55,11 +52,11 @@ export async function requireOrgRole(
   orgId: string,
   requiredRoles: OrgRole[]
 ): Promise<{ authorized: boolean; role: OrgRole | null }> {
-  const role = await getUserOrgRole(userId, orgId);
+  const role = await getUserOrgRole(userId, orgId)
   return {
     authorized: role !== null && requiredRoles.includes(role),
     role,
-  };
+  }
 }
 
 /**
@@ -69,24 +66,26 @@ export async function validateEmailDomain(
   userEmail: string,
   orgId: string
 ): Promise<{ valid: boolean; error?: string }> {
-  const adminClient = getAdminClient();
+  const adminClient = getAdminClient()
   const { data: org } = await adminClient
     .from('organizations')
     .select('settings')
     .eq('id', orgId)
-    .single();
+    .single()
 
-  const requiredDomain = (org?.settings as Record<string, unknown> | null)?.requireEmailDomain as string | null;
+  const requiredDomain = (org?.settings as Record<string, unknown> | null)?.requireEmailDomain as
+    | string
+    | null
 
   if (requiredDomain) {
-    const domain = userEmail.split('@')[1];
+    const domain = userEmail.split('@')[1]
     if (domain !== requiredDomain) {
       return {
         valid: false,
         error: `Only users with @${requiredDomain} email addresses can join this organization`,
-      };
+      }
     }
   }
 
-  return { valid: true };
+  return { valid: true }
 }

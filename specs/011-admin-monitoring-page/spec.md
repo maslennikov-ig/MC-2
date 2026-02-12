@@ -9,6 +9,7 @@
 **Your Role:** Senior Full-Stack Developer implementing this feature incrementally following the 6-week roadmap (Section 5).
 
 **Project Context:**
+
 - **Product:** MegaCampus AI - Course generation platform using LLMs
 - **Architecture:** Monorepo with Next.js 15+ frontend, tRPC API, Supabase PostgreSQL, BullMQ job queues
 - **Tech Stack:** TypeScript (strict), React Server Components, TailwindCSS, shadcn/ui
@@ -18,6 +19,7 @@
 Implement an admin monitoring page that provides deep visibility into the course generation pipeline (Stages 1-6) with real-time updates, detailed trace logging, and manual Stage 6 control for debugging and development.
 
 **Key Features to Implement:**
+
 1. Real-time generation monitoring dashboard (Supabase Realtime)
 2. Input→Process→Output trace viewer for every LLM call
 3. Stage 5 pause mechanism with manual Stage 6 triggering
@@ -90,6 +92,7 @@ Implement an admin monitoring page that provides deep visibility into the course
 - **Supabase Admin Client:** Two separate implementations by design (see CLAUDE.md) - don't unify
 
 **Before You Start:**
+
 1. Read Section 5 (Implementation Roadmap) completely
 2. Understand Section 2.2 (Database Schema Changes)
 3. Review Section 3.2.1 (Pause Mechanism) - critical for Stage 6 control
@@ -148,6 +151,7 @@ Create a sophisticated monitoring interface for the course generation pipeline t
 ### 2.1 Technology Stack
 
 **Frontend:**
+
 - Next.js 15+ (App Router)
 - React Server Components + Client Components
 - TypeScript (strict mode)
@@ -155,12 +159,14 @@ Create a sophisticated monitoring interface for the course generation pipeline t
 - Supabase Realtime client
 
 **Backend:**
+
 - tRPC API endpoints (existing architecture)
 - Supabase PostgreSQL database
 - BullMQ job queues (existing)
 - PostgreSQL FSM for state management (existing)
 
 **Data Flow:**
+
 ```
 User Action → Next.js Page → tRPC Router → BullMQ Queue → Worker
                 ↓                                           ↓
@@ -375,6 +381,7 @@ export interface Lesson {
 **Location**: Top of page
 
 **Components**:
+
 - Course title, ID, and creation timestamp
 - Current generation status badge (with color coding)
 - Progress indicator: X/6 stages complete
@@ -386,6 +393,7 @@ export interface Lesson {
 - Action buttons: "Pause", "Cancel", "Export Logs"
 
 **Data Sources**:
+
 - `courses` table: `title`, `id`, `generation_status`, `created_at`
 - `generation_trace` table: aggregated metrics
 - `generation_status_history` table: status transitions
@@ -395,6 +403,7 @@ export interface Lesson {
 **Visual Design**: Horizontal stepper/timeline with 6 stages
 
 **Each Stage Shows**:
+
 - Stage number and name
 - Status icon: ⏳ Pending | 🔄 In Progress | ✅ Complete | ❌ Failed
 - Start and end timestamps
@@ -428,6 +437,7 @@ export interface Lesson {
 ```
 
 **Data Sources**:
+
 - `generation_status_history`: timestamps, transitions
 - `file_catalog`: uploaded files
 - `document_priorities`: classification results
@@ -484,6 +494,7 @@ export interface Lesson {
 ```
 
 **Interaction**:
+
 - Click any step to expand/collapse
 - Copy buttons for prompt/completion text
 - Download buttons for raw JSON
@@ -650,6 +661,7 @@ async finalizeCourse(courseId: string) {
 ```
 
 **Configuration:**
+
 - **Development mode**: Set `auto_finalize_after_stage6 = FALSE` - requires manual "Complete Course" button
 - **Production mode**: Set `auto_finalize_after_stage6 = TRUE` - automatic finalization after all lessons
 
@@ -819,29 +831,29 @@ async finalizeCourse(courseId: string) {
 **"Complete Course" Button** (when all lessons done):
 
 ```tsx
-{allLessonsComplete && !course.auto_finalize_after_stage6 && (
-  <div className="mt-8 p-6 border-2 border-emerald-500 rounded-lg bg-emerald-500/10">
-    <div className="flex items-center justify-between">
-      <div>
-        <h3 className="text-xl font-bold text-emerald-500">
-          ✅ All Lessons Generated
-        </h3>
-        <p className="text-slate-300 mt-2">
-          All {totalLessons} lessons have been successfully generated.
-          Review the content and complete course generation.
-        </p>
+{
+  allLessonsComplete && !course.auto_finalize_after_stage6 && (
+    <div className="mt-8 p-6 border-2 border-emerald-500 rounded-lg bg-emerald-500/10">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-xl font-bold text-emerald-500">✅ All Lessons Generated</h3>
+          <p className="text-slate-300 mt-2">
+            All {totalLessons} lessons have been successfully generated. Review the content and
+            complete course generation.
+          </p>
+        </div>
+        <Button
+          size="lg"
+          variant="default"
+          onClick={handleFinalizeCourse}
+          className="bg-emerald-500 hover:bg-emerald-600"
+        >
+          Complete Course Generation
+        </Button>
       </div>
-      <Button
-        size="lg"
-        variant="default"
-        onClick={handleFinalizeCourse}
-        className="bg-emerald-500 hover:bg-emerald-600"
-      >
-        Complete Course Generation
-      </Button>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 #### 3.2.3 User Refinement Feature
@@ -912,10 +924,7 @@ export const lessonsRouter = router({
         .eq('id', lesson.data.section.course_id)
         .single();
 
-      const lessonSpec = findLessonSpecInStructure(
-        course.course_structure,
-        input.lessonId
-      );
+      const lessonSpec = findLessonSpecInStructure(course.course_structure, input.lessonId);
 
       // Create new content record
       const { data: newContent } = await ctx.supabase
@@ -987,11 +996,13 @@ function buildRefinementPrompt(
   previousContent: any
 ): string {
   const typeContext = {
-    fix: "You are improving an existing lesson. Focus on correcting errors, improving clarity, and enhancing quality.",
-    add: "You are expanding an existing lesson. Focus on adding the requested content while maintaining coherence with existing material.",
-    simplify: "You are simplifying an existing lesson. Focus on making content more accessible while preserving key concepts.",
-    restructure: "You are restructuring an existing lesson. Focus on improving organization and flow.",
-    custom: "You are modifying an existing lesson based on user feedback.",
+    fix: 'You are improving an existing lesson. Focus on correcting errors, improving clarity, and enhancing quality.',
+    add: 'You are expanding an existing lesson. Focus on adding the requested content while maintaining coherence with existing material.',
+    simplify:
+      'You are simplifying an existing lesson. Focus on making content more accessible while preserving key concepts.',
+    restructure:
+      'You are restructuring an existing lesson. Focus on improving organization and flow.',
+    custom: 'You are modifying an existing lesson based on user feedback.',
   };
 
   return `
@@ -1021,6 +1032,7 @@ IMPORTANT:
 **URL**: `/admin/generation-history`
 
 **Features**:
+
 - Paginated table of all course generations
 - Filters:
   - Date range picker
@@ -1046,6 +1058,7 @@ IMPORTANT:
 **Content**: Same as real-time monitoring dashboard (Section 3.1), but read-only
 
 **Additional Features**:
+
 - Compare button (if multiple generations exist for same course)
 - Export as JSON/CSV
 - Share link (with expiry)
@@ -1057,18 +1070,21 @@ IMPORTANT:
 #### 3.4.1 Role-Based Access
 
 **Superadmin**:
+
 - Full access to all courses across all organizations
 - Can view all generation traces
 - Can trigger/cancel any generation
 - Can modify any course settings
 
 **Admin**:
+
 - Access to courses within their organization only
 - Can view generation traces for their organization's courses
 - Can trigger/cancel generations for their courses
 - Can modify settings for their courses
 
 **Instructor/Student**:
+
 - NO access to admin monitoring page
 - Use regular course viewing interface
 
@@ -1127,6 +1143,7 @@ export default async function AdminGenerationMonitoringPage({
 ### 4.1 Design Philosophy
 
 **Goals**:
+
 1. **Information Density**: Show maximum relevant data without overwhelming
 2. **Progressive Disclosure**: Details on-demand via accordions, modals
 3. **Visual Hierarchy**: Clear importance signaling through size, color, position
@@ -1159,6 +1176,7 @@ export default async function AdminGenerationMonitoringPage({
 ```
 
 **Status Colors**:
+
 - Pending: `--warning` (Amber)
 - In Progress: `--accent-cyan` (Cyan, animated pulse)
 - Complete: `--success` (Emerald)
@@ -1168,6 +1186,7 @@ export default async function AdminGenerationMonitoringPage({
 ### 4.3 Component Patterns
 
 **Use shadcn/ui Components**:
+
 - `Card`, `CardHeader`, `CardContent`: Information panels
 - `Accordion`, `AccordionItem`: Collapsible sections
 - `Badge`: Status indicators
@@ -1179,6 +1198,7 @@ export default async function AdminGenerationMonitoringPage({
 - `ScrollArea`: Scrollable content
 
 **Custom Components**:
+
 - `GenerationTimeline`: Horizontal stepper
 - `TraceViewer`: Nested accordion with syntax highlighting
 - `LessonCard`: Lesson generation control card
@@ -1187,11 +1207,13 @@ export default async function AdminGenerationMonitoringPage({
 ### 4.4 Animations
 
 **Principles**:
+
 - **Functional**: Animations guide attention, not just decorative
 - **Fast**: 150-300ms durations
 - **Smooth**: Ease-in-out timing functions
 
 **Examples**:
+
 - Stage transition: Fade + slide (200ms)
 - Accordion expand: Height animation (250ms)
 - Real-time update: Highlight flash (300ms)
@@ -1249,11 +1271,13 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 ### 4.5 Responsive Design
 
 **Breakpoints**:
+
 - Mobile: < 640px (Stack vertically, simplified view)
 - Tablet: 640px - 1024px (Two-column layout)
 - Desktop: > 1024px (Three-column layout with sidebar)
 
 **Mobile Considerations**:
+
 - Collapsible sidebar
 - Bottom sheet for actions
 - Simplified trace viewer (toggle full view)
@@ -1266,6 +1290,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 ### 5.1 Phase 1: Core Infrastructure (Week 1)
 
 **Backend**:
+
 - [ ] Create `generation_trace` table + RLS policies
 - [ ] Add `pause_at_stage_5` column to `courses`
 - [ ] Add refinement columns to `lesson_contents`
@@ -1283,6 +1308,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
   - [ ] `admin.regenerateLessonWithRefinement`
 
 **Frontend**:
+
 - [ ] Set up admin route structure (`/admin/generation/[courseId]`)
 - [ ] Implement auth middleware + role checks
 - [ ] Create base layout with sidebar
@@ -1291,6 +1317,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 ### 5.2 Phase 2: Monitoring Dashboard (Week 2)
 
 **Components**:
+
 - [ ] Overview panel (course metadata, progress, metrics)
 - [ ] Stage timeline (horizontal stepper)
 - [ ] Stage details panel (expandable)
@@ -1298,6 +1325,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 - [ ] Metrics visualization (charts/graphs)
 
 **Data Integration**:
+
 - [ ] Connect to `generation_status_history` for timeline
 - [ ] Connect to `generation_trace` for detailed logs
 - [ ] Implement Supabase Realtime subscriptions
@@ -1306,6 +1334,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 ### 5.3 Phase 3: Trace Viewer (Week 2-3)
 
 **Components**:
+
 - [ ] Nested accordion trace viewer
 - [ ] Input/Process/Output sections
 - [ ] Syntax highlighting for JSON/prompts
@@ -1313,6 +1342,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 - [ ] Filter/search functionality
 
 **Features**:
+
 - [ ] Drill down into any step
 - [ ] View full prompts/completions
 - [ ] See token usage, costs, durations
@@ -1321,11 +1351,13 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 ### 5.4 Phase 4: Manual Stage 6 Control (Week 3)
 
 **Backend**:
+
 - [ ] Modify Stage 5 handler to respect `pause_at_stage_5`
 - [ ] Create lessons from structure without triggering Stage 6
 - [ ] Implement per-lesson Stage 6 triggering
 
 **Frontend**:
+
 - [ ] Course structure viewer (hierarchical)
 - [ ] Lesson cards with status + actions
 - [ ] "Generate Content" button + handler
@@ -1335,11 +1367,13 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 ### 5.5 Phase 5: User Refinement (Week 4)
 
 **Backend**:
+
 - [ ] Implement refinement storage in `lesson_contents`
 - [ ] Modify Stage 6 orchestrator to handle refinement
 - [ ] Build refinement prompt templates
 
 **Frontend**:
+
 - [ ] Refinement modal UI
 - [ ] Refinement type selector
 - [ ] Instructions text area
@@ -1349,11 +1383,13 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 ### 5.6 Phase 6: Historical Browser (Week 4-5)
 
 **Backend**:
+
 - [ ] Pagination queries for generation history
 - [ ] Filter/search implementation
 - [ ] Export functionality (JSON/CSV)
 
 **Frontend**:
+
 - [ ] History table with pagination
 - [ ] Filters + search bar
 - [ ] Detail view (read-only monitoring dashboard)
@@ -1362,6 +1398,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 ### 5.7 Phase 7: Polish & Testing (Week 5-6)
 
 **Polish**:
+
 - [ ] Animations + transitions
 - [ ] Error states + empty states
 - [ ] Loading skeletons
@@ -1369,12 +1406,14 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 - [ ] Dark mode refinement
 
 **Testing**:
+
 - [ ] E2E tests for admin flows
 - [ ] Integration tests for tRPC routes
 - [ ] Unit tests for utility functions
 - [ ] Manual QA across devices/browsers
 
 **Documentation**:
+
 - [ ] Admin user guide
 - [ ] Developer documentation
 - [ ] API reference
@@ -1388,6 +1427,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 **Decision**: Use Supabase PostgreSQL
 
 **Rationale**:
+
 - **Persistence**: Production-ready, ACID transactions
 - **Querying**: Powerful SQL for filtering, aggregation, joins
 - **Real-time**: Supabase Realtime for live updates
@@ -1396,10 +1436,12 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 - **Backup**: Automated backups via Supabase
 
 **Trade-offs**:
+
 - Increased database size (mitigated by retention policies)
 - Network latency for queries (mitigated by indexing)
 
 **Mitigation**:
+
 - Implement data retention policy (delete traces > 90 days)
 - Use indexes on `course_id`, `lesson_id`, `stage`, `created_at`
 - Consider partitioning for very large tables (future)
@@ -1409,6 +1451,7 @@ export function StageCard({ stage, isActive, isComplete }: StageCardProps) {
 **Decision**: Supabase Realtime (WebSocket-based)
 
 **Rationale**:
+
 - **Efficiency**: No repeated HTTP requests, lower latency
 - **Battery**: Better for mobile devices
 - **Scalability**: Server-initiated updates, no polling overhead
@@ -1442,7 +1485,7 @@ export function useGenerationRealtime(courseId: string) {
           table: 'courses',
           filter: `id=eq.${courseId}`,
         },
-        (payload) => {
+        payload => {
           setStatus(payload.new.generation_status);
         }
       )
@@ -1459,8 +1502,8 @@ export function useGenerationRealtime(courseId: string) {
           table: 'generation_trace',
           filter: `course_id=eq.${courseId}`,
         },
-        (payload) => {
-          setTraces((prev) => [...prev, payload.new as GenerationTrace]);
+        payload => {
+          setTraces(prev => [...prev, payload.new as GenerationTrace]);
         }
       )
       .subscribe();
@@ -1478,6 +1521,7 @@ export function useGenerationRealtime(courseId: string) {
 ### 6.3 Trace Logging: When & What
 
 **When to Log**:
+
 - **Every LLM call**: Input prompt, output completion, tokens, cost
 - **Every validation step**: Input, validation result, errors
 - **Every transformation**: Input data, output data, duration
@@ -1485,6 +1529,7 @@ export function useGenerationRealtime(courseId: string) {
 - **Every error**: Full error object, stack trace, context
 
 **What NOT to Log**:
+
 - User authentication tokens
 - API keys or secrets
 - PII unless necessary (redact if possible)
@@ -1613,43 +1658,43 @@ export async function executePhase1(courseId: string, context: any) {
 export const MODEL_PRICING = {
   // GPT-4 family
   'openai/gpt-4-turbo': {
-    prompt: 10.0,      // $10 per 1M prompt tokens
-    completion: 30.0   // $30 per 1M completion tokens
+    prompt: 10.0, // $10 per 1M prompt tokens
+    completion: 30.0, // $30 per 1M completion tokens
   },
   'openai/gpt-4o': {
     prompt: 5.0,
-    completion: 15.0
+    completion: 15.0,
   },
   'openai/gpt-4o-mini': {
     prompt: 0.15,
-    completion: 0.60
+    completion: 0.6,
   },
 
   // Claude family
   'anthropic/claude-3.5-sonnet': {
     prompt: 3.0,
-    completion: 15.0
+    completion: 15.0,
   },
   'anthropic/claude-3-haiku': {
     prompt: 0.25,
-    completion: 1.25
+    completion: 1.25,
   },
 
   // Open source models
   'meta-llama/llama-3.1-70b-instruct': {
     prompt: 0.35,
-    completion: 0.40
+    completion: 0.4,
   },
   'meta-llama/llama-3.1-8b-instruct': {
     prompt: 0.05,
-    completion: 0.08
+    completion: 0.08,
   },
 
   // Fallback for unknown models
-  'unknown': {
+  unknown: {
     prompt: 1.0,
-    completion: 3.0
-  }
+    completion: 3.0,
+  },
 } as const;
 
 export interface TokenUsage {
@@ -1728,6 +1773,7 @@ await logTrace({
 **Decision**: Option B with structured template
 
 **Rationale**:
+
 - Clear task separation
 - LLM understands it's refining, not creating from scratch
 - Single API call (cost-effective)
@@ -1788,7 +1834,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 import { createClient } from '@supabase/supabase-js';
 
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (authHeader !== `Bearer ${Deno.env.get('CRON_SECRET')}`) {
@@ -1809,22 +1855,23 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         message: 'Cleanup complete',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Cleanup failed:', error);
 
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 });
 ```
 
 **Schedule in Supabase Dashboard**:
+
 - Navigate to: Edge Functions → cleanup-generation-traces → Cron Triggers
 - Schedule: `0 2 * * *` (daily at 2:00 AM UTC)
 - Set environment variable: `CRON_SECRET` (random secret for authentication)
@@ -1863,6 +1910,7 @@ async function archiveAndCleanup() {
 ### 7.1 Phase 2: Super-Admin Dashboard
 
 **Features**:
+
 - User management (create, edit, delete users)
 - Organization management
 - System health monitoring
@@ -1882,6 +1930,7 @@ async function archiveAndCleanup() {
    - ❌ Cancel: Stop generation
 
 **UI Pattern**:
+
 ```
 ┌─────────────────────────────────────────────────┐
 │ Stage 2: Document Processing Complete          │
@@ -1906,6 +1955,7 @@ async function archiveAndCleanup() {
 ### 7.3 Phase 4: Advanced Analytics
 
 **Metrics**:
+
 - Cost per stage, per lesson, per course
 - Token usage trends over time
 - Quality score distributions
@@ -1914,6 +1964,7 @@ async function archiveAndCleanup() {
 - Generation time optimization opportunities
 
 **Visualizations**:
+
 - Line charts: Cost over time, tokens over time
 - Bar charts: Cost by stage, tokens by model
 - Heatmaps: Quality scores across lessons
@@ -1922,12 +1973,14 @@ async function archiveAndCleanup() {
 ### 7.4 Phase 5: Export & Sharing
 
 **Export Formats**:
+
 - **JSON**: Full trace data for external analysis
 - **CSV**: Tabular data for Excel/Google Sheets
 - **PDF**: Human-readable report with visualizations
 - **Markdown**: Documentation-friendly format
 
 **Sharing**:
+
 - Generate shareable link with expiry
 - Embed code for external dashboards
 - Webhook integration (send trace data to external systems)
@@ -1941,6 +1994,7 @@ async function archiveAndCleanup() {
 **Risk**: Large trace tables (millions of rows) slow down queries
 
 **Mitigation**:
+
 - Implement data retention policy (90 days)
 - Use database partitioning (by month)
 - Create optimized indexes
@@ -1952,6 +2006,7 @@ async function archiveAndCleanup() {
 **Risk**: Exposing sensitive data (prompts, user data) in traces
 
 **Mitigation**:
+
 - Implement RLS policies strictly
 - Redact PII from traces
 - Audit log access to admin pages
@@ -1963,6 +2018,7 @@ async function archiveAndCleanup() {
 **Risk**: Information overload - too much data confuses users
 
 **Mitigation**:
+
 - Progressive disclosure (collapsed by default)
 - Filter/search functionality
 - Clear visual hierarchy
@@ -1974,6 +2030,7 @@ async function archiveAndCleanup() {
 **Risk**: Excessive database storage costs from traces
 
 **Mitigation**:
+
 - Retention policy (auto-delete old traces)
 - Compress large text fields (prompts/completions)
 - Monitor storage usage in Supabase dashboard
@@ -2160,11 +2217,13 @@ AdminGenerationMonitoringPage
 **Date**: 2025-11-25
 
 **Next Steps**:
+
 1. ✅ User review and feedback - COMPLETED
 2. ✅ Integrate ADDENDUM solutions - COMPLETED
 3. → Implementation kickoff - READY
 
 **Approved Solutions**:
+
 1. ✅ Data storage approach (Supabase) - Approved
 2. ✅ Real-time updates (Supabase Realtime) - Approved
 3. ✅ Stage 5 pause mechanism - Approved

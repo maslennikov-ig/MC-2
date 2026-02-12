@@ -5,7 +5,11 @@
   "targetaudience": "University freshmen in non-CS majors who need computational skills for statistics courses, marketing analysts migrating from Excel to automation, hobbyist gamers wanting to mod Minecraft with Python scripts, and early-career QA testers tasked with writing small test utilities. All personas share basic computer folder navigation skills but have never written code.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": ["basic computer literacy (create folders, install software)", "high-school algebra (variables and functions concept)", "access to Windows 10/macOS 11/Linux with admin rights"],
+  "prerequisites": [
+    "basic computer literacy (create folders, install software)",
+    "high-school algebra (variables and functions concept)",
+    "access to Windows 10/macOS 11/Linux with admin rights"
+  ],
   "learning_outcomes": [
     "Define and run Python 3 scripts using VS Code integrated terminal",
     "Build interactive console programs that accept input and validate data",

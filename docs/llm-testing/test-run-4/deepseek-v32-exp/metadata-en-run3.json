@@ -5,7 +5,27 @@
   "target_audience": "Absolute beginners with no prior programming experience, students, and career changers.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "No prior programming experience required", "A computer capable of running Python"],
-  "learning_outcomes": ["Explain fundamental programming concepts like variables and data types.", "Apply control flow structures (if/else, loops) to solve problems.", "Construct functions to organize and reuse code effectively.", "Differentiate between core Python data structures (lists, dictionaries).", "Create simple Python scripts to automate basic tasks.", "Identify and resolve common syntax and logic errors."],
-  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Automation", "Computer Science", "Fundamentals"]
+  "prerequisites": [
+    "Basic computer literacy",
+    "No prior programming experience required",
+    "A computer capable of running Python"
+  ],
+  "learning_outcomes": [
+    "Explain fundamental programming concepts like variables and data types.",
+    "Apply control flow structures (if/else, loops) to solve problems.",
+    "Construct functions to organize and reuse code effectively.",
+    "Differentiate between core Python data structures (lists, dictionaries).",
+    "Create simple Python scripts to automate basic tasks.",
+    "Identify and resolve common syntax and logic errors."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Automation",
+    "Computer Science",
+    "Fundamentals"
+  ]
 }

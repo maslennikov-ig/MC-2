@@ -129,7 +129,7 @@ export class OutboxProcessor {
    *
    * Signals the polling loop to stop after current batch completes.
    */
-  async stop(): Promise<void> {
+  stop(): void {
     this.isRunning = false;
     logger.info('Stopping outbox processor');
   }
@@ -170,7 +170,7 @@ export class OutboxProcessor {
       // This ensures DEV and Production environments process only their own outbox entries
       // Note: job_outbox table may not be in generated types yet, using 'any' cast for table name
       const { data, error } = await this.supabase
-        .from('job_outbox' as any)
+        .from('job_outbox')
         .select('*')
         .is('processed_at', null)
         .eq('target_queue', QUEUE_NAME)
@@ -268,7 +268,7 @@ export class OutboxProcessor {
 
         // Mark as processed
         const { error: updateError } = await this.supabase
-          .from('job_outbox' as any)
+          .from('job_outbox')
           .update({ processed_at: new Date().toISOString() })
           .eq('outbox_id', job.outbox_id);
 
@@ -298,7 +298,7 @@ export class OutboxProcessor {
         // Permanent failure: not a connection error or max retries exceeded
         if (!isConnectionError || attempt >= this.maxRetries) {
           const { error: updateError } = await this.supabase
-            .from('job_outbox' as any)
+            .from('job_outbox')
             .update({
               attempts: job.attempts + attempt,
               last_error: errorMessage,
@@ -387,7 +387,7 @@ if (process.env.NODE_ENV !== 'test') {
   process.on('SIGTERM', () => {
     void (async () => {
       logger.info('SIGTERM received, gracefully stopping outbox processor');
-      await outboxProcessor.stop();
+      outboxProcessor.stop();
 
       // Wait for current batch to complete (max 30s)
       const shutdownTimeout = setTimeout(() => {
@@ -409,7 +409,7 @@ if (process.env.NODE_ENV !== 'test') {
   process.on('SIGINT', () => {
     void (async () => {
       logger.info('SIGINT received, gracefully stopping outbox processor');
-      await outboxProcessor.stop();
+      outboxProcessor.stop();
 
       // Wait for current batch to complete (max 30s)
       const shutdownTimeout = setTimeout(() => {

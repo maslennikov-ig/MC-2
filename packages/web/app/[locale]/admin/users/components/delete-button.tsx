@@ -14,10 +14,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { deleteUserAction } from '@/app/actions/admin-users'
+import { trpc } from '@/lib/trpc/react'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
-import type { UserRole } from '@/app/actions/admin-users'
+import type { Role } from '@megacampus/shared-types'
+
+type UserRole = Role
 
 interface DeleteButtonProps {
   userId: string
@@ -37,8 +39,21 @@ export function DeleteButton({
   onDeleted,
 }: DeleteButtonProps) {
   const t = useTranslations('admin.users')
-  const [deleting, setDeleting] = useState(false)
   const [open, setOpen] = useState(false)
+
+  const utils = trpc.useUtils()
+  const deleteMutation = trpc.admin.deleteUser.useMutation({
+    onSuccess: () => {
+      toast.success(t('success.userDeleted'))
+      setOpen(false)
+      void utils.admin.listUsers.invalidate()
+      onDeleted?.()
+    },
+    onError: (error) => {
+      console.error('Failed to delete user:', error)
+      toast.error(error.message || t('errors.deleteFailed'))
+    },
+  })
 
   const isSuperadmin = currentUserRole === 'superadmin'
   const isAdmin = currentUserRole === 'admin' || isSuperadmin
@@ -55,19 +70,8 @@ export function DeleteButton({
     return null
   }
 
-  const handleDelete = async () => {
-    setDeleting(true)
-    try {
-      await deleteUserAction({ userId })
-      toast.success(t('success.userDeleted'))
-      setOpen(false)
-      onDeleted?.()
-    } catch (error) {
-      console.error('Failed to delete user:', error)
-      toast.error(error instanceof Error ? error.message : t('errors.deleteFailed'))
-    } finally {
-      setDeleting(false)
-    }
+  const handleDelete = () => {
+    deleteMutation.mutate({ userId })
   }
 
   return (
@@ -90,13 +94,15 @@ export function DeleteButton({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleting}>{t('deleteDialog.cancel')}</AlertDialogCancel>
+          <AlertDialogCancel disabled={deleteMutation.isPending}>
+            {t('deleteDialog.cancel')}
+          </AlertDialogCancel>
           <AlertDialogAction
-            onClick={() => void handleDelete()}
-            disabled={deleting}
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {deleting ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
+            {deleteMutation.isPending ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

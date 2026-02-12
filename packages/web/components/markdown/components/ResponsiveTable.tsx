@@ -1,6 +1,6 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
-import type { ResponsiveTableProps } from '../types';
+import * as React from 'react'
+import { cn } from '@/lib/utils'
+import type { ResponsiveTableProps } from '../types'
 
 /**
  * ResponsiveTable Component
@@ -35,11 +35,9 @@ export function ResponsiveTable({ children, className }: ResponsiveTableProps) {
       aria-label="Scrollable table"
       tabIndex={0}
     >
-      <div className="min-w-full inline-block align-middle">
-        {children}
-      </div>
+      <div className="inline-block min-w-full align-middle">{children}</div>
     </div>
-  );
+  )
 }
 
 /**

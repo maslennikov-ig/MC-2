@@ -318,7 +318,7 @@ export const DESIGN_THINKING_CHUNKS: RAGChunk[] = [
       '[Пользователь] нуждается в [потребность], потому что [инсайт]. How Might We (HMW) - ' +
       'техника переформулирования проблемы в форме вопроса для стимуляции креативности.',
     page_or_section: 'Глава 2.1',
-    relevance_score: 0.90,
+    relevance_score: 0.9,
     metadata: {
       embedding_model: 'jina-embeddings-v3',
       chunk_size: 512,

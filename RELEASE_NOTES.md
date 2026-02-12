@@ -2,6 +2,437 @@
 
 _Released on 2025-12-26_
 
+## v0.29.9
+
+_Released on 2026-02-12_
+
+### ✨ New Features
+
+- **web**: Add 3 source file(s), update 1 source file(s), +1 more
+- **jina**: Replace in-process rate/concurrency limiters with Redis-based distributed versions
+
+### 🐛 Bug Fixes
+
+- **tests**: Remove BullMQ worker from contract tests
+- **Authentication**: Add local JWT verification fallback for test environments
+- **tests**: Remove fake session_id from mock JWT + fix reregeneration typo
+- **tests**: Fix 32 CI contract test failures — JWT secret, stale enums, wrong namespace
+- **stage4**: Add .default() to SuggestedAnswerSchema.rationale for LLM output resilience
+
+---
+
+_This release was automatically generated from 24 commits._
+
+## v0.29.8
+
+_Released on 2026-02-11_
+
+### 🔧 Improvements
+
+- Code review tech debt — DRY model constants, ModelConfigService migration, startup validation
+
+### 🐛 Bug Fixes
+
+- **lint**: Resolve 23 ESLint errors across web package + suppress test false positives
+- **chat**: Address code review findings CR-004/005/006/007/009/010
+- **chat**: Fix 500 error, add stage-specific models, replace deprecated models
+- **refinement-chat**: Improve JSON content detection
+- **bunker**: Use randomUUID for atomic temp files instead of process.pid
+- **logger,stage4**: LKG race condition, error serialization, rationale validation
+- **chat**: Improve JSON detection + add trim guard + telemetry (code review)
+- **chat**: Prevent empty chat bubbles and blank lesson content (EGT-1521, GDK-6714)
+
+---
+
+_This release was automatically generated from 31 commits._
+
+## v0.29.7
+
+_Released on 2026-02-10_
+
+### ✨ New Features
+
+- Add CategoryBadge to ClarifyingPanel wizard + bulk error log cleanup
+- **logs**: Add auto-resolve RPC for stale to_verify fingerprints
+
+### 🔧 Improvements
+
+- Split 5 largest files into modular structure
+- Split prompt-registry.ts into per-stage modules
+
+### 🔒 Security
+
+- Aidevteam server audit — cryptominer killed, ports fixed
+- Server hardening — SSH, Bull Board, nginx, kernel update
+
+### 🐛 Bug Fixes
+
+- **chat**: Empty assistant bubble + irrelevant proposals in refinement chat
+- Add ARIA labels + 44 unit tests for CategoryBadge
+- Address code review findings from refactoring
+- **tests**: Update 14 stale judge tests to match current implementations
+- **tests**: Mock Supabase Auth tokens locally to eliminate flaky CI failures
+- **i18n**: Extract hardcoded strings from RefinementChat + useRefinement
+
+---
+
+_This release was automatically generated from 37 commits._
+
+## v0.29.6
+
+_Released on 2026-02-10_
+
+### ✨ New Features
+
+- Add Phase 0.5 unit tests + Admin Clarifying Q&A tab
+- **stage4**: Pass course_description to Phase 1/2 + expand Phase 0.5 clarifying system
+
+### 🐛 Bug Fixes
+
+- **chat**: Code review v2 — dedup ChatMessage, fix rejectProposal cleanup, add 6 tests
+- **chat**: Address code review findings — skeleton, redundant check, generic message
+- **chat**: Add Reject button + post-accept guidance message
+- **chat**: Improve chat UX — remove toast, keep proposal after accept, add Stage 6 per-lesson chat
+- **stage4**: Address code review findings for Phase 0.5 multi-round clarification
+
+---
+
+_This release was automatically generated from 11 commits._
+
+## v0.29.5
+
+_Released on 2026-02-10_
+
+### ✨ New Features
+
+- **web**: Sync full_name to auth metadata on profile save
+
+### 🔒 Security
+
+- Add authentication to Telegram webhook endpoint (mc2-gqfj)
+
+### 🐛 Bug Fixes
+
+- **worker**: Resolve log warnings from course generation QGN-6607
+- Address code review HIGH findings — IPv6 SSRF + cleanup audit trail
+- Healthcheck cycle — auth, types, atomic deletion, security hardening
+- **web**: Replace i18n 'as any' with '@ts-expect-error' + add SSRF protection
+- **Security**: Timing-safe metrics API key comparison
+- Healthcheck batch 2 — 6 bugs fixed, bundle optimization
+- **web**: Improve auth sync error handling + sync avatar_url
+- **Security**: Healthcheck — 9 bugs fixed (5 critical, 3 high, 1 medium)
+
+---
+
+_This release was automatically generated from 86 commits._
+
+## v0.29.4
+
+_Released on 2026-02-09_
+
+### ✨ New Features
+
+- **stage6**: Pass lessonSpec to LessonInspector Blueprint tab
+- **pipeline**: Add unified course-level token tracking
+- **Interface**: Add token aggregation to ModuleDashboard
+- **error-handling**: Standardize wrapTRPCError with AppError/PipelineError support
+- **shared-utils**: Create shared-utils package and migrate imports
+- **web**: Migrate env.ts to @t3-oss/env-nextjs with Zod validation
+
+### 🔧 Improvements
+
+- **dry**: Extract completePhaseWithTrace, getErrorMessage, progress constants
+- **lint**: Structural batch 3 — extract 14 top-warning files into helpers (158→119 warnings)
+- **review**: Implement code review recommendations — type safety, constants, docs
+- **lint**: Structural batch 2 addendum — split phase-2-scope + phase-6-summarization (8 warnings fixed)
+- **lint**: Structural batch 2 — split 7 large files (30 warnings fixed)
+- **lint**: Structural batch 1 — split 3 largest router files (18 warnings fixed)
+- **stage4**: Remove dead Phase 6 RAG Planning code
+- Remove dead code InitializeJobHandler (mc2-qt9i)
+- **API**: Split lifecycle.router.ts into lifecycle/ subdirectory
+- **web**: Consolidate validation-utils.ts into validation.ts
+- **shared-utils**: Narrow normalizeLanguageCode return type, remove unknown code passthrough
+- **shared-utils**: Code review improvements — named constants, JSDoc, fallback param, tests
+- Consolidate formatNumber, formatFileSize, sanitization configs to shared packages
+- **course-gen-platform**: Replace `as string` assertions with getTextContent() for LangChain messages
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s), update 5 agent(s), +1 more
+- **CI/CD**: Build shared packages before lint to resolve type-aware rules
+- **lint**: Add JSDoc and standardize error handling in batch 3 helpers
+- **web**: Refetch traces on stage restart to clear stale error nodes
+- **tests**: Replace inline getAuthToken with centralized singleton in generation contract tests
+- **lint**: Code review fixes — Supabase types, re-exports, floating promise
+- **web**: Resolve TS7030 in GlobalCourseChat useEffect — not all code paths return value
+- Prevent test errors in prod logs + auto-mute rules for infra errors
+- Cap totalSections to available sections in Stage 5 (B1)
+- Clean up courseEntries on eviction and metrics on cancellation (CR follow-up)
+- Memory/resource leak audit fixes (mc2-yqyx)
+- **docker**: Add shared-utils to both API and Web Dockerfiles
+- **lint**: Batch 6 — fix all 108 remaining fixable ESLint warnings
+- **Interface**: Rename misleading "Regenerate All" button to "Retry Failed"
+- **web**: Extract uuid-validation to avoid jsdom in API route bundles
+- **pipeline**: Idempotent token tracking — no double-count on retry (CR-006)
+- Add missing migration file and fix zero-token display (CR-001, CR-009)
+- **lint**: Batch 5 — fix 39 ESLint warnings in 7 files
+- **CI/CD**: Add shared-utils build step to CI pipeline
+- **API**: Apply 3 remaining code review improvements
+- **course-gen-platform**: Fix 82 ESLint warnings in batch 4 (10 files)
+- **API**: Apply code review fixes to lifecycle sub-routers
+- **course-gen-platform**: Fix 81 ESLint warnings in batch 3 (handlers, routers, judges, prompts)
+- **course-gen-platform**: Fix 85 ESLint warnings in batch 2 (logger, client, routers, sanitizer)
+- **course-gen-platform**: Fix 135 ESLint warnings in benchmarks, regeneration and chat routers
+- **web**: Address code review findings for env migration
+- **course-gen-platform**: Code review follow-up improvements
+
+---
+
+_This release was automatically generated from 176 commits._
+
+## v0.29.3
+
+_Released on 2026-02-09_
+
+### 🔧 Improvements
+
+- Add Redis LLM cache, optimize API queries, parallelize retry
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 28 source file(s), update 2 test(s), +2 more
+- Address remaining code review issues #6-#15
+- Address code review issues for perf optimization
+
+---
+
+_This release was automatically generated from 14 commits._
+
+## v0.29.2
+
+_Released on 2026-02-08_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), add 2 test(s), +1 more
+- 3-tier model routing for Stage 5 based on section importance
+
+### 🔧 Improvements
+
+- Expand optimizePackageImports with all Radix UI + framer-motion
+- Remove dead complexity/criticality scoring from Stage 5
+- Extract regex to PATTERNS constant, add SSOT JSDoc, fix lastIndex bug
+- Migrate tRPC architecture to @trpc/react-query with typesafe hooks
+
+### 🐛 Bug Fixes
+
+- Harden sanitize.fileName, fix tests, extract CONTROL_CHAR_REGEX
+- **CI/CD**: Build course-gen-platform before type-check
+- Remove type safety bypasses in ClarifyingPanel (#4, #5)
+- Address code review findings for tRPC migration
+- **tests**: Repair unit test suite — 83/83 pass, no hanging
+- **tests**: Repair 10 pre-existing broken unit tests after deduplication
+
+---
+
+_This release was automatically generated from 48 commits._
+
+## v0.29.1
+
+_Released on 2026-02-08_
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.28.62
+
+_Released on 2026-02-07_
+
+### ✨ New Features
+
+- **stage4**: Swap Phase 1 and Phase 0.5 for data-driven clarifying questions
+- **web**: Show classification_rationale in Stage 3 & pedagogical_patterns in Stage 4
+
+### 🔧 Improvements
+
+- **stage4**: Move Visual Style to accordion, remove deprecated Document Relations
+- **pipeline**: Remove dead content_strategy field from analysis_result
+
+### 🐛 Bug Fixes
+
+- **shared-types,web**: Add pedagogical_patterns to editable whitelist & guard empty .in()
+- **stage4,stage5**: Retry pull-fallback + accept any assessment_types type
+
+---
+
+_This release was automatically generated from 33 commits._
+
+## v0.28.61
+
+_Released on 2026-02-07_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Sync course style injection across all generation stages
+- **stage4**: Pass document content to clarifying questions prompt
+
+---
+
+_This release was automatically generated from 7 commits._
+
+## v0.28.60
+
+_Released on 2026-02-07_
+
+### ✨ New Features
+
+- **web**: Add 1 source file(s), update 12 source file(s), +1 more
+
+### 🐛 Bug Fixes
+
+- **userback**: Use identify() for form pre-fill instead of init options
+
+---
+
+_This release was automatically generated from 4 commits._
+
+## v0.28.59
+
+_Released on 2026-02-07_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 1 source file(s), update docs
+- **graph**: Fix Stage 4 results spinner — shared ref race condition + missing complete statuses
+- **stage7**: Fix double retry bug causing enrichments stuck in generating
+- **anti-overlap**: Remaining code review issues (1.3, 2.3, 5.3, security, i18n)
+- **anti-overlap**: Address code review findings for overlap detection
+- **pipeline**: Prevent duplicate lessons via anti-overlap prompts and cross-section detection
+
+---
+
+_This release was automatically generated from 25 commits._
+
+## v0.28.58
+
+_Released on 2026-02-07_
+
+### 🐛 Bug Fixes
+
+- **userback**: Localize widget greeting to Russian
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.28.57
+
+_Released on 2026-02-07_
+
+### 🐛 Bug Fixes
+
+- **userback**: Add font-src CSP and prefill email/name in widget
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.28.56
+
+_Released on 2026-02-06_
+
+### 🐛 Bug Fixes
+
+- **csp**: Add static.userback.io to style-src and connect-src
+
+---
+
+_This release was automatically generated from 4 commits._
+
+## v0.28.55
+
+_Released on 2026-02-06_
+
+### 🐛 Bug Fixes
+
+- **Authentication**: Code review fixes — security, i18n, UX improvements
+
+---
+
+_This release was automatically generated from 3 commits._
+
+## v0.28.54
+
+_Released on 2026-02-06_
+
+### ✨ New Features
+
+- **web**: Add 4 source file(s), update 5 source file(s), +2 more
+- **web**: Embed Userback feedback widget with SPA support and CSP
+
+### 🐛 Bug Fixes
+
+- Remove unused InvitationType imports + fix NODE_ENV test assertions
+- Health check phase 2 - 13 deferred bugs fixed
+- Health check - 8 bugs fixed (mc2-wisp-0t4)
+- **worker**: Use actual path in EACCES fix instructions
+- Shared Jina rate limiter (100 RPM) + EACCES improvements + auto-mute rules
+
+---
+
+_This release was automatically generated from 40 commits._
+
+## v0.28.53
+
+_Released on 2026-02-06_
+
+### ✨ New Features
+
+- **orchestrator**: Add BLOCK_REGENERATION job type and Sentry monitoring
+- **lesson-editor**: Add inline markdown editor for lesson content
+- **generation-graph**: Implement NodeDetailsDrawer action handlers
+- **logger**: Add 2 new auto-mute rules for expected errors
+
+### 🐛 Bug Fixes
+
+- **block-regen**: Optimistic locking, cache limit, shared setNestedValue
+- **orchestrator**: Address code review findings for BLOCK_REGENERATION
+- **CI/CD**: Add concurrency group and paths-ignore for .beads
+- **lesson-editor**: Concurrent save guard, draft toast, save feedback, ARIA
+- **lesson-editor**: CSS, dark mode, autosave, context refactor, and tests
+- **lesson-editor**: Address code review findings
+- Resolve 3 production error categories
+- **workflow**: Merge stage1CourseData with traces for Stage 1 nodes
+
+---
+
+_This release was automatically generated from 62 commits._
+
+## v0.28.52
+
+_Released on 2026-02-04_
+
+### 🔧 Improvements
+
+- **export-lessons**: Optimize DB query with lessons_with_latest_content view
+- **chat**: Extract getUpdatedFieldsForProposal helper function
+- **stage4**: Move suggested_answers normalization to Zod z.preprocess()
+
+### 🐛 Bug Fixes
+
+- **chat**: Resolve message duplication and data not refreshing after apply
+- **tests**: Sync test data with updated Zod schemas (9 failing tests)
+- **tests**: Fix fetch mocking in jina-reranker-client unit test
+- **admin**: Fix null filters breaking /admin/logs page (500 error)
+- **stage4**: Enforce min length + filter invalid answers in normalization
+- Process error logs — 3 bug fixes + 3 auto-mute rules
+- **stage6**: Prevent "sections is not iterable" error in judge
+
+---
+
+_This release was automatically generated from 48 commits._
+
 ## v0.28.51
 
 _Released on 2026-02-04_

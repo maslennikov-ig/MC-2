@@ -59,7 +59,7 @@ Return the corrected JSON now:`;
  */
 export interface CritiqueReviseResult {
   /** Parsed JSON object */
-  data: any;
+  data: unknown;
   /** Number of revision attempts used */
   attempts: number;
 }
@@ -128,12 +128,9 @@ export async function critiqueAndRevise(
       const cleaned = cleanJSONOutput(revised);
 
       // Try parsing
-      const parsed = JSON.parse(cleaned);
+      const parsed = JSON.parse(cleaned) as unknown;
 
-      logger.info(
-        { attempts: attempt + 1 },
-        'Layer 2: Critique-revise succeeded'
-      );
+      logger.info({ attempts: attempt + 1 }, 'Layer 2: Critique-revise succeeded');
 
       return {
         data: parsed,

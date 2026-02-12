@@ -8,19 +8,19 @@
 ### Signature
 
 ```typescript
-export function MarkdownRenderer(props: MarkdownRendererProps): Promise<JSX.Element>
+export function MarkdownRenderer(props: MarkdownRendererProps): Promise<JSX.Element>;
 ```
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `content` | `string` | *required* | Markdown/MDX content to render |
-| `preset` | `'lesson' \| 'chat' \| 'preview' \| 'minimal'` | `'lesson'` | Preset configuration |
-| `components` | `Record<string, ComponentType>` | `{}` | Custom MDX components to merge |
-| `className` | `string` | preset default | Additional CSS classes |
-| `features` | `Partial<FeatureFlags>` | `{}` | Override preset features |
-| `trusted` | `boolean` | `true` | Use trusted (no sanitize) or untrusted pipeline |
+| Prop         | Type                                           | Default        | Description                                     |
+| ------------ | ---------------------------------------------- | -------------- | ----------------------------------------------- |
+| `content`    | `string`                                       | _required_     | Markdown/MDX content to render                  |
+| `preset`     | `'lesson' \| 'chat' \| 'preview' \| 'minimal'` | `'lesson'`     | Preset configuration                            |
+| `components` | `Record<string, ComponentType>`                | `{}`           | Custom MDX components to merge                  |
+| `className`  | `string`                                       | preset default | Additional CSS classes                          |
+| `features`   | `Partial<FeatureFlags>`                        | `{}`           | Override preset features                        |
+| `trusted`    | `boolean`                                      | `true`         | Use trusted (no sanitize) or untrusted pipeline |
 
 ### Usage Examples
 
@@ -74,18 +74,18 @@ export function MarkdownRenderer(props: MarkdownRendererProps): Promise<JSX.Elem
 ### Signature
 
 ```typescript
-export function MarkdownRendererClient(props: MarkdownRendererClientProps): JSX.Element
+export function MarkdownRendererClient(props: MarkdownRendererClientProps): JSX.Element;
 ```
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `content` | `string` | *required* | Streaming markdown content |
-| `preset` | `'chat' \| 'minimal'` | `'chat'` | Limited preset options |
-| `className` | `string` | preset default | Additional CSS classes |
-| `isStreaming` | `boolean` | `false` | Whether content is actively streaming |
-| `features` | `Partial<FeatureFlags>` | `{}` | Override features |
+| Prop          | Type                    | Default        | Description                           |
+| ------------- | ----------------------- | -------------- | ------------------------------------- |
+| `content`     | `string`                | _required_     | Streaming markdown content            |
+| `preset`      | `'chat' \| 'minimal'`   | `'chat'`       | Limited preset options                |
+| `className`   | `string`                | preset default | Additional CSS classes                |
+| `isStreaming` | `boolean`               | `false`        | Whether content is actively streaming |
+| `features`    | `Partial<FeatureFlags>` | `{}`           | Override features                     |
 
 ### Usage Examples
 
@@ -117,19 +117,19 @@ export function MarkdownRendererClient(props: MarkdownRendererClientProps): JSX.
 ### Signature
 
 ```typescript
-export function CodeBlock(props: CodeBlockProps): JSX.Element
+export function CodeBlock(props: CodeBlockProps): JSX.Element;
 ```
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `children` | `ReactNode` | *required* | Code content |
-| `language` | `string` | `'plaintext'` | Programming language |
-| `filename` | `string` | - | Optional filename header |
-| `showLineNumbers` | `boolean` | `false` | Display line numbers |
-| `highlightLines` | `number[]` | `[]` | Lines to highlight (1-indexed) |
-| `className` | `string` | - | Additional CSS classes |
+| Prop              | Type        | Default       | Description                    |
+| ----------------- | ----------- | ------------- | ------------------------------ |
+| `children`        | `ReactNode` | _required_    | Code content                   |
+| `language`        | `string`    | `'plaintext'` | Programming language           |
+| `filename`        | `string`    | -             | Optional filename header       |
+| `showLineNumbers` | `boolean`   | `false`       | Display line numbers           |
+| `highlightLines`  | `number[]`  | `[]`          | Lines to highlight (1-indexed) |
+| `className`       | `string`    | -             | Additional CSS classes         |
 
 ### Usage Examples
 
@@ -183,17 +183,17 @@ export function CodeBlock(props: CodeBlockProps): JSX.Element
 ### Signature
 
 ```typescript
-export function Callout(props: CalloutProps): JSX.Element
+export function Callout(props: CalloutProps): JSX.Element;
 ```
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `type` | `'note' \| 'tip' \| 'warning' \| 'danger' \| 'info'` | *required* | Callout type |
-| `title` | `string` | Type name | Custom title |
-| `children` | `ReactNode` | *required* | Callout content |
-| `className` | `string` | - | Additional CSS classes |
+| Prop        | Type                                                 | Default    | Description            |
+| ----------- | ---------------------------------------------------- | ---------- | ---------------------- |
+| `type`      | `'note' \| 'tip' \| 'warning' \| 'danger' \| 'info'` | _required_ | Callout type           |
+| `title`     | `string`                                             | Type name  | Custom title           |
+| `children`  | `ReactNode`                                          | _required_ | Callout content        |
+| `className` | `string`                                             | -          | Additional CSS classes |
 
 ### Usage Examples
 
@@ -251,16 +251,16 @@ export function Callout(props: CalloutProps): JSX.Element
 ### Signature
 
 ```typescript
-export function MermaidDiagram(props: MermaidDiagramProps): JSX.Element
+export function MermaidDiagram(props: MermaidDiagramProps): JSX.Element;
 ```
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `chart` | `string` | *required* | Mermaid syntax definition |
-| `className` | `string` | - | Additional CSS classes |
-| `ariaLabel` | `string` | - | Accessible description |
+| Prop        | Type     | Default    | Description               |
+| ----------- | -------- | ---------- | ------------------------- |
+| `chart`     | `string` | _required_ | Mermaid syntax definition |
+| `className` | `string` | -          | Additional CSS classes    |
+| `ariaLabel` | `string` | -          | Accessible description    |
 
 ### Usage Examples
 
@@ -299,16 +299,16 @@ flowchart TD
     title="Mermaid diagram"
     aria-label="Flowchart showing decision process"
   />
-  <figcaption class="sr-only">
-    Flowchart showing decision process
-  </figcaption>
+  <figcaption class="sr-only">Flowchart showing decision process</figcaption>
 </figure>
 ```
 
 ### Loading State
 
 ```html
-<div class="mermaid-loading animate-pulse bg-muted rounded-lg h-48 flex items-center justify-center">
+<div
+  class="mermaid-loading animate-pulse bg-muted rounded-lg h-48 flex items-center justify-center"
+>
   <span class="text-muted-foreground">Loading diagram...</span>
 </div>
 ```
@@ -328,18 +328,18 @@ flowchart TD
 ### Signature
 
 ```typescript
-export function Heading(props: HeadingProps): JSX.Element
+export function Heading(props: HeadingProps): JSX.Element;
 ```
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `level` | `1 \| 2 \| 3 \| 4 \| 5 \| 6` | *required* | Heading level |
-| `id` | `string` | auto-generated | Anchor ID |
-| `children` | `ReactNode` | *required* | Heading text |
-| `showAnchor` | `boolean` | `true` | Show anchor on hover |
-| `className` | `string` | - | Additional CSS classes |
+| Prop         | Type                         | Default        | Description            |
+| ------------ | ---------------------------- | -------------- | ---------------------- |
+| `level`      | `1 \| 2 \| 3 \| 4 \| 5 \| 6` | _required_     | Heading level          |
+| `id`         | `string`                     | auto-generated | Anchor ID              |
+| `children`   | `ReactNode`                  | _required_     | Heading text           |
+| `showAnchor` | `boolean`                    | `true`         | Show anchor on hover   |
+| `className`  | `string`                     | -              | Additional CSS classes |
 
 ### Rendered HTML Structure
 
@@ -359,15 +359,15 @@ export function Heading(props: HeadingProps): JSX.Element
 ### Signature
 
 ```typescript
-export function ResponsiveTable(props: ResponsiveTableProps): JSX.Element
+export function ResponsiveTable(props: ResponsiveTableProps): JSX.Element;
 ```
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `children` | `ReactNode` | *required* | Table content |
-| `className` | `string` | - | Additional CSS classes |
+| Prop        | Type        | Default    | Description            |
+| ----------- | ----------- | ---------- | ---------------------- |
+| `children`  | `ReactNode` | _required_ | Table content          |
+| `className` | `string`    | -          | Additional CSS classes |
 
 ### Rendered HTML Structure
 
@@ -386,17 +386,17 @@ export function ResponsiveTable(props: ResponsiveTableProps): JSX.Element
 ### Signature
 
 ```typescript
-export function Link(props: LinkProps): JSX.Element
+export function Link(props: LinkProps): JSX.Element;
 ```
 
 ### Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `href` | `string` | - | Link URL |
-| `children` | `ReactNode` | *required* | Link text |
-| `className` | `string` | - | Additional CSS classes |
-| `title` | `string` | - | Title attribute |
+| Prop        | Type        | Default    | Description            |
+| ----------- | ----------- | ---------- | ---------------------- |
+| `href`      | `string`    | -          | Link URL               |
+| `children`  | `ReactNode` | _required_ | Link text              |
+| `className` | `string`    | -          | Additional CSS classes |
+| `title`     | `string`    | -          | Title attribute        |
 
 ### Behavior
 
@@ -406,12 +406,7 @@ export function Link(props: LinkProps): JSX.Element
 ### Rendered HTML Structure (External)
 
 ```html
-<a
-  href="https://example.com"
-  target="_blank"
-  rel="noopener noreferrer"
-  class="external-link"
->
+<a href="https://example.com" target="_blank" rel="noopener noreferrer" class="external-link">
   Example
   <span class="external-icon" aria-hidden="true">
     <!-- External link icon -->
@@ -426,10 +421,7 @@ export function Link(props: LinkProps): JSX.Element
 ### getPresetConfig
 
 ```typescript
-function getPresetConfig(
-  preset?: PresetName,
-  overrides?: Partial<PresetConfig>
-): PresetConfig
+function getPresetConfig(preset?: PresetName, overrides?: Partial<PresetConfig>): PresetConfig;
 ```
 
 Returns merged preset configuration with any overrides applied.
@@ -437,7 +429,7 @@ Returns merged preset configuration with any overrides applied.
 ### getRemarkPlugins
 
 ```typescript
-function getRemarkPlugins(features: FeatureFlags): PluginList
+function getRemarkPlugins(features: FeatureFlags): PluginList;
 ```
 
 Returns remark plugins based on feature flags.
@@ -445,7 +437,7 @@ Returns remark plugins based on feature flags.
 ### getRehypePluginsTrusted
 
 ```typescript
-function getRehypePluginsTrusted(features: FeatureFlags): PluginList
+function getRehypePluginsTrusted(features: FeatureFlags): PluginList;
 ```
 
 Returns rehype plugins for trusted content (no sanitization).
@@ -453,7 +445,7 @@ Returns rehype plugins for trusted content (no sanitization).
 ### getRehypePluginsUntrusted
 
 ```typescript
-function getRehypePluginsUntrusted(features: FeatureFlags): PluginList
+function getRehypePluginsUntrusted(features: FeatureFlags): PluginList;
 ```
 
 Returns rehype plugins for untrusted content (sanitization first).
@@ -487,12 +479,12 @@ The system uses CSS custom properties for theming:
 
 ## 11. Accessibility Requirements
 
-| Component | ARIA | Keyboard | Focus |
-|-----------|------|----------|-------|
-| CodeBlock | `tabIndex={0}` | Tab to focus | Visible outline |
-| CodeBlock Copy | `aria-label="Copy code"` | Enter/Space | Button focus |
-| Callout | `role="note"` or `role="alert"` | - | - |
-| MermaidDiagram | `aria-label={description}` | - | - |
-| Heading Anchor | `aria-hidden="true"` | Tab to anchor | Visible # |
-| Link (external) | - | Tab | Underline on focus |
-| Table | Native semantics | Tab through cells | Row highlight |
+| Component       | ARIA                            | Keyboard          | Focus              |
+| --------------- | ------------------------------- | ----------------- | ------------------ |
+| CodeBlock       | `tabIndex={0}`                  | Tab to focus      | Visible outline    |
+| CodeBlock Copy  | `aria-label="Copy code"`        | Enter/Space       | Button focus       |
+| Callout         | `role="note"` or `role="alert"` | -                 | -                  |
+| MermaidDiagram  | `aria-label={description}`      | -                 | -                  |
+| Heading Anchor  | `aria-hidden="true"`            | Tab to anchor     | Visible #          |
+| Link (external) | -                               | Tab               | Underline on focus |
+| Table           | Native semantics                | Tab through cells | Row highlight      |

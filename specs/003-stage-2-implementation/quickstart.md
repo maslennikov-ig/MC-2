@@ -79,6 +79,7 @@ pnpm type-check
 **Using Supabase MCP** (via Claude Code with `.mcp.json` = SUPABASE config):
 
 Ask Claude to run:
+
 ```sql
 -- Check current subscription_tier ENUM values
 SELECT enumlabel
@@ -88,6 +89,7 @@ ORDER BY enumsortorder;
 ```
 
 **Expected Output**:
+
 - If TRIAL missing: `free, basic, standard, premium` (4 values)
 - If TRIAL present: `trial, free, basic, standard, premium` (5 values)
 - Check for `basic_plus` instead of `basic` (naming inconsistency)
@@ -97,6 +99,7 @@ ORDER BY enumsortorder;
 **Option A: Via Claude Code with Supabase MCP**
 
 Ask Claude to:
+
 1. Create migration to add TRIAL tier (if missing)
 2. Create error_logs table migration
 3. Apply migrations using `mcp__supabase__apply_migration`
@@ -132,6 +135,7 @@ psql $DATABASE_URL -f specs/003-stage-2-implementation/data-model.md
 ```
 
 **Expected Results**:
+
 - ✅ `trial` tier exists in ENUM
 - ✅ `error_logs` table created with 13 columns
 - ✅ At least 4 indexes on `error_logs`
@@ -143,6 +147,7 @@ psql $DATABASE_URL -f specs/003-stage-2-implementation/data-model.md
 ### 2.1 Inspect Tier Validation Logic
 
 **Files to review**:
+
 ```bash
 # 1. Tier types and configuration
 cat packages/course-gen-platform/src/orchestrator/types/tier.ts
@@ -155,6 +160,7 @@ cat packages/course-gen-platform/src/lib/file-validator.ts
 ```
 
 **Verification Checklist**:
+
 - [ ] `tier.ts` includes all 5 tiers (trial, free, basic, standard, premium)
 - [ ] BASIC tier only allows TXT, MD formats (not PDF, DOCX, PPTX)
 - [ ] FREE tier has `fileUpload: false` and empty `allowedFormats`
@@ -169,6 +175,7 @@ cat packages/course-gen-platform/src/orchestrator/handlers/document-processing.t
 ```
 
 **Verification Checklist**:
+
 - [ ] Handler uses Docling for text extraction (PDF, DOCX, PPTX → Markdown)
 - [ ] Hierarchical chunking implemented (parent: 1500 tokens, child: 400 tokens, overlap: 50)
 - [ ] Jina-v3 embeddings used (768D, late_chunking=true)
@@ -185,6 +192,7 @@ cat packages/course-gen-platform/src/orchestrator/queues/document-processing.ts
 ```
 
 **Verification Checklist**:
+
 - [ ] Queue name: `DOCUMENT_PROCESSING`
 - [ ] Stalled job detection enabled: `stalledInterval: 30000` (30s)
 - [ ] Max stalled count: `maxStalledCount: 2`
@@ -207,12 +215,14 @@ ls -la packages/course-gen-platform/tests/integration/fixtures/common
 ### 3.2 Prepare Test Files
 
 **Manual Option**: Create sample files using office tools
+
 - `sample-course-material.pdf` (~2MB, multilingual content)
 - `sample-course-material.docx` (~500KB, multilingual content)
 - `sample-course-material.txt` (~50KB, plain text)
 - `sample-course-material.md` (~50KB, Markdown with headings)
 
 **Automated Option**: Use existing test files from Stage 0-1 (if available)
+
 ```bash
 # Copy existing fixtures if they exist
 cp packages/course-gen-platform/tests/fixtures/*.pdf packages/course-gen-platform/tests/integration/fixtures/common/
@@ -221,6 +231,7 @@ cp packages/course-gen-platform/tests/fixtures/*.docx packages/course-gen-platfo
 ```
 
 **File Requirements** (from `contracts/integration-test-schema.md`):
+
 - Size: < 5MB per file
 - Content: Multilingual (English + Russian preferred)
 - Structure: Hierarchical with headings and paragraphs
@@ -231,6 +242,7 @@ cp packages/course-gen-platform/tests/fixtures/*.docx packages/course-gen-platfo
 **Option A: Via Supabase MCP** (recommended)
 
 Ask Claude to run:
+
 ```sql
 -- Insert test organizations for all 5 tiers
 INSERT INTO organizations (id, name, subscription_tier, created_at, updated_at)
@@ -269,6 +281,7 @@ pnpm test:integration --coverage
 ```
 
 **Expected Test Count**: 20+ tests
+
 - TRIAL tier: 3 positive tests (PDF, DOCX, TXT)
 - FREE tier: 1 negative test (all formats blocked) or 3 negative tests (one per format)
 - BASIC tier: 1 positive (TXT), 3 negative (PDF, DOCX, PPTX blocked)
@@ -291,12 +304,14 @@ pnpm vitest tests/integration/document-processing-worker.test.ts --reporter=verb
 ### 4.3 Monitor Test Progress
 
 **BullMQ Dashboard** (if available):
+
 ```bash
 # Access BullMQ UI at http://localhost:3000/admin/queues
 # Watch DOCUMENT_PROCESSING queue in real-time during tests
 ```
 
 **Pino Logs**:
+
 ```bash
 # Tail logs during test execution
 tail -f packages/course-gen-platform/logs/application.log | pino-pretty
@@ -307,6 +322,7 @@ tail -f packages/course-gen-platform/logs/application.log | pino-pretty
 ### 5.1 Check Test Pass Rate
 
 **Expected Results**:
+
 - ✅ 100% pass rate for all integration tests
 - ✅ All positive tests complete within 60s timeout
 - ✅ All negative tests fail with expected error codes (403 Forbidden for FREE/BASIC restrictions)
@@ -331,11 +347,13 @@ SELECT COUNT(*) FROM error_logs WHERE organization_id LIKE '00000000-0000-0000-0
 ### 5.3 Verify Tier Validation Works
 
 **Manual Test - Frontend Defense-in-Depth**:
+
 1. Log in as FREE tier user
 2. Navigate to file upload page
 3. Verify upload button is **disabled** with tooltip "Недоступно на вашем тарифе"
 
 **Manual Test - Backend Defense-in-Depth**:
+
 ```bash
 # Attempt direct API call as FREE tier user
 curl -X POST https://your-api.com/api/trpc/files.upload \
@@ -427,6 +445,7 @@ cat .mcp.json | grep supabase
 **Cause**: Document processing taking >60s (test timeout)
 
 **Solution**:
+
 1. Check file sizes (should be <5MB per fixture)
 2. Verify external services accessible (Qdrant, Jina API, Docling)
 3. Increase timeout in Vitest config:
@@ -434,9 +453,9 @@ cat .mcp.json | grep supabase
    // vitest.config.ts
    export default defineConfig({
      test: {
-       timeout: 120_000  // Increase to 2 minutes
-     }
-   })
+       timeout: 120_000, // Increase to 2 minutes
+     },
+   });
    ```
 4. Check Pino logs for bottlenecks (Docling conversion, Qdrant upload)
 
@@ -445,10 +464,11 @@ cat .mcp.json | grep supabase
 **Cause**: Code may allow PDF for BASIC tier (incorrect)
 
 **Solution**:
+
 1. Check `TIER_CONFIG` in `src/orchestrator/types/tier.ts`:
    ```typescript
    basic: {
-     allowedFormats: ['txt', 'md']  // Should NOT include 'pdf', 'docx', 'pptx'
+     allowedFormats: ['txt', 'md']; // Should NOT include 'pdf', 'docx', 'pptx'
    }
    ```
 2. Check `file-validator.ts` logic uses `TIER_CONFIG.allowedFormats`
@@ -459,6 +479,7 @@ cat .mcp.json | grep supabase
 **Cause**: Migration not applied
 
 **Solution**:
+
 1. Re-run migration (Step 1.2)
 2. Verify migration exists in `supabase/migrations/`
 3. Check Supabase Studio for table existence
@@ -488,6 +509,7 @@ Before marking Stage 2 as complete, verify:
 After successful verification:
 
 1. **Commit Changes**:
+
    ```bash
    git add .
    git commit -m "feat: Stage 2 verification complete - database migrations, integration tests, tier validation"
@@ -495,6 +517,7 @@ After successful verification:
    ```
 
 2. **Create Pull Request**:
+
    ```bash
    # Use GitHub CLI
    gh pr create --title "Stage 2 Implementation Verification Complete" \
@@ -502,6 +525,7 @@ After successful verification:
    ```
 
 3. **Proceed to Stage 3**:
+
    ```bash
    # Create new branch for Stage 3 (Create Summary workflow)
    git checkout main

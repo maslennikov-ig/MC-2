@@ -20,10 +20,12 @@ This document defines all animations and motion design for the Node Details Pane
 ### Performance Guidelines
 
 **Prefer animating**:
+
 - `transform` (translate, scale, rotate)
 - `opacity`
 
 **Avoid animating**:
+
 - `width`, `height` (causes layout recalculation)
 - `margin`, `padding` (causes layout recalculation)
 - `color` (acceptable but less performant)
@@ -35,6 +37,7 @@ This document defines all animations and motion design for the Node Details Pane
 ### Modal Overlay (Backdrop)
 
 **Fade In** (200ms):
+
 ```typescript
 const overlayVariants = {
   hidden: {
@@ -51,6 +54,7 @@ const overlayVariants = {
 ```
 
 **Implementation (Framer Motion)**:
+
 ```tsx
 <motion.div
   className="modal-overlay"
@@ -64,6 +68,7 @@ const overlayVariants = {
 ```
 
 **CSS Alternative**:
+
 ```css
 @keyframes modal-overlay-in {
   from {
@@ -78,7 +83,7 @@ const overlayVariants = {
   animation: modal-overlay-in 200ms ease-out;
 }
 
-.modal-overlay[data-state="closed"] {
+.modal-overlay[data-state='closed'] {
   animation: modal-overlay-out 150ms ease-in;
 }
 
@@ -97,6 +102,7 @@ const overlayVariants = {
 ### Modal Content
 
 **Fade + Scale + Slide In** (200ms):
+
 ```typescript
 const contentVariants = {
   hidden: {
@@ -117,6 +123,7 @@ const contentVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
 <motion.div
   className="modal-content"
@@ -130,6 +137,7 @@ const contentVariants = {
 ```
 
 **CSS Alternative**:
+
 ```css
 @keyframes modal-content-in {
   from {
@@ -148,6 +156,7 @@ const contentVariants = {
 ```
 
 **Exit Animation** (150ms - faster for responsiveness):
+
 ```typescript
 exit: {
   opacity: 0,
@@ -167,6 +176,7 @@ exit: {
 ### Tab Content Transition
 
 **Fade + Slide** (100ms):
+
 ```typescript
 const tabContentVariants = {
   hidden: {
@@ -193,6 +203,7 @@ const tabContentVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
 <AnimatePresence mode="wait">
   <motion.div
@@ -208,6 +219,7 @@ const tabContentVariants = {
 ```
 
 **CSS Alternative**:
+
 ```css
 @keyframes tab-fade-in {
   from {
@@ -230,6 +242,7 @@ const tabContentVariants = {
 ### Tab Button Active Indicator
 
 **Slide + Expand** (150ms):
+
 ```typescript
 const activeIndicatorVariants = {
   inactive: {
@@ -248,6 +261,7 @@ const activeIndicatorVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
 <button className="tab-button">
   Tab Name
@@ -261,6 +275,7 @@ const activeIndicatorVariants = {
 ```
 
 **CSS Alternative** (Using `::after` pseudo-element):
+
 ```css
 .tab-button::after {
   content: '';
@@ -274,7 +289,7 @@ const activeIndicatorVariants = {
   transition: transform 150ms ease-out;
 }
 
-.tab-button[data-state="active"]::after {
+.tab-button[data-state='active']::after {
   transform: scaleX(1);
 }
 ```
@@ -286,6 +301,7 @@ const activeIndicatorVariants = {
 ### Collapsible Section Expand/Collapse
 
 **Rotate Icon** (150ms):
+
 ```typescript
 const chevronVariants = {
   collapsed: {
@@ -302,16 +318,15 @@ const chevronVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
-<motion.div
-  variants={chevronVariants}
-  animate={isExpanded ? 'expanded' : 'collapsed'}
->
+<motion.div variants={chevronVariants} animate={isExpanded ? 'expanded' : 'collapsed'}>
   <ChevronRight className="w-4 h-4" />
 </motion.div>
 ```
 
 **Height Animation** (200ms):
+
 ```typescript
 const contentVariants = {
   collapsed: {
@@ -334,6 +349,7 @@ const contentVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
 <motion.div
   variants={contentVariants}
@@ -346,6 +362,7 @@ const contentVariants = {
 ```
 
 **CSS Alternative** (Using `details` element):
+
 ```css
 details summary {
   cursor: pointer;
@@ -382,6 +399,7 @@ details > div {
 ### Copy to Clipboard Feedback
 
 **Button Scale + Feedback** (300ms total):
+
 ```typescript
 const copyButtonVariants = {
   idle: {
@@ -405,6 +423,7 @@ const copyButtonVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
 const [copyState, setCopyState] = useState<'idle' | 'pressed' | 'success'>('idle');
 
@@ -416,16 +435,13 @@ const handleCopy = async () => {
   setTimeout(() => setCopyState('idle'), 2000);
 };
 
-<motion.button
-  variants={copyButtonVariants}
-  animate={copyState}
-  onClick={handleCopy}
->
+<motion.button variants={copyButtonVariants} animate={copyState} onClick={handleCopy}>
   {copyState === 'success' ? <Check /> : <Copy />}
-</motion.button>
+</motion.button>;
 ```
 
 **Feedback Toast** (appears for 2s):
+
 ```typescript
 const feedbackVariants = {
   hidden: {
@@ -466,6 +482,7 @@ const feedbackVariants = {
 ### Pulse Animation (for running/pending states)
 
 **Continuous Pulse** (2s loop):
+
 ```typescript
 const statusDotVariants = {
   running: {
@@ -485,6 +502,7 @@ const statusDotVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
 <motion.div
   className="status-badge-dot"
@@ -494,9 +512,11 @@ const statusDotVariants = {
 ```
 
 **CSS Alternative**:
+
 ```css
 @keyframes status-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
@@ -506,7 +526,7 @@ const statusDotVariants = {
   }
 }
 
-.status-badge-dot[data-status="running"] {
+.status-badge-dot[data-status='running'] {
   animation: status-pulse 2s ease-in-out infinite;
 }
 ```
@@ -518,6 +538,7 @@ const statusDotVariants = {
 ### Button Hover (Desktop)
 
 **Lift + Shadow** (150ms):
+
 ```typescript
 const buttonVariants = {
   rest: {
@@ -544,18 +565,15 @@ const buttonVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
-<motion.button
-  variants={buttonVariants}
-  initial="rest"
-  whileHover="hover"
-  whileTap="pressed"
->
+<motion.button variants={buttonVariants} initial="rest" whileHover="hover" whileTap="pressed">
   Button Text
 </motion.button>
 ```
 
 **CSS Alternative**:
+
 ```css
 .btn-interactive {
   transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -576,6 +594,7 @@ const buttonVariants = {
 ### Card Hover (Desktop)
 
 **Subtle Lift** (200ms):
+
 ```css
 .metric-cell,
 .json-viewer {
@@ -601,6 +620,7 @@ const buttonVariants = {
 ### Skeleton Shimmer
 
 **Shimmer Animation** (2s loop):
+
 ```typescript
 const shimmerVariants = {
   initial: {
@@ -618,6 +638,7 @@ const shimmerVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
 <motion.div
   className="skeleton"
@@ -632,6 +653,7 @@ const shimmerVariants = {
 ```
 
 **CSS Alternative**:
+
 ```css
 @keyframes shimmer {
   0% {
@@ -668,6 +690,7 @@ const shimmerVariants = {
 ### Spinner (for processing states)
 
 **Rotate Animation** (800ms loop):
+
 ```typescript
 const spinnerVariants = {
   animate: {
@@ -682,16 +705,15 @@ const spinnerVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
-<motion.div
-  variants={spinnerVariants}
-  animate="animate"
->
+<motion.div variants={spinnerVariants} animate="animate">
   <Loader2 className="w-5 h-5" />
 </motion.div>
 ```
 
 **CSS Alternative**:
+
 ```css
 @keyframes spin {
   from {
@@ -714,6 +736,7 @@ const spinnerVariants = {
 ### Metrics Grid Entrance
 
 **Stagger Children** (50ms delay between items):
+
 ```typescript
 const gridContainerVariants = {
   hidden: {
@@ -744,6 +767,7 @@ const gridItemVariants = {
 ```
 
 **Implementation**:
+
 ```tsx
 <motion.div
   className="metrics-grid"
@@ -752,11 +776,7 @@ const gridItemVariants = {
   animate="visible"
 >
   {metrics.map((metric, i) => (
-    <motion.div
-      key={i}
-      className="metric-cell"
-      variants={gridItemVariants}
-    >
+    <motion.div key={i} className="metric-cell" variants={gridItemVariants}>
       {/* Metric content */}
     </motion.div>
   ))}
@@ -768,6 +788,7 @@ const gridItemVariants = {
 ### JSON Lines Entrance
 
 **Stagger Lines** (10ms delay for smooth scroll):
+
 ```typescript
 const jsonContainerVariants = {
   hidden: {
@@ -805,6 +826,7 @@ const jsonLineVariants = {
 ### Scroll Indicator Fade
 
 **Auto-hide after scroll** (300ms):
+
 ```typescript
 const [showScrollIndicator, setShowScrollIndicator] = useState(true);
 
@@ -834,6 +856,7 @@ useEffect(() => {
 ### Scroll Shadow Appearance
 
 **Gradient Fade In/Out** (200ms):
+
 ```css
 .modal-body::before {
   content: '';
@@ -849,7 +872,7 @@ useEffect(() => {
   z-index: 10;
 }
 
-.modal-body[data-scrolled="true"]::before {
+.modal-body[data-scrolled='true']::before {
   opacity: 1;
 }
 ```
@@ -861,6 +884,7 @@ useEffect(() => {
 ### Focus Ring Expansion
 
 **Outline + Scale** (150ms):
+
 ```css
 *:focus-visible {
   outline: 2px solid hsl(var(--modal-accent));
@@ -874,6 +898,7 @@ useEffect(() => {
 ```
 
 **Ring Glow** (for important CTAs):
+
 ```css
 .btn-primary:focus-visible {
   box-shadow:
@@ -890,6 +915,7 @@ useEffect(() => {
 ### Swipe to Close Modal
 
 **Drag + Threshold** (300ms snap back):
+
 ```typescript
 const [dragY, setDragY] = useState(0);
 
@@ -918,6 +944,7 @@ const [dragY, setDragY] = useState(0);
 ### Pull-to-Refresh Indicator
 
 **Stretch + Release** (200ms):
+
 ```typescript
 const [pullDistance, setPullDistance] = useState(0);
 
@@ -938,6 +965,7 @@ const [pullDistance, setPullDistance] = useState(0);
 ### Modal Open Sequence
 
 **Header → Tabs → Content** (staggered entrance):
+
 ```typescript
 const modalSequenceVariants = {
   hidden: {
@@ -983,7 +1011,7 @@ const itemVariants = {
 }
 
 /* Remove after animation completes */
-.modal-content[data-animated="true"] {
+.modal-content[data-animated='true'] {
   will-change: auto;
 }
 ```
@@ -992,10 +1020,7 @@ const itemVariants = {
 
 ```typescript
 // Debounce rapid state changes
-const debouncedAnimate = useMemo(
-  () => debounce((value) => setAnimateValue(value), 50),
-  []
-);
+const debouncedAnimate = useMemo(() => debounce(value => setAnimateValue(value), 50), []);
 ```
 
 ### Conditional Rendering
@@ -1054,17 +1079,17 @@ const variants = prefersReducedMotion
 
 ## Animation Timing Reference
 
-| Action | Duration | Easing | Purpose |
-|--------|----------|--------|---------|
-| Modal Open | 200ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Smooth entrance |
-| Modal Close | 150ms | `ease-in` | Quick exit |
-| Tab Switch | 100ms | `ease-out` | Instant feedback |
-| Hover | 150ms | `ease-out` | Responsive feel |
-| Button Press | 100ms | `ease-in` | Tactile feedback |
-| Collapsible | 200ms | `ease-in-out` | Natural expand/collapse |
-| Status Pulse | 2000ms | `ease-in-out` (loop) | Attention draw |
-| Shimmer | 2000ms | `linear` (loop) | Loading indicator |
-| Spinner | 800ms | `linear` (loop) | Processing state |
+| Action       | Duration | Easing                          | Purpose                 |
+| ------------ | -------- | ------------------------------- | ----------------------- |
+| Modal Open   | 200ms    | `cubic-bezier(0.16, 1, 0.3, 1)` | Smooth entrance         |
+| Modal Close  | 150ms    | `ease-in`                       | Quick exit              |
+| Tab Switch   | 100ms    | `ease-out`                      | Instant feedback        |
+| Hover        | 150ms    | `ease-out`                      | Responsive feel         |
+| Button Press | 100ms    | `ease-in`                       | Tactile feedback        |
+| Collapsible  | 200ms    | `ease-in-out`                   | Natural expand/collapse |
+| Status Pulse | 2000ms   | `ease-in-out` (loop)            | Attention draw          |
+| Shimmer      | 2000ms   | `linear` (loop)                 | Loading indicator       |
+| Spinner      | 800ms    | `linear` (loop)                 | Processing state        |
 
 ---
 
@@ -1087,7 +1112,7 @@ import { AnimatePresence } from 'framer-motion';
       {/* Modal content */}
     </motion.div>
   )}
-</AnimatePresence>
+</AnimatePresence>;
 ```
 
 ### Layout Animations
@@ -1226,22 +1251,12 @@ export const NodeDetailsModal = ({ isOpen, onClose }) => {
             animate="visible"
             exit="hidden"
           >
-            <motion.div
-              variants={sequenceVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              <motion.header variants={itemVariants}>
-                {/* Header content */}
-              </motion.header>
+            <motion.div variants={sequenceVariants} initial="hidden" animate="visible">
+              <motion.header variants={itemVariants}>{/* Header content */}</motion.header>
 
-              <motion.nav variants={itemVariants}>
-                {/* Tab navigation */}
-              </motion.nav>
+              <motion.nav variants={itemVariants}>{/* Tab navigation */}</motion.nav>
 
-              <motion.div variants={itemVariants}>
-                {/* Tab content */}
-              </motion.div>
+              <motion.div variants={itemVariants}>{/* Tab content */}</motion.div>
             </motion.div>
           </motion.div>
         </>

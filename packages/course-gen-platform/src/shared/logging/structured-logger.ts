@@ -177,7 +177,10 @@ export class StructuredLogger {
       event: 'stage_error',
       ...event,
     });
-    logger.error(logObj, `[${this.context.stageName || this.context.stageId}] Stage error: ${event.error}`);
+    logger.error(
+      logObj,
+      `[${this.context.stageName || this.context.stageId}] Stage error: ${event.error}`
+    );
   }
 
   // ==========================================================================
@@ -221,18 +224,21 @@ export class StructuredLogger {
    */
   progress(metrics: LogMetrics, message?: string): void {
     const logObj = this.buildLogObject({ event: 'progress' }, metrics);
-    logger.info(logObj, message || `[${this.context.stageName || this.context.stageId}] Progress update`);
+    logger.info(
+      logObj,
+      message || `[${this.context.stageName || this.context.stageId}] Progress update`
+    );
   }
 
   /**
    * Log retry attempt
    */
   retry(attempt: number, maxAttempts: number, reason: string): void {
-    const logObj = this.buildLogObject(
-      { event: 'retry', reason },
-      { attempt, maxAttempts }
+    const logObj = this.buildLogObject({ event: 'retry', reason }, { attempt, maxAttempts });
+    logger.warn(
+      logObj,
+      `[${this.context.stageName || this.context.stageId}] Retry attempt ${attempt}/${maxAttempts}`
     );
-    logger.warn(logObj, `[${this.context.stageName || this.context.stageId}] Retry attempt ${attempt}/${maxAttempts}`);
   }
 }
 

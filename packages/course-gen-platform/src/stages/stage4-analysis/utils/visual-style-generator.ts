@@ -44,7 +44,7 @@ const visualStyleSchema = z.object({
   colorScheme: z.string().min(10).max(500),
   aesthetic: z.string().min(5).max(150),
   visualElements: z.string().min(10).max(300),
-  mood: z.string().min(5).max(100),
+  mood: z.string().min(5).max(300),
 });
 
 /**
@@ -94,7 +94,7 @@ CRITICAL RULES:
   "colorScheme": "string (10-500 chars): Color palette description",
   "aesthetic": "string (5-150 chars): Overall visual style",
   "visualElements": "string (10-300 chars): Specific visual elements to include",
-  "mood": "string (5-100 chars): Emotional tone of the visuals"
+  "mood": "string (5-300 chars): Emotional tone of the visuals"
 }
 
 2. ALL text fields MUST be in ${languageName.toUpperCase()}
@@ -260,7 +260,7 @@ export async function generateVisualStyle(params: VisualStyleParams): Promise<Vi
       jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    const parsed = JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent) as unknown;
     const validationResult = visualStyleSchema.safeParse(parsed);
 
     if (!validationResult.success) {

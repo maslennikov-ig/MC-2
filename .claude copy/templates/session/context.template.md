@@ -35,6 +35,7 @@
 ## Resume Instructions
 
 To continue this session:
+
 1. Read this file to understand current state
 2. Read `session-log.md` for recent decisions and issues
 3. Continue from "Next Steps" section

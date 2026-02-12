@@ -11,6 +11,7 @@
 However, the endpoint **cannot function** because:
 
 ### 1. Package Isolation
+
 - `courseai-next` (Next.js 15 App Router) is a **separate deployment** from `course-gen-platform` (Node.js API)
 - `courseai-next/node_modules/@megacampus/` does **not exist** - packages not shared
 - Cannot import:
@@ -19,7 +20,9 @@ However, the endpoint **cannot function** because:
   - `logger` from `course-gen-platform` Pino
 
 ### 2. RPC Approach Used (But RPCs Don't Exist)
+
 Subagent correctly identified the isolation and used PostgreSQL RPC calls:
+
 - `check_and_reserve_concurrency(p_user_id, p_tier)`
 - `create_bullmq_job(p_job_type, p_job_data, p_priority)`
 - `update_course_progress(...)` ✅ **EXISTS** (created in T004)
@@ -31,9 +34,11 @@ Subagent correctly identified the isolation and used PostgreSQL RPC calls:
 ## Solutions (Choose One)
 
 ### Option 1: Create PostgreSQL RPC Functions ⚠️ Complex
+
 Create 4 missing RPCs in PostgreSQL that call Redis/BullMQ:
 
 **Challenges**:
+
 - PostgreSQL cannot natively call Redis or BullMQ
 - Would need **Supabase Edge Functions** (Deno runtime) as intermediary
 - Edge Functions would:
@@ -45,6 +50,7 @@ Create 4 missing RPCs in PostgreSQL that call Redis/BullMQ:
 - **Complexity**: 4 Edge Functions + triggers
 
 **Files to create**:
+
 ```
 supabase/functions/check-and-reserve-concurrency/index.ts
 supabase/functions/create-bullmq-job/index.ts
@@ -57,17 +63,16 @@ supabase/functions/release-concurrency-slot/index.ts
 Configure pnpm workspace to share `course-gen-platform` modules with `courseai-next`:
 
 **Step 1**: Update root `package.json`:
+
 ```json
 {
   "name": "megacampus-monorepo",
-  "workspaces": [
-    "courseai-next",
-    "packages/*"
-  ]
+  "workspaces": ["courseai-next", "packages/*"]
 }
 ```
 
 **Step 2**: Update `packages/course-gen-platform/package.json`:
+
 ```json
 {
   "name": "@megacampus/course-gen-platform",
@@ -82,6 +87,7 @@ Configure pnpm workspace to share `course-gen-platform` modules with `courseai-n
 ```
 
 **Step 3**: Add to `courseai-next/package.json`:
+
 ```json
 {
   "dependencies": {
@@ -93,6 +99,7 @@ Configure pnpm workspace to share `course-gen-platform` modules with `courseai-n
 **Step 4**: Run `pnpm install` from repo root
 
 **Step 5**: Update API endpoint imports:
+
 ```typescript
 import { concurrencyTracker } from '@megacampus/course-gen-platform/concurrency';
 import { logger } from '@megacampus/course-gen-platform/logger';
@@ -100,12 +107,14 @@ import { retryWithBackoff } from '@megacampus/course-gen-platform/utils';
 ```
 
 **Benefits**:
+
 - Direct imports (no RPC latency)
 - Type safety across packages
 - Shared code maintenance
 - Standard monorepo pattern
 
 **Caveats**:
+
 - BullMQ/Redis dependencies bundled in Next.js (tree-shaking should remove unused)
 - Requires build step for `course-gen-platform` before Next.js dev
 - May need `next.config.js` adjustments for transpilation
@@ -136,21 +145,24 @@ app.post('/api/generate', async (req, res) => {
 ```
 
 Then call from Next.js:
+
 ```typescript
 // courseai-next/app/api/coursegen/generate/route.ts
 const response = await fetch('http://localhost:3001/api/generate', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ courseId, userId, tier })
+  body: JSON.stringify({ courseId, userId, tier }),
 });
 ```
 
 **Benefits**:
+
 - Clear service boundary
 - No package sharing needed
 - Can scale independently
 
 **Drawbacks**:
+
 - Extra network hop
 - Requires service discovery in production
 - Duplicates auth logic (or needs shared session)
@@ -160,6 +172,7 @@ const response = await fetch('http://localhost:3001/api/generate', {
 **Use Option 2: Shared Packages (Monorepo)**
 
 Reasoning:
+
 1. Already using pnpm workspaces (see root `pnpm-workspace.yaml`)
 2. Minimal changes needed
 3. Best developer experience

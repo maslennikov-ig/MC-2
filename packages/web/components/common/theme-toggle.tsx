@@ -1,9 +1,9 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
-import { Sun, Moon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { useThemeSync } from "@/lib/hooks/use-theme-sync"
+import { useEffect, useState } from 'react'
+import { Sun, Moon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 
 export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
@@ -22,7 +22,7 @@ export default function ThemeToggle() {
         className="text-gray-600 hover:text-gray-900 dark:text-white/70 dark:hover:text-white"
         disabled
       >
-        <div className="w-4 h-4" />
+        <div className="h-4 w-4" />
       </Button>
     )
   }
@@ -35,11 +35,7 @@ export default function ThemeToggle() {
       className="text-gray-600 hover:text-gray-900 dark:text-white/70 dark:hover:text-white"
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
     >
-      {theme === 'dark' ? (
-        <Sun className="w-4 h-4" />
-      ) : (
-        <Moon className="w-4 h-4" />
-      )}
+      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </Button>
   )
 }

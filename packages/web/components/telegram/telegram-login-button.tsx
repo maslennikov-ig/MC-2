@@ -39,16 +39,19 @@ export function TelegramLoginButton({
   connectedUsername,
   onDisconnect,
   disabled = false,
-  size = 'medium'
+  size = 'medium',
 }: TelegramLoginButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const scriptRef = useRef<HTMLScriptElement | null>(null)
   const isLoadingRef = useRef(false)
 
   // Callback handler
-  const handleAuth = useCallback(async (user: TelegramAuthData) => {
-    await onAuth(user)
-  }, [onAuth])
+  const handleAuth = useCallback(
+    async (user: TelegramAuthData) => {
+      await onAuth(user)
+    },
+    [onAuth]
+  )
 
   useEffect(() => {
     if (isConnected || disabled || isLoadingRef.current) return
@@ -96,7 +99,7 @@ export function TelegramLoginButton({
   // If connected, show connected state
   if (isConnected) {
     return (
-      <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+      <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
         <div className="flex items-center gap-2">
           <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
           <div>
@@ -104,9 +107,7 @@ export function TelegramLoginButton({
               Telegram подключен
             </p>
             {connectedUsername && (
-              <p className="text-xs text-green-600 dark:text-green-400">
-                @{connectedUsername}
-              </p>
+              <p className="text-xs text-green-600 dark:text-green-400">@{connectedUsername}</p>
             )}
           </div>
         </div>
@@ -115,9 +116,9 @@ export function TelegramLoginButton({
             variant="ghost"
             size="sm"
             onClick={() => void onDisconnect()}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
           >
-            <XCircle className="h-4 w-4 mr-1" />
+            <XCircle className="mr-1 h-4 w-4" />
             Отключить
           </Button>
         )}
@@ -128,19 +129,16 @@ export function TelegramLoginButton({
   // Show Telegram widget container
   return (
     <div className="space-y-3">
-      <div
-        ref={containerRef}
-        className="flex justify-center min-h-[40px] items-center"
-      >
+      <div ref={containerRef} className="flex min-h-[40px] items-center justify-center">
         {/* Telegram script will inject button here */}
         {!scriptRef.current && (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">Загрузка...</span>
           </div>
         )}
       </div>
-      <p className="text-xs text-center text-muted-foreground">
+      <p className="text-muted-foreground text-center text-xs">
         Нажмите кнопку выше для авторизации через Telegram
       </p>
     </div>
@@ -150,7 +148,7 @@ export function TelegramLoginButton({
 // Fallback button for when widget fails to load
 export function TelegramLoginFallback({
   botUsername,
-  disabled = false
+  disabled = false,
 }: {
   botUsername: string
   disabled?: boolean
@@ -167,7 +165,7 @@ export function TelegramLoginFallback({
       disabled={disabled}
       className="w-full border-[#0088cc] text-[#0088cc] hover:bg-[#0088cc]/10"
     >
-      <Send className="h-4 w-4 mr-2" />
+      <Send className="mr-2 h-4 w-4" />
       Подключить через Telegram
     </Button>
   )

@@ -12,6 +12,7 @@
 This deployment checklist guides you through deploying the Transactional Outbox implementation to production. The system eliminates race conditions between FSM initialization and BullMQ job creation, ensuring all workers see initialized FSM state before processing.
 
 **What was implemented:**
+
 - ✅ 3 database tables: `job_outbox`, `idempotency_keys`, `fsm_events`
 - ✅ 1 PostgreSQL RPC function: `initialize_fsm_with_outbox()`
 - ✅ Command handler with 3-layer idempotency (Redis → Database → Cache)
@@ -22,6 +23,7 @@ This deployment checklist guides you through deploying the Transactional Outbox 
 - ✅ Monitoring: 11 alert rules, 10 dashboard panels, 5 metrics endpoints
 
 **Important Note:**
+
 - Project is NEW, all existing data is TEST DATA
 - NO migration of existing courses needed (can delete test data if desired)
 - Clean slate deployment approach
@@ -33,6 +35,7 @@ This deployment checklist guides you through deploying the Transactional Outbox 
 ### Code Verification
 
 - [ ] **Type-check passes**
+
   ```bash
   cd /home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform
   pnpm type-check
@@ -40,12 +43,14 @@ This deployment checklist guides you through deploying the Transactional Outbox 
   ```
 
 - [ ] **Build succeeds**
+
   ```bash
   pnpm build
   # Expected: dist/ directory created
   ```
 
 - [ ] **Integration tests pass**
+
   ```bash
   pnpm test tests/integration/transactional-outbox.test.ts
   # Expected: 16/20 passing (4 failures are expected - test design issues, not bugs)
@@ -66,12 +71,14 @@ This deployment checklist guides you through deploying the Transactional Outbox 
 ### Database Verification
 
 - [ ] **Migrations inventory**
+
   ```bash
   ls packages/course-gen-platform/supabase/migrations/*.sql | wc -l
   # Expected: 57 migrations total (as of 2025-11-18)
   ```
 
 - [ ] **Verify new migrations exist**
+
   ```bash
   ls packages/course-gen-platform/supabase/migrations/202511*.sql | grep -E '(20251118094238|20251118095804)'
   # Expected:
@@ -103,12 +110,14 @@ This deployment checklist guides you through deploying the Transactional Outbox 
 ### Infrastructure
 
 - [ ] **Redis running** (required)
+
   ```bash
   redis-cli ping
   # Expected: PONG
   ```
 
 - [ ] **PostgreSQL accessible** (Supabase)
+
   ```bash
   psql $DATABASE_URL -c "SELECT 1"
   # Expected: 1 row returned
@@ -347,6 +356,7 @@ docker logs course-gen-platform --tail 50
 ```
 
 **Look for successful startup indicators:**
+
 - ✅ "Outbox processor started"
 - ✅ "BullMQ queue initialized"
 - ✅ "Server listening on port 3000" (or your configured port)
@@ -374,6 +384,7 @@ curl http://localhost:3000/api/trpc/metrics.getOutbox
 ```
 
 **If outbox processor is not alive:**
+
 ```bash
 # Check application logs for errors
 pm2 logs course-gen-platform | grep -i outbox
@@ -702,7 +713,7 @@ scrape_configs:
     scrape_interval: 30s
     scrape_timeout: 10s
     static_configs:
-      - targets: ['localhost:3000']  # Adjust for your server
+      - targets: ['localhost:3000'] # Adjust for your server
     metrics_path: '/api/trpc/metrics.getAll'
     scheme: http
 ```
@@ -836,6 +847,7 @@ backend megacampus_backend
 Run these checks 24 hours after deployment:
 
 - [ ] **No critical alerts** (FSM failure, processor stalled, queue buildup)
+
   ```bash
   # Check Prometheus alerts
   curl http://localhost:9090/api/v1/alerts | jq '.data.alerts[] | select(.state == "firing")'
@@ -843,24 +855,28 @@ Run these checks 24 hours after deployment:
   ```
 
 - [ ] **Success rate >99%**
+
   ```bash
   curl http://localhost:3000/api/trpc/metrics.getFSM | jq .successRate
   # Expected: 99+ (100 is ideal)
   ```
 
 - [ ] **Queue depth <100**
+
   ```bash
   curl http://localhost:3000/api/trpc/metrics.getOutbox | jq .health.queueDepth
   # Expected: 0-50 (normal), 50-100 (elevated), >100 (investigate)
   ```
 
 - [ ] **No worker fallback spikes** (Layer 2/3 activations low)
+
   ```bash
   curl http://localhost:3000/api/trpc/metrics.getFallbacks | jq .recentActivations
   # Expected: <10 in last 24 hours (indicates healthy primary path)
   ```
 
 - [ ] **Application uptime 100%**
+
   ```bash
   pm2 info course-gen-platform | grep uptime
   # OR
@@ -879,6 +895,7 @@ Run these checks 24 hours after deployment:
 Run these checks 72 hours after deployment:
 
 - [ ] **System stable** (no restarts, no crashes)
+
   ```bash
   pm2 info course-gen-platform | grep "restarts"
   # Expected: 0 restarts
@@ -887,24 +904,28 @@ Run these checks 72 hours after deployment:
 - [ ] **Performance metrics acceptable**
 
   FSM initialization p95 latency:
+
   ```bash
   curl http://localhost:3000/api/trpc/metrics.getFSM | jq '.durations.p95'
   # Expected: <500ms
   ```
 
   Outbox batch processing p95 latency:
+
   ```bash
   curl http://localhost:3000/api/trpc/metrics.getOutbox | jq '.durations.p95'
   # Expected: <5s
   ```
 
   Cache hit rate:
+
   ```bash
   curl http://localhost:3000/api/trpc/metrics.getFSM | jq '.cacheHitRate'
   # Expected: >20% (if sufficient traffic)
   ```
 
 - [ ] **Database growth acceptable**
+
   ```sql
   -- Check table sizes
   SELECT
@@ -925,6 +946,7 @@ Run these checks 72 hours after deployment:
   ```
 
 - [ ] **Cleanup jobs running**
+
   ```sql
   -- Check pg_cron jobs exist
   SELECT jobid, jobname, schedule, active, last_run, last_run_status
@@ -1023,6 +1045,7 @@ WHERE version IN ('20251118094238', '20251118095804');
 **Impact:** Complete removal of transactional outbox system. Application WILL NOT START without code changes.
 
 **Recovery:**
+
 1. Restore from backup: `psql $DATABASE_URL < backup-YYYYMMDD.sql`
 2. OR apply migrations again (if rollback was due to security, not corruption)
 3. Thorough investigation before redeployment
@@ -1036,12 +1059,14 @@ WHERE version IN ('20251118094238', '20251118095804');
 #### Issue 1: Outbox Processor Not Starting
 
 **Symptoms:**
+
 ```bash
 curl http://localhost:3000/api/trpc/metrics.getOutbox
 # Returns: {"health": {"alive": false}}
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check application logs
 pm2 logs course-gen-platform | grep -i "outbox"
@@ -1053,6 +1078,7 @@ pm2 logs course-gen-platform | grep -i "outbox"
 ```
 
 **Solution:**
+
 ```bash
 # Verify Redis connection
 redis-cli ping
@@ -1067,12 +1093,14 @@ pm2 restart course-gen-platform
 #### Issue 2: Queue Buildup (High Queue Depth)
 
 **Symptoms:**
+
 ```bash
 curl http://localhost:3000/api/trpc/metrics.getOutbox | jq .health.queueDepth
 # Returns: 500+ (critical)
 ```
 
 **Diagnosis:**
+
 ```sql
 -- Check unprocessed entries
 SELECT
@@ -1111,12 +1139,14 @@ EOF
 #### Issue 3: FSM Initialization Failures
 
 **Symptoms:**
+
 ```bash
 curl http://localhost:3000/api/trpc/metrics.getFSM | jq .failureRate
 # Returns: >5% (critical)
 ```
 
 **Diagnosis:**
+
 ```sql
 -- Check recent FSM events for failures
 SELECT entity_id, old_state, new_state, triggered_by, metadata, created_at
@@ -1155,12 +1185,14 @@ RETURNING id, generation_status;
 #### Issue 4: Redis Cache Misses (Low Cache Hit Rate)
 
 **Symptoms:**
+
 ```bash
 curl http://localhost:3000/api/trpc/metrics.getFSM | jq .cacheHitRate
 # Returns: <10% (expected >20%)
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check Redis connection
 redis-cli ping
@@ -1180,12 +1212,14 @@ redis-cli TTL "idempotency:some-test-key"
 **Solution:**
 
 1. **Redis not persisting:** Check Redis eviction policy
+
    ```bash
    redis-cli CONFIG GET maxmemory-policy
    # Expected: allkeys-lru or volatile-lru
    ```
 
 2. **TTL too short:** Check command handler TTL configuration
+
    ```typescript
    // Should be 86400 (24 hours)
    const CACHE_TTL = 60 * 60 * 24;
@@ -1196,6 +1230,7 @@ redis-cli TTL "idempotency:some-test-key"
 #### Issue 5: Worker Fallback Activation Spike
 
 **Symptoms:**
+
 ```bash
 curl http://localhost:3000/api/trpc/metrics.getFallbacks | jq .
 # Returns: layer2Activations or layer3Activations >50 in last hour
@@ -1204,10 +1239,12 @@ curl http://localhost:3000/api/trpc/metrics.getFallbacks | jq .
 **Diagnosis:**
 
 **Layer 2 (QueueEvents Backup):**
+
 - Indicates courses stuck in 'pending' state when jobs are added
 - Suggests API didn't initialize FSM before QueueEvents fired
 
 **Layer 3 (Worker Validation):**
+
 - Indicates workers received jobs without FSM state
 - Suggests outbox processor failed or race condition
 
@@ -1261,6 +1298,7 @@ redis-cli INFO | grep -E "(connected_clients|used_memory_human|total_commands_pr
 ### Detailed Runbooks
 
 For comprehensive troubleshooting guides, see:
+
 - `docs/RUNBOOKS.md` - General operational procedures
 - `docs/ARCHITECTURE.md` - System design and component interactions
 - `docs/DATABASE-SCHEMA.md` - Database schema and query examples
@@ -1268,17 +1306,20 @@ For comprehensive troubleshooting guides, see:
 ### Escalation
 
 **Critical issues (P1):**
+
 - Outbox processor stalled >5 minutes
 - FSM failure rate >20%
 - Queue depth >1000
 - Database unavailable
 
 **Contact:**
+
 - On-call Engineer: PagerDuty rotation
 - Database Team: #db-support Slack
 - Platform Team: #platform-support Slack
 
 **Provide:**
+
 - Symptom description
 - Output from "Quick Diagnostic Commands" section
 - Application logs (last 500 lines)
@@ -1299,6 +1340,7 @@ For comprehensive troubleshooting guides, see:
 ✅ **72h:** Performance metrics within SLOs
 
 **Key Performance Indicators (KPIs):**
+
 - FSM Success Rate: ≥99%
 - Outbox Queue Depth: <100
 - FSM Init p95 Latency: <500ms
@@ -1314,12 +1356,14 @@ For comprehensive troubleshooting guides, see:
 ### Migration Files Reference
 
 **Migration 1:** `20251118094238_create_transactional_outbox_tables.sql`
+
 - Creates: job_outbox, idempotency_keys, fsm_events tables
 - Indexes: 8 total (3 + 2 + 3)
 - RLS policies: All 3 tables protected (system-only access)
 - Cleanup jobs: pg_cron scheduled (30d, 7d, 90d retention)
 
 **Migration 2:** `20251118095804_create_initialize_fsm_with_outbox_rpc.sql`
+
 - Function: `initialize_fsm_with_outbox()`
 - Security: SECURITY DEFINER with search_path protection
 - Atomicity: Single transaction for FSM + outbox + events + idempotency
@@ -1328,11 +1372,13 @@ For comprehensive troubleshooting guides, see:
 ### Configuration Files Reference
 
 **Alerts:** `/packages/course-gen-platform/config/alerts.yml`
+
 - 11 rules (5 critical, 6 warning)
 - Prometheus Alertmanager compatible
 - Runbook URLs included
 
 **Dashboard:** `/packages/course-gen-platform/config/grafana-dashboard.json`
+
 - 10 visualization panels
 - Real-time metrics
 - Alert thresholds configured
@@ -1340,10 +1386,12 @@ For comprehensive troubleshooting guides, see:
 ### Test Files Reference
 
 **Integration Tests:** `/packages/course-gen-platform/tests/integration/transactional-outbox.test.ts`
+
 - 20 test cases
 - Coverage: Atomic coordination, idempotency, outbox processor, defense layers, error scenarios, data integrity
 
 **E2E Tests:** `/packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts`
+
 - 3 scenarios updated
 - Full pipeline validation
 

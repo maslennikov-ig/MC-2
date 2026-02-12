@@ -31,6 +31,7 @@ import {
   setupTestFixtures,
   cleanupTestFixtures,
   cleanupTestJobs,
+  createAuthUser,
   TEST_USERS,
   TEST_COURSES,
 } from '../fixtures';
@@ -185,47 +186,6 @@ function createTestClient(port: number, token?: string) {
 }
 
 /**
- * Create test user in Supabase Auth with password
- *
- * For tests to work, we need to create users in Supabase Auth (not just the users table).
- * This function creates an auth user with a specific ID that matches the test fixture.
- *
- * @param email - User email
- * @param password - User password
- * @param userId - User ID from users table (must match)
- */
-async function createAuthUser(email: string, password: string, userId: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
-
-  // Check if auth user already exists by email
-  const {
-    data: { users: existingUsers },
-  } = await supabase.auth.admin.listUsers();
-  const existingUser = existingUsers.find(u => u.email === email);
-
-  // Always delete existing user to ensure fresh credentials
-  if (existingUser) {
-    console.log(`Deleting existing auth user for ${email} to ensure fresh credentials`);
-    await supabase.auth.admin.deleteUser(existingUser.id);
-  }
-
-  // Create auth user with specific ID (Supabase admin API allows this)
-  const { data, error } = await supabase.auth.admin.createUser({
-    id: userId, // Use the fixture user ID
-    email,
-    password,
-    email_confirm: true, // Auto-confirm email for tests
-    user_metadata: {},
-  });
-
-  if (error) {
-    throw new Error(`Failed to create auth user for ${email}: ${error.message}`);
-  }
-
-  console.log(`Created auth user for ${email} with ID ${data.user.id}`);
-}
-
-/**
  * Wait for job to be processed and recorded in database
  *
  * BullMQ workers process jobs asynchronously and create database records
@@ -282,14 +242,21 @@ describe('tRPC Server - Acceptance Tests', () => {
       await createAuthUser(
         TEST_USERS.instructor1.email,
         'test-password-123',
-        TEST_USERS.instructor1.id
+        TEST_USERS.instructor1.id,
+        TEST_USERS.instructor1.role
       );
       await createAuthUser(
         TEST_USERS.instructor2.email,
         'test-password-456',
-        TEST_USERS.instructor2.id
+        TEST_USERS.instructor2.id,
+        TEST_USERS.instructor2.role
       );
-      await createAuthUser(TEST_USERS.student.email, 'test-password-789', TEST_USERS.student.id);
+      await createAuthUser(
+        TEST_USERS.student.email,
+        'test-password-789',
+        TEST_USERS.student.id,
+        TEST_USERS.student.role
+      );
 
       // Wait for Supabase Auth to propagate all user creations (prevent race condition)
       console.log('Waiting for auth users to be ready...');

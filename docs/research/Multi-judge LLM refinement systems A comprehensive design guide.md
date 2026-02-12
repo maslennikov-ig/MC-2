@@ -10,12 +10,12 @@ For handling conflicting recommendations, the **Multi-Agent Debate Framework** (
 
 For prioritization, a weighted matrix approach works best:
 
-| Agreement Level | Severity | Recommended Action |
-|-----------------|----------|-------------------|
-| 3/3 judges | Critical | Immediate fix, highest priority |
-| 2/3 judges | High | Fix in current iteration |
-| 1/3 judge | Medium | Queue for next iteration if time permits |
-| Conflicting | Any | Trigger debate process or human review |
+| Agreement Level | Severity | Recommended Action                       |
+| --------------- | -------- | ---------------------------------------- |
+| 3/3 judges      | Critical | Immediate fix, highest priority          |
+| 2/3 judges      | High     | Fix in current iteration                 |
+| 1/3 judge       | Medium   | Queue for next iteration if time permits |
+| Conflicting     | Any      | Trigger debate process or human review   |
 
 **Krippendorff's Alpha** emerges as the preferred inter-rater reliability metric for multi-judge systems because it handles any number of raters, works with ordinal data, and remains robust to missing values. Thresholds: α ≥ 0.800 indicates reliable agreement (accept aggregated result), 0.667-0.800 suggests tentative reliability (flag for review), and below 0.667 signals low reliability requiring reconciliation.
 
@@ -86,8 +86,8 @@ The central economic question—when is regeneration cheaper than refinement?—
 The economic evaluation framework from Zellinger & Thomson quantifies the tradeoff:
 
 ```
-Reward = Expected_Accuracy × Value_of_Correct 
-       - Cost_per_Query 
+Reward = Expected_Accuracy × Value_of_Correct
+       - Cost_per_Query
        - Error_Rate × Cost_of_Mistake
 ```
 

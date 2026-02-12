@@ -12,10 +12,10 @@ Following existing Tailwind configuration:
 
 ```typescript
 const breakpoints = {
-  mobile: '0px - 767px',      // xs, sm
-  tablet: '768px - 1023px',   // md
+  mobile: '0px - 767px', // xs, sm
+  tablet: '768px - 1023px', // md
   desktop: '1024px - 1439px', // lg
-  large: '1440px+',           // xl, 2xl
+  large: '1440px+', // xl, 2xl
 };
 ```
 
@@ -23,21 +23,29 @@ const breakpoints = {
 
 ```css
 /* Default: Mobile (no prefix) */
-.class-name { /* 0-767px */ }
+.class-name {
+  /* 0-767px */
+}
 
 /* Tablet */
 @media (min-width: 768px) {
-  .md:class-name { /* 768px+ */ }
+  .md:class-name {
+    /* 768px+ */
+  }
 }
 
 /* Desktop */
 @media (min-width: 1024px) {
-  .lg:class-name { /* 1024px+ */ }
+  .lg:class-name {
+    /* 1024px+ */
+  }
 }
 
 /* Large Desktop */
 @media (min-width: 1440px) {
-  .xl:class-name { /* 1440px+ */ }
+  .xl:class-name {
+    /* 1440px+ */
+  }
 }
 ```
 
@@ -64,6 +72,7 @@ const breakpoints = {
 ```
 
 **Dimensions**:
+
 - Width: `100vw` (full viewport)
 - Height: `100vh` (full viewport)
 - Padding: Removed on container, applied to sections
@@ -72,19 +81,19 @@ const breakpoints = {
 ### Header
 
 ```tsx
-<header className={cn(
-  "px-4 py-3",          // Reduced padding
-  "min-h-[64px]",       // Smaller header height
-  "sticky top-0 z-10"
-)}>
+<header
+  className={cn(
+    'px-4 py-3', // Reduced padding
+    'min-h-[64px]', // Smaller header height
+    'sticky top-0 z-10'
+  )}
+>
   <div className="flex items-center justify-between gap-2">
     {/* Node icon: smaller */}
     <Icon className="w-5 h-5" />
 
     {/* Title: truncated */}
-    <h2 className="text-lg font-semibold truncate flex-1">
-      {nodeLabel}
-    </h2>
+    <h2 className="text-lg font-semibold truncate flex-1">{nodeLabel}</h2>
 
     {/* Status badge: icon only on small screens */}
     <StatusBadge compact />
@@ -103,6 +112,7 @@ const breakpoints = {
 ```
 
 **Key Changes**:
+
 - Smaller padding: `16px` (4) instead of `24px` (6)
 - Smaller icons: `20px` instead of `24px`
 - Title truncates with ellipsis if too long
@@ -112,18 +122,22 @@ const breakpoints = {
 ### Tab Navigation
 
 ```tsx
-<div className={cn(
-  "flex overflow-x-auto",     // Horizontal scroll
-  "border-b border-border",
-  "px-4",                     // Match header padding
-  "scrollbar-hide"            // Hide scrollbar
-)}>
-  <button className={cn(
-    "flex-shrink-0",          // Don't shrink tabs
-    "px-4 py-3",
-    "text-sm whitespace-nowrap",
-    "min-w-[80px]"            // Minimum width per tab
-  )}>
+<div
+  className={cn(
+    'flex overflow-x-auto', // Horizontal scroll
+    'border-b border-border',
+    'px-4', // Match header padding
+    'scrollbar-hide' // Hide scrollbar
+  )}
+>
+  <button
+    className={cn(
+      'flex-shrink-0', // Don't shrink tabs
+      'px-4 py-3',
+      'text-sm whitespace-nowrap',
+      'min-w-[80px]' // Minimum width per tab
+    )}
+  >
     Input
   </button>
   {/* More tabs... */}
@@ -131,6 +145,7 @@ const breakpoints = {
 ```
 
 **Behavior**:
+
 - Horizontal scroll if tabs overflow
 - No scrollbar (hidden)
 - Snap to tab on scroll (CSS scroll-snap)
@@ -139,10 +154,12 @@ const breakpoints = {
 ### Content Area
 
 ```tsx
-<div className={cn(
-  "flex-1 overflow-auto",
-  "p-4"                       // Mobile padding
-)}>
+<div
+  className={cn(
+    'flex-1 overflow-auto',
+    'p-4' // Mobile padding
+  )}
+>
   {/* Single column layout */}
   <div className="space-y-4">
     {/* Input Panel */}
@@ -158,6 +175,7 @@ const breakpoints = {
 ```
 
 **Layout**:
+
 - Single column: All panels stack vertically
 - Spacing: `16px` (4) between panels
 - Full width: Each panel uses 100% width
@@ -166,16 +184,13 @@ const breakpoints = {
 ### Footer (Refinement Chat)
 
 ```tsx
-<footer className={cn(
-  "sticky bottom-0 z-10",
-  "bg-card border-t border-border",
-  "p-4"
-)}>
+<footer className={cn('sticky bottom-0 z-10', 'bg-card border-t border-border', 'p-4')}>
   <RefinementChat compact={true} />
 </footer>
 ```
 
 **Compact Mode**:
+
 - Smaller chat history: `150px` instead of `250px`
 - Smaller textarea: `60px` instead of `80px`
 - Single column quick actions (stacked)
@@ -186,7 +201,9 @@ All interactive elements meet minimum size:
 
 ```css
 /* Minimum touch target: 44x44px */
-button, a, [role="button"] {
+button,
+a,
+[role='button'] {
   min-height: 44px;
   min-width: 44px;
 }
@@ -227,6 +244,7 @@ button, a, [role="button"] {
 ```
 
 **Scroll Behavior**:
+
 - Header: Sticky (always visible)
 - Content: Scrolls vertically
 - Footer: Sticky (always visible for AI stages)
@@ -251,6 +269,7 @@ button, a, [role="button"] {
 ```
 
 **Dimensions**:
+
 - Width: `100%` up to `896px` (max-w-4xl)
 - Height: `90vh` (leaves space for viewport)
 - Padding: `32px` around modal
@@ -259,17 +278,17 @@ button, a, [role="button"] {
 ### Header
 
 ```tsx
-<header className={cn(
-  "px-6 py-4",              // Standard padding
-  "min-h-[72px]"            // Full header height
-)}>
+<header
+  className={cn(
+    'px-6 py-4', // Standard padding
+    'min-h-[72px]' // Full header height
+  )}
+>
   <div className="flex items-center justify-between">
     <div className="flex items-center gap-3">
       <Icon className="w-6 h-6" />
       <div>
-        <h2 className="text-xl font-semibold">
-          {nodeLabel}
-        </h2>
+        <h2 className="text-xl font-semibold">{nodeLabel}</h2>
         <p className="text-sm text-muted-foreground">
           {nodeType} · Stage {stageNumber}
         </p>
@@ -277,7 +296,7 @@ button, a, [role="button"] {
     </div>
 
     <div className="flex items-center gap-2">
-      <StatusBadge />  {/* Full badge with text */}
+      <StatusBadge /> {/* Full badge with text */}
       <button className="p-2">
         <X className="w-5 h-5" />
       </button>
@@ -287,6 +306,7 @@ button, a, [role="button"] {
 ```
 
 **Key Changes**:
+
 - Horizontal layout (icon + text side-by-side)
 - Full status badge with text
 - Larger padding and spacing
@@ -294,23 +314,20 @@ button, a, [role="button"] {
 ### Tab Navigation
 
 ```tsx
-<div className={cn(
-  "flex gap-2",               // Horizontal tabs
-  "border-b border-border",
-  "px-6"
-)}>
-  <button className={cn(
-    "px-4 py-3",
-    "text-sm font-medium",
-    "rounded-t-md"
-  )}>
-    Input
-  </button>
+<div
+  className={cn(
+    'flex gap-2', // Horizontal tabs
+    'border-b border-border',
+    'px-6'
+  )}
+>
+  <button className={cn('px-4 py-3', 'text-sm font-medium', 'rounded-t-md')}>Input</button>
   {/* More tabs... */}
 </div>
 ```
 
 **Behavior**:
+
 - No scrolling (all tabs visible)
 - Hover states enabled
 - Active indicator below tab
@@ -318,33 +335,23 @@ button, a, [role="button"] {
 ### Content Area - 2-Column Layout
 
 ```tsx
-<div className={cn(
-  "grid md:grid-cols-2 gap-6",
-  "p-6"
-)}>
+<div className={cn('grid md:grid-cols-2 gap-6', 'p-6')}>
   {/* Left Column: Input + Process */}
   <div className="space-y-6">
-    <JsonViewer
-      title="Input Data"
-      data={inputData}
-      maxHeight="400px"
-    />
+    <JsonViewer title="Input Data" data={inputData} maxHeight="400px" />
 
     <MetricsGrid {...metrics} />
   </div>
 
   {/* Right Column: Output */}
   <div>
-    <JsonViewer
-      title="Output Data"
-      data={outputData}
-      maxHeight="600px"
-    />
+    <JsonViewer title="Output Data" data={outputData} maxHeight="600px" />
   </div>
 </div>
 ```
 
 **Layout**:
+
 - 2 columns: 50/50 split
 - Gap: `24px` (6) between columns
 - Vertical spacing: `24px` (6) between stacked items
@@ -352,12 +359,8 @@ button, a, [role="button"] {
 ### Footer
 
 ```tsx
-<footer className={cn(
-  "sticky bottom-0 z-10",
-  "border-t border-border",
-  "p-6"
-)}>
-  <RefinementChat />  {/* Standard size */}
+<footer className={cn('sticky bottom-0 z-10', 'border-t border-border', 'p-6')}>
+  <RefinementChat /> {/* Standard size */}
 </footer>
 ```
 
@@ -391,6 +394,7 @@ button, a, [role="button"] {
 ```
 
 **Scroll Behavior**:
+
 - Each column scrolls independently if content overflows
 - Header and footer remain sticky
 
@@ -411,6 +415,7 @@ button, a, [role="button"] {
 ```
 
 **Dimensions**:
+
 - Width: `100%` up to `1152px` (max-w-6xl)
 - Height: `90vh`
 - Padding: `48px` around modal
@@ -418,17 +423,10 @@ button, a, [role="button"] {
 ### Content Area - 3-Column Layout
 
 ```tsx
-<div className={cn(
-  "grid lg:grid-cols-3 gap-6",
-  "p-6"
-)}>
+<div className={cn('grid lg:grid-cols-3 gap-6', 'p-6')}>
   {/* Column 1: Input */}
   <div>
-    <JsonViewer
-      title="Input Data"
-      data={inputData}
-      maxHeight="600px"
-    />
+    <JsonViewer title="Input Data" data={inputData} maxHeight="600px" />
   </div>
 
   {/* Column 2: Process */}
@@ -441,16 +439,13 @@ button, a, [role="button"] {
 
   {/* Column 3: Output */}
   <div>
-    <JsonViewer
-      title="Output Data"
-      data={outputData}
-      maxHeight="600px"
-    />
+    <JsonViewer title="Output Data" data={outputData} maxHeight="600px" />
   </div>
 </div>
 ```
 
 **Layout**:
+
 - 3 equal columns: 33.33% / 33.33% / 33.33%
 - Gap: `24px` (6) between columns
 - All panels visible simultaneously
@@ -525,6 +520,7 @@ Desktop supports rich hover interactions:
 ```
 
 **Dimensions**:
+
 - Width: `100%` up to `1280px` (max-w-7xl) or `1536px` (max-w-screen-2xl)
 - Height: `90vh`
 - Padding: `64px` around modal
@@ -532,15 +528,18 @@ Desktop supports rich hover interactions:
 ### Content Area
 
 ```tsx
-<div className={cn(
-  "grid xl:grid-cols-3 gap-8",  // Larger gap
-  "p-8"                         // Larger padding
-)}>
+<div
+  className={cn(
+    'grid xl:grid-cols-3 gap-8', // Larger gap
+    'p-8' // Larger padding
+  )}
+>
   {/* Same 3-column layout with more breathing room */}
 </div>
 ```
 
 **Layout**:
+
 - 3 columns with more spacing: `32px` (8) gap
 - Larger text sizes for readability
 - More generous padding throughout
@@ -565,6 +564,7 @@ Desktop supports rich hover interactions:
 ### AttemptSelector
 
 **Mobile**:
+
 ```tsx
 <div className="flex flex-col gap-2">
   <label className="text-sm">Attempt</label>
@@ -573,6 +573,7 @@ Desktop supports rich hover interactions:
 ```
 
 **Desktop**:
+
 ```tsx
 <div className="flex items-center gap-3">
   <label className="text-sm">Attempt:</label>
@@ -583,6 +584,7 @@ Desktop supports rich hover interactions:
 ### ApprovalControls
 
 **Mobile**:
+
 ```tsx
 <div className="flex flex-col gap-2">
   <Button className="w-full">Approve</Button>
@@ -591,6 +593,7 @@ Desktop supports rich hover interactions:
 ```
 
 **Desktop**:
+
 ```tsx
 <div className="flex gap-2 justify-end">
   <Button>Reject</Button>
@@ -601,6 +604,7 @@ Desktop supports rich hover interactions:
 ### RefinementChat Quick Actions
 
 **Mobile** (1-2 columns):
+
 ```tsx
 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
   {quickActions.map(action => (
@@ -610,6 +614,7 @@ Desktop supports rich hover interactions:
 ```
 
 **Desktop** (3-4 columns):
+
 ```tsx
 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
   {quickActions.map(action => (
@@ -641,6 +646,7 @@ Default layout as described above.
 ```
 
 **Adjustments**:
+
 - Smaller header/footer
 - More horizontal space for content
 - Chat history height reduced: `120px` instead of `150px`

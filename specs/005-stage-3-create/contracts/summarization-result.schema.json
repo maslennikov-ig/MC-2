@@ -4,12 +4,7 @@
   "title": "SummarizationResult",
   "description": "Result of Stage 3 summarization job (saved to file_catalog)",
   "type": "object",
-  "required": [
-    "file_id",
-    "processed_content",
-    "processing_method",
-    "summary_metadata"
-  ],
+  "required": ["file_id", "processed_content", "processing_method", "summary_metadata"],
   "properties": {
     "file_id": {
       "type": "string",
@@ -24,14 +19,7 @@
     },
     "processing_method": {
       "type": "string",
-      "enum": [
-        "full_text",
-        "map_reduce",
-        "refine",
-        "map_rerank",
-        "stuffing",
-        "hierarchical"
-      ],
+      "enum": ["full_text", "map_reduce", "refine", "map_rerank", "stuffing", "hierarchical"],
       "description": "Summarization strategy used"
     },
     "summary_metadata": {
@@ -82,10 +70,7 @@
           "type": "string",
           "pattern": "^[a-z0-9-]+/[a-z0-9-]+$",
           "description": "OpenRouter model ID used for generation",
-          "examples": [
-            "openai/gpt-oss-20b",
-            "anthropic/claude-3.5-sonnet"
-          ]
+          "examples": ["openai/gpt-oss-20b", "anthropic/claude-3.5-sonnet"]
         },
         "quality_score": {
           "type": "number",

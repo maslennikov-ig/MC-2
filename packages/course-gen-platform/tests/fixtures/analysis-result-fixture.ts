@@ -15,11 +15,10 @@ import type { AnalysisResult } from '@megacampus/shared-types/generation-job';
  *
  * This fixture includes:
  * - All nested objects (course_category, contextual_language, topic_analysis, etc.)
- * - 4 REQUIRED enhancement fields from T055 Schema Unification:
- *   1. pedagogical_patterns (REQUIRED)
- *   2. generation_guidance (REQUIRED)
- *   3. document_relevance_mapping (REQUIRED, can be empty object for title-only)
- *   4. document_analysis (REQUIRED)
+ * - 3 REQUIRED enhancement fields from T055 Schema Unification:
+ *   1. generation_guidance (REQUIRED)
+ *   2. document_relevance_mapping (REQUIRED, can be empty object for title-only)
+ *   3. document_analysis (REQUIRED)
  *
  * @param title - Course title for the test fixture
  * @returns Complete AnalysisResult object
@@ -75,19 +74,18 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
         {
           area: 'Introduction to Fundamentals',
           estimated_lessons: 4,
-          importance: 'core' as const,
+          importance: 'complex' as const,
           learning_objectives: [
             'Learn basic principles and core concepts',
             'Understand fundamental terminology',
           ],
           key_topics: ['topic1', 'topic2', 'topic3'],
           pedagogical_approach: 'hands-on learning with guided examples and progressive difficulty',
-          difficulty_progression: 'gradual' as const,
         },
         {
           area: 'Advanced Topics and Applications',
           estimated_lessons: 6,
-          importance: 'core' as const,
+          importance: 'complex' as const,
           learning_objectives: [
             'Master advanced concepts and techniques',
             'Apply knowledge to real-world scenarios',
@@ -95,7 +93,6 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
           key_topics: ['topic4', 'topic5', 'topic6'],
           pedagogical_approach:
             'project-based learning with real-world scenarios and practical exercises',
-          difficulty_progression: 'gradual' as const,
         },
       ],
     },
@@ -111,26 +108,12 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
     // Phase 4: Synthesis
     scope_instructions:
       'Focus on practical implementation with clear examples. Balance theory and practice to ensure comprehensive understanding.',
-    content_strategy: 'create_from_scratch' as const,
-    expansion_areas: null,
     research_flags: [],
 
     // ========================================================================
     // NEW: REQUIRED enhancement fields (T055 Schema Unification)
-    // These 4 fields are REQUIRED by AnalysisResultSchema (no .optional())
+    // These 3 fields are REQUIRED by AnalysisResultSchema (no .optional())
     // ========================================================================
-
-    pedagogical_patterns: {
-      primary_strategy: 'mixed' as const,
-      theory_practice_ratio: '40:60',
-      assessment_types: ['coding', 'quizzes', 'projects'],
-      key_patterns: [
-        'learn by doing',
-        'incremental complexity',
-        'real-world examples',
-        'hands-on practice',
-      ],
-    },
 
     generation_guidance: {
       tone: 'conversational but precise' as const,
@@ -202,35 +185,19 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
 export const createMinimalAnalysisResult = createFullAnalysisResult;
 
 /**
- * Create AnalysisResult with HIGH complexity sections (≥0.75 score)
+ * Create AnalysisResult with HIGH complexity sections (importance='complex')
  *
- * For RT-001 tiered routing tests expecting Tier 2 (qwen3-max) selection.
- * Used when tests require high-complexity generation workflow.
- *
- * Complexity factors calculation:
- * - 9+ key_topics (high breadth) → 0.4 score
- * - 5+ learning_objectives (high learning goals) → 0.3 score
- * - 6+ estimated_lessons (high lesson count) → 0.3 score
- * - Total: 1.0 (capped at 1.0 by calculateComplexityScore)
- *
- * This ensures that complexity calculations in SectionBatchGenerator
- * will evaluate to ≥0.75, triggering Tier 2 (qwen3-max) routing.
+ * For tiered routing tests expecting complex tier selection.
+ * Section has importance='complex' which triggers premium model routing.
  *
  * @param title - Course title
- * @returns AnalysisResult with high-complexity section in sections_breakdown
+ * @returns AnalysisResult with complex-importance section in sections_breakdown
  *
  * @example
  * ```typescript
- * // For tests that expect high complexity routing to Tier 2
  * const highComplexity = createHighComplexityAnalysisResult('Advanced ML Course');
- * const jobInput: GenerationJobInput = {
- *   analysis_result: highComplexity,
- *   // ... other fields
- * };
- * const generator = new SectionBatchGenerator();
  * const result = await generator.generateBatch(0, 0, 1, jobInput);
- * expect(result.complexityScore).toBeGreaterThanOrEqual(0.75);
- * expect(result.tier).toBe('tier2_qwen3Max');
+ * expect(result.tier).toBe('complex');
  * ```
  */
 export function createHighComplexityAnalysisResult(title: string): AnalysisResult {
@@ -262,10 +229,9 @@ export function createHighComplexityAnalysisResult(title: string): AnalysisResul
             'Create innovative solutions to novel problems', // 5 objectives → 0.3 (high goals)
           ],
           estimated_lessons: 6, // 6 lessons → 0.3 (high count)
-          importance: 'core' as const,
+          importance: 'complex' as const,
           pedagogical_approach:
             'project-based learning with real-world scenarios, advanced case studies, and practical exercises',
-          difficulty_progression: 'gradual' as const,
         },
       ],
     },
@@ -273,36 +239,19 @@ export function createHighComplexityAnalysisResult(title: string): AnalysisResul
 }
 
 /**
- * Create AnalysisResult with LOW complexity sections (<0.75 score)
+ * Create AnalysisResult with LOW complexity sections (importance='simple')
  *
- * For RT-001 tiered routing tests expecting Tier 1 (OSS 120B) selection.
- * Used when tests require low-complexity generation workflow.
- *
- * Complexity factors calculation:
- * - 1-2 key_topics (low breadth) → 0.1 score
- * - 1-2 learning_objectives (few goals) → 0.1 score
- * - 1-2 estimated_lessons (few lessons) → 0.1 score
- * - Total: 0.3 (well below 0.75 threshold)
- *
- * This ensures that complexity calculations in SectionBatchGenerator
- * will evaluate to <0.75, triggering Tier 1 (OSS 120B) routing
- * (assuming criticality is also low).
+ * For tiered routing tests expecting simple tier selection.
+ * Section has importance='simple' which triggers cheap model routing.
  *
  * @param title - Course title
- * @returns AnalysisResult with low-complexity section in sections_breakdown
+ * @returns AnalysisResult with simple-importance section in sections_breakdown
  *
  * @example
  * ```typescript
- * // For tests that expect low complexity routing to Tier 1
  * const lowComplexity = createLowComplexityAnalysisResult('Beginner Course');
- * const jobInput: GenerationJobInput = {
- *   analysis_result: lowComplexity,
- *   // ... other fields
- * };
- * const generator = new SectionBatchGenerator();
  * const result = await generator.generateBatch(0, 0, 1, jobInput);
- * expect(result.complexityScore).toBeLessThan(0.75);
- * expect(result.tier).toBe('tier1_oss120b');
+ * expect(result.tier).toBe('simple');
  * ```
  */
 export function createLowComplexityAnalysisResult(title: string): AnalysisResult {
@@ -328,9 +277,8 @@ export function createLowComplexityAnalysisResult(title: string): AnalysisResult
             'Learn fundamental principles', // 2 objectives → 0.1 (few goals)
           ],
           estimated_lessons: 2, // 2 lessons → 0.1 (low count)
-          importance: 'optional' as const, // Not core
+          importance: 'simple' as const, // Not complex
           pedagogical_approach: 'guided lectures with simple examples',
-          difficulty_progression: 'linear' as const,
         },
       ],
     },

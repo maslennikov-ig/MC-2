@@ -52,12 +52,6 @@ const mockAnalysisResult: AnalysisResult = {
     assessment_approach: 'Project-based',
     progression_logic: 'Incremental complexity',
   },
-  pedagogical_patterns: {
-    primary_strategy: 'problem-based learning',
-    theory_practice_ratio: '30:70',
-    assessment_types: ['coding', 'projects'],
-    key_patterns: ['build incrementally', 'learn by refactoring'],
-  },
   generation_guidance: {
     tone: 'conversational but precise',
     use_analogies: true,
@@ -68,9 +62,7 @@ const mockAnalysisResult: AnalysisResult = {
     contextual_language_hints: 'Assume basic programming knowledge',
     real_world_examples: ['Web development', 'API design'],
   },
-  content_strategy: 'create_from_scratch',
   document_relevance_mapping: {},
-  expansion_areas: null,
   research_flags: [],
   metadata: {
     analysis_version: 'v1.0.0',
@@ -98,33 +90,18 @@ const mockCourseStructure: CourseStructure = {
       id: 'lo-1',
       text: 'Explain TypeScript type system',
       language: 'en',
-      cognitiveLevel: 'understand',
-      estimatedDuration: 10,
-      targetAudienceLevel: 'intermediate',
     },
     {
       id: 'lo-2',
       text: 'Apply types in real-world scenarios',
       language: 'en',
-      cognitiveLevel: 'apply',
-      estimatedDuration: 12,
-      targetAudienceLevel: 'intermediate',
     },
     {
       id: 'lo-3',
       text: 'Design type-safe applications',
       language: 'en',
-      cognitiveLevel: 'create',
-      estimatedDuration: 15,
-      targetAudienceLevel: 'intermediate',
     },
   ],
-  assessment_strategy: {
-    quiz_per_section: true,
-    final_exam: false,
-    practical_projects: 3,
-    assessment_description: 'Hands-on coding exercises and projects',
-  },
   course_tags: ['typescript', 'programming', 'web development', 'types', 'javascript'],
   sections: [
     {
@@ -140,23 +117,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Set up TypeScript', 'Write first TypeScript program'],
           key_topics: ['Installation', 'Configuration', 'First program'],
           estimated_duration_minutes: 15,
-          practical_exercises: [
-            {
-              exercise_type: 'hands-on lab',
-              exercise_title: 'Install and configure TypeScript',
-              exercise_description: 'Set up a TypeScript development environment',
-            },
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'Hello TypeScript',
-              exercise_description: 'Write your first TypeScript program',
-            },
-            {
-              exercise_type: 'self-assessment',
-              exercise_title: 'Check your understanding',
-              exercise_description: 'Review setup steps and verify installation',
-            },
-          ],
         },
         {
           lesson_number: 2,
@@ -164,23 +124,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Identify primitive types', 'Use type annotations'],
           key_topics: ['string', 'number', 'boolean', 'type annotations'],
           estimated_duration_minutes: 20,
-          practical_exercises: [
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'Type annotations practice',
-              exercise_description: 'Add type annotations to variables',
-            },
-            {
-              exercise_type: 'debugging',
-              exercise_title: 'Fix type errors',
-              exercise_description: 'Debug common type annotation mistakes',
-            },
-            {
-              exercise_type: 'quiz',
-              exercise_title: 'Type system quiz',
-              exercise_description: 'Test your knowledge of primitive types',
-            },
-          ],
         },
       ],
     },
@@ -197,23 +140,6 @@ const mockCourseStructure: CourseStructure = {
           lesson_objectives: ['Define interfaces', 'Create type aliases'],
           key_topics: ['Interfaces', 'Type aliases', 'Object types'],
           estimated_duration_minutes: 20,
-          practical_exercises: [
-            {
-              exercise_type: 'coding exercise',
-              exercise_title: 'Define custom types',
-              exercise_description: 'Create interfaces for domain objects',
-            },
-            {
-              exercise_type: 'case study',
-              exercise_title: 'Refactor to use interfaces',
-              exercise_description: 'Improve code quality with proper typing',
-            },
-            {
-              exercise_type: 'peer review',
-              exercise_title: 'Review type definitions',
-              exercise_description: 'Evaluate interface design choices',
-            },
-          ],
         },
       ],
     },

@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 
 /**
  * GET handler for job status query
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Call tRPC endpoint
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const backendUrl = ENV.COURSEGEN_BACKEND_URL
     const tRPCUrl = `${backendUrl}/trpc`
     const response = await fetch(
       `${tRPCUrl}/jobs.getStatus?input=${encodeURIComponent(JSON.stringify({ jobId }))}`,
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
         route: '/api/coursegen/job-status',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', code: 'INTERNAL_ERROR' },

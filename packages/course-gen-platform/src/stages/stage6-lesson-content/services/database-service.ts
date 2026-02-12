@@ -10,6 +10,7 @@ import {
   LessonLabel,
   GenerationProgress,
   GenerationProgressStep,
+  Json,
 } from '@megacampus/shared-types';
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 import { parseGenerationProgress } from '@/shared/schemas/generation-progress.schema';
@@ -38,7 +39,7 @@ export async function handlePartialSuccess(
       {
         lesson_id: lessonUuid,
         course_id: courseId,
-        content: JSON.parse(JSON.stringify(result.lessonContent)),
+        content: JSON.parse(JSON.stringify(result.lessonContent)) as Json,
         status: 'review_required', // Mark as partial success requiring review
         metadata: JSON.parse(
           JSON.stringify({
@@ -47,7 +48,7 @@ export async function handlePartialSuccess(
             errors: result.errors,
             qualityScore: result.metrics.qualityScore,
           })
-        ),
+        ) as Json,
       },
       {
         onConflict: 'lesson_id',
@@ -177,7 +178,7 @@ export async function saveLessonContent(
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
-      content: JSON.parse(JSON.stringify(result.lessonContent)),
+      content: JSON.parse(JSON.stringify(result.lessonContent)) as Json,
       metadata: JSON.parse(
         JSON.stringify({
           lessonLabel,
@@ -198,7 +199,7 @@ export async function saveLessonContent(
           // Human review info for UI warnings (only present if review needed)
           reviewInfo: result.reviewInfo ?? undefined,
         })
-      ),
+      ) as Json,
       status: 'completed',
       generation_attempt: 1,
     });
@@ -248,6 +249,22 @@ export async function saveLessonContent(
           },
           'Incremented lessons_completed counter'
         );
+      }
+
+      // Track tokens in generation_progress (idempotent — safe for lesson retries)
+      const lessonTokens = result.metrics.tokensUsed;
+      if (lessonTokens && lessonTokens > 0 && lessonUuid) {
+        const { error: tokenError } = await supabaseAdmin.rpc('upsert_stage_tokens', {
+          p_course_id: courseId,
+          p_stage_key: `lesson:${lessonUuid}`,
+          p_tokens: lessonTokens,
+        });
+        if (tokenError) {
+          logger.warn(
+            { courseId, lessonLabel, tokens: lessonTokens, error: tokenError.message },
+            'Failed to upsert stage tokens (non-fatal)'
+          );
+        }
       }
     }
   } catch (error) {

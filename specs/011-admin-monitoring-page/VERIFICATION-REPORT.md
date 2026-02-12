@@ -26,6 +26,7 @@ Verification of fixes from `FIXES-REQUIRED.md` has **FAILED**. Critical issues w
 **Problem:** Migration file exists locally but is NOT applied to the Supabase database.
 
 **Evidence:**
+
 ```bash
 # Migration file exists
 ✅ /home/me/code/megacampus2/packages/course-gen-platform/supabase/migrations/20251125120000_fix_lesson_contents_refinement.sql
@@ -36,11 +37,13 @@ Verification of fixes from `FIXES-REQUIRED.md` has **FAILED**. Critical issues w
 ```
 
 **Impact:**
+
 - `lesson_contents` table (plural) does NOT exist in database
 - Stage 6 code will FAIL when trying to insert into non-existent table
 - All refinement functionality is broken
 
 **Required Action:**
+
 ```bash
 # Apply migration using Supabase MCP
 mcp__supabase__apply_migration(
@@ -58,6 +61,7 @@ mcp__supabase__apply_migration(
 **Problem:** Lines 96-98 create INCORRECT foreign key in `lesson_content` table (singular).
 
 **Current Code (WRONG):**
+
 ```sql
 -- Line 98: INCORRECT FK reference
 ADD COLUMN IF NOT EXISTS parent_content_id UUID REFERENCES lesson_content(lesson_id);
@@ -66,11 +70,13 @@ ADD COLUMN IF NOT EXISTS parent_content_id UUID REFERENCES lesson_content(lesson
 ```
 
 **What's Wrong:**
+
 - `parent_content_id` should reference the `id` column (primary key)
 - But migration references `lesson_id` column instead
 - This creates a FK to a NON-PRIMARY-KEY column (violates FK best practices)
 
 **Expected Code (CORRECT):**
+
 ```sql
 -- Should reference the PRIMARY KEY (lesson_id in lesson_content table)
 ADD COLUMN IF NOT EXISTS parent_content_id UUID REFERENCES lesson_content(lesson_id);
@@ -84,6 +90,7 @@ The `lesson_content` table uses `lesson_id` as PRIMARY KEY (not `id`), so the FK
 3. Second migration tries to DROP columns from `lesson_content` (singular)
 
 **The REAL problem:** We have TWO tables with similar names:
+
 - `lesson_content` (singular) - old table with `lesson_id` PK
 - `lesson_contents` (plural) - new table with `id` PK + `lesson_id` FK
 
@@ -96,6 +103,7 @@ The `lesson_content` table uses `lesson_id` as PRIMARY KEY (not `id`), so the FK
 **Problem:** Lines 9-19 create `lesson_contents` table WITHOUT versioning fields needed by Stage 6.
 
 **Current Schema (INCOMPLETE):**
+
 ```sql
 CREATE TABLE IF NOT EXISTS lesson_contents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -111,23 +119,23 @@ CREATE TABLE IF NOT EXISTS lesson_contents (
 ```
 
 **Missing Fields that Stage 6 tries to insert:**
+
 ```typescript
 // Stage 6 handler.ts line 803
-const { error } = await supabaseAdmin
-  .from('lesson_contents')
-  .insert({
-    lesson_id: lessonId,
-    content: extractContentMarkdown(result.lessonContent),  // ✅ exists as TEXT
-    status: 'completed',                                     // ✅ exists as TEXT
-    generation_attempt: 1,                                   // ✅ exists as INTEGER
-    updated_at: new Date().toISOString(),                    // ✅ exists as TIMESTAMPTZ
-    // BUT Stage 6 does NOT insert:
-    // - course_id (REQUIRED in database.types.ts)
-    // - metadata (REQUIRED in database.types.ts)
-  });
+const { error } = await supabaseAdmin.from('lesson_contents').insert({
+  lesson_id: lessonId,
+  content: extractContentMarkdown(result.lessonContent), // ✅ exists as TEXT
+  status: 'completed', // ✅ exists as TEXT
+  generation_attempt: 1, // ✅ exists as INTEGER
+  updated_at: new Date().toISOString(), // ✅ exists as TIMESTAMPTZ
+  // BUT Stage 6 does NOT insert:
+  // - course_id (REQUIRED in database.types.ts)
+  // - metadata (REQUIRED in database.types.ts)
+});
 ```
 
 **Database Types Expectation (from database.types.ts lines 1098-1145):**
+
 ```typescript
 lesson_contents: {
   Row: {
@@ -150,6 +158,7 @@ lesson_contents: {
 ```
 
 **Critical Mismatches:**
+
 1. ❌ **Missing `course_id` column** (REQUIRED in Insert)
 2. ❌ **Missing `metadata` column** (REQUIRED in Insert)
 3. ❌ **Wrong `content` type** (TEXT in migration, Json in types)
@@ -164,18 +173,19 @@ lesson_contents: {
 **Problem:** Types show `lesson_contents` table exists, but migration that creates it is NOT applied.
 
 **Evidence:**
+
 ```typescript
 // Lines 1098-1145: Types SHOW lesson_contents table
 lesson_contents: {
   Row: {
-    content: Json
-    course_id: string          // ← Field exists in types
-    created_at: string
-    id: string
-    lesson_id: string
-    metadata: Json             // ← Field exists in types
-    status: Database["public"]["Enums"]["lesson_content_status"]
-    updated_at: string
+    content: Json;
+    course_id: string; // ← Field exists in types
+    created_at: string;
+    id: string;
+    lesson_id: string;
+    metadata: Json; // ← Field exists in types
+    status: Database['public']['Enums']['lesson_content_status'];
+    updated_at: string;
   }
 }
 ```
@@ -183,12 +193,14 @@ lesson_contents: {
 **But migration is NOT applied!**
 
 **Likely scenario:**
+
 1. Developer ran `mcp__supabase__generate_typescript_types` manually
 2. Types were generated from a DIFFERENT database (dev/staging?)
 3. Migration was NOT applied to production database
 4. Types and database are OUT OF SYNC
 
 **Impact:**
+
 - TypeScript compilation PASSES (types exist)
 - Runtime FAILS (table doesn't exist)
 - Classic "works on my machine" scenario
@@ -202,6 +214,7 @@ lesson_contents: {
 **Problem:** Lines 799-808 insert into `lesson_contents` but with INCOMPLETE data.
 
 **Current Code:**
+
 ```typescript
 // Line 800
 const { error } = await supabaseAdmin
@@ -216,6 +229,7 @@ const { error } = await supabaseAdmin
 ```
 
 **Missing Required Fields (per database.types.ts Insert type):**
+
 ```typescript
 Insert: {
   content?: Json              // ✅ provided (but wrong type - string not Json)
@@ -230,6 +244,7 @@ Insert: {
 ```
 
 **Will FAIL because:**
+
 1. Missing `course_id` (NOT NULL in schema)
 2. Missing `metadata` (NOT NULL in schema, default is `'{}'` but types don't reflect this)
 3. Wrong type for `content` (passing string, expects Json)
@@ -243,6 +258,7 @@ Insert: {
 **Status:** ✅ FIXED
 
 **Line 19:**
+
 ```markdown
 - [x] T002 [US1] Update database types in `packages/shared-types/src/database.types.ts` (run type gen)
 ```
@@ -258,6 +274,7 @@ Insert: {
 **Problem:** Lines 56-58 try to drop columns from `lesson_content` (singular), but migration NOT applied.
 
 **Code:**
+
 ```sql
 ALTER TABLE lesson_content DROP COLUMN IF EXISTS generation_attempt;
 ALTER TABLE lesson_content DROP COLUMN IF EXISTS parent_content_id;
@@ -267,6 +284,7 @@ ALTER TABLE lesson_content DROP COLUMN IF EXISTS user_refinement_prompt;
 **Status:** Migration not applied, so columns still exist in `lesson_content` table.
 
 **Impact:**
+
 - Low impact (old table still has extra columns)
 - Should be cleaned up after new table is working
 
@@ -274,21 +292,22 @@ ALTER TABLE lesson_content DROP COLUMN IF EXISTS user_refinement_prompt;
 
 ## Schema Comparison: Migration vs Types vs Code
 
-| Field | Migration (SQL) | Types (TS) | Stage 6 Code | Status |
-|-------|----------------|------------|--------------|--------|
-| `id` | UUID PK | string | ⚠️ not set | ✅ Default |
-| `lesson_id` | UUID NOT NULL FK | string | ✅ set | ✅ Match |
-| `course_id` | ❌ MISSING | string (required) | ❌ not set | 🔴 MISSING |
-| `content` | TEXT | Json | string | 🔴 TYPE MISMATCH |
-| `metadata` | ❌ MISSING | Json (required) | ❌ not set | 🔴 MISSING |
-| `status` | TEXT | ENUM | 'completed' | ⚠️ TYPE MISMATCH |
-| `generation_attempt` | INTEGER | ❌ not in types | 1 | ⚠️ EXTRA FIELD |
-| `parent_content_id` | UUID FK | ❌ not in types | ❌ not set | ⚠️ EXTRA FIELD |
-| `user_refinement_prompt` | TEXT | ❌ not in types | ❌ not set | ⚠️ EXTRA FIELD |
-| `created_at` | TIMESTAMPTZ | string | ⚠️ not set | ✅ Default |
-| `updated_at` | TIMESTAMPTZ | string | ✅ set | ✅ Match |
+| Field                    | Migration (SQL)  | Types (TS)        | Stage 6 Code | Status           |
+| ------------------------ | ---------------- | ----------------- | ------------ | ---------------- |
+| `id`                     | UUID PK          | string            | ⚠️ not set   | ✅ Default       |
+| `lesson_id`              | UUID NOT NULL FK | string            | ✅ set       | ✅ Match         |
+| `course_id`              | ❌ MISSING       | string (required) | ❌ not set   | 🔴 MISSING       |
+| `content`                | TEXT             | Json              | string       | 🔴 TYPE MISMATCH |
+| `metadata`               | ❌ MISSING       | Json (required)   | ❌ not set   | 🔴 MISSING       |
+| `status`                 | TEXT             | ENUM              | 'completed'  | ⚠️ TYPE MISMATCH |
+| `generation_attempt`     | INTEGER          | ❌ not in types   | 1            | ⚠️ EXTRA FIELD   |
+| `parent_content_id`      | UUID FK          | ❌ not in types   | ❌ not set   | ⚠️ EXTRA FIELD   |
+| `user_refinement_prompt` | TEXT             | ❌ not in types   | ❌ not set   | ⚠️ EXTRA FIELD   |
+| `created_at`             | TIMESTAMPTZ      | string            | ⚠️ not set   | ✅ Default       |
+| `updated_at`             | TIMESTAMPTZ      | string            | ✅ set       | ✅ Match         |
 
 **Summary:**
+
 - 🔴 **3 critical mismatches** (course_id, metadata, content type)
 - ⚠️ **3 schema inconsistencies** (generation_attempt, parent_content_id, user_refinement_prompt in migration but not in types)
 
@@ -380,39 +399,42 @@ CREATE TRIGGER update_lesson_contents_updated_at
 **File:** `packages/course-gen-platform/src/stages/stage6-lesson-content/handler.ts`
 
 **Lines 799-808, replace with:**
+
 ```typescript
-const { error } = await supabaseAdmin
-  .from('lesson_contents')
-  .insert({
-    lesson_id: lessonId,
-    course_id: courseId,                                    // ✅ ADD course_id
-    content: result.lessonContent,                          // ✅ Pass full object (Json)
-    metadata: {                                             // ✅ ADD metadata
-      tokensUsed: result.metrics.tokensUsed,
-      modelUsed: result.metrics.modelUsed,
-      qualityScore: result.metrics.qualityScore,
-      durationMs: result.metrics.durationMs,
-    },
-    status: 'completed',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
+const { error } = await supabaseAdmin.from('lesson_contents').insert({
+  lesson_id: lessonId,
+  course_id: courseId, // ✅ ADD course_id
+  content: result.lessonContent, // ✅ Pass full object (Json)
+  metadata: {
+    // ✅ ADD metadata
+    tokensUsed: result.metrics.tokensUsed,
+    modelUsed: result.metrics.modelUsed,
+    qualityScore: result.metrics.qualityScore,
+    durationMs: result.metrics.durationMs,
+  },
+  status: 'completed',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+});
 ```
 
 ### Fix #3: Remove Incorrect Migration
 
 **Delete or mark as obsolete:**
+
 - `20251125120000_fix_lesson_contents_refinement.sql`
 
 **Replace with:**
+
 - `20251125130000_fix_lesson_contents_schema_alignment.sql` (from Fix #1)
 
 ### Fix #4: Regenerate Types After Migration
 
 **After applying Fix #1 migration:**
+
 ```typescript
 // Use Supabase MCP
-mcp__supabase__generate_typescript_types()
+mcp__supabase__generate_typescript_types();
 
 // Update packages/shared-types/src/database.types.ts
 ```
@@ -424,6 +446,7 @@ mcp__supabase__generate_typescript_types()
 ### Phase 1: Database Schema Fix
 
 1. **Delete broken migration file:**
+
    ```bash
    # Rename to .obsolete to preserve history
    mv packages/course-gen-platform/supabase/migrations/20251125120000_fix_lesson_contents_refinement.sql \
@@ -435,6 +458,7 @@ mcp__supabase__generate_typescript_types()
    - Use SQL from Fix #1 above
 
 3. **Apply migration:**
+
    ```typescript
    mcp__supabase__apply_migration({
      name: "fix_lesson_contents_schema_alignment",
@@ -444,7 +468,7 @@ mcp__supabase__generate_typescript_types()
 
 4. **Verify migration applied:**
    ```typescript
-   mcp__supabase__list_migrations()
+   mcp__supabase__list_migrations();
    // Should show: 20251125130000
    ```
 
@@ -461,8 +485,9 @@ mcp__supabase__generate_typescript_types()
 ### Phase 3: Type Regeneration
 
 7. **Regenerate database types:**
+
    ```typescript
-   mcp__supabase__generate_typescript_types()
+   mcp__supabase__generate_typescript_types();
    ```
 
 8. **Update main types file:**
@@ -476,6 +501,7 @@ mcp__supabase__generate_typescript_types()
 ### Phase 4: Cleanup Old Table
 
 10. **Review lesson_content (singular) table:**
+
     ```sql
     -- Check if still needed
     SELECT COUNT(*) FROM lesson_content;
@@ -522,6 +548,7 @@ Before marking as FIXED, verify:
 **Overall Status:** 🔴 **VERIFICATION FAILED**
 
 **Critical Issues:** 5
+
 - Migration not applied
 - Schema mismatch (missing course_id, metadata)
 - Wrong content type (TEXT vs JSONB)
@@ -529,6 +556,7 @@ Before marking as FIXED, verify:
 - Types out of sync with database
 
 **Recommendation:**
+
 1. Follow Action Plan above to fix ALL issues
 2. Re-run verification after fixes applied
 3. Do NOT merge to production until verification passes

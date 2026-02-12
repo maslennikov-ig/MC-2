@@ -6,6 +6,7 @@
 **Updated:** 2025-12-07
 **Author:** Claude Code
 **Related Documents:**
+
 - [PRD: MegaCampusAI ↔ Open edX Integration](./PRD_MegaCampusAI_OpenEdX_Integration.md)
 - [ADR-001: Choice of Open edX as Primary LMS](./ADR-XXX-Choice-of-Open-edX-as-Primary-LMS.md)
 - [Deep Research: Open edX API and OLX](./Open%20edX%20API%20and%20OLX%20Research.md)
@@ -18,6 +19,7 @@
 This specification defines the technical implementation of the **LMS Integration** module for MegaCampusAI. The initial target is Open edX, but the architecture is designed to support multiple LMS backends in the future (Moodle, Canvas, custom systems).
 
 **Key Features:**
+
 1. Converting AI-generated course content into LMS-specific formats (OLX for Open edX)
 2. Packaging and uploading courses via LMS APIs
 3. Synchronizing course metadata and permissions
@@ -26,6 +28,7 @@ This specification defines the technical implementation of the **LMS Integration
 **Target Package:** `packages/lms-integration/`
 
 **Design Principles:**
+
 - **LMS-agnostic interfaces** — abstract base classes for future LMS support
 - **Reuse existing components** — pino logger, error handling patterns, auth middleware
 - **Production-ready** — comprehensive validation, retry logic, monitoring
@@ -36,22 +39,23 @@ This specification defines the technical implementation of the **LMS Integration
 
 ### 2.1 In Scope (Production)
 
-| Component | Description |
-|-----------|-------------|
-| **LMS Adapter Interface** | Abstract interface for LMS-agnostic operations |
-| **Open edX Adapter** | Concrete implementation for Open edX (OLX + Import API) |
-| **OLX Generator** | Convert Stage 5 JSON → OLX directory structure |
-| **OLX Packager** | Create valid tar.gz from OLX directory |
-| **API Client** | OAuth2 authentication + Course Import API |
-| **Transliteration** | Cyrillic → ASCII for `url_name` attributes |
-| **Validation** | Pre-packaging OLX validation |
-| **Logging** | Pino-based structured logging (reuse from course-gen-platform) |
-| **Error Handling** | Consistent error types with DB logging |
-| **Unit Tests** | 100% coverage for core functions |
-| **Integration Tests** | Mocked API client tests |
-| **E2E Tests** | Full pipeline with real Open edX (CI optional) |
+| Component                 | Description                                                    |
+| ------------------------- | -------------------------------------------------------------- |
+| **LMS Adapter Interface** | Abstract interface for LMS-agnostic operations                 |
+| **Open edX Adapter**      | Concrete implementation for Open edX (OLX + Import API)        |
+| **OLX Generator**         | Convert Stage 5 JSON → OLX directory structure                 |
+| **OLX Packager**          | Create valid tar.gz from OLX directory                         |
+| **API Client**            | OAuth2 authentication + Course Import API                      |
+| **Transliteration**       | Cyrillic → ASCII for `url_name` attributes                     |
+| **Validation**            | Pre-packaging OLX validation                                   |
+| **Logging**               | Pino-based structured logging (reuse from course-gen-platform) |
+| **Error Handling**        | Consistent error types with DB logging                         |
+| **Unit Tests**            | 100% coverage for core functions                               |
+| **Integration Tests**     | Mocked API client tests                                        |
+| **E2E Tests**             | Full pipeline with real Open edX (CI optional)                 |
 
 **Supported OLX Elements:**
+
 - Course Shell (metadata, policies)
 - Chapters (course sections)
 - Sequentials (subsections)
@@ -183,11 +187,15 @@ packages/lms-integration/
 ```typescript
 // packages/lms-integration/src/logger.ts
 export { logger } from '@megacampus/course-gen-platform/shared/logger';
-export type { ErrorSeverity, CreateErrorLogParams } from '@megacampus/course-gen-platform/shared/logger';
+export type {
+  ErrorSeverity,
+  CreateErrorLogParams,
+} from '@megacampus/course-gen-platform/shared/logger';
 export { logPermanentFailure } from '@megacampus/course-gen-platform/shared/logger';
 ```
 
 **Usage:**
+
 ```typescript
 import { logger, logPermanentFailure } from './logger';
 
@@ -199,17 +207,19 @@ await logPermanentFailure({
   error_message: 'LMS import failed after 3 retries',
   severity: 'ERROR',
   job_type: 'LMS_IMPORT',
-  metadata: { lmsType: 'openedx', courseKey }
+  metadata: { lmsType: 'openedx', courseKey },
 });
 ```
 
 ### 4.2 Authentication & Authorization
 
 **Current System (from course-gen-platform):**
+
 - Roles: `superadmin` | `admin` | `instructor` | `student`
 - Middleware: `isAuthenticated`, `hasRole()`, `requireInstructor`
 
 **LMS Integration Permissions:**
+
 - **Publish Course:** `requireInstructor` (instructor, admin, superadmin)
 - **View Import Status:** `requireInstructor`
 - **Delete Course from LMS:** `requireAdmin` (admin, superadmin)
@@ -561,41 +571,50 @@ export class OpenEdXAdapter extends LMSAdapter<OpenEdXConfig> {
   async publishCourse(input: CourseInput): Promise<PublishResult> {
     const startTime = Date.now();
 
-    logger.info({
-      courseId: input.courseId,
-      org: input.org,
-      run: input.run,
-    }, 'Starting Open edX course publish');
+    logger.info(
+      {
+        courseId: input.courseId,
+        org: input.org,
+        run: input.run,
+      },
+      'Starting Open edX course publish'
+    );
 
     try {
       // 1. Generate OLX structure
       const structure = this.generator.generate(input);
 
-      logger.debug({
-        courseKey: structure.courseKey,
-        ...structure.metadata,
-      }, 'OLX structure generated');
+      logger.debug(
+        {
+          courseKey: structure.courseKey,
+          ...structure.metadata,
+        },
+        'OLX structure generated'
+      );
 
       // 2. Package as tar.gz
       const tarGz = await packageOLX(structure, input.courseId);
 
-      logger.debug({
-        packageSize: tarGz.length,
-      }, 'OLX package created');
+      logger.debug(
+        {
+          packageSize: tarGz.length,
+        },
+        'OLX package created'
+      );
 
       // 3. Upload to Open edX
-      const importResult = await this.client.importCourse(
-        structure.courseKey,
-        tarGz
-      );
+      const importResult = await this.client.importCourse(structure.courseKey, tarGz);
 
       const duration = Date.now() - startTime;
 
-      logger.info({
-        courseKey: structure.courseKey,
-        taskId: importResult.taskId,
-        duration,
-      }, 'Course published to Open edX successfully');
+      logger.info(
+        {
+          courseKey: structure.courseKey,
+          taskId: importResult.taskId,
+          duration,
+        },
+        'Course published to Open edX successfully'
+      );
 
       return {
         success: true,
@@ -609,11 +628,14 @@ export class OpenEdXAdapter extends LMSAdapter<OpenEdXConfig> {
     } catch (error) {
       const duration = Date.now() - startTime;
 
-      logger.error({
-        courseId: input.courseId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        duration,
-      }, 'Failed to publish course to Open edX');
+      logger.error(
+        {
+          courseId: input.courseId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          duration,
+        },
+        'Failed to publish course to Open edX'
+      );
 
       throw error;
     }
@@ -648,6 +670,7 @@ export class OpenEdXAdapter extends LMSAdapter<OpenEdXConfig> {
 **File:** `src/utils/url-name.ts`
 
 **Requirements:**
+
 - Output must match regex: `^[a-zA-Z0-9_-]+$`
 - Must be unique within element type (tracked via registry)
 - Maximum length: 50 characters
@@ -723,24 +746,82 @@ export class UrlNameRegistry {
  */
 const CYRILLIC_MAP: Record<string, string> = {
   // Lowercase
-  'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd',
-  'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i',
-  'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n',
-  'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
-  'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch',
-  'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '',
-  'э': 'e', 'ю': 'yu', 'я': 'ya',
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'yo',
+  ж: 'zh',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'kh',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'shch',
+  ъ: '',
+  ы: 'y',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya',
   // Uppercase
-  'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D',
-  'Е': 'E', 'Ё': 'Yo', 'Ж': 'Zh', 'З': 'Z', 'И': 'I',
-  'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N',
-  'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
-  'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch',
-  'Ш': 'Sh', 'Щ': 'Shch', 'Ъ': '', 'Ы': 'Y', 'Ь': '',
-  'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya',
+  А: 'A',
+  Б: 'B',
+  В: 'V',
+  Г: 'G',
+  Д: 'D',
+  Е: 'E',
+  Ё: 'Yo',
+  Ж: 'Zh',
+  З: 'Z',
+  И: 'I',
+  Й: 'Y',
+  К: 'K',
+  Л: 'L',
+  М: 'M',
+  Н: 'N',
+  О: 'O',
+  П: 'P',
+  Р: 'R',
+  С: 'S',
+  Т: 'T',
+  У: 'U',
+  Ф: 'F',
+  Х: 'Kh',
+  Ц: 'Ts',
+  Ч: 'Ch',
+  Ш: 'Sh',
+  Щ: 'Shch',
+  Ъ: '',
+  Ы: 'Y',
+  Ь: '',
+  Э: 'E',
+  Ю: 'Yu',
+  Я: 'Ya',
   // Ukrainian specific
-  'і': 'i', 'І': 'I', 'ї': 'yi', 'Ї': 'Yi',
-  'є': 'ye', 'Є': 'Ye', 'ґ': 'g', 'Ґ': 'G',
+  і: 'i',
+  І: 'I',
+  ї: 'yi',
+  Ї: 'Yi',
+  є: 'ye',
+  Є: 'Ye',
+  ґ: 'g',
+  Ґ: 'G',
 };
 
 /**
@@ -820,30 +901,18 @@ export class OLXGenerator {
           );
 
           // Add HTML XML pointer
-          files.set(
-            `html/${htmlUrlName}.xml`,
-            generateHtmlXml(unit.title, htmlUrlName)
-          );
+          files.set(`html/${htmlUrlName}.xml`, generateHtmlXml(unit.title, htmlUrlName));
 
           // Add HTML content
-          files.set(
-            `html/${htmlUrlName}.html`,
-            generateHtmlContent(unit.content)
-          );
+          files.set(`html/${htmlUrlName}.html`, generateHtmlContent(unit.content));
         }
 
         // Add sequential XML
-        files.set(
-          `sequential/${seqUrlName}.xml`,
-          generateSequentialXml(section.title, unitRefs)
-        );
+        files.set(`sequential/${seqUrlName}.xml`, generateSequentialXml(section.title, unitRefs));
       }
 
       // Add chapter XML
-      files.set(
-        `chapter/${chapterUrlName}.xml`,
-        generateChapterXml(chapter.title, sectionRefs)
-      );
+      files.set(`chapter/${chapterUrlName}.xml`, generateChapterXml(chapter.title, sectionRefs));
     }
 
     // Add policies
@@ -898,13 +967,8 @@ interface ChapterRef {
   displayName: string;
 }
 
-export function generateCourseXml(
-  input: CourseInput,
-  chapters: ChapterRef[]
-): string {
-  const chapterElements = chapters
-    .map(ch => `    <chapter url_name="${ch.urlName}"/>`)
-    .join('\n');
+export function generateCourseXml(input: CourseInput, chapters: ChapterRef[]): string {
+  const chapterElements = chapters.map(ch => `    <chapter url_name="${ch.urlName}"/>`).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <course
@@ -933,13 +997,8 @@ interface SequentialRef {
   urlName: string;
 }
 
-export function generateChapterXml(
-  title: string,
-  sequentials: SequentialRef[]
-): string {
-  const seqElements = sequentials
-    .map(s => `    <sequential url_name="${s.urlName}"/>`)
-    .join('\n');
+export function generateChapterXml(title: string, sequentials: SequentialRef[]): string {
+  const seqElements = sequentials.map(s => `    <sequential url_name="${s.urlName}"/>`).join('\n');
 
   return `<chapter display_name="${escapeXml(title)}">
 ${seqElements}
@@ -958,13 +1017,8 @@ interface VerticalRef {
   urlName: string;
 }
 
-export function generateSequentialXml(
-  title: string,
-  verticals: VerticalRef[]
-): string {
-  const vertElements = verticals
-    .map(v => `    <vertical url_name="${v.urlName}"/>`)
-    .join('\n');
+export function generateSequentialXml(title: string, verticals: VerticalRef[]): string {
+  const vertElements = verticals.map(v => `    <vertical url_name="${v.urlName}"/>`).join('\n');
 
   return `<sequential display_name="${escapeXml(title)}">
 ${vertElements}
@@ -983,13 +1037,8 @@ interface HtmlRef {
   urlName: string;
 }
 
-export function generateVerticalXml(
-  title: string,
-  htmlComponents: HtmlRef[]
-): string {
-  const htmlElements = htmlComponents
-    .map(h => `    <html url_name="${h.urlName}"/>`)
-    .join('\n');
+export function generateVerticalXml(title: string, htmlComponents: HtmlRef[]): string {
+  const htmlElements = htmlComponents.map(h => `    <html url_name="${h.urlName}"/>`).join('\n');
 
   return `<vertical display_name="${escapeXml(title)}">
 ${htmlElements}
@@ -1023,10 +1072,7 @@ export function generateHtmlContent(content: string): string {
 import archiver from 'archiver';
 import { OLXStructure } from './types';
 
-export async function packageOLX(
-  structure: OLXStructure,
-  courseName: string
-): Promise<Buffer> {
+export async function packageOLX(structure: OLXStructure, courseName: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const archive = archiver('tar', { gzip: true });
     const chunks: Buffer[] = [];
@@ -1037,13 +1083,13 @@ export async function packageOLX(
 
     // Add course.xml at root of course directory
     archive.append(structure.courseXml, {
-      name: `${courseName}/course.xml`
+      name: `${courseName}/course.xml`,
     });
 
     // Add all other files
     for (const [path, content] of structure.files) {
       archive.append(content, {
-        name: `${courseName}/${path}`
+        name: `${courseName}/${path}`,
       });
     }
 
@@ -1196,11 +1242,7 @@ export class OpenEdXClient {
       await new Promise(resolve => setTimeout(resolve, this.config.pollInterval));
     }
 
-    throw new OpenEdXImportError(
-      `Import timed out after ${maxWait}ms`,
-      taskId,
-      'Pending'
-    );
+    throw new OpenEdXImportError(`Import timed out after ${maxWait}ms`, taskId, 'Pending');
   }
 
   /**
@@ -1330,7 +1372,11 @@ export class NetworkError extends LMSIntegrationError {
  * Timeout error
  */
 export class TimeoutError extends LMSIntegrationError {
-  constructor(message: string, lmsType: string, public readonly duration: number) {
+  constructor(
+    message: string,
+    lmsType: string,
+    public readonly duration: number
+  ) {
     super(message, 'TIMEOUT_ERROR', lmsType);
   }
 }
@@ -1338,14 +1384,14 @@ export class TimeoutError extends LMSIntegrationError {
 
 ### 8.2 Error Codes
 
-| Code | Description | HTTP | Recovery |
-|------|-------------|------|----------|
-| `OLX_VALIDATION_ERROR` | Invalid OLX structure | 400 | Fix input data |
-| `AUTH_ERROR` | OAuth2 authentication failed | 401 | Check credentials |
-| `IMPORT_ERROR` | Course import failed | 500 | Check error details |
-| `NETWORK_ERROR` | Connection failed | 503 | Retry with backoff |
-| `TIMEOUT_ERROR` | Import timed out | 504 | Increase timeout |
-| `PERMISSION_ERROR` | Insufficient permissions | 403 | Check LMS user roles |
+| Code                   | Description                  | HTTP | Recovery             |
+| ---------------------- | ---------------------------- | ---- | -------------------- |
+| `OLX_VALIDATION_ERROR` | Invalid OLX structure        | 400  | Fix input data       |
+| `AUTH_ERROR`           | OAuth2 authentication failed | 401  | Check credentials    |
+| `IMPORT_ERROR`         | Course import failed         | 500  | Check error details  |
+| `NETWORK_ERROR`        | Connection failed            | 503  | Retry with backoff   |
+| `TIMEOUT_ERROR`        | Import timed out             | 504  | Increase timeout     |
+| `PERMISSION_ERROR`     | Insufficient permissions     | 403  | Check LMS user roles |
 
 ---
 
@@ -1472,7 +1518,11 @@ function findBrokenImageRefs(html: string): string[] {
   while ((match = regex.exec(html)) !== null) {
     const src = match[1];
     // Check for relative paths that won't work in Open edX
-    if (src.startsWith('./') || src.startsWith('../') || (!src.startsWith('http') && !src.startsWith('/static/'))) {
+    if (
+      src.startsWith('./') ||
+      src.startsWith('../') ||
+      (!src.startsWith('http') && !src.startsWith('/static/'))
+    ) {
       broken.push(src);
     }
   }
@@ -1493,12 +1543,7 @@ export { LMSAdapter, PublishResult, CourseStatus } from './adapters/base';
 export { OpenEdXAdapter } from './adapters/openedx/adapter';
 
 // Types
-export type {
-  CourseInput,
-  ChapterInput,
-  SectionInput,
-  UnitInput,
-} from './types/course-input';
+export type { CourseInput, ChapterInput, SectionInput, UnitInput } from './types/course-input';
 export {
   CourseInputSchema,
   ChapterInputSchema,
@@ -1553,40 +1598,40 @@ export async function publishCourse(
 
 ### 11.1 Unit Tests
 
-| Test File | Coverage |
-|-----------|----------|
-| `transliterate.test.ts` | All Cyrillic characters, Ukrainian, edge cases |
-| `url-name.test.ts` | Generation, uniqueness, registry, length limits |
-| `validators.test.ts` | All validation rules, error messages |
-| `templates/*.test.ts` | XML generation for all element types |
-| `olx-generator.test.ts` | Full generation pipeline |
+| Test File               | Coverage                                        |
+| ----------------------- | ----------------------------------------------- |
+| `transliterate.test.ts` | All Cyrillic characters, Ukrainian, edge cases  |
+| `url-name.test.ts`      | Generation, uniqueness, registry, length limits |
+| `validators.test.ts`    | All validation rules, error messages            |
+| `templates/*.test.ts`   | XML generation for all element types            |
+| `olx-generator.test.ts` | Full generation pipeline                        |
 
 ### 11.2 Integration Tests
 
-| Test File | Coverage |
-|-----------|----------|
-| `api-client.test.ts` | Mocked HTTP, auth flow, error handling |
-| `full-pipeline.test.ts` | JSON → OLX → tar.gz (in-memory) |
+| Test File               | Coverage                               |
+| ----------------------- | -------------------------------------- |
+| `api-client.test.ts`    | Mocked HTTP, auth flow, error handling |
+| `full-pipeline.test.ts` | JSON → OLX → tar.gz (in-memory)        |
 
 ### 11.3 E2E Tests
 
-| Test File | Coverage |
-|-----------|----------|
+| Test File                | Coverage                             |
+| ------------------------ | ------------------------------------ |
 | `openedx-import.test.ts` | Real Open edX instance (CI optional) |
 
 ---
 
 ## 12. Non-Functional Requirements
 
-| ID | Requirement | Target | Measurement |
-|----|-------------|--------|-------------|
-| NFR-001 | OLX generation time (50 units) | <5 seconds | Benchmark test |
-| NFR-002 | Package upload time (5MB) | <10 seconds | Integration test |
-| NFR-003 | End-to-end pipeline | <30 seconds | E2E test |
-| NFR-004 | Retry on failure | 3 attempts with exponential backoff | Config + test |
-| NFR-005 | Pre-packaging validation | Fail fast on errors | Unit tests |
-| NFR-006 | Structured logging | All operations logged | Pino output |
-| NFR-007 | Error persistence | Failed imports logged to DB | Error service |
+| ID      | Requirement                    | Target                              | Measurement      |
+| ------- | ------------------------------ | ----------------------------------- | ---------------- |
+| NFR-001 | OLX generation time (50 units) | <5 seconds                          | Benchmark test   |
+| NFR-002 | Package upload time (5MB)      | <10 seconds                         | Integration test |
+| NFR-003 | End-to-end pipeline            | <30 seconds                         | E2E test         |
+| NFR-004 | Retry on failure               | 3 attempts with exponential backoff | Config + test    |
+| NFR-005 | Pre-packaging validation       | Fail fast on errors                 | Unit tests       |
+| NFR-006 | Structured logging             | All operations logged               | Pino output      |
+| NFR-007 | Error persistence              | Failed imports logged to DB         | Error service    |
 
 ---
 
@@ -1627,16 +1672,16 @@ export async function publishCourse(
 
 ## 14. Risks and Mitigations
 
-| ID | Risk | Probability | Impact | Mitigation |
-|----|------|-------------|--------|------------|
-| R-001 | OLX schema changes in future Open edX releases | Low | High | Pin Tutor version; monitor release notes |
-| R-002 | API rate limiting | Medium | Medium | Exponential backoff; request queuing |
-| R-003 | Cyrillic encoding issues | High | Medium | UTF-8 everywhere; comprehensive transliteration tests |
-| R-004 | Course ID collisions | Medium | Low | Registry-based uniqueness tracking |
-| R-005 | Stage 5 schema changes | High | Medium | Adapter layer to isolate changes |
-| R-006 | Large course packages (>100MB) | Low | High | Size validation; chunking in future |
-| R-007 | Broken static asset references | Medium | Medium | Validation warnings; URL-only references |
-| R-008 | LMS permissions mismatch | Medium | High | Clear error messages; permission docs |
+| ID    | Risk                                           | Probability | Impact | Mitigation                                            |
+| ----- | ---------------------------------------------- | ----------- | ------ | ----------------------------------------------------- |
+| R-001 | OLX schema changes in future Open edX releases | Low         | High   | Pin Tutor version; monitor release notes              |
+| R-002 | API rate limiting                              | Medium      | Medium | Exponential backoff; request queuing                  |
+| R-003 | Cyrillic encoding issues                       | High        | Medium | UTF-8 everywhere; comprehensive transliteration tests |
+| R-004 | Course ID collisions                           | Medium      | Low    | Registry-based uniqueness tracking                    |
+| R-005 | Stage 5 schema changes                         | High        | Medium | Adapter layer to isolate changes                      |
+| R-006 | Large course packages (>100MB)                 | Low         | High   | Size validation; chunking in future                   |
+| R-007 | Broken static asset references                 | Medium      | Medium | Validation warnings; URL-only references              |
+| R-008 | LMS permissions mismatch                       | Medium      | High   | Clear error messages; permission docs                 |
 
 ---
 
@@ -1685,17 +1730,17 @@ export async function publishCourse(
 
 ## 16. Acceptance Criteria
 
-| ID | Criterion | Validation Method |
-|----|-----------|-------------------|
-| AC-001 | Unit test suite passes at 100% | `pnpm test` |
-| AC-002 | Integration tests pass | `pnpm test:integration` |
-| AC-003 | TypeScript strict mode compiles | `pnpm build` |
-| AC-004 | README contains usage examples | Manual review |
-| AC-005 | Cyrillic content generates valid OLX | Fixture tests |
-| AC-006 | Generated OLX imports via Studio UI | Manual E2E test |
-| AC-007 | Performance meets NFRs | Benchmark tests |
-| AC-008 | Errors logged to database | Error service test |
-| AC-009 | Adapter interface supports future LMS | Code review |
+| ID     | Criterion                             | Validation Method       |
+| ------ | ------------------------------------- | ----------------------- |
+| AC-001 | Unit test suite passes at 100%        | `pnpm test`             |
+| AC-002 | Integration tests pass                | `pnpm test:integration` |
+| AC-003 | TypeScript strict mode compiles       | `pnpm build`            |
+| AC-004 | README contains usage examples        | Manual review           |
+| AC-005 | Cyrillic content generates valid OLX  | Fixture tests           |
+| AC-006 | Generated OLX imports via Studio UI   | Manual E2E test         |
+| AC-007 | Performance meets NFRs                | Benchmark tests         |
+| AC-008 | Errors logged to database             | Error service test      |
+| AC-009 | Adapter interface supports future LMS | Code review             |
 
 ---
 
@@ -1719,11 +1764,7 @@ Post-production features for consideration:
 ## Appendix A: Sample Usage
 
 ```typescript
-import {
-  publishCourse,
-  CourseInput,
-  OpenEdXConfig,
-} from '@megacampus/lms-integration';
+import { publishCourse, CourseInput, OpenEdXConfig } from '@megacampus/lms-integration';
 
 const config: OpenEdXConfig = {
   instanceId: 'prod-openedx-1',
@@ -1810,41 +1851,42 @@ OPENEDX_MAX_RETRIES=3
 
 ## Appendix C: Permissions Matrix
 
-| Operation | Required Role | Notes |
-|-----------|---------------|-------|
-| Publish Course | `instructor` | Instructors can publish own courses |
-| View Import Status | `instructor` | Can view status of own imports |
-| Delete from LMS | `admin` | Org admins can delete any course |
-| Configure LMS Connection | `superadmin` | Platform-level configuration |
-| Bulk Import | `admin` | Batch operations require admin |
+| Operation                | Required Role | Notes                               |
+| ------------------------ | ------------- | ----------------------------------- |
+| Publish Course           | `instructor`  | Instructors can publish own courses |
+| View Import Status       | `instructor`  | Can view status of own imports      |
+| Delete from LMS          | `admin`       | Org admins can delete any course    |
+| Configure LMS Connection | `superadmin`  | Platform-level configuration        |
+| Bulk Import              | `admin`       | Batch operations require admin      |
 
 ---
 
 ## Appendix D: Glossary
 
-| Term | Definition |
-|------|------------|
-| **OLX** | Open Learning XML — Open edX's native course format |
-| **CMS** | Content Management System (Studio) — authoring interface |
-| **LMS** | Learning Management System — student-facing interface |
-| **Tutor** | Official Docker-based deployment tool for Open edX |
-| **Chapter** | Top-level course section (Week 1, Module 1) |
-| **Sequential** | Subsection within a chapter (Lesson, Topic) |
-| **Vertical** | Single learning unit (page with components) |
-| **Component** | Individual content block (HTML, Video, Problem) |
-| **url_name** | ASCII identifier used in URLs and file names |
-| **Course Key** | Unique identifier: `course-v1:Org+Course+Run` |
-| **Adapter** | Implementation of LMS-specific publishing logic |
+| Term           | Definition                                               |
+| -------------- | -------------------------------------------------------- |
+| **OLX**        | Open Learning XML — Open edX's native course format      |
+| **CMS**        | Content Management System (Studio) — authoring interface |
+| **LMS**        | Learning Management System — student-facing interface    |
+| **Tutor**      | Official Docker-based deployment tool for Open edX       |
+| **Chapter**    | Top-level course section (Week 1, Module 1)              |
+| **Sequential** | Subsection within a chapter (Lesson, Topic)              |
+| **Vertical**   | Single learning unit (page with components)              |
+| **Component**  | Individual content block (HTML, Video, Problem)          |
+| **url_name**   | ASCII identifier used in URLs and file names             |
+| **Course Key** | Unique identifier: `course-v1:Org+Course+Run`            |
+| **Adapter**    | Implementation of LMS-specific publishing logic          |
 
 ---
 
 **Document Status:** Ready for Review
 **Next Steps:**
+
 1. Review and approve specification
 2. Wait for Stage 5 JSON schema stabilization
 3. Begin implementation per Phase 1
 
 ---
 
-*Generated for MegaCampusAI Project*
-*Spec-Driven Development Framework*
+_Generated for MegaCampusAI Project_
+_Spec-Driven Development Framework_

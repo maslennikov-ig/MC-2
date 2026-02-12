@@ -25,6 +25,7 @@ previous_investigations:
 ### Problem Identified
 
 **RT-006 validation fails** with errors like:
+
 ```
 Invalid Bloom's taxonomy verb "применять" in language ru
 Invalid Bloom's taxonomy verb "оценивать" in language ru
@@ -37,11 +38,13 @@ Invalid Bloom's taxonomy verb "оценивать" in language ru
 The RT-006 validator is checking the **`text` field** of learning objectives for Bloom's taxonomy verbs, but it **SHOULD be checking the `cognitiveLevel` enum field** instead.
 
 **What's happening**:
+
 - Validator extracts first verb from `obj.text` (Russian: "применять", "оценивать")
 - Validator checks if this Russian verb is in English Bloom's whitelist
 - Validator fails because Russian verbs are in `obj.text`, not in `cognitiveLevel`
 
 **What should happen**:
+
 - Validator should check `obj.cognitiveLevel` enum ("apply", "evaluate", "create", etc.)
 - Enum field contains English Bloom's level, always valid
 - `obj.text` field can contain ANY language (Russian, English, Chinese, etc.)
@@ -57,12 +60,14 @@ The RT-006 validator is checking the **`text` field** of learning objectives for
 From test execution and user's description:
 
 **Validation Error**:
+
 ```
 Invalid Bloom's taxonomy verb "применять" in language ru
 Invalid Bloom's taxonomy verb "оценивать" in language ru
 ```
 
 **Current Schema Structure** (CORRECT):
+
 ```typescript
 {
   id: "550e8400-e29b-41d4-a716-446655440000",
@@ -75,6 +80,7 @@ Invalid Bloom's taxonomy verb "оценивать" in language ru
 ```
 
 **What RT-006 Validator Currently Does** (WRONG):
+
 1. Extracts action verb from `obj.text`: "применять" (Russian)
 2. Calls `isBloomsVerb("применять", "ru")`
 3. Checks if "применять" exists in `BLOOMS_TAXONOMY_WHITELIST.ru`
@@ -85,6 +91,7 @@ Invalid Bloom's taxonomy verb "оценивать" in language ru
 ### Expected Behavior
 
 **What RT-006 Validator SHOULD Do**:
+
 1. Check that `obj.cognitiveLevel` is a valid Bloom's enum
    - Valid values: "remember", "understand", "apply", "analyze", "evaluate", "create"
    - This is already enforced by Zod enum: `BloomCognitiveLevelSchema`
@@ -92,6 +99,7 @@ Invalid Bloom's taxonomy verb "оценивать" in language ru
 3. Do NOT reject valid objectives just because `text` field contains non-English verbs
 
 **Correct validation logic**:
+
 - `cognitiveLevel` field: MUST be English enum (already enforced by Zod)
 - `text` field: CAN be in any language (no Bloom's verb validation needed)
 - `language` field: Indicates language of `text` field
@@ -126,27 +134,33 @@ Invalid Bloom's taxonomy verb "оценивать" in language ru
 **Key Findings from Project Documentation**:
 
 **Finding 1: Schema Design** (generation-result.ts:415-433)
+
 ```typescript
 export const LearningObjectiveSchema = z.object({
   id: z.string().uuid(),
-  text: z.string()
+  text: z
+    .string()
     .min(10, 'Learning objective too short (min 10 chars)')
     .max(500, 'Learning objective too long (max 500 chars)'),
-  language: SupportedLanguageSchema.describe('Language for Bloom\'s taxonomy validation (19 languages supported)'),
-  cognitiveLevel: BloomCognitiveLevelSchema
-    .optional()
-    .describe('Bloom\'s taxonomy cognitive level (auto-detected from action verb)'),
+  language: SupportedLanguageSchema.describe(
+    "Language for Bloom's taxonomy validation (19 languages supported)"
+  ),
+  cognitiveLevel: BloomCognitiveLevelSchema.optional().describe(
+    "Bloom's taxonomy cognitive level (auto-detected from action verb)"
+  ),
   // ... other fields
-})
+});
 ```
 
 **Key observations**:
+
 - `text` field: String (10-500 chars) - CAN be in ANY language
 - `language` field: Enum ("ru", "en", etc.) - Indicates language of `text`
 - `cognitiveLevel` field: **Optional** enum - ALWAYS English when present
 - Comment says: "auto-detected from action verb" - suggests field should be derived from `text`
 
 **Finding 2: Validator Implementation** (generation-result.ts:440-445)
+
 ```typescript
 .refine(
   (obj) => isBloomsVerb(extractActionVerb(obj.text, obj.language), obj.language),
@@ -157,12 +171,14 @@ export const LearningObjectiveSchema = z.object({
 ```
 
 **BUG IDENTIFIED**:
+
 - Validator extracts verb from `obj.text` (Russian: "применять")
 - Checks if Russian verb is in Russian Bloom's whitelist
 - **Problem**: This validation is WRONG for objectives with `cognitiveLevel` field
 - **Correct approach**: If `cognitiveLevel` exists, validate that field; otherwise validate `text`
 
 **Finding 3: Helper Function** (generation-result.ts:178-187)
+
 ```typescript
 function extractActionVerb(text: string, language: string): string {
   const tokens = text.trim().toLowerCase().split(/\s+/);
@@ -175,12 +191,14 @@ function extractActionVerb(text: string, language: string): string {
 ```
 
 **Analysis**:
+
 - Function extracts first token from `text` field
 - For Russian: removes reflexive ending "ся"
 - Returns extracted verb for validation
 - **Issue**: This is appropriate for TEXT validation, not for ENUM validation
 
 **Finding 4: Bloom's Whitelist** (generation-result.ts:110-118, rt-006 spec:100-149)
+
 ```typescript
 const BLOOMS_TAXONOMY_WHITELIST = {
   en: {
@@ -203,6 +221,7 @@ const BLOOMS_TAXONOMY_WHITELIST = {
 ```
 
 **Analysis**:
+
 - Whitelist contains 165 verbs (87 EN + 78 RU)
 - Russian "применять" is NOT in whitelist (whitelist has "использовать", "продемонстрировать")
 - **But**: If `cognitiveLevel: "apply"` exists, whitelist check is UNNECESSARY
@@ -211,6 +230,7 @@ const BLOOMS_TAXONOMY_WHITELIST = {
 **Finding 5: Spec Documentation** (rt-006 spec:150-174)
 
 **Quote from RT-006 spec (lines 150-174)**:
+
 ```typescript
 function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult {
   const verb = extractActionVerb(objective.text, objective.language);
@@ -221,9 +241,9 @@ function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult 
     if (verbs.includes(verb.toLowerCase())) {
       return {
         passed: true,
-        cognitiveLevel: level as BloomLevel,  // ← Returns detected level
+        cognitiveLevel: level as BloomLevel, // ← Returns detected level
         verb,
-        score: 1.0
+        score: 1.0,
       };
     }
   }
@@ -233,13 +253,16 @@ function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult 
     cognitiveLevel: null,
     verb,
     score: 0.0,
-    issues: [`Action verb "${verb}" not found in Bloom's taxonomy whitelist for ${objective.language}`],
-    suggestion: suggestAlternativeVerb(verb, objective.language)
+    issues: [
+      `Action verb "${verb}" not found in Bloom's taxonomy whitelist for ${objective.language}`,
+    ],
+    suggestion: suggestAlternativeVerb(verb, objective.language),
   };
 }
 ```
 
 **Key insight from spec**:
+
 - Spec's `validateBloomsTaxonomy()` function **detects and returns** `cognitiveLevel`
 - This suggests the validator's PURPOSE is to **populate** `cognitiveLevel` field
 - Current implementation in Zod schema does NOT populate field, only validates
@@ -252,6 +275,7 @@ function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult 
 **Evidence**: generation-result.ts lines 440-445
 
 **Current code**:
+
 ```typescript
 .refine(
   (obj) => isBloomsVerb(extractActionVerb(obj.text, obj.language), obj.language),
@@ -263,16 +287,19 @@ function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult 
 ```
 
 **What this does**:
+
 1. `extractActionVerb(obj.text, obj.language)` → extracts "применять" from Russian text
 2. `isBloomsVerb("применять", "ru")` → checks if "применять" is in Russian whitelist
 3. Fails because "применять" is not in whitelist (whitelist has different Russian verbs)
 
 **Why this is wrong**:
+
 - `obj.text` can contain ANY Russian verb, not just whitelisted ones
 - `obj.cognitiveLevel` already specifies the Bloom's level ("apply")
 - Validator should check `cognitiveLevel` enum, not extract verb from `text`
 
 **Correct approach**:
+
 ```typescript
 .refine(
   (obj) => {
@@ -296,11 +323,13 @@ function validateBloomsTaxonomy(objective: LearningObjective): ValidationResult 
 **Evidence**: generation-result.ts lines 110-118
 
 **Russian "apply" verbs in whitelist**:
+
 ```typescript
 apply: ['выполнить', 'реализовать', 'решить', 'использовать', 'продемонстрировать', 'оперировать', 'вычислить', 'завершить', 'показать', 'исследовать', 'модифицировать'],
 ```
 
 **Analysis**:
+
 - Whitelist contains 11 Russian verbs for "apply" level
 - "применять" is NOT in this list
 - **But**: "применять" is a valid Russian verb meaning "to apply"
@@ -313,6 +342,7 @@ apply: ['выполнить', 'реализовать', 'решить', 'исп�
 **Evidence**: Schema design, spec documentation
 
 **Schema comment** (line 421-423):
+
 ```typescript
 cognitiveLevel: BloomCognitiveLevelSchema
   .optional()
@@ -322,11 +352,13 @@ cognitiveLevel: BloomCognitiveLevelSchema
 **Key phrase**: "auto-detected from action verb"
 
 **Interpretation**:
+
 - If `cognitiveLevel` is provided: field is EXPLICIT, no auto-detection needed
 - If `cognitiveLevel` is missing: validator should DETECT from `text` field
 - Current validator ALWAYS validates `text`, even when `cognitiveLevel` is set
 
 **Correct logic**:
+
 ```typescript
 if (obj.cognitiveLevel) {
   // Cognitive level explicitly set → trust it (already validated by Zod enum)
@@ -342,16 +374,19 @@ if (obj.cognitiveLevel) {
 **Evidence**: RT-006 spec lines 150-174 vs generation-result.ts lines 440-445
 
 **Spec's validator** (lines 150-174):
+
 - **Purpose**: Detect and RETURN `cognitiveLevel` from text
 - **Return type**: `ValidationResult` with `cognitiveLevel` field
 - **Behavior**: Extracts verb, finds level, returns level
 
 **Zod implementation** (lines 440-445):
+
 - **Purpose**: Validate that text contains Bloom's verb
 - **Return type**: Boolean (pass/fail for Zod refine)
 - **Behavior**: Extracts verb, checks whitelist, returns true/false
 
 **Divergence**:
+
 - Spec assumes validator POPULATES `cognitiveLevel` field
 - Zod implementation only VALIDATES, doesn't populate
 - **Result**: Zod validator rejects valid objectives with explicit `cognitiveLevel`
@@ -369,6 +404,7 @@ if (obj.cognitiveLevel) {
 **Mechanism of Failure**:
 
 **Step 1: Learning Objective Created** (with correct schema)
+
 ```typescript
 {
   id: "550e8400-e29b-41d4-a716-446655440000",
@@ -381,6 +417,7 @@ if (obj.cognitiveLevel) {
 ```
 
 **Step 2: Zod Validation Runs** (generation-result.ts:440-445)
+
 ```typescript
 .refine(
   (obj) => isBloomsVerb(extractActionVerb(obj.text, obj.language), obj.language),
@@ -391,26 +428,30 @@ if (obj.cognitiveLevel) {
 ```
 
 **Step 3: extractActionVerb Called** (lines 178-187)
+
 ```typescript
-extractActionVerb("Применять методы продаж...", "ru")
+extractActionVerb('Применять методы продаж...', 'ru');
 // Splits: ["применять", "методы", "продаж", ...]
 // Returns: "применять" (first token, reflexive ending removed)
 ```
 
 **Step 4: isBloomsVerb Called** (lines 220-232)
+
 ```typescript
-isBloomsVerb("применять", "ru")
+isBloomsVerb('применять', 'ru');
 // Gets whitelist: BLOOMS_TAXONOMY_WHITELIST.ru
 // Checks: if "применять" exists in any level's verbs
 // Returns: FALSE (whitelist has: "выполнить", "реализовать", "использовать", etc.)
 ```
 
 **Step 5: Validation Fails**
+
 ```typescript
-message: `Invalid Bloom's taxonomy verb "применять" in language ru`
+message: `Invalid Bloom's taxonomy verb "применять" in language ru`;
 ```
 
 **Step 6: Objective Rejected** (even though it's valid!)
+
 - `cognitiveLevel: "apply"` is correct ✅
 - `text` field contains valid Russian sentence ✅
 - **But**: Validator rejects because "применять" not in whitelist ❌
@@ -438,6 +479,7 @@ message: `Invalid Bloom's taxonomy verb "применять" in language ru`
    - **Gap**: No mechanism to populate `cognitiveLevel` from `text` in Zod schema
 
 **Evidence**:
+
 - **Bug location**: packages/shared-types/src/generation-result.ts lines 440-445
 - **Whitelist**: lines 101-118 (Russian "apply" doesn't include "применять")
 - **Spec**: rt-006-bloom-taxonomy-validation.md lines 150-174
@@ -458,6 +500,7 @@ message: `Invalid Bloom's taxonomy verb "применять" in language ru`
 **File**: `packages/shared-types/src/generation-result.ts`
 
 **Change lines 440-445 from**:
+
 ```typescript
 .refine(
   (obj) => isBloomsVerb(extractActionVerb(obj.text, obj.language), obj.language),
@@ -468,6 +511,7 @@ message: `Invalid Bloom's taxonomy verb "применять" in language ru`
 ```
 
 **To**:
+
 ```typescript
 .refine(
   (obj) => {
@@ -486,6 +530,7 @@ message: `Invalid Bloom's taxonomy verb "применять" in language ru`
 ```
 
 **Pros**:
+
 - **Fixes bug** (no more false positives for objectives with `cognitiveLevel`)
 - **Minimal code change** (5 lines in 1 file)
 - **Backward compatible** (still validates `text` when `cognitiveLevel` missing)
@@ -493,6 +538,7 @@ message: `Invalid Bloom's taxonomy verb "применять" in language ru`
 - **Fast to implement** (10 minutes)
 
 **Cons**:
+
 - Allows objectives with `cognitiveLevel` set but non-Bloom's verb in `text`
 - Example: `{ text: "Understand concepts", cognitiveLevel: "apply" }` would pass
 - **Mitigation**: Add optional consistency check (Solution 2)
@@ -501,6 +547,7 @@ message: `Invalid Bloom's taxonomy verb "применять" in language ru`
 **Risk**: Very Low (additive logic, no breaking changes)
 
 **Validation**:
+
 ```bash
 # 1. Apply fix
 edit generation-result.ts (lines 440-445)
@@ -523,6 +570,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 **File**: `packages/shared-types/src/generation-result.ts`
 
 **Add after Solution 1**:
+
 ```typescript
 .refine(
   (obj) => {
@@ -562,11 +610,13 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 ```
 
 **Pros**:
+
 - **Detects inconsistencies** (text: "understand", cognitiveLevel: "apply")
 - **Non-blocking** (warning only, doesn't reject valid objectives)
 - **Helpful for debugging** (identifies potential LLM errors)
 
 **Cons**:
+
 - **Adds complexity** (second validation pass)
 - **May have false positives** (synonyms not in whitelist)
 - **Optional feature** (not required for bug fix)
@@ -587,15 +637,17 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 **File**: `packages/shared-types/src/generation-result.ts`
 
 **Add before refinements**:
+
 ```typescript
-export const LearningObjectiveSchema = z.object({
-  id: z.string().uuid(),
-  text: z.string().min(10).max(500),
-  language: SupportedLanguageSchema,
-  cognitiveLevel: BloomCognitiveLevelSchema.optional(),
-  // ... other fields
-})
-  .transform((obj) => {
+export const LearningObjectiveSchema = z
+  .object({
+    id: z.string().uuid(),
+    text: z.string().min(10).max(500),
+    language: SupportedLanguageSchema,
+    cognitiveLevel: BloomCognitiveLevelSchema.optional(),
+    // ... other fields
+  })
+  .transform(obj => {
     // If cognitiveLevel is missing, auto-detect from text
     if (!obj.cognitiveLevel) {
       const verb = extractActionVerb(obj.text, obj.language);
@@ -603,7 +655,9 @@ export const LearningObjectiveSchema = z.object({
 
       if (whitelist) {
         for (const [level, verbs] of Object.entries(whitelist)) {
-          if ((verbs as readonly string[]).some((v: string) => v.toLowerCase() === verb.toLowerCase())) {
+          if (
+            (verbs as readonly string[]).some((v: string) => v.toLowerCase() === verb.toLowerCase())
+          ) {
             obj.cognitiveLevel = level as BloomCognitiveLevel;
             break;
           }
@@ -617,10 +671,12 @@ export const LearningObjectiveSchema = z.object({
 ```
 
 **Pros**:
+
 - **Auto-fills cognitiveLevel** (implements spec's "auto-detected" feature)
 - **Reduces manual work** (LLM doesn't need to provide `cognitiveLevel`)
 
 **Cons**:
+
 - **Changes schema behavior** (output has `cognitiveLevel` even if input doesn't)
 - **Breaking change** (transforms affect downstream code)
 - **Whitelist dependency** (fails for verbs not in whitelist)
@@ -642,6 +698,7 @@ export const LearningObjectiveSchema = z.object({
 **File**: `packages/shared-types/src/generation-result.ts`
 
 **Change lines 110-118**:
+
 ```typescript
 ru: {
   remember: ['определить', 'перечислить', 'вспомнить', ...],
@@ -654,10 +711,12 @@ ru: {
 ```
 
 **Pros**:
+
 - **Fixes immediate errors** ("применять", "оценивать" now pass)
 - **Minimal code change** (add 2 words)
 
 **Cons**:
+
 - **DOESN'T fix root cause** (validator still checks wrong field)
 - **Temporary fix** (other Russian verbs will still fail)
 - **Whitelist maintenance** (endless whack-a-mole with missing verbs)
@@ -681,6 +740,7 @@ ru: {
 **Implementation Steps**:
 
 **1. Edit generation-result.ts** (5 minutes)
+
 ```bash
 # File: packages/shared-types/src/generation-result.ts
 # Lines: 440-445
@@ -688,6 +748,7 @@ ru: {
 ```
 
 **2. Test locally** (5 minutes)
+
 ```bash
 # Type-check
 pnpm --filter @megacampus/shared-types type-check
@@ -697,6 +758,7 @@ pnpm --filter @megacampus/shared-types test
 ```
 
 **3. Run E2E tests** (10 minutes)
+
 ```bash
 # Run T053 test with Russian learning objectives
 pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.ts
@@ -705,6 +767,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 ```
 
 **4. Optional: Add Solution 2** (30 minutes)
+
 ```bash
 # Add consistency check warning
 # Non-blocking, helps identify potential issues
@@ -713,6 +776,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 ### Validation Criteria
 
 **Success Metrics**:
+
 - ✅ No "Invalid Bloom's taxonomy verb" errors for objectives with `cognitiveLevel`
 - ✅ Validation still works for objectives WITHOUT `cognitiveLevel`
 - ✅ T053 E2E test passes (all 4 scenarios)
@@ -722,6 +786,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 **Test Cases**:
 
 **Test 1: Objective with cognitiveLevel (should pass)**
+
 ```typescript
 {
   id: "...",
@@ -735,6 +800,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 ```
 
 **Test 2: Objective without cognitiveLevel (should validate text)**
+
 ```typescript
 {
   id: "...",
@@ -748,6 +814,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 ```
 
 **Test 3: Objective without cognitiveLevel, invalid verb (should fail)**
+
 ```typescript
 {
   id: "...",
@@ -761,6 +828,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 ```
 
 **Test 4: Objective with inconsistent verb and level (optional warning)**
+
 ```typescript
 {
   id: "...",
@@ -776,6 +844,7 @@ pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.
 ### Rollback Plan
 
 **If Solution 1 causes issues**:
+
 ```bash
 # 1. Revert generation-result.ts lines 440-445
 git checkout HEAD -- packages/shared-types/src/generation-result.ts
@@ -796,18 +865,21 @@ pnpm test
 ### Implementation Risks
 
 **Risk 1: Objectives with Inconsistent cognitiveLevel**
+
 - **Concern**: LLM sets `cognitiveLevel: "apply"` but text says "understand concepts"
 - **Likelihood**: Low (LLMs usually consistent)
 - **Impact**: Medium (misleading metadata)
 - **Mitigation**: Implement Solution 2 (consistency warning)
 
 **Risk 2: Legacy Objectives Without cognitiveLevel**
+
 - **Concern**: Existing objectives may not have `cognitiveLevel` field
 - **Likelihood**: Medium (field is optional)
 - **Impact**: Low (validator still checks `text` for these)
 - **Mitigation**: No action needed (backward compatible)
 
 **Risk 3: Whitelist Incomplete for Text-Only Validation**
+
 - **Concern**: Objectives without `cognitiveLevel` fail due to missing verbs in whitelist
 - **Likelihood**: Medium (whitelist has 165 verbs, but Russian language is large)
 - **Impact**: Medium (validation errors for valid objectives)
@@ -816,11 +888,13 @@ pnpm test
 ### Performance Impact
 
 **Solution 1**:
+
 - **Performance**: +1 conditional check (if statement)
 - **Latency**: <0.01ms per objective
 - **Negligible impact**: Validation already iterates over all objectives
 
 **Solution 2**:
+
 - **Performance**: +1 additional refine pass
 - **Latency**: ~0.1-0.5ms per objective (whitelist lookup)
 - **Acceptable**: Non-blocking, runs after main validation
@@ -835,11 +909,13 @@ pnpm test
 ### Side Effects
 
 **Reduced validation strictness**:
+
 - Objectives with `cognitiveLevel` skip `text` validation
 - Allows non-Bloom's verbs in `text` field when `cognitiveLevel` is set
 - **Acceptable**: `cognitiveLevel` is the source of truth, `text` is user-facing description
 
 **Better user experience**:
+
 - Russian/non-English learning objectives no longer rejected
 - LLMs can use natural language without whitelist constraints
 - Metadata generation less brittle
@@ -885,6 +961,7 @@ pnpm test
 **Schema Design Intent**:
 
 From schema comments and spec:
+
 - **Course-level** `learning_outcomes`: Simple strings (no cognitive level)
 - **Section-level** `learning_objectives`: Simple strings (no cognitive level)
 - **Lesson-level** `lesson_objectives`: Simple strings (no cognitive level)
@@ -905,6 +982,7 @@ From schema comments and spec:
 ## MCP Server Usage
 
 **Tools Used**:
+
 - ✅ **Read**: Examined generation-result.ts, rt-006 spec, previous investigation
 - ✅ **Grep**: Searched for "Invalid Bloom's taxonomy verb" error message
 - ✅ **Glob**: Located investigation reports and spec files
@@ -912,6 +990,7 @@ From schema comments and spec:
 - ✅ **TodoWrite**: Tracked investigation phases
 
 **MCP Servers Not Used**:
+
 - ❌ **Supabase MCP**: No database queries needed (schema validation only)
 - ❌ **Sequential Thinking MCP**: Bug sufficiently analyzed through code review
 - ❌ **Context7 MCP**: No external library questions
@@ -928,6 +1007,7 @@ From schema comments and spec:
 **Lines**: 440-445
 
 **Change**:
+
 ```typescript
 // BEFORE
 .refine(
@@ -954,6 +1034,7 @@ From schema comments and spec:
 ```
 
 **Testing**:
+
 ```bash
 # 1. Type-check
 pnpm --filter @megacampus/shared-types type-check
@@ -977,6 +1058,7 @@ Add consistency warning (non-blocking) to help identify potential LLM errors.
 **LOCATION**: `packages/shared-types/src/generation-result.ts` lines 440-445
 
 **IMPACT**: False positive validation errors for learning objectives with:
+
 - Russian text (e.g., "применять", "оценивать")
 - Explicit `cognitiveLevel` set (e.g., "apply", "evaluate")
 
@@ -993,6 +1075,7 @@ Add consistency warning (non-blocking) to help identify potential LLM errors.
 ## Investigation Log
 
 **Timeline**:
+
 ```
 2025-11-16 10:20:00 - Investigation started (INV-2025-11-16-002)
 2025-11-16 10:22:00 - Tier 0: Read generation-result.ts, located bug (lines 440-445)
@@ -1007,6 +1090,7 @@ Add consistency warning (non-blocking) to help identify potential LLM errors.
 ```
 
 **Commands Executed**:
+
 ```bash
 # Get current date
 date '+%Y-%m-%d'

@@ -8,6 +8,7 @@ description: UI design system toolkit for Senior UI Designer including design to
 Professional toolkit for creating and maintaining scalable design systems.
 
 ## Core Capabilities
+
 - Design token generation (colors, typography, spacing)
 - Component system architecture
 - Responsive design calculations
@@ -17,13 +18,16 @@ Professional toolkit for creating and maintaining scalable design systems.
 ## Key Scripts
 
 ### design_token_generator.py
+
 Generates complete design system tokens from brand colors.
 
 **Usage**: `python scripts/design_token_generator.py [brand_color] [style] [format]`
+
 - Styles: modern, classic, playful
 - Formats: json, css, scss
 
 **Features**:
+
 - Complete color palette generation
 - Modular typography scale
 - 8pt spacing grid system

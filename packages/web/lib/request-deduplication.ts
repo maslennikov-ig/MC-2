@@ -25,21 +25,20 @@ class RequestDeduplicator {
     const existingRequest = this.pendingRequests.get(key) as PendingRequest<T> | undefined
 
     // Check if there's an existing request that hasn't expired
-    if (existingRequest && (now - existingRequest.timestamp) < ttl) {
+    if (existingRequest && now - existingRequest.timestamp < ttl) {
       return existingRequest.promise
     }
 
     // Create new request
-    const promise = requestFn()
-      .finally(() => {
-        // Clean up after request completes
-        this.pendingRequests.delete(key)
-      })
+    const promise = requestFn().finally(() => {
+      // Clean up after request completes
+      this.pendingRequests.delete(key)
+    })
 
     // Store the pending request
     this.pendingRequests.set(key, {
       promise,
-      timestamp: now
+      timestamp: now,
     })
 
     return promise
@@ -113,31 +112,26 @@ export function withDeduplication<T extends (...args: unknown[]) => Promise<unkn
  */
 export const createCacheKey = {
   // For API endpoints with parameters
-  api: (endpoint: string, params?: Record<string, unknown>) => 
+  api: (endpoint: string, params?: Record<string, unknown>) =>
     `api:${endpoint}:${params ? JSON.stringify(params) : 'no-params'}`,
-  
+
   // For database queries
   query: (table: string, conditions?: Record<string, unknown>) =>
     `query:${table}:${conditions ? JSON.stringify(conditions) : 'no-conditions'}`,
-  
+
   // For user-specific requests
   user: (userId: string, resource: string, params?: Record<string, unknown>) =>
     `user:${userId}:${resource}:${params ? JSON.stringify(params) : 'no-params'}`,
-  
+
   // For file operations
-  file: (operation: string, path: string) =>
-    `file:${operation}:${path}`,
+  file: (operation: string, path: string) => `file:${operation}:${path}`,
 }
 
 /**
  * Hook for request deduplication in React components
  */
 export function useRequestDeduplication() {
-  const execute = async <T>(
-    key: string,
-    requestFn: () => Promise<T>,
-    ttl?: number
-  ): Promise<T> => {
+  const execute = async <T>(key: string, requestFn: () => Promise<T>, ttl?: number): Promise<T> => {
     return globalDeduplicator.execute(key, requestFn, ttl)
   }
 
@@ -146,22 +140,20 @@ export function useRequestDeduplication() {
     cancel: globalDeduplicator.cancel.bind(globalDeduplicator),
     isPending: globalDeduplicator.isPending.bind(globalDeduplicator),
     getPendingCount: () => globalDeduplicator.getPendingCount(),
-    cleanup: globalDeduplicator.cleanup.bind(globalDeduplicator)
+    cleanup: globalDeduplicator.cleanup.bind(globalDeduplicator),
   }
 }
 
 /**
  * Example usage with Supabase queries
  */
-export function createDeduplicatedSupabaseQuery<T>(
-  queryName: string,
-  queryFn: () => Promise<T>
-) {
-  return () => globalDeduplicator.execute(
-    createCacheKey.query(queryName),
-    queryFn,
-    3000 // 3 second TTL for database queries
-  )
+export function createDeduplicatedSupabaseQuery<T>(queryName: string, queryFn: () => Promise<T>) {
+  return () =>
+    globalDeduplicator.execute(
+      createCacheKey.query(queryName),
+      queryFn,
+      3000 // 3 second TTL for database queries
+    )
 }
 
 /**
@@ -171,11 +163,8 @@ export function withApiDeduplication<T>(
   handler: () => Promise<T>,
   req: { url?: string; method?: string; body?: Record<string, unknown> }
 ): Promise<T> {
-  const key = createCacheKey.api(
-    `${req.method || 'GET'}:${req.url || 'unknown'}`,
-    req.body
-  )
-  
+  const key = createCacheKey.api(`${req.method || 'GET'}:${req.url || 'unknown'}`, req.body)
+
   return globalDeduplicator.execute(key, handler, 2000) // 2 second TTL for API calls
 }
 
@@ -193,7 +182,7 @@ export class CancellableRequestDeduplicator extends RequestDeduplicator {
     const now = Date.now()
     const existingRequest = this.pendingRequests.get(key) as PendingRequest<T> | undefined
 
-    if (existingRequest && (now - existingRequest.timestamp) < ttl) {
+    if (existingRequest && now - existingRequest.timestamp < ttl) {
       return existingRequest.promise
     }
 
@@ -207,15 +196,14 @@ export class CancellableRequestDeduplicator extends RequestDeduplicator {
     const controller = new AbortController()
     this.controllers.set(key, controller)
 
-    const promise = requestFn(controller.signal)
-      .finally(() => {
-        this.pendingRequests.delete(key)
-        this.controllers.delete(key)
-      })
+    const promise = requestFn(controller.signal).finally(() => {
+      this.pendingRequests.delete(key)
+      this.controllers.delete(key)
+    })
 
     this.pendingRequests.set(key, {
       promise,
-      timestamp: now
+      timestamp: now,
     })
 
     return promise

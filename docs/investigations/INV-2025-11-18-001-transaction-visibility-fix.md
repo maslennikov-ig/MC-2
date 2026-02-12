@@ -21,16 +21,19 @@ Successfully diagnosed and fixed a transaction visibility bug that prevented E2E
 ### Symptoms
 
 E2E test T053 failed with error:
+
 ```
 Error: No outbox entries found for course <uuid>
 ```
 
 Despite the fact that:
+
 - RPC function `initialize_fsm_with_outbox()` returned success
 - Response included 4 outbox entries in JSONB format
 - Command handler logged "FSM initialized successfully"
 
 Database queries immediately after RPC call found **zero records** in:
+
 - `job_outbox` table (expected 4, got 0)
 - `fsm_events` table (expected 1, got 0)
 - `idempotency_keys` table (expected 1, got 0)
@@ -46,6 +49,7 @@ Transaction commit timing issue - data not visible to subsequent queries due to 
 ### Phase 1: Direct RPC Testing (SQL Editor)
 
 **Test:** Execute RPC function directly via Supabase SQL Editor
+
 ```sql
 SELECT initialize_fsm_with_outbox(...);
 SELECT * FROM job_outbox WHERE entity_id = 'test-id';
@@ -64,6 +68,7 @@ SELECT * FROM job_outbox WHERE entity_id = 'test-id';
 ### Phase 3: PostgreSQL Logs Analysis
 
 **Critical Discovery:**
+
 ```
 ERROR: column job_outbox.retry_count does not exist
 ```
@@ -79,6 +84,7 @@ Repeated errors in Postgres logs showed test queries were failing due to wrong c
 **Critical Discovery #2:**
 
 RLS policies blocking writes:
+
 ```sql
 -- job_outbox
 policyname: job_outbox_system_only
@@ -101,6 +107,7 @@ with_check: false  ← BLOCKS INSERTS
 **Root Cause Identified:**
 
 Even though RPC function was `SECURITY DEFINER` (runs with postgres privileges), PostgreSQL still enforced RLS policies. The function returned success because it:
+
 1. Built JSONB response from local variables
 2. Executed RETURN statement
 3. Transaction attempted COMMIT
@@ -134,6 +141,7 @@ This created illusion of success while data was never persisted.
 **File:** `supabase/migrations/20251118100000_fix_rpc_bypass_rls.sql`
 
 **Change:**
+
 ```sql
 CREATE OR REPLACE FUNCTION initialize_fsm_with_outbox(...)
 RETURNS JSONB
@@ -153,6 +161,7 @@ $$;
 **File:** `tests/e2e/t053-synergy-sales-course.test.ts:284`
 
 **Change:**
+
 ```typescript
 // BEFORE
 .select('processed_at, retry_count, last_error')
@@ -168,6 +177,7 @@ $$;
 **File:** `tests/e2e/t053-synergy-sales-course.test.ts:288-291`
 
 **Change:**
+
 ```typescript
 // BEFORE
 if (!outboxEntries || outboxEntries.length === 0) {
@@ -178,7 +188,7 @@ if (!outboxEntries || outboxEntries.length === 0) {
 if (!outboxEntries || outboxEntries.length === 0) {
   console.log(`⏳ No outbox entries found yet, waiting...`);
   await new Promise(resolve => setTimeout(resolve, 1000));
-  continue;  // Retry instead of failing
+  continue; // Retry instead of failing
 }
 ```
 
@@ -189,6 +199,7 @@ if (!outboxEntries || outboxEntries.length === 0) {
 ## Verification
 
 ### Manual SQL Test
+
 ```sql
 SELECT initialize_fsm_with_outbox(...);
 -- Returns: {"fsmState": {...}, "outboxEntries": [4 items]}
@@ -204,6 +215,7 @@ SELECT * FROM idempotency_keys WHERE key = 'test-key';
 ```
 
 ### E2E Test Output
+
 ```
 [T053] ✓ Stage 2 FSM initialized: stage_2_init
 [T053] ✓ Stage 2 outbox entries created: 4
@@ -221,6 +233,7 @@ SELECT * FROM idempotency_keys WHERE key = 'test-key';
 **New observation:** Test now times out waiting for `processed_at` to be set by background outbox processor. This is a **separate concern** about test environment (background worker speed), NOT a transaction visibility issue.
 
 The test successfully:
+
 - ✅ Calls RPC function
 - ✅ Receives 4 outbox entries
 - ✅ Queries database and finds 4 entries

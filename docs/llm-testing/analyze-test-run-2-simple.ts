@@ -49,11 +49,11 @@ interface LessonResult {
 }
 
 interface QualityScore {
-  schemaScore: number;    // 0-100: Structure completeness
-  contentScore: number;   // 0-100: Content quality heuristics
-  languageScore: number;  // 0-100: Language quality indicators
-  overallScore: number;   // Average of above
-  details: string[];      // Issue details
+  schemaScore: number; // 0-100: Structure completeness
+  contentScore: number; // 0-100: Content quality heuristics
+  languageScore: number; // 0-100: Language quality indicators
+  overallScore: number; // Average of above
+  details: string[]; // Issue details
 }
 
 interface ModelAnalysis {
@@ -80,7 +80,8 @@ interface CategoryScore {
 // CONSTANTS
 // ============================================================================
 
-const TEST_RUN_DIR = '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-2';
+const TEST_RUN_DIR =
+  '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-2';
 const OUTPUT_DIR = '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing';
 
 const MODELS = [
@@ -94,7 +95,7 @@ const MODELS = [
   'qwen3-32b',
   'qwen3-235b-thinking',
   'oss-120b',
-  'qwen3-235b-a22b'
+  'qwen3-235b-a22b',
 ];
 
 const MODEL_NAMES: Record<string, string> = {
@@ -108,7 +109,7 @@ const MODEL_NAMES: Record<string, string> = {
   'qwen3-32b': 'Qwen3 32B',
   'qwen3-235b-thinking': 'Qwen3 235B Thinking',
   'oss-120b': 'OSS 120B',
-  'qwen3-235b-a22b': 'Qwen3 235B A22B'
+  'qwen3-235b-a22b': 'Qwen3 235B A22B',
 };
 
 const PLACEHOLDER_PATTERNS = [
@@ -144,7 +145,7 @@ function assessMetadataQuality(data: MetadataResult, language: 'en' | 'ru'): Qua
     'difficulty_level',
     'prerequisites',
     'learning_outcomes',
-    'course_tags'
+    'course_tags',
   ];
 
   const presentFields = requiredFields.filter(field => {
@@ -155,7 +156,9 @@ function assessMetadataQuality(data: MetadataResult, language: 'en' | 'ru'): Qua
   schemaPoints = (presentFields.length / requiredFields.length) * 100;
 
   if (presentFields.length < requiredFields.length) {
-    details.push(`Missing fields: ${requiredFields.filter(f => !presentFields.includes(f)).join(', ')}`);
+    details.push(
+      `Missing fields: ${requiredFields.filter(f => !presentFields.includes(f)).join(', ')}`
+    );
   }
 
   // Content quality heuristics
@@ -220,10 +223,18 @@ function assessMetadataQuality(data: MetadataResult, language: 'en' | 'ru'): Qua
     contentIssues++;
   }
 
-  contentPoints = Math.max(0, 100 - (contentIssues * 15));
+  contentPoints = Math.max(0, 100 - contentIssues * 15);
 
   // Language quality
-  const allText = [title, description, overview, audience, ...prerequisites, ...outcomes, ...tags].join(' ');
+  const allText = [
+    title,
+    description,
+    overview,
+    audience,
+    ...prerequisites,
+    ...outcomes,
+    ...tags,
+  ].join(' ');
 
   let languageIssues = 0;
 
@@ -268,7 +279,7 @@ function assessMetadataQuality(data: MetadataResult, language: 'en' | 'ru'): Qua
     }
   }
 
-  languagePoints = Math.max(0, 100 - (languageIssues * 20));
+  languagePoints = Math.max(0, 100 - languageIssues * 20);
 
   const overallScore = (schemaPoints + contentPoints + languagePoints) / 3;
 
@@ -277,7 +288,7 @@ function assessMetadataQuality(data: MetadataResult, language: 'en' | 'ru'): Qua
     contentScore: Math.round(contentPoints),
     languageScore: Math.round(languagePoints),
     overallScore: Math.round(overallScore),
-    details
+    details,
   };
 }
 
@@ -293,7 +304,7 @@ function assessLessonQuality(data: LessonResult, language: 'en' | 'ru'): Quality
     'section_title',
     'section_description',
     'learning_objectives',
-    'lessons'
+    'lessons',
   ];
 
   const presentFields = requiredFields.filter(field => {
@@ -304,7 +315,9 @@ function assessLessonQuality(data: LessonResult, language: 'en' | 'ru'): Quality
   schemaPoints = (presentFields.length / requiredFields.length) * 100;
 
   if (presentFields.length < requiredFields.length) {
-    details.push(`Missing fields: ${requiredFields.filter(f => !presentFields.includes(f)).join(', ')}`);
+    details.push(
+      `Missing fields: ${requiredFields.filter(f => !presentFields.includes(f)).join(', ')}`
+    );
   }
 
   // Check lessons array structure
@@ -316,7 +329,13 @@ function assessLessonQuality(data: LessonResult, language: 'en' | 'ru'): Quality
     // Check each lesson structure
     let lessonIssues = 0;
     for (const lesson of lessons) {
-      const lessonFields = ['lesson_number', 'lesson_title', 'lesson_objective', 'key_topics', 'exercises'];
+      const lessonFields = [
+        'lesson_number',
+        'lesson_title',
+        'lesson_objective',
+        'key_topics',
+        'exercises',
+      ];
       const presentLessonFields = lessonFields.filter(f => (lesson as any)[f] !== undefined);
 
       if (presentLessonFields.length < lessonFields.length) {
@@ -400,7 +419,7 @@ function assessLessonQuality(data: LessonResult, language: 'en' | 'ru'): Quality
     }
   }
 
-  contentPoints = Math.max(0, 100 - (contentIssues * 5));
+  contentPoints = Math.max(0, 100 - contentIssues * 5);
 
   // Language quality
   const allText = [
@@ -411,8 +430,8 @@ function assessLessonQuality(data: LessonResult, language: 'en' | 'ru'): Quality
       l.lesson_title || '',
       l.lesson_objective || '',
       ...(l.key_topics || []),
-      ...(l.exercises || []).flatMap(e => [e.exercise_title || '', e.exercise_instructions || ''])
-    ])
+      ...(l.exercises || []).flatMap(e => [e.exercise_title || '', e.exercise_instructions || '']),
+    ]),
   ].join(' ');
 
   let languageIssues = 0;
@@ -441,7 +460,7 @@ function assessLessonQuality(data: LessonResult, language: 'en' | 'ru'): Quality
     }
   }
 
-  languagePoints = Math.max(0, 100 - (languageIssues * 20));
+  languagePoints = Math.max(0, 100 - languageIssues * 20);
 
   const overallScore = (schemaPoints + contentPoints + languagePoints) / 3;
 
@@ -450,7 +469,7 @@ function assessLessonQuality(data: LessonResult, language: 'en' | 'ru'): Quality
     contentScore: Math.round(contentPoints),
     languageScore: Math.round(languagePoints),
     overallScore: Math.round(overallScore),
-    details
+    details,
   };
 }
 
@@ -469,7 +488,7 @@ function analyzeModel(modelSlug: string): ModelAnalysis {
     successRate: 0,
     totalRuns: 3,
     successfulRuns: 0,
-    failedRuns: 3
+    failedRuns: 3,
   });
 
   if (!existsSync(modelDir)) {
@@ -479,7 +498,7 @@ function analyzeModel(modelSlug: string): ModelAnalysis {
       metadataRU: emptyCategory(),
       lessonEN: emptyCategory(),
       lessonRU: emptyCategory(),
-      overallScore: 0
+      overallScore: 0,
     };
   }
 
@@ -489,7 +508,7 @@ function analyzeModel(modelSlug: string): ModelAnalysis {
     metadataEN: [] as QualityScore[],
     metadataRU: [] as QualityScore[],
     lessonEN: [] as QualityScore[],
-    lessonRU: [] as QualityScore[]
+    lessonRU: [] as QualityScore[],
   };
 
   for (const file of files) {
@@ -516,7 +535,7 @@ function analyzeModel(modelSlug: string): ModelAnalysis {
     }
   }
 
-  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const avg = (arr: number[]) => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
 
   const processCategory = (categoryScores: QualityScore[]): CategoryScore => ({
     avgScore: avg(categoryScores.map(s => s.overallScore)),
@@ -526,7 +545,7 @@ function analyzeModel(modelSlug: string): ModelAnalysis {
     successRate: categoryScores.length / 3,
     totalRuns: 3,
     successfulRuns: categoryScores.length,
-    failedRuns: 3 - categoryScores.length
+    failedRuns: 3 - categoryScores.length,
   });
 
   const metadataEN = processCategory(scores.metadataEN);
@@ -538,7 +557,7 @@ function analyzeModel(modelSlug: string): ModelAnalysis {
     ...scores.metadataEN.map(s => s.overallScore),
     ...scores.metadataRU.map(s => s.overallScore),
     ...scores.lessonEN.map(s => s.overallScore),
-    ...scores.lessonRU.map(s => s.overallScore)
+    ...scores.lessonRU.map(s => s.overallScore),
   ];
 
   return {
@@ -547,7 +566,7 @@ function analyzeModel(modelSlug: string): ModelAnalysis {
     metadataRU,
     lessonEN,
     lessonRU,
-    overallScore: avg(allScores)
+    overallScore: avg(allScores),
   };
 }
 
@@ -787,10 +806,18 @@ for (const model of MODELS) {
   const result = analyzeModel(model);
   allResults.push(result);
 
-  console.log(`   Metadata EN: ${result.metadataEN.avgScore.toFixed(1)}% (${result.metadataEN.successfulRuns}/3)`);
-  console.log(`   Metadata RU: ${result.metadataRU.avgScore.toFixed(1)}% (${result.metadataRU.successfulRuns}/3)`);
-  console.log(`   Lesson EN:   ${result.lessonEN.avgScore.toFixed(1)}% (${result.lessonEN.successfulRuns}/3)`);
-  console.log(`   Lesson RU:   ${result.lessonRU.avgScore.toFixed(1)}% (${result.lessonRU.successfulRuns}/3)`);
+  console.log(
+    `   Metadata EN: ${result.metadataEN.avgScore.toFixed(1)}% (${result.metadataEN.successfulRuns}/3)`
+  );
+  console.log(
+    `   Metadata RU: ${result.metadataRU.avgScore.toFixed(1)}% (${result.metadataRU.successfulRuns}/3)`
+  );
+  console.log(
+    `   Lesson EN:   ${result.lessonEN.avgScore.toFixed(1)}% (${result.lessonEN.successfulRuns}/3)`
+  );
+  console.log(
+    `   Lesson RU:   ${result.lessonRU.avgScore.toFixed(1)}% (${result.lessonRU.successfulRuns}/3)`
+  );
   console.log(`   Overall:     ${result.overallScore.toFixed(1)}%\n`);
 }
 

@@ -186,7 +186,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
   it('should fail after all retries exhausted', async () => {
     // All attempts: Low quality
     vi.mocked(qualityValidator.validateSummaryQuality).mockResolvedValue({
-      quality_score: 0.50,
+      quality_score: 0.5,
       quality_check_passed: false,
       threshold: 0.75,
       original_length: 10000,
@@ -219,7 +219,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
     // Note: Need to reset mocks and run again for accurate count
     vi.clearAllMocks();
     vi.mocked(qualityValidator.validateSummaryQuality).mockResolvedValue({
-      quality_score: 0.50,
+      quality_score: 0.5,
       quality_check_passed: false,
       threshold: 0.75,
       original_length: 10000,
@@ -315,7 +315,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
 
     // Mock quality check: Low quality after first attempt
     vi.mocked(qualityValidator.validateSummaryQuality).mockResolvedValueOnce({
-      quality_score: 0.60,
+      quality_score: 0.6,
       quality_check_passed: false,
       threshold: 0.75,
       original_length: 2900, // Near threshold
@@ -404,7 +404,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
         compression_ratio: 0.2,
       })
       .mockResolvedValueOnce({
-        quality_score: 0.70,
+        quality_score: 0.7,
         quality_check_passed: false,
         threshold: 0.75,
         original_length: 10000,
@@ -442,9 +442,7 @@ describe('Stage 3: Quality Gate Integration (T044)', () => {
     expect(result.summary_metadata.retry_strategy_changes).toContain(
       'model: gpt-oss-20b → openai/gpt-oss-120b'
     );
-    expect(result.summary_metadata.retry_strategy_changes).toContain(
-      'max_tokens: 200K → 250K'
-    );
+    expect(result.summary_metadata.retry_strategy_changes).toContain('max_tokens: 200K → 250K');
 
     // Verify quality validator called 4 times
     expect(qualityValidator.validateSummaryQuality).toHaveBeenCalledTimes(4);

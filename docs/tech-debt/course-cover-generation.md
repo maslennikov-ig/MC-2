@@ -23,11 +23,13 @@ ALTER TABLE courses ADD COLUMN cover_generated_at TIMESTAMPTZ;
 ```
 
 **Pros**:
+
 - Simple implementation
 - No new tables
 - Fast queries
 
 **Cons**:
+
 - No generation history
 - No metadata tracking
 - Different pattern from lesson covers
@@ -47,11 +49,13 @@ CREATE TABLE course_enrichments (
 ```
 
 **Pros**:
+
 - Consistent with lesson enrichments
 - Full metadata tracking
 - Extensible for future course-level enrichments
 
 **Cons**:
+
 - New table to maintain
 - More complex queries
 
@@ -60,10 +64,12 @@ CREATE TABLE course_enrichments (
 Add `lesson_id` as nullable, add `course_only` boolean.
 
 **Pros**:
+
 - Reuses existing infrastructure
 - Single table for all enrichments
 
 **Cons**:
+
 - Breaks current foreign key constraint
 - Confusing semantics
 

@@ -10,17 +10,17 @@
 
 ### Ключевые метрики
 
-| Показатель | Значение |
-|------------|----------|
-| **Всего коммитов** | 692 |
-| **Новых функций (feat)** | 108 |
-| **Исправлений (fix)** | 138 |
-| **Тестов добавлено/улучшено** | 22 |
-| **Рефакторингов** | 13 |
-| **Релизов** | 189 |
-| **Pull Requests** | 9 |
-| **Версия на начало периода** | v0.8.0 |
-| **Версия на конец периода** | v0.26.24 |
+| Показатель                    | Значение |
+| ----------------------------- | -------- |
+| **Всего коммитов**            | 692      |
+| **Новых функций (feat)**      | 108      |
+| **Исправлений (fix)**         | 138      |
+| **Тестов добавлено/улучшено** | 22       |
+| **Рефакторингов**             | 13       |
+| **Релизов**                   | 189      |
+| **Pull Requests**             | 9        |
+| **Версия на начало периода**  | v0.8.0   |
+| **Версия на конец периода**   | v0.26.24 |
 
 ---
 
@@ -36,16 +36,16 @@ pie title Распределение файлов по типам
     "Markdown Docs" : 120
 ```
 
-| Метрика | Значение |
-|---------|----------|
-| **Строк кода** | 361,276 |
-| **TypeScript файлов** | 984 |
-| **React компонентов** | 357 |
-| **Тестовых файлов** | 156 |
-| **Таблиц в БД** | 34 |
-| **AI агентов** | 58 |
-| **Skills (навыков)** | 20 |
-| **Спецификаций** | 22 |
+| Метрика               | Значение |
+| --------------------- | -------- |
+| **Строк кода**        | 361,276  |
+| **TypeScript файлов** | 984      |
+| **React компонентов** | 357      |
+| **Тестовых файлов**   | 156      |
+| **Таблиц в БД**       | 34       |
+| **AI агентов**        | 58       |
+| **Skills (навыков)**  | 20       |
+| **Спецификаций**      | 22       |
 
 ### Структура монорепозитория
 
@@ -94,13 +94,13 @@ xychart-beta
 
 ### Velocity Trend (по данным Weekly Reports)
 
-| Неделя | Коммитов | Релизов | Velocity | Фокус |
-|--------|----------|---------|----------|-------|
-| W44 (Oct 30) | 32 | 6 | Baseline | Stage 4 Analysis |
-| W45 (Nov 06) | 38 | 8 | +18.8% | Stage 5 Foundation |
-| W46 (Nov 13) | 40 | 9 | +5.3% | Stage 5 Core Services |
-| W47 (Nov 20) | 50 | 11 | +25.0% | Stage 5 Production |
-| W48 (Nov 27) | 50 | 11 | +25.0% | Semantic Matching |
+| Неделя       | Коммитов | Релизов | Velocity | Фокус                 |
+| ------------ | -------- | ------- | -------- | --------------------- |
+| W44 (Oct 30) | 32       | 6       | Baseline | Stage 4 Analysis      |
+| W45 (Nov 06) | 38       | 8       | +18.8%   | Stage 5 Foundation    |
+| W46 (Nov 13) | 40       | 9       | +5.3%    | Stage 5 Core Services |
+| W47 (Nov 20) | 50       | 11      | +25.0%   | Stage 5 Production    |
+| W48 (Nov 27) | 50       | 11      | +25.0%   | Semantic Matching     |
 
 ---
 
@@ -212,22 +212,23 @@ erDiagram
 
 ### Таблицы по категориям (34 таблицы)
 
-| Категория | Таблицы | Описание |
-|-----------|---------|----------|
-| **Core Entities** | `organizations`, `users`, `courses`, `sections`, `lessons` | Основные бизнес-сущности |
-| **Content** | `lesson_content`, `lesson_contents`, `assets`, `file_catalog` | Контент курсов и файлы |
-| **Generation Pipeline** | `job_status`, `job_outbox`, `generation_trace`, `generation_locks`, `generation_status_history` | Пайплайн генерации |
-| **FSM & Idempotency** | `fsm_events`, `idempotency_keys` | Конечный автомат состояний |
-| **RAG & Vectors** | `rag_context_cache`, `document_priorities` | RAG контекст и приоритеты |
-| **LLM Config** | `llm_model_config`, `prompt_templates`, `pipeline_global_settings`, `refinement_config` | Настройки AI моделей |
-| **LMS Integration** | `lms_configurations`, `lms_import_jobs` | Интеграция с LMS |
-| **Admin & Audit** | `admin_audit_logs`, `error_logs`, `system_metrics`, `log_issue_status` | Аудит и мониторинг |
-| **Settings** | `tier_settings`, `context_reserve_settings`, `config_backups` | Настройки тарифов |
-| **Enrollments** | `course_enrollments`, `api_keys` | Зачисления и API ключи |
+| Категория               | Таблицы                                                                                         | Описание                   |
+| ----------------------- | ----------------------------------------------------------------------------------------------- | -------------------------- |
+| **Core Entities**       | `organizations`, `users`, `courses`, `sections`, `lessons`                                      | Основные бизнес-сущности   |
+| **Content**             | `lesson_content`, `lesson_contents`, `assets`, `file_catalog`                                   | Контент курсов и файлы     |
+| **Generation Pipeline** | `job_status`, `job_outbox`, `generation_trace`, `generation_locks`, `generation_status_history` | Пайплайн генерации         |
+| **FSM & Idempotency**   | `fsm_events`, `idempotency_keys`                                                                | Конечный автомат состояний |
+| **RAG & Vectors**       | `rag_context_cache`, `document_priorities`                                                      | RAG контекст и приоритеты  |
+| **LLM Config**          | `llm_model_config`, `prompt_templates`, `pipeline_global_settings`, `refinement_config`         | Настройки AI моделей       |
+| **LMS Integration**     | `lms_configurations`, `lms_import_jobs`                                                         | Интеграция с LMS           |
+| **Admin & Audit**       | `admin_audit_logs`, `error_logs`, `system_metrics`, `log_issue_status`                          | Аудит и мониторинг         |
+| **Settings**            | `tier_settings`, `context_reserve_settings`, `config_backups`                                   | Настройки тарифов          |
+| **Enrollments**         | `course_enrollments`, `api_keys`                                                                | Зачисления и API ключи     |
 
 ### RLS Security
 
 Все 34 таблицы защищены Row Level Security (RLS):
+
 - ✅ Multi-tenant изоляция по `organization_id`
 - ✅ Роли: `superadmin`, `admin`, `instructor`, `student`
 - ✅ Audit logging для всех административных действий
@@ -271,15 +272,15 @@ gantt
 
 ### Детальный статус каждого Stage
 
-| Stage | Название | Статус | Задач выполнено | Прогресс |
-|-------|----------|--------|-----------------|----------|
-| 0 | Foundation | ✅ Завершён | 100% | ████████████████████ 100% |
-| 1 | Course Creation | ✅ Завершён | 100% | ████████████████████ 100% |
-| 2 | Document Processing | ✅ Завершён | 100% | ████████████████████ 100% |
-| 3 | Summarization | ✅ Завершён | 100% | ████████████████████ 100% |
-| 4 | Analysis | ✅ Завершён | 65/65 задач | ████████████████████ 100% |
-| 5 | Structure Generation | ✅ Завершён | 55/55 задач | ████████████████████ 100% |
-| 6 | Lesson Content | 🔄 В работе | ~85% | █████████████████░░░ 85% |
+| Stage | Название             | Статус      | Задач выполнено | Прогресс                  |
+| ----- | -------------------- | ----------- | --------------- | ------------------------- |
+| 0     | Foundation           | ✅ Завершён | 100%            | ████████████████████ 100% |
+| 1     | Course Creation      | ✅ Завершён | 100%            | ████████████████████ 100% |
+| 2     | Document Processing  | ✅ Завершён | 100%            | ████████████████████ 100% |
+| 3     | Summarization        | ✅ Завершён | 100%            | ████████████████████ 100% |
+| 4     | Analysis             | ✅ Завершён | 65/65 задач     | ████████████████████ 100% |
+| 5     | Structure Generation | ✅ Завершён | 55/55 задач     | ████████████████████ 100% |
+| 6     | Lesson Content       | 🔄 В работе | ~85%            | █████████████████░░░ 85%  |
 
 ---
 
@@ -414,6 +415,7 @@ flowchart TB
 ```
 
 **Функционал:**
+
 - ✅ Генерация OLX-пакетов для Open edX
 - ✅ OAuth2 аутентификация с LMS
 - ✅ Публикация курсов через REST API
@@ -455,6 +457,7 @@ flowchart LR
 ```
 
 **Реализовано:**
+
 - ✅ Унифицированная система рендеринга markdown
 - ✅ Server-side rendering для SEO
 - ✅ 6 User Stories (US1-US6) выполнено
@@ -498,6 +501,7 @@ flowchart TB
 ```
 
 **Функционал:**
+
 - ✅ Визуализация всех этапов пайплайна
 - ✅ Настройка моделей и тарифов
 - ✅ Управление промптами
@@ -542,6 +546,7 @@ flowchart TB
 ```
 
 **Возможности:**
+
 - ✅ Интерактивная визуализация workflow
 - ✅ Real-time обновления через SSE
 - ✅ Инспектор уроков и модулей
@@ -588,17 +593,18 @@ flowchart TB
 
 **Метрики CI/CD:**
 
-| Этап | Время |
-|------|-------|
-| Setup + Install | ~2 мин (с кэшем: ~30 сек) |
-| Lint + Type Check | ~1 мин |
-| Build | ~3 мин |
-| Tests | ~2 мин |
-| Docker Build | ~5 мин (с кэшем) |
-| Deploy | ~3 мин |
-| **Полный CI/CD** | **~17-19 мин** |
+| Этап              | Время                     |
+| ----------------- | ------------------------- |
+| Setup + Install   | ~2 мин (с кэшем: ~30 сек) |
+| Lint + Type Check | ~1 мин                    |
+| Build             | ~3 мин                    |
+| Tests             | ~2 мин                    |
+| Docker Build      | ~5 мин (с кэшем)          |
+| Deploy            | ~3 мин                    |
+| **Полный CI/CD**  | **~17-19 мин**            |
 
 **Оптимизации:**
+
 - ✅ Multi-stage Docker builds (70% уменьшение размера)
 - ✅ Zero-downtime rolling deployment
 - ✅ Automatic rollback on failure
@@ -652,9 +658,10 @@ mindmap
 ```
 
 **Статистика:**
+
 - 58 агентов в 12 доменах
 - 20 skills (переиспользуемые навыки)
-- 5 L1 оркестраторов (/health-* команды)
+- 5 L1 оркестраторов (/health-\* команды)
 - Speckit workflow integration
 
 **Домены агентов:**
@@ -711,40 +718,40 @@ timeline
 
 ## Версионная прогрессия
 
-| Дата | Версия | Основные изменения |
-|------|--------|-------------------|
-| 09.10 | v0.1.0 | Initial commit |
-| 19.10 | v0.8.0 | Security Improvements |
-| 20.10 | v0.10.0 | Stage 0 Foundation Complete |
-| 22.10 | v0.11.0 | Stage 1 Complete |
-| 27.10 | v0.12.2 | Stage 2 Verification |
-| 29.10 | v0.13.1 | Stage 3 Complete |
-| 05.11 | v0.13.1 | Stage 4 All 65 Tasks |
-| 08.11 | v0.16.0 | Stage 5 Phase 2 Foundation |
-| 16.11 | v0.18.0 | Transactional Outbox |
-| 27.11 | v0.20.0 | Celestial Mission UI |
-| 28.11 | v0.21.0 | Generation Graph View |
-| 02.12 | v0.22.0 | Admin Pipeline Panel |
-| 11.12 | v0.22.49 | Open edX Integration |
-| 14.12 | v0.23.0 | Markdown Renderer |
-| 15.12 | v0.26.0 | CI/CD Pipeline |
-| 18.12 | v0.26.8 | Migration to mc2 repo |
-| 25.12 | v0.26.24 | Current |
+| Дата  | Версия   | Основные изменения          |
+| ----- | -------- | --------------------------- |
+| 09.10 | v0.1.0   | Initial commit              |
+| 19.10 | v0.8.0   | Security Improvements       |
+| 20.10 | v0.10.0  | Stage 0 Foundation Complete |
+| 22.10 | v0.11.0  | Stage 1 Complete            |
+| 27.10 | v0.12.2  | Stage 2 Verification        |
+| 29.10 | v0.13.1  | Stage 3 Complete            |
+| 05.11 | v0.13.1  | Stage 4 All 65 Tasks        |
+| 08.11 | v0.16.0  | Stage 5 Phase 2 Foundation  |
+| 16.11 | v0.18.0  | Transactional Outbox        |
+| 27.11 | v0.20.0  | Celestial Mission UI        |
+| 28.11 | v0.21.0  | Generation Graph View       |
+| 02.12 | v0.22.0  | Admin Pipeline Panel        |
+| 11.12 | v0.22.49 | Open edX Integration        |
+| 14.12 | v0.23.0  | Markdown Renderer           |
+| 15.12 | v0.26.0  | CI/CD Pipeline              |
+| 18.12 | v0.26.8  | Migration to mc2 repo       |
+| 25.12 | v0.26.24 | Current                     |
 
 ---
 
 ## Статистика по Pull Requests
 
-| PR # | Название | Дата | Статус |
-|------|----------|------|--------|
-| #11 | 018-judge-targeted-refinement | 14.12 | ✅ Merged |
-| #9 | feature/markdown-renderer | 14.12 | ✅ Merged |
-| #7 | Stage 4 Analysis (65 Tasks) | 05.11 | ✅ Merged |
-| #6 | Claude GitHub Actions | 05.11 | ✅ Merged |
-| #5 | Stage 3 Phase 9 Improvements | 29.10 | ✅ Merged |
-| #4 | Stage 3 Create | 29.10 | ✅ Merged |
-| #2 | v0.10.0 Release | 22.10 | ✅ Merged |
-| #1 | Stage 0 Foundation | 20.10 | ✅ Merged |
+| PR # | Название                      | Дата  | Статус    |
+| ---- | ----------------------------- | ----- | --------- |
+| #11  | 018-judge-targeted-refinement | 14.12 | ✅ Merged |
+| #9   | feature/markdown-renderer     | 14.12 | ✅ Merged |
+| #7   | Stage 4 Analysis (65 Tasks)   | 05.11 | ✅ Merged |
+| #6   | Claude GitHub Actions         | 05.11 | ✅ Merged |
+| #5   | Stage 3 Phase 9 Improvements  | 29.10 | ✅ Merged |
+| #4   | Stage 3 Create                | 29.10 | ✅ Merged |
+| #2   | v0.10.0 Release               | 22.10 | ✅ Merged |
+| #1   | Stage 0 Foundation            | 20.10 | ✅ Merged |
 
 ---
 
@@ -771,46 +778,50 @@ pie title Коммиты по функциональным областям
 ## Технический стек
 
 ### Backend
-| Технология | Версия | Назначение |
-|------------|--------|------------|
-| Node.js | 20+ | Runtime |
-| TypeScript | 5.x (strict) | Язык |
-| tRPC | v11 | API |
-| BullMQ | latest | Job Queue |
-| Redis | 7 | Cache + Queue |
-| Supabase | latest | PostgreSQL + Auth |
-| Qdrant | latest | Vector DB |
-| Pino | latest | Logging |
+
+| Технология | Версия       | Назначение        |
+| ---------- | ------------ | ----------------- |
+| Node.js    | 20+          | Runtime           |
+| TypeScript | 5.x (strict) | Язык              |
+| tRPC       | v11          | API               |
+| BullMQ     | latest       | Job Queue         |
+| Redis      | 7            | Cache + Queue     |
+| Supabase   | latest       | PostgreSQL + Auth |
+| Qdrant     | latest       | Vector DB         |
+| Pino       | latest       | Logging           |
 
 ### Frontend
-| Технология | Версия | Назначение |
-|------------|--------|------------|
-| Next.js | 15 | Framework |
-| React | 19 | UI Library |
-| Tailwind CSS | 3.x | Styling |
-| shadcn/ui | latest | Components |
-| Zustand | latest | State |
-| Immer | latest | Immutable Updates |
-| ReactFlow | latest | Graph Visualization |
-| next-intl | latest | i18n |
+
+| Технология   | Версия | Назначение          |
+| ------------ | ------ | ------------------- |
+| Next.js      | 15     | Framework           |
+| React        | 19     | UI Library          |
+| Tailwind CSS | 3.x    | Styling             |
+| shadcn/ui    | latest | Components          |
+| Zustand      | latest | State               |
+| Immer        | latest | Immutable Updates   |
+| ReactFlow    | latest | Graph Visualization |
+| next-intl    | latest | i18n                |
 
 ### AI/ML
-| Технология | Назначение |
-|------------|------------|
-| LangGraph | StateGraph Orchestration |
-| OpenRouter | Multi-model LLM API |
-| Jina v3 | Embeddings (768D) |
-| Qdrant | Vector Search |
-| Zod | Schema Validation |
+
+| Технология | Назначение               |
+| ---------- | ------------------------ |
+| LangGraph  | StateGraph Orchestration |
+| OpenRouter | Multi-model LLM API      |
+| Jina v3    | Embeddings (768D)        |
+| Qdrant     | Vector Search            |
+| Zod        | Schema Validation        |
 
 ### DevOps
-| Технология | Назначение |
-|------------|------------|
-| GitHub Actions | CI/CD |
-| Docker Compose | Orchestration |
-| GHCR | Container Registry |
+
+| Технология         | Назначение         |
+| ------------------ | ------------------ |
+| GitHub Actions     | CI/CD              |
+| Docker Compose     | Orchestration      |
+| GHCR               | Container Registry |
 | Multi-stage Builds | Image Optimization |
-| Telegram Bot | Notifications |
+| Telegram Bot       | Notifications      |
 
 ---
 
@@ -818,14 +829,14 @@ pie title Коммиты по функциональным областям
 
 ### Типы изменений
 
-| Категория | Количество | Описание |
-|-----------|------------|----------|
-| feat | 108 | Новые функции |
-| fix | 138 | Исправления багов |
-| refactor | 13 | Улучшение структуры |
-| test | 22 | Тестирование |
-| docs | 43 | Документация |
-| chore | 368 | Релизы и обслуживание |
+| Категория | Количество | Описание              |
+| --------- | ---------- | --------------------- |
+| feat      | 108        | Новые функции         |
+| fix       | 138        | Исправления багов     |
+| refactor  | 13         | Улучшение структуры   |
+| test      | 22         | Тестирование          |
+| docs      | 43         | Документация          |
+| chore     | 368        | Релизы и обслуживание |
 
 ### Тестирование
 
@@ -840,12 +851,12 @@ pie title Коммиты по функциональным областям
 
 ### Health Metrics (Week 48)
 
-| Метрика | Значение | Тренд |
-|---------|----------|-------|
-| Test Coverage | 85% | +2% |
-| Build Status | ✅ Passing | Stable |
+| Метрика           | Значение                | Тренд     |
+| ----------------- | ----------------------- | --------- |
+| Test Coverage     | 85%                     | +2%       |
+| Build Status      | ✅ Passing              | Stable    |
 | Release Stability | 11 deploys, 0 rollbacks | Excellent |
-| Technical Debt | Reduced | Improved |
+| Technical Debt    | Reduced                 | Improved  |
 
 ---
 
@@ -853,13 +864,13 @@ pie title Коммиты по функциональным областям
 
 ### Генерация курсов
 
-| Метрика | Значение |
-|---------|----------|
-| Обработка документа | ~30 сек |
-| Анализ (Stage 4) | ~2-5 мин |
-| Генерация структуры (Stage 5) | ~3-7 мин |
-| Генерация контента урока | ~1-3 мин |
-| Полный курс (10 уроков) | ~30-60 мин |
+| Метрика                       | Значение   |
+| ----------------------------- | ---------- |
+| Обработка документа           | ~30 сек    |
+| Анализ (Stage 4)              | ~2-5 мин   |
+| Генерация структуры (Stage 5) | ~3-7 мин   |
+| Генерация контента урока      | ~1-3 мин   |
+| Полный курс (10 уроков)       | ~30-60 мин |
 
 ### Качество контента
 
@@ -870,14 +881,14 @@ pie title Коммиты по функциональным областям
 
 ### Resource Allocation (Production)
 
-| Сервис | CPU | RAM |
-|--------|-----|-----|
-| Redis | 1 | 1GB |
-| Docling MCP | 2 | 4GB |
-| API | 2 | 2GB |
-| Worker | 2 | 2GB |
-| Web | 2 | 2GB |
-| **Total** | **9** | **11GB** |
+| Сервис      | CPU   | RAM      |
+| ----------- | ----- | -------- |
+| Redis       | 1     | 1GB      |
+| Docling MCP | 2     | 4GB      |
+| API         | 2     | 2GB      |
+| Worker      | 2     | 2GB      |
+| Web         | 2     | 2GB      |
+| **Total**   | **9** | **11GB** |
 
 ---
 
@@ -886,21 +897,25 @@ pie title Коммиты по функциональным областям
 Из changelog за период:
 
 ### Critical Fixes (P0)
+
 - ✅ Устранены все ошибки компиляции TypeScript (11 → 0)
 - ✅ Удалены ссылки на несуществующие таблицы БД
 - ✅ Исправлен бесконечный цикл рендеринга в AuthButton
 
 ### High Priority (P1)
+
 - ✅ Устранены утечки памяти в 5 компонентах
 - ✅ Исправлены зависимости React хуков
 - ✅ Решена несовместимость с Edge Runtime
 
 ### Medium Priority (P2)
+
 - ✅ Заменено 37 использований типа 'any'
 - ✅ Удалены неиспользуемые переменные
 - ✅ Удалён вывод пароля в консоль (security)
 
 ### Low Priority (P3)
+
 - ✅ Удалены console.log из 20+ файлов
 - ✅ ESLint warnings: 27 → 0
 
@@ -997,82 +1012,82 @@ flowchart TB
 
 ### Распределение по ролям
 
-| Роль | Кол-во | Ответственность |
-|------|--------|-----------------|
-| **Leadership & Management** | 4 | Стратегия, продукт, координация |
-| **Backend Development** | 6 | AI Pipeline, API, интеграции |
-| **Frontend Development** | 6 | UI/UX реализация, React компоненты |
-| **AI/ML Engineering** | 4 | LLM интеграция, промпты, качество |
-| **DevOps & Infrastructure** | 3 | CI/CD, деплой, мониторинг |
-| **QA & Testing** | 3 | Тестирование, автоматизация |
-| **Design** | 2 | UX исследования, UI дизайн |
-| **Всего** | **28** | |
+| Роль                        | Кол-во | Ответственность                    |
+| --------------------------- | ------ | ---------------------------------- |
+| **Leadership & Management** | 4      | Стратегия, продукт, координация    |
+| **Backend Development**     | 6      | AI Pipeline, API, интеграции       |
+| **Frontend Development**    | 6      | UI/UX реализация, React компоненты |
+| **AI/ML Engineering**       | 4      | LLM интеграция, промпты, качество  |
+| **DevOps & Infrastructure** | 3      | CI/CD, деплой, мониторинг          |
+| **QA & Testing**            | 3      | Тестирование, автоматизация        |
+| **Design**                  | 2      | UX исследования, UI дизайн         |
+| **Всего**                   | **28** |                                    |
 
 ### Детальный состав команды
 
 #### Leadership & Management (4 человека)
 
-| Позиция | Зона ответственности |
-|---------|---------------------|
-| CEO / Founder | Стратегическое видение, бизнес-развитие, инвесторы |
-| CTO | Техническая архитектура, технологические решения |
-| Product Manager | Roadmap продукта, приоритизация фич, stakeholders |
-| Project Manager | Спринты, ресурсы, коммуникация, риски |
+| Позиция         | Зона ответственности                               |
+| --------------- | -------------------------------------------------- |
+| CEO / Founder   | Стратегическое видение, бизнес-развитие, инвесторы |
+| CTO             | Техническая архитектура, технологические решения   |
+| Product Manager | Roadmap продукта, приоритизация фич, stakeholders  |
+| Project Manager | Спринты, ресурсы, коммуникация, риски              |
 
 #### Backend Team (6 человек)
 
-| Позиция | Специализация | Ключевые задачи |
-|---------|---------------|-----------------|
-| Tech Lead Backend | Архитектура | Stage Pipeline, системный дизайн |
-| Senior Backend Dev #1 | AI Pipeline | Stages 3-6, LangGraph оркестрация |
-| Senior Backend Dev #2 | Интеграции | Open edX LMS, OAuth2, API |
-| Backend Developer #1 | Queue System | BullMQ workers, job processing |
-| Backend Developer #2 | Data Layer | Supabase, миграции, RLS |
-| Backend Developer #3 | Services | tRPC endpoints, валидация |
+| Позиция               | Специализация | Ключевые задачи                   |
+| --------------------- | ------------- | --------------------------------- |
+| Tech Lead Backend     | Архитектура   | Stage Pipeline, системный дизайн  |
+| Senior Backend Dev #1 | AI Pipeline   | Stages 3-6, LangGraph оркестрация |
+| Senior Backend Dev #2 | Интеграции    | Open edX LMS, OAuth2, API         |
+| Backend Developer #1  | Queue System  | BullMQ workers, job processing    |
+| Backend Developer #2  | Data Layer    | Supabase, миграции, RLS           |
+| Backend Developer #3  | Services      | tRPC endpoints, валидация         |
 
 #### Frontend Team (6 человек)
 
-| Позиция | Специализация | Ключевые задачи |
-|---------|---------------|-----------------|
-| Tech Lead Frontend | Архитектура | Next.js 15, компонентная система |
-| Senior Frontend Dev #1 | Visualization | Generation Graph, ReactFlow |
-| Senior Frontend Dev #2 | Admin UI | Pipeline Panel, настройки |
-| Frontend Developer #1 | Components | shadcn/ui, формы, таблицы |
-| Frontend Developer #2 | Real-time | SSE, streaming, live updates |
-| Fullstack Developer #1 | Integration | tRPC клиент, state management |
-| Fullstack Developer #2 | Features | Markdown renderer, i18n |
+| Позиция                | Специализация | Ключевые задачи                  |
+| ---------------------- | ------------- | -------------------------------- |
+| Tech Lead Frontend     | Архитектура   | Next.js 15, компонентная система |
+| Senior Frontend Dev #1 | Visualization | Generation Graph, ReactFlow      |
+| Senior Frontend Dev #2 | Admin UI      | Pipeline Panel, настройки        |
+| Frontend Developer #1  | Components    | shadcn/ui, формы, таблицы        |
+| Frontend Developer #2  | Real-time     | SSE, streaming, live updates     |
+| Fullstack Developer #1 | Integration   | tRPC клиент, state management    |
+| Fullstack Developer #2 | Features      | Markdown renderer, i18n          |
 
 #### AI/ML Team (4 человека)
 
-| Позиция | Специализация | Ключевые задачи |
-|---------|---------------|-----------------|
-| AI/ML Lead | Стратегия | Архитектура AI Pipeline, модели |
-| ML Engineer #1 | RAG System | Qdrant, embeddings, поиск |
-| ML Engineer #2 | Quality | Judge System, валидация |
-| Prompt Engineer | Prompts | Оптимизация промптов, A/B тесты |
+| Позиция         | Специализация | Ключевые задачи                 |
+| --------------- | ------------- | ------------------------------- |
+| AI/ML Lead      | Стратегия     | Архитектура AI Pipeline, модели |
+| ML Engineer #1  | RAG System    | Qdrant, embeddings, поиск       |
+| ML Engineer #2  | Quality       | Judge System, валидация         |
+| Prompt Engineer | Prompts       | Оптимизация промптов, A/B тесты |
 
 #### DevOps & Infrastructure (3 человека)
 
-| Позиция | Специализация | Ключевые задачи |
-|---------|---------------|-----------------|
-| Senior DevOps Engineer | CI/CD | GitHub Actions, Docker, деплой |
-| DevOps Engineer | Infrastructure | Серверы, мониторинг, алерты |
-| Database Administrator | Databases | PostgreSQL, Qdrant, оптимизация |
+| Позиция                | Специализация  | Ключевые задачи                 |
+| ---------------------- | -------------- | ------------------------------- |
+| Senior DevOps Engineer | CI/CD          | GitHub Actions, Docker, деплой  |
+| DevOps Engineer        | Infrastructure | Серверы, мониторинг, алерты     |
+| Database Administrator | Databases      | PostgreSQL, Qdrant, оптимизация |
 
 #### QA Team (3 человека)
 
-| Позиция | Специализация | Ключевые задачи |
-|---------|---------------|-----------------|
-| QA Lead | Стратегия | Test coverage, качество |
-| QA Engineer #1 | Automation | Unit/Integration тесты, Vitest |
-| QA Engineer #2 | Manual & E2E | E2E сценарии, регрессия |
+| Позиция        | Специализация | Ключевые задачи                |
+| -------------- | ------------- | ------------------------------ |
+| QA Lead        | Стратегия     | Test coverage, качество        |
+| QA Engineer #1 | Automation    | Unit/Integration тесты, Vitest |
+| QA Engineer #2 | Manual & E2E  | E2E сценарии, регрессия        |
 
 #### Design Team (2 человека)
 
-| Позиция | Специализация | Ключевые задачи |
-|---------|---------------|-----------------|
-| Senior UX Designer | Experience | User research, flows, прототипы |
-| UI Designer | Interface | Компоненты, стили, анимации |
+| Позиция            | Специализация | Ключевые задачи                 |
+| ------------------ | ------------- | ------------------------------- |
+| Senior UX Designer | Experience    | User research, flows, прототипы |
+| UI Designer        | Interface     | Компоненты, стили, анимации     |
 
 ### Вклад команды по областям
 
@@ -1110,21 +1125,21 @@ pie title Распределение усилий команды
 
 ### Итоговые цифры
 
-| Метрика | Значение |
-|---------|----------|
-| **Команда** | 28+ специалистов |
-| Коммитов | 692 |
-| Новых функций | 108 |
-| Исправлений | 138 |
-| Релизов | 189 |
-| Строк кода | 361,276 |
-| TypeScript файлов | 1,341 |
-| Таблиц в БД | 34 |
-| AI агентов | 58 |
-| Спецификаций | 22 |
+| Метрика           | Значение         |
+| ----------------- | ---------------- |
+| **Команда**       | 28+ специалистов |
+| Коммитов          | 692              |
+| Новых функций     | 108              |
+| Исправлений       | 138              |
+| Релизов           | 189              |
+| Строк кода        | 361,276          |
+| TypeScript файлов | 1,341            |
+| Таблиц в БД       | 34               |
+| AI агентов        | 58               |
+| Спецификаций      | 22               |
 
 ---
 
-*Отчёт сгенерирован: 25 декабря 2025*
-*Репозитории: maslennikov-ig/MegaCampusAI → MC-2/mc2*
-*Версия: v0.26.24*
+_Отчёт сгенерирован: 25 декабря 2025_
+_Репозитории: maslennikov-ig/MegaCampusAI → MC-2/mc2_
+_Версия: v0.26.24_

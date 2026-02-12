@@ -49,21 +49,19 @@ export const reorder = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      lessonId,
-      enrichmentCount: orderedIds.length,
-      userId: currentUser.id,
-    }, 'Reorder enrichments request');
+    logger.info(
+      {
+        requestId,
+        lessonId,
+        enrichmentCount: orderedIds.length,
+        userId: currentUser.id,
+      },
+      'Reorder enrichments request'
+    );
 
     try {
       // Step 1: Verify lesson access
-      await verifyLessonAccess(
-        lessonId,
-        currentUser.id,
-        currentUser.organizationId,
-        requestId
-      );
+      await verifyLessonAccess(lessonId, currentUser.id, currentUser.organizationId, requestId);
 
       // Step 2: Verify all enrichments belong to this lesson
       const supabase = getSupabaseAdmin();
@@ -74,11 +72,14 @@ export const reorder = protectedProcedure
         .in('id', orderedIds);
 
       if (fetchError) {
-        logger.error({
-          requestId,
-          lessonId,
-          error: fetchError.message,
-        }, 'Failed to fetch enrichments for reorder');
+        logger.error(
+          {
+            requestId,
+            lessonId,
+            error: fetchError.message,
+          },
+          'Failed to fetch enrichments for reorder'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -91,11 +92,14 @@ export const reorder = protectedProcedure
       const invalidIds = orderedIds.filter(id => !existingIds.has(id));
 
       if (invalidIds.length > 0) {
-        logger.warn({
-          requestId,
-          lessonId,
-          invalidIds,
-        }, 'Some enrichment IDs not found in lesson');
+        logger.warn(
+          {
+            requestId,
+            lessonId,
+            invalidIds,
+          },
+          'Some enrichment IDs not found in lesson'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -128,12 +132,15 @@ export const reorder = protectedProcedure
       // Check for any errors
       const errors = results.filter(r => r.error);
       if (errors.length > 0) {
-        logger.error({
-          requestId,
-          lessonId,
-          errorCount: errors.length,
-          errors: errors.map(e => e.error?.message),
-        }, 'Some enrichment reorder updates failed');
+        logger.error(
+          {
+            requestId,
+            lessonId,
+            errorCount: errors.length,
+            errors: errors.map(e => e.error?.message),
+          },
+          'Some enrichment reorder updates failed'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -141,11 +148,14 @@ export const reorder = protectedProcedure
         });
       }
 
-      logger.info({
-        requestId,
-        lessonId,
-        reorderedCount: orderedIds.length,
-      }, 'Enrichments reordered');
+      logger.info(
+        {
+          requestId,
+          lessonId,
+          reorderedCount: orderedIds.length,
+        },
+        'Enrichments reordered'
+      );
 
       return {
         success: true,
@@ -158,11 +168,14 @@ export const reorder = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        lessonId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Reorder enrichments failed');
+      logger.error(
+        {
+          requestId,
+          lessonId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Reorder enrichments failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

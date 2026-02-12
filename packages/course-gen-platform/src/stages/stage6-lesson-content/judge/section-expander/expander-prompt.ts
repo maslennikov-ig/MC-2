@@ -56,22 +56,24 @@ export function buildExpanderPrompt(input: SectionExpanderInput): string {
     .join('\n');
 
   // Format learning objectives
-  const objectives = input.learningObjectives
-    .map((obj, idx) => `${idx + 1}. ${obj}`)
-    .join('\n');
+  const objectives = input.learningObjectives.map((obj, idx) => `${idx + 1}. ${obj}`).join('\n');
 
   // Format RAG chunks (if available)
-  const ragContext = input.ragChunks.length > 0
-    ? input.ragChunks
-        .map((chunk) => {
-          // Handle different chunk formats
-          if (typeof chunk === 'string') return chunk;
-          if (chunk.content) return chunk.content;
-          if (chunk.text) return chunk.text;
-          return JSON.stringify(chunk);
-        })
-        .join('\n\n---\n\n')
-    : 'No additional reference materials provided.';
+  const ragContext =
+    input.ragChunks.length > 0
+      ? input.ragChunks
+          .map(chunk => {
+            const c = chunk as RagChunk;
+            // Handle different chunk formats
+            if (typeof c === 'string') return c;
+            if (typeof c === 'object' && c !== null) {
+              if ('content' in c) return c.content;
+              if ('text' in c) return c.text;
+            }
+            return JSON.stringify(c);
+          })
+          .join('\n\n---\n\n')
+      : 'No additional reference materials provided.';
 
   // Format context anchors
   const prevContext = input.contextAnchors.prevSectionEnd
@@ -192,7 +194,7 @@ When regenerating a section that contains these elements:
  * ```
  */
 export function formatIssuesAsRequirements(issues: TargetedIssue[]): string[] {
-  return issues.map((issue) => {
+  return issues.map(issue => {
     switch (issue.criterion) {
       case 'factual_accuracy':
         return `Ensure factual accuracy: ${issue.description}`;
@@ -215,7 +217,7 @@ export function formatIssuesAsRequirements(issues: TargetedIssue[]): string[] {
 /**
  * RAG chunk format - union type for different chunk formats
  */
-type RagChunk = string | { content: string } | { text: string };
+export type RagChunk = string | { content: string } | { text: string };
 
 /**
  * Extract RAG chunk text content
@@ -273,4 +275,3 @@ export function validateTargetWordCount(count: number | undefined): number {
   }
   return Math.max(50, Math.min(2000, count));
 }
-

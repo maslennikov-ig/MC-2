@@ -60,11 +60,10 @@ describe('Phase 3: Deep Expert Analysis', () => {
         {
           area: 'Introduction to Hooks',
           estimated_lessons: 10,
-          importance: 'core' as const,
+          importance: 'complex' as const,
           learning_objectives: ['Understand hooks basics', 'Compare to class components'],
           key_topics: ['useState', 'useEffect', 'rules of hooks'],
           pedagogical_approach: 'Theory with live examples',
-          difficulty_progression: 'gradual' as const,
         },
       ],
     },
@@ -86,14 +85,6 @@ describe('Phase 3: Deep Expert Analysis', () => {
           progression_logic:
             'Start with simple hooks (useState), progress to complex patterns (custom hooks), end with optimization',
         },
-        expansion_areas: [
-          {
-            area: 'Advanced patterns',
-            priority: 'important',
-            specific_requirements: ['Add useCallback examples', 'Add useMemo patterns'],
-            estimated_lessons: 5,
-          },
-        ],
         research_flags: [],
         phase_metadata: {
           duration_ms: 30000,
@@ -108,34 +99,12 @@ describe('Phase 3: Deep Expert Analysis', () => {
       expect(mockOutput.pedagogical_strategy.progression_logic.length).toBeGreaterThanOrEqual(100);
     });
 
-    it('should allow null expansion_areas when completeness is high', () => {
-      const mockOutput: Phase3Output = {
-        pedagogical_strategy: {
-          assessment_approach: 'Quizzes and final project with continuous reinforcement',
-          progression_logic:
-            'Balanced progression from fundamentals to advanced topics with continuous reinforcement',
-        },
-        expansion_areas: null, // High completeness (≥80%)
-        research_flags: [],
-        phase_metadata: {
-          duration_ms: 25000,
-          model_used: 'openai/gpt-oss-120b',
-          tokens: { input: 2500, output: 1200, total: 3700 },
-          quality_score: 0.0,
-          retry_count: 0,
-        },
-      };
-
-      expect(mockOutput.expansion_areas).toBeNull();
-    });
-
     it('should support research flags with required fields', () => {
       const mockOutput: Phase3Output = {
         pedagogical_strategy: {
           assessment_approach: 'Written tests and code reviews with deep conceptual understanding',
           progression_logic: 'Deep conceptual understanding before practical application',
         },
-        expansion_areas: null,
         research_flags: [
           {
             topic: 'React 19 features',
@@ -171,7 +140,6 @@ describe('Phase 3: Deep Expert Analysis', () => {
             'Build complete application as final project with incremental features',
           progression_logic: 'Learn by building - each lesson adds new feature to growing project',
         },
-        expansion_areas: null,
         research_flags: [],
         phase_metadata: {
           duration_ms: 35000,

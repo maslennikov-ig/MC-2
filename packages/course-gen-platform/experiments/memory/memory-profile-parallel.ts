@@ -93,16 +93,13 @@ async function processDocument(
   if (estimatedTokens > 3000) {
     console.log(`[Doc ${fileIndex}] Running LLM summarization...`);
     try {
-      const summaryResult = await hierarchicalChunking(
-        markdown,
-        'rus',
-        'Educational document',
-        {
-          targetTokens: 200000,
-          maxIterations: 3,
-        }
+      const summaryResult = await hierarchicalChunking(markdown, 'rus', 'Educational document', {
+        targetTokens: 200000,
+        maxIterations: 3,
+      });
+      console.log(
+        `[Doc ${fileIndex}] Summary: ${summaryResult.summary.length} chars, iterations: ${summaryResult.iterations}`
       );
-      console.log(`[Doc ${fileIndex}] Summary: ${summaryResult.summary.length} chars, iterations: ${summaryResult.iterations}`);
     } catch (error) {
       console.error(`[Doc ${fileIndex}] Summarization failed: ${error}`);
     }
@@ -150,9 +147,7 @@ async function main() {
 
   // This is how BullMQ worker processes with concurrency
   await Promise.all(
-    TEST_FILES.map((filePath, index) =>
-      processDocument(filePath, index, doclingClient)
-    )
+    TEST_FILES.map((filePath, index) => processDocument(filePath, index, doclingClient))
   );
 
   const duration = Date.now() - startTime;

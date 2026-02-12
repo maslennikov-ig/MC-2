@@ -1,85 +1,86 @@
-'use client';
+'use client'
 
-import React, { memo, useMemo, useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Copy, ChevronDown, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { memo, useMemo, useState, useCallback } from 'react'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Copy, ChevronDown, ChevronRight, Maximize2, Minimize2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 interface JsonViewerProps {
-  data: unknown;
-  title?: string;
-  maxHeight?: string;
-  defaultExpanded?: boolean;
+  data: unknown
+  title?: string
+  maxHeight?: string
+  defaultExpanded?: boolean
 }
 
 interface JsonNodeProps {
-  value: unknown;
-  keyName?: string;
-  level: number;
-  isLast: boolean;
-  expandAll: boolean;
+  value: unknown
+  keyName?: string
+  level: number
+  isLast: boolean
+  expandAll: boolean
 }
 
-type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
-type JsonObject = { [key: string]: JsonValue };
-type JsonArray = JsonValue[];
+type JsonValue = string | number | boolean | null | JsonObject | JsonArray
+type JsonObject = { [key: string]: JsonValue }
+type JsonArray = JsonValue[]
 
-const INDENT_SIZE = 16; // px per level
-const LARGE_ARRAY_THRESHOLD = 100; // Items before pagination kicks in
-const LARGE_OBJECT_THRESHOLD = 100; // Keys before pagination kicks in
-const ITEMS_PER_PAGE = 50; // Items shown per page for large datasets
+const INDENT_SIZE = 16 // px per level
+const LARGE_ARRAY_THRESHOLD = 100 // Items before pagination kicks in
+const LARGE_OBJECT_THRESHOLD = 100 // Keys before pagination kicks in
+const ITEMS_PER_PAGE = 50 // Items shown per page for large datasets
 
 // Syntax highlighting component for individual JSON values
 const JsonValueRender = memo(({ value }: { value: unknown }) => {
   if (value === null) {
-    return <span className="text-[var(--json-null)]">null</span>;
+    return <span className="text-[var(--json-null)]">null</span>
   }
 
   if (typeof value === 'string') {
-    return <span className="text-[var(--json-string)]">&quot;{value}&quot;</span>;
+    return <span className="text-[var(--json-string)]">&quot;{value}&quot;</span>
   }
 
   if (typeof value === 'number') {
-    return <span className="text-[var(--json-number)]">{value}</span>;
+    return <span className="text-[var(--json-number)]">{value}</span>
   }
 
   if (typeof value === 'boolean') {
-    return <span className="text-[var(--json-boolean)]">{String(value)}</span>;
+    return <span className="text-[var(--json-boolean)]">{String(value)}</span>
   }
 
-  return <span>{String(value)}</span>;
-});
-JsonValueRender.displayName = 'JsonValueRender';
+  return <span>{JSON.stringify(value)}</span>
+})
+JsonValueRender.displayName = 'JsonValueRender'
 
 // Recursive JSON tree node component
 const JsonNode = memo(({ value, keyName, level, isLast, expandAll }: JsonNodeProps) => {
-  const [isExpanded, setIsExpanded] = useState(expandAll);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(expandAll)
+  const [currentPage, setCurrentPage] = useState(0)
 
   // Sync with expandAll prop
   React.useEffect(() => {
-    setIsExpanded(expandAll);
-  }, [expandAll]);
+    setIsExpanded(expandAll)
+  }, [expandAll])
 
   const toggleExpand = useCallback(() => {
-    setIsExpanded((prev) => !prev);
+    setIsExpanded((prev) => !prev)
     // Reset pagination when collapsing
     if (isExpanded) {
-      setCurrentPage(0);
+      setCurrentPage(0)
     }
-  }, [isExpanded]);
+  }, [isExpanded])
 
   const showNextPage = useCallback(() => {
-    setCurrentPage(prev => prev + 1);
-  }, []);
+    setCurrentPage((prev) => prev + 1)
+  }, [])
 
   const showPrevPage = useCallback(() => {
-    setCurrentPage(prev => Math.max(0, prev - 1));
-  }, []);
+    setCurrentPage((prev) => Math.max(0, prev - 1))
+  }, [])
 
-  const indent = level * INDENT_SIZE;
+  const indent = level * INDENT_SIZE
 
   // Primitive value (leaf node)
   if (value === null || typeof value !== 'object') {
@@ -96,28 +97,28 @@ const JsonNode = memo(({ value, keyName, level, isLast, expandAll }: JsonNodePro
           {!isLast && <span className="text-[var(--json-bracket)]">,</span>}
         </div>
       </div>
-    );
+    )
   }
 
   // Array or Object
-  const isArray = Array.isArray(value);
+  const isArray = Array.isArray(value)
   const allEntries = isArray
     ? (value as JsonArray).map((item, idx) => [String(idx), item] as const)
-    : Object.entries(value as JsonObject);
+    : Object.entries(value as JsonObject)
 
-  const isEmpty = allEntries.length === 0;
-  const openBracket = isArray ? '[' : '{';
-  const closeBracket = isArray ? ']' : '}';
+  const isEmpty = allEntries.length === 0
+  const openBracket = isArray ? '[' : '{'
+  const closeBracket = isArray ? ']' : '}'
 
   // Performance optimization: Paginate large datasets
-  const threshold = isArray ? LARGE_ARRAY_THRESHOLD : LARGE_OBJECT_THRESHOLD;
-  const isLargeDataset = allEntries.length > threshold;
-  const totalPages = Math.ceil(allEntries.length / ITEMS_PER_PAGE);
-  const startIdx = currentPage * ITEMS_PER_PAGE;
-  const endIdx = Math.min(startIdx + ITEMS_PER_PAGE, allEntries.length);
-  const entries = isLargeDataset ? allEntries.slice(startIdx, endIdx) : allEntries;
-  const hasNextPage = isLargeDataset && currentPage < totalPages - 1;
-  const hasPrevPage = isLargeDataset && currentPage > 0;
+  const threshold = isArray ? LARGE_ARRAY_THRESHOLD : LARGE_OBJECT_THRESHOLD
+  const isLargeDataset = allEntries.length > threshold
+  const totalPages = Math.ceil(allEntries.length / ITEMS_PER_PAGE)
+  const startIdx = currentPage * ITEMS_PER_PAGE
+  const endIdx = Math.min(startIdx + ITEMS_PER_PAGE, allEntries.length)
+  const entries = isLargeDataset ? allEntries.slice(startIdx, endIdx) : allEntries
+  const hasNextPage = isLargeDataset && currentPage < totalPages - 1
+  const hasPrevPage = isLargeDataset && currentPage > 0
 
   // Single-line display for empty arrays/objects
   if (isEmpty) {
@@ -130,32 +131,35 @@ const JsonNode = memo(({ value, keyName, level, isLast, expandAll }: JsonNodePro
               <span className="text-[var(--json-bracket)]">: </span>
             </>
           )}
-          <span className="text-[var(--json-bracket)]">{openBracket}{closeBracket}</span>
+          <span className="text-[var(--json-bracket)]">
+            {openBracket}
+            {closeBracket}
+          </span>
           {!isLast && <span className="text-[var(--json-bracket)]">,</span>}
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div>
       {/* Header line with expand/collapse button */}
-      <div className="flex items-center font-mono text-sm leading-6 group">
+      <div className="group flex items-center font-mono text-sm leading-6">
         <button
           onClick={toggleExpand}
-          className="flex items-center hover:bg-accent/50 rounded px-1 -ml-1 focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="hover:bg-accent/50 focus:ring-primary/20 -ml-1 flex items-center rounded px-1 focus:ring-2 focus:outline-none"
           style={{ paddingLeft: `${indent}px` }}
           aria-expanded={isExpanded}
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
         >
           {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+            <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
           )}
           {keyName && (
             <>
-              <span className="text-[var(--json-keyword)] ml-1">&quot;{keyName}&quot;</span>
+              <span className="ml-1 text-[var(--json-keyword)]">&quot;{keyName}&quot;</span>
               <span className="text-[var(--json-bracket)]">: </span>
             </>
           )}
@@ -181,9 +185,13 @@ const JsonNode = memo(({ value, keyName, level, isLast, expandAll }: JsonNodePro
           >
             {/* Pagination info for large datasets */}
             {isLargeDataset && (
-              <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground" style={{ paddingLeft: `${indent + INDENT_SIZE}px` }}>
+              <div
+                className="text-muted-foreground flex items-center gap-2 font-mono text-xs"
+                style={{ paddingLeft: `${indent + INDENT_SIZE}px` }}
+              >
                 <span>
-                  Showing {startIdx + 1}-{endIdx} of {allEntries.length} {isArray ? 'items' : 'keys'}
+                  Showing {startIdx + 1}-{endIdx} of {allEntries.length}{' '}
+                  {isArray ? 'items' : 'keys'}
                 </span>
                 {hasPrevPage && (
                   <button
@@ -225,166 +233,165 @@ const JsonNode = memo(({ value, keyName, level, isLast, expandAll }: JsonNodePro
         )}
       </AnimatePresence>
     </div>
-  );
-});
-JsonNode.displayName = 'JsonNode';
+  )
+})
+JsonNode.displayName = 'JsonNode'
 
-export const JsonViewer = memo(({
-  data,
-  title,
-  maxHeight = '60vh',
-  defaultExpanded = false
-}: JsonViewerProps) => {
-  const [expandAll, setExpandAll] = useState(defaultExpanded);
+export const JsonViewer = memo(
+  ({ data, title, maxHeight = '60vh', defaultExpanded = false }: JsonViewerProps) => {
+    const [expandAll, setExpandAll] = useState(defaultExpanded)
 
-  const jsonString = useMemo(() => {
-    try {
-      return JSON.stringify(data, null, 2);
-    } catch (_error) {
-      return String(data);
-    }
-  }, [data]);
-
-  // Performance measurement: Track JSON render time
-  React.useEffect(() => {
-    if (!data) return;
-
-    const startMark = 'json-render-start';
-    const endMark = 'json-render-end';
-    const measureName = 'json-render-duration';
-
-    performance.mark(startMark);
-
-    const rafId = requestAnimationFrame(() => {
-      performance.mark(endMark);
-
+    const jsonString = useMemo(() => {
       try {
-        performance.measure(measureName, startMark, endMark);
-        const measure = performance.getEntriesByName(measureName)[0];
-        const duration = measure.duration;
-
-        // Count total items for context
-        const itemCount = Array.isArray(data)
-          ? data.length
-          : typeof data === 'object' && data !== null
-          ? Object.keys(data).length
-          : 0;
-
-        if (duration > 100 && itemCount > 50) {
-          console.warn(
-            `[Performance] JsonViewer render exceeded 100ms: ${duration.toFixed(2)}ms for ${itemCount} items`,
-            { title, itemCount }
-          );
-        } else if (process.env.NODE_ENV === 'development' && itemCount > 100) {
-          console.log(
-            `[Performance] JsonViewer rendered ${itemCount} items in ${duration.toFixed(2)}ms`,
-            { title }
-          );
-        }
-
-        performance.clearMarks(startMark);
-        performance.clearMarks(endMark);
-        performance.clearMeasures(measureName);
-      } catch (error) {
-        console.debug('[Performance] Failed to measure JSON render time:', error);
+        return JSON.stringify(data, null, 2)
+      } catch (_error) {
+        return String(data)
       }
-    });
+    }, [data])
 
-    return () => cancelAnimationFrame(rafId);
-  }, [data, title]);
+    // Performance measurement: Track JSON render time
+    React.useEffect(() => {
+      if (!data) return
 
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(jsonString);
-      toast.success('Copied to clipboard');
-    } catch (_error) {
-      toast.error('Failed to copy to clipboard');
+      const startMark = 'json-render-start'
+      const endMark = 'json-render-end'
+      const measureName = 'json-render-duration'
+
+      performance.mark(startMark)
+
+      const rafId = requestAnimationFrame(() => {
+        performance.mark(endMark)
+
+        try {
+          performance.measure(measureName, startMark, endMark)
+          const measure = performance.getEntriesByName(measureName)[0]
+          const duration = measure.duration
+
+          // Count total items for context
+          const itemCount = Array.isArray(data)
+            ? data.length
+            : typeof data === 'object' && data !== null
+              ? Object.keys(data).length
+              : 0
+
+          if (duration > 100 && itemCount > 50) {
+            console.warn(
+              `[Performance] JsonViewer render exceeded 100ms: ${duration.toFixed(2)}ms for ${itemCount} items`,
+              { title, itemCount }
+            )
+          } else if (process.env.NODE_ENV === 'development' && itemCount > 100) {
+            console.log(
+              `[Performance] JsonViewer rendered ${itemCount} items in ${duration.toFixed(2)}ms`,
+              { title }
+            )
+          }
+
+          performance.clearMarks(startMark)
+          performance.clearMarks(endMark)
+          performance.clearMeasures(measureName)
+        } catch (error) {
+          console.debug('[Performance] Failed to measure JSON render time:', error)
+        }
+      })
+
+      return () => cancelAnimationFrame(rafId)
+    }, [data, title])
+
+    const handleCopy = useCallback(async () => {
+      try {
+        await copyToClipboard(jsonString)
+        toast.success('Copied to clipboard')
+      } catch (_error) {
+        toast.error('Failed to copy to clipboard')
+      }
+    }, [jsonString])
+
+    const toggleExpandAll = useCallback(() => {
+      setExpandAll((prev) => !prev)
+    }, [])
+
+    if (!data) {
+      return (
+        <div className="text-muted-foreground rounded-md border border-slate-200 bg-slate-100 p-4 text-sm dark:border-slate-700 dark:bg-slate-800">
+          No data available
+        </div>
+      )
     }
-  }, [jsonString]);
 
-  const toggleExpandAll = useCallback(() => {
-    setExpandAll((prev) => !prev);
-  }, []);
-
-  if (!data) {
     return (
-      <div className="p-4 border rounded-md bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm text-muted-foreground">
-        No data available
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+        {/* Header with controls */}
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+          <div className="flex items-center gap-2">
+            {title && <span className="text-sm font-medium">{title}</span>}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleExpandAll}
+              className="h-8 px-2 text-xs"
+              title={expandAll ? 'Свернуть всё' : 'Развернуть всё'}
+            >
+              {expandAll ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5" />
+                  <span className="ml-1 hidden sm:inline">Свернуть</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  <span className="ml-1 hidden sm:inline">Развернуть</span>
+                </>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                void handleCopy()
+              }}
+              className="h-8 px-2 text-xs"
+              title="Копировать"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span className="ml-1 hidden sm:inline">Копировать</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* JSON content with custom scrollbar */}
+        <ScrollArea className="w-full" style={{ maxHeight }}>
+          <div className="p-4">
+            <JsonNode value={data} level={0} isLast={true} expandAll={expandAll} />
+          </div>
+        </ScrollArea>
+
+        {/* CSS variables for syntax highlighting */}
+        <style jsx>{`
+          /* Light theme syntax colors */
+          :global(:root) {
+            --json-keyword: hsl(220, 95%, 45%); /* Blue - for keys */
+            --json-string: hsl(130, 88%, 32%); /* Green - for string values */
+            --json-number: hsl(169, 84%, 38%); /* Teal - for numbers */
+            --json-boolean: hsl(240, 100%, 50%); /* Blue - for true/false */
+            --json-null: hsl(0, 0%, 50%); /* Gray - for null */
+            --json-bracket: hsl(240, 100%, 50%); /* Blue - for {}, [], : */
+          }
+
+          /* Dark theme syntax colors */
+          :global(.dark) {
+            --json-keyword: hsl(200, 100%, 65%); /* Light blue - for keys */
+            --json-string: hsl(145, 63%, 57%); /* Green - for string values */
+            --json-number: hsl(168, 55%, 60%); /* Teal - for numbers */
+            --json-boolean: hsl(217, 71%, 63%); /* Blue - for true/false */
+            --json-null: hsl(220, 9%, 66%); /* Gray - for null */
+            --json-bracket: hsl(213, 97%, 68%); /* Light blue - for {}, [], : */
+          }
+        `}</style>
       </div>
-    );
+    )
   }
+)
 
-  return (
-    <div className="border rounded-lg overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-      {/* Header with controls */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
-        <div className="flex items-center gap-2">
-          {title && <span className="text-sm font-medium">{title}</span>}
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleExpandAll}
-            className="h-8 px-2 text-xs"
-            title={expandAll ? 'Свернуть всё' : 'Развернуть всё'}
-          >
-            {expandAll ? (
-              <>
-                <Minimize2 className="w-3.5 h-3.5" />
-                <span className="ml-1 hidden sm:inline">Свернуть</span>
-              </>
-            ) : (
-              <>
-                <Maximize2 className="w-3.5 h-3.5" />
-                <span className="ml-1 hidden sm:inline">Развернуть</span>
-              </>
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopy}
-            className="h-8 px-2 text-xs"
-            title="Копировать"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            <span className="ml-1 hidden sm:inline">Копировать</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* JSON content with custom scrollbar */}
-      <ScrollArea className="w-full" style={{ maxHeight }}>
-        <div className="p-4">
-          <JsonNode value={data} level={0} isLast={true} expandAll={expandAll} />
-        </div>
-      </ScrollArea>
-
-      {/* CSS variables for syntax highlighting */}
-      <style jsx>{`
-        /* Light theme syntax colors */
-        :global(:root) {
-          --json-keyword: hsl(220, 95%, 45%); /* Blue - for keys */
-          --json-string: hsl(130, 88%, 32%); /* Green - for string values */
-          --json-number: hsl(169, 84%, 38%); /* Teal - for numbers */
-          --json-boolean: hsl(240, 100%, 50%); /* Blue - for true/false */
-          --json-null: hsl(0, 0%, 50%); /* Gray - for null */
-          --json-bracket: hsl(240, 100%, 50%); /* Blue - for {}, [], : */
-        }
-
-        /* Dark theme syntax colors */
-        :global(.dark) {
-          --json-keyword: hsl(200, 100%, 65%); /* Light blue - for keys */
-          --json-string: hsl(145, 63%, 57%); /* Green - for string values */
-          --json-number: hsl(168, 55%, 60%); /* Teal - for numbers */
-          --json-boolean: hsl(217, 71%, 63%); /* Blue - for true/false */
-          --json-null: hsl(220, 9%, 66%); /* Gray - for null */
-          --json-bracket: hsl(213, 97%, 68%); /* Light blue - for {}, [], : */
-        }
-      `}</style>
-    </div>
-  );
-});
-
-JsonViewer.displayName = 'JsonViewer';
+JsonViewer.displayName = 'JsonViewer'

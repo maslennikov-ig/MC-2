@@ -7,6 +7,7 @@ Video assets were not displaying on the course page even though they existed in 
 ## Root Cause
 
 The issue was caused by Row Level Security (RLS) policies on the `assets` table in Supabase. The RLS policy requires either:
+
 1. The course to be published (`is_published = true`), OR
 2. The current authenticated user to be the course owner
 
@@ -52,6 +53,7 @@ const { data: assets, error: assetsError } = await adminSupabase
 ## Testing
 
 After implementing the fix:
+
 1. Clear browser cache
 2. Restart Next.js dev server if needed
 3. Navigate to the course page

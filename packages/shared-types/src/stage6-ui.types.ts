@@ -19,15 +19,14 @@ import type { JudgeRecommendation, SelfReviewResult } from './judge-types';
 // =============================================================================
 
 /**
- * Stage6NodeName - The 4 pipeline nodes in Stage 6 lesson generation
+ * Stage6NodeName - The 3 pipeline nodes in Stage 6 lesson generation
  *
  * Pipeline flow:
  * 1. generator: Generates full lesson content (intro + sections + summary) in one pass
  * 2. selfReviewer: Pre-judge validation (Fail-Fast architecture)
  * 3. judge: Evaluates quality using CLEV voting and targeted refinement
- * 4. coverGenerator: Generates lesson cover image (auto-triggered after judge completes)
  */
-export type Stage6NodeName = 'generator' | 'selfReviewer' | 'judge' | 'coverGenerator';
+export type Stage6NodeName = 'generator' | 'selfReviewer' | 'judge';
 
 /**
  * Stage6NodeStatus - Current status of a pipeline node
@@ -305,6 +304,8 @@ export interface LessonMatrixRow {
   retryCount: number;
   /** Whether retry action is available */
   canRetry: boolean;
+  /** Total tokens consumed (null if pending/active) */
+  totalTokens: number | null;
 }
 
 /**
@@ -334,6 +335,8 @@ export interface ModuleDashboardAggregates {
   totalDurationMs: number;
   /** Estimated time remaining for pending/active lessons (null if unknown) */
   estimatedTimeRemainingMs: number | null;
+  /** Total tokens consumed across all lessons */
+  totalTokens: number;
 }
 
 /**
@@ -465,6 +468,14 @@ export interface LessonInspectorData {
   /** Source documents used in RAG retrieval for this lesson */
   sourceDocuments?: SourceDocument[];
 
+  // Generation input parameters
+  /** Lesson specification used for generation (from Stage 5) */
+  lessonSpec?: Record<string, unknown> | null;
+  /** Course style prompt used for generation */
+  style?: string | null;
+  /** Language of generation */
+  language?: string | null;
+
   // Quality
   /** Self-review result from pre-judge validation (null if not reviewed yet) */
   selfReviewResult?: SelfReviewResult | null;
@@ -513,7 +524,6 @@ export const STAGE6_NODE_LABELS: Record<Stage6NodeName, { ru: string; descriptio
   generator: { ru: 'Генератор', description: 'Генерация полного контента урока' },
   selfReviewer: { ru: 'Самопроверка', description: 'Предварительная проверка качества' },
   judge: { ru: 'Оценка качества', description: 'Проверка критериев и доработка' },
-  coverGenerator: { ru: 'Обложка', description: 'Генерация обложки урока' },
 } as const;
 
 /**
@@ -553,7 +563,12 @@ export const CONSENSUS_METHOD_LABELS: Record<ConsensusMethod, string> = {
  * - section-expander: Regenerates entire sections
  * - delta-judge: Verifies patch results
  */
-export type RefinementAgentName = 'arbiter' | 'patcher' | 'section-expander' | 'delta-judge' | 'orchestrator';
+export type RefinementAgentName =
+  | 'arbiter'
+  | 'patcher'
+  | 'section-expander'
+  | 'delta-judge'
+  | 'orchestrator';
 
 /**
  * RefinementEventType - All streaming event types for UI updates
@@ -906,7 +921,10 @@ export interface LessonInspectorDataRefinementExtension {
 /**
  * REFINEMENT_MODE_LABELS - Russian labels for operation modes
  */
-export const REFINEMENT_MODE_LABELS: Record<'full-auto' | 'semi-auto', { ru: string; description: string }> = {
+export const REFINEMENT_MODE_LABELS: Record<
+  'full-auto' | 'semi-auto',
+  { ru: string; description: string }
+> = {
   'full-auto': { ru: 'Автоматический', description: 'Полностью автоматическая доработка' },
   'semi-auto': { ru: 'Полуавтоматический', description: 'С возможностью эскалации на человека' },
 } as const;
@@ -923,7 +941,10 @@ export const FIX_ACTION_LABELS: Record<FixActionType, { ru: string; description:
 /**
  * REFINEMENT_STATUS_LABELS - Russian labels for refinement statuses
  */
-export const REFINEMENT_STATUS_LABELS: Record<'accepted' | 'accepted_warning' | 'best_effort' | 'escalated', { ru: string; color: string }> = {
+export const REFINEMENT_STATUS_LABELS: Record<
+  'accepted' | 'accepted_warning' | 'best_effort' | 'escalated',
+  { ru: string; color: string }
+> = {
   accepted: { ru: 'Принято', color: 'emerald' },
   accepted_warning: { ru: 'Принято с замечаниями', color: 'yellow' },
   best_effort: { ru: 'Лучший результат', color: 'orange' },
@@ -942,8 +963,14 @@ export const SECTION_LOCK_LABELS: Record<SectionLockReason, { ru: string; descri
 /**
  * AGREEMENT_LEVEL_LABELS - Russian labels for agreement levels
  */
-export const AGREEMENT_LEVEL_LABELS: Record<'high' | 'moderate' | 'low', { ru: string; description: string }> = {
+export const AGREEMENT_LEVEL_LABELS: Record<
+  'high' | 'moderate' | 'low',
+  { ru: string; description: string }
+> = {
   high: { ru: 'Высокое согласие', description: 'Судьи единодушны (α ≥ 0.80)' },
-  moderate: { ru: 'Умеренное согласие', description: 'Судьи в основном согласны (0.67 ≤ α < 0.80)' },
+  moderate: {
+    ru: 'Умеренное согласие',
+    description: 'Судьи в основном согласны (0.67 ≤ α < 0.80)',
+  },
   low: { ru: 'Низкое согласие', description: 'Судьи расходятся во мнениях (α < 0.67)' },
 } as const;

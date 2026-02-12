@@ -12,18 +12,18 @@
  * @module app/admin/pipeline/components/config-history-dialog
  */
 
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { Loader2, History, RotateCcw } from 'lucide-react';
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+import { Loader2, History, RotateCcw } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,22 +33,22 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { getModelConfigHistory, revertModelConfigToVersion } from '@/app/actions/pipeline-admin';
-import { DiffViewer } from './diff-viewer';
-import type { ModelConfigHistoryItem } from '@megacampus/shared-types';
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import { trpc } from '@/lib/trpc/react'
+import { DiffViewer } from './diff-viewer'
+import type { PhaseName } from '@megacampus/shared-types'
 
 interface ConfigHistoryDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  phaseName: string;
-  onReverted?: () => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  phaseName: PhaseName
+  onReverted?: () => void
 }
 
 /**
@@ -60,100 +60,88 @@ export function ConfigHistoryDialog({
   phaseName,
   onReverted,
 }: ConfigHistoryDialogProps) {
-  const [history, setHistory] = useState<ModelConfigHistoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Diff comparison state
-  const [compareMode, setCompareMode] = useState(false);
-  const [selectedV1, setSelectedV1] = useState<string>('');
-  const [selectedV2, setSelectedV2] = useState<string>('');
+  const [compareMode, setCompareMode] = useState(false)
+  const [selectedV1, setSelectedV1] = useState<string>('')
+  const [selectedV2, setSelectedV2] = useState<string>('')
 
   // Revert confirmation state
-  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
-  const [revertTargetVersion, setRevertTargetVersion] = useState<number | null>(null);
-  const [isReverting, setIsReverting] = useState(false);
+  const [revertDialogOpen, setRevertDialogOpen] = useState(false)
+  const [revertTargetVersion, setRevertTargetVersion] = useState<number | null>(null)
 
-  // Load history when dialog opens
-  useEffect(() => {
-    if (!open) return;
+  // tRPC query for config history
+  const {
+    data: history = [],
+    isLoading,
+    error,
+  } = trpc.pipelineAdmin.getModelConfigHistory.useQuery(
+    {
+      phaseName,
+      configType: 'global',
+    },
+    { enabled: open && !!phaseName }
+  )
 
-    async function loadHistory() {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const result = await getModelConfigHistory({
-          phaseName,
-          configType: 'global',
-        });
-        setHistory(result.result?.data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load history');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadHistory();
-  }, [open, phaseName]);
+  // tRPC mutation for reverting
+  const revertMutation = trpc.pipelineAdmin.revertModelConfigToVersion.useMutation({
+    onSuccess: (_data, variables) => {
+      toast.success(`Reverted to version ${variables.targetVersion}`)
+      onReverted?.()
+      onOpenChange(false)
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to revert')
+    },
+    onSettled: () => {
+      setRevertDialogOpen(false)
+      setRevertTargetVersion(null)
+    },
+  })
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
-      setCompareMode(false);
-      setSelectedV1('');
-      setSelectedV2('');
+      setCompareMode(false)
+      setSelectedV1('')
+      setSelectedV2('')
     }
-  }, [open]);
+  }, [open])
 
   // Handle revert action
-  const handleRevert = async (version: number) => {
-    setRevertTargetVersion(version);
-    setRevertDialogOpen(true);
-  };
+  const handleRevert = (version: number) => {
+    setRevertTargetVersion(version)
+    setRevertDialogOpen(true)
+  }
 
-  const confirmRevert = async () => {
-    if (!revertTargetVersion) return;
+  const confirmRevert = () => {
+    if (!revertTargetVersion) return
 
-    try {
-      setIsReverting(true);
-      await revertModelConfigToVersion({
-        phaseName,
-        targetVersion: revertTargetVersion,
-      });
-
-      toast.success(`Reverted to version ${revertTargetVersion}`);
-      onReverted?.();
-      onOpenChange(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to revert');
-    } finally {
-      setIsReverting(false);
-      setRevertDialogOpen(false);
-      setRevertTargetVersion(null);
-    }
-  };
+    revertMutation.mutate({
+      phaseName,
+      targetVersion: revertTargetVersion,
+    })
+  }
 
   // Get config objects for comparison
-  const config1 = history.find((h) => h.id === selectedV1);
-  const config2 = history.find((h) => h.id === selectedV2);
+  const config1 = history.find((h) => h.id === selectedV1)
+  const config2 = history.find((h) => h.id === selectedV2)
 
   // Format date for display
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = new Date(dateString)
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    }).format(date);
-  };
+    }).format(date)
+  }
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="max-h-[80vh] max-w-4xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
@@ -166,18 +154,18 @@ export function ConfigHistoryDialog({
 
           {isLoading && (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
             </div>
           )}
 
           {error && (
-            <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
-              <p className="text-sm text-destructive">{error}</p>
+            <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
+              <p className="text-destructive text-sm">{error.message}</p>
             </div>
           )}
 
           {!isLoading && !error && history.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-muted-foreground py-8 text-center">
               <p>No version history available</p>
             </div>
           )}
@@ -190,16 +178,16 @@ export function ConfigHistoryDialog({
                   variant={compareMode ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => {
-                    setCompareMode(!compareMode);
-                    setSelectedV1('');
-                    setSelectedV2('');
+                    setCompareMode(!compareMode)
+                    setSelectedV1('')
+                    setSelectedV2('')
                   }}
                 >
                   {compareMode ? 'Exit Compare Mode' : 'Compare Versions'}
                 </Button>
 
                 {compareMode && (
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-muted-foreground text-sm">
                     Select two versions to compare
                   </div>
                 )}
@@ -210,7 +198,8 @@ export function ConfigHistoryDialog({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span>
-                      <Badge variant="outline">V{config1.version}</Badge> → <Badge variant="outline">V{config2.version}</Badge>
+                      <Badge variant="outline">V{config1.version}</Badge> →{' '}
+                      <Badge variant="outline">V{config2.version}</Badge>
                     </span>
                   </div>
                   <DiffViewer
@@ -244,7 +233,7 @@ export function ConfigHistoryDialog({
                           {history.map((item) => (
                             <div
                               key={`v1-${item.id}`}
-                              className="flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50"
+                              className="hover:bg-muted/50 flex items-center space-x-2 rounded-md border p-3"
                             >
                               <RadioGroupItem value={item.id} id={`v1-${item.id}`} />
                               <Label
@@ -253,11 +242,11 @@ export function ConfigHistoryDialog({
                               >
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline">V{item.version}</Badge>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDate(item.createdAt)}
+                                  <span className="text-muted-foreground text-xs">
+                                    {formatDate(item.createdAt || '')}
                                   </span>
                                 </div>
-                                <div className="text-xs text-muted-foreground truncate">
+                                <div className="text-muted-foreground truncate text-xs">
                                   {item.modelId}
                                 </div>
                               </Label>
@@ -272,7 +261,7 @@ export function ConfigHistoryDialog({
                           {history.map((item) => (
                             <div
                               key={`v2-${item.id}`}
-                              className="flex items-center space-x-2 rounded-md border p-3 hover:bg-muted/50"
+                              className="hover:bg-muted/50 flex items-center space-x-2 rounded-md border p-3"
                             >
                               <RadioGroupItem value={item.id} id={`v2-${item.id}`} />
                               <Label
@@ -281,11 +270,11 @@ export function ConfigHistoryDialog({
                               >
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline">V{item.version}</Badge>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDate(item.createdAt)}
+                                  <span className="text-muted-foreground text-xs">
+                                    {formatDate(item.createdAt || '')}
                                   </span>
                                 </div>
-                                <div className="text-xs text-muted-foreground truncate">
+                                <div className="text-muted-foreground truncate text-xs">
                                   {item.modelId}
                                 </div>
                               </Label>
@@ -301,10 +290,10 @@ export function ConfigHistoryDialog({
                     {history.map((item, index) => (
                       <div
                         key={item.id}
-                        className="rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                        className="hover:bg-muted/50 rounded-lg border p-4 transition-colors"
                       >
                         <div className="flex items-start justify-between">
-                          <div className="space-y-2 flex-1">
+                          <div className="flex-1 space-y-2">
                             <div className="flex items-center gap-2">
                               <Badge variant={index === 0 ? 'default' : 'outline'}>
                                 Version {item.version}
@@ -324,15 +313,17 @@ export function ConfigHistoryDialog({
                                 </div>
                               )}
                               <div>
-                                <span className="text-muted-foreground">Temperature:</span> {item.temperature}
+                                <span className="text-muted-foreground">Temperature:</span>{' '}
+                                {item.temperature}
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Max Tokens:</span> {item.maxTokens}
+                                <span className="text-muted-foreground">Max Tokens:</span>{' '}
+                                {item.maxTokens}
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <span>{formatDate(item.createdAt)}</span>
+                            <div className="text-muted-foreground flex items-center gap-4 text-xs">
+                              <span>{formatDate(item.createdAt || '')}</span>
                               {item.createdByEmail && <span>By: {item.createdByEmail}</span>}
                             </div>
                           </div>
@@ -343,7 +334,7 @@ export function ConfigHistoryDialog({
                               size="sm"
                               onClick={() => handleRevert(item.version)}
                             >
-                              <RotateCcw className="h-4 w-4 mr-1" />
+                              <RotateCcw className="mr-1 h-4 w-4" />
                               Revert
                             </Button>
                           )}
@@ -369,14 +360,14 @@ export function ConfigHistoryDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isReverting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRevert} disabled={isReverting}>
-              {isReverting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            <AlertDialogCancel disabled={revertMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRevert} disabled={revertMutation.isPending}>
+              {revertMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm Revert
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  );
+  )
 }

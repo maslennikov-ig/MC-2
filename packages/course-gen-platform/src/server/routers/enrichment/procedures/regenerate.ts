@@ -75,11 +75,14 @@ export const regenerate = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      enrichmentId,
-      userId: currentUser.id,
-    }, 'Regenerate enrichment request');
+    logger.info(
+      {
+        requestId,
+        enrichmentId,
+        userId: currentUser.id,
+      },
+      'Regenerate enrichment request'
+    );
 
     try {
       // Step 1: Verify enrichment access and get current data
@@ -91,18 +94,40 @@ export const regenerate = protectedProcedure
       );
 
       // Step 2: Check if enrichment can be regenerated
-      const allowedStatuses = ['failed', 'cancelled', 'completed'];
+      const allowedStatuses = ['failed', 'cancelled', 'completed', 'generating'];
       if (!allowedStatuses.includes(enrichment.status)) {
-        logger.warn({
-          requestId,
-          enrichmentId,
-          currentStatus: enrichment.status,
-        }, 'Cannot regenerate enrichment with current status');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            currentStatus: enrichment.status,
+          },
+          'Cannot regenerate enrichment with current status'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Cannot regenerate enrichment with status '${enrichment.status}'. Only failed, cancelled, or completed enrichments can be regenerated.`,
+          message: `Cannot regenerate enrichment with status '${enrichment.status}'. Only failed, cancelled, completed, or stuck generating enrichments can be regenerated.`,
         });
+      }
+
+      // Step 2.1: For generating enrichments, require a minimum stuck time (10 min)
+      if (enrichment.status === 'generating') {
+        const updatedAt = new Date(enrichment.updated_at);
+        if (isNaN(updatedAt.getTime())) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Invalid enrichment timestamp',
+          });
+        }
+        const stuckThresholdMs = 10 * 60 * 1000;
+        if (Date.now() - updatedAt.getTime() < stuckThresholdMs) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              'Enrichment is still generating. Wait at least 10 minutes before regenerating.',
+          });
+        }
       }
 
       // Step 2.5: For completed enrichments, clean up existing assets
@@ -117,18 +142,24 @@ export const regenerate = protectedProcedure
               extension
             );
             await deleteEnrichmentAsset(assetPath);
-            logger.info({
-              requestId,
-              enrichmentId,
-              assetPath,
-            }, 'Deleted existing asset for regeneration');
+            logger.info(
+              {
+                requestId,
+                enrichmentId,
+                assetPath,
+              },
+              'Deleted existing asset for regeneration'
+            );
           } catch (storageError) {
             // Log but don't fail - file may not exist
-            logger.warn({
-              requestId,
-              enrichmentId,
-              error: storageError instanceof Error ? storageError.message : String(storageError),
-            }, 'Failed to delete existing asset (continuing with regeneration)');
+            logger.warn(
+              {
+                requestId,
+                enrichmentId,
+                error: storageError instanceof Error ? storageError.message : String(storageError),
+              },
+              'Failed to delete existing asset (continuing with regeneration)'
+            );
           }
         }
       }
@@ -156,11 +187,14 @@ export const regenerate = protectedProcedure
         .eq('id', enrichmentId);
 
       if (updateError) {
-        logger.error({
-          requestId,
-          enrichmentId,
-          error: updateError.message,
-        }, 'Failed to update enrichment for regeneration');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            error: updateError.message,
+          },
+          'Failed to update enrichment for regeneration'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -179,7 +213,6 @@ export const regenerate = protectedProcedure
         userId: currentUser.id,
         organizationId: currentUser.organizationId,
         settings: {},
-        retryAttempt: newAttempt,
         isDraftPhase: isTwoStageType(enrichmentType),
       };
 
@@ -187,12 +220,15 @@ export const regenerate = protectedProcedure
         jobId: `enrich-${enrichmentId}-${newAttempt}`,
       });
 
-      logger.info({
-        requestId,
-        enrichmentId,
-        newAttempt,
-        jobId: job.id,
-      }, 'Enrichment regeneration enqueued');
+      logger.info(
+        {
+          requestId,
+          enrichmentId,
+          newAttempt,
+          jobId: job.id,
+        },
+        'Enrichment regeneration enqueued'
+      );
 
       return {
         success: true,
@@ -206,11 +242,14 @@ export const regenerate = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        enrichmentId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Regenerate enrichment failed');
+      logger.error(
+        {
+          requestId,
+          enrichmentId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Regenerate enrichment failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

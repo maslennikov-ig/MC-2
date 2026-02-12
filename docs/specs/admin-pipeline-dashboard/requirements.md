@@ -3,16 +3,20 @@
 ## 1. Общее описание
 
 ### 1.1 Цель
+
 Создать административную страницу для суперадминов платформы MegaCampus, которая позволяет:
+
 - Просматривать полную структуру пайплайна генерации курсов (все 6 этапов)
 - Управлять конфигурацией LLM-моделей для каждой фазы
 - Редактировать промпты, используемые на каждом этапе
 - Получать актуальный список моделей с OpenRouter API
 
 ### 1.2 Целевая аудитория
+
 Только пользователи с ролью `superadmin`. Страница должна быть недоступна для других ролей (admin, instructor, student).
 
 ### 1.3 Расположение
+
 - URL: `/admin/pipeline`
 - Временно отдельная страница, позже интегрируется в общую админку
 
@@ -24,14 +28,14 @@
 
 Пайплайн состоит из 6 этапов (stages), реализованных через BullMQ:
 
-| Этап | Название | Описание | Файл handler |
-|------|----------|----------|--------------|
-| Stage 1 | Document Upload | Загрузка документов (синхронный tRPC) | `stages/stage1-document-upload/handler.ts` |
+| Этап    | Название            | Описание                                                    | Файл handler                                   |
+| ------- | ------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
+| Stage 1 | Document Upload     | Загрузка документов (синхронный tRPC)                       | `stages/stage1-document-upload/handler.ts`     |
 | Stage 2 | Document Processing | Конвертация Docling, чанкинг, эмбеддинги, загрузка в Qdrant | `stages/stage2-document-processing/handler.ts` |
-| Stage 3 | Classification | Классификация и категоризация контента | `stages/stage3-classification/handler.ts` |
-| Stage 4 | Analysis | Многофазный LLM-анализ с валидацией качества | `stages/stage4-analysis/handler.ts` |
-| Stage 5 | Generation | Генерация структуры курса | `stages/stage5-generation/handler.ts` |
-| Stage 6 | Lesson Content | Сборка финального контента уроков | `stages/stage6-lesson-content/handler.ts` |
+| Stage 3 | Classification      | Классификация и категоризация контента                      | `stages/stage3-classification/handler.ts`      |
+| Stage 4 | Analysis            | Многофазный LLM-анализ с валидацией качества                | `stages/stage4-analysis/handler.ts`            |
+| Stage 5 | Generation          | Генерация структуры курса                                   | `stages/stage5-generation/handler.ts`          |
+| Stage 6 | Lesson Content      | Сборка финального контента уроков                           | `stages/stage6-lesson-content/handler.ts`      |
 
 ### 2.2 Конфигурация моделей
 
@@ -52,15 +56,15 @@ created_at, updated_at: timestamptz
 
 **Текущие фазы и дефолтные модели** (из `langchain-models.ts:178-218`):
 
-| Фаза | Модель | Temperature | Max Tokens | Назначение |
-|------|--------|-------------|------------|------------|
-| phase_1_classification | openai/gpt-oss-20b | 0.7 | 4096 | Классификация (простая задача) |
-| phase_2_scope | openai/gpt-oss-20b | 0.7 | 4096 | Определение scope |
-| phase_3_expert | openai/gpt-oss-120b | 0.5 | 8000 | Экспертный анализ (критично для качества) |
-| phase_4_synthesis | openai/gpt-oss-20b | 0.7 | 6000 | Синтез результатов |
-| phase_6_rag_planning | openai/gpt-oss-20b | 0.7 | 4096 | Планирование RAG |
-| emergency | x-ai/grok-4-fast | 0.7 | 30000 | Обработка больших контекстов |
-| quality_fallback | moonshotai/kimi-k2-0905 | 0.3 | 16000 | Fallback при ошибках валидации |
+| Фаза                   | Модель                  | Temperature | Max Tokens | Назначение                                |
+| ---------------------- | ----------------------- | ----------- | ---------- | ----------------------------------------- |
+| phase_1_classification | openai/gpt-oss-20b      | 0.7         | 4096       | Классификация (простая задача)            |
+| phase_2_scope          | openai/gpt-oss-20b      | 0.7         | 4096       | Определение scope                         |
+| phase_3_expert         | openai/gpt-oss-120b     | 0.5         | 8000       | Экспертный анализ (критично для качества) |
+| phase_4_synthesis      | openai/gpt-oss-20b      | 0.7         | 6000       | Синтез результатов                        |
+| phase_6_rag_planning   | openai/gpt-oss-20b      | 0.7         | 4096       | Планирование RAG                          |
+| emergency              | x-ai/grok-4-fast        | 0.7         | 30000      | Обработка больших контекстов              |
+| quality_fallback       | moonshotai/kimi-k2-0905 | 0.3         | 16000      | Fallback при ошибках валидации            |
 
 ### 2.3 Промпты
 
@@ -68,29 +72,30 @@ created_at, updated_at: timestamptz
 
 **ПОЛНЫЙ СПИСОК ПРОМПТОВ В СИСТЕМЕ (~18 штук)**:
 
-| Stage | Файл | Промпт/Функция | Назначение |
-|-------|------|----------------|------------|
-| **Stage 3** | `phases/phase-classification.ts` | Classification Prompt | Классификация документов по приоритетам (CORE/IMPORTANT/SUPPLEMENTARY) |
-| **Stage 3** | `utils/tournament-classification.ts` | Tournament Prompt | Турнирная классификация для >100K токенов |
-| **Stage 4** | `phases/phase-1-classifier.ts` | `buildClassificationPrompt()` | Классификация курса по 6 категориям, contextual language |
-| **Stage 4** | `phases/phase-2-scope.ts` | Scope Prompt | Определение scope курса |
-| **Stage 4** | `phases/phase-3-expert.ts` | Expert Analysis Prompt | Экспертный анализ (критичный для качества) |
-| **Stage 4** | `phases/phase-4-synthesis.ts` | Synthesis Prompt | Синтез результатов всех фаз |
-| **Stage 4** | `phases/phase-6-rag-planning.ts` | RAG Planning Prompt | Планирование RAG-контекста для уроков |
-| **Stage 5** | `utils/metadata-generator.ts` | Metadata Prompt | Генерация метаданных курса |
-| **Stage 5** | `utils/section-batch-generator.ts` | Section Generation Prompt | Батчевая генерация секций курса |
-| **Stage 5** | `phases/phase3-v2-spec-generator.ts` | V2 Spec Prompt | Генерация V2 спецификаций уроков |
-| **Stage 6** | `utils/prompt-templates.ts` | `buildPlannerPrompt()` | Генерация outline урока |
-| **Stage 6** | `utils/prompt-templates.ts` | `buildExpanderPrompt()` | Расширение секций в полный контент |
-| **Stage 6** | `utils/prompt-templates.ts` | `buildAssemblerPrompt()` | Сборка секций в урок |
-| **Stage 6** | `utils/prompt-templates.ts` | `buildSmootherPrompt()` | Полировка переходов и стиля |
-| **Stage 6** | `judge/prompt-cache.ts` | JUDGE_STATIC_PROMPTS.rubric | OSCQR рубрика для оценки (~2000 токенов) |
-| **Stage 6** | `judge/prompt-cache.ts` | JUDGE_STATIC_PROMPTS.instructions | Инструкции для Judge (~500 токенов) |
-| **Stage 6** | `judge/prompt-cache.ts` | JUDGE_STATIC_PROMPTS.fewShotExamples | Few-shot примеры оценки (~1500 токенов) |
-| **Stage 6** | `judge/fix-templates.ts` | Fix Templates | Шаблоны исправлений контента по feedback |
-| **Stage 6** | `judge/refinement-loop.ts` | Refinement Prompt | Refinement контента после Judge |
+| Stage       | Файл                                 | Промпт/Функция                       | Назначение                                                             |
+| ----------- | ------------------------------------ | ------------------------------------ | ---------------------------------------------------------------------- |
+| **Stage 3** | `phases/phase-classification.ts`     | Classification Prompt                | Классификация документов по приоритетам (CORE/IMPORTANT/SUPPLEMENTARY) |
+| **Stage 3** | `utils/tournament-classification.ts` | Tournament Prompt                    | Турнирная классификация для >100K токенов                              |
+| **Stage 4** | `phases/phase-1-classifier.ts`       | `buildClassificationPrompt()`        | Классификация курса по 6 категориям, contextual language               |
+| **Stage 4** | `phases/phase-2-scope.ts`            | Scope Prompt                         | Определение scope курса                                                |
+| **Stage 4** | `phases/phase-3-expert.ts`           | Expert Analysis Prompt               | Экспертный анализ (критичный для качества)                             |
+| **Stage 4** | `phases/phase-4-synthesis.ts`        | Synthesis Prompt                     | Синтез результатов всех фаз                                            |
+| **Stage 4** | `phases/phase-6-rag-planning.ts`     | RAG Planning Prompt                  | Планирование RAG-контекста для уроков                                  |
+| **Stage 5** | `utils/metadata-generator.ts`        | Metadata Prompt                      | Генерация метаданных курса                                             |
+| **Stage 5** | `utils/section-batch-generator.ts`   | Section Generation Prompt            | Батчевая генерация секций курса                                        |
+| **Stage 5** | `phases/phase3-v2-spec-generator.ts` | V2 Spec Prompt                       | Генерация V2 спецификаций уроков                                       |
+| **Stage 6** | `utils/prompt-templates.ts`          | `buildPlannerPrompt()`               | Генерация outline урока                                                |
+| **Stage 6** | `utils/prompt-templates.ts`          | `buildExpanderPrompt()`              | Расширение секций в полный контент                                     |
+| **Stage 6** | `utils/prompt-templates.ts`          | `buildAssemblerPrompt()`             | Сборка секций в урок                                                   |
+| **Stage 6** | `utils/prompt-templates.ts`          | `buildSmootherPrompt()`              | Полировка переходов и стиля                                            |
+| **Stage 6** | `judge/prompt-cache.ts`              | JUDGE_STATIC_PROMPTS.rubric          | OSCQR рубрика для оценки (~2000 токенов)                               |
+| **Stage 6** | `judge/prompt-cache.ts`              | JUDGE_STATIC_PROMPTS.instructions    | Инструкции для Judge (~500 токенов)                                    |
+| **Stage 6** | `judge/prompt-cache.ts`              | JUDGE_STATIC_PROMPTS.fewShotExamples | Few-shot примеры оценки (~1500 токенов)                                |
+| **Stage 6** | `judge/fix-templates.ts`             | Fix Templates                        | Шаблоны исправлений контента по feedback                               |
+| **Stage 6** | `judge/refinement-loop.ts`           | Refinement Prompt                    | Refinement контента после Judge                                        |
 
 **Структура промптов** (Context-First XML strategy):
+
 ```xml
 <lesson_context>
   <metadata>...</metadata>
@@ -104,6 +109,7 @@ created_at, updated_at: timestamptz
 ```
 
 **Особенности разных stages**:
+
 - **Stage 3**: Промпты inline в файлах, работают с document metadata
 - **Stage 4**: Используют `SystemMessage` + `HumanMessage` из LangChain
 - **Stage 5**: Промпты с token budget management
@@ -136,6 +142,7 @@ created_at, updated_at: timestamptz
 **FR-4**: Отображать все 6 этапов пайплайна в виде визуальной схемы/таймлайна
 
 **FR-5**: Для каждого этапа показывать:
+
 - Номер и название этапа
 - Краткое описание (что делает)
 - Статус (активен/неактивен)
@@ -145,6 +152,7 @@ created_at, updated_at: timestamptz
 - Средняя стоимость (из `generation_trace`)
 
 **FR-6**: Показывать статистику пайплайна:
+
 - Общее количество генераций за период
 - Успешных/неудачных
 - Общая стоимость
@@ -155,6 +163,7 @@ created_at, updated_at: timestamptz
 **FR-7**: Отображать таблицу текущих конфигураций моделей из `llm_model_config`
 
 **FR-8**: Для каждой фазы показывать:
+
 - Название фазы (human-readable)
 - Текущая модель (model_id)
 - Fallback модель
@@ -164,12 +173,14 @@ created_at, updated_at: timestamptz
 - Дата последнего изменения
 
 **FR-9**: Возможность редактировать конфигурацию модели:
+
 - Выбор модели из списка OpenRouter (FR-13)
 - Изменение temperature (slider 0-2)
 - Изменение max_tokens (input с валидацией)
 - Выбор fallback модели
 
 **FR-10**: Возможность добавлять course-specific override:
+
 - Выбор курса
 - Выбор фазы
 - Настройка параметров
@@ -179,12 +190,14 @@ created_at, updated_at: timestamptz
 **FR-12**: При сохранении - валидация что модель существует в OpenRouter
 
 **FR-12a**: Версионирование конфигураций моделей:
+
 - При каждом изменении создавать новую версию (не перезаписывать)
 - История изменений с датами и авторами
 - Возможность откатиться к предыдущей версии
 - Просмотр diff между версиями
 
 **FR-12b**: Расширенный список фаз для конфигурации:
+
 - Добавить `stage_3_classification` - классификация документов
 - Добавить `stage_5_metadata` - генерация метаданных
 - Добавить `stage_5_sections` - генерация секций
@@ -195,11 +208,13 @@ created_at, updated_at: timestamptz
 ### 3.4 Интеграция с OpenRouter API
 
 **FR-13**: Получать список доступных моделей через OpenRouter API:
+
 - Endpoint: `GET https://openrouter.ai/api/v1/models`
 - Кэширование на 1 час (модели редко меняются)
 - Показывать: название, провайдер, context length, pricing
 
 **FR-14**: Для каждой модели отображать:
+
 - ID модели (для конфига)
 - Название (human-readable)
 - Провайдер (OpenAI, Anthropic, etc.)
@@ -208,6 +223,7 @@ created_at, updated_at: timestamptz
 - Поддерживаемые features (vision, function calling, etc.)
 
 **FR-15**: Фильтрация и поиск моделей:
+
 - По провайдеру
 - По размеру контекста (min/max)
 - По цене
@@ -218,6 +234,7 @@ created_at, updated_at: timestamptz
 **FR-16**: Создать новую таблицу `prompt_templates` для хранения промптов в БД
 
 **FR-17**: Структура таблицы `prompt_templates`:
+
 ```sql
 id: uuid PRIMARY KEY
 stage: text NOT NULL  -- 'stage_2', 'stage_3', 'stage_4', 'stage_5', 'stage_6'
@@ -240,6 +257,7 @@ UNIQUE(stage, prompt_key, version)
 **FR-19**: Отображать список всех промптов, сгруппированных по этапам
 
 **FR-20**: Для каждого промпта показывать:
+
 - Название и описание
 - Этап (stage)
 - Версия
@@ -248,29 +266,34 @@ UNIQUE(stage, prompt_key, version)
 - Дата последнего изменения
 
 **FR-21**: Редактор промптов:
+
 - Textarea с подсветкой синтаксиса (XML)
 - Список доступных переменных справа
 - Preview с подстановкой тестовых данных
 - Валидация XML структуры
 
 **FR-22**: Версионирование промптов:
+
 - При сохранении изменений - создавать новую версию
 - Возможность откатиться к предыдущей версии
 - История изменений с датами и авторами
 
 **FR-23**: Fallback логика:
+
 - Если промпт не найден в БД - использовать hardcoded из кода
 - Флаг "use_database_prompts" в конфиге (для безопасного отката)
 
 ### 3.6 Дополнительные настройки
 
 **FR-24**: Секция "Глобальные настройки пайплайна":
+
 - RAG token budget (default: 20000)
 - Quality threshold для валидации
 - Retry attempts per phase
 - Timeout per phase
 
 **FR-25**: Секция "Feature flags":
+
 - use_database_prompts: boolean (fallback to code)
 - enable_quality_validation: boolean
 - enable_cost_tracking: boolean
@@ -278,12 +301,14 @@ UNIQUE(stage, prompt_key, version)
 ### 3.7 Экспорт/Импорт конфигурации
 
 **FR-26**: Экспорт всей конфигурации в JSON:
+
 - Все конфигурации моделей (текущие активные версии)
 - Все промпты (текущие активные версии)
 - Глобальные настройки и feature flags
 - Метаданные экспорта (дата, версия, автор)
 
 **FR-27**: Формат экспорта:
+
 ```json
 {
   "export_metadata": {
@@ -300,6 +325,7 @@ UNIQUE(stage, prompt_key, version)
 ```
 
 **FR-28**: Импорт конфигурации из JSON:
+
 - Валидация схемы JSON перед импортом
 - Preview изменений перед применением
 - Выбор что импортировать (модели/промпты/все)
@@ -307,6 +333,7 @@ UNIQUE(stage, prompt_key, version)
 - Возможность отмены импорта (rollback)
 
 **FR-29**: Сценарии использования экспорта/импорта:
+
 - Бэкап перед критическими изменениями
 - Перенос конфигурации между окружениями (dev → staging → prod)
 - Шаринг конфигурации между командами
@@ -380,65 +407,105 @@ packages/shared-types/src/
 export const pipelineAdminRouter = router({
   // Pipeline Overview
   getStagesInfo: superadminProcedure.query(),
-  getPipelineStats: superadminProcedure.input(z.object({
-    startDate: z.date().optional(),
-    endDate: z.date().optional(),
-  })).query(),
+  getPipelineStats: superadminProcedure
+    .input(
+      z.object({
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      })
+    )
+    .query(),
 
   // Models Configuration
   listModelConfigs: superadminProcedure.query(),
   updateModelConfig: superadminProcedure.input(ModelConfigUpdateSchema).mutation(),
-  resetModelConfigToDefault: superadminProcedure.input(z.object({
-    phase: PhaseNameSchema,
-  })).mutation(),
-  getModelConfigHistory: superadminProcedure.input(z.object({
-    phase: PhaseNameSchema,
-  })).query(),
-  revertModelConfigToVersion: superadminProcedure.input(z.object({
-    phase: PhaseNameSchema,
-    version: z.number(),
-  })).mutation(),
+  resetModelConfigToDefault: superadminProcedure
+    .input(
+      z.object({
+        phase: PhaseNameSchema,
+      })
+    )
+    .mutation(),
+  getModelConfigHistory: superadminProcedure
+    .input(
+      z.object({
+        phase: PhaseNameSchema,
+      })
+    )
+    .query(),
+  revertModelConfigToVersion: superadminProcedure
+    .input(
+      z.object({
+        phase: PhaseNameSchema,
+        version: z.number(),
+      })
+    )
+    .mutation(),
 
   // OpenRouter Models
-  listOpenRouterModels: superadminProcedure.query(),  // cached
-  refreshOpenRouterModels: superadminProcedure.mutation(),  // force refresh cache
+  listOpenRouterModels: superadminProcedure.query(), // cached
+  refreshOpenRouterModels: superadminProcedure.mutation(), // force refresh cache
 
   // Prompts
   listPromptTemplates: superadminProcedure.query(),
-  getPromptTemplate: superadminProcedure.input(z.object({
-    stage: StageSchema,
-    promptKey: z.string(),
-  })).query(),
+  getPromptTemplate: superadminProcedure
+    .input(
+      z.object({
+        stage: StageSchema,
+        promptKey: z.string(),
+      })
+    )
+    .query(),
   updatePromptTemplate: superadminProcedure.input(PromptTemplateUpdateSchema).mutation(),
-  revertPromptToVersion: superadminProcedure.input(z.object({
-    id: z.string().uuid(),
-    version: z.number(),
-  })).mutation(),
-  getPromptHistory: superadminProcedure.input(z.object({
-    stage: StageSchema,
-    promptKey: z.string(),
-  })).query(),
+  revertPromptToVersion: superadminProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        version: z.number(),
+      })
+    )
+    .mutation(),
+  getPromptHistory: superadminProcedure
+    .input(
+      z.object({
+        stage: StageSchema,
+        promptKey: z.string(),
+      })
+    )
+    .query(),
 
   // Global Settings
   getGlobalSettings: superadminProcedure.query(),
   updateGlobalSettings: superadminProcedure.input(GlobalSettingsSchema).mutation(),
 
   // Export/Import
-  exportConfiguration: superadminProcedure.query(),  // returns full JSON export
-  validateImport: superadminProcedure.input(z.object({
-    configJson: z.string(),  // JSON string to validate
-  })).mutation(),  // returns validation result + preview
-  importConfiguration: superadminProcedure.input(z.object({
-    configJson: z.string(),
-    importModels: z.boolean().default(true),
-    importPrompts: z.boolean().default(true),
-    importSettings: z.boolean().default(true),
-    createBackup: z.boolean().default(true),
-  })).mutation(),
+  exportConfiguration: superadminProcedure.query(), // returns full JSON export
+  validateImport: superadminProcedure
+    .input(
+      z.object({
+        configJson: z.string(), // JSON string to validate
+      })
+    )
+    .mutation(), // returns validation result + preview
+  importConfiguration: superadminProcedure
+    .input(
+      z.object({
+        configJson: z.string(),
+        importModels: z.boolean().default(true),
+        importPrompts: z.boolean().default(true),
+        importSettings: z.boolean().default(true),
+        createBackup: z.boolean().default(true),
+      })
+    )
+    .mutation(),
   listBackups: superadminProcedure.query(),
-  restoreFromBackup: superadminProcedure.input(z.object({
-    backupId: z.string().uuid(),
-  })).mutation(),
+  restoreFromBackup: superadminProcedure
+    .input(
+      z.object({
+        backupId: z.string().uuid(),
+      })
+    )
+    .mutation(),
 });
 ```
 
@@ -447,20 +514,20 @@ export const pipelineAdminRouter = router({
 ```typescript
 // openrouter-models.ts
 interface OpenRouterModel {
-  id: string;                    // e.g., "openai/gpt-4"
-  name: string;                  // e.g., "GPT-4"
+  id: string; // e.g., "openai/gpt-4"
+  name: string; // e.g., "GPT-4"
   description: string;
-  context_length: number;        // e.g., 128000
+  context_length: number; // e.g., 128000
   pricing: {
-    prompt: string;              // e.g., "0.00003" per token
-    completion: string;          // e.g., "0.00006" per token
+    prompt: string; // e.g., "0.00003" per token
+    completion: string; // e.g., "0.00006" per token
   };
   top_provider: {
     context_length: number;
     max_completion_tokens: number;
   };
   architecture: {
-    modality: string;            // "text->text" | "text+image->text"
+    modality: string; // "text->text" | "text+image->text"
     tokenizer: string;
     instruct_type: string;
   };
@@ -865,11 +932,11 @@ const PROMPTS_TO_SEED = [
 
 ### 8.1 Риски
 
-| Риск | Вероятность | Влияние | Митигация |
-|------|-------------|---------|-----------|
-| OpenRouter API недоступен | Средняя | Низкое | Кэширование + показ последних известных моделей |
-| Некорректный промпт ломает генерацию | Высокая | Высокое | Fallback на код + валидация + preview |
-| Миграция промптов потеряет форматирование | Средняя | Среднее | Тщательное тестирование seed script |
+| Риск                                      | Вероятность | Влияние | Митигация                                       |
+| ----------------------------------------- | ----------- | ------- | ----------------------------------------------- |
+| OpenRouter API недоступен                 | Средняя     | Низкое  | Кэширование + показ последних известных моделей |
+| Некорректный промпт ломает генерацию      | Высокая     | Высокое | Fallback на код + валидация + preview           |
+| Миграция промптов потеряет форматирование | Средняя     | Среднее | Тщательное тестирование seed script             |
 
 ### 8.2 Ограничения
 
@@ -882,10 +949,12 @@ const PROMPTS_TO_SEED = [
 ## 9. Зависимости
 
 ### 9.1 Внешние
+
 - OpenRouter API (`https://openrouter.ai/api/v1/models`)
 - Supabase (БД + Auth)
 
 ### 9.2 Внутренние
+
 - `packages/web` - Next.js фронтенд
 - `packages/course-gen-platform` - tRPC backend
 - `packages/shared-types` - общие типы
@@ -895,32 +964,36 @@ const PROMPTS_TO_SEED = [
 
 ## 10. Глоссарий
 
-| Термин | Определение |
-|--------|-------------|
-| Stage | Этап пайплайна генерации (1-6) |
-| Phase | Фаза внутри этапа (напр. phase_1_classification в Stage 4) |
-| Prompt Template | Шаблон промпта с плейсхолдерами для переменных |
-| Fallback | Запасной вариант при ошибке основного |
-| OpenRouter | Агрегатор API различных LLM провайдеров |
+| Термин          | Определение                                                |
+| --------------- | ---------------------------------------------------------- |
+| Stage           | Этап пайплайна генерации (1-6)                             |
+| Phase           | Фаза внутри этапа (напр. phase_1_classification в Stage 4) |
+| Prompt Template | Шаблон промпта с плейсхолдерами для переменных             |
+| Fallback        | Запасной вариант при ошибке основного                      |
+| OpenRouter      | Агрегатор API различных LLM провайдеров                    |
 
 ---
 
 ## 11. Ссылки
 
 ### Административная инфраструктура
+
 - Admin layout: `packages/web/app/admin/layout.tsx`
 - Admin router: `packages/course-gen-platform/src/server/routers/admin.ts`
 - Authorization middleware: `packages/course-gen-platform/src/server/middleware/authorize.ts`
 
 ### Конфигурация моделей
+
 - Model selector service: `packages/course-gen-platform/src/shared/llm/langchain-models.ts`
 - DB table: `llm_model_config`
 
 ### Stage 3 - Classification
+
 - Phase classification: `packages/course-gen-platform/src/stages/stage3-classification/phases/phase-classification.ts`
 - Tournament classification: `packages/course-gen-platform/src/stages/stage3-classification/utils/tournament-classification.ts`
 
 ### Stage 4 - Analysis
+
 - Phase 1 classifier: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-1-classifier.ts`
 - Phase 2 scope: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-2-scope.ts`
 - Phase 3 expert: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-3-expert.ts`
@@ -928,16 +1001,19 @@ const PROMPTS_TO_SEED = [
 - Phase 6 RAG planning: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-6-rag-planning.ts`
 
 ### Stage 5 - Generation
+
 - Metadata generator: `packages/course-gen-platform/src/stages/stage5-generation/utils/metadata-generator.ts`
 - Section batch generator: `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch-generator.ts`
 - V2 spec generator: `packages/course-gen-platform/src/stages/stage5-generation/phases/phase3-v2-spec-generator.ts`
 
 ### Stage 6 - Lesson Content
+
 - Prompt templates: `packages/course-gen-platform/src/stages/stage6-lesson-content/utils/prompt-templates.ts`
 - Judge prompt cache: `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/prompt-cache.ts`
 - Fix templates: `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/fix-templates.ts`
 - Refinement loop: `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/refinement-loop.ts`
 
 ### Общие типы
+
 - Model config types: `packages/shared-types/src/model-config.ts`
 - Analysis schemas: `packages/shared-types/src/analysis-schemas.ts`

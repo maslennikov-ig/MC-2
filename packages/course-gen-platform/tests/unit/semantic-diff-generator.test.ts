@@ -15,9 +15,7 @@ describe('generateSemanticDiff', () => {
       'Анализировать архитектурные решения',
     ];
 
-    const regenerated = [
-      'Объяснить основы ООП',
-    ];
+    const regenerated = ['Объяснить основы ООП'];
 
     const diff = await generateSemanticDiff({
       original,
@@ -72,11 +70,7 @@ describe('generateSemanticDiff', () => {
   });
 
   it('should detect restructured or expanded change type for reorganized content', async () => {
-    const original = [
-      'Learn about databases',
-      'Study SQL queries',
-      'Practice data modeling',
-    ];
+    const original = ['Learn about databases', 'Study SQL queries', 'Practice data modeling'];
 
     const regenerated = [
       'Master relational database design',
@@ -158,8 +152,9 @@ describe('generateSemanticDiff', () => {
     expect(poorDiff.alignmentScore).toBeLessThanOrEqual(3);
   });
 
-  it('should validate Bloom\'s level preservation for learning objectives', async () => {
-    // Preserved: both use "Explain" (understand level)
+  it("should always return true for Bloom's level preservation (simplified per mc2-jlje)", async () => {
+    // isBloomLevelPreserved was simplified to always return true (mc2-jlje)
+    // Pedagogical intent preservation is now handled by semantic similarity
     const preserved = await generateSemanticDiff({
       original: 'Explain the concept of inheritance',
       regenerated: 'Explain object-oriented inheritance principles',
@@ -168,14 +163,13 @@ describe('generateSemanticDiff', () => {
     });
     expect(preserved.bloomLevelPreserved).toBe(true);
 
-    // Not preserved: "Remember" to "Create"
-    const notPreserved = await generateSemanticDiff({
+    const alsoPreserved = await generateSemanticDiff({
       original: 'Define basic programming terms',
       regenerated: 'Design a complete software architecture',
       fieldPath: 'learning_objectives[0]',
       blockType: 'learning_objectives',
     });
-    expect(notPreserved.bloomLevelPreserved).toBe(false);
+    expect(alsoPreserved.bloomLevelPreserved).toBe(true);
   });
 
   it('should extract concepts from array content', async () => {
@@ -201,8 +195,8 @@ describe('generateSemanticDiff', () => {
     expect(diff.conceptsAdded.length).toBeGreaterThan(0);
     expect(diff.conceptsRemoved.length).toBeGreaterThan(0);
     // Check for concepts in lowercase (as they're normalized)
-    const hasFrameworkConcept = diff.conceptsAdded.some(c =>
-      c.includes('tensor') || c.includes('pytorch') || c.includes('supervised')
+    const hasFrameworkConcept = diff.conceptsAdded.some(
+      c => c.includes('tensor') || c.includes('pytorch') || c.includes('supervised')
     );
     expect(hasFrameworkConcept).toBe(true);
   });

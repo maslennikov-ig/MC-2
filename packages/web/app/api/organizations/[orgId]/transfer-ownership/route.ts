@@ -69,8 +69,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const adminClient = getAdminClient()
 
     // Call the RPC function for atomic transfer
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (adminClient as any).rpc('transfer_organization_ownership', {
+    const { data, error } = await adminClient.rpc('transfer_organization_ownership', {
       p_org_id: orgId,
       p_current_owner_id: user.id,
       p_new_owner_id: newOwnerId,
@@ -91,7 +90,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           requestId,
           newOwnerId,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to transfer ownership', requestId },
         { status: 500 }
@@ -131,7 +130,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         errorCode: 'INTERNAL_ERROR',
         requestId,
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },

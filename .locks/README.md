@@ -5,6 +5,7 @@ This directory contains temporary lock files used to prevent concurrent write op
 ## Purpose
 
 Orchestrators use lock files to ensure only ONE fixer/updater runs at a time, preventing:
+
 - File conflicts
 - Race conditions
 - Inconsistent state
@@ -14,6 +15,7 @@ Orchestrators use lock files to ensure only ONE fixer/updater runs at a time, pr
 **Filename**: `active-fixer.lock`
 
 **Content**:
+
 ```json
 {
   "domain": "bugs|security|dead-code|dependency",
@@ -46,11 +48,13 @@ Orchestrators use lock files to ensure only ONE fixer/updater runs at a time, pr
 ## Parallel Execution Rules
 
 **Hunter/Scanner phases** (read-only):
+
 - ✅ CAN run in parallel
 - ✅ NO lock required
 - Multiple domains can scan simultaneously
 
 **Fixer/Updater phases** (write operations):
+
 - ❌ CANNOT run in parallel
 - ✅ MUST acquire lock first
 - Only ONE domain can fix at a time
@@ -60,6 +64,7 @@ Orchestrators use lock files to ensure only ONE fixer/updater runs at a time, pr
 **Scenario**: User runs `/health bugs` and `/health security` simultaneously
 
 **Timeline**:
+
 ```
 T0: Both orchestrators start Phase 1 (detection) - PARALLEL ✅
 T1: bug-orchestrator creates active-fixer.lock, starts fixing
@@ -71,6 +76,7 @@ T4: security-orchestrator acquires lock, starts fixing
 ## Troubleshooting
 
 **Lock stuck?**
+
 ```bash
 # Check lock age
 ls -lh .locks/active-fixer.lock
@@ -80,6 +86,7 @@ rm .locks/active-fixer.lock
 ```
 
 **Multiple domains waiting?**
+
 - This is expected behavior
 - Sequential execution ensures safety
 - Each domain will run after previous completes
@@ -87,6 +94,7 @@ rm .locks/active-fixer.lock
 ---
 
 **Auto-cleanup**: Orchestrators remove their lock files on:
+
 - Successful completion
 - Validation failure (after rollback)
 - Max iterations reached

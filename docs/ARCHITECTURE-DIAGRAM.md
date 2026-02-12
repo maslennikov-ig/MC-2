@@ -226,6 +226,7 @@ stateDiagram-v2
 **Purpose:** Eliminate race conditions between FSM state initialization and BullMQ job creation through atomic coordination.
 
 **Problem Solved:**
+
 - ❌ Before: Jobs created before FSM initialized → "Invalid generation status transition" errors
 - ✅ After: FSM + jobs created atomically in single transaction → guaranteed consistency
 
@@ -327,6 +328,7 @@ graph TB
 ### Key Components
 
 **1. InitializeFSMCommandHandler** (`src/services/fsm-initialization-command-handler.ts`)
+
 - Orchestrates atomic FSM initialization
 - Implements 3-layer idempotency strategy:
   - Layer 1: Redis cache check (1-2ms)
@@ -335,6 +337,7 @@ graph TB
 - Handles Redis failures gracefully (non-fatal)
 
 **2. OutboxProcessor** (`src/orchestrator/outbox-processor.ts`)
+
 - Background processor (singleton, auto-starts)
 - Adaptive polling (1s → 30s based on activity)
 - Batch processing (100 jobs, parallel groups of 10)
@@ -342,6 +345,7 @@ graph TB
 - Health check endpoint
 
 **3. RPC Function** (`initialize_fsm_with_outbox`)
+
 - SECURITY DEFINER with search_path protection
 - Atomic transaction (FSM + outbox + events + idempotency)
 - Input validation and error handling
@@ -350,6 +354,7 @@ graph TB
 ### Data Flow
 
 **Happy Path (99.9% of requests):**
+
 ```
 API Request
   → Command Handler
@@ -366,6 +371,7 @@ Background (async):
 ```
 
 **Cached Path (subsequent requests):**
+
 ```
 API Request
   → Command Handler
@@ -374,6 +380,7 @@ API Request
 ```
 
 **Fallback Path (edge cases):**
+
 ```
 Job Added Outside Normal Flow
   → Layer 2: QueueEvents detects
@@ -389,30 +396,36 @@ Job Added Outside Normal Flow
 ### Performance Characteristics
 
 **Latency:**
+
 - Cache hit: ~1-2ms (Redis)
 - Cache miss: ~50-100ms (PostgreSQL transaction)
 - Background processing: <5s for most jobs
 
 **Throughput:**
+
 - Command handler: Limited by PostgreSQL transaction rate (~500-1000 TPS)
 - Outbox processor: 100 jobs/batch, configurable parallelism
 
 **Scalability:**
+
 - Horizontal: Run multiple outbox processors (idempotent)
 - Vertical: Increase batch size and parallelism
 
 ### Monitoring
 
 **Metrics Tracked:**
+
 - FSM init success rate, duration, cache hit rate
 - Outbox queue depth, processing latency, failures
 - Worker fallback activations (Layer 2/3)
 
 **Alert Rules (11 total):**
+
 - Critical: FSM failure >5%, Queue depth >1000, Processor stalled >5min
 - Warning: Cache hit <20%, Fallback frequency >10/5min
 
 **API Endpoints:**
+
 - `/api/trpc/metrics.getAll` - Complete system metrics
 - `/api/trpc/metrics.healthCheck` - Load balancer health check
 
@@ -605,27 +618,32 @@ graph TB
 ### Stage 4 Key Features
 
 **1. Multi-Model Orchestration (40-50% Cost Savings)**
+
 - **Phase 1-2:** GPT OSS-20B (cheap for simple classification/scope tasks)
 - **Phase 3:** GPT OSS-120B ALWAYS (expert-level analysis requires power)
 - **Phase 4:** Adaptive (document count drives model selection)
 - **Fallback:** Gemini 2.5 Flash (emergency quality escalation)
 
 **2. Quality Validation**
+
 - **Semantic Similarity:** Jina-v3 embeddings, 0.75+ threshold
 - **Retry Logic:** 2 attempts with 20B → escalate to 120B → emergency Gemini
 - **Quality Score:** 99.99% average on 3 Russian legal documents (T055 test)
 
 **3. Cost Tracking**
+
 - **Token Usage:** 127.1K / 200K budget (63.5% utilization)
 - **Phase Distribution:** 33% classify, 34% scope, 15% expert, 6% synthesis
 - **Per-Phase Metrics:** Input tokens, output tokens, USD cost, duration
 
 **4. LangGraph StateGraph**
+
 - **Conditional Routing:** Phase transitions based on validation results
 - **State Management:** Persistent state across all 6 phases
 - **Custom Observability:** Supabase metrics (NO LangSmith dependency)
 
 **5. Production Safeguards**
+
 - **Stage 3 Barrier:** 100% document completion enforcement
 - **Minimum 10 Lessons:** FR-015 validation (48 lessons generated in T055)
 - **XSS Sanitization:** DOMPurify for all LLM outputs
@@ -816,11 +834,13 @@ erDiagram
 ### Additional Tables (Not shown in ERD)
 
 **llm_model_config** (Stage 4)
+
 - Per-phase LLM model configuration (provider, model, temperature, max_tokens)
 - Supports phase-specific overrides (Phase 3 always uses 120B model)
 - Global defaults with adaptive selection logic
 
 **Cost Tracking** (Stage 3-4)
+
 - Embedded in `file_catalog.summary_metadata` (Stage 3: token counts, cost per document)
 - Embedded in `courses.analysis_result.phase_metadata` (Stage 4: per-phase metrics)
 - Enables per-organization cost analytics and tier-based budget limits
@@ -893,6 +913,7 @@ graph TB
 ## 🎯 Key Features & Innovations
 
 ### 1. **Advanced RAG System** (Stage 0, Stage 2, Stage 5-6)
+
 - **Hierarchical Chunking:** Parent (1500 tokens) + Child (400 tokens) for optimal precision/context trade-off
 - **Late Chunking:** Context-aware embeddings, -67% retrieval failures
 - **BM25 Hybrid Search:** Sparse + Dense vectors, +15-20pp precision improvement (82% → 89-92%)
@@ -905,6 +926,7 @@ graph TB
 - **Content Deduplication:** SHA-256 hash + reference counting, **80% cost savings**
 
 ### 2. **LLM Document Summarization** (Stage 3 - ✅ COMPLETE)
+
 - **Hierarchical Chunking Strategy:** 115K token chunks with 5% overlap
 - **Adaptive Compression:** DETAILED → BALANCED → AGGRESSIVE (max 5 iterations)
 - **Quality Validation:** Semantic similarity 0.75+ threshold via Jina-v3
@@ -913,6 +935,7 @@ graph TB
 - **Multilingual Support:** 13 languages with language-specific token estimation
 
 ### 3. **Multi-Phase Analysis Orchestration** (Stage 4 - ✅ COMPLETE)
+
 - **LangChain + LangGraph:** StateGraph with 6 phases (barrier → classify → scope → expert → synthesis → assembly)
 - **Multi-Model Architecture:** GPT OSS-20B (simple), GPT OSS-120B (expert), Gemini 2.5 Flash (fallback)
 - **Adaptive Model Selection:** Phase 4 uses 20B for <3 docs, 120B for ≥3 docs
@@ -923,6 +946,7 @@ graph TB
 - **XSS Protection:** DOMPurify sanitization for all LLM outputs
 
 ### 4. **Production-Grade Security**
+
 - **JWT Custom Claims:** Role + organization_id embedded in token
 - **PostgreSQL Roles:** Automatic role switching via PostgREST
 - **28 RLS Policies:** 100% table coverage, zero data leakage
@@ -930,6 +954,7 @@ graph TB
 - **XSS Sanitization:** DOMPurify for all LLM-generated content (Stage 4)
 
 ### 5. **Scalable Orchestration**
+
 - **BullMQ Queue System:** Redis-based job management
 - **Worker Lifecycle:** Orphan recovery, retry with exponential backoff
 - **Concurrency Control:** Per-tier limits (TRIAL/STANDARD: 5, FREE: 1, BASIC: 2, PREMIUM: 10)
@@ -937,12 +962,14 @@ graph TB
 - **Stage Barriers:** 100% completion enforcement (Stage 3 must complete before Stage 4)
 
 ### 6. **Multi-Tenant Architecture**
+
 - **Organization-Based Isolation:** Every query filtered by organization_id
 - **Tier-Based Features:** TRIAL, FREE, BASIC, STANDARD, PREMIUM
 - **Storage Quotas:** 0GB → 10GB, enforced at upload + RLS level
 - **Format Restrictions:** TXT/MD (BASIC) → All formats + Image OCR (PREMIUM)
 
 ### 7. **AI Model Flexibility**
+
 - **OpenRouter Integration:** Multi-model support (GPT OSS-20B, GPT OSS-120B, Gemini 2.5 Flash)
 - **Jina-v3 Embeddings:** 768D, 89 languages, task-specific
 - **Docling Conversion:** PDF/DOCX/PPTX → Markdown with OCR
@@ -950,6 +977,7 @@ graph TB
 - **Quality-Based Escalation:** 2 attempts with 20B → escalate to 120B → emergency Gemini
 
 ### 8. **Developer Experience**
+
 - **Type-Safe Monorepo:** pnpm workspaces + TypeScript strict mode
 - **tRPC API:** Zero runtime overhead, end-to-end type safety
 - **CI/CD Pipeline:** GitHub Actions (test, build, deploy)
@@ -962,40 +990,43 @@ graph TB
 ## 📈 Performance Metrics
 
 ### Infrastructure & RAG (Stage 0-2, Stage 5-6)
-| Metric | Value | Improvement |
-|--------|-------|-------------|
-| **RAG Precision@5 (BM25 Hybrid)** | 89-92% | +15-20pp (baseline: 70-75%) |
-| **RAG Precision (w/ Reranker v2)** | 90-95% (expected) | +10-15pp (82% → 90-95%) |
-| **Retrieval Failures** | <2% | -67% (baseline: 5-6%) |
-| **Reranker Latency (Stage 5)** | ~200-500ms | Per section (100 candidates) |
-| **Reranker Latency (Stage 6)** | ~80-150ms | Per lesson (28 candidates) |
-| **RLS Query Performance** | <50ms | 50%+ faster (JWT custom claims) |
-| **Cost Savings (Deduplication)** | 80% | SHA-256 hash + reference counting |
-| **API Endpoint Latency** | <500ms | P95 latency (generation.initiate) |
-| **Vector Search Latency** | <100ms | HNSW index (m=16, ef=100) |
-| **Concurrent Uploads** | 1-10 | Tier-based (FREE: 1, PREMIUM: 10) |
+
+| Metric                             | Value             | Improvement                       |
+| ---------------------------------- | ----------------- | --------------------------------- |
+| **RAG Precision@5 (BM25 Hybrid)**  | 89-92%            | +15-20pp (baseline: 70-75%)       |
+| **RAG Precision (w/ Reranker v2)** | 90-95% (expected) | +10-15pp (82% → 90-95%)           |
+| **Retrieval Failures**             | <2%               | -67% (baseline: 5-6%)             |
+| **Reranker Latency (Stage 5)**     | ~200-500ms        | Per section (100 candidates)      |
+| **Reranker Latency (Stage 6)**     | ~80-150ms         | Per lesson (28 candidates)        |
+| **RLS Query Performance**          | <50ms             | 50%+ faster (JWT custom claims)   |
+| **Cost Savings (Deduplication)**   | 80%               | SHA-256 hash + reference counting |
+| **API Endpoint Latency**           | <500ms            | P95 latency (generation.initiate) |
+| **Vector Search Latency**          | <100ms            | HNSW index (m=16, ef=100)         |
+| **Concurrent Uploads**             | 1-10              | Tier-based (FREE: 1, PREMIUM: 10) |
 
 ### LLM Summarization (Stage 3)
-| Metric | Value | Baseline | Notes |
-|--------|-------|----------|-------|
-| **Cost Per 500 Docs** | $0.45-1.00 | $500-1000 (GPT-4) | 99.8% cheaper |
-| **Quality (Semantic Similarity)** | 0.75-0.82 | 0.60-0.70 (simple truncate) | +12-15pp improvement |
-| **Small Doc Bypass Rate** | ~30% | 0% | Zero LLM cost for <3K tokens |
-| **Compression Ratio** | 30-70% | Fixed 50% | Adaptive strategy |
-| **Processing Time (500 docs)** | ~15 min | ~60 min | 4x faster (batching) |
-| **Token Budget Utilization** | 115K / 200K | N/A | 57.5% average usage |
+
+| Metric                            | Value       | Baseline                    | Notes                        |
+| --------------------------------- | ----------- | --------------------------- | ---------------------------- |
+| **Cost Per 500 Docs**             | $0.45-1.00  | $500-1000 (GPT-4)           | 99.8% cheaper                |
+| **Quality (Semantic Similarity)** | 0.75-0.82   | 0.60-0.70 (simple truncate) | +12-15pp improvement         |
+| **Small Doc Bypass Rate**         | ~30%        | 0%                          | Zero LLM cost for <3K tokens |
+| **Compression Ratio**             | 30-70%      | Fixed 50%                   | Adaptive strategy            |
+| **Processing Time (500 docs)**    | ~15 min     | ~60 min                     | 4x faster (batching)         |
+| **Token Budget Utilization**      | 115K / 200K | N/A                         | 57.5% average usage          |
 
 ### Multi-Phase Analysis (Stage 4)
-| Metric | Value | Validation | Notes |
-|--------|-------|------------|-------|
-| **Token Usage (3 docs)** | 127.1K / 200K | 63.5% | T055 E2E test (Russian legal docs) |
-| **Quality Score** | 99.99% | 0.75+ threshold | Semantic similarity via Jina-v3 |
-| **Pipeline Duration (3 docs)** | 56.5s | <120s | 6 phases executed |
-| **Phase Distribution** | 33%/34%/15%/6% | N/A | classify/scope/expert/synthesis |
-| **Cost Savings** | 40-50% | Always-120B baseline | Multi-model orchestration |
-| **Research Flag Precision** | >95% | <5% false positive | Conservative approach |
-| **Lesson Count Validation** | 48 lessons | Minimum 10 | FR-015 compliant |
-| **Model Escalation Rate** | <10% | N/A | 20B → 120B → Gemini fallback |
+
+| Metric                         | Value          | Validation           | Notes                              |
+| ------------------------------ | -------------- | -------------------- | ---------------------------------- |
+| **Token Usage (3 docs)**       | 127.1K / 200K  | 63.5%                | T055 E2E test (Russian legal docs) |
+| **Quality Score**              | 99.99%         | 0.75+ threshold      | Semantic similarity via Jina-v3    |
+| **Pipeline Duration (3 docs)** | 56.5s          | <120s                | 6 phases executed                  |
+| **Phase Distribution**         | 33%/34%/15%/6% | N/A                  | classify/scope/expert/synthesis    |
+| **Cost Savings**               | 40-50%         | Always-120B baseline | Multi-model orchestration          |
+| **Research Flag Precision**    | >95%           | <5% false positive   | Conservative approach              |
+| **Lesson Count Validation**    | 48 lessons     | Minimum 10           | FR-015 compliant                   |
+| **Model Escalation Rate**      | <10%           | N/A                  | 20B → 120B → Gemini fallback       |
 
 ---
 
@@ -1151,18 +1182,21 @@ megacampus2/
 ## 🎓 Use Cases
 
 ### 1. **Corporate Training**
+
 - Upload company policies/manuals (PDF/DOCX)
 - AI generates structured training courses
 - Multi-tenant isolation per organization
 - Tier-based quotas (TRIAL → PREMIUM)
 
 ### 2. **Educational Institutions**
+
 - Instructors create courses from lecture notes
 - RAG retrieval for context-aware content
 - Student enrollment tracking
 - Progress analytics (future roadmap)
 
 ### 3. **Content Creators**
+
 - Generate courses from research papers
 - Multi-format output (text, video, audio)
 - AI assistant for content editing
@@ -1173,6 +1207,7 @@ megacampus2/
 ## 🔮 Development Roadmap
 
 ### Core Workflows (Stages 0-6)
+
 - ✅ **Stage 0:** Foundation Infrastructure (COMPLETE - v0.9.0, 2025-10-20)
   - 103/103 tasks | RAG system, BullMQ, Supabase, Authentication
 - ✅ **Stage 1:** Main Entry Orchestrator (COMPLETE - v0.11.0, 2025-10-22)
@@ -1189,6 +1224,7 @@ megacampus2/
   - RAG, batching, retry, database ready, AI prompts needed
 
 ### Stage 7-8 (Integration & Admin)
+
 - ⏸️ **Stage 7:** LMS Integration (80% infrastructure ready)
   - REST API for external LMS
   - Webhooks (course status, approvals)
@@ -1199,6 +1235,7 @@ megacampus2/
   - Token usage analytics
 
 ### Future Features
+
 - **Multi-Format Generation:** Audio (TTS), Video (HeyGen), Presentations (reveal.js)
 - **Learner Analytics:** Completion tracking, quiz results, strengths/weaknesses
 - **Individual Programs:** Personalized 20-minute daily lessons
@@ -1208,28 +1245,29 @@ megacampus2/
 
 ## 📊 Project Statistics
 
-| Category | Count | Details |
-|----------|-------|---------|
-| **Completed Stages** | 5 / 9 | 56% complete (Stages 0-4) |
-| **Total Tasks Completed** | 343 | 103 + 37 + 38 + 100 + 65 |
-| **Database Tables** | 14 | organizations, users, courses, sections, lessons, file_catalog, job_status, llm_model_config, etc. |
-| **ENUM Types** | 11 | subscription_tier, role, course_status, generation_status, processing_status, etc. |
-| **RLS Policies** | 28+ | 100% table coverage |
-| **Migrations** | 25+ | Supabase migrations (SQL) |
-| **Tests** | 150+ | 70+ integration, 20 contract, 5 unit, T055 E2E |
-| **tRPC Endpoints** | 14+ | 5 routers (admin, billing, generation, files, analysis) |
-| **BullMQ Job Types** | 10+ | DOCUMENT_PROCESSING, SUMMARIZATION, STRUCTURE_ANALYSIS, etc. |
-| **LLM Models** | 3 | GPT OSS-20B, GPT OSS-120B, Gemini 2.5 Flash |
-| **Packages** | 3 | course-gen-platform, shared-types, trpc-client-sdk |
-| **Technologies** | 35+ | See Tech Stack diagram |
-| **Lines of Code** | 60,000+ | TypeScript, SQL, Markdown |
-| **Releases** | 6 | v0.9.0, v0.11.0, v0.12.2, v0.13.0, v0.14.6 |
+| Category                  | Count   | Details                                                                                            |
+| ------------------------- | ------- | -------------------------------------------------------------------------------------------------- |
+| **Completed Stages**      | 5 / 9   | 56% complete (Stages 0-4)                                                                          |
+| **Total Tasks Completed** | 343     | 103 + 37 + 38 + 100 + 65                                                                           |
+| **Database Tables**       | 14      | organizations, users, courses, sections, lessons, file_catalog, job_status, llm_model_config, etc. |
+| **ENUM Types**            | 11      | subscription_tier, role, course_status, generation_status, processing_status, etc.                 |
+| **RLS Policies**          | 28+     | 100% table coverage                                                                                |
+| **Migrations**            | 25+     | Supabase migrations (SQL)                                                                          |
+| **Tests**                 | 150+    | 70+ integration, 20 contract, 5 unit, T055 E2E                                                     |
+| **tRPC Endpoints**        | 14+     | 5 routers (admin, billing, generation, files, analysis)                                            |
+| **BullMQ Job Types**      | 10+     | DOCUMENT_PROCESSING, SUMMARIZATION, STRUCTURE_ANALYSIS, etc.                                       |
+| **LLM Models**            | 3       | GPT OSS-20B, GPT OSS-120B, Gemini 2.5 Flash                                                        |
+| **Packages**              | 3       | course-gen-platform, shared-types, trpc-client-sdk                                                 |
+| **Technologies**          | 35+     | See Tech Stack diagram                                                                             |
+| **Lines of Code**         | 60,000+ | TypeScript, SQL, Markdown                                                                          |
+| **Releases**              | 6       | v0.9.0, v0.11.0, v0.12.2, v0.13.0, v0.14.6                                                         |
 
 ---
 
 ## 🏆 Competitive Advantages
 
 ### Technical Excellence
+
 1. **Advanced RAG:** Hierarchical chunking + Late chunking + BM25 hybrid = 89-92% precision (industry standard: 70-75%)
 2. **Multi-Phase LLM Orchestration:** LangChain + LangGraph with 6-phase pipeline (unique architecture)
 3. **Type-Safe Architecture:** End-to-end type safety via tRPC + Zod validation (zero runtime overhead)
@@ -1237,12 +1275,14 @@ megacampus2/
 5. **Scalable Infrastructure:** BullMQ + Redis + Kubernetes-ready workers with stage barriers
 
 ### Cost Efficiency (Unique Differentiators)
+
 6. **80% RAG Cost Savings:** Content deduplication via SHA-256 hash + reference counting
 7. **40-50% LLM Cost Savings:** Multi-model orchestration (20B for simple, 120B for expert)
 8. **99.8% Summarization Savings:** $0.45-1.00/500 docs vs $500-1000 (GPT-4)
 9. **Small Document Bypass:** <3K tokens = zero LLM cost (~30% of documents)
 
 ### Quality & Reliability
+
 10. **99.99% Analysis Quality:** Validated on real Russian legal documents (T055 E2E test)
 11. **0.75+ Semantic Similarity:** Quality validation for all LLM outputs
 12. **Conservative Research Flags:** <5% false positive rate (minimize noise)
@@ -1250,6 +1290,7 @@ megacampus2/
 14. **Stage Barriers:** 100% completion enforcement (Stage 3 before Stage 4)
 
 ### Developer Experience & Vendor Independence
+
 15. **Zero Vendor Lock-In:** Custom observability (NO LangSmith), OpenRouter (30+ models)
 16. **Comprehensive Testing:** 150+ tests (integration, contract, unit, E2E)
 17. **ADR-001:** LangChain + LangGraph selected from 11 frameworks (scored 8.4/10)
@@ -1285,6 +1326,7 @@ megacampus2/
 ## 📝 Changelog
 
 ### Version 1.1 (2025-11-04) - Stage 3 & 4 Complete
+
 - **NEW**: Stage 4 Multi-Phase Analysis Pipeline diagram (LangChain + LangGraph)
 - **NEW**: Stage 4 Key Features section (multi-model orchestration, quality validation, cost tracking)
 - **UPDATED**: Course Generation Workflow (added CreatingSummaries, AnalyzingStructure states)
@@ -1300,6 +1342,7 @@ megacampus2/
 - **UPDATED**: Monorepo Structure (added Stage 3 & 4 services, tests, specs)
 
 ### Version 1.0 (2025-10-27) - Initial Release
+
 - Initial comprehensive architecture diagram
 - System architecture overview
 - Course generation workflow state machine

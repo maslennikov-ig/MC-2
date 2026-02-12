@@ -111,7 +111,7 @@ function parseQuizResponse(content: string): QuizEnrichmentContent | null {
       jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    const parsed = JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent) as unknown;
     const result = quizOutputSchema.safeParse(parsed);
 
     if (result.success) {

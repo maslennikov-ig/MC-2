@@ -31,47 +31,67 @@ export const pipelineAdminRouter = router({
   // Pipeline Overview
   // =========================================================================
 
-  getStagesInfo: superadminProcedure
-    .query(async ({ ctx }) => { /* ... */ }),
+  getStagesInfo: superadminProcedure.query(async ({ ctx }) => {
+    /* ... */
+  }),
 
   getPipelineStats: superadminProcedure
-    .input(z.object({
-      periodDays: z.number().min(1).max(365).default(30),
-    }))
-    .query(async ({ ctx, input }) => { /* ... */ }),
+    .input(
+      z.object({
+        periodDays: z.number().min(1).max(365).default(30),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   // =========================================================================
   // Model Configuration
   // =========================================================================
 
-  listModelConfigs: superadminProcedure
-    .query(async ({ ctx }) => { /* ... */ }),
+  listModelConfigs: superadminProcedure.query(async ({ ctx }) => {
+    /* ... */
+  }),
 
   updateModelConfig: superadminProcedure
     .input(updateModelConfigInputSchema)
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   getModelConfigHistory: superadminProcedure
-    .input(z.object({
-      configType: z.string(),
-      phaseName: phaseNameSchema,
-    }))
-    .query(async ({ ctx, input }) => { /* ... */ }),
+    .input(
+      z.object({
+        configType: z.string(),
+        phaseName: phaseNameSchema,
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   revertModelConfigToVersion: superadminProcedure
-    .input(z.object({
-      configType: z.string(),
-      phaseName: phaseNameSchema,
-      targetVersion: z.number().min(1),
-    }))
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .input(
+      z.object({
+        configType: z.string(),
+        phaseName: phaseNameSchema,
+        targetVersion: z.number().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   resetModelConfigToDefault: superadminProcedure
-    .input(z.object({
-      configType: z.string(),
-      phaseName: phaseNameSchema,
-    }))
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .input(
+      z.object({
+        configType: z.string(),
+        phaseName: phaseNameSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   // =========================================================================
   // OpenRouter Models
@@ -79,80 +99,109 @@ export const pipelineAdminRouter = router({
 
   listOpenRouterModels: superadminProcedure
     .input(modelFilterSchema.optional())
-    .query(async ({ ctx, input }) => { /* ... */ }),
+    .query(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
-  refreshOpenRouterModels: superadminProcedure
-    .mutation(async ({ ctx }) => { /* ... */ }),
+  refreshOpenRouterModels: superadminProcedure.mutation(async ({ ctx }) => {
+    /* ... */
+  }),
 
   // =========================================================================
   // Prompt Templates
   // =========================================================================
 
-  listPromptTemplates: superadminProcedure
-    .query(async ({ ctx }) => { /* ... */ }),
+  listPromptTemplates: superadminProcedure.query(async ({ ctx }) => {
+    /* ... */
+  }),
 
   getPromptTemplate: superadminProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ ctx, input }) => { /* ... */ }),
+    .query(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   updatePromptTemplate: superadminProcedure
     .input(updatePromptTemplateInputSchema)
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   getPromptHistory: superadminProcedure
-    .input(z.object({
-      stage: promptStageSchema,
-      promptKey: z.string(),
-    }))
-    .query(async ({ ctx, input }) => { /* ... */ }),
+    .input(
+      z.object({
+        stage: promptStageSchema,
+        promptKey: z.string(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   revertPromptToVersion: superadminProcedure
-    .input(z.object({
-      stage: promptStageSchema,
-      promptKey: z.string(),
-      targetVersion: z.number().min(1),
-    }))
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .input(
+      z.object({
+        stage: promptStageSchema,
+        promptKey: z.string(),
+        targetVersion: z.number().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   // =========================================================================
   // Global Settings
   // =========================================================================
 
-  getGlobalSettings: superadminProcedure
-    .query(async ({ ctx }) => { /* ... */ }),
+  getGlobalSettings: superadminProcedure.query(async ({ ctx }) => {
+    /* ... */
+  }),
 
   updateGlobalSettings: superadminProcedure
     .input(globalSettingsSchema.partial())
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   // =========================================================================
   // Export/Import
   // =========================================================================
 
-  exportConfiguration: superadminProcedure
-    .query(async ({ ctx }) => { /* ... */ }),
+  exportConfiguration: superadminProcedure.query(async ({ ctx }) => {
+    /* ... */
+  }),
 
   validateImport: superadminProcedure
     .input(z.object({ configJson: z.string() }))
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
   importConfiguration: superadminProcedure
-    .input(z.object({
-      configJson: z.string(),
-      options: z.object({
-        importModels: z.boolean().default(true),
-        importPrompts: z.boolean().default(true),
-        importSettings: z.boolean().default(true),
-      }),
-    }))
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .input(
+      z.object({
+        configJson: z.string(),
+        options: z.object({
+          importModels: z.boolean().default(true),
+          importPrompts: z.boolean().default(true),
+          importSettings: z.boolean().default(true),
+        }),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 
-  listBackups: superadminProcedure
-    .query(async ({ ctx }) => { /* ... */ }),
+  listBackups: superadminProcedure.query(async ({ ctx }) => {
+    /* ... */
+  }),
 
   restoreFromBackup: superadminProcedure
     .input(z.object({ backupId: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => { /* ... */ }),
+    .mutation(async ({ ctx, input }) => {
+      /* ... */
+    }),
 });
 ```
 
@@ -169,6 +218,7 @@ Returns information about all 6 pipeline stages.
 **Input**: None
 
 **Output**:
+
 ```typescript
 {
   stages: PipelineStage[]; // Array of 6 stages
@@ -176,6 +226,7 @@ Returns information about all 6 pipeline stages.
 ```
 
 **Logic**:
+
 1. Return static stage definitions with linked models/prompts
 2. Query `generation_trace` for avg execution time and cost per stage
 3. Determine stage status based on recent error rate
@@ -187,6 +238,7 @@ Returns information about all 6 pipeline stages.
 Returns aggregate statistics for the pipeline.
 
 **Input**:
+
 ```typescript
 {
   periodDays: number; // 1-365, default 30
@@ -194,6 +246,7 @@ Returns aggregate statistics for the pipeline.
 ```
 
 **Output**:
+
 ```typescript
 {
   totalGenerations: number;
@@ -202,11 +255,12 @@ Returns aggregate statistics for the pipeline.
   totalCost: number;
   avgCompletionTime: number;
   periodStart: string; // ISO datetime
-  periodEnd: string;   // ISO datetime
+  periodEnd: string; // ISO datetime
 }
 ```
 
 **Logic**:
+
 1. Query `generation_trace` for the specified period
 2. Aggregate counts, costs, and times
 3. Calculate success/failure rates
@@ -222,6 +276,7 @@ Returns all active model configurations.
 **Input**: None
 
 **Output**:
+
 ```typescript
 {
   configs: ModelConfig[];
@@ -229,6 +284,7 @@ Returns all active model configurations.
 ```
 
 **Logic**:
+
 1. Query `llm_model_config` where `is_active = true`
 2. Include user info for `created_by` via join
 
@@ -239,6 +295,7 @@ Returns all active model configurations.
 Updates a model configuration, creating a new version.
 
 **Input**:
+
 ```typescript
 {
   id: string;
@@ -250,6 +307,7 @@ Updates a model configuration, creating a new version.
 ```
 
 **Output**:
+
 ```typescript
 {
   config: ModelConfig;
@@ -258,6 +316,7 @@ Updates a model configuration, creating a new version.
 ```
 
 **Logic**:
+
 1. Validate model exists in OpenRouter (FR-010)
 2. Start transaction
 3. Set current version `is_active = false`
@@ -266,6 +325,7 @@ Updates a model configuration, creating a new version.
 6. Commit transaction
 
 **Errors**:
+
 - `MODEL_NOT_FOUND`: If modelId doesn't exist in OpenRouter
 - `CONFIG_NOT_FOUND`: If id doesn't exist
 
@@ -276,6 +336,7 @@ Updates a model configuration, creating a new version.
 Returns version history for a specific config.
 
 **Input**:
+
 ```typescript
 {
   configType: string;
@@ -284,6 +345,7 @@ Returns version history for a specific config.
 ```
 
 **Output**:
+
 ```typescript
 {
   history: ModelConfigHistoryItem[];
@@ -291,6 +353,7 @@ Returns version history for a specific config.
 ```
 
 **Logic**:
+
 1. Query all versions ordered by version DESC
 2. Join with users for author info
 
@@ -301,6 +364,7 @@ Returns version history for a specific config.
 Reverts a config to a previous version (creates new version).
 
 **Input**:
+
 ```typescript
 {
   configType: string;
@@ -310,6 +374,7 @@ Reverts a config to a previous version (creates new version).
 ```
 
 **Output**:
+
 ```typescript
 {
   config: ModelConfig;
@@ -318,6 +383,7 @@ Reverts a config to a previous version (creates new version).
 ```
 
 **Logic**:
+
 1. Get target version data
 2. Deactivate current version
 3. Insert new version with target's data + incremented version number
@@ -330,6 +396,7 @@ Reverts a config to a previous version (creates new version).
 Resets config to hardcoded defaults (creates new version).
 
 **Input**:
+
 ```typescript
 {
   configType: string;
@@ -338,6 +405,7 @@ Resets config to hardcoded defaults (creates new version).
 ```
 
 **Output**:
+
 ```typescript
 {
   config: ModelConfig;
@@ -345,6 +413,7 @@ Resets config to hardcoded defaults (creates new version).
 ```
 
 **Logic**:
+
 1. Get defaults from `langchain-models.ts`
 2. Create new version with default values
 3. Log to audit
@@ -358,6 +427,7 @@ Resets config to hardcoded defaults (creates new version).
 Returns cached OpenRouter models with optional filtering.
 
 **Input** (optional):
+
 ```typescript
 {
   providers?: string[];
@@ -369,6 +439,7 @@ Returns cached OpenRouter models with optional filtering.
 ```
 
 **Output**:
+
 ```typescript
 {
   models: OpenRouterModel[];
@@ -379,6 +450,7 @@ Returns cached OpenRouter models with optional filtering.
 ```
 
 **Logic**:
+
 1. Call `getOpenRouterModels()` service
 2. Apply filters if provided
 3. Return with cache metadata
@@ -392,6 +464,7 @@ Force refresh of OpenRouter models cache.
 **Input**: None
 
 **Output**:
+
 ```typescript
 {
   models: OpenRouterModel[];
@@ -400,6 +473,7 @@ Force refresh of OpenRouter models cache.
 ```
 
 **Logic**:
+
 1. Call `getOpenRouterModels(forceRefresh: true)`
 2. Return fresh data
 
@@ -414,6 +488,7 @@ Returns all active prompts grouped by stage.
 **Input**: None
 
 **Output**:
+
 ```typescript
 {
   promptsByStage: PromptsByStage;
@@ -421,6 +496,7 @@ Returns all active prompts grouped by stage.
 ```
 
 **Logic**:
+
 1. Query `prompt_templates` where `is_active = true`
 2. Group by stage
 3. If no prompts found, return hardcoded registry keys with empty templates
@@ -432,6 +508,7 @@ Returns all active prompts grouped by stage.
 Returns a single prompt template with full details.
 
 **Input**:
+
 ```typescript
 {
   id: string;
@@ -439,6 +516,7 @@ Returns a single prompt template with full details.
 ```
 
 **Output**:
+
 ```typescript
 {
   prompt: PromptTemplate;
@@ -452,6 +530,7 @@ Returns a single prompt template with full details.
 Updates a prompt, creating a new version.
 
 **Input**:
+
 ```typescript
 {
   id: string;
@@ -463,6 +542,7 @@ Updates a prompt, creating a new version.
 ```
 
 **Output**:
+
 ```typescript
 {
   prompt: PromptTemplate;
@@ -471,6 +551,7 @@ Updates a prompt, creating a new version.
 ```
 
 **Logic**:
+
 1. Validate XML syntax if `promptTemplate` provided
 2. Start transaction
 3. Set current version `is_active = false`
@@ -479,6 +560,7 @@ Updates a prompt, creating a new version.
 6. Commit
 
 **Errors**:
+
 - `INVALID_XML`: If prompt template has XML syntax errors
 - `PROMPT_NOT_FOUND`: If id doesn't exist
 
@@ -489,6 +571,7 @@ Updates a prompt, creating a new version.
 Returns version history for a prompt.
 
 **Input**:
+
 ```typescript
 {
   stage: PromptStage;
@@ -497,6 +580,7 @@ Returns version history for a prompt.
 ```
 
 **Output**:
+
 ```typescript
 {
   history: PromptHistoryItem[];
@@ -510,6 +594,7 @@ Returns version history for a prompt.
 Reverts prompt to a previous version.
 
 **Input**:
+
 ```typescript
 {
   stage: PromptStage;
@@ -519,6 +604,7 @@ Reverts prompt to a previous version.
 ```
 
 **Output**:
+
 ```typescript
 {
   prompt: PromptTemplate;
@@ -537,6 +623,7 @@ Returns current global settings.
 **Input**: None
 
 **Output**:
+
 ```typescript
 {
   settings: GlobalSettings;
@@ -544,6 +631,7 @@ Returns current global settings.
 ```
 
 **Logic**:
+
 1. Query settings from `llm_model_config` or dedicated storage
 2. Merge with defaults for any missing values
 
@@ -556,6 +644,7 @@ Updates global settings (partial update).
 **Input**: Partial<GlobalSettings>
 
 **Output**:
+
 ```typescript
 {
   settings: GlobalSettings;
@@ -563,6 +652,7 @@ Updates global settings (partial update).
 ```
 
 **Logic**:
+
 1. Merge with existing settings
 2. Validate all values
 3. Save
@@ -579,6 +669,7 @@ Exports all configurations as JSON.
 **Input**: None
 
 **Output**:
+
 ```typescript
 {
   export: ConfigExport;
@@ -587,6 +678,7 @@ Exports all configurations as JSON.
 ```
 
 **Logic**:
+
 1. Query all active model configs
 2. Query all active prompt templates
 3. Get current global settings
@@ -599,6 +691,7 @@ Exports all configurations as JSON.
 Validates import JSON and returns preview of changes.
 
 **Input**:
+
 ```typescript
 {
   configJson: string;
@@ -606,6 +699,7 @@ Validates import JSON and returns preview of changes.
 ```
 
 **Output**:
+
 ```typescript
 {
   isValid: boolean;
@@ -615,6 +709,7 @@ Validates import JSON and returns preview of changes.
 ```
 
 **Logic**:
+
 1. Parse JSON
 2. Validate schema
 3. Compare with current state
@@ -627,6 +722,7 @@ Validates import JSON and returns preview of changes.
 Applies imported configuration.
 
 **Input**:
+
 ```typescript
 {
   configJson: string;
@@ -634,11 +730,12 @@ Applies imported configuration.
     importModels: boolean;
     importPrompts: boolean;
     importSettings: boolean;
-  };
+  }
 }
 ```
 
 **Output**:
+
 ```typescript
 {
   success: boolean;
@@ -648,6 +745,7 @@ Applies imported configuration.
 ```
 
 **Logic**:
+
 1. Create auto backup (FR-031)
 2. Validate JSON
 3. Start transaction
@@ -666,6 +764,7 @@ Returns list of configuration backups.
 **Input**: None
 
 **Output**:
+
 ```typescript
 {
   backups: ConfigBackup[];
@@ -673,6 +772,7 @@ Returns list of configuration backups.
 ```
 
 **Logic**:
+
 1. Query `config_backups` ordered by `created_at DESC`
 2. Join with users for author info
 3. Return max 20 (enforced by DB trigger)
@@ -684,6 +784,7 @@ Returns list of configuration backups.
 Restores configuration from a backup.
 
 **Input**:
+
 ```typescript
 {
   backupId: string;
@@ -691,6 +792,7 @@ Restores configuration from a backup.
 ```
 
 **Output**:
+
 ```typescript
 {
   success: boolean;
@@ -699,6 +801,7 @@ Restores configuration from a backup.
 ```
 
 **Logic**:
+
 1. Create new auto backup before restore
 2. Get backup data
 3. Apply as import (all options true)
@@ -708,17 +811,17 @@ Restores configuration from a backup.
 
 ## Error Codes
 
-| Code | HTTP | Description |
-|------|------|-------------|
-| `UNAUTHORIZED` | 401 | User not authenticated |
-| `FORBIDDEN` | 403 | User is not superadmin |
-| `MODEL_NOT_FOUND` | 404 | OpenRouter model doesn't exist |
-| `CONFIG_NOT_FOUND` | 404 | Configuration doesn't exist |
-| `PROMPT_NOT_FOUND` | 404 | Prompt template doesn't exist |
-| `BACKUP_NOT_FOUND` | 404 | Backup doesn't exist |
-| `INVALID_XML` | 400 | Prompt template has XML syntax errors |
-| `INVALID_IMPORT` | 400 | Import JSON validation failed |
-| `VERSION_CONFLICT` | 409 | Concurrent edit detected |
+| Code               | HTTP | Description                           |
+| ------------------ | ---- | ------------------------------------- |
+| `UNAUTHORIZED`     | 401  | User not authenticated                |
+| `FORBIDDEN`        | 403  | User is not superadmin                |
+| `MODEL_NOT_FOUND`  | 404  | OpenRouter model doesn't exist        |
+| `CONFIG_NOT_FOUND` | 404  | Configuration doesn't exist           |
+| `PROMPT_NOT_FOUND` | 404  | Prompt template doesn't exist         |
+| `BACKUP_NOT_FOUND` | 404  | Backup doesn't exist                  |
+| `INVALID_XML`      | 400  | Prompt template has XML syntax errors |
+| `INVALID_IMPORT`   | 400  | Import JSON validation failed         |
+| `VERSION_CONFLICT` | 409  | Concurrent edit detected              |
 
 ---
 

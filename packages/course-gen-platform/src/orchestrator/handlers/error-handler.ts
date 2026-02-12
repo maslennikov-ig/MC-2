@@ -122,6 +122,8 @@ export function classifyError(error: Error | unknown): ErrorType {
     ['504', ErrorType.TRANSIENT],
 
     // Permanent errors (validation/auth issues)
+    ['unavailable for legal reasons', ErrorType.PERMANENT], // Jina 451 content policy
+    ['content policy', ErrorType.PERMANENT],
     ['validation', ErrorType.PERMANENT],
     ['invalid', ErrorType.PERMANENT],
     ['unauthorized', ErrorType.PERMANENT],

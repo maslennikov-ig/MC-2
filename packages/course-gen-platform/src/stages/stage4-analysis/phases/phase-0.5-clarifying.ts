@@ -1,11 +1,12 @@
 /**
  * Phase 0.5: Clarifying Questions
  *
- * Generates smart questions based on course context to gather user preferences.
- * Runs after Budget Allocation, before Phase 1 (Classification).
+ * Generates smart questions based on course context and Phase 1 classification data.
+ * Runs after Phase 1 (Classification), before Phase 2 (Scope).
  *
  * Key Features:
- * - Generates 3-14 context-aware questions with priorities
+ * - Generates 3-20 context-aware questions with data-driven priorities
+ * - Uses Phase 1 output (missing_elements, completeness, key_concepts) for targeted questions
  * - Provides suggested answers with rationale
  * - Stores questions in clarifying_questions table
  * - Integrates with Budget Allocator for condensed context
@@ -18,7 +19,7 @@
  */
 
 import { z } from 'zod';
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logTrace } from '@/shared/trace-logger';
@@ -26,6 +27,7 @@ import logger from '@/shared/logger';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
 import type { ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
+import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
 
 // ============================================================================
 // CONSTANTS
@@ -58,11 +60,42 @@ export type QuestionType = z.infer<typeof QuestionTypeSchema>;
  */
 export const SuggestedAnswerSchema = z.object({
   text: z.string().min(5).max(500),
-  rationale: z.string().min(10).max(300),
+  rationale: z.string().min(10).max(300).default('Auto-generated rationale for this answer option'),
   is_recommended: z.boolean().optional(), // For open type: marks the AI-recommended answer
 });
 
 export type SuggestedAnswer = z.infer<typeof SuggestedAnswerSchema>;
+
+/**
+ * Normalize a single suggested answer from LLM output.
+ * Handles strings, arrays, and malformed objects that LLMs sometimes produce.
+ */
+function normalizeSuggestedAnswer(val: unknown): unknown {
+  if (val && typeof val === 'object' && !Array.isArray(val) && 'text' in val) {
+    const obj = val as Record<string, unknown>;
+    // Ensure rationale exists — LLMs sometimes omit it
+    if (!obj.rationale || typeof obj.rationale !== 'string' || obj.rationale.length < 10) {
+      return {
+        ...obj,
+        rationale:
+          obj.rationale && typeof obj.rationale === 'string'
+            ? `${obj.rationale} (auto-completed rationale)`
+            : 'Auto-generated rationale for this answer option',
+      };
+    }
+    return val;
+  }
+  if (typeof val === 'string' && val.trim().length > 0) {
+    const text = val.length >= 5 ? val : `${val} (вариант ответа)`;
+    return { text, rationale: 'Auto-generated rationale', is_recommended: false };
+  }
+  if (Array.isArray(val) && val.length > 0) {
+    const raw = String(val[0]);
+    const text = raw.length >= 5 ? raw : `${raw} (вариант ответа)`;
+    return { text, rationale: 'Auto-generated rationale', is_recommended: false };
+  }
+  return null;
+}
 
 /**
  * Single clarifying question with metadata
@@ -76,8 +109,23 @@ export const ClarifyingQuestionSchema = z.object({
   question_text: z.string().min(10).max(500),
   question_type: QuestionTypeSchema.default('open'),
   question_priority: z.enum(['critical', 'important', 'nice_to_have']),
-  question_category: z.string().min(3).max(50),
-  suggested_answers: z.array(SuggestedAnswerSchema).min(2).max(6), // Increased max to 6 for multi_choice
+  question_category: z.enum([
+    'company_context',
+    'audience',
+    'expected_outcomes',
+    'content_structure',
+    'focus_priorities',
+    'business_goals',
+    'practical_application',
+    'constraints',
+  ]),
+  suggested_answers: z.preprocess(val => {
+    if (!Array.isArray(val)) return val;
+    return val
+      .map(normalizeSuggestedAnswer)
+      .filter(a => a !== null)
+      .slice(0, 6);
+  }, z.array(SuggestedAnswerSchema).min(2).max(6)),
 });
 
 export type ClarifyingQuestion = z.infer<typeof ClarifyingQuestionSchema>;
@@ -86,7 +134,7 @@ export type ClarifyingQuestion = z.infer<typeof ClarifyingQuestionSchema>;
  * LLM output schema for clarifying questions generation
  */
 export const ClarifyingOutputSchema = z.object({
-  questions: z.array(ClarifyingQuestionSchema).min(3).max(14),
+  questions: z.array(ClarifyingQuestionSchema).min(3).max(50),
 });
 
 export type ClarifyingOutput = z.infer<typeof ClarifyingOutputSchema>;
@@ -127,6 +175,19 @@ export const Phase05InputSchema = z.object({
 
   /** Language code (ISO 639-1) */
   language: z.string().min(2).max(5),
+
+  /** Document summaries from Stage 3 (reused from orchestrator, no extra DB calls) */
+  document_summaries: z
+    .array(
+      z.object({
+        file_name: z.string(),
+        processed_content: z.string(),
+      })
+    )
+    .optional(),
+
+  /** Phase 1 classification output for data-driven question generation */
+  phase1_output: z.custom<Phase1Output>().optional(),
 });
 
 export type Phase05Input = z.infer<typeof Phase05InputSchema>;
@@ -153,15 +214,31 @@ export function extractAnswerString(answer: UserAnswerValue | string | null): st
 // ============================================================================
 
 /**
- * Build condensed context from budget allocation
+ * Truncate document content to stay within token budget.
+ * Same pattern as phase-1-classifier.ts — 4:1 char-to-token ratio.
+ */
+function truncateContent(content: string, maxTokens: number): string {
+  const estimatedTokens = Math.ceil(content.length / 4);
+  if (estimatedTokens <= maxTokens) return content;
+  const maxChars = maxTokens * 4;
+  return `${content.substring(0, maxChars)}\n[... truncated ...]`;
+}
+
+/**
+ * Build condensed context from budget allocation and document content.
  *
  * Creates a compact summary of document context for prompt injection.
- * Similar to pattern used in other phases for token-aware context building.
+ * Includes actual document text (truncated to ~4K total tokens) so the model
+ * can avoid asking questions already answered in the documents.
  *
  * @param budgetAllocation - Stage 4 budget allocation result (nullable when no documents)
+ * @param documentSummaries - Document content from Stage 3 (reused from orchestrator)
  * @returns Condensed context string
  */
-function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation | null): string {
+function buildCondensedContext(
+  budgetAllocation: Stage4BudgetAllocation | null,
+  documentSummaries?: Array<{ file_name: string; processed_content: string }>
+): string {
   // Handle case when no documents were uploaded
   if (!budgetAllocation) {
     return 'No documents provided. Course will be generated based on title and description only.';
@@ -181,11 +258,65 @@ function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation | null):
   );
   contextParts.push(`- SUPPLEMENTARY: ${breakdown.supplementary.count} documents (summaries only)`);
 
-  // Model selection
-  contextParts.push(`\nModel: ${budgetAllocation.modelSelection.modelId}`);
-  contextParts.push(`Context Budget: ${budgetAllocation.totalTokens.toLocaleString()} tokens`);
+  // Actual document content (truncated to ~4K total tokens)
+  if (documentSummaries && documentSummaries.length > 0) {
+    const tokensPerDoc = Math.floor(4000 / documentSummaries.length);
+    contextParts.push('\nDOCUMENT CONTENTS:');
+    for (const doc of documentSummaries) {
+      contextParts.push(
+        `\n[${doc.file_name}]\n${truncateContent(doc.processed_content, tokensPerDoc)}`
+      );
+    }
+  }
 
   return contextParts.join('\n');
+}
+
+/**
+ * Build preliminary analysis context from Phase 1 output
+ * Provides data-driven context for smarter question generation
+ */
+function buildPhase1Context(phase1Output: Phase1Output): string {
+  const { course_category, topic_analysis } = phase1Output;
+
+  const parts: string[] = [];
+  parts.push('PRELIMINARY ANALYSIS (from Phase 1 Classification):');
+  parts.push(
+    `- Course Category: ${course_category.primary} (confidence: ${(course_category.confidence * 100).toFixed(0)}%)`
+  );
+  parts.push(`- Topic Complexity: ${topic_analysis.complexity}`);
+  parts.push(`- Information Completeness: ${topic_analysis.information_completeness}%`);
+
+  if (topic_analysis.key_concepts.length > 0) {
+    parts.push(`- Key Concepts Already Identified: ${topic_analysis.key_concepts.join(', ')}`);
+  }
+
+  if (
+    Array.isArray(topic_analysis.missing_elements) &&
+    topic_analysis.missing_elements.length > 0
+  ) {
+    parts.push(
+      `- MISSING ELEMENTS (prioritize questions about these): ${topic_analysis.missing_elements.join(', ')}`
+    );
+  }
+
+  // Priority guidance based on completeness
+  const completeness = topic_analysis.information_completeness;
+  if (completeness < 50) {
+    parts.push(
+      '\nPRIORITY GUIDANCE: Information completeness is LOW (<50%). Focus on CRITICAL questions that fill major knowledge gaps. Be thorough — cover all 8 category blocks with detailed questions.'
+    );
+  } else if (completeness < 80) {
+    parts.push(
+      '\nPRIORITY GUIDANCE: Information completeness is MODERATE (50-80%). Balance IMPORTANT questions across all category blocks. Ask targeted follow-ups where gaps exist.'
+    );
+  } else {
+    parts.push(
+      '\nPRIORITY GUIDANCE: Information completeness is HIGH (>80%). Focus on NICE_TO_HAVE refinement questions. Still ensure each category block has at least one question.'
+    );
+  }
+
+  return parts.join('\n');
 }
 
 /**
@@ -198,16 +329,18 @@ function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation | null):
  * @returns Prompt messages for LLM
  */
 function buildClarifyingPrompt(input: Phase05Input): [SystemMessage, HumanMessage] {
-  const { courseContext, language, budgetAllocation } = input;
+  const { courseContext, language, budgetAllocation, document_summaries, phase1_output } = input;
 
-  // Build condensed context from budget allocation
-  const condensedContext = buildCondensedContext(budgetAllocation);
+  // Build condensed context from budget allocation + document content
+  const condensedContext = buildCondensedContext(budgetAllocation, document_summaries);
 
   // System message with role and constraints
   const systemMessage = new SystemMessage(
     `You are an expert course designer helping to create a tailored learning experience.
 
 Your task is to generate clarifying questions that will help improve the course design based on the provided context.
+
+PLATFORM: MegaCampus is an online course platform. Courses are always text-based lessons with optional enrichments (quiz, audio, video, presentation). The delivery format is fixed — do not ask about it.
 
 CRITICAL RULES:
 1. ALL output MUST be in ${language.toUpperCase()} (the course target language)
@@ -219,7 +352,7 @@ CRITICAL RULES:
       "question_text": "string (10-500 chars)",
       "question_type": "open|single_choice|multi_choice",
       "question_priority": "critical|important|nice_to_have",
-      "question_category": "audience|content|depth|format|outcome|tool",
+      "question_category": "company_context|audience|expected_outcomes|content_structure|focus_priorities|business_goals|practical_application|constraints",
       "suggested_answers": [
         { "text": "string (5-500 chars)", "rationale": "string (10-300 chars)", "is_recommended": boolean }
       ]
@@ -227,7 +360,7 @@ CRITICAL RULES:
   ]
 }
 
-3. Generate 3-14 questions total
+3. Generate as many questions as needed for complete understanding of the course requirements. Minimum 1 question per category block. No artificial upper limits — thoroughness is more important than brevity
 4. QUESTION TYPES - choose the optimal type for each question:
    - "open": When answer requires free-form text (e.g., specific goals, unique requirements)
      * MUST mark exactly ONE answer as "is_recommended": true
@@ -257,8 +390,22 @@ CRITICAL RULES:
    - important: Will significantly improve course (e.g., preferred learning style, time constraints)
    - nice_to_have: Optional enhancements (e.g., specific tools/technologies preferences)
 6. Focus on questions that cannot be inferred from the provided context
-7. Avoid generic questions - be specific to this course topic`
+7. Avoid generic questions - be specific to this course topic
+8. **MANDATORY COVERAGE**: Generate at least 1 question for EACH of the 8 category blocks:
+   - company_context: Company description, industry, size, culture, existing training programs
+   - audience: Target audience, roles, experience level, pain points, learning preferences
+   - expected_outcomes: Measurable skills, competencies, certifications after course completion
+   - content_structure: Required topics, modules, theses, case studies, depth of coverage
+   - focus_priorities: Key competencies, emphasis areas, critical skills to develop
+   - business_goals: ROI expectations, performance metrics, business objectives alignment
+   - practical_application: Exercises, projects, real-world scenarios, hands-on activities
+   - constraints: Time limits, budget, compliance requirements, technical limitations
+9. Adjust question depth based on information completeness — ask more detailed questions where information gaps exist
+10. Ensure questions from different categories get diverse priorities (not all critical)`
   );
+
+  // Build Phase 1 context if available
+  const phase1Context = phase1_output ? buildPhase1Context(phase1_output) : '';
 
   // Human message with course context
   const humanMessage = new HumanMessage(
@@ -267,13 +414,14 @@ Title: ${courseContext.title}
 ${courseContext.description ? `Description: ${courseContext.description}` : ''}
 Target Audience: ${courseContext.target_audience || 'mixed'}
 Language: ${language.toUpperCase()}
-
+${phase1Context ? `\n${phase1Context}\n` : ''}
 DOCUMENT CONTEXT (condensed):
 ${condensedContext}
 
 TASK:
-Generate 3-14 clarifying questions that will help create a better course.
-
+Generate comprehensive clarifying questions covering ALL 8 category blocks to fully understand the course requirements.
+${phase1_output ? 'Use the PRELIMINARY ANALYSIS above to ask targeted questions about identified gaps and missing elements.' : ''}
+Each category block (company_context, audience, expected_outcomes, content_structure, focus_priorities, business_goals, practical_application, constraints) MUST have at least 1 question.
 Output MUST be valid JSON with all text fields in ${language.toUpperCase()}.`
   );
 
@@ -335,10 +483,10 @@ function validateQuestionTypeSuggestions(question: ClarifyingQuestion): boolean 
  *
  * @param courseId - Course UUID
  * @param questions - Generated questions from LLM
- * @param iterationRound - Always 1 (round 2 removed)
+ * @param iterationRound - Clarifying round (1-3)
  * @returns Promise<void>
  */
-async function storeQuestions(
+export async function storeQuestions(
   courseId: string,
   questions: ClarifyingQuestion[],
   iterationRound: number
@@ -466,7 +614,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     } finally {
       clearTimeout(timeoutId);
     }
-    const rawOutput = response.content as string;
+    const rawOutput = getTextContent(response.content);
 
     phaseLogger.debug(
       { outputLength: rawOutput.length },
@@ -475,7 +623,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
 
     // Log trace data for observability
     const promptText = promptMessages
-      .map(m => `${m._getType().toUpperCase()}:\n${m.content}`)
+      .map(m => `${m._getType().toUpperCase()}:\n${getTextContent(m.content)}`)
       .join('\n\n');
 
     await logTrace({
@@ -514,7 +662,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
       );
     }
 
-    // Validate with Zod
+    // Validate with Zod (normalization of suggested_answers handled by z.preprocess in schema)
     const validationResult = ClarifyingOutputSchema.safeParse(parsedOutput);
 
     if (!validationResult.success) {
@@ -634,7 +782,7 @@ export async function getPendingQuestions(courseId: string): Promise<ClarifyingQ
  * Get answered questions for a course
  *
  * Retrieves questions with user answers (status: answered).
- * Used by Phase 1+ to inject user preferences into analysis.
+ * Used by Phase 2+ to inject user preferences into analysis.
  *
  * @param courseId - Course UUID
  * @returns Promise<ClarifyingQuestionRow[]> - Answered questions
@@ -728,8 +876,7 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
 
   // Use atomic RPC function for transaction safety
   // This ensures all questions are updated or none are (rollback on failure)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)('auto_answer_questions_atomic', {
+  const { data, error } = await supabase.rpc('auto_answer_questions_atomic', {
     p_course_id: courseId,
   });
 
@@ -738,10 +885,10 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
       { courseId, error: error.message, code: error.code },
       'RPC auto_answer_questions_atomic failed'
     );
-    throw new Error(`Failed to auto-answer questions: ${error.message}`);
+    throw new Error(`Failed to auto-answer questions: ${String(error.message)}`);
   }
 
-  const result = data as AutoAnswerRpcResponse;
+  const result = data as unknown as AutoAnswerRpcResponse;
 
   if (!result.success) {
     logger.error(
@@ -773,4 +920,218 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
   }
 
   return result.updated_count;
+}
+
+// ============================================================================
+// SUFFICIENCY ANALYSIS FOR MULTI-ROUND CLARIFICATION
+// ============================================================================
+
+/**
+ * Sufficiency verdict from LLM analysis of user answers
+ */
+export interface SufficiencyVerdict {
+  /** Whether gathered information is sufficient to proceed */
+  is_sufficient: boolean;
+  /** Confidence level (0-1) */
+  confidence: number;
+  /** Identified information gaps */
+  gaps: string[];
+  /** Follow-up questions if not sufficient */
+  follow_up_questions?: ClarifyingQuestion[];
+}
+
+const SufficiencyVerdictSchema = z.object({
+  is_sufficient: z.boolean(),
+  confidence: z.number().min(0).max(1),
+  gaps: z.array(z.string()),
+  follow_up_questions: z.array(ClarifyingQuestionSchema).optional(),
+});
+
+const SUFFICIENCY_SYSTEM_PROMPT = `You are an expert course designer evaluating whether enough information has been gathered to create a high-quality course.
+
+Analyze the user's answers to clarifying questions and determine if the information is SUFFICIENT to proceed with course design.
+
+CRITICAL RULES:
+1. Respond with valid JSON matching this schema:
+{
+  "is_sufficient": boolean,
+  "confidence": number (0-1),
+  "gaps": ["string array of identified information gaps"],
+  "follow_up_questions": [
+    {
+      "question_text": "string (10-500 chars)",
+      "question_type": "open|single_choice|multi_choice",
+      "question_priority": "critical|important|nice_to_have",
+      "question_category": "company_context|audience|expected_outcomes|content_structure|focus_priorities|business_goals|practical_application|constraints",
+      "suggested_answers": [{ "text": "string", "rationale": "string", "is_recommended": boolean }]
+    }
+  ]
+}
+
+2. Set is_sufficient=true if you have enough information to design a comprehensive course
+3. Set is_sufficient=false if there are SIGNIFICANT gaps that would lead to poor course quality
+4. If not sufficient, generate follow_up_questions targeting the specific gaps
+5. Be pragmatic — minor gaps are OK. Focus on information that would MATERIALLY change the course design`;
+
+/**
+ * Analyze sufficiency of user answers and generate follow-up questions if needed.
+ *
+ * @param input - Phase 0.5 input data
+ * @param answeredQuestions - All answered questions from current and previous rounds
+ * @param currentRound - Current round number (1 or 2)
+ * @returns SufficiencyVerdict with potential follow-up questions
+ */
+export async function analyzeSufficiency(
+  input: Phase05Input,
+  answeredQuestions: Array<{ question: string; answer: string; category: string | null }>,
+  currentRound: number
+): Promise<SufficiencyVerdict> {
+  const { courseContext, language } = input;
+
+  const model = await getModelForPhase('stage_4_clarifying', input.course_id, undefined, language);
+
+  const roundGuidance =
+    currentRound === 2
+      ? 'This is round 2 of max 3. Be more lenient — only ask truly critical follow-ups'
+      : 'This is round 1 of max 3. Ask follow-ups if there are significant gaps';
+
+  const systemMsg = new SystemMessage(
+    `${SUFFICIENCY_SYSTEM_PROMPT}
+6. ALL output MUST be in ${language.toUpperCase()}
+7. ${roundGuidance}`
+  );
+
+  const answersContext = answeredQuestions
+    .map(
+      (a, i) => `[Q${i + 1}] (${a.category || 'general'}) ${a.question}\n[A${i + 1}] ${a.answer}`
+    )
+    .join('\n\n');
+
+  const humanMsg = new HumanMessage(`COURSE CONTEXT:
+Title: ${courseContext.title}
+${courseContext.description ? `Description: ${courseContext.description}` : ''}
+Target Audience: ${courseContext.target_audience || 'mixed'}
+Language: ${language.toUpperCase()}
+Current Round: ${currentRound} of 3
+
+ALL ANSWERS GATHERED SO FAR:
+${answersContext}
+
+TASK:
+Analyze whether the gathered information is sufficient to design a comprehensive, high-quality course.
+If NOT sufficient, generate follow-up questions targeting the specific gaps.
+Output valid JSON.`);
+
+  const startTime = Date.now();
+  const response = await model.invoke([systemMsg, humanMsg]);
+  const rawOutput = getTextContent(response.content);
+
+  // Log trace
+  await logTrace({
+    courseId: input.course_id,
+    stage: 'stage_4',
+    phase: 'stage_4_clarifying',
+    stepName: `sufficiency_analysis_round_${currentRound}`,
+    inputData: { answeredCount: answeredQuestions.length, currentRound },
+    completionText: rawOutput,
+    modelUsed: model.model || 'unknown',
+    durationMs: Date.now() - startTime,
+  });
+
+  // Parse and validate
+  let parsed: unknown;
+  try {
+    parsed = safeJSONParse(rawOutput);
+  } catch (parseError) {
+    logger.error(
+      {
+        courseId: input.course_id,
+        currentRound,
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        rawOutputPreview: rawOutput.slice(0, 200),
+      },
+      'Sufficiency analysis JSON parse failed, defaulting to sufficient'
+    );
+    // Store failure in trace for audit trail
+    await logTrace({
+      courseId: input.course_id,
+      stage: 'stage_4',
+      phase: 'stage_4_clarifying',
+      stepName: `sufficiency_parse_failure_round_${currentRound}`,
+      errorData: {
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        rawOutput: rawOutput.slice(0, 500),
+      },
+      durationMs: Date.now() - startTime,
+    });
+    return {
+      is_sufficient: true,
+      confidence: 0.3,
+      gaps: ['Parse failure - proceeding by default'],
+    };
+  }
+
+  const result = SufficiencyVerdictSchema.safeParse(parsed);
+  if (!result.success) {
+    logger.error(
+      { courseId: input.course_id, currentRound, errors: result.error.errors },
+      'Sufficiency verdict validation failed, defaulting to sufficient'
+    );
+    return {
+      is_sufficient: true,
+      confidence: 0.3,
+      gaps: ['Validation failure - proceeding by default'],
+    };
+  }
+
+  // CRITICAL-002 fix: Confidence threshold to prevent unnecessary follow-ups
+  // If LLM says "not sufficient" but confidence is high (>=0.6), override to sufficient
+  if (!result.data.is_sufficient && result.data.confidence >= 0.6) {
+    logger.info(
+      {
+        courseId: input.course_id,
+        currentRound,
+        confidence: result.data.confidence,
+        gapCount: result.data.gaps.length,
+      },
+      'Overriding to sufficient: confidence too high for follow-ups'
+    );
+    result.data.is_sufficient = true;
+    result.data.follow_up_questions = undefined;
+  }
+
+  // HIGH-003 fix: Validate and truncate follow-up question count per round
+  const maxFollowUps = currentRound === 1 ? 20 : 10;
+  if (result.data.follow_up_questions && result.data.follow_up_questions.length > maxFollowUps) {
+    logger.warn(
+      {
+        courseId: input.course_id,
+        currentRound,
+        followUpCount: result.data.follow_up_questions.length,
+        maxAllowed: maxFollowUps,
+      },
+      'LLM generated too many follow-up questions, truncating'
+    );
+    const priorityOrder: Record<string, number> = { critical: 0, important: 1, nice_to_have: 2 };
+    result.data.follow_up_questions = result.data.follow_up_questions
+      .sort(
+        (a, b) =>
+          (priorityOrder[a.question_priority] ?? 2) - (priorityOrder[b.question_priority] ?? 2)
+      )
+      .slice(0, maxFollowUps);
+  }
+
+  logger.info(
+    {
+      courseId: input.course_id,
+      currentRound,
+      isSufficient: result.data.is_sufficient,
+      confidence: result.data.confidence,
+      gapCount: result.data.gaps.length,
+      followUpCount: result.data.follow_up_questions?.length || 0,
+    },
+    'Sufficiency analysis complete'
+  );
+
+  return result.data;
 }

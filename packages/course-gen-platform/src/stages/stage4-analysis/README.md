@@ -11,7 +11,7 @@ Stage 4 performs deep content analysis to extract pedagogical insights, course s
 
 ### Core Components
 
-- **Orchestrator:** `orchestrator.ts` - LangGraph StateGraph with 5 analysis phases
+- **Orchestrator:** `orchestrator.ts` - LangGraph StateGraph with 4 analysis phases + assembly
 - **Handler:** `handler.ts` - BullMQ job handler with progress tracking
 - **Phases:** `phases/` - Individual phase implementations
 
@@ -21,7 +21,18 @@ Stage 4 performs deep content analysis to extract pedagogical insights, course s
 Analysis Job Input
     |
     v
-Phase 1: Classifier (Course Category + Contextual Language)
+Phase 0: Pre-Flight (Stage 3 Barrier + Input Validation)
+    |
+    v
+Budget Allocation (Token Budget for Documents)
+    |
+    v
+Phase 1: Classifier (Course Category + Topic Analysis + Missing Elements)
+    |
+    v
+Phase 0.5: Clarifying Questions (Data-Driven, Enriched with Phase 1 Output)
+    |          |
+    |     [PAUSE if semi-automatic mode -> user answers -> RESUME]
     |
     v
 Phase 2: Scope (Course Structure + Lessons Distribution)
@@ -37,9 +48,6 @@ Phase 5: Assembly (Pure Logic - Combine All Outputs)
     |
     v
 AnalysisResult -> courses.analysis_result
-
-[DEPRECATED] Phase 6: RAG Planning - Removed in mc2-u9fb
-Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
 ```
 
 ---
@@ -64,7 +72,6 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
   - `knowledge_bridge`: Prior knowledge connection
   - `practical_benefit_focus`: Real-world applications
 - `topic_analysis`: Key concepts, determined topic, scope
-- `pedagogical_patterns`: (Optional) Teaching patterns for category
 
 ---
 
@@ -86,13 +93,12 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
     - `key_topics`: Topics covered
     - `learning_objectives`: Section objectives
     - `estimated_lessons`: Lessons per section
-    - `importance`: "critical" | "important" | "supplementary"
-    - `prerequisites`: Dependency chain
+    - `importance`: "simple" | "normal" | "complex" (drives Stage 5 model tier routing)
+    - `pedagogical_approach`: Teaching methodology
 
 **Validation:**
 
 - Minimum 10 total lessons (FR-015)
-- Circular dependency detection in prerequisites
 
 ---
 
@@ -108,7 +114,6 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
 - `pedagogical_strategy`:
   - `assessment_approach`: How learners demonstrate understanding (min 50 chars)
   - `progression_logic`: Learning path rationale (min 100 chars)
-- `expansion_areas`: Topics for optional deep-dives
 - `research_flags[]`: Topics requiring external research
   - `topic`: Research topic
   - `context`: Why research needed
@@ -134,13 +139,6 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
   - `exercise_types`: Assessment types
   - `contextual_language_hints`: Audience-specific guidance
   - `real_world_examples`: Practical applications
-- `content_strategy`: "create_from_scratch" | "expand_and_enhance" | "optimize_existing"
-
-**Strategy Selection:**
-
-- <3 documents: "create_from_scratch"
-- 3-10 documents: "expand_and_enhance"
-- 10+ documents: "optimize_existing"
 
 ---
 
@@ -157,41 +155,12 @@ Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
 2. Sanitize LLM-generated text (XSS prevention with DOMPurify)
 3. Calculate cumulative metadata (tokens, cost, duration)
 4. Validate prerequisites chain (circular dependency detection)
-5. Validate optional fields (pedagogical_patterns, generation_guidance)
+5. Validate optional fields (generation_guidance)
 
 **Security:**
 
 - All LLM-generated text sanitized before storage
 - Prevents XSS attacks in frontend display
-
----
-
-### Phase 6: RAG Planning [DEPRECATED]
-
-> **⚠️ DEPRECATED in mc2-u9fb**: This phase has been removed.
-> Vector search with priority boosting (mc2-zac) now handles document retrieval.
-
-**File:** `phases/phase-6-rag-planning.ts` (kept for backward compatibility)
-**Status:** SKIPPED - always returns empty mapping
-
-**Reason for Deprecation:**
-
-- LLM-based document-to-section mapping introduced systematic error risk
-- Errors in mapping propagated to all lessons in affected sections
-- Vector search with priority boosting provides dynamic, per-lesson relevance
-
-**Benefits of Removal:**
-
-- ~5-10 seconds faster per course
-- ~2-5K tokens saved per course
-- No LLM error propagation risk
-- Dynamic relevance scoring instead of static mapping
-
-**Migration:**
-
-- New courses: `document_relevance_mapping` is always `{}`
-- Existing courses: Legacy data remains valid and functional
-- Stage 5/6 RAG retrieval uses priority boosting (CORE +20%, IMPORTANT +12%)
 
 ---
 
@@ -231,22 +200,16 @@ interface AnalysisResult {
   course_category: CourseCategory;
   contextual_language: ContextualLanguage;
   topic_analysis: TopicAnalysis;
-  pedagogical_patterns?: PedagogicalPatterns;
 
   // Phase 2
   recommended_structure: RecommendedStructure;
 
   // Phase 3
   pedagogical_strategy: PedagogicalStrategy;
-  expansion_areas: ExpansionArea[] | null;
   research_flags: ResearchFlag[];
 
   // Phase 4
   generation_guidance: GenerationGuidance;
-  content_strategy: ContentStrategy;
-
-  // Phase 6
-  document_relevance_mapping: DocumentRelevanceMapping;
 
   // Metadata
   metadata: {
@@ -270,7 +233,6 @@ interface AnalysisResult {
 ### External Services
 
 - **OpenRouter API:** LLM completion (models configured via database)
-- **Jina Embeddings:** Semantic validation (optional, Phase 6)
 
 ### Internal Modules
 
@@ -355,7 +317,7 @@ pnpm test tests/unit/stages/stage4/
 
 **Scenarios:**
 
-- Full 6-phase pipeline
+- Full pipeline
 - Document count variations
 - Language handling
 - Error recovery paths
@@ -435,6 +397,6 @@ On successful completion:
 
 ---
 
-**Last Updated:** 2025-11-21
+**Last Updated:** 2026-02-07
 **Version:** 1.0.0
 **Owner:** course-gen-platform team

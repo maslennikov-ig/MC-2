@@ -12,6 +12,7 @@
 LLMs generating lesson content frequently produce **invalid Mermaid diagram syntax**. The most common issue is **escaped quotes** (`\"`) inside node labels, which breaks client-side rendering.
 
 **Example of the Problem**:
+
 ```mermaid
 flowchart TD
     A[Contact: \"Promised Response\"] --> B[Follow-up]
@@ -20,6 +21,7 @@ flowchart TD
 The `\"` syntax is invalid in Mermaid - it renders as a broken diagram with parsing errors.
 
 **Impact**:
+
 - Broken diagrams in 15-30% of lessons containing Mermaid
 - Poor user experience (error messages instead of diagrams)
 - Manual intervention required to fix
@@ -33,11 +35,13 @@ LLMs (especially instruction-tuned models) are trained on code that uses escaped
 ## Decision Drivers
 
 ### Primary Drivers
+
 1. **Zero Rendering Failures** (40%): Users should never see broken diagrams
 2. **Automated Recovery** (30%): Fix issues without human intervention
 3. **Cost Efficiency** (20%): Avoid expensive Judge calls for fixable issues
 
 ### Secondary Drivers
+
 4. **Defense in Depth** (10%): Multiple layers to catch edge cases
 
 ---
@@ -49,10 +53,12 @@ LLMs (especially instruction-tuned models) are trained on code that uses escaped
 **Approach**: Add Mermaid guidelines to generation prompts only.
 
 **Pros**:
+
 - Simple implementation
 - No additional processing
 
 **Cons**:
+
 - LLMs still produce escaped quotes ~10-15% of time
 - No recovery for failures
 - Silent broken diagrams
@@ -66,10 +72,12 @@ LLMs (especially instruction-tuned models) are trained on code that uses escaped
 **Approach**: Fix Mermaid syntax in the web frontend before rendering.
 
 **Pros**:
+
 - Works for all content (past and future)
 - No regeneration needed
 
 **Cons**:
+
 - Masks quality issues (bad content stored in DB)
 - Every client must implement fix logic
 - Maintenance burden across platforms (web, mobile)
@@ -84,10 +92,12 @@ LLMs (especially instruction-tuned models) are trained on code that uses escaped
 **Approach**: Route Mermaid issues to Judge for quality evaluation.
 
 **Pros**:
+
 - Comprehensive evaluation
 - Can assess semantic correctness too
 
 **Cons**:
+
 - Expensive (Judge costs ~$0.10-0.15 per lesson)
 - Overkill for syntax-only issues
 - Increases latency
@@ -102,6 +112,7 @@ LLMs (especially instruction-tuned models) are trained on code that uses escaped
 **Approach**: Prevention + Auto-Fix + Detection layers.
 
 **Architecture**:
+
 ```
 Layer 1: Prevention (Prompt Instructions)
     ↓
@@ -111,12 +122,14 @@ Layer 3: Detection (Heuristic Filter) → CRITICAL → REGENERATE
 ```
 
 **Pros**:
+
 - Near-zero Mermaid failures reach production
 - No expensive Judge calls for syntax issues
 - Self-healing at each layer
 - Defense in depth catches edge cases
 
 **Cons**:
+
 - Three components to maintain
 - Slightly more complex pipeline
 
@@ -154,7 +167,7 @@ Automatic syntax correction after generation:
 
 **Location**: `stages/stage6-lesson-content/utils/mermaid-sanitizer.ts`
 
-```typescript
+````typescript
 /**
  * Regex to match Mermaid code blocks in markdown
  */
@@ -187,7 +200,7 @@ export function sanitizeMermaidBlocks(content: string): MermaidSanitizeResult {
 
   return { content: sanitizedContent, modified, fixes };
 }
-```
+````
 
 **Integration Point**: Called in `nodes/generator.ts` after LLM response:
 
@@ -240,7 +253,7 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
 if (!mermaidCheck.passed) {
   issues.push({
     type: 'HYGIENE',
-    severity: 'CRITICAL',  // <-- CRITICAL, not COMPLEX
+    severity: 'CRITICAL', // <-- CRITICAL, not COMPLEX
     location: 'global',
     description: `Mermaid syntax issues: ${mermaidCheck.mermaidIssues.join('; ')}`,
   });
@@ -256,6 +269,7 @@ if (!mermaidCheck.passed) {
 5. **Speed**: Regeneration is faster than Judge round-trip
 
 **Flow Diagram**:
+
 ```
 Mermaid Issue Detected (Layer 3)
     ↓
@@ -277,15 +291,18 @@ Layer 3 (Detection) should now pass
 ## Implementation Files
 
 ### New Files
+
 - `stages/stage6-lesson-content/utils/mermaid-sanitizer.ts` - Auto-fix logic
 
 ### Modified Files
+
 - `stages/stage6-lesson-content/judge/heuristic-filter.ts` - Added `checkMermaidSyntax()`
 - `stages/stage6-lesson-content/nodes/self-reviewer-node.ts` - CRITICAL severity routing
 - `stages/stage6-lesson-content/nodes/generator.ts` - Sanitizer integration
 - `shared/prompts/prompt-registry.ts` - Mermaid instructions
 
 ### Test Files
+
 - `tests/stages/stage6-lesson-content/mermaid-fix-pipeline.e2e.test.ts` - 27 tests
 
 ---
@@ -311,11 +328,13 @@ Layer 3 (Detection) should now pass
 ## Validation & Success Metrics
 
 ### Success Criteria
+
 - 0 Mermaid rendering failures in production logs
 - Sanitizer fix rate >= 95% of escaped quote issues
 - Regeneration rate for Mermaid-only issues < 5%
 
 ### Monitoring
+
 - Log sanitizer fixes with count and block index
 - Track heuristic filter Mermaid issue detection rate
 - Monitor regeneration reasons (should rarely be "Mermaid only")
@@ -356,5 +375,6 @@ Layer 3 (Detection) should now pass
 ---
 
 **Decision Log**:
+
 - 2025-12-25: ADR created and ACCEPTED
 - 2025-12-25: Implementation complete with 27 E2E tests passing

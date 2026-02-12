@@ -123,7 +123,7 @@ function parseDraftResponse(content: string): PresentationDraft | null {
       jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    const parsed = JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent) as unknown;
     const result = presentationDraftSchema.safeParse(parsed);
 
     if (result.success) {
@@ -157,7 +157,7 @@ function parseFinalResponse(content: string): PresentationOutput | null {
       jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    const parsed = JSON.parse(jsonContent);
+    const parsed = JSON.parse(jsonContent) as unknown;
     const result = presentationOutputSchema.safeParse(parsed);
 
     if (result.success) {

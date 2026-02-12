@@ -1,18 +1,12 @@
-'use client';
+'use client'
 
-import React, { useMemo } from 'react';
-import { ErrorBoundary } from 'react-error-boundary';
-import { cn } from '@/lib/utils';
-import { useNodeSelection } from '../../hooks/useNodeSelection';
-import { useTranslations, useLocale } from 'next-intl';
-import {
-  PRIORITY_CONFIG,
-  isValidPriority,
-} from '@/lib/generation-graph/priority-config';
-import {
-  getDocumentDisplayName,
-  truncateDisplayName,
-} from '@/lib/generation-graph/document-display-name';
+import React, { useMemo } from 'react'
+import { ErrorBoundary } from 'react-error-boundary'
+import { cn } from '@/lib/utils'
+import { useNodeSelection } from '../../hooks/useNodeSelection'
+import { useTranslations, useLocale } from 'next-intl'
+import { PRIORITY_CONFIG, isValidPriority } from '@/lib/generation-graph/priority-config'
+import { getDocumentDisplayName, truncateDisplayName } from '@megacampus/shared-utils'
 import {
   Loader2,
   AlertCircle,
@@ -25,10 +19,10 @@ import {
   Timer,
   Eye,
   RotateCw,
-} from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+} from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import {
   Table,
   TableBody,
@@ -37,7 +31,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/table'
 
 // ============================================================================
 // TYPES
@@ -48,25 +42,25 @@ import {
  */
 export interface DocumentMatrixRow {
   /** Document UUID */
-  documentId: string;
+  documentId: string
   /** Original filename */
-  filename: string;
+  filename: string
   /** AI-generated title from Phase 6 summarization */
-  generatedTitle?: string | null;
+  generatedTitle?: string | null
   /** User-provided original filename at upload */
-  originalName?: string | null;
+  originalName?: string | null
   /** Processing status */
-  status: 'pending' | 'active' | 'completed' | 'error';
+  status: 'pending' | 'active' | 'completed' | 'error'
   /** Document priority for processing order */
-  priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+  priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY'
   /** Number of completed processing stages */
-  completedStages: number;
+  completedStages: number
   /** Total number of processing stages */
-  totalStages: number;
+  totalStages: number
   /** Processing time in milliseconds */
-  processingTimeMs?: number;
+  processingTimeMs?: number
   /** Error message if status is 'error' */
-  errorMessage?: string;
+  errorMessage?: string
 }
 
 /**
@@ -74,26 +68,26 @@ export interface DocumentMatrixRow {
  */
 export interface Stage2DashboardData {
   /** Total number of documents */
-  totalDocuments: number;
+  totalDocuments: number
   /** Number of completed documents */
-  completedDocuments: number;
+  completedDocuments: number
   /** Number of currently processing documents */
-  processingDocuments: number;
+  processingDocuments: number
   /** Number of failed documents */
-  failedDocuments: number;
+  failedDocuments: number
   /** Document list for matrix display */
-  documents: DocumentMatrixRow[];
+  documents: DocumentMatrixRow[]
   /** Aggregated processing statistics */
   aggregates: {
     /** Total pages across all documents */
-    totalPages: number;
+    totalPages: number
     /** Total chunks created */
-    totalChunks: number;
+    totalChunks: number
     /** Total tokens embedded */
-    totalTokens: number;
+    totalTokens: number
     /** Average processing time per document in ms */
-    avgProcessingTimeMs: number;
-  };
+    avgProcessingTimeMs: number
+  }
 }
 
 // ============================================================================
@@ -107,28 +101,26 @@ function DashboardErrorFallback({
   error,
   resetErrorBoundary,
 }: {
-  error: Error;
-  resetErrorBoundary: () => void;
+  error: Error
+  resetErrorBoundary: () => void
 }) {
-  const t = useTranslations('generation');
+  const t = useTranslations('generation')
 
   return (
-    <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-      <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-      <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">
+    <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+      <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
+      <h3 className="mb-2 text-lg font-semibold text-red-600 dark:text-red-400">
         {t('stage2.displayError')}
       </h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 max-w-sm">
-        {error.message}
-      </p>
+      <p className="mb-4 max-w-sm text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
       <button
         onClick={resetErrorBoundary}
-        className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-md text-sm"
+        className="rounded-md bg-indigo-500 px-4 py-2 text-sm text-white hover:bg-indigo-600"
       >
         {t('stage2.tryAgain')}
       </button>
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -139,22 +131,22 @@ function DashboardErrorFallback({
  * Format processing time in human-readable format
  */
 function formatDuration(ms: number | undefined, t: (key: string) => string): string {
-  if (ms === undefined || ms === 0) return '-';
-  if (ms < 1000) return `${ms}${t('stage2.milliseconds')}`;
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}${t('stage2.seconds')}`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}${t('stage2.minutes')} ${remainingSeconds}${t('stage2.seconds')}`;
+  if (ms === undefined || ms === 0) return '-'
+  if (ms < 1000) return `${ms}${t('stage2.milliseconds')}`
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}${t('stage2.seconds')}`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  return `${minutes}${t('stage2.minutes')} ${remainingSeconds}${t('stage2.seconds')}`
 }
 
 /**
  * Format average processing time
  */
 function formatAvgTime(ms: number, t: (key: string) => string): string {
-  if (ms === 0) return '-';
-  if (ms < 1000) return `~${Math.round(ms)}${t('stage2.milliseconds')}`;
-  return `~${(ms / 1000).toFixed(1)}${t('stage2.seconds')}`;
+  if (ms === 0) return '-'
+  if (ms < 1000) return `~${Math.round(ms)}${t('stage2.milliseconds')}`
+  return `~${(ms / 1000).toFixed(1)}${t('stage2.seconds')}`
 }
 
 /**
@@ -163,42 +155,36 @@ function formatAvgTime(ms: number, t: (key: string) => string): string {
 function getRowClassName(status: DocumentMatrixRow['status']): string {
   switch (status) {
     case 'pending':
-      return 'text-slate-400 dark:text-slate-500';
+      return 'text-slate-400 dark:text-slate-500'
     case 'active':
-      return 'bg-indigo-50 dark:bg-indigo-950/30 font-semibold text-indigo-900 dark:text-indigo-100';
+      return 'bg-indigo-50 dark:bg-indigo-950/30 font-semibold text-indigo-900 dark:text-indigo-100'
     case 'completed':
-      return '';
+      return ''
     case 'error':
-      return 'text-red-600 dark:text-red-400';
+      return 'text-red-600 dark:text-red-400'
   }
 }
 
 /**
  * Get priority badge using SSOT config
  */
-function getPriorityBadge(
-  priority: DocumentMatrixRow['priority'],
-  locale: 'ru' | 'en' = 'ru'
-) {
-  if (!priority) return null;
+function getPriorityBadge(priority: DocumentMatrixRow['priority'], locale: 'ru' | 'en' = 'ru') {
+  if (!priority) return null
 
   // Use SSOT for validation and config
   if (!isValidPriority(priority)) {
-    console.warn(`[Stage2Dashboard] Invalid priority value: ${priority}`);
-    return null;
+    console.warn(`[Stage2Dashboard] Invalid priority value: ${priority}`)
+    return null
   }
 
-  const config = PRIORITY_CONFIG[priority];
-  const style = config.style;
+  const config = PRIORITY_CONFIG[priority]
+  const style = config.style
 
   return (
-    <Badge
-      variant="outline"
-      className={cn('text-xs', style.bg, style.text, style.border)}
-    >
+    <Badge variant="outline" className={cn('text-xs', style.bg, style.text, style.border)}>
       {config.label[locale]}
     </Badge>
-  );
+  )
 }
 
 /**
@@ -218,7 +204,7 @@ function getStatusBadge(data: Stage2DashboardData, t: (key: string) => string) {
       >
         {t('stage2.requiresAttention')}
       </Badge>
-    );
+    )
   }
 
   if (data.processingDocuments > 0) {
@@ -235,7 +221,7 @@ function getStatusBadge(data: Stage2DashboardData, t: (key: string) => string) {
       >
         {t('stage2.statusActive')}
       </Badge>
-    );
+    )
   }
 
   if (data.completedDocuments === data.totalDocuments && data.totalDocuments > 0) {
@@ -251,7 +237,7 @@ function getStatusBadge(data: Stage2DashboardData, t: (key: string) => string) {
       >
         {t('stage2.statusCompleted')}
       </Badge>
-    );
+    )
   }
 
   return (
@@ -266,7 +252,7 @@ function getStatusBadge(data: Stage2DashboardData, t: (key: string) => string) {
     >
       {t('stage2.statusPending')}
     </Badge>
-  );
+  )
 }
 
 // ============================================================================
@@ -274,19 +260,17 @@ function getStatusBadge(data: Stage2DashboardData, t: (key: string) => string) {
 // ============================================================================
 
 interface Stage2DashboardHeaderProps {
-  data: Stage2DashboardData;
-  className?: string;
+  data: Stage2DashboardData
+  className?: string
 }
 
 /**
  * Dashboard header with title and vital signs
  */
 function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) {
-  const t = useTranslations('generation');
+  const t = useTranslations('generation')
   const progressPercent =
-    data.totalDocuments > 0
-      ? Math.round((data.completedDocuments / data.totalDocuments) * 100)
-      : 0;
+    data.totalDocuments > 0 ? Math.round((data.completedDocuments / data.totalDocuments) * 100) : 0
 
   return (
     <div
@@ -297,11 +281,11 @@ function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) 
         className
       )}
     >
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 p-6">
         {/* Title Row */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/40">
+            <div className="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/40">
               <FileStack className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             </div>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
@@ -324,7 +308,7 @@ function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) 
           <Progress
             value={progressPercent}
             className="h-2 bg-indigo-100 dark:bg-indigo-900/30 [&>div]:bg-indigo-500 dark:[&>div]:bg-indigo-400"
-            aria-label={t('stage2.overallProgress') || "Общий прогресс обработки документов"}
+            aria-label={t('stage2.overallProgress') || 'Общий прогресс обработки документов'}
             aria-valuenow={progressPercent}
             aria-valuemin={0}
             aria-valuemax={100}
@@ -332,17 +316,17 @@ function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) 
         </div>
 
         {/* Vital Signs Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {/* Total Documents */}
           <VitalSignCard
-            icon={<FileStack className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />}
+            icon={<FileStack className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />}
             label={t('stage2.totalLabel')}
             value={data.totalDocuments.toString()}
           />
 
           {/* Completed */}
           <VitalSignCard
-            icon={<CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />}
+            icon={<CheckCircle2 className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />}
             label={t('stage2.readyLabel')}
             value={data.completedDocuments.toString()}
             variant="success"
@@ -350,7 +334,7 @@ function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) 
 
           {/* Processing */}
           <VitalSignCard
-            icon={<Clock className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />}
+            icon={<Clock className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />}
             label={t('stage2.inProgressLabel')}
             value={data.processingDocuments.toString()}
             variant="active"
@@ -358,7 +342,7 @@ function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) 
 
           {/* Failed */}
           <VitalSignCard
-            icon={<AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400" />}
+            icon={<AlertTriangle className="h-4 w-4 text-red-500 dark:text-red-400" />}
             label={t('stage2.errorsLabel')}
             value={data.failedDocuments.toString()}
             variant={data.failedDocuments > 0 ? 'error' : undefined}
@@ -366,14 +350,14 @@ function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) 
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 interface VitalSignCardProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  variant?: 'success' | 'active' | 'error';
+  icon: React.ReactNode
+  label: string
+  value: string
+  variant?: 'success' | 'active' | 'error'
 }
 
 /**
@@ -384,76 +368,66 @@ function VitalSignCard({ icon, label, value, variant }: VitalSignCardProps) {
     success: 'text-emerald-600 dark:text-emerald-400',
     active: 'text-indigo-600 dark:text-indigo-400',
     error: 'text-red-600 dark:text-red-400',
-  };
+  }
 
   return (
     <div
       className={cn(
-        'p-4 rounded-lg border',
+        'rounded-lg border p-4',
         'border-slate-200 dark:border-slate-700',
         'bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900',
         'transition-all duration-300',
-        'hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600'
+        'hover:border-indigo-300 hover:shadow-md dark:hover:border-indigo-600'
       )}
     >
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         {icon}
-        <div className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400 font-medium">
+        <div className="text-xs font-medium tracking-wide text-slate-600 uppercase dark:text-slate-400">
           {label}
         </div>
       </div>
       <div
         className={cn(
-          'text-2xl font-mono font-semibold',
+          'font-mono text-2xl font-semibold',
           variant ? variantClasses[variant] : 'text-slate-900 dark:text-indigo-400'
         )}
       >
         {value}
       </div>
     </div>
-  );
+  )
 }
 
 interface DocumentMatrixProps {
-  documents: DocumentMatrixRow[];
-  onDocumentClick: (documentId: string) => void;
-  className?: string;
-  isLoading?: boolean;
+  documents: DocumentMatrixRow[]
+  onDocumentClick: (documentId: string) => void
+  className?: string
+  isLoading?: boolean
 }
 
 /**
  * Document matrix table
  */
-function DocumentMatrix({
-  documents,
-  onDocumentClick,
-  className,
-  isLoading,
-}: DocumentMatrixProps) {
-  const t = useTranslations('generation');
-  const locale = useLocale();
+function DocumentMatrix({ documents, onDocumentClick, className, isLoading }: DocumentMatrixProps) {
+  const t = useTranslations('generation')
+  const locale = useLocale()
 
   // Sort by priority (CORE > IMPORTANT > SUPPLEMENTARY) then by filename
   // Must be called before any early returns to comply with React hooks rules
   const sortedDocuments = useMemo(() => {
-    const priorityOrder: Record<string, number> = { CORE: 0, IMPORTANT: 1, SUPPLEMENTARY: 2 };
+    const priorityOrder: Record<string, number> = { CORE: 0, IMPORTANT: 1, SUPPLEMENTARY: 2 }
     return [...documents].sort((a, b) => {
-      const aPriority = a.priority ? priorityOrder[a.priority] ?? 3 : 3;
-      const bPriority = b.priority ? priorityOrder[b.priority] ?? 3 : 3;
-      if (aPriority !== bPriority) return aPriority - bPriority;
-      return a.filename.localeCompare(b.filename);
-    });
-  }, [documents]);
+      const aPriority = a.priority ? (priorityOrder[a.priority] ?? 3) : 3
+      const bPriority = b.priority ? (priorityOrder[b.priority] ?? 3) : 3
+      if (aPriority !== bPriority) return aPriority - bPriority
+      return a.filename.localeCompare(b.filename)
+    })
+  }, [documents])
 
   // Loading skeleton state
   if (isLoading) {
     return (
-      <div
-        className={cn(
-          'rounded-lg border border-slate-200 dark:border-slate-700',
-          className
-        )}
-      >
+      <div className={cn('rounded-lg border border-slate-200 dark:border-slate-700', className)}>
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -469,38 +443,33 @@ function DocumentMatrix({
             {[1, 2, 3].map((i) => (
               <TableRow key={i}>
                 <TableCell>
-                  <div className="h-4 w-48 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  <div className="h-4 w-48 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                 </TableCell>
                 <TableCell>
-                  <div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  <div className="h-6 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                 </TableCell>
                 <TableCell className="text-center">
-                  <div className="h-4 w-20 mx-auto bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  <div className="mx-auto h-4 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                 </TableCell>
                 <TableCell className="text-center">
-                  <div className="h-6 w-16 mx-auto bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  <div className="mx-auto h-6 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="h-4 w-12 ml-auto bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  <div className="ml-auto h-4 w-12 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                 </TableCell>
                 <TableCell className="text-center">
-                  <div className="h-8 w-8 mx-auto bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  <div className="mx-auto h-8 w-8 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
-    );
+    )
   }
 
   return (
-    <div
-      className={cn(
-        'rounded-lg border border-slate-200 dark:border-slate-700',
-        className
-      )}
-    >
+    <div className={cn('rounded-lg border border-slate-200 dark:border-slate-700', className)}>
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -519,8 +488,8 @@ function DocumentMatrix({
               onClick={() => onDocumentClick(doc.documentId)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onDocumentClick(doc.documentId);
+                  e.preventDefault()
+                  onDocumentClick(doc.documentId)
                 }
               }}
               tabIndex={0}
@@ -530,39 +499,45 @@ function DocumentMatrix({
                 'cursor-pointer transition-colors',
                 getRowClassName(doc.status),
                 'hover:bg-slate-100 dark:hover:bg-slate-800',
-                'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2'
+                'focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none'
               )}
             >
               <TableCell className="font-medium">
                 {(() => {
-                  const displayName = getDocumentDisplayName(doc);
-                  const showOriginal = doc.generatedTitle && (doc.originalName || doc.filename) && doc.generatedTitle !== (doc.originalName || doc.filename);
-                  const originalFilename = doc.originalName || doc.filename;
+                  const displayName = getDocumentDisplayName(doc)
+                  const showOriginal =
+                    doc.generatedTitle &&
+                    (doc.originalName || doc.filename) &&
+                    doc.generatedTitle !== (doc.originalName || doc.filename)
+                  const originalFilename = doc.originalName || doc.filename
                   return (
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-2">
                         {doc.status === 'error' && (
-                          <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                          <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
                         )}
-                        <span className="truncate max-w-xs" title={displayName}>
+                        <span className="max-w-xs truncate" title={displayName}>
                           {truncateDisplayName(displayName, 60)}
                         </span>
                       </div>
                       {showOriginal && (
                         <span
-                          className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-xs ml-6"
+                          className="ml-6 max-w-xs truncate text-xs text-slate-400 dark:text-slate-500"
                           title={originalFilename}
                         >
                           ({truncateDisplayName(originalFilename, 40)})
                         </span>
                       )}
                       {doc.errorMessage && (
-                        <p className="text-xs text-red-500 mt-1 truncate ml-6" title={doc.errorMessage}>
+                        <p
+                          className="mt-1 ml-6 truncate text-xs text-red-500"
+                          title={doc.errorMessage}
+                        >
                           {doc.errorMessage}
                         </p>
                       )}
                     </div>
-                  );
+                  )
                 })()}
               </TableCell>
               <TableCell>{getPriorityBadge(doc.priority, locale)}</TableCell>
@@ -573,7 +548,7 @@ function DocumentMatrix({
                   </span>
                   <Progress
                     value={(doc.completedStages / doc.totalStages) * 100}
-                    className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 [&>div]:bg-indigo-500"
+                    className="h-1.5 w-12 bg-slate-200 dark:bg-slate-700 [&>div]:bg-indigo-500"
                     aria-label={`${doc.filename}: ${doc.completedStages}/${doc.totalStages}`}
                     aria-valuenow={doc.completedStages}
                     aria-valuemin={0}
@@ -597,85 +572,85 @@ function DocumentMatrix({
           <TableRow className="hover:bg-transparent">
             <TableCell colSpan={6} className="text-center">
               <div className="flex items-center justify-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-400">
-                <span>{t('stage2.totalLabel')}: {documents.length} {t('stage2.documentsCount')}</span>
+                <span>
+                  {t('stage2.totalLabel')}: {documents.length} {t('stage2.documentsCount')}
+                </span>
               </div>
             </TableCell>
           </TableRow>
         </TableFooter>
       </Table>
     </div>
-  );
+  )
 }
 
 interface StatusIndicatorProps {
-  status: DocumentMatrixRow['status'];
+  status: DocumentMatrixRow['status']
 }
 
 /**
  * Status indicator badge
  */
 function StatusIndicator({ status }: StatusIndicatorProps) {
-  const t = useTranslations('generation');
+  const t = useTranslations('generation')
 
-  const variants: Record<
-    DocumentMatrixRow['status'],
-    { bg: string; text: string; label: string }
-  > = {
-    pending: {
-      bg: 'bg-slate-100 dark:bg-slate-800',
-      text: 'text-slate-500 dark:text-slate-400',
-      label: t('stage2.statusPending'),
-    },
-    active: {
-      bg: 'bg-indigo-100 dark:bg-indigo-900/40',
-      text: 'text-indigo-600 dark:text-indigo-400',
-      label: t('stage2.statusActive'),
-    },
-    completed: {
-      bg: 'bg-emerald-100 dark:bg-emerald-900/40',
-      text: 'text-emerald-600 dark:text-emerald-400',
-      label: t('stage2.statusCompleted'),
-    },
-    error: {
-      bg: 'bg-red-100 dark:bg-red-900/40',
-      text: 'text-red-600 dark:text-red-400',
-      label: t('stage2.statusError'),
-    },
-  };
+  const variants: Record<DocumentMatrixRow['status'], { bg: string; text: string; label: string }> =
+    {
+      pending: {
+        bg: 'bg-slate-100 dark:bg-slate-800',
+        text: 'text-slate-500 dark:text-slate-400',
+        label: t('stage2.statusPending'),
+      },
+      active: {
+        bg: 'bg-indigo-100 dark:bg-indigo-900/40',
+        text: 'text-indigo-600 dark:text-indigo-400',
+        label: t('stage2.statusActive'),
+      },
+      completed: {
+        bg: 'bg-emerald-100 dark:bg-emerald-900/40',
+        text: 'text-emerald-600 dark:text-emerald-400',
+        label: t('stage2.statusCompleted'),
+      },
+      error: {
+        bg: 'bg-red-100 dark:bg-red-900/40',
+        text: 'text-red-600 dark:text-red-400',
+        label: t('stage2.statusError'),
+      },
+    }
 
-  const variant = variants[status];
+  const variant = variants[status]
 
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium',
+        'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium',
         variant.bg,
         variant.text
       )}
     >
       {status === 'active' && (
-        <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full mr-1.5 animate-pulse" />
+        <span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
       )}
       {variant.label}
     </span>
-  );
+  )
 }
 
 interface ActionButtonProps {
-  document: DocumentMatrixRow;
-  onDocumentClick: (documentId: string) => void;
+  document: DocumentMatrixRow
+  onDocumentClick: (documentId: string) => void
 }
 
 /**
  * Action button for document row
  */
 function ActionButton({ document, onDocumentClick }: ActionButtonProps) {
-  const t = useTranslations('generation');
+  const t = useTranslations('generation')
 
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDocumentClick(document.documentId);
-  };
+    e.stopPropagation()
+    onDocumentClick(document.documentId)
+  }
 
   if (document.status === 'error') {
     return (
@@ -689,7 +664,7 @@ function ActionButton({ document, onDocumentClick }: ActionButtonProps) {
       >
         <RotateCw className="h-4 w-4" />
       </Button>
-    );
+    )
   }
 
   return (
@@ -702,14 +677,14 @@ function ActionButton({ document, onDocumentClick }: ActionButtonProps) {
     >
       <Eye className="h-4 w-4" />
     </Button>
-  );
+  )
 }
 
 interface Stage2DashboardFooterProps {
-  aggregates: Stage2DashboardData['aggregates'];
-  failedCount: number;
-  onRetryFailed?: () => void;
-  className?: string;
+  aggregates: Stage2DashboardData['aggregates']
+  failedCount: number
+  onRetryFailed?: () => void
+  className?: string
 }
 
 /**
@@ -721,7 +696,7 @@ function Stage2DashboardFooter({
   onRetryFailed,
   className,
 }: Stage2DashboardFooterProps) {
-  const t = useTranslations('generation');
+  const t = useTranslations('generation')
 
   return (
     <div
@@ -736,15 +711,22 @@ function Stage2DashboardFooter({
       <div className="flex items-center gap-6 text-sm text-slate-600 dark:text-slate-400">
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4" />
-          <span>{aggregates.totalPages} {t('stage2.pagesLabel')}</span>
+          <span>
+            {aggregates.totalPages} {t('stage2.pagesLabel')}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Hash className="h-4 w-4" />
-          <span>{aggregates.totalChunks} {t('stage2.chunksLabel')}</span>
+          <span>
+            {aggregates.totalChunks} {t('stage2.chunksLabel')}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Timer className="h-4 w-4" />
-          <span>{formatAvgTime(aggregates.avgProcessingTimeMs, t as unknown as (key: string) => string)}{t('stage2.perDoc')}</span>
+          <span>
+            {formatAvgTime(aggregates.avgProcessingTimeMs, t as unknown as (key: string) => string)}
+            {t('stage2.perDoc')}
+          </span>
         </div>
       </div>
 
@@ -762,11 +744,12 @@ function Stage2DashboardFooter({
           )}
         >
           <RotateCw className="h-4 w-4" />
-          {t('stage2.retryErrors')}{failedCount > 0 && ` (${failedCount})`}
+          {t('stage2.retryErrors')}
+          {failedCount > 0 && ` (${failedCount})`}
         </Button>
       </div>
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -775,15 +758,15 @@ function Stage2DashboardFooter({
 
 interface Stage2DashboardProps {
   /** Dashboard data */
-  data: Stage2DashboardData | null;
+  data: Stage2DashboardData | null
   /** Loading state */
-  isLoading?: boolean;
+  isLoading?: boolean
   /** Error state */
-  error?: Error | null;
+  error?: Error | null
   /** Handler for retry failed documents */
-  onRetryFailed?: () => void;
+  onRetryFailed?: () => void
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
 
 /**
@@ -809,96 +792,117 @@ export function Stage2Dashboard({
   onRetryFailed,
   className,
 }: Stage2DashboardProps) {
-  const { selectNode } = useNodeSelection();
-  const t = useTranslations('generation');
+  const { selectNode } = useNodeSelection()
+  const t = useTranslations('generation')
 
   // Convert documentId to React Flow node ID
-  const toNodeId = (documentId: string) => `doc_${documentId}`;
+  const toNodeId = (documentId: string) => `doc_${documentId}`
 
   // Handle document click - select document node
   const handleDocumentClick = (documentId: string) => {
-    selectNode(toNodeId(documentId));
-  };
+    selectNode(toNodeId(documentId))
+  }
 
   // Loading state
   if (isLoading) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full py-12', className)}>
+      <div className={cn('flex h-full flex-col items-center justify-center py-12', className)}>
         <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
         <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
           {t('stage2.loadingDocuments')}
         </p>
       </div>
-    );
+    )
   }
 
   // Error state
   if (error) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full py-12', className)}>
-        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-        <div className="text-red-500 dark:text-red-400 text-center">
+      <div className={cn('flex h-full flex-col items-center justify-center py-12', className)}>
+        <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
+        <div className="text-center text-red-500 dark:text-red-400">
           <p className="font-medium">{t('stage2.loadingError')}</p>
-          <p className="text-sm mt-1">{error.message}</p>
+          <p className="mt-1 text-sm">{error.message}</p>
         </div>
       </div>
-    );
+    )
   }
 
   // No data state
   if (!data) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full py-12 text-center', className)}>
-        <FileStack className="h-12 w-12 text-slate-400 mb-4" />
-        <p className="text-slate-500 dark:text-slate-400 font-medium">
+      <div
+        className={cn(
+          'flex h-full flex-col items-center justify-center py-12 text-center',
+          className
+        )}
+      >
+        <FileStack className="mb-4 h-12 w-12 text-slate-400" />
+        <p className="font-medium text-slate-500 dark:text-slate-400">
           {t('stage2.documentsNotFound')}
         </p>
-        <p className="text-sm text-slate-400 dark:text-slate-500 mt-2 max-w-sm">
+        <p className="mt-2 max-w-sm text-sm text-slate-400 dark:text-slate-500">
           {t('stage2.documentsNotFoundHint')}
         </p>
       </div>
-    );
+    )
   }
 
   // Empty documents state
   if (data.documents.length === 0) {
     return (
-      <div className={cn('flex flex-col items-center justify-center h-full py-12 text-center', className)}>
-        <FileStack className="h-12 w-12 text-slate-400 mb-4" />
-        <p className="text-slate-500 dark:text-slate-400 font-medium">
+      <div
+        className={cn(
+          'flex h-full flex-col items-center justify-center py-12 text-center',
+          className
+        )}
+      >
+        <FileStack className="mb-4 h-12 w-12 text-slate-400" />
+        <p className="font-medium text-slate-500 dark:text-slate-400">
           {t('stage2.noDocumentsToProcess')}
         </p>
-        <p className="text-sm text-slate-400 dark:text-slate-500 mt-2 max-w-sm">
+        <p className="mt-2 max-w-sm text-sm text-slate-400 dark:text-slate-500">
           {t('stage2.noDocumentsHint')}
         </p>
       </div>
-    );
+    )
   }
 
   return (
     <ErrorBoundary FallbackComponent={DashboardErrorFallback}>
-      <div
-        className={cn('flex flex-col h-full', className)}
-        aria-live="polite"
-        aria-atomic="false"
-      >
+      <div className={cn('flex h-full flex-col', className)} aria-live="polite" aria-atomic="false">
         {/* Header with vital signs */}
-        <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-200"><p className="text-sm text-red-600">{t('stage2.headerLoadError')}</p></div>}>
+        <ErrorBoundary
+          fallback={
+            <div className="border-b border-red-200 bg-red-50 p-4 dark:bg-red-900/20">
+              <p className="text-sm text-red-600">{t('stage2.headerLoadError')}</p>
+            </div>
+          }
+        >
           <Stage2DashboardHeader data={data} className="flex-shrink-0" />
         </ErrorBoundary>
 
         {/* Document matrix - scrollable */}
-        <ErrorBoundary fallback={<div className="flex-1 flex items-center justify-center p-4"><p className="text-sm text-red-600">{t('stage2.tableLoadError')}</p></div>}>
-          <div className="flex-1 overflow-y-auto min-h-0 p-4">
-            <DocumentMatrix
-              documents={data.documents}
-              onDocumentClick={handleDocumentClick}
-            />
+        <ErrorBoundary
+          fallback={
+            <div className="flex flex-1 items-center justify-center p-4">
+              <p className="text-sm text-red-600">{t('stage2.tableLoadError')}</p>
+            </div>
+          }
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <DocumentMatrix documents={data.documents} onDocumentClick={handleDocumentClick} />
           </div>
         </ErrorBoundary>
 
         {/* Footer with statistics and actions */}
-        <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200"><p className="text-sm text-red-600">{t('stage2.statsLoadError')}</p></div>}>
+        <ErrorBoundary
+          fallback={
+            <div className="border-t border-red-200 bg-red-50 p-4 dark:bg-red-900/20">
+              <p className="text-sm text-red-600">{t('stage2.statsLoadError')}</p>
+            </div>
+          }
+        >
           <Stage2DashboardFooter
             aggregates={data.aggregates}
             failedCount={data.failedDocuments}
@@ -908,7 +912,7 @@ export function Stage2Dashboard({
         </ErrorBoundary>
       </div>
     </ErrorBoundary>
-  );
+  )
 }
 
-export default Stage2Dashboard;
+export default Stage2Dashboard

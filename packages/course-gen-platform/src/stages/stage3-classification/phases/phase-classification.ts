@@ -35,6 +35,9 @@ import {
 } from '../utils/tournament-classification';
 import { createPromptService } from '../../../shared/prompts/prompt-service';
 import { createModelConfigService } from '../../../shared/llm/model-config-service';
+import { cache as redisCache } from '../../../shared/cache/redis';
+import { createHash } from 'crypto';
+import { formatFileSize } from '@megacampus/shared-utils';
 
 // ============================================================================
 // LLM Response Schema
@@ -81,9 +84,7 @@ const ComparativeClassificationResponseSchema = z.object({
     .describe('Classification results for all documents'),
 });
 
-type ComparativeClassificationResponse = z.infer<
-  typeof ComparativeClassificationResponseSchema
->;
+type ComparativeClassificationResponse = z.infer<typeof ComparativeClassificationResponseSchema>;
 
 // ============================================================================
 // Input Types
@@ -125,6 +126,47 @@ export interface ClassificationInput {
  * If all document summaries exceed this budget, use two-stage tournament classification
  */
 const CLASSIFICATION_INPUT_BUDGET = 100_000; // tokens
+
+/**
+ * Redis cache configuration for document classification
+ */
+/** TTL for document classification cache. Override via DOC_CLASS_CACHE_TTL env var. */
+const DOC_CLASS_CACHE_TTL = parseInt(process.env.DOC_CLASS_CACHE_TTL || String(86400 * 7), 10); // default: 7 days
+const DOC_CLASS_CACHE_PREFIX = 'doc_class';
+const DOC_CLASS_CACHE_VERSION = 'v1';
+
+// ============================================================================
+// Helper Functions - Cache Key Builder
+// ============================================================================
+
+/**
+ * Build cache key for document classification results
+ *
+ * Generates a deterministic cache key based on:
+ * - File IDs (sorted for determinism)
+ * - Course context (title + description)
+ *
+ * Uses SHA-256 hash truncated to 16 hex chars (64 bits of entropy).
+ * Birthday paradox: ~4 billion keys for 50% collision probability — safe for cache.
+ *
+ * @param courseId - Course UUID
+ * @param fileIds - Array of file UUIDs
+ * @param courseContext - Course title and description
+ * @returns Cache key string
+ */
+function buildDocClassCacheKey(
+  courseId: string,
+  fileIds: string[],
+  courseContext: { title: string; description: string }
+): string {
+  const payload = JSON.stringify({
+    fids: [...fileIds].sort(),
+    title: courseContext.title,
+    desc: courseContext.description,
+  });
+  const hash = createHash('sha256').update(payload).digest('hex').slice(0, 16);
+  return `${DOC_CLASS_CACHE_PREFIX}:${DOC_CLASS_CACHE_VERSION}:${courseId}:${hash}`;
+}
 
 // ============================================================================
 // Helper Functions - Model Configuration
@@ -204,20 +246,54 @@ export async function executeDocumentClassificationComparative(
   // Step 2: Fetch course context for better classification
   const courseContext = await fetchCourseContext(supabase, courseId);
 
+  // Step 2.5: Check cache before LLM classification
+  const cacheKey = buildDocClassCacheKey(courseId, fileIds, courseContext);
+  const cached = await redisCache.get<DocumentPriority[]>(cacheKey);
+  if (cached && cached.length > 0) {
+    logger.info(
+      { courseId, fileCount: fileIds.length, cacheKey, cacheStatus: 'hit' },
+      'Document classification cache hit — skipping LLM call'
+    );
+
+    // Restore Date objects from JSON serialization (JSON.parse returns ISO strings, not Dates)
+    const restored = cached.map(p => ({
+      ...p,
+      classified_at:
+        typeof p.classified_at === 'string'
+          ? new Date(p.classified_at)
+          : p.classified_at instanceof Date
+            ? p.classified_at
+            : new Date(),
+    }));
+
+    // Still store results to DB (may have been cleared)
+    const supabaseForStore = getSupabaseAdmin();
+    await storeClassificationResults(supabaseForStore, courseId, restored);
+
+    logger.info(
+      { courseId, totalClassified: restored.length },
+      'Document classification restored from cache'
+    );
+
+    return restored;
+  }
+
+  logger.debug({ courseId, cacheKey, cacheStatus: 'miss' }, 'Document classification cache miss');
+
   // Step 3: Calculate total summary tokens for budget decision
-  const totalSummaryTokens = fileMetadataList.reduce(
-    (sum, file) => sum + file.summary_tokens,
-    0
-  );
+  const totalSummaryTokens = fileMetadataList.reduce((sum, file) => sum + file.summary_tokens, 0);
 
   const requiresTournament = totalSummaryTokens > CLASSIFICATION_INPUT_BUDGET;
 
-  logger.info({
-    fileCount: fileMetadataList.length,
-    totalSummaryTokens,
-    budget: CLASSIFICATION_INPUT_BUDGET,
-    requiresTournament,
-  }, 'Classification strategy determined');
+  logger.info(
+    {
+      fileCount: fileMetadataList.length,
+      totalSummaryTokens,
+      budget: CLASSIFICATION_INPUT_BUDGET,
+      requiresTournament,
+    },
+    'Classification strategy determined'
+  );
 
   // Step 4: Execute appropriate classification strategy
   let comparativeResults: ComparativeClassificationResponse;
@@ -251,10 +327,7 @@ export async function executeDocumentClassificationComparative(
         { fileCount: fileMetadataList.length },
         'Using single-stage comparative classification (summaries fit in budget)'
       );
-      comparativeResults = await classifyDocumentsComparatively(
-        fileMetadataList,
-        courseContext
-      );
+      comparativeResults = await classifyDocumentsComparatively(fileMetadataList, courseContext);
     }
   } catch (error) {
     logger.error(
@@ -305,6 +378,10 @@ export async function executeDocumentClassificationComparative(
     });
   }
 
+  // Step 4.5: Cache classification results
+  await redisCache.set(cacheKey, documentPriorities, { ttl: DOC_CLASS_CACHE_TTL });
+  logger.debug({ courseId, cacheKey }, 'Document classification results cached');
+
   // Step 5: Store classifications
   await storeClassificationResults(supabase, courseId, documentPriorities);
 
@@ -312,11 +389,11 @@ export async function executeDocumentClassificationComparative(
     {
       courseId,
       totalClassified: documentPriorities.length,
-      coreCount: documentPriorities.filter((p) => p.importance_score >= 0.9).length,
+      coreCount: documentPriorities.filter(p => p.importance_score >= 0.9).length,
       importantCount: documentPriorities.filter(
-        (p) => p.importance_score >= 0.7 && p.importance_score < 0.9
+        p => p.importance_score >= 0.7 && p.importance_score < 0.9
       ).length,
-      supplementaryCount: documentPriorities.filter((p) => p.importance_score < 0.7).length,
+      supplementaryCount: documentPriorities.filter(p => p.importance_score < 0.7).length,
     },
     'Comparative document classification phase complete'
   );
@@ -385,10 +462,7 @@ export async function executeDocumentClassification(
 
   for (const fileMeta of fileMetadataList) {
     try {
-      logger.debug(
-        { fileId: fileMeta.id, filename: fileMeta.filename },
-        'Classifying document'
-      );
+      logger.debug({ fileId: fileMeta.id, filename: fileMeta.filename }, 'Classifying document');
 
       const response = await classifyDocument(fileMeta, courseContext);
       classificationResults.push({ fileId: fileMeta.id, response });
@@ -429,16 +503,14 @@ export async function executeDocumentClassification(
 
   // Step 5: Build DocumentPriority array
   const now = new Date();
-  const documentPriorities: DocumentPriority[] = sortedResults.map(
-    (result, index) => ({
-      file_id: result.fileId,
-      priority: getPriorityLevel(result.response.importance_score),
-      importance_score: result.response.importance_score,
-      order: index + 1,
-      classification_rationale: result.response.classification_rationale,
-      classified_at: now,
-    })
-  );
+  const documentPriorities: DocumentPriority[] = sortedResults.map((result, index) => ({
+    file_id: result.fileId,
+    priority: getPriorityLevel(result.response.importance_score),
+    importance_score: result.response.importance_score,
+    order: index + 1,
+    classification_rationale: result.response.classification_rationale,
+    classified_at: now,
+  }));
 
   // Step 6: Store classifications (if document_priorities table exists)
   // Note: This will be implemented when the table is created via migration
@@ -448,10 +520,8 @@ export async function executeDocumentClassification(
     {
       courseId,
       totalClassified: documentPriorities.length,
-      highPriorityCount: documentPriorities.filter((p) => p.priority === 'HIGH')
-        .length,
-      lowPriorityCount: documentPriorities.filter((p) => p.priority === 'LOW')
-        .length,
+      highPriorityCount: documentPriorities.filter(p => p.priority === 'HIGH').length,
+      lowPriorityCount: documentPriorities.filter(p => p.priority === 'LOW').length,
     },
     'Document classification phase complete'
   );
@@ -477,7 +547,9 @@ async function fetchFileMetadata(
 ): Promise<FileMetadata[]> {
   const { data, error } = await supabase
     .from('file_catalog')
-    .select('id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata')
+    .select(
+      'id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata'
+    )
     .in('id', fileIds);
 
   if (error) {
@@ -489,22 +561,25 @@ async function fetchFileMetadata(
     return [];
   }
 
-  return data.map((file) => {
+  return data.map(file => {
     // Use processed_content (summary) if available, fallback to markdown_content
     const content = file.processed_content || file.markdown_content || '';
 
     // Get summary tokens from metadata, or estimate if not available
     const metadata = file.summary_metadata as { summary_tokens?: number } | null;
-    const summaryTokens = metadata?.summary_tokens ||
-      tokenEstimator.estimateTokens(content, detectLanguage(content));
+    const summaryTokens =
+      metadata?.summary_tokens || tokenEstimator.estimateTokens(content, detectLanguage(content));
 
-    logger.debug({
-      fileId: file.id,
-      hasProcessedContent: !!file.processed_content,
-      hasGeneratedTitle: !!file.generated_title,
-      summaryTokens,
-      contentLength: content.length,
-    }, 'Loaded file for classification');
+    logger.debug(
+      {
+        fileId: file.id,
+        hasProcessedContent: !!file.processed_content,
+        hasGeneratedTitle: !!file.generated_title,
+        summaryTokens,
+        contentLength: content.length,
+      },
+      'Loaded file for classification'
+    );
 
     return {
       id: file.id,
@@ -557,10 +632,7 @@ async function classifyDocument(
     modelConfig.maxTokens
   );
 
-  const [systemMsg, humanMsg] = await buildClassificationPrompt(
-    fileMeta,
-    courseContext
-  );
+  const [systemMsg, humanMsg] = await buildClassificationPrompt(fileMeta, courseContext);
 
   const response = await model.invoke([systemMsg, humanMsg]);
   const rawOutput = response.content as string;
@@ -606,9 +678,7 @@ async function classifyDocumentsComparatively(
   );
 
   // Use withStructuredOutput for structured JSON responses
-  const structuredModel = model.withStructuredOutput(
-    ComparativeClassificationResponseSchema
-  );
+  const structuredModel = model.withStructuredOutput(ComparativeClassificationResponseSchema);
 
   const [systemMsg, humanMsg] = await buildComparativeClassificationPrompt(
     fileMetadataList,
@@ -636,10 +706,9 @@ async function buildComparativeClassificationPrompt(
   // Build document list with previews
   // Use generated_title when available for meaningful document identification
   const documentDescriptions = fileMetadataList
-    .map(
-      (file, index) => {
-        const hasGeneratedTitle = !!file.generated_title;
-        return `
+    .map((file, index) => {
+      const hasGeneratedTitle = !!file.generated_title;
+      return `
 [Document ${index + 1}]
 ID: ${file.id}
 ${hasGeneratedTitle ? `Title: ${file.generated_title}` : ''}
@@ -649,8 +718,7 @@ File Size: ${formatFileSize(file.file_size)}
 Content Preview (first 1500 chars):
 ${file.content_preview.substring(0, 1500)}${file.content_preview.length > 1500 ? '...[truncated]' : ''}
 ---`;
-      }
-    )
+    })
     .join('\n');
 
   // Load and render prompt from database (with hardcoded fallback)
@@ -664,7 +732,8 @@ ${file.content_preview.substring(0, 1500)}${file.content_preview.length > 1500 ?
 
   const systemMessage = new SystemMessage(systemPromptText);
 
-  const humanMessage = new HumanMessage(`Classify ALL ${fileMetadataList.length} documents comparatively. Remember:
+  const humanMessage =
+    new HumanMessage(`Classify ALL ${fileMetadataList.length} documents comparatively. Remember:
 - Exactly 1 CORE document
 - Maximum ${maxImportant} IMPORTANT documents
 - Remaining documents are SUPPLEMENTARY`);
@@ -683,14 +752,12 @@ function validateComparativeResults(
 
   // Check count matches
   if (classifications.length !== expectedCount) {
-    throw new Error(
-      `Expected ${expectedCount} classifications, got ${classifications.length}`
-    );
+    throw new Error(`Expected ${expectedCount} classifications, got ${classifications.length}`);
   }
 
   // Count priority levels
-  const coreCount = classifications.filter((c) => c.priority === 'CORE').length;
-  const importantCount = classifications.filter((c) => c.priority === 'IMPORTANT').length;
+  const coreCount = classifications.filter(c => c.priority === 'CORE').length;
+  const importantCount = classifications.filter(c => c.priority === 'IMPORTANT').length;
   const maxImportant = Math.ceil(expectedCount * 0.3);
 
   // Validate constraints
@@ -713,7 +780,11 @@ function validateComparativeResults(
     );
     // Auto-fix: demote excess to SUPPLEMENTARY
     let demotedCount = 0;
-    for (let i = 0; i < classifications.length && demotedCount < importantCount - maxImportant; i++) {
+    for (
+      let i = 0;
+      i < classifications.length && demotedCount < importantCount - maxImportant;
+      i++
+    ) {
       if (classifications[i].priority === 'IMPORTANT') {
         classifications[i].priority = 'SUPPLEMENTARY';
         demotedCount++;
@@ -744,7 +815,9 @@ async function buildClassificationPrompt(
 
   const systemMessage = new SystemMessage(systemPromptText);
 
-  const humanMessage = new HumanMessage(`Classify this document based on its importance and relevance to the course.`);
+  const humanMessage = new HumanMessage(
+    `Classify this document based on its importance and relevance to the course.`
+  );
 
   return [systemMessage, humanMessage];
 }
@@ -854,15 +927,6 @@ function extractJsonFromResponse(response: string): string {
 }
 
 /**
- * Format file size for display
- */
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
  * Detect document language using simple heuristic
  *
  * Checks for Cyrillic characters to detect Russian.
@@ -885,9 +949,7 @@ function detectLanguage(text: string): string {
 /**
  * Retrieve stored classification from file_catalog
  */
-export async function getStoredClassification(
-  fileId: string
-): Promise<DocumentPriority | null> {
+export async function getStoredClassification(fileId: string): Promise<DocumentPriority | null> {
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
@@ -920,9 +982,7 @@ export async function getStoredClassification(
 /**
  * Retrieve all classifications for a course
  */
-export async function getCourseClassifications(
-  courseId: string
-): Promise<DocumentPriority[]> {
+export async function getCourseClassifications(courseId: string): Promise<DocumentPriority[]> {
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase

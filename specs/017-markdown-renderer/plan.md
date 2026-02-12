@@ -11,6 +11,7 @@ Create a unified `<MarkdownRenderer>` component system for MegaCampusAI educatio
 
 **Language/Version**: TypeScript 5.9+ (strict mode)
 **Primary Dependencies**:
+
 - `next-mdx-remote@5.x` - RSC MDX compilation
 - `streamdown@latest` - Streaming markdown (Vercel)
 - `shiki@1.24+` - SSR syntax highlighting
@@ -26,34 +27,37 @@ Create a unified `<MarkdownRenderer>` component system for MegaCampusAI educatio
 **Project Type**: Monorepo package (`packages/web`)
 
 **Performance Goals**:
+
 - 0 KB client JS for syntax highlighting (Shiki SSR)
 - ~5-10 KB client JS for streaming renderer (Streamdown)
 - Mermaid lazy-loaded only when diagram visible
 - LCP impact < 100ms
 
 **Constraints**:
+
 - CSP must NOT include `unsafe-eval` in main app (Mermaid isolated in iframe)
 - Must preserve all existing content rendering functionality
 - WCAG AA compliance required
 
 **Scale/Scope**:
+
 - 4 existing components to migrate
 - 10 user stories to satisfy
 - 27 functional requirements
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Context-First Architecture | ✅ PASS | Existing components analyzed, patterns documented in requirements.md |
-| II. Single Source of Truth | ✅ PASS | Single MarkdownRenderer with presets replaces 4+ duplicated implementations |
-| III. Strict Type Safety | ✅ PASS | TypeScript strict mode, explicit interfaces for all props |
-| IV. Atomic Evolution | ✅ PASS | Tasks will be broken into small, verifiable units with `/push patch` after each |
-| V. Quality Gates & Security | ✅ PASS | rehype-sanitize for UGC, Mermaid sandboxed iframe, CSP maintained |
-| VI. Library-First Development | ✅ PASS | Using established libraries: Shiki, Streamdown, KaTeX, Mermaid |
-| VII. Task Tracking & Artifacts | ✅ PASS | Tasks.md will track all deliverables with artifact paths |
+| Principle                      | Status  | Notes                                                                           |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------- |
+| I. Context-First Architecture  | ✅ PASS | Existing components analyzed, patterns documented in requirements.md            |
+| II. Single Source of Truth     | ✅ PASS | Single MarkdownRenderer with presets replaces 4+ duplicated implementations     |
+| III. Strict Type Safety        | ✅ PASS | TypeScript strict mode, explicit interfaces for all props                       |
+| IV. Atomic Evolution           | ✅ PASS | Tasks will be broken into small, verifiable units with `/push patch` after each |
+| V. Quality Gates & Security    | ✅ PASS | rehype-sanitize for UGC, Mermaid sandboxed iframe, CSP maintained               |
+| VI. Library-First Development  | ✅ PASS | Using established libraries: Shiki, Streamdown, KaTeX, Mermaid                  |
+| VII. Task Tracking & Artifacts | ✅ PASS | Tasks.md will track all deliverables with artifact paths                        |
 
 **Re-check after Phase 1**: Verified - no new violations introduced by design decisions.
 
@@ -116,11 +120,11 @@ packages/web/
 
 > No constitution violations requiring justification.
 
-| Decision | Rationale | Simpler Alternative Rejected |
-|----------|-----------|------------------------------|
-| Dual renderer (RSC + Client) | Spec requirement FR-027: SSR for static, Streamdown for streaming | Single renderer cannot handle both SSR and streaming optimally |
-| Sandboxed iframe for Mermaid | Spec requirement FR-028: Avoid unsafe-eval in main CSP | Direct Mermaid requires unsafe-eval, violates security requirement |
-| Presets system | DRY principle: 4 contexts need different feature sets | Per-component configuration would duplicate logic |
+| Decision                     | Rationale                                                         | Simpler Alternative Rejected                                       |
+| ---------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Dual renderer (RSC + Client) | Spec requirement FR-027: SSR for static, Streamdown for streaming | Single renderer cannot handle both SSR and streaming optimally     |
+| Sandboxed iframe for Mermaid | Spec requirement FR-028: Avoid unsafe-eval in main CSP            | Direct Mermaid requires unsafe-eval, violates security requirement |
+| Presets system               | DRY principle: 4 contexts need different feature sets             | Per-component configuration would duplicate logic                  |
 
 ## Security: Sanitization Schema
 
@@ -133,11 +137,16 @@ export const sanitizeSchema = {
   ...defaultSchema,
   tagNames: [
     ...(defaultSchema.tagNames ?? []),
-    'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', // KaTeX MathML
+    'math',
+    'semantics',
+    'mrow',
+    'mi',
+    'mo',
+    'mn', // KaTeX MathML
   ],
   attributes: {
     ...defaultSchema.attributes,
-    code: ['className'],  // For language-* classes
+    code: ['className'], // For language-* classes
     span: ['className', 'style'], // For Shiki highlighting
   },
 };

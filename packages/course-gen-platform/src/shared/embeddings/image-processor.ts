@@ -18,7 +18,10 @@
  * @module shared/embeddings/image-processor
  */
 
-import { DoclingPicture, DoclingDocument } from '../../stages/stage2-document-processing/docling/types.js';
+import {
+  DoclingPicture,
+  DoclingDocument,
+} from '../../stages/stage2-document-processing/docling/types.js';
 import { ImageMetadata } from './markdown-converter.js';
 import { logger } from '../logger/index.js';
 
@@ -125,10 +128,13 @@ export function processImages(
   const startTime = Date.now();
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
-  logger.info({
-    total_images: document.pictures.length,
-    options: opts,
-  }, 'Processing document images');
+  logger.info(
+    {
+      total_images: document.pictures.length,
+      options: opts,
+    },
+    'Processing document images'
+  );
 
   const images: ProcessedImage[] = [];
   let with_ocr = 0;
@@ -154,7 +160,10 @@ export function processImages(
         }
       }
     } catch (error) {
-      logger.error({ err: error instanceof Error ? error.message : String(error), image_id: picture.id }, 'Failed to process image');
+      logger.error(
+        { err: error instanceof Error ? error.message : String(error), image_id: picture.id },
+        'Failed to process image'
+      );
       errors++;
       images.push({
         id: picture.id,
@@ -168,15 +177,18 @@ export function processImages(
 
   const processingTime = Date.now() - startTime;
 
-  logger.info({
-    total: document.pictures.length,
-    processed: images.length,
-    with_ocr,
-    with_descriptions,
-    skipped,
-    errors,
-    processing_time_ms: processingTime,
-  }, 'Image processing completed');
+  logger.info(
+    {
+      total: document.pictures.length,
+      processed: images.length,
+      with_ocr,
+      with_descriptions,
+      skipped,
+      errors,
+      processing_time_ms: processingTime,
+    },
+    'Image processing completed'
+  );
 
   return {
     images,
@@ -229,11 +241,14 @@ function processSingleImage(
       image.data = picture.data;
       image.data_size = data_size;
     } else {
-      logger.warn({
-        image_id: picture.id,
-        size: data_size,
-        limit: options.max_data_size,
-      }, 'Image data exceeds size limit');
+      logger.warn(
+        {
+          image_id: picture.id,
+          size: data_size,
+          limit: options.max_data_size,
+        },
+        'Image data exceeds size limit'
+      );
       image.status = 'skipped';
       image.error = `Image data too large: ${formatBytes(data_size)} > ${formatBytes(options.max_data_size)}`;
     }
@@ -241,9 +256,12 @@ function processSingleImage(
 
   // Generate semantic description (PREMIUM feature - deferred to T074.5)
   if (options.generate_descriptions) {
-    logger.warn({
-      image_id: picture.id,
-    }, 'Semantic image descriptions are a PREMIUM feature (T074.5)');
+    logger.warn(
+      {
+        image_id: picture.id,
+      },
+      'Semantic image descriptions are a PREMIUM feature (T074.5)'
+    );
     // Placeholder for future implementation
     // image.description = await generateImageDescription(picture);
     // image.tags = await generateImageTags(picture);
@@ -385,12 +403,18 @@ export function filterImagesByQuality(
     }
 
     // Check OCR length
-    if (criteria.min_ocr_length && (!image.ocr_text || image.ocr_text.length < criteria.min_ocr_length)) {
+    if (
+      criteria.min_ocr_length &&
+      (!image.ocr_text || image.ocr_text.length < criteria.min_ocr_length)
+    ) {
       return false;
     }
 
     // Check OCR confidence
-    if (criteria.min_ocr_confidence && (!image.ocr_confidence || image.ocr_confidence < criteria.min_ocr_confidence)) {
+    if (
+      criteria.min_ocr_confidence &&
+      (!image.ocr_confidence || image.ocr_confidence < criteria.min_ocr_confidence)
+    ) {
       return false;
     }
 
@@ -471,7 +495,7 @@ function formatBytes(bytes: number): string {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Math.round(bytes / Math.pow(k, i) * 100) / 100} ${sizes[i]}`;
+  return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
 }
 
 // NOTE: Premium image processing features (semantic descriptions, tagging) are

@@ -6,10 +6,12 @@
 **Affects**: Stage 4 (Analysis), Stage 5 (Generation), all tests using analysis_result
 
 **Related Investigations**:
+
 - `INV-2025-11-11-002-regenerate-section-test-hang.md`
 - `INV-2025-11-11-003-regenerate-section-validation-failures.md`
 
 **Research References**:
+
 - `specs/008-generation-generation-json/research-decisions/rt-002-architecture-balance.md`
 
 ---
@@ -17,6 +19,7 @@
 ## Table of Contents
 
 ### PART 1: CRITICAL - Transformation Layer (Production Blocker)
+
 1. [Executive Summary](#executive-summary)
 2. [Problem Analysis](#problem-analysis)
 3. [Requirements](#requirements)
@@ -26,12 +29,14 @@
 7. [Acceptance Criteria](#acceptance-criteria)
 
 ### PART 2: ENHANCEMENT - Schema Improvements (Quality Optimization)
+
 8. [Enhancement Overview](#part-2-enhancement---schema-improvements)
 9. [Schema Enhancements Required](#schema-enhancements-required)
 10. [Implementation Plan - Part 2](#implementation-plan---part-2) (2-3 days)
 11. [Migration Strategy](#migration-strategy)
 
 ### Combined
+
 12. [Combined Timeline & Dependencies](#combined-timeline--dependencies)
 13. [References](#references)
 
@@ -53,6 +58,7 @@
 **Current State:** Stage 4 (Analysis) outputs a **FULL** `AnalysisResult` schema with complex nested objects, while Stage 5 (Generation) expects a **SIMPLIFIED** schema with flattened string/enum fields. **NO transformation layer exists** between the two stages, causing **production code to fail** when Stage 5 attempts to read Stage 4 output from the database.
 
 **Impact:**
+
 - ❌ **Production Blocker**: Stage 5 cannot process real Stage 4 output
 - ❌ **Test Failures**: `tests/contract/generation.test.ts` failing (16/17 passing)
 - ❌ **Schema Inconsistency**: Two schemas with same name `AnalysisResult` but different structures
@@ -184,7 +190,7 @@ prompt += `**Analysis Context** (from Stage 4 Analyze):
 **File:** `packages/course-gen-platform/src/services/stage5/generation-phases.ts:725`
 
 ```typescript
-parts.push(input.analysis_result.pedagogical_strategy);  // ❌ WRONG TYPE (object, not string)
+parts.push(input.analysis_result.pedagogical_strategy); // ❌ WRONG TYPE (object, not string)
 ```
 
 #### Test Code (test fixtures use Stage 4 schema)
@@ -207,6 +213,7 @@ function createMinimalAnalysisResult(title: string) {
 ### 3. Missing Transformation Layer
 
 **Expected Location:**
+
 - Option A: In Phase 5 Assembly (`phase-5-assembly.ts`) before saving to database
 - Option B: In Stage 5 handler (`stage5-generation.ts`) when reading from database
 - Option C: In shared utilities (`@megacampus/shared-types`)
@@ -216,17 +223,19 @@ function createMinimalAnalysisResult(title: string) {
 **Evidence:**
 
 **Phase 5 Assembly** (`packages/course-gen-platform/src/orchestrator/services/analysis/phase-5-assembly.ts:228-263`):
+
 ```typescript
 const result: AnalysisResult = {
   // From Phase 1: Classification and contextual language
-  course_category: input.phase1_output.course_category,  // ← Saves FULL object
-  contextual_language: sanitizedContextualLanguage,       // ← Saves FULL object (6 fields)
-  pedagogical_strategy: input.phase3_output.pedagogical_strategy,  // ← Saves FULL object (5 fields)
+  course_category: input.phase1_output.course_category, // ← Saves FULL object
+  contextual_language: sanitizedContextualLanguage, // ← Saves FULL object (6 fields)
+  pedagogical_strategy: input.phase3_output.pedagogical_strategy, // ← Saves FULL object (5 fields)
   // NO TRANSFORMATION - just assembly
 };
 ```
 
 **Comment in code (line 273-277):**
+
 ```typescript
 // NOTE: Language Preservation (FR-004)
 // - The user's target language (input.language) is NOT stored in AnalysisResult
@@ -244,6 +253,7 @@ const result: AnalysisResult = {
 ### Functional Requirements
 
 **FR-1: Transformation Layer**
+
 - **MUST** transform Stage 4 FULL schema → Stage 5 SIMPLIFIED schema
 - **MUST** extract `category` from `course_category.primary`
 - **MUST** extract `difficulty` from `topic_analysis.target_audience`
@@ -252,17 +262,20 @@ const result: AnalysisResult = {
 - **MUST** flatten `topic_analysis.determined_topic` → top-level field
 
 **FR-2: Backward Compatibility**
+
 - **MUST** preserve FULL schema in `courses.analysis_result` (database JSONB)
 - **MUST** create SIMPLIFIED schema only for Stage 5 input validation
 - **MUST** allow existing Stage 4 workflows to continue unchanged
 - **MUST** NOT break existing tests that use FULL schema for database storage
 
 **FR-3: Data Preservation**
+
 - **MUST NOT** lose information during transformation (reversible if needed)
 - **MUST** maintain semantic accuracy (e.g., `contextual_language` string accurately represents 6 fields)
 - **SHOULD** include transformation metadata (version, timestamp)
 
 **FR-4: Validation**
+
 - **MUST** validate FULL schema at Stage 4 output (current behavior)
 - **MUST** validate SIMPLIFIED schema at Stage 5 input
 - **MUST** provide clear error messages if transformation fails
@@ -270,20 +283,24 @@ const result: AnalysisResult = {
 ### Non-Functional Requirements
 
 **NFR-1: Performance**
+
 - Transformation **MUST** complete in <100ms (avoid blocking Stage 5 job processing)
 - Transformation **SHOULD NOT** increase memory usage beyond 10MB per job
 
 **NFR-2: Testing**
+
 - **MUST** have unit tests for transformation logic (100% coverage)
 - **MUST** have integration tests for Stage 4 → Stage 5 pipeline
 - **MUST** re-run ALL existing tests after implementation (17 contract, 50+ unit, 30+ integration)
 
 **NFR-3: Documentation**
+
 - **MUST** document transformation rules in code comments
 - **MUST** update schema documentation (`data-model.md`)
 - **SHOULD** create migration guide for developers
 
 **NFR-4: Monitoring**
+
 - **SHOULD** log transformation metrics (success rate, errors)
 - **SHOULD** alert if transformation failure rate >1%
 
@@ -296,6 +313,7 @@ const result: AnalysisResult = {
 **Decision:** Add transformation layer in Stage 5 handler (`stage5-generation.ts`) **AFTER** reading from database, **BEFORE** passing to Generation workflow.
 
 **Rationale:**
+
 1. ✅ **Preserves Stage 4 behavior** - No changes to Stage 4 output
 2. ✅ **Minimal surface area** - Only one entry point (Stage 5 handler)
 3. ✅ **Clear responsibility** - Stage 5 "adapts" to Stage 4 output
@@ -303,6 +321,7 @@ const result: AnalysisResult = {
 5. ✅ **Backward compatible** - FULL schema stays in database
 
 **Alternative Considered (Rejected):**
+
 - ❌ **Transform in Phase 5 Assembly** - Would break backward compatibility (old Stage 5 code expects FULL schema in DB)
 - ❌ **Transform in shared types** - Too early, prevents using FULL schema in other contexts (e.g., analytics, reports)
 
@@ -384,10 +403,10 @@ export function transformAnalysisForGeneration(
 
   // Rule 2: Map difficulty from topic_analysis.target_audience
   const difficultyMap = {
-    'beginner': 'beginner' as const,
-    'intermediate': 'intermediate' as const,
-    'advanced': 'advanced' as const,
-    'mixed': 'intermediate' as const,  // Default mixed to intermediate
+    beginner: 'beginner' as const,
+    intermediate: 'intermediate' as const,
+    advanced: 'advanced' as const,
+    mixed: 'intermediate' as const, // Default mixed to intermediate
   };
   const difficulty = difficultyMap[fullSchema.topic_analysis.target_audience];
 
@@ -419,9 +438,8 @@ export function transformAnalysisForGeneration(
   const key_concepts = fullSchema.topic_analysis.key_concepts;
 
   // Rule 7: Extract expansion_areas (flatten if needed)
-  const expansion_areas = fullSchema.expansion_areas?.map(area =>
-    typeof area === 'string' ? area : area.area
-  ) || [];
+  const expansion_areas =
+    fullSchema.expansion_areas?.map(area => (typeof area === 'string' ? area : area.area)) || [];
 
   // Rule 8: Extract research_flags (preserve structure)
   const research_flags = fullSchema.research_flags || [];
@@ -456,6 +474,7 @@ export function transformAnalysisForGeneration(
 **File:** `packages/course-gen-platform/src/orchestrator/handlers/stage5-generation.ts:250-350`
 
 **Current Code:**
+
 ```typescript
 async execute(
   jobData: GenerationJobData,
@@ -479,6 +498,7 @@ async execute(
 ```
 
 **Modified Code:**
+
 ```typescript
 import { transformAnalysisForGeneration } from '../../services/stage5/transform-analysis-for-generation';
 import type { AnalysisResultFull } from '@megacampus/shared-types/analysis-result';
@@ -552,6 +572,7 @@ async execute(
 ### Phase 1: Transformation Layer (Days 1-2)
 
 **Tasks:**
+
 1. ✅ Create `transform-analysis-for-generation.ts` utility
 2. ✅ Implement 9 transformation rules
 3. ✅ Add transformation metadata tracking
@@ -563,10 +584,12 @@ async execute(
 6. ✅ Add transformation logging (success/failure metrics)
 
 **Files to Create:**
+
 - `packages/course-gen-platform/src/services/stage5/transform-analysis-for-generation.ts` (NEW)
 - `packages/course-gen-platform/tests/unit/stage5/transform-analysis-for-generation.test.ts` (NEW)
 
 **Files to Modify:**
+
 - `packages/course-gen-platform/src/orchestrator/handlers/stage5-generation.ts` (add transformation call)
 
 **Estimated Effort:** 1-2 days
@@ -574,12 +597,14 @@ async execute(
 ### Phase 2: Test Fixtures (Day 3)
 
 **Tasks:**
+
 1. ✅ Update test fixtures to use SIMPLIFIED schema
 2. ✅ Update `createMinimalAnalysisResult()` in contract tests
 3. ✅ Update all 15 test files that use `analysis_result`
 4. ✅ Ensure backward compatibility (tests using FULL schema for DB storage still work)
 
 **Files to Modify:**
+
 - `packages/course-gen-platform/tests/contract/generation.test.ts` (primary file)
 - `packages/course-gen-platform/tests/unit/stage5/metadata-generator.test.ts`
 - `packages/course-gen-platform/tests/unit/stage5/section-batch-generator.test.ts`
@@ -590,6 +615,7 @@ async execute(
 ### Phase 3: Regression Testing (Day 4)
 
 **Tasks:**
+
 1. ✅ Run ALL existing tests (unit, contract, integration, e2e)
    - `pnpm test` (unit tests)
    - `pnpm test:contract` (contract tests - 17 tests)
@@ -600,6 +626,7 @@ async execute(
 5. ✅ Run lint (`pnpm lint`)
 
 **Success Criteria:**
+
 - ✅ All unit tests pass
 - ✅ All contract tests pass (17/17)
 - ✅ All integration tests pass
@@ -611,6 +638,7 @@ async execute(
 ### Phase 4: Documentation (Day 5)
 
 **Tasks:**
+
 1. ✅ Update `docs/008-generation-generation-json/data-model.md`
    - Document FULL vs SIMPLIFIED schemas
    - Document transformation rules
@@ -621,9 +649,11 @@ async execute(
 4. ✅ Create migration guide for developers (`docs/migrations/MIGRATION-stage4-stage5-schema.md`)
 
 **Files to Create:**
+
 - `docs/migrations/MIGRATION-stage4-stage5-schema.md` (NEW)
 
 **Files to Modify:**
+
 - `docs/008-generation-generation-json/data-model.md`
 - `docs/FUTURE/enhance-analyze-schema-for-generation.md`
 
@@ -632,6 +662,7 @@ async execute(
 ### Phase 5: Monitoring & Deployment (Day 6)
 
 **Tasks:**
+
 1. ✅ Add transformation metrics logging
 2. ✅ Add error alerting (if failure rate >1%)
 3. ✅ Deploy to staging environment
@@ -640,6 +671,7 @@ async execute(
 6. ✅ Monitor transformation success rate for 24h
 
 **Deployment Steps:**
+
 1. Run `/push minor` (version bump to 0.17.0 due to new feature)
 2. Deploy to staging
 3. Verify staging tests pass
@@ -659,6 +691,7 @@ async execute(
 **File:** `packages/course-gen-platform/tests/unit/stage5/transform-analysis-for-generation.test.ts`
 
 **Test Cases:**
+
 1. ✅ **Rule 1:** Extract `category` from `course_category.primary`
 2. ✅ **Rule 2:** Map `difficulty` from `topic_analysis.target_audience`
 3. ✅ **Rule 3:** Flatten `contextual_language` (6 fields → 1 string)
@@ -679,6 +712,7 @@ async execute(
 **File:** `packages/course-gen-platform/tests/contract/generation.test.ts`
 
 **Changes:**
+
 1. ✅ Update `createMinimalAnalysisResult()` to return SIMPLIFIED schema
 2. ✅ Verify all 17 tests pass with new schema
 3. ✅ Add new test: "should handle both FULL and SIMPLIFIED analysis_result schemas"
@@ -692,6 +726,7 @@ async execute(
 **Action:** Run `pnpm test:integration` and verify all pass
 
 **Focus Areas:**
+
 - Stage 4 → Stage 5 pipeline (`stage5-generation-worker.test.ts`)
 - Analysis pipeline (`analysis-pipeline-enhanced.test.ts`)
 - E2E tests (`t055-full-pipeline.test.ts`)
@@ -701,6 +736,7 @@ async execute(
 **Action:** Run FULL test suite after implementation
 
 **Commands:**
+
 ```bash
 # Unit tests
 pnpm test
@@ -756,11 +792,13 @@ pnpm lint
 ### High Risk
 
 **Risk 1: Semantic Loss in Flattening**
+
 - **Description:** Flattening `contextual_language` (6 fields → 1 string) may lose structure
 - **Mitigation:** Use structured concatenation with clear delimiters (newlines, headers)
 - **Impact:** LOW (LLMs handle structured text well)
 
 **Risk 2: Test Regressions**
+
 - **Description:** Updating 15 test files may introduce new failures
 - **Mitigation:** Run full test suite after each file update, use Git to track changes
 - **Impact:** MEDIUM (time-consuming but solvable)
@@ -768,11 +806,13 @@ pnpm lint
 ### Medium Risk
 
 **Risk 3: Difficulty Mapping Ambiguity**
+
 - **Description:** Mapping `target_audience='mixed'` to `difficulty='intermediate'` is arbitrary
 - **Mitigation:** Document assumption, log warning when mapping occurs
 - **Impact:** LOW (semantic similarity validation will catch quality issues)
 
 **Risk 4: Performance Overhead**
+
 - **Description:** Transformation adds <100ms per job (acceptable)
 - **Mitigation:** Profile transformation function, optimize if needed
 - **Impact:** VERY LOW (transformation is simple string operations)
@@ -780,6 +820,7 @@ pnpm lint
 ### Low Risk
 
 **Risk 5: Backward Compatibility Edge Cases**
+
 - **Description:** Old courses in database may have slightly different FULL schema
 - **Mitigation:** Add defensive checks, handle nullable fields gracefully
 - **Impact:** VERY LOW (AnalysisResult schema stable since v1.0.0)
@@ -813,13 +854,13 @@ pnpm lint
 
 **Total Estimated Effort:** 5-6 days (1 developer)
 
-| Phase | Days | Tasks |
-|-------|------|-------|
-| **Phase 1: Transformation Layer** | 1-2 | Implement transformation logic, unit tests |
-| **Phase 2: Test Fixtures** | 1 | Update 15 test files |
-| **Phase 3: Regression Testing** | 1 | Run full test suite, fix regressions |
-| **Phase 4: Documentation** | 0.5 | Update docs, write migration guide |
-| **Phase 5: Monitoring & Deployment** | 0.5 | Deploy, monitor |
+| Phase                                | Days | Tasks                                      |
+| ------------------------------------ | ---- | ------------------------------------------ |
+| **Phase 1: Transformation Layer**    | 1-2  | Implement transformation logic, unit tests |
+| **Phase 2: Test Fixtures**           | 1    | Update 15 test files                       |
+| **Phase 3: Regression Testing**      | 1    | Run full test suite, fix regressions       |
+| **Phase 4: Documentation**           | 0.5  | Update docs, write migration guide         |
+| **Phase 5: Monitoring & Deployment** | 0.5  | Deploy, monitor                            |
 
 **Critical Path:** Phase 1 → Phase 2 → Phase 3 (cannot parallelize)
 
@@ -855,6 +896,7 @@ pnpm lint
 ### Example 1: Professional Course
 
 **Input (FULL Schema):**
+
 ```json
 {
   "course_category": {
@@ -886,6 +928,7 @@ pnpm lint
 ```
 
 **Output (SIMPLIFIED Schema):**
+
 ```json
 {
   "category": "professional",
@@ -926,12 +969,14 @@ RT-002 research revealed that the Analyze output schema needs enhancements to pr
 ### Summary
 
 **What's Already Correct (No Changes Needed)**:
+
 - ✅ **Granularity**: Section-level (3-7 sections) - PERFECT per RT-002
 - ✅ **Section Fields**: High-level objectives and topics - PERFECT
 - ✅ **Pedagogical Strategy**: Exists and works well
 - ✅ **Scope Instructions**: Exists and works (but can be enhanced)
 
 **What Needs Enhancement**:
+
 - 🟡 **Pedagogical Patterns**: Need theory/practice balance guidance
 - 🟡 **Generation Guidance**: Need structured constraints (not free-text)
 - 🟡 **Section Metadata**: Need section IDs, duration, difficulty, prerequisites
@@ -950,6 +995,7 @@ RT-002 research revealed that the Analyze output schema needs enhancements to pr
 **Current State**: `pedagogical_strategy` exists but lacks specific patterns
 
 **Schema Addition**:
+
 ```json
 {
   "pedagogical_patterns": {
@@ -958,7 +1004,13 @@ RT-002 research revealed that the Analyze output schema needs enhancements to pr
     "properties": {
       "primary_strategy": {
         "type": "string",
-        "enum": ["problem-based learning", "lecture-based", "inquiry-based", "project-based", "mixed"],
+        "enum": [
+          "problem-based learning",
+          "lecture-based",
+          "inquiry-based",
+          "project-based",
+          "mixed"
+        ],
         "description": "Primary pedagogical strategy observed in source materials"
       },
       "theory_practice_ratio": {
@@ -1011,6 +1063,7 @@ RT-002 research revealed that the Analyze output schema needs enhancements to pr
 **Enhancement**: Replace with structured object (keep scope_instructions deprecated for backward compatibility)
 
 **Schema Addition**:
+
 ```json
 {
   "generation_guidance": {
@@ -1019,7 +1072,12 @@ RT-002 research revealed that the Analyze output schema needs enhancements to pr
     "properties": {
       "tone": {
         "type": "string",
-        "enum": ["conversational but precise", "formal academic", "casual friendly", "technical professional"],
+        "enum": [
+          "conversational but precise",
+          "formal academic",
+          "casual friendly",
+          "technical professional"
+        ],
         "description": "Tone to use in lesson content"
       },
       "use_analogies": {
@@ -1093,6 +1151,7 @@ RT-002 research revealed that the Analyze output schema needs enhancements to pr
 **Current State**: sections_breakdown has area, estimated_lessons, importance, learning_objectives, key_topics
 
 **Schema Addition** (to SectionBreakdown definition):
+
 ```json
 {
   "SectionBreakdown": {
@@ -1159,11 +1218,17 @@ RT-002 research revealed that the Analyze output schema needs enhancements to pr
 **Current State**: No document-level metadata (only section-level)
 
 **Schema Addition**:
+
 ```json
 {
   "document_analysis": {
     "type": "object",
-    "required": ["source_materials", "main_themes", "complexity_assessment", "estimated_total_hours"],
+    "required": [
+      "source_materials",
+      "main_themes",
+      "complexity_assessment",
+      "estimated_total_hours"
+    ],
     "properties": {
       "source_materials": {
         "type": "array",
@@ -1292,6 +1357,7 @@ Routing Logic:
 ```
 
 **Phase 2 Metadata Generation**:
+
 - **CRITICAL fields** (pedagogical_patterns, generation_guidance): qwen3-max ALWAYS
 - **NON-CRITICAL fields** (descriptions, prerequisites): OSS 120B → escalate if needed
 
@@ -1307,12 +1373,14 @@ Routing Logic:
 **Model**: **gpt-oss-120b** (ALWAYS)
 **Context Window**: 128K tokens
 **Reasoning**:
+
 - Requires deep understanding of teaching methodologies
 - Critical quality field - must be consistent across entire course
 - Needs to detect subtle patterns in source materials (theory/practice ratio, assessment types)
 - Phase 3 already uses 120B for pedagogical strategy analysis
 
 **Example Output**:
+
 ```json
 {
   "pedagogical_patterns": {
@@ -1334,12 +1402,14 @@ Routing Logic:
 **Model**: **gpt-oss-20b** → **gpt-oss-120b** (adaptive)
 **Context Window**: 128K tokens (when escalated)
 **Reasoning**:
+
 - Requires synthesis of document tone, analogies, jargon from all phases
 - Most courses can be handled by 20B (simple guidance)
 - Complex courses with ≥3 documents escalate to 120B automatically
 - Phase 4 already performs adaptive routing based on complexity
 
 **Example Output**:
+
 ```json
 {
   "generation_guidance": {
@@ -1364,12 +1434,14 @@ Routing Logic:
 **Model**: **qwen3-max** (ALWAYS for CRITICAL metadata)
 **Context Window**: 32K tokens (sufficient for metadata)
 **Reasoning**:
+
 - Requires structured reasoning for section_id, prerequisites, difficulty
 - Must maintain consistency across all sections (dependency graph)
 - Estimated duration requires understanding of learning time (qwen3-max excels at reasoning)
 - Phase 2 metadata already uses qwen3-max for critical fields
 
 **Enhanced Fields**:
+
 ```json
 {
   "section_id": "1",
@@ -1389,12 +1461,14 @@ Routing Logic:
 **Model**: **gpt-oss-20b** → **gpt-oss-120b** (adaptive) OR **google/gemini-2.5-flash** (overflow)
 **Context Window**: 128K tokens (120B) or 1M tokens (Gemini)
 **Reasoning**:
+
 - Requires analysis of ALL source documents (potentially large context)
 - Main themes, complexity assessment need document-level understanding
 - Gemini 2.5 Flash becomes cost-effective for ≥5 documents (large context)
 - Phase 4 already handles context overflow with Gemini fallback
 
 **Example Output**:
+
 ```json
 {
   "document_analysis": {
@@ -1435,6 +1509,7 @@ Routing Logic:
 #### 2. **Cost Optimization**
 
 **Total Cost Breakdown** (per course):
+
 ```
 Stage 4 Analyze:
   Phase 1 (20B):     ~$0.02
@@ -1461,6 +1536,7 @@ TOTAL COST (both stages): ~$0.78-$1.13 per course
 #### 3. **Quality Improvement**
 
 **Expected Quality Gains** (from RT-002 research):
+
 - pedagogical_patterns: +10% Generation quality (pedagogical consistency)
 - generation_guidance: +15% Generation quality (better constraint adherence)
 - enhanced sections_breakdown: +10% Generation quality (dependency handling)
@@ -1484,28 +1560,30 @@ const guidance = input.analysis_result.generation_guidance || {
   avoid_jargon: [],
   include_visuals: ['diagrams', 'code examples'],
   exercise_types: ['coding'],
-  contextual_language_hints: input.analysis_result.scope_instructions || ''
+  contextual_language_hints: input.analysis_result.scope_instructions || '',
 };
 
 const patterns = input.analysis_result.pedagogical_patterns || {
   primary_strategy: 'mixed',
   theory_practice_ratio: '50:50',
   assessment_types: ['coding'],
-  key_patterns: []
+  key_patterns: [],
 };
 
-const sectionEnhancements = section.section_id ? {
-  section_id: section.section_id,
-  estimated_duration_hours: section.estimated_duration_hours || 2.0,
-  difficulty: section.difficulty || 'intermediate',
-  prerequisites: section.prerequisites || []
-} : {
-  // Generate defaults if old schema
-  section_id: String(index + 1),
-  estimated_duration_hours: 2.0,
-  difficulty: 'intermediate',
-  prerequisites: []
-};
+const sectionEnhancements = section.section_id
+  ? {
+      section_id: section.section_id,
+      estimated_duration_hours: section.estimated_duration_hours || 2.0,
+      difficulty: section.difficulty || 'intermediate',
+      prerequisites: section.prerequisites || [],
+    }
+  : {
+      // Generate defaults if old schema
+      section_id: String(index + 1),
+      estimated_duration_hours: 2.0,
+      difficulty: 'intermediate',
+      prerequisites: [],
+    };
 ```
 
 **Result**: Generation works with old Analyze output (defaults), gets better results with new schema (enhanced fields)
@@ -1540,6 +1618,7 @@ const sectionEnhancements = section.section_id ? {
 **Answer**: ✅ **Use existing multi-model orchestration** - no new models needed
 
 **Rationale**:
+
 1. pedagogical_patterns: Already generated in Analyze Phase 3 (120B) - no additional cost
 2. generation_guidance: Already generated in Analyze Phase 4 (adaptive) - no additional cost
 3. Enhanced sections_breakdown: Already generated in Generation Phase 2 (qwen3-max) - no additional cost
@@ -1554,6 +1633,7 @@ const sectionEnhancements = section.section_id ? {
 ### Phase 1: Schema Updates (Day 1)
 
 **Tasks**:
+
 1. ✅ Add `pedagogical_patterns` field to AnalysisResult schema
 2. ✅ Add `generation_guidance` field (keep `scope_instructions` deprecated)
 3. ✅ Enhance `sections_breakdown` with section_id, duration, difficulty, prerequisites
@@ -1561,6 +1641,7 @@ const sectionEnhancements = section.section_id ? {
 5. ✅ Update TypeScript types in `@megacampus/shared-types`
 
 **Files to Modify**:
+
 - `packages/shared-types/src/analysis-result.ts` (add new fields)
 - `packages/shared-types/src/generation-job.ts` (optional - if needed)
 - `specs/007-stage-4-analyze/contracts/analysis-result.schema.json` (JSON schema definition)
@@ -1572,6 +1653,7 @@ const sectionEnhancements = section.section_id ? {
 ### Phase 2: Analyze Prompt Updates (Day 2)
 
 **Tasks**:
+
 1. ✅ Update Phase 1 (Classification) prompt to output `pedagogical_patterns`
 2. ✅ Update Phase 3 (Pedagogical Strategy) prompt to output structured patterns
 3. ✅ Update Phase 4 (Structure) prompt to output `generation_guidance`
@@ -1579,6 +1661,7 @@ const sectionEnhancements = section.section_id ? {
 5. ✅ Update validation logic to ensure new fields are present
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-1-classification.ts`
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-3-pedagogical-strategy.ts`
 - `packages/course-gen-platform/src/orchestrator/services/analysis/phase-4-structure-optimization.ts`
@@ -1591,6 +1674,7 @@ const sectionEnhancements = section.section_id ? {
 ### Phase 3: Generation Integration (Day 3)
 
 **Tasks**:
+
 1. ✅ Update `metadata-generator.ts` to consume `pedagogical_patterns`
 2. ✅ Update `section-batch-generator.ts` to consume `generation_guidance`
 3. ✅ Update `generation-phases.ts` to use enhanced `sections_breakdown` fields
@@ -1598,6 +1682,7 @@ const sectionEnhancements = section.section_id ? {
 5. ✅ Test with 10 sample courses
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/generation-phases.ts`
@@ -1609,6 +1694,7 @@ const sectionEnhancements = section.section_id ? {
 ### Phase 4: Testing & Validation (Day 3)
 
 **Tasks**:
+
 1. ✅ Run Analyze on 10 courses with new schema
 2. ✅ Verify Generation quality improvement (A/B test)
 3. ✅ Ensure backward compatibility (old schema still works)
@@ -1616,6 +1702,7 @@ const sectionEnhancements = section.section_id ? {
 5. ✅ Measure quality metrics (semantic similarity)
 
 **Success Criteria**:
+
 - All 10 test courses generate valid new schema
 - Generation quality improves by ≥10% (semantic similarity)
 - No breaking changes to existing Generation code
@@ -1636,11 +1723,13 @@ const sectionEnhancements = section.section_id ? {
 **Requirement**: Stage 5 Generation MUST work with both old schema (PART 1 transformation layer output) and new schema (PART 2 enhancements)
 
 **Implementation**:
+
 1. Keep `scope_instructions` field (populate from `generation_guidance` if new schema)
 2. Make new fields optional (defaults if missing)
 3. Version analysis_result with `metadata.analysis_version`
 
 **Code Example** (Generation reads schema):
+
 ```typescript
 // In metadata-generator.ts or section-batch-generator.ts
 
@@ -1651,7 +1740,7 @@ const guidance = input.analysis_result.generation_guidance || {
   avoid_jargon: [],
   include_visuals: ['diagrams', 'code examples'],
   exercise_types: ['coding'],
-  contextual_language_hints: input.analysis_result.scope_instructions || ''
+  contextual_language_hints: input.analysis_result.scope_instructions || '',
 };
 
 // Handle pedagogical_patterns (new) or defaults
@@ -1659,7 +1748,7 @@ const patterns = input.analysis_result.pedagogical_patterns || {
   primary_strategy: 'mixed',
   theory_practice_ratio: '50:50',
   assessment_types: ['coding'],
-  key_patterns: []
+  key_patterns: [],
 };
 
 // Handle enhanced sections_breakdown fields (new) or defaults
@@ -1677,11 +1766,13 @@ const prerequisites = section.prerequisites || [];
 ### Validation Metrics
 
 **Before PART 2 Implementation**:
+
 - Generation quality with PART 1 transformation layer: Baseline (100%)
 - Lesson objective alignment: Baseline (100%)
 - Pedagogical consistency: Baseline (100%)
 
 **After PART 2 Implementation**:
+
 - Generation quality: +10-15% improvement expected
 - Lesson objective alignment: +10% improvement expected
 - Pedagogical consistency: +15% improvement expected
@@ -1689,6 +1780,7 @@ const prerequisites = section.prerequisites || [];
 - Analyze cost: Should stay <$0.50 per course (no regression)
 
 **A/B Test**:
+
 - Generate 20 courses with PART 1 schema (transformation layer only)
 - Generate 20 courses with PART 2 schema (enhancements)
 - Compare quality metrics
@@ -1771,6 +1863,7 @@ This specification consists of **two sequential parts** that MUST be implemented
 ### Critical Path
 
 **Path 1 (MUST DO - Production Blocker)**:
+
 ```
 PART 1.1 Transformation Layer (Days 1-2)
   ↓
@@ -1786,6 +1879,7 @@ PRODUCTION READY ✅
 ```
 
 **Path 2 (SHOULD DO - Quality Optimization)**:
+
 ```
 WAIT for PART 1 deployment + 24h monitoring
   ↓
@@ -1803,6 +1897,7 @@ ENHANCED QUALITY ✅ (+10-15% improvement)
 ### Milestone Checklist
 
 **Milestone 1: Transformation Layer Complete** (After Day 6)
+
 - [ ] ✅ All 17 contract tests pass
 - [ ] ✅ All integration tests pass
 - [ ] ✅ Type-check passes
@@ -1811,6 +1906,7 @@ ENHANCED QUALITY ✅ (+10-15% improvement)
 - [ ] ✅ Stage 5 can process real Stage 4 output
 
 **Milestone 2: Schema Enhancements Complete** (After Day 9)
+
 - [ ] ✅ All new fields added to schema
 - [ ] ✅ Analyze outputs new schema
 - [ ] ✅ Generation consumes new schema
@@ -1823,12 +1919,14 @@ ENHANCED QUALITY ✅ (+10-15% improvement)
 ### Rollback Strategy
 
 **If PART 1 fails** (transformation issues):
+
 - Rollback deployment (transformation is in handler, Stage 4 unchanged)
 - Disable transformation feature flag
 - Investigate and fix
 - Re-deploy
 
 **If PART 2 fails** (schema issues):
+
 - Schema is backward compatible (new fields optional)
 - Generation falls back to defaults
 - No rollback needed (graceful degradation)
@@ -1839,6 +1937,7 @@ ENHANCED QUALITY ✅ (+10-15% improvement)
 ### Resource Allocation
 
 **Recommended Team**:
+
 - **Backend Engineer**: Implement PART 1 transformation layer (5-6 days)
 - **Backend Engineer**: Implement PART 2 schema enhancements (2-3 days)
 - **QA Engineer**: Regression testing for PART 1 (1 day)

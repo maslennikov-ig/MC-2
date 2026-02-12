@@ -30,15 +30,15 @@ SECURITY DEFINER
 
 ## Parameters
 
-| Parameter | Type | Required | Constraints | Description |
-|-----------|------|----------|-------------|-------------|
-| `p_course_id` | UUID | ✅ Yes | Valid UUID, course must exist | Course to update |
-| `p_step_id` | INTEGER | ✅ Yes | 1-5 | Step number (1=Initialize, 2=Process/Analyze, 3-4=Structure, 5=Content) |
-| `p_status` | TEXT | ✅ Yes | 'pending', 'in_progress', 'completed', 'failed' | New status for step |
-| `p_message` | TEXT | ✅ Yes | Non-empty string | User-facing message (Russian) |
-| `p_error_message` | TEXT | ❌ No | Optional, used when status='failed' | Error message for frontend |
-| `p_error_details` | JSONB | ❌ No | Optional, used when status='failed' | Detailed error context |
-| `p_metadata` | JSONB | ❌ No | Default: `{}` | Additional context (executor, timestamps, etc.) |
+| Parameter         | Type    | Required | Constraints                                     | Description                                                             |
+| ----------------- | ------- | -------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
+| `p_course_id`     | UUID    | ✅ Yes   | Valid UUID, course must exist                   | Course to update                                                        |
+| `p_step_id`       | INTEGER | ✅ Yes   | 1-5                                             | Step number (1=Initialize, 2=Process/Analyze, 3-4=Structure, 5=Content) |
+| `p_status`        | TEXT    | ✅ Yes   | 'pending', 'in_progress', 'completed', 'failed' | New status for step                                                     |
+| `p_message`       | TEXT    | ✅ Yes   | Non-empty string                                | User-facing message (Russian)                                           |
+| `p_error_message` | TEXT    | ❌ No    | Optional, used when status='failed'             | Error message for frontend                                              |
+| `p_error_details` | JSONB   | ❌ No    | Optional, used when status='failed'             | Detailed error context                                                  |
+| `p_metadata`      | JSONB   | ❌ No    | Default: `{}`                                   | Additional context (executor, timestamps, etc.)                         |
 
 ---
 
@@ -49,6 +49,7 @@ SECURITY DEFINER
 **Structure**: Updated `generation_progress` object
 
 **Example**:
+
 ```json
 {
   "steps": [
@@ -69,7 +70,7 @@ SECURITY DEFINER
       "completed_at": null,
       "error": null,
       "error_details": null
-    },
+    }
     // ... steps 3-5
   ],
   "percentage": 30,
@@ -88,13 +89,13 @@ SECURITY DEFINER
 
 ### Step ID to Step Name Mapping
 
-| Step ID | Russian Name | English Name | Job Type |
-|---------|--------------|--------------|----------|
-| 1 | Запуск генерации | Launch generation | INITIALIZE |
-| 2 (files) | Обработка документов | Document processing | DOCUMENT_PROCESSING |
-| 2 (no files) | Анализ задачи | Task analysis | STRUCTURE_ANALYSIS |
-| 3-4 | Генерация структуры | Structure generation | STRUCTURE_GENERATION |
-| 5 | Создание контента | Content creation | TEXT_GENERATION |
+| Step ID      | Russian Name         | English Name         | Job Type             |
+| ------------ | -------------------- | -------------------- | -------------------- |
+| 1            | Запуск генерации     | Launch generation    | INITIALIZE           |
+| 2 (files)    | Обработка документов | Document processing  | DOCUMENT_PROCESSING  |
+| 2 (no files) | Анализ задачи        | Task analysis        | STRUCTURE_ANALYSIS   |
+| 3-4          | Генерация структуры  | Structure generation | STRUCTURE_GENERATION |
+| 5            | Создание контента    | Content creation     | TEXT_GENERATION      |
 
 ### Percentage Calculation
 
@@ -111,6 +112,7 @@ function calculatePercentage(step_id: number, status: string): number {
 ```
 
 **Examples**:
+
 - Step 1 'in_progress' → 10%
 - Step 1 'completed' → 20%
 - Step 2 'in_progress' → 30%
@@ -132,11 +134,13 @@ function calculatePercentage(step_id: number, status: string): number {
 ### Idempotency
 
 Calling with same parameters multiple times is safe:
+
 - UPDATE operations don't duplicate data
 - Timestamps overwritten on each call (acceptable)
 - Metadata merged (not replaced)
 
 **Example**:
+
 ```sql
 -- Call 1
 SELECT update_course_progress(
@@ -292,8 +296,8 @@ const { data, error } = await supabase.rpc('update_course_progress', {
     job_id: 'course-gen-123',
     executor: 'orchestrator',
     tier: 'PREMIUM',
-    priority: 10
-  }
+    priority: 10,
+  },
 });
 
 if (error) {
@@ -316,8 +320,8 @@ const { data, error } = await supabase.rpc('update_course_progress', {
   p_metadata: {
     job_id: job.id,
     executor: 'worker',
-    worker_instance: 'worker-1'
-  }
+    worker_instance: 'worker-1',
+  },
 });
 
 if (error) {
@@ -339,8 +343,8 @@ const { data, error } = await supabase.rpc('update_course_progress', {
     job_id: job.id,
     executor: 'worker',
     processing_duration_ms: 3456,
-    chunks_created: 42
-  }
+    chunks_created: 42,
+  },
 });
 ```
 
@@ -357,13 +361,13 @@ const { data, error } = await supabase.rpc('update_course_progress', {
   p_error_details: {
     file_type: 'application/unknown',
     file_size: 5242880,
-    error_code: 'UNSUPPORTED_FORMAT'
+    error_code: 'UNSUPPORTED_FORMAT',
   },
   p_metadata: {
     job_id: job.id,
     executor: 'worker',
-    failed_at: new Date().toISOString()
-  }
+    failed_at: new Date().toISOString(),
+  },
 });
 ```
 
@@ -380,7 +384,7 @@ const course = await supabase
 if (course.data.generation_progress.steps[0].status !== 'completed') {
   logger.warn('Orphaned job detected, recovering step 1', {
     courseId: job.data.courseId,
-    jobId: job.id
+    jobId: job.id,
   });
 
   // Fallback: Complete step 1 from worker
@@ -393,8 +397,8 @@ if (course.data.generation_progress.steps[0].status !== 'completed') {
       job_id: job.id,
       executor: 'worker',
       recovered_by_worker: true,
-      recovery_reason: 'orchestrator_rpc_failure'
-    }
+      recovery_reason: 'orchestrator_rpc_failure',
+    },
   });
 
   // Log recovery event to system_metrics
@@ -404,7 +408,7 @@ if (course.data.generation_progress.steps[0].status !== 'completed') {
     user_id: job.data.userId,
     course_id: job.data.courseId,
     job_id: job.id,
-    metadata: { recovery_step: 1 }
+    metadata: { recovery_step: 1 },
   });
 }
 ```
@@ -440,12 +444,13 @@ ERROR: Invalid status: done. Must be pending|in_progress|completed|failed
 **Resolution**: Caller should check for NULL return and handle appropriately
 
 **Example**:
+
 ```typescript
 const { data, error } = await supabase.rpc('update_course_progress', {
   p_course_id: 'non-existent-uuid',
   p_step_id: 1,
   p_status: 'completed',
-  p_message: 'Test'
+  p_message: 'Test',
 });
 
 if (data === null) {
@@ -461,6 +466,7 @@ if (data === null) {
 ### Query Plan
 
 Single UPDATE with JSONB manipulation:
+
 - **Index Used**: Primary key on `courses(id)` (UUID)
 - **JSONB Operations**: `jsonb_set()` is O(n) where n = JSONB depth
 - **Average Depth**: 3-4 levels for `generation_progress`
@@ -492,10 +498,12 @@ Single UPDATE with JSONB manipulation:
 Function uses `SECURITY DEFINER`, which runs with owner privileges. This bypasses RLS policies on the `courses` table.
 
 **Why Needed**:
+
 - Backend service needs to update any course (not just owned by current user)
 - Worker processes run as service role, not as individual users
 
 **Security Mitigation**:
+
 - Function validates all inputs
 - Only service role can execute
 - Audit trail via `last_progress_update` timestamp
@@ -584,14 +592,16 @@ describe('update_course_progress RPC', () => {
         title: 'Test Course',
         user_id: 'test-user-uuid',
         generation_progress: {
-          steps: Array(5).fill(null).map((_, i) => ({
-            id: i + 1,
-            name: `Step ${i + 1}`,
-            status: 'pending'
-          })),
+          steps: Array(5)
+            .fill(null)
+            .map((_, i) => ({
+              id: i + 1,
+              name: `Step ${i + 1}`,
+              status: 'pending',
+            })),
           percentage: 0,
-          current_step: 0
-        }
+          current_step: 0,
+        },
       })
       .select('id')
       .single();
@@ -604,7 +614,7 @@ describe('update_course_progress RPC', () => {
       p_course_id: testCourseId,
       p_step_id: 1,
       p_status: 'completed',
-      p_message: 'Test complete'
+      p_message: 'Test complete',
     });
 
     expect(error).toBeNull();
@@ -619,7 +629,7 @@ describe('update_course_progress RPC', () => {
       p_course_id: testCourseId,
       p_step_id: 1,
       p_status: 'completed',
-      p_message: 'Test'
+      p_message: 'Test',
     });
 
     // Call 2 (retry)
@@ -627,7 +637,7 @@ describe('update_course_progress RPC', () => {
       p_course_id: testCourseId,
       p_step_id: 1,
       p_status: 'completed',
-      p_message: 'Test'
+      p_message: 'Test',
     });
 
     expect(data1.steps[0].status).toBe('completed');
@@ -640,7 +650,7 @@ describe('update_course_progress RPC', () => {
       p_course_id: testCourseId,
       p_step_id: 10,
       p_status: 'completed',
-      p_message: 'Test'
+      p_message: 'Test',
     });
 
     expect(error).not.toBeNull();
@@ -652,7 +662,7 @@ describe('update_course_progress RPC', () => {
       p_course_id: testCourseId,
       p_step_id: 1,
       p_status: 'invalid_status',
-      p_message: 'Test'
+      p_message: 'Test',
     });
 
     expect(error).not.toBeNull();

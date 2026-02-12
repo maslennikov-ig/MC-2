@@ -1,13 +1,11 @@
-/* eslint-disable max-lines */
 /**
  * Stage 5 - Generation Phase: Course Structure Schema
  *
  * This module defines comprehensive Zod schemas for course generation output
- * including RT-006 Bloom's Taxonomy validation placeholders.
+ * including placeholder validation.
  *
  * @module generation-result
  * @see specs/008-generation-generation-json/data-model.md
- * @see research-decisions/rt-006-bloom-taxonomy-validation.md
  * @see docs/generation/LLM-VALIDATION-BEST-PRACTICES.md
  */
 
@@ -17,17 +15,15 @@ import { z } from 'zod';
 import { courseLevelSchema, type CourseLevel } from './common-enums';
 
 // ============================================================================
-// RT-007 PHASE 3: VALIDATION SEVERITY SYSTEM
+// VALIDATION SEVERITY SYSTEM
 // ============================================================================
 
 /**
- * RT-007 Phase 3: 3-tier validation severity system
+ * 3-tier validation severity system
  *
- * - ERROR: Blocks saving/progression (pedagogically incorrect, incomplete content)
- * - WARNING: Logs but allows progression (fuzzy match reduces false positives)
+ * - ERROR: Blocks saving/progression (incomplete content)
+ * - WARNING: Logs but allows progression
  * - INFO: Monitoring only, no blocking (metrics for optimization)
- *
- * @see specs/008-generation-generation-json/research-decisions/rt-007-bloom-taxonomy-validation-improvements.md (lines 600-890)
  */
 export enum ValidationSeverity {
   ERROR = 'error', // Blocks saving/progression
@@ -36,10 +32,10 @@ export enum ValidationSeverity {
 }
 
 /**
- * RT-007 Phase 3: Validation result structure
+ * Validation result structure
  *
- * Replaces boolean returns with structured severity-based results
- * including quality scores, issues categorization, and LLM-friendly suggestions.
+ * Structured severity-based results including quality scores,
+ * issues categorization, and LLM-friendly suggestions.
  */
 export interface ValidationResult {
   passed: boolean; // Overall pass/fail status
@@ -52,233 +48,14 @@ export interface ValidationResult {
   metadata?: {
     // Optional metadata for debugging
     rule?: string; // Rule name that triggered this result
-    level?: string; // Bloom's level (for taxonomy validation)
-    verb?: string; // Extracted verb (for taxonomy validation)
     expected?: { min: number; max: number }; // Expected range (for duration validation)
     actual?: number; // Actual value (for duration validation)
   };
 }
 
 // ============================================================================
-// RT-006 VALIDATION CONSTANTS AND HELPERS
-// RT-007: Validators extracted to separate files for better organization
+// VALIDATION CONSTANTS AND HELPERS
 // ============================================================================
-
-/**
- * Import validators from course-gen-platform package
- *
- * RT-007 Phase 1: Validators are now in separate files with improvements:
- * - blooms-validators.ts: Bloom's Taxonomy validation
- * - placeholder-validator.ts: Conservative placeholder detection
- * - duration-validator.ts: Duration proportionality with difficulty multiplier
- *
- * Note: These imports are conditional based on package availability.
- * Validators are also exported here for backward compatibility.
- */
-
-/**
- * RT-007 Phase 1: Validators are now inline for shared-types package
- *
- * These validators are kept inline in this file to avoid circular dependencies
- * between packages. The course-gen-platform package has its own copy in:
- * packages/course-gen-platform/src/services/stage5/validators/
- */
-
-/**
- * RT-006 P0: Non-measurable verbs blacklist (11 EN + 10 RU)
- * These verbs cannot be verified through assessment
- */
-const NON_MEASURABLE_VERBS_BLACKLIST = {
-  en: [
-    'understand',
-    'know',
-    'learn',
-    'appreciate',
-    'be aware of',
-    'be familiar with',
-    'grasp',
-    'comprehend',
-    'realize',
-    'recognize',
-    'become acquainted with',
-  ],
-  ru: [
-    'понимать',
-    'знать',
-    'изучать',
-    'осознавать',
-    'быть знакомым с',
-    'постигать',
-    'усваивать',
-    'разбираться',
-    'осмыслять',
-    'овладевать',
-  ],
-} as const;
-
-/**
- * RT-006 P1: Bloom's Taxonomy whitelist (165 verbs across 6 levels)
- */
-const BLOOMS_TAXONOMY_WHITELIST = {
-  en: {
-    remember: [
-      'define',
-      'list',
-      'recall',
-      'recognize',
-      'identify',
-      'name',
-      'state',
-      'describe',
-      'label',
-      'match',
-      'select',
-      'reproduce',
-      'cite',
-      'memorize',
-    ],
-    understand: [
-      'explain',
-      'summarize',
-      'paraphrase',
-      'classify',
-      'compare',
-      'contrast',
-      'interpret',
-      'exemplify',
-      'illustrate',
-      'infer',
-      'predict',
-      'discuss',
-    ],
-    apply: [
-      'execute',
-      'implement',
-      'solve',
-      'use',
-      'demonstrate',
-      'operate',
-      'calculate',
-      'complete',
-      'show',
-      'examine',
-      'modify',
-    ],
-    analyze: [
-      'differentiate',
-      'organize',
-      'attribute',
-      'deconstruct',
-      'distinguish',
-      'examine',
-      'experiment',
-      'question',
-      'test',
-      'investigate',
-    ],
-    evaluate: [
-      'check',
-      'critique',
-      'judge',
-      'hypothesize',
-      'argue',
-      'defend',
-      'support',
-      'assess',
-      'rate',
-      'recommend',
-    ],
-    create: [
-      'design',
-      'construct',
-      'plan',
-      'produce',
-      'invent',
-      'develop',
-      'formulate',
-      'assemble',
-      'compose',
-      'devise',
-    ],
-  },
-  ru: {
-    remember: [
-      'определить',
-      'перечислить',
-      'вспомнить',
-      'распознать',
-      'идентифицировать',
-      'назвать',
-      'утверждать',
-      'описать',
-      'обозначить',
-      'сопоставить',
-      'выбрать',
-      'воспроизвести',
-      'цитировать',
-    ],
-    understand: [
-      'объяснить',
-      'резюмировать',
-      'перефразировать',
-      'классифицировать',
-      'сравнить',
-      'противопоставить',
-      'интерпретировать',
-      'проиллюстрировать',
-      'сделать вывод',
-      'предсказать',
-      'обсудить',
-    ],
-    apply: [
-      'выполнить',
-      'реализовать',
-      'решить',
-      'использовать',
-      'продемонстрировать',
-      'оперировать',
-      'вычислить',
-      'завершить',
-      'показать',
-      'исследовать',
-      'модифицировать',
-    ],
-    analyze: [
-      'дифференцировать',
-      'организовать',
-      'атрибутировать',
-      'деконструировать',
-      'различить',
-      'изучить',
-      'экспериментировать',
-      'задать вопрос',
-      'тестировать',
-    ],
-    evaluate: [
-      'проверить',
-      'критиковать',
-      'судить',
-      'выдвинуть гипотезу',
-      'аргументировать',
-      'защитить',
-      'поддержать',
-      'оценить',
-      'рекомендовать',
-    ],
-    create: [
-      'спроектировать',
-      'сконструировать',
-      'спланировать',
-      'произвести',
-      'изобрести',
-      'разработать',
-      'сформулировать',
-      'собрать',
-      'составить',
-      'придумать',
-    ],
-  },
-} as const;
 
 /**
  * RT-007 P1: Conservative placeholder patterns
@@ -326,64 +103,6 @@ interface PlaceholderIssue {
   matchedText: string;
   matchedPattern: string;
   patternIndex: number;
-}
-
-/**
- * RT-006 P1: Duration proportionality constants
- *
- * Reduced minimums to allow flexibility for simple lessons and unit testing
- */
-const MIN_TOPIC_DURATION = 1; // Reduced from 2 to allow shorter lessons
-const MAX_TOPIC_DURATION = 5;
-const MIN_OBJECTIVE_DURATION = 3; // Reduced from 5 to allow concise objectives
-const MAX_OBJECTIVE_DURATION = 15;
-const ENGAGEMENT_CAP = 60; // Increased from 6 to match 45-minute lesson maximum
-
-/**
- * RT-007 P1: Difficulty level multiplier
- */
-const DIFFICULTY_MULTIPLIER = {
-  beginner: 1.0,
-  intermediate: 1.5,
-  advanced: 2.0,
-} as const;
-
-/**
- * Helper: Extract action verb from learning objective text
- *
- * NOTE: Exported for ADVISORY validation only (not used in BLOCKING validation)
- * Can be used by orchestrator to generate recommendations without failing validation.
- */
-export function extractActionVerb(text: string, language: string): string {
-  const tokens = text.trim().toLowerCase().split(/\s+/);
-  if (language === 'ru') {
-    const verb = tokens[0] || '';
-    return verb.replace(/ся$/, '');
-  }
-  return tokens[0] || '';
-}
-
-/**
- * Helper: Check if text contains non-measurable verbs
- *
- * RT-007 Phase 2: Supports EN/RU only (other languages fallback to no check)
- */
-function hasNonMeasurableVerb(text: string, language: string): boolean {
-  const lowerText = text.toLowerCase();
-
-  // Only EN and RU have non-measurable verb blacklists
-  if (language === 'en' || language === 'ru') {
-    const blacklist = NON_MEASURABLE_VERBS_BLACKLIST[language];
-    // RT-007 P6: Use word boundaries to avoid false positives
-    // e.g., "распознать" should NOT match "знать" (it contains "знать" as substring)
-    return blacklist.some(verb => {
-      const pattern = new RegExp(`\\b${verb.toLowerCase()}\\b`, 'u');
-      return pattern.test(lowerText);
-    });
-  }
-
-  // Other languages: no check (assume measurable)
-  return false;
 }
 
 /**
@@ -435,29 +154,6 @@ function getPlaceholderMatches(text: string): Array<{ pattern: RegExp; match: st
 }
 
 /**
- * Helper: Check if verb is in Bloom's taxonomy whitelist (LEGACY - exact match only)
- *
- * RT-007 Phase 2: This is a simplified version for shared-types package.
- * For full fuzzy matching support, use the validators in course-gen-platform package.
- *
- * NOTE: Exported for ADVISORY validation only (not used in BLOCKING validation)
- * Can be used by orchestrator to generate recommendations without failing validation.
- */
-export function isBloomsVerb(verb: string, language: string): boolean {
-  // Only EN and RU have full whitelists in shared-types
-  if (language !== 'en' && language !== 'ru') {
-    // For other languages, assume valid (will be validated by course-gen-platform)
-    return true;
-  }
-
-  const whitelist = BLOOMS_TAXONOMY_WHITELIST[language];
-  const lowerVerb = verb.toLowerCase();
-  return Object.values(whitelist).some((verbs: readonly string[]) =>
-    verbs.some((v: string) => v.toLowerCase() === lowerVerb)
-  );
-}
-
-/**
  * Helper: Scan object recursively for placeholders with detailed issue information
  */
 function scanForPlaceholders(obj: unknown, path: string = ''): PlaceholderIssue[] {
@@ -486,89 +182,6 @@ function scanForPlaceholders(obj: unknown, path: string = ''): PlaceholderIssue[
   return issues;
 }
 
-/**
- * Calculate expected duration range
- *
- * NOTE: Currently unused after removing validateDurationProportionality refinement.
- * Kept for potential future use in analytics or optional warnings.
- *
- * Reference: INV-2025-11-19-001-duration-fields-architecture.md (Section 4)
- */
-
-function calculateExpectedDuration(
-  topicCount: number,
-  objectiveCount: number,
-  difficultyLevel: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'
-): { min: number; max: number } {
-  const multiplier = DIFFICULTY_MULTIPLIER[difficultyLevel];
-
-  // Base minimum (without multiplier - allows shorter lessons regardless of difficulty)
-  const baseMin = topicCount * MIN_TOPIC_DURATION + objectiveCount * MIN_OBJECTIVE_DURATION;
-  // Maximum scales with difficulty
-  const baseMax = topicCount * MAX_TOPIC_DURATION + objectiveCount * MAX_OBJECTIVE_DURATION;
-
-  return {
-    min: Math.ceil(baseMin), // Don't multiply minimum - allows flexibility for all difficulty levels
-    max: Math.ceil(baseMax * multiplier), // Only multiply maximum to account for advanced content depth
-  };
-}
-
-/**
- * Validate duration proportionality
- *
- * NOTE: Removed from LessonSchema refinement because duration is now a fixed constraint
- * (injected from frontend), not a variable generated by LLM.
- *
- * Kept for potential future use in analytics or optional warnings, but NOT as a blocking validation.
- *
- * Reference: INV-2025-11-19-001-duration-fields-architecture.md (Section 4)
- */
-// @ts-expect-error TS6133 - Kept for potential future use
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function validateDurationProportionality(lesson: {
-  key_topics: string[];
-  lesson_objectives: unknown[];
-  estimated_duration_minutes: number;
-  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
-}): { passed: boolean; issues?: string[]; warnings?: string[] } {
-  const topicCount = lesson.key_topics.length;
-  const objectiveCount = lesson.lesson_objectives.length;
-  const actualDuration = lesson.estimated_duration_minutes;
-
-  const expected = calculateExpectedDuration(
-    topicCount,
-    objectiveCount,
-    lesson.difficulty_level || 'intermediate'
-  );
-
-  if (actualDuration < expected.min) {
-    return {
-      passed: false,
-      issues: [
-        `Duration too short: ${actualDuration} min (expected ${expected.min}-${expected.max} min for ${lesson.difficulty_level || 'intermediate'} level)`,
-      ],
-    };
-  }
-
-  const warnings: string[] = [];
-
-  if (actualDuration > expected.max) {
-    // Exceeding max is OK for complex topics - add informational warning
-    warnings.push(
-      `Duration exceeds max: ${actualDuration} min (expected ${expected.min}-${expected.max} min). This is OK for complex topics.`
-    );
-  }
-
-  if (actualDuration > ENGAGEMENT_CAP) {
-    // Exceeding engagement cap - add recommendation
-    warnings.push(
-      `Duration exceeds engagement cap: ${actualDuration} min (cap: ${ENGAGEMENT_CAP} min). Consider adding breaks or splitting into shorter segments for better learner engagement.`
-    );
-  }
-
-  return { passed: true, warnings: warnings.length > 0 ? warnings : undefined };
-}
-
 // ============================================================================
 // EXERCISE TYPES (FR-010) - UPDATED 2025-11-19
 // ============================================================================
@@ -590,64 +203,16 @@ export const EXERCISE_TYPES_LEGACY = [
   'reflection',
 ] as const;
 
-/**
- * Practical exercise schema (FR-010)
- * Each lesson must include 3-5 practical exercises
- *
- * UPDATED 2025-11-19: exercise_type changed from strict enum to freeform text
- * to eliminate 60-80% of validation failures caused by semantically correct
- * but structurally invalid values ('visual aids', 'role play scenario').
- *
- * Research basis: "Rethinking LLM validation: The case against strict enums alone.md"
- * recommends TEXT with CHECK constraints over PostgreSQL ENUMs for LLM-generated fields.
- */
-export const PracticalExerciseSchema = z.object({
-  exercise_type: z
-    .string()
-    .min(3, 'Exercise type description too short (minimum 3 characters)')
-    .describe(
-      'Description of the exercise type and activities (minimum 3 characters). ' +
-        'For simple exercises, use brief labels (10-30 chars): "case study analysis", "role-play scenario", "hands-on lab". ' +
-        'For complex multi-step exercises, provide detailed instructions (50-150+ chars recommended): ' +
-        '"Watch video introduction, complete individual practice tasks, then participate in small group ' +
-        'discussion to compare solutions and approaches, followed by peer feedback session". ' +
-        'Be specific about format, interaction model, and learning activities. ' +
-        'Examples: "visual aids presentation", "group discussion with moderator", "interactive simulation", ' +
-        '"peer assessment activity", "reflective journal with guided questions".'
-    ),
-  exercise_title: z
-    .string()
-    .min(5, 'Exercise title too short (min 5 chars)')
-    .max(300, 'Exercise title too long (max 300 chars - FR-022)'),
-  exercise_description: z
-    .string()
-    .min(10, 'Exercise description too short (min 10 chars)')
-    .max(1500, 'Exercise description too long (max 1500 chars - FR-022)'),
-});
-
-export type PracticalExercise = z.infer<typeof PracticalExerciseSchema>;
+// PracticalExerciseSchema REMOVED — Stage 6 generates exercises independently from lesson content.
+// Stage 5 no longer generates practical_exercises (token savings: ~20-30% of output).
+// See: stage6-lesson-content/nodes/generator/generator-content.ts generateExercises()
 
 // ============================================================================
-// LEARNING OBJECTIVES (RT-006 Enhanced)
+// LEARNING OBJECTIVES
 // ============================================================================
 
 /**
- * Bloom's Taxonomy cognitive levels (RT-006 P1 validation)
- * Revised taxonomy (Anderson & Krathwohl, 2001)
- */
-export const BloomCognitiveLevelSchema = z.enum([
-  'remember', // Level 1: Recall facts (list, name, identify)
-  'understand', // Level 2: Explain ideas (explain, summarize, interpret)
-  'apply', // Level 3: Use in new context (demonstrate, implement, execute)
-  'analyze', // Level 4: Break into parts (compare, differentiate, examine)
-  'evaluate', // Level 5: Make judgments (assess, critique, justify)
-  'create', // Level 6: Produce new work (design, develop, construct)
-]);
-
-export type BloomCognitiveLevel = z.infer<typeof BloomCognitiveLevelSchema>;
-
-/**
- * RT-007 Phase 2: Supported languages for Bloom's Taxonomy validation (19 languages)
+ * Supported languages for course generation (19 languages)
  *
  * Matches SUPPORTED_LANGUAGES from packages/web/lib/validation/course.ts
  */
@@ -688,47 +253,13 @@ const LearningObjectiveBaseSchema = z.object({
     .string()
     .min(10, 'Learning objective too short (min 10 chars)')
     .max(500, 'Learning objective too long (max 500 chars)'),
-  language: SupportedLanguageSchema.describe(
-    "Language for Bloom's taxonomy validation (19 languages supported)"
-  ),
-  cognitiveLevel: BloomCognitiveLevelSchema.optional().describe(
-    "Bloom's taxonomy cognitive level (auto-detected from action verb)"
-  ),
-  estimatedDuration: z
-    .number()
-    .int()
-    .min(5, 'Objective duration too short (min 5 minutes per RT-006)')
-    .max(15, 'Objective duration too long (max 15 minutes per RT-006)')
-    .optional()
-    .describe('Estimated time to achieve objective (5-15 min per RT-006 P1)'),
-  targetAudienceLevel: z
-    .enum(['beginner', 'intermediate', 'advanced'])
-    .optional()
-    .describe('Target learner level for complexity validation'),
+  language: SupportedLanguageSchema.describe('Language of the learning objective'),
 });
 
 /**
- * Learning objective schema with RT-007 Phase 2 multilingual validation
- *
- * Validates learning objectives against pedagogical quality standards:
- * - P0: Non-measurable verbs blacklist (EN/RU only)
- * - P1: Bloom's taxonomy whitelist with fuzzy matching (19 languages)
- *
- * RT-007 Phase 3: Inline validators for Zod schema compatibility
- * - These validators return boolean for Zod .refine() compatibility
- * - For severity-aware validation (ERROR/WARNING/INFO), use orchestrateValidation()
- *   from course-gen-platform/src/services/stage5/validators/validation-orchestrator.ts
- *
- * Reference:
- * - research-decisions/rt-006-bloom-taxonomy-validation.md
- * - research-decisions/rt-007-bloom-taxonomy-validation-improvements.md
+ * Learning objective schema for validation
  */
-export const LearningObjectiveSchema = LearningObjectiveBaseSchema.refine(
-  obj => !hasNonMeasurableVerb(obj.text, obj.language),
-  obj => ({
-    message: `Non-measurable verb detected in "${obj.text}". Cannot verify learning through assessment.`,
-  })
-);
+export const LearningObjectiveSchema = LearningObjectiveBaseSchema;
 
 export type LearningObjective = z.infer<typeof LearningObjectiveSchema>;
 
@@ -738,10 +269,6 @@ export type LearningObjective = z.infer<typeof LearningObjectiveSchema>;
  * Used for LLM generation validation BEFORE code injection of:
  * - id: Generated by crypto.randomUUID()
  * - language: Injected from frontend_parameters.language
- *
- * Does NOT include refinement validation (non-measurable verbs) because
- * language field is needed for that check. Use LearningObjectiveSchema
- * for final validation after field injection.
  *
  * After LLM generation, use LearningObjectiveSchema for final validation.
  */
@@ -810,12 +337,7 @@ const LessonBaseSchema = z.object({
       'Difficulty level affects duration expectations (beginner: 1.0x, intermediate: 1.5x, advanced: 2.0x)'
     ),
 
-  // Practical exercises (FR-010)
-  practical_exercises: z
-    .array(PracticalExerciseSchema)
-    .min(3, 'At least 3 practical exercises required (FR-010)')
-    .max(5, 'Maximum 5 practical exercises per lesson (FR-010)')
-    .describe('3-5 practical exercises per lesson'),
+  // practical_exercises REMOVED — Stage 6 generates exercises from lesson content independently
 });
 
 /**
@@ -960,18 +482,8 @@ export type Section = z.infer<typeof SectionSchema>;
 export const DifficultyLevelSchema = courseLevelSchema;
 export type DifficultyLevel = CourseLevel;
 
-export const AssessmentStrategySchema = z.object({
-  quiz_per_section: z.boolean().describe('Include quiz at end of each section'),
-  final_exam: z.boolean().describe('Include comprehensive final exam'),
-  practical_projects: z.number().int().min(0).max(10).describe('Number of practical projects'),
-  assessment_description: z
-    .string()
-    .min(10, 'Assessment description too short (min 10 chars)')
-    .max(1500, 'Assessment description too long (max 1500 chars - FR-022)')
-    .describe('Description of assessment approach (min 10 chars, spec recommends 50+)'),
-});
-
-export type AssessmentStrategy = z.infer<typeof AssessmentStrategySchema>;
+// AssessmentStrategySchema REMOVED — not consumed by Stage 6 or any downstream pipeline.
+// Was displayed in UI (CourseStructureView) but didn't influence content generation.
 
 // ============================================================================
 // FULL COURSE STRUCTURE (FR-007 + FR-015 Validation)
@@ -1030,11 +542,9 @@ export const CourseStructureSchema = z
       .array(LearningObjectiveSchema)
       .min(3, 'At least 3 course-level learning outcomes required')
       .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
-      .describe(
-        'Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'
-      ),
+      .describe('Course-level learning outcomes (3-15 items)'),
 
-    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
+    // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
       .array(z.string().min(3).max(150))
@@ -1054,12 +564,12 @@ export const CourseStructureSchema = z
   // Hardcoded min 10 check removed to support course_size flexibility
   .refine(
     structure => {
-      // RT-006 P0: Validate no placeholders in course structure
+      // Validate no placeholders in course structure
       const issues = scanForPlaceholders(structure);
 
-      if (issues.length > 0) {
+      if (issues.length > 0 && process.env.NODE_ENV === 'development') {
         // Log detailed info for debugging
-        console.error('[RT-006] Placeholder validation failed:', JSON.stringify(issues, null, 2));
+        console.error('[Placeholder] Validation failed:', JSON.stringify(issues, null, 2));
       }
 
       return issues.length === 0;
@@ -1137,11 +647,9 @@ export const CourseMetadataSchema = z
       .array(LearningObjectiveSchema)
       .min(3, 'At least 3 course-level learning outcomes required')
       .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
-      .describe(
-        'Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'
-      ),
+      .describe('Course-level learning outcomes (3-15 items)'),
 
-    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
+    // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
       .array(z.string().min(3).max(150))
@@ -1213,7 +721,7 @@ export const CourseMetadataWithoutInjectedFieldsSchema = z
         'Course-level learning outcomes WITHOUT id/language (injected by code after validation)'
       ),
 
-    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
+    // assessment_strategy REMOVED — not consumed by Stage 6 or downstream pipeline
 
     course_tags: z
       .array(z.string().min(3).max(150))
@@ -1330,18 +838,12 @@ export interface GenerationResult {
 }
 
 // ============================================================================
-// RT-006 VALIDATION - IMPLEMENTATION COMPLETE
+// VALIDATION
 // ============================================================================
 
 /**
- * RT-006 Bloom's Taxonomy validation is now integrated into Zod schemas:
+ * Validation is integrated into Zod schemas:
  *
- * - LearningObjectiveSchema: P0 non-measurable verbs + P1 Bloom's taxonomy
- * - LessonSchema: P1 duration proportionality
- * - CourseStructureSchema: P0 placeholder detection
- *
- * Validators imported from:
- * packages/course-gen-platform/src/server/services/generation/validators/blooms-validators.ts
- *
- * Reference: research-decisions/rt-006-bloom-taxonomy-validation.md
+ * - CourseStructureSchema: Placeholder detection
+ * - LearningObjectiveSchema: Text length validation
  */

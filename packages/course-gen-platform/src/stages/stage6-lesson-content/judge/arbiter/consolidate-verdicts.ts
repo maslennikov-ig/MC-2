@@ -149,7 +149,7 @@ function redirectGlobalToSections(globalIssues: JudgeIssue[]): JudgeIssue[] {
  * @param input - ArbiterInput with clevResult, lessonContent, operationMode
  * @returns ArbiterOutput with plan, agreement info, accepted/rejected issues
  */
-export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterOutput> {
+export function consolidateVerdicts(input: ArbiterInput): ArbiterOutput {
   const startTime = Date.now();
 
   // Extract all issues from all verdicts

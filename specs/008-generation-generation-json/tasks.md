@@ -34,6 +34,7 @@
 **Total Archived**: 50+ tasks, ~2730 lines → See `ArchiveTasks.md` for full details
 
 **Key Accomplishments** (Phases 0-8):
+
 - ✅ 624+ tests (92% coverage)
 - ✅ 9 services (~4500 lines): metadata-generator, section-batch-generator, generation-orchestrator, etc.
 - ✅ 5 utilities (~2000 lines): json-repair, validators, sanitization, RAG integration
@@ -50,6 +51,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 ### T001-R-IMPL **[EXECUTOR: llm-service-specialist]** [US3] ✅ Apply RT-001 Multi-Model Orchestration Strategy
 
 **Status**: ✅ **COMPLETE** (2025-11-15)
+
 - ✅ **Metadata generation**: Language-aware routing (RU: Qwen3 235B, EN: DeepSeek v3.1, Fallback: Kimi K2)
 - ✅ **Section generation**: Full 3-tier routing (Tier 1: OSS 120B, Tier 2: Language-optimized, Tier 3: Gemini overflow)
 - ✅ **Pre-routing logic**: calculateComplexityScore(), assessCriticality() with thresholds (0.75/0.80)
@@ -63,6 +65,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 **Prerequisites**: ✅ RT-001 research complete (`research-decisions/rt-001-model-routing.md`)
 
 **Implementation Scope**:
+
 1. **metadata-generator.ts** (T019):
    - Implement hybrid routing: critical fields → qwen3-max ALWAYS, non-critical → OSS 120B with escalation
    - Define CRITICAL_METADATA_FIELDS and NON_CRITICAL_METADATA_FIELDS
@@ -86,17 +89,20 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
    - Add cost tracking: accumulate cost per phase, total per course
 
 **Quality Gates**:
+
 - Phase 2: Critical metadata ≥0.85 quality, non-critical ≥0.75
 - Phase 3: Semantic similarity ≥0.75 per section
 - Overall: Cost $0.30-0.40, Quality 85-90% similarity, Escalation 20-25%
 
 **Success Criteria** (from RT-001):
+
 - ✅ Cost per course: $0.30-0.40
 - ✅ Quality: ≥0.75 semantic similarity (avg ≥0.85)
 - ✅ Escalation rate: 20-30%
 - ✅ Latency: <120s per course
 
 **Testing**:
+
 - Unit tests: Validate model selection logic per RT-001 rules
 - Integration tests: Run 10 test courses, measure cost/quality/escalation
 - Edge cases: title-only, overflow (>120K), validation failures
@@ -110,12 +116,13 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 **Output**: RT-001 strategy fully implemented and validated
 
 → **Artifacts**:
-  - [metadata-generator.ts](../../packages/course-gen-platform/src/services/stage5/metadata-generator.ts) - Language-aware routing: selectModelForLanguage() (lines 334-349), MODELS config (lines 90-102)
-  - [section-batch-generator.ts](../../packages/course-gen-platform/src/services/stage5/section-batch-generator.ts) - 3-tier routing: selectModelTier() (lines 374-419), reactive escalation (lines 581-621)
-  - [section-batch-generator.ts](../../packages/course-gen-platform/src/services/stage5/section-batch-generator.ts) - Pre-routing: calculateComplexityScore() (lines 281-315), assessCriticality() (lines 327-357)
-  - [quality-validator.ts](../../packages/course-gen-platform/src/services/stage5/quality-validator.ts) - Jina-v3 embeddings, cosine similarity (lines 495-530)
-  - [generation-phases.ts](../../packages/course-gen-platform/src/services/stage5/generation-phases.ts) - State tracking: modelUsed, qualityScores, tier tracking
-  - **Models**: RU (Qwen3 235B, DeepSeek Terminus), EN (DeepSeek Terminus, OSS 120B), Fallback (Kimi K2, Gemini 2.5 Flash)
+
+- [metadata-generator.ts](../../packages/course-gen-platform/src/services/stage5/metadata-generator.ts) - Language-aware routing: selectModelForLanguage() (lines 334-349), MODELS config (lines 90-102)
+- [section-batch-generator.ts](../../packages/course-gen-platform/src/services/stage5/section-batch-generator.ts) - 3-tier routing: selectModelTier() (lines 374-419), reactive escalation (lines 581-621)
+- [section-batch-generator.ts](../../packages/course-gen-platform/src/services/stage5/section-batch-generator.ts) - Pre-routing: calculateComplexityScore() (lines 281-315), assessCriticality() (lines 327-357)
+- [quality-validator.ts](../../packages/course-gen-platform/src/services/stage5/quality-validator.ts) - Jina-v3 embeddings, cosine similarity (lines 495-530)
+- [generation-phases.ts](../../packages/course-gen-platform/src/services/stage5/generation-phases.ts) - State tracking: modelUsed, qualityScores, tier tracking
+- **Models**: RU (Qwen3 235B, DeepSeek Terminus), EN (DeepSeek Terminus, OSS 120B), Fallback (Kimi K2, Gemini 2.5 Flash)
 
 ---
 
@@ -128,6 +135,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 **Prerequisites**: ✅ RT-005 research complete (`research-decisions/rt-005-json-repair-regeneration.md`)
 
 **Implementation Scope**:
+
 1. **json-repair.ts** (T015):
    - Integrate approved repair library (json-repair, jsonrepair, or custom FSM)
    - Implement optimal repair cascade: FSM → 4-level → field-name-fix → LLM semantic repair
@@ -150,11 +158,13 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
    - Implement circuit breaker for repair failures (>5 consecutive fails → skip repair, regenerate directly)
 
 **Quality Gates**:
+
 - Repair success rate: ≥90% for parse errors, ≥80% for schema violations
 - Token savings: 20-30% vs full regeneration (measured over 100 test courses)
 - Total cost per course: ≤$0.45 (within RT-001/RT-004 budgets)
 
 **Testing**:
+
 - Unit tests: Repair cascade for common error types
 - Integration tests: 100 test courses with injected errors, measure repair success and cost
 - Edge cases: Large JSON (>10K tokens), deeply nested (>50 levels), multiple concurrent errors
@@ -165,10 +175,11 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 **Output**: RT-005 strategy fully implemented with repair library integration and monitoring
 
 → **Artifacts**:
-  - [json-repair.ts](../../packages/course-gen-platform/src/services/stage5/json-repair.ts) - 4-level repair cascade implemented (FSM → brace → quote → comma → comment)
-  - [metadata-generator.ts](../../packages/course-gen-platform/src/services/stage5/metadata-generator.ts) - UnifiedRegenerator integration (lines 219-220)
-  - [section-batch-generator.ts](../../packages/course-gen-platform/src/services/stage5/section-batch-generator.ts) - UnifiedRegenerator integration (lines 497-498)
-  - **Verification Report**: Investigation confirmed all 4 layers implemented, integrated, and monitored (2025-11-15)
+
+- [json-repair.ts](../../packages/course-gen-platform/src/services/stage5/json-repair.ts) - 4-level repair cascade implemented (FSM → brace → quote → comma → comment)
+- [metadata-generator.ts](../../packages/course-gen-platform/src/services/stage5/metadata-generator.ts) - UnifiedRegenerator integration (lines 219-220)
+- [section-batch-generator.ts](../../packages/course-gen-platform/src/services/stage5/section-batch-generator.ts) - UnifiedRegenerator integration (lines 497-498)
+- **Verification Report**: Investigation confirmed all 4 layers implemented, integrated, and monitored (2025-11-15)
 
 ---
 
@@ -181,6 +192,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 **Prerequisites**: ✅ RT-006 research complete (`research-decisions/rt-006-bloom-taxonomy-validation.md`)
 
 **Implementation Scope**:
+
 1. **Phase P0 (Blocking - Draft Gate)** - PRIORITY 1:
    - File: `packages/course-gen-platform/src/server/services/generation/validators/blooms-validators.ts`
    - Implement `validateNonMeasurableVerbs()`: Blacklist check for "understand", "know", "learn" (EN + RU)
@@ -212,12 +224,14 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
    - **Effort**: 16-24 hours
 
 **Success Criteria** (from RT-006):
+
 - ✅ P0: 55-60% reduction in draft rejections
 - ✅ P1: 95%+ pedagogical compliance, +10-15% quality
 - ✅ P2: Objective quality metrics (0-100 scale)
 - ✅ P3: Full SDLC integration
 
 **Deployment Strategy**:
+
 - Week 1-2: P0 (draft gate) → staging → A/B test → production
 - Week 3-4: P1 (review gate) → production (100% traffic)
 - Week 5-6: P2 (metrics) → quality dashboard
@@ -230,11 +244,12 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 **Output**: RT-006 validation framework fully implemented in production
 
 → **Artifacts**:
-  - [blooms-validators.ts](../../packages/course-gen-platform/src/services/stage5/validators/blooms-validators.ts) - P0-P1 validators + RT-007 universal fuzzy matching
-  - [blooms-whitelists.ts](../../packages/course-gen-platform/src/services/stage5/validators/blooms-whitelists.ts) - 165 approved verbs (87 EN + 78 RU)
-  - [metadata-generator.ts](../../packages/course-gen-platform/src/services/stage5/metadata-generator.ts) - RT-006 validation integration (lines 252-256)
-  - [section-batch-generator.ts](../../packages/course-gen-platform/src/services/stage5/section-batch-generator.ts) - RT-006 validation integration (lines 522-523)
-  - **Verification Report**: Investigation confirmed P0-P1 validators implemented, RT-007 fuzzy matching included (2025-11-15)
+
+- [blooms-validators.ts](../../packages/course-gen-platform/src/services/stage5/validators/blooms-validators.ts) - P0-P1 validators + RT-007 universal fuzzy matching
+- [blooms-whitelists.ts](../../packages/course-gen-platform/src/services/stage5/validators/blooms-whitelists.ts) - 165 approved verbs (87 EN + 78 RU)
+- [metadata-generator.ts](../../packages/course-gen-platform/src/services/stage5/metadata-generator.ts) - RT-006 validation integration (lines 252-256)
+- [section-batch-generator.ts](../../packages/course-gen-platform/src/services/stage5/section-batch-generator.ts) - RT-006 validation integration (lines 522-523)
+- **Verification Report**: Investigation confirmed P0-P1 validators implemented, RT-007 fuzzy matching included (2025-11-15)
 
 ---
 
@@ -242,39 +257,39 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 
 ### Build & Type Checking
 
-- [X] T045 [ORCHESTRATOR] [US1-US4] Run type-check across all packages ✅ COMPLETE
+- [x] T045 [ORCHESTRATOR] [US1-US4] Run type-check across all packages ✅ COMPLETE
   - Execute: `pnpm type-check`
   - **Status**: ✅ Stage 5 packages (shared-types, course-gen-platform) passed
   - **Note**: courseai-next has pre-existing errors unrelated to Stage 5
 
-- [X] T046 [ORCHESTRATOR] [US1-US4] Run production build ✅ COMPLETE
+- [x] T046 [ORCHESTRATOR] [US1-US4] Run production build ✅ COMPLETE
   - Execute: `pnpm --filter @megacampus/shared-types build && pnpm --filter @megacampus/course-gen-platform build`
   - **Status**: ✅ Both packages built successfully
 
 ### Documentation (Parallel Group F) ✅ COMPLETE
 
-- [X] T047 [ORCHESTRATOR] [P] **[PARALLEL-GROUP-F]** [US1-US4] Create Stage 5 implementation summary ✅
+- [x] T047 [ORCHESTRATOR] [P] **[PARALLEL-GROUP-F]** [US1-US4] Create Stage 5 implementation summary ✅
   - File: `docs/implementation-summaries/stage5-generation.md`
   - **Status**: ✅ COMPLETE - Comprehensive 10K+ word implementation summary created
   - **Coverage**: Architecture decisions, RT-001-006 research findings, service descriptions, testing metrics
   - **Sections**: Executive summary, architecture overview, service descriptions, edge cases, lessons learned
   - **→ Artifacts**: [stage5-generation.md](../../docs/implementation-summaries/stage5-generation.md) (650+ lines)
 
-- [X] T048 [ORCHESTRATOR] [P] **[PARALLEL-GROUP-F]** [US1-US4] Update IMPLEMENTATION_ROADMAP_EN.md ✅
+- [x] T048 [ORCHESTRATOR] [P] **[PARALLEL-GROUP-F]** [US1-US4] Update IMPLEMENTATION_ROADMAP_EN.md ✅
   - File: `docs/IMPLEMENTATION_ROADMAP_EN.md`
   - **Status**: ✅ COMPLETE - Stage 5 marked complete with full metrics
   - **Updates**: Version 1.6, status header updated, comprehensive Stage 5 completion section
   - **Metrics**: 50+ tasks, 624+ tests (92%), 9 services, 5 utilities, 6 research docs
   - **→ Artifacts**: [IMPLEMENTATION_ROADMAP_EN.md](../../docs/IMPLEMENTATION_ROADMAP_EN.md) (updated lines 1-630)
 
-- [X] T049 [ORCHESTRATOR] [P] **[PARALLEL-GROUP-F]** [US1-US4] Update CHANGELOG.md ✅
+- [x] T049 [ORCHESTRATOR] [P] **[PARALLEL-GROUP-F]** [US1-US4] Update CHANGELOG.md ✅
   - File: `CHANGELOG.md`
   - **Status**: ✅ COMPLETE - Comprehensive v0.16.28 entry added
   - **Sections**: Added (services, utilities, APIs, research, features), Fixed (T055, field names), Changed (LangGraph, routing)
   - **Format**: Keep a Changelog compliant, semantic versioning
   - **→ Artifacts**: [CHANGELOG.md](../../CHANGELOG.md) (v0.16.28 entry, lines 10-96)
 
-- [X] T050 [ORCHESTRATOR] [P] **[PARALLEL-GROUP-F]** [US1-US4] Update README.md ✅
+- [x] T050 [ORCHESTRATOR] [P] **[PARALLEL-GROUP-F]** [US1-US4] Update README.md ✅
   - File: `README.md`
   - **Status**: ✅ COMPLETE - Stage 5 section added, capabilities updated
   - **Updates**: Overview, "What Provides", API docs, Features section, Project Status
@@ -283,7 +298,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 
 ### Code Review & Validation
 
-- [X] T051 **[EXECUTOR: code-reviewer]** **[SEQUENTIAL]** **[BLOCKS: T052]** [US1-US4] Run code review with code-reviewer agent ✅ COMPLETE
+- [x] T051 **[EXECUTOR: code-reviewer]** **[SEQUENTIAL]** **[BLOCKS: T052]** [US1-US4] Run code review with code-reviewer agent ✅ COMPLETE
   - Invoke code-reviewer agent to review all Stage 5 code
   - Review focus: quality, security, maintainability, best practices validation
   - Check constitution compliance (all 8 principles from plan.md lines 59-181)
@@ -294,7 +309,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
   - **Depends on**: All implementation tasks (T001-T039) complete ✅
   - **→ Artifacts**: [stage5-code-review-report.md](../../.tmp/current/reports/stage5-code-review-report.md) (54KB, comprehensive review)
 
-- [X] T052 [ORCHESTRATOR] **[SEQUENTIAL]** [US1-US4] Address code review findings ✅
+- [x] T052 [ORCHESTRATOR] **[SEQUENTIAL]** [US1-US4] Address code review findings ✅
   - Review code-reviewer report from T051
   - Prioritize critical issues (security, blocking bugs)
   - Fix security vulnerabilities (if any)
@@ -316,7 +331,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
   - **Test Results**: Stage 5 tests 262/262 PASS ✅ (v0.16.31)
   - **Remaining**: 87 non-Stage5 test failures (Docling, Auth) → tracked in T052-REMAINING-TESTS.md
 
-- [X] T052-TESTS [ORCHESTRATOR] **[SEQUENTIAL]** [US1-US4] Fix remaining test failures ✅ COMPLETE (v0.16.32)
+- [x] T052-TESTS [ORCHESTRATOR] **[SEQUENTIAL]** [US1-US4] Fix remaining test failures ✅ COMPLETE (v0.16.32)
   - **Approach**: Parallel investigation with 7 specialized agents (5 investigation + 2 implementation)
   - **Strategy**: Documentation-first research → internet search → fix implementation
   - **Results**:
@@ -332,8 +347,8 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
     - [metadata-generator.ts](../../packages/course-gen-platform/src/services/stage5/metadata-generator.ts) - Model ID fix
     - [generation-phases.ts](../../packages/course-gen-platform/src/orchestrator/services/generation/generation-phases.ts) - Documentation update
     - [fixtures/index.ts](../../packages/course-gen-platform/tests/fixtures/index.ts) - Added getTestFixtures() helper for test isolation
-    - [stage3-*.test.ts](../../packages/course-gen-platform/tests/integration/) - 4 files: Queue initialization fixes
-    - [stage4-*.test.ts](../../packages/course-gen-platform/tests/integration/) - 4 files: Unique user IDs per file
+    - [stage3-\*.test.ts](../../packages/course-gen-platform/tests/integration/) - 4 files: Queue initialization fixes
+    - [stage4-\*.test.ts](../../packages/course-gen-platform/tests/integration/) - 4 files: Unique user IDs per file
     - [INV-2025-11-13-003](../../packages/course-gen-platform/docs/investigations/INV-2025-11-13-003-stage4-test-failures-comprehensive.md) - Stage 4 test isolation investigation
     - [test-fixing-progress.md](../../.tmp/current/test-fixing-progress.md) - Auth tests skip decision documented
     - [parallel-test-fix-plan.md](../../.tmp/current/parallel-test-fix-plan.md) - Parallel agent strategy
@@ -343,7 +358,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 
 ### Manual Testing & Performance Validation
 
-- [X] T053 [ORCHESTRATOR] **[SEQUENTIAL]** [US1-US4] Manual E2E testing + FSM Refactor ✅ COMPLETE
+- [x] T053 [ORCHESTRATOR] **[SEQUENTIAL]** [US1-US4] Manual E2E testing + FSM Refactor ✅ COMPLETE
   - **Status**: ✅ E2E test passed 100% + FSM refactor complete
   - **Test File**: `packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts`
   - **Test Results** (2025-11-17):
@@ -398,6 +413,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 ## Summary
 
 **Total Tasks**: 66 tasks total
+
 - **Completed**: 58 tasks (Phases 0-8 + 3 research implementations, archived in ArchiveTasks.md)
 - **Skipped**: 1 task (T054 - unnecessary for production readiness)
 - **Effective Completion**: 58/65 tasks (89.2%) - T054 excluded as optional
@@ -406,6 +422,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
   - 10 final validation tasks (T045-T054: **9 complete**, 1 skipped)
 
 **Implementation Progress**:
+
 - ✅ Phase 0-8: Core implementation complete (50+ tasks)
 - ✅ **Research enhancements**: RT-001 (Multi-Model Orchestration) ✅, RT-005 (JSON Repair) ✅, RT-006 (Bloom's Taxonomy) ✅
 - ✅ 624+ tests (92% coverage)
@@ -421,6 +438,7 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 **Production Scope**: ALL tasks T001-R through T054 (includes mandatory research RT-001, RT-005, RT-006)
 
 **Estimated Remaining Duration**:
+
 - ✅ Research implementations: **COMPLETE** (T001-R-IMPL ✅, T005-R-IMPL ✅, T006-R-IMPL ✅)
 - ✅ Documentation: **COMPLETE** (T047-T050)
 - ✅ Code review & fixes: **COMPLETE** (T051, T052, T052-TESTS)
@@ -429,18 +447,21 @@ These tasks apply research findings (RT-001, RT-005, RT-006) to enhance existing
 - **Total**: 0 days remaining - **IMPLEMENTATION COMPLETE** (58/65 tasks, 89.2%)
 
 **Architecture** (Implemented):
+
 - LangGraph 5-phase orchestration (validate → metadata → sections → quality → assembly)
 - Per-batch processing (SECTIONS_PER_BATCH=1, independent 120K budget)
 - Token budget: ≤90K input + ≤30K output = 120K total per batch
 - Model routing: OSS 20B → OSS 120B → qwen3-max → Gemini (based on phase criticality)
 
 **Quality Gates** (Implemented):
+
 - Jina-v3 semantic similarity (0.75 threshold, FR-021)
 - Minimum 10 lessons enforcement (FR-015)
 - XSS sanitization (DOMPurify, FR-008)
 - Cost tracking (generation_metadata.cost_usd, FR-015)
 
 **Next Steps**:
+
 1. ✅ Complete documentation updates (T047-T050) **DONE**
 2. ✅ Run code review (T051) **DONE**
 3. ✅ Address review findings (T052, T052-TESTS) **DONE**

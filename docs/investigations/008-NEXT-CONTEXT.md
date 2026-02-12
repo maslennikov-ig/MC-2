@@ -17,11 +17,13 @@
 ## ✅ What Was Done
 
 ### Investigation Results
+
 - ✅ Tested alternative PDF: `2510.13928v1.pdf` → **WORKS** (131,564 chars)
 - ❌ Original PDF: `sample-course-material.pdf` → Empty (0 chars)
 - ✅ Root cause: Specific PDF structure issue (not Docling bug)
 
 ### Documentation Created
+
 1. **Docling Optimal Strategies** (`docs/investigations/docling-optimal-strategies.md`)
    - 20KB comprehensive guide
    - Best practices for all document formats
@@ -41,28 +43,34 @@
 ## 📝 What To Do Next (5 minutes)
 
 ### Step 1: Update Test File Path
+
 Find and replace in test files:
+
 ```typescript
 // FROM:
-'tests/integration/fixtures/common/sample-course-material.pdf'
+'tests/integration/fixtures/common/sample-course-material.pdf';
 
 // TO:
-'tests/integration/fixtures/common/2510.13928v1.pdf'
+'tests/integration/fixtures/common/2510.13928v1.pdf';
 ```
 
 **Files to check**:
+
 - `tests/integration/document-processing-worker.test.ts`
 - `tests/manual/docling-pdf-direct.test.ts`
 - Any other tests using the old PDF
 
 ### Step 2: Run Tests
+
 ```bash
 cd packages/course-gen-platform
 pnpm test:integration
 ```
 
 ### Step 3: Verify & Commit
+
 If tests pass:
+
 ```bash
 git add .
 git commit -m "fix: Use working PDF file in Docling tests (2510.13928v1.pdf)
@@ -79,12 +87,12 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## 📊 Test Files Available
 
-| File | Size | Pages | Status | Markdown Length |
-|------|------|-------|--------|-----------------|
-| `2510.13928v1.pdf` | 952 KB | 9 | ✅ **WORKS** | 131,564 chars |
-| `sample-course-material.pdf` | 6.1 MB | 10 | ❌ Empty | 0 chars |
-| `sample-course-material.docx` | 696 KB | 10 | ✅ Works | ~10,000 chars |
-| `sample-course-material.txt` | 8.7 KB | 65 lines | ✅ Works | ~8,700 chars |
+| File                          | Size   | Pages    | Status       | Markdown Length |
+| ----------------------------- | ------ | -------- | ------------ | --------------- |
+| `2510.13928v1.pdf`            | 952 KB | 9        | ✅ **WORKS** | 131,564 chars   |
+| `sample-course-material.pdf`  | 6.1 MB | 10       | ❌ Empty     | 0 chars         |
+| `sample-course-material.docx` | 696 KB | 10       | ✅ Works     | ~10,000 chars   |
+| `sample-course-material.txt`  | 8.7 KB | 65 lines | ✅ Works     | ~8,700 chars    |
 
 **Recommendation**: Use `2510.13928v1.pdf` for PDF tests
 
@@ -93,11 +101,13 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## 🔍 Key Findings
 
 ### Docling Performance (from testing)
+
 - **Processing time**: 153s first time, 0.1s cached
 - **Success rate**: 90-95% for most PDFs
 - **Issue**: Specific PDF structures may fail (5-10% edge cases)
 
 ### Future Improvements (Backlog)
+
 1. **Two-tier fallback** (Stage 2, High Priority)
    - Tier 1: Docling anchor extraction
    - Tier 2: External libraries (PyMuPDF4LLM, Marker)
@@ -113,6 +123,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ## 🚀 Ready to Proceed?
 
 **Yes!** Everything is ready:
+
 - ✅ Working PDF file identified and tested
 - ✅ Docling MCP Server running (healthy)
 - ✅ All dependencies in place

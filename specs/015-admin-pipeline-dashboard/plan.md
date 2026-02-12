@@ -6,6 +6,7 @@
 ## Summary
 
 Admin dashboard for superadmins to manage the 6-stage course generation pipeline. Provides:
+
 - Visual pipeline overview with statistics (from `generation_trace`)
 - Model configuration management with versioning (extending `llm_model_config`)
 - Prompt template editor with versioning (new `prompt_templates` table)
@@ -26,17 +27,17 @@ Admin dashboard for superadmins to manage the 6-stage course generation pipeline
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Context-First Architecture | ✅ PASS | Full codebase analysis completed - existing admin router, procedures, langchain-models reviewed |
-| II. Single Source of Truth | ✅ PASS | Types in `packages/shared-types`, re-export pattern followed |
-| III. Strict Type Safety | ✅ PASS | TypeScript strict, Zod validation for all inputs |
-| IV. Atomic Evolution | ✅ PASS | Tasks broken into small commits, `/push patch` after each |
-| V. Quality Gates & Security | ✅ PASS | RLS policies required, superadminProcedure enforced, audit logging |
-| VI. Library-First Development | ✅ PASS | shadcn/ui components, existing tRPC patterns, CodeMirror for editor |
-| VII. Task Tracking & Artifacts | ✅ PASS | TodoWrite, tasks.md, artifact links |
+| Principle                      | Status  | Notes                                                                                           |
+| ------------------------------ | ------- | ----------------------------------------------------------------------------------------------- |
+| I. Context-First Architecture  | ✅ PASS | Full codebase analysis completed - existing admin router, procedures, langchain-models reviewed |
+| II. Single Source of Truth     | ✅ PASS | Types in `packages/shared-types`, re-export pattern followed                                    |
+| III. Strict Type Safety        | ✅ PASS | TypeScript strict, Zod validation for all inputs                                                |
+| IV. Atomic Evolution           | ✅ PASS | Tasks broken into small commits, `/push patch` after each                                       |
+| V. Quality Gates & Security    | ✅ PASS | RLS policies required, superadminProcedure enforced, audit logging                              |
+| VI. Library-First Development  | ✅ PASS | shadcn/ui components, existing tRPC patterns, CodeMirror for editor                             |
+| VII. Task Tracking & Artifacts | ✅ PASS | TodoWrite, tasks.md, artifact links                                                             |
 
 ## Project Structure
 
@@ -258,22 +259,22 @@ CREATE TRIGGER trigger_cleanup_old_backups
 
 ### New Dependencies to Add
 
-| Library | Purpose | Rationale |
-|---------|---------|-----------|
-| `@uiw/react-codemirror` | Prompt editor | Best React wrapper for CodeMirror 6 |
-| `@codemirror/lang-xml` | XML syntax highlighting | Pure XML mode, no HTML autocomplete noise |
-| `fast-xml-parser` | XML validation | Pure JS, 8M+ downloads, TypeScript support |
-| `json-diff-kit` | JSON config diff viewer | TypeScript-native, LCS algorithm |
+| Library                       | Purpose                 | Rationale                                  |
+| ----------------------------- | ----------------------- | ------------------------------------------ |
+| `@uiw/react-codemirror`       | Prompt editor           | Best React wrapper for CodeMirror 6        |
+| `@codemirror/lang-xml`        | XML syntax highlighting | Pure XML mode, no HTML autocomplete noise  |
+| `fast-xml-parser`             | XML validation          | Pure JS, 8M+ downloads, TypeScript support |
+| `json-diff-kit`               | JSON config diff viewer | TypeScript-native, LCS algorithm           |
 | `react-diff-viewer-continued` | Prompt text diff viewer | GitHub-style side-by-side diff, dark theme |
 
 ### Existing Libraries to Reuse
 
-| Library | Usage |
-|---------|-------|
-| **shadcn/ui components** | Tabs, Card, Dialog, Form, Table, Select, Slider, Badge, Toast, AlertDialog |
-| **TanStack Table** | Data tables (via shadcn/ui DataTable) - already integrated |
-| **react-hook-form + zod** | Form handling with validation |
-| **Immer** | State management for complex updates |
+| Library                   | Usage                                                                      |
+| ------------------------- | -------------------------------------------------------------------------- |
+| **shadcn/ui components**  | Tabs, Card, Dialog, Form, Table, Select, Slider, Badge, Toast, AlertDialog |
+| **TanStack Table**        | Data tables (via shadcn/ui DataTable) - already integrated                 |
+| **react-hook-form + zod** | Form handling with validation                                              |
+| **Immer**                 | State management for complex updates                                       |
 
 ### Components NOT to Build from Scratch
 
@@ -285,24 +286,24 @@ CREATE TRIGGER trigger_cleanup_old_backups
 
 ## Risk Mitigation
 
-| Risk | Mitigation |
-|------|------------|
-| OpenRouter API unavailable | Cache models for 1 hour, show cached data with warning |
-| Invalid prompt breaks generation | Fallback to hardcoded prompts, validate XML syntax |
-| Version history grows unbounded | Unlimited versions as per clarification (minimal storage impact) |
-| Concurrent edits conflict | Optimistic locking with version check on save |
-| Import corrupts config | Auto-backup before import, validation preview, rollback capability |
+| Risk                             | Mitigation                                                         |
+| -------------------------------- | ------------------------------------------------------------------ |
+| OpenRouter API unavailable       | Cache models for 1 hour, show cached data with warning             |
+| Invalid prompt breaks generation | Fallback to hardcoded prompts, validate XML syntax                 |
+| Version history grows unbounded  | Unlimited versions as per clarification (minimal storage impact)   |
+| Concurrent edits conflict        | Optimistic locking with version check on save                      |
+| Import corrupts config           | Auto-backup before import, validation preview, rollback capability |
 
 ## Research Completed (Phase 0) ✅
 
 See [research.md](./research.md) for full details.
 
-| Topic | Decision |
-|-------|----------|
+| Topic                    | Decision                                            |
+| ------------------------ | --------------------------------------------------- |
 | CodeMirror 6 integration | `@uiw/react-codemirror` with `@codemirror/lang-xml` |
-| OpenRouter API schema | Documented, caching strategy defined |
-| Versioned config tables | Version column + is_active flag pattern |
-| XML validation | `fast-xml-parser` (server) + `DOMParser` (client) |
-| Admin UI components | shadcn/ui DataTable (TanStack Table) |
-| Version diff viewer | `json-diff-kit` |
-| Prompt preview | Simple `{{var}}` replacement (no library needed) |
+| OpenRouter API schema    | Documented, caching strategy defined                |
+| Versioned config tables  | Version column + is_active flag pattern             |
+| XML validation           | `fast-xml-parser` (server) + `DOMParser` (client)   |
+| Admin UI components      | shadcn/ui DataTable (TanStack Table)                |
+| Version diff viewer      | `json-diff-kit`                                     |
+| Prompt preview           | Simple `{{var}}` replacement (no library needed)    |

@@ -82,23 +82,23 @@ Section-level RAG chunks                        |   |
 
 ### Stage 4 - Creates Document Relevance Mapping
 
-| File | Purpose |
-|------|---------|
+| File                                                                                     | Purpose                                                                                     |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-6-rag-planning.ts` | LLM service that generates `document_relevance_mapping` by analyzing sections and documents |
 
 ### Stage 5 - Uses DRM for Section-level RAG
 
-| File | Purpose |
-|------|---------|
+| File                                                                                       | Purpose                                                                                              |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | `packages/course-gen-platform/src/stages/stage5-generation/utils/section-rag-retriever.ts` | Uses `primary_documents` from DRM to filter Qdrant search for section-level retrieval (20-30 chunks) |
 
 ### Stage 6 - Extracts and Uses DRM
 
-| File | Purpose |
-|------|---------|
-| `packages/course-gen-platform/src/server/routers/lesson-content/procedures/partial-generate.ts` | Fetches `analysis_result` from database and passes to helper |
-| `packages/course-gen-platform/src/server/routers/lesson-content/helpers.ts` | `buildMinimalLessonSpec()` extracts DRM for section and populates `rag_context.primary_documents` |
-| `packages/course-gen-platform/src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts` | Uses `primary_documents` to filter Qdrant search via `document_ids` filter (5-10 chunks) |
+| File                                                                                            | Purpose                                                                                           |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `packages/course-gen-platform/src/server/routers/lesson-content/procedures/partial-generate.ts` | Fetches `analysis_result` from database and passes to helper                                      |
+| `packages/course-gen-platform/src/server/routers/lesson-content/helpers.ts`                     | `buildMinimalLessonSpec()` extracts DRM for section and populates `rag_context.primary_documents` |
+| `packages/course-gen-platform/src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts`   | Uses `primary_documents` to filter Qdrant search via `document_ids` filter (5-10 chunks)          |
 
 ---
 
@@ -125,11 +125,11 @@ interface Phase6Input {
 
 // Output structure
 interface SectionRAGPlan {
-  primary_documents: string[];      // file_catalog IDs ranked by relevance
-  search_queries: string[];         // 3-10 queries for RAG retrieval
-  expected_topics: string[];        // 2-8 topics to find in chunks
-  confidence: 'high' | 'medium';    // Based on processing_mode
-  note?: string;                    // Guidance for Generation
+  primary_documents: string[]; // file_catalog IDs ranked by relevance
+  search_queries: string[]; // 3-10 queries for RAG retrieval
+  expected_topics: string[]; // 2-8 topics to find in chunks
+  confidence: 'high' | 'medium'; // Based on processing_mode
+  note?: string; // Guidance for Generation
 }
 ```
 
@@ -152,7 +152,7 @@ export async function retrieveSectionContext(params: SectionRAGParams): Promise<
   const queryChunks = await executeSearchQuery({
     query,
     courseId,
-    primaryDocuments: ragPlan.primary_documents,  // From DRM
+    primaryDocuments: ragPlan.primary_documents, // From DRM
     scoreThreshold,
     limit: chunksPerQuery,
   });
@@ -211,12 +211,10 @@ const ragPlan = analysisResult?.document_relevance_mapping?.[String(sectionNumbe
 return {
   // ... other fields
   rag_context: {
-    primary_documents: ragPlan?.primary_documents?.length
-      ? ragPlan.primary_documents
-      : [],  // Empty array triggers fallback
+    primary_documents: ragPlan?.primary_documents?.length ? ragPlan.primary_documents : [], // Empty array triggers fallback
     search_queries: ragPlan?.search_queries?.length
       ? ragPlan.search_queries
-      : (lesson.key_topics || [lesson.lesson_title]),
+      : lesson.key_topics || [lesson.lesson_title],
     expected_chunks: 7,
   },
 };
@@ -235,9 +233,10 @@ const searchOptions: SearchOptions = {
   filters: {
     course_id: courseId,
     // Filter by primary documents if specified (empty array = search all)
-    ...(primaryDocIds && primaryDocIds.length > 0 && {
-      document_ids: primaryDocIds,
-    }),
+    ...(primaryDocIds &&
+      primaryDocIds.length > 0 && {
+        document_ids: primaryDocIds,
+      }),
   },
 };
 
@@ -250,13 +249,13 @@ const response = await searchChunks(query, searchOptions);
 
 The system gracefully handles missing or incomplete DRM data:
 
-| Condition | Behavior |
-|-----------|----------|
-| `analysis_result` is undefined | Falls back to searching ALL course documents |
-| `document_relevance_mapping` is undefined | Falls back to searching ALL course documents |
-| `document_relevance_mapping[sectionNumber]` doesn't exist | Falls back to searching ALL course documents |
-| `primary_documents` array is empty (`[]`) | Falls back to searching ALL course documents |
-| `search_queries` is empty | Uses `lesson.key_topics` or lesson title as queries |
+| Condition                                                 | Behavior                                            |
+| --------------------------------------------------------- | --------------------------------------------------- |
+| `analysis_result` is undefined                            | Falls back to searching ALL course documents        |
+| `document_relevance_mapping` is undefined                 | Falls back to searching ALL course documents        |
+| `document_relevance_mapping[sectionNumber]` doesn't exist | Falls back to searching ALL course documents        |
+| `primary_documents` array is empty (`[]`)                 | Falls back to searching ALL course documents        |
+| `search_queries` is empty                                 | Uses `lesson.key_topics` or lesson title as queries |
 
 The fallback is implemented in `helpers.ts`:
 
@@ -266,16 +265,19 @@ const hasDRM = !!ragPlan;
 const primaryDocsCount = ragPlan?.primary_documents?.length ?? 0;
 const usedFallback = !hasDRM || primaryDocsCount === 0;
 
-logger.debug({
-  requestId,
-  lessonId,
-  sectionNumber,
-  hasDRM,
-  primaryDocsCount,
-  usedFallback,
-}, usedFallback
-  ? 'DRM fallback: searching all documents'
-  : 'DRM found: filtering by primary_documents');
+logger.debug(
+  {
+    requestId,
+    lessonId,
+    sectionNumber,
+    hasDRM,
+    primaryDocsCount,
+    usedFallback,
+  },
+  usedFallback
+    ? 'DRM fallback: searching all documents'
+    : 'DRM found: filtering by primary_documents'
+);
 ```
 
 And in `lesson-rag-retriever.ts`:
@@ -322,15 +324,13 @@ export const LessonRAGContextV2Schema = z.object({
    * Primary document IDs from file_catalog.
    * These documents provide the authoritative source material.
    */
-  primary_documents: z.array(z.string().min(1))
-    .min(1, 'Must have at least 1 primary document'),
+  primary_documents: z.array(z.string().min(1)).min(1, 'Must have at least 1 primary document'),
 
   /**
    * Search queries for vector retrieval.
    * Used to fetch relevant chunks from the knowledge base.
    */
-  search_queries: z.array(z.string().min(3))
-    .min(1),
+  search_queries: z.array(z.string().min(3)).min(1),
 
   /**
    * Expected number of chunks to retrieve.
@@ -346,10 +346,10 @@ export const LessonRAGContextV2Schema = z.object({
 
 The `confidence` field in DRM indicates retrieval reliability:
 
-| Level | Meaning | Recommendation |
-|-------|---------|----------------|
-| `high` | All `primary_documents` are small (<5K tokens) and use `full_text` mode | Trust retrieved content is complete |
-| `medium` | At least one `primary_document` is large and uses `summary`/`hierarchical` mode | Verify context is sufficient |
+| Level    | Meaning                                                                         | Recommendation                      |
+| -------- | ------------------------------------------------------------------------------- | ----------------------------------- |
+| `high`   | All `primary_documents` are small (<5K tokens) and use `full_text` mode         | Trust retrieved content is complete |
+| `medium` | At least one `primary_document` is large and uses `summary`/`hierarchical` mode | Verify context is sufficient        |
 
 ---
 
@@ -358,17 +358,20 @@ The `confidence` field in DRM indicates retrieval reliability:
 The system logs DRM usage for monitoring data quality:
 
 ```typescript
-logger.debug({
-  requestId,
-  lessonId,
-  sectionNumber,
-  hasDRM,
-  primaryDocsCount,
-  usedFallback,
-  searchQueriesCount: ragPlan?.search_queries?.length ?? 0,
-}, usedFallback
-  ? 'DRM fallback: searching all documents'
-  : 'DRM found: filtering by primary_documents');
+logger.debug(
+  {
+    requestId,
+    lessonId,
+    sectionNumber,
+    hasDRM,
+    primaryDocsCount,
+    usedFallback,
+    searchQueriesCount: ragPlan?.search_queries?.length ?? 0,
+  },
+  usedFallback
+    ? 'DRM fallback: searching all documents'
+    : 'DRM found: filtering by primary_documents'
+);
 ```
 
 Key metrics to monitor:

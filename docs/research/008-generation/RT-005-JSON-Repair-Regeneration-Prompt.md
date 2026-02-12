@@ -18,6 +18,7 @@
 ### What We Have (Documented Strategies)
 
 **From plan.md/research.md (n8n proof-of-concept)**:
+
 ```typescript
 // 4-Level JSON Repair Strategy (Current)
 1. Brace counting (balance { } brackets)
@@ -30,6 +31,7 @@
 ```
 
 **From RT-004 (Quality Validation Research)**:
+
 ```typescript
 // Self-Healing Techniques (Production Systems)
 Level 1: FSM-based repair (95% success, 0.1x cost)
@@ -40,6 +42,7 @@ Level 3: Full regeneration (100% fresh, 1.0x cost)
 ```
 
 **Current Retry Strategy** (research.md):
+
 ```typescript
 // 2-Attempt Progressive Prompt Strictness
 Attempt 1: Standard prompt with examples
@@ -48,6 +51,7 @@ Exponential backoff: delay = 1000ms * attempt
 ```
 
 **Field Name Auto-Fix** (research.md):
+
 ```typescript
 // Recursive camelCase → snake_case transformation
 // Maps: courseTitle → course_title, lessonObjectives → lesson_objectives
@@ -57,6 +61,7 @@ Exponential backoff: delay = 1000ms * attempt
 ### Gap Analysis
 
 **What's Missing**:
+
 1. **FSM repair implementation details**: Which library? (json-repair npm package?) Custom implementation?
 2. **LLM repair prompt patterns**: How to structure validation error feedback for best repair success?
 3. **Cost-benefit thresholds**: Exact token count breakpoints (1K? 2K? 5K?) for repair vs regenerate
@@ -65,6 +70,7 @@ Exponential backoff: delay = 1000ms * attempt
 6. **Multi-language considerations**: Does repair work equally well for EN/RU/DE/ES JSON?
 
 **Questions**:
+
 1. Should we use FSM-based repair (json-repair library) as Level 1, BEFORE 4-level cascade?
 2. When should LLM repair be invoked? (After FSM fails? Only for schema violations?)
 3. Should regeneration use stricter prompts (RT-004 attempts 6-7) or model escalation (attempts 8-10)?
@@ -79,6 +85,7 @@ Exponential backoff: delay = 1000ms * attempt
 #### Q1: Repair Techniques - Effectiveness & Cost
 
 **Investigate**:
+
 1. **FSM-based repair libraries**:
    - json-repair (npm): Success rates, edge cases, performance
    - Alternative libraries: jsonrepair, json5, hjson
@@ -106,6 +113,7 @@ Exponential backoff: delay = 1000ms * attempt
 #### Q2: Regeneration Strategies - When & How
 
 **Investigate**:
+
 1. **Regeneration triggers**:
    - After how many repair attempts? (1? 2? 3?)
    - Schema violations only, or all parse errors?
@@ -133,6 +141,7 @@ Exponential backoff: delay = 1000ms * attempt
 #### Q3: Error Classification - Repairability Matrix
 
 **Investigate**:
+
 1. **Parse errors** (JSON syntax):
    - Missing brackets/braces: FSM repair (95% success)?
    - Unescaped quotes: 4-level cascade (90% success)?
@@ -165,6 +174,7 @@ Exponential backoff: delay = 1000ms * attempt
 #### Q4: Integration with RT-004 Retry Logic
 
 **Investigate**:
+
 1. **Repair in retry sequence**:
    - Where does repair fit in 10-attempt escalation?
    - Option A: Repair after every failed generation (attempts 1-10)
@@ -172,6 +182,7 @@ Exponential backoff: delay = 1000ms * attempt
    - Option C: Repair on parse errors, regenerate on quality errors
 
 2. **Optimal escalation sequence**:
+
    ```
    Current RT-004:
    Attempts 1-3: Network retry (same params)
@@ -209,6 +220,7 @@ Exponential backoff: delay = 1000ms * attempt
 #### Q5: Production Implementation - Libraries & Patterns
 
 **Investigate**:
+
 1. **JSON repair libraries** (npm ecosystem):
    - **json-repair**: 1M+ downloads, FSM-based, handles most syntax errors
    - **jsonrepair**: Alternative FSM implementation
@@ -243,6 +255,7 @@ Exponential backoff: delay = 1000ms * attempt
 #### Q6: Multi-Language JSON Repair
 
 **Investigate**:
+
 - Do repair techniques work equally for EN/RU/DE/ES JSON?
 - Are LLM repair prompts language-agnostic or need translation?
 - Field name mapping: language-specific patterns (Russian camelCase conventions)?
@@ -250,6 +263,7 @@ Exponential backoff: delay = 1000ms * attempt
 #### Q7: Token Budget Impact
 
 **Investigate**:
+
 - RT-003 defines INPUT_BUDGET_MAX = 90K tokens
 - Repair adds: error message (100 tokens) + repair prompt (50 tokens) + delta output (100 tokens) = +250 tokens
 - Impact on per-batch budget: 250/90,000 = 0.28% overhead (negligible)
@@ -258,6 +272,7 @@ Exponential backoff: delay = 1000ms * attempt
 #### Q8: Edge Cases & Failure Modes
 
 **Investigate**:
+
 - Very large JSON (>10K tokens): Repair becomes expensive, regeneration better?
 - Deeply nested structures: Repair may corrupt sibling fields?
 - Multiple concurrent errors: Repair one, break another (cascading failures)?
@@ -294,6 +309,7 @@ Exponential backoff: delay = 1000ms * attempt
 ### Analysis Framework
 
 **For Each Repair Technique**:
+
 1. **Success Rate**: % of errors successfully repaired
 2. **Cost Multiplier**: Token cost vs full regeneration (0.1x - 1.0x)
 3. **Latency**: Time to repair vs regenerate
@@ -302,6 +318,7 @@ Exponential backoff: delay = 1000ms * attempt
 6. **Production Readiness**: Library stability, community support
 
 **Decision Criteria Matrix**:
+
 ```
 Error Type × Context Size × Success Rate × Cost → Repair or Regenerate?
 
@@ -319,15 +336,18 @@ Semantic quality error × Any size × 20% × 2.0x → ALWAYS regenerate (repair 
 ### 1. Decision Document: `rt-005-json-repair-regeneration.md`
 
 **Structure**:
+
 ```markdown
 # RT-005: JSON Repair & Regeneration Strategy - FINAL DECISION
 
 ## Executive Summary
+
 - Approved strategy: [FSM + 4-level + LLM repair + regeneration]
 - Cost impact: [token savings, total cost per course]
 - Success rate: [% of courses generated without manual intervention]
 
 ## Repair Techniques (Ranked)
+
 1. FSM-based repair (95% success, 0.1x cost) - Level 1
 2. 4-level cascade (85% success, 0.0x cost) - Level 2
 3. Field name auto-fix (100% success, 0.0x cost) - Level 3
@@ -335,24 +355,29 @@ Semantic quality error × Any size × 20% × 2.0x → ALWAYS regenerate (repair 
 5. Full regeneration (100% fresh, 1.0x cost) - Level 5
 
 ## Decision Tree
+
 [Flowchart: Parse error → FSM → 4-level → Validate → Pass/Fail]
 [Flowchart: Schema error → Check context → >2K: LLM repair / <2K: Regenerate]
 
 ## Integration with RT-004 Retry Logic
+
 [10-attempt sequence with repair hooks at each stage]
 
 ## Implementation Guide
+
 - Library: json-repair (npm)
 - LLM repair prompt: [validated pattern]
 - Code examples: TypeScript/Zod integration
 - Monitoring metrics: repair success rate, token savings
 
 ## Cost-Benefit Analysis
+
 - Baseline (no repair): $0.38-0.51 per course (RT-004 with retries)
 - With repair: $0.30-0.42 per course (20-30% savings on repairs)
 - ROI: [savings justify implementation complexity]
 
 ## Tasks to Update
+
 - T015: json-repair.ts (add FSM + LLM repair)
 - T019: metadata-generator.ts (integrate repair cascade)
 - T020: section-batch-generator.ts (integrate repair cascade)
@@ -362,6 +387,7 @@ Semantic quality error × Any size × 20% × 2.0x → ALWAYS regenerate (repair 
 ### 2. Research Report: `rt-005-research-report-json-repair.md`
 
 **Structure**:
+
 - Comprehensive literature review (30-50KB)
 - Repair technique comparisons (benchmarks, case studies)
 - Production system analysis (Instructor, Guardrails, LangChain patterns)
@@ -374,6 +400,7 @@ Semantic quality error × Any size × 20% × 2.0x → ALWAYS regenerate (repair 
 **New task**: T005-R-IMPL - Apply RT-005 JSON Repair Strategy
 
 **Updated tasks**:
+
 - T015: json-repair.ts (extend with FSM + LLM repair)
 - T019: metadata-generator.ts (integrate repair cascade)
 - T020: section-batch-generator.ts (integrate repair cascade)
@@ -384,17 +411,20 @@ Semantic quality error × Any size × 20% × 2.0x → ALWAYS regenerate (repair 
 ## Success Criteria
 
 **Research Quality**:
+
 - [ ] All 8 research questions (Q1-Q8) answered with data-backed conclusions
 - [ ] Decision tree with exact thresholds (token counts, success rates, cost multipliers)
 - [ ] Production-ready library recommendations (npm packages, versions)
 - [ ] Integration guide with TypeScript/Zod code examples
 
 **Cost-Benefit Validation**:
+
 - [ ] Token savings quantified: repair vs regeneration (target: 20-30% savings)
 - [ ] Success rate validated: target 90-95% with repair + retry (RT-004 level)
 - [ ] Total cost per course: target ≤$0.45 (within RT-001/RT-004 budgets)
 
 **Implementation Readiness**:
+
 - [ ] Clear specifications for T015 (json-repair.ts) implementation
 - [ ] Integration patterns for T019/T020 (metadata/section generators)
 - [ ] Monitoring metrics defined (repair success rate, token savings, failure modes)
@@ -406,12 +436,14 @@ Semantic quality error × Any size × 20% × 2.0x → ALWAYS regenerate (repair 
 **Estimated Research Time**: 4-6 hours (comprehensive production system analysis + benchmarking)
 
 **Dependencies**:
+
 - RT-001 ✅ (model routing strategy)
 - RT-004 ✅ (retry logic and quality thresholds)
 - plan.md ✅ (4-level cascade documented)
 - research.md ✅ (n8n proof-of-concept patterns)
 
 **Blocks**:
+
 - T015 (json-repair.ts implementation)
 - T019 (metadata-generator.ts integration)
 - T020 (section-batch-generator.ts integration)
@@ -468,6 +500,7 @@ Focus on production-ready strategies with data-backed recommendations. Prioritiz
 ## Notes for Implementation
 
 **After Research Complete**:
+
 1. Review decision document (`rt-005-json-repair-regeneration.md`)
 2. Update `tasks.md` with:
    - Mark T005-R as COMPLETE ✅

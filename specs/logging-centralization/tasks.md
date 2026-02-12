@@ -9,6 +9,7 @@
 ## Task Execution Instructions
 
 **For Implementing Agent**:
+
 1. Execute tasks in order (dependencies exist)
 2. After each task: run `pnpm type-check` and `pnpm build`
 3. Mark task with `[x]` when complete
@@ -25,8 +26,10 @@
 **Dependencies**: None
 
 **Actions**:
+
 1. Create directory: `packages/shared-logger/`
 2. Create `package.json`:
+
 ```json
 {
   "name": "@megacampus/shared-logger",
@@ -58,6 +61,7 @@
 ```
 
 3. Create `tsconfig.json`:
+
 ```json
 {
   "extends": "../../tsconfig.base.json",
@@ -72,6 +76,7 @@
 ```
 
 4. Create `src/types.ts`:
+
 ```typescript
 export interface LoggerOptions {
   level?: string;
@@ -94,6 +99,7 @@ export interface ChildLoggerContext {
 5. Run `pnpm install` from root
 
 **Validation**:
+
 - `packages/shared-logger/` exists
 - `pnpm install` completes without errors
 
@@ -105,7 +111,9 @@ export interface ChildLoggerContext {
 **Dependencies**: Task 1
 
 **Actions**:
+
 1. Create `packages/shared-logger/src/transports.ts`:
+
 ```typescript
 import type { TransportTargetOptions } from 'pino';
 
@@ -149,6 +157,7 @@ export function getTransportConfig(): TransportTargetOptions | undefined {
 ```
 
 2. Create `packages/shared-logger/src/index.ts`:
+
 ```typescript
 import pino, { Logger } from 'pino';
 import { getTransportConfig } from './transports';
@@ -185,6 +194,7 @@ export type { ChildLoggerContext, LoggerOptions } from './types';
 3. Build package: `cd packages/shared-logger && pnpm build`
 
 **Validation**:
+
 - `pnpm build` succeeds in shared-logger
 - `dist/` contains `.js`, `.mjs`, and `.d.ts` files
 
@@ -196,7 +206,9 @@ export type { ChildLoggerContext, LoggerOptions } from './types';
 **Dependencies**: Task 2
 
 **Actions**:
+
 1. Add dependency in `packages/course-gen-platform/package.json`:
+
 ```json
 {
   "dependencies": {
@@ -206,6 +218,7 @@ export type { ChildLoggerContext, LoggerOptions } from './types';
 ```
 
 2. Replace `packages/course-gen-platform/src/shared/logger/index.ts`:
+
 ```typescript
 /**
  * Logger for course-gen-platform
@@ -225,6 +238,7 @@ export type { Logger, ChildLoggerContext } from '@megacampus/shared-logger';
 3. Run `pnpm install` from root
 
 **Validation**:
+
 - `pnpm type-check` passes for course-gen-platform
 - Existing imports still work (`import logger from '../shared/logger'`)
 
@@ -236,7 +250,9 @@ export type { Logger, ChildLoggerContext } from '@megacampus/shared-logger';
 **Dependencies**: Task 2
 
 **Actions**:
+
 1. Add dependency in `packages/web/package.json`:
+
 ```json
 {
   "dependencies": {
@@ -246,6 +262,7 @@ export type { Logger, ChildLoggerContext } from '@megacampus/shared-logger';
 ```
 
 2. Replace `packages/web/lib/logger.ts`:
+
 ```typescript
 /**
  * Logger for Next.js web application
@@ -297,6 +314,7 @@ export default logger;
 3. Run `pnpm install` from root
 
 **Validation**:
+
 - `pnpm type-check` passes for web package
 - Logger can be imported: `import { logger } from '@/lib/logger'`
 
@@ -308,11 +326,13 @@ export default logger;
 **Dependencies**: Task 3
 
 **Actions**:
+
 1. Edit `packages/course-gen-platform/src/shared/logging/structured-logger.ts`
 2. Find line: `import logger from '../logger';`
 3. Change to: `import logger from '@megacampus/shared-logger';`
 
 **Validation**:
+
 - `pnpm type-check` passes
 - StructuredLogger still works (factory functions export correctly)
 
@@ -325,6 +345,7 @@ export default logger;
 **Scope**: `packages/course-gen-platform/src/orchestrator/`
 
 **Actions**:
+
 1. Find all `console.log`, `console.error`, `console.warn` in orchestrator directory
 2. Replace with logger calls:
    - `console.log(msg, data)` → `logger.info({ ...data }, msg)`
@@ -334,6 +355,7 @@ export default logger;
 3. Add import if not present: `import logger from '../shared/logger';`
 
 **Example Transformations**:
+
 ```typescript
 // BEFORE
 console.log('Job started:', jobId);
@@ -345,6 +367,7 @@ logger.error({ err: error, jobId }, 'Job failed');
 ```
 
 **Validation**:
+
 - `pnpm type-check` passes
 - No console statements remain in `src/orchestrator/`
 
@@ -357,11 +380,13 @@ logger.error({ err: error, jobId }, 'Job failed');
 **Scope**: `packages/course-gen-platform/src/stages/`
 
 **Actions**:
+
 1. Find all console statements in stages directory
 2. Replace with logger calls (same pattern as Task 6)
 3. Use StructuredLogger where available (stage processing contexts)
 
 **Validation**:
+
 - `pnpm type-check` passes
 - No console statements remain in `src/stages/`
 
@@ -374,6 +399,7 @@ logger.error({ err: error, jobId }, 'Job failed');
 **Scope**: `packages/web/app/`, `packages/web/lib/`
 
 **Actions**:
+
 1. Find all console statements in server components, actions, API routes
 2. Replace with appropriate logger:
    - Server code: `import { logger } from '@/lib/logger'`
@@ -383,6 +409,7 @@ logger.error({ err: error, jobId }, 'Job failed');
    - Actions: `const log = createActionLogger('action-name')`
 
 **Validation**:
+
 - `pnpm type-check` passes
 - Minimal console statements remain (only in client components if necessary)
 
@@ -394,7 +421,9 @@ logger.error({ err: error, jobId }, 'Job failed');
 **Dependencies**: None (can run in parallel with Tasks 6-8)
 
 **Actions**:
+
 1. Update `.env.example` (or create if not exists):
+
 ```env
 # Logging Configuration
 LOG_LEVEL=info
@@ -406,6 +435,7 @@ AXIOM_DATASET=mc2-logs
 ```
 
 2. Update `docker-compose.yml` (if exists) to include:
+
 ```yaml
 services:
   backend:
@@ -418,6 +448,7 @@ services:
 3. Update any deployment configurations to include Axiom variables
 
 **Validation**:
+
 - `.env.example` contains Axiom variables
 - Docker configs include environment variables
 
@@ -429,19 +460,23 @@ services:
 **Dependencies**: All previous tasks
 
 **Actions**:
+
 1. Run full validation:
+
 ```bash
 pnpm type-check  # Must pass
 pnpm build       # Must pass
 ```
 
 2. Count remaining console statements:
+
 ```bash
 grep -r "console\." packages/course-gen-platform/src/ packages/web/app packages/web/lib --include="*.ts" --include="*.tsx" | grep -v node_modules | wc -l
 # Target: < 20 (only tests/scripts)
 ```
 
 3. Test logger output:
+
 ```bash
 # Development mode - should see colorized output
 LOG_LEVEL=debug pnpm --filter course-gen-platform dev
@@ -453,6 +488,7 @@ LOG_LEVEL=debug pnpm --filter course-gen-platform dev
    - How to create child loggers
 
 **Validation**:
+
 - Type-check passes
 - Build passes
 - Console statement count < 20

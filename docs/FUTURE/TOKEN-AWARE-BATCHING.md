@@ -13,6 +13,7 @@
 Currently, the embedding generation code uses a **fixed batch size** (5 chunks per batch) to avoid exceeding Jina API's 8,194 token limit. This is a conservative approach that works but is suboptimal:
 
 ### Current Implementation
+
 ```typescript
 // src/shared/embeddings/generate.ts:272
 const BATCH_SIZE = 5; // Fixed batch size
@@ -117,7 +118,7 @@ export interface BatchConfig {
 
 export const DEFAULT_BATCH_CONFIG: BatchConfig = {
   maxTokensPerBatch: 7500, // 694 token buffer below Jina's 8194 limit
-  maxChunksPerBatch: 100,  // Jina API limit
+  maxChunksPerBatch: 100, // Jina API limit
   minChunksPerBatch: 1,
 };
 
@@ -144,7 +145,7 @@ export function createTokenAwareBatches<T extends TokenCountedChunk>(
     if (chunkTokens > fullConfig.maxTokensPerBatch) {
       console.warn(
         `Chunk has ${chunkTokens} tokens, exceeding maxTokensPerBatch (${fullConfig.maxTokensPerBatch}). ` +
-        `This chunk will be processed alone and may fail API validation.`
+          `This chunk will be processed alone and may fail API validation.`
       );
 
       // Process oversized chunk in its own batch
@@ -219,6 +220,7 @@ export function getBatchStats<T extends TokenCountedChunk>(
 **File**: `src/shared/embeddings/generate.ts`
 
 Replace:
+
 ```typescript
 const BATCH_SIZE = 5;
 const embeddings: EmbeddingResult[] = [];
@@ -233,23 +235,27 @@ for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
 ```
 
 With:
+
 ```typescript
 import { createTokenAwareBatches, getBatchStats } from './batch-optimizer.js';
 
 const batches = createTokenAwareBatches(chunks, {
   maxTokensPerBatch: 7500, // Safe buffer below Jina's 8194 limit
-  maxChunksPerBatch: 100,  // Jina API limit
+  maxChunksPerBatch: 100, // Jina API limit
 });
 
 // Log batch statistics for monitoring
 const stats = getBatchStats(batches);
-logger.info({
-  batchCount: stats.batchCount,
-  avgBatchSize: Math.round(stats.avgBatchSize),
-  avgTokensPerBatch: Math.round(stats.avgTokensPerBatch),
-  totalChunks: stats.totalChunks,
-  task,
-}, 'Token-aware batching applied');
+logger.info(
+  {
+    batchCount: stats.batchCount,
+    avgBatchSize: Math.round(stats.avgBatchSize),
+    avgTokensPerBatch: Math.round(stats.avgTokensPerBatch),
+    totalChunks: stats.totalChunks,
+    task,
+  },
+  'Token-aware batching applied'
+);
 
 const embeddings: EmbeddingResult[] = [];
 let totalTokens = 0;
@@ -366,11 +372,11 @@ describe('Token-Aware Batching', () => {
 
 ### Performance Benchmarks
 
-| Document Type | Chunks | Fixed Batch (5) | Token-Aware | Improvement |
-|--------------|--------|-----------------|-------------|-------------|
-| Small TXT | 22 (child-only) | 5 batches | **2 batches** | **60% faster** |
-| Medium DOCX | 54 (parent+child) | 11 batches | **7 batches** | **36% faster** |
-| Large PDF | 200 (parent+child) | 40 batches | **27 batches** | **32% faster** |
+| Document Type | Chunks             | Fixed Batch (5) | Token-Aware    | Improvement    |
+| ------------- | ------------------ | --------------- | -------------- | -------------- |
+| Small TXT     | 22 (child-only)    | 5 batches       | **2 batches**  | **60% faster** |
+| Medium DOCX   | 54 (parent+child)  | 11 batches      | **7 batches**  | **36% faster** |
+| Large PDF     | 200 (parent+child) | 40 batches      | **27 batches** | **32% faster** |
 
 ### Multilingual Safety
 
@@ -398,19 +404,24 @@ describe('Token-Aware Batching', () => {
 ## Monitoring & Metrics
 
 Add logging to track:
+
 ```typescript
-logger.info({
-  batchStrategy: 'token-aware',
-  batchCount: stats.batchCount,
-  avgBatchSize: Math.round(stats.avgBatchSize),
-  avgTokensPerBatch: Math.round(stats.avgTokensPerBatch),
-  maxTokensObserved: stats.maxTokensPerBatch,
-  documentSize: chunks.length,
-  language: detectedLanguage, // if available
-}, 'Embedding batch optimization');
+logger.info(
+  {
+    batchStrategy: 'token-aware',
+    batchCount: stats.batchCount,
+    avgBatchSize: Math.round(stats.avgBatchSize),
+    avgTokensPerBatch: Math.round(stats.avgTokensPerBatch),
+    maxTokensObserved: stats.maxTokensPerBatch,
+    documentSize: chunks.length,
+    language: detectedLanguage, // if available
+  },
+  'Embedding batch optimization'
+);
 ```
 
 **Alert thresholds**:
+
 - `maxTokensObserved > 8000`: Warning (approaching Jina limit)
 - `avgBatchSize < 3`: Performance degradation (too many small batches)
 

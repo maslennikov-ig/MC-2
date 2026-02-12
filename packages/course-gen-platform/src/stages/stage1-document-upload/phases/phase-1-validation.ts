@@ -22,7 +22,11 @@ import type { Stage1Input, Phase1ValidationOutput } from '../types';
 /**
  * Validation error codes
  */
-export type ValidationErrorCode = 'NOT_FOUND' | 'FORBIDDEN' | 'BAD_REQUEST' | 'INTERNAL_SERVER_ERROR';
+export type ValidationErrorCode =
+  | 'NOT_FOUND'
+  | 'FORBIDDEN'
+  | 'BAD_REQUEST'
+  | 'INTERNAL_SERVER_ERROR';
 
 /**
  * Validation error with user-friendly message
@@ -64,9 +68,7 @@ export class ValidationError extends Error {
  * // Proceed to Phase 2 with result.tier
  * ```
  */
-export async function runPhase1Validation(
-  input: Stage1Input
-): Promise<Phase1ValidationOutput> {
+export async function runPhase1Validation(input: Stage1Input): Promise<Phase1ValidationOutput> {
   const startTime = Date.now();
   const supabase = getSupabaseAdmin();
 
@@ -143,10 +145,7 @@ export async function runPhase1Validation(
       { courseId: input.courseId, error: countError.message },
       '[Phase 1] Failed to count existing files'
     );
-    throw createValidationError(
-      'INTERNAL_SERVER_ERROR',
-      'Failed to check existing file count'
-    );
+    throw createValidationError('INTERNAL_SERVER_ERROR', 'Failed to check existing file count');
   }
 
   // Step 4: Validate file with tier-based restrictions

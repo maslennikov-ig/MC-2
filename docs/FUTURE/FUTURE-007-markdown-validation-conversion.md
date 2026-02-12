@@ -10,6 +10,7 @@
 After LLM generates lesson content and it passes all quality checks (LLM Judge, sanity checks), there's still a risk that the generated content contains malformed or non-standard markdown that won't render correctly in the frontend.
 
 **Examples of potential issues:**
+
 - Unclosed code blocks (missing closing ```)
 - Malformed tables (inconsistent column counts)
 - Broken links syntax `[text](url` without closing parenthesis
@@ -27,12 +28,12 @@ Add a **validation + normalization layer** after content generation that:
 
 ### Library Candidates
 
-| Library | Pros | Cons |
-|---------|------|------|
-| **remark** (unified) | Already in project, AST-based, extensible | Requires custom plugins |
-| **markdown-it** | Fast, CommonMark compliant, good error handling | New dependency |
-| **marked** | Fast, widely used | Less extensible |
-| **micromark** | Low-level, very fast | More work to use |
+| Library              | Pros                                            | Cons                    |
+| -------------------- | ----------------------------------------------- | ----------------------- |
+| **remark** (unified) | Already in project, AST-based, extensible       | Requires custom plugins |
+| **markdown-it**      | Fast, CommonMark compliant, good error handling | New dependency          |
+| **marked**           | Fast, widely used                               | Less extensible         |
+| **micromark**        | Low-level, very fast                            | More work to use        |
 
 **Recommendation**: Use **remark** since it's already in the project (017-markdown-renderer uses it). Can parse → validate → stringify back to normalized markdown.
 
@@ -82,12 +83,14 @@ export async function validateAndNormalizeMarkdown(
     return {
       valid: false,
       normalized: markdown, // Return original on parse failure
-      issues: [{
-        line: 0,
-        column: 0,
-        message: `Parse error: ${error.message}`,
-        severity: 'error',
-      }],
+      issues: [
+        {
+          line: 0,
+          column: 0,
+          message: `Parse error: ${error.message}`,
+          severity: 'error',
+        },
+      ],
     };
   }
 }

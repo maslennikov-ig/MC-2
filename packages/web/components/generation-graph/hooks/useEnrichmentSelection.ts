@@ -1,32 +1,40 @@
-'use client';
+'use client'
 
-import { useMemo } from 'react';
-import type { EnrichmentType } from '@megacampus/shared-types';
+import { useMemo } from 'react'
+import type { EnrichmentType } from '@megacampus/shared-types'
 
 /**
  * Enrichment selection state for count-based routing
  */
 export interface EnrichmentSelectionState {
   /** Total count of enrichments for the lesson */
-  count: number;
+  count: number
   /** Whether the lesson has no enrichments (show EmptyStateCards) */
-  isEmpty: boolean;
+  isEmpty: boolean
   /** Whether the lesson has exactly one enrichment (auto-select) */
-  hasSingle: boolean;
+  hasSingle: boolean
   /** Whether the lesson has multiple enrichments (show list) */
-  hasMultiple: boolean;
+  hasMultiple: boolean
   /** Counts by enrichment type */
-  countByType: Record<EnrichmentType, number>;
+  countByType: Record<EnrichmentType, number>
   /** Types that are present */
-  presentTypes: EnrichmentType[];
+  presentTypes: EnrichmentType[]
   /** Types that are missing (can be added) */
-  missingTypes: EnrichmentType[];
+  missingTypes: EnrichmentType[]
 }
 
 /**
  * All available enrichment types
  */
-const ALL_ENRICHMENT_TYPES: EnrichmentType[] = ['quiz', 'video', 'audio', 'presentation', 'document', 'cover', 'card'];
+const ALL_ENRICHMENT_TYPES: EnrichmentType[] = [
+  'quiz',
+  'video',
+  'audio',
+  'presentation',
+  'document',
+  'cover',
+  'card',
+]
 
 /**
  * Hook for count-based routing logic in the enrichment inspector
@@ -51,8 +59,8 @@ export function useEnrichmentSelection(
   enrichments: Array<{ type: EnrichmentType }> | null | undefined
 ): EnrichmentSelectionState {
   return useMemo(() => {
-    const items = enrichments ?? [];
-    const count = items.length;
+    const items = enrichments ?? []
+    const count = items.length
 
     // Count by type
     const countByType: Record<EnrichmentType, number> = {
@@ -64,17 +72,17 @@ export function useEnrichmentSelection(
       document: 0,
       card: 0,
       banner: 0,
-    };
+    }
 
     for (const enrichment of items) {
       if (enrichment.type in countByType) {
-        countByType[enrichment.type]++;
+        countByType[enrichment.type]++
       }
     }
 
     // Determine present and missing types
-    const presentTypes = ALL_ENRICHMENT_TYPES.filter((type) => countByType[type] > 0);
-    const missingTypes = ALL_ENRICHMENT_TYPES.filter((type) => countByType[type] === 0);
+    const presentTypes = ALL_ENRICHMENT_TYPES.filter((type) => countByType[type] > 0)
+    const missingTypes = ALL_ENRICHMENT_TYPES.filter((type) => countByType[type] === 0)
 
     return {
       count,
@@ -84,8 +92,8 @@ export function useEnrichmentSelection(
       countByType,
       presentTypes,
       missingTypes,
-    };
-  }, [enrichments]);
+    }
+  }, [enrichments])
 }
 
 /**
@@ -96,7 +104,7 @@ export function useSingleEnrichmentId(
   enrichments: Array<{ id: string }> | null | undefined
 ): string | null {
   return useMemo(() => {
-    const items = enrichments ?? [];
-    return items.length === 1 ? items[0].id : null;
-  }, [enrichments]);
+    const items = enrichments ?? []
+    return items.length === 1 ? items[0].id : null
+  }, [enrichments])
 }

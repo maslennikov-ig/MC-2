@@ -6,6 +6,7 @@
 ## Verified Subagents
 
 ✅ All required subagents exist and are properly configured:
+
 - **database-architect** - PostgreSQL migrations, JSONB, RLS, RPC functions
 - **infrastructure-specialist** - Redis, BullMQ, Lua scripts, concurrency
 - **fullstack-nextjs-specialist** - Next.js 15 App Router, Supabase Auth, REST endpoints
@@ -13,14 +14,18 @@
 ## Execution Strategy
 
 ### Phase 1: Setup (MAIN agent)
+
 **Execute immediately**:
+
 - T001: Install Pino (DONE)
 - T002: Verify infrastructure (DONE - Redis running, Supabase running)
 
 ### Phase 2: Foundational (Mixed executors)
 
 #### Step 1: Database Migrations (database-architect subagent)
+
 **Single Task tool call for T003-T005**:
+
 ```
 Task(
   subagent_type="database-architect",
@@ -46,17 +51,23 @@ Task(
 ```
 
 #### Step 2: PARALLEL-GROUP-A (MAIN agent, 3 tool calls in single message)
+
 **Execute T006+T007+T008 simultaneously**:
+
 - T006: Replace logger with Pino (Edit `src/shared/logger/index.ts`)
 - T007: Create system-metrics types (Write `src/shared/types/system-metrics.ts`)
 - T008: Create concurrency types (Write `src/shared/types/concurrency.ts`)
 
 #### Step 3: Retry Utility (MAIN agent)
+
 **Execute T009**:
+
 - Write `src/shared/utils/retry.ts` from quickstart.md Section 4.3
 
 #### Step 4: Concurrency Tracker (infrastructure-specialist subagent)
+
 **Single Task tool call for T010**:
+
 ```
 Task(
   subagent_type="infrastructure-specialist",
@@ -79,6 +90,7 @@ Task(
 ### Phase 3: API Endpoint (fullstack-nextjs-specialist subagent)
 
 **Single Task tool call for T011-T019**:
+
 ```
 Task(
   subagent_type="fullstack-nextjs-specialist",
@@ -104,6 +116,7 @@ Task(
 ### Phase 4-5: Worker Updates & Frontend (MAIN agent)
 
 **Execute sequentially**:
+
 - T020-T022: Worker handler updates (orphan detection, lifecycle calls, cleanup)
 - T023+T024: PARALLEL verification (frontend JSONB structure, status transitions)
 - T025-T026: Sequential frontend changes (Authorization header, env variable)
@@ -111,9 +124,11 @@ Task(
 ### Phase 6: Polish (MAIN agent)
 
 **PARALLEL-GROUP-C (4 tool calls)**:
+
 - T027+T028+T030+T031 in single message
 
 **Then sequential**:
+
 - T029: Quickstart validation
 
 ## Total Subagent Calls

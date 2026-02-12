@@ -132,7 +132,7 @@ const channel = supabase
       schema: 'public',
       table: 'lesson_enrichments',
     },
-    (payload) => {
+    payload => {
       console.log('Update:', payload.new);
     }
   )
@@ -143,15 +143,15 @@ const channel = supabase
 
 ## 6. Key Files to Know
 
-| Purpose | File Path |
-|---------|-----------|
-| Types | `packages/shared-types/src/lesson-enrichment.ts` |
-| Content Types | `packages/shared-types/src/enrichment-content.ts` |
-| tRPC Router | `packages/course-gen-platform/src/server/routers/enrichment/router.ts` |
-| BullMQ Worker | `packages/course-gen-platform/src/stages/stage7-enrichments/factory.ts` |
-| Quiz Handler | `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts` |
-| LessonNode UI | `packages/web/components/generation-graph/nodes/LessonNode.tsx` |
-| AssetDock UI | `packages/web/components/generation-graph/nodes/AssetDock.tsx` |
+| Purpose         | File Path                                                                             |
+| --------------- | ------------------------------------------------------------------------------------- |
+| Types           | `packages/shared-types/src/lesson-enrichment.ts`                                      |
+| Content Types   | `packages/shared-types/src/enrichment-content.ts`                                     |
+| tRPC Router     | `packages/course-gen-platform/src/server/routers/enrichment/router.ts`                |
+| BullMQ Worker   | `packages/course-gen-platform/src/stages/stage7-enrichments/factory.ts`               |
+| Quiz Handler    | `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts` |
+| LessonNode UI   | `packages/web/components/generation-graph/nodes/LessonNode.tsx`                       |
+| AssetDock UI    | `packages/web/components/generation-graph/nodes/AssetDock.tsx`                        |
 | Inspector Panel | `packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx` |
 
 ---
@@ -188,11 +188,13 @@ pnpm -F course-gen-platform logs:worker | grep stage7
 ### "Enrichment stuck in pending"
 
 1. Check Redis connection:
+
    ```bash
    redis-cli ping
    ```
 
 2. Check worker is running:
+
    ```bash
    ps aux | grep stage7
    ```
@@ -205,6 +207,7 @@ pnpm -F course-gen-platform logs:worker | grep stage7
 ### "TTS generation failed"
 
 1. Verify OpenAI API key:
+
    ```bash
    curl https://api.openai.com/v1/models \
      -H "Authorization: Bearer $OPENAI_API_KEY"
@@ -243,4 +246,4 @@ After basic setup:
 
 ---
 
-*Happy coding!*
+_Happy coding!_

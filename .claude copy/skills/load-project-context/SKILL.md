@@ -41,6 +41,7 @@ Read the file `.claude/project-index.md`
 ### Step 2: If file exists
 
 Return the full content. The agent should use this to:
+
 - Understand project structure
 - Identify key directories for the task
 - Find relevant patterns and conventions
@@ -49,6 +50,7 @@ Return the full content. The agent should use this to:
 
 Return this message:
 "Project index not found. To create one:
+
 1. Copy `.claude/templates/project-index.template.md` to `.claude/project-index.md`
 2. Customize for your project structure
 3. Keep under 150 lines for token efficiency"
@@ -57,6 +59,7 @@ Return this message:
 ## Output Format
 
 The skill returns the project index content directly, which includes:
+
 - Architecture overview with links
 - Core domains with key directories
 - Patterns and conventions
@@ -84,6 +87,7 @@ Agent now knows exactly where to look without scanning entire codebase.
 ## Maintenance
 
 The project index should be updated:
+
 - When major architectural changes occur
 - Weekly for "Recent Changes" section
 - When new domains/packages are added

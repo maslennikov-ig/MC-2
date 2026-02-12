@@ -135,9 +135,7 @@ export function validateSourceDocuments(
   }
 
   const coreDocumentUsed = priorityCounts.core > 0;
-  const coreChunkPercentage = totalChunks > 0
-    ? Math.round((coreChunks / totalChunks) * 100)
-    : 0;
+  const coreChunkPercentage = totalChunks > 0 ? Math.round((coreChunks / totalChunks) * 100) : 0;
 
   // Check validation rules
   let passed = true;
@@ -168,18 +166,24 @@ export function validateSourceDocuments(
 
   // Log validation result
   if (passed) {
-    logger.debug({
-      totalDocuments: sourceDocuments.length,
-      priorityCounts,
-      coreChunkPercentage,
-    }, 'Source document validation passed');
+    logger.debug(
+      {
+        totalDocuments: sourceDocuments.length,
+        priorityCounts,
+        coreChunkPercentage,
+      },
+      'Source document validation passed'
+    );
   } else {
-    logger.warn({
-      totalDocuments: sourceDocuments.length,
-      priorityCounts,
-      coreChunkPercentage,
-      warnings,
-    }, 'Source document validation FAILED');
+    logger.warn(
+      {
+        totalDocuments: sourceDocuments.length,
+        priorityCounts,
+        coreChunkPercentage,
+        warnings,
+      },
+      'Source document validation FAILED'
+    );
   }
 
   return {
@@ -202,7 +206,7 @@ export function validateSourceDocuments(
  * @returns true if at least one CORE document was used
  */
 export function hasCoreDocument(sourceDocuments: SourceDocument[]): boolean {
-  return sourceDocuments.some((doc) => doc.document_priority === 'CORE');
+  return sourceDocuments.some(doc => doc.document_priority === 'CORE');
 }
 
 /**

@@ -25,6 +25,7 @@
 import { z } from 'zod';
 import type { ChatOpenAI } from '@langchain/openai';
 import logger from '@/shared/logger';
+import { setNestedValue } from '@/shared/utils/nested-value';
 
 /**
  * Partial regeneration result
@@ -90,7 +91,8 @@ export async function regeneratePartialFields<T>(
     logger.info('Layer 3: Data already valid, no regeneration needed');
     return {
       data: validation.data,
-      successfulFields: partialData && typeof partialData === 'object' ? Object.keys(partialData) : [],
+      successfulFields:
+        partialData && typeof partialData === 'object' ? Object.keys(partialData) : [],
       regeneratedFields: [],
       attempts: 0,
     };
@@ -186,7 +188,7 @@ function extractFailedFields(error: z.ZodError): string[] {
  */
 function extractSuccessfulFields(data: unknown, failedFields: string[]): string[] {
   const allFields = extractAllFieldPaths(data);
-  return allFields.filter((field) => !failedFields.some((failed) => field.startsWith(failed)));
+  return allFields.filter(field => !failedFields.some(failed => field.startsWith(failed)));
 }
 
 /**
@@ -260,7 +262,7 @@ function buildFocusedPrompt(
   partialData: unknown
 ): string {
   const successfulValues = successfulFields
-    .map((field) => {
+    .map(field => {
       const value = getNestedValue(partialData, field);
       return `  - ${field}: ${JSON.stringify(value)}`;
     })
@@ -276,7 +278,7 @@ The following fields are ALREADY VALID (do not regenerate):
 ${successfulValues || '  (none)'}
 
 The following fields FAILED validation and need regeneration:
-${failedFields.map((f) => `  - ${f}`).join('\n')}
+${failedFields.map(f => `  - ${f}`).join('\n')}
 
 TASK: Generate a COMPLETE JSON object that includes:
 1. All successful fields (copied exactly as shown above)
@@ -299,12 +301,14 @@ Return the complete JSON now:`;
  * @returns Value at path or undefined
  */
 function getNestedValue(obj: unknown, path: string): unknown {
-  const parts = path.split(/\.|\ específicamente \[\]/).filter(Boolean);
-  let current: any = obj; // Use any for traversal
+  const parts = path.split(/\.|\[|\]/).filter(Boolean);
+  let current: unknown = obj;
 
   for (const part of parts) {
-    if (current === null || current === undefined) return undefined;
-    current = current[part];
+    if (current === null || current === undefined || typeof current !== 'object') {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[part];
   }
 
   return current;
@@ -328,7 +332,7 @@ function mergeFields(
   _regeneratedFields: string[]
 ): unknown {
   // Start with regenerated data (includes all fields)
-  const merged = JSON.parse(JSON.stringify(regenerated));
+  const merged = JSON.parse(JSON.stringify(regenerated)) as unknown;
 
   // Override with successful fields from original
   for (const field of successfulFields) {
@@ -341,30 +345,7 @@ function mergeFields(
   return merged;
 }
 
-/**
- * Sets nested value in object using dot notation path
- *
- * @param obj - Object to set value in
- * @param path - Dot notation path
- * @param value - Value to set
- */
-function setNestedValue(obj: Record<string, any>, path: string, value: unknown): void {
-  const parts = path.split(/\.|\ specifically \[\]/).filter(Boolean);
-  let current = obj;
-
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    if (!(part in current)) {
-      // Determine if next part is array index
-      const nextPart = parts[i + 1];
-      current[part] = /^\d+$/.test(nextPart) ? [] : {};
-    }
-    current = current[part];
-  }
-
-  const lastPart = parts[parts.length - 1];
-  current[lastPart] = value;
-}
+// setNestedValue imported from @/shared/utils/nested-value
 
 /**
  * Formats Zod error for logging
@@ -373,7 +354,5 @@ function setNestedValue(obj: Record<string, any>, path: string, value: unknown):
  * @returns Formatted error string
  */
 function formatZodError(error: z.ZodError): string {
-  return error.issues
-    .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-    .join('; ');
+  return error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ');
 }

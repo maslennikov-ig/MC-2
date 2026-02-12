@@ -52,16 +52,16 @@ Successfully completed all P2 priority optimization tasks for the MegaCampusAI S
 
 **Consolidated Policies Created:**
 
-| Table | Operation | Policy Name | Consolidates |
-|-------|-----------|-------------|--------------|
-| generation_status_history | SELECT | `generation_history_read_unified` | 2 policies → 1 |
-| llm_model_config | SELECT | `llm_model_config_read_unified` | 3 policies → 1 |
-| llm_model_config | INSERT | `llm_model_config_superadmin_insert` | Split from ALL |
-| llm_model_config | UPDATE | `llm_model_config_superadmin_update` | Split from ALL |
-| llm_model_config | DELETE | `llm_model_config_superadmin_delete` | Split from ALL |
-| users | INSERT | `users_insert_unified` | 2 policies → 1 |
-| users | SELECT | `users_read_unified` | 3 policies → 1 |
-| users | UPDATE | `users_update_unified` | 2 policies → 1 |
+| Table                     | Operation | Policy Name                          | Consolidates   |
+| ------------------------- | --------- | ------------------------------------ | -------------- |
+| generation_status_history | SELECT    | `generation_history_read_unified`    | 2 policies → 1 |
+| llm_model_config          | SELECT    | `llm_model_config_read_unified`      | 3 policies → 1 |
+| llm_model_config          | INSERT    | `llm_model_config_superadmin_insert` | Split from ALL |
+| llm_model_config          | UPDATE    | `llm_model_config_superadmin_update` | Split from ALL |
+| llm_model_config          | DELETE    | `llm_model_config_superadmin_delete` | Split from ALL |
+| users                     | INSERT    | `users_insert_unified`               | 2 policies → 1 |
+| users                     | SELECT    | `users_read_unified`                 | 3 policies → 1 |
+| users                     | UPDATE    | `users_update_unified`               | 2 policies → 1 |
 
 **Total:** 10 original policies → 8 optimized policies (20% reduction in policy evaluations)
 
@@ -82,26 +82,31 @@ Successfully completed all P2 priority optimization tasks for the MegaCampusAI S
 **Verified behaviors preserved:**
 
 ✅ **Superadmins:**
+
 - Can read all records across all tables
 - Can insert/update/delete llm_model_config
 - Can insert/update/delete users
 - Bypass logic intact: `is_superadmin((SELECT auth.uid()))`
 
 ✅ **Admins:**
+
 - Can read generation_status_history for their organization
 - Organization isolation maintained
 
 ✅ **Regular Users:**
+
 - Can read own user data
 - Can read organization members
 - Can update own data (no role/org change)
 - Can read generation history for owned courses
 
 ✅ **Auth Trigger:**
+
 - Can insert new users via signup flow
 - Public policy preserved for auth.users trigger
 
 ✅ **Service Roles:**
+
 - generation_status_history INSERT policy for public role (service writes)
 - llm_model_config global configs readable by public role
 
@@ -109,15 +114,16 @@ Successfully completed all P2 priority optimization tasks for the MegaCampusAI S
 
 **Policy Evaluation Reduction:**
 
-| Table | Before | After | Reduction |
-|-------|--------|-------|-----------|
-| generation_status_history SELECT | 2 evaluations | 1 evaluation | 50% |
-| llm_model_config SELECT | 3 evaluations | 1 evaluation | 67% |
-| users INSERT | 2 evaluations | 1 evaluation | 50% |
-| users SELECT | 3 evaluations | 1 evaluation | 67% |
-| users UPDATE | 2 evaluations | 1 evaluation | 50% |
+| Table                            | Before        | After        | Reduction |
+| -------------------------------- | ------------- | ------------ | --------- |
+| generation_status_history SELECT | 2 evaluations | 1 evaluation | 50%       |
+| llm_model_config SELECT          | 3 evaluations | 1 evaluation | 67%       |
+| users INSERT                     | 2 evaluations | 1 evaluation | 50%       |
+| users SELECT                     | 3 evaluations | 1 evaluation | 67%       |
+| users UPDATE                     | 2 evaluations | 1 evaluation | 50%       |
 
 **Estimated Performance Gain:**
+
 - 50-67% fewer policy evaluations per query
 - Reduced CPU overhead on high-traffic tables (users, generation_status_history)
 - Simplified query plan analysis for PostgreSQL optimizer
@@ -131,6 +137,7 @@ Successfully completed all P2 priority optimization tasks for the MegaCampusAI S
 **Location:** `/home/me/code/megacampus2/docs/reports/database/2025-11/2025-11-04-unused-indexes-analysis.md`
 
 **Summary:**
+
 - **Total Indexes Analyzed:** 32
 - **Recommendation: KEEP:** 26 indexes (essential for anticipated queries)
 - **Recommendation: INVESTIGATE:** 6 indexes (potential removal after production data)
@@ -139,6 +146,7 @@ Successfully completed all P2 priority optimization tasks for the MegaCampusAI S
 ### Key Findings
 
 **KEEP Categories:**
+
 1. **Foreign Key Coverage (1):** Essential for JOINs
 2. **Status/Filtering (8):** Common query patterns
 3. **Temporal/Sorting (4):** Chronological ordering
@@ -148,6 +156,7 @@ Successfully completed all P2 priority optimization tasks for the MegaCampusAI S
 7. **User/Relationships (3):** Audit trails
 
 **INVESTIGATE (Future Decision):**
+
 1. `idx_courses_analysis_result_gin` - GIN on JSONB (verify containment queries)
 2. `idx_file_catalog_parsed_content_metadata` - GIN on nested JSONB (verify usage)
 3. `idx_file_catalog_hash` - Potential duplicate of dedup index
@@ -155,12 +164,14 @@ Successfully completed all P2 priority optimization tasks for the MegaCampusAI S
 5. `idx_llm_model_config_phase` - Tiny table (5 rows), may not need index
 
 **Rationale for Conservative Approach:**
+
 - Early stage deployment (< 100 rows per table)
 - Usage patterns not yet established
 - Index maintenance cost minimal at current scale
 - Risk of performance degradation > benefit of removal
 
 **Next Steps:**
+
 1. Monitor production query patterns for 90 days
 2. Enable `pg_stat_statements` for query analysis
 3. Re-evaluate with real usage data in Q1 2026
@@ -223,10 +234,12 @@ ORDER BY tablename, cmd;
 ### Supabase Advisor Check
 
 **Performance Warnings (Multiple Permissive Policies):**
+
 - **Before:** 5 warnings
 - **After:** 0 warnings ✅
 
 **Remaining Advisories:**
+
 - 32 unused index warnings (INFO level - analyzed, no action required)
 - No security warnings
 - No critical performance issues
@@ -283,6 +296,7 @@ ORDER BY tablename, cmd;
 ### Theoretical Performance Metrics
 
 **Before (Multiple Policies):**
+
 ```
 SELECT * FROM users WHERE organization_id = ?
 → Policy 1: Check superadmin
@@ -292,6 +306,7 @@ SELECT * FROM users WHERE organization_id = ?
 ```
 
 **After (Unified Policy):**
+
 ```
 SELECT * FROM users WHERE organization_id = ?
 → Single policy: (superadmin OR own_data OR org_member)
@@ -316,12 +331,14 @@ ls -la | grep 20251104
 ### 2. Create Rollback Migration
 
 Create new migration reversing changes:
+
 - Drop unified policies
 - Recreate original separate policies with exact original logic
 
 ### 3. Test Rollback in Development
 
 Before applying to production:
+
 - Test access patterns
 - Verify all roles (superadmin, admin, user, public)
 - Run Supabase advisors
@@ -340,12 +357,14 @@ supabase db push
 ## Conclusion
 
 ✅ **Task 1: Policy Consolidation - COMPLETE**
+
 - 10 policies consolidated into 5 unified policies
 - All "Multiple Permissive Policies" warnings resolved (5 → 0)
 - Access control logic fully preserved and validated
 - Performance improvements: 50-67% fewer policy evaluations
 
 ✅ **Task 2: Unused Indexes Analysis - COMPLETE**
+
 - Comprehensive analysis of 32 unused indexes
 - Conservative recommendations: 26 KEEP, 6 INVESTIGATE
 - No immediate removal actions required
@@ -358,12 +377,14 @@ supabase db push
 ---
 
 **Deliverables:**
+
 1. ✅ Migration: `20251104164938_consolidate_multiple_permissive_policies.sql` (applied)
 2. ✅ Migration: `20251104165139_fix_llm_model_config_policy_overlap.sql` (applied)
 3. ✅ Analysis: `2025-11-04-unused-indexes-analysis.md`
 4. ✅ Summary: `2025-11-04-p2-optimization-summary.md` (this document)
 
 **MCP Tools Used:**
+
 - `mcp__supabase__list_tables` - Schema inspection
 - `mcp__supabase__list_migrations` - Migration history review
 - `mcp__supabase__get_advisors` - Performance/security validation
@@ -371,6 +392,7 @@ supabase db push
 - `mcp__supabase__apply_migration` - Migration deployment
 
 **Validation Status:** ✅ PASSED
+
 - No duplicate policies remain
 - All unified policies created successfully
 - Supabase advisors show 0 policy warnings

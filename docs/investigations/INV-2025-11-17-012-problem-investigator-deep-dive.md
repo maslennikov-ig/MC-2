@@ -5,9 +5,10 @@
 **Investigator**: problem-investigator (deep verification agent)
 **Priority**: P0-CRITICAL
 **Related Investigations**:
+
 - INV-2025-11-16-001 (RT-006 metadata validation - analyzed OLD code)
 - INV-2025-11-17-011 (Generation JSON schema mismatch - analyzed OLD code)
-**Related Commits**:
+  **Related Commits**:
 - f96c64e (FSM redesign + quality validator fix - ACTUAL FIX)
 - 5262f9c (Mark T053 complete - TEST PASSED)
 
@@ -18,6 +19,7 @@
 **CRITICAL DISCOVERY**: The problem has **ALREADY BEEN FIXED** by commit f96c64e (2025-11-17 11:02).
 
 **Key Findings**:
+
 1. **Previous investigations analyzed OLD code** (before f96c64e) where `CourseMetadataSchema.learning_outcomes` was `z.array(z.string())`
 2. **Proposed solutions are now OBSOLETE** - they recommend fixing prompts to request strings
 3. **Actual fix took OPPOSITE approach** - changed schema to expect objects (matching prompts)
@@ -33,6 +35,7 @@
 ### Initial Report (User)
 
 User requested deep investigation because "T053 E2E test has failed MULTIPLE times despite previous fix attempts" and asked to:
+
 1. Verify root cause identified in INV-2025-11-17-011
 2. Examine WHY previous fixes failed
 3. Validate proposed solutions
@@ -41,17 +44,21 @@ User requested deep investigation because "T053 E2E test has failed MULTIPLE tim
 ### Timeline Confusion
 
 **Test Failure Log**: `/tmp/t053-test-output.log` (2025-11-17 10:29)
+
 - Course ID: `77366f85-39b7-4452-b139-c7e81ad86a84`
 - Errors: "RT-006 validation failed", "Required; Required; Required..." (60+ violations)
 
 **Investigation Documents**: Written after test failure (10:29-11:00)
+
 - INV-2025-11-17-011: Analyzed code, identified prompt-schema mismatch
 - TASK-T053-FIX-PHASE1-CRITICAL.md: Proposed fix plan
 
 **Actual Fix**: Commit f96c64e (2025-11-17 11:02)
+
 - Fixed the problem using DIFFERENT approach than proposed
 
 **Test Success**: Commit 5262f9c (2025-11-17 11:23)
+
 - Marks T053 complete: "100% success, 4 sections, 76 lessons"
 
 **Conclusion**: The investigations and proposed solutions were written BEFORE the actual fix, making them **obsolete**.
@@ -65,6 +72,7 @@ User requested deep investigation because "T053 E2E test has failed MULTIPLE tim
 **Location**: `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 
 **BEFORE f96c64e** (what investigations analyzed):
+
 ```typescript
 // Lines 430-450: Hardcoded prompt requesting OBJECTS
 "learning_outcomes": [
@@ -79,6 +87,7 @@ User requested deep investigation because "T053 E2E test has failed MULTIPLE tim
 ```
 
 **AFTER f96c64e** (CURRENT state):
+
 ```typescript
 // Lines 433-440: Dynamic schema generation from Zod
 import { zodToPromptSchema } from '@/utils/zod-to-prompt-schema';
@@ -93,6 +102,7 @@ ${schemaDescription}
 ```
 
 **What zodToPromptSchema produces for CourseMetadataSchema.learning_outcomes**:
+
 ```
 "learning_outcomes": array (min 3, max 15) of {
   "id": string (UUID format),
@@ -107,6 +117,7 @@ ${schemaDescription}
 **Analysis**: Prompt now requests OBJECTS (dynamically generated from schema).
 
 **Post-Processing Added** (lines 249-258):
+
 ```typescript
 // Inject id (UUID) and language (from frontend_parameters)
 // CRITICAL: LLM should NOT generate these fields
@@ -128,6 +139,7 @@ if (result.data.learning_outcomes && Array.isArray(result.data.learning_outcomes
 **Location**: `packages/shared-types/src/generation-result.ts`
 
 **BEFORE f96c64e** (commit 9539b2a - what investigations analyzed):
+
 ```typescript
 // Line 706-709: Expects STRINGS
 learning_outcomes: z.array(z.string().min(10).max(600))
@@ -137,6 +149,7 @@ learning_outcomes: z.array(z.string().min(10).max(600))
 ```
 
 **AFTER f96c64e** (CURRENT state):
+
 ```typescript
 // Line 706-709: Expects OBJECTS
 learning_outcomes: z.array(LearningObjectiveSchema)
@@ -146,18 +159,20 @@ learning_outcomes: z.array(LearningObjectiveSchema)
 ```
 
 **LearningObjectiveSchema** (lines 421-445):
+
 ```typescript
-export const LearningObjectiveSchema = z.object({
-  id: z.string().uuid(), // Required
-  text: z.string().min(10).max(500), // Required
-  language: SupportedLanguageSchema, // Required (19 languages)
-  cognitiveLevel: BloomCognitiveLevelSchema.optional(), // Optional
-  estimatedDuration: z.number().int().min(5).max(15).optional(), // Optional
-  targetAudienceLevel: z.enum(['beginner', 'intermediate', 'advanced']).optional(), // Optional
-})
+export const LearningObjectiveSchema = z
+  .object({
+    id: z.string().uuid(), // Required
+    text: z.string().min(10).max(500), // Required
+    language: SupportedLanguageSchema, // Required (19 languages)
+    cognitiveLevel: BloomCognitiveLevelSchema.optional(), // Optional
+    estimatedDuration: z.number().int().min(5).max(15).optional(), // Optional
+    targetAudienceLevel: z.enum(['beginner', 'intermediate', 'advanced']).optional(), // Optional
+  })
   .refine(
-    (obj) => !hasNonMeasurableVerb(obj.text, obj.language), // RT-006 Bloom's validation
-    (obj) => ({ message: `Non-measurable verb detected...` })
+    obj => !hasNonMeasurableVerb(obj.text, obj.language), // RT-006 Bloom's validation
+    obj => ({ message: `Non-measurable verb detected...` })
   );
 ```
 
@@ -172,6 +187,7 @@ export const LearningObjectiveSchema = z.object({
 **BEFORE and AFTER f96c64e**: NO CHANGE (already correct)
 
 Prompts (lines 806-829) request OBJECTS for `learning_objectives` and `lesson_objectives`:
+
 ```typescript
 "learning_objectives": [
   {
@@ -201,6 +217,7 @@ Prompts (lines 806-829) request OBJECTS for `learning_objectives` and `lesson_ob
 **CRITICAL CONTRADICTION RESOLVED**:
 
 Looking at the CURRENT code I read earlier:
+
 - `SectionSchema.learning_objectives`: `z.array(z.string())` (lines 526-529)
 - `LessonSchema.lesson_objectives`: `z.array(z.string())` (lines 472-475)
 
@@ -215,6 +232,7 @@ But section-batch-generator prompts request OBJECTS!
 ### Finding 4: Git History Deep Dive
 
 **Commit Timeline**:
+
 ```bash
 9539b2a (2025-11-12) - T055 schema unification Phase 2
   → CourseMetadataSchema.learning_outcomes: z.array(z.string())
@@ -238,6 +256,7 @@ f96c64e (2025-11-17 11:02) - FSM redesign + quality validator fix
 **Key Question**: Did f96c64e also change SectionSchema and LessonSchema?
 
 Let me check:
+
 ```bash
 git show f96c64e -- packages/shared-types/src/generation-result.ts | grep -B 2 -A 3 "learning_objectives:\|lesson_objectives:"
 ```
@@ -253,11 +272,13 @@ git show f96c64e -- packages/shared-types/src/generation-result.ts | grep -B 2 -
 ### Finding 5: The "3 Format" Fix
 
 Looking at f96c64e commit message:
+
 > "Fixed section-batch-generator.ts to accept 3 generation formats"
 
 This suggests section-batch-generator has FLEXIBLE validation that accepts MULTIPLE formats. Let me check if there's post-processing similar to metadata-generator:
 
 **Hypothesis**: Section-batch-generator might:
+
 1. Accept objects from LLM
 2. Post-process to extract ONLY the `text` field
 3. Convert objects → strings before schema validation
@@ -265,6 +286,7 @@ This suggests section-batch-generator has FLEXIBLE validation that accepts MULTI
 Let me search for post-processing in section-batch-generator:
 
 **Finding**: The error logs from /tmp/t053-test-output.log show errors like:
+
 ```
 "0.learning_objectives.0": "Expected string, received object"
 ```
@@ -288,6 +310,7 @@ Let me check if there's custom validation logic...
 **Attempt 3**: Same "Required" errors
 
 **Root Cause** (BEFORE f96c64e):
+
 1. Prompts requested OBJECTS (id, text, language, cognitiveLevel, etc.)
 2. Schemas expected STRINGS
 3. LLM generated objects (following prompt)
@@ -301,6 +324,7 @@ Let me check if there's custom validation logic...
 ### Finding 7: Why f96c64e Fix Works
 
 **Fix Strategy**:
+
 1. **Change schema to match prompts** (objects) instead of changing prompts to match schema (strings)
 2. **Add post-processing** to inject architectural fields (id, language) that LLM shouldn't manage
 3. **Enable richer metadata**: cognitive level, estimated duration, target audience level
@@ -310,12 +334,14 @@ Let me check if there's custom validation logic...
 **Why This Is BETTER Than Proposed Solution**:
 
 **Proposed Solution** (INV-2025-11-17-011, TASK-T053-FIX-PHASE1-CRITICAL):
+
 - Change prompts to request strings
 - Lose all pedagogical metadata
 - RT-006 Bloom's validation wouldn't work properly
 - Inconsistency: Course uses strings, Section/Lesson use objects
 
 **Actual Fix** (f96c64e):
+
 - Keep prompts requesting objects
 - Change schema to accept objects
 - Add post-processing for architectural fields
@@ -329,6 +355,7 @@ Let me check if there's custom validation logic...
 ### Primary Cause: Investigation Reports Analyzed OLD Code
 
 **Timeline**:
+
 1. **2025-11-12**: Commit 9539b2a (T055 schema unification) set all objectives to strings
 2. **2025-11-16**: INV-2025-11-16-001 analyzed code, found prompt-schema mismatch, proposed fixing prompts
 3. **2025-11-17 10:29**: Test failed with same errors
@@ -341,12 +368,14 @@ Let me check if there's custom validation logic...
 ### Secondary Cause: Architectural Evolution
 
 **Design Evolution**:
+
 1. **Original Design** (data-model.md spec): Course/Section/Lesson objectives as simple strings
 2. **RT-006 Implementation**: Bloom's taxonomy validation added (requires object structure)
 3. **T055 Schema Unification** (9539b2a): Attempted to unify using strings (lost metadata)
 4. **f96c64e Correction**: Recognized objects are better, changed course-level to match sections/lessons
 
 **Why Objects Are Correct**:
+
 - RT-006 validators need language + text for multilingual verb detection
 - Cognitive level tracking enables learning analytics
 - Duration and audience level support adaptive learning
@@ -361,6 +390,7 @@ Let me check if there's custom validation logic...
 **Status**: ❌ **OBSOLETE and COUNTERPRODUCTIVE**
 
 **From TASK-T053-FIX-PHASE1-CRITICAL.md**:
+
 ```
 Change metadata-generator.ts lines 430-439:
 FROM: "learning_outcomes": [{ id, text, language, ... }]
@@ -368,6 +398,7 @@ TO:   "learning_outcomes": string[] (3-15 items)
 ```
 
 **Why This Would BREAK Things**:
+
 1. f96c64e ALREADY changed schema to objects
 2. Changing prompts to strings would CREATE a new mismatch (opposite direction)
 3. Would lose RT-006 Bloom's taxonomy validation
@@ -383,12 +414,14 @@ TO:   "learning_outcomes": string[] (3-15 items)
 **Status**: ✅ **ALREADY IMPLEMENTED** (by f96c64e)
 
 **From INV-2025-11-17-011 Phase 2**:
+
 ```
 Implement zod-to-prompt-schema utility
 Update all generators with schemas
 ```
 
 **Implementation Status**:
+
 - ✅ `zod-to-prompt-schema.ts` created (by f96c64e)
 - ✅ `metadata-generator.ts` uses zodToPromptSchema (by f96c64e)
 - ❓ `section-batch-generator.ts` status unclear (uses hardcoded prompts still)
@@ -402,6 +435,7 @@ Update all generators with schemas
 **Status**: ⚠️ **PARTIALLY ADDRESSED**
 
 **From INV-2025-11-17-011 Phase 3**:
+
 ```
 Add schema-completeness-check repair strategy
 Validate required fields after jsonrepair
@@ -409,6 +443,7 @@ Add defaults for missing fields
 ```
 
 **Current Implementation**:
+
 - ✅ Post-processing in metadata-generator injects id/language
 - ❌ No general schema-completeness-check layer
 - ❌ No automatic defaults for missing fields
@@ -422,6 +457,7 @@ Add defaults for missing fields
 ### Issue 1: Section/Lesson Schema Mismatch (UNRESOLVED?)
 
 **Finding**:
+
 - `SectionSchema.learning_objectives`: expects `z.array(z.string())`
 - `LessonSchema.lesson_objectives`: expects `z.array(z.string())`
 - `section-batch-generator` prompts: request OBJECTS
@@ -435,17 +471,20 @@ Add defaults for missing fields
 ### Issue 2: Missing exercise_type Enum Documentation
 
 **Finding** (from INV-2025-11-17-011):
+
 ```
 LLM generates: "role_play", "peer_review"
 Schema allows: "self_assessment", "case_study", "hands_on", "discussion", "quiz", "simulation", "reflection"
 ```
 
 **Status**: Section-batch-generator prompts show:
+
 ```typescript
 "exercise_type": "hands_on"  // Example only, no explicit enum list
 ```
 
 **Recommendation**: Add explicit enum documentation in section-batch-generator prompt:
+
 ```typescript
 "exercise_type": "self_assessment" | "case_study" | "hands_on" | "discussion" | "quiz" | "simulation" | "reflection" (ONLY these 7 values allowed)
 ```
@@ -457,6 +496,7 @@ Schema allows: "self_assessment", "case_study", "hands_on", "discussion", "quiz"
 ### Issue 3: State Machine Transition Errors (NON-BLOCKING)
 
 **Finding** (from test logs):
+
 ```
 Invalid generation status transition: pending → generating_structure
 Valid transitions from pending: [initializing, cancelled]
@@ -485,11 +525,13 @@ Valid transitions from pending: [initializing, cancelled]
 **Recommendation 1**: Update Investigation Documents (HOUSEKEEPING)
 
 Mark as **RESOLVED-SUPERSEDED**:
+
 - INV-2025-11-16-001 (analyzed OLD code with string schema)
 - INV-2025-11-17-011 (analyzed OLD code with string schema)
 - TASK-T053-FIX-PHASE1-CRITICAL.md (proposes obsolete fix)
 
 Add note:
+
 ```
 **STATUS UPDATE (2025-11-17 11:23)**:
 This investigation analyzed code BEFORE commit f96c64e.
@@ -502,6 +544,7 @@ Test NOW PASSES (5262f9c). Proposed solutions are OBSOLETE.
 **Recommendation 2**: Verify Section/Lesson Schema Alignment (OPTIONAL)
 
 **Task**: Investigate why test passes despite apparent Section/Lesson schema mismatch:
+
 - Read section-batch-generator post-f96c64e for post-processing logic
 - Check if schemas were changed in a commit I didn't examine
 - Verify "3 format" acceptance mechanism
@@ -521,6 +564,7 @@ Test NOW PASSES (5262f9c). Proposed solutions are OBSOLETE.
 **Recommendation 4**: Complete zodToPromptSchema Migration (MEDIUM)
 
 **Task**: Ensure ALL Stage 4/5 generators use zodToPromptSchema instead of hardcoded prompts:
+
 - ✅ metadata-generator.ts (done by f96c64e)
 - ❓ section-batch-generator.ts (check status)
 - ❓ Phase 1-5 generators (check status)
@@ -534,6 +578,7 @@ Test NOW PASSES (5262f9c). Proposed solutions are OBSOLETE.
 ### Tier 0: Project Internal Documentation
 
 **Code Files Examined**:
+
 1. `/packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
    - **Commit 9539b2a**: Hardcoded prompts requesting objects
    - **Commit f96c64e**: Uses zodToPromptSchema, added post-processing
@@ -550,6 +595,7 @@ Test NOW PASSES (5262f9c). Proposed solutions are OBSOLETE.
    - **Key Feature**: Recursively processes objects, arrays, enums with constraints
 
 **Investigation Documents**:
+
 1. **INV-2025-11-16-001** (analyzed OLD code):
    - **Date**: 2025-11-16
    - **Status**: COMPLETED (but OBSOLETE)
@@ -571,6 +617,7 @@ Test NOW PASSES (5262f9c). Proposed solutions are OBSOLETE.
    - **Reality**: Would break f96c64e fix
 
 **Git Commits**:
+
 1. **9539b2a** (2025-11-12): T055 schema unification Phase 2
    - Changed schema to strings
    - Comment: "simple strings per spec data-model.md"
@@ -602,6 +649,7 @@ Test NOW PASSES (5262f9c). Proposed solutions are OBSOLETE.
 ## MCP Server Usage
 
 **Tools Used**:
+
 - ✅ **Read**: Examined 10+ files (generators, schemas, investigations, tasks)
 - ✅ **Grep**: Searched patterns (learning_outcomes, LearningObjectiveSchema, exercise_type, prompts)
 - ✅ **Bash**: Git history (show, log, diff), file operations, timestamps
@@ -609,6 +657,7 @@ Test NOW PASSES (5262f9c). Proposed solutions are OBSOLETE.
 - ✅ **Sequential Thinking MCP**: Complex reasoning about schema evolution and fix strategies (15 thought steps)
 
 **MCP Servers Not Used**:
+
 - ❌ **Supabase MCP**: Schema available in migrations, no runtime queries needed
 - ❌ **Context7 MCP**: No external library questions
 
@@ -619,16 +668,19 @@ Test NOW PASSES (5262f9c). Proposed solutions are OBSOLETE.
 ### Immediate Actions (CRITICAL)
 
 **1. CANCEL Proposed Fix Plan**:
+
 - Mark TASK-T053-FIX-PHASE1-CRITICAL.md as **CANCELLED**
 - Reason: Would undo f96c64e fix that already works
 - Add note explaining fix is complete
 
 **2. Update Investigation Status**:
+
 - INV-2025-11-16-001: Add "RESOLVED-SUPERSEDED by f96c64e"
 - INV-2025-11-17-011: Add "RESOLVED-SUPERSEDED by f96c64e"
 - Link to this deep-dive report (INV-2025-11-17-012)
 
 **3. Verify Test Status**:
+
 ```bash
 # Run T053 E2E test to confirm still passing
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
@@ -641,16 +693,19 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ### Optional Follow-Up Tasks
 
 **Task 1: Section/Lesson Schema Investigation** (LOW priority):
+
 - Investigate why test passes despite Section/Lesson objectives being strings in schema
 - Check if f96c64e added post-processing or flexible validation
 - Document "3 format" handling mechanism
 
 **Task 2: Complete zodToPromptSchema Migration** (MEDIUM priority):
+
 - Audit all Stage 4/5 generators
 - Replace hardcoded prompts with zodToPromptSchema
 - Prevents future prompt-schema mismatches
 
 **Task 3: Add exercise_type Enum Docs** (LOW priority):
+
 - Update section-batch-generator prompt
 - Add explicit enum value list
 - Prevents LLM inventing new types
@@ -681,6 +736,7 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ## Investigation Log
 
 **Timeline**:
+
 ```
 2025-11-17 (User Request) - Investigation started (INV-2025-11-17-012)
   ↓
@@ -705,6 +761,7 @@ Phase 6: Generate investigation report
 ```
 
 **Commands Executed**:
+
 ```bash
 # Read investigation documents
 Read INV-2025-11-16-001, INV-2025-11-17-011, TASK-T053-FIX-PHASE1-CRITICAL.md

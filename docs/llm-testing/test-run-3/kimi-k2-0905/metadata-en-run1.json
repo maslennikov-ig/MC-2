@@ -5,10 +5,7 @@
   "target_audience": "Aspiring programmers, data-curious professionals, and students with no prior coding experience who want a practical jump-start into tech.",
   "estimated_duration_hours": 18,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "Ability to install software"
-  ],
+  "prerequisites": ["Basic computer literacy", "Ability to install software"],
   "learning_outcomes": [
     "Install and configure Python 3 and Visual Studio Code",
     "Apply variables, operators, and built-in data types to solve arithmetic and string problems",

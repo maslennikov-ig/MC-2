@@ -152,7 +152,12 @@ export async function detectResearchFlags(
 
   // Use 120B model for expert-level judgment (with dynamic tier selection)
   // Language is passed to service which handles 'any' fallback for unknown languages
-  const model = await getModelForPhase('stage_4_expert', course_id, estimatedTokenCount, input.language);
+  const model = await getModelForPhase(
+    'stage_4_expert',
+    course_id,
+    estimatedTokenCount,
+    input.language
+  );
   const modelId = model.model || 'openai/gpt-oss-120b'; // Get modelId from ChatOpenAI instance
 
   // Build prompt
@@ -193,10 +198,12 @@ export async function detectResearchFlags(
 
       // Extract token usage from response metadata
       const usage = {
-        input_tokens: (response as { usage_metadata?: { input_tokens?: number } }).usage_metadata
-          ?.input_tokens || 0,
-        output_tokens: (response as { usage_metadata?: { output_tokens?: number } }).usage_metadata
-          ?.output_tokens || 0,
+        input_tokens:
+          (response as { usage_metadata?: { input_tokens?: number } }).usage_metadata
+            ?.input_tokens || 0,
+        output_tokens:
+          (response as { usage_metadata?: { output_tokens?: number } }).usage_metadata
+            ?.output_tokens || 0,
       };
 
       return {

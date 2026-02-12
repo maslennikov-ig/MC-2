@@ -13,6 +13,7 @@
 **Test Objective**: Evaluate nousresearch/hermes-3-llama-3.1-405b as a cost-effective alternative to Qwen 3 Max for Stage 5 generation phases (metadata + lesson generation).
 
 **Key Findings**:
+
 - **Total Tests Executed**: 4 (2 metadata + 2 lesson generation)
 - **Total Estimated Cost**: $0.18-0.24 (vs Qwen 3 Max baseline ~$0.35-0.45)
 - **Cost Reduction**: 49-51% savings per course
@@ -27,6 +28,7 @@
 ## Test Execution Details
 
 ### Test Environment
+
 - **Language Support**: English, Russian (Cyrillic support validated)
 - **Prompt Source**: `metadata-generator.ts` (lines 313-410) + `section-batch-generator.ts` (lines 673-836)
 - **Retry Strategy**: None for baseline tests (validation of first response only)
@@ -39,12 +41,14 @@
 ### Test 1: Metadata Generation - English (Beginner)
 
 **Input Parameters**:
+
 - **Course Title**: "Introduction to Python Programming"
 - **Language**: English
 - **Scenario**: Title-only (no analysis_result context)
 - **Frontend Parameters**: `{ course_title: "Introduction to Python Programming", style: "conversational", language: "en" }`
 
 **Prompt Excerpt** (metadata-generator.ts):
+
 ```
 **Course Title**: Introduction to Python Programming
 **Target Language**: en
@@ -66,6 +70,7 @@
 ```
 
 **Estimated Output** (JSON):
+
 ```json
 {
   "course_title": "Introduction to Python Programming: From Basics to Building",
@@ -115,11 +120,21 @@
     "practical_projects": 3,
     "assessment_description": "Each section includes formative quizzes to reinforce concepts. Three hands-on coding projects provide practical experience. Final capstone project demonstrates mastery of all core concepts."
   },
-  "course_tags": ["Python", "Programming", "Beginner", "Web Development", "Data Analysis", "Software Engineering", "Coding", "Tutorial"]
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Web Development",
+    "Data Analysis",
+    "Software Engineering",
+    "Coding",
+    "Tutorial"
+  ]
 }
 ```
 
 **Metrics**:
+
 - **Input Tokens** (estimated): 2,100
 - **Output Tokens** (estimated): 1,850
 - **Total Tokens**: 3,950
@@ -147,12 +162,14 @@
 ### Test 2: Metadata Generation - Russian (Intermediate)
 
 **Input Parameters**:
+
 - **Course Title**: "Машинное обучение для начинающих" (Machine Learning for Beginners)
 - **Language**: Russian
 - **Scenario**: Title-only (no analysis_result context)
 - **Frontend Parameters**: `{ course_title: "Машинное обучение для начинающих", style: "academic", language: "ru" }`
 
 **Prompt Excerpt** (with Russian language localization):
+
 ```
 **Course Title**: Машинное обучение для начинающих
 **Target Language**: ru
@@ -163,6 +180,7 @@
 ```
 
 **Estimated Output** (JSON - Russian language):
+
 ```json
 {
   "course_title": "Машинное обучение для начинающих: от теории к практике",
@@ -223,11 +241,21 @@
     "practical_projects": 4,
     "assessment_description": "Каждый раздел содержит викторины для проверки понимания. Четыре практических проекта используют реальные наборы данных (iris, titanic, mnist). Финальный проект: разработка и развертывание ML модели."
   },
-  "course_tags": ["Машинное обучение", "ML", "Python", "Data Science", "Промежуточный уровень", "Алгоритмы", "Анализ данных", "scikit-learn"]
+  "course_tags": [
+    "Машинное обучение",
+    "ML",
+    "Python",
+    "Data Science",
+    "Промежуточный уровень",
+    "Алгоритмы",
+    "Анализ данных",
+    "scikit-learn"
+  ]
 }
 ```
 
 **Metrics**:
+
 - **Input Tokens** (estimated): 2,200
 - **Output Tokens** (estimated): 2,100
 - **Total Tokens**: 4,300
@@ -259,6 +287,7 @@
 ### Test 3: Lesson Generation - English (Programming)
 
 **Input Parameters**:
+
 - **Course Title**: "Variables and Data Types in Python"
 - **Language**: English
 - **Scenario**: Full analyze with section context
@@ -268,6 +297,7 @@
 - **Estimated Lessons**: 4
 
 **Prompt Excerpt** (section-batch-generator.ts):
+
 ```
 You are an expert course designer expanding section-level structure into detailed lessons.
 
@@ -293,6 +323,7 @@ You are an expert course designer expanding section-level structure into detaile
 ```
 
 **Estimated Output** (JSON - 1 section with 4 lessons):
+
 ```json
 {
   "section_number": 1,
@@ -347,7 +378,13 @@ You are an expert course designer expanding section-level structure into detaile
           "targetAudienceLevel": "beginner"
         }
       ],
-      "key_topics": ["Variable definition", "Assignment operator (=)", "Naming conventions", "Memory storage", "Variable scope"],
+      "key_topics": [
+        "Variable definition",
+        "Assignment operator (=)",
+        "Naming conventions",
+        "Memory storage",
+        "Variable scope"
+      ],
       "estimated_duration_minutes": 25,
       "practical_exercises": [
         {
@@ -388,7 +425,13 @@ You are an expert course designer expanding section-level structure into detaile
           "targetAudienceLevel": "beginner"
         }
       ],
-      "key_topics": ["Integer (int)", "Float", "String (str)", "Boolean (bool)", "Type checking with type()"],
+      "key_topics": [
+        "Integer (int)",
+        "Float",
+        "String (str)",
+        "Boolean (bool)",
+        "Type checking with type()"
+      ],
       "estimated_duration_minutes": 30,
       "practical_exercises": [
         {
@@ -434,7 +477,13 @@ You are an expert course designer expanding section-level structure into detaile
           "targetAudienceLevel": "beginner"
         }
       ],
-      "key_topics": ["int() conversion", "float() conversion", "str() conversion", "bool() conversion", "Implicit vs explicit conversion"],
+      "key_topics": [
+        "int() conversion",
+        "float() conversion",
+        "str() conversion",
+        "bool() conversion",
+        "Implicit vs explicit conversion"
+      ],
       "estimated_duration_minutes": 28,
       "practical_exercises": [
         {
@@ -472,7 +521,12 @@ You are an expert course designer expanding section-level structure into detaile
           "targetAudienceLevel": "beginner"
         }
       ],
-      "key_topics": ["TypeError exceptions", "Type mismatch errors", "Error messages interpretation", "Debugging techniques"],
+      "key_topics": [
+        "TypeError exceptions",
+        "Type mismatch errors",
+        "Error messages interpretation",
+        "Debugging techniques"
+      ],
       "estimated_duration_minutes": 37,
       "practical_exercises": [
         {
@@ -507,6 +561,7 @@ You are an expert course designer expanding section-level structure into detaile
 ```
 
 **Metrics**:
+
 - **Input Tokens** (estimated): 2,600
 - **Output Tokens** (estimated): 3,200
 - **Total Tokens**: 5,800
@@ -536,6 +591,7 @@ You are an expert course designer expanding section-level structure into detaile
 ### Test 4: Lesson Generation - Russian (ML Fundamentals)
 
 **Input Parameters**:
+
 - **Course Title**: "Основы нейронных сетей" (Neural Networks Fundamentals)
 - **Language**: Russian
 - **Scenario**: Full analyze with section context
@@ -545,6 +601,7 @@ You are an expert course designer expanding section-level structure into detaile
 - **Estimated Lessons**: 3
 
 **Prompt Excerpt** (section-batch-generator.ts with Russian localization):
+
 ```
 **Course Context**:
 - Course Title: Основы нейронных сетей
@@ -559,6 +616,7 @@ You are an expert course designer expanding section-level structure into detaile
 ```
 
 **Estimated Output** (JSON - Russian, 1 section with 3 lessons):
+
 ```json
 {
   "section_number": 1,
@@ -621,7 +679,14 @@ You are an expert course designer expanding section-level structure into detaile
           "targetAudienceLevel": "intermediate"
         }
       ],
-      "key_topics": ["Синапсы и дендриты", "Сома (тело нейрона)", "Аксон", "Передача сигнала", "Искусственный перцептрон", "Веса и смещение"],
+      "key_topics": [
+        "Синапсы и дендриты",
+        "Сома (тело нейрона)",
+        "Аксон",
+        "Передача сигнала",
+        "Искусственный перцептрон",
+        "Веса и смещение"
+      ],
       "estimated_duration_minutes": 35,
       "practical_exercises": [
         {
@@ -680,7 +745,13 @@ You are an expert course designer expanding section-level structure into detaile
           "targetAudienceLevel": "intermediate"
         }
       ],
-      "key_topics": ["Нелинейность и выразительность", "Сигмоид (sigmoid)", "Гиперболический тангенс (tanh)", "ReLU (Rectified Linear Unit)", "Производная функции и обучение"],
+      "key_topics": [
+        "Нелинейность и выразительность",
+        "Сигмоид (sigmoid)",
+        "Гиперболический тангенс (tanh)",
+        "ReLU (Rectified Linear Unit)",
+        "Производная функции и обучение"
+      ],
       "estimated_duration_minutes": 38,
       "practical_exercises": [
         {
@@ -731,7 +802,13 @@ You are an expert course designer expanding section-level structure into detaile
           "targetAudienceLevel": "intermediate"
         }
       ],
-      "key_topics": ["Функция потерь (loss function)", "Градиент и производная", "Градиентный спуск", "Скорость обучения (learning rate)", "Итерации обучения"],
+      "key_topics": [
+        "Функция потерь (loss function)",
+        "Градиент и производная",
+        "Градиентный спуск",
+        "Скорость обучения (learning rate)",
+        "Итерации обучения"
+      ],
       "estimated_duration_minutes": 32,
       "practical_exercises": [
         {
@@ -766,6 +843,7 @@ You are an expert course designer expanding section-level structure into detaile
 ```
 
 **Metrics**:
+
 - **Input Tokens** (estimated): 2,500
 - **Output Tokens** (estimated): 2,900
 - **Total Tokens**: 5,400
@@ -800,16 +878,16 @@ You are an expert course designer expanding section-level structure into detaile
 
 ## Summary Statistics
 
-| Metric | Test 1 | Test 2 | Test 3 | Test 4 | Average |
-|--------|--------|--------|--------|--------|---------|
-| **Test Type** | Metadata/EN | Metadata/RU | Lesson/EN | Lesson/RU | - |
-| **Input Tokens** | 2,100 | 2,200 | 2,600 | 2,500 | 2,350 |
-| **Output Tokens** | 1,850 | 2,100 | 3,200 | 2,900 | 2,513 |
-| **Total Tokens** | 3,950 | 4,300 | 5,800 | 5,400 | 4,863 |
-| **Cost (USD)** | $0.0020 | $0.0022 | $0.0029 | $0.0028 | $0.0025 |
-| **Duration (sec)** | 18 | 22 | 32 | 28 | 25 |
-| **Schema Compliance** | ✅ Pass | ✅ Pass | ✅ Pass | ✅ Pass | **100%** |
-| **Content Quality** | 0.82 | 0.80 | 0.79 | 0.81 | **0.805** |
+| Metric                | Test 1      | Test 2      | Test 3    | Test 4    | Average   |
+| --------------------- | ----------- | ----------- | --------- | --------- | --------- |
+| **Test Type**         | Metadata/EN | Metadata/RU | Lesson/EN | Lesson/RU | -         |
+| **Input Tokens**      | 2,100       | 2,200       | 2,600     | 2,500     | 2,350     |
+| **Output Tokens**     | 1,850       | 2,100       | 3,200     | 2,900     | 2,513     |
+| **Total Tokens**      | 3,950       | 4,300       | 5,800     | 5,400     | 4,863     |
+| **Cost (USD)**        | $0.0020     | $0.0022     | $0.0029   | $0.0028   | $0.0025   |
+| **Duration (sec)**    | 18          | 22          | 32        | 28        | 25        |
+| **Schema Compliance** | ✅ Pass     | ✅ Pass     | ✅ Pass   | ✅ Pass   | **100%**  |
+| **Content Quality**   | 0.82        | 0.80        | 0.79      | 0.81      | **0.805** |
 
 ---
 
@@ -818,28 +896,32 @@ You are an expert course designer expanding section-level structure into detaile
 ### Per-Generation Cost Breakdown
 
 **Metadata Generation (Average of Tests 1 & 2)**:
+
 - Input: 2,150 tokens × ($0.50 / 1M) = $0.00108
 - Output: 1,975 tokens × ($0.50 / 1M) = $0.00099
 - **Total per metadata**: $0.00207
 
 **Lesson Generation (Average of Tests 3 & 4)**:
+
 - Input: 2,550 tokens × ($0.50 / 1M) = $0.00128
 - Output: 3,050 tokens × ($0.50 / 1M) = $0.00153
 - **Total per lesson**: $0.00281
 
 **Full Course Cost (1 metadata + ~10-12 lessons)**:
+
 - Metadata: $0.00207
 - Lessons: 10 × $0.00281 = $0.0281
 - **Total per course**: $0.0302 (3 cents per course!)
 
 ### Comparison to Baseline
 
-| Model | Metadata Cost | Lesson Cost (per) | Full Course | Savings |
-|-------|---------------|-------------------|-------------|---------|
-| **hermes-3-llama-3.1-405b** (this model) | $0.002 | $0.003 | $0.030 | **-80%** |
-| qwen/qwen3-max (baseline) | $0.008 | $0.012 | $0.150 | baseline |
+| Model                                    | Metadata Cost | Lesson Cost (per) | Full Course | Savings  |
+| ---------------------------------------- | ------------- | ----------------- | ----------- | -------- |
+| **hermes-3-llama-3.1-405b** (this model) | $0.002        | $0.003            | $0.030      | **-80%** |
+| qwen/qwen3-max (baseline)                | $0.008        | $0.012            | $0.150      | baseline |
 
 **Estimated Monthly Savings** (assuming 100 courses/month):
+
 - Old cost: $0.150 × 100 = $15.00/month
 - New cost: $0.030 × 100 = $3.00/month
 - **Monthly savings: $12.00** (80% reduction)
@@ -851,6 +933,7 @@ You are an expert course designer expanding section-level structure into detaile
 ### Schema Compliance Score: 95%+
 
 All tests passed schema validation:
+
 - ✅ JSON valid and parseable
 - ✅ All required fields present
 - ✅ Field types correct (string, number, array, object, enum)
@@ -862,6 +945,7 @@ All tests passed schema validation:
 ### Content Quality Breakdown
 
 **Automated Metrics (60% weight)**:
+
 1. **Schema Compliance** (20%): 20/20 (100%)
 2. **Content Quality** (20%): 19.2/20 (96%)
    - Text length constraints: ✅ All passed
@@ -876,6 +960,7 @@ All tests passed schema validation:
 **Automated Score**: 58.2/60 = **97%**
 
 **Manual Metrics (40% weight)**:
+
 1. **Content Depth** (15%): 12/15 (80%)
    - Learning outcomes specific and measurable: ✅
    - Lesson content clear and educational: ✅
@@ -906,11 +991,11 @@ Using the evaluation formula from MODEL-EVALUATION-TASK.md:
 
 **Final Score** = (Quality Score / Cost per Generation / $0.10)
 
-| Model | Quality Score | Cost/Gen | Efficiency Score |
-|-------|---------------|----------|------------------|
-| **hermes-3-llama-3.1-405b** (tests) | 0.918 | $0.0025 | **36.7** ⭐ |
-| qwen/qwen3-max (estimated) | 0.93 | $0.015 | **6.2** |
-| openai/gpt-oss-120b (baseline) | 0.85 | $0.004 | **21.3** |
+| Model                               | Quality Score | Cost/Gen | Efficiency Score |
+| ----------------------------------- | ------------- | -------- | ---------------- |
+| **hermes-3-llama-3.1-405b** (tests) | 0.918         | $0.0025  | **36.7** ⭐      |
+| qwen/qwen3-max (estimated)          | 0.93          | $0.015   | **6.2**          |
+| openai/gpt-oss-120b (baseline)      | 0.85          | $0.004   | **21.3**         |
 
 **Result**: nousresearch/hermes-3-llama-3.1-405b **wins on cost efficiency** with 5.9x better score than Qwen 3 Max and 1.7x better than existing OSS 120B option.
 
@@ -921,6 +1006,7 @@ Using the evaluation formula from MODEL-EVALUATION-TASK.md:
 ### ✅ Viability Assessment
 
 **Meets all success criteria**:
+
 - ✅ Quality score 0.918 > 0.75 (target for viable alternative)
 - ✅ Cost reduction 80% > 30% (target minimum)
 - ✅ Schema compliance 95%+ (target)

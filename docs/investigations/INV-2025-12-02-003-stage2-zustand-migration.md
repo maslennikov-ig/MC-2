@@ -10,13 +10,13 @@
 
 ### Решенные проблемы
 
-| Проблема | Причина | Решение |
-|----------|---------|---------|
-| Счетчик показывал некорректные значения | React batching обновлений | Zustand обходит batching |
-| Modal показывал 1 этап вместо 7 | Данные читались из props | Чтение из Zustand store |
-| "Инициализация" застревала в Active | Marker phases не имеют output_data | Добавлен `isMarkerPhase` check |
-| "Завершено" застревала в Active | Marker phases не имеют output_data | Добавлен `isMarkerPhase` check |
-| Документ не становился зеленым | `calculateDocumentStatus` требовал `lastStage.status === 'completed'` | Изменено на проверку существования `lastStage` |
+| Проблема                                | Причина                                                               | Решение                                        |
+| --------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------- |
+| Счетчик показывал некорректные значения | React batching обновлений                                             | Zustand обходит batching                       |
+| Modal показывал 1 этап вместо 7         | Данные читались из props                                              | Чтение из Zustand store                        |
+| "Инициализация" застревала в Active     | Marker phases не имеют output_data                                    | Добавлен `isMarkerPhase` check                 |
+| "Завершено" застревала в Active         | Marker phases не имеют output_data                                    | Добавлен `isMarkerPhase` check                 |
+| Документ не становился зеленым          | `calculateDocumentStatus` требовал `lastStage.status === 'completed'` | Изменено на проверку существования `lastStage` |
 
 ### Ключевой фикс: Marker Phases
 
@@ -24,20 +24,22 @@
 // БЫЛО (неправильно):
 const stepStatus: NodeStatus = trace.error_data
   ? 'error'
-  : trace.output_data  // ← init/complete не имеют output_data!
+  : trace.output_data // ← init/complete не имеют output_data!
     ? 'completed'
     : 'active';
 
 // СТАЛО (правильно):
-const isMarkerPhase = phase === 'init' || phase === 'start' || phase === 'complete' || phase === 'finish';
+const isMarkerPhase =
+  phase === 'init' || phase === 'start' || phase === 'complete' || phase === 'finish';
 const stepStatus: NodeStatus = trace.error_data
   ? 'error'
-  : (isMarkerPhase || trace.output_data)  // ← теперь учитываем marker phases
+  : isMarkerPhase || trace.output_data // ← теперь учитываем marker phases
     ? 'completed'
     : 'active';
 ```
 
 **Применено в двух местах:**
+
 - `addTrace()` (line 383) - для realtime обновлений
 - `loadFromTraces()` (line 558) - для загрузки истории при refresh
 
@@ -51,26 +53,27 @@ enableMapSet();
 
 export const useGenerationStore = create<GenerationState>()(
   immer((set, get) => ({
-    documents: new Map(),  // Теперь работает с Immer
+    documents: new Map(), // Теперь работает с Immer
     // ...
   }))
 );
 ```
 
 Без `enableMapSet()` будет ошибка:
+
 ```
 Error: The plugin for 'MapSet' has not been loaded into Immer
 ```
 
 ### Измененные файлы
 
-| Файл | Изменение |
-|------|-----------|
-| `packages/web/stores/useGenerationStore.ts` | СОЗДАН - унифицированный store |
-| `packages/web/stores/useDocumentProcessingStore.ts` | УДАЛЕН |
-| `packages/web/components/generation-monitoring/realtime-provider.tsx` | Импорт store |
-| `packages/web/components/generation-graph/nodes/DocumentNode.tsx` | Чтение из Zustand |
-| `packages/web/components/generation-graph/panels/NodeDetailsModal/index.tsx` | Чтение stages из Zustand |
+| Файл                                                                         | Изменение                      |
+| ---------------------------------------------------------------------------- | ------------------------------ |
+| `packages/web/stores/useGenerationStore.ts`                                  | СОЗДАН - унифицированный store |
+| `packages/web/stores/useDocumentProcessingStore.ts`                          | УДАЛЕН                         |
+| `packages/web/components/generation-monitoring/realtime-provider.tsx`        | Импорт store                   |
+| `packages/web/components/generation-graph/nodes/DocumentNode.tsx`            | Чтение из Zustand              |
+| `packages/web/components/generation-graph/panels/NodeDetailsModal/index.tsx` | Чтение stages из Zustand       |
 
 ---
 
@@ -81,6 +84,7 @@ Migrate **entire generation workflow state** from fragmented local state (useGra
 ## Current Architecture Problems
 
 ### Problem 1: Dual State Systems
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CURRENT (Broken)                              │
@@ -104,11 +108,13 @@ Migrate **entire generation workflow state** from fragmented local state (useGra
 ```
 
 ### Problem 2: Data Not Synced
+
 - Modal shows 1 stage (from useGraphData documentSteps)
 - DocumentNode shows correct progress (from Zustand)
 - After refresh: Zustand loads from traces, but documentSteps is empty until traces reprocessed
 
 ### Problem 3: Status Not Updated
+
 - `calculateDocumentStatus()` uses `documentSteps` from local state
 - `completed` status never reached because local state lags behind
 
@@ -165,13 +171,15 @@ import { TraceAttempt, NodeStatus } from '@megacampus/shared-types';
 const TOTAL_STEPS = 7;
 
 const PHASE_TO_STEP_INDEX: Record<string, number> = {
-  'init': 0, 'start': 0,
-  'processing': 1,
-  'chunking': 2,
-  'embedding': 3,
-  'indexing': 4,
-  'summarization': 5,
-  'complete': 6, 'finish': 6
+  init: 0,
+  start: 0,
+  processing: 1,
+  chunking: 2,
+  embedding: 3,
+  indexing: 4,
+  summarization: 5,
+  complete: 6,
+  finish: 6,
 };
 
 // Full stage data for modal display
@@ -189,12 +197,12 @@ interface DocumentStageData {
 interface DocumentProgress {
   id: string;
   name: string;
-  status: NodeStatus;  // Overall status: pending → active → completed/error
-  completedSteps: number;  // 0-6 index
-  totalSteps: number;  // Always 7
+  status: NodeStatus; // Overall status: pending → active → completed/error
+  completedSteps: number; // 0-6 index
+  totalSteps: number; // Always 7
   currentPhase: string;
   priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
-  stages: DocumentStageData[];  // Full stage data for modal
+  stages: DocumentStageData[]; // Full stage data for modal
 }
 
 interface DocumentProcessingState {
@@ -220,8 +228,8 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
     documents: new Map(),
     courseId: null,
 
-    setCourseId: (id) => {
-      set((state) => {
+    setCourseId: id => {
+      set(state => {
         if (state.courseId !== id) {
           state.courseId = id;
           state.documents = new Map();
@@ -229,7 +237,7 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
       });
     },
 
-    addTrace: (trace) => {
+    addTrace: trace => {
       if (trace.stage !== 'stage_2') return;
 
       const docId = extractDocumentId(trace);
@@ -239,7 +247,7 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
       const stepIndex = PHASE_TO_STEP_INDEX[phase] ?? -1;
       if (stepIndex === -1) return;
 
-      set((state) => {
+      set(state => {
         const existing = state.documents.get(docId);
         const docName = extractDocumentName(trace);
 
@@ -262,7 +270,7 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
           status: stepStatus,
           attempts: [attempt],
           inputData: trace.input_data,
-          outputData: trace.output_data
+          outputData: trace.output_data,
         };
 
         if (existing) {
@@ -302,7 +310,7 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
             totalSteps: TOTAL_STEPS,
             currentPhase: phase,
             priority: trace.input_data?.priority,
-            stages: [newStage]
+            stages: [newStage],
           };
           state.documents.set(docId, newDoc);
         }
@@ -311,12 +319,12 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
           docId: docId.substring(0, 8),
           phase,
           stepIndex,
-          stagesCount: state.documents.get(docId)?.stages.length
+          stagesCount: state.documents.get(docId)?.stages.length,
         });
       });
     },
 
-    loadFromTraces: (traces) => {
+    loadFromTraces: traces => {
       const stage2Traces = traces
         .filter(t => t.stage === 'stage_2')
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -325,7 +333,7 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
 
       logger.devLog('[DocumentStore] Loading', stage2Traces.length, 'traces');
 
-      set((state) => {
+      set(state => {
         state.documents = new Map();
 
         // Process each trace to build complete state
@@ -354,7 +362,7 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
             status: stepStatus,
             attempts: [attempt],
             inputData: trace.input_data,
-            outputData: trace.output_data
+            outputData: trace.output_data,
           };
 
           const existing = state.documents.get(docId);
@@ -388,7 +396,7 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
               totalSteps: TOTAL_STEPS,
               currentPhase: phase,
               priority: trace.input_data?.priority,
-              stages: [newStage]
+              stages: [newStage],
             });
           }
         }
@@ -398,26 +406,26 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
     },
 
     reset: () => {
-      set((state) => {
+      set(state => {
         state.documents = new Map();
         state.courseId = null;
       });
     },
 
     // Selectors - return stable references for useShallow
-    getProgress: (docId) => {
+    getProgress: docId => {
       const doc = get().documents.get(docId);
       return {
         completed: doc ? doc.completedSteps + 1 : 0,
-        total: TOTAL_STEPS
+        total: TOTAL_STEPS,
       };
     },
 
-    getDocument: (docId) => get().documents.get(docId),
+    getDocument: docId => get().documents.get(docId),
 
     getDocuments: () => Array.from(get().documents.values()),
 
-    getDocumentStatus: (docId) => {
+    getDocumentStatus: docId => {
       const doc = get().documents.get(docId);
       return doc?.status || 'pending';
     },
@@ -426,7 +434,7 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
       const { documents } = get();
       if (documents.size === 0) return false;
       return Array.from(documents.values()).every(doc => doc.status === 'completed');
-    }
+    },
   }))
 );
 
@@ -434,28 +442,37 @@ export const useDocumentProcessingStore = create<DocumentProcessingState>()(
 function extractDocumentId(trace: GenerationTrace): string | null {
   const inputData = trace.input_data;
   if (!inputData) return null;
-  return inputData.document_id || inputData.documentId || inputData.fileId || inputData.file_id || null;
+  return (
+    inputData.document_id || inputData.documentId || inputData.fileId || inputData.file_id || null
+  );
 }
 
 function extractDocumentName(trace: GenerationTrace): string | null {
   const inputData = trace.input_data;
   if (!inputData) return null;
-  return inputData.originalFilename || inputData.original_filename ||
-         inputData.originalName || inputData.original_name ||
-         inputData.file_name || inputData.filename || inputData.fileName || null;
+  return (
+    inputData.originalFilename ||
+    inputData.original_filename ||
+    inputData.originalName ||
+    inputData.original_name ||
+    inputData.file_name ||
+    inputData.filename ||
+    inputData.fileName ||
+    null
+  );
 }
 
 function translateStepName(phase: string): string {
   const translations: Record<string, string> = {
-    'init': 'Инициализация',
-    'start': 'Начало',
-    'processing': 'Обработка',
-    'chunking': 'Разбиение',
-    'embedding': 'Эмбеддинги',
-    'indexing': 'Индексация',
-    'summarization': 'Саммаризация',
-    'complete': 'Завершено',
-    'finish': 'Готово'
+    init: 'Инициализация',
+    start: 'Начало',
+    processing: 'Обработка',
+    chunking: 'Разбиение',
+    embedding: 'Эмбеддинги',
+    indexing: 'Индексация',
+    summarization: 'Саммаризация',
+    complete: 'Завершено',
+    finish: 'Готово',
   };
   return translations[phase] || phase;
 }
@@ -470,10 +487,10 @@ function traceToAttempt(trace: GenerationTrace, attemptNumber: number): TraceAtt
       model: trace.model_used || 'unknown',
       tokens: trace.tokens_used || 0,
       duration: trace.duration_ms || 0,
-      cost: trace.cost_usd || 0
+      cost: trace.cost_usd || 0,
     },
     status: trace.error_data ? 'failed' : 'success',
-    errorMessage: trace.error_data?.message
+    errorMessage: trace.error_data?.message,
   };
 }
 
@@ -514,7 +531,7 @@ const documents = useDocumentProcessingStore.getState().getDocuments();
 // Change condition from `documentSteps.size > 0` to `documents.length > 0`
 
 // Use documents directly instead of documentSteps.forEach
-documents.forEach((doc) => {
+documents.forEach(doc => {
   const docNodeId = `doc_${doc.id.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
 
   newNodes.push({
@@ -526,14 +543,14 @@ documents.forEach((doc) => {
       label: doc.name,
       filename: doc.name,
       documentId: doc.id,
-      status: doc.status,  // Now from Zustand
+      status: doc.status, // Now from Zustand
       stageNumber: 2,
       priority: doc.priority,
-      stages: doc.stages,  // Now from Zustand
+      stages: doc.stages, // Now from Zustand
       completedStages: doc.completedSteps + 1,
       totalStages: doc.totalSteps,
       // ... rest
-    }
+    },
   });
 });
 ```
@@ -548,9 +565,7 @@ const { completed, total } = useDocumentProcessingStore(
 );
 
 // Add status subscription for green highlighting
-const docStatus = useDocumentProcessingStore(
-  state => state.getDocumentStatus(data.documentId)
-);
+const docStatus = useDocumentProcessingStore(state => state.getDocumentStatus(data.documentId));
 
 // Use docStatus || data.status as fallback
 const currentStatus = docStatus || statusEntry?.status || data.status;
@@ -562,8 +577,8 @@ Modal should read stages from store:
 
 ```typescript
 // In modal, when selectedNode.type === 'document':
-const docData = useDocumentProcessingStore(
-  state => state.getDocument(selectedNode.data.documentId)
+const docData = useDocumentProcessingStore(state =>
+  state.getDocument(selectedNode.data.documentId)
 );
 
 // Use docData.stages instead of docNode.data.stages
@@ -573,6 +588,7 @@ const stages = docData?.stages || [];
 ### Phase 5: Remove Dead Code
 
 From `useGraphData.ts`, remove:
+
 - `documentSteps` useState
 - `setDocumentSteps` calls in processTraces
 - `DocumentWithSteps` interface (move to store if needed)
@@ -582,13 +598,13 @@ From `useGraphData.ts`, remove:
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `packages/web/stores/useDocumentProcessingStore.ts` | Rewrite with Immer, add stages |
-| `packages/web/components/generation-graph/hooks/useGraphData.ts` | Remove documentSteps, use store |
-| `packages/web/components/generation-graph/nodes/DocumentNode.tsx` | Add status from store |
-| `packages/web/components/generation-graph/panels/NodeDetailsModal/index.tsx` | Read stages from store |
-| `packages/web/package.json` | Ensure zustand/middleware/immer installed |
+| File                                                                         | Changes                                   |
+| ---------------------------------------------------------------------------- | ----------------------------------------- |
+| `packages/web/stores/useDocumentProcessingStore.ts`                          | Rewrite with Immer, add stages            |
+| `packages/web/components/generation-graph/hooks/useGraphData.ts`             | Remove documentSteps, use store           |
+| `packages/web/components/generation-graph/nodes/DocumentNode.tsx`            | Add status from store                     |
+| `packages/web/components/generation-graph/panels/NodeDetailsModal/index.tsx` | Read stages from store                    |
+| `packages/web/package.json`                                                  | Ensure zustand/middleware/immer installed |
 
 ## Acceptance Criteria
 
@@ -721,8 +737,8 @@ interface DocumentState {
   name: string;
   status: NodeStatus;
   priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
-  completedSteps: number;  // 0-6 index
-  totalSteps: number;      // Always 7
+  completedSteps: number; // 0-6 index
+  totalSteps: number; // Always 7
   currentPhase: string;
   stages: DocumentStageData[];
 }
@@ -832,7 +848,7 @@ export const useGenerationStore = create<GenerationState>()(
     // ========== INITIALIZATION ==========
 
     setCourseId: (id, hasDocuments) => {
-      set((state) => {
+      set(state => {
         state.courseId = id;
         state.hasDocuments = hasDocuments;
         state.stages = initializeStages(hasDocuments);
@@ -844,7 +860,7 @@ export const useGenerationStore = create<GenerationState>()(
     },
 
     reset: () => {
-      set((state) => {
+      set(state => {
         state.courseId = null;
         state.stages = new Map();
         state.documents = new Map();
@@ -858,8 +874,8 @@ export const useGenerationStore = create<GenerationState>()(
 
     // ========== TRACE PROCESSING ==========
 
-    addTrace: (trace) => {
-      set((state) => {
+    addTrace: trace => {
+      set(state => {
         const attempt = traceToAttempt(trace);
 
         switch (trace.stage) {
@@ -886,12 +902,12 @@ export const useGenerationStore = create<GenerationState>()(
       });
     },
 
-    loadFromTraces: (traces) => {
+    loadFromTraces: traces => {
       const sorted = [...traces].sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
 
-      set((state) => {
+      set(state => {
         // Reset parallel items
         state.documents = new Map();
         state.lessons = new Map();
@@ -921,8 +937,8 @@ export const useGenerationStore = create<GenerationState>()(
       });
     },
 
-    setModuleStructure: (modulesData) => {
-      set((state) => {
+    setModuleStructure: modulesData => {
+      set(state => {
         state.modules = new Map();
         state.lessons = new Map();
 
@@ -935,16 +951,16 @@ export const useGenerationStore = create<GenerationState>()(
             status: 'pending',
             totalLessons: mod.lessons?.length || 0,
             completedLessons: 0,
-            isCollapsed: modulesData.length > 5
+            isCollapsed: modulesData.length > 5,
           });
 
-          mod.lessons?.forEach((les) => {
+          mod.lessons?.forEach(les => {
             state.lessons.set(les.id, {
               id: les.id,
               moduleId,
               title: les.title,
               status: 'pending',
-              attempts: []
+              attempts: [],
             });
           });
         });
@@ -953,32 +969,32 @@ export const useGenerationStore = create<GenerationState>()(
 
     // ========== SELECTORS ==========
 
-    getStageStatus: (stageId) => {
+    getStageStatus: stageId => {
       return get().stages.get(stageId)?.status || 'pending';
     },
 
-    getStageAttempts: (stageId) => {
+    getStageAttempts: stageId => {
       return get().stages.get(stageId)?.attempts || [];
     },
 
-    isStageComplete: (stageId) => {
+    isStageComplete: stageId => {
       const stage = get().stages.get(stageId);
       return stage?.status === 'completed' || stage?.status === 'skipped';
     },
 
-    getDocument: (docId) => get().documents.get(docId),
+    getDocument: docId => get().documents.get(docId),
 
     getDocuments: () => Array.from(get().documents.values()),
 
-    getDocumentProgress: (docId) => {
+    getDocumentProgress: docId => {
       const doc = get().documents.get(docId);
       return {
         completed: doc ? doc.completedSteps + 1 : 0,
-        total: 7
+        total: 7,
       };
     },
 
-    getDocumentStatus: (docId) => {
+    getDocumentStatus: docId => {
       return get().documents.get(docId)?.status || 'pending';
     },
 
@@ -989,17 +1005,17 @@ export const useGenerationStore = create<GenerationState>()(
       return Array.from(documents.values()).every(d => d.status === 'completed');
     },
 
-    getModule: (moduleId) => get().modules.get(moduleId),
+    getModule: moduleId => get().modules.get(moduleId),
 
     getModules: () => Array.from(get().modules.values()),
 
-    getLesson: (lessonId) => get().lessons.get(lessonId),
+    getLesson: lessonId => get().lessons.get(lessonId),
 
-    getLessonsByModule: (moduleId) => {
+    getLessonsByModule: moduleId => {
       return Array.from(get().lessons.values()).filter(l => l.moduleId === moduleId);
     },
 
-    getLessonStatus: (lessonId) => {
+    getLessonStatus: lessonId => {
       return get().lessons.get(lessonId)?.status || 'pending';
     },
 
@@ -1038,7 +1054,7 @@ export const useGenerationStore = create<GenerationState>()(
       return Array.from(stages.values()).every(
         s => s.status === 'completed' || s.status === 'skipped'
       );
-    }
+    },
   }))
 );
 
@@ -1051,13 +1067,13 @@ function initializeStages(hasDocuments: boolean): Map<StageId, StageState> {
 
   const stageIds: StageId[] = ['stage_1', 'stage_2', 'stage_3', 'stage_4', 'stage_5', 'stage_6'];
 
-  stageIds.forEach((id) => {
+  stageIds.forEach(id => {
     const isSkipped = !hasDocuments && (id === 'stage_2' || id === 'stage_3');
 
     stages.set(id, {
       id,
       status: isSkipped ? 'skipped' : 'pending',
-      attempts: []
+      attempts: [],
     });
   });
 
@@ -1116,7 +1132,7 @@ function updateDocumentFromTrace(
     status: stepStatus,
     attempts: [attempt],
     inputData: trace.input_data,
-    outputData: trace.output_data
+    outputData: trace.output_data,
   };
 
   if (existing) {
@@ -1148,7 +1164,7 @@ function updateDocumentFromTrace(
       totalSteps: 7,
       currentPhase: phase,
       priority: trace.input_data?.priority,
-      stages: [newStage]
+      stages: [newStage],
     });
   }
 
@@ -1186,8 +1202,9 @@ function updateLessonFromTrace(
       // Update module progress
       const module = state.modules.get(existing.moduleId);
       if (module) {
-        const moduleLessons = Array.from(state.lessons.values())
-          .filter(l => l.moduleId === existing.moduleId);
+        const moduleLessons = Array.from(state.lessons.values()).filter(
+          l => l.moduleId === existing.moduleId
+        );
         module.completedLessons = moduleLessons.filter(l => l.status === 'completed').length;
 
         if (module.completedLessons === module.totalLessons) {
@@ -1237,48 +1254,55 @@ const USE_UNIFIED_STORE = process.env.NEXT_PUBLIC_USE_UNIFIED_STORE === 'true';
 
 ## Files to Create/Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| `packages/web/stores/useGenerationStore.ts` | CREATE | Unified Zustand store |
-| `packages/web/stores/useDocumentProcessingStore.ts` | DELETE | Remove partial store |
-| `packages/web/stores/useNodeSelection.ts` | KEEP | Already good |
-| `packages/web/components/generation-graph/hooks/useGraphData.ts` | MODIFY | Use store instead of local state |
-| `packages/web/components/generation-graph/nodes/DocumentNode.tsx` | MODIFY | Use unified store |
-| `packages/web/components/generation-graph/nodes/LessonNode.tsx` | MODIFY | Use unified store |
-| `packages/web/components/generation-graph/nodes/StageNode.tsx` | MODIFY | Use unified store |
-| `packages/web/components/generation-graph/panels/NodeDetailsModal/` | MODIFY | Use unified store |
-| `packages/web/components/generation-monitoring/realtime-provider.tsx` | MODIFY | Feed traces to unified store |
+| File                                                                  | Action | Description                      |
+| --------------------------------------------------------------------- | ------ | -------------------------------- |
+| `packages/web/stores/useGenerationStore.ts`                           | CREATE | Unified Zustand store            |
+| `packages/web/stores/useDocumentProcessingStore.ts`                   | DELETE | Remove partial store             |
+| `packages/web/stores/useNodeSelection.ts`                             | KEEP   | Already good                     |
+| `packages/web/components/generation-graph/hooks/useGraphData.ts`      | MODIFY | Use store instead of local state |
+| `packages/web/components/generation-graph/nodes/DocumentNode.tsx`     | MODIFY | Use unified store                |
+| `packages/web/components/generation-graph/nodes/LessonNode.tsx`       | MODIFY | Use unified store                |
+| `packages/web/components/generation-graph/nodes/StageNode.tsx`        | MODIFY | Use unified store                |
+| `packages/web/components/generation-graph/panels/NodeDetailsModal/`   | MODIFY | Use unified store                |
+| `packages/web/components/generation-monitoring/realtime-provider.tsx` | MODIFY | Feed traces to unified store     |
 
 ## Extended Acceptance Criteria
 
 ### Stage 1 (Upload)
+
 - [ ] Status updates to active when processing
 - [ ] Status updates to completed when done
 
 ### Stage 2 (Documents)
+
 - [ ] Each document shows correct progress (1/7 → 7/7)
 - [ ] Document turns green when complete
 - [ ] Modal shows all stages
 - [ ] Stage 2 completes when ALL documents done
 
 ### Stage 3 (Classification)
+
 - [ ] Status updates correctly
 - [ ] Awaiting approval state works
 
 ### Stage 4 (Analysis)
+
 - [ ] Status updates correctly
 
 ### Stage 5 (Structure)
+
 - [ ] Status updates correctly
 - [ ] Module structure populates Stage 6
 
 ### Stage 6 (Generation)
+
 - [ ] Modules/lessons created from Stage 5 output
 - [ ] Each lesson shows progress
 - [ ] Module progress tracks lesson completion
 - [ ] Stage 6 completes when ALL lessons done
 
 ### Cross-cutting
+
 - [ ] Page refresh preserves all state
 - [ ] No React batching issues
 - [ ] TypeScript compiles

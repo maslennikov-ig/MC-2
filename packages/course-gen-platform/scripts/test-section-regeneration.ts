@@ -88,7 +88,9 @@ function testParsing() {
   console.log('\nSections found:');
 
   for (const section of parsed.sections) {
-    console.log(`  - [${section.id}] "${section.title}" (lines ${section.startLine}-${section.endLine})`);
+    console.log(
+      `  - [${section.id}] "${section.title}" (lines ${section.startLine}-${section.endLine})`
+    );
     console.log(`    Content preview: "${section.content.slice(0, 50)}..."`);
   }
 
@@ -104,7 +106,9 @@ function testParsing() {
   const expectedIds = ['introduction', 'section_1', 'section_2', 'summary'];
   for (let i = 0; i < expectedIds.length; i++) {
     if (parsed.sections[i].id !== expectedIds[i]) {
-      throw new Error(`Expected section ${i} to be "${expectedIds[i]}", got "${parsed.sections[i].id}"`);
+      throw new Error(
+        `Expected section ${i} to be "${expectedIds[i]}", got "${parsed.sections[i].id}"`
+      );
     }
   }
 
@@ -146,7 +150,10 @@ function testContextExtraction() {
 
   // Test context for introduction (includes title line before it)
   const introContext = getSectionContext(parsed, 'introduction');
-  console.log('Context for introduction:', introContext ? `"${introContext.slice(0, 50)}..."` : '(empty)');
+  console.log(
+    'Context for introduction:',
+    introContext ? `"${introContext.slice(0, 50)}..."` : '(empty)'
+  );
 
   // Introduction has the title as context (line 0 is "# TypeScript Fundamentals")
   if (!introContext.includes('TypeScript Fundamentals')) {
@@ -155,7 +162,10 @@ function testContextExtraction() {
 
   // Test context for section_1 (should include title + intro)
   const sec1Context = getSectionContext(parsed, 'section_1');
-  console.log('Context for section_1:', sec1Context ? `"${sec1Context.slice(0, 80)}..."` : '(empty)');
+  console.log(
+    'Context for section_1:',
+    sec1Context ? `"${sec1Context.slice(0, 80)}..."` : '(empty)'
+  );
 
   if (!sec1Context.includes('TypeScript Fundamentals')) {
     throw new Error('Expected context for section_1 to include lesson title');
@@ -163,7 +173,10 @@ function testContextExtraction() {
 
   // Test context for summary (should include previous sections)
   const summaryContext = getSectionContext(parsed, 'summary');
-  console.log('Context for summary:', summaryContext ? `"${summaryContext.slice(0, 80)}..."` : '(empty)');
+  console.log(
+    'Context for summary:',
+    summaryContext ? `"${summaryContext.slice(0, 80)}..."` : '(empty)'
+  );
 
   if (!summaryContext.includes('Working with Interfaces')) {
     throw new Error('Expected context for summary to include previous section');
@@ -308,7 +321,6 @@ async function main() {
     console.log('  1. Integrate with orchestrator to call regenerateSections()');
     console.log('  2. Add UI support for showing regenerated sections');
     console.log('  3. Test with real LLM calls in staging environment');
-
   } catch (error) {
     console.error('\n❌ Test failed:', error);
     process.exit(1);

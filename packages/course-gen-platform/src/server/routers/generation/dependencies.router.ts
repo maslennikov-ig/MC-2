@@ -15,6 +15,9 @@ import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
 import type { CourseStructure } from '@megacampus/shared-types';
+import { JobType } from '@megacampus/shared-types';
+import type { JobData } from '@megacampus/shared-types';
+import { addJob } from '../../../orchestrator/queue';
 import {
   buildDependencyGraph,
   getUpstream,
@@ -35,10 +38,12 @@ export const dependenciesRouter = router({
    * @authorization instructor (read-only, ownership check)
    */
   getBlockDependencies: instructorProcedure
-    .input(z.object({
-      courseId: z.string().uuid(),
-      blockPath: z.string(),
-    }))
+    .input(
+      z.object({
+        courseId: z.string().uuid(),
+        blockPath: z.string(),
+      })
+    )
     .query(async ({ ctx, input }) => {
       const { courseId, blockPath } = input;
       const supabase = getSupabaseAdmin();
@@ -62,7 +67,10 @@ export const dependenciesRouter = router({
           .single();
 
         if (courseError || !course) {
-          logger.warn({ userId, courseId, error: courseError }, 'Course not found in getBlockDependencies');
+          logger.warn(
+            { userId, courseId, error: courseError },
+            'Course not found in getBlockDependencies'
+          );
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Course not found',
@@ -71,11 +79,14 @@ export const dependenciesRouter = router({
 
         // Step 2: Verify course ownership
         if (course.user_id !== userId) {
-          logger.warn({
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation in getBlockDependencies');
+          logger.warn(
+            {
+              userId,
+              courseId,
+              courseOwnerId: course.user_id,
+            },
+            'Course ownership violation in getBlockDependencies'
+          );
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'You do not have access to this course',
@@ -99,12 +110,15 @@ export const dependenciesRouter = router({
         try {
           nodeId = blockPathToNodeId(blockPath);
         } catch (error) {
-          logger.warn({
-            userId,
-            courseId,
-            blockPath,
-            error: error instanceof Error ? error.message : String(error),
-          }, 'Invalid blockPath in getBlockDependencies');
+          logger.warn(
+            {
+              userId,
+              courseId,
+              blockPath,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Invalid blockPath in getBlockDependencies'
+          );
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: `Invalid blockPath: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -118,14 +132,17 @@ export const dependenciesRouter = router({
         const upstream = getUpstream(graph, nodeId);
         const downstream = getDownstream(graph, nodeId);
 
-        logger.info({
-          userId,
-          courseId,
-          blockPath,
-          nodeId,
-          upstreamCount: upstream.length,
-          downstreamCount: downstream.length,
-        }, 'GetBlockDependencies: Retrieved successfully');
+        logger.info(
+          {
+            userId,
+            courseId,
+            blockPath,
+            nodeId,
+            upstreamCount: upstream.length,
+            downstreamCount: downstream.length,
+          },
+          'GetBlockDependencies: Retrieved successfully'
+        );
 
         // Step 8: Return formatted result
         return {
@@ -138,12 +155,15 @@ export const dependenciesRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          userId,
-          courseId,
-          blockPath,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in getBlockDependencies');
+        logger.error(
+          {
+            userId,
+            courseId,
+            blockPath,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in getBlockDependencies'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -186,12 +206,14 @@ export const dependenciesRouter = router({
    * @authorization instructor
    */
   cascadeUpdate: instructorProcedure
-    .input(z.object({
-      courseId: z.string().uuid(),
-      changedPath: z.string(),
-      newValue: z.unknown(),
-      action: z.enum(['mark_stale', 'auto_regenerate', 'review_each']),
-    }))
+    .input(
+      z.object({
+        courseId: z.string().uuid(),
+        changedPath: z.string(),
+        newValue: z.unknown(),
+        action: z.enum(['mark_stale', 'auto_regenerate', 'review_each']),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const { courseId, changedPath, newValue, action } = input;
       const supabase = getSupabaseAdmin();
@@ -215,7 +237,10 @@ export const dependenciesRouter = router({
           .single();
 
         if (courseError || !course) {
-          logger.warn({ userId, courseId, error: courseError }, 'Course not found in cascadeUpdate');
+          logger.warn(
+            { userId, courseId, error: courseError },
+            'Course not found in cascadeUpdate'
+          );
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Course not found',
@@ -223,11 +248,14 @@ export const dependenciesRouter = router({
         }
 
         if (course.user_id !== userId) {
-          logger.warn({
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation in cascadeUpdate');
+          logger.warn(
+            {
+              userId,
+              courseId,
+              courseOwnerId: course.user_id,
+            },
+            'Course ownership violation in cascadeUpdate'
+          );
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'You do not have access to this course',
@@ -251,24 +279,39 @@ export const dependenciesRouter = router({
         const downstream = getDownstream(graph, nodeId);
         const affectedPaths = downstream.map(d => d.id);
 
-        logger.info({
-          userId,
-          courseId,
-          changedPath,
-          action,
-          affectedCount: affectedPaths.length,
-        }, 'CascadeUpdate: Processing dependency changes');
+        // Guard: limit cascade jobs per request to prevent cost explosion
+        const MAX_CASCADE_JOBS_PER_REQUEST = 20;
+        if (action === 'auto_regenerate' && affectedPaths.length > MAX_CASCADE_JOBS_PER_REQUEST) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Too many affected paths (${affectedPaths.length}). Maximum ${MAX_CASCADE_JOBS_PER_REQUEST} per request. Use 'review_each' to select specific paths.`,
+          });
+        }
+
+        logger.info(
+          {
+            userId,
+            courseId,
+            changedPath,
+            action,
+            affectedCount: affectedPaths.length,
+          },
+          'CascadeUpdate: Processing dependency changes'
+        );
 
         // Step 4: Apply field update
         try {
           applyFieldUpdate(courseStructure, changedPath, newValue);
         } catch (error) {
-          logger.error({
-            userId,
-            courseId,
-            changedPath,
-            error: error instanceof Error ? error.message : String(error),
-          }, 'Failed to apply field update in cascadeUpdate');
+          logger.error(
+            {
+              userId,
+              courseId,
+              changedPath,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Failed to apply field update in cascadeUpdate'
+          );
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: `Failed to update field: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -281,44 +324,58 @@ export const dependenciesRouter = router({
         if (action === 'mark_stale') {
           // Mark all affected elements as stale
           // Note: This is a conceptual flag - implement actual stale marking if needed
-          logger.info({
-            userId,
-            courseId,
-            affectedPaths,
-          }, 'CascadeUpdate: Marked elements as stale');
+          logger.info(
+            {
+              userId,
+              courseId,
+              affectedPaths,
+            },
+            'CascadeUpdate: Marked elements as stale'
+          );
         } else if (action === 'auto_regenerate') {
-          // Queue regeneration jobs for all affected elements
+          // Queue regeneration jobs for all affected downstream elements
           regenerationJobId = nanoid();
 
-          logger.info({
-            userId,
-            courseId,
-            regenerationJobId,
-            affectedCount: affectedPaths.length,
-          }, 'CascadeUpdate: Queuing regeneration jobs (not yet implemented)');
+          for (const path of affectedPaths) {
+            await addJob(
+              JobType.BLOCK_REGENERATION,
+              {
+                organizationId: course.organization_id,
+                courseId,
+                userId,
+                jobType: JobType.BLOCK_REGENERATION,
+                createdAt: new Date().toISOString(),
+                blockPath: path,
+                parentJobId: regenerationJobId,
+                instruction: 'Update to align with parent changes',
+                stageId: 'stage_5',
+              } as unknown as JobData,
+              {
+                priority: 5,
+                jobId: `cascade-${courseId}-${path.replace(/[[\].]/g, '-')}`,
+              }
+            );
+          }
 
-          // TODO: Implement BullMQ job queuing when regeneration job type is available
-          // For now, we just log the intention and return the job ID
-          // Example implementation:
-          // for (const path of affectedPaths) {
-          //   await addJob(JobType.REGENERATE_BLOCK, {
-          //     organizationId: course.organization_id,
-          //     courseId,
-          //     userId,
-          //     jobType: JobType.REGENERATE_BLOCK,
-          //     createdAt: new Date().toISOString(),
-          //     blockPath: path,
-          //     parentJobId: regenerationJobId,
-          //     instruction: 'Update to align with parent changes',
-          //   });
-          // }
+          logger.info(
+            {
+              userId,
+              courseId,
+              regenerationJobId,
+              affectedCount: affectedPaths.length,
+            },
+            'CascadeUpdate: Queued block regeneration jobs'
+          );
         } else if (action === 'review_each') {
           // Just return affected paths for client-side handling
-          logger.info({
-            userId,
-            courseId,
-            affectedPaths,
-          }, 'CascadeUpdate: Returning affected paths for review');
+          logger.info(
+            {
+              userId,
+              courseId,
+              affectedPaths,
+            },
+            'CascadeUpdate: Returning affected paths for review'
+          );
         }
 
         // Step 6: Update course structure in database
@@ -331,25 +388,31 @@ export const dependenciesRouter = router({
           .eq('id', courseId);
 
         if (updateError) {
-          logger.error({
-            userId,
-            courseId,
-            error: updateError,
-          }, 'Failed to update course structure in cascadeUpdate');
+          logger.error(
+            {
+              userId,
+              courseId,
+              error: updateError,
+            },
+            'Failed to update course structure in cascadeUpdate'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to save changes',
           });
         }
 
-        logger.info({
-          userId,
-          courseId,
-          changedPath,
-          action,
-          affectedCount: affectedPaths.length,
-          regenerationJobId,
-        }, 'CascadeUpdate: Completed successfully');
+        logger.info(
+          {
+            userId,
+            courseId,
+            changedPath,
+            action,
+            affectedCount: affectedPaths.length,
+            regenerationJobId,
+          },
+          'CascadeUpdate: Completed successfully'
+        );
 
         // Step 7: Return response
         return {
@@ -361,12 +424,15 @@ export const dependenciesRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          userId,
-          courseId,
-          changedPath,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in cascadeUpdate');
+        logger.error(
+          {
+            userId,
+            courseId,
+            changedPath,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in cascadeUpdate'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

@@ -11,6 +11,7 @@
 ## Executive Summary
 
 Текущая система обрабатывает все документы единообразно с фиксированным лимитом 200K токенов, что неоптимально:
+
 - ❌ Все документы получают одинаковый объём контекста независимо от важности
 - ❌ Ключевые документы (сборники лекций) конкурируют за токены со справочными (законы, ГОСТы)
 - ❌ Нет автоматического переключения на более мощную модель при необходимости
@@ -39,6 +40,7 @@ for (const doc of documents) {
 ```
 
 **Проблемы**:
+
 1. ❌ **Сборник лекций** (100K токенов, HIGH priority) → summary теряет детали
 2. ❌ **Федеральный закон** (150K токенов, LOW priority) → конкурирует за бюджет
 3. ❌ **Нет приоритизации**: обработка в случайном порядке (как вернула БД)
@@ -48,16 +50,19 @@ for (const doc of documents) {
 ### Пример из тестов (T055)
 
 **3 документа загружены**:
+
 1. **Презентация и обучение.txt** (71KB, ~18K токенов) — **самый важный** для курса
 2. Письмо Минфина России.pdf (636KB, ~159K токенов) — справочный материал
 3. Постановление Правительства РФ.txt (281KB, ~70K токенов) — нормативная база
 
 **Текущая обработка**:
+
 - Все 3 получили summary (превысили 200K общий лимит)
 - **"Презентация и обучение"** должна была сохраниться целиком, но summary из-за общего лимита
 - Обработаны в произвольном порядке (не по важности)
 
 **Желаемая обработка**:
+
 - **"Презентация и обучение"** → HIGH priority, order=1, full text (18K)
 - **Письмо Минфина** → LOW priority, order=2, summary (159K → 5K summary)
 - **Постановление** → LOW priority, order=3, summary (70K → 3K summary)
@@ -74,6 +79,7 @@ for (const doc of documents) {
 **Критерий**: Документ должен быть использован в курсе **полностью или почти полностью**
 
 **Примеры**:
+
 - ✅ Сборник лекций
 - ✅ Учебник или учебное пособие
 - ✅ Методические материалы
@@ -81,6 +87,7 @@ for (const doc of documents) {
 - ✅ Авторские презентации преподавателя
 
 **Характеристики**:
+
 - LLM-определение: `importance_score >= 0.7` + категория "course_core"
 - Лимит на 1 документ: **до 50,000 токенов**
 - Если >50K → summary (Map-Reduce)
@@ -91,6 +98,7 @@ for (const doc of documents) {
 **Критерий**: Всё остальное — контекстная и справочная информация
 
 **Примеры**:
+
 - ✅ Федеральные законы, ГОСТы, СНиПы
 - ✅ Постановления, регламенты
 - ✅ Научные статьи (не являющиеся основой курса)
@@ -98,6 +106,7 @@ for (const doc of documents) {
 - ✅ Справочные материалы
 
 **Характеристики**:
+
 - LLM-определение: `importance_score < 0.7` OR категория "reference"
 - **ВСЕГДА summary** (независимо от размера)
 - **Исключение**: документы <3,000 токенов могут быть сохранены целиком (если есть бюджет)
@@ -110,6 +119,7 @@ for (const doc of documents) {
 #### Порог переключения: 80,000 токенов
 
 **Логика**:
+
 ```
 IF (HIGH_priority_total ≤ 80,000 tokens):
   Model: OSS 20B/120B (128K context, дешёвая)
@@ -188,6 +198,7 @@ interface DocumentWithPriority {
 ```
 
 **Пример**:
+
 ```
 10 документов загружено
 
@@ -243,8 +254,8 @@ async function processDocument(doc: UploadedFile) {
       filename: doc.filename,
       priority: priority,
       order: order,
-      importance_score: score
-    }
+      importance_score: score,
+    },
   });
 
   // 4. Сохранить в БД
@@ -253,18 +264,20 @@ async function processDocument(doc: UploadedFile) {
     analyze_content: analyzeContent, // full или summary для Analyze
     vectors: vectors, // из оригинала для RAG
     priority: priority,
-    order: order
+    order: order,
   });
 }
 ```
 
 **Зачем**:
+
 - ✅ Analyze Stage использует summary (экономия токенов, суть документа)
 - ✅ Generation/Lesson Stage использует RAG → получает chunks из **оригинала** (детали)
 - ✅ Summary = "оглавление" (что есть в документе)
 - ✅ Vectors = "детальный контент" (конкретные параграфы, цитаты, примеры)
 
 **Пример**:
+
 ```
 Федеральный закон об образовании (150K токенов):
 → Analyze content: 5K summary ("закон регулирует A, B, C...")
@@ -291,17 +304,14 @@ interface AnalyzeModelConfig {
   triggerCondition: string;
 }
 
-function selectAnalyzeModel(
-  highPriorityTokens: number
-): AnalyzeModelConfig {
-
+function selectAnalyzeModel(highPriorityTokens: number): AnalyzeModelConfig {
   if (highPriorityTokens <= 80000) {
     return {
       model: 'openai/gpt-oss-120b',
       contextWindow: 128000,
       budgetLimit: 80000,
-      costPer1M: 0.20, // $0.20/1M tokens
-      triggerCondition: 'HIGH ≤ 80K (fits in OSS 120B context)'
+      costPer1M: 0.2, // $0.20/1M tokens
+      triggerCondition: 'HIGH ≤ 80K (fits in OSS 120B context)',
     };
   } else {
     // Превысили 80K → нужна модель с большим context
@@ -310,7 +320,7 @@ function selectAnalyzeModel(
       contextWindow: 1000000,
       budgetLimit: 400000,
       costPer1M: 0.15, // $0.15/1M tokens (Gemini дешевле!)
-      triggerCondition: 'HIGH > 80K (requires 1M context model)'
+      triggerCondition: 'HIGH > 80K (requires 1M context model)',
     };
 
     // Альтернатива: Claude Sonnet (200K context, $3/1M)
@@ -326,6 +336,7 @@ function selectAnalyzeModel(
 ```
 
 **Преимущества автовыбора**:
+
 - ✅ **Экономия**: Используем дешёвую модель когда можем (90%+ курсов ≤80K)
 - ✅ **Качество**: Автоматически переключаемся на мощную модель при необходимости
 - ✅ **Масштабируемость**: Gemini 1M context позволяет обработать до 8 больших HIGH документов (8 × 50K = 400K)
@@ -340,6 +351,7 @@ function selectAnalyzeModel(
 **Цель**: Определить priority (HIGH/LOW) и order (1-N) для всех документов
 
 **Файлы**:
+
 - `packages/course-gen-platform/src/services/stage3/document-classifier.ts` (NEW)
 
 **Логика**:
@@ -349,19 +361,21 @@ import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
 
 const DocumentClassificationSchema = z.object({
-  documents: z.array(z.object({
-    file_id: z.string().uuid(),
-    priority: z.enum(['HIGH', 'LOW']),
-    order: z.number().int().positive(),
-    importance_score: z.number().min(0).max(1),
-    category: z.enum([
-      'course_core', // Основной материал курса
-      'supplementary', // Дополнительный материал
-      'reference', // Справочная информация
-      'regulatory' // Нормативные документы
-    ]),
-    reasoning: z.string().min(10).max(500)
-  }))
+  documents: z.array(
+    z.object({
+      file_id: z.string().uuid(),
+      priority: z.enum(['HIGH', 'LOW']),
+      order: z.number().int().positive(),
+      importance_score: z.number().min(0).max(1),
+      category: z.enum([
+        'course_core', // Основной материал курса
+        'supplementary', // Дополнительный материал
+        'reference', // Справочная информация
+        'regulatory', // Нормативные документы
+      ]),
+      reasoning: z.string().min(10).max(500),
+    })
+  ),
 });
 
 export class DocumentClassifier {
@@ -370,7 +384,7 @@ export class DocumentClassifier {
   constructor() {
     this.llm = new ChatOpenAI({
       model: 'openai/gpt-oss-20b', // лёгкая модель для классификации
-      temperature: 0.3 // низкая температура для стабильности
+      temperature: 0.3, // низкая температура для стабильности
     });
   }
 
@@ -378,15 +392,14 @@ export class DocumentClassifier {
     files: UploadedFile[],
     courseContext: { title: string; topic?: string }
   ): Promise<DocumentClassification[]> {
-
     // Получить preview каждого документа (первые 1000 символов)
     const filePreviews = await Promise.all(
-      files.map(async (file) => ({
+      files.map(async file => ({
         file_id: file.id,
         filename: file.filename,
         file_size: file.file_size,
         token_count: file.token_count,
-        preview: await this.getDocumentPreview(file, 1000)
+        preview: await this.getDocumentPreview(file, 1000),
       }))
     );
 
@@ -414,12 +427,16 @@ ${courseContext.topic ? `Описание: ${courseContext.topic}` : ''}
 - Category: reference или regulatory
 
 ДОКУМЕНТЫ:
-${filePreviews.map((f, idx) => `
+${filePreviews
+  .map(
+    (f, idx) => `
 ${idx + 1}. Файл: ${f.filename}
    Размер: ${f.file_size} bytes (~${f.token_count} tokens)
    Preview:
    ${f.preview}
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 ВЕРНИ JSON:
 {
@@ -443,17 +460,12 @@ ${idx + 1}. Файл: ${f.filename}
 `;
 
     const response = await this.llm.invoke(prompt);
-    const parsed = DocumentClassificationSchema.parse(
-      JSON.parse(response.content)
-    );
+    const parsed = DocumentClassificationSchema.parse(JSON.parse(response.content));
 
     return parsed.documents;
   }
 
-  private async getDocumentPreview(
-    file: UploadedFile,
-    maxChars: number
-  ): Promise<string> {
+  private async getDocumentPreview(file: UploadedFile, maxChars: number): Promise<string> {
     // Читаем первые N символов из файла
     const fullText = await readFileFromStorage(file.storage_path);
     return fullText.substring(0, maxChars);
@@ -468,14 +480,21 @@ function heuristicClassification(
   files: UploadedFile[],
   courseContext: { title: string; topic?: string }
 ): DocumentClassification[] {
-
   const scored = files.map(file => {
     let score = 0.5; // базовый балл
 
     // Эвристика 1: Ключевые слова в названии (HIGH priority)
     const highKeywords = [
-      'лекци', 'учебник', 'пособие', 'программа', 'курс',
-      'lecture', 'textbook', 'syllabus', 'curriculum', 'manual'
+      'лекци',
+      'учебник',
+      'пособие',
+      'программа',
+      'курс',
+      'lecture',
+      'textbook',
+      'syllabus',
+      'curriculum',
+      'manual',
     ];
     if (highKeywords.some(kw => file.filename.toLowerCase().includes(kw))) {
       score += 0.3;
@@ -483,8 +502,15 @@ function heuristicClassification(
 
     // Эвристика 2: Справочные документы (LOW priority)
     const lowKeywords = [
-      'закон', 'гост', 'снип', 'постановление', 'регламент',
-      'law', 'standard', 'regulation', 'decree'
+      'закон',
+      'гост',
+      'снип',
+      'постановление',
+      'регламент',
+      'law',
+      'standard',
+      'regulation',
+      'decree',
     ];
     if (lowKeywords.some(kw => file.filename.toLowerCase().includes(kw))) {
       score -= 0.3;
@@ -508,7 +534,7 @@ function heuristicClassification(
       order: 0, // будет установлен после сортировки
       importance_score: Math.min(1.0, Math.max(0.0, score)),
       category: score >= 0.7 ? 'course_core' : 'reference',
-      reasoning: 'Эвристическая оценка (LLM недоступен)'
+      reasoning: 'Эвристическая оценка (LLM недоступен)',
     };
   });
 
@@ -526,6 +552,7 @@ function heuristicClassification(
 **Цель**: Распределить токен-бюджет между HIGH и LOW на основе порога 80K
 
 **Файлы**:
+
 - `packages/course-gen-platform/src/services/stage3/budget-allocator.ts` (NEW)
 
 **Логика**:
@@ -539,12 +566,10 @@ interface BudgetAllocation {
 }
 
 export class BudgetAllocator {
-
   allocateBudget(
     highPriorityDocs: DocumentWithPriority[],
     lowPriorityDocs: DocumentWithPriority[]
   ): BudgetAllocation {
-
     // Посчитать сколько токенов займут HIGH документы (full text)
     const highTokensTotal = highPriorityDocs.reduce((sum, doc) => {
       const docTokens = Math.min(doc.token_count, 50000); // cap at 50K
@@ -561,7 +586,7 @@ export class BudgetAllocator {
         highBudget: 80000,
         lowBudget: 80000 - highTokensTotal,
         analyzeModel: analyzeModel,
-        totalBudget: 80000
+        totalBudget: 80000,
       };
     } else {
       // Сценарий B: Тяжёлый курс
@@ -569,7 +594,7 @@ export class BudgetAllocator {
         highBudget: 400000,
         lowBudget: 400000 - highTokensTotal,
         analyzeModel: analyzeModel,
-        totalBudget: 400000
+        totalBudget: 400000,
       };
     }
   }
@@ -579,7 +604,6 @@ export class BudgetAllocator {
     lowDocs: DocumentWithPriority[],
     availableBudget: number
   ): { fullText: string[]; summary: string[] } {
-
     const fullTextIds: string[] = [];
     const summaryIds: string[] = [];
     let budgetUsed = 0;
@@ -608,6 +632,7 @@ export class BudgetAllocator {
 ### Phase 3: Integration into Document Processing Pipeline
 
 **Файлы**:
+
 - `packages/course-gen-platform/src/workers/document-processing.ts` (MODIFY)
 - `packages/course-gen-platform/src/orchestrator/generation.ts` (MODIFY)
 
@@ -617,13 +642,12 @@ export class BudgetAllocator {
 // generation.ts - создание job'ов для обработки документов
 
 if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles?.length > 0) {
-
   // ШАГ 1: Классифицировать документы через LLM
   const classifier = new DocumentClassifier();
-  const classifications = await classifier.classifyDocuments(
-    uploadedFiles,
-    { title: course.course_title, topic: course.settings?.topic }
-  );
+  const classifications = await classifier.classifyDocuments(uploadedFiles, {
+    title: course.course_title,
+    topic: course.settings?.topic,
+  });
 
   // ШАГ 2: Разделить на HIGH и LOW
   const highPriorityDocs = classifications.filter(c => c.priority === 'HIGH');
@@ -636,13 +660,13 @@ if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles?.length > 0) {
       ...uploadedFiles.find(f => f.id === c.file_id)!,
       priority: c.priority,
       order: c.order,
-      importance_score: c.importance_score
+      importance_score: c.importance_score,
     })),
     lowPriorityDocs.map(c => ({
       ...uploadedFiles.find(f => f.id === c.file_id)!,
       priority: c.priority,
       order: c.order,
-      importance_score: c.importance_score
+      importance_score: c.importance_score,
     }))
   );
 
@@ -651,21 +675,24 @@ if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles?.length > 0) {
     lowPriorityDocs.map(c => ({
       ...uploadedFiles.find(f => f.id === c.file_id)!,
       priority: c.priority,
-      order: c.order
+      order: c.order,
     })),
     budget.lowBudget
   );
 
   // ШАГ 5: Логировать решения
-  logger.info({
-    totalDocs: uploadedFiles.length,
-    highPriorityCount: highPriorityDocs.length,
-    lowPriorityCount: lowPriorityDocs.length,
-    highBudget: budget.highBudget,
-    lowBudget: budget.lowBudget,
-    analyzeModel: budget.analyzeModel.model,
-    lowFullTextCount: lowFullTextDecision.fullText.length
-  }, 'Document budget allocation completed');
+  logger.info(
+    {
+      totalDocs: uploadedFiles.length,
+      highPriorityCount: highPriorityDocs.length,
+      lowPriorityCount: lowPriorityDocs.length,
+      highBudget: budget.highBudget,
+      lowBudget: budget.lowBudget,
+      analyzeModel: budget.analyzeModel.model,
+      lowFullTextCount: lowFullTextDecision.fullText.length,
+    },
+    'Document budget allocation completed'
+  );
 
   // ШАГ 6: Создать job'ы в правильном порядке (order 1-N)
   const sortedClassifications = classifications.sort((a, b) => a.order - b.order);
@@ -700,30 +727,30 @@ if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles?.length > 0) {
       budget_allocation: {
         high_budget: budget.highBudget,
         low_budget: budget.lowBudget,
-        analyze_model: budget.analyzeModel.model
-      }
+        analyze_model: budget.analyzeModel.model,
+      },
     };
 
     // Варьировать priority в BullMQ на основе order
-    const queuePriority = calculateQueuePriority(
-      TIER_PRIORITY[tier],
-      classification.order
-    );
+    const queuePriority = calculateQueuePriority(TIER_PRIORITY[tier], classification.order);
 
     const job = await addJob(JobType.DOCUMENT_PROCESSING, jobData, {
-      priority: queuePriority
+      priority: queuePriority,
     });
 
     jobIds.push(job.id as string);
 
-    logger.info({
-      fileId: file.id,
-      filename: file.filename,
-      priority: classification.priority,
-      order: classification.order,
-      processingMode: processingMode,
-      queuePriority: queuePriority
-    }, 'Document processing job created');
+    logger.info(
+      {
+        fileId: file.id,
+        filename: file.filename,
+        priority: classification.priority,
+        order: classification.order,
+        processingMode: processingMode,
+        queuePriority: queuePriority,
+      },
+      'Document processing job created'
+    );
   }
 
   // ШАГ 7: Сохранить metadata о выборе модели для Analyze Stage
@@ -737,10 +764,10 @@ if (jobType === JobType.DOCUMENT_PROCESSING && uploadedFiles?.length > 0) {
         document_classification: {
           high_count: highPriorityDocs.length,
           low_count: lowPriorityDocs.length,
-          total_budget: budget.totalBudget
-        }
-      }
-    }
+          total_budget: budget.totalBudget,
+        },
+      },
+    },
   });
 }
 ```
@@ -772,6 +799,7 @@ function calculateQueuePriority(
 ### Phase 4: Vectorization from Original Text
 
 **Файлы**:
+
 - `packages/course-gen-platform/src/workers/document-processing.ts` (MODIFY)
 
 **Изменения**:
@@ -786,13 +814,16 @@ async function processDocument(job: Job<DocumentProcessingJobData>) {
   const fullText = await readDocumentFromStorage(file_id);
   const tokenCount = estimateTokens(fullText);
 
-  logger.info({
-    fileId: file_id,
-    priority: priority,
-    order: order,
-    tokenCount: tokenCount,
-    processingMode: processing_mode
-  }, 'Processing document');
+  logger.info(
+    {
+      fileId: file_id,
+      priority: priority,
+      order: order,
+      tokenCount: tokenCount,
+      processingMode: processing_mode,
+    },
+    'Processing document'
+  );
 
   // 2. Определяем что сохранить для Analyze context
   let analyzeContent: string;
@@ -804,13 +835,16 @@ async function processDocument(job: Job<DocumentProcessingJobData>) {
     // Создать summary (Map-Reduce)
     analyzeContent = await createDocumentSummary(fullText, {
       strategy: 'map-reduce',
-      targetTokens: tokenCount > 100000 ? 10000 : 5000
+      targetTokens: tokenCount > 100000 ? 10000 : 5000,
     });
-    logger.info({
-      fileId: file_id,
-      originalTokens: tokenCount,
-      summaryTokens: estimateTokens(analyzeContent)
-    }, 'Created summary for Analyze');
+    logger.info(
+      {
+        fileId: file_id,
+        originalTokens: tokenCount,
+        summaryTokens: estimateTokens(analyzeContent),
+      },
+      'Created summary for Analyze'
+    );
   }
 
   // 3. ВЕКТОРИЗАЦИЯ ВСЕГДА ИЗ ОРИГИНАЛА (не summary!)
@@ -821,7 +855,7 @@ async function processDocument(job: Job<DocumentProcessingJobData>) {
       childChunkSize: 400, // tokens
       parentChunkSize: 1500, // tokens
       strategy: 'hierarchical',
-      preserveHeadings: true
+      preserveHeadings: true,
     },
     metadata: {
       file_id: file_id,
@@ -829,15 +863,18 @@ async function processDocument(job: Job<DocumentProcessingJobData>) {
       order: order,
       importance_score: job.data.importance_score,
       category: job.data.category,
-      processing_mode: processing_mode
-    }
+      processing_mode: processing_mode,
+    },
   });
 
-  logger.info({
-    fileId: file_id,
-    vectorsCreated: vectors.length,
-    sourceText: 'ORIGINAL' // подтверждаем что из оригинала
-  }, 'Vectorization completed');
+  logger.info(
+    {
+      fileId: file_id,
+      vectorsCreated: vectors.length,
+      sourceText: 'ORIGINAL', // подтверждаем что из оригинала
+    },
+    'Vectorization completed'
+  );
 
   // 4. Сохранить в БД
   await db.file_catalog.update({
@@ -852,9 +889,9 @@ async function processDocument(job: Job<DocumentProcessingJobData>) {
         processing_mode: processing_mode,
         analyze_content_tokens: estimateTokens(analyzeContent),
         vectors_count: vectors.length,
-        vectorized_from: 'original_text' // мета-информация
-      }
-    }
+        vectorized_from: 'original_text', // мета-информация
+      },
+    },
   });
 
   logger.info({ fileId: file_id }, 'Document processing completed');
@@ -866,6 +903,7 @@ async function processDocument(job: Job<DocumentProcessingJobData>) {
 ### Phase 5: Analyze Stage Integration
 
 **Файлы**:
+
 - `packages/course-gen-platform/src/services/stage4/analyze-orchestrator.ts` (MODIFY)
 
 **Изменения**:
@@ -874,7 +912,6 @@ async function processDocument(job: Job<DocumentProcessingJobData>) {
 // analyze-orchestrator.ts
 
 async function buildAnalyzeContext(courseId: string): Promise<string> {
-
   // 1. Получить документы с их metadata
   const documents = await db.file_catalog.findMany({
     where: { course_id: courseId, vectorized: true },
@@ -884,25 +921,28 @@ async function buildAnalyzeContext(courseId: string): Promise<string> {
       filename: true,
       summary: true, // analyze_content (full или summary)
       token_count: true,
-      processing_metadata: true
-    }
+      processing_metadata: true,
+    },
   });
 
   // 2. Получить выбранную модель из course settings
   const course = await db.courses.findUnique({
     where: { id: courseId },
-    select: { settings: true }
+    select: { settings: true },
   });
 
   const analyzeModel = course?.settings?.analyze_model || 'openai/gpt-oss-120b';
   const analyzeBudget = course?.settings?.analyze_budget || 80000;
 
-  logger.info({
-    courseId: courseId,
-    documentsCount: documents.length,
-    analyzeModel: analyzeModel,
-    analyzeBudget: analyzeBudget
-  }, 'Building Analyze context');
+  logger.info(
+    {
+      courseId: courseId,
+      documentsCount: documents.length,
+      analyzeModel: analyzeModel,
+      analyzeBudget: analyzeBudget,
+    },
+    'Building Analyze context'
+  );
 
   // 3. Собрать контекст из summary (или full text)
   let contextParts: string[] = [];
@@ -921,21 +961,27 @@ ${doc.summary}
     totalTokens += estimateTokens(doc.summary);
   }
 
-  logger.info({
-    courseId: courseId,
-    totalTokens: totalTokens,
-    budgetLimit: analyzeBudget,
-    budgetUtilization: (totalTokens / analyzeBudget * 100).toFixed(1) + '%'
-  }, 'Analyze context built');
-
-  // 4. Проверить что не превысили бюджет
-  if (totalTokens > analyzeBudget) {
-    logger.warn({
+  logger.info(
+    {
       courseId: courseId,
       totalTokens: totalTokens,
       budgetLimit: analyzeBudget,
-      overflow: totalTokens - analyzeBudget
-    }, 'Analyze context exceeds budget - truncating');
+      budgetUtilization: ((totalTokens / analyzeBudget) * 100).toFixed(1) + '%',
+    },
+    'Analyze context built'
+  );
+
+  // 4. Проверить что не превысили бюджет
+  if (totalTokens > analyzeBudget) {
+    logger.warn(
+      {
+        courseId: courseId,
+        totalTokens: totalTokens,
+        budgetLimit: analyzeBudget,
+        overflow: totalTokens - analyzeBudget,
+      },
+      'Analyze context exceeds budget - truncating'
+    );
 
     // Truncate до бюджета (приоритет за HIGH документами с меньшим order)
     // TODO: implement smart truncation
@@ -952,15 +998,18 @@ ${doc.summary}
 ### 📊 Метрики успеха
 
 **Качество**:
+
 - ✅ **90%+ курсов используют дешёвую модель** (HIGH ≤ 80K)
 - ✅ **100% ключевых документов** сохранены полностью (если ≤50K)
 - ✅ **RAG качество +20%**: векторы из оригинала, не summary
 
 **Стоимость**:
+
 - ✅ **Экономия 60-80%** на лёгких курсах (OSS 120B vs Gemini)
 - ✅ **Прозрачность расходов**: логируем модель и причину выбора
 
 **Производительность**:
+
 - ✅ **Время обработки -30%**: приоритизация обрабатывает важное первым
 - ✅ **Пользовательский опыт**: видят прогресс по ключевым документам раньше
 
@@ -971,6 +1020,7 @@ ${doc.summary}
 **Effort**: 3-4 дня (1 senior developer)
 
 **Breakdown**:
+
 - Phase 1 (LLM Classification): 1 день
 - Phase 2 (Budget Allocator): 0.5 дня
 - Phase 3 (Pipeline Integration): 1 день
@@ -979,6 +1029,7 @@ ${doc.summary}
 - Testing: 0.5 дня
 
 **ROI**:
+
 - Экономия: ~$0.10 per course (200K → 80K tokens average)
 - Volume: 1000 courses/month → **$100/month savings**
 - Quality improvement: Priceless (RAG из оригиналов)
@@ -990,27 +1041,32 @@ ${doc.summary}
 ### Обратная совместимость
 
 **Existing courses** (already processed):
+
 - ✅ Продолжают работать с текущими summary
 - ✅ Не требуют reprocessing
 - ✅ Можно опционально reprocess для улучшения качества
 
 **New courses** (after deployment):
+
 - ✅ Автоматически используют новую систему
 - ✅ Classification + Budget allocation + Vectorization из оригинала
 
 ### Rollout Strategy
 
 **Phase 1**: Soft launch (1 week)
+
 - Deploy to TRIAL tier only
 - Monitor metrics: model selection, budget usage, quality scores
 - Fix bugs if any
 
 **Phase 2**: Gradual rollout (1 week)
+
 - Deploy to FREE + BASIC tiers
 - Compare A/B: old vs new system
 - Validate cost savings
 
 **Phase 3**: Full production (ongoing)
+
 - Deploy to all tiers
 - Continuous monitoring
 - Fine-tune LLM prompts based on data
@@ -1024,6 +1080,7 @@ ${doc.summary}
 **A**: 20 × 50K = 1M tokens — превышает 400K бюджет.
 
 **Решение**:
+
 - Первые 8 документов (order 1-8): full text (8 × 50K = 400K)
 - Документы 9-20: summary (~5K каждый, 12 × 5K = 60K)
 - Логируем warning: "Некоторые HIGH документы сокращены из-за превышения бюджета"
@@ -1034,6 +1091,7 @@ ${doc.summary}
 **A**: В текущей версии — нет (автоматическая классификация).
 
 **Future enhancement**: Добавить UI для manual override:
+
 - User видит LLM-определённый priority
 - Может изменить HIGH ↔ LOW
 - Может изменить order (drag-and-drop)
@@ -1042,12 +1100,14 @@ ${doc.summary}
 ### Q: Как LLM определяет HIGH vs LOW для нетипичных документов?
 
 **A**: LLM анализирует:
+
 1. **Содержание preview** (первые 1000 символов)
 2. **Название файла** (контекстные подсказки)
 3. **Размер файла** (эвристика: лекции часто 10-60K tokens)
 4. **Тема курса** (релевантность контента)
 
 **Пример**:
+
 ```
 Курс: "Введение в машинное обучение"
 Документ: "ГОСТ Р 59276-2020 Искусственный интеллект.pdf" (120K tokens)
@@ -1062,6 +1122,7 @@ LLM reasoning:
 ### Q: Что происходит с векторами при reprocessing?
 
 **A**:
+
 - Старые векторы удаляются из Qdrant
 - Создаются новые векторы из оригинала
 - File catalog обновляется с новыми metadata

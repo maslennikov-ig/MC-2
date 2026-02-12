@@ -7,6 +7,7 @@ This guide walks you through setting up Qdrant Cloud for the MegaCampusAI RAG in
 ## Overview
 
 **Qdrant Cloud Free Tier Specifications:**
+
 - Storage: 1GB
 - Max vectors: ~50,000 (768 dimensions, 32-bit float)
 - Query latency: <30ms (p95)
@@ -60,11 +61,13 @@ Once your cluster is provisioned:
 ### 4. Update Environment Variables
 
 1. Open your `.env` file at:
+
    ```
    /home/me/code/megacampus2/packages/course-gen-platform/.env
    ```
 
 2. Update the Qdrant configuration section:
+
    ```bash
    # Qdrant Configuration
    QDRANT_URL=https://your-actual-cluster-url.aws.cloud.qdrant.io
@@ -86,6 +89,7 @@ pnpm tsx scripts/verify-qdrant-connection.ts
 ```
 
 Expected output:
+
 ```
 Qdrant Cloud Connection Verification
 
@@ -125,6 +129,7 @@ Qdrant Cloud Connection Verification
 **Issue**: Cannot connect to Qdrant Cloud
 
 **Solutions**:
+
 1. Verify QDRANT_URL format (should start with `https://`)
 2. Check API key for typos or extra spaces
 3. Ensure cluster status is "Running" in the dashboard
@@ -136,6 +141,7 @@ Qdrant Cloud Connection Verification
 **Issue**: "Unauthorized" or "Invalid API Key" error
 
 **Solutions**:
+
 1. Generate a new API key from the Qdrant Cloud dashboard
 2. Ensure no extra spaces or characters in the `.env` file
 3. Restart your application after updating `.env`
@@ -145,6 +151,7 @@ Qdrant Cloud Connection Verification
 **Issue**: Connection times out
 
 **Solutions**:
+
 1. Check if your cluster region is far from your location
 2. Verify cluster is in "Running" state (not "Starting" or "Stopped")
 3. Check for network issues or corporate firewall blocking the connection
@@ -174,6 +181,7 @@ After successful verification:
 ### Stage 0 Capacity Planning
 
 With 1GB storage and 768-dimensional vectors:
+
 - Max vectors: ~50,000
 - Recommended allocation:
   - 3-5 test courses
@@ -184,6 +192,7 @@ With 1GB storage and 768-dimensional vectors:
 ### Vector Dimensions
 
 Using Jina AI embeddings v2 base:
+
 - Dimensions: 768
 - Precision: 32-bit float
 - Storage per vector: ~3KB (including payload metadata)
@@ -191,6 +200,7 @@ Using Jina AI embeddings v2 base:
 ### Distance Metrics
 
 **Cosine Similarity** (recommended for semantic search):
+
 - Best for text embeddings
 - Normalizes vector length
 - Range: [-1, 1] (1 = identical, -1 = opposite)
@@ -198,10 +208,12 @@ Using Jina AI embeddings v2 base:
 ### HNSW Index Parameters
 
 **m=16** (number of bi-directional links):
+
 - Higher = better recall, more memory
 - Sweet spot for 768-dim vectors
 
 **ef_construct=100** (construction time search depth):
+
 - Higher = better index quality, slower indexing
 - Recommended for production use
 
@@ -215,6 +227,7 @@ Using Jina AI embeddings v2 base:
 ## Support
 
 If you encounter issues:
+
 1. Check the Qdrant Cloud dashboard for cluster status
 2. Review the verification script output for detailed error messages
 3. Consult the Qdrant Discord community: https://qdrant.to/discord

@@ -154,16 +154,19 @@ export async function hierarchicalChunking(
     maxTokensPerChunk = 10000,
   } = options;
 
-  logger.info({
-    textLength: text.length,
-    language,
-    topic,
-    targetTokens,
-    maxIterations,
-    chunkSize,
-    overlapPercent,
-    model,
-  }, 'Starting hierarchical chunking summarization');
+  logger.info(
+    {
+      textLength: text.length,
+      language,
+      topic,
+      targetTokens,
+      maxIterations,
+      chunkSize,
+      overlapPercent,
+      model,
+    },
+    'Starting hierarchical chunking summarization'
+  );
 
   let currentText = text;
   let iteration = 0;
@@ -179,20 +182,26 @@ export async function hierarchicalChunking(
     // Estimate current token count
     const currentTokens = tokenEstimator.estimateTokens(currentText, language);
 
-    logger.info({
-      iteration,
-      currentTokens,
-      targetTokens,
-      compressionLevel: getCompressionLevel(iteration),
-    }, 'Hierarchical chunking iteration');
+    logger.info(
+      {
+        iteration,
+        currentTokens,
+        targetTokens,
+        compressionLevel: getCompressionLevel(iteration),
+      },
+      'Hierarchical chunking iteration'
+    );
 
     // Stop condition: target reached
     if (currentTokens <= targetTokens) {
-      logger.info({
-        iteration,
-        finalTokens: currentTokens,
-        targetTokens,
-      }, 'Target tokens reached, stopping iteration');
+      logger.info(
+        {
+          iteration,
+          finalTokens: currentTokens,
+          targetTokens,
+        },
+        'Target tokens reached, stopping iteration'
+      );
 
       return {
         summary: currentText,
@@ -212,11 +221,14 @@ export async function hierarchicalChunking(
     const compressionLevel = getCompressionLevel(iteration);
     compressionLevelsUsed.push(compressionLevel);
 
-    logger.info({
-      iteration,
-      compressionLevel,
-      currentTokens,
-    }, 'Chunking and summarizing with compression level');
+    logger.info(
+      {
+        iteration,
+        compressionLevel,
+        currentTokens,
+      },
+      'Chunking and summarizing with compression level'
+    );
 
     // Split into chunks with overlap
     const chunks = createChunks(currentText, {
@@ -227,11 +239,14 @@ export async function hierarchicalChunking(
 
     totalChunksProcessed += chunks.length;
 
-    logger.info({
-      iteration,
-      chunkCount: chunks.length,
-      compressionLevel,
-    }, 'Created chunks for parallel summarization');
+    logger.info(
+      {
+        iteration,
+        chunkCount: chunks.length,
+        compressionLevel,
+      },
+      'Created chunks for parallel summarization'
+    );
 
     // Summarize each chunk in parallel
     const chunkSummaries = await Promise.all(
@@ -255,12 +270,15 @@ export async function hierarchicalChunking(
       totalOutputTokens += result.outputTokens;
     });
 
-    logger.info({
-      iteration,
-      chunksSummarized: chunkSummaries.length,
-      totalInputTokens,
-      totalOutputTokens,
-    }, 'Chunk summaries generated');
+    logger.info(
+      {
+        iteration,
+        chunksSummarized: chunkSummaries.length,
+        totalInputTokens,
+        totalOutputTokens,
+      },
+      'Chunk summaries generated'
+    );
 
     // Combine summaries with separator
     currentText = chunkSummaries.map(r => r.summary).join('\n\n---\n\n');
@@ -269,12 +287,15 @@ export async function hierarchicalChunking(
   // Max iterations reached
   const finalTokens = tokenEstimator.estimateTokens(currentText, language);
 
-  logger.warn({
-    maxIterations,
-    finalTokens,
-    targetTokens,
-    compressionLevelsUsed,
-  }, 'Max iterations reached, target not achieved');
+  logger.warn(
+    {
+      maxIterations,
+      finalTokens,
+      targetTokens,
+      compressionLevelsUsed,
+    },
+    'Max iterations reached, target not achieved'
+  );
 
   return {
     summary: currentText,
@@ -362,17 +383,24 @@ function createChunks(
     effectiveOverlapPercent = Math.max(1, overlapPercent / 2); // Half, min 1%
   }
 
-  const overlapCharSize = Math.ceil((chunkSize * (effectiveOverlapPercent / 100)) * ratio);
+  const overlapCharSize = Math.ceil(chunkSize * (effectiveOverlapPercent / 100) * ratio);
 
-  logger.debug({
-    originalOverlapPercent: overlapPercent,
-    effectiveOverlapPercent,
-    textLength: text.length,
-    chunkCharSize,
-    overlapCharSize,
-    reason: text.length < chunkCharSize ? 'small_document' :
-            text.length < chunkCharSize * 2 ? 'medium_document' : 'large_document',
-  }, 'Adaptive overlap calculated');
+  logger.debug(
+    {
+      originalOverlapPercent: overlapPercent,
+      effectiveOverlapPercent,
+      textLength: text.length,
+      chunkCharSize,
+      overlapCharSize,
+      reason:
+        text.length < chunkCharSize
+          ? 'small_document'
+          : text.length < chunkCharSize * 2
+            ? 'medium_document'
+            : 'large_document',
+    },
+    'Adaptive overlap calculated'
+  );
 
   const chunks: string[] = [];
   let start = 0;
@@ -400,11 +428,14 @@ function createChunks(
     }
   }
 
-  logger.debug({
-    textLength: text.length,
-    chunkCount: chunks.length,
-    avgChunkSize: chunks.reduce((sum, c) => sum + c.length, 0) / chunks.length,
-  }, 'Chunks created');
+  logger.debug(
+    {
+      textLength: text.length,
+      chunkCount: chunks.length,
+      avgChunkSize: chunks.reduce((sum, c) => sum + c.length, 0) / chunks.length,
+    },
+    'Chunks created'
+  );
 
   return chunks;
 }
@@ -442,13 +473,16 @@ Please summarize the following text:
 
 ${chunk}`;
 
-  logger.debug({
-    chunkIndex,
-    totalChunks,
-    chunkLength: chunk.length,
-    compressionLevel,
-    model,
-  }, 'Summarizing chunk');
+  logger.debug(
+    {
+      chunkIndex,
+      totalChunks,
+      chunkLength: chunk.length,
+      compressionLevel,
+      model,
+    },
+    'Summarizing chunk'
+  );
 
   try {
     const response = await llmClient.generateCompletion(userPrompt, {
@@ -458,13 +492,16 @@ ${chunk}`;
       systemPrompt,
     });
 
-    logger.debug({
-      chunkIndex,
-      totalChunks,
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
-      compressionLevel,
-    }, 'Chunk summarized successfully');
+    logger.debug(
+      {
+        chunkIndex,
+        totalChunks,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        compressionLevel,
+      },
+      'Chunk summarized successfully'
+    );
 
     return {
       summary: response.content,
@@ -472,12 +509,15 @@ ${chunk}`;
       outputTokens: response.outputTokens,
     };
   } catch (error) {
-    logger.error({
-      chunkIndex,
-      totalChunks,
-      compressionLevel,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'Failed to summarize chunk');
+    logger.error(
+      {
+        chunkIndex,
+        totalChunks,
+        compressionLevel,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to summarize chunk'
+    );
 
     throw new Error(
       `Failed to summarize chunk ${chunkIndex + 1}/${totalChunks}: ${

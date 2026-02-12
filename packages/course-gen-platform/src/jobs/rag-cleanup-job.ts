@@ -133,11 +133,14 @@ export async function executeRagCleanupJob(
   const startTime = Date.now();
   const timestamp = new Date();
 
-  logger.info({
-    expirationHours: resolvedConfig.expirationHours,
-    useDirectDeletion: resolvedConfig.useDirectDeletion,
-    dryRun: resolvedConfig.dryRun,
-  }, '[RAG Cleanup Job] Starting execution');
+  logger.info(
+    {
+      expirationHours: resolvedConfig.expirationHours,
+      useDirectDeletion: resolvedConfig.useDirectDeletion,
+      dryRun: resolvedConfig.dryRun,
+    },
+    '[RAG Cleanup Job] Starting execution'
+  );
 
   try {
     let result: RagCleanupJobResult;
@@ -178,22 +181,28 @@ export async function executeRagCleanupJob(
     jobState.lastResult = result;
 
     if (resolvedConfig.verbose || result.totalCleaned > 0) {
-      logger.info({
-        totalCleaned: result.totalCleaned,
-        coursesProcessed: result.coursesProcessed,
-        durationMs: result.durationMs,
-        errorsCount: result.errors.length,
-        dryRun: resolvedConfig.dryRun,
-      }, '[RAG Cleanup Job] Execution complete');
+      logger.info(
+        {
+          totalCleaned: result.totalCleaned,
+          coursesProcessed: result.coursesProcessed,
+          durationMs: result.durationMs,
+          errorsCount: result.errors.length,
+          dryRun: resolvedConfig.dryRun,
+        },
+        '[RAG Cleanup Job] Execution complete'
+      );
     }
 
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    logger.error({
-      err: errorMessage,
-    }, '[RAG Cleanup Job] Execution failed');
+    logger.error(
+      {
+        err: errorMessage,
+      },
+      '[RAG Cleanup Job] Execution failed'
+    );
 
     const failedResult: RagCleanupJobResult = {
       totalCleaned: 0,
@@ -248,18 +257,25 @@ export function startScheduledCleanup(
 
   jobState.config = resolvedConfig;
 
-  logger.info({
-    intervalMs: resolvedConfig.runIntervalMs,
-    intervalHours: (resolvedConfig.runIntervalMs / (60 * 60 * 1000)).toFixed(2),
-    expirationHours: resolvedConfig.expirationHours,
-  }, '[RAG Cleanup Job] Starting scheduled cleanup');
+  logger.info(
+    {
+      intervalMs: resolvedConfig.runIntervalMs,
+      intervalHours: (resolvedConfig.runIntervalMs / (60 * 60 * 1000)).toFixed(2),
+      expirationHours: resolvedConfig.expirationHours,
+    },
+    '[RAG Cleanup Job] Starting scheduled cleanup'
+  );
 
   // Run immediately on start
-  void runScheduledCleanup(resolvedConfig).catch(err => logger.error({ err }, '[RAG Cleanup Job] Initial run failed'));
+  void runScheduledCleanup(resolvedConfig).catch(err =>
+    logger.error({ err }, '[RAG Cleanup Job] Initial run failed')
+  );
 
   // Schedule recurring runs
   jobState.timer = setInterval(() => {
-    void runScheduledCleanup(resolvedConfig).catch(err => logger.error({ err }, '[RAG Cleanup Job] Scheduled run failed'));
+    void runScheduledCleanup(resolvedConfig).catch(err =>
+      logger.error({ err }, '[RAG Cleanup Job] Scheduled run failed')
+    );
   }, resolvedConfig.runIntervalMs);
 
   return jobState.timer;
@@ -323,9 +339,7 @@ export function getJobConfig(): Required<RagCleanupJobConfig> {
  *
  * Prevents overlapping runs if previous run takes longer than interval.
  */
-async function runScheduledCleanup(
-  config: Required<RagCleanupJobConfig>
-): Promise<void> {
+async function runScheduledCleanup(config: Required<RagCleanupJobConfig>): Promise<void> {
   // Prevent overlapping runs
   if (jobState.isRunning) {
     logger.debug('[RAG Cleanup Job] Skipping run - previous run still in progress');
@@ -351,15 +365,19 @@ async function runScheduledCleanup(
  * Automatically stops scheduler on SIGTERM/SIGINT.
  */
 function handleShutdown(signal: string): void {
-  logger.debug({
-    signal,
-  }, '[RAG Cleanup Job] Received shutdown signal');
+  logger.debug(
+    {
+      signal,
+    },
+    '[RAG Cleanup Job] Received shutdown signal'
+  );
 
   stopScheduledCleanup();
 }
 
 // Register shutdown handlers (only in Node.js environment)
-if (typeof process !== 'undefined' && process.on) {
-  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-  process.on('SIGINT', () => handleShutdown('SIGINT'));
+// Use process.once to prevent handler stacking on re-import
+if (typeof process !== 'undefined' && process.once) {
+  process.once('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.once('SIGINT', () => handleShutdown('SIGINT'));
 }

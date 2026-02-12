@@ -1,4 +1,5 @@
 import React, { memo, useRef, useMemo, useEffect } from 'react'
+import { usePrevious } from '@/lib/hooks/use-previous'
 import {
   Handle,
   Position,
@@ -117,16 +118,15 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
 
   // Track zoom mode for semantic zoom - notify React Flow when node dimensions change
   // This ensures edges are recalculated when crossing zoom thresholds
-  const prevZoomModeRef = useRef<'minimal' | 'medium' | 'full'>('full')
   const currentZoomMode = zoom < 0.3 ? 'minimal' : zoom < 0.5 ? 'medium' : 'full'
+  const prevZoomMode = usePrevious(currentZoomMode)
 
   useEffect(() => {
-    if (prevZoomModeRef.current !== currentZoomMode) {
-      prevZoomModeRef.current = currentZoomMode
-      // Notify React Flow to recalculate node dimensions and edge positions
+    if (prevZoomMode === undefined) return
+    if (prevZoomMode !== currentZoomMode) {
       updateNodeInternals(id)
     }
-  }, [currentZoomMode, id, updateNodeInternals])
+  }, [currentZoomMode, prevZoomMode, id, updateNodeInternals])
 
   // Subscribe to realtime status updates - MUST be called before any conditional returns (Rules of Hooks)
   const statusEntry = useNodeStatus(id)

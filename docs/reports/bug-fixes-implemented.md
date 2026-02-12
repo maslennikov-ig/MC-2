@@ -28,6 +28,7 @@ Successfully created comprehensive database migrations to align Supabase schema 
 **Purpose**: Store lesson media assets (video, audio, presentations, documents)
 
 **Columns**:
+
 - `id` (UUID, PK)
 - `lesson_id` (UUID, FK → lessons)
 - `course_id` (UUID, FK → courses)
@@ -46,11 +47,13 @@ Successfully created comprehensive database migrations to align Supabase schema 
 - `created_at`, `updated_at` (TIMESTAMPTZ)
 
 **RLS Policies**:
+
 - Admin: Full access to organization assets
 - Instructor: Manage own course assets, view org assets
 - Student: View assets in enrolled courses
 
 **Indexes**:
+
 - `idx_assets_lesson_id`
 - `idx_assets_course_id`
 - `idx_assets_asset_type`
@@ -63,6 +66,7 @@ Successfully created comprehensive database migrations to align Supabase schema 
 **Purpose**: Track Google Drive file sync status and metadata
 
 **Columns**:
+
 - `id` (UUID, PK)
 - `file_id` (TEXT, UNIQUE) - Google Drive file ID
 - `name` (TEXT)
@@ -80,6 +84,7 @@ Successfully created comprehensive database migrations to align Supabase schema 
 **RLS Policies**: Same as assets table
 
 **Indexes**:
+
 - `idx_google_drive_files_file_id`
 - `idx_google_drive_files_course_id`
 - `idx_google_drive_files_sync_status`
@@ -90,10 +95,12 @@ Successfully created comprehensive database migrations to align Supabase schema 
 ### 3. File Catalog Updates
 
 **Added Columns**:
+
 - `google_drive_file_id` (TEXT, nullable)
 - `original_name` (TEXT, nullable)
 
 **Index**:
+
 - `idx_file_catalog_google_drive_file_id`
 
 ---
@@ -101,6 +108,7 @@ Successfully created comprehensive database migrations to align Supabase schema 
 ### 4. Sections & Lessons Timestamps
 
 **Added Columns**:
+
 - `sections.updated_at` (TIMESTAMPTZ)
 - `lessons.updated_at` (TIMESTAMPTZ)
 
@@ -111,11 +119,13 @@ Successfully created comprehensive database migrations to align Supabase schema 
 ### 5. User Profile Columns
 
 **Added to users table**:
+
 - `full_name` (TEXT, nullable)
 - `avatar_url` (TEXT, nullable)
 - `bio` (TEXT, nullable)
 
 **Index**:
+
 - `idx_users_full_name` (for searches)
 
 ---
@@ -123,11 +133,13 @@ Successfully created comprehensive database migrations to align Supabase schema 
 ### 6. Lesson Content Columns
 
 **Added to lessons table**:
+
 - `content` (JSONB) - rich/structured content
 - `content_text` (TEXT) - plain text content
 - `objectives` (TEXT[]) - learning objectives array
 
 **Indexes**:
+
 - `idx_lessons_content_gin` (GIN index for JSONB)
 - `idx_lessons_objectives_gin` (GIN index for array)
 
@@ -140,6 +152,7 @@ Successfully created comprehensive database migrations to align Supabase schema 
 The database migrations are complete, but the TypeScript types file needs regeneration.
 
 **Why manual regeneration is needed**:
+
 - Supabase CLI requires project linking (`supabase link`) which wasn't configured
 - MCP Supabase tool generated complete types, but manual file update had issues
 - Types file structure requires proper placement within Tables section
@@ -157,6 +170,7 @@ pnpm supabase gen types typescript --project-id diqooqbuchsliypgwksu > types/dat
 ```
 
 After regeneration, the following errors will be resolved:
+
 - ✅ Missing table "assets" (currently 8 errors)
 - ✅ Missing table "google_drive_files" (currently 2 errors)
 - ✅ Missing columns in file_catalog (currently 5 errors)
@@ -166,6 +180,7 @@ After regeneration, the following errors will be resolved:
 - ⚠️ Enum mismatches for course_status (requires code fixes)
 
 **Remaining Issues** (require code changes, not schema changes):
+
 - Course status enum values (completed, failed, cancelled not in DB enum)
 - lesson_number property usage (frontend uses derived value)
 
@@ -176,21 +191,23 @@ After regeneration, the following errors will be resolved:
 ### Database Schema ✅
 
 All migrations successfully applied:
+
 ```sql
 -- Verify tables exist
-SELECT table_name FROM information_schema.tables 
-WHERE table_schema = 'public' 
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'public'
 AND table_name IN ('assets', 'google_drive_files');
 
 -- Verify columns added
 SELECT column_name FROM information_schema.columns
-WHERE table_name = 'file_catalog' 
+WHERE table_name = 'file_catalog'
 AND column_name IN ('google_drive_file_id', 'original_name');
 ```
 
 ### RLS Policies ✅
 
 All tables have proper RLS enabled with role-based access:
+
 - Superadmin: Full access
 - Admin: Organization-scoped access
 - Instructor: Own courses + org viewing
@@ -210,12 +227,14 @@ All migrations are reversible via Supabase migrations system.
 ## Next Steps
 
 1. **Regenerate Types** (REQUIRED):
+
    ```bash
    cd courseai-next
    pnpm supabase gen types typescript --project-id diqooqbuchsliypgwksu > types/database.generated.ts
    ```
 
 2. **Run Type Check**:
+
    ```bash
    cd courseai-next
    pnpm tsc --noEmit
@@ -226,7 +245,7 @@ All migrations are reversible via Supabase migrations system.
    - Fix lesson_number derived property usage
    - Update avatar_url usage in profile updates
 
-4. **Test**Frontend**:
+4. **Test**Frontend\*\*:
    - Verify course page loads with assets
    - Test Google Drive upload flow
    - Check user profile editing
@@ -236,9 +255,11 @@ All migrations are reversible via Supabase migrations system.
 ## Files Modified
 
 ### Database
+
 - 6 new migrations in `packages/course-gen-platform/supabase/migrations/`
 
 ### TypeScript (Pending)
+
 - `courseai-next/types/database.generated.ts` (needs regeneration)
 
 ---
@@ -246,16 +267,19 @@ All migrations are reversible via Supabase migrations system.
 ## Impact Assessment
 
 **Risk Level**: Low
+
 - All changes are additive (no breaking changes)
 - Existing data unaffected
 - RLS policies prevent unauthorized access
 
 **Performance**: Minimal
+
 - Indexes added for all foreign keys
 - GIN indexes for JSONB/array columns
 - No full table scans introduced
 
 **Compatibility**: High
+
 - New columns are nullable
 - Existing queries continue to work
 - Frontend gracefully handles missing data
@@ -268,4 +292,3 @@ All migrations are reversible via Supabase migrations system.
 2. Consider adding enum for asset_type if values are fixed
 3. Add data validation triggers for objectives array format
 4. Set up monitoring for RLS policy performance
-

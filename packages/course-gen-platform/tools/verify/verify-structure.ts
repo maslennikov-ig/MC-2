@@ -262,7 +262,6 @@ function verifyStructure(): void {
   checkDirectory('packages', 'Root packages directory');
   checkDirectory('packages/course-gen-platform', 'course-gen-platform package');
   checkDirectory('packages/shared-types', 'shared-types package');
-  checkDirectory('packages/trpc-client-sdk', 'trpc-client-sdk package');
   checkDirectory('packages/course-gen-platform/src', 'course-gen-platform/src');
   checkDirectory('packages/course-gen-platform/src/server', 'course-gen-platform/src/server');
   checkDirectory(
@@ -278,14 +277,12 @@ function verifyStructure(): void {
   validatePackageJson('package.json', 'Root package');
   validatePackageJson('packages/course-gen-platform/package.json', 'course-gen-platform');
   validatePackageJson('packages/shared-types/package.json', 'shared-types');
-  validatePackageJson('packages/trpc-client-sdk/package.json', 'trpc-client-sdk');
 
   // 3. Check TypeScript configuration
   console.log('Validating TypeScript configuration...');
   validateTsConfig('tsconfig.json', 'Root tsconfig');
   validateTsConfig('packages/course-gen-platform/tsconfig.json', 'course-gen-platform');
   validateTsConfig('packages/shared-types/tsconfig.json', 'shared-types');
-  validateTsConfig('packages/trpc-client-sdk/tsconfig.json', 'trpc-client-sdk');
 
   // 4. Check workspace configuration
   console.log('Validating workspace configuration...');

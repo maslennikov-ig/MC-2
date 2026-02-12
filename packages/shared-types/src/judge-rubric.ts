@@ -413,7 +413,7 @@ export function validateCriteriaWeights(criteria: CriterionConfig[]): boolean {
  * Gets the default weight for a criterion from DEFAULT_OSCQR_RUBRIC
  */
 export function getDefaultCriterionWeight(criterion: JudgeCriterion): number {
-  const config = DEFAULT_OSCQR_RUBRIC.criteria.find((c) => c.criterion === criterion);
+  const config = DEFAULT_OSCQR_RUBRIC.criteria.find(c => c.criterion === criterion);
   return config?.weight ?? 0;
 }
 
@@ -421,6 +421,6 @@ export function getDefaultCriterionWeight(criterion: JudgeCriterion): number {
  * Checks if a criterion requires RAG grounding
  */
 export function criterionRequiresRag(criterion: JudgeCriterion): boolean {
-  const config = DEFAULT_OSCQR_RUBRIC.criteria.find((c) => c.criterion === criterion);
+  const config = DEFAULT_OSCQR_RUBRIC.criteria.find(c => c.criterion === criterion);
   return config?.requiresRag ?? false;
 }

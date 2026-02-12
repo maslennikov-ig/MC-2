@@ -225,17 +225,17 @@ Output the JSON directly (no markdown, no explanations):`;
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://ai.megacampus.ru',
-        'X-Title': 'MegaCampus LLM Quality Testing'
+        'X-Title': 'MegaCampus LLM Quality Testing',
       },
       body: JSON.stringify({
         model: this.modelName,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 8000
-      })
+        max_tokens: 8000,
+      }),
     });
 
     if (!response.ok) {
@@ -254,9 +254,10 @@ Output the JSON directly (no markdown, no explanations):`;
 
     try {
       // Build prompt based on entity type
-      const prompt = scenario.entityId === 'metadata'
-        ? this.buildMetadataPrompt(scenario)
-        : this.buildLessonPrompt(scenario);
+      const prompt =
+        scenario.entityId === 'metadata'
+          ? this.buildMetadataPrompt(scenario)
+          : this.buildLessonPrompt(scenario);
 
       // Call OpenRouter API
       const result = await this.callOpenRouter(prompt);
@@ -267,18 +268,29 @@ Output the JSON directly (no markdown, no explanations):`;
 
       // Save metadata log
       const logPath = `${this.outputDir}/${scenario.id}-run${runNumber}.log`;
-      await writeFile(logPath, JSON.stringify({
-        model: 'Qwen3 235B Thinking',
-        modelSlug: this.modelSlug,
-        modelName: this.modelName,
-        scenario: scenario.id,
-        runNumber,
-        duration: result.duration,
-        timestamp: new Date().toISOString(),
-        contentLength: result.content.length,
-      }, null, 2), 'utf-8');
+      await writeFile(
+        logPath,
+        JSON.stringify(
+          {
+            model: 'Qwen3 235B Thinking',
+            modelSlug: this.modelSlug,
+            modelName: this.modelName,
+            scenario: scenario.id,
+            runNumber,
+            duration: result.duration,
+            timestamp: new Date().toISOString(),
+            contentLength: result.content.length,
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
 
-      log(`[${this.modelSlug}] ${scenario.id} run ${runNumber}/${this.runsPerScenario}... ✓ ${result.duration}ms`, 'success');
+      log(
+        `[${this.modelSlug}] ${scenario.id} run ${runNumber}/${this.runsPerScenario}... ✓ ${result.duration}ms`,
+        'success'
+      );
 
       return {
         scenarioId: scenario.id,
@@ -289,23 +301,33 @@ Output the JSON directly (no markdown, no explanations):`;
         logPath,
         contentLength: result.content.length,
       };
-
     } catch (error: any) {
       const duration = Date.now() - startTime;
 
       // Save error details
       const errorPath = `${this.outputDir}/${scenario.id}-run${runNumber}-ERROR.json`;
-      await writeFile(errorPath, JSON.stringify({
-        model: 'Qwen3 235B Thinking',
-        modelSlug: this.modelSlug,
-        scenario: scenario.id,
-        runNumber,
-        error: error.message,
-        timestamp: new Date().toISOString(),
-        duration
-      }, null, 2), 'utf-8');
+      await writeFile(
+        errorPath,
+        JSON.stringify(
+          {
+            model: 'Qwen3 235B Thinking',
+            modelSlug: this.modelSlug,
+            scenario: scenario.id,
+            runNumber,
+            error: error.message,
+            timestamp: new Date().toISOString(),
+            duration,
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
 
-      log(`[${this.modelSlug}] ${scenario.id} run ${runNumber}/${this.runsPerScenario}... ✗ ${error.message}`, 'error');
+      log(
+        `[${this.modelSlug}] ${scenario.id} run ${runNumber}/${this.runsPerScenario}... ✗ ${error.message}`,
+        'error'
+      );
 
       return {
         scenarioId: scenario.id,
@@ -320,7 +342,10 @@ Output the JSON directly (no markdown, no explanations):`;
 
   async runAllTests(): Promise<void> {
     section(`Quality Testing: ${this.modelName}`);
-    log(`Running ${this.scenarios.length} scenarios × ${this.runsPerScenario} runs = ${this.scenarios.length * this.runsPerScenario} total API calls`, 'info');
+    log(
+      `Running ${this.scenarios.length} scenarios × ${this.runsPerScenario} runs = ${this.scenarios.length * this.runsPerScenario} total API calls`,
+      'info'
+    );
     log(`Output directory: ${this.outputDir}`, 'info');
 
     for (const scenario of this.scenarios) {
@@ -331,7 +356,10 @@ Output the JSON directly (no markdown, no explanations):`;
         this.runs.push(run);
 
         // Wait 2s between requests (rate limiting)
-        if (i < this.runsPerScenario || scenario.id !== this.scenarios[this.scenarios.length - 1].id) {
+        if (
+          i < this.runsPerScenario ||
+          scenario.id !== this.scenarios[this.scenarios.length - 1].id
+        ) {
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
@@ -357,7 +385,9 @@ Output the JSON directly (no markdown, no explanations):`;
       const scenarioPassed = scenarioRuns.filter(r => r.status === 'SUCCESS').length;
       const status = scenarioPassed === this.runsPerScenario ? '✓' : '✗';
       const color = scenarioPassed === this.runsPerScenario ? colors.green : colors.red;
-      console.log(`  ${color}${status}${colors.reset} ${scenario.id}: ${scenarioPassed}/${this.runsPerScenario} passed`);
+      console.log(
+        `  ${color}${status}${colors.reset} ${scenario.id}: ${scenarioPassed}/${this.runsPerScenario} passed`
+      );
     }
 
     console.log(`\nOutputs saved to: ${this.outputDir}`);

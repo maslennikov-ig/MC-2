@@ -1,13 +1,11 @@
-'use client';
+'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Activity, CheckCircle, DollarSign, Clock } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { getPipelineStats } from '@/app/actions/pipeline-admin';
-import type { PipelineStats as PipelineStatsType } from '@megacampus/shared-types';
-import { useTranslations } from 'next-intl';
-import { formatDuration } from '@/lib/utils/format';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Activity, CheckCircle, DollarSign, Clock } from 'lucide-react'
+import { trpc } from '@/lib/trpc/react'
+import { useTranslations } from 'next-intl'
+import { formatDuration } from '@megacampus/shared-utils'
 
 /**
  * PipelineStats Component
@@ -22,26 +20,8 @@ import { formatDuration } from '@/lib/utils/format';
  * Shows loading skeletons while data is being fetched.
  */
 export function PipelineStats() {
-  const t = useTranslations('admin');
-  const [stats, setStats] = useState<PipelineStatsType | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function loadStats() {
-      try {
-        setIsLoading(true);
-        const data = await getPipelineStats();
-        setStats(data.result?.data || null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load stats');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadStats();
-  }, []);
+  const t = useTranslations('admin')
+  const { data: stats, isLoading, error } = trpc.pipelineAdmin.getPipelineStats.useQuery()
 
   if (isLoading) {
     return (
@@ -54,43 +34,46 @@ export function PipelineStats() {
             </CardHeader>
             <CardContent>
               <Skeleton className="h-8 w-16" />
-              <Skeleton className="h-3 w-32 mt-1" />
+              <Skeleton className="mt-1 h-3 w-32" />
             </CardContent>
           </Card>
         ))}
       </div>
-    );
+    )
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
-        <p className="text-sm text-destructive">{error}</p>
+      <div className="border-destructive bg-destructive/10 rounded-lg border p-4">
+        <p className="text-destructive text-sm">{error.message}</p>
       </div>
-    );
+    )
   }
 
-  if (!stats) return null;
+  if (!stats) return null
 
   const successRate =
     stats.totalGenerations > 0
       ? ((stats.successCount / stats.totalGenerations) * 100).toFixed(1)
-      : '0';
+      : '0'
 
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       <Card className="admin-gradient-border admin-stagger-item overflow-visible">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium" style={{ color: 'rgb(var(--admin-text-secondary))' }}>
+          <CardTitle
+            className="text-sm font-medium"
+            style={{ color: 'rgb(var(--admin-text-secondary))' }}
+          >
             {t('pipeline.stats.totalGenerations')}
           </CardTitle>
-          <Activity className="h-5 w-5 admin-icon-glow text-cyan-400" />
+          <Activity className="admin-icon-glow h-5 w-5 text-cyan-400" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold bg-gradient-to-br from-cyan-400 to-cyan-600 bg-clip-text text-transparent">
+          <div className="bg-gradient-to-br from-cyan-400 to-cyan-600 bg-clip-text text-3xl font-bold text-transparent">
             {stats.totalGenerations}
           </div>
-          <p className="text-xs mt-1" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
+          <p className="mt-1 text-xs" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
             {t('pipeline.stats.last30days')}
           </p>
         </CardContent>
@@ -98,33 +81,40 @@ export function PipelineStats() {
 
       <Card className="admin-gradient-border admin-stagger-item overflow-visible">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium" style={{ color: 'rgb(var(--admin-text-secondary))' }}>
+          <CardTitle
+            className="text-sm font-medium"
+            style={{ color: 'rgb(var(--admin-text-secondary))' }}
+          >
             {t('pipeline.stats.successRate')}
           </CardTitle>
-          <CheckCircle className="h-5 w-5 admin-icon-glow text-green-400" />
+          <CheckCircle className="admin-icon-glow h-5 w-5 text-green-400" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold bg-gradient-to-br from-green-400 to-emerald-600 bg-clip-text text-transparent">
+          <div className="bg-gradient-to-br from-green-400 to-emerald-600 bg-clip-text text-3xl font-bold text-transparent">
             {successRate}%
           </div>
-          <p className="text-xs mt-1" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
-            {stats.successCount} {t('pipeline.stats.succeeded')}, {stats.failureCount} {t('pipeline.stats.failed')}
+          <p className="mt-1 text-xs" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
+            {stats.successCount} {t('pipeline.stats.succeeded')}, {stats.failureCount}{' '}
+            {t('pipeline.stats.failed')}
           </p>
         </CardContent>
       </Card>
 
       <Card className="admin-gradient-border admin-stagger-item overflow-visible">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium" style={{ color: 'rgb(var(--admin-text-secondary))' }}>
+          <CardTitle
+            className="text-sm font-medium"
+            style={{ color: 'rgb(var(--admin-text-secondary))' }}
+          >
             {t('pipeline.stats.totalCost')}
           </CardTitle>
-          <DollarSign className="h-5 w-5 admin-icon-glow text-amber-400" />
+          <DollarSign className="admin-icon-glow h-5 w-5 text-amber-400" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold bg-gradient-to-br from-amber-400 to-orange-600 bg-clip-text text-transparent">
+          <div className="bg-gradient-to-br from-amber-400 to-orange-600 bg-clip-text text-3xl font-bold text-transparent">
             ${stats.totalCost.toFixed(2)}
           </div>
-          <p className="text-xs mt-1" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
+          <p className="mt-1 text-xs" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
             {t('pipeline.stats.usdSpent')}
           </p>
         </CardContent>
@@ -132,20 +122,23 @@ export function PipelineStats() {
 
       <Card className="admin-gradient-border admin-stagger-item overflow-visible">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium" style={{ color: 'rgb(var(--admin-text-secondary))' }}>
+          <CardTitle
+            className="text-sm font-medium"
+            style={{ color: 'rgb(var(--admin-text-secondary))' }}
+          >
             {t('pipeline.stats.avgTime')}
           </CardTitle>
-          <Clock className="h-5 w-5 admin-icon-glow text-purple-400" />
+          <Clock className="admin-icon-glow h-5 w-5 text-purple-400" />
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold bg-gradient-to-br from-purple-400 to-pink-600 bg-clip-text text-transparent">
+          <div className="bg-gradient-to-br from-purple-400 to-pink-600 bg-clip-text text-3xl font-bold text-transparent">
             {formatDuration(stats.avgCompletionTime)}
           </div>
-          <p className="text-xs mt-1" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
+          <p className="mt-1 text-xs" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
             {t('pipeline.stats.perGeneration')}
           </p>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

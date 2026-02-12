@@ -102,10 +102,7 @@ async function createNewVersion<T extends { id: string; version: number }>(
     .single();
 
   // Deactivate current
-  await ctx.supabase
-    .from(tableName)
-    .update({ is_active: false })
-    .eq('id', currentId);
+  await ctx.supabase.from(tableName).update({ is_active: false }).eq('id', currentId);
 
   // Insert new version
   const { data: newVersion } = await ctx.supabase
@@ -223,10 +220,13 @@ export function PromptEditorDialog({ prompt, onSave, onClose }: PromptEditorDial
     return parseError ? parseError.textContent : null;
   }, []);
 
-  const handleChange = useCallback((val: string) => {
-    setValue(val);
-    setError(validateXml(val));
-  }, [validateXml]);
+  const handleChange = useCallback(
+    (val: string) => {
+      setValue(val);
+      setError(validateXml(val));
+    },
+    [validateXml]
+  );
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -249,7 +249,7 @@ export function PromptEditorDialog({ prompt, onSave, onClose }: PromptEditorDial
 
           <div className="space-y-2">
             <h4 className="font-medium">Variables</h4>
-            {prompt.variables.map((v) => (
+            {prompt.variables.map(v => (
               <div key={v.name} className="text-sm">
                 <code>{`{{${v.name}}}`}</code>
                 <p className="text-muted-foreground">{v.description}</p>
@@ -259,8 +259,12 @@ export function PromptEditorDialog({ prompt, onSave, onClose }: PromptEditorDial
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => onSave(value)} disabled={!!error}>Save</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => onSave(value)} disabled={!!error}>
+            Save
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -336,6 +340,7 @@ Check user has `role = 'superadmin'` in the `users` table.
 ### 3. "OpenRouter API error"
 
 The service should return cached data. Check:
+
 - API key in environment (if required)
 - Network connectivity
 - Cache state in service
@@ -343,6 +348,7 @@ The service should return cached data. Check:
 ### 4. "XML validation fails"
 
 Ensure prompt uses valid XML. Common issues:
+
 - Unclosed tags
 - Invalid attribute values
 - Unescaped `<` or `&` characters

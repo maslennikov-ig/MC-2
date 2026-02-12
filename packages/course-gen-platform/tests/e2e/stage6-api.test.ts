@@ -29,15 +29,17 @@ import {
   setupTestFixtures,
   cleanupTestFixtures,
   cleanupTestJobs,
+  createAuthUser,
   setupStage6TestCourse,
   cleanupStage6TestData,
   TEST_USERS,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   TEST_ORGS,
 } from '../fixtures';
 import {
-  ANALYTICAL_LESSON_SPEC,
-  createTestLessonSpec,
-  createTestRAGChunks,
+  ANALYTICAL_LESSON_SPEC as _ANALYTICAL_LESSON_SPEC,
+  createTestLessonSpec as _createTestLessonSpec,
+  createTestRAGChunks as _createTestRAGChunks,
 } from '../fixtures/stage6';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import express from 'express';
@@ -188,40 +190,6 @@ function createTestClient(port: number, token?: string) {
 }
 
 /**
- * Create test user in Supabase Auth
- *
- * @param email - User email
- * @param password - User password
- * @param userId - User ID from users table
- */
-async function createAuthUser(email: string, password: string, userId: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
-
-  const {
-    data: { users: existingUsers },
-  } = await supabase.auth.admin.listUsers();
-  const existingUser = existingUsers.find(u => u.email === email);
-
-  if (existingUser) {
-    console.log(`[Stage 6 API Tests] Deleting existing auth user for ${email}`);
-    await supabase.auth.admin.deleteUser(existingUser.id);
-  }
-
-  const { data, error } = await supabase.auth.admin.createUser({
-    id: userId,
-    email,
-    password,
-    email_confirm: true,
-  });
-
-  if (error) {
-    throw new Error(`Failed to create auth user for ${email}: ${error.message}`);
-  }
-
-  console.log(`[Stage 6 API Tests] Created auth user for ${email} with ID ${data.user.id}`);
-}
-
-/**
  * Generate unique course ID for test isolation
  */
 function generateUniqueCourseId(): string {
@@ -238,7 +206,7 @@ describe('Stage 6 tRPC API E2E', () => {
   let testCourseId: string;
   let testLessonSpecs: LessonSpecificationV2[];
   let instructorToken: string;
-  let studentToken: string;
+  let _studentToken: string;
   let setupSuccessful = false;
 
   beforeAll(async () => {
@@ -252,9 +220,15 @@ describe('Stage 6 tRPC API E2E', () => {
       await createAuthUser(
         TEST_USERS.instructor1.email,
         'test-password-123',
-        TEST_USERS.instructor1.id
+        TEST_USERS.instructor1.id,
+        TEST_USERS.instructor1.role
       );
-      await createAuthUser(TEST_USERS.student.email, 'test-password-789', TEST_USERS.student.id);
+      await createAuthUser(
+        TEST_USERS.student.email,
+        'test-password-789',
+        TEST_USERS.student.id,
+        TEST_USERS.student.role
+      );
 
       // Wait for auth users to propagate
       console.log('[Stage 6 API Tests] Waiting for auth users to be ready...');
@@ -289,7 +263,7 @@ describe('Stage 6 tRPC API E2E', () => {
     // Get auth tokens
     try {
       instructorToken = await getAuthToken(TEST_USERS.instructor1.email, 'test-password-123');
-      studentToken = await getAuthToken(TEST_USERS.student.email, 'test-password-789');
+      _studentToken = await getAuthToken(TEST_USERS.student.email, 'test-password-789');
       console.log('[Stage 6 API Tests] Auth tokens obtained successfully');
       setupSuccessful = true;
     } catch (error) {
@@ -1097,7 +1071,7 @@ describe('Stage 6 tRPC API E2E', () => {
       }
     });
 
-    it('should handle malformed JSON in request gracefully', async () => {
+    it('should handle malformed JSON in request gracefully', () => {
       // This would require testing at a lower level than tRPC client allows
       // The tRPC client handles JSON serialization automatically
       expect(true).toBe(true);

@@ -25,6 +25,8 @@ export default defineConfig({
   external: [
     // Keep BullMQ external - it's a runtime dependency and handles its own ESM
     'bullmq',
+    // Keep Sentry external - large SDK with native bindings
+    '@sentry/node',
     // Keep pino external - it has native bindings
     'pino',
     'pino-pretty',

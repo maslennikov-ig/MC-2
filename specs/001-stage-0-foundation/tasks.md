@@ -33,7 +33,6 @@ Based on plan.md monorepo structure:
 
 ---
 
-
 ---
 
 ## 📊 Progress Dashboard
@@ -61,8 +60,7 @@ Based on plan.md monorepo structure:
 
 ### Implementation for User Story 5
 
-
-- [X] T074.1.2 [infrastructure-specialist] [US5] Setup Docling MCP Server for document conversion (BLOCKS T074.3, T074.4)
+- [x] T074.1.2 [infrastructure-specialist] [US5] Setup Docling MCP Server for document conversion (BLOCKS T074.3, T074.4)
   - **Purpose**: Configure Docling MCP server to enable document-to-markdown conversion
   - **Development time**: 1 day | **Runtime cost**: $0 (Docling open-source)
   - **Dependency**: Prerequisite for T074.3 (Markdown conversion) and T074.4 (OCR control)
@@ -100,7 +98,7 @@ Based on plan.md monorepo structure:
     - ✅ Integration tests passing
     - ✅ Documentation in `docs/docling-setup.md`
 
-- [X] T074.3 [infrastructure-specialist] [US5] Implement Markdown conversion pipeline for document processing (BLOCKS T075)
+- [x] T074.3 [infrastructure-specialist] [US5] Implement Markdown conversion pipeline for document processing (BLOCKS T075)
   - **Purpose**: Convert all document formats to unified Markdown for simplified chunking
   - **Development time**: 2 days | **Runtime cost**: $0 (Docling native)
   - **Architecture**: Docling MCP → DoclingDocument JSON → Markdown export → T075 chunking
@@ -144,12 +142,13 @@ Based on plan.md monorepo structure:
     - Note: Semantic image descriptions (Vision API) are PREMIUM feature (T074.5 - optional)
 
   - **Output format**:
+
     ```typescript
     interface ConversionResult {
-      markdown: string;                    // Clean Markdown text for T075
-      json: DoclingDocument;               // Full JSON for metadata enrichment
-      images: ImageMetadata[];             // Extracted images with captions
-      structure: DocumentStructure;        // Heading hierarchy
+      markdown: string; // Clean Markdown text for T075
+      json: DoclingDocument; // Full JSON for metadata enrichment
+      images: ImageMetadata[]; // Extracted images with captions
+      structure: DocumentStructure; // Heading hierarchy
     }
     ```
 
@@ -177,7 +176,7 @@ Based on plan.md monorepo structure:
     - ⏸️ Vision API for semantic image descriptions (Jina/OpenRouter/GPT-4o - provider TBD)
     - ⏸️ Advanced table structure analysis
 
-- [X] T074.4 [infrastructure-specialist] [US5] Configure tier-based document processing with Docling and OCR control
+- [x] T074.4 [infrastructure-specialist] [US5] Configure tier-based document processing with Docling and OCR control
   - **Purpose**: Fix tier-based file format restrictions and enable Docling/OCR only for STANDARD/PREMIUM tiers
   - **Development time**: 1.5 days | **Runtime cost**: $0 (Tesseract/EasyOCR free)
   - **Dependency**: Requires T074.1.2 (Docling MCP Server) and T074.3 (Markdown conversion)
@@ -227,27 +226,37 @@ Based on plan.md monorepo structure:
     - Cost: $0 (OCR engines are free, only infrastructure cost)
 
   - **Error messages by tier** (corrected):
+
     ```typescript
     // FREE tier user attempts file upload
-    throw new Error('File uploads are not available on FREE tier. Please upgrade to BASIC or higher.');
+    throw new Error(
+      'File uploads are not available on FREE tier. Please upgrade to BASIC or higher.'
+    );
 
     // BASIC tier user uploads PDF
-    throw new Error('PDF processing requires STANDARD tier or higher. Allowed formats: TXT, MD. Please upgrade.');
+    throw new Error(
+      'PDF processing requires STANDARD tier or higher. Allowed formats: TXT, MD. Please upgrade.'
+    );
 
     // BASIC tier user uploads DOCX
-    throw new Error('DOCX processing requires STANDARD tier or higher. Allowed formats: TXT, MD. Please upgrade.');
+    throw new Error(
+      'DOCX processing requires STANDARD tier or higher. Allowed formats: TXT, MD. Please upgrade.'
+    );
 
     // STANDARD tier user uploads scanned PDF
     // → Works automatically with Docling OCR
 
     // BASIC tier user uploads image (PNG)
-    throw new Error('Image processing requires PREMIUM tier. Allowed formats: TXT, MD. Please upgrade.');
+    throw new Error(
+      'Image processing requires PREMIUM tier. Allowed formats: TXT, MD. Please upgrade.'
+    );
 
     // STANDARD tier user uploads image
     throw new Error('Image processing requires PREMIUM tier. Please upgrade.');
     ```
 
   - **Processing logic by tier**:
+
     ```typescript
     switch (organizationTier) {
       case 'free':
@@ -268,7 +277,7 @@ Based on plan.md monorepo structure:
         // All formats including images - use Docling with OCR + image extraction
         return await doclingClient.convertToDoclingDocument(filePath, {
           enableOCR: true,
-          extractImages: true
+          extractImages: true,
         });
     }
     ```
@@ -297,7 +306,7 @@ Based on plan.md monorepo structure:
     - ❌ Vision API for semantic image descriptions (PREMIUM optional feature)
     - ❌ Language pack customization (default: eng, rus, spa sufficient)
 
-- [X] T074.5 [infrastructure-specialist] [US5] (OPTIONAL) Integrate Vision API for semantic image descriptions (PREMIUM tier)
+- [x] T074.5 [infrastructure-specialist] [US5] (OPTIONAL) Integrate Vision API for semantic image descriptions (PREMIUM tier)
   - **Purpose**: Add semantic descriptions to images using Vision API (Jina/OpenRouter/GPT-4o)
   - **Status**: ⏸️ DEFERRED - Intentionally deferred to post-MVP per recommendation
   - **Development time**: 2-3 days | **Runtime cost**: ~$0.001-0.01 per image (provider-dependent)
@@ -323,7 +332,7 @@ Based on plan.md monorepo structure:
 
   - **Recommendation**: ⏸️ Defer to post-MVP, revisit after user feedback
 
-- [X] T075 [infrastructure-specialist] [US5] Implement STANDARD tier RAG (hierarchical + late + BM25 hybrid + structure-aware)
+- [x] T075 [infrastructure-specialist] [US5] Implement STANDARD tier RAG (hierarchical + late + BM25 hybrid + structure-aware)
   - **⚠️ DEPENDS ON T074.3**: Uses Markdown conversion pipeline for document processing
   - **PRIMARY IMPLEMENTATION TARGET**: STANDARD (Optimum) tier - all other tiers are variations
   - **Development time**: 5-7 days | **Storage overhead**: +55% | **Runtime cost**: $0.02-0.025/1M tokens
@@ -404,14 +413,14 @@ Based on plan.md monorepo structure:
 
   - Return chunks with parent-child relationships and comprehensive metadata for hierarchical retrieval
 
-- [X] T076 [infrastructure-specialist] [US5] Implement embedding generation service
+- [x] T076 [infrastructure-specialist] [US5] Implement embedding generation service
   - Create `packages/course-gen-platform/src/shared/embeddings/generate.ts`
   - Accept document text and task type ("retrieval.passage" or "retrieval.query")
   - Call Jina-v3 API to generate embeddings
   - Return 768-dimensional vector
   - Cache embeddings in Redis (1-hour TTL)
 
-- [X] T077 [infrastructure-specialist] [US5] Implement vector upload service
+- [x] T077 [infrastructure-specialist] [US5] Implement vector upload service
   - Create `packages/course-gen-platform/src/shared/qdrant/upload.ts`
   - Accept chunks with embeddings and metadata
   - Batch upload to Qdrant (100-500 vectors per batch)
@@ -419,7 +428,7 @@ Based on plan.md monorepo structure:
   - Update file_catalog.vector_status to 'indexed'
   - Handle upload failures (update vector_status to 'failed')
 
-- [X] T078 [infrastructure-specialist] [US5] Implement semantic search service
+- [x] T078 [infrastructure-specialist] [US5] Implement semantic search service
   - Create `packages/course-gen-platform/src/shared/qdrant/search.ts`
   - Accept query text and search filters (course_id, organization_id)
   - Generate query embedding with Jina-v3 (task: "retrieval.query")
@@ -428,7 +437,7 @@ Based on plan.md monorepo structure:
   - Return: chunk_text, similarity_score, metadata
   - Cache search results for common queries
 
-- [X] T079 [infrastructure-specialist] [US5] Implement vector lifecycle management with content deduplication
+- [x] T079 [infrastructure-specialist] [US5] Implement vector lifecycle management with content deduplication
   - Create `packages/course-gen-platform/src/shared/qdrant/lifecycle.ts`
   - **Content Deduplication (Reference Counting)**:
     - Add `reference_count` INTEGER and `original_file_id` UUID columns to file_catalog (migration)
@@ -442,7 +451,7 @@ Based on plan.md monorepo structure:
   - Synchronize with PostgreSQL file_catalog table
   - Track vector status: pending, indexing, indexed, failed
 
-- [X] T080 [infrastructure-specialist] [US5] Create end-to-end RAG workflow (test)
+- [x] T080 [infrastructure-specialist] [US5] Create end-to-end RAG workflow (test)
   - Create script: `packages/course-gen-platform/scripts/test-rag-workflow.ts`
   - **Full workflow test**: Upload test document → Docling conversion → Markdown export (T074.3) → chunk (T075) → embed (T076) → store in Qdrant (T077)
   - Perform test query → generate query embedding → search → retrieve results
@@ -450,7 +459,7 @@ Based on plan.md monorepo structure:
   - Measure latency at each step
   - Test with multiple document formats: PDF, DOCX, PPTX to verify Markdown conversion
 
-- [X] T080.1 [integration-tester] [US5] Tier-Based Processing Tests (BLOCKS T081, T082, T083)
+- [x] T080.1 [integration-tester] [US5] Tier-Based Processing Tests (BLOCKS T081, T082, T083)
   - Create script: `packages/course-gen-platform/scripts/test-tier-processing.ts`
   - **Purpose**: Validate tier-based file format restrictions and processing logic (T074.4)
   - **Test Coverage**: FREE, BASIC, STANDARD, PREMIUM tier restrictions
@@ -486,7 +495,7 @@ Based on plan.md monorepo structure:
     - `scripts/test-tier-processing.ts` (~400 lines)
     - Test documents: TXT, MD, PDF (text), PDF (scanned), DOCX, PPTX, PNG
 
-- [X] T080.2 [integration-tester] [US5] Docling Integration Tests (DEPENDS ON Docling MCP Server)
+- [x] T080.2 [integration-tester] [US5] Docling Integration Tests (DEPENDS ON Docling MCP Server)
   - Create script: `packages/course-gen-platform/scripts/test-docling-conversion.ts`
   - **Purpose**: Validate Docling MCP conversion quality for PDF/DOCX/PPTX (T074.3)
   - **Test Coverage**: Document format conversion quality
@@ -528,7 +537,7 @@ Based on plan.md monorepo structure:
 
   - **Note**: Requires Docling MCP Server running (T074.1.2 - already implemented)
 
-- [X] T080.3 [integration-tester] [US5] Content Deduplication Tests (BLOCKS T081, T082, T083)
+- [x] T080.3 [integration-tester] [US5] Content Deduplication Tests (BLOCKS T081, T082, T083)
   - Create script: `packages/course-gen-platform/scripts/test-deduplication.ts`
   - **Purpose**: Validate reference counting and vector duplication (T079 - 2000+ lines of code)
   - **Test Coverage**: Deduplication detection, reference counting, vector duplication
@@ -583,7 +592,7 @@ Based on plan.md monorepo structure:
     - Query Qdrant to verify vector count per course_id
     - Query `organization_deduplication_stats` view for savings
 
-- [X] T080.4 [integration-tester] [US5] BM25 Hybrid Search Tests (BLOCKS T081, T082, T083)
+- [x] T080.4 [integration-tester] [US5] BM25 Hybrid Search Tests (BLOCKS T081, T082, T083)
   - Create script: `packages/course-gen-platform/scripts/test-hybrid-search.ts`
   - **Purpose**: Validate BM25 sparse vectors + RRF hybrid search (T075 - 600+ lines of code)
   - **Test Coverage**: Sparse vector generation, hybrid search, precision improvement
@@ -633,7 +642,7 @@ Based on plan.md monorepo structure:
     - Hybrid search latency: <100ms p95 (2× searches + RRF merge)
     - Precision improvement: +7-10pp (target: 82% → 89-92%)
 
-- [X] T080.5 [integration-tester] [US5] Redis Caching Tests (OPTIONAL)
+- [x] T080.5 [integration-tester] [US5] Redis Caching Tests (OPTIONAL)
   - Create script: `packages/course-gen-platform/scripts/test-redis-caching.ts`
   - **Purpose**: Validate Redis cache hits/misses for embeddings and search (T076, T078)
   - **Test Coverage**: Cache behavior, TTL, performance improvement
@@ -688,7 +697,7 @@ Based on plan.md monorepo structure:
 
   - **Note**: Can skip if Redis not available - workflow works without caching
 
-- [X] T081 [integration-tester] [US5] Verify Qdrant with acceptance tests (DEPENDS ON T080.1, T080.3, T080.4)
+- [x] T081 [integration-tester] [US5] Verify Qdrant with acceptance tests (DEPENDS ON T080.1, T080.3, T080.4)
   - Create `packages/course-gen-platform/tests/integration/qdrant.test.ts`
   - Test scenario 1: Collection created with HNSW configuration
   - Test scenario 2: Test vectors uploaded successfully
@@ -696,13 +705,13 @@ Based on plan.md monorepo structure:
   - Test scenario 4: Search with course_id filter returns only vectors for specified course
   - Test scenario 5: Multi-tenant isolation works (organization_id filtering)
 
-- [X] T082 [integration-tester] [US5] Verify Jina-v3 embeddings with acceptance tests
+- [x] T082 [integration-tester] [US5] Verify Jina-v3 embeddings with acceptance tests
   - Create `packages/course-gen-platform/tests/integration/jina-embeddings.test.ts`
   - Test scenario 1: Embeddings generated with 768 dimensions
   - Test scenario 2: Task-specific embeddings ("retrieval.passage" vs "retrieval.query")
   - Test scenario 3: Semantic similarity >95% recall for similar documents
 
-- [X] T083 [integration-tester] [US5] Create 5 test courses with RAG workflow
+- [x] T083 [integration-tester] [US5] Create 5 test courses with RAG workflow
   - Create script: `packages/course-gen-platform/scripts/seed-rag-data.ts`
   - Upload 5 test documents (different topics and formats: PDF, DOCX, PPTX, MD, TXT)
   - Process through full RAG workflow: Docling conversion → Markdown export → chunk → embed → store
@@ -710,7 +719,7 @@ Based on plan.md monorepo structure:
   - Test semantic search across all courses
   - Validate Markdown conversion quality for each document type
 
-- [X] T084 [technical-writer] [US5] Document migration path to self-hosted Jina-v3
+- [x] T084 [technical-writer] [US5] Document migration path to self-hosted Jina-v3
   - Create `docs/jina-v3-migration.md`
   - Document trigger conditions: >20GB indexed data or >100K queries/month
   - Document infrastructure requirements: Docker, 8GB RAM, 4 vCPU
@@ -721,8 +730,7 @@ Based on plan.md monorepo structure:
 
 ### Implementation for User Story 6
 
-
-- [X] T085 [DIRECT] [P] [US6] Create GitHub Actions test workflow
+- [x] T085 [DIRECT] [P] [US6] Create GitHub Actions test workflow
   - Create `.github/workflows/test.yml`
   - Trigger on: push to any branch, pull request
   - Setup Node.js 20+, pnpm
@@ -734,7 +742,7 @@ Based on plan.md monorepo structure:
   - Add Redis 7 service for BullMQ tests
   - **STATUS**: ✅ Workflow ready - ESLint fixed, Redis added, timeouts configured
 
-- [X] T086 [DIRECT] [P] [US6] Create GitHub Actions build workflow
+- [x] T086 [DIRECT] [P] [US6] Create GitHub Actions build workflow
   - Create `.github/workflows/build.yml`
   - Trigger on: push to main branch, pull request
   - Setup Node.js 20+, pnpm
@@ -744,7 +752,7 @@ Based on plan.md monorepo structure:
   - Verify build completes within 5 minutes
   - **STATUS**: ✅ Workflow created and ready for main branch merges
 
-- [X] T087 [DIRECT] [P] [US6] Create GitHub Actions deployment workflow (staging)
+- [x] T087 [DIRECT] [P] [US6] Create GitHub Actions deployment workflow (staging)
   - Create `.github/workflows/deploy-staging.yml`
   - Trigger on: push to main branch
   - Prerequisites: tests pass, build succeeds
@@ -752,7 +760,7 @@ Based on plan.md monorepo structure:
   - Run smoke tests against staging
   - **STATUS**: ✅ Workflow created with deployment placeholders ready for staging setup
 
-- [X] T088 [DIRECT] [US6] Configure branch protection rules
+- [x] T088 [DIRECT] [US6] Configure branch protection rules
   - **STATUS**: ✅ Documentation created - requires GitHub admin to apply
   - **FILES**: `.github/BRANCH_PROTECTION.md`
   - **REQUIREMENTS**:
@@ -762,7 +770,7 @@ Based on plan.md monorepo structure:
     - Prevent force pushes
   - **NOTE**: Branch protection rules documented; requires repository admin access to enable in GitHub UI
 
-- [X] T089 [integration-tester] [US6] Verify CI/CD pipeline with acceptance tests
+- [x] T089 [integration-tester] [US6] Verify CI/CD pipeline with acceptance tests
   - Test scenario 1: Push commit → automated tests run → status reported
   - Test scenario 2: Tests pass → build artifacts generated
   - Test scenario 3: Tests fail → commit blocked from merging
@@ -773,10 +781,9 @@ Based on plan.md monorepo structure:
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-
 **Purpose**: Improvements that affect multiple user stories
 
-- [X] T098 [DIRECT] [P] Create `/push` slash command for automated release management
+- [x] T098 [DIRECT] [P] Create `/push` slash command for automated release management
   - **Purpose**: Automate the release workflow with version bumping, changelog updates, and GitHub push
   - **Development time**: 2-3 hours | **Complexity**: Medium
   - **Dependencies**: None
@@ -826,14 +833,14 @@ Based on plan.md monorepo structure:
 
   - **Detailed specification**: See `specs/001-stage-0-foundation/T098-push-command-task.md`
 
-- [X] T090 [technical-writer] [P] Create comprehensive README.md
+- [x] T090 [technical-writer] [P] Create comprehensive README.md
   - Document project overview
   - Document Stage 0 scope (infrastructure only, no workflows)
   - Document technology stack
   - Link to quickstart.md for developer onboarding
   - Document monorepo structure
 
-- [X] T091 [technical-writer] [P] Create quickstart.md guide
+- [x] T091 [technical-writer] [P] Create quickstart.md guide
   - Document prerequisites: Node.js 20+, pnpm, Docker, Supabase account, Qdrant account
   - Document local setup steps
   - Document environment variable configuration
@@ -842,21 +849,21 @@ Based on plan.md monorepo structure:
   - Document running tests
   - Document common troubleshooting
 
-- [X] T092 [technical-writer] [P] Create API documentation
+- [x] T092 [technical-writer] [P] Create API documentation
   - Document tRPC router endpoints
   - Document authentication flow
   - Document authorization roles
   - Document file upload constraints per tier
   - Document error codes and responses
 
-- [X] T093 [api-builder] [P] Create tRPC client SDK package
+- [x] T093 [api-builder] [P] Create tRPC client SDK package
   - Create `packages/trpc-client-sdk/src/index.ts`
   - Export tRPC client factory
   - Export router types for external consumers
   - Add usage examples in README
   - Prepare for npm publishing
 
-- [X] T094 [security-orchestrator] [P] Security hardening review
+- [x] T094 [security-orchestrator] [P] Security hardening review
   - ✅ Review RLS policies for security vulnerabilities (PASSED - properly configured)
   - ✅ Review JWT validation logic (PASSED - secure patterns found)
   - ✅ Review file upload validation (PASSED - no vulnerabilities)
@@ -864,22 +871,21 @@ Based on plan.md monorepo structure:
   - ✅ Document security best practices (COMPLETED - docs/security/CREDENTIAL-ROTATION-GUIDE.md)
   - **Status**: COMPLETE - Private repos + .gitignore = acceptable risk, rotation guide available if needed
 
-- [X] T095 [ORCHESTRATOR] Performance optimization
+- [x] T095 [ORCHESTRATOR] Performance optimization
   - Profile tRPC endpoint latency (target <200ms p95)
   - Profile BullMQ job processing throughput (target 100+ jobs/sec)
   - Profile vector search latency (target <30ms p95)
   - Identify and optimize bottlenecks
 
-- [X] T096 [integration-tester] Run full acceptance test suite (quickstart.md validation)
+- [x] T096 [integration-tester] Run full acceptance test suite (quickstart.md validation)
   - Follow quickstart.md step by step with fresh environment
   - Verify all 24 success criteria from spec.md
   - Document any issues or missing steps
   - Update quickstart.md if needed
 
-- [X] T097 [ORCHESTRATOR] Create Stage 0 completion report
+- [x] T097 [ORCHESTRATOR] Create Stage 0 completion report
   - Document all completed user stories
   - Document all passing acceptance tests
   - Document any deviations from spec.md
   - Document known issues or limitations
   - Confirm readiness for Stage 1 development
-

@@ -20,23 +20,23 @@ import type { LucideIcon } from 'lucide-react';
  * Node type enumeration
  */
 export type GraphNodeType =
-  | 'stage'     // Main pipeline stage (1-6)
-  | 'document'  // Parallel document in Stage 2
-  | 'lesson'    // Parallel lesson in Stage 6
-  | 'module'    // Collapsible module group
-  | 'merge'     // Convergence point after parallel
-  | 'end';      // Pipeline completion node
+  | 'stage' // Main pipeline stage (1-6)
+  | 'document' // Parallel document in Stage 2
+  | 'lesson' // Parallel lesson in Stage 6
+  | 'module' // Collapsible module group
+  | 'merge' // Convergence point after parallel
+  | 'end'; // Pipeline completion node
 
 /**
  * Node status enumeration
  */
 export type NodeStatus =
-  | 'pending'   // Not yet started
-  | 'active'    // Currently processing
+  | 'pending' // Not yet started
+  | 'active' // Currently processing
   | 'completed' // Successfully finished
-  | 'error'     // Failed with error
-  | 'awaiting'  // Waiting for user approval
-  | 'skipped';  // Optional step was skipped (FR-SS01)
+  | 'error' // Failed with error
+  | 'awaiting' // Waiting for user approval
+  | 'skipped'; // Optional step was skipped (FR-SS01)
 
 /**
  * Stage number type (1-6 for current stages, null for utility nodes)
@@ -227,10 +227,10 @@ export interface EndNode extends GraphNode {
  * Edge status enumeration
  */
 export type EdgeStatus =
-  | 'idle'      // No activity
-  | 'active'    // Data flowing
+  | 'idle' // No activity
+  | 'active' // Data flowing
   | 'completed' // Transfer complete
-  | 'error';    // Error occurred
+  | 'error'; // Error occurred
 
 /**
  * Graph edge interface
@@ -332,13 +332,13 @@ export interface ProcessMetrics {
  * Stage type classification
  */
 export type StageType =
-  | 'trigger'     // Start nodes (Stage 1)
-  | 'document'    // File processing (Stage 2)
-  | 'ai'          // LLM operations (Stage 3, 4)
-  | 'structure'   // Structure generation (Stage 5)
-  | 'content'     // Content output (Stage 6)
-  | 'assessment'  // Quiz/homework (FUTURE)
-  | 'media';      // Video/audio (FUTURE)
+  | 'trigger' // Start nodes (Stage 1)
+  | 'document' // File processing (Stage 2)
+  | 'ai' // LLM operations (Stage 3, 4)
+  | 'structure' // Structure generation (Stage 5)
+  | 'content' // Content output (Stage 6)
+  | 'assessment' // Quiz/homework (FUTURE)
+  | 'media'; // Video/audio (FUTURE)
 
 /**
  * Stage configuration entry

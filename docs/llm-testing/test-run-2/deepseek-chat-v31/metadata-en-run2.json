@@ -5,7 +5,27 @@
   "target_audience": "Absolute beginners with no prior programming experience; professionals from non-technical fields (e.g., marketers, project managers, researchers) seeking to automate tasks or understand code; and students exploring a potential career in software development, data science, or IT.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Ability to install software on your computer", "No prior programming knowledge required"],
-  "learning_outcomes": ["Define and utilize fundamental programming constructs such as variables, data types, and operators.", "Build programs that implement conditional logic and loops to control execution flow.", "Create reusable functions to structure code and perform specific tasks.", "Analyze and manipulate data stored in core Python data structures including lists and dictionaries.", "Construct simple Python applications by combining core concepts to solve practical problems.", "Evaluate code to identify and fix common syntax and logical errors."],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "data structures", "functions"]
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software on your computer",
+    "No prior programming knowledge required"
+  ],
+  "learning_outcomes": [
+    "Define and utilize fundamental programming constructs such as variables, data types, and operators.",
+    "Build programs that implement conditional logic and loops to control execution flow.",
+    "Create reusable functions to structure code and perform specific tasks.",
+    "Analyze and manipulate data stored in core Python data structures including lists and dictionaries.",
+    "Construct simple Python applications by combining core concepts to solve practical problems.",
+    "Evaluate code to identify and fix common syntax and logical errors."
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "data structures",
+    "functions"
+  ]
 }

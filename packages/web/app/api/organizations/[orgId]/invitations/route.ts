@@ -3,28 +3,9 @@ import { getAdminClient } from '@/lib/supabase/client-factory'
 import { authenticateRequest } from '@/lib/auth'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { nanoid, customAlphabet } from 'nanoid'
-import { type OrgRole, type InvitationType } from '@megacampus/shared-types'
+import { type OrgRole } from '@megacampus/shared-types'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
-
-// Type definitions for organization tables (not yet in generated types)
-interface OrganizationInvitationRow {
-  id: string
-  organization_id: string
-  invitation_type: string
-  email: string | null
-  token: string | null
-  code: string | null
-  role: string
-  created_by: string
-  created_at: string
-  expires_at: string
-  max_uses: number | null
-  current_uses: number
-  status: string
-  accepted_by: string | null
-  accepted_at: string | null
-}
 
 /**
  * Invitation code configuration
@@ -48,7 +29,6 @@ function generateToken(): string {
 
 /**
  * Check if user has admin-level access to the organization
- * Uses raw query to avoid type issues with new tables
  */
 async function checkOrgAdminAccess(
   client: SupabaseClient,
@@ -63,13 +43,12 @@ async function checkOrgAdminAccess(
   // Fallback to direct query if RPC doesn't exist
   if (error?.code === '42883') {
     // Function doesn't exist, use direct query
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: membership, error: queryError } = (await (client as any)
+    const { data: membership, error: queryError } = await client
       .from('organization_members')
       .select('role')
       .eq('organization_id', orgId)
       .eq('user_id', userId)
-      .single()) as { data: { role: string } | null; error: { message: string } | null }
+      .single()
 
     if (queryError || !membership) {
       return { hasAccess: false, role: null }
@@ -156,22 +135,22 @@ export async function GET(
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10)))
     const offset = (page - 1) * pageSize
 
-    // Get invitations - use type assertion for new table (not yet in generated types)
-
     const {
       data: invitations,
       count,
       error,
-    } = (await (adminClient as any)
+    } = await adminClient
       .from('organization_invitations')
-      .select('*', { count: 'exact' })
+      .select(
+        `
+        *,
+        creator:created_by (id, email, full_name)
+      `,
+        { count: 'exact' }
+      )
       .eq('organization_id', orgId)
       .order('created_at', { ascending: false })
-      .range(offset, offset + pageSize - 1)) as {
-      data: OrganizationInvitationRow[] | null
-      count: number | null
-      error: { message: string } | null
-    }
+      .range(offset, offset + pageSize - 1)
 
     if (error) {
       logger.error('Invitations API GET: Database error', { requestId, error: error.message })
@@ -188,49 +167,42 @@ export async function GET(
           requestId,
           invitationType: undefined, // List operation - no specific type
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to fetch invitations', requestId },
         { status: 500 }
       )
     }
 
-    // Get creator details for each invitation
-    const creatorIds = [...new Set(invitations?.map((inv) => inv.created_by) || [])]
-    let creatorsMap: Record<string, { email: string; full_name: string | null }> = {}
-
-    if (creatorIds.length > 0) {
-      const { data: creators } = await adminClient
-        .from('users')
-        .select('id, email, full_name')
-        .in('id', creatorIds)
-
-      if (creators) {
-        creatorsMap = Object.fromEntries(
-          creators.map((c) => [c.id, { email: c.email, full_name: c.full_name }])
-        )
-      }
-    }
-
     // Transform to camelCase and add creator info
-    const transformedInvitations = (invitations || []).map((inv) => ({
-      id: inv.id,
-      organizationId: inv.organization_id,
-      invitationType: inv.invitation_type as InvitationType,
-      email: inv.email,
-      token: inv.token,
-      code: inv.code,
-      role: inv.role as OrgRole,
-      createdBy: inv.created_by,
-      createdAt: inv.created_at,
-      expiresAt: inv.expires_at,
-      maxUses: inv.max_uses,
-      currentUses: inv.current_uses,
-      status: inv.status,
-      acceptedBy: inv.accepted_by,
-      acceptedAt: inv.accepted_at,
-      creator: creatorsMap[inv.created_by] || null,
-    }))
+    const transformedInvitations = (invitations || []).map((inv) => {
+      // Supabase relational select returns nested object; SDK types don't include it
+      const creatorData = (inv as Record<string, unknown>).creator as {
+        id: string
+        email: string
+        full_name: string | null
+      } | null
+      return {
+        id: inv.id,
+        organizationId: inv.organization_id,
+        invitationType: inv.invitation_type,
+        email: inv.email,
+        token: inv.token,
+        code: inv.code,
+        role: inv.role as OrgRole,
+        createdBy: inv.created_by,
+        createdAt: inv.created_at,
+        expiresAt: inv.expires_at,
+        maxUses: inv.max_uses,
+        currentUses: inv.current_uses,
+        status: inv.status,
+        acceptedBy: inv.accepted_by,
+        acceptedAt: inv.accepted_at,
+        creator: creatorData
+          ? { email: creatorData.email, full_name: creatorData.full_name }
+          : null,
+      }
+    })
 
     logger.info('Invitations API GET: Success', {
       requestId,
@@ -269,7 +241,7 @@ export async function GET(
         requestId,
         invitationType: undefined, // List operation - no specific type
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },
@@ -349,9 +321,7 @@ export async function POST(
       code = generateCode()
     }
 
-    // Insert invitation - use type assertion for new table (not yet in generated types)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: invitation, error } = (await (adminClient as any)
+    const { data: invitation, error } = await adminClient
       .from('organization_invitations')
       .insert({
         organization_id: orgId,
@@ -364,13 +334,10 @@ export async function POST(
         expires_at: expiresAt.toISOString(),
         max_uses: maxUses ?? null,
         current_uses: 0,
-        status: 'pending',
+        status: 'pending' as const,
       })
       .select()
-      .single()) as {
-      data: OrganizationInvitationRow | null
-      error: { message: string; code: string } | null
-    }
+      .single()
 
     if (error) {
       logger.error('Invitations API POST: Database error', {
@@ -391,7 +358,7 @@ export async function POST(
           requestId,
           invitationType,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to create invitation', requestId },
         { status: 500 }
@@ -423,7 +390,7 @@ export async function POST(
       invitation: {
         id: invitation.id,
         organizationId: invitation.organization_id,
-        invitationType: invitation.invitation_type as InvitationType,
+        invitationType: invitation.invitation_type,
         email: invitation.email,
         token: invitation.token,
         code: invitation.code,
@@ -459,7 +426,7 @@ export async function POST(
         requestId,
         invitationType: undefined, // Not available in catch block
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },

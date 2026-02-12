@@ -8,12 +8,14 @@
 > **🎉 DISCOVERY**: Zod schemas already exist! Full `AnalysisResultSchema` found in `packages/course-gen-platform/src/types/analysis-result.ts`. Phase 1 simplified from 4-6h to 2-3h (**saved 2-3 hours!**)
 
 **Progress Summary**:
+
 - ⏳ **U01-U05**: Schema unification (Zod validator, helper functions) - PENDING
 - ⏳ **U06-U10**: Stage 5 services update - PENDING
 - ⏳ **U11-U15**: Test updates - PENDING
 - ⏳ **U16-U18**: Documentation and validation - PENDING
 
 **Key Objectives**:
+
 - Unify Stage 4 (Analyze) and Stage 5 (Generation) schemas
 - **Generation ALWAYS receives FULL data from Analyze** (100% of cases, no exceptions)
 - Eliminate schema mismatch causing validation failures
@@ -22,12 +24,14 @@
 - Align with RT-002 architecture (Generation uses full context)
 
 **Artifacts to Create**:
+
 1. `packages/shared-types/src/analysis-result-validator.ts` - Zod validator for full AnalysisResult
 2. `packages/course-gen-platform/src/services/stage5/analysis-formatters.ts` - 7 helper functions
 3. `packages/course-gen-platform/tests/unit/stage5/analysis-formatters.test.ts` - Helper tests (100% coverage)
 4. `docs/migrations/MIGRATION-unified-schemas.md` - Migration guide
 
 **Files to Modify**:
+
 - `packages/shared-types/src/generation-job.ts` - Replace simplified schema with full schema
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts` - Use helper functions
 - `packages/course-gen-platform/src/services/stage5/metadata-generator.ts` - Use helper functions
@@ -44,12 +48,14 @@
 **Objective**: Use existing Zod schemas and create helper functions
 
 **DISCOVERY**: ✅ Zod schemas ALREADY EXIST!
+
 - **Full AnalysisResultSchema**: `packages/course-gen-platform/src/types/analysis-result.ts` (lines 41-108)
 - **PedagogicalPatternsSchema**: `packages/shared-types/src/analysis-schemas.ts` (lines 147-152)
 - **GenerationGuidanceSchema**: `packages/shared-types/src/analysis-schemas.ts` (lines 156-166)
 - **All nested schemas**: course_category, contextual_language, topic_analysis, pedagogical_strategy
 
 **What's Missing**: Enhancement fields not yet in main schema (ALL REQUIRED):
+
 - `pedagogical_patterns` - Analyze always generates
 - `generation_guidance` - Analyze always generates
 - `document_relevance_mapping` - Analyze always generates, Generation decides whether to use RAG
@@ -62,9 +68,11 @@
 **Architecture Note**: Analyze (Stage 4) ALWAYS generates ALL these fields, even if input was title-only. Generation (Stage 5) receives ALL fields and decides whether to use RAG.
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/types/analysis-result.ts` (lines 88-91)
 
 **Implementation**:
+
 ```typescript
 // CURRENT (line 88):
   scope_instructions: z.string().min(100),
@@ -124,29 +132,30 @@
 
 **Recommended Approach** (cleaner separation, Best Practice):
 Create `packages/shared-types/src/analysis-result-validator.ts` that imports and extends:
+
 ```typescript
 import {
   AnalysisResultSchema as BaseSchema,
   SectionBreakdownSchema,
   ExpansionAreaSchema,
-  ResearchFlagSchema
+  ResearchFlagSchema,
 } from '../../course-gen-platform/src/types/analysis-result';
 
 import {
   PedagogicalPatternsSchema,
   GenerationGuidanceSchema,
   DocumentRelevanceMappingSchema,
-  DocumentAnalysisSchema
+  DocumentAnalysisSchema,
 } from './analysis-schemas';
 
 // Extended schema with ALL fields REQUIRED (production Best Practice)
 // Analyze (Stage 4) ALWAYS generates ALL fields for Generation
 // Generation (Stage 5) receives ALL fields and decides whether to use RAG
 export const FullAnalysisResultSchema = BaseSchema.extend({
-  pedagogical_patterns: PedagogicalPatternsSchema,          // REQUIRED (Analyze always generates)
-  generation_guidance: GenerationGuidanceSchema,            // REQUIRED (Analyze always generates)
-  document_relevance_mapping: DocumentRelevanceMappingSchema,  // REQUIRED (Analyze always generates, Generation decides if use)
-  document_analysis: DocumentAnalysisSchema,                // REQUIRED (Analyze always generates, Generation decides if use)
+  pedagogical_patterns: PedagogicalPatternsSchema, // REQUIRED (Analyze always generates)
+  generation_guidance: GenerationGuidanceSchema, // REQUIRED (Analyze always generates)
+  document_relevance_mapping: DocumentRelevanceMappingSchema, // REQUIRED (Analyze always generates, Generation decides if use)
+  document_analysis: DocumentAnalysisSchema, // REQUIRED (Analyze always generates, Generation decides if use)
 });
 
 export { FullAnalysisResultSchema as AnalysisResultSchema };
@@ -160,11 +169,12 @@ export {
   PedagogicalPatternsSchema,
   GenerationGuidanceSchema,
   DocumentRelevanceMappingSchema,
-  DocumentAnalysisSchema
+  DocumentAnalysisSchema,
 };
 ```
 
 **Validation**:
+
 - ✅ ALL 4 fields REQUIRED (Analyze always generates ALL fields, even if input was title-only)
 - ✅ All schemas imported correctly
 - ✅ Type exports work
@@ -180,9 +190,11 @@ export {
 **Task**: Replace simplified AnalysisResultSchema with import from existing Zod schema
 
 **Files to Modify**:
+
 - `packages/shared-types/src/generation-job.ts` (lines 24-54)
 
 **Option A: Direct import from course-gen-platform** (Quick, 5 min):
+
 ```typescript
 // OLD (lines 24-54) - DELETE:
 export const AnalysisResultSchema = z.object({
@@ -199,6 +211,7 @@ export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 ```
 
 **Option B: Import from new shared-types validator** (Cleaner, 10 min, requires U01 Alternative Approach):
+
 ```typescript
 // OLD (lines 24-54) - DELETE:
 export const AnalysisResultSchema = z.object({
@@ -215,6 +228,7 @@ export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 **Recommended**: Option A for speed, Option B for cleaner architecture
 
 **Validation**:
+
 - ✅ Import works correctly
 - ✅ Type exports unchanged for consumers
 - ✅ No breaking changes to GenerationJobInputSchema structure
@@ -229,6 +243,7 @@ export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 **Task**: Create 7 helper functions to format nested AnalysisResult fields for prompts
 
 **Files to Create**:
+
 - `packages/course-gen-platform/src/services/stage5/analysis-formatters.ts`
 
 **Functions to Implement**:
@@ -242,6 +257,7 @@ export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 7. `getCategoryFromAnalysis(analysis)` → Extract primary category
 
 **Key Features**:
+
 - ✅ ALL fields REQUIRED (Analyze always generates ALL 4 enhancement fields)
 - ✅ Multiple strategies for contextual_language (full/summary/specific)
 - ✅ Clear formatting with headers and sections
@@ -258,9 +274,11 @@ export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 **Task**: Comprehensive unit tests for all 7 helper functions
 
 **Files to Create**:
+
 - `packages/course-gen-platform/tests/unit/stage5/analysis-formatters.test.ts`
 
 **Test Cases** (50+ tests total):
+
 1. formatCourseCategoryForPrompt:
    - All category types
    - With/without secondary category
@@ -297,6 +315,7 @@ export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 **Task**: Verify no TypeScript errors after schema changes
 
 **Commands**:
+
 ```bash
 cd packages/shared-types
 pnpm type-check
@@ -306,6 +325,7 @@ pnpm type-check
 ```
 
 **Expected Results**:
+
 - ✅ No type errors in shared-types
 - ✅ No type errors in course-gen-platform
 - ✅ Imports resolve correctly
@@ -313,6 +333,7 @@ pnpm type-check
 - ✅ AnalysisResultSchema now includes all nested objects
 
 **Note**: Since we're using existing schemas, type errors should be minimal. Most likely issues:
+
 - Import path resolution (if using Option B in U02)
 - Missing re-exports
 
@@ -326,6 +347,7 @@ pnpm type-check
 **Reason**: Existing Zod schemas found, only need to extend and import
 
 **Completed Tasks**:
+
 - [ ] U01: Extend existing AnalysisResultSchema (30-40 min)
 - [ ] U02: Update generation-job.ts import (5-10 min)
 - [ ] U03: Create helper functions (2h, unchanged)
@@ -345,10 +367,13 @@ pnpm type-check
 **Task**: Replace flat field access with helper functions
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
 
 **Locations to Update**:
+
 1. **Lines 655-658**: Analysis context in prompt
+
    ```typescript
    // OLD:
    - Difficulty: ${input.analysis_result.difficulty}
@@ -368,11 +393,13 @@ pnpm type-check
    - document_analysis (Analyze always generates, Generation decides if use)
 
 **Search Command**:
+
 ```bash
 grep -n "analysis_result\.\(category\|difficulty\|contextual_language\|pedagogical_strategy\)" section-batch-generator.ts
 ```
 
 **Validation**:
+
 - ✅ All flat field access replaced
 - ✅ Prompts include rich context from ALL nested fields
 - ✅ ALL 4 REQUIRED fields available (Analyze always generates)
@@ -388,16 +415,23 @@ grep -n "analysis_result\.\(category\|difficulty\|contextual_language\|pedagogic
 **Task**: Replace flat field access with helper functions
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 
 **Locations to Update**:
+
 1. **Lines 312-315**: Analysis context in prompt
 2. **Line 257**: Language priority comment (contextual_language reference)
 3. **Line 492**: Difficulty comparison
 
 **Implementation**:
+
 ```typescript
-import { getDifficultyFromAnalysis, formatCourseCategoryForPrompt, formatPedagogicalStrategyForPrompt } from './analysis-formatters';
+import {
+  getDifficultyFromAnalysis,
+  formatCourseCategoryForPrompt,
+  formatPedagogicalStrategyForPrompt,
+} from './analysis-formatters';
 
 // Update prompt construction:
 const difficulty = getDifficultyFromAnalysis(analysis);
@@ -413,6 +447,7 @@ ${strategy}
 ```
 
 **Validation**:
+
 - ✅ All references updated
 - ✅ No type errors
 - ✅ Prompts formatted correctly
@@ -426,12 +461,15 @@ ${strategy}
 **Task**: Replace direct pedagogical_strategy usage with formatter
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/services/stage5/generation-phases.ts`
 
 **Locations to Update**:
+
 1. **Line 725**: pedagogical_strategy in parts array
 
 **Implementation**:
+
 ```typescript
 import { formatPedagogicalStrategyForPrompt } from './analysis-formatters';
 
@@ -439,11 +477,14 @@ import { formatPedagogicalStrategyForPrompt } from './analysis-formatters';
 parts.push(input.analysis_result.pedagogical_strategy);
 
 // NEW:
-const strategyFormatted = formatPedagogicalStrategyForPrompt(input.analysis_result.pedagogical_strategy);
+const strategyFormatted = formatPedagogicalStrategyForPrompt(
+  input.analysis_result.pedagogical_strategy
+);
 parts.push(strategyFormatted);
 ```
 
 **Validation**:
+
 - ✅ Strategy formatted correctly
 - ✅ No type errors
 - ✅ Prompt construction works
@@ -457,12 +498,14 @@ parts.push(strategyFormatted);
 **Task**: Find and update any remaining references in Stage 5 services
 
 **Search Command**:
+
 ```bash
 cd packages/course-gen-platform/src/services/stage5
 grep -rn "analysis_result\.\(category\|difficulty\|contextual_language\|pedagogical_strategy\)" .
 ```
 
 **Files to Check**:
+
 - quality-validator.ts
 - qdrant-search.ts
 - cost-calculator.ts
@@ -471,11 +514,13 @@ grep -rn "analysis_result\.\(category\|difficulty\|contextual_language\|pedagogi
 - Any other service files
 
 **Action**:
+
 - Update each occurrence with helper functions
 - Ensure type safety
 - Add imports
 
 **Validation**:
+
 - ✅ All occurrences found and updated
 - ✅ No type errors across all files
 - ✅ Grep search returns zero results
@@ -489,12 +534,14 @@ grep -rn "analysis_result\.\(category\|difficulty\|contextual_language\|pedagogi
 **Task**: Verify no TypeScript errors after Stage 5 updates
 
 **Commands**:
+
 ```bash
 cd packages/course-gen-platform
 pnpm type-check
 ```
 
 **Validation**:
+
 - ✅ No type errors in Stage 5 services
 - ✅ All imports resolve correctly
 - ✅ Helper functions work as expected
@@ -512,16 +559,18 @@ pnpm type-check
 **Task**: Update fixture to return FULL schema with nested objects
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/tests/contract/generation.test.ts` (lines 64-141)
 
 **Implementation**:
+
 ```typescript
 // OLD (SIMPLIFIED):
 function createMinimalAnalysisResult(title: string) {
   return {
-    category: 'professional',  // ❌ Flat field
-    difficulty: 'intermediate',  // ❌ Doesn't exist in Stage 4
-    contextual_language: 'English',  // ❌ Should be object
+    category: 'professional', // ❌ Flat field
+    difficulty: 'intermediate', // ❌ Doesn't exist in Stage 4
+    contextual_language: 'English', // ❌ Should be object
     // ...
   };
 }
@@ -529,13 +578,15 @@ function createMinimalAnalysisResult(title: string) {
 // NEW (FULL):
 function createMinimalAnalysisResult(title: string) {
   return {
-    course_category: {  // ✅ Nested object
+    course_category: {
+      // ✅ Nested object
       primary: 'professional' as const,
       confidence: 0.9,
       reasoning: 'Test course for contract testing',
       secondary: null,
     },
-    contextual_language: {  // ✅ 6 fields
+    contextual_language: {
+      // ✅ 6 fields
       why_matters_context: 'Test context for learning importance',
       motivators: 'Test motivators for engagement',
       experience_prompt: 'Test experience description',
@@ -543,7 +594,8 @@ function createMinimalAnalysisResult(title: string) {
       knowledge_bridge: 'Test knowledge bridge',
       practical_benefit_focus: 'Test practical benefits',
     },
-    topic_analysis: {  // ✅ Full object
+    topic_analysis: {
+      // ✅ Full object
       determined_topic: title,
       information_completeness: 80,
       complexity: 'medium' as const,
@@ -553,7 +605,8 @@ function createMinimalAnalysisResult(title: string) {
       key_concepts: ['concept1', 'concept2', 'concept3'],
       domain_keywords: ['keyword1', 'keyword2', 'keyword3', 'keyword4', 'keyword5'],
     },
-    pedagogical_strategy: {  // ✅ 5 fields
+    pedagogical_strategy: {
+      // ✅ 5 fields
       teaching_style: 'mixed' as const,
       assessment_approach: 'Test assessment approach',
       practical_focus: 'medium' as const,
@@ -566,6 +619,7 @@ function createMinimalAnalysisResult(title: string) {
 ```
 
 **Validation**:
+
 - ✅ Returns full AnalysisResult type
 - ✅ All nested objects correct
 - ✅ Passes AnalysisResultSchema.safeParse() validation
@@ -580,9 +634,11 @@ function createMinimalAnalysisResult(title: string) {
 **Task**: Ensure language and style fields are set correctly
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/tests/contract/generation.test.ts` (line 393)
 
 **Changes**:
+
 ```typescript
 const { data, error } = await supabase
   .from('courses')
@@ -596,6 +652,7 @@ const { data, error } = await supabase
 ```
 
 **Validation**:
+
 - ✅ No null style errors
 - ✅ Validation passes in Phase 1
 
@@ -608,26 +665,30 @@ const { data, error } = await supabase
 **Task**: Find and update 15+ test files that use analysis_result
 
 **Search Command**:
+
 ```bash
 cd packages/course-gen-platform/tests
 grep -rl "analysis_result" . | grep "\.test\.ts$"
 ```
 
 **Expected Files** (from investigation report):
+
 1. tests/contract/generation.test.ts ✅ Done in U11
 2. tests/unit/stage5/metadata-generator.test.ts
 3. tests/unit/stage5/section-batch-generator.test.ts
 4. tests/unit/stage5/generation-phases.test.ts
-5. tests/integration/*.test.ts (multiple files)
+5. tests/integration/\*.test.ts (multiple files)
 6. ... ~10 more files
 
 **Action for Each File**:
+
 - Replace simplified fixtures with full schema
 - Update test expectations (nested objects)
 - Ensure validation passes
 - Run tests after each file
 
 **Validation**:
+
 - ✅ All test files updated
 - ✅ Fixtures use full schema
 - ✅ Tests pass individually
@@ -641,6 +702,7 @@ grep -rl "analysis_result" . | grep "\.test\.ts$"
 **Task**: Run all tests and verify 100% pass rate
 
 **Commands**:
+
 ```bash
 # Unit tests
 pnpm test
@@ -653,12 +715,14 @@ pnpm test:integration
 ```
 
 **Expected Results**:
+
 - ✅ All unit tests pass
 - ✅ 17/17 contract tests pass (was 16/17)
 - ✅ All integration tests pass
 - ✅ Zero regressions
 
 **Fix Regressions**:
+
 - If any tests fail, investigate and fix
 - Update fixtures or test expectations
 - Re-run until 100% pass
@@ -672,6 +736,7 @@ pnpm test:integration
 **Task**: Verify code quality across all packages
 
 **Commands**:
+
 ```bash
 # Type check
 pnpm type-check
@@ -681,6 +746,7 @@ pnpm lint
 ```
 
 **Validation**:
+
 - ✅ No type errors
 - ✅ No lint errors
 - ✅ Code quality maintained
@@ -698,14 +764,17 @@ pnpm lint
 **Task**: Document unified schema approach
 
 **Files to Modify**:
+
 - `docs/008-generation-generation-json/data-model.md`
 
 **Sections to Add/Update**:
+
 1. **Schema Unification Note**: Explain that AnalysisResult is now unified across stages
 2. **Helper Functions**: Document analysis-formatters.ts usage
 3. **Migration Note**: Reference MIGRATION-unified-schemas.md
 
 **Validation**:
+
 - ✅ Documentation clear and accurate
 - ✅ Examples updated
 - ✅ References correct
@@ -719,9 +788,11 @@ pnpm lint
 **Task**: Document migration for developers
 
 **Files to Create**:
+
 - `docs/migrations/MIGRATION-unified-schemas.md`
 
 **Content**:
+
 ```markdown
 # Migration Guide: Unified Stage 4/Stage 5 Schemas
 
@@ -759,6 +830,7 @@ Use helper functions from analysis-formatters.ts:
 ```
 
 **Validation**:
+
 - ✅ Migration guide complete
 - ✅ Examples clear
 - ✅ Breaking changes documented
@@ -772,6 +844,7 @@ Use helper functions from analysis-formatters.ts:
 **Task**: Test Stage 4 → Stage 5 pipeline with real data
 
 **Steps**:
+
 1. Run Stage 4 (Analyze) on test course (title-only or with documents)
 2. Verify Analyze generates ALL 4 fields (even if input was title-only)
 3. Verify analysis_result saved to database (JSONB) with ALL fields present
@@ -784,17 +857,20 @@ Use helper functions from analysis-formatters.ts:
    - ✅ Generation completes successfully
 
 **Test Cases**:
+
 - Title-only course (Analyze still generates ALL 4 fields)
 - Course with documents (Analyze generates ALL 4 fields with document analysis)
 - Different course categories and difficulty levels
 - Different pedagogical strategies
 
 **CRITICAL**:
+
 - Analyze (Stage 4) ALWAYS generates ALL 4 fields, even if input was title-only
 - Generation (Stage 5) ALWAYS receives ALL 4 fields (ALL REQUIRED in schema)
 - Generation decides whether to use RAG data (logic-level decision, not schema-level)
 
 **Validation**:
+
 - ✅ All test cases pass
 - ✅ No errors in logs
 - ✅ Prompts look correct
@@ -806,6 +882,7 @@ Use helper functions from analysis-formatters.ts:
 ## 📊 Progress Tracking
 
 ### Phase 1: Schema Unification (Day 1)
+
 - [ ] U01: Extend existing Zod validator ✨ SIMPLIFIED (was: create from scratch)
 - [ ] U02: Update generation-job.ts import ✨ SIMPLIFIED (just import)
 - [ ] U03: Create helper functions
@@ -818,6 +895,7 @@ Use helper functions from analysis-formatters.ts:
 ---
 
 ### Phase 2: Update Stage 5 Services (Day 2)
+
 - [ ] U06: Update section-batch-generator.ts
 - [ ] U07: Update metadata-generator.ts
 - [ ] U08: Update generation-phases.ts
@@ -830,6 +908,7 @@ Use helper functions from analysis-formatters.ts:
 ---
 
 ### Phase 3: Update Tests (Day 3)
+
 - [ ] U11: Update createMinimalAnalysisResult()
 - [ ] U12: Update createTestCourseWithStructure()
 - [ ] U13: Update 15+ test files
@@ -842,6 +921,7 @@ Use helper functions from analysis-formatters.ts:
 ---
 
 ### Phase 4: Documentation (Day 4)
+
 - [ ] U16: Update data-model.md
 - [ ] U17: Create migration guide
 - [ ] U18: Manual testing
@@ -854,6 +934,7 @@ Use helper functions from analysis-formatters.ts:
 ## ✅ Acceptance Criteria
 
 ### Must Have (BLOCKING)
+
 - [ ] ✅ Zod validator created (U01)
 - [ ] ✅ generation-job.ts uses full schema (U02)
 - [ ] ✅ All 7 helper functions implemented (U03)
@@ -869,6 +950,7 @@ Use helper functions from analysis-formatters.ts:
 - [ ] ✅ Documentation updated (U16, U17)
 
 ### Should Have (IMPORTANT)
+
 - [ ] ✅ Stage 5 uses pedagogical_patterns if available
 - [ ] ✅ Stage 5 uses generation_guidance if available
 - [ ] ✅ Manual testing passes (U18)
@@ -878,12 +960,14 @@ Use helper functions from analysis-formatters.ts:
 ## 🎯 Success Metrics
 
 ### Technical Metrics
+
 - **Schema Validation Pass Rate**: 100%
 - **Type Coverage**: 100% (no `any` types)
 - **Test Pass Rate**: 100% (unit + contract + integration)
 - **Helper Function Coverage**: 100%
 
 ### Business Metrics
+
 - **Stage 4 → Stage 5 Pipeline**: Works without transformation
 - **Information Preservation**: 100% (no data loss)
 - **RT-002 Compliance**: Generation has full context
@@ -900,9 +984,10 @@ Use helper functions from analysis-formatters.ts:
 
 **Status**: ⏳ PENDING START
 **Total Estimated Effort**: 18-26 hours (2.5-3.5 days, 1 developer) ✅ **REDUCED**
-  - Phase 1: 2-3h (was 4-6h, **saved 2-3h** thanks to existing Zod schemas!)
-  - Phase 2: 6-8h (unchanged)
-  - Phase 3: 6-8h (unchanged)
-  - Phase 4: 4-6h (unchanged)
-**Created**: 2025-11-12
-**Last Updated**: 2025-11-12 (updated after discovering existing schemas)
+
+- Phase 1: 2-3h (was 4-6h, **saved 2-3h** thanks to existing Zod schemas!)
+- Phase 2: 6-8h (unchanged)
+- Phase 3: 6-8h (unchanged)
+- Phase 4: 4-6h (unchanged)
+  **Created**: 2025-11-12
+  **Last Updated**: 2025-11-12 (updated after discovering existing schemas)

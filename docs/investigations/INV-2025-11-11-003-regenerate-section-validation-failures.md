@@ -5,7 +5,7 @@ timestamp: 2025-11-11T12:00:00Z
 investigator: Claude Code (Investigation Agent)
 test_file: tests/contract/generation.test.ts
 affected_tests:
-  - "should regenerate section successfully"
+  - 'should regenerate section successfully'
 previous_issue: INV-2025-11-11-001 (timeout hang - SOLVED)
 current_issue: Input validation failures after timeout fix
 ---
@@ -19,6 +19,7 @@ current_issue: Input validation failures after timeout fix
 **Root Cause**: Test fixture `createMinimalAnalysisResult()` generates analysis_result data that does NOT match the `AnalysisResultSchema` expected by GenerationJobInputSchema validation in Phase 1 (validate_input).
 
 **Key Finding**: The test fixture was created based on Stage 4 (Analyze) output schema, but Stage 5 (Generation) expects a **simplified, different schema** with:
+
 - Different field names (e.g., `category` not `course_category`)
 - Different field types (e.g., `contextual_language` is string not object)
 - Different required fields (e.g., missing `difficulty`, `needs_research`)
@@ -55,6 +56,7 @@ current_issue: Input validation failures after timeout fix
 ```
 
 **Timeline**:
+
 1. **Previous Issue (SOLVED)**: Test hung indefinitely due to missing `timeout` in ChatOpenAI initialization
 2. **Fix Applied**: Added `timeout: 300000` (5 minutes) to ChatOpenAI at section-batch-generator.ts:842
 3. **New Problem**: Test now progresses but fails validation, cycles through regeneration layers, times out after >6 minutes
@@ -99,17 +101,21 @@ current_issue: Input validation failures after timeout fix
 ### Files Examined
 
 **Test Files** (1 file):
+
 - `/home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform/tests/contract/generation.test.ts` (lines 64-141, 356-403, 855-900)
 
 **Schema Definitions** (1 file):
+
 - `/home/me/code/megacampus2-worktrees/generation-json/packages/shared-types/src/generation-job.ts` (lines 24-54, 70-92, 135-154)
 
 **Service Implementation** (3 files):
+
 - `/home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform/src/services/stage5/generation-phases.ts` (lines 140-195)
 - `/home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform/src/services/stage5/section-batch-generator.ts` (lines 154-279, 830-844)
 - `/home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform/src/services/stage5/section-regeneration-service.ts` (lines 108-244)
 
 **Validation Logic** (2 files):
+
 - `/home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform/src/shared/regeneration/unified-regenerator.ts` (lines 1-200, 304-334)
 - `/home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform/src/server/routers/generation.ts` (lines 1310-1424)
 
@@ -150,14 +156,17 @@ grep -r "AnalysisResultSchema" packages/
 #### Step-by-Step Execution Flow
 
 1. **Test Setup** (line 861 in generation.test.ts)
+
    ```typescript
    const courseId = await createTestCourseWithStructure('Test Course - Regenerate Section');
    ```
+
    - Calls `createTestCourseWithStructure()` which creates course with:
      - `analysis_result: createMinimalAnalysisResult(title)`
      - `course_structure: mockStructure`
 
 2. **Test Invokes Endpoint** (line 871)
+
    ```typescript
    result = await client.generation.regenerateSection.mutate({
      courseId,
@@ -166,11 +175,13 @@ grep -r "AnalysisResultSchema" packages/
    ```
 
 3. **tRPC Router** (line 1407 in generation.ts)
+
    ```typescript
    await service.regenerateSection(courseId, sectionNumber, userId, organizationId);
    ```
 
 4. **SectionRegenerationService Fetches Data** (line 133-138 in section-regeneration-service.ts)
+
    ```typescript
    const { data: course, error } = await supabase
      .from('courses')
@@ -181,9 +192,11 @@ grep -r "AnalysisResultSchema" packages/
 
    const analysisResult = course.analysis_result as AnalysisResult | null;
    ```
+
    - **Result**: Fetches `analysis_result` created by test fixture
 
 5. **Service Builds GenerationJobInput** (line 231-243)
+
    ```typescript
    const jobInput: GenerationJobInput = {
      course_id: courseId,
@@ -201,27 +214,28 @@ grep -r "AnalysisResultSchema" packages/
    ```
 
 6. **SectionBatchGenerator.generateBatch** (line 273-279 in section-batch-generator.ts)
+
    ```typescript
    const result = await this.sectionBatchGenerator.generateBatch(
-     sectionNumber,      // batchNum
-     sectionIndex,       // startSection
-     sectionIndex + 1,   // endSection (exclusive)
-     jobInput,           // ❌ Contains invalid analysis_result
+     sectionNumber, // batchNum
+     sectionIndex, // startSection
+     sectionIndex + 1, // endSection (exclusive)
+     jobInput, // ❌ Contains invalid analysis_result
      this.qdrantClient
    );
    ```
 
 7. **Phase 1: validate_input** (line 146-157 in generation-phases.ts)
+
    ```typescript
    const result = GenerationJobInputSchema.safeParse(state.input);
 
    if (!result.success) {
-     const errors = result.error.errors.map(
-       (err) => `${err.path.join('.')}: ${err.message}`
-     );
+     const errors = result.error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
      // ❌ VALIDATION FAILS HERE
    }
    ```
+
    - **Validation Errors**:
      ```
      analysis_result.category: Required
@@ -237,6 +251,7 @@ grep -r "AnalysisResultSchema" packages/
 #### Schema Comparison
 
 **Test Fixture `createMinimalAnalysisResult()` Provides** (lines 64-141 in generation.test.ts):
+
 ```typescript
 {
   course_category: {              // ❌ Wrong: Should be "category" (string)
@@ -272,6 +287,7 @@ grep -r "AnalysisResultSchema" packages/
 ```
 
 **Stage 5 AnalysisResultSchema Expects** (lines 24-54 in generation-job.ts):
+
 ```typescript
 {
   // Phase 1: Classification
@@ -308,21 +324,22 @@ grep -r "AnalysisResultSchema" packages/
 
 #### Detailed Mismatch Analysis
 
-| Field | Test Fixture | Schema Expects | Issue |
-|-------|-------------|----------------|-------|
-| `category` | ❌ Missing (has `course_category` object) | ✅ Required (string) | **Field name + type mismatch** |
-| `difficulty` | ❌ Missing | ✅ Required (enum) | **Missing field** |
-| `contextual_language` | ❌ Object with 6 subfields | ✅ String | **Type mismatch** |
-| `recommended_structure` | ✅ Correct | ✅ Match | ✅ OK |
-| `pedagogical_strategy` | ❌ Object with 5 subfields | ✅ String | **Type mismatch** |
-| `needs_research` | ❌ Missing | ✅ Required (boolean) | **Missing field** |
-| `expansion_areas` | ✅ null (acceptable) | ✅ Array (optional) | ✅ OK |
-| `final_scope_instructions` | ✅ Has as `scope_instructions` | ✅ Expected | ⚠️ Field name variation |
-| `determined_topic` | ✅ Correct | ✅ Match | ✅ OK |
-| `key_concepts` | ✅ Correct | ✅ Match | ✅ OK |
-| `content_approach` | ✅ Has as `content_strategy` | ✅ Expected | ⚠️ Field name variation |
+| Field                      | Test Fixture                              | Schema Expects        | Issue                          |
+| -------------------------- | ----------------------------------------- | --------------------- | ------------------------------ |
+| `category`                 | ❌ Missing (has `course_category` object) | ✅ Required (string)  | **Field name + type mismatch** |
+| `difficulty`               | ❌ Missing                                | ✅ Required (enum)    | **Missing field**              |
+| `contextual_language`      | ❌ Object with 6 subfields                | ✅ String             | **Type mismatch**              |
+| `recommended_structure`    | ✅ Correct                                | ✅ Match              | ✅ OK                          |
+| `pedagogical_strategy`     | ❌ Object with 5 subfields                | ✅ String             | **Type mismatch**              |
+| `needs_research`           | ❌ Missing                                | ✅ Required (boolean) | **Missing field**              |
+| `expansion_areas`          | ✅ null (acceptable)                      | ✅ Array (optional)   | ✅ OK                          |
+| `final_scope_instructions` | ✅ Has as `scope_instructions`            | ✅ Expected           | ⚠️ Field name variation        |
+| `determined_topic`         | ✅ Correct                                | ✅ Match              | ✅ OK                          |
+| `key_concepts`             | ✅ Correct                                | ✅ Match              | ✅ OK                          |
+| `content_approach`         | ✅ Has as `content_strategy`              | ✅ Expected           | ⚠️ Field name variation        |
 
 **Additional Issue**: `frontend_parameters.style`
+
 ```typescript
 frontend_parameters: {
   course_title: course.title,        // ✅ OK
@@ -330,6 +347,7 @@ frontend_parameters: {
   style: course.style || undefined,  // ❌ course.style is null → becomes undefined → fails validation
 }
 ```
+
 - **Problem**: `style` field in `courses` table is `null` in test data
 - **Schema**: `style: CourseStyleSchema.optional()` - but validation fails when undefined (should accept null/undefined)
 - **Workaround**: Set explicit default or omit field entirely
@@ -337,11 +355,13 @@ frontend_parameters: {
 ### Evidence
 
 **Code Locations**:
+
 - Test fixture: `tests/contract/generation.test.ts:64-141` (`createMinimalAnalysisResult`)
 - Schema definition: `packages/shared-types/src/generation-job.ts:24-54` (`AnalysisResultSchema`)
 - Validation: `src/services/stage5/generation-phases.ts:146` (Phase 1 validate_input)
 
 **Validation Error Log**:
+
 ```json
 {
   "level": 50,
@@ -378,6 +398,7 @@ frontend_parameters: {
 1. **Replace `createMinimalAnalysisResult()` function** (lines 64-141 in generation.test.ts)
 
    **Change from**:
+
    ```typescript
    function createMinimalAnalysisResult(title: string) {
      return {
@@ -402,6 +423,7 @@ frontend_parameters: {
    ```
 
    **Change to**:
+
    ```typescript
    /**
     * Create minimal valid analysis_result for Stage 5 generation tests
@@ -412,9 +434,9 @@ frontend_parameters: {
    function createMinimalAnalysisResult(title: string) {
      return {
        // Phase 1: Classification
-       category: 'professional',                          // ✅ String, not object
-       difficulty: 'intermediate' as const,               // ✅ Added required field
-       contextual_language: 'English',                    // ✅ String, not object
+       category: 'professional', // ✅ String, not object
+       difficulty: 'intermediate' as const, // ✅ Added required field
+       contextual_language: 'English', // ✅ String, not object
 
        // Phase 2: Scope
        recommended_structure: {
@@ -434,11 +456,12 @@ frontend_parameters: {
 
        // Phase 3: Expert Analysis
        pedagogical_strategy: 'Mixed approach with hands-on practice', // ✅ String, not object
-       needs_research: false,                             // ✅ Added required field
-       expansion_areas: [],                               // ✅ Kept (optional)
+       needs_research: false, // ✅ Added required field
+       expansion_areas: [], // ✅ Kept (optional)
 
        // Phase 4: Synthesis
-       final_scope_instructions: 'Create comprehensive course covering fundamentals and advanced topics',
+       final_scope_instructions:
+         'Create comprehensive course covering fundamentals and advanced topics',
 
        // Phase 5: Topic Analysis
        determined_topic: title,
@@ -453,6 +476,7 @@ frontend_parameters: {
 2. **Fix `createTestCourseWithStructure()` style field** (line 393 in generation.test.ts)
 
    **Change from**:
+
    ```typescript
    const { data, error } = await supabase
      .from('courses')
@@ -464,6 +488,7 @@ frontend_parameters: {
    ```
 
    **Change to**:
+
    ```typescript
    const { data, error } = await supabase
      .from('courses')
@@ -480,9 +505,11 @@ frontend_parameters: {
    ```bash
    pnpm test tests/contract/generation.test.ts -t "should regenerate section successfully"
    ```
+
    - Expected: Phase 1 validation passes, test proceeds to LLM generation
 
 **Pros**:
+
 - ✅ Fixes root cause (test data matches schema)
 - ✅ No production code changes needed
 - ✅ Makes test fixture accurate for Stage 5 contract tests
@@ -490,6 +517,7 @@ frontend_parameters: {
 - ✅ Low risk (test-only change)
 
 **Cons**:
+
 - ⚠️ Test fixture no longer matches full Stage 4 output (acceptable - Stage 5 uses simplified schema)
 - ⚠️ May need to update other tests using `createMinimalAnalysisResult` (verify no other usages)
 
@@ -506,6 +534,7 @@ frontend_parameters: {
 **Implementation Steps**:
 
 1. **Modify `AnalysisResultSchema`** in `packages/shared-types/src/generation-job.ts`
+
    ```typescript
    export const AnalysisResultSchema = z.object({
      // Accept both "category" (Stage 5) and "course_category" (Stage 4)
@@ -527,10 +556,12 @@ frontend_parameters: {
 2. **Add transform logic** to extract simplified values from complex objects
 
 **Pros**:
+
 - ✅ Backward compatible with both schemas
 - ✅ Tests pass without fixture changes
 
 **Cons**:
+
 - ❌ Increases schema complexity significantly
 - ❌ Masks underlying schema mismatch issue
 - ❌ Makes schema harder to maintain
@@ -553,6 +584,7 @@ frontend_parameters: {
 **Implementation Steps**:
 
 1. **Add environment check in `generation-phases.ts`**:
+
    ```typescript
    async validateInput(state: GenerationStateType): Promise<Partial<GenerationStateType>> {
      if (process.env.NODE_ENV === 'test') {
@@ -566,9 +598,11 @@ frontend_parameters: {
    ```
 
 **Pros**:
+
 - ✅ Quick fix for tests
 
 **Cons**:
+
 - ❌ Hides schema mismatch issues
 - ❌ Tests no longer validate real production behavior
 - ❌ Reduces test coverage and quality
@@ -588,6 +622,7 @@ frontend_parameters: {
 ### Priority
 
 **Medium Priority**: This is a test issue, not a production bug. However:
+
 - Test is correctly identifying a schema mismatch
 - This may indicate a larger issue with Stage 4 → Stage 5 data flow
 - Should be fixed to ensure test suite accurately validates production behavior
@@ -595,6 +630,7 @@ frontend_parameters: {
 ### Files to Change
 
 **Solution 1 (RECOMMENDED)**:
+
 - File: `packages/course-gen-platform/tests/contract/generation.test.ts`
 - Lines 64-141: Update `createMinimalAnalysisResult()` to match `AnalysisResultSchema`
 - Lines 393: Add `language` and `style` fields to course creation
@@ -602,6 +638,7 @@ frontend_parameters: {
 ### Validation Criteria
 
 **After Fix**:
+
 - ✅ Phase 1 (validate_input) passes without errors
 - ✅ Test proceeds to LLM generation (Phase 2)
 - ✅ Test may still fail at LLM generation (non-deterministic), but NOT at validation
@@ -609,6 +646,7 @@ frontend_parameters: {
 - ✅ Test completes within reasonable time (2-3 minutes for LLM generation)
 
 **Success Indicators**:
+
 ```
 ✅ No "validate_input" errors
 ✅ No "analysis_result.category: Required" errors
@@ -619,15 +657,18 @@ frontend_parameters: {
 ### Testing Requirements
 
 **Unit Tests**:
+
 - Verify `createMinimalAnalysisResult()` output matches `AnalysisResultSchema`
 - Add validation test: `AnalysisResultSchema.safeParse(createMinimalAnalysisResult('Test'))` should succeed
 
 **Integration Tests**:
+
 - Run full test suite: `pnpm test tests/contract/generation.test.ts`
 - Verify "should regenerate section successfully" progresses past Phase 1
 - Verify other tests using `createMinimalAnalysisResult()` still pass
 
 **Manual Validation**:
+
 ```typescript
 // Add to test file temporarily
 import { AnalysisResultSchema } from '@megacampus/shared-types';
@@ -646,6 +687,7 @@ if (!testResult.success) {
 ### Implementation Risks
 
 **Solution 1: Fix Test Fixture**
+
 - **Performance impact**: None
 - **Breaking changes**: None (test-only)
 - **Side effects**: May reveal other test issues (good - that's the point of tests)
@@ -656,6 +698,7 @@ if (!testResult.success) {
 **Underlying Issue**: This investigation reveals a **schema evolution problem** between Stage 4 and Stage 5:
 
 1. **Stage 4 (Analyze)** outputs a rich, nested analysis result:
+
    ```typescript
    {
      course_category: { primary, confidence, reasoning },
@@ -676,6 +719,7 @@ if (!testResult.success) {
    ```
 
 **Questions to Address**:
+
 1. **Is there a data transformation step** between Stage 4 and Stage 5?
    - If yes: Where is it? (Not found in investigation)
    - If no: How does production code handle this mismatch?
@@ -698,31 +742,34 @@ if (!testResult.success) {
 ### Tier 0: Project Internal Documentation
 
 **Test Fixture**:
+
 - `tests/contract/generation.test.ts:64-141` - `createMinimalAnalysisResult()` function
   > Creates analysis_result based on Stage 4 full output schema, not Stage 5 simplified schema
 
 **Schema Definitions**:
+
 - `packages/shared-types/src/generation-job.ts:24-54` - `AnalysisResultSchema` for Stage 5
   > "This represents the complete output from the Analyze stage."
   > **NOTE**: Comment is misleading - schema is actually SIMPLIFIED, not complete
 
 **Validation Logic**:
+
 - `packages/course-gen-platform/src/services/stage5/generation-phases.ts:146-157` - Phase 1 validate_input
   > ```typescript
   > const result = GenerationJobInputSchema.safeParse(state.input);
   > if (!result.success) {
-  >   const errors = result.error.errors.map(
-  >     (err) => `${err.path.join('.')}: ${err.message}`
-  >   );
+  >   const errors = result.error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
   > }
   > ```
 
 **Previous Investigation**:
+
 - `docs/investigations/INV-2025-11-11-001-generation-test-failures.md`
   > Identified UnifiedRegenerator and database schema issues (both FIXED)
   > Current issue is NEW and appeared after timeout fix
 
 **Git History**:
+
 ```bash
 # Find when AnalysisResultSchema was last modified
 git log --all --oneline --grep="AnalysisResultSchema" -- packages/shared-types/src/generation-job.ts
@@ -738,6 +785,7 @@ Not applicable - issue is project-specific schema mismatch, not framework/librar
 ### MCP Server Usage
 
 **Tools Used**:
+
 - **Read**: 8 files (test file, schema definitions, service implementations, validation logic)
 - **Grep**: 2 searches (schema definitions, validation patterns)
 - **Bash**: 1 command (search for GenerationJobInputSchema exports)
@@ -762,6 +810,7 @@ Not applicable - issue is project-specific schema mismatch, not framework/librar
 ### Follow-up Recommendations
 
 1. **Add schema validation tests**: Create unit test to validate `createMinimalAnalysisResult()` output against `AnalysisResultSchema`
+
    ```typescript
    it('createMinimalAnalysisResult should match AnalysisResultSchema', () => {
      const result = AnalysisResultSchema.safeParse(createMinimalAnalysisResult('Test'));
@@ -783,16 +832,16 @@ Not applicable - issue is project-specific schema mismatch, not framework/librar
 
 ### Timeline
 
-| Timestamp | Action | Result |
-|-----------|--------|--------|
-| 00:00:00 | Read user request | Identified NEW issue after timeout fix |
-| 00:05:00 | Read test file (generation.test.ts) | Found `createMinimalAnalysisResult()` fixture |
-| 00:10:00 | Read schema (generation-job.ts) | Found `AnalysisResultSchema` definition |
-| 00:15:00 | Compare fixture vs schema | Identified 6 field mismatches |
-| 00:20:00 | Read validation logic (generation-phases.ts) | Confirmed Phase 1 validates against AnalysisResultSchema |
-| 00:25:00 | Read service flow (section-regeneration-service.ts) | Traced data flow from test to validation |
-| 00:30:00 | Analyze error logs | Mapped validation errors to specific schema mismatches |
-| 00:35:00 | Root cause confirmed | Test fixture schema != Stage 5 schema |
+| Timestamp | Action                                              | Result                                                   |
+| --------- | --------------------------------------------------- | -------------------------------------------------------- |
+| 00:00:00  | Read user request                                   | Identified NEW issue after timeout fix                   |
+| 00:05:00  | Read test file (generation.test.ts)                 | Found `createMinimalAnalysisResult()` fixture            |
+| 00:10:00  | Read schema (generation-job.ts)                     | Found `AnalysisResultSchema` definition                  |
+| 00:15:00  | Compare fixture vs schema                           | Identified 6 field mismatches                            |
+| 00:20:00  | Read validation logic (generation-phases.ts)        | Confirmed Phase 1 validates against AnalysisResultSchema |
+| 00:25:00  | Read service flow (section-regeneration-service.ts) | Traced data flow from test to validation                 |
+| 00:30:00  | Analyze error logs                                  | Mapped validation errors to specific schema mismatches   |
+| 00:35:00  | Root cause confirmed                                | Test fixture schema != Stage 5 schema                    |
 
 ### Commands Run
 

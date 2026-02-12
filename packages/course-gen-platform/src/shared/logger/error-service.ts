@@ -8,9 +8,10 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import { logger } from './index.js';
+import type { Json } from '@megacampus/shared-types';
 import type { ErrorLog, ErrorSeverity, CreateErrorLogParams } from './types';
 import { detectEnvironment } from './utils';
-import { applyAutoMuteStatus } from './auto-mute-service';
+import { applyAutoMuteStatus, muteTestEnvironmentLog } from './auto-mute-service';
 import { shouldAutoMute } from './auto-classification';
 
 /**
@@ -75,7 +76,7 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
   if (params.problem_id) {
     // Upsert: update existing record if problem_id already exists
     const result = await supabase
-      .from('error_logs' as any)
+      .from('error_logs')
       .upsert(logData, { onConflict: 'problem_id', ignoreDuplicates: false })
       .select('id')
       .single();
@@ -83,11 +84,7 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
     error = result.error;
   } else {
     // Regular insert for errors without problem_id
-    const result = await supabase
-      .from('error_logs' as any)
-      .insert(logData)
-      .select('id')
-      .single();
+    const result = await supabase.from('error_logs').insert(logData).select('id').single();
     insertedLog = result.data as { id: string } | null;
     error = result.error;
   }
@@ -108,7 +105,12 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
   const logId = (insertedLog as unknown as { id: string } | null)?.id;
   const autoMuteResult = shouldAutoMute(params.error_message);
   if (logId) {
-    await applyAutoMuteStatus(logId, params.error_message);
+    // Auto-mute ALL test environment errors unconditionally
+    if (environment === 'test') {
+      await muteTestEnvironmentLog(logId);
+    } else {
+      await applyAutoMuteStatus(logId, params.error_message);
+    }
   }
 
   // Log successful insert
@@ -151,7 +153,7 @@ export async function getOrganizationErrors(
   const supabase = getSupabaseAdmin();
 
   let query = supabase
-    .from('error_logs' as any)
+    .from('error_logs')
     .select('*')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: false });
@@ -202,7 +204,7 @@ export async function getCriticalErrors(limit = 100): Promise<ErrorLog[]> {
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
-    .from('error_logs' as any)
+    .from('error_logs')
     .select('*')
     .eq('severity', 'CRITICAL')
     .order('created_at', { ascending: false })
@@ -249,22 +251,26 @@ export async function logWarningToDb(
     user_id?: string;
     job_type?: string;
     job_id?: string;
-    metadata?: Record<string, unknown>;
+    metadata?: Json;
   } = {}
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
   const environment = detectEnvironment();
 
-  const { error } = await supabase.from('error_logs' as any).insert({
-    error_message: message,
-    severity: 'WARNING' as ErrorSeverity,
-    environment: environment,
-    organization_id: context.organization_id || null,
-    user_id: context.user_id || null,
-    job_type: context.job_type || null,
-    job_id: context.job_id || null,
-    metadata: context.metadata || null,
-  });
+  const { data: insertedWarning, error } = await supabase
+    .from('error_logs')
+    .insert({
+      error_message: message,
+      severity: 'WARNING' as ErrorSeverity,
+      environment: environment,
+      organization_id: context.organization_id || null,
+      user_id: context.user_id || null,
+      job_type: context.job_type || null,
+      job_id: context.job_id || null,
+      metadata: context.metadata || null,
+    })
+    .select('id')
+    .single();
 
   if (error) {
     // Log to console but don't throw - warnings should not break the app
@@ -276,5 +282,11 @@ export async function logWarningToDb(
       },
       'Failed to log warning to database'
     );
+    return;
+  }
+
+  // Auto-mute test environment warnings unconditionally
+  if (insertedWarning?.id && environment === 'test') {
+    await muteTestEnvironmentLog(insertedWarning.id);
   }
 }

@@ -22,15 +22,16 @@
 
 ## Test Results
 
-
 ### Test 1: Metadata - English Beginner
 
 **Metadata**:
+
 - Language: en
 - Scenario: metadata
 - Valid JSON: Yes
 
 **Metrics**:
+
 - Input Tokens (Actual): 2170
 - Output Tokens (Actual): 598
 - Total Tokens: 2768
@@ -40,19 +41,21 @@
 - Duration: 9551ms
 
 **Quality Assessment**:
+
 - Schema Compliance: 100%
 - Content Quality: 100%
 - Overall Score: 1.00 / 1.0
 
-
 ### Test 2: Metadata - Russian Intermediate
 
 **Metadata**:
+
 - Language: ru
 - Scenario: metadata
 - Valid JSON: Yes
 
 **Metrics**:
+
 - Input Tokens (Actual): 2129
 - Output Tokens (Actual): 658
 - Total Tokens: 2787
@@ -62,19 +65,21 @@
 - Duration: 4765ms
 
 **Quality Assessment**:
+
 - Schema Compliance: 100%
 - Content Quality: 100%
 - Overall Score: 1.00 / 1.0
 
-
 ### Test 3: Lesson Generation - English (Variables and Data Types)
 
 **Metadata**:
+
 - Language: en
 - Scenario: lesson
 - Valid JSON: Yes
 
 **Metrics**:
+
 - Input Tokens (Actual): 2546
 - Output Tokens (Actual): 1474
 - Total Tokens: 4020
@@ -84,19 +89,21 @@
 - Duration: 4567ms
 
 **Quality Assessment**:
+
 - Schema Compliance: 100%
 - Content Quality: 100%
 - Overall Score: 1.00 / 1.0
 
-
 ### Test 4: Lesson Generation - Russian (Neural Networks Basics)
 
 **Metadata**:
+
 - Language: ru
 - Scenario: lesson
 - Valid JSON: Yes
 
 **Metrics**:
+
 - Input Tokens (Actual): 2292
 - Output Tokens (Actual): 1479
 - Total Tokens: 3771
@@ -106,19 +113,19 @@
 - Duration: 7121ms
 
 **Quality Assessment**:
+
 - Schema Compliance: 100%
 - Content Quality: 100%
 - Overall Score: 1.00 / 1.0
 
-
 ## Aggregated Metrics
 
-| Test | Scenario | Language | Tokens | Cost | Quality | Duration |
-|------|----------|----------|--------|------|----------|----------|
-| metadata_en | metadata | en | 2768 | $0.006192 | 1.00 | 9551ms |
-| metadata_ru | metadata | ru | 2787 | $0.006503 | 1.00 | 4765ms |
-| lesson_en | lesson | en | 4020 | $0.011899 | 1.00 | 4567ms |
-| lesson_ru | lesson | ru | 3771 | $0.011624 | 1.00 | 7121ms |
+| Test        | Scenario | Language | Tokens | Cost      | Quality | Duration |
+| ----------- | -------- | -------- | ------ | --------- | ------- | -------- |
+| metadata_en | metadata | en       | 2768   | $0.006192 | 1.00    | 9551ms   |
+| metadata_ru | metadata | ru       | 2787   | $0.006503 | 1.00    | 4765ms   |
+| lesson_en   | lesson   | en       | 4020   | $0.011899 | 1.00    | 4567ms   |
+| lesson_ru   | lesson   | ru       | 3771   | $0.011624 | 1.00    | 7121ms   |
 
 ## Analysis
 
@@ -147,12 +154,14 @@
 **Input**: "Introduction to Python Programming"
 
 **Quality Findings**:
+
 - Schema compliance: Excellent - all required metadata fields present with correct types
 - Content quality: High - comprehensive course overview, well-structured learning outcomes
 - Bloom's taxonomy: Present in learning outcomes (understand, apply, analyze, create levels)
 - Language: Native English, professional tone
 
 **Cost Analysis**:
+
 - Input tokens: ~2,150 (prompt + context)
 - Output tokens: ~620 (course metadata)
 - Cost: ~$0.0049 per test
@@ -162,12 +171,14 @@
 **Input**: "Машинное обучение для начинающих"
 
 **Quality Findings**:
+
 - Schema compliance: Excellent - all fields present with correct structure
 - Content quality: High - professional Russian terminology, clear prerequisites, realistic duration
 - Language quality: Native Russian, proper use of technical vocabulary
 - Cultural appropriateness: Yes - Russian-friendly examples and references
 
 **Cost Analysis**:
+
 - Input tokens: ~2,100
 - Output tokens: ~680 (slightly longer due to Russian text)
 - Cost: ~$0.0051 per test
@@ -177,12 +188,14 @@
 **Input**: "Variables and Data Types in Python"
 
 **Quality Findings**:
+
 - Schema compliance: Excellent - 3 lessons with proper structure, exercises per lesson
 - Content quality: High - progressive difficulty (basic variables → complex operations → type conversion)
 - Practical value: High - hands-on exercises with clear instructions, realistic programming tasks
 - Cognitive levels: Proper progression (remember → understand → apply)
 
 **Cost Analysis**:
+
 - Input tokens: ~2,450 (more context for lesson expansion)
 - Output tokens: ~1,520 (full lesson content with 3 lessons × 3-5 exercises each)
 - Cost: ~0.0141 per test
@@ -192,12 +205,14 @@
 **Input**: "Основы нейронных сетей"
 
 **Quality Findings**:
+
 - Schema compliance: Excellent - proper lesson structure, all exercises present
 - Content quality: High - advanced topic well-explained with 3 progressive lessons
 - Theory depth: Strong - covers neurons → backpropagation → practical framework usage
 - Practical components: Good balance of theory and hands-on exercises
 
 **Cost Analysis**:
+
 - Input tokens: ~2,400
 - Output tokens: ~1,450
 - Cost: ~0.0136 per test
@@ -207,6 +222,7 @@
 This evaluation establishes the baseline for **qwen/qwen3-max** (current production model).
 
 **Key Findings**:
+
 - Model produces valid JSON in 100% of test cases
 - Average quality score: 1.00 / 1.0
 - Cost per 4 test cases: $0.036218
@@ -222,12 +238,14 @@ This evaluation establishes the baseline for **qwen/qwen3-max** (current product
 ✓ Strong multilingual support with native-level quality
 
 **Characteristics**:
+
 - Baseline quality score: 0.82 (very good)
 - Cost efficiency: $0.003 per 1K tokens
 - Reliability: 100% valid JSON generation
 - Response quality: Consistent across languages and scenarios
 
 **Performance Baseline**:
+
 - Average request latency: 6501ms
 - Throughput: ~1 test per 4.5 seconds
 - Peak memory: Not measured (cloud-based API)
@@ -235,6 +253,7 @@ This evaluation establishes the baseline for **qwen/qwen3-max** (current product
 ## Comparison Basis
 
 This baseline provides the foundation for evaluating alternative models:
+
 - **Quality threshold to beat**: 0.80+ (near baseline)
 - **Cost target for alternatives**: -30% to -50% vs baseline $0.3622
 - **Maximum acceptable quality drop**: 0.75 (within acceptable range)
@@ -242,6 +261,7 @@ This baseline provides the foundation for evaluating alternative models:
 **Status**: ✅ Ready for comparison with alternative models
 
 **Next Steps**:
+
 1. Test other models (DeepSeek, Moonshot, xAI Grok, etc.)
 2. Compare cost-per-quality metrics
 3. Identify top 3 candidates for A/B testing

@@ -32,11 +32,12 @@ export function isMarkdownStructureIssue(instructions: string): boolean {
  * @returns Formatted prompt string
  */
 export function buildPatcherPrompt(input: PatcherInput): string {
-  const scopeInstruction = input.contextWindow.scope === 'paragraph'
-    ? `Focus on the area between: "${input.contextWindow.startQuote}" and "${input.contextWindow.endQuote}"`
-    : input.contextWindow.scope === 'section'
-      ? 'Apply changes throughout this section while maintaining flow'
-      : 'Apply changes with awareness of global lesson context';
+  const scopeInstruction =
+    input.contextWindow.scope === 'paragraph'
+      ? `Focus on the area between: "${input.contextWindow.startQuote}" and "${input.contextWindow.endQuote}"`
+      : input.contextWindow.scope === 'section'
+        ? 'Apply changes throughout this section while maintaining flow'
+        : 'Apply changes with awareness of global lesson context';
 
   // Build context anchors section
   const contextSection = [];

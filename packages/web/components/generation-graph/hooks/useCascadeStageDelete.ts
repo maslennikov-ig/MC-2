@@ -2,10 +2,8 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
-import {
-  checkDownstreamStagesAction,
-  deleteDownstreamStagesAction,
-} from '@/app/actions/admin-generation'
+import { deleteDownstreamStagesAction } from '@/app/actions/admin-generation'
+import { trpc } from '@/lib/trpc/react'
 import type { DownstreamStagesInfo } from '../panels/output/CascadeStageDeleteModal'
 
 interface UseCascadeStageDeleteResult {
@@ -78,6 +76,8 @@ export function useCascadeStageDelete(
   performSave: (fieldPath: string, value: unknown) => void,
   locale: 'ru' | 'en' = 'ru'
 ): UseCascadeStageDeleteResult {
+  const utils = trpc.useUtils()
+
   // Cascade delete modal state
   const [cascadeModalOpen, setCascadeModalOpen] = useState(false)
   const [downstreamInfo, setDownstreamInfo] = useState<DownstreamStagesInfo | null>(null)
@@ -106,7 +106,7 @@ export function useCascadeStageDelete(
       }
 
       try {
-        const info = await checkDownstreamStagesAction(courseId)
+        const info = await utils.generation.checkDownstreamStages.fetch({ courseId })
 
         // Determine if we need to show the modal based on source stage
         const shouldShowModal =

@@ -12,6 +12,7 @@
 **DECISION: Adopt "Pragmatic Cascade" strategy combining jsonrepair library (FSM) + existing 4-level cascade + selective LLM semantic repair**
 
 **Key Results**:
+
 - ✅ **Success Rate**: 95% (target: 90-95%)
 - ✅ **Cost**: $0.35-0.38 per course (target: $0.30-0.42)
 - ✅ **Token Budget**: 94-96% preserved (target: ≤95%)
@@ -28,6 +29,7 @@
 **Purpose**: Handle 95-98% of parse errors at near-zero cost
 
 **Implementation**:
+
 ```typescript
 import { jsonrepair } from 'jsonrepair';
 
@@ -42,17 +44,20 @@ function fsmRepair(rawJson: string): string {
 ```
 
 **Coverage**:
+
 - Missing/extra brackets, braces (95% success)
 - Unescaped quotes (92% success)
 - Trailing commas (100% success)
 - Comments (100% success)
 
 **Performance**:
+
 - Cost multiplier: 0.05x
 - Token overhead: 0-50 tokens
 - Success rate: 95-98%
 
 **Library Choice**: **jsonrepair** (npm)
+
 - 713K weekly downloads
 - Zero dependencies
 - TypeScript native
@@ -64,6 +69,7 @@ function fsmRepair(rawJson: string): string {
 **Purpose**: Catch errors missed by FSM, add +5-10% success
 
 **Implementation** (reuse from n8n proof-of-concept):
+
 ```typescript
 function fourLevelCascade(json: string): string {
   let repaired = json;
@@ -90,6 +96,7 @@ function fourLevelCascade(json: string): string {
 ```
 
 **Performance**:
+
 - Cost multiplier: 0.10x
 - Token overhead: 50-100 tokens
 - Incremental success: +5-10% (total 90-95% with Layer 1)
@@ -99,6 +106,7 @@ function fourLevelCascade(json: string): string {
 **Purpose**: Handle schema violations for large contexts (>1K tokens)
 
 **Decision Tree**:
+
 ```
 Context size <500 tokens  → Skip LLM repair, regenerate (1.0x cheaper)
 Context size 500-1K tokens → Regenerate (marginal savings)
@@ -106,6 +114,7 @@ Context size >1K tokens    → LLM repair (0.4x vs 1.0x regeneration)
 ```
 
 **Implementation** (Schema-Guided Error Feedback pattern):
+
 ```typescript
 async function llmSemanticRepair(
   json: string,
@@ -120,14 +129,14 @@ async function llmSemanticRepair(
   }
 
   // Format errors
-  const errors = error.issues.map(issue =>
-    `- Field "${issue.path.join('.')}": ${issue.message}`
-  ).join('\n');
+  const errors = error.issues
+    .map(issue => `- Field "${issue.path.join('.')}": ${issue.message}`)
+    .join('\n');
 
   // Language-specific prompt
   const instructions = {
-    en: "Fix the JSON structure while preserving English text exactly.",
-    ru: "Исправьте структуру JSON, сохранив русский текст без изменений."
+    en: 'Fix the JSON structure while preserving English text exactly.',
+    ru: 'Исправьте структуру JSON, сохранив русский текст без изменений.',
   };
 
   const prompt = `
@@ -146,10 +155,10 @@ Return ONLY the corrected JSON, preserving all ${language.toUpperCase()} text an
     model: 'openai/gpt-oss-20b', // Cheap model for repair
     messages: [
       { role: 'system', content: 'You are a JSON repair specialist.' },
-      { role: 'user', content: prompt }
+      { role: 'user', content: prompt },
     ],
     temperature: 0.1, // Low temperature for structural fixes
-    max_tokens: 2000 // Limit repair overhead
+    max_tokens: 2000, // Limit repair overhead
   });
 
   return response.choices[0]?.message?.content || null;
@@ -157,12 +166,14 @@ Return ONLY the corrected JSON, preserving all ${language.toUpperCase()} text an
 ```
 
 **Performance**:
+
 - Cost multiplier: 0.40-0.50x (vs 1.0x regeneration)
 - Token overhead: 250-400 tokens
 - Success rate: 75-85% for schema violations
 - Break-even: >1,000 token contexts
 
 **Multi-Language Support**:
+
 - EN/RU templates provided
 - DE/ES can be added as needed
 - FSM Layer 1 is language-agnostic (UTF-8 preserving)
@@ -172,11 +183,13 @@ Return ONLY the corrected JSON, preserving all ${language.toUpperCase()} text an
 **Purpose**: Last resort when repair cascade fails
 
 **Trigger Conditions**:
+
 - All layers 1-3 failed
 - Error count >3 concurrent errors
 - Semantic errors (hallucinations, wrong intent)
 
 **Integration with RT-004**:
+
 ```typescript
 // Attempts 1-2: Fast fail with FSM repair
 { temp: 1.0, model: 'OSS 120B', repair: 'fsm', backoff: 0 },
@@ -200,6 +213,7 @@ Return ONLY the corrected JSON, preserving all ${language.toUpperCase()} text an
 ```
 
 **Performance**:
+
 - Cost multiplier: 1.0x (baseline)
 - Cumulative success: 97-99% after 10 attempts
 - Expected: Most courses succeed by attempt 3 (85% cumulative)
@@ -211,6 +225,7 @@ Return ONLY the corrected JSON, preserving all ${language.toUpperCase()} text an
 ### Parse Errors → Always FSM Repair (Layer 1-2)
 
 **Error Types**:
+
 - Trailing commas
 - Missing brackets/braces
 - Unescaped quotes
@@ -222,15 +237,17 @@ Return ONLY the corrected JSON, preserving all ${language.toUpperCase()} text an
 ### Type Mismatches → Zod Coercion First
 
 **Error Types**:
+
 - String "30" → number 30
 - Boolean string parsing
 
 **Strategy**:
+
 ```typescript
 // Use Zod .coerce() transformers
 const CoercedSchema = z.object({
   estimated_duration_minutes: z.coerce.number(), // "30" → 30
-  quiz_per_section: z.coerce.boolean() // "true" → true
+  quiz_per_section: z.coerce.boolean(), // "true" → true
 });
 ```
 
@@ -241,15 +258,16 @@ const CoercedSchema = z.object({
 
 **Decision Matrix**:
 
-| Context Size | Strategy | Rationale |
-|--------------|----------|-----------|
-| <500 tokens | Regenerate immediately | Retry cheaper than repair |
-| 500-2K tokens | LLM repair if <3 missing | Marginal savings |
-| >2K tokens | Always attempt LLM repair | 31-40% cost savings |
+| Context Size  | Strategy                  | Rationale                 |
+| ------------- | ------------------------- | ------------------------- |
+| <500 tokens   | Regenerate immediately    | Retry cheaper than repair |
+| 500-2K tokens | LLM repair if <3 missing  | Marginal savings          |
+| >2K tokens    | Always attempt LLM repair | 31-40% cost savings       |
 
 ### Constraint Violations → Regenerate with Examples
 
 **Error Types**:
+
 - Regex pattern failures
 - Min/max value violations
 
@@ -259,6 +277,7 @@ const CoercedSchema = z.object({
 ### Semantic Errors → Regenerate Only
 
 **Error Types**:
+
 - Hallucinations
 - Wrong intent
 - Reasoning errors
@@ -272,14 +291,14 @@ const CoercedSchema = z.object({
 
 ### Analysis (90K Input Budget from RT-003)
 
-| Component | Tokens | % Budget | Notes |
-|-----------|--------|----------|-------|
-| Primary generation | 85,000 | 94.4% | Course content |
-| FSM repair (Layer 1) | 50 | 0.06% | Near-zero |
-| Simple cascade (Layer 2) | 100 | 0.11% | Negligible |
-| LLM repair (Layer 3) | 250 | 0.28% | Per attempt |
-| Retry reserve | 4,300 | 4.8% | Safety margin |
-| **Total** | **90,000** | **100%** | ✅ Within budget |
+| Component                | Tokens     | % Budget | Notes            |
+| ------------------------ | ---------- | -------- | ---------------- |
+| Primary generation       | 85,000     | 94.4%    | Course content   |
+| FSM repair (Layer 1)     | 50         | 0.06%    | Near-zero        |
+| Simple cascade (Layer 2) | 100        | 0.11%    | Negligible       |
+| LLM repair (Layer 3)     | 250        | 0.28%    | Per attempt      |
+| Retry reserve            | 4,300      | 4.8%     | Safety margin    |
+| **Total**                | **90,000** | **100%** | ✅ Within budget |
 
 **Conclusion**: Repair overhead is **negligible** (0.06-0.45%), preserving **94%+ of budget** for content generation.
 
@@ -289,12 +308,12 @@ const CoercedSchema = z.object({
 
 ### Baseline vs Optimized
 
-| Approach | Cost/Course | Success | Annual (100K) | Savings |
-|----------|-------------|---------|---------------|---------|
-| **Baseline (regen only)** | $0.51-0.66 | 85% | $51K-66K | — |
-| FSM repair only | $0.46-0.50 | 90% | $46K-50K | 10-23% |
-| Current 4-level cascade | $0.42-0.48 | 90-92% | $42K-48K | 18-27% |
-| **RT-005 (Approved)** | **$0.35-0.38** | **95%** | **$35K-38K** | **27-32%** ✓ |
+| Approach                  | Cost/Course    | Success | Annual (100K) | Savings      |
+| ------------------------- | -------------- | ------- | ------------- | ------------ |
+| **Baseline (regen only)** | $0.51-0.66     | 85%     | $51K-66K      | —            |
+| FSM repair only           | $0.46-0.50     | 90%     | $46K-50K      | 10-23%       |
+| Current 4-level cascade   | $0.42-0.48     | 90-92%  | $42K-48K      | 18-27%       |
+| **RT-005 (Approved)**     | **$0.35-0.38** | **95%** | **$35K-38K**  | **27-32%** ✓ |
 
 **Annual Savings**: $16K-28K (100K courses/year)
 
@@ -348,14 +367,14 @@ import { Counter, Histogram } from 'prom-client';
 const repairAttempts = new Counter({
   name: 'json_repair_attempts_total',
   help: 'Total repair attempts',
-  labelNames: ['strategy', 'language', 'error_type']
+  labelNames: ['strategy', 'language', 'error_type'],
 });
 
 // Repair success rate
 const repairSuccess = new Counter({
   name: 'json_repair_success_total',
   help: 'Successful repairs',
-  labelNames: ['strategy', 'attempt', 'layer']
+  labelNames: ['strategy', 'attempt', 'layer'],
 });
 
 // Repair duration
@@ -363,14 +382,14 @@ const repairDuration = new Histogram({
   name: 'json_repair_duration_ms',
   help: 'Repair duration in milliseconds',
   buckets: [10, 50, 100, 500, 1000, 5000],
-  labelNames: ['strategy']
+  labelNames: ['strategy'],
 });
 
 // Cost tracking
 const repairCost = new Counter({
   name: 'json_repair_cost_usd_total',
   help: 'Cumulative repair cost in USD',
-  labelNames: ['strategy']
+  labelNames: ['strategy'],
 });
 ```
 
@@ -392,21 +411,24 @@ const repairCost = new Counter({
 ### LLM Repair: Language-Specific Prompts
 
 **Supported Languages** (initial):
+
 - English (en)
 - Russian (ru)
 
 **Future Expansion** (add as needed):
+
 - German (de)
 - Spanish (es)
 - 13+ additional languages (language detection from analysis_result.contextual_language)
 
 **Implementation**:
+
 ```typescript
 const REPAIR_INSTRUCTIONS = {
-  en: "Fix the JSON structure while preserving English text exactly.",
-  ru: "Исправьте структуру JSON, сохранив русский текст без изменений.",
-  de: "Korrigieren Sie die JSON-Struktur unter Beibehaltung des deutschen Textes.",
-  es: "Corrija la estructura JSON preservando el texto español exactamente."
+  en: 'Fix the JSON structure while preserving English text exactly.',
+  ru: 'Исправьте структуру JSON, сохранив русский текст без изменений.',
+  de: 'Korrigieren Sie die JSON-Struktur unter Beibehaltung des deutschen Textes.',
+  es: 'Corrija la estructura JSON preservando el texto español exactamente.',
 };
 
 function getRepairInstruction(language: string): string {
@@ -423,6 +445,7 @@ function getRepairInstruction(language: string): string {
 **Risk**: Memory issues, truncation
 
 **Mitigation**:
+
 ```typescript
 import { jsonrepairTransform } from 'jsonrepair';
 
@@ -437,6 +460,7 @@ const stream = rawStream
 **Risk**: Stack overflow, cascading failures
 
 **Mitigation**:
+
 - Implement depth limits (max 100 levels)
 - Validate subtrees incrementally
 - Use iterative parsers (not recursive)
@@ -461,6 +485,7 @@ if (zodError.issues.length > 3) {
 **Risk**: Malicious content in JSON fields
 
 **Mitigation** (DOMPurify sanitization):
+
 ```typescript
 import DOMPurify from 'isomorphic-dompurify';
 
@@ -481,6 +506,7 @@ function sanitizeCourseStructure(course: CourseStructure): CourseStructure {
 ### Short-Term (Months 1-3)
 
 ✅ **Implemented in RT-005**:
+
 - jsonrepair integration
 - LLM semantic repair
 - Monitoring & metrics
@@ -488,6 +514,7 @@ function sanitizeCourseStructure(course: CourseStructure): CourseStructure {
 ### Medium-Term (Months 3-6)
 
 **If success rate <93%**:
+
 - [ ] Evaluate Instructor-TS framework (auto-retry automation)
 - [ ] Add multi-step pipeline for complex reasoning errors
 - [ ] Implement response caching (15-30% additional savings)
@@ -495,6 +522,7 @@ function sanitizeCourseStructure(course: CourseStructure): CourseStructure {
 ### Long-Term (Months 6-12)
 
 **If volume >500K courses/month**:
+
 - [ ] Evaluate FSM constrained decoding (self-hosted)
   - **Break-even**: 500K-1M queries/month
   - **Success**: 99.9% guaranteed format
@@ -507,22 +535,24 @@ function sanitizeCourseStructure(course: CourseStructure): CourseStructure {
 
 ### Target Metrics (from RT-005 research task)
 
-| Metric | Target | Achievable | Status |
-|--------|--------|------------|--------|
-| **Success rate** | 90-95% | **95%** | ✅ Met |
-| **Cost per course** | $0.30-0.42 | **$0.35-0.38** | ✅ Met |
-| **Token budget** | ≤95% | **94-96%** | ✅ Met |
-| **Token savings** | 20-30% | **27-32%** | ✅ Met |
-| **Production-ready libs** | Stable | **jsonrepair (713K/week)** | ✅ Met |
+| Metric                    | Target     | Achievable                 | Status |
+| ------------------------- | ---------- | -------------------------- | ------ |
+| **Success rate**          | 90-95%     | **95%**                    | ✅ Met |
+| **Cost per course**       | $0.30-0.42 | **$0.35-0.38**             | ✅ Met |
+| **Token budget**          | ≤95%       | **94-96%**                 | ✅ Met |
+| **Token savings**         | 20-30%     | **27-32%**                 | ✅ Met |
+| **Production-ready libs** | Stable     | **jsonrepair (713K/week)** | ✅ Met |
 
 ### Validation Plan
 
 **Phase 1 (Week 1)**: Unit tests + integration tests (12 hours)
+
 - FSM repair: 100 test cases (parse errors, quotes, commas, comments)
 - 4-level cascade: 50 test cases (brace counting, edge cases)
 - Error classification: 20 test cases (parse, type, missing, constraint, semantic)
 
 **Phase 2 (Week 2-3)**: Production simulation (100 test courses)
+
 - Minimal user input scenarios (title only → Analyze → Generation with sparse analysis_result)
 - Full Analyze results (rich context)
 - Different languages (EN/RU)
@@ -536,12 +566,14 @@ function sanitizeCourseStructure(course: CourseStructure): CourseStructure {
 ## 12. Implementation Tasks
 
 **Follow-up Tasks**:
+
 - [ ] **T005-R-IMPL**: Apply RT-005 strategy to json-repair.ts, metadata-generator.ts, section-batch-generator.ts, generation-phases.ts (assigned to llm-service-specialist)
   - Depends on: RT-005 ✅, T015, T019, T020, T029-B
   - Effort: 46 hours over 1.5 weeks
   - Output: RT-005 strategy fully implemented with monitoring
 
 **Integration Points**:
+
 - **T015** (json-repair.ts): Implement 4-layer cascade
 - **T019** (metadata-generator.ts): Integrate parseMetadata() with repair cascade
 - **T020** (section-batch-generator.ts): Integrate parseSections() with repair cascade
@@ -554,18 +586,21 @@ function sanitizeCourseStructure(course: CourseStructure): CourseStructure {
 ### Why "Pragmatic Cascade" over alternatives?
 
 **Alternative 1: Instructor-TS Framework**
+
 - ❌ Higher cost ($0.38-0.42 vs $0.35-0.38)
 - ❌ Framework dependency risk
 - ❌ 72 hours implementation vs 46 hours
 - ✅ Higher success (97% vs 95%) - **Not worth 50% more effort for +2% success**
 
 **Alternative 2: FSM Constrained Decoding (self-hosted)**
+
 - ❌ Requires $50K-100K infrastructure
 - ❌ 260 hours implementation (3+ months)
 - ❌ Break-even only at 500K+ queries/month (currently 100K)
 - ✅ 99.9% success, 0.02x cost - **Future roadmap, not immediate priority**
 
 **Pragmatic Cascade Wins**:
+
 - ✅ Meets all targets (95% success, $0.35-0.38 cost)
 - ✅ Fast implementation (46 hours, 1.5 weeks)
 - ✅ Proven libraries (jsonrepair 713K weekly downloads)

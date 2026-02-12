@@ -1,14 +1,14 @@
-'use client';
+'use client'
 
-import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
-import { cn } from '@/lib/utils';
-import type { MermaidDiagramProps } from '../types';
+import * as React from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { cn } from '@/lib/utils'
+import type { MermaidDiagramProps } from '../types'
 
 /**
  * Mermaid CDN URL for loading the library
  */
-const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'
 
 /**
  * Minimal HTML escaping for Mermaid content
@@ -22,7 +22,7 @@ const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
  */
 function escapeHtml(str: string): string {
   // Only escape angle brackets - quotes are needed for Mermaid subgraph labels etc.
-  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /**
@@ -77,7 +77,7 @@ function generateMermaidHtml(chart: string, isDark: boolean): string {
       });
     </script>
   </body>
-</html>`;
+</html>`
 }
 
 /**
@@ -102,42 +102,42 @@ function generateMermaidHtml(chart: string, isDark: boolean): string {
  * ```
  */
 export function MermaidIframe({ chart, className, ariaLabel }: MermaidDiagramProps) {
-  const [isDark, setIsDark] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(200);
+  const [isDark, setIsDark] = useState(false)
+  const [iframeHeight, setIframeHeight] = useState(200)
 
   useEffect(() => {
     // Check if dark mode is currently active
-    const checkDark = () => document.documentElement.classList.contains('dark');
-    setIsDark(checkDark());
+    const checkDark = () => document.documentElement.classList.contains('dark')
+    setIsDark(checkDark())
 
     // Observe class changes on the html element for theme switching
     const observer = new MutationObserver(() => {
-      setIsDark(checkDark());
-    });
+      setIsDark(checkDark())
+    })
 
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class'],
-    });
+    })
 
-    return () => observer.disconnect();
-  }, []);
+    return () => observer.disconnect()
+  }, [])
 
   // Listen for height updates from iframe
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'mermaid-height' && typeof e.data.height === 'number') {
         // Set height with minimum of 200px and add 32px for padding
-        setIframeHeight(Math.max(200, e.data.height + 32));
+        setIframeHeight(Math.max(200, e.data.height + 32))
       }
-    };
+    }
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
 
   // Memoize the HTML generation to avoid unnecessary recalculations
-  const srcdoc = useMemo(() => generateMermaidHtml(chart, isDark), [chart, isDark]);
+  const srcdoc = useMemo(() => generateMermaidHtml(chart, isDark), [chart, isDark])
 
   return (
     <figure className={cn('mermaid-container not-prose my-6', className)}>
@@ -145,9 +145,9 @@ export function MermaidIframe({ chart, className, ariaLabel }: MermaidDiagramPro
         srcDoc={srcdoc}
         sandbox="allow-scripts"
         title={ariaLabel || 'Mermaid diagram'}
-        className="mermaid-iframe w-full border-0 rounded-lg border border-border bg-card"
+        className="mermaid-iframe border-border bg-card w-full rounded-lg border border-0"
         style={{ height: `${iframeHeight}px`, minHeight: '200px' }}
       />
     </figure>
-  );
+  )
 }

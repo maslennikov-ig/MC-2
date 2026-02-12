@@ -7,37 +7,37 @@
  * @module app/admin/pipeline/components/model-selector
  */
 
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react'
+import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { listOpenRouterModels } from '@/app/actions/pipeline-admin';
-import type { OpenRouterModel } from '@megacampus/shared-types';
+} from '@/components/ui/select'
+import { trpc } from '@/lib/trpc/react'
+import type { OpenRouterModel } from '@megacampus/shared-types'
 
 interface ModelSelectorProps {
-  value: string;
-  onValueChange: (value: string) => void;
-  label?: string;
-  placeholder?: string;
+  value: string
+  onValueChange: (value: string) => void
+  label?: string
+  placeholder?: string
 }
 
 /**
@@ -53,96 +53,79 @@ interface ModelSelectorProps {
  * Uses Command + Popover pattern from shadcn/ui.
  */
 export function ModelSelector({ value, onValueChange, label, placeholder }: ModelSelectorProps) {
-  const [open, setOpen] = useState(false);
-  const [models, setModels] = useState<OpenRouterModel[]>([]);
-  const [filteredModels, setFilteredModels] = useState<OpenRouterModel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [open, setOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Filter state
-  const [selectedProvider, setSelectedProvider] = useState<string>('all');
-  const [minContext, setMinContext] = useState('');
-  const [maxContext, setMaxContext] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState<string>('all')
+  const [minContext, setMinContext] = useState('')
+  const [maxContext, setMaxContext] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
 
-  // Load models on mount
-  useEffect(() => {
-    async function loadModels() {
-      try {
-        setIsLoading(true);
-        const result = await listOpenRouterModels();
-        const modelsList = result.result?.data?.models || [];
-        setModels(modelsList);
-        setFilteredModels(modelsList);
-      } catch (error) {
-        console.error('Failed to load models:', error);
-        setModels([]);
-        setFilteredModels([]);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  // tRPC query for OpenRouter models
+  const { data: modelsData, isLoading } = trpc.pipelineAdmin.listOpenRouterModels.useQuery()
 
-    loadModels();
-  }, []);
+  const models: OpenRouterModel[] = modelsData?.models ?? []
 
   // Apply filters
+  const [filteredModels, setFilteredModels] = useState<OpenRouterModel[]>([])
+
   useEffect(() => {
-    let filtered = [...models];
+    let filtered = [...models]
 
     // Provider filter
     if (selectedProvider !== 'all') {
-      filtered = filtered.filter((m) => m.provider === selectedProvider);
+      filtered = filtered.filter((m) => m.provider === selectedProvider)
     }
 
     // Context size filters
     if (minContext) {
-      const min = parseInt(minContext, 10);
+      const min = parseInt(minContext, 10)
       if (!isNaN(min)) {
-        filtered = filtered.filter((m) => m.contextLength >= min);
+        filtered = filtered.filter((m) => m.contextLength >= min)
       }
     }
     if (maxContext) {
-      const max = parseInt(maxContext, 10);
+      const max = parseInt(maxContext, 10)
       if (!isNaN(max)) {
-        filtered = filtered.filter((m) => m.contextLength <= max);
+        filtered = filtered.filter((m) => m.contextLength <= max)
       }
     }
 
     // Price filter (average per million tokens)
     if (maxPrice) {
-      const maxPriceNum = parseFloat(maxPrice);
+      const maxPriceNum = parseFloat(maxPrice)
       if (!isNaN(maxPriceNum)) {
         filtered = filtered.filter((m) => {
-          const avgPrice = ((m.pricing.prompt + m.pricing.completion) / 2) * 1_000_000;
-          return avgPrice <= maxPriceNum;
-        });
+          const avgPrice = ((m.pricing.prompt + m.pricing.completion) / 2) * 1_000_000
+          return avgPrice <= maxPriceNum
+        })
       }
     }
 
     // Search query filter
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
         (m) =>
           m.id.toLowerCase().includes(query) ||
           m.name.toLowerCase().includes(query) ||
           (m.description && m.description.toLowerCase().includes(query))
-      );
+      )
     }
 
-    setFilteredModels(filtered);
-  }, [models, selectedProvider, minContext, maxContext, maxPrice, searchQuery]);
+    setFilteredModels(filtered)
+  }, [models, selectedProvider, minContext, maxContext, maxPrice, searchQuery])
 
   // Get unique providers
-  const providers = Array.from(new Set(models.map((m) => m.provider))).sort();
+  const providers = Array.from(new Set(models.map((m) => m.provider))).sort()
 
   // Find selected model for display
-  const selectedModel = models.find((m) => m.id === value);
+  const selectedModel = models.find((m) => m.id === value)
 
   return (
     <div className="space-y-2">
-      {label && <Label className="text-gray-900 dark:text-gray-100 font-medium">{label}</Label>}
+      {label && <Label className="font-medium text-gray-900 dark:text-gray-100">{label}</Label>}
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -150,32 +133,48 @@ export function ModelSelector({ value, onValueChange, label, placeholder }: Mode
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between bg-gray-100 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-slate-950 hover:border-purple-500/30 dark:hover:border-cyan-500/30"
+            className="w-full justify-between border-gray-200 bg-gray-100 text-gray-900 hover:border-purple-500/30 hover:bg-gray-100 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100 dark:hover:border-cyan-500/30 dark:hover:bg-slate-950"
           >
             {selectedModel ? (
               <span className="truncate">
                 {selectedModel.name} ({selectedModel.provider})
               </span>
             ) : (
-              <span className="text-gray-500 dark:text-gray-500">{placeholder || 'Select model...'}</span>
+              <span className="text-gray-500 dark:text-gray-500">
+                {placeholder || 'Select model...'}
+              </span>
             )}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[600px] p-0 bg-white dark:bg-slate-950 border-gray-200 dark:border-slate-700 shadow-2xl" align="start">
+        <PopoverContent
+          className="w-[600px] border-gray-200 bg-white p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
+          align="start"
+        >
           {/* Filters */}
-          <div className="border-b border-gray-200 dark:border-slate-700 p-3 space-y-2 bg-gray-100 dark:bg-slate-900">
+          <div className="space-y-2 border-b border-gray-200 bg-gray-100 p-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs text-gray-600 dark:text-gray-300 font-medium">Provider</Label>
+                <Label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  Provider
+                </Label>
                 <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                  <SelectTrigger className="h-8 bg-white dark:bg-slate-950 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100">
+                  <SelectTrigger className="h-8 border-gray-200 bg-white text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-gray-100">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-slate-950 border-gray-200 dark:border-slate-700">
-                    <SelectItem value="all" className="text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-slate-800">All Providers</SelectItem>
+                  <SelectContent className="border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-950">
+                    <SelectItem
+                      value="all"
+                      className="text-gray-900 hover:bg-gray-200 dark:text-gray-100 dark:hover:bg-slate-800"
+                    >
+                      All Providers
+                    </SelectItem>
                     {providers.map((provider) => (
-                      <SelectItem key={provider} value={provider} className="text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-slate-800">
+                      <SelectItem
+                        key={provider}
+                        value={provider}
+                        className="text-gray-900 hover:bg-gray-200 dark:text-gray-100 dark:hover:bg-slate-800"
+                      >
                         {provider}
                       </SelectItem>
                     ))}
@@ -183,49 +182,55 @@ export function ModelSelector({ value, onValueChange, label, placeholder }: Mode
                 </Select>
               </div>
               <div>
-                <Label className="text-xs text-gray-600 dark:text-gray-300 font-medium">Max Price ($/M tokens)</Label>
+                <Label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  Max Price ($/M tokens)
+                </Label>
                 <Input
                   type="number"
                   placeholder="e.g., 10"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="h-8 bg-white dark:bg-slate-950 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  className="h-8 border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 dark:border-slate-700 dark:bg-slate-950 dark:text-gray-100 dark:placeholder:text-gray-500"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs text-gray-600 dark:text-gray-300 font-medium">Min Context</Label>
+                <Label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  Min Context
+                </Label>
                 <Input
                   type="number"
                   placeholder="e.g., 32000"
                   value={minContext}
                   onChange={(e) => setMinContext(e.target.value)}
-                  className="h-8 bg-white dark:bg-slate-950 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  className="h-8 border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 dark:border-slate-700 dark:bg-slate-950 dark:text-gray-100 dark:placeholder:text-gray-500"
                 />
               </div>
               <div>
-                <Label className="text-xs text-gray-600 dark:text-gray-300 font-medium">Max Context</Label>
+                <Label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  Max Context
+                </Label>
                 <Input
                   type="number"
                   placeholder="e.g., 200000"
                   value={maxContext}
                   onChange={(e) => setMaxContext(e.target.value)}
-                  className="h-8 bg-white dark:bg-slate-950 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  className="h-8 border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 dark:border-slate-700 dark:bg-slate-950 dark:text-gray-100 dark:placeholder:text-gray-500"
                 />
               </div>
             </div>
           </div>
 
           {/* Model list */}
-          <Command className="bg-white dark:bg-slate-950 border-none">
+          <Command className="border-none bg-white dark:bg-slate-950">
             <CommandInput
               placeholder="Search models..."
               value={searchQuery}
               onValueChange={setSearchQuery}
-              className="bg-white dark:bg-slate-950 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 border-none"
+              className="border-none bg-white text-gray-900 placeholder:text-gray-400 dark:bg-slate-950 dark:text-gray-100 dark:placeholder:text-gray-500"
             />
-            <CommandEmpty className="text-gray-600 dark:text-gray-300 py-6">
+            <CommandEmpty className="py-6 text-gray-600 dark:text-gray-300">
               {isLoading ? (
                 <div className="flex items-center justify-center py-6">
                   <Loader2 className="h-4 w-4 animate-spin text-purple-500 dark:text-cyan-400" />
@@ -237,7 +242,7 @@ export function ModelSelector({ value, onValueChange, label, placeholder }: Mode
             </CommandEmpty>
             <CommandGroup className="max-h-[300px] overflow-auto">
               {filteredModels.map((model) => {
-                const avgPrice = ((model.pricing.prompt + model.pricing.completion) / 2) * 1_000_000;
+                const avgPrice = ((model.pricing.prompt + model.pricing.completion) / 2) * 1_000_000
 
                 return (
                   <CommandItem
@@ -245,10 +250,10 @@ export function ModelSelector({ value, onValueChange, label, placeholder }: Mode
                     value={model.id}
                     onSelect={() => {
                       // Use model.id directly, not currentValue (which may be lowercased by Command)
-                      onValueChange(model.id === value ? '' : model.id);
-                      setOpen(false);
+                      onValueChange(model.id === value ? '' : model.id)
+                      setOpen(false)
                     }}
-                    className="flex items-start gap-2 py-2 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-slate-800 hover:border-l-2 hover:border-purple-500 dark:hover:border-cyan-400 transition-all cursor-pointer"
+                    className="flex cursor-pointer items-start gap-2 py-2 text-gray-900 transition-all hover:border-l-2 hover:border-purple-500 hover:bg-gray-200 dark:text-gray-100 dark:hover:border-cyan-400 dark:hover:bg-slate-800"
                   >
                     <Check
                       className={cn(
@@ -256,17 +261,21 @@ export function ModelSelector({ value, onValueChange, label, placeholder }: Mode
                         value === model.id ? 'opacity-100' : 'opacity-0'
                       )}
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate text-gray-900 dark:text-gray-100">{model.name}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-500 truncate">{model.id}</div>
-                      <div className="flex gap-3 text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium text-gray-900 dark:text-gray-100">
+                        {model.name}
+                      </div>
+                      <div className="truncate text-xs text-gray-500 dark:text-gray-500">
+                        {model.id}
+                      </div>
+                      <div className="mt-1 flex gap-3 text-xs text-gray-600 dark:text-gray-300">
                         <span>{model.provider}</span>
                         <span>{(model.contextLength / 1000).toFixed(0)}K context</span>
                         <span className="text-amber-500">${avgPrice.toFixed(2)}/M</span>
                       </div>
                     </div>
                   </CommandItem>
-                );
+                )
               })}
             </CommandGroup>
           </Command>
@@ -275,24 +284,28 @@ export function ModelSelector({ value, onValueChange, label, placeholder }: Mode
 
       {/* Selected model details */}
       {selectedModel && (
-        <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1 p-2 rounded-md border border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-900">
+        <div className="space-y-1 rounded-md border border-gray-200 bg-gray-100 p-2 text-xs text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-300">
           <div>
-            <span className="font-medium text-gray-900 dark:text-gray-100">ID:</span> {selectedModel.id}
+            <span className="font-medium text-gray-900 dark:text-gray-100">ID:</span>{' '}
+            {selectedModel.id}
           </div>
           <div>
-            <span className="font-medium text-gray-900 dark:text-gray-100">Context:</span> {selectedModel.contextLength.toLocaleString()} tokens
+            <span className="font-medium text-gray-900 dark:text-gray-100">Context:</span>{' '}
+            {selectedModel.contextLength.toLocaleString()} tokens
           </div>
           <div>
-            <span className="font-medium text-gray-900 dark:text-gray-100">Pricing:</span> ${(selectedModel.pricing.prompt * 1_000_000).toFixed(2)}/M prompt, $
+            <span className="font-medium text-gray-900 dark:text-gray-100">Pricing:</span> $
+            {(selectedModel.pricing.prompt * 1_000_000).toFixed(2)}/M prompt, $
             {(selectedModel.pricing.completion * 1_000_000).toFixed(2)}/M completion
           </div>
           {selectedModel.description && (
             <div>
-              <span className="font-medium text-gray-900 dark:text-gray-100">Description:</span> {selectedModel.description}
+              <span className="font-medium text-gray-900 dark:text-gray-100">Description:</span>{' '}
+              {selectedModel.description}
             </div>
           )}
         </div>
       )}
     </div>
-  );
+  )
 }

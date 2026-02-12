@@ -1,67 +1,40 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useDebouncedCallback } from 'use-debounce'
 import {
   ReactFlow,
   ReactFlowProvider,
   Background,
   Panel,
-  NodeTypes,
-  EdgeTypes,
   useNodesInitialized,
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
 import { useGraphData } from './hooks/useGraphData'
-import { useGraphLayout } from './hooks/useGraphLayout'
-import StageNode from './nodes/StageNode'
-import MergeNode from './nodes/MergeNode'
-import EndNode from './nodes/EndNode'
-import DocumentNode from './nodes/DocumentNode'
-import LessonNode from './nodes/LessonNode'
-import ModuleGroup from './nodes/ModuleGroup'
-import Stage2Group from './nodes/Stage2Group'
-import ClarifyingNode from './nodes/ClarifyingNode'
-import AnimatedEdge from './edges/AnimatedEdge'
-import DataFlowEdge from './edges/DataFlowEdge'
+import { useFullscreenMode } from './hooks/useFullscreenMode'
+import { useCourseDataSync } from './hooks/useCourseDataSync'
+import { useRealtimeStatusData } from './hooks/useRealtimeStatusData'
+import { useAutoNodeSelection } from './hooks/useAutoNodeSelection'
+import { useGraphLayoutEffect } from './hooks/useGraphLayoutEffect'
 import { StaticGraphProvider } from './contexts/StaticGraphContext'
 import { RealtimeStatusProvider } from './contexts/RealtimeStatusContext'
 import { FullscreenProvider } from './contexts/FullscreenContext'
 import { GraphOperationsProvider } from './contexts/GraphOperationsContext'
-import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants'
+import { GRAPH_STAGE_CONFIG, NODE_STYLES } from '@/lib/generation-graph/constants'
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
-import {
-  RealtimeStatusData,
-  NodeStatusEntry,
-  VisualStyle,
-  parseAnalysisResult,
-  type AnalysisResult,
-  COURSE_DATA_UPDATED_EVENT,
-  isCourseDataUpdatedEvent,
-  hasRelevantFieldChanges,
-} from '@megacampus/shared-types'
-import { GenerationProgress, CourseStatus } from '@/types/course-generation'
-import {
-  mapStatusToNodeStatus,
-  getStageFromStatus,
-  isAwaitingApproval,
-  calculateProgress,
-} from '@/lib/generation-graph/utils'
+import { isAwaitingApproval } from '@/lib/generation-graph/utils'
+import type { Database } from '@megacampus/shared-types'
 import { GraphControls } from './controls/GraphControls'
 import { GraphMinimap } from './controls/GraphMinimap'
 import { GraphHeader } from './GraphHeader'
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
-import { useTouchGestures } from './hooks/useTouchGestures'
 import { NodeDetailsDrawer } from './panels/NodeDetailsDrawer'
 import { AdminPanel } from './panels/AdminPanel'
 import { useNodeSelection } from './hooks/useNodeSelection'
 import { MissionControlBanner } from '@/components/generation-celestial/MissionControlBanner'
-import { useClarifyingIsEnabled, useClarifyingProgress } from '@/lib/trpc/client'
+import { trpc } from '@/lib/trpc/react'
 import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
-// MobileProgressList removed - maintaining two view modes adds complexity
 import { useBreakpoint } from './hooks/useBreakpoint'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import { logger } from '@/lib/client-logger'
@@ -72,140 +45,21 @@ import { LongRunningIndicator } from './controls/LongRunningIndicator'
 import { useBackgroundTab } from './hooks/useBackgroundTab'
 import { useSessionRecovery } from './hooks/useSessionRecovery'
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation'
-// ViewToggle removed - maintaining two view modes adds complexity without significant benefit
 import { useUserRole } from './hooks/useUserRole'
 import { useDocumentsWithStatus } from './hooks/useDocumentsWithStatus'
-import { createClient } from '@/lib/supabase/client'
 import { useLocale } from 'next-intl'
 import { useParams } from 'next/navigation'
 import { setTranslationLocale } from './hooks/use-graph-data/utils/step-translations'
-import type { CourseStructure } from '@megacampus/shared-types'
 import { PartialGenerationProvider } from './contexts/PartialGenerationContext'
 import { SelectionToolbar } from './components/SelectionToolbar'
 import { useGenerationStore } from '@/stores/useGenerationStore'
-import { AppNode, AppEdge } from './types'
 import type { ClarifyingProgressData } from './hooks/use-graph-data/types'
+import { nodeTypes, edgeTypes } from './GraphView.constants'
+import { GraphInteractions } from './GraphInteractions'
+import type { GraphViewProps } from './GraphView.types'
 
-// Define node and edge types OUTSIDE component to prevent re-creation on each render
-const nodeTypes: NodeTypes = {
-  stage: StageNode,
-  merge: MergeNode,
-  end: EndNode,
-  document: DocumentNode,
-  lesson: LessonNode,
-  module: ModuleGroup,
-  stage2group: Stage2Group,
-  clarifying: ClarifyingNode,
-}
-
-const edgeTypes: EdgeTypes = {
-  animated: AnimatedEdge,
-  dataflow: DataFlowEdge,
-}
-
-/**
- * Type guard for validating VisualStyle data from database JSON.
- * Ensures all 4 required string fields are present before use.
- */
-function isVisualStyle(data: unknown): data is VisualStyle {
-  if (!data || typeof data !== 'object') return false
-  const d = data as Record<string, unknown>
-  return (
-    typeof d.colorScheme === 'string' &&
-    typeof d.aesthetic === 'string' &&
-    typeof d.visualElements === 'string' &&
-    typeof d.mood === 'string'
-  )
-}
-
-/**
- * Props for the GraphView component.
- */
-export interface GraphViewProps {
-  /** Unique identifier for the course being generated */
-  courseId: string
-  /** Optional display title for the course (defaults to 'Course Generation') */
-  courseTitle?: string
-  /**
-   * Whether the course has documents.
-   * When false, Stage 2 (Document Processing) and Stage 3 (Classification)
-   * are marked as 'skipped' in the graph visualization.
-   * @default true
-   */
-  hasDocuments?: boolean
-  /** Stage number where generation failed (from courses.failed_at_stage) */
-  failedAtStage?: number | null
-  /**
-   * Actual progress percentage from the database (0-100).
-   * When provided, this is used instead of calculating from status.
-   * Ensures consistency with CelestialHeader progress display.
-   */
-  progressPercentage?: number
-  /** Human-readable generation code (e.g., "ABC-1234") for debugging */
-  generationCode?: string | null
-  /**
-   * Pre-loaded Stage 1 course data.
-   * When provided, Stage 1 node displays this data immediately
-   * instead of waiting for traces from generation.
-   */
-  stage1CourseData?: {
-    inputData: Record<string, unknown>
-    outputData: Record<string, unknown>
-  }
-  /**
-   * User subscription tier for model display.
-   * Determines which model name is shown (e.g., "Premium Model" for 'premium').
-   * @default 'standard'
-   */
-  tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium'
-  /**
-   * Full generation progress data for header stats display.
-   * Contains started_at, modules_total, lessons_total, lessons_completed, etc.
-   */
-  generationProgress?: GenerationProgress
-  /**
-   * Current generation status for header stats display.
-   */
-  generationStatus?: CourseStatus
-  /**
-   * Whether realtime connection is active.
-   * Used for connection indicator in header.
-   */
-  isRealtimeConnected?: boolean
-  /**
-   * Read-only mode for automatic generation.
-   * Hides edit, regenerate, and approve buttons.
-   */
-  readOnly?: boolean
-  /**
-   * NEW: Automatic mode handlers for MissionControlBanner
-   */
-  isPaused?: boolean
-  onPause?: () => Promise<void>
-  onResume?: () => Promise<void>
-  onCancelGeneration?: () => Promise<void>
-  onSwitchToManual?: () => Promise<void>
-}
-
-/**
- * Props for the GraphInteractions component.
- */
-interface GraphInteractionsProps {
-  /** Callback to update panning mode state */
-  setIsPanning: (isPanning: boolean) => void
-}
-
-/**
- * Internal component that manages graph interactions (keyboard shortcuts, touch gestures).
- * Renders nothing but sets up interaction event handlers.
- *
- * @param props - Component props
- */
-function GraphInteractions({ setIsPanning }: GraphInteractionsProps) {
-  useKeyboardShortcuts(setIsPanning)
-  useTouchGestures()
-  return null
-}
+// Re-export GraphViewProps for backward compatibility
+export type { GraphViewProps } from './GraphView.types'
 
 /**
  * Internal GraphView component wrapped in ReactFlowProvider context.
@@ -247,12 +101,19 @@ function GraphViewInner({
   const { isTablet } = useBreakpoint(768)
   const nodesInitialized = useNodesInitialized()
   const { fitView, getNodes, setCenter } = useReactFlow()
-  const initialFitDone = useRef(false)
 
   // Get courseSlug and orgSlug from URL params for navigation
   const params = useParams()
   const courseSlug = params?.courseSlug as string | undefined
   const orgSlug = params?.orgSlug as string | undefined
+
+  // Clean up Zustand store on unmount to prevent stale data accumulation
+  const resetStore = useGenerationStore((state) => state.reset)
+  useEffect(() => {
+    return () => {
+      resetStore()
+    }
+  }, [resetStore])
 
   // Sync locale for step name translations
   const locale = useLocale()
@@ -268,48 +129,11 @@ function GraphViewInner({
   const [isProcessingBanner, setIsProcessingBanner] = useState(false)
 
   // Fullscreen mode
-  const containerRef = useRef<HTMLDivElement>(null)
   const portalContainerRef = useRef<HTMLDivElement>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-
-  const toggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return
-
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch((err) => {
-        console.error('Error attempting to enable fullscreen:', err)
-      })
-    } else {
-      document.exitFullscreen()
-    }
-  }, [])
-
-  // Sync fullscreen state with browser
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
-    }
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
-    }
-  }, [])
-
-  // View mode toggle removed (T096) - maintaining two views adds complexity without significant benefit
+  const { isFullscreen, containerRef, toggleFullscreen } = useFullscreenMode()
 
   // Pan/Selection state (FIX-018)
-  // Default to Pan Mode (n8n style), Space to Select
   const [isPanning, setIsPanning] = useState(true)
-
-  // Visual style for course imagery (fetched from courses.visual_style)
-  const [visualStyle, setVisualStyle] = useState<VisualStyle | null>(null)
-
-  // Course writing style (fetched from courses.style) - used in Stage 4 Hero Card via StaticGraphContext
-  const [courseStyle, setCourseStyle] = useState<string | null>(null)
-
-  // Analysis result from Stage 4 (persisted edits from courses.analysis_result)
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
 
   // Theme support
   const { resolvedTheme, mounted } = useThemeSync()
@@ -334,7 +158,11 @@ function GraphViewInner({
       }
 
   // Realtime Data
-  const { traces, status: pipelineStatus, isConnected } = useGenerationRealtime()
+  const { traces, status: pipelineStatusRaw, isConnected } = useGenerationRealtime()
+  // FIXME: realtime-provider returns CourseStatus but should return GenerationStatus
+  const pipelineStatus = pipelineStatusRaw as
+    | Database['public']['Enums']['generation_status']
+    | null
 
   // Check if we're in clarifying phase (for MissionControlBanner mode)
   const isClarifyingPhase = pipelineStatus === 'stage_4_clarifying'
@@ -350,7 +178,7 @@ function GraphViewInner({
       if (targetNode?.position) {
         const width = targetNode.measured?.width || 180
         const height = targetNode.measured?.height || 80
-        setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
+        void setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
           zoom: 1.0,
           duration: 600,
         })
@@ -370,7 +198,7 @@ function GraphViewInner({
         const width = errorNode.measured?.width || 180
         const height = errorNode.measured?.height || 80
 
-        setCenter(errorNode.position.x + width / 2, errorNode.position.y + height / 2, {
+        void setCenter(errorNode.position.x + width / 2, errorNode.position.y + height / 2, {
           zoom: 1.2,
           duration: 800,
         })
@@ -408,18 +236,24 @@ function GraphViewInner({
       pipelineStatus?.startsWith('stage_6') ||
       pipelineStatus === 'completed')
 
-  const { data: clarifyingEnabled } = useClarifyingIsEnabled(courseId, {
-    enabled: isAtStage4OrBeyond,
-    staleTime: Infinity, // Config doesn't change, cache forever
-    refetchOnWindowFocus: false,
-  })
+  const { data: clarifyingEnabled } = trpc.clarifying.isEnabled.useQuery(
+    { courseId },
+    {
+      enabled: isAtStage4OrBeyond,
+      staleTime: Infinity, // Config doesn't change, cache forever
+      refetchOnWindowFocus: false,
+    }
+  )
 
   // Step 2: Only fetch progress if clarifying is actually enabled
-  const { data: clarifyingProgressRaw } = useClarifyingProgress(courseId, {
-    enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
-    staleTime: 0, // Invalidation triggers immediate refetch (fixes node counter not updating)
-    refetchOnWindowFocus: false,
-  })
+  const { data: clarifyingProgressRaw } = trpc.clarifying.getProgress.useQuery(
+    { courseId },
+    {
+      enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
+      staleTime: 0, // Invalidation triggers immediate refetch (fixes node counter not updating)
+      refetchOnWindowFocus: false,
+    }
+  )
 
   // Transform clarifying progress to expected format
   const clarifyingData: ClarifyingProgressData | undefined =
@@ -458,367 +292,30 @@ function GraphViewInner({
     clarifyingData,
     courseStatus: pipelineStatus ?? undefined,
   })
-  const { layoutNodes, layoutError: _layoutError } = useGraphLayout()
-  // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
-  const layoutGenerationRef = useRef(0)
+  // Course data sync (structure, visual_style, style, analysis_result)
+  const { visualStyle, courseStyle, analysisResult } = useCourseDataSync({
+    courseId,
+    initializeFromCourseStructure,
+    isConnected,
+    pipelineStatus,
+  })
 
-  // Ref to access latest nodes without adding to effect dependencies
-  const nodesRef = useRef(nodes)
-  useEffect(() => {
-    nodesRef.current = nodes
-  }, [nodes])
-
-  // Ref to prevent concurrent refetches (race condition protection)
-  const refetchInProgressRef = useRef(false)
-  // Ref to prevent double-fetch in strict mode
-  const courseStructureInitialized = useRef(false)
-  // M3: Ref to store previous course structure for change detection
-  const prevCourseStructureRef = useRef<string | null>(null)
-
-  /**
-   * Unified function to fetch course data from database.
-   * Consolidates logic from initial fetch, event refetch, and Stage 5 complete fetch.
-   *
-   * @param fields - 'all' fetches course_structure, visual_style, style, analysis_result;
-   *                 'structure_only' fetches only course_structure
-   * @param includeCompletedLessons - Whether to also fetch completed lesson labels from generation_trace
-   * @param options - Additional options for fetch behavior
-   */
-  const fetchCourseData = useCallback(
-    async (
-      fields: 'all' | 'structure_only',
-      includeCompletedLessons: boolean,
-      options?: {
-        source?: string
-        checkMounted?: () => boolean
-        onError?: (context: string) => void
-      }
-    ) => {
-      // H2: Prevent concurrent refetches (race condition protection)
-      if (refetchInProgressRef.current) {
-        logger.info('[GraphView] Refetch already in progress, skipping')
-        return
-      }
-
-      refetchInProgressRef.current = true
-      const startTime = performance.now()
-
-      try {
-        if (options?.source) {
-          logger.info('[GraphView] Course data updated, refetching...', { source: options.source })
-        }
-
-        const supabase = createClient()
-
-        // Build completed lessons query if needed
-        const lessonsQuery = includeCompletedLessons
-          ? supabase
-              .from('generation_trace')
-              .select('input_data')
-              .eq('course_id', courseId)
-              .eq('stage', 'stage_6')
-              .eq('step_name', 'finish')
-              .not('input_data->lessonLabel', 'is', null)
-          : null
-
-        // Fetch based on fields parameter - use separate queries for type safety
-        let courseStructure: CourseStructure | null = null
-        let visualStyleData: unknown = null
-        let styleData: string | null = null
-        let analysisResultData: unknown = null
-
-        if (fields === 'all') {
-          // Fetch all fields
-          const [courseResult, lessonsResult] = await Promise.all([
-            supabase
-              .from('courses')
-              .select('course_structure, visual_style, style, analysis_result')
-              .eq('id', courseId)
-              .single(),
-            lessonsQuery,
-          ])
-
-          if (courseResult.error) {
-            logger.error('[GraphView] Failed to fetch course data:', courseResult.error)
-            options?.onError?.('course data')
-            return
-          }
-
-          // E1: Guard against setState on unmounted component
-          if (options?.checkMounted && !options.checkMounted()) {
-            logger.info('[GraphView] Component unmounted, skipping state update')
-            return
-          }
-
-          courseStructure = courseResult.data?.course_structure as CourseStructure | null
-          visualStyleData = courseResult.data?.visual_style
-          styleData = courseResult.data?.style ?? null
-          analysisResultData = courseResult.data?.analysis_result
-
-          // Update visual style
-          if (visualStyleData && isVisualStyle(visualStyleData)) {
-            setVisualStyle(visualStyleData)
-          }
-
-          // Update course style
-          if (styleData) {
-            setCourseStyle(styleData)
-          }
-
-          // Update analysis result
-          if (analysisResultData) {
-            const parsed = parseAnalysisResult(analysisResultData)
-            if (parsed) {
-              setAnalysisResult(parsed)
-            }
-          }
-
-          // Extract completed labels
-          const completedLabels =
-            lessonsResult?.data && lessonsResult.data.length > 0
-              ? [
-                  ...new Set(
-                    lessonsResult.data
-                      .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
-                      .filter(Boolean)
-                  ),
-                ]
-              : []
-
-          // Update course structure (M3: only if changed)
-          if (courseStructure) {
-            const structureJson = JSON.stringify(courseStructure)
-            const hasStructureChanged = prevCourseStructureRef.current !== structureJson
-
-            if (hasStructureChanged) {
-              initializeFromCourseStructure(courseStructure, completedLabels)
-              prevCourseStructureRef.current = structureJson
-              logger.debug('[GraphView] Course structure updated')
-            } else {
-              logger.debug('[GraphView] Course structure unchanged, skipping rebuild')
-            }
-            courseStructureInitialized.current = true
-          } else {
-            // Reset flag if no structure found during initial load (might be added later)
-            courseStructureInitialized.current = false
-          }
-        } else {
-          // Fetch structure only
-          const [courseResult, lessonsResult] = await Promise.all([
-            supabase.from('courses').select('course_structure').eq('id', courseId).single(),
-            lessonsQuery,
-          ])
-
-          if (courseResult.error) {
-            logger.error(
-              '[GraphView] Failed to fetch course structure after Stage 5:',
-              courseResult.error
-            )
-            options?.onError?.('course structure after Stage 5')
-            return
-          }
-
-          // E1: Guard against setState on unmounted component
-          if (options?.checkMounted && !options.checkMounted()) {
-            logger.info('[GraphView] Component unmounted, skipping state update')
-            return
-          }
-
-          courseStructure = courseResult.data?.course_structure as CourseStructure | null
-
-          // Extract completed labels
-          const completedLabels =
-            lessonsResult?.data && lessonsResult.data.length > 0
-              ? [
-                  ...new Set(
-                    lessonsResult.data
-                      .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
-                      .filter(Boolean)
-                  ),
-                ]
-              : []
-
-          // Update course structure (M3: only if changed)
-          if (courseStructure) {
-            const structureJson = JSON.stringify(courseStructure)
-            const hasStructureChanged = prevCourseStructureRef.current !== structureJson
-
-            if (hasStructureChanged) {
-              initializeFromCourseStructure(courseStructure, completedLabels)
-              prevCourseStructureRef.current = structureJson
-              logger.debug('[GraphView] Course structure updated (structure_only)')
-            } else {
-              logger.debug('[GraphView] Course structure unchanged, skipping rebuild')
-            }
-            courseStructureInitialized.current = true
-          }
-        }
-
-        const duration = performance.now() - startTime
-        logger.info('[GraphView] Course data refreshed successfully', {
-          fields,
-          includeCompletedLessons,
-          duration: `${duration.toFixed(2)}ms`,
-        })
-      } finally {
-        refetchInProgressRef.current = false
-      }
-    },
-    [courseId, initializeFromCourseStructure]
-  )
-
-  // Fetch course structure on mount to initialize modules/lessons (Task 1: Stage 6 UI/UX)
-  // This ensures the structure appears immediately even on page refresh
-  useEffect(() => {
-    // Prevent double-fetch in strict mode
-    if (courseStructureInitialized.current) return
-    courseStructureInitialized.current = true
-
-    // Initial fetch: all fields + completed lessons
-    void fetchCourseData('all', true, {
-      onError: () => {
-        // Reset flag on error to allow retry on remount
-        courseStructureInitialized.current = false
-      },
-    })
-  }, [fetchCourseData])
-
-  // Listen for course-data-updated events (dispatched by realtime provider)
-  // This handles UI refresh after apply proposal (Stage 5) and clarifying answers (Stage 4)
-  useEffect(() => {
-    let isMounted = true
-
-    const handleCourseDataUpdated = (event: Event) => {
-      // M4: Type-safe event validation
-      if (!isCourseDataUpdatedEvent(event)) {
-        logger.warn('[GraphView] Invalid course-data-updated event received')
-        return
-      }
-
-      const { detail } = event
-
-      // Only handle events for this course
-      if (detail.courseId !== courseId) return
-
-      // BP2: Only process realtime events when connected
-      // Fallback polling handles disconnected state - avoid duplicate fetches
-      if (detail.source === 'realtime' && !isConnected) {
-        logger.info('[GraphView] Ignoring realtime event - using fallback polling')
-        return
-      }
-
-      // H1: Only refetch if relevant fields changed
-      if (!hasRelevantFieldChanges(detail.updatedFields)) {
-        logger.info('[GraphView] No relevant fields updated, skipping refetch', {
-          updatedFields: detail.updatedFields,
-        })
-        return
-      }
-
-      // Event refetch: all fields, no completed lessons
-      void fetchCourseData('all', false, {
-        source: detail.source,
-        checkMounted: () => isMounted,
-      })
-    }
-
-    window.addEventListener(COURSE_DATA_UPDATED_EVENT, handleCourseDataUpdated)
-    return () => {
-      isMounted = false
-      window.removeEventListener(COURSE_DATA_UPDATED_EVENT, handleCourseDataUpdated)
-      logger.info('[GraphView] Removed course-data-updated listener for', courseId)
-    }
-  }, [courseId, fetchCourseData, isConnected])
-
-  // Re-fetch course structure when Stage 5 becomes complete
-  // This ensures lesson nodes appear immediately after Stage 5 approval
-  const prevPipelineStatus = useRef<string | null>(null)
-  const isInitialMount = useRef(true)
-  useEffect(() => {
-    // Skip the initial mount - first useEffect already handles initial load with completedLabels
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-      prevPipelineStatus.current = pipelineStatus ?? null
-      return
-    }
-
-    // Only trigger on actual transition TO stage_5_complete (not initial load)
-    const wasNotComplete = prevPipelineStatus.current !== 'stage_5_complete'
-    const isNowComplete = pipelineStatus === 'stage_5_complete'
-    prevPipelineStatus.current = pipelineStatus ?? null
-
-    if (wasNotComplete && isNowComplete) {
-      // Reset the initialization flag to allow re-fetch
-      courseStructureInitialized.current = false
-
-      // Stage 5 complete fetch: structure only + completed lessons
-      void fetchCourseData('structure_only', true)
-    }
-  }, [pipelineStatus, fetchCourseData])
-
-  // Re-fetch course data (analysis_result, visual_style, style) when stage transitions to awaiting_approval
-  // This ensures results appear immediately without manual page refresh
-  useEffect(() => {
-    const awaitingStatuses = [
-      'stage_3_awaiting_approval',
-      'stage_4_awaiting_approval',
-      'stage_5_awaiting_approval',
-    ]
-
-    const wasNotAwaiting = !awaitingStatuses.includes(prevPipelineStatus.current || '')
-    const isNowAwaiting = awaitingStatuses.includes(pipelineStatus || '')
-
-    // Only trigger on transition TO awaiting status (not initial load or re-render)
-    if (wasNotAwaiting && isNowAwaiting) {
-      const fetchCourseData = async () => {
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from('courses')
-          .select('analysis_result, visual_style, style')
-          .eq('id', courseId)
-          .single()
-
-        if (error) {
-          console.error('[GraphView] Failed to fetch course data on awaiting:', error)
-          return
-        }
-
-        if (data?.analysis_result) {
-          const parsed = parseAnalysisResult(data.analysis_result)
-          if (parsed) {
-            setAnalysisResult(parsed)
-          }
-        }
-
-        if (data?.visual_style && isVisualStyle(data.visual_style)) {
-          setVisualStyle(data.visual_style)
-        }
-
-        if (data?.style) {
-          setCourseStyle(data.style)
-        }
-      }
-
-      fetchCourseData()
-    }
-  }, [pipelineStatus, courseId])
+  // Auto-layout when graph structure changes
+  const { initialFitDone } = useGraphLayoutEffect({
+    nodes,
+    edges,
+    setNodes,
+    nodePositionsRef,
+  })
 
   // Initialize Stage 2 documents from database with proper statuses
-  // This ensures documents appear in the graph on page load (before realtime traces arrive)
-  // and have correct completion status for Stage2Group display
-  // Note: initializeDocumentsWithStatus is safe to call multiple times - it only updates
-  // documents that are still 'pending' (won't overwrite progress from realtime traces)
   const storeDocumentsCount = useGenerationStore((state) => state.documents.size)
   useEffect(() => {
     if (isCatalogLoading || !hasDocuments) return
     if (documentsWithStatus.length === 0) return
 
-    // Initialize/update Zustand store with proper statuses (for Stage2Group counters)
-    // Safe to call multiple times - only updates pending documents
-    // This handles: initial load, HMR reset, and status changes (e.g., after "Start" clicked)
     initializeDocumentsWithStatus(documentsWithStatus)
 
-    // Initialize useGraphData documentSteps only if store was empty (first load or HMR)
     if (storeDocumentsCount === 0) {
       initializeDocumentsFromDb(documentsWithStatus)
     }
@@ -830,116 +327,6 @@ function GraphViewInner({
     initializeDocumentsWithStatus,
     initializeDocumentsFromDb,
   ])
-
-  // Track module and stage2group collapse states for relayout trigger
-  const collapseSignature = useMemo(
-    () =>
-      nodes
-        .filter((n) => n.type === 'module' || n.type === 'stage2group')
-        .map((n) => `${n.id}:${n.data?.isCollapsed}`)
-        .join(','),
-    [nodes]
-  )
-
-  // Create stable layout trigger based on structure, not content
-  // This prevents the effect from running on every node status update
-  const layoutTrigger = useMemo(
-    () => ({
-      nodeCount: nodes.length,
-      containerIds: nodes
-        .filter((n) => n.type === 'module' || n.type === 'stage2group')
-        .map((n) => n.id)
-        .join(','),
-      collapseSignature,
-    }),
-    [nodes, collapseSignature]
-  )
-
-  // Use ref to track previous trigger for comparison
-  const prevLayoutTrigger = useRef(layoutTrigger)
-
-  // Debounced layout function to prevent rapid layout calculations
-  const debouncedLayout = useDebouncedCallback(
-    async (
-      nodesToLayout: AppNode[],
-      edgesToLayout: AppEdge[],
-      generation: number,
-      wasCollapseChange: boolean
-    ) => {
-      if (layoutGenerationRef.current !== generation) {
-        return // Stale request
-      }
-
-      try {
-        const layoutedNodes = await layoutNodes(nodesToLayout, edgesToLayout)
-
-        if (layoutGenerationRef.current !== generation) {
-          return // Another layout started
-        }
-
-        // CRITICAL: Save positions BEFORE setNodes to prevent race condition
-        // This ensures next graph rebuild has correct positions
-        // Save ALL node positions including lessons (with parentId)
-        // Lessons need their positions saved because graph rebuild in useGraphData
-        // uses nodePositionsRef to restore positions, and without saved positions
-        // lessons would get {x: 0, y: 0} on every rebuild
-        layoutedNodes.forEach((n) => {
-          if (n.position) {
-            nodePositionsRef.current.set(n.id, n.position)
-          }
-        })
-
-        setNodes(layoutedNodes)
-
-        // Fit view after layout - comfortable zoom to see all nodes
-        if (!initialFitDone.current) {
-          initialFitDone.current = true
-          requestAnimationFrame(() => {
-            fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 })
-          })
-        } else if (wasCollapseChange) {
-          // Restore viewport after layout when collapse changed
-          restoreViewport()
-        }
-      } catch (error) {
-        console.error('[GraphView] Layout calculation failed:', error)
-        // Layout failed, but don't crash - nodes will stay at current positions
-      }
-    },
-    50, // 50ms debounce
-    { leading: true, trailing: true }
-  )
-
-  // Auto-layout when structure changes (node count, container IDs, or collapse state)
-  useEffect(() => {
-    const structureChanged =
-      layoutTrigger.nodeCount !== prevLayoutTrigger.current.nodeCount ||
-      layoutTrigger.containerIds !== prevLayoutTrigger.current.containerIds
-    const collapseChanged =
-      layoutTrigger.collapseSignature !== prevLayoutTrigger.current.collapseSignature
-    const isInitialLoad = !initialFitDone.current
-
-    // Update ref for next comparison
-    prevLayoutTrigger.current = layoutTrigger
-
-    // Only layout if structure changes, collapse state changes, or initial load
-    if (nodesRef.current.length > 0 && (structureChanged || isInitialLoad || collapseChanged)) {
-      // Note: preserveViewport() is now called BEFORE setNodes() in ModuleGroup/Stage2Group
-      // to capture viewport state before any React Flow processing occurs.
-      // This prevents the race condition where viewport would shift between setNodes and this useEffect.
-
-      // Increment generation to track this layout request
-      const currentGeneration = ++layoutGenerationRef.current
-
-      // Use debounced layout to prevent rapid layout calculations
-      debouncedLayout(nodesRef.current, edges, currentGeneration, collapseChanged && !isInitialLoad)
-    }
-
-    // Cleanup: cancel pending debounced calls on unmount or re-run
-    return () => {
-      debouncedLayout.cancel()
-    }
-  }, [layoutTrigger, edges, debouncedLayout])
 
   // Selection
   const { selectNode, deselectNode, selectedNodeId } = useNodeSelection()
@@ -983,98 +370,22 @@ function GraphViewInner({
     if (nodesInitialized && !initialFitDone.current && nodes.length > 0) {
       initialFitDone.current = true
       requestAnimationFrame(() => {
-        fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 300 })
+        void fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 300 })
       })
     }
   }, [nodesInitialized, nodes.length, fitView])
 
   // Prepare Realtime Context
-  const realtimeData: RealtimeStatusData = useMemo(() => {
-    const nodeStatuses = new Map<string, NodeStatusEntry>()
-    const currentStage = getStageFromStatus(pipelineStatus || '')
-    const awaitingStage = isAwaitingApproval(pipelineStatus || '')
-    const hasError = pipelineStatus === 'failed'
-
-    Object.values(GRAPH_STAGE_CONFIG).forEach((stage) => {
-      const status = mapStatusToNodeStatus(
-        stage.number,
-        currentStage,
-        pipelineStatus || 'draft',
-        hasError,
-        awaitingStage,
-        failedAtStage, // Pass failedAtStage from props
-        hasDocuments // Pass hasDocuments to mark stages 2,3 as skipped when no documents
-      )
-
-      nodeStatuses.set(stage.id, {
-        status,
-        lastUpdated: new Date(),
-      })
-    })
-
-    // Calculate Stage 6 progress from lesson completion
-    const stage6Nodes = nodes.filter((n) => n.type === 'lesson' || n.type === 'module')
-    const stage6Lessons = stage6Nodes.filter((n) => n.type === 'lesson')
-    const stage6Completed = stage6Lessons.filter((l) => l.data.status === 'completed').length
-    const stage6Progress =
-      stage6Lessons.length > 0 ? Math.round((stage6Completed / stage6Lessons.length) * 100) : 0
-
-    // Update Stage 6 status entry with progress
-    const stage6Status = nodeStatuses.get('stage_6')
-    if (stage6Status) {
-      nodeStatuses.set('stage_6', {
-        ...stage6Status,
-        progress: stage6Progress,
-      })
-    }
-
-    // Set End node status based on pipeline completion
-    // End node should be 'completed' only when entire pipeline is completed
-    nodeStatuses.set('end', {
-      status: pipelineStatus === 'completed' ? 'completed' : 'pending',
-      lastUpdated: new Date(),
-    })
-
-    let mappedStatus: 'idle' | 'running' | 'completed' | 'failed' | 'paused' = 'idle'
-    if (pipelineStatus && ACTIVE_STATUSES.includes(pipelineStatus)) {
-      mappedStatus = 'running'
-    } else if (pipelineStatus === 'completed') {
-      mappedStatus = 'completed'
-    } else if (pipelineStatus === 'failed') {
-      mappedStatus = 'failed'
-    }
-
-    // Use progressPercentage from database when available (ensures consistency with CelestialHeader)
-    // Fall back to calculated progress from status for backward compatibility
-    // Pass lesson counts for Stage 6 progress interpolation
-    const overallProgress =
-      progressPercentage !== undefined
-        ? progressPercentage
-        : calculateProgress(pipelineStatus, hasDocuments, {
-            lessonsCompleted: generationProgress?.lessons_completed,
-            lessonsTotal: generationProgress?.lessons_total,
-          })
-
-    return {
-      nodeStatuses,
-      activeNodeId: null,
-      pipelineStatus: mappedStatus,
-      overallProgress,
-      elapsedTime: 0,
-      totalCost: 0,
-      isConnected,
-      lastUpdated: new Date(),
-    }
-  }, [
+  const realtimeData = useRealtimeStatusData({
     pipelineStatus,
     isConnected,
     hasDocuments,
     failedAtStage,
     nodes,
     progressPercentage,
-    generationProgress?.lessons_completed,
-    generationProgress?.lessons_total,
-  ])
+    lessonsCompleted: generationProgress?.lessons_completed,
+    lessonsTotal: generationProgress?.lessons_total,
+  })
 
   // Static Data (includes dynamic counts for EndNode display)
   const staticData = useMemo(() => {
@@ -1106,73 +417,14 @@ function GraphViewInner({
 
   const awaitingStage = isAwaitingApproval(pipelineStatus || '')
 
-  // Track which stages have been auto-opened to prevent reopening on page reload
-  const getAutoOpenedKey = useCallback(
-    (stage: string) => `graphview_auto_opened_${courseId}_${stage}`,
-    [courseId]
-  )
-
-  const hasBeenAutoOpened = useCallback(
-    (stage: string) => {
-      if (typeof window === 'undefined') return false
-      return sessionStorage.getItem(getAutoOpenedKey(stage)) === 'true'
-    },
-    [getAutoOpenedKey]
-  )
-
-  const markAsAutoOpened = useCallback(
-    (stage: string) => {
-      if (typeof window === 'undefined') return
-      sessionStorage.setItem(getAutoOpenedKey(stage), 'true')
-    },
-    [getAutoOpenedKey]
-  )
-
-  // Auto-select Stage 3, 4, or 5 node when awaiting approval (always) or completed (only once per session)
-  useEffect(() => {
-    let selectedStage: string | null = null
-    let isAwaitingState = false
-
-    // Check clarifying state FIRST - specific handling for clarifying node
-    // (stage_4_clarifying returns awaitingStage=4, but we want to open clarifying node, not stage_4)
-    if (pipelineStatus === 'stage_4_clarifying') {
-      selectedStage = 'stage_4_clarifying'
-      isAwaitingState = true
-    }
-    // Check awaiting approval states - ALWAYS open for awaiting (user needs to take action)
-    else if (awaitingStage === 3) {
-      selectedStage = 'stage_3'
-      isAwaitingState = true
-    } else if (awaitingStage === 4) {
-      selectedStage = 'stage_4'
-      isAwaitingState = true
-    } else if (awaitingStage === 5) {
-      selectedStage = 'stage_5'
-      isAwaitingState = true
-    }
-    // Check completion states - only open ONCE per session (not on reload)
-    else if (pipelineStatus === 'stage_4_complete' && !hasBeenAutoOpened('stage_4_complete')) {
-      selectedStage = 'stage_4'
-    } else if (pipelineStatus === 'stage_5_complete' && !hasBeenAutoOpened('stage_5_complete')) {
-      selectedStage = 'stage_5'
-    }
-
-    // Select the node if a stage is determined (mark as auto-opened)
-    if (selectedStage) {
-      selectNode(selectedStage, { autoOpened: true })
-      // Mark completion states as opened (awaiting states always reopen)
-      if (!isAwaitingState && pipelineStatus) {
-        markAsAutoOpened(pipelineStatus)
-      }
-    }
-
-    // Cleanup: deselect when stage changes
-    return () => {
-      if (selectedStage) {
-        deselectNode()
-      }
-    }
-  }, [awaitingStage, pipelineStatus, selectNode, deselectNode, hasBeenAutoOpened, markAsAutoOpened])
+  // Auto-select Stage 3, 4, or 5 node when awaiting approval or on completion
+  useAutoNodeSelection({
+    courseId,
+    pipelineStatus,
+    awaitingStage,
+    selectNode,
+    deselectNode,
+  })
 
   return (
     <RealtimeStatusProvider value={realtimeData}>

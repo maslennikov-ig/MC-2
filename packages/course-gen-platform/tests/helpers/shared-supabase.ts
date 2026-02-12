@@ -37,12 +37,13 @@ let sharedClient: SupabaseClient<Database> | null = null;
 export function getTestSupabaseClient(): SupabaseClient<Database> {
   if (!sharedClient) {
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseServiceKey =
+      process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error(
         'Missing Supabase credentials in environment variables. ' +
-        'Required: SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY)'
+          'Required: SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY)'
       );
     }
 

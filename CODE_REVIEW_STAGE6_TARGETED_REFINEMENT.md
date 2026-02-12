@@ -13,6 +13,7 @@ The Stage 6 Targeted Refinement implementation is **well-architected and product
 **Overall Assessment**: ✅ **APPROVED** with minor recommendations for enhancement
 
 **Key Strengths**:
+
 - Zero TypeScript errors across entire codebase
 - Excellent module separation and single-responsibility principle
 - Comprehensive JSDoc documentation
@@ -21,6 +22,7 @@ The Stage 6 Targeted Refinement implementation is **well-architected and product
 - Thoughtful algorithm implementations (Krippendorff's Alpha, greedy coloring for parallelism)
 
 **Areas for Enhancement**:
+
 - Reduce code duplication in helper functions
 - Add more comprehensive error context
 - Implement missing TODO items for production readiness
@@ -39,17 +41,20 @@ The Stage 6 Targeted Refinement implementation is **well-architected and product
 ### 1. Code Duplication: Section Index Parsing
 
 **Location**: Multiple files
+
 - `/home/me/code/megacampus2-worktrees/judge-stage6/packages/course-gen-platform/src/stages/stage6-lesson-content/judge/arbiter/consolidate-verdicts.ts` (lines 424-435)
 - `/home/me/code/megacampus2-worktrees/judge-stage6/packages/course-gen-platform/src/stages/stage6-lesson-content/judge/router/route-task.ts` (lines 168-176)
 
 **Issue**: `parseSectionIndex` function is duplicated with slightly different implementations.
 
 **Impact**:
+
 - Maintenance burden (updates must be synchronized)
 - Potential for inconsistent behavior
 - Violates DRY principle
 
 **Recommendation**:
+
 ```typescript
 // Create shared utility: packages/course-gen-platform/src/stages/stage6-lesson-content/judge/utils/section-utils.ts
 
@@ -63,8 +68,8 @@ export function parseSectionIndex(sectionId: string): number {
 
   // Named sections: assign special indices for sorting
   const namedSections: Record<string, number> = {
-    'sec_introduction': 0,
-    'sec_conclusion': 9999,
+    sec_introduction: 0,
+    sec_conclusion: 9999,
   };
 
   for (const [name, index] of Object.entries(namedSections)) {
@@ -81,6 +86,7 @@ export function parseSectionIndex(sectionId: string): number {
 ### 2. Location String Normalization Duplication
 
 **Location**:
+
 - `/home/me/code/megacampus2-worktrees/judge-stage6/packages/course-gen-platform/src/stages/stage6-lesson-content/judge/arbiter/conflict-resolver.ts` (lines 146-162)
 - `/home/me/code/megacampus2-worktrees/judge-stage6/packages/course-gen-platform/src/stages/stage6-lesson-content/judge/arbiter/consolidate-verdicts.ts` (lines 149-178)
 
@@ -95,15 +101,17 @@ export function parseSectionIndex(sectionId: string): number {
 **Issue**: `interpretAgreementLevel` function duplicates logic from `krippendorff.ts` and hardcodes thresholds instead of using `REFINEMENT_CONFIG`.
 
 **Current**:
+
 ```typescript
 function interpretAgreementLevel(score: number): AgreementLevel {
-  if (score >= 0.80) return 'high';
+  if (score >= 0.8) return 'high';
   if (score >= 0.67) return 'moderate';
   return 'low';
 }
 ```
 
 **Recommendation**:
+
 ```typescript
 function interpretAgreementLevel(score: number): AgreementLevel {
   if (score >= REFINEMENT_CONFIG.krippendorff.highAgreement) return 'high';
@@ -123,6 +131,7 @@ function interpretAgreementLevel(score: number): AgreementLevel {
 **Issue**: `extractRagChunkText` uses `any` type parameter.
 
 **Current**:
+
 ```typescript
 export function extractRagChunkText(chunk: any): string {
   if (typeof chunk === 'string') return chunk;
@@ -133,6 +142,7 @@ export function extractRagChunkText(chunk: any): string {
 ```
 
 **Recommendation**:
+
 ```typescript
 type RagChunkFormat =
   | string
@@ -154,6 +164,7 @@ export function extractRagChunkText(chunk: RagChunkFormat): string {
 **Issue**: Magic numbers (3, 2, 1) used for ranking without constants.
 
 **Example** (`conflict-resolver.ts` lines 294-300):
+
 ```typescript
 function severityRank(severity: IssueSeverity): number {
   const ranks: Record<IssueSeverity, number> = {
@@ -166,6 +177,7 @@ function severityRank(severity: IssueSeverity): number {
 ```
 
 **Recommendation**: Extract to constants at module level:
+
 ```typescript
 const SEVERITY_RANKS = {
   critical: 3,
@@ -181,16 +193,17 @@ const SEVERITY_RANKS = {
 **Issue**: Uses `Math.max(1, ...)` pattern but could be more explicit.
 
 **Current**:
+
 ```typescript
 return {
   avgSentenceLength: words.length / Math.max(1, sentences.length),
-  avgWordLength:
-    words.reduce((sum, w) => sum + w.length, 0) / Math.max(1, words.length),
+  avgWordLength: words.reduce((sum, w) => sum + w.length, 0) / Math.max(1, words.length),
   paragraphBreakRatio: paragraphs.length / Math.max(1, sentences.length),
 };
 ```
 
 **Recommendation**: Add explicit zero-length checks with logging:
+
 ```typescript
 if (sentences.length === 0 || words.length === 0) {
   logger.warn('Empty content in readability calculation');
@@ -209,6 +222,7 @@ if (sentences.length === 0 || words.length === 0) {
 **Issue**: Using `void` operator to suppress unused variable warnings in placeholder code.
 
 **Current**:
+
 ```typescript
 // Prevent unused variable warnings
 void input;
@@ -217,6 +231,7 @@ void buildDeltaJudgeSystemPrompt;
 ```
 
 **Recommendation**: Use underscore prefix convention:
+
 ```typescript
 export async function verifyPatch(_input: DeltaJudgeInput): Promise<DeltaJudgeOutput> {
   // TODO: Integrate with actual LLM service
@@ -236,10 +251,12 @@ export async function verifyPatch(_input: DeltaJudgeInput): Promise<DeltaJudgeOu
 **Issue**: Default values hardcoded instead of referencing configuration.
 
 **Examples**:
+
 - `section-expander/index.ts` line 237: `return 300; // Default`
 - `targeted-refinement/index.ts` line 536: `targetWordCount: 300, // Default target`
 
 **Recommendation**: Add to `REFINEMENT_CONFIG`:
+
 ```typescript
 export const REFINEMENT_CONFIG = {
   // ... existing config
@@ -263,6 +280,7 @@ export const REFINEMENT_CONFIG = {
 **Grade**: A+ (Excellent)
 
 **Strengths**:
+
 1. **Clean Module Boundaries**: Each module has clear responsibilities
    - Arbiter: Consensus and conflict resolution
    - Router: Decision logic (pure functions)
@@ -272,6 +290,7 @@ export const REFINEMENT_CONFIG = {
    - Targeted-Refinement: Orchestration
 
 2. **Dependency Injection**: LLM functions are injected, enabling testing
+
    ```typescript
    export type LLMCallFn = (
      prompt: string,
@@ -289,6 +308,7 @@ export const REFINEMENT_CONFIG = {
    - I/O operations isolated in orchestration layer
 
 **Areas for Improvement**:
+
 - Consider extracting shared utilities to reduce duplication
 - Some orchestration functions are getting large (400+ lines in `targeted-refinement/index.ts`)
 
@@ -297,12 +317,14 @@ export const REFINEMENT_CONFIG = {
 **Grade**: A (Very Good)
 
 **Strengths**:
+
 1. **Comprehensive Type Coverage**: All functions have explicit types
 2. **Zod Schema Integration**: Runtime validation for external data
 3. **Type Guards**: Proper narrowing where needed
 4. **Union Types**: Effective use for state machines (`StoppingReason`, `QualityStatus`)
 
 **Weaknesses**:
+
 1. Some `any` types in utility functions (e.g., `extractRagChunkText`)
 2. Type assertions in a few places could be avoided with better inference
 
@@ -311,6 +333,7 @@ export const REFINEMENT_CONFIG = {
 **Grade**: B+ (Good)
 
 **Strengths**:
+
 1. **Try-Catch Blocks**: All async operations wrapped
 2. **Graceful Degradation**: Placeholder implementations return safe defaults
 3. **Fallback Mechanisms**:
@@ -318,11 +341,13 @@ export const REFINEMENT_CONFIG = {
    - LLM failures return original content
 
 **Weaknesses**:
+
 1. Limited error context in some cases (e.g., which LLM call failed)
 2. Some errors swallowed without adequate logging
 3. No error categorization (transient vs permanent failures)
 
 **Recommendation**:
+
 ```typescript
 class RefinementError extends Error {
   constructor(
@@ -342,6 +367,7 @@ class RefinementError extends Error {
 **Grade**: A+ (Excellent)
 
 **Strengths**:
+
 1. **Comprehensive JSDoc**: Every function has clear documentation
 2. **Examples Provided**: Many functions include usage examples
 3. **Module-Level Documentation**: Clear purpose statements
@@ -349,6 +375,7 @@ class RefinementError extends Error {
 5. **Algorithm Documentation**: Complex algorithms explained (Krippendorff, greedy coloring)
 
 **Example of excellent documentation** (`krippendorff.ts`):
+
 ```typescript
 /**
  * Calculate Krippendorff's Alpha from judge verdicts
@@ -378,12 +405,14 @@ class RefinementError extends Error {
 **Current State**: No unit tests found in reviewed files.
 
 **Testability Assessment**:
+
 1. ✅ **Pure Functions**: Router and iteration controller are fully testable
 2. ✅ **Dependency Injection**: LLM calls can be mocked
 3. ✅ **Exported Test Helpers**: `parseSectionIndex` exported for testing
 4. ❌ **Missing Tests**: No test files found
 
 **Recommendation**: Prioritize testing for:
+
 1. **Pure Algorithm Functions**:
    - `calculateAgreementScore` (with edge cases: 0, 1, 2+ verdicts)
    - `createExecutionBatches` (adjacency constraints)
@@ -395,6 +424,7 @@ class RefinementError extends Error {
    - Best-effort selector logic
 
 **Test Structure**:
+
 ```typescript
 // packages/course-gen-platform/src/stages/stage6-lesson-content/judge/__tests__/arbiter/krippendorff.test.ts
 describe('calculateAgreementScore', () => {
@@ -422,14 +452,14 @@ describe('calculateAgreementScore', () => {
 
 **Grade**: A (Excellent)
 
-1. **Krippendorff's Alpha**: O(n*m) where n=judges, m=criteria
+1. **Krippendorff's Alpha**: O(n\*m) where n=judges, m=criteria
    - ✅ Appropriate for small n (2-3 judges)
 
 2. **Execution Batching**: O(n²) greedy coloring
    - ✅ Acceptable for small n (typical: 5-10 sections)
    - Could optimize to O(n log n) if needed at scale
 
-3. **Conflict Resolution**: O(n*m) where n=issues, m=sections
+3. **Conflict Resolution**: O(n\*m) where n=issues, m=sections
    - ✅ Efficient grouping with hash maps
 
 4. **Convergence Detection**: O(k) where k=history size
@@ -440,11 +470,13 @@ describe('calculateAgreementScore', () => {
 **Grade**: A- (Very Good)
 
 **Strengths**:
+
 1. Immutable updates prevent memory leaks
 2. Maps used for efficient lookups
 3. Streaming events prevent memory accumulation
 
 **Concerns**:
+
 1. Iteration history keeps full content copies (could be large for long lessons)
    ```typescript
    state.contentHistory.push({
@@ -456,6 +488,7 @@ describe('calculateAgreementScore', () => {
    ```
 
 **Recommendation**: Consider content diffing or compression for history:
+
 ```typescript
 interface CompactIterationResult {
   iteration: number;
@@ -471,6 +504,7 @@ interface CompactIterationResult {
 **Grade**: A (Excellent)
 
 1. **Accurate Estimation**: Token estimation formulas well-calibrated
+
    ```typescript
    const promptBase = 500;
    const issueTokens = input.issues.length * 50;
@@ -491,15 +525,18 @@ interface CompactIterationResult {
 **Grade**: A- (Very Good)
 
 **Strengths**:
+
 1. Zod schemas for external inputs
 2. Number clamping (scores 0-1, word counts min/max)
 3. String length validation
 
 **Weaknesses**:
+
 1. No explicit input sanitization for LLM prompts (potential injection)
 2. Location strings not validated for malicious patterns
 
 **Recommendation**:
+
 ```typescript
 function sanitizeLocationString(location: string): string {
   // Remove potentially problematic characters
@@ -515,11 +552,13 @@ function sanitizeLocationString(location: string): string {
 **Grade**: B+ (Good)
 
 **Issue**: Some error messages might leak internal details:
+
 ```typescript
-reasoning: `Verification error: ${error instanceof Error ? error.message : 'Unknown error'}`
+reasoning: `Verification error: ${error instanceof Error ? error.message : 'Unknown error'}`;
 ```
 
 **Recommendation**: Sanitize error messages before returning to clients:
+
 ```typescript
 function sanitizeErrorMessage(error: unknown): string {
   if (error instanceof RefinementError) {
@@ -537,12 +576,14 @@ function sanitizeErrorMessage(error: unknown): string {
 ### 1. Excellent Algorithm Implementations
 
 **Krippendorff's Alpha** (`krippendorff.ts`):
+
 - Correctly implements ordinal metric
 - Proper fallback to Pearson correlation
 - Handles edge cases (0, 1 verdicts)
 - Good numerical stability (clamping to [0,1])
 
 **Greedy Coloring** (`consolidate-verdicts.ts` and `route-task.ts`):
+
 - Efficient parallel batch creation
 - Respects adjacency constraints
 - Considers task priority
@@ -550,6 +591,7 @@ function sanitizeErrorMessage(error: unknown): string {
 ### 2. Well-Designed Prompt Templates
 
 **Patcher Prompt** (`patcher-prompt.ts`):
+
 ```typescript
 export function buildPatcherPrompt(input: PatcherInput): string {
   // Clear structure with sections
@@ -560,6 +602,7 @@ export function buildPatcherPrompt(input: PatcherInput): string {
 ```
 
 **Section-Expander Prompt** (`expander-prompt.ts`):
+
 - RAG chunk integration
 - Learning objective alignment
 - Word count validation
@@ -568,6 +611,7 @@ export function buildPatcherPrompt(input: PatcherInput): string {
 ### 3. Robust State Management
 
 **Iteration Controller** (`iteration-controller.ts`):
+
 - Clear stopping conditions with priority order
 - Comprehensive state tracking
 - Convergence detection algorithm
@@ -576,6 +620,7 @@ export function buildPatcherPrompt(input: PatcherInput): string {
 ### 4. Thoughtful Configuration
 
 **REFINEMENT_CONFIG** (referenced throughout):
+
 - Centralized configuration
 - Mode-specific thresholds
 - Token budget limits
@@ -584,6 +629,7 @@ export function buildPatcherPrompt(input: PatcherInput): string {
 ### 5. Streaming Event Architecture
 
 **Targeted Refinement** (`targeted-refinement/index.ts`):
+
 ```typescript
 emitEvent(onStreamEvent, {
   type: 'refinement_start',
@@ -597,6 +643,7 @@ emitEvent(onStreamEvent, {
   sections: batchSections,
 });
 ```
+
 - Enables real-time UI updates
 - Safe error handling
 - Clean separation from core logic
@@ -604,6 +651,7 @@ emitEvent(onStreamEvent, {
 ### 6. Placeholder Pattern for Gradual Integration
 
 All modules with LLM dependencies have well-structured placeholders:
+
 ```typescript
 if (llmCall) {
   // Use injected LLM function
@@ -620,6 +668,7 @@ if (llmCall) {
 ```
 
 This pattern:
+
 - Allows incremental development
 - Maintains type safety
 - Enables testing without LLM
@@ -634,6 +683,7 @@ This pattern:
 **Grade**: A (Excellent)
 
 Tasks encapsulate all information needed for execution:
+
 ```typescript
 interface SectionRefinementTask {
   sectionId: string;
@@ -647,6 +697,7 @@ interface SectionRefinementTask {
 ```
 
 Benefits:
+
 - Serializable for job queues
 - Self-contained for parallel execution
 - Easy to retry on failure
@@ -656,17 +707,16 @@ Benefits:
 **Grade**: A (Excellent)
 
 Router uses decision matrix to select execution strategy:
+
 ```typescript
-export function routeTask(
-  task: SectionRefinementTask,
-  config: RoutingConfig
-): RouterDecision {
+export function routeTask(task: SectionRefinementTask, config: RoutingConfig): RouterDecision {
   // Decision logic based on task characteristics
   // Returns: { action, executor, estimatedTokens, reason }
 }
 ```
 
 Benefits:
+
 - Pluggable routing strategies
 - Testable decision logic
 - Clear separation from execution
@@ -676,6 +726,7 @@ Benefits:
 **Grade**: A (Excellent)
 
 Event emission for progress tracking:
+
 ```typescript
 type RefinementEvent =
   | { type: 'refinement_start'; targetSections: string[]; mode: OperationMode }
@@ -685,6 +736,7 @@ type RefinementEvent =
 ```
 
 Benefits:
+
 - Decouples progress reporting from business logic
 - Enables multiple observers (UI, logging, metrics)
 - Type-safe event handling
@@ -694,6 +746,7 @@ Benefits:
 **Grade**: A (Excellent)
 
 Clear state transitions with explicit stopping conditions:
+
 ```typescript
 type StoppingReason =
   | 'continue_more_tasks'
@@ -706,6 +759,7 @@ type StoppingReason =
 ```
 
 Benefits:
+
 - Predictable state transitions
 - Easy to debug
 - Clear termination conditions
@@ -806,6 +860,7 @@ Benefits:
 The Stage 6 Targeted Refinement implementation is **well-crafted, maintainable, and demonstrates strong software engineering practices**. The modular architecture, comprehensive documentation, and thoughtful design patterns make this code a solid foundation for production deployment.
 
 **Key Takeaways**:
+
 - Zero TypeScript errors indicates attention to type safety
 - Clear separation of concerns enables independent module evolution
 - Placeholder pattern allows incremental LLM integration
@@ -813,11 +868,13 @@ The Stage 6 Targeted Refinement implementation is **well-crafted, maintainable, 
 - Documentation quality is exceptional, making onboarding easy
 
 **Risk Assessment**: **LOW**
+
 - No critical or blocking issues
 - Major issues are primarily code quality improvements
 - Production readiness depends on completing TODO integrations
 
 **Recommendation**: ✅ **APPROVE FOR INTEGRATION** after addressing:
+
 1. Code duplication (2-4 hours)
 2. LLM service integration (8-16 hours)
 3. Basic test coverage for pure functions (8-12 hours)
@@ -829,4 +886,3 @@ The Stage 6 Targeted Refinement implementation is **well-crafted, maintainable, 
 **Review Completed**: 2025-12-11
 **Files Reviewed**: 16 TypeScript files (~3,500 lines of code)
 **Review Duration**: Comprehensive deep-dive analysis
-

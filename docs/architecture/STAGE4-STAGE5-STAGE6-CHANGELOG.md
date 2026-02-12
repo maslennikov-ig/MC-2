@@ -91,12 +91,12 @@ packages/course-gen-platform/src/shared/prompts/
 
 ### Metrics & Monitoring
 
-| Metric | Before V2.2 | After V2.2 |
-|--------|-------------|------------|
-| Token cost per refinement | ~$0.30 | ~$0.05-0.10 |
-| Mermaid rendering failures | 15-30% | ~0% |
-| Average iterations to pass | 2.5 | 1.8 |
-| Best-effort fallback rate | N/A | <5% |
+| Metric                     | Before V2.2 | After V2.2  |
+| -------------------------- | ----------- | ----------- |
+| Token cost per refinement  | ~$0.30      | ~$0.05-0.10 |
+| Mermaid rendering failures | 15-30%      | ~0%         |
+| Average iterations to pass | 2.5         | 1.8         |
+| Best-effort fallback rate  | N/A         | <5%         |
 
 ### Migration Notes
 
@@ -126,6 +126,7 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 **Research Source**: `docs/research/008-generation/Optimizing AI Lesson Content Prompts.md`
 
 **Key Additions**:
+
 - ✅ **Critical vs Optional Specification** guidelines (evidence-based)
 - ✅ **LessonSpecification V2 Schema** (complete TypeScript interface)
 - ✅ **Content Type Variation** (technical vs conceptual vs compliance)
@@ -141,6 +142,7 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 **Research Source**: `docs/research/008-generation/Research Prompt - Optimal LLM Parameters.md` (PENDING)
 
 **Key Additions**:
+
 - ✅ **Parameter Strategy by Stage** (Stage 3, 4, 5, 6)
 - ✅ **Phase-Specific Parameters** (temperature, top-p, penalties)
 - ✅ **Content Archetype Parameters** (code_tutorial 0.2, concept_explainer 0.7, legal_warning 0.1)
@@ -156,12 +158,14 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 ### LessonSpecification V1 → V2
 
 **Removed Fields**:
+
 - ❌ `content_structure.intro.hook: string` (exact text)
 - ❌ `content_structure.main_sections[].word_count: number` (exact count)
 - ❌ `content_structure.main_sections[].rag_query: string` (query, not results)
 - ❌ `content_structure.exercises[].grading_rubric?: string` (unstructured)
 
 **Added Fields**:
+
 - ✅ `metadata.target_audience: enum` (executive/practitioner/novice)
 - ✅ `metadata.tone: enum` (formal/conversational-professional)
 - ✅ `metadata.compliance_level: enum` (strict/standard)
@@ -184,6 +188,7 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 ### NEW: Priority 0 (BLOCKING)
 
 **Stage 5 → Stage 6 Interface Refactoring**
+
 - Duration: 2-3 days
 - Blocks: Priority 3 (Generation RAG Integration)
 - Tasks: Update schema, V1→V2 transformer, Zod schemas
@@ -191,6 +196,7 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 ### Updated: Priority 3
 
 **Generation RAG Integration + Semantic Scaffolding**
+
 - Duration: 3-4 days (extended from 2-3)
 - NEW: Implement V2 schema generation
 - NEW: hook_strategy detection, depth calculation, content_archetype inference
@@ -199,12 +205,14 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 ### NEW: Priority 4
 
 **Stage 6 Prompt Template + Dynamic Temperature**
+
 - Duration: 2-3 days
 - Tasks: Context-First XML template, dynamic temperature, Markdown parser, INSUFFICIENT_CONTEXT logic
 
 ### NEW: Priority 5
 
 **LLM Parameters Implementation (AFTER RESEARCH)**
+
 - Duration: 2 days
 - Tasks: Integrate research results, update all stages, A/B testing
 
@@ -213,12 +221,14 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 ## Key Decisions (Updated)
 
 **V2.0 Decisions** (unchanged):
+
 - ✅ NO summary passed to Generation
 - ✅ NO RAG access in Analyze
 - ✅ Document Prioritization is FOUNDATION
 - ✅ Two-level RAG
 
 **NEW V2.1 Decisions**:
+
 - ✅ **Semantic Scaffolding** (not executable prompts)
 - ✅ **Dynamic temperature** by content archetype (0.1-0.7 range)
 - ✅ **Markdown output** for prose, JSON for metadata
@@ -232,6 +242,7 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 **Source**: `docs/research/008-generation/Optimizing AI Lesson Content Prompts.md`
 
 **Key Findings Applied**:
+
 1. **Over-Specification Risk**: "Mad Libs" approach (3.2/5.0 quality, 1.8x retries)
 2. **Optimal Approach**: Semantic Scaffolding (3.8/5.0 quality, 1.2x retries)
 3. **ROI**: 29% efficiency gain (per 50 lessons: $6.50 savings, 65 hours saved)
@@ -245,6 +256,7 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 **Status**: Awaiting Perplexity research completion
 
 **Expected Integration**:
+
 - Empirical validation of temperature recommendations
 - Production evidence (OpenAI, Khan Academy, Duolingo)
 - Academic backing (papers)
@@ -257,10 +269,12 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 ### Backward Compatibility
 
 **V1 Schema**: Still supported
+
 - Automatic transformation to V2
 - No reprocessing required for existing courses
 
 **V2 Schema**: New courses
+
 - Automatically use V2 from Priority 0 completion
 - A/B test: V1 vs V2 quality metrics
 
@@ -269,24 +283,26 @@ V2.1 adds **critical implementation details** from Prompt Specification research
 ```typescript
 function transformV1toV2(v1: LessonSpecV1): LessonSpecification {
   return {
-    metadata: { /* infer from v1 */ },
+    metadata: {
+      /* infer from v1 */
+    },
     intro_blueprint: {
-      hook_strategy: extractStrategy(v1.hook),  // Parse text → enum
-      hook_topic: extractTopic(v1.hook)
+      hook_strategy: extractStrategy(v1.hook), // Parse text → enum
+      hook_topic: extractTopic(v1.hook),
     },
     sections: v1.sections.map(s => ({
       content_archetype: mapContentType(s.expected_content_type),
-      rag_context_id: executeAndStoreRAG(s.rag_query),  // Execute + cache
+      rag_context_id: executeAndStoreRAG(s.rag_query), // Execute + cache
       constraints: {
-        depth: mapWordCountToDepth(s.word_count),  // 200-400 → "summary"
+        depth: mapWordCountToDepth(s.word_count), // 200-400 → "summary"
         required_keywords: extractKeywords(s.section),
-        prohibited_terms: []
+        prohibited_terms: [],
       },
-      key_points_to_cover: [s.section]
+      key_points_to_cover: [s.section],
     })),
     exercises: v1.exercises.map(e => ({
-      rubric_criteria: parseRubric(e.grading_rubric)  // string → structured
-    }))
+      rubric_criteria: parseRubric(e.grading_rubric), // string → structured
+    })),
   };
 }
 ```
@@ -296,6 +312,7 @@ function transformV1toV2(v1: LessonSpecV1): LessonSpecification {
 ## Acceptance Criteria (Updated)
 
 **NEW Requirements for Sign-Off**:
+
 1. ✅ **Priority 0**: LessonSpecification V2 implemented
 2. ✅ Generation produces V2 schema
 3. ✅ V1→V2 transformer working
@@ -321,16 +338,14 @@ function transformV1toV2(v1: LessonSpecV1): LessonSpecification {
 ## Next Actions
 
 **Immediate** (BLOCKING):
+
 1. ✅ V2.1 document complete
 2. ⏳ Run LLM Parameters research via Perplexity (awaiting)
 3. ⏳ Implement Priority 0 (LessonSpecification V2) - 2-3 days
 
-**Short-term**:
-4. ⏳ Implement Priority 1 (Document Prioritization) - 3-4 days
-5. ⏳ Integrate LLM Parameters research results (after research)
+**Short-term**: 4. ⏳ Implement Priority 1 (Document Prioritization) - 3-4 days 5. ⏳ Integrate LLM Parameters research results (after research)
 
-**Medium-term**:
-6. ⏳ Priority 2-4 implementation (Analyze Phase 6, Generation V2, Stage 6)
+**Medium-term**: 6. ⏳ Priority 2-4 implementation (Analyze Phase 6, Generation V2, Stage 6)
 
 ---
 

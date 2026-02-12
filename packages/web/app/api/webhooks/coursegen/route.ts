@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import type { Database } from '@/types/database.generated'
 import type { GenerationStep, GenerationProgress } from '@/types/course-generation'
@@ -85,8 +85,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing courseId' }, { status: 400 })
     }
 
-    // Initialize Supabase client with service role for admin operations
-    const supabase = await createClient()
+    // Use admin client for webhook operations (no user session available from n8n)
+    const supabase = supabaseAdmin
 
     // Log the webhook event
     logger.info('Webhook received', {
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
               courseId: payload.courseId,
               webhookStatus: payload.status,
             },
-          }).catch(() => {})
+          }).catch((e) => console.error('Log write failed:', e.message))
 
           return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
         }
@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
               courseId: payload.courseId,
               webhookStatus: 'completed',
             },
-          }).catch(() => {})
+          }).catch((e) => console.error('Log write failed:', e.message))
 
           return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
         }
@@ -329,7 +329,7 @@ export async function POST(request: NextRequest) {
               webhookStatus: 'failed',
               originalError: payload.error,
             },
-          }).catch(() => {})
+          }).catch((e) => console.error('Log write failed:', e.message))
 
           return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
         }
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
             courseId: payload.courseId,
             webhookStatus: 'failed',
           },
-        }).catch(() => {})
+        }).catch((e) => console.error('Log write failed:', e.message))
 
         logger.error('Course generation failed', {
           courseId: payload.courseId,
@@ -380,13 +380,13 @@ export async function POST(request: NextRequest) {
         route: '/api/webhooks/coursegen',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 // Handle other HTTP methods
-export async function GET() {
+export function GET() {
   return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
 }

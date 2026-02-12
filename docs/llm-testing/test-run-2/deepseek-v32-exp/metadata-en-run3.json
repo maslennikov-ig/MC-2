@@ -5,7 +5,11 @@
   "target_audience": "Absolute beginners with no prior coding experience; career changers looking to enter the tech industry in roles like data analysis or automation; students from non-technical majors (e.g., biology, business) seeking to add a technical skill; professionals in administrative or operational roles looking to automate repetitive tasks using scripts.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["No prior programming experience required", "Basic computer literacy (saving files, using a web browser)", "Access to a computer with an internet connection to install necessary software"],
+  "prerequisites": [
+    "No prior programming experience required",
+    "Basic computer literacy (saving files, using a web browser)",
+    "Access to a computer with an internet connection to install necessary software"
+  ],
   "learning_outcomes": [
     "Define and apply fundamental programming concepts such as variables, data types, and basic operators.",
     "Build control structures using conditional statements and loops to manage program logic and flow.",
@@ -14,5 +18,16 @@
     "Construct Python scripts that read from and write to external files for data persistence.",
     "Develop simple applications by integrating core concepts to solve practical problems."
   ],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "scripting", "computer science", "data structures", "functions"]
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "scripting",
+    "computer science",
+    "data structures",
+    "functions"
+  ]
 }

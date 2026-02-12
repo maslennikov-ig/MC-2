@@ -221,8 +221,8 @@ interface VideoEnrichmentContent {
 ```typescript
 interface AudioEnrichmentContent {
   type: 'audio';
-  transcript: string;           // Optimized text for TTS
-  voice_id: string;             // OpenAI voice: alloy, echo, fable, onyx, nova, shimmer
+  transcript: string; // Optimized text for TTS
+  voice_id: string; // OpenAI voice: alloy, echo, fable, onyx, nova, shimmer
   ssml_hints?: Array<{
     position: number;
     type: 'pause' | 'emphasis';
@@ -250,9 +250,9 @@ interface PresentationEnrichmentContent {
     title: string;
     layout: 'bullets' | 'two-column' | 'image-left' | 'quote' | 'diagram';
     content: {
-      main: string[];           // Bullet points
-      secondary?: string;       // Secondary content area
-      notes: string;            // Speaker notes
+      main: string[]; // Bullet points
+      secondary?: string; // Secondary content area
+      notes: string; // Speaker notes
     };
     visual_suggestion?: string;
   }>;
@@ -289,7 +289,7 @@ interface QuizEnrichmentContent {
     explanation: string;
     points: number;
   }>;
-  passing_score: number;            // Percentage 0-100
+  passing_score: number; // Percentage 0-100
   time_limit_minutes?: number;
   shuffle_questions: boolean;
   shuffle_options: boolean;
@@ -307,7 +307,7 @@ interface QuizEnrichmentContent {
 interface DocumentEnrichmentContent {
   type: 'document';
   description: string;
-  placeholder: true;    // Indicates coming soon feature
+  placeholder: true; // Indicates coming soon feature
   // Future fields:
   // file_url?: string;
   // file_size_bytes?: number;
@@ -333,19 +333,19 @@ type EnrichmentContent =
 ```typescript
 interface EnrichmentMetadata {
   // Generation metrics
-  duration_seconds?: number;      // For audio/video
-  tokens_used?: number;           // LLM tokens consumed
-  cost_usd?: number;              // Estimated cost
-  quality_score?: number;         // 0-1 quality rating
+  duration_seconds?: number; // For audio/video
+  tokens_used?: number; // LLM tokens consumed
+  cost_usd?: number; // Estimated cost
+  quality_score?: number; // 0-1 quality rating
 
   // Model information
-  model_used?: string;            // e.g., 'tts-1-hd', 'claude-sonnet-4-20250514'
+  model_used?: string; // e.g., 'tts-1-hd', 'claude-sonnet-4-20250514'
   generation_duration_ms?: number; // Processing time
 
   // Type-specific
-  word_count?: number;            // For audio/video scripts
-  slide_count?: number;           // For presentations
-  question_count?: number;        // For quizzes
+  word_count?: number; // For audio/video scripts
+  slide_count?: number; // For presentations
+  question_count?: number; // For quizzes
 
   // Retry information
   previous_attempts?: Array<{
@@ -367,24 +367,18 @@ interface EnrichmentMetadata {
 
 import { z } from 'zod';
 
-export const enrichmentTypeSchema = z.enum([
-  'video',
-  'audio',
-  'presentation',
-  'quiz',
-  'document'
-]);
+export const enrichmentTypeSchema = z.enum(['video', 'audio', 'presentation', 'quiz', 'document']);
 
 export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
 
 export const enrichmentStatusSchema = z.enum([
   'pending',
-  'draft_generating',  // Two-stage: Phase 1 in progress
-  'draft_ready',       // Two-stage: Awaiting user review
-  'generating',        // Final generation (or single-stage)
+  'draft_generating', // Two-stage: Phase 1 in progress
+  'draft_ready', // Two-stage: Awaiting user review
+  'generating', // Final generation (or single-stage)
   'completed',
   'failed',
-  'cancelled'
+  'cancelled',
 ]);
 
 export type EnrichmentStatus = z.infer<typeof enrichmentStatusSchema>;
@@ -455,17 +449,21 @@ export const EnrichmentJobDataSchema = BaseJobDataSchema.extend({
   language: z.enum(['ru', 'en']),
 
   // Type-specific settings
-  settings: z.object({
-    voice_id: z.string().optional(),        // For audio
-    avatar_id: z.string().optional(),       // For video (future)
-    theme: z.string().optional(),           // For presentation
-    question_count: z.number().optional(),  // For quiz
-    difficulty_distribution: z.object({
-      easy: z.number(),
-      medium: z.number(),
-      hard: z.number(),
-    }).optional(),
-  }).optional(),
+  settings: z
+    .object({
+      voice_id: z.string().optional(), // For audio
+      avatar_id: z.string().optional(), // For video (future)
+      theme: z.string().optional(), // For presentation
+      question_count: z.number().optional(), // For quiz
+      difficulty_distribution: z
+        .object({
+          easy: z.number(),
+          medium: z.number(),
+          hard: z.number(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export type EnrichmentJobData = z.infer<typeof EnrichmentJobDataSchema>;
@@ -477,15 +475,15 @@ export type EnrichmentJobData = z.infer<typeof EnrichmentJobDataSchema>;
 
 ### 6.1 From Spec Requirements
 
-| Field | Rule | Enforcement |
-|-------|------|-------------|
-| order_index | Must be > 0 | DB constraint |
-| order_index | Unique per (lesson, type) | DB constraint |
-| content | Valid JSON | DB type |
-| enrichment_type | Must be valid enum | DB enum |
-| status | Must be valid enum | DB enum |
-| lesson_id | Must exist | FK constraint |
-| course_id | Must exist | FK constraint |
+| Field           | Rule                      | Enforcement   |
+| --------------- | ------------------------- | ------------- |
+| order_index     | Must be > 0               | DB constraint |
+| order_index     | Unique per (lesson, type) | DB constraint |
+| content         | Valid JSON                | DB type       |
+| enrichment_type | Must be valid enum        | DB enum       |
+| status          | Must be valid enum        | DB enum       |
+| lesson_id       | Must exist                | FK constraint |
+| course_id       | Must exist                | FK constraint |
 
 ### 6.2 State Transitions
 
@@ -512,6 +510,7 @@ pending ──► draft_generating ──┬──► draft_ready ──┬─�
 ```
 
 **Two-Stage Flow Explained:**
+
 1. **Phase 1 (Draft)**: `pending` → `draft_generating` → `draft_ready`
    - AI generates script/structure (cheap LLM call)
    - User reviews and optionally edits the draft
@@ -520,6 +519,7 @@ pending ──► draft_generating ──┬──► draft_ready ──┬─�
    - Final content is produced and stored
 
 Valid transitions:
+
 - `pending` → `generating` (single-stage start)
 - `pending` → `draft_generating` (two-stage start)
 - `draft_generating` → `draft_ready` (draft complete)
@@ -589,11 +589,13 @@ WHERE e.id = u.id;
 ## 8. Migration File Reference
 
 Complete migration file path:
+
 ```
 packages/course-gen-platform/supabase/migrations/20241224_stage7_enrichments.sql
 ```
 
 Migration includes:
+
 1. Enum creation
 2. Table creation with all columns
 3. Indexes
@@ -620,25 +622,25 @@ import { z } from 'zod';
  */
 export interface EnrichmentTypeDefinition<
   TContent extends Record<string, unknown> = Record<string, unknown>,
-  TSettings extends Record<string, unknown> = Record<string, unknown>
+  TSettings extends Record<string, unknown> = Record<string, unknown>,
 > {
   // Identity
-  type: string;                          // Unique type key (e.g., 'video', 'flashcards')
-  version: number;                       // Schema version for migrations
+  type: string; // Unique type key (e.g., 'video', 'flashcards')
+  version: number; // Schema version for migrations
 
   // Display
-  icon: string;                          // Lucide icon name (e.g., 'Video', 'FileQuestion')
-  label: { en: string; ru: string };     // Localized display name
+  icon: string; // Lucide icon name (e.g., 'Video', 'FileQuestion')
+  label: { en: string; ru: string }; // Localized display name
   description: { en: string; ru: string }; // Localized description
 
   // Behavior
   generationFlow: 'single-stage' | 'two-stage';
   estimatedDuration: (lessonWordCount: number) => number; // seconds
-  estimatedCost: (lessonWordCount: number) => number;     // USD
+  estimatedCost: (lessonWordCount: number) => number; // USD
 
   // Schemas
-  contentSchema: z.ZodType<TContent>;    // Zod schema for content JSONB
-  settingsSchema: z.ZodType<TSettings>;  // Zod schema for generation settings
+  contentSchema: z.ZodType<TContent>; // Zod schema for content JSONB
+  settingsSchema: z.ZodType<TSettings>; // Zod schema for generation settings
 
   // UI Components (lazy-loaded)
   components: {
@@ -649,11 +651,11 @@ export interface EnrichmentTypeDefinition<
 
   // Feature flags
   features: {
-    canEdit: boolean;           // Can user edit after generation?
-    canRegenerate: boolean;     // Can regenerate from scratch?
-    canExport: boolean;         // Has export/download capability?
-    requiresAsset: boolean;     // Needs file storage (audio/video)?
-    supportsPreview: boolean;   // Has in-app preview?
+    canEdit: boolean; // Can user edit after generation?
+    canRegenerate: boolean; // Can regenerate from scratch?
+    canExport: boolean; // Has export/download capability?
+    requiresAsset: boolean; // Needs file storage (audio/video)?
+    supportsPreview: boolean; // Has in-app preview?
   };
 }
 ```
@@ -706,12 +708,12 @@ enrichmentRegistry.register({
   label: { en: 'Video', ru: 'Видео' },
   description: {
     en: 'AI-generated video presentation of lesson content',
-    ru: 'Видеопрезентация контента урока, сгенерированная ИИ'
+    ru: 'Видеопрезентация контента урока, сгенерированная ИИ',
   },
 
   generationFlow: 'two-stage',
-  estimatedDuration: (words) => Math.ceil(words / 150) * 60, // ~150 words/min
-  estimatedCost: (words) => (words / 1000) * 0.50,           // $0.50/1K words
+  estimatedDuration: words => Math.ceil(words / 150) * 60, // ~150 words/min
+  estimatedCost: words => (words / 1000) * 0.5, // $0.50/1K words
 
   contentSchema: videoContentSchema,
   settingsSchema: videoSettingsSchema,
@@ -723,10 +725,10 @@ enrichmentRegistry.register({
   },
 
   features: {
-    canEdit: false,        // Can't edit generated video
+    canEdit: false, // Can't edit generated video
     canRegenerate: true,
-    canExport: true,       // Download MP4
-    requiresAsset: true,   // Stores in Supabase Storage
+    canExport: true, // Download MP4
+    requiresAsset: true, // Stores in Supabase Storage
     supportsPreview: true,
   },
 });
@@ -737,6 +739,7 @@ enrichmentRegistry.register({
 To add a new enrichment type (e.g., `flashcards`):
 
 1. **Database**: Add to enum (migration):
+
    ```sql
    ALTER TYPE enrichment_type ADD VALUE 'flashcards';
    ```
@@ -755,6 +758,7 @@ To add a new enrichment type (e.g., `flashcards`):
 6. **Tests**: Add test cases for new type
 
 **No changes needed to**:
+
 - Inspector Panel logic (uses registry)
 - Asset Dock (uses registry icons)
 - BullMQ router (dispatches by type)
@@ -762,19 +766,19 @@ To add a new enrichment type (e.g., `flashcards`):
 
 ### 9.5 Type Configuration Matrix
 
-| Type | Flow | Asset | Preview | Edit | Export |
-|------|------|-------|---------|------|--------|
-| `video` | two-stage | ✅ MP4 | ✅ | ❌ | ✅ |
-| `audio` | single | ✅ MP3 | ✅ | ❌ | ✅ |
-| `presentation` | two-stage | ❌ | ✅ | ✅ | ✅ HTML |
-| `quiz` | single | ❌ | ✅ | ✅ | ✅ QTI |
-| `document` | — | ✅ | ✅ | ❌ | ✅ |
-| `flashcards` | single | ❌ | ✅ | ✅ | ✅ Anki |
-| `summary` | single | ❌ | ✅ | ✅ | ✅ MD |
-| `mindmap` | single | ❌ | ✅ | ❌ | ✅ SVG |
+| Type           | Flow      | Asset  | Preview | Edit | Export  |
+| -------------- | --------- | ------ | ------- | ---- | ------- |
+| `video`        | two-stage | ✅ MP4 | ✅      | ❌   | ✅      |
+| `audio`        | single    | ✅ MP3 | ✅      | ❌   | ✅      |
+| `presentation` | two-stage | ❌     | ✅      | ✅   | ✅ HTML |
+| `quiz`         | single    | ❌     | ✅      | ✅   | ✅ QTI  |
+| `document`     | —         | ✅     | ✅      | ❌   | ✅      |
+| `flashcards`   | single    | ❌     | ✅      | ✅   | ✅ Anki |
+| `summary`      | single    | ❌     | ✅      | ✅   | ✅ MD   |
+| `mindmap`      | single    | ❌     | ✅      | ❌   | ✅ SVG  |
 
-*Types below the line are future examples showing extensibility.*
+_Types below the line are future examples showing extensibility._
 
 ---
 
-*Data model complete. Ready for Phase 1 implementation.*
+_Data model complete. Ready for Phase 1 implementation._

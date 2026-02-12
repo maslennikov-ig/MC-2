@@ -8,38 +8,38 @@ Azure Cognitive Services Neural TTS offers robust coverage across all target lan
 
 ### Tier 1: Premium quality (Rating 8-10)
 
-| Language | Best Voice | Gender | Styles Available | Rating | Notes |
-|----------|-----------|--------|-----------------|--------|-------|
-| **English (en)** | `en-US-JennyNeural` | F | 14 styles (cheerful, newscast, assistant) | **9/10** | HD version available; best overall |
-| **Chinese (zh-CN)** | `zh-CN-XiaoxiaoNeural` | F | 14 styles + role-play | **9.5/10** | Most feature-rich; multilingual support |
-| **Japanese (ja)** | `ja-JP-NanamiNeural` | F | None | **8.5/10** | HD version; clear articulation |
-| **Korean (ko)** | `ko-KR-SunHiNeural` | F | None | **8.5/10** | HyunsuMultilingual for 77 languages |
-| **Portuguese (pt)** | `pt-BR-FranciscaNeural` | F | None | **8.5/10** | HD available; separate pt-PT voices |
-| **Hindi (hi)** | `hi-IN-SwaraNeural` | F | 4 styles (cheerful, newscast, empathetic) | **8/10** | September 2024 major upgrade |
+| Language            | Best Voice              | Gender | Styles Available                          | Rating     | Notes                                   |
+| ------------------- | ----------------------- | ------ | ----------------------------------------- | ---------- | --------------------------------------- |
+| **English (en)**    | `en-US-JennyNeural`     | F      | 14 styles (cheerful, newscast, assistant) | **9/10**   | HD version available; best overall      |
+| **Chinese (zh-CN)** | `zh-CN-XiaoxiaoNeural`  | F      | 14 styles + role-play                     | **9.5/10** | Most feature-rich; multilingual support |
+| **Japanese (ja)**   | `ja-JP-NanamiNeural`    | F      | None                                      | **8.5/10** | HD version; clear articulation          |
+| **Korean (ko)**     | `ko-KR-SunHiNeural`     | F      | None                                      | **8.5/10** | HyunsuMultilingual for 77 languages     |
+| **Portuguese (pt)** | `pt-BR-FranciscaNeural` | F      | None                                      | **8.5/10** | HD available; separate pt-PT voices     |
+| **Hindi (hi)**      | `hi-IN-SwaraNeural`     | F      | 4 styles (cheerful, newscast, empathetic) | **8/10**   | September 2024 major upgrade            |
 
 ### Tier 2: Good quality (Rating 7.5-8)
 
-| Language | Best Voice | Gender | Styles | Rating | Notes |
-|----------|-----------|--------|--------|--------|-------|
-| **Spanish (es)** | `es-ES-ElviraNeural` | F | None | **8/10** | 21+ regional variants; HD available |
-| **French (fr)** | `fr-FR-DeniseNeural` | F | None | **8/10** | HD voices; fr-CA for Canadian |
-| **German (de)** | `de-DE-KatjaNeural` | F | None | **8/10** | Cross-lingual English pronunciation |
-| **Italian (it)** | `it-IT-ElsaNeural` | F | None | **8/10** | HD available; 38+ voices |
-| **Indonesian (id)** | `id-ID-GadisNeural` | F | None | **8/10** | Full SSML support |
-| **Chinese (zh-TW)** | `zh-TW-HsiaoChenNeural` | F | None | **8/10** | Less variety than zh-CN |
-| **Arabic (ar)** | `ar-SA-ZariyahNeural` | F | None | **7.5/10** | 78% pronunciation improvement (Dec 2024) |
-| **Russian (ru)** | `ru-RU-SvetlanaNeural` | F | None | **7.5/10** | Feb 2025 quality update |
-| **Polish (pl)** | `pl-PL-AgnieszkaNeural` | F | None | **7.5/10** | Basic implementation |
-| **Turkish (tr)** | `tr-TR-EmelNeural` | F | None | **7.5/10** | Only 2 voices available |
-| **Vietnamese (vi)** | `vi-VN-HoaiMyNeural` | F | None | **7.5/10** | No phoneme support |
-| **Thai (th)** | `th-TH-PremwadeeNeural` | F | None | **7.5/10** | Clear professional tone |
-| **Malay (ms)** | `ms-MY-YasminNeural` | F | None | **7.5/10** | No custom lexicon support |
+| Language            | Best Voice              | Gender | Styles | Rating     | Notes                                    |
+| ------------------- | ----------------------- | ------ | ------ | ---------- | ---------------------------------------- |
+| **Spanish (es)**    | `es-ES-ElviraNeural`    | F      | None   | **8/10**   | 21+ regional variants; HD available      |
+| **French (fr)**     | `fr-FR-DeniseNeural`    | F      | None   | **8/10**   | HD voices; fr-CA for Canadian            |
+| **German (de)**     | `de-DE-KatjaNeural`     | F      | None   | **8/10**   | Cross-lingual English pronunciation      |
+| **Italian (it)**    | `it-IT-ElsaNeural`      | F      | None   | **8/10**   | HD available; 38+ voices                 |
+| **Indonesian (id)** | `id-ID-GadisNeural`     | F      | None   | **8/10**   | Full SSML support                        |
+| **Chinese (zh-TW)** | `zh-TW-HsiaoChenNeural` | F      | None   | **8/10**   | Less variety than zh-CN                  |
+| **Arabic (ar)**     | `ar-SA-ZariyahNeural`   | F      | None   | **7.5/10** | 78% pronunciation improvement (Dec 2024) |
+| **Russian (ru)**    | `ru-RU-SvetlanaNeural`  | F      | None   | **7.5/10** | Feb 2025 quality update                  |
+| **Polish (pl)**     | `pl-PL-AgnieszkaNeural` | F      | None   | **7.5/10** | Basic implementation                     |
+| **Turkish (tr)**    | `tr-TR-EmelNeural`      | F      | None   | **7.5/10** | Only 2 voices available                  |
+| **Vietnamese (vi)** | `vi-VN-HoaiMyNeural`    | F      | None   | **7.5/10** | No phoneme support                       |
+| **Thai (th)**       | `th-TH-PremwadeeNeural` | F      | None   | **7.5/10** | Clear professional tone                  |
+| **Malay (ms)**      | `ms-MY-YasminNeural`    | F      | None   | **7.5/10** | No custom lexicon support                |
 
 ### Tier 3: Acceptable quality (Rating 6-7)
 
-| Language | Best Voice | Gender | Rating | Critical Limitations |
-|----------|-----------|--------|--------|---------------------|
-| **Bengali (bn)** | `bn-IN-TanishaaNeural` | F | **6.5/10** | No phonemes, no custom lexicon, numeral handling issues |
+| Language         | Best Voice             | Gender | Rating     | Critical Limitations                                    |
+| ---------------- | ---------------------- | ------ | ---------- | ------------------------------------------------------- |
+| **Bengali (bn)** | `bn-IN-TanishaaNeural` | F      | **6.5/10** | No phonemes, no custom lexicon, numeral handling issues |
 
 ### Regional variant recommendations
 
@@ -56,35 +56,35 @@ Languages transmit information at remarkably consistent rates (~**39 bits/second
 
 ### Syllable rates relative to English
 
-| Language | Syllables/Second | Relative to English | Audio Duration Impact |
-|----------|-----------------|--------------------|-----------------------|
-| **Japanese** | 7.84 | 1.27x faster | -5% to -15% shorter |
-| **Spanish** | 7.82 | 1.26x faster | +15% to +25% longer (more text) |
-| **French** | 7.18 | 1.16x faster | +15% to +20% longer |
-| **Italian** | 6.99 | 1.13x faster | +10% to +15% longer |
-| **English** | 6.19 | 1.00x baseline | Baseline |
-| **German** | 5.97 | 0.96x slower | +25% to +35% longer |
-| **Korean** | ~5.96 | 0.96x | -5% to -15% shorter |
-| **Mandarin** | 5.18 | 0.84x slower | -10% to -20% shorter |
-| **Vietnamese** | ~5.20 | 0.84x slower | 0% to +10% |
-| **Thai** | ~5.00 | 0.81x slower | -5% to -15% shorter |
+| Language       | Syllables/Second | Relative to English | Audio Duration Impact           |
+| -------------- | ---------------- | ------------------- | ------------------------------- |
+| **Japanese**   | 7.84             | 1.27x faster        | -5% to -15% shorter             |
+| **Spanish**    | 7.82             | 1.26x faster        | +15% to +25% longer (more text) |
+| **French**     | 7.18             | 1.16x faster        | +15% to +20% longer             |
+| **Italian**    | 6.99             | 1.13x faster        | +10% to +15% longer             |
+| **English**    | 6.19             | 1.00x baseline      | Baseline                        |
+| **German**     | 5.97             | 0.96x slower        | +25% to +35% longer             |
+| **Korean**     | ~5.96            | 0.96x               | -5% to -15% shorter             |
+| **Mandarin**   | 5.18             | 0.84x slower        | -10% to -20% shorter            |
+| **Vietnamese** | ~5.20            | 0.84x slower        | 0% to +10%                      |
+| **Thai**       | ~5.00            | 0.81x slower        | -5% to -15% shorter             |
 
 ### Practical duration planning
 
 A **3-minute English video** translates to these approximate durations:
 
-| Language | Expected Duration | Planning Multiplier |
-|----------|------------------|---------------------|
-| German | 3:45 – 4:03 | 1.30x |
-| Russian | 3:36 – 3:54 | 1.25x |
-| Arabic | 3:36 – 3:54 | 1.25x |
-| Spanish, French, Portuguese | 3:27 – 3:45 | 1.20x |
-| Polish, Italian | 3:18 – 3:36 | 1.15x |
-| Hindi, Bengali | 3:18 – 3:45 | 1.15x |
-| English | 3:00 | 1.00x |
-| Korean | 2:42 – 2:51 | 0.90x |
-| Japanese | 2:33 – 2:51 | 0.88x |
-| Chinese | 2:24 – 2:42 | 0.85x |
+| Language                    | Expected Duration | Planning Multiplier |
+| --------------------------- | ----------------- | ------------------- |
+| German                      | 3:45 – 4:03       | 1.30x               |
+| Russian                     | 3:36 – 3:54       | 1.25x               |
+| Arabic                      | 3:36 – 3:54       | 1.25x               |
+| Spanish, French, Portuguese | 3:27 – 3:45       | 1.20x               |
+| Polish, Italian             | 3:18 – 3:36       | 1.15x               |
+| Hindi, Bengali              | 3:18 – 3:45       | 1.15x               |
+| English                     | 3:00              | 1.00x               |
+| Korean                      | 2:42 – 2:51       | 0.90x               |
+| Japanese                    | 2:33 – 2:51       | 0.88x               |
+| Chinese                     | 2:24 – 2:42       | 0.85x               |
 
 ### Recommended sync approach for e-learning
 
@@ -112,12 +112,12 @@ The industry-standard **hybrid approach** combines dynamic slide timing with mod
 
 **Critical specifications:**
 
-| Parameter | Latin | CJK | Implementation |
-|-----------|-------|-----|----------------|
-| Font size | 32px | 37px (+15%) | CJK characters need larger sizing for equivalent readability |
-| Line height | 1.2 | 1.7 | Dense strokes require more breathing room |
-| Letter spacing | Variable | 0 (monospaced) | Each CJK character occupies 1em |
-| Inter-script gap | — | 0.25em | Add space between CJK and Latin/numerals |
+| Parameter        | Latin    | CJK            | Implementation                                               |
+| ---------------- | -------- | -------------- | ------------------------------------------------------------ |
+| Font size        | 32px     | 37px (+15%)    | CJK characters need larger sizing for equivalent readability |
+| Line height      | 1.2      | 1.7            | Dense strokes require more breathing room                    |
+| Letter spacing   | Variable | 0 (monospaced) | Each CJK character occupies 1em                              |
+| Inter-script gap | —        | 0.25em         | Add space between CJK and Latin/numerals                     |
 
 **Line breaking rules (Kinsoku Shori):**
 
@@ -133,34 +133,34 @@ The industry-standard **hybrid approach** combines dynamic slide timing with mod
 
 ```jsx
 const RTLFrame = ({ children }) => (
-  <AbsoluteFill style={{ 
-    direction: 'rtl', 
-    fontFamily: 'Tajawal, Noto Naskh Arabic, sans-serif',
-    letterSpacing: 0  // Critical: prevents breaking letter connections
-  }}>
+  <AbsoluteFill
+    style={{
+      direction: 'rtl',
+      fontFamily: 'Tajawal, Noto Naskh Arabic, sans-serif',
+      letterSpacing: 0, // Critical: prevents breaking letter connections
+    }}
+  >
     {children}
   </AbsoluteFill>
 );
 
 // Isolate LTR code blocks within RTL context
 const CodeBlock = ({ code }) => (
-  <div style={{ direction: 'ltr', fontFamily: 'monospace' }}>
-    {code}
-  </div>
+  <div style={{ direction: 'ltr', fontFamily: 'monospace' }}>{code}</div>
 );
 ```
 
 **Layout mirroring strategy:**
 
-| Element | Mirror for RTL? | Rationale |
-|---------|----------------|-----------|
-| Overall composition | **Yes** | Primary content starts from right |
-| Navigation/menus | **Yes** | Reading direction alignment |
-| Avatar position | **Yes** → right side | Matches eye-reset point for RTL readers |
-| Code blocks | **No** | Keep LTR with visual isolation |
-| Media playback controls | **No** | Universal LTR convention |
-| Progress bars | **No** | Media convention |
-| Numbers in text | Always LTR | Numbers read left-to-right universally |
+| Element                 | Mirror for RTL?      | Rationale                               |
+| ----------------------- | -------------------- | --------------------------------------- |
+| Overall composition     | **Yes**              | Primary content starts from right       |
+| Navigation/menus        | **Yes**              | Reading direction alignment             |
+| Avatar position         | **Yes** → right side | Matches eye-reset point for RTL readers |
+| Code blocks             | **No**               | Keep LTR with visual isolation          |
+| Media playback controls | **No**               | Universal LTR convention                |
+| Progress bars           | **No**               | Media convention                        |
+| Numbers in text         | Always LTR           | Numbers read left-to-right universally  |
 
 **FFmpeg Arabic rendering** requires compilation with FriBidi:
 
@@ -217,10 +217,10 @@ const segmented = wordcut.cut('สวัสดีชาวโลก');
 
 **Vietnamese diacritics** require fonts with complete coverage of all 134 Vietnamese-specific characters including stacked marks (ẩ = a + circumflex + hook above).
 
-| Language | Line Height | Font Size vs Latin | Recommended Font |
-|----------|-------------|-------------------|------------------|
-| Thai | 1.6-1.8 | +6% | Noto Sans Thai |
-| Vietnamese | 1.4-1.5 | Same | Be Vietnam Pro, Noto Sans |
+| Language   | Line Height | Font Size vs Latin | Recommended Font          |
+| ---------- | ----------- | ------------------ | ------------------------- |
+| Thai       | 1.6-1.8     | +6%                | Noto Sans Thai            |
+| Vietnamese | 1.4-1.5     | Same               | Be Vietnam Pro, Noto Sans |
 
 **Test string for Vietnamese**: `Ẩẫậ Ếềể Ốồổ Ứừử` (stacked diacritics)
 
@@ -230,60 +230,63 @@ const segmented = wordcut.cut('สวัสดีชาวโลก');
 :root {
   --font-universal: 
     /* System UI base (Latin/Cyrillic) */
-    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    
-    /* CJK */
-    "PingFang SC", "Microsoft YaHei", "Hiragino Sans", 
-    "Apple SD Gothic Neo", "Malgun Gothic",
-    
-    /* Arabic */
-    "Geeza Pro", "Segoe UI", Tahoma,
-    
-    /* Indic */
-    "Kohinoor Devanagari", "Nirmala UI", "Kohinoor Bangla",
-    
-    /* Thai */
-    Thonburi, "Leelawadee UI",
-    
-    /* Noto fallbacks (comprehensive) */
-    "Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", 
-    "Noto Naskh Arabic", "Noto Sans Devanagari", 
-    "Noto Sans Bengali", "Noto Sans Thai",
-    
-    sans-serif;
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, /* CJK */ 'PingFang SC',
+    'Microsoft YaHei', 'Hiragino Sans', 'Apple SD Gothic Neo', 'Malgun Gothic',
+    /* Arabic */ 'Geeza Pro', 'Segoe UI', Tahoma, /* Indic */ 'Kohinoor Devanagari', 'Nirmala UI',
+    'Kohinoor Bangla', /* Thai */ Thonburi, 'Leelawadee UI',
+    /* Noto fallbacks (comprehensive) */ 'Noto Sans', 'Noto Sans CJK SC', 'Noto Sans CJK JP',
+    'Noto Naskh Arabic', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Thai', sans-serif;
 }
 ```
 
 **Language-specific overrides:**
 
 ```css
-:lang(zh-CN) { font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
-:lang(ja) { font-family: "Hiragino Sans", "Yu Gothic UI", "Noto Sans CJK JP", sans-serif; }
-:lang(ko) { font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", sans-serif; }
-:lang(ar) { font-family: "Geeza Pro", "Noto Naskh Arabic", serif; direction: rtl; }
-:lang(hi) { font-family: "Noto Sans Devanagari", sans-serif; line-height: 1.8; }
-:lang(bn) { font-family: "Noto Sans Bengali", sans-serif; line-height: 1.8; }
-:lang(th) { font-family: "Noto Sans Thai", sans-serif; line-height: 1.6; }
+:lang(zh-CN) {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+}
+:lang(ja) {
+  font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Noto Sans CJK JP', sans-serif;
+}
+:lang(ko) {
+  font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans CJK KR', sans-serif;
+}
+:lang(ar) {
+  font-family: 'Geeza Pro', 'Noto Naskh Arabic', serif;
+  direction: rtl;
+}
+:lang(hi) {
+  font-family: 'Noto Sans Devanagari', sans-serif;
+  line-height: 1.8;
+}
+:lang(bn) {
+  font-family: 'Noto Sans Bengali', sans-serif;
+  line-height: 1.8;
+}
+:lang(th) {
+  font-family: 'Noto Sans Thai', sans-serif;
+  line-height: 1.6;
+}
 ```
 
 ## Text length variations and layout strategy
 
 ### Expansion percentages by language
 
-| Language | Text Expansion | Layout Impact |
-|----------|---------------|---------------|
-| **German** | +30-35% | Most expansion—design here first |
-| **Russian** | +20-30% | Significant expansion |
-| **Arabic** | +20-30% | Plus RTL + taller glyphs |
-| **Spanish, French, Portuguese** | +15-25% | Consistent moderate expansion |
-| **Polish, Italian** | +15-25% | Moderate |
-| **Hindi, Bengali** | +10-25% | Variable + taller scripts |
-| **Turkish, Indonesian** | +10-20% | Moderate |
-| **Vietnamese** | -10% to +5% | Near-neutral |
-| **Thai** | -10% to +10% | Near-neutral but taller |
-| **Chinese** | -30-50% | Major contraction (but 2x char width) |
-| **Japanese** | -20-40% | Contraction (but wider characters) |
-| **Korean** | -10-30% | Moderate contraction |
+| Language                        | Text Expansion | Layout Impact                         |
+| ------------------------------- | -------------- | ------------------------------------- |
+| **German**                      | +30-35%        | Most expansion—design here first      |
+| **Russian**                     | +20-30%        | Significant expansion                 |
+| **Arabic**                      | +20-30%        | Plus RTL + taller glyphs              |
+| **Spanish, French, Portuguese** | +15-25%        | Consistent moderate expansion         |
+| **Polish, Italian**             | +15-25%        | Moderate                              |
+| **Hindi, Bengali**              | +10-25%        | Variable + taller scripts             |
+| **Turkish, Indonesian**         | +10-20%        | Moderate                              |
+| **Vietnamese**                  | -10% to +5%    | Near-neutral                          |
+| **Thai**                        | -10% to +10%   | Near-neutral but taller               |
+| **Chinese**                     | -30-50%        | Major contraction (but 2x char width) |
+| **Japanese**                    | -20-40%        | Contraction (but wider characters)    |
+| **Korean**                      | -10-30%        | Moderate contraction                  |
 
 ### Design strategy for video slides
 
@@ -293,8 +296,16 @@ const segmented = wordcut.cut('สวัสดีชาวโลก');
 4. **Apply language-specific font scaling**:
 
 ```css
-:lang(de), :lang(ru), :lang(ar) { font-size: 0.9em; }  /* Slightly smaller */
-:lang(zh), :lang(ja), :lang(ko) { font-size: 1.1em; }  /* Larger for readability */
+:lang(de),
+:lang(ru),
+:lang(ar) {
+  font-size: 0.9em;
+} /* Slightly smaller */
+:lang(zh),
+:lang(ja),
+:lang(ko) {
+  font-size: 1.1em;
+} /* Larger for readability */
 ```
 
 ## Cultural considerations for avatar and voice
@@ -311,15 +322,15 @@ Research strongly supports **ethnicity-matched avatars** for educational content
 
 ### Voice formality by region
 
-| Region | Formality Level | Voice Style Recommendation |
-|--------|----------------|---------------------------|
-| **Japan** | Very high | Calm, professional, moderate pace; use polite speech level |
-| **Germany** | High | Direct, precise, factual; minimal enthusiasm |
-| **Korea** | High | Respectful, hierarchical tone |
-| **Middle East** | High | Formal address; consider gender preferences |
-| **Latin America** | Medium | Warm, expressive; emphasize "simpatía" |
-| **France** | Medium-high | Sophisticated, relationship-oriented |
-| **US/UK** | Medium | Professional but approachable |
+| Region            | Formality Level | Voice Style Recommendation                                 |
+| ----------------- | --------------- | ---------------------------------------------------------- |
+| **Japan**         | Very high       | Calm, professional, moderate pace; use polite speech level |
+| **Germany**       | High            | Direct, precise, factual; minimal enthusiasm               |
+| **Korea**         | High            | Respectful, hierarchical tone                              |
+| **Middle East**   | High            | Formal address; consider gender preferences                |
+| **Latin America** | Medium          | Warm, expressive; emphasize "simpatía"                     |
+| **France**        | Medium-high     | Sophisticated, relationship-oriented                       |
+| **US/UK**         | Medium          | Professional but approachable                              |
 
 ### Gestures to avoid universally
 
@@ -358,7 +369,7 @@ Research strongly supports **ethnicity-matched avatars** for educational content
 
 ## Conclusion
 
-Successful multi-language e-learning video production requires attention to three interconnected systems: **voice quality** (Azure TTS with language-appropriate voices and SSML tuning), **typography** (proper shaping engines and script-specific fonts), and **cultural adaptation** (avatar matching, formality levels, and layout direction). 
+Successful multi-language e-learning video production requires attention to three interconnected systems: **voice quality** (Azure TTS with language-appropriate voices and SSML tuning), **typography** (proper shaping engines and script-specific fonts), and **cultural adaptation** (avatar matching, formality levels, and layout direction).
 
 The highest-risk languages for rendering issues are **Bengali** (limited TTS quality, complex conjuncts), **Arabic** (RTL complexity, bidirectional text), and **Thai** (word segmentation). Prioritize testing these languages early. German presents the greatest **layout challenge** due to text expansion, while Chinese and Japanese require careful **font variant selection** to avoid appearing "wrong" to native readers.
 

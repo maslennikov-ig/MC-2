@@ -15,7 +15,12 @@
  */
 
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
-import type { CourseStructure, DependencyGraph, DependencyNode, DependencyEdge } from '@megacampus/shared-types';
+import type {
+  CourseStructure,
+  DependencyGraph,
+  DependencyNode,
+  DependencyEdge,
+} from '@megacampus/shared-types';
 
 /**
  * Builds a dependency graph from a CourseStructure
@@ -98,7 +103,10 @@ export function buildDependencyGraph(structure: CourseStructure): DependencyGrap
  * @param nodeId - The target node ID (e.g., "section.0.lesson.1")
  * @returns Array of upstream nodes with their paths
  */
-export function getUpstream(graph: DependencyGraph, nodeId: string): Array<{ id: string; label: string; path: string }> {
+export function getUpstream(
+  graph: DependencyGraph,
+  nodeId: string
+): Array<{ id: string; label: string; path: string }> {
   const upstream: Array<{ id: string; label: string; path: string }> = [];
   const visited = new Set<string>();
 
@@ -107,10 +115,12 @@ export function getUpstream(graph: DependencyGraph, nodeId: string): Array<{ id:
     visited.add(currentNodeId);
 
     // Find all edges pointing TO the current node (parents)
-    const parentEdges = graph.edges.filter((edge) => edge.to === currentNodeId && edge.type === 'PARENT_OF');
+    const parentEdges = graph.edges.filter(
+      edge => edge.to === currentNodeId && edge.type === 'PARENT_OF'
+    );
 
-    parentEdges.forEach((edge) => {
-      const parentNode = graph.nodes.find((n) => n.id === edge.from);
+    parentEdges.forEach(edge => {
+      const parentNode = graph.nodes.find(n => n.id === edge.from);
       if (parentNode) {
         const newPath = [parentNode.id, ...path];
         upstream.push({
@@ -135,7 +145,10 @@ export function getUpstream(graph: DependencyGraph, nodeId: string): Array<{ id:
  * @param nodeId - The target node ID (e.g., "section.0")
  * @returns Array of downstream nodes with their paths
  */
-export function getDownstream(graph: DependencyGraph, nodeId: string): Array<{ id: string; label: string; path: string }> {
+export function getDownstream(
+  graph: DependencyGraph,
+  nodeId: string
+): Array<{ id: string; label: string; path: string }> {
   const downstream: Array<{ id: string; label: string; path: string }> = [];
   const visited = new Set<string>();
 
@@ -144,10 +157,12 @@ export function getDownstream(graph: DependencyGraph, nodeId: string): Array<{ i
     visited.add(currentNodeId);
 
     // Find all edges starting FROM the current node (children)
-    const childEdges = graph.edges.filter((edge) => edge.from === currentNodeId && edge.type === 'PARENT_OF');
+    const childEdges = graph.edges.filter(
+      edge => edge.from === currentNodeId && edge.type === 'PARENT_OF'
+    );
 
-    childEdges.forEach((edge) => {
-      const childNode = graph.nodes.find((n) => n.id === edge.to);
+    childEdges.forEach(edge => {
+      const childNode = graph.nodes.find(n => n.id === edge.to);
       if (childNode) {
         const newPath = [...path, childNode.id];
         downstream.push({
@@ -199,7 +214,7 @@ export function blockPathToNodeId(blockPath: string): string {
  */
 export function getNodeLabel(graph: DependencyGraph, blockPath: string): string {
   const nodeId = blockPathToNodeId(blockPath);
-  const node = graph.nodes.find((n) => n.id === nodeId);
+  const node = graph.nodes.find(n => n.id === nodeId);
 
   if (!node) {
     return blockPath; // Fallback to the path itself
@@ -305,23 +320,11 @@ export function buildDependencyGraphWithAnalysis(
   // -------------------------------------------------------------------------
 
   // Course-level nodes (from AnalysisResult)
-  createExtendedCourseNode(
-    nodesMap,
-    'course.learning_objectives',
-    'Course Learning Objectives'
-  );
+  createExtendedCourseNode(nodesMap, 'course.learning_objectives', 'Course Learning Objectives');
 
-  createExtendedCourseNode(
-    nodesMap,
-    'course.key_concepts',
-    'Course Key Concepts'
-  );
+  createExtendedCourseNode(nodesMap, 'course.key_concepts', 'Course Key Concepts');
 
-  createExtendedCourseNode(
-    nodesMap,
-    'course.pedagogical_strategy',
-    'Course Pedagogical Strategy'
-  );
+  createExtendedCourseNode(nodesMap, 'course.pedagogical_strategy', 'Course Pedagogical Strategy');
 
   // Root course node (for hierarchical structure)
   createExtendedCourseNode(nodesMap, 'course', structure.course_title || 'Course');
@@ -454,7 +457,7 @@ export function buildDependencyGraphWithAnalysis(
   // Step 3: Convert map to array for compatibility
   // -------------------------------------------------------------------------
 
-  nodesMap.forEach((node) => {
+  nodesMap.forEach(node => {
     nodes.push({
       id: node.id,
       type: node.type,

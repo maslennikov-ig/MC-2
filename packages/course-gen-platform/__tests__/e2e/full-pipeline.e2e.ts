@@ -31,7 +31,10 @@ import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { addJob } from '../../src/orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import { uploadFile } from '../../src/stages/stage1-document-upload/handler';
-import { executeStage6, type Stage6Input } from '../../src/stages/stage6-lesson-content/orchestrator';
+import {
+  executeStage6,
+  type Stage6Input,
+} from '../../src/stages/stage6-lesson-content/orchestrator';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 
 // ============================================================================
@@ -107,7 +110,9 @@ async function waitForStatus(
 
     if (status === 'failed') {
       console.log('');
-      throw new Error(`Generation failed: ${course.generation_metadata?.error_message || 'Unknown error'}`);
+      throw new Error(
+        `Generation failed: ${course.generation_metadata?.error_message || 'Unknown error'}`
+      );
     }
 
     await sleep(3000);
@@ -137,9 +142,8 @@ async function waitForDocumentsProcessed(
     }
 
     const total = files?.length || 0;
-    const processed = files?.filter(f =>
-      f.vector_status === 'ready' || f.vector_status === 'indexed'
-    ).length || 0;
+    const processed =
+      files?.filter(f => f.vector_status === 'ready' || f.vector_status === 'indexed').length || 0;
     const failed = files?.filter(f => f.vector_status === 'failed').length || 0;
 
     process.stdout.write(`\r   Documents: ${processed}/${total} ready, ${failed} failed   `);
@@ -178,11 +182,16 @@ async function waitForDocumentsSummarized(
 
     const total = files?.length || 0;
     // Only count files that have markdown_content (Stage 2 completed successfully)
-    const eligibleForSummarization = files?.filter(f => f.markdown_content && f.markdown_content.length > 0) || [];
-    const summarized = eligibleForSummarization.filter(f => f.processed_content && f.processed_content.length > 0).length;
+    const eligibleForSummarization =
+      files?.filter(f => f.markdown_content && f.markdown_content.length > 0) || [];
+    const summarized = eligibleForSummarization.filter(
+      f => f.processed_content && f.processed_content.length > 0
+    ).length;
     const failedStage2 = total - eligibleForSummarization.length;
 
-    process.stdout.write(`\r   Summarized: ${summarized}/${eligibleForSummarization.length} (${failedStage2} failed Stage 2)   `);
+    process.stdout.write(
+      `\r   Summarized: ${summarized}/${eligibleForSummarization.length} (${failedStage2} failed Stage 2)   `
+    );
 
     // Success if all eligible files are summarized (at least 1 must exist)
     if (eligibleForSummarization.length > 0 && summarized === eligibleForSummarization.length) {
@@ -202,10 +211,7 @@ async function waitForDocumentsSummarized(
 /**
  * Wait for analysis_result to appear in course
  */
-async function waitForAnalysisResult(
-  courseId: string,
-  maxWaitMs: number = 300000
-): Promise<any> {
+async function waitForAnalysisResult(courseId: string, maxWaitMs: number = 300000): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -246,9 +252,9 @@ async function runStage1(courseId: string, orgId: string, userId: string): Promi
   log('Stage 1: Document Upload');
 
   try {
-    const files = fs.readdirSync(TEST_DATA_DIR).filter(f =>
-      f.endsWith('.pdf') || f.endsWith('.docx')
-    );
+    const files = fs
+      .readdirSync(TEST_DATA_DIR)
+      .filter(f => f.endsWith('.pdf') || f.endsWith('.docx'));
 
     log(`  Found ${files.length} test documents`);
     const uploadedFiles: Array<{ fileId: string; filePath: string; mimeType: string }> = [];
@@ -287,18 +293,22 @@ async function runStage1(courseId: string, orgId: string, userId: string): Promi
     log('  Triggering Stage 2 jobs...');
     for (const file of uploadedFiles) {
       const absoluteFilePath = path.join(process.cwd(), file.filePath);
-      await addJob(JobType.DOCUMENT_PROCESSING, {
-        jobType: JobType.DOCUMENT_PROCESSING,
-        organizationId: orgId,
-        courseId,
-        userId,
-        createdAt: new Date().toISOString(),
-        fileId: file.fileId,
-        filePath: absoluteFilePath,
-        mimeType: file.mimeType,
-        chunkSize: 512,
-        chunkOverlap: 50,
-      } as any, { priority: 10 });
+      await addJob(
+        JobType.DOCUMENT_PROCESSING,
+        {
+          jobType: JobType.DOCUMENT_PROCESSING,
+          organizationId: orgId,
+          courseId,
+          userId,
+          createdAt: new Date().toISOString(),
+          fileId: file.fileId,
+          filePath: absoluteFilePath,
+          mimeType: file.mimeType,
+          chunkSize: 512,
+          chunkOverlap: 50,
+        } as any,
+        { priority: 10 }
+      );
       log(`    -> Queued job for: ${file.fileId}`);
     }
 
@@ -324,7 +334,11 @@ async function runStage1(courseId: string, orgId: string, userId: string): Promi
  * Stage 2-4: Document Processing, Summarization, Analysis
  * These run via BullMQ workers
  */
-async function runStages2to4(courseId: string, orgId: string, userId: string): Promise<StageResult[]> {
+async function runStages2to4(
+  courseId: string,
+  orgId: string,
+  userId: string
+): Promise<StageResult[]> {
   const results: StageResult[] = [];
 
   // Stage 2: Document Processing
@@ -332,7 +346,9 @@ async function runStages2to4(courseId: string, orgId: string, userId: string): P
   const stage2Start = Date.now();
   try {
     const files = await waitForDocumentsProcessed(courseId, 300000);
-    const processedCount = files.filter(f => f.vector_status === 'ready' || f.vector_status === 'indexed').length;
+    const processedCount = files.filter(
+      f => f.vector_status === 'ready' || f.vector_status === 'indexed'
+    ).length;
 
     results.push({
       stage: 'Stage 2: Document Processing',
@@ -376,13 +392,17 @@ async function runStages2to4(courseId: string, orgId: string, userId: string): P
   const stage4Start = Date.now();
   try {
     // Trigger Stage 4 analysis job (use snake_case for handler compatibility)
-    await addJob(JobType.STRUCTURE_ANALYSIS, {
-      jobType: JobType.STRUCTURE_ANALYSIS,
-      organization_id: orgId,
-      course_id: courseId,
-      user_id: userId,
-      createdAt: new Date().toISOString(),
-    } as any, { priority: 10 });
+    await addJob(
+      JobType.STRUCTURE_ANALYSIS,
+      {
+        jobType: JobType.STRUCTURE_ANALYSIS,
+        organization_id: orgId,
+        course_id: courseId,
+        user_id: userId,
+        createdAt: new Date().toISOString(),
+      } as any,
+      { priority: 10 }
+    );
 
     // Wait for analysis_result to appear (10 min timeout for LLM analysis phases)
     await waitForAnalysisResult(courseId, 600000);
@@ -456,10 +476,8 @@ async function runStage5(courseId: string, orgId: string, userId: string): Promi
     const result = await waitForStatus(courseId, ['completed'], 1200000);
 
     const structure = result.data.course_structure;
-    const lessonCount = structure?.sections?.reduce(
-      (sum: number, s: any) => sum + (s.lessons?.length || 0),
-      0
-    ) || 0;
+    const lessonCount =
+      structure?.sections?.reduce((sum: number, s: any) => sum + (s.lessons?.length || 0), 0) || 0;
 
     return {
       stage: 'Stage 5: Structure Generation',
@@ -492,7 +510,12 @@ async function runStage6(courseId: string, courseStructure: any): Promise<StageR
 
   try {
     // Collect all lessons from all sections
-    const allLessons: { lesson: any; sectionTitle: string; sectionIndex: number; lessonIndex: number }[] = [];
+    const allLessons: {
+      lesson: any;
+      sectionTitle: string;
+      sectionIndex: number;
+      lessonIndex: number;
+    }[] = [];
 
     for (let sIdx = 0; sIdx < (courseStructure?.sections?.length || 0); sIdx++) {
       const section = courseStructure.sections[sIdx];
@@ -625,7 +648,7 @@ async function runStage6(courseId: string, courseStructure: any): Promise<StageR
 
     return {
       stage: 'Stage 6: Lesson Content Generation',
-      status: failureCount === 0 ? 'success' : (successCount > 0 ? 'partial' : 'failure'),
+      status: failureCount === 0 ? 'success' : successCount > 0 ? 'partial' : 'failure',
       duration: Date.now() - startTime,
       data: {
         lessonsProcessed: lessonsToProcess.length,
@@ -667,9 +690,14 @@ function generateReport(courseId: string, allResults: StageResult[]): string {
 
   let totalDuration = 0;
   for (const result of allResults) {
-    const statusIcon = result.status === 'success' ? '✅' :
-                       result.status === 'partial' ? '⚠️' :
-                       result.status === 'failure' ? '❌' : '⏭️';
+    const statusIcon =
+      result.status === 'success'
+        ? '✅'
+        : result.status === 'partial'
+          ? '⚠️'
+          : result.status === 'failure'
+            ? '❌'
+            : '⏭️';
     const duration = `${(result.duration / 1000).toFixed(1)}s`;
     report.push(`| ${result.stage} | ${statusIcon} ${result.status} | ${duration} |`);
     totalDuration += result.duration;
@@ -693,9 +721,14 @@ function generateReport(courseId: string, allResults: StageResult[]): string {
   report.push('## 📝 Detailed Results\n');
 
   for (const result of allResults) {
-    const statusIcon = result.status === 'success' ? '✅' :
-                       result.status === 'partial' ? '⚠️' :
-                       result.status === 'failure' ? '❌' : '⏭️';
+    const statusIcon =
+      result.status === 'success'
+        ? '✅'
+        : result.status === 'partial'
+          ? '⚠️'
+          : result.status === 'failure'
+            ? '❌'
+            : '⏭️';
     report.push(`### ${statusIcon} ${result.stage}\n`);
     report.push(`- **Status**: ${result.status}`);
     report.push(`- **Duration**: ${(result.duration / 1000).toFixed(1)}s`);
@@ -738,7 +771,11 @@ function generateReport(courseId: string, allResults: StageResult[]): string {
         report.push('\n**Generated Structure**:\n');
         report.push(`- Course Title: "${data.structure.course_title}"`);
         report.push(`- Sections: ${data.structure.sections?.length || 0}`);
-        const totalLessons = data.structure.sections?.reduce((sum: number, s: any) => sum + (s.lessons?.length || 0), 0) || 0;
+        const totalLessons =
+          data.structure.sections?.reduce(
+            (sum: number, s: any) => sum + (s.lessons?.length || 0),
+            0
+          ) || 0;
         report.push(`- Total Lessons: ${totalLessons}`);
         report.push(`- Language: ${data.structure.target_language || 'N/A'}`);
         report.push(`- Difficulty: ${data.structure.difficulty_level || 'N/A'}`);
@@ -763,7 +800,9 @@ function generateReport(courseId: string, allResults: StageResult[]): string {
           const model = lesson.modelUsed?.split('/').pop() || 'N/A';
           const quality = lesson.qualityScore?.toFixed(2) || 'N/A';
           const duration = `${(lesson.duration / 1000).toFixed(1)}s`;
-          report.push(`| ${i + 1} | ${lesson.lessonTitle?.slice(0, 30)}... | ${lesson.position} | ${model} | ${lesson.tokensUsed || 0} | ${quality} | ${duration} | ${status} |`);
+          report.push(
+            `| ${i + 1} | ${lesson.lessonTitle?.slice(0, 30)}... | ${lesson.position} | ${model} | ${lesson.tokensUsed || 0} | ${quality} | ${duration} | ${status} |`
+          );
         }
 
         // Content previews for successful lessons
@@ -881,9 +920,10 @@ async function main() {
       }
 
       createError = result.error;
-      const isTransient = createError?.message?.includes('Internal server error') ||
-                          createError?.message?.includes('503') ||
-                          createError?.message?.includes('500');
+      const isTransient =
+        createError?.message?.includes('Internal server error') ||
+        createError?.message?.includes('503') ||
+        createError?.message?.includes('500');
 
       if (!isTransient) {
         // Permanent error, don't retry
@@ -958,12 +998,13 @@ async function main() {
 
     for (const result of allResults) {
       const icon = result.status === 'success' ? '✅' : result.status === 'failure' ? '❌' : '⏭️';
-      console.log(`${icon} ${result.stage}: ${result.status} (${(result.duration / 1000).toFixed(1)}s)`);
+      console.log(
+        `${icon} ${result.stage}: ${result.status} (${(result.duration / 1000).toFixed(1)}s)`
+      );
     }
 
     console.log(`\n📊 Total Duration: ${(totalDuration / 1000).toFixed(1)}s`);
     console.log(`📄 Report saved to: ${reportPath}`);
-
   } catch (error) {
     console.error('\n❌ Fatal error:', error instanceof Error ? error.message : error);
     process.exit(1);

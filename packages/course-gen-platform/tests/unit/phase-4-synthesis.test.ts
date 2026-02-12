@@ -1,37 +1,13 @@
 /**
  * Unit tests for Phase 4: Document Synthesis
  *
- * Tests adaptive model selection, scope_instructions generation,
- * and content_strategy determination.
+ * Tests adaptive model selection and scope_instructions generation.
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  determineContentStrategy,
-  type Phase4Input,
-} from '../../src/orchestrator/services/analysis/phase-4-synthesis';
+import { type Phase4Input } from '../../src/orchestrator/services/analysis/phase-4-synthesis';
 
 describe('Phase 4: Document Synthesis', () => {
-  describe('Content Strategy Determination', () => {
-    it('should return create_from_scratch for <3 documents', () => {
-      expect(determineContentStrategy(0)).toBe('create_from_scratch');
-      expect(determineContentStrategy(1)).toBe('create_from_scratch');
-      expect(determineContentStrategy(2)).toBe('create_from_scratch');
-    });
-
-    it('should return expand_and_enhance for 3-10 documents', () => {
-      expect(determineContentStrategy(3)).toBe('expand_and_enhance');
-      expect(determineContentStrategy(5)).toBe('expand_and_enhance');
-      expect(determineContentStrategy(10)).toBe('expand_and_enhance');
-    });
-
-    it('should return optimize_existing for >10 documents', () => {
-      expect(determineContentStrategy(11)).toBe('optimize_existing');
-      expect(determineContentStrategy(20)).toBe('optimize_existing');
-      expect(determineContentStrategy(50)).toBe('optimize_existing');
-    });
-  });
-
   describe('Phase 4 Input Structure', () => {
     it('should accept valid Phase4Input structure', () => {
       const validInput: Phase4Input = {
@@ -101,16 +77,15 @@ describe('Phase 4: Document Synthesis', () => {
               {
                 area: 'Introduction to Hooks',
                 estimated_lessons: 10,
-                importance: 'core',
+                importance: 'complex',
                 learning_objectives: ['Understand Hooks motivation', 'Learn Hook rules'],
                 key_topics: ['Class vs functional components', 'Hook rules', 'useState basics'],
                 pedagogical_approach: 'Start with theory, then hands-on examples',
-                difficulty_progression: 'gradual',
               },
               {
                 area: 'State Management with Hooks',
                 estimated_lessons: 20,
-                importance: 'core',
+                importance: 'complex',
                 learning_objectives: ['Master useState', 'Handle complex state'],
                 key_topics: [
                   'useState',
@@ -119,12 +94,11 @@ describe('Phase 4: Document Synthesis', () => {
                   'multiple state variables',
                 ],
                 pedagogical_approach: 'Practice-heavy with real examples',
-                difficulty_progression: 'gradual',
               },
               {
                 area: 'Side Effects with useEffect',
                 estimated_lessons: 20,
-                importance: 'core',
+                importance: 'complex',
                 learning_objectives: ['Understand useEffect', 'Handle cleanup'],
                 key_topics: [
                   'useEffect basics',
@@ -133,7 +107,6 @@ describe('Phase 4: Document Synthesis', () => {
                   'async effects',
                 ],
                 pedagogical_approach: 'Theory then practice',
-                difficulty_progression: 'steep',
               },
             ],
           },
@@ -151,7 +124,6 @@ describe('Phase 4: Document Synthesis', () => {
             progression_logic:
               'Start with simple useState, build to complex useEffect patterns, culminate in custom hooks',
           },
-          expansion_areas: null,
           research_flags: [],
           phase_metadata: {
             duration_ms: 12000,

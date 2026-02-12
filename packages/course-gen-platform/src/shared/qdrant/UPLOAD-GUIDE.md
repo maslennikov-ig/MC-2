@@ -13,6 +13,7 @@ The vector upload service (`upload.ts`) now automatically updates the database (
 ### Required Environment Variables
 
 Add to `.env`:
+
 ```bash
 # Supabase Configuration
 SUPABASE_URL=https://your-project.supabase.co
@@ -44,15 +45,12 @@ const embeddingResult = await generateEmbeddingsWithLateChunking(
 );
 
 // Upload to Qdrant (automatically updates database status)
-const uploadResult = await uploadChunksToQdrant(
-  embeddingResult.embeddings,
-  {
-    batch_size: 100,           // Default: 100
-    enable_sparse: true,       // Enable BM25 hybrid search
-    wait: true,                // Wait for indexing to complete
-    collection_name: 'course_embeddings'
-  }
-);
+const uploadResult = await uploadChunksToQdrant(embeddingResult.embeddings, {
+  batch_size: 100, // Default: 100
+  enable_sparse: true, // Enable BM25 hybrid search
+  wait: true, // Wait for indexing to complete
+  collection_name: 'course_embeddings',
+});
 
 // Check result
 if (uploadResult.success) {
@@ -73,29 +71,31 @@ if (uploadResult.success) {
 
 The `file_catalog.vector_status` field tracks the indexing status:
 
-| Status | Description | When Set |
-|--------|-------------|----------|
-| `pending` | Awaiting processing | Initial upload to file_catalog |
+| Status     | Description            | When Set                          |
+| ---------- | ---------------------- | --------------------------------- |
+| `pending`  | Awaiting processing    | Initial upload to file_catalog    |
 | `indexing` | Processing in progress | (Optional) Before starting upload |
-| `indexed` | Successfully indexed | After successful Qdrant upload |
-| `failed` | Upload failed | After upload error |
+| `indexed`  | Successfully indexed   | After successful Qdrant upload    |
+| `failed`   | Upload failed          | After upload error                |
 
 ### Automatic Status Updates
 
 **On Success**:
+
 ```typescript
 // Automatically called after successful upload
 // Updates all documents to 'indexed'
-file_catalog.vector_status = 'indexed'
-file_catalog.updated_at = NOW()
+file_catalog.vector_status = 'indexed';
+file_catalog.updated_at = NOW();
 ```
 
 **On Failure**:
+
 ```typescript
 // Automatically called on upload error
 // Updates all documents to 'failed'
-file_catalog.vector_status = 'failed'
-file_catalog.updated_at = NOW()
+file_catalog.vector_status = 'failed';
+file_catalog.updated_at = NOW();
 // Error message logged to console
 ```
 
@@ -144,47 +144,49 @@ import { uploadChunksToQdrant, updateVectorStatus } from '@/shared/qdrant/upload
 import { generateEmbeddingsWithLateChunking } from '@/shared/embeddings/generate';
 import { Worker } from 'bullmq';
 
-const worker = new Worker('document-processing', async (job) => {
-  const { documentId, chunks } = job.data;
+const worker = new Worker(
+  'document-processing',
+  async job => {
+    const { documentId, chunks } = job.data;
 
-  try {
-    // Mark as indexing
-    await updateVectorStatus(documentId, 'indexing');
+    try {
+      // Mark as indexing
+      await updateVectorStatus(documentId, 'indexing');
 
-    // Update job progress
-    await job.updateProgress(25);
+      // Update job progress
+      await job.updateProgress(25);
 
-    // Generate embeddings
-    const embeddingResult = await generateEmbeddingsWithLateChunking(
-      chunks,
-      'retrieval.passage',
-      true
-    );
+      // Generate embeddings
+      const embeddingResult = await generateEmbeddingsWithLateChunking(
+        chunks,
+        'retrieval.passage',
+        true
+      );
 
-    await job.updateProgress(50);
+      await job.updateProgress(50);
 
-    // Upload to Qdrant (automatically updates to 'indexed')
-    const uploadResult = await uploadChunksToQdrant(
-      embeddingResult.embeddings,
-      { enable_sparse: true }
-    );
+      // Upload to Qdrant (automatically updates to 'indexed')
+      const uploadResult = await uploadChunksToQdrant(embeddingResult.embeddings, {
+        enable_sparse: true,
+      });
 
-    await job.updateProgress(100);
+      await job.updateProgress(100);
 
-    return {
-      documentId,
-      vectorsUploaded: uploadResult.points_uploaded,
-      duration: uploadResult.duration_ms
-    };
-
-  } catch (error) {
-    // Status automatically set to 'failed'
-    console.error(`Document ${documentId} indexing failed:`, error);
-    throw error;
+      return {
+        documentId,
+        vectorsUploaded: uploadResult.points_uploaded,
+        duration: uploadResult.duration_ms,
+      };
+    } catch (error) {
+      // Status automatically set to 'failed'
+      console.error(`Document ${documentId} indexing failed:`, error);
+      throw error;
+    }
+  },
+  {
+    connection: redisConnection,
   }
-}, {
-  connection: redisConnection
-});
+);
 ```
 
 ---
@@ -196,10 +198,7 @@ const worker = new Worker('document-processing', async (job) => {
 ```typescript
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
 
 const { data, error } = await supabase
   .from('file_catalog')
@@ -243,6 +242,7 @@ console.log(`Indexed documents: ${indexedDocs?.length}`);
 ### Upload Failure Scenarios
 
 **Qdrant Connection Error**:
+
 ```typescript
 try {
   await uploadChunksToQdrant(embeddings);
@@ -253,6 +253,7 @@ try {
 ```
 
 **Invalid Vector Dimensions**:
+
 ```typescript
 try {
   await uploadChunksToQdrant(embeddings);
@@ -263,6 +264,7 @@ try {
 ```
 
 **Database Update Failure**:
+
 ```typescript
 // Upload succeeds but status update fails
 // Error is logged but upload continues
@@ -272,6 +274,7 @@ try {
 ### Graceful Degradation
 
 If status update fails:
+
 1. Error is logged to console
 2. Upload process continues
 3. Other documents are still updated
@@ -296,6 +299,7 @@ for (const documentId of uniqueDocumentIds) {
 ### Expected Console Output
 
 **Successful Upload**:
+
 ```
 Uploading batch 1: 100 points (1-100 of 250)
 ✓ Batch 1 uploaded successfully
@@ -313,6 +317,7 @@ Updating vector_status for 3 documents...
 ```
 
 **Failed Upload**:
+
 ```
 Uploading batch 1: 100 points (1-100 of 250)
 Upload failed: Connection to Qdrant lost
@@ -338,7 +343,7 @@ import { uploadChunksToQdrant } from '@/shared/qdrant/upload';
 // Process multiple documents in parallel
 const documents = [doc1, doc2, doc3];
 
-const uploadPromises = documents.map(async (doc) => {
+const uploadPromises = documents.map(async doc => {
   const embeddings = await generateEmbeddings(doc.chunks);
   return uploadChunksToQdrant(embeddings);
 });
@@ -361,14 +366,11 @@ results.forEach((result, index) => {
 import { uploadChunksToQdrant } from '@/shared/qdrant/upload';
 
 // Enable BM25 sparse vectors for hybrid search
-const uploadResult = await uploadChunksToQdrant(
-  embeddingResult.embeddings,
-  {
-    batch_size: 100,
-    enable_sparse: true,  // Enables BM25 lexical search
-    wait: true
-  }
-);
+const uploadResult = await uploadChunksToQdrant(embeddingResult.embeddings, {
+  batch_size: 100,
+  enable_sparse: true, // Enables BM25 lexical search
+  wait: true,
+});
 
 // Now supports hybrid search with:
 // - Dense vectors (semantic similarity via Jina-v3)
@@ -382,13 +384,10 @@ const uploadResult = await uploadChunksToQdrant(
 import { uploadChunksToQdrant } from '@/shared/qdrant/upload';
 
 // Upload to custom collection
-const uploadResult = await uploadChunksToQdrant(
-  embeddings,
-  {
-    collection_name: 'custom_embeddings',
-    batch_size: 200
-  }
-);
+const uploadResult = await uploadChunksToQdrant(embeddings, {
+  collection_name: 'custom_embeddings',
+  batch_size: 200,
+});
 ```
 
 ---
@@ -400,19 +399,19 @@ const uploadResult = await uploadChunksToQdrant(
 **Problem**: Database status remains 'pending' after upload
 
 **Solution**:
+
 1. Check environment variables are set:
+
    ```bash
    echo $SUPABASE_URL
    echo $SUPABASE_SERVICE_KEY
    ```
 
 2. Verify Supabase connection:
+
    ```typescript
    import { createClient } from '@supabase/supabase-js';
-   const supabase = createClient(
-     process.env.SUPABASE_URL!,
-     process.env.SUPABASE_SERVICE_KEY!
-   );
+   const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
    const { data, error } = await supabase.from('file_catalog').select('count');
    console.log('Supabase connected:', !error);
    ```
@@ -429,13 +428,16 @@ const uploadResult = await uploadChunksToQdrant(
 **Problem**: Upload succeeds but status update errors are not visible
 
 **Solution**:
+
 1. Check console logs for error messages
 2. Enable verbose logging:
+
    ```typescript
    process.env.DEBUG = 'supabase:*';
    ```
 
 3. Test updateVectorStatus directly:
+
    ```typescript
    import { updateVectorStatus } from '@/shared/qdrant/upload';
 
@@ -452,10 +454,9 @@ const uploadResult = await uploadChunksToQdrant(
 
 **Solution**:
 Verify unique document IDs are being extracted:
+
 ```typescript
-const uniqueDocumentIds = Array.from(
-  new Set(embeddingResults.map(r => r.chunk.document_id))
-);
+const uniqueDocumentIds = Array.from(new Set(embeddingResults.map(r => r.chunk.document_id)));
 
 console.log('Unique document IDs:', uniqueDocumentIds);
 // Should show all unique IDs, not just one
@@ -475,21 +476,20 @@ console.log('Unique document IDs:', uniqueDocumentIds);
 // For large datasets (10,000+ vectors)
 await uploadChunksToQdrant(embeddings, {
   batch_size: 200,
-  enable_sparse: true
+  enable_sparse: true,
 });
 ```
 
 ### Parallel Processing
 
 For multiple documents:
+
 ```typescript
 // Process in batches of 5 documents at a time
 const batchSize = 5;
 for (let i = 0; i < documents.length; i += batchSize) {
   const batch = documents.slice(i, i + batchSize);
-  await Promise.all(
-    batch.map(doc => processDocument(doc))
-  );
+  await Promise.all(batch.map(doc => processDocument(doc)));
 }
 ```
 
@@ -498,6 +498,7 @@ for (let i = 0; i < documents.length; i += batchSize) {
 ## Best Practices
 
 1. **Always check upload result**
+
    ```typescript
    const result = await uploadChunksToQdrant(embeddings);
    if (!result.success) {
@@ -507,12 +508,14 @@ for (let i = 0; i < documents.length; i += batchSize) {
    ```
 
 2. **Set status to 'indexing' before long operations**
+
    ```typescript
    await updateVectorStatus(documentId, 'indexing');
    // ... long-running operation ...
    ```
 
 3. **Use batch processing for multiple documents**
+
    ```typescript
    // Instead of:
    for (const doc of documents) {
@@ -520,12 +523,11 @@ for (let i = 0; i < documents.length; i += batchSize) {
    }
 
    // Use:
-   await Promise.all(
-     documents.map(doc => processAndUpload(doc))
-   );
+   await Promise.all(documents.map(doc => processAndUpload(doc)));
    ```
 
 4. **Monitor failed uploads**
+
    ```typescript
    // Periodic check for failed documents
    const { data: failedDocs } = await supabase
@@ -554,6 +556,7 @@ for (let i = 0; i < documents.length; i += batchSize) {
 ## Support
 
 For issues or questions:
+
 1. Check console logs for error messages
 2. Verify environment variables are set
 3. Review implementation summary: `T077-IMPLEMENTATION-SUMMARY.md`

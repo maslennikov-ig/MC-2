@@ -7,7 +7,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { shouldAutoMute, AUTO_MUTE_RULES } from '@/shared/logger/auto-classification';
+import {
+  shouldAutoMute,
+  AUTO_MUTE_RULES,
+  type AutoMuteRule,
+} from '@/shared/logger/auto-classification';
 
 describe('shouldAutoMute', () => {
   describe('graceful_shutdown patterns', () => {
@@ -214,6 +218,96 @@ describe('shouldAutoMute', () => {
     });
   });
 
+  describe('expected_behavior patterns', () => {
+    it('should auto-mute "Job not found" polling errors', () => {
+      const result = shouldAutoMute('Job 272 not found');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+
+    it('should auto-mute "Failed to log generation trace"', () => {
+      const result = shouldAutoMute('Failed to log generation trace');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+  });
+
+  describe('graceful_fallback patterns', () => {
+    it('should auto-mute "Patcher REJECTED truncated"', () => {
+      const result = shouldAutoMute(
+        'Patcher: REJECTED - content was truncated, returning original'
+      );
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+
+    it('should auto-mute preprocessing failures with fallback', () => {
+      const result = shouldAutoMute('Preprocessing failed, using raw output');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+  });
+
+  describe('Stage 5 model fallbacks', () => {
+    it('should auto-mute Stage 5 primary model failures', () => {
+      const result = shouldAutoMute('Stage 5: Primary model attempt failed');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('cascading_repair');
+    });
+  });
+
+  describe('job_lifecycle new patterns', () => {
+    it('should auto-mute "could not renew lock for job" errors', () => {
+      const result = shouldAutoMute('could not renew lock for job 12345');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('job_lifecycle');
+    });
+
+    it('should auto-mute "Missing key for job moveToDelayed" errors', () => {
+      const result = shouldAutoMute('Missing key for job 456. Command: moveToDelayed');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('job_lifecycle');
+    });
+  });
+
+  describe('heuristic false positive patterns', () => {
+    it('should auto-mute "Critical language consistency failure" errors', () => {
+      const result = shouldAutoMute('Critical language consistency failure: detected Cyrillic');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+
+    it('should auto-mute "Critical heuristic failures detected skipping LLM review" errors', () => {
+      const result = shouldAutoMute('Critical heuristic failures detected, skipping LLM review');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+  });
+
+  describe('stage5 section materialization fallback patterns', () => {
+    it('should auto-mute "Batch section insert failed" warnings', () => {
+      const result = shouldAutoMute(
+        'Batch section insert failed, falling back to individual inserts'
+      );
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+
+    it('should auto-mute "Failed to create section record (may already exist)" warnings', () => {
+      const result = shouldAutoMute('Failed to create section record (may already exist)');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+  });
+
+  describe('stage6 content sanity check patterns', () => {
+    it('should auto-mute "Content failed sanity check (non-blocking warning)" warnings', () => {
+      const result = shouldAutoMute('Content failed sanity check (non-blocking warning)');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('expected_behavior');
+    });
+  });
+
   describe('AUTO_MUTE_RULES configuration', () => {
     it('should have rules defined (auto-mute patterns)', () => {
       // At least 20 rules expected - exact count changes as rules are added
@@ -231,8 +325,10 @@ describe('shouldAutoMute', () => {
     });
 
     it('should have unique patterns', () => {
-      const patternStrings = AUTO_MUTE_RULES.map(r => r.pattern.source);
-      const uniquePatterns = new Set(patternStrings);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      const patternStrings = AUTO_MUTE_RULES.map((r: AutoMuteRule) => r.pattern.source);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      const uniquePatterns = new Set<string>(patternStrings);
       expect(uniquePatterns.size).toBe(AUTO_MUTE_RULES.length);
     });
   });

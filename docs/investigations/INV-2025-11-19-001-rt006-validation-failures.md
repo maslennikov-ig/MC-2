@@ -1,6 +1,7 @@
 # Investigation: RT-006 Validation Failures - zodToPromptSchema Missing ZodEffects Handler
 
 ---
+
 investigation_id: INV-2025-11-19-001
 status: ✅ COMPLETE - Root Cause Identified
 timestamp: 2025-11-19T08:45:00Z
@@ -9,8 +10,10 @@ test_file: tests/e2e/t053-synergy-sales-course.test.ts
 course_id: 83d22a57-ec2a-4d1f-8cfc-004d64c4ab77
 parent_investigation: INV-2025-11-17-013
 related_investigations:
-  - INV-2025-11-17-013 (zodToPromptSchema contradiction - hardcoded examples removed ✅)
-  - INV-2025-11-16-001 (RT-006 metadata validation - initial discovery)
+
+- INV-2025-11-17-013 (zodToPromptSchema contradiction - hardcoded examples removed ✅)
+- INV-2025-11-16-001 (RT-006 metadata validation - initial discovery)
+
 ---
 
 ## Executive Summary
@@ -32,6 +35,7 @@ related_investigations:
 ### Observed Behavior (Test Logs)
 
 **Error Pattern** (Attempt 1):
+
 ```json
 {
   "msg": "RT-006 validation failed in section generation",
@@ -42,6 +46,7 @@ related_investigations:
 ```
 
 **Error Pattern** (Attempt 2 - After Auto-Repair):
+
 ```json
 {
   "msg": "RT-006 validation failed in section generation",
@@ -54,38 +59,48 @@ related_investigations:
 ### Expected Behavior
 
 **RT-006 Validation Schema** (from `generation-result.ts` lines 464-506):
+
 ```typescript
-export const LessonSchema = z.object({
-  lesson_number: z.number().int().positive(),               // REQUIRED ✅
-  lesson_title: z.string().min(5).max(500),                 // REQUIRED ✅
-  lesson_objectives: z.array(z.string().min(10).max(600))   // REQUIRED ✅
-    .min(1).max(5),
-  key_topics: z.array(z.string().min(5).max(300))           // REQUIRED ✅
-    .min(2).max(10),
-  estimated_duration_minutes: z.number().int().min(3).max(45), // REQUIRED ✅
-  difficulty_level: z.enum(['beginner', 'intermediate', 'advanced'])
-    .optional(),
-  practical_exercises: z.array(PracticalExerciseSchema)     // REQUIRED ✅
-    .min(3).max(5),
-})
-  .refine(                                                   // ⚠️ WRAPS IN ZodEffects
-    (lesson) => validateDurationProportionality(lesson).passed,
-    (lesson) => ({ message: validateDurationProportionality(lesson).issues?.[0] })
+export const LessonSchema = z
+  .object({
+    lesson_number: z.number().int().positive(), // REQUIRED ✅
+    lesson_title: z.string().min(5).max(500), // REQUIRED ✅
+    lesson_objectives: z
+      .array(z.string().min(10).max(600)) // REQUIRED ✅
+      .min(1)
+      .max(5),
+    key_topics: z
+      .array(z.string().min(5).max(300)) // REQUIRED ✅
+      .min(2)
+      .max(10),
+    estimated_duration_minutes: z.number().int().min(3).max(45), // REQUIRED ✅
+    difficulty_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+    practical_exercises: z
+      .array(PracticalExerciseSchema) // REQUIRED ✅
+      .min(3)
+      .max(5),
+  })
+  .refine(
+    // ⚠️ WRAPS IN ZodEffects
+    lesson => validateDurationProportionality(lesson).passed,
+    lesson => ({ message: validateDurationProportionality(lesson).issues?.[0] })
   );
 ```
 
 **LLM Should Generate**:
+
 ```json
 {
   "section_number": 1,
   "lessons": [
     {
-      "lesson_number": 1,                        // ❌ MISSING
+      "lesson_number": 1, // ❌ MISSING
       "lesson_title": "...",
       "lesson_objectives": ["..."],
       "key_topics": ["..."],
-      "estimated_duration_minutes": 15,          // ❌ MISSING
-      "practical_exercises": [                   // ❌ MISSING
+      "estimated_duration_minutes": 15, // ❌ MISSING
+      "practical_exercises": [
+        // ❌ MISSING
         {
           "exercise_type": "hands_on",
           "exercise_title": "...",
@@ -104,6 +119,7 @@ export const LessonSchema = z.object({
 ### Phase 1: Tier 0 - Project Internal Search (MANDATORY FIRST)
 
 **Files Examined**:
+
 1. ✅ `docs/investigations/INV-2025-11-17-013` - Previous investigation that removed hardcoded examples
 2. ✅ `docs/investigations/INV-2025-11-16-001` - Original RT-006 validation issue
 3. ✅ Git history since 2025-11-15 for generation files
@@ -116,23 +132,27 @@ export const LessonSchema = z.object({
 **RT-006 Validation Schema** (`packages/shared-types/src/generation-result.ts`):
 
 **Lines 464-506 - LessonSchema Definition**:
+
 ```typescript
-export const LessonSchema = z.object({
-  lesson_number: z.number().int().positive(),               // ✅ REQUIRED
-  lesson_title: z.string().min(5).max(500),
-  lesson_objectives: z.array(z.string().min(10).max(600)).min(1).max(5),
-  key_topics: z.array(z.string().min(5).max(300)).min(2).max(10),
-  estimated_duration_minutes: z.number().int().min(3).max(45), // ✅ REQUIRED
-  difficulty_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
-  practical_exercises: z.array(PracticalExerciseSchema).min(3).max(5), // ✅ REQUIRED
-})
-  .refine(                                                   // ⚠️ CRITICAL: WRAPS IN ZodEffects
-    (lesson) => validateDurationProportionality(lesson).passed,
-    (lesson) => ({ message: validateDurationProportionality(lesson).issues?.[0] })
+export const LessonSchema = z
+  .object({
+    lesson_number: z.number().int().positive(), // ✅ REQUIRED
+    lesson_title: z.string().min(5).max(500),
+    lesson_objectives: z.array(z.string().min(10).max(600)).min(1).max(5),
+    key_topics: z.array(z.string().min(5).max(300)).min(2).max(10),
+    estimated_duration_minutes: z.number().int().min(3).max(45), // ✅ REQUIRED
+    difficulty_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+    practical_exercises: z.array(PracticalExerciseSchema).min(3).max(5), // ✅ REQUIRED
+  })
+  .refine(
+    // ⚠️ CRITICAL: WRAPS IN ZodEffects
+    lesson => validateDurationProportionality(lesson).passed,
+    lesson => ({ message: validateDurationProportionality(lesson).issues?.[0] })
   );
 ```
 
 **Lines 515-540 - SectionSchema Definition**:
+
 ```typescript
 export const SectionSchema = z.object({
   section_number: z.number().int().positive(),
@@ -140,14 +160,16 @@ export const SectionSchema = z.object({
   section_description: z.string().min(20).max(2000),
   learning_objectives: z.array(z.string().min(10).max(600)).min(1).max(5),
   estimated_duration_minutes: z.number().int().positive(),
-  lessons: z.array(LessonSchema)                           // ⚠️ CONTAINS ZodEffects
+  lessons: z
+    .array(LessonSchema) // ⚠️ CONTAINS ZodEffects
     .min(1),
-});  // ✅ NO .refine() on SectionSchema itself
+}); // ✅ NO .refine() on SectionSchema itself
 ```
 
 **LLM Prompt Template** (`packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`):
 
 **Lines 762-768 - Schema Inclusion (CORRECT)**:
+
 ```typescript
 // RT-002: Add Zod schema description for clear structure
 const schemaDescription = zodToPromptSchema(SectionSchema);
@@ -158,6 +180,7 @@ ${schemaDescription}
 ```
 
 **Lines 795-813 - Attempt 1 Prompt (Post-Fix)**:
+
 ```typescript
 if (attemptNumber === 1) {
   // Attempt 1: Trust zodToPromptSchema output (lines 762-768) as single source of truth
@@ -188,6 +211,7 @@ if (attemptNumber === 1) {
 **File**: `packages/course-gen-platform/src/utils/zod-to-prompt-schema.ts`
 
 **Lines 40-177 - Function Implementation**:
+
 ```typescript
 export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string {
   const indent = '  '.repeat(depth);
@@ -247,6 +271,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
      - Falls through to fallback: **returns `"unknown"`** ❌
 
 **Actual Prompt Output** (inferred):
+
 ```
 {
   "section_number": integer, min 1,
@@ -259,6 +284,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
 ```
 
 **Impact**: LLM sees `"lessons": array of unknown`, so it doesn't know:
+
 - Lessons have `lesson_number` field
 - Lessons have `estimated_duration_minutes` field
 - Lessons have `practical_exercises` array
@@ -316,16 +342,19 @@ LessonSchema = z.object({ ... })
 ### Contributing Factors
 
 **Factor 1**: Commit 8546b5d added `.refine()` to `LessonSchema` for RT-007 Phase 1 validation
+
 - **When**: 2025-11-17 (recent change)
 - **Why**: Duration proportionality validation
 - **Impact**: Changed `LessonSchema` from `ZodObject` to `ZodEffects`
 
 **Factor 2**: `zodToPromptSchema` was created (commit f96c64e) without `ZodEffects` handler
+
 - **When**: 2025-11-17 (same day as `.refine()` addition)
 - **Why**: Initial implementation didn't anticipate schemas with `.refine()`
 - **Impact**: Silent failure (returns "unknown" instead of error)
 
 **Factor 3**: Previous fix (commit 8af7c1d) focused on hardcoded examples
+
 - **When**: 2025-11-17
 - **What**: Removed hardcoded JSON examples that contradicted schema
 - **Why Incomplete**: Didn't address underlying `ZodEffects` gap
@@ -334,11 +363,13 @@ LessonSchema = z.object({ ... })
 ### Why Tests Didn't Catch This
 
 **No Unit Tests for `zodToPromptSchema`**:
+
 - No test coverage for schemas with `.refine()`
 - No verification of output format
 - No regression tests after adding `.refine()` to `LessonSchema`
 
 **E2E Test (T053) Not Run During Development**:
+
 - Test marked "complete" without execution
 - No automated CI pipeline running E2E tests
 - Manual testing relied on code inspection, not execution
@@ -356,6 +387,7 @@ LessonSchema = z.object({ ... })
 **Implementation** (Lines 40-65, add after unwrapping Optional/Nullable):
 
 **BEFORE**:
+
 ```typescript
 export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string {
   const indent = '  '.repeat(depth);
@@ -390,6 +422,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
 ```
 
 **AFTER**:
+
 ```typescript
 export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string {
   const indent = '  '.repeat(depth);
@@ -430,12 +463,14 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
 ```
 
 **Changes**:
+
 - **Lines to add**: 4 lines (import + unwrap logic)
 - **Lines modified**: 0 (only adding, not changing existing code)
 - **Complexity**: Trivial (same pattern as Optional/Nullable unwrapping)
 - **Estimated Time**: 15 minutes
 
 **Impact**:
+
 - ✅ Unwraps `ZodEffects` to access underlying `ZodObject`
 - ✅ Continues normal processing for `ZodObject` handler
 - ✅ Generates complete lesson structure in prompt
@@ -443,6 +478,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
 - ✅ RT-006 validation passes
 
 **Risk**: Very Low
+
 - **Scope**: Isolated to `zodToPromptSchema` utility
 - **Behavior**: Consistent with existing unwrapping logic
 - **Fallback**: Existing handlers unchanged
@@ -509,9 +545,11 @@ describe('zodToPromptSchema', () => {
 
   describe('ZodEffects Handling', () => {
     it('unwraps ZodEffects created by .refine()', () => {
-      const schema = z.object({
-        value: z.number().int().positive(),
-      }).refine(x => x.value > 0, { message: 'Must be positive' });
+      const schema = z
+        .object({
+          value: z.number().int().positive(),
+        })
+        .refine(x => x.value > 0, { message: 'Must be positive' });
 
       const result = zodToPromptSchema(schema);
 
@@ -524,9 +562,11 @@ describe('zodToPromptSchema', () => {
     });
 
     it('handles nested ZodEffects (object with refined nested object)', () => {
-      const innerSchema = z.object({
-        field: z.string(),
-      }).refine(x => x.field.length > 0);
+      const innerSchema = z
+        .object({
+          field: z.string(),
+        })
+        .refine(x => x.field.length > 0);
 
       const outerSchema = z.object({
         nested: innerSchema,
@@ -590,11 +630,13 @@ describe('zodToPromptSchema', () => {
 **Objective**: Avoid `ZodEffects` by moving validation outside schema definition.
 
 **Approach**:
+
 1. Remove `.refine()` from `LessonSchema`
 2. Move duration validation to runtime check after parsing
 3. Keep schema as pure `ZodObject`
 
 **BEFORE**:
+
 ```typescript
 export const LessonSchema = z.object({ ... })
   .refine(
@@ -604,6 +646,7 @@ export const LessonSchema = z.object({ ... })
 ```
 
 **AFTER**:
+
 ```typescript
 export const LessonSchema = z.object({ ... });
 // NO .refine() - pure ZodObject
@@ -622,6 +665,7 @@ export function validateLesson(lesson: Lesson): ValidationResult {
 ```
 
 **Why NOT RECOMMENDED**:
+
 - ❌ Loses declarative validation in schema
 - ❌ Requires manual validation calls everywhere
 - ❌ Breaks RT-006/RT-007 validation architecture
@@ -637,24 +681,28 @@ export function validateLesson(lesson: Lesson): ValidationResult {
 ### Phase 1: Critical Fix (30 minutes)
 
 **Task 1.1**: Add ZodEffects handler to zodToPromptSchema (15 min)
+
 - File: `packages/course-gen-platform/src/utils/zod-to-prompt-schema.ts`
 - Change: Add 4 lines after Optional/Nullable unwrapping (lines 64-68)
 - Implementation: See Solution 1 above
 - Run: `pnpm type-check` to verify
 
 **Task 1.2**: Add unit tests for zodToPromptSchema (30 min)
+
 - File: `packages/course-gen-platform/tests/unit/utils/zod-to-prompt-schema.test.ts` (NEW)
 - Implementation: See Solution 2 above
 - Run: `pnpm test tests/unit/utils/zod-to-prompt-schema.test.ts`
 - Verify: All tests pass, including LessonSchema/SectionSchema
 
 **Task 1.3**: Verify with T053 E2E test (10 min)
+
 - Run: `pnpm test tests/e2e/t053-synergy-sales-course.test.ts`
 - Expected: Stage 5 generation SUCCEEDS
 - Expected: No RT-006 "Required" field errors
 - Expected: Test completes in < 15 minutes
 
 **Success Criteria**:
+
 - ✅ `zodToPromptSchema(LessonSchema)` returns full structure (not "unknown")
 - ✅ Unit tests pass
 - ✅ T053 E2E test passes
@@ -665,11 +713,13 @@ export function validateLesson(lesson: Lesson): ValidationResult {
 ### Phase 2: Documentation & Prevention (20 minutes)
 
 **Task 2.1**: Update investigation document (10 min)
+
 - Mark INV-2025-11-19-001 as RESOLVED
 - Link to fix commit
 - Add to "Lessons Learned"
 
 **Task 2.2**: Add inline comment in generation-result.ts (5 min)
+
 - File: `packages/shared-types/src/generation-result.ts`
 - Location: Line 499 (before `.refine()`)
 - Comment:
@@ -680,6 +730,7 @@ export function validateLesson(lesson: Lesson): ValidationResult {
   ```
 
 **Task 2.3**: Commit with proper references (5 min)
+
 - Git add + commit
 - Reference INV-2025-11-19-001
 - Tag with "Fixes RT-006 validation failures"
@@ -693,6 +744,7 @@ export function validateLesson(lesson: Lesson): ValidationResult {
 **Test Suite**: `tests/unit/utils/zod-to-prompt-schema.test.ts`
 
 **Coverage**:
+
 1. ✅ Basic types (string, number, enum, boolean)
 2. ✅ Complex types (object, array, union)
 3. ✅ ZodEffects unwrapping (.refine())
@@ -700,6 +752,7 @@ export function validateLesson(lesson: Lesson): ValidationResult {
 5. ✅ Real schemas (LessonSchema, SectionSchema)
 
 **Run**:
+
 ```bash
 pnpm test tests/unit/utils/zod-to-prompt-schema.test.ts
 ```
@@ -715,6 +768,7 @@ pnpm test tests/unit/utils/zod-to-prompt-schema.test.ts
 **Scenario 2**: Full Pipeline - Analyze + Generate + Style (US2)
 
 **Success Criteria**:
+
 - ✅ Stage 5 generation SUCCEEDS
 - ✅ No RT-006 validation errors
 - ✅ No "Required" field errors for:
@@ -725,6 +779,7 @@ pnpm test tests/unit/utils/zod-to-prompt-schema.test.ts
 - ✅ Test completes within 15 minutes (not timeout)
 
 **Run**:
+
 ```bash
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ```
@@ -736,6 +791,7 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ### Tier 0: Project Internal
 
 **Previous Investigations**:
+
 1. **INV-2025-11-17-013** - zodToPromptSchema contradiction
    - **Finding**: Hardcoded JSON examples contradicted schema
    - **Fix**: Removed hardcoded examples (commit 8af7c1d)
@@ -747,6 +803,7 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
    - **Status**: Partial fix (didn't handle ZodEffects)
 
 **Git History**:
+
 ```bash
 8af7c1d - fix(stage5): remove hardcoded JSON examples that contradict zodToPromptSchema
 8546b5d - feat(validators): implement RT-007 Phase 1 - Bloom's Taxonomy Quick Fixes
@@ -756,6 +813,7 @@ f96c64e - refactor: FSM redesign + quality validator fix + system metrics expans
 ```
 
 **Code References**:
+
 - `packages/shared-types/src/generation-result.ts` lines 464-506 (LessonSchema with .refine())
 - `packages/course-gen-platform/src/utils/zod-to-prompt-schema.ts` lines 40-177 (missing ZodEffects handler)
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts` lines 762-813 (prompt usage)
@@ -773,6 +831,7 @@ f96c64e - refactor: FSM redesign + quality validator fix + system metrics expans
 ## MCP Server Usage
 
 **Tools Used**:
+
 1. **Project Internal Search** (Tier 0):
    - Read previous investigation documents
    - Read source code files
@@ -841,6 +900,7 @@ f96c64e - refactor: FSM redesign + quality validator fix + system metrics expans
 **Primary Goal**: T053 E2E test PASSES
 
 **Secondary Goals**:
+
 - ✅ Zero RT-006 "Required" field errors
 - ✅ `zodToPromptSchema(LessonSchema)` generates complete structure
 - ✅ `zodToPromptSchema(SectionSchema)` includes nested lesson fields
@@ -848,6 +908,7 @@ f96c64e - refactor: FSM redesign + quality validator fix + system metrics expans
 - ✅ No "unknown" in prompt output for any schema
 
 **Quality Gates**:
+
 - Type-check MUST pass
 - Unit tests MUST pass (10+ test cases)
 - E2E test MUST pass (T053 Scenario 2)
@@ -870,6 +931,7 @@ f96c64e - refactor: FSM redesign + quality validator fix + system metrics expans
 ## Follow-Up Tasks
 
 **After Phase 1 completes**:
+
 1. ✅ Mark INV-2025-11-19-001 as RESOLVED
 2. ✅ Update INV-2025-11-17-013 status (note: fixed hardcoded examples, but ZodEffects issue remained)
 3. ✅ Add inline comment in generation-result.ts about .refine() usage

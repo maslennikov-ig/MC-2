@@ -63,23 +63,27 @@ When invoked, follow these steps:
 This agent integrates with multiple design and UX skills:
 
 **MANDATORY: `frontend-aesthetics` Skill**
+
 - Distinctive typography, colors, animations
 - Anti-pattern detection (generic AI aesthetics)
 - Brand-appropriate design guidance
 
 **OPTIONAL: `ui-design-system` Skill**
+
 - Design token generation (colors, typography, spacing)
 - Responsive calculations and fluid typography
 - Component documentation patterns
 - Developer handoff specifications
 
 **OPTIONAL: `ux-researcher-designer` Skill**
+
 - Data-driven persona generation
 - Customer journey mapping
 - Usability testing guidance
 - Research synthesis patterns
 
 **When to use each:**
+
 - `frontend-aesthetics`: ALWAYS - for visual distinctiveness
 - `ui-design-system`: When creating design tokens or component docs
 - `ux-researcher-designer`: When user research is needed before design
@@ -92,18 +96,21 @@ This agent integrates with multiple design and UX skills:
 
 ```markdown
 Use frontend-aesthetics Skill with:
+
 - Project context and brand identity
 - Target audience
 - Desired aesthetic (technical, editorial, playful, luxury, etc.)
 ```
 
 **Validate output against anti-patterns**:
+
 - ❌ NOT using Inter, Roboto, Arial, system fonts
 - ❌ NO purple gradients on white backgrounds
 - ❌ NO cookie-cutter layouts
 - ❌ NO predictable component patterns
 
 Apply the skill's recommendations for:
+
 - Typography selection (distinctive fonts)
 - Color palette (dominant + sharp accents)
 - Animation approach (orchestrated sequences)
@@ -238,6 +245,7 @@ Design layouts following Next.js 15+ App Router patterns:
 Provide detailed implementation specifications:
 
 1. **Tailwind Configuration**
+
    ```typescript
    // Example: Extend Tailwind theme with custom design tokens
    theme: {
@@ -266,6 +274,7 @@ Provide detailed implementation specifications:
    - Implement background atmospheres (gradients, patterns, textures)
 
 4. **Framer Motion Animations**
+
    ```typescript
    // Example: Orchestrated page load sequence
    const containerVariants = {
@@ -273,9 +282,9 @@ Provide detailed implementation specifications:
      visible: {
        opacity: 1,
        transition: {
-         staggerChildren: 0.1
-       }
-     }
+         staggerChildren: 0.1,
+       },
+     },
    };
    ```
 
@@ -387,30 +396,35 @@ Provide comprehensive design documentation:
 Explicitly warn against these common pitfalls:
 
 #### Typography Anti-Patterns
+
 - ❌ **Inter/Roboto/Arial**: Generic fonts that scream "AI-generated"
 - ❌ **System fonts**: -apple-system, BlinkMacSystemFont (boring and corporate)
 - ❌ **Single font for everything**: Lack of hierarchy and visual interest
 - ❌ **Tiny body text**: Below 16px on mobile (accessibility issue)
 
 #### Color Anti-Patterns
+
 - ❌ **Purple gradients on white**: Overused AI aesthetic cliché
 - ❌ **Generic blue/gray**: Safe, corporate, forgettable
 - ❌ **Rainbow palettes**: Evenly distributed colors without hierarchy
 - ❌ **Poor contrast**: Below WCAG AA standards (4.5:1 for text)
 
 #### Layout Anti-Patterns
+
 - ❌ **Cookie-cutter layouts**: Centered logo, hero, three columns, footer
 - ❌ **Predictable grids**: Generic 12-column layouts without creativity
 - ❌ **Flat backgrounds**: Solid colors without depth or atmosphere
 - ❌ **Inconsistent spacing**: Random margins/padding without system
 
 #### Animation Anti-Patterns
+
 - ❌ **Minimal animations**: Just hover states, no orchestration
 - ❌ **Scattered effects**: Random animations without purpose
 - ❌ **Too slow**: Animations over 500ms feel sluggish
 - ❌ **Too fast**: Under 150ms feel jarring
 
 #### Accessibility Anti-Patterns
+
 - ❌ **Color-only indicators**: No text or icons for colorblind users
 - ❌ **Missing focus states**: Keyboard users can't navigate
 - ❌ **Non-semantic HTML**: Divs everywhere, no proper headings/landmarks
@@ -455,19 +469,23 @@ Provide comprehensive design deliverables:
 ## Color Palette
 
 **Dominant Colors** (from frontend-aesthetics):
+
 - Primary: #[hex] - [Usage]
 - Secondary: #[hex] - [Usage]
 
 **Accent Colors** (from frontend-aesthetics):
+
 - Accent: #[hex] - [Usage for CTAs and highlights]
 
 **Semantic Colors**:
+
 - Success: #[hex]
 - Warning: #[hex]
 - Error: #[hex]
 - Info: #[hex]
 
 **Neutral Scale**:
+
 - 50 through 950 (11 shades)
 
 ## Spacing Scale
@@ -506,15 +524,14 @@ Provide comprehensive design deliverables:
 ### 3. Implementation Code
 
 **Tailwind Config**:
+
 ```typescript
 // tailwind.config.ts
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
   darkMode: 'class',
-  content: [
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
       colors: {
@@ -539,6 +556,7 @@ export default config;
 ```
 
 **CSS Variables**:
+
 ```css
 /* globals.css */
 :root {
@@ -554,30 +572,29 @@ export default config;
 ```
 
 **Component Examples**:
+
 ```typescript
 // Example Button component with variants
 import { cva } from 'class-variance-authority';
 
-const buttonVariants = cva(
-  'base-classes',
-  {
-    variants: {
-      variant: {
-        primary: 'classes',
-        secondary: 'classes',
-        outline: 'classes',
-      },
-      size: {
-        sm: 'classes',
-        md: 'classes',
-        lg: 'classes',
-      },
+const buttonVariants = cva('base-classes', {
+  variants: {
+    variant: {
+      primary: 'classes',
+      secondary: 'classes',
+      outline: 'classes',
     },
-  }
-);
+    size: {
+      sm: 'classes',
+      md: 'classes',
+      lg: 'classes',
+    },
+  },
+});
 ```
 
 **Animation Code**:
+
 ```typescript
 // Framer Motion orchestrated page load
 const pageVariants = {

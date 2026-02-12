@@ -43,8 +43,6 @@ export type PhaseName =
   | 'stage_5_extended_ru'
   | 'stage_5_extended_en'
   // Stage 6: Lesson Content
-  /** @deprecated Phase 6 RAG Planning removed in mc2-u9fb. Kept for backward compatibility. */
-  | 'stage_6_rag_planning'
   | 'stage_6_judge'
   | 'stage_6_refinement'
   | 'stage_6_standard_ru'
@@ -64,6 +62,15 @@ export type PhaseName =
   | 'stage_7_quiz'
   | 'stage_7_presentation'
   | 'stage_7_document'
+  // Chat
+  | 'chat_node_refinement'
+  | 'chat_global_guidance'
+  | 'chat_full_regeneration'
+  | 'chat_stage_5_refinement'
+  | 'chat_stage_6_refinement'
+  // Inline Operations
+  | 'inline_block_regeneration'
+  | 'inline_element_crud'
   // Special
   | 'emergency'
   | 'quality_fallback';

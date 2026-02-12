@@ -149,11 +149,7 @@ interface ElkGraph {
   edges: ElkEdge[];
 }
 
-export function useGraphLayout(
-  nodes: Node[],
-  edges: Edge[],
-  options: Record<string, string> = {}
-) {
+export function useGraphLayout(nodes: Node[], edges: Edge[], options: Record<string, string> = {}) {
   const [layoutedNodes, setLayoutedNodes] = useState<Node[]>(nodes);
   const [isLayouting, setIsLayouting] = useState(false);
 
@@ -166,12 +162,12 @@ export function useGraphLayout(
     const elkGraph: ElkGraph = {
       id: 'root',
       layoutOptions: { ...DEFAULT_OPTIONS, ...options },
-      children: nodes.map((node) => ({
+      children: nodes.map(node => ({
         id: node.id,
         width: node.measured?.width ?? 200,
         height: node.measured?.height ?? 100,
       })),
-      edges: edges.map((edge) => ({
+      edges: edges.map(edge => ({
         id: edge.id,
         sources: [edge.source],
         targets: [edge.target],
@@ -182,8 +178,8 @@ export function useGraphLayout(
       const layoutedGraph = await elk.layout(elkGraph);
 
       // Apply positions back to nodes
-      const positioned = nodes.map((node) => {
-        const elkNode = layoutedGraph.children?.find((n) => n.id === node.id);
+      const positioned = nodes.map(node => {
+        const elkNode = layoutedGraph.children?.find(n => n.id === node.id);
         return {
           ...node,
           position: {

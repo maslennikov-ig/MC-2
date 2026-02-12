@@ -5,74 +5,8 @@ import { createModelConfigService } from '../../../../shared/llm/model-config-se
 import { getRagTokenBudget } from '../../../../services/global-settings-service';
 import logger from '@/shared/logger';
 import { ModelTier } from './types';
-import { MODELS, TOKEN_BUDGET, QUALITY_THRESHOLDS } from './constants';
-import { normalizeLanguageCode } from '@/shared/utils/language-utils';
-
-/**
- * Calculate complexity score for pre-routing (RT-001)
- */
-export function calculateComplexityScore(section: SectionBreakdown): number {
-  let score = 0;
-
-  const topicCount = section.key_topics?.length || 0;
-  if (topicCount >= 8) {
-    score += 0.4;
-  } else if (topicCount >= 5) {
-    score += 0.25;
-  } else {
-    score += 0.1;
-  }
-
-  const objectiveCount = section.learning_objectives?.length || 0;
-  if (objectiveCount >= 5) {
-    score += 0.3;
-  } else if (objectiveCount >= 3) {
-    score += 0.2;
-  } else {
-    score += 0.1;
-  }
-
-  const estimatedLessons = section.estimated_lessons || 0;
-  if (estimatedLessons >= 5) {
-    score += 0.3;
-  } else if (estimatedLessons >= 3) {
-    score += 0.2;
-  } else {
-    score += 0.1;
-  }
-
-  return Math.min(1.0, score);
-}
-
-/**
- * Assess criticality for pre-routing (RT-001)
- */
-export function assessCriticality(section: SectionBreakdown): number {
-  let score = 0;
-
-  const importance = section.importance || 'optional';
-  if (importance === 'core') {
-    score += 0.6;
-  } else if (importance === 'important') {
-    score += 0.3;
-  } else {
-    score += 0.1;
-  }
-
-  const sectionName = section.area?.toLowerCase() || '';
-  if (
-    sectionName.includes('introduction') ||
-    sectionName.includes('fundamental') ||
-    sectionName.includes('basics') ||
-    sectionName.includes('getting started')
-  ) {
-    score += 0.4;
-  } else {
-    score += 0.2;
-  }
-
-  return Math.min(1.0, score);
-}
+import { MODELS, TOKEN_BUDGET } from './constants';
+import { normalizeLanguageCode } from '@megacampus/shared-utils';
 
 /**
  * Estimate context length for Tier 3 routing
@@ -93,17 +27,27 @@ export async function estimateContextLength(
 }
 
 /**
- * Select model tier based on complexity, criticality, and language
+ * Select model tier based on section importance and first-section rule.
+ *
+ * 3-tier routing (importance-based):
+ * - simple: cheap model for trivial sections (importance=simple)
+ * - normal: main workhorse for standard sections (importance=normal)
+ * - complex: premium model for complex sections + first section of every course
+ * - tier3_gemini: context overflow fallback (>108K tokens)
+ *
+ * First section (sectionIndex=0) always gets the complex tier for best quality.
  */
 export async function selectModelTier(
-  complexityScore: number,
-  criticalityScore: number,
   input: GenerationJobInput,
   qdrantClient: QdrantClient | undefined,
-  language: string
+  language: string,
+  sectionIndex: number,
+  section: SectionBreakdown
 ): Promise<ModelTier> {
   const estimatedContextLength = await estimateContextLength(input, qdrantClient);
+  const langCode = normalizeLanguageCode(language, 'en');
 
+  // 1. Context overflow → Gemini (unchanged)
   if (estimatedContextLength > TOKEN_BUDGET.GEMINI_TRIGGER_INPUT) {
     return {
       model: MODELS.tier3_gemini,
@@ -112,94 +56,73 @@ export async function selectModelTier(
     };
   }
 
-  if (
-    complexityScore >= QUALITY_THRESHOLDS.complexity ||
-    criticalityScore >= QUALITY_THRESHOLDS.criticality
-  ) {
-    try {
-      const langCode = normalizeLanguageCode(language, 'en');
-      const modelConfigService = createModelConfigService();
-      const config = await modelConfigService.getModelForPhase(
-        'stage_5_sections',
-        undefined,
-        estimatedContextLength,
-        langCode
-      );
-      const modelId = config.modelId || MODELS.lessons_fallback;
+  // 2. Determine target tier based on importance + first-section rule
+  const importance = section.importance || 'normal';
+  const isFirstSection = sectionIndex === 0;
 
-      const isRussian = langCode === 'ru';
-      const tierName = isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons';
+  let targetTier: 'simple' | 'normal' | 'complex';
+  let tierReason: string;
 
-      logger.info({
-        msg: 'Tier 2 model selection via getModelForPhase',
-        language: langCode,
-        modelId,
-        phase: 'stage_5_sections',
-        complexityScore,
-        criticalityScore,
-      });
-
-      return {
-        model: modelId,
-        tier: tierName,
-        reason: `High complexity (${complexityScore.toFixed(2)}) or criticality (${criticalityScore.toFixed(2)}) - using ${language}-optimized model (${modelId})`,
-      };
-    } catch (error) {
-      logger.warn({
-        msg: 'getModelForPhase failed for tier2, using hardcoded fallback',
-        language,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-
-      const langCode = normalizeLanguageCode(language, 'en');
-      const isRussian = langCode === 'ru';
-      const model = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
-      const tierName = isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons';
-
-      return {
-        model,
-        tier: tierName,
-        reason: `High complexity (${complexityScore.toFixed(2)}) or criticality (${criticalityScore.toFixed(2)}) - using ${language}-optimized model (${model}, hardcoded fallback)`,
-      };
-    }
+  if (isFirstSection) {
+    targetTier = 'complex';
+    tierReason = 'First section always uses premium model for best quality';
+  } else if (importance === 'complex') {
+    targetTier = 'complex';
+    tierReason = `Section importance=${importance} (complex material)`;
+  } else if (importance === 'simple') {
+    targetTier = 'simple';
+    tierReason = `Section importance=${importance} (trivial content)`;
+  } else {
+    targetTier = 'normal';
+    tierReason = `Section importance=${importance} (standard content)`;
   }
 
-  // Tier 1: Standard complexity - try to get model from database
-  const langCode = normalizeLanguageCode(language, 'en');
+  // 3. Resolve model from DB config
+  const phaseNameMap: Record<string, string> = {
+    simple: 'stage_5_simple',
+    normal: 'stage_5_normal',
+    complex: 'stage_5_complex',
+  };
+
+  const phaseName = phaseNameMap[targetTier];
+
   try {
     const modelConfigService = createModelConfigService();
-    const tier1Config = await modelConfigService.getModelForPhase(
-      'stage_5_tier1',
+    const config = await modelConfigService.getModelForPhase(
+      phaseName,
       undefined,
       estimatedContextLength,
       langCode
     );
-    const tier1Model = tier1Config.modelId || MODELS.tier1_oss120b;
+    const modelId = config.modelId || MODELS[targetTier];
 
     logger.info({
-      msg: 'Tier 1 model selection via getModelForPhase',
-      phase: 'stage_5_tier1',
-      modelId: tier1Model,
-      source: tier1Config.source,
-      complexityScore,
-      criticalityScore,
+      msg: `Model tier selection: ${targetTier}`,
+      tier: targetTier,
+      phase: phaseName,
+      modelId,
+      source: config.source,
+      sectionIndex,
+      isFirstSection,
+      importance,
     });
 
     return {
-      model: tier1Model,
-      tier: 'tier1_oss120b',
-      reason: `Standard section (model from ${tier1Config.source}: ${tier1Model}): complexity=${complexityScore.toFixed(2)}, criticality=${criticalityScore.toFixed(2)}`,
+      model: modelId,
+      tier: targetTier,
+      reason: `${tierReason} → ${modelId} (from ${config.source})`,
     };
   } catch (error) {
     logger.warn({
-      msg: 'getModelForPhase failed for tier1, using hardcoded fallback',
+      msg: `getModelForPhase failed for ${phaseName}, using hardcoded fallback`,
+      tier: targetTier,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     return {
-      model: MODELS.tier1_oss120b,
-      tier: 'tier1_oss120b',
-      reason: `Standard section (hardcoded fallback): complexity=${complexityScore.toFixed(2)}, criticality=${criticalityScore.toFixed(2)}`,
+      model: MODELS[targetTier],
+      tier: targetTier,
+      reason: `${tierReason} → ${MODELS[targetTier]} (hardcoded fallback)`,
     };
   }
 }

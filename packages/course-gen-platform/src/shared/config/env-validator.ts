@@ -35,11 +35,7 @@ const REQUIRED_ENV_VARS = {
   server: ['NODE_ENV', 'PORT'] as const,
 
   // Supabase Database & Auth
-  supabase: [
-    'SUPABASE_URL',
-    'SUPABASE_SERVICE_KEY',
-    'SUPABASE_ANON_KEY',
-  ] as const,
+  supabase: ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SUPABASE_ANON_KEY'] as const,
 
   // Redis (Job Queue & Rate Limiting)
   redis: ['REDIS_URL'] as const,
@@ -118,9 +114,7 @@ export function validateEnvironment(): void {
  * @param subsystem - The subsystem to validate ('supabase', 'redis', 'qdrant', 'jina')
  * @throws {EnvironmentValidationError} If required variables for the subsystem are missing
  */
-export function validateSubsystem(
-  subsystem: keyof typeof REQUIRED_ENV_VARS
-): void {
+export function validateSubsystem(subsystem: keyof typeof REQUIRED_ENV_VARS): void {
   const vars = REQUIRED_ENV_VARS[subsystem];
   const missing: string[] = [];
 

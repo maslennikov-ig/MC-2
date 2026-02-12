@@ -56,16 +56,11 @@ async function main() {
     console.log(`\nProcessing file: ${fileId}`);
 
     try {
-      const result = await executePhase6Summarization(
-        courseId,
-        fileId,
-        organizationId,
-        {
-          onProgress: (progress, message) => {
-            console.log(`  [${progress}%] ${message}`);
-          }
-        }
-      );
+      const result = await executePhase6Summarization(courseId, fileId, organizationId, {
+        onProgress: (progress, message) => {
+          console.log(`  [${progress}%] ${message}`);
+        },
+      });
 
       console.log(`  SUCCESS:`);
       console.log(`    Method: ${result.processingMethod}`);
@@ -73,7 +68,6 @@ async function main() {
       console.log(`    Original tokens: ${result.originalTokens}`);
       console.log(`    Quality score: ${result.metadata.qualityScore}`);
       console.log(`    Processing time: ${result.metadata.processingTimeMs}ms`);
-
     } catch (error) {
       console.error(`  FAILED: ${error instanceof Error ? error.message : String(error)}`);
       logger.error({ fileId, error }, 'Summarization failed');
@@ -85,7 +79,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((error) => {
+main().catch(error => {
   console.error('Fatal error:', error);
   process.exit(1);
 });

@@ -42,9 +42,7 @@ dotenv.config({ path: resolve(__dirname, '../../.env') });
 // Import components
 import { chunkMarkdown } from '../../src/shared/embeddings/markdown-chunker';
 import { enrichChunks } from '../../src/shared/embeddings/metadata-enricher';
-import {
-  generateEmbeddingsWithLateChunking,
-} from '../../src/shared/embeddings/generate';
+import { generateEmbeddingsWithLateChunking } from '../../src/shared/embeddings/generate';
 import { uploadChunksToQdrant } from '../../src/shared/qdrant/upload';
 import { searchChunks } from '../../src/shared/qdrant/search';
 import { qdrantClient } from '../../src/shared/qdrant/client';
@@ -53,7 +51,9 @@ import { BM25Scorer } from '../../src/shared/embeddings/bm25';
 
 // UUID generator
 function generateUUID(): string {
-  return randomBytes(16).toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+  return randomBytes(16)
+    .toString('hex')
+    .replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
 }
 
 // ANSI colors
@@ -628,7 +628,12 @@ async function testSparseVectorGeneration(): Promise<void> {
     logInfo(`  Input: "${testText}"`);
     logInfo(`  Terms: ${sparseVector.indices.length}`);
     logInfo(`  Indices: [${sparseVector.indices.slice(0, 5).join(', ')}...]`);
-    logInfo(`  Values (BM25 scores): [${sparseVector.values.slice(0, 5).map(v => v.toFixed(3)).join(', ')}...]`);
+    logInfo(
+      `  Values (BM25 scores): [${sparseVector.values
+        .slice(0, 5)
+        .map(v => v.toFixed(3))
+        .join(', ')}...]`
+    );
 
     // Validate sparse vector
     if (sparseVector.indices.length === 0 || sparseVector.values.length === 0) {
@@ -666,9 +671,7 @@ async function testHybridUpload(): Promise<void> {
     // First, delete existing test data
     await qdrantClient.delete(COLLECTION_CONFIG.name, {
       filter: {
-        must: [
-          { key: 'organization_id', match: { value: 'test-hybrid-org-001' } },
-        ],
+        must: [{ key: 'organization_id', match: { value: 'test-hybrid-org-001' } }],
       },
       wait: true,
     });
@@ -714,7 +717,9 @@ async function testHybridUpload(): Promise<void> {
       }
 
       totalChunks += uploadResult.points_uploaded;
-      logInfo(`  Uploaded ${uploadResult.points_uploaded} chunks from "${doc.name}" (dense + sparse)`);
+      logInfo(
+        `  Uploaded ${uploadResult.points_uploaded} chunks from "${doc.name}" (dense + sparse)`
+      );
     }
 
     logSuccess(`Uploaded ${testDocs.length} documents with hybrid vectors`);
@@ -811,7 +816,8 @@ async function testDenseOnlySearch(): Promise<void> {
     }
 
     stats.denseSearchCount = testQueries.length;
-    stats.denseAvgLatency = stats.denseLatencies.reduce((a, b) => a + b, 0) / stats.denseLatencies.length;
+    stats.denseAvgLatency =
+      stats.denseLatencies.reduce((a, b) => a + b, 0) / stats.denseLatencies.length;
     stats.denseAvgPrecision = precisions.reduce((a, b) => a + b, 0) / precisions.length;
 
     logSuccess('Dense-only search complete');
@@ -819,7 +825,9 @@ async function testDenseOnlySearch(): Promise<void> {
     logInfo(`  Average precision: ${(stats.denseAvgPrecision * 100).toFixed(1)}%`);
 
     // Validate latency
-    const p95Latency = stats.denseLatencies.sort((a, b) => a - b)[Math.floor(stats.denseLatencies.length * 0.95)];
+    const p95Latency = stats.denseLatencies.sort((a, b) => a - b)[
+      Math.floor(stats.denseLatencies.length * 0.95)
+    ];
     if (p95Latency < 50) {
       logSuccess(`  P95 latency: ${p95Latency}ms (< 50ms target)`);
     } else {
@@ -883,19 +891,23 @@ async function testHybridSearch(): Promise<void> {
     }
 
     stats.hybridSearchCount = testQueries.length;
-    stats.hybridAvgLatency = stats.hybridLatencies.reduce((a, b) => a + b, 0) / stats.hybridLatencies.length;
+    stats.hybridAvgLatency =
+      stats.hybridLatencies.reduce((a, b) => a + b, 0) / stats.hybridLatencies.length;
     stats.hybridAvgPrecision = precisions.reduce((a, b) => a + b, 0) / precisions.length;
 
     // Calculate precision improvement
     stats.precisionImprovement = stats.hybridAvgPrecision - stats.denseAvgPrecision;
-    stats.precisionImprovementPercent = (stats.precisionImprovement / stats.denseAvgPrecision) * 100;
+    stats.precisionImprovementPercent =
+      (stats.precisionImprovement / stats.denseAvgPrecision) * 100;
 
     logSuccess('Hybrid search complete');
     logInfo(`  Average latency: ${stats.hybridAvgLatency.toFixed(0)}ms`);
     logInfo(`  Average precision: ${(stats.hybridAvgPrecision * 100).toFixed(1)}%`);
 
     // Validate latency
-    const p95Latency = stats.hybridLatencies.sort((a, b) => a - b)[Math.floor(stats.hybridLatencies.length * 0.95)];
+    const p95Latency = stats.hybridLatencies.sort((a, b) => a - b)[
+      Math.floor(stats.hybridLatencies.length * 0.95)
+    ];
     if (p95Latency < 100) {
       logSuccess(`  P95 latency: ${p95Latency}ms (< 100ms target)`);
     } else {
@@ -904,11 +916,17 @@ async function testHybridSearch(): Promise<void> {
 
     // Validate precision improvement
     if (stats.precisionImprovement > 0.05) {
-      logSuccess(`  Precision improvement: +${(stats.precisionImprovement * 100).toFixed(1)}pp (+${stats.precisionImprovementPercent.toFixed(1)}%)`);
+      logSuccess(
+        `  Precision improvement: +${(stats.precisionImprovement * 100).toFixed(1)}pp (+${stats.precisionImprovementPercent.toFixed(1)}%)`
+      );
     } else if (stats.precisionImprovement > 0) {
-      logWarning(`  Precision improvement: +${(stats.precisionImprovement * 100).toFixed(1)}pp (target: >5pp)`);
+      logWarning(
+        `  Precision improvement: +${(stats.precisionImprovement * 100).toFixed(1)}pp (target: >5pp)`
+      );
     } else {
-      logError(`  Precision improvement: ${(stats.precisionImprovement * 100).toFixed(1)}pp (negative!)`);
+      logError(
+        `  Precision improvement: ${(stats.precisionImprovement * 100).toFixed(1)}pp (negative!)`
+      );
     }
 
     stats.testsPassed++;
@@ -929,9 +947,7 @@ async function cleanupTestData(): Promise<void> {
   try {
     await qdrantClient.delete(COLLECTION_CONFIG.name, {
       filter: {
-        must: [
-          { key: 'organization_id', match: { value: 'test-hybrid-org-001' } },
-        ],
+        must: [{ key: 'organization_id', match: { value: 'test-hybrid-org-001' } }],
       },
       wait: true,
     });
@@ -949,8 +965,12 @@ function displaySummary(): void {
   logSection('Test Summary');
 
   console.log(`\n${colors.bold}Test Results:${colors.reset}`);
-  console.log(`  Tests passed: ${colors.green}${stats.testsPassed}${colors.reset}/${stats.totalTests}`);
-  console.log(`  Tests failed: ${stats.testsFailed > 0 ? colors.red : colors.green}${stats.testsFailed}${colors.reset}/${stats.totalTests}`);
+  console.log(
+    `  Tests passed: ${colors.green}${stats.testsPassed}${colors.reset}/${stats.totalTests}`
+  );
+  console.log(
+    `  Tests failed: ${stats.testsFailed > 0 ? colors.red : colors.green}${stats.testsFailed}${colors.reset}/${stats.totalTests}`
+  );
 
   console.log(`\n${colors.bold}Corpus Statistics:${colors.reset}`);
   console.log(`  Documents uploaded: ${colors.cyan}${stats.documentsUploaded}${colors.reset}`);
@@ -960,25 +980,52 @@ function displaySummary(): void {
 
   console.log(`\n${colors.bold}Dense-Only Search (Baseline):${colors.reset}`);
   console.log(`  Queries executed: ${colors.cyan}${stats.denseSearchCount}${colors.reset}`);
-  console.log(`  Average latency: ${colors.cyan}${stats.denseAvgLatency.toFixed(0)}ms${colors.reset}`);
-  console.log(`  Average precision: ${colors.cyan}${(stats.denseAvgPrecision * 100).toFixed(1)}%${colors.reset}`);
+  console.log(
+    `  Average latency: ${colors.cyan}${stats.denseAvgLatency.toFixed(0)}ms${colors.reset}`
+  );
+  console.log(
+    `  Average precision: ${colors.cyan}${(stats.denseAvgPrecision * 100).toFixed(1)}%${colors.reset}`
+  );
 
   console.log(`\n${colors.bold}Hybrid Search (Dense + Sparse + RRF):${colors.reset}`);
   console.log(`  Queries executed: ${colors.cyan}${stats.hybridSearchCount}${colors.reset}`);
-  console.log(`  Average latency: ${colors.cyan}${stats.hybridAvgLatency.toFixed(0)}ms${colors.reset}`);
-  console.log(`  Average precision: ${colors.cyan}${(stats.hybridAvgPrecision * 100).toFixed(1)}%${colors.reset}`);
+  console.log(
+    `  Average latency: ${colors.cyan}${stats.hybridAvgLatency.toFixed(0)}ms${colors.reset}`
+  );
+  console.log(
+    `  Average precision: ${colors.cyan}${(stats.hybridAvgPrecision * 100).toFixed(1)}%${colors.reset}`
+  );
 
   console.log(`\n${colors.bold}Precision Improvement:${colors.reset}`);
-  const improvementColor = stats.precisionImprovement >= 0.05 ? colors.green : stats.precisionImprovement > 0 ? colors.yellow : colors.red;
-  console.log(`  Absolute: ${improvementColor}+${(stats.precisionImprovement * 100).toFixed(1)}pp${colors.reset}`);
-  console.log(`  Relative: ${improvementColor}+${stats.precisionImprovementPercent.toFixed(1)}%${colors.reset}`);
+  const improvementColor =
+    stats.precisionImprovement >= 0.05
+      ? colors.green
+      : stats.precisionImprovement > 0
+        ? colors.yellow
+        : colors.red;
+  console.log(
+    `  Absolute: ${improvementColor}+${(stats.precisionImprovement * 100).toFixed(1)}pp${colors.reset}`
+  );
+  console.log(
+    `  Relative: ${improvementColor}+${stats.precisionImprovementPercent.toFixed(1)}%${colors.reset}`
+  );
 
   console.log(`\n${colors.bold}Acceptance Criteria:${colors.reset}`);
-  console.log(`  ${stats.corpusSize > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} BM25 sparse vectors generated`);
-  console.log(`  ${stats.uniqueTerms > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} Corpus statistics tracked`);
-  console.log(`  ${stats.hybridSearchCount > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} Hybrid search executed`);
-  console.log(`  ${stats.precisionImprovement >= 0.05 ? colors.green + '✓' : colors.yellow + '⚠'}${colors.reset} Precision improvement >5pp (target: 5-10pp)`);
-  console.log(`  ${stats.hybridAvgLatency < 100 ? colors.green + '✓' : colors.yellow + '⚠'}${colors.reset} Hybrid search latency <100ms p95`);
+  console.log(
+    `  ${stats.corpusSize > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} BM25 sparse vectors generated`
+  );
+  console.log(
+    `  ${stats.uniqueTerms > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} Corpus statistics tracked`
+  );
+  console.log(
+    `  ${stats.hybridSearchCount > 0 ? colors.green + '✓' : colors.red + '✗'}${colors.reset} Hybrid search executed`
+  );
+  console.log(
+    `  ${stats.precisionImprovement >= 0.05 ? colors.green + '✓' : colors.yellow + '⚠'}${colors.reset} Precision improvement >5pp (target: 5-10pp)`
+  );
+  console.log(
+    `  ${stats.hybridAvgLatency < 100 ? colors.green + '✓' : colors.yellow + '⚠'}${colors.reset} Hybrid search latency <100ms p95`
+  );
 }
 
 /**
@@ -1016,7 +1063,9 @@ async function ensureCollectionExists(): Promise<void> {
  */
 async function runHybridSearchTests(): Promise<void> {
   console.log(`${colors.bold}${colors.cyan}${'='.repeat(70)}${colors.reset}`);
-  console.log(`${colors.bold}${colors.cyan}BM25 Hybrid Search Integration Test (T080.4)${colors.reset}`);
+  console.log(
+    `${colors.bold}${colors.cyan}BM25 Hybrid Search Integration Test (T080.4)${colors.reset}`
+  );
   console.log(`${colors.bold}${colors.cyan}${'='.repeat(70)}${colors.reset}`);
 
   const startTime = Date.now();

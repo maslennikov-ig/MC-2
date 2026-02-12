@@ -5,10 +5,7 @@
   "target_audience": "Absolute beginners with no coding experience, career changers entering tech fields, and professionals seeking automation skills for office tasks.",
   "estimated_duration_hours": 28.5,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer navigation skills",
-    "Familiarity with installing software"
-  ],
+  "prerequisites": ["Basic computer navigation skills", "Familiarity with installing software"],
   "learning_outcomes": [
     "Write executable Python scripts using correct syntax and indentation",
     "Implement loops and conditionals to solve computational problems",

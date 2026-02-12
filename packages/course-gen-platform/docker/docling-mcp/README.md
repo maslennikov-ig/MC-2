@@ -35,16 +35,16 @@ docker compose logs -f docling-mcp
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DOCLING_CACHE_DIR` | `/app/cache` | Directory for document cache |
-| `DOCLING_MODELS_PATH` | `/app/models` | Directory for ML models |
-| `DOCLING_LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `DOCLING_MAX_FILE_SIZE` | `104857600` | Maximum file size in bytes (100MB) |
-| `DOCLING_TIMEOUT` | `300` | Processing timeout in seconds |
-| `MCP_TRANSPORT` | `streamable-http` | MCP transport protocol |
-| `MCP_HOST` | `0.0.0.0` | Server host |
-| `MCP_PORT` | `8000` | Server port |
+| Variable                | Default           | Description                                 |
+| ----------------------- | ----------------- | ------------------------------------------- |
+| `DOCLING_CACHE_DIR`     | `/app/cache`      | Directory for document cache                |
+| `DOCLING_MODELS_PATH`   | `/app/models`     | Directory for ML models                     |
+| `DOCLING_LOG_LEVEL`     | `INFO`            | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `DOCLING_MAX_FILE_SIZE` | `104857600`       | Maximum file size in bytes (100MB)          |
+| `DOCLING_TIMEOUT`       | `300`             | Processing timeout in seconds               |
+| `MCP_TRANSPORT`         | `streamable-http` | MCP transport protocol                      |
+| `MCP_HOST`              | `0.0.0.0`         | Server host                                 |
+| `MCP_PORT`              | `8000`            | Server port                                 |
 
 ## Resource Requirements
 
@@ -81,6 +81,7 @@ curl http://localhost:8000/health
 ### Container won't start
 
 Check logs:
+
 ```bash
 docker compose logs docling-mcp
 ```
@@ -88,6 +89,7 @@ docker compose logs docling-mcp
 ### Out of memory
 
 Increase memory limit in docker-compose.yml:
+
 ```yaml
 deploy:
   resources:
@@ -98,6 +100,7 @@ deploy:
 ### Processing timeout
 
 Increase timeout environment variable:
+
 ```bash
 DOCLING_TIMEOUT=600
 ```

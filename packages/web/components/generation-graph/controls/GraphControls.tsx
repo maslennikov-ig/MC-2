@@ -1,48 +1,48 @@
-import React, { memo, useCallback, useState } from 'react';
-import { useReactFlow } from '@xyflow/react';
-import { Plus, Minus, Focus, Wand2 } from 'lucide-react';
-import { useGraphLayout } from '../hooks/useGraphLayout';
-import { AppNode, AppEdge } from '../types';
+import React, { memo, useCallback, useState } from 'react'
+import { useReactFlow } from '@xyflow/react'
+import { Plus, Minus, Focus, Wand2 } from 'lucide-react'
+import { useGraphLayout } from '../hooks/useGraphLayout'
+import { AppNode, AppEdge } from '../types'
 
 interface GraphControlsProps {
-  isDark?: boolean;
+  isDark?: boolean
 }
 
 export const GraphControls = memo(function GraphControls({ isDark }: GraphControlsProps) {
-  const { zoomIn, zoomOut, fitView, getNodes, getEdges, setNodes } = useReactFlow();
-  const { layoutNodes } = useGraphLayout();
-  const [isArranging, setIsArranging] = useState(false);
+  const { zoomIn, zoomOut, fitView, getNodes, getEdges, setNodes } = useReactFlow()
+  const { layoutNodes } = useGraphLayout()
+  const [isArranging, setIsArranging] = useState(false)
 
   const handleAutoArrange = useCallback(async () => {
-    if (isArranging) return;
+    if (isArranging) return
 
-    setIsArranging(true);
+    setIsArranging(true)
     try {
-      const currentNodes = getNodes() as AppNode[];
-      const currentEdges = getEdges() as AppEdge[];
+      const currentNodes = getNodes() as AppNode[]
+      const currentEdges = getEdges() as AppEdge[]
 
-      const layoutedNodes = await layoutNodes(currentNodes, currentEdges);
-      setNodes(layoutedNodes);
+      const layoutedNodes = await layoutNodes(currentNodes, currentEdges)
+      setNodes(layoutedNodes)
 
       // Fit view after layout with slight delay for smooth animation
       requestAnimationFrame(() => {
-        fitView({ padding: 0.15, duration: 400 });
-      });
+        fitView({ padding: 0.15, duration: 400 })
+      })
     } finally {
-      setIsArranging(false);
+      setIsArranging(false)
     }
-  }, [isArranging, getNodes, getEdges, layoutNodes, setNodes, fitView]);
+  }, [isArranging, getNodes, getEdges, layoutNodes, setNodes, fitView])
 
   const buttonClass = isDark
     ? 'p-2 hover:bg-slate-600 text-slate-300 rounded transition-colors disabled:opacity-50'
-    : 'p-2 hover:bg-slate-100 text-slate-600 rounded transition-colors disabled:opacity-50';
+    : 'p-2 hover:bg-slate-100 text-slate-600 rounded transition-colors disabled:opacity-50'
 
   return (
-    <div className={`nopan absolute bottom-4 left-4 flex flex-col gap-1 shadow-md p-1 rounded-lg z-10 border ${
-      isDark
-        ? 'bg-slate-800 border-slate-700'
-        : 'bg-white border-slate-200'
-    }`}>
+    <div
+      className={`nopan absolute bottom-4 left-4 z-10 flex flex-col gap-1 rounded-lg border p-1 shadow-md ${
+        isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'
+      }`}
+    >
       <button
         onClick={() => zoomIn()}
         className={buttonClass}
@@ -70,7 +70,7 @@ export const GraphControls = memo(function GraphControls({ isDark }: GraphContro
       >
         <Focus size={16} />
       </button>
-      <div className={`h-px my-1 ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+      <div className={`my-1 h-px ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
       <button
         onClick={handleAutoArrange}
         disabled={isArranging}
@@ -82,5 +82,5 @@ export const GraphControls = memo(function GraphControls({ isDark }: GraphContro
         <Wand2 size={16} className={isArranging ? 'animate-spin' : ''} />
       </button>
     </div>
-  );
-});
+  )
+})

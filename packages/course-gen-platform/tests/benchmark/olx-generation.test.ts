@@ -293,13 +293,13 @@ describe('OLX Generation Benchmark - 50 Units', () => {
     const htmlContents = Array.from(result.htmlContent.values());
 
     // Verify at least one unit has learning objectives
-    const hasLearningObjectives = htmlContents.some((content) =>
+    const hasLearningObjectives = htmlContents.some(content =>
       content.includes('Learning Objectives')
     );
     expect(hasLearningObjectives).toBe(true);
 
     // Verify at least one unit has code blocks
-    const hasCodeBlocks = htmlContents.some((content) => content.includes('<code>'));
+    const hasCodeBlocks = htmlContents.some(content => content.includes('<code>'));
     expect(hasCodeBlocks).toBe(true);
 
     // Verify content is not empty
@@ -408,8 +408,7 @@ describe('OLX Generation - Performance Regression', () => {
 
     // Calculate average and standard deviation
     const avg = durations.reduce((sum, d) => sum + d, 0) / durations.length;
-    const variance =
-      durations.reduce((sum, d) => sum + Math.pow(d - avg, 2), 0) / durations.length;
+    const variance = durations.reduce((sum, d) => sum + Math.pow(d - avg, 2), 0) / durations.length;
     const stdDev = Math.sqrt(variance);
 
     console.log(`✓ Performance Consistency (5 runs):`);

@@ -9,8 +9,10 @@
 ## Tasks Updated with RT-002 Results
 
 ### 1. T002-R [ORCHESTRATOR] - Design Generation Orchestration Architecture
+
 **Status**: ✅ Marked COMPLETE
 **Updates**:
+
 - Added status: "✅ RESEARCH COMPLETE - Architectural decisions made"
 - Added decision document references:
   - Quick reference: `.rt-002-decisions.md`
@@ -25,13 +27,16 @@
 ---
 
 ### 2. T019 [llm-service-specialist] - Create metadata-generator.ts
+
 **Updates**:
+
 - Added RT-002 context: "Generation creates course-level metadata from Analyze's section-level structure"
 - Added reference to `.rt-002-decisions.md` for division of labor details
 - Added note: "Analyze provides section-level breakdown (3-7 sections, high-level objectives)"
 - Clarified model selection depends on RT-001 (not finalized yet)
 
 **Key Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: Generation creates course-level metadata from Analyze's section-level structure
 - **📋 RT-002 Context**: Analyze provides section-level breakdown (3-7 sections, high-level objectives), Generation synthesizes course-level metadata
@@ -41,7 +46,9 @@
 ---
 
 ### 3. T020 [llm-service-specialist] - Create section-batch-generator.ts
+
 **Updates**:
+
 - Added RT-002 architecture decision: "Generation expands each section into 3-5 detailed lessons"
 - Added detailed input/output context from RT-002:
   - Input: Section-level structure (high-level objectives, key topics)
@@ -56,6 +63,7 @@
 - Updated function signature: `generateBatch(..., qdrantClient?: QdrantClient)`
 
 **Key Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: Generation expands each section (from Analyze) into 3-5 detailed lessons with exercises
 - **📋 RT-002 Context**:
@@ -72,7 +80,9 @@
 ---
 
 ### 4. T021 [llm-service-specialist] - Create buildBatchPrompt() helper
+
 **Updates**:
+
 - Added RT-002 prompt engineering guidance: "Let reasoning models reason - provide constraints, NOT instructions"
 - Added detailed guidance from RT-002:
   - Analyze provides: Section objectives, key topics, pedagogical approach, constraints
@@ -82,6 +92,7 @@
 - Added reference to `.rt-002-decisions.md` for prompt engineering guidelines
 
 **Key Context Added**:
+
 ```markdown
 - **🎯 RT-002 Prompt Engineering**: Let reasoning models reason - provide constraints, NOT instructions
 - **📋 RT-002 Guidance**:
@@ -94,7 +105,9 @@
 ---
 
 ### 5. T022 [ORCHESTRATOR] - Create qdrant-search.ts (optional RAG)
+
 **Updates**:
+
 - Added RT-002 architecture decision: "OPTIONAL RAG with LLM-driven autonomous decision making via tool calling"
 - Added detailed RAG strategy from RT-002:
   - Implementation: Tool-calling interface (`search_documents` tool)
@@ -111,6 +124,7 @@
 - Added reference to `.rag-decision-analysis.md` for full pros/cons analysis
 
 **Key Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: OPTIONAL RAG with LLM-driven autonomous decision making via tool calling
 - **📋 RT-002 RAG Strategy**:
@@ -131,7 +145,9 @@
 ---
 
 ### 6. T029-A [typescript-types-specialist] - Create generation-state.ts types
+
 **Updates**:
+
 - Added RT-002 architecture decision: "5-Phase workflow (Metadata → Section Batch → Validation → Assembly → Verification)"
 - Updated `current_phase` type to explicit union: `'metadata' | 'section_batch' | 'validation' | 'assembly' | 'verification'`
 - Added comment: `modelUsed` will be defined by RT-001 (model routing)
@@ -139,17 +155,20 @@
 - Added reference to `.rt-002-decisions.md` for phase descriptions
 
 **Key Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: 5-Phase workflow (Metadata → Section Batch → Validation → Assembly → Verification)
 - **See**: `research-decisions/rt-002-architecture-balance.md` for phase descriptions
-- current_phase: 'metadata' | 'section_batch' | 'validation' | 'assembly' | 'verification'  // 5 phases per RT-002
-- modelUsed: { metadata: string, sections: string, validation?: string }  // RT-001 will define model routing
+- current_phase: 'metadata' | 'section_batch' | 'validation' | 'assembly' | 'verification' // 5 phases per RT-002
+- modelUsed: { metadata: string, sections: string, validation?: string } // RT-001 will define model routing
 ```
 
 ---
 
 ### 7. T029-B [orchestration-logic-specialist] - Create generation-phases.ts
+
 **Updates**:
+
 - Added RT-002 architecture decision: "5 phases implementing hybrid specialization model (78.5% success rate)"
 - Added `QdrantClient?` to constructor dependencies (optional RAG)
 - Added phase-specific notes:
@@ -160,6 +179,7 @@
 - Added reference to `.rt-002-decisions.md` for phase workflow details
 
 **Key Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: 5 phases implementing hybrid specialization model (78.5% success rate)
 - **See**: `research-decisions/rt-002-architecture-balance.md` for phase workflow details
@@ -172,7 +192,9 @@
 ---
 
 ### 8. T029-C [orchestration-logic-specialist] - Create generation-orchestrator.ts
+
 **Updates**:
+
 - Added RT-002 architecture decision: "LangGraph StateGraph coordinating 5-phase workflow with model routing and quality gates"
 - Updated constructor: instantiate GenerationPhases with optional QdrantClient
 - Updated `execute()` signature: `execute(input: GenerationJobInput, qdrantClient?: QdrantClient)`
@@ -181,6 +203,7 @@
 - Added reference to `.rt-002-decisions.md` for orchestration flow details
 
 **Key Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: LangGraph StateGraph coordinating 5-phase workflow with model routing and quality gates
 - **See**: `research-decisions/rt-002-architecture-balance.md` for orchestration flow details
@@ -194,6 +217,7 @@
 ## Summary Statistics
 
 **Total Tasks Updated**: 8 tasks
+
 - T002-R: Architecture design (marked complete)
 - T019: metadata-generator.ts (added context)
 - T020: section-batch-generator.ts (added RAG integration)
@@ -204,11 +228,13 @@
 - T029-C: generation-orchestrator.ts (added RAG parameter)
 
 **New References Added**:
+
 - `.rt-002-decisions.md`: Quick reference (cited 8 times)
 - `.generation-architecture-design.md`: Full analysis (cited 1 time)
 - `.rag-decision-analysis.md`: RAG pros/cons (cited 2 times)
 
 **Key Concepts Propagated**:
+
 - Division of Labor: Analyze (section-level) → Generation (lesson-level)
 - 5-Phase Architecture: Metadata → Section Batch → Validation → Assembly → Verification
 - Optional RAG: LLM autonomy via tool calling (2-5 queries optimal)
@@ -216,6 +242,7 @@
 - Success Rate: 78.5% for hybrid specialization model
 
 **Dependencies Updated**:
+
 - All tasks now reference T002-R ✅ COMPLETE
 - RAG integration added to T020, T029-B, T029-C
 - Model routing decisions deferred to RT-001 (not yet analyzed)

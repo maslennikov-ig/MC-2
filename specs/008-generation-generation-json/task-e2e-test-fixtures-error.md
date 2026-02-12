@@ -34,6 +34,7 @@ TypeError: __vite_ssr_import_6__.TEST_USERS.find is not a function
 ## Предположение о причине
 
 Похоже, что проблема связана с **несовместимостью версий теста после git rebase**. Возможно:
+
 - Fixtures изменились в remote branch
 - Импорты обновились, но тест использует старый формат
 - Vitest кэш содержит старую версию fixtures
@@ -43,28 +44,33 @@ TypeError: __vite_ssr_import_6__.TEST_USERS.find is not a function
 ## Что нужно сделать
 
 ### Шаг 1: Поиск в документации
+
 - [ ] Поискать в `docs/` информацию о проблемах с fixtures в E2E тестах
 - [ ] Поискать упоминания `TEST_USERS.find is not a function`
 - [ ] Проверить investigation reports на похожие ошибки
 - [ ] Проверить README или troubleshooting guides для E2E тестов
 
 ### Шаг 2: Диагностика импортов
+
 - [ ] Прочитать `tests/fixtures/index.ts` (или аналогичный файл)
 - [ ] Проверить экспорт `TEST_USERS` и `TEST_ORGS`
 - [ ] Убедиться, что это массивы, а не объекты
 - [ ] Проверить, изменился ли формат после rebase
 
 ### Шаг 3: Проверка версий
+
 - [ ] Сравнить текущую версию теста с remote branch
 - [ ] Проверить, есть ли breaking changes в fixtures
 - [ ] Проверить git log для fixtures файла
 
 ### Шаг 4: Исправление
+
 - [ ] Применить найденное решение из документации ИЛИ
 - [ ] Обновить импорты в соответствии с новой структурой ИЛИ
 - [ ] Исправить exports в fixtures файле
 
 ### Шаг 5: Валидация
+
 - [ ] Очистить vitest кэш: `rm -rf packages/course-gen-platform/node_modules/.vite`
 - [ ] Запустить тест: `pnpm --filter course-gen-platform test tests/e2e/t053-synergy-sales-course.test.ts`
 - [ ] Убедиться, что Scenario 2 запускается без ошибок
@@ -82,6 +88,7 @@ TypeError: __vite_ssr_import_6__.TEST_USERS.find is not a function
 ## Ожидаемый результат
 
 После исправления тест должен:
+
 - ✅ Найти все 4 файла (уже работает)
 - ✅ Импортировать fixtures корректно
 - ✅ Запустить Scenario 2: Full Analyze + Style
@@ -90,6 +97,7 @@ TypeError: __vite_ssr_import_6__.TEST_USERS.find is not a function
 ## Дополнительная информация
 
 **Текущая ошибка (полный вывод):**
+
 ```
 FAIL tests/e2e/t053-synergy-sales-course.test.ts > T053: Stage 5 Generation - Synergy Sales Course E2E > Scenario 2: Full Analyze Results + Style (US2)
 TypeError: __vite_ssr_import_6__.TEST_USERS.find is not a function
@@ -97,11 +105,13 @@ TypeError: __vite_ssr_import_6__.TEST_USERS.find is not a function
 ```
 
 **Git rebase info:**
+
 - Последний rebase: успешно выполнен (6/6 commits rebased)
 - Новые коммиты в remote были подтянуты
 - Возможно, fixtures обновились в remote branch
 
 **Vitest cache:**
+
 - Кэш очищен: `rm -rf packages/course-gen-platform/node_modules/.vite`
 - Проблема осталась после очистки кэша
 
@@ -110,6 +120,7 @@ TypeError: __vite_ssr_import_6__.TEST_USERS.find is not a function
 **НАЧАТЬ С ПОИСКА В ДОКУМЕНТАЦИИ** - пользователь уверен, что мы уже сталкивались с этим.
 
 Паттерны для поиска:
+
 - `TEST_USERS.find`
 - `fixtures error`
 - `is not a function`

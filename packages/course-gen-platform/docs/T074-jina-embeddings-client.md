@@ -32,27 +32,32 @@ This document describes the implementation of the Jina-embeddings-v3 API client 
 ### Core Functionality
 
 ✅ **Rate Limiting**
+
 - 1500 requests per minute (1 request per 40ms minimum)
 - Simple timestamp-based implementation
 - Queues requests to respect API limits
 
 ✅ **Exponential Backoff**
+
 - Retry strategy: 1s → 2s → 4s → 8s → 16s → 32s (max)
 - Maximum 3 retry attempts
 - Handles 429 (rate limit), 500 (server error), and network failures
 - Does not retry on 4xx client errors (except 429)
 
 ✅ **Task-Specific Embeddings**
+
 - `retrieval.passage`: For indexing documents/content
 - `retrieval.query`: For search queries
 - Optimizes embeddings for each use case
 
 ✅ **Batch Processing**
+
 - Supports up to 100 texts per API request
 - Automatically splits larger batches into multiple requests
 - Efficient for bulk document processing
 
 ✅ **Validation & Error Handling**
+
 - Environment variable validation (JINA_API_KEY)
 - Response structure validation
 - Dimension verification (768 dimensions)
@@ -79,15 +84,12 @@ import { generateEmbedding } from '@/shared/embeddings';
 
 // For indexing documents
 const documentEmbedding = await generateEmbedding(
-  "Machine learning is a subset of AI...",
-  "retrieval.passage"
+  'Machine learning is a subset of AI...',
+  'retrieval.passage'
 );
 
 // For search queries
-const queryEmbedding = await generateEmbedding(
-  "What is machine learning?",
-  "retrieval.query"
-);
+const queryEmbedding = await generateEmbedding('What is machine learning?', 'retrieval.query');
 ```
 
 #### Batch Embedding Generation
@@ -95,13 +97,9 @@ const queryEmbedding = await generateEmbedding(
 ```typescript
 import { generateEmbeddings } from '@/shared/embeddings';
 
-const texts = [
-  "First document chunk...",
-  "Second document chunk...",
-  "Third document chunk..."
-];
+const texts = ['First document chunk...', 'Second document chunk...', 'Third document chunk...'];
 
-const embeddings = await generateEmbeddings(texts, "retrieval.passage");
+const embeddings = await generateEmbeddings(texts, 'retrieval.passage');
 // Returns: number[][] - Array of 768-dimensional vectors
 ```
 
@@ -120,13 +118,13 @@ const isHealthy = await healthCheck(); // true/false
 import { JinaEmbeddingError } from '@/shared/embeddings';
 
 try {
-  const embedding = await generateEmbedding(text, "retrieval.passage");
+  const embedding = await generateEmbedding(text, 'retrieval.passage');
 } catch (error) {
   if (error instanceof JinaEmbeddingError) {
     console.error('Jina API Error:', {
       type: error.errorType,
       status: error.statusCode,
-      message: error.message
+      message: error.message,
     });
   }
 }
@@ -177,8 +175,8 @@ const rateLimiter = new RateLimiter();
 
 ```typescript
 export class JinaEmbeddingError extends Error {
-  errorType: string;      // CONFIG_ERROR, API_ERROR, etc.
-  statusCode?: number;    // HTTP status code
+  errorType: string; // CONFIG_ERROR, API_ERROR, etc.
+  statusCode?: number; // HTTP status code
   originalError?: unknown; // Original error for debugging
 }
 ```
@@ -216,12 +214,12 @@ Already configured in `.env` file.
 
 The embeddings are configured to match the Qdrant collection:
 
-| Parameter         | Jina Client | Qdrant Collection | Status |
-|-------------------|-------------|-------------------|--------|
-| Dimensions        | 768         | 768               | ✅ Match |
-| Distance Metric   | N/A         | Cosine            | ✅ Compatible |
-| Normalization     | false       | Handled by Qdrant | ✅ Optimal |
-| Max Token Length  | 8192        | N/A               | ✅ Auto-truncate |
+| Parameter        | Jina Client | Qdrant Collection | Status           |
+| ---------------- | ----------- | ----------------- | ---------------- |
+| Dimensions       | 768         | 768               | ✅ Match         |
+| Distance Metric  | N/A         | Cosine            | ✅ Compatible    |
+| Normalization    | false       | Handled by Qdrant | ✅ Optimal       |
+| Max Token Length | 8192        | N/A               | ✅ Auto-truncate |
 
 ## Cost Analysis
 
@@ -249,6 +247,7 @@ Based on Jina-v3 pricing ($0.02 per 1M tokens):
 ### Batch Recommendations
 
 For optimal performance:
+
 - Use `generateEmbeddings()` for 2+ texts (amortizes API latency)
 - Process in batches of 10-100 texts for best throughput
 - Respect 1500 RPM limit (automatically enforced by client)
@@ -256,21 +255,25 @@ For optimal performance:
 ## Error Scenarios Handled
 
 ### Configuration Errors
+
 - Missing `JINA_API_KEY` → Throws `CONFIG_ERROR` immediately
 - Invalid API key → Throws `API_ERROR` with 401 status
 
 ### API Errors
+
 - 429 (Rate limit) → Retry with exponential backoff (max 3 retries)
 - 422 (Validation) → Retry (may be transient)
 - 500 (Server error) → Retry with exponential backoff
 - 4xx (Client errors) → Throw immediately (no retry)
 
 ### Network Errors
+
 - Connection timeout → Retry with exponential backoff
 - DNS resolution failure → Retry
 - Network unreachable → Retry
 
 ### Response Validation Errors
+
 - Invalid JSON → Throws `INVALID_RESPONSE`
 - Missing data array → Throws `INVALID_RESPONSE`
 - Wrong dimensions → Throws `DIMENSION_MISMATCH`
@@ -281,9 +284,9 @@ For optimal performance:
 
 ```typescript
 export type {
-  JinaEmbeddingRequest,   // API request structure
-  JinaEmbeddingResponse,  // API response structure
-  JinaErrorResponse,      // API error structure
+  JinaEmbeddingRequest, // API request structure
+  JinaEmbeddingResponse, // API response structure
+  JinaErrorResponse, // API error structure
 };
 
 export class JinaEmbeddingError extends Error {
@@ -362,7 +365,7 @@ const embeddings = await generateEmbeddings(chunks, 'retrieval.passage');
 const points = chunks.map((chunk, i) => ({
   id: generateId(),
   vector: embeddings[i],
-  payload: { text: chunk, courseId, chunkIndex: i }
+  payload: { text: chunk, courseId, chunkIndex: i },
 }));
 
 await qdrantClient.upsert('knowledge-base', { points });
@@ -390,21 +393,25 @@ Note: Pre-existing errors in `src/shared/qdrant/examples.ts` are unrelated to th
 ## Code Quality
 
 ### Documentation
+
 - Comprehensive JSDoc comments on all public functions
 - Usage examples in documentation
 - Type annotations on all parameters and return values
 
 ### Error Handling
+
 - Custom error class with detailed context
 - Descriptive error messages for debugging
 - Proper error propagation
 
 ### Performance
+
 - Efficient rate limiting with minimal overhead
 - Batch processing support for throughput optimization
 - Automatic retry logic for resilience
 
 ### Maintainability
+
 - Clear separation of concerns
 - Single responsibility principle
 - Easy to test and extend

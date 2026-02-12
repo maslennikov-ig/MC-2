@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ? 'CONFIGURED' : 'MISSING',
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ? 'CONFIGURED' : 'MISSING',
-    N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL ? 'CONFIGURED' : 'MISSING',
+    COURSEGEN_BACKEND_URL: process.env.COURSEGEN_BACKEND_URL ? 'CONFIGURED' : 'MISSING',
     ENABLE_DEV_AUTH: process.env.ENABLE_DEV_AUTH || 'false',
     API_KEY: process.env.API_KEY ? 'CONFIGURED' : 'NOT_SET',
   }

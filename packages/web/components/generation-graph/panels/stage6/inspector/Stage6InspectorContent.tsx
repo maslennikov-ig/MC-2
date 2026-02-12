@@ -1,12 +1,12 @@
-'use client';
+'use client'
 
-import React, { memo, useState } from 'react';
-import { ErrorBoundary } from 'react-error-boundary';
-import { cn } from '@/lib/utils';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
+import React, { memo, useState } from 'react'
+import { ErrorBoundary } from 'react-error-boundary'
+import { cn } from '@/lib/utils'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,29 +17,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { MarkdownRendererFull } from '@/components/markdown';
-import { JsonViewer } from '../../shared/JsonViewer';
-import { AutoCardPreview } from '../../shared/AutoCardPreview';
-import { Stage6StatsStrip } from './Stage6StatsStrip';
-import { Stage6QualityTab } from './tabs/Stage6QualityTab';
-import { Stage6InputTab } from './tabs/Stage6InputTab';
-import {
-  CheckCircle2,
-  Edit3,
-  RotateCcw,
-  AlertCircle,
-  Loader2,
-  Trash2,
-} from 'lucide-react';
+} from '@/components/ui/alert-dialog'
+import { MarkdownRendererFull } from '@/components/markdown'
+import { JsonViewer } from '../../shared/JsonViewer'
+import { AutoCardPreview } from '../../shared/AutoCardPreview'
+import { Stage6StatsStrip } from './Stage6StatsStrip'
+import { Stage6QualityTab } from './tabs/Stage6QualityTab'
+import { Stage6InputTab } from './tabs/Stage6InputTab'
+import { CheckCircle2, Edit3, RotateCcw, AlertCircle, Loader2, Trash2 } from 'lucide-react'
 import type {
   LessonContentPreview,
   SelfReviewResult,
   JudgeVerdictDisplay,
   Stage6NodeName,
   SourceDocument,
-} from '@megacampus/shared-types';
-import { SourceDocumentsPanel } from '../../lesson/SourceDocumentsPanel';
+  LessonSpecificationV2,
+} from '@megacampus/shared-types'
+import { SourceDocumentsPanel } from '../../lesson/SourceDocumentsPanel'
+import { LessonMarkdownEditor } from '../../lesson/LessonMarkdownEditor'
+import { useLessonEdit } from '../../../contexts/LessonEditContext'
+import { useTranslations } from 'next-intl'
 
 // =============================================================================
 // TYPES
@@ -47,49 +44,57 @@ import { SourceDocumentsPanel } from '../../lesson/SourceDocumentsPanel';
 
 interface Stage6InspectorContentProps {
   // Content
-  content: LessonContentPreview | null;
-  rawMarkdown: string | null;
-  metadata: Record<string, unknown> | null;
-  logs: Array<{ level: string; message: string; timestamp: string; details?: unknown }>;
+  content: LessonContentPreview | null
+  rawMarkdown: string | null
+  metadata: Record<string, unknown> | null
+  logs: Array<{ level: string; message: string; timestamp: string; details?: unknown }>
   /** Source documents used in RAG retrieval for this lesson */
-  sourceDocuments?: SourceDocument[];
+  sourceDocuments?: SourceDocument[]
+
+  // Generation input parameters
+  /** Lesson specification from Stage 5 */
+  lessonSpec?: LessonSpecificationV2 | null
+  /** Course style for content generation */
+  style?: string | null
+  /** Language code (e.g., 'en', 'ru') */
+  generationLanguage?: string | null
 
   // Quality data
-  selfReviewResult: SelfReviewResult | null;
-  judgeResult: JudgeVerdictDisplay | null;
+  selfReviewResult: SelfReviewResult | null
+  judgeResult: JudgeVerdictDisplay | null
 
   // Stats for StatsStrip
   stats: {
-    tokens: number;
-    durationMs: number;
+    tokens: number
+    durationMs: number
     /** Subscription tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' */
-    modelTier: string;
-    quality: number; // 0-100
-    tokensBreakdown?: Record<Stage6NodeName, number>;
-  };
+    modelTier: string
+    quality: number // 0-100
+    tokensBreakdown?: Record<Stage6NodeName, number>
+  }
 
   // Status
-  status: 'pending' | 'active' | 'completed' | 'error';
-  errorMessage?: string;
+  status: 'pending' | 'active' | 'completed' | 'error'
+  errorMessage?: string
 
   // Actions
-  onApprove: () => void;
-  onEdit: () => void;
-  onRegenerate: () => void;
-  onDelete?: () => void;
-  isApproving?: boolean;
-  isRegenerating?: boolean;
-  isDeleting?: boolean;
+  onApprove: () => void
+  onEdit: () => void
+  onRegenerate: () => void
+  onDelete?: () => void
+  isApproving?: boolean
+  isRegenerating?: boolean
+  isDeleting?: boolean
 
   // Card preview
   /** Lesson UUID for card preview */
-  lessonId?: string;
+  lessonId?: string
   /** Course UUID for card preview */
-  courseId?: string;
+  courseId?: string
 
   // i18n
-  locale?: 'ru' | 'en';
-  className?: string;
+  locale?: 'ru' | 'en'
+  className?: string
 }
 
 // =============================================================================
@@ -100,23 +105,21 @@ function InspectorContentErrorFallback({
   error,
   resetErrorBoundary,
 }: {
-  error: Error;
-  resetErrorBoundary: () => void;
+  error: Error
+  resetErrorBoundary: () => void
 }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full py-12 text-center p-4">
-      <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-      <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">
+    <div className="flex h-full flex-col items-center justify-center p-4 py-12 text-center">
+      <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
+      <h3 className="mb-2 text-lg font-semibold text-red-600 dark:text-red-400">
         Ошибка отображения контента
       </h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 max-w-md">
-        {error.message}
-      </p>
+      <p className="mb-4 max-w-md text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
       <Button onClick={resetErrorBoundary} variant="outline" size="sm">
         Попробовать снова
       </Button>
     </div>
-  );
+  )
 }
 
 // =============================================================================
@@ -124,24 +127,24 @@ function InspectorContentErrorFallback({
 // =============================================================================
 
 interface LogViewerProps {
-  logs: Array<{ level: string; message: string; timestamp: string; details?: unknown }>;
-  locale: 'ru' | 'en';
+  logs: Array<{ level: string; message: string; timestamp: string; details?: unknown }>
+  locale: 'ru' | 'en'
 }
 
 const LogViewer = memo(function LogViewer({ logs, locale }: LogViewerProps) {
+  const t = useTranslations('generation.stage6.inspector')
+
   const levelColors: Record<string, string> = {
-    error: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-300 dark:border-red-700',
+    error:
+      'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-300 dark:border-red-700',
     warn: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300 dark:border-amber-700',
     info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300 dark:border-blue-700',
-    debug: 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300 border-slate-300 dark:border-slate-700',
-  };
+    debug:
+      'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300 border-slate-300 dark:border-slate-700',
+  }
 
   if (logs.length === 0) {
-    return (
-      <div className="text-center py-8 text-sm text-muted-foreground">
-        {locale === 'ru' ? 'Логов нет' : 'No logs available'}
-      </div>
-    );
+    return <div className="text-muted-foreground py-8 text-center text-sm">{t('noMetadata')}</div>
   }
 
   return (
@@ -149,25 +152,25 @@ const LogViewer = memo(function LogViewer({ logs, locale }: LogViewerProps) {
       {logs.map((log, idx) => (
         <div
           key={idx}
-          className="flex items-start gap-3 p-3 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+          className="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900"
         >
           <Badge
             variant="outline"
-            className={cn('text-xs shrink-0 mt-0.5', levelColors[log.level] || levelColors.debug)}
+            className={cn('mt-0.5 shrink-0 text-xs', levelColors[log.level] || levelColors.debug)}
           >
             {log.level.toUpperCase()}
           </Badge>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-foreground break-words">{log.message}</p>
-            <p className="text-xs text-muted-foreground mt-1">
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground text-sm break-words">{log.message}</p>
+            <p className="text-muted-foreground mt-1 text-xs">
               {new Date(log.timestamp).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}
             </p>
             {log.details && typeof log.details === 'object' && log.details !== null ? (
               <details className="mt-2">
-                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-                  {locale === 'ru' ? 'Детали' : 'Details'}
+                <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
+                  {t('noMetadata')}
                 </summary>
-                <pre className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded text-xs overflow-auto max-h-40">
+                <pre className="mt-2 max-h-40 overflow-auto rounded bg-slate-100 p-2 text-xs dark:bg-slate-800">
                   {JSON.stringify(log.details as Record<string, unknown>, null, 2)}
                 </pre>
               </details>
@@ -176,8 +179,8 @@ const LogViewer = memo(function LogViewer({ logs, locale }: LogViewerProps) {
         </div>
       ))}
     </div>
-  );
-});
+  )
+})
 
 // =============================================================================
 // MAIN COMPONENT
@@ -200,6 +203,9 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   metadata,
   logs,
   sourceDocuments,
+  lessonSpec,
+  style,
+  generationLanguage,
   selfReviewResult,
   judgeResult,
   stats,
@@ -217,64 +223,62 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   locale = 'en',
   className,
 }: Stage6InspectorContentProps) {
-  const [activeTab, setActiveTab] = useState<'preview' | 'quality' | 'sources' | 'input' | 'blueprint' | 'trace' | 'card'>('preview');
+  const [activeTab, setActiveTab] = useState<
+    'preview' | 'quality' | 'sources' | 'input' | 'blueprint' | 'trace' | 'card'
+  >('preview')
+
+  // Inline editing state from context (provided by LessonEditProvider in NodeDetailsDrawer)
+  const lessonEdit = useLessonEdit()
+  const isEditing = lessonEdit?.isEditing ?? false
+  const isSaving = lessonEdit?.isSaving ?? false
 
   // Localized labels
-  const labels = {
-    preview: locale === 'ru' ? 'Просмотр' : 'Preview',
-    quality: locale === 'ru' ? 'Качество' : 'Quality',
-    sources: locale === 'ru' ? 'Источники' : 'Sources',
-    input: locale === 'ru' ? 'Входные' : 'Input',
-    blueprint: locale === 'ru' ? 'Схема' : 'Blueprint',
-    trace: locale === 'ru' ? 'Трассировка' : 'Trace',
-    card: locale === 'ru' ? 'Карточка' : 'Card',
-    approve: locale === 'ru' ? 'Одобрить' : 'Approve',
-    edit: locale === 'ru' ? 'Редактировать' : 'Edit',
-    regenerate: locale === 'ru' ? 'Переделать' : 'Regenerate',
-    delete: locale === 'ru' ? 'Удалить' : 'Delete',
-    approving: locale === 'ru' ? 'Одобрение...' : 'Approving...',
-    regenerating: locale === 'ru' ? 'Переделывается...' : 'Regenerating...',
-    deleting: locale === 'ru' ? 'Удаление...' : 'Deleting...',
-    noContent: locale === 'ru' ? 'Контент урока недоступен' : 'Lesson content unavailable',
-    noMetadata: locale === 'ru' ? 'Метаданные недоступны' : 'Metadata unavailable',
-    error: locale === 'ru' ? 'Ошибка генерации' : 'Generation Error',
-    deleteConfirmTitle: locale === 'ru' ? 'Удалить урок?' : 'Delete lesson?',
-    deleteConfirmDescription: locale === 'ru'
-      ? 'Это действие необратимо. Будут удалены все материалы урока, включая сгенерированный контент, обогащения (видео, аудио, квизы) и связанные файлы.'
-      : 'This action cannot be undone. All lesson materials will be deleted, including generated content, enrichments (videos, audio, quizzes) and related files.',
-    deleteConfirmCancel: locale === 'ru' ? 'Отмена' : 'Cancel',
-    deleteConfirmAction: locale === 'ru' ? 'Удалить' : 'Delete',
-  };
+  const t = useTranslations('generation.stage6.inspector')
 
-  // Action bar visibility - show for completed OR error with content
-  const showActions = status === 'completed' || (status === 'error' && (rawMarkdown || content));
+  // Action bar visibility - show for completed OR error with content, hide when editing
+  const showActions =
+    !isEditing && (status === 'completed' || (status === 'error' && (rawMarkdown || content)))
 
   // Render content based on active tab
   const renderTabContent = () => {
     if (activeTab === 'preview') {
-      if (!rawMarkdown && !content) {
+      if (isEditing && lessonEdit) {
         return (
-          <div className="text-center py-12 text-sm text-muted-foreground">
-            {labels.noContent}
-          </div>
-        );
+          <LessonMarkdownEditor
+            initialContent={rawMarkdown || ''}
+            onSave={lessonEdit.onSaveEdit}
+            onCancel={lessonEdit.onCancelEdit}
+            isSaving={isSaving}
+            draftKey={lessonId}
+          />
+        )
+      }
+
+      if (!rawMarkdown?.trim() && !content) {
+        return (
+          <div className="text-muted-foreground py-12 text-center text-sm">{t('noContent')}</div>
+        )
       }
 
       return (
         <ErrorBoundary
           FallbackComponent={({ error, resetErrorBoundary }) => (
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-400">
-              <p className="font-medium mb-2">{labels.error}</p>
-              <p className="text-xs mb-3">{error.message}</p>
+            <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+              <p className="mb-2 font-medium">{t('error')}</p>
+              <p className="mb-3 text-xs">{error.message}</p>
               <Button onClick={resetErrorBoundary} variant="outline" size="sm">
-                {locale === 'ru' ? 'Попробовать снова' : 'Retry'}
+                {t('retryLabel')}
               </Button>
             </div>
           )}
         >
-          <MarkdownRendererFull content={rawMarkdown || ''} preset="preview" features={{ mermaid: true }} />
+          <MarkdownRendererFull
+            content={rawMarkdown?.trim() ? rawMarkdown : ''}
+            preset="preview"
+            features={{ mermaid: true }}
+          />
         </ErrorBoundary>
-      );
+      )
     }
 
     if (activeTab === 'quality') {
@@ -284,97 +288,79 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
           judgeResult={judgeResult || undefined}
           locale={locale}
         />
-      );
+      )
     }
 
     if (activeTab === 'sources') {
-      return (
-        <SourceDocumentsPanel
-          sourceDocuments={sourceDocuments || []}
-          locale={locale}
-        />
-      );
+      return <SourceDocumentsPanel sourceDocuments={sourceDocuments || []} locale={locale} />
     }
 
     if (activeTab === 'input') {
       // Extract input parameters from metadata and sourceDocuments
-      const ragChunksCount = sourceDocuments?.reduce((sum, doc) => sum + (doc.chunk_count || 0), 0) || 0;
+      const ragChunksCount =
+        sourceDocuments?.reduce((sum, doc) => sum + (doc.chunk_count || 0), 0) || 0
 
       return (
         <Stage6InputTab
-          lessonSpec={null} // TODO: Add lessonSpec to LessonInspectorData
-          style={null} // TODO: Add style to LessonInspectorData
-          language={null} // TODO: Add language to LessonInspectorData
+          lessonSpec={lessonSpec ?? null}
+          style={style ?? null}
+          language={generationLanguage ?? null}
           ragChunksCount={ragChunksCount}
           locale={locale}
         />
-      );
+      )
     }
 
     if (activeTab === 'blueprint') {
       if (!metadata) {
         return (
-          <div className="text-center py-12 text-sm text-muted-foreground">
-            {labels.noMetadata}
-          </div>
-        );
+          <div className="text-muted-foreground py-12 text-center text-sm">{t('noMetadata')}</div>
+        )
       }
 
-      return (
-        <JsonViewer
-          data={metadata}
-          title={locale === 'ru' ? 'Метаданные урока' : 'Lesson Metadata'}
-          defaultExpanded={false}
-        />
-      );
+      return <JsonViewer data={metadata} title={t('blueprint')} defaultExpanded={false} />
     }
 
     if (activeTab === 'trace') {
-      return <LogViewer logs={logs} locale={locale} />;
+      return <LogViewer logs={logs} locale={locale} />
     }
 
     if (activeTab === 'card') {
       // Only render AutoCardPreview if both courseId and lessonId are provided
       if (!courseId || !lessonId) {
         return (
-          <div className="text-center py-12 text-sm text-muted-foreground">
-            {locale === 'ru' ? 'Карточка недоступна' : 'Card unavailable'}
+          <div className="text-muted-foreground py-12 text-center text-sm">
+            {t('cardUnavailable')}
           </div>
-        );
+        )
       }
 
-      return (
-        <AutoCardPreview
-          cardType="lesson"
-          courseId={courseId}
-          lessonId={lessonId}
-        />
-      );
+      return <AutoCardPreview cardType="lesson" courseId={courseId} lessonId={lessonId} />
     }
 
-    return null;
-  };
+    return null
+  }
 
   return (
     <ErrorBoundary FallbackComponent={InspectorContentErrorFallback}>
-      <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>
+      <div className={cn('flex h-full flex-col bg-white dark:bg-slate-950', className)}>
         {/* Tabs at TOP */}
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-4 pt-4 pb-0">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 pt-4 pb-0 dark:border-slate-800">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
             <TabsList>
-              <TabsTrigger value="preview">{labels.preview}</TabsTrigger>
-              <TabsTrigger value="quality">{labels.quality}</TabsTrigger>
-              <TabsTrigger value="sources">{labels.sources}</TabsTrigger>
-              <TabsTrigger value="input">{labels.input}</TabsTrigger>
-              <TabsTrigger value="blueprint">{labels.blueprint}</TabsTrigger>
-              <TabsTrigger value="trace">{labels.trace}</TabsTrigger>
-              <TabsTrigger value="card">{labels.card}</TabsTrigger>
+              <TabsTrigger value="preview">{t('preview')}</TabsTrigger>
+              <TabsTrigger value="quality">{t('quality')}</TabsTrigger>
+              <TabsTrigger value="sources">{t('sources')}</TabsTrigger>
+              <TabsTrigger value="input">{t('input')}</TabsTrigger>
+              <TabsTrigger value="blueprint">{t('blueprint')}</TabsTrigger>
+              <TabsTrigger value="trace">{t('trace')}</TabsTrigger>
+              <TabsTrigger value="card">{t('card')}</TabsTrigger>
             </TabsList>
           </Tabs>
 
           {/* Actions (right-aligned) */}
           {showActions && (
-            <div className="flex items-center gap-2 ml-auto pb-2">
+            <div className="ml-auto flex items-center gap-2 pb-2">
               {/* Delete button with confirmation dialog */}
               {onDelete && (
                 <AlertDialog>
@@ -383,35 +369,35 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
                       variant="ghost"
                       size="sm"
                       disabled={isDeleting || isRegenerating || isApproving}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
+                      className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/50 dark:hover:text-red-300"
                     >
                       {isDeleting ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          {labels.deleting}
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {t('deleting')}
                         </>
                       ) : (
                         <>
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          {labels.delete}
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {t('delete')}
                         </>
                       )}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>{labels.deleteConfirmTitle}</AlertDialogTitle>
+                      <AlertDialogTitle>{t('deleteConfirmTitle')}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        {labels.deleteConfirmDescription}
+                        {t('deleteConfirmDescription')}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>{labels.deleteConfirmCancel}</AlertDialogCancel>
+                      <AlertDialogCancel>{t('deleteConfirmCancel')}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={onDelete}
-                        className="bg-red-600 hover:bg-red-700 text-white"
+                        className="bg-red-600 text-white hover:bg-red-700"
                       >
-                        {labels.deleteConfirmAction}
+                        {t('deleteConfirmAction')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -426,13 +412,13 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
               >
                 {isRegenerating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {labels.regenerating}
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('regenerating')}
                   </>
                 ) : (
                   <>
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    {labels.regenerate}
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    {t('regenerate')}
                   </>
                 )}
               </Button>
@@ -443,8 +429,8 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
                 onClick={onEdit}
                 disabled={isApproving || isRegenerating || isDeleting}
               >
-                <Edit3 className="w-4 h-4 mr-2" />
-                {labels.edit}
+                <Edit3 className="mr-2 h-4 w-4" />
+                {t('edit')}
               </Button>
 
               <Button
@@ -455,13 +441,13 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
               >
                 {isApproving ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {labels.approving}
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('approving')}
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    {labels.approve}
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {t('approve')}
                   </>
                 )}
               </Button>
@@ -481,13 +467,14 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
 
         {/* Error banner (if error status) */}
         {status === 'error' && errorMessage && (
-          <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-red-700 dark:text-red-400">
-                {labels.error}
-              </p>
-              <p className="text-xs text-red-600 dark:text-red-400/80 truncate" title={errorMessage}>
+          <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">{t('error')}</p>
+              <p
+                className="truncate text-xs text-red-600 dark:text-red-400/80"
+                title={errorMessage}
+              >
                 {errorMessage}
               </p>
             </div>
@@ -495,12 +482,14 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         )}
 
         {/* Tab Content Area (scrollable) */}
-        <ScrollArea className="flex-1">
-          <div className="p-6">
-            {renderTabContent()}
-          </div>
-        </ScrollArea>
+        {isEditing && activeTab === 'preview' ? (
+          <div className="flex-1 overflow-hidden">{renderTabContent()}</div>
+        ) : (
+          <ScrollArea className="flex-1">
+            <div className="p-6">{renderTabContent()}</div>
+          </ScrollArea>
+        )}
       </div>
     </ErrorBoundary>
-  );
-});
+  )
+})

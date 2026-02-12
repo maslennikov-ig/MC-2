@@ -23,10 +23,13 @@ async function addDocumentIdIndex() {
   try {
     await qdrantClient.createPayloadIndex(collectionName, {
       field_name: 'document_id',
-      field_schema: 'keyword'
+      field_schema: 'keyword',
     });
 
-    logger.info({ collectionName, field_name: 'document_id' }, 'Payload index created successfully');
+    logger.info(
+      { collectionName, field_name: 'document_id' },
+      'Payload index created successfully'
+    );
   } catch (error) {
     if (error instanceof Error && error.message.includes('already exists')) {
       logger.info({ collectionName, field_name: 'document_id' }, 'Payload index already exists');
@@ -41,7 +44,7 @@ addDocumentIdIndex()
     logger.info('Script completed successfully');
     process.exit(0);
   })
-  .catch((error) => {
+  .catch(error => {
     logger.error({ err: error instanceof Error ? error.message : String(error) }, 'Script failed');
     process.exit(1);
   });

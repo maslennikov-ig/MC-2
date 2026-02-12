@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
-import { isValidUUID } from '@/lib/validation-utils'
+import { isValidUUID } from '@/lib/uuid-validation'
 import { type OrgRole } from '@megacampus/shared-types'
 
 type RouteParams = { params: Promise<{ orgId: string; userId: string }> }
@@ -116,7 +116,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
           errorCode: 'INTERNAL_ERROR',
           targetUserId,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to remove member' }, { status: 500 })
     }
 
@@ -139,7 +139,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         route: '/api/organizations/[orgId]/members/[userId]',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

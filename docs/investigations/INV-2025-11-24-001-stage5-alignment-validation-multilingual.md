@@ -1,12 +1,14 @@
 # INV-2025-11-24-001: Stage 5 Alignment Validation Failure for Multilingual Content
 
 ---
+
 investigation_id: INV-2025-11-24-001
 status: RESOLVED
 timestamp: 2025-11-24T13:00:00Z
 resolved_at: 2025-11-24T14:15:00Z
 priority: HIGH
 related_course: 6a71b727-73a8-43b3-8218-133d4fa026fa
+
 ---
 
 ## Executive Summary
@@ -18,6 +20,7 @@ related_course: 6a71b727-73a8-43b3-8218-133d4fa026fa
 **Recommended Solution**: Make the title alignment check language-aware by skipping it when target language is not English.
 
 **Key Findings**:
+
 1. Title check at lines 614-622 applies -0.3 penalty when Russian title doesn't contain English substring
 2. Difficulty mismatch check at lines 629-635 applies additional -0.2 penalty
 3. Combined penalties drop alignment from 1.0 to 0.5, far below the 0.85 threshold
@@ -28,22 +31,26 @@ related_course: 6a71b727-73a8-43b3-8218-133d4fa026fa
 ## Problem Statement
 
 ### Observed Behavior
+
 - E2E test completes Stages 1-4 successfully
 - Stage 5 fails with error: "Generation failed: Unknown error"
 - All 5 UnifiedRegenerator layers exhaust without success
 - Quality validation returns false for all model outputs
 
 ### Expected Behavior
+
 - Stage 5 should generate valid course metadata
 - Quality validation should pass for legitimate multilingual content
 - Russian titles should not be penalized for not containing English test title
 
 ### Impact
+
 - E2E test cannot complete
 - Production course generation for Russian content may fail
 - All 3+ models marked as failing despite generating valid output
 
 ### Environment
+
 - Branch: 010-stages-456-pipeline
 - E2E test title: "E2E Test Course - 2025-11-24T12:46"
 - Target language: Russian (ru)
@@ -55,13 +62,13 @@ related_course: 6a71b727-73a8-43b3-8218-133d4fa026fa
 
 ### Hypotheses Tested
 
-| # | Hypothesis | Evidence | Result |
-|---|------------|----------|--------|
-| 1 | Missing `model` parameter in UnifiedRegenerator | Line 229 shows `model: model` already present | REJECTED |
-| 2 | Quality logging not enabled | Lines 213-221 show logging already implemented | REJECTED |
-| 3 | Alignment title check too strict for multilingual | Lines 614-622 show substring check fails for Russian | CONFIRMED |
-| 4 | Difficulty mismatch adds additional penalty | Lines 629-635 apply -0.2 for difficulty mismatch | CONFIRMED |
-| 5 | Thresholds too high | 0.85 alignment threshold cannot be met with -0.3 + -0.2 penalties | CONFIRMED |
+| #   | Hypothesis                                        | Evidence                                                          | Result    |
+| --- | ------------------------------------------------- | ----------------------------------------------------------------- | --------- |
+| 1   | Missing `model` parameter in UnifiedRegenerator   | Line 229 shows `model: model` already present                     | REJECTED  |
+| 2   | Quality logging not enabled                       | Lines 213-221 show logging already implemented                    | REJECTED  |
+| 3   | Alignment title check too strict for multilingual | Lines 614-622 show substring check fails for Russian              | CONFIRMED |
+| 4   | Difficulty mismatch adds additional penalty       | Lines 629-635 apply -0.2 for difficulty mismatch                  | CONFIRMED |
+| 5   | Thresholds too high                               | 0.85 alignment threshold cannot be met with -0.3 + -0.2 penalties | CONFIRMED |
 
 ### Files Examined
 
@@ -105,24 +112,24 @@ related_course: 6a71b727-73a8-43b3-8218-133d4fa026fa
 if (
   metadata.course_title &&
   input.frontend_parameters.course_title &&
-  !metadata.course_title.toLowerCase().includes(
-    input.frontend_parameters.course_title.toLowerCase().substring(0, 10)
-  )
+  !metadata.course_title
+    .toLowerCase()
+    .includes(input.frontend_parameters.course_title.toLowerCase().substring(0, 10))
 ) {
-  alignmentScore -= 0.3;  // <-- PROBLEM: -0.3 penalty
+  alignmentScore -= 0.3; // <-- PROBLEM: -0.3 penalty
 }
 ```
 
 **Why This Fails**:
 
-| Step | Value |
-|------|-------|
-| Input title | "E2E Test Course - 2025-11-24T12:46" |
-| First 10 chars (lowercase) | "e2e test c" |
-| Target language | Russian ("ru") |
-| Generated title | "Полный курс по продажам образовательных мероприятий" |
-| Substring check | "полный курс..." does NOT contain "e2e test c" |
-| Result | alignmentScore -= 0.3 |
+| Step                       | Value                                                 |
+| -------------------------- | ----------------------------------------------------- |
+| Input title                | "E2E Test Course - 2025-11-24T12:46"                  |
+| First 10 chars (lowercase) | "e2e test c"                                          |
+| Target language            | Russian ("ru")                                        |
+| Generated title            | "Полный курс по продажам образовательных мероприятий" |
+| Substring check            | "полный курс..." does NOT contain "e2e test c"        |
+| Result                     | alignmentScore -= 0.3                                 |
 
 **The check assumes the LLM will preserve English title fragments even when generating in Russian, which is incorrect.**
 
@@ -136,11 +143,12 @@ if (
   metadata.difficulty_level &&
   analysisDifficulty !== metadata.difficulty_level
 ) {
-  alignmentScore -= 0.2;  // <-- Additional penalty
+  alignmentScore -= 0.2; // <-- Additional penalty
 }
 ```
 
 **Combined Impact**:
+
 - Starting alignment: 1.0
 - Title mismatch: -0.3 (CERTAIN for Russian)
 - Difficulty mismatch: -0.2 (POSSIBLE)
@@ -200,12 +208,12 @@ private validateMetadataQuality(
 // Check title matches - ONLY for English content
 // For multilingual, the LLM legitimately generates localized titles
 if (
-  language === 'en' &&  // ADD language check
+  language === 'en' && // ADD language check
   metadata.course_title &&
   input.frontend_parameters.course_title &&
-  !metadata.course_title.toLowerCase().includes(
-    input.frontend_parameters.course_title.toLowerCase().substring(0, 10)
-  )
+  !metadata.course_title
+    .toLowerCase()
+    .includes(input.frontend_parameters.course_title.toLowerCase().substring(0, 10))
 ) {
   alignmentScore -= 0.3;
 }
@@ -218,11 +226,13 @@ const quality = this.validateMetadataQuality(metadataFields, input, language);
 ```
 
 **Pros**:
+
 - Fixes the root cause
 - No impact on English content validation
 - Semantically correct for multilingual generation
 
 **Cons**:
+
 - Requires signature change
 - Need to update both call sites (lines 205 and 305)
 
@@ -244,18 +254,20 @@ const quality = this.validateMetadataQuality(metadataFields, input, language);
 const QUALITY_THRESHOLDS = {
   critical: {
     completeness: 0.85,
-    coherence: 0.90,
-    alignment: 0.70,  // Changed from 0.85
+    coherence: 0.9,
+    alignment: 0.7, // Changed from 0.85
   },
   // ...
 };
 ```
 
 **Pros**:
+
 - Simple one-line change
 - Provides buffer for edge cases
 
 **Cons**:
+
 - May allow lower quality content to pass
 - Doesn't fix the underlying logic issue
 - Band-aid solution
@@ -280,10 +292,12 @@ const QUALITY_THRESHOLDS = {
 ```
 
 **Pros**:
+
 - Simplest fix
 - Title matching is low-value for course quality
 
 **Cons**:
+
 - Loses title alignment check for English content
 - May miss actual title-related issues
 
@@ -296,43 +310,54 @@ const QUALITY_THRESHOLDS = {
 ## Implementation Guidance
 
 ### Priority
+
 **Solution 1 (Language-Aware)** is the recommended approach.
 
 ### Files to Change
 
-| File | Change |
-|------|--------|
+| File                                                                                    | Change                                                              |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | `packages/course-gen-platform/src/stages/stage5-generation/utils/metadata-generator.ts` | Modify `validateMetadataQuality()` signature and add language check |
 
 ### Specific Code Locations
 
 1. **Line 205** (qualityValidator call inside UnifiedRegenerator config):
+
    ```typescript
    const quality = this.validateMetadataQuality(metadataFields, input);
    ```
+
    Change to:
+
    ```typescript
    const quality = this.validateMetadataQuality(metadataFields, input, language);
    ```
+
    Note: `language` is already available in scope from line 155.
 
 2. **Line 305** (post-regeneration quality check):
+
    ```typescript
    const quality = this.validateMetadataQuality(metadataFields, input);
    ```
+
    Change to:
+
    ```typescript
    const quality = this.validateMetadataQuality(metadataFields, input, language);
    ```
 
 3. **Line 500** (method signature):
+
    ```typescript
    private validateMetadataQuality(
      metadata: Partial<CourseStructure>,
      input: GenerationJobInput
    ): QualityMetrics {
    ```
+
    Change to:
+
    ```typescript
    private validateMetadataQuality(
      metadata: Partial<CourseStructure>,
@@ -349,9 +374,9 @@ const QUALITY_THRESHOLDS = {
      language === 'en' &&
      metadata.course_title &&
      input.frontend_parameters.course_title &&
-     !metadata.course_title.toLowerCase().includes(
-       input.frontend_parameters.course_title.toLowerCase().substring(0, 10)
-     )
+     !metadata.course_title
+       .toLowerCase()
+       .includes(input.frontend_parameters.course_title.toLowerCase().substring(0, 10))
    ) {
      alignmentScore -= 0.3;
    }
@@ -378,16 +403,20 @@ const QUALITY_THRESHOLDS = {
 ## Risks and Considerations
 
 ### Implementation Risks
+
 - **Low**: Simple conditional logic change
 - **No breaking changes**: Default parameter maintains backward compatibility
 
 ### Performance Impact
+
 - **None**: Single string comparison added
 
 ### Breaking Changes
+
 - **None**: English content validation unchanged
 
 ### Side Effects
+
 - Russian, Chinese, Japanese, and other non-English content will no longer be penalized for localized titles
 - This is the INTENDED behavior
 
@@ -398,16 +427,19 @@ const QUALITY_THRESHOLDS = {
 ### Tier 0: Project Internal
 
 **Task Document**:
+
 - `/home/me/code/megacampus2/.tmp/current/TASK-FIX-STAGE5-METADATA-QUALITY.md`
 - Correctly identified the title check as suspected root cause
 - Suggested lowering thresholds as fallback option
 
 **Previous Investigation**:
+
 - `docs/investigations/INV-2025-11-19-006-stage5-quality-validation-failure.md`
 - Focused on semantic similarity (Jina-v3) for sections
 - Different issue than this metadata alignment validation
 
 **Related Investigation**:
+
 - `docs/investigations/INV-2025-11-19-006-unified-regeneration-integration.md`
 - Documents UnifiedRegenerator architecture
 - Confirms model parameter requirement for Layers 2-3
@@ -424,22 +456,24 @@ Not needed - root cause identified from internal code analysis.
 
 ## MCP Server Usage
 
-| Tool | Purpose | Result |
-|------|---------|--------|
+| Tool                | Purpose                        | Result                                       |
+| ------------------- | ------------------------------ | -------------------------------------------- |
 | Sequential Thinking | Multi-step root cause analysis | Confirmed alignment validation as root cause |
-| Supabase (get_logs) | Check edge function logs | Only cleanup-old-drafts logs found |
+| Supabase (get_logs) | Check edge function logs       | Only cleanup-old-drafts logs found           |
 
 ---
 
 ## Next Steps
 
 ### For Orchestrator/User
+
 1. Review this investigation report
 2. Implement Solution 1 (language-aware title check)
 3. Run type-check to verify no compilation errors
 4. Re-run E2E test to confirm fix
 
 ### Follow-up Recommendations
+
 1. Consider adding integration test for Russian language course generation
 2. Review other alignment checks for multilingual compatibility
 3. Consider adding language parameter to quality logging for debugging
@@ -450,16 +484,16 @@ Not needed - root cause identified from internal code analysis.
 
 ### Timeline
 
-| Time | Action |
-|------|--------|
-| T+0 | Received task specification |
-| T+2 | Read metadata-generator.ts (710 lines) |
-| T+3 | Read task document TASK-FIX-STAGE5-METADATA-QUALITY.md |
-| T+4 | Read investigation reports INV-2025-11-19-006-* |
-| T+5 | Read unified-regenerator.ts (654 lines) |
-| T+8 | Ran Sequential Thinking analysis (5 steps) |
-| T+10 | Root cause confirmed: title substring check |
-| T+12 | Generated investigation report |
+| Time | Action                                                 |
+| ---- | ------------------------------------------------------ |
+| T+0  | Received task specification                            |
+| T+2  | Read metadata-generator.ts (710 lines)                 |
+| T+3  | Read task document TASK-FIX-STAGE5-METADATA-QUALITY.md |
+| T+4  | Read investigation reports INV-2025-11-19-006-\*       |
+| T+5  | Read unified-regenerator.ts (654 lines)                |
+| T+8  | Ran Sequential Thinking analysis (5 steps)             |
+| T+10 | Root cause confirmed: title substring check            |
+| T+12 | Generated investigation report                         |
 
 ### Commands Run
 
@@ -476,17 +510,17 @@ Not needed - root cause identified from internal code analysis.
 
 ## Report Summary
 
-| Field | Value |
-|-------|-------|
-| Investigation ID | INV-2025-11-24-001 |
-| Topic | Stage 5 Alignment Validation Multilingual Failure |
-| Duration | ~15 minutes |
-| Root Cause | Title substring check fails for non-English content |
-| Evidence Collected | 4 files examined, 5 hypotheses tested |
-| Recommended Solution | Solution 1: Language-aware title check |
-| Complexity | Low |
-| Risk | Low |
-| Estimated Effort | 15 minutes |
+| Field                | Value                                               |
+| -------------------- | --------------------------------------------------- |
+| Investigation ID     | INV-2025-11-24-001                                  |
+| Topic                | Stage 5 Alignment Validation Multilingual Failure   |
+| Duration             | ~15 minutes                                         |
+| Root Cause           | Title substring check fails for non-English content |
+| Evidence Collected   | 4 files examined, 5 hypotheses tested               |
+| Recommended Solution | Solution 1: Language-aware title check              |
+| Complexity           | Low                                                 |
+| Risk                 | Low                                                 |
+| Estimated Effort     | 15 minutes                                          |
 
 ---
 
@@ -499,12 +533,14 @@ Not needed - root cause identified from internal code analysis.
 ### Implemented Fixes
 
 **Fix 1: Language-aware title alignment check** (Solution 1 from above)
+
 - Modified `validateMetadataQuality()` in `metadata-generator.ts`
 - Added `language: string = 'en'` parameter
 - Added guard `language === 'en' &&` to title substring check
 - Title check now only applies to English content
 
 **Fix 2: Remove NOTE from placeholder patterns** (Additional fix discovered during testing)
+
 - Modified `generation-result.ts` (shared-types) and `placeholder-validator.ts` (course-gen-platform)
 - Removed `NOTE` from regex pattern `/\b(TODO|FIXME|XXX|HACK|NOTE|@todo)\b/i`
 - `NOTE` is a legitimate word in educational content ("Note: важная информация")
@@ -512,6 +548,7 @@ Not needed - root cause identified from internal code analysis.
 ### Verification
 
 E2E test passed all 6 stages after fixes:
+
 ```
 ✅ Stage 1: Document Upload: success (5.5s)
 ✅ Stage 2: Document Processing: success (32.8s)
@@ -524,8 +561,8 @@ E2E test passed all 6 stages after fixes:
 
 ### Files Modified
 
-| File | Change |
-|------|--------|
-| `packages/course-gen-platform/src/stages/stage5-generation/utils/metadata-generator.ts` | Language parameter + guard for title check |
-| `packages/shared-types/src/generation-result.ts` | Removed NOTE from placeholder patterns |
-| `packages/course-gen-platform/src/stages/stage5-generation/validators/placeholder-validator.ts` | Removed NOTE from placeholder patterns |
+| File                                                                                            | Change                                     |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `packages/course-gen-platform/src/stages/stage5-generation/utils/metadata-generator.ts`         | Language parameter + guard for title check |
+| `packages/shared-types/src/generation-result.ts`                                                | Removed NOTE from placeholder patterns     |
+| `packages/course-gen-platform/src/stages/stage5-generation/validators/placeholder-validator.ts` | Removed NOTE from placeholder patterns     |

@@ -1,22 +1,22 @@
-'use client';
+'use client'
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react'
 
 interface RestartStageResult {
-  success: boolean;
-  jobId?: string;
-  previousStatus?: string;
-  newStatus?: string;
-  stageNumber?: number;
-  error?: string;
-  code?: string;
+  success: boolean
+  jobId?: string
+  previousStatus?: string
+  newStatus?: string
+  stageNumber?: number
+  error?: string
+  code?: string
 }
 
 interface UseRestartStageReturn {
-  restartStage: (stageNumber: number) => Promise<RestartStageResult>;
-  isRestarting: boolean;
-  error: Error | null;
-  lastResult: RestartStageResult | null;
+  restartStage: (stageNumber: number) => Promise<RestartStageResult>
+  isRestarting: boolean
+  error: Error | null
+  lastResult: RestartStageResult | null
 }
 
 /**
@@ -49,43 +49,43 @@ interface UseRestartStageReturn {
  * ```
  */
 export function useRestartStage(orgSlug: string, courseSlug: string): UseRestartStageReturn {
-  const [isRestarting, setIsRestarting] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [lastResult, setLastResult] = useState<RestartStageResult | null>(null);
+  const [isRestarting, setIsRestarting] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+  const [lastResult, setLastResult] = useState<RestartStageResult | null>(null)
 
   const restartStage = useCallback(
     async (stageNumber: number): Promise<RestartStageResult> => {
       // Validate stage number
       if (stageNumber < 2 || stageNumber > 6) {
-        const err = new Error('Stage number must be between 2 and 6');
-        setError(err);
-        return { success: false, error: err.message, code: 'INVALID_STAGE' };
+        const err = new Error('Stage number must be between 2 and 6')
+        setError(err)
+        return { success: false, error: err.message, code: 'INVALID_STAGE' }
       }
 
-      setIsRestarting(true);
-      setError(null);
-      setLastResult(null);
+      setIsRestarting(true)
+      setError(null)
+      setLastResult(null)
 
       try {
         const response = await fetch(`/api/courses/${orgSlug}/${courseSlug}/restart-stage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ stageNumber }),
-        });
+        })
 
-        const data = await response.json();
+        const data = await response.json()
 
         if (!response.ok) {
-          const errorMessage = data.error || 'Failed to restart stage';
-          const err = new Error(errorMessage);
-          setError(err);
+          const errorMessage = data.error || 'Failed to restart stage'
+          const err = new Error(errorMessage)
+          setError(err)
           const result: RestartStageResult = {
             success: false,
             error: errorMessage,
             code: data.code,
-          };
-          setLastResult(result);
-          return result;
+          }
+          setLastResult(result)
+          return result
         }
 
         const result: RestartStageResult = {
@@ -94,25 +94,25 @@ export function useRestartStage(orgSlug: string, courseSlug: string): UseRestart
           previousStatus: data.previousStatus,
           newStatus: data.newStatus,
           stageNumber: data.stageNumber,
-        };
-        setLastResult(result);
-        return result;
+        }
+        setLastResult(result)
+        return result
       } catch (err) {
-        const error = err instanceof Error ? err : new Error('Unknown error during restart');
-        setError(error);
+        const error = err instanceof Error ? err : new Error('Unknown error during restart')
+        setError(error)
         const result: RestartStageResult = {
           success: false,
           error: error.message,
           code: 'NETWORK_ERROR',
-        };
-        setLastResult(result);
-        return result;
+        }
+        setLastResult(result)
+        return result
       } finally {
-        setIsRestarting(false);
+        setIsRestarting(false)
       }
     },
     [orgSlug, courseSlug]
-  );
+  )
 
-  return { restartStage, isRestarting, error, lastResult };
+  return { restartStage, isRestarting, error, lastResult }
 }

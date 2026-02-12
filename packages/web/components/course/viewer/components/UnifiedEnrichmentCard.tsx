@@ -265,20 +265,20 @@ export function UnifiedEnrichmentCard({
 
   const getTitle = useCallback(() => {
     if (isImageType) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return t(`images.${type}.title` as any)
+      // @ts-expect-error — dynamic translation key with template literal, type verified at runtime
+      return t(`images.${type}.title`)
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return t(`placeholder.${type}.title` as any)
+    // @ts-expect-error — dynamic translation key with template literal, type verified at runtime
+    return t(`placeholder.${type}.title`)
   }, [t, type, isImageType])
 
   const getDescription = useCallback(() => {
     if (isImageType) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return t(`images.${type}.description` as any)
+      // @ts-expect-error — dynamic translation key with template literal, type verified at runtime
+      return t(`images.${type}.description`)
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return t(`placeholder.${type}.description` as any)
+    // @ts-expect-error — dynamic translation key with template literal, type verified at runtime
+    return t(`placeholder.${type}.description`)
   }, [t, type, isImageType])
 
   // Build options props based on type

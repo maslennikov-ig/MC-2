@@ -13,17 +13,17 @@
  * @module app/admin/pipeline/components/text-diff-viewer
  */
 
-'use client';
+'use client'
 
-import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
-import { useThemeSync } from '@/lib/hooks/use-theme-sync';
+import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued'
+import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 
 interface TextDiffViewerProps {
-  oldValue: string;
-  newValue: string;
-  oldTitle?: string;
-  newTitle?: string;
-  splitView?: boolean;
+  oldValue: string
+  newValue: string
+  oldTitle?: string
+  newTitle?: string
+  splitView?: boolean
 }
 
 /**
@@ -45,12 +45,12 @@ export function TextDiffViewer({
   newTitle = 'Current Version',
   splitView = true,
 }: TextDiffViewerProps) {
-  const { resolvedTheme, mounted } = useThemeSync();
+  const { resolvedTheme, mounted } = useThemeSync()
   // Use light theme as default when not mounted to prevent hydration mismatch
-  const isDark = mounted && resolvedTheme === 'dark';
+  const isDark = mounted && resolvedTheme === 'dark'
 
   return (
-    <div className="rounded-lg border bg-background overflow-hidden">
+    <div className="bg-background overflow-hidden rounded-lg border">
       <ReactDiffViewer
         oldValue={oldValue}
         newValue={newValue}
@@ -133,5 +133,5 @@ export function TextDiffViewer({
         }}
       />
     </div>
-  );
+  )
 }

@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React, { memo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import React, { memo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import {
   CheckCircle2,
   AlertTriangle,
@@ -11,13 +11,9 @@ import {
   MinusCircle,
   Clock,
   Loader2,
-} from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import type {
-  Stage1ProcessTabProps,
-  ValidationStep,
-  ValidationStepStatus,
-} from './types';
+} from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import type { Stage1ProcessTabProps, ValidationStep, ValidationStepStatus } from './types'
 
 /**
  * Status icon mapping with colors
@@ -25,9 +21,9 @@ import type {
 const statusConfig: Record<
   ValidationStepStatus | 'pending' | 'skipped',
   {
-    icon: React.ElementType;
-    colorClass: string;
-    animate?: boolean;
+    icon: React.ElementType
+    colorClass: string
+    animate?: boolean
   }
 > = {
   success: {
@@ -51,7 +47,7 @@ const statusConfig: Record<
     icon: MinusCircle,
     colorClass: 'text-gray-400',
   },
-};
+}
 
 /**
  * Formats duration in milliseconds to human-readable string
@@ -59,11 +55,11 @@ const statusConfig: Record<
  * @returns Formatted string (e.g., "12ms" or "1.2s")
  */
 function formatDuration(ms: number | undefined): string {
-  if (ms === undefined || ms === null) return '';
+  if (ms === undefined || ms === null) return ''
   if (ms >= 1000) {
-    return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 1000).toFixed(1)}s`
   }
-  return `${Math.round(ms)}ms`;
+  return `${Math.round(ms)}ms`
 }
 
 /**
@@ -76,11 +72,11 @@ function generateDefaultSteps(
   hasFiles = false
 ): ValidationStep[] {
   const baseSteps: Array<{
-    id: ValidationStep['id'];
-    name: string;
-    description: string;
-    requiresFiles?: boolean;
-    mockDuration: number;
+    id: ValidationStep['id']
+    name: string
+    description: string
+    requiresFiles?: boolean
+    mockDuration: number
   }> = [
     {
       id: 'validation',
@@ -108,12 +104,10 @@ function generateDefaultSteps(
       description: t('registryDesc'),
       mockDuration: 35,
     },
-  ];
+  ]
 
   // Filter steps based on whether files are present
-  const applicableSteps = baseSteps.filter(
-    (step) => !step.requiresFiles || hasFiles
-  );
+  const applicableSteps = baseSteps.filter((step) => !step.requiresFiles || hasFiles)
 
   if (status === 'completed') {
     return applicableSteps.map((step) => ({
@@ -121,23 +115,17 @@ function generateDefaultSteps(
       name: step.name,
       status: 'success' as const,
       durationMs: step.mockDuration,
-    }));
+    }))
   }
 
   if (status === 'error') {
     return applicableSteps.map((step, index) => ({
       id: step.id,
       name: step.name,
-      status:
-        index === applicableSteps.length - 1
-          ? ('error' as const)
-          : ('success' as const),
+      status: index === applicableSteps.length - 1 ? ('error' as const) : ('success' as const),
       durationMs: index === applicableSteps.length - 1 ? undefined : step.mockDuration,
-      message:
-        index === applicableSteps.length - 1
-          ? 'Database connection failed'
-          : undefined,
-    }));
+      message: index === applicableSteps.length - 1 ? 'Database connection failed' : undefined,
+    }))
   }
 
   // Pending: first step is pending, rest are untouched
@@ -146,23 +134,23 @@ function generateDefaultSteps(
     name: step.name,
     status: index === 0 ? ('pending' as const) : ('pending' as const),
     durationMs: undefined,
-  }));
+  }))
 }
 
 /**
  * Individual validation step row component
  */
 interface ValidationStepRowProps {
-  step: ValidationStep;
-  t: ReturnType<typeof useTranslations<'generation.stage1'>>;
+  step: ValidationStep
+  t: ReturnType<typeof useTranslations<'generation.stage1'>>
 }
 
 function ValidationStepRow({ step, t }: ValidationStepRowProps) {
-  const isPending = step.status === 'pending';
-  const isSkipped = !['success', 'warning', 'error', 'pending'].includes(step.status);
-  const effectiveStatus = isSkipped ? 'skipped' : step.status;
-  const config = statusConfig[effectiveStatus] || statusConfig.pending;
-  const Icon = config.icon;
+  const isPending = step.status === 'pending'
+  const isSkipped = !['success', 'warning', 'error', 'pending'].includes(step.status)
+  const effectiveStatus = isSkipped ? 'skipped' : step.status
+  const config = statusConfig[effectiveStatus] || statusConfig.pending
+  const Icon = config.icon
 
   // Get description from translations if not provided
   const getDescription = (): string => {
@@ -171,15 +159,15 @@ function ValidationStepRow({ step, t }: ValidationStepRowProps) {
       security: t('securityScanDesc'),
       storage: t('storageUploadDesc'),
       registry: t('registryDesc'),
-    };
+    }
 
-    return descMap[step.id] ?? '';
-  };
+    return descMap[step.id] ?? ''
+  }
 
   return (
     <div
       className={cn(
-        'flex items-start gap-3 p-3 rounded-lg transition-colors duration-200',
+        'flex items-start gap-3 rounded-lg p-3 transition-colors duration-200',
         step.status === 'error' && 'bg-red-50 dark:bg-red-950/20',
         step.status === 'success' && 'bg-green-50/50 dark:bg-green-950/10',
         isPending && 'bg-muted/30'
@@ -197,11 +185,11 @@ function ValidationStepRow({ step, t }: ValidationStepRowProps) {
       </div>
 
       {/* Step details */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span
             className={cn(
-              'font-medium text-sm',
+              'text-sm font-medium',
               step.status === 'error' && 'text-red-700 dark:text-red-400',
               step.status === 'success' && 'text-foreground',
               isPending && 'text-muted-foreground'
@@ -212,34 +200,26 @@ function ValidationStepRow({ step, t }: ValidationStepRowProps) {
 
           {/* Duration badge */}
           {step.durationMs !== undefined && step.durationMs > 0 && (
-            <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
+            <span className="text-muted-foreground flex-shrink-0 font-mono text-xs">
               {formatDuration(step.durationMs)}
             </span>
           )}
 
           {/* Skipped indicator */}
-          {isSkipped && (
-            <span className="text-xs text-gray-400 italic">
-              {t('stepSkipped')}
-            </span>
-          )}
+          {isSkipped && <span className="text-xs text-gray-400 italic">{t('stepSkipped')}</span>}
         </div>
 
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {getDescription()}
-        </p>
+        <p className="text-muted-foreground mt-0.5 text-sm">{getDescription()}</p>
 
         {/* Error message expansion */}
         {step.status === 'error' && step.message && (
-          <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 rounded-md">
-            <p className="text-sm text-red-700 dark:text-red-300 font-mono">
-              {step.message}
-            </p>
+          <div className="mt-2 rounded-md bg-red-100 p-2 dark:bg-red-900/30">
+            <p className="font-mono text-sm text-red-700 dark:text-red-300">{step.message}</p>
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -253,33 +233,28 @@ export const Stage1ProcessTab = memo<Stage1ProcessTabProps>(function Stage1Proce
   totalDurationMs,
   status = 'completed',
 }) {
-  const t = useTranslations('generation.stage1');
+  const t = useTranslations('generation.stage1')
 
   // Generate default steps if not provided
-  const steps = providedSteps || generateDefaultSteps(status, t);
+  const steps = providedSteps || generateDefaultSteps(status, t)
 
   // Calculate total duration from steps if not provided
   const calculatedTotal =
-    totalDurationMs ??
-    steps.reduce((sum, step) => sum + (step.durationMs ?? 0), 0);
+    totalDurationMs ?? steps.reduce((sum, step) => sum + (step.durationMs ?? 0), 0)
 
   return (
     <div className="space-y-4">
       {/* Validation Receipt Card */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <CheckCircle2 className="text-primary h-4 w-4" />
             {t('validationReceipt')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
           {steps.map((step) => (
-            <ValidationStepRow
-              key={step.id}
-              step={step}
-              t={t}
-            />
+            <ValidationStepRow key={step.id} step={step} t={t} />
           ))}
         </CardContent>
       </Card>
@@ -289,11 +264,11 @@ export const Stage1ProcessTab = memo<Stage1ProcessTabProps>(function Stage1Proce
         <Card className="bg-muted/50">
           <CardContent className="py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4" />
                 <span>{t('totalLatency')}</span>
               </div>
-              <span className="text-lg font-mono font-semibold text-foreground">
+              <span className="text-foreground font-mono text-lg font-semibold">
                 {formatDuration(calculatedTotal)}
               </span>
             </div>
@@ -301,7 +276,7 @@ export const Stage1ProcessTab = memo<Stage1ProcessTabProps>(function Stage1Proce
         </Card>
       )}
     </div>
-  );
-});
+  )
+})
 
-export default Stage1ProcessTab;
+export default Stage1ProcessTab

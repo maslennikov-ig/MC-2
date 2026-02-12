@@ -35,11 +35,13 @@ Stage 3: Summarization (next stage)
 ## Phase Breakdown
 
 ### Phase 1: Docling Conversion
+
 **File:** `phases/phase-1-docling-conversion.ts`
 
 Converts documents to DoclingDocument JSON format using Docling MCP server.
 
 **Features:**
+
 - OCR text extraction (STANDARD/PREMIUM tiers)
 - Table extraction
 - Formula processing
@@ -49,6 +51,7 @@ Converts documents to DoclingDocument JSON format using Docling MCP server.
 **Progress:** 10% → 80%
 
 **Tier Support:**
+
 - BASIC: TXT/MD only (plain text read, no Docling)
 - STANDARD: PDF, DOCX, PPTX, HTML + OCR
 - PREMIUM: All formats + enhanced image processing
@@ -56,11 +59,13 @@ Converts documents to DoclingDocument JSON format using Docling MCP server.
 ---
 
 ### Phase 4: Hierarchical Chunking
+
 **File:** `phases/phase-4-chunking.ts`
 
 Chunks markdown content into hierarchical parent/child chunks for semantic retrieval.
 
 **Features:**
+
 - Hierarchical chunking (parent chunks + child chunks)
 - Metadata enrichment (document_id, course_id, organization_id)
 - Configurable chunk sizes (DEFAULT_CHUNKING_CONFIG)
@@ -68,6 +73,7 @@ Chunks markdown content into hierarchical parent/child chunks for semantic retri
 **Progress:** 50% → 60%
 
 **Output:**
+
 - Parent chunks: Large context windows
 - Child chunks: Precise retrieval targets
 - Enriched metadata for filtering
@@ -75,11 +81,13 @@ Chunks markdown content into hierarchical parent/child chunks for semantic retri
 ---
 
 ### Phase 5: Embedding Generation
+
 **File:** `phases/phase-5-embedding.ts`
 
 Generates embeddings for chunks using late chunking strategy for improved semantic coherence.
 
 **Features:**
+
 - Late chunking embeddings (improved cross-chunk coherence)
 - Batch processing
 - Token usage tracking
@@ -92,11 +100,13 @@ Generates embeddings for chunks using late chunking strategy for improved semant
 ---
 
 ### Phase 6: Qdrant Upload
+
 **File:** `phases/phase-6-qdrant-upload.ts`
 
 Uploads chunk embeddings to Qdrant vector database for RAG retrieval.
 
 **Features:**
+
 - Batch upload (100 points per batch)
 - Automatic vector_status update to 'indexed'
 - Chunk count tracking
@@ -105,6 +115,7 @@ Uploads chunk embeddings to Qdrant vector database for RAG retrieval.
 **Progress:** 80% → 95%
 
 **Output:**
+
 - Points uploaded to Qdrant
 - `vector_status` = 'indexed' in file_catalog
 - Ready for RAG retrieval
@@ -114,11 +125,13 @@ Uploads chunk embeddings to Qdrant vector database for RAG retrieval.
 ## Dependencies
 
 ### External Services
+
 - **Docling MCP:** Document conversion (PDF, DOCX, PPTX, HTML → JSON + Markdown)
 - **Embedding API:** Embedding generation (OpenAI, Jina, etc.)
 - **Qdrant:** Vector database for embeddings
 
 ### Internal Modules
+
 - `shared/embeddings/` - Markdown conversion, chunking, embedding generation
 - `shared/qdrant/` - Qdrant upload utilities
 - `shared/supabase/` - Database operations (file_catalog, courses)
@@ -129,28 +142,34 @@ Uploads chunk embeddings to Qdrant vector database for RAG retrieval.
 ## Testing
 
 ### Unit Tests
+
 **Location:** `tests/unit/stages/stage2/`
 
 **Coverage:**
+
 - Phase 1: Docling conversion (mocked MCP)
 - Phase 4: Chunking logic
 - Phase 5: Embedding generation
 - Phase 6: Qdrant upload
 
 **Run:**
+
 ```bash
 pnpm test tests/unit/stages/stage2/
 ```
 
 ### Integration Tests
+
 **Location:** `tests/integration/`
 
 **Scenarios:**
+
 - End-to-end document processing pipeline
 - Tier-based feature gating (BASIC vs STANDARD vs PREMIUM)
 - Error handling and retry logic
 
 **Run:**
+
 ```bash
 pnpm test tests/integration/stage2-*
 ```
@@ -160,13 +179,16 @@ pnpm test tests/integration/stage2-*
 ## Tier-Based Processing
 
 ### FREE Tier
+
 **Status:** NOT SUPPORTED (blocked at file upload)
 **Reason:** No document uploads allowed on FREE tier
 
 ### BASIC Tier
+
 **Supported Formats:** TXT, MD (plain text only)
 **Processing:** Direct file read (no Docling)
 **Features:**
+
 - ✅ Plain text chunking
 - ✅ Embedding generation
 - ✅ Qdrant indexing
@@ -175,9 +197,11 @@ pnpm test tests/integration/stage2-*
 - ❌ No image extraction
 
 ### STANDARD Tier
+
 **Supported Formats:** PDF, DOCX, PPTX, HTML, TXT, MD
 **Processing:** Docling MCP conversion
 **Features:**
+
 - ✅ OCR text extraction
 - ✅ Table extraction
 - ✅ Formula processing
@@ -185,9 +209,11 @@ pnpm test tests/integration/stage2-*
 - ❌ No semantic image descriptions (PREMIUM)
 
 ### PREMIUM Tier
+
 **Supported Formats:** All (including images: JPG, PNG, etc.)
 **Processing:** Docling MCP + enhanced image processing
 **Features:**
+
 - ✅ All STANDARD features
 - ✅ Semantic image descriptions (future: T074.5)
 - ✅ Advanced image analysis
@@ -200,48 +226,59 @@ pnpm test tests/integration/stage2-*
 ### Common Errors
 
 **1. File Not Found**
+
 ```typescript
 Error: Failed to fetch file metadata: File not found
 ```
+
 **Cause:** Invalid file_id or file deleted
 **Resolution:** Verify file_id exists in file_catalog
 
 **2. Unsupported Format (BASIC Tier)**
+
 ```typescript
 Error: File type 'application/pdf' is not supported on BASIC tier
 ```
+
 **Cause:** PDF upload on BASIC tier
 **Resolution:** Upgrade to STANDARD tier or use TXT/MD files
 
 **3. Docling Conversion Failed**
+
 ```typescript
 Error: Docling MCP conversion failed: timeout
 ```
+
 **Cause:** Large document or Docling MCP unavailable
 **Resolution:** Retry job, check Docling MCP status
 
 **4. Qdrant Upload Failed**
+
 ```typescript
 Error: Failed to upload chunks to Qdrant
 ```
+
 **Cause:** Qdrant unavailable or rate-limited
 **Resolution:** Retry job, check Qdrant connection
 
 ### Failure Recovery
 
 On any phase failure:
+
 1. **vector_status** updated to 'failed' in file_catalog
 2. Error logged to **error_logs** table with full stack trace
 3. Job marked as **failed** in BullMQ
 4. User notified via UI (generation_status)
 
 **Retry Strategy:**
+
 - Automatic retry: 3 attempts with exponential backoff
 - Manual retry (single document): Use `documentProcessing.retryDocument` tRPC endpoint
 - Manual retry (all documents): Use `generation.restartFromStage` with stage 2
 
 **Retry Behavior (NEW)**:
 The `documentProcessing.retryDocument` endpoint provides single-document retry with automatic cleanup:
+
 1. Validates document status is 'failed'
 2. **Cleans up existing vectors from Qdrant** (prevents orphaned vectors)
 3. Resets document status to 'pending'
@@ -250,6 +287,7 @@ The `documentProcessing.retryDocument` endpoint provides single-document retry w
 6. Returns job ID for tracking
 
 **Qdrant Vector Cleanup**:
+
 - Deletes vectors by `document_id` + `course_id` filter
 - Uses `wait: true` for guaranteed deletion before retry
 - Non-fatal on errors (logs warning but doesn't block retry)
@@ -267,6 +305,7 @@ See `/home/me/code/megacampus2/docs/API.md#document-processing-router` for API d
 **Pricing:** ~$0.0001 per 1K tokens
 
 **Average Document:**
+
 - Pages: 10
 - Chunks: ~50 (parent + child)
 - Tokens: ~5,000
@@ -279,6 +318,7 @@ See `/home/me/code/megacampus2/docs/API.md#document-processing-router` for API d
 **Average Document:** ~50KB storage
 
 **Monthly Cost (1000 docs):**
+
 - Storage: 1000 docs × 50KB = 50MB = ~$0.02/month
 - Embedding: 1000 docs × $0.0005 = $0.50
 - **Total:** ~$0.52 per 1000 documents
@@ -332,6 +372,7 @@ export const DEFAULT_CHUNKING_CONFIG = {
 **Location:** Pino logs via `shared/logger`
 
 **Key Events:**
+
 - `Document processing started` (fileId, tier, mimeType)
 - `Docling conversion complete` (pages, images, tables)
 - `Chunking complete` (parent_chunks, child_chunks)
@@ -343,15 +384,19 @@ export const DEFAULT_CHUNKING_CONFIG = {
 ## Roadmap
 
 ### T074.5: Premium Image Features
+
 **Status:** Planned (Q1 2025)
 **Features:**
+
 - Semantic image descriptions using Vision LLM
 - Image-text alignment scoring
 - Visual context extraction
 
 ### T076: Incremental Re-indexing
+
 **Status:** Planned (Q2 2025)
 **Features:**
+
 - Update only changed sections (not full re-index)
 - Version tracking for document updates
 - Differential chunking

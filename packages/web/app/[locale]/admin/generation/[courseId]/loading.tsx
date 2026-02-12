@@ -1,5 +1,5 @@
-import { FullPageLoader } from "@/components/ui/full-page-loader";
+import { FullPageLoader } from '@/components/ui/full-page-loader'
 
 export default function GenerationLoading() {
-  return <FullPageLoader text="Loading generation..." />;
+  return <FullPageLoader text="Loading generation..." />
 }

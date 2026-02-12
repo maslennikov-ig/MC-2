@@ -6,6 +6,21 @@
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
   "prerequisites": ["Basic computer literacy", "No prior programming experience required"],
-  "learning_outcomes": ["Explain fundamental Python programming concepts", "Write simple Python scripts using variables and control structures", "Apply functions and basic data structures to solve problems", "Develop a simple application using acquired Python skills", "Identify and fix common syntax and runtime errors"],
-  "course_tags": ["Python", "Programming", "Coding", "Beginner", "Software Development", "Automation", "Data Structures", "Functions"]
+  "learning_outcomes": [
+    "Explain fundamental Python programming concepts",
+    "Write simple Python scripts using variables and control structures",
+    "Apply functions and basic data structures to solve problems",
+    "Develop a simple application using acquired Python skills",
+    "Identify and fix common syntax and runtime errors"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Coding",
+    "Beginner",
+    "Software Development",
+    "Automation",
+    "Data Structures",
+    "Functions"
+  ]
 }

@@ -18,12 +18,14 @@ This plan details the refactoring of the course-gen-platform orchestrator to ach
 - **Stage 5** (Generation): Handler + **orphaned** services in `services/stage5/` (outside orchestrator!)
 
 **Target Architecture:** Unified `src/stages/{stage-name}/` structure with:
+
 - Dedicated orchestrator per stage
 - Isolated phase modules
 - Consistent handler interface
 - Co-located tests
 
 **Benefits:**
+
 - Eliminates architectural inconsistencies
 - Improves code navigation and discoverability
 - Reduces coupling between stages
@@ -121,18 +123,22 @@ packages/course-gen-platform/tests/
 ### Import Dependency Analysis
 
 **Stage 2 (document-processing.ts) imported by:**
+
 - `orchestrator/worker.ts` (handler registration)
 - No other direct imports (self-contained)
 
 **Stage 3 (stage3-summarization.ts) imported by:**
+
 - `orchestrator/worker.ts` (handler registration)
 - `orchestrator/services/summarization-service.ts` (service import)
 
 **Stage 4 (stage4-analysis.ts) imported by:**
+
 - `orchestrator/worker.ts` (handler registration)
 - `orchestrator/services/analysis/analysis-orchestrator.ts` (imports all phases)
 
 **Stage 5 (stage5-generation.ts) imported by:**
+
 - `orchestrator/worker.ts` (handler registration)
 - `services/stage5/generation-orchestrator.ts` (orchestrator)
 - `services/stage5/*.ts` (14+ service files)
@@ -140,6 +146,7 @@ packages/course-gen-platform/tests/
 - `server/routers/generation.ts` (API router)
 
 **High-Risk Files (>5 dependents):**
+
 - `services/stage5/generation-orchestrator.ts`
 - `services/stage5/section-batch-generator.ts`
 - `services/stage5/quality-validator.ts`
@@ -341,25 +348,26 @@ mkdir -p tests/unit/stages/stage5/{phases,utils,validators}
 
 ### Step 1.2: Move Core Files
 
-| From | To | Size | Notes |
-|------|----|----|-------|
+| From                                         | To                                         | Size | Notes             |
+| -------------------------------------------- | ------------------------------------------ | ---- | ----------------- |
 | `services/stage5/generation-orchestrator.ts` | `stages/stage5-generation/orchestrator.ts` | 14KB | Main orchestrator |
-| `orchestrator/handlers/stage5-generation.ts` | `stages/stage5-generation/handler.ts` | 23KB | Thin wrapper only |
-| `services/stage5/generation-phases.ts` | `stages/stage5-generation/phases/index.ts` | 27KB | Phase definitions |
+| `orchestrator/handlers/stage5-generation.ts` | `stages/stage5-generation/handler.ts`      | 23KB | Thin wrapper only |
+| `services/stage5/generation-phases.ts`       | `stages/stage5-generation/phases/index.ts` | 27KB | Phase definitions |
 
 ### Step 1.3: Split Phase Files
 
 Extract from `generation-phases.ts` → individual phase files:
 
-| Target File | Extracted Function | Lines |
-|------------|-------------------|-------|
-| `phases/phase-1-validation.ts` | `validateInputPhase()` | ~50 |
-| `phases/phase-2-metadata.ts` | `generateMetadataPhase()` | ~100 |
-| `phases/phase-3-sections.ts` | `generateSectionsPhase()` | ~150 |
-| `phases/phase-4-quality.ts` | `validateQualityPhase()` | ~80 |
-| `phases/phase-5-lessons.ts` | `validateLessonsPhase()` | ~60 |
+| Target File                    | Extracted Function        | Lines |
+| ------------------------------ | ------------------------- | ----- |
+| `phases/phase-1-validation.ts` | `validateInputPhase()`    | ~50   |
+| `phases/phase-2-metadata.ts`   | `generateMetadataPhase()` | ~100  |
+| `phases/phase-3-sections.ts`   | `generateSectionsPhase()` | ~150  |
+| `phases/phase-4-quality.ts`    | `validateQualityPhase()`  | ~80   |
+| `phases/phase-5-lessons.ts`    | `validateLessonsPhase()`  | ~60   |
 
 **Extraction Pattern:**
+
 ```typescript
 // Before (generation-phases.ts):
 export const generateMetadataPhase = async (state: GenerationState) => { ... }
@@ -372,24 +380,25 @@ export async function executeMetadataGeneration(state: GenerationState): Promise
 
 ### Step 1.4: Move Service Files
 
-| From | To | Notes |
-|------|----|----|
-| `services/stage5/metadata-generator.ts` | `stages/stage5-generation/utils/metadata-generator.ts` | Keep as utility |
-| `services/stage5/section-batch-generator.ts` | `stages/stage5-generation/utils/section-batch-generator.ts` | Keep as utility |
-| `services/stage5/quality-validator.ts` | `stages/stage5-generation/utils/quality-validator.ts` | Keep as utility |
-| `services/stage5/cost-calculator.ts` | `stages/stage5-generation/utils/cost-calculator.ts` | Move entire file |
-| `services/stage5/json-repair.ts` | `stages/stage5-generation/utils/json-repair.ts` | Move entire file |
-| `services/stage5/field-name-fix.ts` | `stages/stage5-generation/utils/field-name-fix.ts` | Move entire file |
-| `services/stage5/analysis-formatters.ts` | `stages/stage5-generation/utils/analysis-formatters.ts` | Move entire file |
-| `services/stage5/sanitize-course-structure.ts` | `stages/stage5-generation/utils/sanitize.ts` | Rename for brevity |
-| `services/stage5/qdrant-search.ts` | `stages/stage5-generation/utils/qdrant-search.ts` | Move entire file |
-| `services/stage5/validators/*` | `stages/stage5-generation/validators/*` | Move entire directory |
+| From                                           | To                                                          | Notes                 |
+| ---------------------------------------------- | ----------------------------------------------------------- | --------------------- |
+| `services/stage5/metadata-generator.ts`        | `stages/stage5-generation/utils/metadata-generator.ts`      | Keep as utility       |
+| `services/stage5/section-batch-generator.ts`   | `stages/stage5-generation/utils/section-batch-generator.ts` | Keep as utility       |
+| `services/stage5/quality-validator.ts`         | `stages/stage5-generation/utils/quality-validator.ts`       | Keep as utility       |
+| `services/stage5/cost-calculator.ts`           | `stages/stage5-generation/utils/cost-calculator.ts`         | Move entire file      |
+| `services/stage5/json-repair.ts`               | `stages/stage5-generation/utils/json-repair.ts`             | Move entire file      |
+| `services/stage5/field-name-fix.ts`            | `stages/stage5-generation/utils/field-name-fix.ts`          | Move entire file      |
+| `services/stage5/analysis-formatters.ts`       | `stages/stage5-generation/utils/analysis-formatters.ts`     | Move entire file      |
+| `services/stage5/sanitize-course-structure.ts` | `stages/stage5-generation/utils/sanitize.ts`                | Rename for brevity    |
+| `services/stage5/qdrant-search.ts`             | `stages/stage5-generation/utils/qdrant-search.ts`           | Move entire file      |
+| `services/stage5/validators/*`                 | `stages/stage5-generation/validators/*`                     | Move entire directory |
 
 ### Step 1.5: Update Import Paths
 
 **Search Pattern:** `from.*services/stage5/`
 
 **Files to Update (6 files):**
+
 1. `shared/regeneration/layers/layer-2-critique-revise.ts`
 2. `shared/regeneration/layers/layer-3-partial-regen.ts`
 3. `shared/regeneration/layers/layer-4-model-escalation.ts`
@@ -398,6 +407,7 @@ export async function executeMetadataGeneration(state: GenerationState): Promise
 6. `orchestrator/worker.ts`
 
 **Example Update:**
+
 ```typescript
 // Before:
 import { GenerationOrchestrator } from '../../services/stage5/generation-orchestrator';
@@ -409,6 +419,7 @@ import { QualityValidator } from '../../stages/stage5-generation/utils/quality-v
 ```
 
 **Automated Update Command:**
+
 ```bash
 # Update all imports in one pass
 find src/ -type f -name "*.ts" -exec sed -i \
@@ -434,14 +445,15 @@ import { stage5GenerationHandler } from '../stages/stage5-generation/handler';
 
 ### Step 1.7: Move Tests
 
-| From | To |
-|------|-------|
-| `tests/unit/stage5/metadata-generator.test.ts` | `tests/unit/stages/stage5/utils/metadata-generator.test.ts` |
+| From                                                | To                                                               |
+| --------------------------------------------------- | ---------------------------------------------------------------- |
+| `tests/unit/stage5/metadata-generator.test.ts`      | `tests/unit/stages/stage5/utils/metadata-generator.test.ts`      |
 | `tests/unit/stage5/section-batch-generator.test.ts` | `tests/unit/stages/stage5/utils/section-batch-generator.test.ts` |
-| `tests/unit/stage5/cost-calculator.test.ts` | `tests/unit/stages/stage5/utils/cost-calculator.test.ts` |
-| `tests/unit/stage5/*.test.ts` | `tests/unit/stages/stage5/**/*.test.ts` |
+| `tests/unit/stage5/cost-calculator.test.ts`         | `tests/unit/stages/stage5/utils/cost-calculator.test.ts`         |
+| `tests/unit/stage5/*.test.ts`                       | `tests/unit/stages/stage5/**/*.test.ts`                          |
 
 **Update Test Imports:**
+
 ```bash
 find tests/unit/stages/stage5/ -type f -name "*.test.ts" -exec sed -i \
   -e "s|../../../src/services/stage5/|../../../../../src/stages/stage5-generation/utils/|g" \
@@ -550,39 +562,40 @@ mkdir -p tests/unit/stages/stage4/phases/
 
 ### Step 2.2: Move Core Files
 
-| From | To | Notes |
-|------|----|----|
-| `orchestrator/services/analysis/analysis-orchestrator.ts` | `stages/stage4-analysis/orchestrator.ts` | Main orchestrator |
-| `orchestrator/handlers/stage4-analysis.ts` | `stages/stage4-analysis/handler.ts` | Refactor to thin wrapper |
+| From                                                      | To                                       | Notes                    |
+| --------------------------------------------------------- | ---------------------------------------- | ------------------------ |
+| `orchestrator/services/analysis/analysis-orchestrator.ts` | `stages/stage4-analysis/orchestrator.ts` | Main orchestrator        |
+| `orchestrator/handlers/stage4-analysis.ts`                | `stages/stage4-analysis/handler.ts`      | Refactor to thin wrapper |
 
 ### Step 2.3: Move Phase Files
 
-| From | To |
-|------|-------|
-| `orchestrator/services/analysis/phase-1-classifier.ts` | `stages/stage4-analysis/phases/phase-1-classifier.ts` |
-| `orchestrator/services/analysis/phase-2-scope.ts` | `stages/stage4-analysis/phases/phase-2-scope.ts` |
-| `orchestrator/services/analysis/phase-3-expert.ts` | `stages/stage4-analysis/phases/phase-3-expert.ts` |
-| `orchestrator/services/analysis/phase-4-synthesis.ts` | `stages/stage4-analysis/phases/phase-4-synthesis.ts` |
-| `orchestrator/services/analysis/phase-5-assembly.ts` | `stages/stage4-analysis/phases/phase-5-assembly.ts` |
+| From                                                     | To                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------- |
+| `orchestrator/services/analysis/phase-1-classifier.ts`   | `stages/stage4-analysis/phases/phase-1-classifier.ts`   |
+| `orchestrator/services/analysis/phase-2-scope.ts`        | `stages/stage4-analysis/phases/phase-2-scope.ts`        |
+| `orchestrator/services/analysis/phase-3-expert.ts`       | `stages/stage4-analysis/phases/phase-3-expert.ts`       |
+| `orchestrator/services/analysis/phase-4-synthesis.ts`    | `stages/stage4-analysis/phases/phase-4-synthesis.ts`    |
+| `orchestrator/services/analysis/phase-5-assembly.ts`     | `stages/stage4-analysis/phases/phase-5-assembly.ts`     |
 | `orchestrator/services/analysis/phase-6-rag-planning.ts` | `stages/stage4-analysis/phases/phase-6-rag-planning.ts` |
 
 ### Step 2.4: Move Utility Files
 
-| From | To |
-|------|-------|
-| `orchestrator/services/analysis/langchain-models.ts` | `stages/stage4-analysis/utils/langchain-models.ts` |
-| `orchestrator/services/analysis/workflow-graph.ts` | `stages/stage4-analysis/utils/workflow-graph.ts` |
-| `orchestrator/services/analysis/field-name-fix.ts` | `stages/stage4-analysis/utils/field-name-fix.ts` |
-| `orchestrator/services/analysis/contextual-language.ts` | `stages/stage4-analysis/utils/contextual-language.ts` |
-| `orchestrator/services/analysis/research-flag-detector.ts` | `stages/stage4-analysis/utils/research-flag-detector.ts` |
-| `orchestrator/services/analysis/analysis-validators.ts` | `stages/stage4-analysis/utils/validators.ts` |
-| `orchestrator/services/analysis/langchain-observability.ts` | `stages/stage4-analysis/utils/observability.ts` |
+| From                                                        | To                                                       |
+| ----------------------------------------------------------- | -------------------------------------------------------- |
+| `orchestrator/services/analysis/langchain-models.ts`        | `stages/stage4-analysis/utils/langchain-models.ts`       |
+| `orchestrator/services/analysis/workflow-graph.ts`          | `stages/stage4-analysis/utils/workflow-graph.ts`         |
+| `orchestrator/services/analysis/field-name-fix.ts`          | `stages/stage4-analysis/utils/field-name-fix.ts`         |
+| `orchestrator/services/analysis/contextual-language.ts`     | `stages/stage4-analysis/utils/contextual-language.ts`    |
+| `orchestrator/services/analysis/research-flag-detector.ts`  | `stages/stage4-analysis/utils/research-flag-detector.ts` |
+| `orchestrator/services/analysis/analysis-validators.ts`     | `stages/stage4-analysis/utils/validators.ts`             |
+| `orchestrator/services/analysis/langchain-observability.ts` | `stages/stage4-analysis/utils/observability.ts`          |
 
 ### Step 2.5: Update Import Paths
 
 **Search Pattern:** `from.*orchestrator/services/analysis/`
 
 **Files to Update (fewer than Stage 5):**
+
 1. `orchestrator/worker.ts`
 2. `shared/regeneration/layers/layer-2-critique-revise.ts`
 3. `shared/regeneration/layers/layer-3-partial-regen.ts`
@@ -590,6 +603,7 @@ mkdir -p tests/unit/stages/stage4/phases/
 5. `shared/regeneration/layers/layer-5-emergency.ts`
 
 **Automated Update:**
+
 ```bash
 find src/ -type f -name "*.ts" -exec sed -i \
   -e "s|orchestrator/services/analysis/analysis-orchestrator|stages/stage4-analysis/orchestrator|g" \
@@ -602,11 +616,11 @@ find src/ -type f -name "*.ts" -exec sed -i \
 
 ### Step 2.6: Move Tests
 
-| From | To |
-|------|-------|
+| From                                                                   | To                                                           |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `tests/unit/orchestrator/services/analysis/phase-1-classifier.test.ts` | `tests/unit/stages/stage4/phases/phase-1-classifier.test.ts` |
-| `tests/unit/orchestrator/services/analysis/backward-compat.test.ts` | `tests/unit/stages/stage4/backward-compat.test.ts` |
-| `tests/unit/orchestrator/services/analysis/__tests__/*` | `tests/unit/stages/stage4/utils/*` |
+| `tests/unit/orchestrator/services/analysis/backward-compat.test.ts`    | `tests/unit/stages/stage4/backward-compat.test.ts`           |
+| `tests/unit/orchestrator/services/analysis/__tests__/*`                | `tests/unit/stages/stage4/utils/*`                           |
 
 ### Step 2.7: Validation Checklist
 
@@ -683,6 +697,7 @@ mkdir -p tests/unit/stages/stage2/phases/
 ### Step 3.2: Analyze Monolithic Handler
 
 **Current Structure (document-processing.ts - 803 lines):**
+
 - Lines 1-93: Imports, types, class declaration
 - Lines 94-429: `execute()` method (main orchestration)
 - Lines 430-461: `processDocumentByTier()` (tier routing)
@@ -692,6 +707,7 @@ mkdir -p tests/unit/stages/stage2/phases/
 - Lines 590-803: `processWithDocling()` (Docling processing + 6 sub-phases)
 
 **Embedded Phases (lines 590-803):**
+
 1. Docling conversion (lines 595-620)
 2. Markdown processing (lines 625-650)
 3. Image extraction (lines 655-680)
@@ -702,6 +718,7 @@ mkdir -p tests/unit/stages/stage2/phases/
 ### Step 3.3: Split Handler into Orchestrator + Phases
 
 **New Orchestrator:**
+
 ```typescript
 // stages/stage2-document-processing/orchestrator.ts
 export class DocumentProcessingOrchestrator {
@@ -736,19 +753,23 @@ export class DocumentProcessingOrchestrator {
 
 ### Step 3.4: Extract Phase Files
 
-| Target File | Extracted From | Lines | Logic |
-|------------|----------------|-------|-------|
-| `phases/phase-1-docling-conversion.ts` | Lines 595-620 | ~80 | Docling MCP call |
-| `phases/phase-2-markdown-processing.ts` | Lines 625-650 | ~60 | Markdown conversion |
-| `phases/phase-3-image-extraction.ts` | Lines 655-680 | ~70 | OCR + image metadata |
-| `phases/phase-4-chunking.ts` | Lines 685-720 | ~80 | Hierarchical chunking |
-| `phases/phase-5-embedding.ts` | Lines 725-760 | ~80 | Late chunking embeddings |
-| `phases/phase-6-qdrant-upload.ts` | Lines 765-803 | ~90 | Vector DB upload |
+| Target File                             | Extracted From | Lines | Logic                    |
+| --------------------------------------- | -------------- | ----- | ------------------------ |
+| `phases/phase-1-docling-conversion.ts`  | Lines 595-620  | ~80   | Docling MCP call         |
+| `phases/phase-2-markdown-processing.ts` | Lines 625-650  | ~60   | Markdown conversion      |
+| `phases/phase-3-image-extraction.ts`    | Lines 655-680  | ~70   | OCR + image metadata     |
+| `phases/phase-4-chunking.ts`            | Lines 685-720  | ~80   | Hierarchical chunking    |
+| `phases/phase-5-embedding.ts`           | Lines 725-760  | ~80   | Late chunking embeddings |
+| `phases/phase-6-qdrant-upload.ts`       | Lines 765-803  | ~90   | Vector DB upload         |
 
 **Example Extraction:**
+
 ```typescript
 // phases/phase-4-chunking.ts
-import { chunkMarkdown, DEFAULT_CHUNKING_CONFIG } from '../../../shared/embeddings/markdown-chunker';
+import {
+  chunkMarkdown,
+  DEFAULT_CHUNKING_CONFIG,
+} from '../../../shared/embeddings/markdown-chunker';
 
 export async function executeChunking(markdown: string): Promise<ChunkResult[]> {
   const chunks = await chunkMarkdown(markdown, DEFAULT_CHUNKING_CONFIG);
@@ -874,25 +895,26 @@ mkdir -p tests/unit/stages/stage3/phases/
 
 ### Step 4.2: Move Core Files
 
-| From | To | Notes |
-|------|----|----|
-| `orchestrator/services/summarization-service.ts` | `stages/stage3-summarization/orchestrator.ts` | Rename + refactor |
-| `orchestrator/handlers/stage3-summarization.ts` | `stages/stage3-summarization/handler.ts` | Already thin wrapper |
-| `orchestrator/workers/stage3-summarization.worker.ts` | `stages/stage3-summarization/worker.ts` | Move worker config |
+| From                                                  | To                                            | Notes                |
+| ----------------------------------------------------- | --------------------------------------------- | -------------------- |
+| `orchestrator/services/summarization-service.ts`      | `stages/stage3-summarization/orchestrator.ts` | Rename + refactor    |
+| `orchestrator/handlers/stage3-summarization.ts`       | `stages/stage3-summarization/handler.ts`      | Already thin wrapper |
+| `orchestrator/workers/stage3-summarization.worker.ts` | `stages/stage3-summarization/worker.ts`       | Move worker config   |
 
 ### Step 4.3: Extract Phases
 
 Currently `summarization-service.ts` contains all logic in one function. Split into:
 
-| Phase File | Logic |
-|-----------|-------|
-| `phases/phase-1-validation.ts` | Input validation |
-| `phases/phase-2-summarization.ts` | LLM summarization |
-| `phases/phase-3-metadata.ts` | Token counting + cost calculation |
+| Phase File                        | Logic                             |
+| --------------------------------- | --------------------------------- |
+| `phases/phase-1-validation.ts`    | Input validation                  |
+| `phases/phase-2-summarization.ts` | LLM summarization                 |
+| `phases/phase-3-metadata.ts`      | Token counting + cost calculation |
 
 ### Step 4.4: Update Import Paths
 
 **Files to Update:**
+
 1. `orchestrator/worker.ts` (handler registration)
 2. `orchestrator/handlers/stage3-summarization.ts` → `stages/stage3-summarization/handler.ts`
 
@@ -1005,27 +1027,33 @@ Each stage must have a `README.md` with:
 # Stage {N}: {Name}
 
 ## Overview
+
 Brief description of stage purpose.
 
 ## Architecture
+
 - **Orchestrator:** Main entry point
 - **Handler:** BullMQ job handler (thin wrapper)
 - **Phases:** {N} phases listed
 
 ## Phase Breakdown
+
 1. **Phase 1:** Description
 2. **Phase 2:** Description
-...
+   ...
 
 ## Dependencies
+
 - External: (e.g., Docling MCP, OpenRouter API)
 - Internal: (e.g., shared/embeddings, shared/qdrant)
 
 ## Testing
+
 - Unit tests: `tests/unit/stages/stage{N}/`
 - Integration tests: `tests/integration/stage{N}-*.test.ts`
 
 ## Cost Tracking
+
 - Model: {model name}
 - Avg cost: ${cost} per run
 ```
@@ -1089,27 +1117,30 @@ pnpm build
 
 ## Risk Matrix
 
-| Phase | Risk Level | Impact | Probability | Mitigation |
-|-------|-----------|--------|-------------|------------|
-| Phase 1 (Stage 5) | HIGH | HIGH | MEDIUM | Automated sed, incremental testing |
-| Phase 2 (Stage 4) | MEDIUM | MEDIUM | LOW | Already structured, fewer deps |
-| Phase 3 (Stage 2) | MEDIUM | LOW | MEDIUM | Self-contained, low coupling |
-| Phase 4 (Stage 3) | LOW | LOW | LOW | Simplest stage, clear boundaries |
+| Phase             | Risk Level | Impact | Probability | Mitigation                         |
+| ----------------- | ---------- | ------ | ----------- | ---------------------------------- |
+| Phase 1 (Stage 5) | HIGH       | HIGH   | MEDIUM      | Automated sed, incremental testing |
+| Phase 2 (Stage 4) | MEDIUM     | MEDIUM | LOW         | Already structured, fewer deps     |
+| Phase 3 (Stage 2) | MEDIUM     | LOW    | MEDIUM      | Self-contained, low coupling       |
+| Phase 4 (Stage 3) | LOW        | LOW    | LOW         | Simplest stage, clear boundaries   |
 
 ### Risk Factors
 
 **High-Risk Indicators:**
+
 - ❌ >10 files importing from target module
 - ❌ Monolithic file >500 lines
 - ❌ Complex cross-module dependencies
 - ❌ Shared state or singletons
 
 **Medium-Risk Indicators:**
+
 - ⚠️ 5-10 files importing from target module
 - ⚠️ Files 200-500 lines
 - ⚠️ Some cross-module dependencies
 
 **Low-Risk Indicators:**
+
 - ✅ <5 files importing from target module
 - ✅ Files <200 lines
 - ✅ Clear module boundaries
@@ -1117,12 +1148,14 @@ pnpm build
 ### Contingency Plans
 
 **If Phase 1 (Stage 5) fails:**
+
 - Rollback using Git (Step 1.10)
 - Re-assess risk factors
 - Consider alternative approach: incremental file-by-file moves
 - Engage senior developer for code review
 
 **If any phase takes >2x estimated time:**
+
 - Pause and assess blockers
 - Document unexpected complexity
 - Consider splitting into sub-phases
@@ -1168,14 +1201,17 @@ pnpm build
 ## Timeline & Milestones
 
 ### Week 1: Planning & Phase 1
+
 - **Day 1 (4h):** Planning, document creation, baseline metrics
 - **Day 2-3 (12h):** Phase 1 (Stage 5) execution + validation
 
 ### Week 2: Phases 2-3
+
 - **Day 4 (4h):** Phase 2 (Stage 4) execution + validation
 - **Day 5-6 (10h):** Phase 3 (Stage 2) execution + validation
 
 ### Week 3: Phase 4 & Finalization
+
 - **Day 7 (4h):** Phase 4 (Stage 3) execution + validation
 - **Day 8 (4h):** Full test suite, documentation, cleanup
 
@@ -1196,14 +1232,14 @@ grep -r "from.*handlers/" src/ | wc -l > baseline-handler-imports.txt
 
 ### Post-Refactoring Metrics (Target)
 
-| Metric | Baseline | Target | Actual |
-|--------|---------|--------|--------|
-| Total TypeScript files | TBD | TBD | |
-| Lines of code (handlers) | ~2100 | ~1200 | |
-| Average file size | ~400 lines | <200 lines | |
-| Import depth (max) | 5 levels | 4 levels | |
-| Test coverage | ~85% | ≥90% | |
-| Duplicate code % | ~12% | <5% | |
+| Metric                   | Baseline   | Target     | Actual |
+| ------------------------ | ---------- | ---------- | ------ |
+| Total TypeScript files   | TBD        | TBD        |        |
+| Lines of code (handlers) | ~2100      | ~1200      |        |
+| Average file size        | ~400 lines | <200 lines |        |
+| Import depth (max)       | 5 levels   | 4 levels   |        |
+| Test coverage            | ~85%       | ≥90%       |        |
+| Duplicate code %         | ~12%       | <5%        |        |
 
 ### Success Metrics
 
@@ -1219,9 +1255,11 @@ grep -r "from.*handlers/" src/ | wc -l > baseline-handler-imports.txt
 ### Stage 2 Files (Current)
 
 **Handlers:**
+
 - `orchestrator/handlers/document-processing.ts` (28KB, 803 lines)
 
 **Dependencies:**
+
 - `shared/embeddings/index.js` (markdown conversion)
 - `shared/docling/types.js` (Docling types)
 - `shared/embeddings/markdown-chunker.js` (chunking)
@@ -1229,29 +1267,36 @@ grep -r "from.*handlers/" src/ | wc -l > baseline-handler-imports.txt
 - `shared/qdrant/upload.js` (vector DB)
 
 **Tests:**
+
 - None (to be created)
 
 ### Stage 3 Files (Current)
 
 **Handlers:**
+
 - `orchestrator/handlers/stage3-summarization.ts` (11KB, 358 lines)
 
 **Services:**
+
 - `orchestrator/services/summarization-service.ts`
 
 **Workers:**
+
 - `orchestrator/workers/stage3-summarization.worker.ts`
 
 **Tests:**
+
 - `tests/e2e/stage3-real-documents.test.ts`
 - `tests/integration/stage3-cost-tracking.test.ts`
 
 ### Stage 4 Files (Current)
 
 **Handlers:**
+
 - `orchestrator/handlers/stage4-analysis.ts` (19KB, 515 lines)
 
 **Services:**
+
 - `orchestrator/services/analysis/analysis-orchestrator.ts` (18KB)
 - `orchestrator/services/analysis/phase-1-classifier.ts` (10KB)
 - `orchestrator/services/analysis/phase-2-scope.ts` (21KB)
@@ -1268,6 +1313,7 @@ grep -r "from.*handlers/" src/ | wc -l > baseline-handler-imports.txt
 - `orchestrator/services/analysis/langchain-observability.ts` (14KB)
 
 **Tests:**
+
 - `tests/unit/orchestrator/services/analysis/phase-1-classifier.test.ts`
 - `tests/unit/orchestrator/services/analysis/backward-compat.test.ts`
 - `tests/unit/orchestrator/services/analysis/__tests__/*` (3+ files)
@@ -1276,9 +1322,11 @@ grep -r "from.*handlers/" src/ | wc -l > baseline-handler-imports.txt
 ### Stage 5 Files (Current)
 
 **Handlers:**
+
 - `orchestrator/handlers/stage5-generation.ts` (23KB, 659 lines)
 
 **Services (ORPHANED):**
+
 - `services/stage5/generation-orchestrator.ts` (14KB)
 - `services/stage5/metadata-generator.ts` (25KB)
 - `services/stage5/section-batch-generator.ts` (37KB)
@@ -1299,6 +1347,7 @@ grep -r "from.*handlers/" src/ | wc -l > baseline-handler-imports.txt
 - `services/stage5/validators/blooms-whitelists.ts`
 
 **Tests:**
+
 - `tests/unit/stage5/` (15+ test files)
 
 ---
@@ -1455,24 +1504,29 @@ echo "✅ All validations passed!"
 
 ## Appendix E: Lessons Learned (Post-Refactoring)
 
-*To be filled after completion*
+_To be filled after completion_
 
 **What went well:**
+
 - TBD
 
 **What went poorly:**
+
 - TBD
 
 **Unexpected challenges:**
+
 - TBD
 
 **Time estimates vs actuals:**
-- Phase 1: Est. 6-8h, Actual: ___h
-- Phase 2: Est. 4-5h, Actual: ___h
-- Phase 3: Est. 5-6h, Actual: ___h
-- Phase 4: Est. 3-4h, Actual: ___h
+
+- Phase 1: Est. 6-8h, Actual: \_\_\_h
+- Phase 2: Est. 4-5h, Actual: \_\_\_h
+- Phase 3: Est. 5-6h, Actual: \_\_\_h
+- Phase 4: Est. 3-4h, Actual: \_\_\_h
 
 **Recommendations for future refactors:**
+
 - TBD
 
 ---
@@ -1480,15 +1534,18 @@ echo "✅ All validations passed!"
 ## Appendix F: References
 
 ### Internal Documentation
+
 - `CLAUDE.md` - Agent orchestration rules
 - `docs/Agents Ecosystem/AGENT-ORCHESTRATION.md` - Orchestration patterns
 - `docs/Agents Ecosystem/ARCHITECTURE.md` - System architecture
 
 ### Relevant Specs
+
 - `specs/008-generation-generation-json/` - Stage 5 specs
 - `specs/T074-T075-RAG-integration/` - Stage 2 specs
 
 ### External Resources
+
 - [BullMQ Best Practices](https://docs.bullmq.io/patterns/producer-consumer)
 - [LangGraph State Management](https://langchain-ai.github.io/langgraphjs/how-tos/state-model/)
 - [Clean Architecture (Martin, 2017)](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
@@ -1497,4 +1554,4 @@ echo "✅ All validations passed!"
 
 **End of Refactoring Plan**
 
-*This document is a living plan. Update as execution progresses.*
+_This document is a living plan. Update as execution progresses._

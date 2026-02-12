@@ -38,12 +38,14 @@ The Stage 4 barrier validation fails despite Stage 3 completing successfully due
 ### Observed Behavior
 
 Stage 4 barrier validation fails with error:
+
 ```
 BARRIER_FAILED: Not all documents summarized successfully
 Stage 4 barrier check metrics: 0/3 complete, 3 failed
 ```
 
 Despite Stage 3 test output showing:
+
 ```
 [T055] Document processing status: 3/3 completed, 0 failed
 [T055] All documents processed successfully
@@ -113,6 +115,7 @@ grep -r "vector_status.*indexed" src/orchestrator/
 ### Data Collected
 
 **Stage 2 (Vectorization) Database Update**:
+
 ```typescript
 // From: src/shared/qdrant/upload.ts:236
 await updateVectorStatus(documentId, 'indexed', undefined, chunkCount);
@@ -120,6 +123,7 @@ await updateVectorStatus(documentId, 'indexed', undefined, chunkCount);
 ```
 
 **Stage 3 (Summarization) Database Update**:
+
 ```typescript
 // From: src/orchestrator/handlers/stage3-summarization.ts:258-266
 await supabaseAdmin
@@ -136,6 +140,7 @@ await supabaseAdmin
 ```
 
 **Stage 4 Barrier Validation Query**:
+
 ```sql
 -- From: supabase/migrations/20251029100000_stage4_barrier_rpc.sql:18-22
 SELECT
@@ -147,6 +152,7 @@ WHERE course_id = p_course_id;
 ```
 
 **Test Validation Query**:
+
 ```typescript
 // From: tests/e2e/t055-full-pipeline.test.ts:324-335
 const { data: documents } = await supabase
@@ -176,11 +182,13 @@ The test's `waitForDocumentProcessing()` function validates `vector_status === '
 **Evidence**:
 
 1. **Migration 20251028000000_stage3_summary_metadata.sql** adds `processed_content` column:
+
    ```sql
    ALTER TABLE file_catalog ADD COLUMN processed_content TEXT NULL;
    ```
 
 2. **Stage 3 handler** (`stage3-summarization.ts:258-266`) updates `processed_content`:
+
    ```typescript
    .update({
      processed_content: result.processed_content,
@@ -190,13 +198,14 @@ The test's `waitForDocumentProcessing()` function validates `vector_status === '
    ```
 
 3. **Stage 4 barrier RPC** (`check_stage4_barrier`) checks `processed_content`:
+
    ```sql
    COUNT(*) FILTER (WHERE processed_content IS NOT NULL) AS completed_count
    ```
 
 4. **Test validation** (`t055-full-pipeline.test.ts:334`) checks WRONG field:
    ```typescript
-   const completedDocs = documents?.filter(d => d.vector_status === 'indexed')
+   const completedDocs = documents?.filter(d => d.vector_status === 'indexed');
    // Should check: d.processed_content !== null
    ```
 
@@ -264,6 +273,7 @@ The test's `waitForDocumentProcessing()` function validates `vector_status === '
 **Description**: Update `waitForDocumentProcessing()` to check `processed_content IS NOT NULL` instead of `vector_status = 'indexed'`.
 
 **Why This Addresses Root Cause**:
+
 - Aligns test validation with barrier validation criteria
 - Ensures test waits for Stage 3 completion before proceeding to Stage 4
 - Eliminates race condition between vectorization and summarization
@@ -276,6 +286,7 @@ The test's `waitForDocumentProcessing()` function validates `vector_status === '
    - **Purpose**: Check correct completion signal
 
 **Code Change**:
+
 ```typescript
 // BEFORE (line 334):
 const completedDocs = documents?.filter(d => d.vector_status === 'indexed').length || 0;
@@ -290,25 +301,26 @@ const completedDocs = documents?.filter(d => d.processed_content !== null).lengt
    - **Purpose**: Match barrier validation criteria
 
 **Code Change**:
+
 ```typescript
 // BEFORE (line 342):
-const allProcessed = documents?.every(d =>
-  ['indexed', 'failed'].includes(d.vector_status || '')
-);
+const allProcessed = documents?.every(d => ['indexed', 'failed'].includes(d.vector_status || ''));
 
 // AFTER:
-const allProcessed = documents?.every(d =>
-  d.processed_content !== null || d.vector_status === 'failed'
+const allProcessed = documents?.every(
+  d => d.processed_content !== null || d.vector_status === 'failed'
 );
 ```
 
 **Testing Strategy**:
+
 - Run `pnpm test tests/e2e/t055-full-pipeline.test.ts`
 - Verify test waits until Stage 3 completes (processed_content populated)
 - Confirm Stage 4 barrier validation passes
 - Check that test output matches barrier validation (3/3 complete)
 
 **Pros**:
+
 - ✅ Minimal code change (2 lines)
 - ✅ Fixes root cause directly
 - ✅ Aligns test with production barrier validation
@@ -316,6 +328,7 @@ const allProcessed = documents?.every(d =>
 - ✅ No changes to production code
 
 **Cons**:
+
 - ❌ Test name `waitForDocumentProcessing` is now slightly misleading (waits for summarization, not just processing)
 - ❌ Doesn't fix underlying confusion about "processing" vs "summarization"
 
@@ -332,6 +345,7 @@ const allProcessed = documents?.every(d =>
 **Description**: Rename `waitForDocumentProcessing()` to `waitForDocumentSummarization()` to clarify what it waits for.
 
 **Why This Addresses Root Cause**:
+
 - Makes test intent explicit
 - Reduces confusion between Stage 2 (processing) and Stage 3 (summarization)
 - Self-documenting code
@@ -344,6 +358,7 @@ const allProcessed = documents?.every(d =>
    - **Purpose**: Clarify test intent
 
 **Code Change**:
+
 ```typescript
 // BEFORE (line 313):
 async function waitForDocumentProcessing(
@@ -358,6 +373,7 @@ async function waitForDocumentSummarization(
    - **Purpose**: Consistency
 
 **Code Change**:
+
 ```typescript
 // BEFORE (line 654):
 await waitForDocumentProcessing(testCourseId);
@@ -367,15 +383,18 @@ await waitForDocumentSummarization(testCourseId);
 ```
 
 **Testing Strategy**:
+
 - Same as Solution 1
 - Verify renamed function behaves identically
 
 **Pros**:
+
 - ✅ Improves code clarity
 - ✅ Self-documenting
 - ✅ Prevents future confusion
 
 **Cons**:
+
 - ❌ Additional change beyond minimal fix
 - ❌ Might confuse developers who grep for "waitForDocumentProcessing"
 
@@ -392,6 +411,7 @@ await waitForDocumentSummarization(testCourseId);
 **Description**: Create two separate wait functions: `waitForVectorization()` and `waitForSummarization()`.
 
 **Why This Addresses Root Cause**:
+
 - Explicitly distinguishes Stage 2 and Stage 3
 - Allows independent validation of each stage
 - Makes test workflow match production workflow
@@ -404,19 +424,14 @@ await waitForDocumentSummarization(testCourseId);
    - **Purpose**: Stage 2 validation
 
 **Code Change**:
+
 ```typescript
-async function waitForVectorization(
-  courseId: string,
-  timeoutMs: number = 300000
-): Promise<void> {
+async function waitForVectorization(courseId: string, timeoutMs: number = 300000): Promise<void> {
   // ... similar to current waitForDocumentProcessing
   // BUT: checks vector_status = 'indexed'
 }
 
-async function waitForSummarization(
-  courseId: string,
-  timeoutMs: number = 300000
-): Promise<void> {
+async function waitForSummarization(courseId: string, timeoutMs: number = 300000): Promise<void> {
   // ... similar to current waitForDocumentProcessing
   // BUT: checks processed_content IS NOT NULL
 }
@@ -428,6 +443,7 @@ async function waitForSummarization(
    - **Purpose**: Validate both stages explicitly
 
 **Code Change**:
+
 ```typescript
 // Stage 2 validation
 await waitForVectorization(testCourseId);
@@ -439,17 +455,20 @@ console.log('[T055] ✓ All documents summarized\n');
 ```
 
 **Testing Strategy**:
+
 - Run full E2E test
 - Verify Stage 2 completion logged separately from Stage 3
 - Confirm both stages validated before Stage 4
 
 **Pros**:
+
 - ✅ Most explicit solution
 - ✅ Matches production workflow exactly
 - ✅ Better test observability (see which stage is slow)
 - ✅ Future-proof (easy to add Stage 1, Stage 4 validators)
 
 **Cons**:
+
 - ❌ More code duplication
 - ❌ Higher complexity
 - ❌ Longer test execution time (two sequential waits)
@@ -481,11 +500,13 @@ console.log('[T055] ✓ All documents summarized\n');
    - **Purpose**: Update allProcessed check to include processed_content
 
 **Validation Criteria**:
+
 - ✅ Test waits until all documents have `processed_content IS NOT NULL` - Verify with database query during test
 - ✅ Stage 4 barrier validation passes (no BARRIER_FAILED error) - Check test output
 - ✅ Test output shows 3/3 documents complete before Stage 4 starts - Verify log messages
 
 **Testing Requirements**:
+
 - Unit tests: None needed (test-only change)
 - Integration tests: Run `pnpm test tests/e2e/t055-full-pipeline.test.ts` successfully
 - Manual verification:
@@ -495,6 +516,7 @@ console.log('[T055] ✓ All documents summarized\n');
   4. Check barrier validation passes
 
 **Dependencies**:
+
 - No library updates needed
 - No infrastructure changes needed
 - No database migrations needed
@@ -529,6 +551,7 @@ None - test-only change
 ## Execution Flow Diagram
 
 **Current (BROKEN) Flow**:
+
 ```
 Stage 2: Vectorization
   ↓ (sets vector_status = 'indexed')
@@ -546,6 +569,7 @@ Stage 3: Summarization (still running)
 ```
 
 **Fixed Flow**:
+
 ```
 Stage 2: Vectorization
   ↓ (sets vector_status = 'indexed')

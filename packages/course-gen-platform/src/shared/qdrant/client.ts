@@ -28,7 +28,7 @@ function validateQdrantConfig(): void {
   if (missing.length > 0) {
     throw new Error(
       `Missing required Qdrant environment variables: ${missing.join(', ')}. ` +
-      'Please ensure these are set in your .env file.'
+        'Please ensure these are set in your .env file.'
     );
   }
 }

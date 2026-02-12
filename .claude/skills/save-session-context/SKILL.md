@@ -25,6 +25,7 @@ Saves the current workflow state to enable seamless session resumption.
 ### Step 1: Gather Current State
 
 Collect the following information:
+
 - Current workflow name and phase
 - Priority level and completion counts
 - Last completed action
@@ -33,6 +34,7 @@ Collect the following information:
 ### Step 2: Get Git State
 
 Run `git status` and `git log -1` to capture:
+
 - Current branch
 - Uncommitted files count
 - Last commit hash and message
@@ -40,6 +42,7 @@ Run `git status` and `git log -1` to capture:
 ### Step 3: Determine Next Steps
 
 Based on current phase and workflow, identify:
+
 - Immediate next action
 - Following 2-3 actions
 
@@ -84,6 +87,7 @@ Write to `.tmp/current/session/context.md`:
 ## Resume Instructions
 
 To continue this session:
+
 1. Read this file to understand current state
 2. Read `session-log.md` for recent decisions
 3. Continue from "Next Steps" section
@@ -105,6 +109,7 @@ git branch --show-current       # Current branch
 ## Output
 
 Confirmation message:
+
 ```
 Session context saved to .tmp/current/session/context.md
 - Workflow: health-bugs

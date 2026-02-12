@@ -22,12 +22,12 @@ For an AI-powered educational platform with Next.js 15+, React 19, and Tailwind 
 
 ```typescript
 // next.config.mjs - Complete configuration
-import createMDX from '@next/mdx'
-import remarkGfm from 'remark-gfm'
-import remarkMath from 'remark-math'
-import rehypeKatex from 'rehype-katex'
-import rehypePrettyCode from 'rehype-pretty-code'
-import rehypeSlug from 'rehype-slug'
+import createMDX from '@next/mdx';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypePrettyCode from 'rehype-pretty-code';
+import rehypeSlug from 'rehype-slug';
 
 const withMDX = createMDX({
   options: {
@@ -35,17 +35,20 @@ const withMDX = createMDX({
     rehypePlugins: [
       rehypeSlug,
       rehypeKatex,
-      [rehypePrettyCode, {
-        theme: { light: 'github-light', dark: 'github-dark' },
-        keepBackground: false,
-      }],
+      [
+        rehypePrettyCode,
+        {
+          theme: { light: 'github-light', dark: 'github-dark' },
+          keepBackground: false,
+        },
+      ],
     ],
   },
-})
+});
 
 export default withMDX({
   pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
-})
+});
 ```
 
 ---
@@ -54,26 +57,26 @@ export default withMDX({
 
 The Markdown library ecosystem has consolidated around a few well-maintained solutions, each serving different use cases. React-markdown (v10.1.0, **15.2k GitHub stars**) remains the go-to for rendering plain Markdown strings, while MDX-based solutions dominate when component embedding matters.
 
-| Library | RSC Support | Bundle Impact | Best For | Maintenance |
-|---------|-------------|---------------|----------|-------------|
-| **next-mdx-remote** | Native (`/rsc` import) | 0KB client | Dynamic/CMS content | Active (HashiCorp) |
-| **@next/mdx** | Native | 0KB client | File-based content | Active (Vercel) |
-| **react-markdown** | Partial (`MarkdownAsync`) | ~42KB client | Simple Markdown strings | Active |
-| **Streamdown** | ✅ | Optimized | AI streaming output | Active (Vercel) |
-| **marked/markdown-it** | ❌ | ~8-32KB | Non-React contexts | Not recommended |
+| Library                | RSC Support               | Bundle Impact | Best For                | Maintenance        |
+| ---------------------- | ------------------------- | ------------- | ----------------------- | ------------------ |
+| **next-mdx-remote**    | Native (`/rsc` import)    | 0KB client    | Dynamic/CMS content     | Active (HashiCorp) |
+| **@next/mdx**          | Native                    | 0KB client    | File-based content      | Active (Vercel)    |
+| **react-markdown**     | Partial (`MarkdownAsync`) | ~42KB client  | Simple Markdown strings | Active             |
+| **Streamdown**         | ✅                        | Optimized     | AI streaming output     | Active (Vercel)    |
+| **marked/markdown-it** | ❌                        | ~8-32KB       | Non-React contexts      | Not recommended    |
 
 For AI-generated content that streams token-by-token, Vercel's **Streamdown** library (3.3k stars) solves the critical problem of rendering incomplete Markdown blocks during streaming. It memoizes parsed blocks to prevent expensive re-renders on each token, making it the optimal choice for ChatGPT-style educational assistants.
 
 ```tsx
 // Streaming AI content with Streamdown
-import { Streamdown } from 'streamdown'
+import { Streamdown } from 'streamdown';
 
 function AIExplanation({ stream }) {
   return (
     <article className="prose dark:prose-invert">
       <Streamdown>{stream}</Streamdown>
     </article>
-  )
+  );
 }
 ```
 
@@ -85,39 +88,39 @@ The syntax highlighting landscape shifted decisively toward **Shiki** in 2024-20
 
 **rehype-pretty-code** wraps Shiki for seamless integration with the remark/rehype pipeline. It adds features essential for educational content: line numbers via CSS counters, line highlighting using `{1,4-5}` syntax in code fences, word highlighting with `/pattern/` notation, and diff highlighting for showing code changes.
 
-| Highlighter | Client Bundle | RSC Support | Languages | Features |
-|-------------|---------------|-------------|-----------|----------|
-| **Shiki/rehype-pretty-code** | 0KB | Excellent | 190+ | Line/word/diff highlighting, dual themes |
-| **prism-react-renderer** | ~12KB | Client only | ~40 | Render props API, customizable |
-| **react-syntax-highlighter** | 17-200KB | Client only | 190+ | Built-in line numbers |
-| **Sugar High** | ~1KB | Manual | JS/JSX only | Ultra-lightweight |
-| **Bright** | 0KB | Native | 190+ | RSC-first, extensible |
+| Highlighter                  | Client Bundle | RSC Support | Languages   | Features                                 |
+| ---------------------------- | ------------- | ----------- | ----------- | ---------------------------------------- |
+| **Shiki/rehype-pretty-code** | 0KB           | Excellent   | 190+        | Line/word/diff highlighting, dual themes |
+| **prism-react-renderer**     | ~12KB         | Client only | ~40         | Render props API, customizable           |
+| **react-syntax-highlighter** | 17-200KB      | Client only | 190+        | Built-in line numbers                    |
+| **Sugar High**               | ~1KB          | Manual      | JS/JSX only | Ultra-lightweight                        |
+| **Bright**                   | 0KB           | Native      | 190+        | RSC-first, extensible                    |
 
 For educational platforms, the **a11y-dark** and **github-light/dark** themes provide WCAG-compliant contrast ratios (**4.5:1 minimum**) essential for readability. The copy-to-clipboard functionality requires a client component wrapper:
 
 ```tsx
 // components/CodeBlock.tsx
-'use client'
-import { useState } from 'react'
+'use client';
+import { useState } from 'react';
 
 export function CopyButton({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false)
-  
+  const [copied, setCopied] = useState(false);
+
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-  
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <button 
+    <button
       onClick={handleCopy}
       className="absolute top-2 right-2 px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600"
       aria-label="Copy code to clipboard"
     >
       {copied ? '✓ Copied' : 'Copy'}
     </button>
-  )
+  );
 }
 ```
 
@@ -128,6 +131,7 @@ export function CopyButton({ code }: { code: string }) {
 Premium Markdown styling follows consistent patterns across Notion, Linear, Stripe, and Vercel documentation. **Inter** has emerged as the standard UI font (used by Notion and Linear) due to its high x-height and excellent screen legibility. The Tailwind typography plugin encodes these patterns into ready-to-use prose classes.
 
 The key typography values that define readable educational content:
+
 - **Body font size**: 16-18px (16px minimum for accessibility)
 - **Line height**: 1.5-1.625 (WCAG recommends 1.5× minimum)
 - **Line length**: 65-75 characters (use `max-width: 65ch`)
@@ -136,13 +140,15 @@ The key typography values that define readable educational content:
 
 ```tsx
 // Applying Tailwind typography with customizations
-<article className="prose prose-lg dark:prose-invert
+<article
+  className="prose prose-lg dark:prose-invert
   prose-headings:tracking-tight
   prose-h2:border-b prose-h2:pb-2
   prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
   prose-code:bg-gray-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
   prose-img:rounded-xl prose-img:shadow-lg
-  max-w-prose">
+  max-w-prose"
+>
   <MarkdownRenderer content={content} />
 </article>
 ```
@@ -155,18 +161,18 @@ const calloutStyles = {
   warning: 'bg-amber-50 border-amber-400 dark:bg-amber-950',
   tip: 'bg-emerald-50 border-emerald-400 dark:bg-emerald-950',
   danger: 'bg-red-50 border-red-400 dark:bg-red-950',
-}
+};
 
 export function Callout({ type = 'note', title, children }) {
   return (
-    <aside 
+    <aside
       role={type === 'warning' || type === 'danger' ? 'alert' : 'note'}
       className={`my-6 p-4 border-l-4 rounded-r-lg ${calloutStyles[type]}`}
     >
       {title && <strong className="block mb-2">{title}</strong>}
       <div className="text-sm leading-relaxed">{children}</div>
     </aside>
-  )
+  );
 }
 ```
 
@@ -189,9 +195,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       </div>
     ),
     thead: ({ children }) => (
-      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
-        {children}
-      </thead>
+      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">{children}</thead>
     ),
     th: ({ children }) => (
       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -208,7 +212,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
         {children}
       </td>
     ),
-  }
+  };
 }
 ```
 
@@ -224,13 +228,10 @@ The setup uses remark-math to parse `$inline$` and `$$block$$` LaTeX syntax, the
 
 ```tsx
 // Include KaTeX CSS in your layout
-import 'katex/dist/katex.min.css'
+import 'katex/dist/katex.min.css';
 
 // Or via CDN in layout.tsx
-<link 
-  href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" 
-  rel="stylesheet" 
-/>
+<link href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" rel="stylesheet" />;
 ```
 
 KaTeX supports approximately **300 LaTeX functions**—sufficient for undergraduate mathematics, physics, and statistics. For graduate-level content requiring obscure LaTeX packages or enhanced accessibility (speech output, braille), MathJax remains necessary. MathJax 3's accessibility extensions provide ARIA labels and explorable equations that KaTeX cannot match.
@@ -242,7 +243,7 @@ KaTeX supports approximately **300 LaTeX functions**—sufficient for undergradu
 When rendering user-generated Markdown, **rehype-sanitize** prevents XSS attacks by stripping dangerous HTML elements and attributes. The plugin order matters critically—sanitize first, then apply other transformations:
 
 ```typescript
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 
 // Extended schema to preserve code highlighting and math classes
 const sanitizeSchema = {
@@ -252,14 +253,10 @@ const sanitizeSchema = {
     code: [['className', /^language-./, 'math-inline', 'math-display']],
     span: [...(defaultSchema.attributes?.span || []), ['className', /^hljs-/]],
   },
-}
+};
 
 // Plugin order: sanitize BEFORE other transformations
-rehypePlugins: [
-  [rehypeSanitize, sanitizeSchema],
-  rehypeKatex,
-  rehypePrettyCode,
-]
+rehypePlugins: [[rehypeSanitize, sanitizeSchema], rehypeKatex, rehypePrettyCode];
 ```
 
 The sanitizer automatically prefixes all `id` and `name` attributes with `user-content-` to prevent DOM clobbering attacks. For AI-generated content from trusted sources, sanitization adds unnecessary overhead and can be skipped.
@@ -270,26 +267,26 @@ The sanitizer automatically prefixes all `id` and `name` attributes with `user-c
 
 The architecture choice between SSR and CSR determines bundle size and initial render performance. For educational content that doesn't require real-time interactivity, **full server rendering eliminates JavaScript entirely** from the Markdown pipeline.
 
-| Strategy | Client JS | Use When |
-|----------|-----------|----------|
-| Full RSC | 0KB | Static/cached content |
-| Hybrid | Minimal | Interactive code blocks, diagrams |
+| Strategy | Client JS | Use When                          |
+| -------- | --------- | --------------------------------- |
+| Full RSC | 0KB       | Static/cached content             |
+| Hybrid   | Minimal   | Interactive code blocks, diagrams |
 | Full CSR | 50-200KB+ | User-generated, real-time editing |
 
 **Caching rendered Markdown** at the React level using the `cache` function prevents redundant processing:
 
 ```tsx
-import { cache } from 'react'
-import { compileMDX } from 'next-mdx-remote/rsc'
+import { cache } from 'react';
+import { compileMDX } from 'next-mdx-remote/rsc';
 
 export const getLesson = cache(async (slug: string) => {
-  const source = await fetchLessonContent(slug)
+  const source = await fetchLessonContent(slug);
   return compileMDX({
     source,
     options: { mdxOptions: { remarkPlugins, rehypePlugins } },
     components: customComponents,
-  })
-})
+  });
+});
 ```
 
 For heavy components like Mermaid diagrams, use **dynamic imports with `ssr: false`** to keep them client-side while the rest renders on the server:
@@ -298,7 +295,7 @@ For heavy components like Mermaid diagrams, use **dynamic imports with `ssr: fal
 const Mermaid = dynamic(() => import('./Mermaid'), {
   ssr: false,
   loading: () => <div className="animate-pulse h-48 bg-gray-100 rounded" />,
-})
+});
 ```
 
 ---
@@ -319,7 +316,7 @@ Educational content must be accessible to all learners. Beyond semantic HTML, sp
 ```tsx
 // Accessible code block wrapper
 <div role="group" aria-label={`${language} code example`}>
-  <button 
+  <button
     onClick={handleCopy}
     className="focus:ring-2 focus:ring-blue-500 focus:outline-none"
     aria-label="Copy code to clipboard"

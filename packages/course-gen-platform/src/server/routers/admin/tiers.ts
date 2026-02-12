@@ -19,7 +19,10 @@ import { superadminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
-import { refreshCache as refreshTierCache, clearCache as clearTierCache } from '../../../shared/tier/tier-settings-service';
+import {
+  refreshCache as refreshTierCache,
+  clearCache as clearTierCache,
+} from '../../../shared/tier/tier-settings-service';
 import type { TierSettings, TierSettingsRow } from '@megacampus/shared-types';
 import type { Database } from '@megacampus/shared-types/database.types';
 import { toTierSettings, getDefaultTierSettingsForKey } from '@megacampus/shared-types';
@@ -117,10 +120,7 @@ export const tiersRouter = router({
     try {
       const supabase = getSupabaseAdmin();
 
-      const { data, error } = await supabase
-        .from('tier_settings')
-        .select('*')
-        .order('tier_key');
+      const { data, error } = await supabase.from('tier_settings').select('*').order('tier_key');
 
       if (error) {
         logger.error({ err: error.message }, 'Failed to fetch tier settings');
@@ -134,7 +134,7 @@ export const tiersRouter = router({
         return [];
       }
 
-      return data.map((row) => toTierSettings(row as TierSettingsRow));
+      return data.map(row => toTierSettings(row as TierSettingsRow));
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
@@ -183,7 +183,10 @@ export const tiersRouter = router({
               message: ErrorMessages.notFound('Tier settings', input.tierKey),
             });
           }
-          logger.error({ err: error.message, tierKey: input.tierKey }, 'Failed to fetch tier settings');
+          logger.error(
+            { err: error.message, tierKey: input.tierKey },
+            'Failed to fetch tier settings'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('Tier settings retrieval', error.message),
@@ -293,7 +296,10 @@ export const tiersRouter = router({
           .single();
 
         if (error) {
-          logger.error({ err: error.message, tierKey: input.tierKey }, 'Failed to update tier settings');
+          logger.error(
+            { err: error.message, tierKey: input.tierKey },
+            'Failed to update tier settings'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('Tier settings update', error.message),
@@ -330,12 +336,18 @@ export const tiersRouter = router({
         // Refresh cache after update (blocking to ensure consistency)
         try {
           await refreshTierCache();
-          logger.info({ tierKey: input.tierKey }, '[TiersRouter] Cache refreshed after tier update');
+          logger.info(
+            { tierKey: input.tierKey },
+            '[TiersRouter] Cache refreshed after tier update'
+          );
         } catch (cacheError) {
           // Clear cache on failure so next request fetches fresh data from DB
           clearTierCache();
           logger.error(
-            { err: cacheError instanceof Error ? cacheError.message : String(cacheError), tierKey: input.tierKey },
+            {
+              err: cacheError instanceof Error ? cacheError.message : String(cacheError),
+              tierKey: input.tierKey,
+            },
             '[TiersRouter] Failed to refresh cache after tier update, cache cleared'
           );
         }

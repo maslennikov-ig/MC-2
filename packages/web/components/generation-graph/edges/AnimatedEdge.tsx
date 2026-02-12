@@ -1,6 +1,6 @@
-import React, { memo } from 'react';
-import { BaseEdge, EdgeProps, getBezierPath } from '@xyflow/react';
-import { RFGraphEdge } from '../types';
+import React, { memo } from 'react'
+import { BaseEdge, EdgeProps, getBezierPath } from '@xyflow/react'
+import { RFGraphEdge } from '../types'
 
 const AnimatedEdge = ({
   sourceX,
@@ -20,23 +20,23 @@ const AnimatedEdge = ({
     targetX,
     targetY,
     targetPosition,
-  });
+  })
 
   // Status-based styling
-  let strokeColor = '#cbd5e1'; // slate-300 (idle)
-  let strokeWidth = 2;
+  let strokeColor = '#cbd5e1' // slate-300 (idle)
+  let strokeWidth = 2
   // Safe access to data
-  const isAnimated = !!(data?.animated || data?.status === 'active');
+  const isAnimated = !!(data?.animated || data?.status === 'active')
 
   if (data?.status === 'active') {
-    strokeColor = '#3b82f6'; // blue-500
-    strokeWidth = 3;
+    strokeColor = '#3b82f6' // blue-500
+    strokeWidth = 3
   } else if (data?.status === 'completed') {
-    strokeColor = '#10b981'; // emerald-500
-    strokeWidth = 2;
+    strokeColor = '#10b981' // emerald-500
+    strokeWidth = 2
   } else if (data?.status === 'error') {
-    strokeColor = '#ef4444'; // red-500
-    strokeWidth = 2;
+    strokeColor = '#ef4444' // red-500
+    strokeWidth = 2
   }
 
   return (
@@ -52,7 +52,7 @@ const AnimatedEdge = ({
       }}
       className={isAnimated ? 'animated-edge' : ''}
     />
-  );
-};
+  )
+}
 
-export default memo(AnimatedEdge);
+export default memo(AnimatedEdge)

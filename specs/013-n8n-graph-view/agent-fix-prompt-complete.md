@@ -19,6 +19,7 @@ You are tasked with completing the missing implementation for the n8n-Graph-View
 **Spec**: T065 - FR-ERR03
 
 **Requirements**:
+
 - Export `useRetry()` hook
 - Takes `courseId: string` as parameter
 - Returns `{ retry, isRetrying, error }`
@@ -26,6 +27,7 @@ You are tasked with completing the missing implementation for the n8n-Graph-View
 - Handle loading state and errors
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/generation-graph/hooks/useRetry.ts
 'use client';
@@ -42,31 +44,34 @@ export function useRetry(courseId: string): UseRetryReturn {
   const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const retry = useCallback(async (nodeId: string, itemId?: string) => {
-    setIsRetrying(true);
-    setError(null);
+  const retry = useCallback(
+    async (nodeId: string, itemId?: string) => {
+      setIsRetrying(true);
+      setError(null);
 
-    try {
-      const response = await fetch(`/api/courses/${courseId}/retry`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, itemId })
-      });
+      try {
+        const response = await fetch(`/api/courses/${courseId}/retry`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodeId, itemId }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Retry failed');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Retry failed');
+        }
+
+        return await response.json();
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Unknown error');
+        setError(error);
+        throw error;
+      } finally {
+        setIsRetrying(false);
       }
-
-      return await response.json();
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown error');
-      setError(error);
-      throw error;
-    } finally {
-      setIsRetrying(false);
-    }
-  }, [courseId]);
+    },
+    [courseId]
+  );
 
   return { retry, isRetrying, error };
 }
@@ -80,12 +85,14 @@ export function useRetry(courseId: string): UseRetryReturn {
 **Spec**: T072 - FR-R05
 
 **Requirements**:
+
 - Start polling when `isRealtimeConnected === false`
 - Poll every 5 seconds
 - Fetch latest traces from API
 - Stop polling when realtime reconnects
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/generation-graph/hooks/useFallbackPolling.ts
 'use client';
@@ -151,12 +158,14 @@ export function useFallbackPolling(
 **Spec**: T073 - FR-R06
 
 **Requirements**:
+
 - Use `useReactFlow()` to access viewport
 - Save viewport before updates
 - Restore viewport after updates
 - Use `requestAnimationFrame` for smooth transitions
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/generation-graph/hooks/useViewportPreservation.ts
 'use client';
@@ -199,11 +208,13 @@ export function useViewportPreservation(): UseViewportPreservationReturn {
 **Spec**: T079 - FR-ER04
 
 **Requirements**:
+
 - Track degradation mode: 'full' | 'polling' | 'static'
 - Provide handlers for failures
 - Return degradation state and UI message
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/generation-graph/hooks/useGracefulDegradation.ts
 'use client';
@@ -237,18 +248,19 @@ export function useGracefulDegradation(): UseGracefulDegradationReturn {
     setMode('full');
   }, []);
 
-  const statusMessage = mode === 'full'
-    ? null
-    : mode === 'polling'
-      ? 'Live updates temporarily unavailable. Refreshing periodically.'
-      : 'Unable to fetch updates. Showing last known state.';
+  const statusMessage =
+    mode === 'full'
+      ? null
+      : mode === 'polling'
+        ? 'Live updates temporarily unavailable. Refreshing periodically.'
+        : 'Unable to fetch updates. Showing last known state.';
 
   return {
     degradationMode: mode,
     handleRealtimeFailure,
     handlePollingFailure,
     reset,
-    statusMessage
+    statusMessage,
   };
 }
 ```
@@ -263,6 +275,7 @@ export function useGracefulDegradation(): UseGracefulDegradationReturn {
 **Spec**: T036-T038
 
 #### 5a. Create `panels/InputTab.tsx`:
+
 ```typescript
 // packages/web/components/generation-graph/panels/InputTab.tsx
 'use client';
@@ -287,6 +300,7 @@ export const InputTab = ({ inputData }: InputTabProps) => {
 ```
 
 #### 5b. Create `panels/ProcessTab.tsx`:
+
 ```typescript
 // packages/web/components/generation-graph/panels/ProcessTab.tsx
 'use client';
@@ -327,6 +341,7 @@ export const ProcessTab = ({ duration, tokens, cost, status }: ProcessTabProps) 
 ```
 
 #### 5c. Create `panels/OutputTab.tsx`:
+
 ```typescript
 // packages/web/components/generation-graph/panels/OutputTab.tsx
 'use client';
@@ -353,6 +368,7 @@ export const OutputTab = ({ outputData }: OutputTabProps) => {
 #### 5d. Update `panels/NodeDetailsDrawer.tsx`:
 
 Add imports at top:
+
 ```typescript
 import { InputTab } from './InputTab';
 import { ProcessTab } from './ProcessTab';
@@ -360,6 +376,7 @@ import { OutputTab } from './OutputTab';
 ```
 
 Replace inline TabsContent with:
+
 ```tsx
 <TabsContent value="input" className="mt-4 space-y-4" data-testid="content-input">
   <InputTab inputData={displayData?.inputData} />
@@ -389,19 +406,24 @@ Replace inline TabsContent with:
 Add after the main node content, inside the outer div (before closing `</div>`):
 
 ```tsx
-{/* Retry Count Badge */}
-{data.retryCount && data.retryCount > 0 && (
-  <div
-    className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md z-10"
-    data-testid={`retry-badge-${id}`}
-    aria-label={`${data.retryCount} retries`}
-  >
-    {data.retryCount}
-  </div>
-)}
+{
+  /* Retry Count Badge */
+}
+{
+  data.retryCount && data.retryCount > 0 && (
+    <div
+      className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md z-10"
+      data-testid={`retry-badge-${id}`}
+      aria-label={`${data.retryCount} retries`}
+    >
+      {data.retryCount}
+    </div>
+  );
+}
 ```
 
 Also add `retryCount` to the data type interface if not present:
+
 ```typescript
 interface StageNodeData {
   // ... existing fields
@@ -547,6 +569,7 @@ export const ApprovalControls = ({
 **File**: `packages/web/components/generation-graph/GraphView.tsx`
 
 Add imports:
+
 ```typescript
 import { useFallbackPolling } from './hooks/useFallbackPolling';
 import { useViewportPreservation } from './hooks/useViewportPreservation';
@@ -554,6 +577,7 @@ import { useGracefulDegradation } from './hooks/useGracefulDegradation';
 ```
 
 Inside `GraphViewInner` component, add the hooks:
+
 ```typescript
 function GraphViewInner({ courseId, courseTitle }: GraphViewProps) {
   // ... existing hooks
@@ -786,6 +810,7 @@ Then verify in browser:
 ## Files to Create/Modify Summary
 
 ### CREATE (7 new files):
+
 1. `hooks/useRetry.ts`
 2. `hooks/useFallbackPolling.ts`
 3. `hooks/useViewportPreservation.ts`
@@ -795,6 +820,7 @@ Then verify in browser:
 7. `panels/OutputTab.tsx`
 
 ### MODIFY (5 existing files):
+
 1. `panels/NodeDetailsDrawer.tsx` - Use extracted tab components
 2. `nodes/StageNode.tsx` - Add retry badge + awaiting style
 3. `controls/ApprovalControls.tsx` - Connect to backend API

@@ -180,6 +180,13 @@ export type Database = {
             referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "assets_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
         ]
       }
       audit_log: {
@@ -1198,6 +1205,13 @@ export type Database = {
             referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "generation_trace_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
         ]
       }
       idempotency_keys: {
@@ -1443,6 +1457,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lesson_contents_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
+          {
             foreignKeyName: "lesson_contents_parent_content_id_fkey"
             columns: ["parent_content_id"]
             isOneToOne: false
@@ -1528,6 +1549,13 @@ export type Database = {
             referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lesson_enrichments_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
         ]
       }
       lesson_progress: {
@@ -1587,6 +1615,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lessons"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
           },
         ]
       }
@@ -2531,6 +2566,13 @@ export type Database = {
             referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "rag_context_cache_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons_with_latest_content"
+            referencedColumns: ["lesson_id"]
+          },
         ]
       }
       refinement_config: {
@@ -3012,6 +3054,26 @@ export type Database = {
         }
         Relationships: []
       }
+      lessons_with_latest_content: {
+        Row: {
+          content: Json | null
+          content_created_at: string | null
+          content_metadata: Json | null
+          lesson_id: string | null
+          lesson_title: string | null
+          order_index: number | null
+          section_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lessons_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       llm_benchmark_comparison: {
         Row: {
           generation_time_ms: number | null
@@ -3275,6 +3337,10 @@ export type Database = {
           success: boolean
         }[]
       }
+      delete_course_cascade: {
+        Args: { p_course_id: string }
+        Returns: Json
+      }
       expire_old_invitations: { Args: never; Returns: number }
       export_archive_to_json: {
         Args: { p_age_days?: number }
@@ -3488,6 +3554,10 @@ export type Database = {
         Args: { org_id: string; size_bytes: number }
         Returns: boolean
       }
+      increment_tokens_used: {
+        Args: { p_course_id: string; p_tokens: number }
+        Returns: undefined
+      }
       initialize_fsm_with_outbox: {
         Args: {
           p_entity_id: string
@@ -3690,6 +3760,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      upsert_stage_tokens: {
+        Args: { p_course_id: string; p_stage_key: string; p_tokens: number }
+        Returns: undefined
       }
       validate_minimum_lessons: {
         Args: { course_structure: Json }
@@ -4019,4 +4093,3 @@ export const Constants = {
     },
   },
 } as const
-

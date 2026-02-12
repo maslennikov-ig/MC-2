@@ -5,7 +5,11 @@
   "target_audience": "Absolute beginners with no prior coding experience; career-changers exploring tech roles in software development or data science; students in non-technical majors seeking to add a valuable skill; administrative professionals, researchers, and marketers looking to automate repetitive tasks and data analysis; and hobbyists interested in understanding how software works.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with using a text editor", "No prior programming experience required"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a text editor",
+    "No prior programming experience required"
+  ],
   "learning_outcomes": [
     "Define and apply fundamental programming concepts such as variables, data types, and control structures.",
     "Build functional Python scripts that utilize loops, conditional logic, and user-defined functions.",
@@ -13,5 +17,15 @@
     "Analyze simple problems and design algorithmic solutions implemented in Python code.",
     "Construct basic data structures, including lists and dictionaries, to organize and manipulate information."
   ],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "data types", "functions", "file i/o"]
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "data types",
+    "functions",
+    "file i/o"
+  ]
 }

@@ -84,7 +84,7 @@ export function calculateAgreementScore(verdicts: JudgeVerdict[]): AgreementResu
   const ratingMatrix: number[][] = [];
 
   for (const verdict of verdicts) {
-    const row: number[] = criteria.map((criterion) => {
+    const row: number[] = criteria.map(criterion => {
       const score = verdict.criteriaScores[criterion as keyof CriteriaScores];
       // Convert 0-1 score to ordinal scale (0-10 for better granularity)
       return Math.round(score * 10);
@@ -99,7 +99,7 @@ export function calculateAgreementScore(verdicts: JudgeVerdict[]): AgreementResu
     // Use ordinal metric (default is identity metric)
     const ordinalMetric = (a: number, b: number) => Math.abs(a - b);
     alphaScore = alpha(ratingMatrix, ordinalMetric);
-  } catch (error) {
+  } catch {
     // Fallback: if krippendorff calculation fails (e.g., no variance),
     // calculate simple agreement as average pairwise correlation
     alphaScore = calculateFallbackAgreement(verdicts, criteria);
@@ -149,8 +149,8 @@ function calculateFallbackAgreement(verdicts: JudgeVerdict[], criteria: JudgeCri
   // Calculate all pairwise correlations
   for (let i = 0; i < verdicts.length; i++) {
     for (let j = i + 1; j < verdicts.length; j++) {
-      const scores1 = criteria.map((c) => verdicts[i].criteriaScores[c as keyof CriteriaScores]);
-      const scores2 = criteria.map((c) => verdicts[j].criteriaScores[c as keyof CriteriaScores]);
+      const scores1 = criteria.map(c => verdicts[i].criteriaScores[c as keyof CriteriaScores]);
+      const scores2 = criteria.map(c => verdicts[j].criteriaScores[c as keyof CriteriaScores]);
 
       // Calculate Pearson correlation
       const correlation = calculatePearsonCorrelation(scores1, scores2);

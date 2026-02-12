@@ -9,6 +9,7 @@
 ## Quick Context
 
 **What was done**:
+
 - Stage 4 (Course Content Analysis) implemented (52/52 tasks)
 - Multi-phase multi-model architecture (5 phases, 20B/120B/Gemini)
 - Code review completed: 9.2/10, APPROVED FOR PRODUCTION
@@ -22,16 +23,19 @@ Execute POST-REVIEW-FIXES.md (3 priority tasks, 11-15 hours)
 ## Critical Fixes (Production-blocking)
 
 ### 1. Split orchestrator file (2-3h) [P1]
+
 - **File**: `src/orchestrator/services/analysis/analysis-orchestrator.ts`
 - **Problem**: 555 lines (exceeds 300 line limit)
 - **Action**: Split into orchestrator (300 lines) + validators (255 lines)
 
 ### 2. Add LLM output sanitization (3-4h) [P1]
+
 - **Security risk**: XSS via unsanitized LLM outputs
 - **Action**: Add `dompurify` sanitization in phase-5-assembly.ts
 - **Test**: Verify XSS protection works
 
 ### 3. Optional LangSmith integration (6-8h) [P2]
+
 - **Enhancement**: Add trace visualization (feature-flagged)
 - **Action**: Implement `LANGSMITH_ENABLED` flag
 - **Non-blocking**: Can deploy without this
@@ -63,6 +67,7 @@ Then execute Phase 1 (P1 tasks) before production deployment.
 ## Validation Checklist
 
 After fixes:
+
 - [ ] Type-check: 0 errors
 - [ ] Build: Success
 - [ ] Tests: 20/20 contract + 7 integration passing

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
-import { isValidUUID } from '@/lib/validation-utils'
+import { isValidUUID } from '@/lib/uuid-validation'
 import { z } from 'zod'
 import {
   orgRoleSchema,
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           route: `/api/organizations/${orgId}/members`,
           errorCode: 'INTERNAL_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 })
     }
 
@@ -198,7 +198,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         route: '/api/organizations/[orgId]/members',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -322,7 +322,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           errorCode: 'INTERNAL_ERROR',
           targetUserId: newUserId,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to add member' }, { status: 500 })
     }
 
@@ -359,7 +359,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         route: '/api/organizations/[orgId]/members',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -465,7 +465,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           errorCode: 'INTERNAL_ERROR',
           targetUserId: targetUserId,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to update member role' }, { status: 500 })
     }
 
@@ -504,7 +504,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         route: '/api/organizations/[orgId]/members',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

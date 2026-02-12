@@ -14,14 +14,14 @@ Comprehensive code review completed for the Stage 6 LangGraph-based lesson conte
 
 ### Key Metrics
 
-| Metric | Value |
-|--------|-------|
-| Files Reviewed | 14 |
-| Type-Check | PASSED |
-| Critical Issues | 0 |
-| High Priority Issues | 3 |
-| Medium Priority Issues | 7 |
-| Low Priority Issues | 5 |
+| Metric                 | Value  |
+| ---------------------- | ------ |
+| Files Reviewed         | 14     |
+| Type-Check             | PASSED |
+| Critical Issues        | 0      |
+| High Priority Issues   | 3      |
+| Medium Priority Issues | 7      |
+| Low Priority Issues    | 5      |
 
 ### Overall Assessment
 
@@ -71,6 +71,7 @@ import { executeStage6 } from './orchestrator';
 
 **Recommendation**:
 Either:
+
 1. Remove `lessonContent` creation from smoother (only produce `smoothedContent`)
 2. Or modify `judgeNode` to use/enhance existing `lessonContent` from state
 
@@ -108,6 +109,7 @@ export async function executeStage6(
 ### M1. Duplicate `extractTokenUsage` Function
 
 **Files**:
+
 - `/packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/planner.ts:158-171`
 - `/packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/expander.ts:219-231`
 - `/packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/assembler.ts:200-212`
@@ -132,6 +134,7 @@ export function extractTokenUsage(response: ChatModelResponse): number {
 ### M2. Hardcoded Model IDs
 
 **Files**:
+
 - `/packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/planner.ts:28`
 - `/packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/expander.ts:39-40`
 - `/packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/assembler.ts:33`
@@ -356,6 +359,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 **File**: `/packages/course-gen-platform/src/stages/stage6-lesson-content/state.ts`
 
 The LangGraph state definition is well-structured with:
+
 - Clear documentation for each field
 - Appropriate reducers for accumulating fields (errors, tokens, costs)
 - Type-safe annotations
@@ -364,6 +368,7 @@ The LangGraph state definition is well-structured with:
 ### P2. Proper Error Handling in Nodes
 
 All nodes follow a consistent error handling pattern:
+
 - Try-catch with detailed logging
 - Graceful degradation by returning error state
 - Preserving execution metrics on failure
@@ -371,6 +376,7 @@ All nodes follow a consistent error handling pattern:
 ### P3. Good Separation of Concerns
 
 The architecture demonstrates proper separation:
+
 - State definition separate from logic
 - Each node focused on single responsibility
 - Utilities extracted for reusability
@@ -379,6 +385,7 @@ The architecture demonstrates proper separation:
 ### P4. Comprehensive Logging
 
 Structured logging is used throughout with:
+
 - Consistent context (lessonId, courseId)
 - Phase-specific metrics
 - Duration tracking
@@ -387,6 +394,7 @@ Structured logging is used throughout with:
 ### P5. RAG Context Management
 
 The `lesson-rag-retriever.ts` module provides:
+
 - Caching for retry consistency
 - Section-level pre-retrieval
 - Coverage score calculation
@@ -395,6 +403,7 @@ The `lesson-rag-retriever.ts` module provides:
 ### P6. Type Safety
 
 The code demonstrates strong TypeScript practices:
+
 - Proper type exports
 - Interface definitions for all data structures
 - Generic type parameters where appropriate
@@ -441,21 +450,21 @@ The code demonstrates strong TypeScript practices:
 
 ## Files Reviewed
 
-| File | Lines | Status |
-|------|-------|--------|
-| `state.ts` | 337 | OK |
-| `orchestrator.ts` | 763 | 2 issues |
-| `handler.ts` | 1151 | 2 issues |
-| `nodes/planner.ts` | 264 | 1 issue |
-| `nodes/expander.ts` | 467 | 1 issue |
-| `nodes/assembler.ts` | 354 | 1 issue |
-| `nodes/smoother.ts` | 415 | 2 issues |
-| `nodes/index.ts` | 26 | OK |
-| `utils/prompt-templates.ts` | 669 | 1 issue |
-| `utils/lesson-rag-retriever.ts` | 923 | 1 issue |
-| `utils/parameter-selector.ts` | 356 | OK |
-| `utils/markdown-parser.ts` | 592 | OK |
-| `utils/citation-builder.ts` | 566 | OK |
+| File                            | Lines | Status   |
+| ------------------------------- | ----- | -------- |
+| `state.ts`                      | 337   | OK       |
+| `orchestrator.ts`               | 763   | 2 issues |
+| `handler.ts`                    | 1151  | 2 issues |
+| `nodes/planner.ts`              | 264   | 1 issue  |
+| `nodes/expander.ts`             | 467   | 1 issue  |
+| `nodes/assembler.ts`            | 354   | 1 issue  |
+| `nodes/smoother.ts`             | 415   | 2 issues |
+| `nodes/index.ts`                | 26    | OK       |
+| `utils/prompt-templates.ts`     | 669   | 1 issue  |
+| `utils/lesson-rag-retriever.ts` | 923   | 1 issue  |
+| `utils/parameter-selector.ts`   | 356   | OK       |
+| `utils/markdown-parser.ts`      | 592   | OK       |
+| `utils/citation-builder.ts`     | 566   | OK       |
 
 ---
 

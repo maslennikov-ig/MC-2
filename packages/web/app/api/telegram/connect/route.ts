@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { logger } from '@/lib/logger'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
@@ -26,7 +27,7 @@ interface TelegramAuthData {
  */
 function verifyTelegramAuth(data: TelegramAuthData): boolean {
   if (!TELEGRAM_BOT_TOKEN) {
-    console.error('TELEGRAM_BOT_TOKEN not configured')
+    logger.error('TELEGRAM_BOT_TOKEN not configured')
     return false
   }
 
@@ -35,14 +36,11 @@ function verifyTelegramAuth(data: TelegramAuthData): boolean {
   // Create data-check-string: sorted key=value pairs joined by \n
   const dataCheckString = Object.keys(authData)
     .sort()
-    .map(key => `${key}=${authData[key as keyof typeof authData]}`)
+    .map((key) => `${key}=${authData[key as keyof typeof authData]}`)
     .join('\n')
 
   // Secret key is SHA256 hash of bot token
-  const secretKey = crypto
-    .createHash('sha256')
-    .update(TELEGRAM_BOT_TOKEN)
-    .digest()
+  const secretKey = crypto.createHash('sha256').update(TELEGRAM_BOT_TOKEN).digest()
 
   // Calculate HMAC-SHA256
   const calculatedHash = crypto
@@ -50,9 +48,14 @@ function verifyTelegramAuth(data: TelegramAuthData): boolean {
     .update(dataCheckString)
     .digest('hex')
 
-  // Verify hash matches
-  if (calculatedHash !== hash) {
-    console.error('Telegram auth hash mismatch')
+  // Verify hash matches (timing-safe comparison)
+  const hashBuffer = Buffer.from(hash)
+  const calculatedBuffer = Buffer.from(calculatedHash)
+  if (
+    hashBuffer.length !== calculatedBuffer.length ||
+    !crypto.timingSafeEqual(hashBuffer, calculatedBuffer)
+  ) {
+    logger.error('Telegram auth hash mismatch')
     return false
   }
 
@@ -60,7 +63,7 @@ function verifyTelegramAuth(data: TelegramAuthData): boolean {
   const authDate = data.auth_date * 1000 // Convert to milliseconds
   const maxAge = 24 * 60 * 60 * 1000 // 1 day
   if (Date.now() - authDate > maxAge) {
-    console.error('Telegram auth data is too old')
+    logger.error('Telegram auth data is too old')
     return false
   }
 
@@ -72,21 +75,18 @@ export async function POST(request: NextRequest) {
     // Get auth header
     const authHeader = request.headers.get('authorization')
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const accessToken = authHeader.slice(7)
 
     // Verify user session
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(accessToken)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(accessToken)
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Invalid session' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
     }
 
     // Parse Telegram auth data
@@ -94,10 +94,7 @@ export async function POST(request: NextRequest) {
 
     // Verify Telegram auth
     if (!verifyTelegramAuth(telegramData)) {
-      return NextResponse.json(
-        { error: 'Invalid Telegram authorization' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid Telegram authorization' }, { status: 400 })
     }
 
     // Update user profile with Telegram data
@@ -106,31 +103,24 @@ export async function POST(request: NextRequest) {
       .update({
         telegram_chat_id: telegramData.id.toString(),
         telegram_notifications_enabled: true,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
 
     if (updateError) {
-      console.error('Failed to update user:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to save Telegram connection' },
-        { status: 500 }
-      )
+      logger.error('Failed to update user:', updateError)
+      return NextResponse.json({ error: 'Failed to save Telegram connection' }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
       telegram_chat_id: telegramData.id.toString(),
       telegram_username: telegramData.username,
-      telegram_first_name: telegramData.first_name
+      telegram_first_name: telegramData.first_name,
     })
-
   } catch (error) {
-    console.error('Telegram connect error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logger.error('Telegram connect error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -140,21 +130,18 @@ export async function DELETE(request: NextRequest) {
     // Get auth header
     const authHeader = request.headers.get('authorization')
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const accessToken = authHeader.slice(7)
 
     // Verify user session
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(accessToken)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(accessToken)
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Invalid session' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
     }
 
     // Remove Telegram data from user profile
@@ -163,25 +150,18 @@ export async function DELETE(request: NextRequest) {
       .update({
         telegram_chat_id: null,
         telegram_notifications_enabled: false,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
 
     if (updateError) {
-      console.error('Failed to update user:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to disconnect Telegram' },
-        { status: 500 }
-      )
+      logger.error('Failed to update user:', updateError)
+      return NextResponse.json({ error: 'Failed to disconnect Telegram' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
-
   } catch (error) {
-    console.error('Telegram disconnect error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logger.error('Telegram disconnect error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -190,7 +190,7 @@ describe('Scenario 1: Import shared types from shared-types package', () => {
       // Then: Enum should have expected values
       expect(JobType).toBeDefined();
       expect(JobType.TEST_JOB).toBe('test_job');
-      expect(JobType.INITIALIZE).toBe('initialize');
+
       expect(JobType.DOCUMENT_PROCESSING).toBe('document_processing');
     });
 
@@ -241,7 +241,7 @@ describe('Scenario 1: Import shared types from shared-types package', () => {
         organizationId: '123e4567-e89b-12d3-a456-426614174000',
         courseId: '123e4567-e89b-12d3-a456-426614174001',
         userId: '123e4567-e89b-12d3-a456-426614174002',
-        jobType: JobType.INITIALIZE,
+        jobType: JobType.TEST_JOB,
         createdAt: new Date().toISOString(),
       };
 
@@ -259,8 +259,8 @@ describe('Scenario 1: Import shared types from shared-types package', () => {
       expect(DEFAULT_JOB_OPTIONS).toBeDefined();
       expect(DEFAULT_JOB_OPTIONS[JobType.TEST_JOB]).toBeDefined();
       expect(DEFAULT_JOB_OPTIONS[JobType.TEST_JOB].attempts).toBe(3);
-      expect(DEFAULT_JOB_OPTIONS[JobType.INITIALIZE]).toBeDefined();
-      expect(DEFAULT_JOB_OPTIONS[JobType.INITIALIZE].timeout).toBe(30000);
+      expect(DEFAULT_JOB_OPTIONS[JobType.DOCUMENT_PROCESSING]).toBeDefined();
+      expect(DEFAULT_JOB_OPTIONS[JobType.DOCUMENT_PROCESSING].timeout).toBe(300000);
     });
   });
 
@@ -494,7 +494,7 @@ describe('Scenario 3: Runtime verification', () => {
 
       // Then: Should have all expected job types
       expect(JobType.TEST_JOB).toBe('test_job');
-      expect(JobType.INITIALIZE).toBe('initialize');
+
       expect(JobType.DOCUMENT_PROCESSING).toBe('document_processing');
       expect(JobType.SUMMARY_GENERATION).toBe('summary_generation');
       expect(JobType.STRUCTURE_ANALYSIS).toBe('structure_analysis');

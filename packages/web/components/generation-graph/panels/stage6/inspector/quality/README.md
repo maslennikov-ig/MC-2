@@ -45,18 +45,18 @@ Side-by-side or unified diff viewer for showing changes made by SelfReviewer whe
 ```typescript
 interface DiffViewerProps {
   /** Original content before fixes */
-  originalContent: string;
+  originalContent: string
   /** Fixed content after SelfReviewer */
-  fixedContent: string;
+  fixedContent: string
   /** Optional list of changes for annotations (reserved for future use) */
   changes?: Array<{
-    type: string;
-    severity: string;
-    location: string;
-    description: string;
-  }>;
+    type: string
+    severity: string
+    location: string
+    description: string
+  }>
   /** Locale for translations */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 ```
 
@@ -65,13 +65,9 @@ interface DiffViewerProps {
 **Basic Example:**
 
 ```tsx
-import { DiffViewer } from './DiffViewer';
+import { DiffViewer } from './DiffViewer'
 
-<DiffViewer
-  originalContent={originalMarkdown}
-  fixedContent={patchedMarkdown}
-  locale="en"
-/>
+;<DiffViewer originalContent={originalMarkdown} fixedContent={patchedMarkdown} locale="en" />
 ```
 
 **With Changes (future enhancement):**
@@ -90,31 +86,33 @@ import { DiffViewer } from './DiffViewer';
 ```tsx
 // In Stage6QualityTab.tsx
 const handleViewDiff = () => {
-  setShowDiffModal(true);
-};
+  setShowDiffModal(true)
+}
 
-{showDiffModal && (
-  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-    <div className="bg-white dark:bg-slate-900 rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-auto">
-      <h3 className="text-lg font-semibold mb-4">
-        {locale === 'ru' ? 'Сравнение изменений' : 'Diff Viewer'}
-      </h3>
+{
+  showDiffModal && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-lg bg-white p-6 dark:bg-slate-900">
+        <h3 className="mb-4 text-lg font-semibold">
+          {locale === 'ru' ? 'Сравнение изменений' : 'Diff Viewer'}
+        </h3>
 
-      <DiffViewer
-        originalContent={originalContent}
-        fixedContent={fixedContent}
-        changes={selfReviewResult.issues}
-        locale={locale}
-      />
+        <DiffViewer
+          originalContent={originalContent}
+          fixedContent={fixedContent}
+          changes={selfReviewResult.issues}
+          locale={locale}
+        />
 
-      <div className="mt-4 flex justify-end">
-        <Button onClick={() => setShowDiffModal(false)}>
-          {locale === 'ru' ? 'Закрыть' : 'Close'}
-        </Button>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={() => setShowDiffModal(false)}>
+            {locale === 'ru' ? 'Закрыть' : 'Close'}
+          </Button>
+        </div>
       </div>
     </div>
-  </div>
-)}
+  )
+}
 ```
 
 #### Implementation Details
@@ -154,6 +152,7 @@ The component uses a simple line-based diff algorithm that compares content line
 **Theme**: Blue/Cyan for Stage 6 consistency
 
 **Key Classes:**
+
 - `font-mono text-xs` - Monospace font for code
 - `bg-green-50 dark:bg-green-950/30` - Added lines
 - `bg-red-50 dark:bg-red-950/30` - Removed lines
@@ -161,6 +160,7 @@ The component uses a simple line-based diff algorithm that compares content line
 - `border-slate-200 dark:border-slate-700` - Borders
 
 **Layout:**
+
 - Fixed-height scroll area: `h-[400px]`
 - Split view: `grid grid-cols-2 gap-px`
 - Unified view: Single column flex layout

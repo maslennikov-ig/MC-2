@@ -1,5 +1,5 @@
-import { NotFoundState } from '@/components/common/error-states';
+import { NotFoundState } from '@/components/common/error-states'
 
 export default function NotFoundPage() {
-  return <NotFoundState variant="fullpage" />;
+  return <NotFoundState variant="fullpage" />
 }

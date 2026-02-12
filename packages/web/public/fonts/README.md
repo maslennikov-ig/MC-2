@@ -3,6 +3,7 @@
 This directory is intentionally kept for potential future use of local fonts.
 
 Currently, the application uses Google Fonts through Next.js's `next/font/google` package:
+
 - Inter (variable font)
 - JetBrains Mono (variable font)
 

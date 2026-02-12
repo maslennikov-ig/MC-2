@@ -120,8 +120,15 @@ async function checkEnrichmentsDirectory(): Promise<EnrichmentsDirectoryCheck> {
       };
     } catch (writeError) {
       logger.error(
-        { path: enrichmentsPath, error: (writeError as Error).message },
+        {
+          path: enrichmentsPath,
+          errorDetails: { message: (writeError as Error).message },
+        },
         'Enrichments directory is not writable'
+      );
+      logger.error(
+        { path: enrichmentsPath },
+        `EACCES FIX: Run on host: sudo chown -R 1001:1001 ${enrichmentsPath} && sudo chmod -R 755 ${enrichmentsPath}`
       );
 
       return {
@@ -131,7 +138,7 @@ async function checkEnrichmentsDirectory(): Promise<EnrichmentsDirectoryCheck> {
         error: `Directory not writable: ${(writeError as Error).message}`,
       };
     }
-  } catch (accessError) {
+  } catch {
     // Directory doesn't exist - try to create it
     try {
       await fs.mkdir(enrichmentsPath, { recursive: true });
@@ -225,7 +232,7 @@ function startReadinessHeartbeat(): void {
   if (readinessHeartbeatInterval) return;
 
   readinessHeartbeatInterval = setInterval(() => {
-    refreshReadinessHeartbeat();
+    void refreshReadinessHeartbeat();
   }, READINESS_HEARTBEAT_INTERVAL_MS);
 
   logger.info(

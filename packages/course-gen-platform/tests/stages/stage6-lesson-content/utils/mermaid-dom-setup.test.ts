@@ -299,7 +299,9 @@ describe('MermaidDOMSetup - Multiple Render Calls', () => {
       // Before fix: Would fail on 2nd+ call with "DOMPurify.addHook is not a function"
       testCases.forEach((svg, index) => {
         expect(() => {
-          const sanitized = purify.sanitize(svg, { ADD_TAGS: ['svg', 'rect', 'circle', 'line', 'path', 'text'] });
+          const sanitized = purify.sanitize(svg, {
+            ADD_TAGS: ['svg', 'rect', 'circle', 'line', 'path', 'text'],
+          });
           expect(sanitized).toBeDefined();
           expect(sanitized.length).toBeGreaterThan(0);
         }).not.toThrow();

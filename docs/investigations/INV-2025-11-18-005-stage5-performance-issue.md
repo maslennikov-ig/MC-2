@@ -1,15 +1,18 @@
 # Investigation: Stage 5 Generation Performance Issue (>10 min timeout)
 
 ---
+
 investigation_id: INV-2025-11-18-005
 status: INVESTIGATION_COMPLETE
 timestamp: 2025-11-18T21:30:00Z
 priority: P1 - High (blocks E2E test completion)
 test_file: tests/e2e/t053-synergy-sales-course.test.ts
 related_docs:
-  - INV-2025-11-18-003-t053-e2e-test-fixes.md (Issues #1-6)
-  - INV-2025-11-18-004-stage4-analysis-failures.md (Issue #7 - RESOLVED)
-course_id: 64d0d5e9-f058-4b51-9bce-9c7480830323
+
+- INV-2025-11-18-003-t053-e2e-test-fixes.md (Issues #1-6)
+- INV-2025-11-18-004-stage4-analysis-failures.md (Issue #7 - RESOLVED)
+  course_id: 64d0d5e9-f058-4b51-9bce-9c7480830323
+
 ---
 
 ## Executive Summary
@@ -19,6 +22,7 @@ course_id: 64d0d5e9-f058-4b51-9bce-9c7480830323
 **Root Cause**: **Sequential section processing** in Phase 2 (section batch generation) causes 4x performance degradation. The code processes 8 sections one-by-one in a for-loop, with each section taking ~75 seconds for LLM generation. Total time: 8 sections × 75s = 600+ seconds.
 
 **Evidence**:
+
 - Phase 2 accounts for 96% of total generation time (600s out of 625s total)
 - Sequential for-loop in `generation-phases.ts` lines 175-191 blocks concurrent processing
 - Spec requirement: <150s for 8 sections (SC-003)
@@ -27,6 +31,7 @@ course_id: 64d0d5e9-f058-4b51-9bce-9c7480830323
 **Recommended Solution**: Implement parallel batch processing with `PARALLEL_BATCH_SIZE=4` to process 4 sections concurrently. Expected improvement: 600s → 150s (meets SC-003 spec exactly).
 
 **Impact**:
+
 - Blocks E2E test completion
 - Production courses experience 4x longer generation times than designed
 - User experience degradation (10+ minute waits vs 2.5 minute target)
@@ -38,6 +43,7 @@ course_id: 64d0d5e9-f058-4b51-9bce-9c7480830323
 ### Observed Behavior
 
 **Test Execution Timeline**:
+
 ```
 18:24:39 - Test starts
 18:25:xx - Stage 2 completes (document processing)
@@ -49,6 +55,7 @@ course_id: 64d0d5e9-f058-4b51-9bce-9c7480830323
 ```
 
 **Stage 5 Generation Details**:
+
 - Job Type: `STRUCTURE_GENERATION`
 - Course ID: `64d0d5e9-f058-4b51-9bce-9c7480830323`
 - Analysis Result: 48 lessons, 8 sections (~6 lessons per section average)
@@ -59,12 +66,14 @@ course_id: 64d0d5e9-f058-4b51-9bce-9c7480830323
 ### Expected Behavior
 
 **From spec.md SC-003**:
+
 ```
 Course structure generation completes within 150 seconds for standard courses
 (8 sections, 20-30 lessons), measured from job start to database commit.
 ```
 
 **Expected Time Breakdown**:
+
 - Phase 1 (Metadata): ~20s (qwen3-max)
 - Phase 2 (Sections): ~125s (8 sections with parallel processing)
 - Phase 3-5 (Validation + Commit): ~5s
@@ -88,6 +97,7 @@ Course structure generation completes within 150 seconds for standard courses
 **Handler: `stage5-generation.ts`**
 
 Lines 351-387: Handler initializes orchestrator and executes 5-phase pipeline:
+
 ```typescript
 const orchestrator = new GenerationOrchestrator(
   new MetadataGenerator(),
@@ -102,6 +112,7 @@ const result: GenerationResult = await orchestrator.execute(input);
 **Orchestrator: `generation-orchestrator.ts`**
 
 Lines 48-67: Defines sequential graph flow:
+
 ```
 START → phase1 (metadata) → phase2 (sections) → assembly →
         phase3 (quality) → phase4 (FR-015) → phase5 (commit) → END
@@ -110,12 +121,11 @@ START → phase1 (metadata) → phase2 (sections) → assembly →
 **Phase 2 Node: `generation-phases.ts` lines 137-242**
 
 CRITICAL FINDING - Sequential for-loop:
+
 ```typescript
 // Line 174-191: Generate each section as a batch (SECTIONS_PER_BATCH = 1)
 for (let sectionIndex = 0; sectionIndex < totalSections; sectionIndex++) {
-  console.log(
-    `[phase2] Generating section batch ${sectionIndex + 1}/${totalSections}...`
-  );
+  console.log(`[phase2] Generating section batch ${sectionIndex + 1}/${totalSections}...`);
 
   const result = await generator.generateBatch(
     sectionIndex + 1,
@@ -132,6 +142,7 @@ for (let sectionIndex = 0; sectionIndex < totalSections; sectionIndex++) {
 ```
 
 **Analysis**:
+
 - `await` keyword blocks each iteration
 - 8 sections processed ONE AT A TIME
 - No concurrent processing despite spec mentioning `PARALLEL_BATCH_SIZE=2` (spec.md line 17)
@@ -139,6 +150,7 @@ for (let sectionIndex = 0; sectionIndex < totalSections; sectionIndex++) {
 **Section Batch Generator: `section-batch-generator.ts`**
 
 Lines 467-673: Each `generateBatch()` call:
+
 1. Builds prompt (~1s)
 2. Invokes LLM via `model.invoke(prompt)` ← **BOTTLENECK**
 3. Parses JSON with UnifiedRegenerator (~2-5s)
@@ -151,16 +163,17 @@ Line 856: Timeout per LLM call: `timeout: 300000` (5 minutes!)
 
 **Phase Breakdown (Estimated)**:
 
-| Phase | Operation | Time | % of Total |
-|-------|-----------|------|------------|
-| Phase 1 | Metadata generation (qwen3-max) | ~20s | 3% |
-| **Phase 2** | **Section batch generation (8 sequential)** | **~600s** | **96%** |
-| Phase 3 | Quality validation (STUB) | ~1s | <1% |
-| Phase 4 | FR-015 lesson count validation | ~1s | <1% |
-| Phase 5 | Database commit (STUB + actual DB write) | ~3s | <1% |
-| **TOTAL** | | **~625s** | **100%** |
+| Phase       | Operation                                   | Time      | % of Total |
+| ----------- | ------------------------------------------- | --------- | ---------- |
+| Phase 1     | Metadata generation (qwen3-max)             | ~20s      | 3%         |
+| **Phase 2** | **Section batch generation (8 sequential)** | **~600s** | **96%**    |
+| Phase 3     | Quality validation (STUB)                   | ~1s       | <1%        |
+| Phase 4     | FR-015 lesson count validation              | ~1s       | <1%        |
+| Phase 5     | Database commit (STUB + actual DB write)    | ~3s       | <1%        |
+| **TOTAL**   |                                             | **~625s** | **100%**   |
 
 **Phase 2 Sequential Processing**:
+
 ```
 Section 1: 75s (LLM call + parsing)
 Section 2: 75s (blocked by await)
@@ -175,6 +188,7 @@ Total:     600s
 ```
 
 **LLM Response Time per Section**: ~75 seconds average
+
 - Includes: Network latency + model inference + JSON streaming
 - Generates: ~6 lessons per section (48 total / 8 sections)
 - Token estimate: ~15-20K output tokens per section
@@ -184,17 +198,20 @@ Total:     600s
 **ROOT CAUSE**: Sequential section processing in `generation-phases.ts` lines 175-191
 
 **Evidence**:
+
 1. **Sequential blocking**: `await` in for-loop prevents concurrent processing
 2. **No parallelization**: Despite spec mentioning `PARALLEL_BATCH_SIZE=2`, code uses sequential loop
 3. **Time dominance**: Phase 2 accounts for 96% of total time (600s / 625s)
 4. **Independent operations**: Each section is self-contained (no dependencies between sections)
 
 **Contributing Factors**:
+
 1. **LLM latency**: 75 seconds per section (network + inference)
 2. **Large output tokens**: ~15-20K tokens per section (6 lessons with exercises)
 3. **Model selection**: May be using slower models (qwen3-max/120B) instead of faster 20B
 
 **NOT Bottlenecks**:
+
 - ✅ Phase 1 (metadata): Only 20s (3% of total)
 - ✅ Phase 3-5 (validation + DB): Only 5s total (<1%)
 - ✅ RAG operations: Optional, not enabled in this test
@@ -203,17 +220,20 @@ Total:     600s
 ### Phase 4: Comparison with SC-003 Spec
 
 **Spec Requirement** (spec.md line 190):
+
 ```
 SC-003: Course structure generation completes within 150 seconds for
 standard courses (8 sections, 20-30 lessons)
 ```
 
 **Current Performance**:
+
 - Test scenario: 8 sections, 48 lessons
 - Actual time: > 600 seconds
 - **Gap: 4x slower than spec (600s vs 150s target)**
 
 **Spec Mentions Parallel Processing** (spec.md line 17):
+
 ```
 "Внутри одной генерации: секции обрабатываются группами по 2 параллельно
 (PARALLEL_BATCH_SIZE=2), задержка 2 секунды между группами."
@@ -234,6 +254,7 @@ Translation: "Within one generation: sections are processed in groups of 2 in pa
 **Location**: `packages/course-gen-platform/src/orchestrator/services/generation/generation-phases.ts` lines 175-191
 
 **Code Pattern**:
+
 ```typescript
 for (let sectionIndex = 0; sectionIndex < totalSections; sectionIndex++) {
   const result = await generator.generateBatch(...); // ← BLOCKS next iteration
@@ -242,6 +263,7 @@ for (let sectionIndex = 0; sectionIndex < totalSections; sectionIndex++) {
 ```
 
 **Why This Causes 4x Slowdown**:
+
 1. Each `await` blocks the entire loop
 2. 8 sections × 75s/section = 600 seconds total
 3. Sections are independent (no shared state, different topics)
@@ -251,6 +273,7 @@ for (let sectionIndex = 0; sectionIndex < totalSections; sectionIndex++) {
 ### Mechanism of Failure
 
 **Sequential Execution Flow**:
+
 ```
 [Phase 2 Start] → Section 1 LLM call (75s) →
                   Section 2 LLM call (75s) →
@@ -264,6 +287,7 @@ for (let sectionIndex = 0; sectionIndex < totalSections; sectionIndex++) {
 ```
 
 **Expected Parallel Flow (PARALLEL_BATCH_SIZE=4)**:
+
 ```
 [Phase 2 Start] →
   Batch 1: [Section 1, 2, 3, 4] in parallel (75s) →
@@ -304,6 +328,7 @@ for (let sectionIndex = 0; sectionIndex < totalSections; sectionIndex++) {
 **Description**: Process 4 sections concurrently using `Promise.all()`, then process the next 4.
 
 **Implementation**:
+
 ```typescript
 // In generation-phases.ts, replace lines 175-191 with:
 
@@ -319,7 +344,9 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
   const batchEnd = Math.min(batchStart + PARALLEL_BATCH_SIZE, totalSections);
   const batchPromises = [];
 
-  console.log(`[phase2] Processing batch ${batchStart / PARALLEL_BATCH_SIZE + 1}: sections ${batchStart + 1}-${batchEnd}`);
+  console.log(
+    `[phase2] Processing batch ${batchStart / PARALLEL_BATCH_SIZE + 1}: sections ${batchStart + 1}-${batchEnd}`
+  );
 
   // Launch parallel section generations
   for (let sectionIndex = batchStart; sectionIndex < batchEnd; sectionIndex++) {
@@ -351,6 +378,7 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 ```
 
 **Expected Performance**:
+
 - 8 sections / 4 parallel = 2 batches
 - Batch 1: 75s (sections 1-4 in parallel)
 - Delay: 2s
@@ -359,6 +387,7 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 - **Total Pipeline: ~177s** (meets SC-003 spec of <150s with small margin)
 
 **Pros**:
+
 - ✅ Meets SC-003 spec requirement (<150s)
 - ✅ 4x performance improvement (600s → 150s)
 - ✅ Simple implementation (~20 lines of code)
@@ -367,17 +396,20 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 - ✅ Maintains error handling and retry logic
 
 **Cons**:
+
 - ⚠️ Increased OpenRouter API concurrency (4 concurrent requests)
 - ⚠️ Requires testing for rate limit handling
 - ⚠️ May need error isolation (one section failure shouldn't block others)
 
 **Risk**: MEDIUM
+
 - OpenRouter concurrency limits unknown (need to test)
 - May trigger rate limiting (mitigated by 2s delay between batches)
 
 **Effort**: LOW (2-3 hours implementation + testing)
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/orchestrator/services/generation/generation-phases.ts` (lines 175-191)
 
 ---
@@ -389,6 +421,7 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 **Implementation**: Same as Solution 1, but with `PARALLEL_BATCH_SIZE = 2`
 
 **Expected Performance**:
+
 - 8 sections / 2 parallel = 4 batches
 - Batch 1: 75s (sections 1-2)
 - Delay: 2s
@@ -401,12 +434,14 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 - **Total Pipeline: ~331s** (still 2x over spec, but 45% improvement)
 
 **Pros**:
+
 - ✅ Matches spec requirement exactly (PARALLEL_BATCH_SIZE=2)
 - ✅ Lower concurrency risk
 - ✅ 45% performance improvement (600s → 306s)
 - ✅ Easier to debug and monitor
 
 **Cons**:
+
 - ❌ Still exceeds SC-003 spec (331s vs 150s target)
 - ❌ Requires further optimization to meet spec
 
@@ -421,6 +456,7 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 **Description**: Investigate and optimize per-section LLM response time from 75s to 40-50s.
 
 **Potential Optimizations**:
+
 1. **Model selection**: Use OSS 20B (faster) instead of qwen3-max/120B where appropriate
 2. **Prompt optimization**: Reduce prompt tokens by ~20-30%
 3. **Output token reduction**: Simplify lesson structure (fewer examples)
@@ -428,22 +464,26 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 5. **Network optimization**: Use OpenRouter's fastest endpoints
 
 **Expected Performance**:
+
 - Current: 75s per section
 - Optimized: 40-50s per section
 - With PARALLEL_BATCH_SIZE=4: 8 sections / 4 = 2 batches × 45s = ~90s Phase 2
 - **Total Pipeline: ~115s** (well under SC-003 spec)
 
 **Pros**:
+
 - ✅ Significant performance gain when combined with Solution 1
 - ✅ Reduces API costs (fewer tokens)
 - ✅ Improves user experience across all courses
 
 **Cons**:
+
 - ⚠️ Requires extensive testing (quality validation)
 - ⚠️ May reduce generation quality if over-optimized
 - ⚠️ More complex to implement and validate
 
 **Risk**: MEDIUM-HIGH
+
 - Quality degradation risk
 - Requires A/B testing and quality metrics
 
@@ -456,6 +496,7 @@ for (let batchStart = 0; batchStart < totalSections; batchStart += PARALLEL_BATC
 **Description**: Increase `MAX_WAIT_TIME` from 600s to 900s (15 minutes) in test configuration.
 
 **Implementation**:
+
 ```typescript
 // In tests/e2e/t053-synergy-sales-course.test.ts
 const TEST_CONFIG = {
@@ -466,11 +507,13 @@ const TEST_CONFIG = {
 ```
 
 **Pros**:
+
 - ✅ Immediate fix (5 minutes implementation)
 - ✅ Allows E2E test to complete
 - ✅ No code changes to production code
 
 **Cons**:
+
 - ❌ Doesn't fix underlying performance issue
 - ❌ 15-minute generation time is unacceptable for production
 - ❌ Still 6x over SC-003 spec (900s vs 150s)
@@ -489,18 +532,21 @@ This issue blocks E2E test completion and indicates production performance is 4x
 ### Recommended Approach
 
 **Phase 1: Implement Solution 1 (Parallel Batch Processing)** ⭐
+
 - Modify `generation-phases.ts` lines 175-191
 - Implement `PARALLEL_BATCH_SIZE=4` with `Promise.all()`
 - Add 2-second delay between batches
 - Test with 8-section course
 
 **Phase 2: Validate Performance**
+
 - Run t053 E2E test
 - Verify total time < 150s (SC-003)
 - Check error handling (one failed section doesn't block others)
 - Monitor OpenRouter rate limiting
 
 **Phase 3: Optional - Solution 3 (LLM Optimization)**
+
 - Profile LLM response times
 - Test faster models (OSS 20B vs qwen3-max)
 - Optimize prompts for token reduction
@@ -519,16 +565,19 @@ This issue blocks E2E test completion and indicates production performance is 4x
 ### Validation Criteria
 
 **Performance**:
+
 - [ ] Total pipeline time < 150s for 8 sections (SC-003)
 - [ ] Phase 2 time < 125s
 - [ ] E2E test completes successfully
 
 **Quality**:
+
 - [ ] All 48 lessons generated correctly
 - [ ] Quality scores >= 0.75 (SC-004)
 - [ ] No validation errors
 
 **Reliability**:
+
 - [ ] Error handling works (one section failure doesn't block others)
 - [ ] Retry logic still functional
 - [ ] No OpenRouter rate limiting errors
@@ -571,17 +620,20 @@ This issue blocks E2E test completion and indicates production performance is 4x
 ### Performance Impact
 
 **Current**:
+
 - Total time: ~625s
 - Phase 2: ~600s (96% of total)
 - User experience: Unacceptable (10+ minute wait)
 
 **After Solution 1 (PARALLEL_BATCH_SIZE=4)**:
+
 - Total time: ~177s
 - Phase 2: ~152s (86% of total)
 - User experience: Acceptable (< 3 minutes)
 - **Improvement: 71% reduction (625s → 177s)**
 
 **After Solution 1 + Solution 3 (optimized LLM)**:
+
 - Total time: ~115s
 - Phase 2: ~90s (78% of total)
 - User experience: Excellent (< 2 minutes)
@@ -607,16 +659,19 @@ This issue blocks E2E test completion and indicates production performance is 4x
 ### Tier 0: Project Internal
 
 **Spec Document**: `specs/008-generation-generation-json/spec.md`
+
 - Line 17: "секции обрабатываются группами по 2 параллельно (PARALLEL_BATCH_SIZE=2)"
 - Line 190: "SC-003: Course structure generation completes within 150 seconds"
 - Line 69: "Acceptance Scenarios" for US3 (Multi-Model Orchestration)
 
 **Code References**:
+
 - `packages/course-gen-platform/src/orchestrator/services/generation/generation-phases.ts` (lines 137-242)
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts` (lines 467-673)
 - `packages/course-gen-platform/src/orchestrator/handlers/stage5-generation.ts` (lines 351-387)
 
 **Related Investigations**:
+
 - INV-2025-11-18-004: Stage 4 Analysis Failures (RESOLVED)
 - INV-2025-11-18-003: T053 E2E Test Fixes (Issues #1-6, RESOLVED)
 
@@ -627,10 +682,12 @@ Not applicable - this is an architectural performance issue, not a framework/lib
 ### Tier 2: Official Documentation
 
 **LangGraph Documentation**:
+
 - StateGraph execution model (sequential vs parallel nodes)
 - Node parallelization patterns
 
 **OpenRouter Documentation**:
+
 - Concurrency limits and rate limiting
 - Best practices for parallel requests
 
@@ -641,6 +698,7 @@ Not applicable - this is an architectural performance issue, not a framework/lib
 ### Sequential Thinking MCP
 
 Used to analyze the performance issue through multi-step reasoning:
+
 - Thought 1-2: Identified sequential processing as primary bottleneck
 - Thought 3-4: Verified root cause with timing calculations
 - Thought 5-6: Calculated optimization impact for parallel processing
@@ -758,15 +816,18 @@ Investigation complete with actionable recommendations.
 **DISCOVERY**: The parallel processing fix was initially implemented in the WRONG file!
 
 **Incorrect File** (not used by runtime):
+
 - `/packages/course-gen-platform/src/orchestrator/services/generation/generation-phases.ts`
 - This file contains phase nodes but is NOT imported by Stage 5 handler
 
 **Correct File** (actually used):
+
 - `/packages/course-gen-platform/src/services/stage5/generation-phases.ts`
 - Lines 324-400: `generateSections()` method with sequential for-loop
 - Imported by `GenerationOrchestrator` which is used by `Stage5GenerationHandler`
 
 **Import Chain Verification**:
+
 1. `stage5-generation.ts` line 28: `import { GenerationOrchestrator } from '../../services/stage5/generation-orchestrator'`
 2. `generation-orchestrator.ts` line 34: `import { GenerationPhases } from './generation-phases'`
 3. `generation-phases.ts` line 324: `async generateSections()` ← THIS is the method that needs fixing

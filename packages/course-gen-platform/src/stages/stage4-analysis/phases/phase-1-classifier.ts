@@ -17,7 +17,7 @@
  */
 
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
 import { Phase1OutputSchema } from '@megacampus/shared-types/analysis-schemas';
@@ -55,6 +55,8 @@ export interface Phase1Input {
     priority: string;
     category: string | null;
   }>;
+  /** Course description (user-provided context) */
+  course_description?: string;
 }
 
 /**
@@ -86,7 +88,6 @@ ${schemaDescription}
 4. Extract 3-10 key concepts and 5-15 domain keywords
 
 FIELD FORMATS:
-- theory_practice_ratio: Format "XX:YY" where XX+YY=100 (e.g., "30:70", "50:50", "70:30")
 
 CATEGORIES (with examples):
 - professional: Business skills, technical training, certifications (e.g., "Project Management", "Python Programming")
@@ -142,19 +143,24 @@ CATEGORIES (with examples):
       .join('\n\n');
   }
 
+  // Build course description context
+  let courseDescriptionContext = '';
+  if (input.course_description) {
+    courseDescriptionContext = `\n\n**User-Provided Course Description**:\n${input.course_description}`;
+  }
+
   const humanMessage = new HumanMessage(`COURSE INFORMATION:
 Topic: ${input.topic}
 Target Language: ${outputLanguage} (ALL OUTPUT MUST BE IN ${outputLanguage.toUpperCase()})
 Target Audience: ${input.target_audience || 'mixed'}
 Lesson Duration: ${input.lesson_duration_minutes || 15} minutes
-${documentContext}${clarifyingContext}
+${courseDescriptionContext}${documentContext}${clarifyingContext}
 
 TASK:
 1. Classify this course into the most appropriate category
 2. Analyze topic complexity and identify key concepts
 3. Extract domain keywords relevant to this topic
 4. Assess information completeness and identify missing elements
-5. Determine pedagogical patterns for the course
 
 IMPORTANT: Generate ALL text content (topic_analysis descriptions, key_concepts, domain_keywords) in ${outputLanguage.toUpperCase()}.
 Output MUST be valid JSON with all text fields in ${outputLanguage}.`);
@@ -194,11 +200,11 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
     async () => {
       // Invoke LLM
       const response = await model.invoke(promptMessages);
-      const rawOutput = response.content as string;
+      const rawOutput = getTextContent(response.content);
 
       // Store trace data for orchestrator to log
       const promptText = promptMessages
-        .map(m => `${m._getType().toUpperCase()}:\n${m.content}`)
+        .map(m => `${m._getType().toUpperCase()}:\n${getTextContent(m.content)}`)
         .join('\n\n');
       storeTraceData(courseId, 'stage_4_classification', {
         promptText,
@@ -212,11 +218,10 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
 
       // Step 2: Try to parse and preprocess enums
       try {
-        const parsedRaw = JSON.parse(preprocessedOutput);
-        const preprocessed = preprocessObject(parsedRaw, {
+        const parsedRaw = JSON.parse(preprocessedOutput) as unknown;
+        const preprocessed = preprocessObject(parsedRaw as Record<string, unknown>, {
           course_category: 'enum',
           target_audience: 'enum',
-          primary_strategy: 'enum',
           // Phase 1 specific enum fields
         });
         preprocessedOutput = JSON.stringify(preprocessed);
@@ -262,7 +267,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
       // Regenerate with retry layers
       const regenResult = await regenerator.regenerate({
         rawOutput: preprocessedOutput,
-        originalPrompt: promptMessages.map(m => m.content).join('\n\n'),
+        originalPrompt: promptMessages.map(m => getTextContent(m.content)).join('\n\n'),
       });
 
       // Validate regeneration result

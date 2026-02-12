@@ -35,7 +35,23 @@ export function extractContentBody(state: LessonGraphStateType): LessonContentBo
     // Try to parse JSON from string (for backward compatibility)
     // safeJSONParse handles markdown code blocks, thinking tags, and JSON repair
     const parsed = safeJSONParse(state.generatedContent);
-    return parsed as LessonContentBody;
+    if (parsed && typeof parsed === 'object') {
+      const body = parsed as LessonContentBody;
+      if (!Array.isArray(body.sections)) {
+        body.sections = [];
+      }
+      if (!Array.isArray(body.examples)) {
+        body.examples = [];
+      }
+      if (!Array.isArray(body.exercises)) {
+        body.exercises = [];
+      }
+      if (!body.intro) {
+        body.intro = '';
+      }
+      return body;
+    }
+    return null;
   } catch {
     // JSON parsing failed, try markdown parser
     logger.debug('Failed to parse JSON, trying markdown parser');
@@ -90,30 +106,38 @@ export function countWords(contentBody: LessonContentBody): number {
   let wordCount = 0;
 
   // Count intro words
-  wordCount += contentBody.intro.split(/\s+/).filter(Boolean).length;
+  if (contentBody.intro) {
+    wordCount += contentBody.intro.split(/\s+/).filter(Boolean).length;
+  }
 
   // Count section words
-  for (const section of contentBody.sections) {
-    wordCount += section.title.split(/\s+/).filter(Boolean).length;
-    wordCount += section.content.split(/\s+/).filter(Boolean).length;
+  if (Array.isArray(contentBody.sections)) {
+    for (const section of contentBody.sections) {
+      wordCount += section.title.split(/\s+/).filter(Boolean).length;
+      wordCount += section.content.split(/\s+/).filter(Boolean).length;
+    }
   }
 
   // Count example words
-  for (const example of contentBody.examples) {
-    wordCount += example.title.split(/\s+/).filter(Boolean).length;
-    wordCount += example.content.split(/\s+/).filter(Boolean).length;
-    if (example.code) {
-      wordCount += example.code.split(/\s+/).filter(Boolean).length;
+  if (Array.isArray(contentBody.examples)) {
+    for (const example of contentBody.examples) {
+      wordCount += example.title.split(/\s+/).filter(Boolean).length;
+      wordCount += example.content.split(/\s+/).filter(Boolean).length;
+      if (example.code) {
+        wordCount += example.code.split(/\s+/).filter(Boolean).length;
+      }
     }
   }
 
   // Count exercise words
-  for (const exercise of contentBody.exercises) {
-    wordCount += exercise.question.split(/\s+/).filter(Boolean).length;
-    wordCount += exercise.solution.split(/\s+/).filter(Boolean).length;
-    if (exercise.hints) {
-      for (const hint of exercise.hints) {
-        wordCount += hint.split(/\s+/).filter(Boolean).length;
+  if (Array.isArray(contentBody.exercises)) {
+    for (const exercise of contentBody.exercises) {
+      wordCount += exercise.question.split(/\s+/).filter(Boolean).length;
+      wordCount += exercise.solution.split(/\s+/).filter(Boolean).length;
+      if (exercise.hints) {
+        for (const hint of exercise.hints) {
+          wordCount += hint.split(/\s+/).filter(Boolean).length;
+        }
       }
     }
   }

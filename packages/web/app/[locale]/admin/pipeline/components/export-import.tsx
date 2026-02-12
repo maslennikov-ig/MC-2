@@ -12,10 +12,10 @@
  * @module app/admin/pipeline/components/export-import
  */
 
-'use client';
+'use client'
 
-import { useState, useRef, useEffect } from 'react';
-import { toast } from 'sonner';
+import { useState, useRef } from 'react'
+import { toast } from 'sonner'
 import {
   Download,
   Upload,
@@ -25,13 +25,13 @@ import {
   AlertTriangle,
   CheckCircle,
   AlertCircle,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +41,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from '@/components/ui/alert-dialog'
 import {
   Table,
   TableBody,
@@ -49,164 +49,149 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import {
-  exportConfiguration,
-  validateImport,
-  importConfiguration,
-  listBackups,
-  restoreFromBackup,
-} from '@/app/actions/pipeline-admin';
-import type { ConfigBackup, ConfigExport, ImportPreview } from '@megacampus/shared-types';
+} from '@/components/ui/table'
+import { TRPCClientError } from '@trpc/client'
+import { trpc } from '@/lib/trpc/react'
+import type { ConfigExport, ImportPreview } from '@megacampus/shared-types'
 
 /**
  * Export/Import Panel - Export config, import config, manage backups
  */
 export function ExportImportPanel() {
+  const utils = trpc.useUtils()
+
   // Export state
-  const [isExporting, setIsExporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false)
 
   // Import state
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importFile, setImportFile] = useState<ConfigExport | null>(null);
-  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importFile, setImportFile] = useState<ConfigExport | null>(null)
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const [isValidating, setIsValidating] = useState(false)
   const [importOptions, setImportOptions] = useState({
     importModelConfigs: true,
     importPromptTemplates: true,
     importGlobalSettings: true,
     createBackup: true,
-  });
-  const [showImportConfirm, setShowImportConfirm] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
+  })
+  const [showImportConfirm, setShowImportConfirm] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
-  // Backups state
-  const [backups, setBackups] = useState<ConfigBackup[]>([]);
-  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
-  const [restoreTarget, setRestoreTarget] = useState<ConfigBackup | null>(null);
-  const [isRestoring, setIsRestoring] = useState(false);
+  // Backups query
+  const { data: backups = [], isLoading: isLoadingBackups } =
+    trpc.pipelineAdmin.listBackups.useQuery()
+
+  // Restore state - uses tRPC output type which has nullable createdAt
+  const [restoreTarget, setRestoreTarget] = useState<(typeof backups)[number] | null>(null)
+
+  // tRPC mutations
+  const importMutation = trpc.pipelineAdmin.importConfiguration.useMutation({
+    onSuccess: () => {
+      toast.success('Configuration imported successfully')
+      setImportFile(null)
+      setImportPreview(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      void utils.pipelineAdmin.listBackups.invalidate()
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Import failed')
+    },
+    onSettled: () => {
+      setShowImportConfirm(false)
+    },
+  })
+
+  const restoreMutation = trpc.pipelineAdmin.restoreFromBackup.useMutation({
+    onSuccess: (_data, _vars) => {
+      toast.success(`Restored from ${restoreTarget?.backupName}`)
+      void utils.pipelineAdmin.listBackups.invalidate()
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Restore failed')
+    },
+    onSettled: () => {
+      setRestoreTarget(null)
+    },
+  })
 
   // Export handler - downloads JSON file
   const handleExport = async () => {
     try {
-      setIsExporting(true);
-      const result = await exportConfiguration();
-      const exportData = result.result?.data || result.result;
+      setIsExporting(true)
+      const exportData = await utils.pipelineAdmin.exportConfiguration.fetch()
 
       // Create and download file
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
         type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pipeline-config-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pipeline-config-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
 
-      toast.success('Configuration exported successfully');
+      toast.success('Configuration exported successfully')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Export failed');
+      if (err instanceof TRPCClientError) {
+        toast.error(err.message)
+      } else {
+        toast.error('Export failed')
+      }
     } finally {
-      setIsExporting(false);
+      setIsExporting(false)
     }
-  };
+  }
 
   // File upload handler
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]
+    if (!file) return
 
     try {
-      setIsValidating(true);
-      setValidationError(null);
-      const text = await file.text();
-      const data = JSON.parse(text) as ConfigExport;
-      setImportFile(data);
+      setIsValidating(true)
+      setValidationError(null)
+      const text = await file.text()
+      const data = JSON.parse(text) as ConfigExport
+      setImportFile(data)
 
-      // Validate via backend
-      const result = await validateImport({ exportData: data });
-      setImportPreview(result.result?.data || result.result);
-      toast.success('Import file validated successfully');
+      // Validate via backend using utils.fetch for on-demand query
+      const preview = await utils.pipelineAdmin.validateImport.fetch({ exportData: data })
+      setImportPreview(preview)
+      toast.success('Import file validated successfully')
     } catch (err) {
-      setValidationError(err instanceof Error ? err.message : 'Invalid JSON file');
-      toast.error('Failed to validate import file');
-      setImportFile(null);
-      setImportPreview(null);
+      setValidationError(err instanceof Error ? err.message : 'Invalid JSON file')
+      toast.error('Failed to validate import file')
+      setImportFile(null)
+      setImportPreview(null)
     } finally {
-      setIsValidating(false);
+      setIsValidating(false)
     }
-  };
+  }
 
   // Import handler
-  const handleImport = async () => {
-    if (!importFile) return;
-
-    try {
-      setIsImporting(true);
-      await importConfiguration({
-        exportData: importFile,
-        options: importOptions,
-      });
-      toast.success('Configuration imported successfully');
-      // Reset state
-      setImportFile(null);
-      setImportPreview(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      // Refresh backups list
-      loadBackups();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Import failed');
-    } finally {
-      setIsImporting(false);
-      setShowImportConfirm(false);
-    }
-  };
-
-  // Load backups
-  const loadBackups = async () => {
-    try {
-      setIsLoadingBackups(true);
-      const result = await listBackups();
-      setBackups(result.result?.data || result.result || []);
-    } catch (_err) {
-      toast.error('Failed to load backups');
-    } finally {
-      setIsLoadingBackups(false);
-    }
-  };
+  const handleImport = () => {
+    if (!importFile) return
+    importMutation.mutate({
+      exportData: importFile,
+      options: importOptions,
+    })
+  }
 
   // Restore handler
-  const handleRestore = async () => {
-    if (!restoreTarget) return;
-
-    try {
-      setIsRestoring(true);
-      await restoreFromBackup({
-        backupId: restoreTarget.id,
-        options: {
-          restoreModelConfigs: true,
-          restorePromptTemplates: true,
-          restoreGlobalSettings: true,
-        },
-      });
-      toast.success(`Restored from ${restoreTarget.backupName}`);
-      loadBackups();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Restore failed');
-    } finally {
-      setIsRestoring(false);
-      setRestoreTarget(null);
-    }
-  };
-
-  // Load backups on mount
-  useEffect(() => {
-    loadBackups();
-  }, []);
+  const handleRestore = () => {
+    if (!restoreTarget) return
+    restoreMutation.mutate({
+      backupId: restoreTarget.id,
+      options: {
+        restoreModelConfigs: true,
+        restorePromptTemplates: true,
+        restoreGlobalSettings: true,
+      },
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -223,11 +208,11 @@ export function ExportImportPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={handleExport} disabled={isExporting}>
+          <Button onClick={() => void handleExport()} disabled={isExporting}>
             {isExporting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <FileJson className="h-4 w-4 mr-2" />
+              <FileJson className="mr-2 h-4 w-4" />
             )}
             Export to JSON
           </Button>
@@ -251,7 +236,7 @@ export function ExportImportPanel() {
             ref={fileInputRef}
             type="file"
             accept=".json"
-            onChange={handleFileSelect}
+            onChange={(e) => void handleFileSelect(e)}
             className="hidden"
           />
           <Button
@@ -260,20 +245,20 @@ export function ExportImportPanel() {
             disabled={isValidating}
           >
             {isValidating ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <Upload className="h-4 w-4 mr-2" />
+              <Upload className="mr-2 h-4 w-4" />
             )}
             Select JSON File
           </Button>
 
           {/* Validation error */}
           {validationError && (
-            <div className="rounded-lg border border-destructive bg-destructive/10 p-3 flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div className="border-destructive bg-destructive/10 flex items-start gap-2 rounded-lg border p-3">
+              <AlertTriangle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
               <div className="space-y-1">
-                <p className="text-sm font-medium text-destructive">Validation Error</p>
-                <p className="text-sm text-destructive/80">{validationError}</p>
+                <p className="text-destructive text-sm font-medium">Validation Error</p>
+                <p className="text-destructive/80 text-sm">{validationError}</p>
               </div>
             </div>
           )}
@@ -281,13 +266,13 @@ export function ExportImportPanel() {
           {/* Import preview */}
           {importPreview && importFile && !validationError && (
             <>
-              <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+              <div className="bg-muted/50 space-y-3 rounded-lg border p-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <h4 className="font-medium">Import Preview</h4>
                 </div>
                 <Separator />
-                <div className="text-sm space-y-2">
+                <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Model Configs:</span>
                     <Badge variant="outline">
@@ -308,23 +293,25 @@ export function ExportImportPanel() {
                   </div>
                 </div>
                 {/* Detailed changes */}
-                {importPreview.modelConfigChanges && importPreview.modelConfigChanges.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">Model Changes:</p>
-                    <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
-                      {importPreview.modelConfigChanges.map((change, idx) => (
-                        <li key={idx} className="list-disc">
-                          {change.phaseName}: {change.currentModelId || '(none)'} → {change.newModelId}
-                          <Badge variant="secondary" className="ml-2 text-xs">
-                            {change.changeType}
-                          </Badge>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 flex items-start gap-2 mt-3">
-                  <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                {importPreview.modelConfigChanges &&
+                  importPreview.modelConfigChanges.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground text-xs font-medium">Model Changes:</p>
+                      <ul className="text-muted-foreground ml-4 space-y-0.5 text-xs">
+                        {importPreview.modelConfigChanges.map((change, idx) => (
+                          <li key={idx} className="list-disc">
+                            {change.phaseName}: {change.currentModelId || '(none)'} →{' '}
+                            {change.newModelId}
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              {change.changeType}
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                <div className="mt-3 flex items-start gap-2 rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                   <p className="text-xs text-blue-900 dark:text-blue-100">
                     Exported from platform version: <strong>{importFile.platformVersion}</strong> on{' '}
                     {new Date(importFile.exportedAt).toLocaleString()}
@@ -335,7 +322,7 @@ export function ExportImportPanel() {
               {/* Import options */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">Import Options</Label>
-                <div className="space-y-3 ml-2">
+                <div className="ml-2 space-y-3">
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="importModels"
@@ -344,7 +331,7 @@ export function ExportImportPanel() {
                         setImportOptions((prev) => ({ ...prev, importModelConfigs: !!checked }))
                       }
                     />
-                    <Label htmlFor="importModels" className="text-sm font-normal cursor-pointer">
+                    <Label htmlFor="importModels" className="cursor-pointer text-sm font-normal">
                       Import Model Configs
                     </Label>
                   </div>
@@ -359,7 +346,7 @@ export function ExportImportPanel() {
                         }))
                       }
                     />
-                    <Label htmlFor="importPrompts" className="text-sm font-normal cursor-pointer">
+                    <Label htmlFor="importPrompts" className="cursor-pointer text-sm font-normal">
                       Import Prompt Templates
                     </Label>
                   </div>
@@ -374,7 +361,7 @@ export function ExportImportPanel() {
                         }))
                       }
                     />
-                    <Label htmlFor="importSettings" className="text-sm font-normal cursor-pointer">
+                    <Label htmlFor="importSettings" className="cursor-pointer text-sm font-normal">
                       Import Global Settings
                     </Label>
                   </div>
@@ -387,7 +374,7 @@ export function ExportImportPanel() {
                         setImportOptions((prev) => ({ ...prev, createBackup: !!checked }))
                       }
                     />
-                    <Label htmlFor="createBackup" className="text-sm font-normal cursor-pointer">
+                    <Label htmlFor="createBackup" className="cursor-pointer text-sm font-normal">
                       Create Backup Before Import
                     </Label>
                   </div>
@@ -397,17 +384,17 @@ export function ExportImportPanel() {
               {/* Import button */}
               <Button
                 onClick={() => setShowImportConfirm(true)}
-                disabled={isImporting}
+                disabled={importMutation.isPending}
                 className="w-full"
               >
-                {isImporting ? (
+                {importMutation.isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Importing...
                   </>
                 ) : (
                   <>
-                    <Upload className="h-4 w-4 mr-2" />
+                    <Upload className="mr-2 h-4 w-4" />
                     Import Configuration
                   </>
                 )}
@@ -432,10 +419,10 @@ export function ExportImportPanel() {
         <CardContent>
           {isLoadingBackups ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
             </div>
           ) : backups.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-muted-foreground py-8 text-center">
               <p className="text-sm">No backups found</p>
             </div>
           ) : (
@@ -468,7 +455,7 @@ export function ExportImportPanel() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {new Date(backup.createdAt).toLocaleString()}
+                        {backup.createdAt ? new Date(backup.createdAt).toLocaleString() : '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {backup.createdByEmail || '-'}
@@ -479,7 +466,7 @@ export function ExportImportPanel() {
                           size="sm"
                           onClick={() => setRestoreTarget(backup)}
                         >
-                          <RotateCcw className="h-3 w-3 mr-1" />
+                          <RotateCcw className="mr-1 h-3 w-3" />
                           Restore
                         </Button>
                       </TableCell>
@@ -504,12 +491,10 @@ export function ExportImportPanel() {
                   ? ' A backup will be created automatically.'
                   : ' No backup will be created.'}
               </p>
-              <p className="font-medium text-foreground">Importing:</p>
-              <ul className="list-disc list-inside text-sm space-y-1">
+              <p className="text-foreground font-medium">Importing:</p>
+              <ul className="list-inside list-disc space-y-1 text-sm">
                 {importOptions.importModelConfigs && (
-                  <li>
-                    Model Configs ({importPreview?.modelConfigChanges?.length || 0} changes)
-                  </li>
+                  <li>Model Configs ({importPreview?.modelConfigChanges?.length || 0} changes)</li>
                 )}
                 {importOptions.importPromptTemplates && (
                   <li>
@@ -523,11 +508,11 @@ export function ExportImportPanel() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isImporting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleImport} disabled={isImporting}>
-              {isImporting ? (
+            <AlertDialogCancel disabled={importMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleImport} disabled={importMutation.isPending}>
+              {importMutation.isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Importing...
                 </>
               ) : (
@@ -549,20 +534,23 @@ export function ExportImportPanel() {
                 <strong>{restoreTarget?.backupName}</strong>.
               </p>
               <p>
-                Created on {restoreTarget && new Date(restoreTarget.createdAt).toLocaleString()} by{' '}
-                {restoreTarget?.createdByEmail || 'system'}
+                Created on{' '}
+                {restoreTarget?.createdAt
+                  ? new Date(restoreTarget.createdAt).toLocaleString()
+                  : 'unknown date'}{' '}
+                by {restoreTarget?.createdByEmail || 'system'}
               </p>
-              <p className="font-medium text-foreground">
+              <p className="text-foreground font-medium">
                 All current settings will be replaced with the backup version.
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRestoring}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRestore} disabled={isRestoring}>
-              {isRestoring ? (
+            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestore} disabled={restoreMutation.isPending}>
+              {restoreMutation.isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Restoring...
                 </>
               ) : (
@@ -573,5 +561,5 @@ export function ExportImportPanel() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
+  )
 }

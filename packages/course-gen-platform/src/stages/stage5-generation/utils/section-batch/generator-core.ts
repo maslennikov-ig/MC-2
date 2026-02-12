@@ -6,9 +6,10 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
-import { normalizeLanguageCode } from '@/shared/utils/language-utils';
+import { normalizeLanguageCode } from '@megacampus/shared-utils';
 import { z } from 'zod';
 import logger from '@/shared/logger';
+import { logTrace } from '@/shared/trace-logger';
 import { ModelTier, SectionBatchResult } from './types';
 import { MODELS, OPENROUTER_BASE_URL } from './constants';
 import { buildBatchPrompt, CourseConstraints } from './prompt-builder';
@@ -87,7 +88,7 @@ function cleanupPlaceholders(
 
       result[key] = cleaned;
     } else if (Array.isArray(value)) {
-      result[key] = value.map(item => {
+      result[key] = (value as unknown[]).map((item): unknown => {
         if (typeof item === 'object' && item !== null) {
           return cleanupPlaceholders(item as Record<string, unknown>, context);
         }
@@ -159,21 +160,7 @@ function preprocessResponse(rawContent: string): string {
             const lessonTitle = (preprocessedLesson.lesson_title as string) || sectionTitle;
             const context = { lessonTitle, topicHint: sectionTitle };
 
-            if (
-              preprocessedLesson.practical_exercises &&
-              Array.isArray(preprocessedLesson.practical_exercises)
-            ) {
-              preprocessedLesson.practical_exercises = (
-                preprocessedLesson.practical_exercises as Record<string, unknown>[]
-              ).map(exercise => {
-                let preprocessedExercise = preprocessObject(exercise, {
-                  difficulty_level: 'enum',
-                });
-                // Cleanup placeholders in exercises (most common issue)
-                preprocessedExercise = cleanupPlaceholders(preprocessedExercise, context);
-                return preprocessedExercise;
-              });
-            }
+            // practical_exercises preprocessing REMOVED — Stage 6 generates exercises independently
 
             // Cleanup placeholders in lesson fields
             preprocessedLesson = cleanupPlaceholders(preprocessedLesson, context);
@@ -258,6 +245,15 @@ function validateAndInjectDuration(
           level: 'error',
         })
       );
+      // Fire-and-forget: track RT-006 retries in generation_trace for telemetry
+      void logTrace({
+        courseId: input.course_id,
+        stage: 'stage_5',
+        phase: 'generate_sections',
+        stepName: 'rt006_validation_failed',
+        errorData: { batchNum, sectionIndex, issues },
+        durationMs: 0,
+      });
       throw new Error(`RT-006 validation failed: ${issues}`);
     }
     throw error;
@@ -273,8 +269,6 @@ export async function generateWithRetry(
   input: GenerationJobInput,
   modelTier: ModelTier,
   qdrantClient: QdrantClient | undefined,
-  complexityScore: number,
-  criticalityScore: number,
   language: string,
   constraints?: CourseConstraints
 ): Promise<SectionBatchResult> {
@@ -367,17 +361,15 @@ export async function generateWithRetry(
         tier: currentModelTier.tier,
         tokensUsed: estimateTokens(prompt, rawContent),
         retryCount,
-        complexityScore,
-        criticalityScore,
         regenerationMetrics,
       };
     } catch (error) {
       retryCount++;
 
-      if (currentModelTier.tier === 'tier1_oss120b' && retryCount < maxAttempts) {
+      if (currentModelTier.tier === 'simple' && retryCount < maxAttempts) {
         console.warn(
           JSON.stringify({
-            msg: 'Tier 1 (OSS 120B) failed, attempting escalation to Tier 2',
+            msg: 'Simple tier failed, escalating to complex tier',
             batchNum,
             sectionIndex,
             attempt: retryCount,
@@ -386,39 +378,38 @@ export async function generateWithRetry(
           })
         );
 
-        // Get escalation model from database with language-specific fallback
+        // Escalate simple → complex: get model from database with language-specific fallback
         const langCode = normalizeLanguageCode(language, 'en');
-        const isRussian = langCode === 'ru';
         let escalationModel: string;
         let escalationSource = 'database';
 
         try {
           const modelConfigService = createModelConfigService();
           const escalationConfig = await modelConfigService.getModelForPhase(
-            'stage_5_escalation',
+            'stage_5_complex',
             undefined,
             undefined,
             langCode
           );
-          escalationModel = escalationConfig.modelId || MODELS.lessons_fallback;
+          escalationModel = escalationConfig.modelId || MODELS.complex;
           escalationSource = escalationConfig.source;
         } catch (configError) {
           logger.warn({
             msg: 'getModelForPhase failed for escalation, using hardcoded fallback',
             error: configError instanceof Error ? configError.message : 'Unknown error',
           });
-          escalationModel = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
+          escalationModel = MODELS.complex;
           escalationSource = 'hardcoded';
         }
 
         currentModelTier = {
           model: escalationModel,
-          tier: isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons',
-          reason: `Quality escalation from tier1 - using ${langCode}-optimized model (${escalationSource})`,
+          tier: 'complex',
+          reason: `Quality escalation from simple tier - using complex model (${escalationSource})`,
         };
 
         logger.info({
-          msg: 'Escalating to tier2 after quality failure',
+          msg: 'Escalating to complex tier after simple tier failure',
           language,
           model: escalationModel,
           tier: currentModelTier.tier,

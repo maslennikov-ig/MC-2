@@ -179,12 +179,7 @@
   "comparisonWithV1": {
     "enabled": true,
     "v1ResultsPath": "specs/008-generation-generation-json/quality-tests/",
-    "compareMetrics": [
-      "quality scores",
-      "consistency",
-      "reliability",
-      "schema compliance"
-    ]
+    "compareMetrics": ["quality scores", "consistency", "reliability", "schema compliance"]
   },
   "notes": [
     "SECOND TEST RUN (v2) - separate from first test",

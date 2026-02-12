@@ -66,7 +66,10 @@ export function registerCleanupHandler(
   priority: number = 100
 ): void {
   cleanupHandlers.push({ name, handler, priority });
-  logger.debug({ name, priority, totalHandlers: cleanupHandlers.length }, 'Cleanup handler registered');
+  logger.debug(
+    { name, priority, totalHandlers: cleanupHandlers.length },
+    'Cleanup handler registered'
+  );
 }
 
 /**
@@ -112,7 +115,7 @@ export async function runCleanupHandlers(
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   // Create a timeout promise
-  const timeoutPromise = new Promise<'timeout'>((resolve) => {
+  const timeoutPromise = new Promise<'timeout'>(resolve => {
     timeoutId = setTimeout(() => {
       abortController.abort();
       resolve('timeout');
@@ -185,7 +188,10 @@ export async function runCleanupHandlers(
     return { total, succeeded: stats.succeeded, failed: stats.failed, timedOut: true };
   }
 
-  logger.info({ total, succeeded: stats.succeeded, failed: stats.failed }, 'All cleanup handlers completed');
+  logger.info(
+    { total, succeeded: stats.succeeded, failed: stats.failed },
+    'All cleanup handlers completed'
+  );
   return { total, succeeded: stats.succeeded, failed: stats.failed, timedOut: false };
 }
 

@@ -702,7 +702,7 @@ describe('OLXGenerator - Validation Error Handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(OLXValidationError);
       if (error instanceof OLXValidationError) {
-        expect(error.errors.some((e) => e.message.includes('at least 1 chapter'))).toBe(true);
+        expect(error.errors.some(e => e.message.includes('at least 1 chapter'))).toBe(true);
       }
     }
   });
@@ -724,7 +724,7 @@ describe('OLXGenerator - Validation Error Handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(OLXValidationError);
       if (error instanceof OLXValidationError) {
-        expect(error.errors.some((e) => e.message.includes('at least 1 section'))).toBe(true);
+        expect(error.errors.some(e => e.message.includes('at least 1 section'))).toBe(true);
       }
     }
   });
@@ -752,7 +752,7 @@ describe('OLXGenerator - Validation Error Handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(OLXValidationError);
       if (error instanceof OLXValidationError) {
-        expect(error.errors.some((e) => e.message.includes('at least 1 unit'))).toBe(true);
+        expect(error.errors.some(e => e.message.includes('at least 1 unit'))).toBe(true);
       }
     }
   });
@@ -786,7 +786,7 @@ describe('OLXGenerator - Validation Error Handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(OLXValidationError);
       if (error instanceof OLXValidationError) {
-        expect(error.errors.some((e) => e.message.includes('must have content'))).toBe(true);
+        expect(error.errors.some(e => e.message.includes('must have content'))).toBe(true);
       }
     }
   });
@@ -802,7 +802,9 @@ describe('OLXGenerator - Validation Error Handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(OLXValidationError);
       if (error instanceof OLXValidationError) {
-        expect(error.errors.some((e) => e.message.includes('courseId') && e.message.includes('ASCII'))).toBe(true);
+        expect(
+          error.errors.some(e => e.message.includes('courseId') && e.message.includes('ASCII'))
+        ).toBe(true);
       }
     }
   });
@@ -818,7 +820,9 @@ describe('OLXGenerator - Validation Error Handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(OLXValidationError);
       if (error instanceof OLXValidationError) {
-        expect(error.errors.some((e) => e.message.includes('org') && e.message.includes('ASCII'))).toBe(true);
+        expect(
+          error.errors.some(e => e.message.includes('org') && e.message.includes('ASCII'))
+        ).toBe(true);
       }
     }
   });
@@ -834,7 +838,9 @@ describe('OLXGenerator - Validation Error Handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(OLXValidationError);
       if (error instanceof OLXValidationError) {
-        expect(error.errors.some((e) => e.message.includes('run') && e.message.includes('ASCII'))).toBe(true);
+        expect(
+          error.errors.some(e => e.message.includes('run') && e.message.includes('ASCII'))
+        ).toBe(true);
       }
     }
   });
@@ -865,9 +871,7 @@ describe('OLXGenerator - Reset Functionality', () => {
             {
               id: 'sec1',
               title: 'Test',
-              units: [
-                { id: 'u1', title: 'Test', content: '<p>1</p>' },
-              ],
+              units: [{ id: 'u1', title: 'Test', content: '<p>1</p>' }],
             },
           ],
         },
@@ -888,9 +892,7 @@ describe('OLXGenerator - Reset Functionality', () => {
             {
               id: 'sec2',
               title: 'Test',
-              units: [
-                { id: 'u2', title: 'Test', content: '<p>2</p>' },
-              ],
+              units: [{ id: 'u2', title: 'Test', content: '<p>2</p>' }],
             },
           ],
         },

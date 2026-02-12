@@ -38,7 +38,6 @@ import { appRouter } from '../../src/server/app-router';
 import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
-import { getWorker, stopWorker } from '../../src/orchestrator/worker';
 import { closeQueue } from '../../src/orchestrator/queue';
 import { getAuthToken } from '../helpers/auth-token';
 
@@ -203,7 +202,7 @@ function createTestClient(port: number, token?: string) {
  */
 async function createTestCourse(
   title: string,
-  generationStatus: string = 'processing_documents'
+  generationStatus: string = 'stage_2_processing'
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
 
@@ -239,7 +238,6 @@ async function createTestCourse(
 describe('Contract: Analysis Router', () => {
   let testServer: TestServer;
   let serverPort: number;
-  let worker: any;
   let testCourseIds: string[] = [];
 
   beforeAll(async () => {
@@ -256,9 +254,9 @@ describe('Contract: Analysis Router', () => {
     testServer = await startTestServer();
     serverPort = testServer.port;
 
-    // Start BullMQ worker for job processing
-    worker = getWorker(1);
-    console.log('BullMQ worker started for test job processing');
+    // NOTE: BullMQ worker is NOT started for contract tests.
+    // Contract tests verify API contracts (input validation, error codes, response shapes)
+    // and do not require actual job processing.
 
     console.log(`Test server ready on port ${serverPort}`);
   }, 30000);
@@ -282,12 +280,8 @@ describe('Contract: Analysis Router', () => {
   afterAll(async () => {
     console.log('Tearing down analysis contract tests...');
 
-    // Stop worker BEFORE server
-    if (worker) {
-      console.log('Stopping BullMQ worker...');
-      await stopWorker(false);
-      await closeQueue();
-    }
+    // Close BullMQ queue (no worker to stop — contract tests don't start one)
+    await closeQueue();
 
     // Stop server
     if (testServer) {
@@ -354,7 +348,7 @@ describe('Contract: Analysis Router', () => {
       const client = createTestClient(serverPort, token);
 
       // And: A course with analysis in progress
-      const courseId = await createTestCourse('Test Course - Force Restart', 'analyzing_task');
+      const courseId = await createTestCourse('Test Course - Force Restart', 'stage_4_analyzing');
       testCourseIds.push(courseId);
 
       // When: Starting analysis with forceRestart=true
@@ -516,7 +510,7 @@ describe('Contract: Analysis Router', () => {
           user_id: freeOrgUserId, // User from free org
           title: 'Course from different org',
           slug: `test-course-other-org-${Date.now()}`,
-          generation_status: 'processing_documents',
+          generation_status: 'stage_2_processing',
         })
         .select('id')
         .single();
@@ -551,7 +545,7 @@ describe('Contract: Analysis Router', () => {
       const client = createTestClient(serverPort, token);
 
       // And: A course with known status
-      const courseId = await createTestCourse('Test Course - Get Status', 'analyzing_task');
+      const courseId = await createTestCourse('Test Course - Get Status', 'stage_4_analyzing');
       testCourseIds.push(courseId);
 
       // Update progress
@@ -567,7 +561,7 @@ describe('Contract: Analysis Router', () => {
       expect(result).toHaveProperty('progress');
       expect(typeof result.status).toBe('string');
       expect(typeof result.progress).toBe('number');
-      expect(result.status).toBe('analyzing_task');
+      expect(result.status).toBe('stage_4_analyzing');
       expect(result.progress).toBe(50);
     });
 
@@ -668,7 +662,7 @@ describe('Contract: Analysis Router', () => {
       const client = createTestClient(serverPort, token);
 
       // And: A course without completed analysis
-      const courseId = await createTestCourse('Test Course - No Result', 'analyzing_task');
+      const courseId = await createTestCourse('Test Course - No Result', 'stage_4_analyzing');
       testCourseIds.push(courseId);
 
       // When: Getting analysis result

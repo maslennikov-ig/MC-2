@@ -5,7 +5,7 @@ version: 2025-11-04
 status: success
 agent: supabase-auditor
 project_ref: diqooqbuchsliypgwksu
-schemas_audited: ["public", "auth"]
+schemas_audited: ['public', 'auth']
 tables_audited: 13
 issues_found: 78
 critical_count: 0
@@ -40,6 +40,7 @@ Comprehensive Supabase database audit completed for MegaCampusAI platform. The d
 - **Overall Health Score**: 82/100 (Good)
 
 ### Health Score Breakdown
+
 - Schema Design: 95/100 (Excellent - well-structured, proper FKs)
 - Security: 75/100 (Good - RLS enabled, but security warnings)
 - Performance: 70/100 (Needs Improvement - many unused indexes, RLS optimization needed)
@@ -73,25 +74,26 @@ No critical security vulnerabilities or data integrity issues detected.
 
 ### Tables Overview
 
-| Schema | Table | Rows | Size | Primary Key | Foreign Keys | RLS Enabled |
-|--------|-------|------|------|-------------|--------------|-------------|
-| public | file_catalog | 93 | 48 MB | id (UUID) | 3 | ✅ |
-| public | courses | 46 | 1.6 MB | id (UUID) | 2 | ✅ |
-| public | job_status | 0 | 272 KB | id (UUID) | 4 | ✅ |
-| public | error_logs | 17 | 200 KB | id (UUID) | 1 | ✅ |
-| public | generation_status_history | 39 | 176 KB | id (UUID) | 2 | ✅ |
-| public | lessons | 16 | 144 KB | id (UUID) | 1 | ✅ |
-| public | course_enrollments | 11 | 144 KB | id (UUID) | 2 | ✅ |
-| public | users | 82 | 136 KB | id (UUID) | 1 | ✅ |
-| public | system_metrics | 14 | 128 KB | id (UUID) | 2 | ✅ |
-| public | sections | 8 | 112 KB | id (UUID) | 1 | ✅ |
-| public | organizations | 59 | 96 KB | id (UUID) | 0 | ✅ |
-| public | lesson_content | 16 | 80 KB | lesson_id (UUID) | 1 | ✅ |
-| public | llm_model_config | 5 | 80 KB | id (UUID) | 1 | ✅ |
+| Schema | Table                     | Rows | Size   | Primary Key      | Foreign Keys | RLS Enabled |
+| ------ | ------------------------- | ---- | ------ | ---------------- | ------------ | ----------- |
+| public | file_catalog              | 93   | 48 MB  | id (UUID)        | 3            | ✅          |
+| public | courses                   | 46   | 1.6 MB | id (UUID)        | 2            | ✅          |
+| public | job_status                | 0    | 272 KB | id (UUID)        | 4            | ✅          |
+| public | error_logs                | 17   | 200 KB | id (UUID)        | 1            | ✅          |
+| public | generation_status_history | 39   | 176 KB | id (UUID)        | 2            | ✅          |
+| public | lessons                   | 16   | 144 KB | id (UUID)        | 1            | ✅          |
+| public | course_enrollments        | 11   | 144 KB | id (UUID)        | 2            | ✅          |
+| public | users                     | 82   | 136 KB | id (UUID)        | 1            | ✅          |
+| public | system_metrics            | 14   | 128 KB | id (UUID)        | 2            | ✅          |
+| public | sections                  | 8    | 112 KB | id (UUID)        | 1            | ✅          |
+| public | organizations             | 59   | 96 KB  | id (UUID)        | 0            | ✅          |
+| public | lesson_content            | 16   | 80 KB  | lesson_id (UUID) | 1            | ✅          |
+| public | llm_model_config          | 5    | 80 KB  | id (UUID)        | 1            | ✅          |
 
 ### Schema Health: EXCELLENT
 
 **Strengths:**
+
 - All tables have UUID primary keys (industry best practice for distributed systems)
 - Proper foreign key constraints with CASCADE/SET NULL strategies
 - Comprehensive ENUM types for data validation
@@ -110,21 +112,21 @@ All 13 tables in the public schema have RLS enabled with comprehensive policies.
 
 ### RLS Policy Summary
 
-| Table | RLS Enabled | Policy Count | Role Coverage |
-|-------|-------------|--------------|---------------|
-| organizations | ✅ | 1 | authenticated |
-| users | ✅ | 7 | authenticated, public, supabase_auth_admin |
-| courses | ✅ | 1 | authenticated |
-| sections | ✅ | 1 | authenticated |
-| lessons | ✅ | 1 | authenticated |
-| lesson_content | ✅ | 1 | authenticated |
-| file_catalog | ✅ | 1 | authenticated |
-| course_enrollments | ✅ | 1 | authenticated |
-| job_status | ✅ | 1 | authenticated |
-| generation_status_history | ✅ | 3 | authenticated, public |
-| system_metrics | ✅ | 2 | authenticated, public |
-| error_logs | ✅ | 2 | authenticated, service_role |
-| llm_model_config | ✅ | 3 | authenticated, public |
+| Table                     | RLS Enabled | Policy Count | Role Coverage                              |
+| ------------------------- | ----------- | ------------ | ------------------------------------------ |
+| organizations             | ✅          | 1            | authenticated                              |
+| users                     | ✅          | 7            | authenticated, public, supabase_auth_admin |
+| courses                   | ✅          | 1            | authenticated                              |
+| sections                  | ✅          | 1            | authenticated                              |
+| lessons                   | ✅          | 1            | authenticated                              |
+| lesson_content            | ✅          | 1            | authenticated                              |
+| file_catalog              | ✅          | 1            | authenticated                              |
+| course_enrollments        | ✅          | 1            | authenticated                              |
+| job_status                | ✅          | 1            | authenticated                              |
+| generation_status_history | ✅          | 3            | authenticated, public                      |
+| system_metrics            | ✅          | 2            | authenticated, public                      |
+| error_logs                | ✅          | 2            | authenticated, service_role                |
+| llm_model_config          | ✅          | 3            | authenticated, public                      |
 
 ### RLS Policy Pattern: Unified + Superadmin
 
@@ -145,6 +147,7 @@ USING (
 ```
 
 **Benefits:**
+
 - Single policy per table reduces complexity
 - Superadmin bypass for administrative access
 - Role-based access control via JWT claims
@@ -168,6 +171,7 @@ USING (
 **Risk**: If these views contain logic that exposes sensitive data, they could be exploited to bypass RLS policies.
 
 **Recommendation**:
+
 ```sql
 -- Review each view and ensure they don't expose sensitive data
 -- If possible, change to SECURITY INVOKER (default):
@@ -186,6 +190,7 @@ AS SELECT ...;
 **Impact**: Potential security vulnerability through search_path manipulation
 
 **Affected Functions**:
+
 1. `public.get_generation_summary`
 2. `public.is_superadmin`
 3. `public.validate_generation_status_transition`
@@ -197,6 +202,7 @@ AS SELECT ...;
 **Risk**: Functions without a fixed search_path can be exploited by attackers who manipulate the search_path to reference malicious schemas.
 
 **Recommendation**:
+
 ```sql
 -- Add SET search_path to each function
 CREATE OR REPLACE FUNCTION get_generation_summary(p_course_id UUID)
@@ -237,6 +243,7 @@ While the database has comprehensive indexing, **over half of the indexes are un
 **Impact**: Slow JOIN queries when querying generation history by user
 
 **Current State**:
+
 ```sql
 -- Foreign key exists but no index
 ALTER TABLE generation_status_history
@@ -245,6 +252,7 @@ ALTER TABLE generation_status_history
 ```
 
 **Recommendation**:
+
 ```sql
 CREATE INDEX idx_generation_history_changed_by
 ON generation_status_history(changed_by)
@@ -257,6 +265,7 @@ WHERE changed_by IS NOT NULL;
 **Impact**: Slow JOIN queries when querying metrics by user
 
 **Current State**:
+
 ```sql
 -- Foreign key exists but no index
 ALTER TABLE system_metrics
@@ -265,6 +274,7 @@ ALTER TABLE system_metrics
 ```
 
 **Recommendation**:
+
 ```sql
 CREATE INDEX idx_system_metrics_user_id
 ON system_metrics(user_id)
@@ -278,6 +288,7 @@ WHERE user_id IS NOT NULL;
 **Grouped by table:**
 
 #### courses (10 unused indexes)
+
 - `idx_courses_generation_status`
 - `idx_courses_active_generation`
 - `idx_courses_status`
@@ -288,6 +299,7 @@ WHERE user_id IS NOT NULL;
 - `idx_courses_analysis_result_gin` (GIN index on JSONB - may be useful later)
 
 #### job_status (8 unused indexes)
+
 - `idx_job_status_updated_at`
 - `idx_job_status_status`
 - `idx_job_status_created_at`
@@ -295,6 +307,7 @@ WHERE user_id IS NOT NULL;
 - `idx_job_status_org_cancelled`
 
 #### file_catalog (6 unused indexes)
+
 - `idx_file_catalog_hash`
 - `idx_file_catalog_error_message`
 - `idx_file_catalog_parsed_content_metadata`
@@ -303,11 +316,13 @@ WHERE user_id IS NOT NULL;
 #### Others (24 unused indexes across remaining tables)
 
 **Recommendation**: Evaluate each unused index based on:
+
 1. **Future query patterns**: Will this index be needed as data grows?
 2. **Storage cost**: How much space does it consume?
 3. **Write penalty**: Does this table have frequent writes?
 
 **Action**:
+
 ```sql
 -- Example: Drop unused indexes (carefully evaluate each one first)
 DROP INDEX IF EXISTS idx_courses_status;
@@ -318,6 +333,7 @@ DROP INDEX IF EXISTS idx_job_status_created_at;
 ### Well-Used Indexes
 
 **Good indexes** (frequently scanned):
+
 - `courses_pkey`, `courses_slug_org_unique` (unique constraint)
 - `idx_courses_organization_id`, `idx_courses_user_id` (foreign keys)
 - `file_catalog_pkey`, `idx_file_catalog_organization_id`
@@ -337,6 +353,7 @@ DROP INDEX IF EXISTS idx_job_status_created_at;
 ### Migration Timeline
 
 **Latest Migrations:**
+
 1. `20251103171044_fix_stage4_status_transition` (2025-11-03)
 2. `20251102173111_add_update_course_progress_overload` (2025-11-02)
 3. `20251102134650_add_update_course_progress_overload` (2025-11-02)
@@ -344,6 +361,7 @@ DROP INDEX IF EXISTS idx_job_status_created_at;
 5. `20251101082512_stage4_model_config` (2025-11-01)
 
 **Stage Evolution:**
+
 - Stage 3: Summarization metadata (`20251028171145_stage3_summary_metadata`)
 - Stage 4: Analysis fields and model config (`20251101082512`, `20251101082704`)
 - Stage 8: System metrics and monitoring (`20251021075707` - `20251021075830`)
@@ -351,6 +369,7 @@ DROP INDEX IF EXISTS idx_job_status_created_at;
 ### Migration Quality: EXCELLENT
 
 **Strengths:**
+
 - Descriptive migration names indicate purpose
 - Logical grouping of related changes
 - Incremental schema evolution
@@ -376,6 +395,7 @@ DROP INDEX IF EXISTS idx_job_status_created_at;
 **Affected Tables**: ALL tables with RLS policies (users, organizations, courses, sections, lessons, lesson_content, file_catalog, course_enrollments, job_status, generation_status_history, system_metrics, llm_model_config)
 
 **Example Issue** (`users.Users can update own data` policy):
+
 ```sql
 -- CURRENT (BAD - re-evaluates for each row)
 USING (auth.uid() = id)
@@ -413,6 +433,7 @@ USING (
 **Problem**: When a table has multiple permissive RLS policies for the same role and action, PostgreSQL must evaluate ALL of them (OR logic), which is slower than a single comprehensive policy.
 
 **Examples**:
+
 1. **llm_model_config**: 3 SELECT policies for all roles (read_global, read_course_override, superadmin_all)
 2. **users**: Multiple policies for INSERT (Allow user creation via trigger, superadmin_users_insert)
 3. **generation_status_history**: 2 SELECT policies (admin_read, owner_read)
@@ -441,11 +462,11 @@ USING (
 
 #### Table Sizes
 
-| Table | Size | Rows | Size per Row |
-|-------|------|------|--------------|
-| file_catalog | 48 MB | 93 | ~516 KB |
-| courses | 1.6 MB | 46 | ~35 KB |
-| job_status | 272 KB | 0 | N/A |
+| Table        | Size   | Rows | Size per Row |
+| ------------ | ------ | ---- | ------------ |
+| file_catalog | 48 MB  | 93   | ~516 KB      |
+| courses      | 1.6 MB | 46   | ~35 KB       |
+| job_status   | 272 KB | 0    | N/A          |
 
 **Analysis**: `file_catalog` dominates storage (94% of total) due to large JSONB fields (parsed_content, markdown_content). This is expected for a document processing system.
 
@@ -453,32 +474,35 @@ USING (
 
 **Critical Bloat** (>100% dead tuples):
 
-| Table | Live Rows | Dead Rows | Dead Ratio |
-|-------|-----------|-----------|------------|
-| sections | 8 | 39 | **487.50%** |
-| course_enrollments | 11 | 42 | **381.82%** |
-| system_metrics | 14 | 45 | **321.43%** |
-| lesson_content | 16 | 30 | **187.50%** |
-| generation_status_history | 39 | 48 | **123.08%** |
+| Table                     | Live Rows | Dead Rows | Dead Ratio  |
+| ------------------------- | --------- | --------- | ----------- |
+| sections                  | 8         | 39        | **487.50%** |
+| course_enrollments        | 11        | 42        | **381.82%** |
+| system_metrics            | 14        | 45        | **321.43%** |
+| lesson_content            | 16        | 30        | **187.50%** |
+| generation_status_history | 39        | 48        | **123.08%** |
 
 **Warning Bloat** (50-100% dead tuples):
 
-| Table | Live Rows | Dead Rows | Dead Ratio |
-|-------|-----------|-----------|------------|
-| organizations | 59 | 52 | 88.14% |
-| courses | 46 | 23 | 50.00% |
+| Table         | Live Rows | Dead Rows | Dead Ratio |
+| ------------- | --------- | --------- | ---------- |
+| organizations | 59        | 52        | 88.14%     |
+| courses       | 46        | 23        | 50.00%     |
 
 **Healthy** (<50% dead tuples):
+
 - users, file_catalog, job_status (0 rows, 29 dead - likely recent TRUNCATE)
 
 **Root Cause**: High UPDATE/DELETE activity on small tables without aggressive autovacuum settings.
 
 **Impact**:
+
 - Wasted storage (dead tuples not reclaimed)
 - Slower sequential scans (must skip dead tuples)
 - Index bloat (indexes reference dead tuples)
 
 **Recommendation**:
+
 ```sql
 -- Immediate: Manual VACUUM ANALYZE
 VACUUM ANALYZE sections;
@@ -511,6 +535,7 @@ ALTER TABLE system_metrics SET (autovacuum_vacuum_scale_factor = 0.05);
 **Details**: Supabase Auth can check passwords against the HaveIBeenPwned database to prevent users from using compromised passwords. This feature is currently disabled.
 
 **Recommendation**: Enable via Supabase Dashboard:
+
 1. Navigate to Authentication > Policies
 2. Enable "Leaked Password Protection"
 3. Configure minimum password strength requirements
@@ -520,6 +545,7 @@ ALTER TABLE system_metrics SET (autovacuum_vacuum_scale_factor = 0.05);
 ### RLS Policy Security: EXCELLENT
 
 **Strengths:**
+
 - All tables have RLS enabled
 - Proper organization-level isolation for multi-tenancy
 - Superadmin bypass pattern for administrative operations
@@ -527,6 +553,7 @@ ALTER TABLE system_metrics SET (autovacuum_vacuum_scale_factor = 0.05);
 - Comprehensive role-based access control (admin, instructor, student)
 
 **Security Best Practices:**
+
 - JWT claims properly validated (`auth.jwt() ->> 'role'`)
 - Foreign key checks via helper functions prevent data leakage
 - Service role policies for background job operations
@@ -540,21 +567,22 @@ ALTER TABLE system_metrics SET (autovacuum_vacuum_scale_factor = 0.05);
 
 ### Installed Extensions (9)
 
-| Extension | Version | Schema | Status |
-|-----------|---------|--------|--------|
-| uuid-ossp | 1.1 | extensions | ✅ Installed |
-| pgcrypto | 1.3 | extensions | ✅ Installed |
-| pg_stat_statements | 1.11 | extensions | ✅ Installed |
-| http | 1.6 | extensions | ✅ Installed |
-| pg_graphql | 1.5.11 | graphql | ✅ Installed |
-| pgtap | 1.2.0 | extensions | ✅ Installed |
-| supabase_vault | 0.3.1 | vault | ✅ Installed |
-| pg_tle | 1.4.0 | pgtle | ✅ Installed |
-| pgsodium | Not installed | - | ⚠️ Available |
+| Extension          | Version       | Schema     | Status       |
+| ------------------ | ------------- | ---------- | ------------ |
+| uuid-ossp          | 1.1           | extensions | ✅ Installed |
+| pgcrypto           | 1.3           | extensions | ✅ Installed |
+| pg_stat_statements | 1.11          | extensions | ✅ Installed |
+| http               | 1.6           | extensions | ✅ Installed |
+| pg_graphql         | 1.5.11        | graphql    | ✅ Installed |
+| pgtap              | 1.2.0         | extensions | ✅ Installed |
+| supabase_vault     | 0.3.1         | vault      | ✅ Installed |
+| pg_tle             | 1.4.0         | pgtle      | ✅ Installed |
+| pgsodium           | Not installed | -          | ⚠️ Available |
 
 ### Extension Usage
 
 **Actively Used:**
+
 - `uuid-ossp`: UUID generation (gen_random_uuid())
 - `pgcrypto`: Password hashing for test users (hash_password function)
 - `pg_stat_statements`: Query performance monitoring
@@ -563,6 +591,7 @@ ALTER TABLE system_metrics SET (autovacuum_vacuum_scale_factor = 0.05);
 - `pgtap`: Unit testing framework
 
 **Available but Not Installed:**
+
 - `pgsodium`: Advanced cryptography (consider for sensitive data encryption)
 - `vector`: Vector embeddings (not needed for current RAG strategy - using Qdrant)
 - `postgis`: Geospatial data (not needed for LMS)
@@ -589,9 +618,11 @@ All installed extensions serve a clear purpose in the application architecture.
 ## analysis_result Field Documentation
 
 ### Location
+
 `public.courses.analysis_result` (JSONB)
 
 ### Purpose
+
 Stage 4 multi-phase LangChain analysis output containing comprehensive course planning metadata.
 
 ### Schema Structure
@@ -601,15 +632,15 @@ The `analysis_result` JSONB field contains the output from the Stage 4 analysis 
 ```typescript
 interface AnalysisResult {
   // Phase 1: Classification
-  course_category: string;           // e.g., "Programming", "Business", "Design"
-  contextual_language: string;       // Language/framework context (e.g., "Python", "React")
+  course_category: string; // e.g., "Programming", "Business", "Design"
+  contextual_language: string; // Language/framework context (e.g., "Python", "React")
 
   // Phase 2: Scope Analysis
   topic_analysis: {
-    main_topics: string[];           // Primary subjects covered
-    subtopics: string[];             // Detailed topic breakdown
-    difficulty_level: string;        // "beginner" | "intermediate" | "advanced"
-    estimated_duration: string;      // e.g., "4-6 hours"
+    main_topics: string[]; // Primary subjects covered
+    subtopics: string[]; // Detailed topic breakdown
+    difficulty_level: string; // "beginner" | "intermediate" | "advanced"
+    estimated_duration: string; // e.g., "4-6 hours"
   };
 
   // Phase 3: Expert Synthesis
@@ -618,7 +649,7 @@ interface AnalysisResult {
       title: string;
       lessons: Array<{
         title: string;
-        type: "video" | "text" | "quiz" | "interactive" | "assignment";
+        type: 'video' | 'text' | 'quiz' | 'interactive' | 'assignment';
         duration_minutes: number;
       }>;
     }>;
@@ -628,35 +659,35 @@ interface AnalysisResult {
 
   // Phase 4: Strategy & Scope
   pedagogical_strategy: {
-    teaching_style: string;          // e.g., "hands-on", "theoretical", "project-based"
-    learning_outcomes: string[];     // Expected student outcomes
-    prerequisites: string[];         // Required prior knowledge
-    target_audience: string;         // e.g., "junior developers", "beginners"
+    teaching_style: string; // e.g., "hands-on", "theoretical", "project-based"
+    learning_outcomes: string[]; // Expected student outcomes
+    prerequisites: string[]; // Required prior knowledge
+    target_audience: string; // e.g., "junior developers", "beginners"
   };
 
   scope_instructions: {
-    content_depth: string;           // How deep to go into each topic
-    practical_examples: boolean;     // Include code examples?
-    exercises_needed: boolean;       // Include practice exercises?
-    real_world_projects: boolean;    // Include real projects?
+    content_depth: string; // How deep to go into each topic
+    practical_examples: boolean; // Include code examples?
+    exercises_needed: boolean; // Include practice exercises?
+    real_world_projects: boolean; // Include real projects?
   };
 
   research_flags: {
-    needs_current_info: boolean;     // Requires up-to-date information?
+    needs_current_info: boolean; // Requires up-to-date information?
     reference_docs_needed: string[]; // List of docs to reference
-    external_resources: string[];    // Recommended external materials
+    external_resources: string[]; // Recommended external materials
   };
 
   // Metadata
-  analysis_version: string;          // Schema version (e.g., "4.0")
-  generated_at: string;              // ISO 8601 timestamp
+  analysis_version: string; // Schema version (e.g., "4.0")
+  generated_at: string; // ISO 8601 timestamp
   model_used: {
-    phase_1: string;                 // Model used for classification
-    phase_2: string;                 // Model used for scope
-    phase_3: string;                 // Model used for expert synthesis
-    phase_4: string;                 // Model used for final strategy
+    phase_1: string; // Model used for classification
+    phase_2: string; // Model used for scope
+    phase_3: string; // Model used for expert synthesis
+    phase_4: string; // Model used for final strategy
   };
-  quality_score: number;             // 0-100 quality assessment
+  quality_score: number; // 0-100 quality assessment
 }
 ```
 
@@ -677,8 +708,8 @@ interface AnalysisResult {
       {
         "title": "Introduction to React Hooks",
         "lessons": [
-          {"title": "What are Hooks?", "type": "video", "duration_minutes": 15},
-          {"title": "useState Deep Dive", "type": "text", "duration_minutes": 30}
+          { "title": "What are Hooks?", "type": "video", "duration_minutes": 15 },
+          { "title": "useState Deep Dive", "type": "text", "duration_minutes": 30 }
         ]
       }
     ],
@@ -743,6 +774,7 @@ const { data: programmingCourses } = await supabase
 ### Index
 
 A GIN index exists for efficient JSONB queries:
+
 ```sql
 CREATE INDEX idx_courses_analysis_result_gin
 ON courses USING gin (analysis_result);
@@ -759,6 +791,7 @@ ON courses USING gin (analysis_result);
 **Status**: PASSED
 
 Successfully connected to Supabase project:
+
 - Project: MegaCampusAI (diqooqbuchsliypgwksu)
 - URL: https://diqooqbuchsliypgwksu.supabase.co
 - Region: us-east-1 (inferred from domain)
@@ -768,6 +801,7 @@ Successfully connected to Supabase project:
 **Status**: PASSED
 
 All configured schemas (public, auth) successfully queried:
+
 - public: 13 tables
 - auth: 18 tables (Supabase Auth schema)
 
@@ -791,6 +825,7 @@ Database is fully operational and secure, but performance optimizations are reco
 ### Immediate Actions (High Priority - P0)
 
 #### 1. Create Missing Indexes on Foreign Keys
+
 **Priority**: P0
 **Estimated Time**: 10 minutes
 **Risk**: Medium (performance impact)
@@ -808,6 +843,7 @@ WHERE user_id IS NOT NULL;
 ```
 
 #### 2. Run VACUUM on Bloated Tables
+
 **Priority**: P0
 **Estimated Time**: 5 minutes (automatic)
 **Benefit**: Reclaim storage, improve query performance
@@ -821,11 +857,13 @@ VACUUM ANALYZE generation_status_history;
 ```
 
 #### 3. Review Security Definer Views
+
 **Priority**: P0
 **Estimated Time**: 30 minutes
 **Risk**: High (potential security vulnerability)
 
 Review each SECURITY DEFINER view to ensure it doesn't expose sensitive data:
+
 1. `admin_generation_dashboard`
 2. `file_catalog_processing_status`
 3. `organization_deduplication_stats`
@@ -835,6 +873,7 @@ Review each SECURITY DEFINER view to ensure it doesn't expose sensitive data:
 ### Recommended Actions (High Priority - P1)
 
 #### 1. Fix RLS Auth Init Plan Issues
+
 **Priority**: P1
 **Estimated Time**: 2-3 hours (22 policies to update)
 **Benefit**: 10-100x performance improvement at scale
@@ -844,6 +883,7 @@ Wrap all `auth.uid()` and `auth.jwt()` calls in SELECT subqueries in ALL RLS pol
 See example in Performance Audit section above.
 
 #### 2. Fix Function Search Path Issues
+
 **Priority**: P1
 **Estimated Time**: 30 minutes (7 functions)
 **Risk**: Medium (security vulnerability)
@@ -851,6 +891,7 @@ See example in Performance Audit section above.
 Add `SET search_path = public, pg_temp` to all affected functions.
 
 #### 3. Enable Leaked Password Protection
+
 **Priority**: P1
 **Estimated Time**: 5 minutes
 **Benefit**: Prevent compromised passwords
@@ -858,6 +899,7 @@ Add `SET search_path = public, pg_temp` to all affected functions.
 Enable via Supabase Dashboard > Authentication > Policies.
 
 #### 4. Consolidate Multiple Permissive Policies
+
 **Priority**: P1
 **Estimated Time**: 1-2 hours
 **Benefit**: Improved query performance
@@ -867,6 +909,7 @@ Consolidate multiple permissive policies into single policies with OR logic (see
 ### Optional Actions (Medium Priority - P2)
 
 #### 1. Remove Unused Indexes
+
 **Priority**: P2
 **Estimated Time**: 1 hour (evaluate 48 indexes)
 **Benefit**: Faster writes, reduced storage
@@ -874,6 +917,7 @@ Consolidate multiple permissive policies into single policies with OR logic (see
 Carefully evaluate each unused index before dropping. Some may be needed for future query patterns.
 
 #### 2. Tune Autovacuum Settings
+
 **Priority**: P2
 **Estimated Time**: 30 minutes
 **Benefit**: Prevent future bloat
@@ -885,6 +929,7 @@ ALTER TABLE system_metrics SET (autovacuum_vacuum_scale_factor = 0.05);
 ```
 
 #### 3. Consider Installing pgsodium
+
 **Priority**: P2
 **Estimated Time**: 15 minutes
 **Benefit**: Column-level encryption for sensitive data

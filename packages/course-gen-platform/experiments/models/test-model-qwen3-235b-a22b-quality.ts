@@ -228,9 +228,10 @@ Output the JSON directly (no markdown, no explanations):`;
     scenario: TestScenario,
     runNumber: number
   ): Promise<{ content: string; duration: number; tokens: { input: number; output: number } }> {
-    const prompt = scenario.entityId === 'metadata'
-      ? this.buildMetadataPrompt(scenario)
-      : this.buildLessonPrompt(scenario);
+    const prompt =
+      scenario.entityId === 'metadata'
+        ? this.buildMetadataPrompt(scenario)
+        : this.buildLessonPrompt(scenario);
 
     const startTime = Date.now();
     try {
@@ -238,17 +239,17 @@ Output the JSON directly (no markdown, no explanations):`;
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://ai.megacampus.ru',
-          'X-Title': 'MegaCampus Quality Testing'
+          'X-Title': 'MegaCampus Quality Testing',
         },
         body: JSON.stringify({
           model: 'qwen/qwen3-235b-a22b',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
-          max_tokens: 8000
-        })
+          max_tokens: 8000,
+        }),
       });
 
       if (!response.ok) {
@@ -264,7 +265,9 @@ Output the JSON directly (no markdown, no explanations):`;
 
       // If content is empty but reasoning exists, this is a reasoning model failure
       if (!content && message.reasoning) {
-        throw new Error('Model only provided reasoning, no actual content (hit token limit during thinking)');
+        throw new Error(
+          'Model only provided reasoning, no actual content (hit token limit during thinking)'
+        );
       }
 
       // If content is completely empty (even without reasoning), also fail
@@ -321,7 +324,10 @@ Output the JSON directly (no markdown, no explanations):`;
         'utf-8'
       );
 
-      log(`[qwen3-235b-a22b] ${scenario.id} run ${runNumber}/${this.runsPerScenario}... ✓ ${duration}ms`, 'success');
+      log(
+        `[qwen3-235b-a22b] ${scenario.id} run ${runNumber}/${this.runsPerScenario}... ✓ ${duration}ms`,
+        'success'
+      );
 
       return {
         scenarioId: scenario.id,
@@ -355,7 +361,10 @@ Output the JSON directly (no markdown, no explanations):`;
         'utf-8'
       );
 
-      log(`[qwen3-235b-a22b] ${scenario.id} run ${runNumber}/${this.runsPerScenario}... ✗ ${errorMessage}`, 'error');
+      log(
+        `[qwen3-235b-a22b] ${scenario.id} run ${runNumber}/${this.runsPerScenario}... ✗ ${errorMessage}`,
+        'error'
+      );
 
       return {
         scenarioId: scenario.id,
@@ -377,9 +386,8 @@ Output the JSON directly (no markdown, no explanations):`;
       const passed = scenarioResults.filter(r => r.status === 'SUCCESS').length;
       const failed = scenarioResults.filter(r => r.status === 'FAILED').length;
 
-      const status = failed === 0
-        ? `${colors.green}✓${colors.reset}`
-        : `${colors.red}✗${colors.reset}`;
+      const status =
+        failed === 0 ? `${colors.green}✓${colors.reset}` : `${colors.red}✗${colors.reset}`;
 
       console.log(`  ${status} ${scenario.id}: ${passed}/${this.runsPerScenario} passed`);
     });
@@ -418,7 +426,12 @@ Output the JSON directly (no markdown, no explanations):`;
         this.results.push(result);
 
         // Wait 2s between requests (rate limiting)
-        if (!(scenario === this.scenarios[this.scenarios.length - 1] && runNumber === this.runsPerScenario)) {
+        if (
+          !(
+            scenario === this.scenarios[this.scenarios.length - 1] &&
+            runNumber === this.runsPerScenario
+          )
+        ) {
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }

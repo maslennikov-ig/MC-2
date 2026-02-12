@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Switch } from '@/components/ui/switch'
-import { toggleUserActivationAction } from '@/app/actions/admin-users'
+import { trpc } from '@/lib/trpc/react'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { Label } from '@/components/ui/label'
@@ -17,26 +17,28 @@ interface ActivationSwitchProps {
 export function ActivationSwitch({ userId, isActive, disabled, onToggled }: ActivationSwitchProps) {
   const t = useTranslations('admin.users')
   const [active, setActive] = useState(isActive)
-  const [toggling, setToggling] = useState(false)
 
-  const handleToggle = async (checked: boolean) => {
-    setToggling(true)
-    try {
-      await toggleUserActivationAction({
-        userId,
-        isActive: checked,
-      })
-
-      setActive(checked)
-      toast.success(checked ? t('success.userActivated') : t('success.userDeactivated'))
+  const utils = trpc.useUtils()
+  const toggleMutation = trpc.admin.toggleUserActivation.useMutation({
+    onSuccess: (_data, variables) => {
+      setActive(variables.isActive)
+      toast.success(variables.isActive ? t('success.userActivated') : t('success.userDeactivated'))
+      void utils.admin.listUsers.invalidate()
       onToggled?.()
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Failed to toggle activation:', error)
-      toast.error(error instanceof Error ? error.message : t('errors.activationFailed'))
+      toast.error(error.message || t('errors.activationFailed'))
       setActive(isActive) // Revert on error
-    } finally {
-      setToggling(false)
-    }
+    },
+  })
+
+  const handleToggle = (checked: boolean) => {
+    setActive(checked) // Optimistic update
+    toggleMutation.mutate({
+      userId,
+      isActive: checked,
+    })
   }
 
   return (
@@ -44,8 +46,8 @@ export function ActivationSwitch({ userId, isActive, disabled, onToggled }: Acti
       <Switch
         id={`activation-${userId}`}
         checked={active}
-        onCheckedChange={(checked) => void handleToggle(checked)}
-        disabled={disabled || toggling}
+        onCheckedChange={handleToggle}
+        disabled={disabled || toggleMutation.isPending}
         aria-label={t('actions.toggleActivation')}
       />
       <Label

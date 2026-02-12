@@ -17,16 +17,19 @@ What are the **current state-of-the-art approaches for document summarization** 
 ### Context & Requirements
 
 **Use Case**: Educational course generation platform that needs to:
+
 1. **Stage 3 (Current)**: Summarize uploaded documents (1-200 pages, multilingual: Russian + English) to reduce token costs for downstream stages
 2. **Stage 4-6 (Future)**: Use summaries as input for course structure analysis, content generation, and lesson creation
 
 **Document Characteristics**:
+
 - Type: Technical manuals, educational materials, textbooks, research papers
 - Languages: Primarily Russian (60%) and English (40%)
 - Size range: 1 page → 200+ pages (highly variable)
 - Content types: Text, tables, diagrams (OCR extracted), code snippets, mathematical formulas
 
 **Critical Requirements**:
+
 - **Quality**: High semantic fidelity (original meaning preserved)
 - **Cost-efficiency**: Processing 500-5000 documents/month per organization
 - **Multilingual**: Equal quality for Russian and English
@@ -34,6 +37,7 @@ What are the **current state-of-the-art approaches for document summarization** 
 - **Robustness**: Handle edge cases (mixed languages, technical jargon, tables, structured data)
 
 **Quality Validation Approach**:
+
 - Semantic similarity measurement using Jina-v3 embeddings (768D, multilingual)
 - Target: >0.75 cosine similarity between original document and summary
 
@@ -42,6 +46,7 @@ What are the **current state-of-the-art approaches for document summarization** 
 **Primary Goal**: Discover ALL modern summarization approaches available in 2024-2025, not limited to classical methods.
 
 **Areas to Explore**:
+
 1. **Classical Approaches** (baseline understanding):
    - Stuffing (single prompt with full document)
    - Map-Reduce (chunk summaries → combine)
@@ -79,6 +84,7 @@ What are the **current state-of-the-art approaches for document summarization** 
 ### Expected Deliverables
 
 Please provide:
+
 1. **Comprehensive overview** of all discovered summarization approaches (classical + modern)
 2. **Comparison matrix**: Quality, cost, complexity, use cases for each approach
 3. **Recommendations**: Top 3-5 approaches suitable for our pipeline based on:
@@ -106,18 +112,21 @@ What is the **optimal LLM application framework** for building our multi-stage e
 ### Context & Requirements
 
 **Use Case**: TypeScript/Node.js backend that needs to:
+
 1. **Stage 3**: Document summarization (current priority)
 2. **Stage 4**: Course structure analysis (extract topics, subtopics, learning objectives from summaries)
 3. **Stage 5**: Content generation (create course outlines, module descriptions)
 4. **Stage 6**: Lesson creation (generate individual lessons with exercises, examples)
 
 **Technical Environment**:
+
 - Language: TypeScript 5.3.3, Node.js 20+
 - Architecture: Monorepo (Turborepo), Next.js 14 app, BullMQ async workers
 - Database: PostgreSQL (Supabase), Qdrant vector DB
 - Infrastructure: Docker, Linux servers, Redis
 
 **Critical Requirements**:
+
 - **Production-grade**: Reliability, error handling, retry logic, observability
 - **TypeScript-first**: Excellent TypeScript support, type safety, autocomplete
 - **Maintainability**: Clean abstractions, minimal boilerplate, good documentation
@@ -127,6 +136,7 @@ What is the **optimal LLM application framework** for building our multi-stage e
 - **Cost control**: Token usage tracking, caching, prompt optimization
 
 **Current MVP Assumptions** (to be validated):
+
 - LangChain.js (mature ecosystem, many integrations)
 - LangGraph (agent workflows, state machines)
 - Direct OpenRouter API (lightweight, full control)
@@ -137,6 +147,7 @@ What is the **optimal LLM application framework** for building our multi-stage e
 **Primary Goal**: Discover ALL LLM frameworks suitable for production TypeScript applications, not limited to well-known options.
 
 **Areas to Explore**:
+
 1. **Popular Frameworks** (baseline):
    - LangChain.js: Maturity, ecosystem size, TypeScript quality
    - LangGraph: Agent workflows, state management, debugging tools
@@ -183,6 +194,7 @@ What is the **optimal LLM application framework** for building our multi-stage e
 ### Expected Deliverables
 
 Please provide:
+
 1. **Comprehensive framework survey**: ALL discovered TypeScript LLM frameworks (popular + emerging)
 2. **Comparison matrix**: DX, production readiness, performance, flexibility, cost efficiency
 3. **Recommendations**: Top 3 frameworks ranked by suitability for our pipeline:
@@ -211,12 +223,14 @@ What are the **best cost-effective, high-quality open-source LLM models** (as of
 **Use Case**: Educational course generation pipeline (Stages 3-6) that processes 500-5000 documents/month per organization.
 
 **Task Types**:
+
 1. **Stage 3 (Summarization)**: Abstractive summarization of 1-200 page documents
 2. **Stage 4 (Analysis)**: Extract topics, subtopics, learning objectives, course structure
 3. **Stage 5 (Generation)**: Create course outlines, module descriptions, metadata
 4. **Stage 6 (Lesson Creation)**: Generate lessons, exercises, examples, explanations
 
 **Critical Requirements**:
+
 - **Quality**: High coherence, factual accuracy, semantic fidelity
 - **Cost**: Must be significantly cheaper than GPT-4/Claude-3.5 (target: <$0.50 per 1M tokens input)
 - **Multilingual**: Excellent Russian + English support (equal quality)
@@ -225,10 +239,12 @@ What are the **best cost-effective, high-quality open-source LLM models** (as of
 - **Reliability**: Production-ready, stable, good uptime
 
 **Budget Constraints**:
+
 - **Expensive models to AVOID**: GPT-4 Turbo ($10/1M input), Claude-3.5 Sonnet ($3/1M input), Gemini 1.5 Pro ($7/1M input)
 - **Target price range**: $0.10 - $1.00 per 1M tokens (input), $0.50 - $3.00 per 1M tokens (output)
 
 **Known Candidates** (to be validated, not limiting):
+
 - Llama 3.3 70B / Llama 3.1 405B
 - Qwen 2.5 72B / Qwen Turbo
 - DeepSeek V3
@@ -244,6 +260,7 @@ What are the **best cost-effective, high-quality open-source LLM models** (as of
 **Primary Goal**: Discover ALL cost-effective open-source models available in 2024-2025 via API, not limited to well-known models.
 
 **Areas to Explore**:
+
 1. **Open-Source Model Landscape** (2024-2025):
    - Latest releases from Meta (Llama family), Alibaba (Qwen), DeepSeek, Mistral, Cohere
    - Emerging models from Chinese AI labs (many are open-source and cost-effective)
@@ -293,6 +310,7 @@ What are the **best cost-effective, high-quality open-source LLM models** (as of
 ### Expected Deliverables
 
 Please provide:
+
 1. **Comprehensive model survey**: ALL discovered cost-effective models (open-source + affordable proprietary)
 2. **Comparison matrix**: Quality (benchmarks), cost ($/1M tokens), context window, multilingual support, API availability
 3. **Recommendations**: Top 5 models ranked by overall value:
@@ -319,6 +337,7 @@ Please provide:
 ## Additional Guidance for Deep Research
 
 **Research Methodology**:
+
 1. **Start broad**: Survey academic papers, industry blogs, model leaderboards, GitHub trending
 2. **Filter by criteria**: Focus on production-ready, API-accessible, cost-effective solutions
 3. **Cross-validate**: Check multiple sources (HuggingFace leaderboard, LMSYS Chatbot Arena, OpenRouter pricing)
@@ -326,6 +345,7 @@ Please provide:
 5. **Recency bias**: Weight 2024-2025 developments heavily (AI moves fast!)
 
 **Output Format**:
+
 - Executive summary (1-2 paragraphs per research)
 - Detailed findings with tables/comparisons
 - Actionable recommendations with justifications
@@ -334,6 +354,7 @@ Please provide:
 **Timeline**: No rush—thorough research is more valuable than fast research. Take time to explore emerging options.
 
 **Questions to Ask**:
+
 - "What would a production engineering team choose in 2025?"
 - "Are there new techniques/frameworks/models that weren't available 6 months ago?"
 - "What are the hidden costs?" (API limits, vendor lock-in, maintenance burden)

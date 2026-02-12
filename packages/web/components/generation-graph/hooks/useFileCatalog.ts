@@ -1,17 +1,17 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 /**
  * File catalog entry for filename lookup.
  */
 interface FileCatalogEntry {
-  id: string;
-  filename: string;
+  id: string
+  filename: string
   /** AI-generated title from Phase 6 summarization */
-  generated_title: string | null;
-  original_name: string | null;
+  generated_title: string | null
+  original_name: string | null
 }
 
 /**
@@ -34,63 +34,66 @@ interface FileCatalogEntry {
  * ```
  */
 export function useFileCatalog(courseId: string) {
-  const [filenameMap, setFilenameMap] = useState<Map<string, string>>(new Map());
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [filenameMap, setFilenameMap] = useState<Map<string, string>>(new Map())
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   // Fetch file catalog data
   useEffect(() => {
     if (!courseId) {
-      setIsLoading(false);
-      return;
+      setIsLoading(false)
+      return
     }
 
     const fetchFiles = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
+        setIsLoading(true)
+        setError(null)
 
-        const supabase = createClient();
+        const supabase = createClient()
         const { data, error: fetchError } = await supabase
           .from('file_catalog')
           .select('id, filename, generated_title, original_name')
-          .eq('course_id', courseId);
+          .eq('course_id', courseId)
 
         if (fetchError) {
-          throw new Error(fetchError.message);
+          throw new Error(fetchError.message)
         }
 
         // Build filename map
         // Priority: generated_title > original_name > filename
-        const map = new Map<string, string>();
-        (data as FileCatalogEntry[] || []).forEach((file) => {
-          const displayName = file.generated_title || file.original_name || file.filename;
+        const map = new Map<string, string>()
+        ;((data as FileCatalogEntry[]) || []).forEach((file) => {
+          const displayName = file.generated_title || file.original_name || file.filename
           if (displayName) {
-            map.set(file.id, displayName);
+            map.set(file.id, displayName)
           }
-        });
+        })
 
-        setFilenameMap(map);
+        setFilenameMap(map)
       } catch (err) {
-        console.error('[useFileCatalog] Failed to fetch file catalog:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch files'));
+        console.error('[useFileCatalog] Failed to fetch file catalog:', err)
+        setError(err instanceof Error ? err : new Error('Failed to fetch files'))
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    fetchFiles();
-  }, [courseId]);
+    fetchFiles()
+  }, [courseId])
 
   // Lookup function
-  const getFilename = useCallback((fileId: string): string | undefined => {
-    return filenameMap.get(fileId);
-  }, [filenameMap]);
+  const getFilename = useCallback(
+    (fileId: string): string | undefined => {
+      return filenameMap.get(fileId)
+    },
+    [filenameMap]
+  )
 
   return {
     filenameMap,
     getFilename,
     isLoading,
     error,
-  };
+  }
 }

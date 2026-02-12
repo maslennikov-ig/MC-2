@@ -1,21 +1,38 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { ChatRequest, ChatResponse, Proposal } from '@megacampus/shared-types/chat-types'
+import { createCourseDataUpdatedEvent } from '@megacampus/shared-types'
 import { sendChatMessage, applyProposal as applyProposalAction } from '@/app/actions/refinement'
 
-interface ChatMessage {
+/** Map proposal type to affected database fields for GraphView refresh */
+function getUpdatedFieldsForProposal(proposal: Proposal): string[] {
+  switch (proposal.type) {
+    case 'field_updates':
+      return proposal.stageId === 'stage_4' ? ['analysis_result'] : ['course_structure']
+    case 'lesson_patch':
+      return ['course_structure']
+    case 'direct_action':
+      return ['analysis_result', 'course_structure']
+  }
+}
+
+export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: string
+  pending?: boolean
 }
 
 export const useRefinement = (courseId: string) => {
+  const t = useTranslations('generation')
   const [isRefining, setIsRefining] = useState(false)
   const [conversationId, setConversationId] = useState<string | undefined>()
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [latestProposal, setLatestProposal] = useState<Proposal | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const [proposalError, setProposalError] = useState<string | null>(null)
+  const [acceptedProposal, setAcceptedProposal] = useState<Proposal | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const isMountedRef = useRef(true)
 
@@ -43,6 +60,7 @@ export const useRefinement = (courseId: string) => {
     setConversationId(undefined)
     setChatHistory([])
     setLatestProposal(null)
+    setAcceptedProposal(null)
   }, [])
 
   const acceptProposal = useCallback(async () => {
@@ -61,30 +79,26 @@ export const useRefinement = (courseId: string) => {
       // Only update state if component is still mounted
       if (!isMountedRef.current) return
 
-      toast.success('Изменения применены')
+      setAcceptedProposal(previousProposal)
 
       // Добавить inline feedback в историю чата
       const updateCount =
         previousProposal.type === 'field_updates' ? previousProposal.updates.length : 1
-      const fieldWord =
-        updateCount === 1
-          ? 'поле обновлено'
-          : updateCount < 5
-            ? 'поля обновлено'
-            : 'полей обновлено'
       setChatHistory((prev) => [
         ...prev,
         {
           role: 'system',
-          content: `✅ Изменения применены (${updateCount} ${fieldWord})`,
+          content: t('refinementChat.proposal.appliedMessage', { count: updateCount }),
           timestamp: new Date().toISOString(),
         },
       ])
 
-      // Emit event for data refetch
+      // Emit event for data refetch with proper CourseDataUpdatedDetail format
       window.dispatchEvent(
-        new CustomEvent('course-data-updated', {
-          detail: { courseId, proposalType: previousProposal.type },
+        createCourseDataUpdatedEvent({
+          courseId,
+          updatedFields: getUpdatedFieldsForProposal(previousProposal),
+          source: 'manual',
         })
       )
     } catch (error) {
@@ -93,7 +107,8 @@ export const useRefinement = (courseId: string) => {
 
       // Rollback on error
       setLatestProposal(previousProposal)
-      const errorMsg = error instanceof Error ? error.message : 'Ошибка применения изменений'
+      const errorMsg =
+        error instanceof Error ? error.message : t('refinementChat.proposal.applyError')
       setProposalError(errorMsg)
       toast.error(errorMsg)
 
@@ -102,7 +117,7 @@ export const useRefinement = (courseId: string) => {
         ...prev,
         {
           role: 'system',
-          content: `❌ Ошибка: ${errorMsg}`,
+          content: t('refinementChat.proposal.errorMessage', { error: errorMsg }),
           timestamp: new Date().toISOString(),
         },
       ])
@@ -111,13 +126,28 @@ export const useRefinement = (courseId: string) => {
         setIsApplying(false)
       }
     }
-  }, [courseId, conversationId, latestProposal])
+  }, [courseId, conversationId, latestProposal, t])
 
   const retryProposal = useCallback(async () => {
     if (!isMountedRef.current) return
     setProposalError(null)
     await acceptProposal()
   }, [acceptProposal])
+
+  const rejectProposal = useCallback(() => {
+    if (!latestProposal) return
+    setLatestProposal(null)
+    setProposalError(null)
+    setAcceptedProposal(null)
+    setChatHistory((prev) => [
+      ...prev,
+      {
+        role: 'system',
+        content: t('refinementChat.proposal.rejectedMessage'),
+        timestamp: new Date().toISOString(),
+      },
+    ])
+  }, [latestProposal, t])
 
   const refine = useCallback(
     async (
@@ -159,40 +189,36 @@ export const useRefinement = (courseId: string) => {
         // Check if aborted after response or component unmounted - ignore result
         if (controller.signal.aborted || !isMountedRef.current) return
 
-        // Only update state if request wasn't aborted and component is mounted
-        if (!controller.signal.aborted && isMountedRef.current) {
-          // Update conversation state from response
-          if (response.conversationId) {
-            setConversationId(response.conversationId)
-          }
+        // Update conversation state from response
+        if (response.conversationId) {
+          setConversationId(response.conversationId)
+        }
 
-          // Add messages to history
-          setChatHistory((prev) => [
-            ...prev,
-            { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
-            {
-              role: 'assistant',
-              content: response.assistantMessage,
-              timestamp: new Date().toISOString(),
-            },
-          ])
+        // Add messages to history
+        setChatHistory((prev) => [
+          ...prev,
+          { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
+          {
+            role: 'assistant',
+            content:
+              response.assistantMessage?.trim() ||
+              t('refinementChat.proposal.emptyResponseFallback'),
+            timestamp: new Date().toISOString(),
+          },
+        ])
 
-          // Update proposal state if present
-          if (response.proposal) {
-            setLatestProposal(response.proposal)
-            setProposalError(null) // Clear any previous error
-          }
+        // Update proposal state if present
+        if (response.proposal) {
+          setLatestProposal(response.proposal)
+          setProposalError(null) // Clear any previous error
+          setAcceptedProposal(null)
+        }
 
-          // Show appropriate toast based on intent
-          if (response.intent === 'regenerate') {
-            toast.success('Regeneration Started', {
-              description: 'AI is regenerating the content. A new version will appear shortly.',
-            })
-          } else {
-            toast.success('Refinement Applied', {
-              description: response.assistantMessage,
-            })
-          }
+        // Show toast only for regenerate (long async operation); refine response is shown in chat
+        if (response.intent === 'regenerate') {
+          toast.success(t('refinementChat.proposal.regenerationStarted'), {
+            description: t('refinementChat.proposal.regenerationStartedDesc'),
+          })
         }
 
         return response
@@ -202,9 +228,9 @@ export const useRefinement = (courseId: string) => {
           return
         }
 
-        toast.error('Chat Failed', {
+        toast.error(t('refinementChat.proposal.chatFailed'), {
           description:
-            error instanceof Error ? error.message : 'Could not send message. Please try again.',
+            error instanceof Error ? error.message : t('refinementChat.proposal.chatFailedDesc'),
         })
         throw error
       } finally {
@@ -218,7 +244,7 @@ export const useRefinement = (courseId: string) => {
         }
       }
     },
-    [courseId, conversationId]
+    [courseId, conversationId, t]
   )
 
   return {
@@ -233,5 +259,7 @@ export const useRefinement = (courseId: string) => {
     acceptProposal,
     proposalError,
     retryProposal,
+    rejectProposal,
+    acceptedProposal,
   }
 }

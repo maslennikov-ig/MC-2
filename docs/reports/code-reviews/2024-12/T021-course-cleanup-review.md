@@ -53,6 +53,7 @@ Comprehensive code review completed for the course deletion cleanup feature impl
 **Recommendation**: Add UUID validation before path construction.
 
 **Example Fix**:
+
 ```typescript
 import { validate as isValidUUID } from 'uuid';
 
@@ -62,10 +63,13 @@ export async function deleteUploadedFiles(
 ): Promise<FilesCleanupResult> {
   // Validate UUIDs to prevent path traversal
   if (!isValidUUID(organizationId) || !isValidUUID(courseId)) {
-    logger.error({
-      organizationId,
-      courseId,
-    }, '[Files Cleanup] Invalid UUID format');
+    logger.error(
+      {
+        organizationId,
+        courseId,
+      },
+      '[Files Cleanup] Invalid UUID format'
+    );
 
     return {
       success: false,
@@ -83,10 +87,13 @@ export async function deleteUploadedFiles(
   const uploadsBasePath = path.normalize(path.join(process.cwd(), uploadsDir));
 
   if (!normalizedPath.startsWith(uploadsBasePath)) {
-    logger.error({
-      normalizedPath,
-      uploadsBasePath,
-    }, '[Files Cleanup] Path traversal detected');
+    logger.error(
+      {
+        normalizedPath,
+        uploadsBasePath,
+      },
+      '[Files Cleanup] Path traversal detected'
+    );
 
     return {
       success: false,
@@ -115,6 +122,7 @@ export async function deleteUploadedFiles(
 **Recommendation**: Validate UUID format before executing Qdrant operations.
 
 **Example Fix**:
+
 ```typescript
 import { validate as isValidUUID } from 'uuid';
 
@@ -150,6 +158,7 @@ export async function deleteVectorsForCourse(
 **Recommendation**: Add explicit type annotation for better readability.
 
 **Example Fix**:
+
 ```typescript
 async function scanAndDelete(pattern: string): Promise<number> {
   const redis = getRedisClient();
@@ -192,6 +201,7 @@ async function scanAndDelete(pattern: string): Promise<number> {
 **Recommendation**: Centralize the uploads directory configuration in a shared constant or ensure consistent defaults.
 
 **Example Fix**:
+
 ```typescript
 // Create a shared constant file: src/shared/config/paths.ts
 export const UPLOADS_DIR = process.env.UPLOADS_DIR || '/tmp/megacampus/uploads';
@@ -223,6 +233,7 @@ export async function deleteUploadedFiles(
 **Recommendation**: Document that this is intentional (best-effort cleanup) or implement a rollback mechanism. The current approach is acceptable for cleanup operations where partial success is better than no cleanup, but it should be explicitly documented.
 
 **Example Documentation**:
+
 ```typescript
 /**
  * Clean up all resources associated with a course
@@ -265,6 +276,7 @@ export async function cleanupCourseResources(
 **Recommendation**: Add debug logging in the catch block.
 
 **Example Fix**:
+
 ```typescript
 async function getDirectorySize(dirPath: string): Promise<{ size: number; fileCount: number }> {
   let totalSize = 0;
@@ -288,10 +300,13 @@ async function getDirectorySize(dirPath: string): Promise<{ size: number; fileCo
     }
   } catch (error) {
     // Directory doesn't exist or not accessible - this is expected
-    logger.debug({
-      dirPath,
-      error: error instanceof Error ? error.message : String(error),
-    }, '[Files Cleanup] Directory size calculation skipped (expected if dir does not exist)');
+    logger.debug(
+      {
+        dirPath,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      '[Files Cleanup] Directory size calculation skipped (expected if dir does not exist)'
+    );
   }
 
   return { size: totalSize, fileCount };
@@ -313,6 +328,7 @@ async function getDirectorySize(dirPath: string): Promise<{ size: number; fileCo
 **Recommendation**: Add inline comment explaining the trade-off.
 
 **Example Fix**:
+
 ```typescript
 // Count vectors to be deleted (approximate for performance)
 // Qdrant approximate counts are ~99% accurate and 10-100x faster than exact counts
@@ -412,6 +428,7 @@ packages/course-gen-platform/src/shared/qdrant/lifecycle.ts          (+55 lines,
 ### Import Validation ✅
 
 All imports are valid:
+
 - ✅ `@/shared/logger` - Correct path alias
 - ✅ `../qdrant/lifecycle` - Relative import valid
 - ✅ `../rag/rag-cleanup` - Module exists and exports correct functions
@@ -425,6 +442,7 @@ All imports are valid:
 ### Export Structure ✅
 
 The index.ts exports are well-designed:
+
 ```typescript
 // Public API (what consumers should use)
 export { cleanupCourseResources } from './course-cleanup';
@@ -490,6 +508,7 @@ describe('course-cleanup', () => {
 **Priority**: MEDIUM
 
 End-to-end tests with real dependencies would validate:
+
 - Redis SCAN pagination with large datasets
 - File system operations with actual directories
 - Qdrant vector deletion with real collections
@@ -500,6 +519,7 @@ End-to-end tests with real dependencies would validate:
 **Priority**: MEDIUM
 
 The cleanup operations should be safe to retry. Tests should verify:
+
 - Calling cleanup twice doesn't fail
 - Cleanup on non-existent course returns success
 - Partial cleanup can be retried safely
@@ -634,15 +654,18 @@ The course cleanup implementation is well-designed, properly structured, and fol
 All identified issues have been addressed:
 
 ### HIGH Priority (2/2 fixed)
+
 - ✅ **Path Traversal Vulnerability** - Added UUID validation and path normalization
 - ✅ **Missing UUID Validation** - Added validation to all cleanup functions
 
 ### MEDIUM Priority (3/3 fixed)
+
 - ✅ **Redis SCAN Cursor Type** - Added explicit `[string, string[]]` type annotation
 - ✅ **UPLOADS_DIR Inconsistency** - Centralized using `env.uploadsDir` from env-validator
 - ✅ **Transaction Safety Docs** - Added comprehensive JSDoc explaining best-effort approach
 
 ### LOW Priority (2/2 fixed)
+
 - ✅ **Empty Catch Block** - Added debug logging for directory size calculation errors
 - ✅ **Approximate Count Docs** - Added detailed comment explaining performance trade-offs
 

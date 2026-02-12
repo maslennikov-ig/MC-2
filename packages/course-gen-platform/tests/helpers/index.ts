@@ -8,8 +8,11 @@
  *   import { getAuthToken, clearTokenCache, getTestSupabaseClient } from '../helpers';
  */
 
-// Auth token helper with caching and exponential backoff
+// Auth token helper with caching and mock JWT support
 export { getAuthToken, clearTokenCache, getTokenCacheStats } from './auth-token';
+
+// Mock JWT generation (for direct use when email→userId mapping is known)
+export { createTestJWT } from './mock-auth-token';
 
 // Shared Supabase client singleton
 export {

@@ -14,5 +14,14 @@
     "Explain the use of core Python data types (strings, lists, dictionaries)",
     "Create simple applications combining multiple programming concepts"
   ],
-  "course_tags": ["Python", "programming fundamentals", "beginner coding", "software development", "data science basics", "automation", "scripting", "computer science"]
+  "course_tags": [
+    "Python",
+    "programming fundamentals",
+    "beginner coding",
+    "software development",
+    "data science basics",
+    "automation",
+    "scripting",
+    "computer science"
+  ]
 }

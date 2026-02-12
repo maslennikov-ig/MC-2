@@ -19,24 +19,24 @@ Few-shot prompting significantly outperforms zero-shot for classification, but *
 ```
 EXAMPLES:
 
-Document: "Course: Advanced Machine Learning | Prerequisites: Linear algebra, Python 
-proficiency | Learning Objectives: By the end of this course, students will implement 
-neural networks... | Grading: Midterm 30%, Final 40%, Projects 30% | Required Text: 
+Document: "Course: Advanced Machine Learning | Prerequisites: Linear algebra, Python
+proficiency | Learning Objectives: By the end of this course, students will implement
+neural networks... | Grading: Midterm 30%, Final 40%, Projects 30% | Required Text:
 Deep Learning by Goodfellow..."
-Reasoning: Contains explicit learning objectives, grading breakdown, prerequisites, 
+Reasoning: Contains explicit learning objectives, grading breakdown, prerequisites,
 and required materials. These are definitive syllabus components.
 Classification: CORE
 
-Document: "Case Study: Netflix Recommendation System | In this exercise, apply the 
-collaborative filtering techniques from Chapter 5. Discussion Questions: 1) How would 
+Document: "Case Study: Netflix Recommendation System | In this exercise, apply the
+collaborative filtering techniques from Chapter 5. Discussion Questions: 1) How would
 you modify the algorithm for..."
-Reasoning: Labeled as case study with practice exercises. References core content but 
+Reasoning: Labeled as case study with practice exercises. References core content but
 designed for application rather than primary instruction.
 Classification: IMPORTANT
 
-Document: "Bibliography | Anderson, J. (2019) Machine Learning Foundations... | 
+Document: "Bibliography | Anderson, J. (2019) Machine Learning Foundations... |
 For further reading on advanced topics, see the resources below..."
-Reasoning: Consists primarily of citations with "further reading" language. No learning 
+Reasoning: Consists primarily of citations with "further reading" language. No learning
 objectives or assessable content. Reference material only.
 Classification: SUPPLEMENTARY
 ```
@@ -74,7 +74,7 @@ SUPPLEMENTARY SIGNALS:
 
 Document: [content]
 
-First, identify which signals are present. Then classify based on the highest-priority 
+First, identify which signals are present. Then classify based on the highest-priority
 signals found (CORE signals override IMPORTANT, IMPORTANT overrides SUPPLEMENTARY).
 ```
 
@@ -85,20 +85,20 @@ This approach forces the model to systematically check for CORE signals before i
 Combat conservative bias by explicitly instructing the model about expected distributions and forcing decisive classification:
 
 ```
-You must classify documents into exactly ONE category. In a typical course document 
+You must classify documents into exactly ONE category. In a typical course document
 set: ~20-30% are CORE, ~30-40% are IMPORTANT, ~30-40% are SUPPLEMENTARY.
 
 Classification rules:
-1. If ANY strong CORE signal is present, classify as CORE (do NOT downgrade to 
+1. If ANY strong CORE signal is present, classify as CORE (do NOT downgrade to
    SUPPLEMENTARY for safety)
 2. When in doubt between adjacent categories, choose the HIGHER priority category
-3. SUPPLEMENTARY is ONLY for documents with explicit optional/reference indicators 
+3. SUPPLEMENTARY is ONLY for documents with explicit optional/reference indicators
    or pure citation lists
-4. A document with learning content but no "optional" label defaults to IMPORTANT, 
+4. A document with learning content but no "optional" label defaults to IMPORTANT,
    not SUPPLEMENTARY
 
-CRITICAL: Do NOT classify primary instructional content as SUPPLEMENTARY. 
-A syllabus is ALWAYS CORE. A textbook chapter is ALWAYS CORE. Only use SUPPLEMENTARY 
+CRITICAL: Do NOT classify primary instructional content as SUPPLEMENTARY.
+A syllabus is ALWAYS CORE. A textbook chapter is ALWAYS CORE. Only use SUPPLEMENTARY
 for clearly optional reference material.
 ```
 
@@ -116,7 +116,7 @@ Require structured output that separates reasoning from classification and inclu
   "supplementary_signals_found": [],
   "primary_classification": "CORE",
   "confidence": 0.92,
-  "reasoning": "Contains explicit learning objectives and grading breakdown consistent 
+  "reasoning": "Contains explicit learning objectives and grading breakdown consistent
                with course syllabus. No optional/supplementary indicators found."
 }
 ```
@@ -150,15 +150,15 @@ This prevents the scenario where every document individually gets classified as 
 ## Recommended production prompt template
 
 ```
-You are an expert curriculum designer classifying documents for an AI course 
-generation platform. Your task is to categorize each document by its educational 
+You are an expert curriculum designer classifying documents for an AI course
+generation platform. Your task is to categorize each document by its educational
 importance.
 
 CATEGORIES (classify into exactly ONE):
 
 **CORE**: Essential documents required for course completion
 - Syllabi, course outlines, official requirements
-- Primary textbooks or main instructional content  
+- Primary textbooks or main instructional content
 - Exams, graded assignments, assessments
 - Content with explicit learning objectives and grading criteria
 - Signal keywords: "required", "must", "learning objectives", "assessment", "prerequisite"
@@ -179,7 +179,7 @@ CATEGORIES (classify into exactly ONE):
 
 CLASSIFICATION RULES:
 1. Default UP not down: When uncertain, choose the higher-priority category
-2. Instructional content defaults to IMPORTANT minimum (never SUPPLEMENTARY unless 
+2. Instructional content defaults to IMPORTANT minimum (never SUPPLEMENTARY unless
    explicitly optional)
 3. Any document with learning objectives = CORE or IMPORTANT, never SUPPLEMENTARY
 4. SUPPLEMENTARY requires explicit optional indicators OR pure reference format
@@ -212,17 +212,20 @@ OUTPUT (JSON):
 ## Evaluation criteria for classification quality
 
 **Quantitative metrics**:
+
 - **Label distribution entropy**: Measure whether classifications are reasonably distributed. If >80% fall into any single category, flag for prompt tuning
 - **Precision/recall per category**: Track how often CORE documents are correctly identified as CORE (aim for >85% recall on CORE)
 - **Confidence calibration**: Check if stated confidence correlates with actual accuracy
 
 **Qualitative validation checklist**:
+
 - Every course has at least one CORE document identified
 - Syllabi are always classified as CORE (100% accuracy required)
 - Documents with "optional" or "supplementary" in filename/content are classified as SUPPLEMENTARY
 - Case studies and exercises are classified as IMPORTANT, not SUPPLEMENTARY
 
 **Red flags indicating bias**:
+
 - More than 60% of documents classified as SUPPLEMENTARY
 - Syllabi or textbook chapters appearing in SUPPLEMENTARY
 - Zero CORE classifications in any batch

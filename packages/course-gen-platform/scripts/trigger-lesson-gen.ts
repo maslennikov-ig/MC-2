@@ -37,7 +37,9 @@ async function main() {
   // Get lesson and course info
   const { data: lesson, error: lessonError } = await supabase
     .from('lessons')
-    .select('id, title, section_id, order_index, metadata, sections!inner(id, course_id, order_index, courses!inner(id, organization_id, user_id, language, course_structure))')
+    .select(
+      'id, title, section_id, order_index, metadata, sections!inner(id, course_id, order_index, courses!inner(id, organization_id, user_id, language, course_structure))'
+    )
     .eq('id', lessonId)
     .single();
 
@@ -73,7 +75,7 @@ async function main() {
 
   if (courseStructure && courseStructure.sections) {
     for (const sec of courseStructure.sections) {
-      const found = sec.lessons.find((l) => l.lesson_title === lesson.title);
+      const found = sec.lessons.find(l => l.lesson_title === lesson.title);
       if (found) {
         const objectives = found.lesson_objectives || [];
         const keyTopics = found.key_topics || [];

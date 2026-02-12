@@ -142,7 +142,12 @@ export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOut
     let maxTokens = 512;
 
     try {
-      const config = await modelService.getModelForPhase('stage_6_delta_judge');
+      const config = (await modelService.getModelForPhase('stage_6_delta_judge')) as {
+        modelId: string;
+        temperature: number;
+        maxTokens: number;
+        source: string;
+      };
       modelId = config.modelId;
       temperature = config.temperature;
       maxTokens = config.maxTokens;
@@ -234,24 +239,28 @@ export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOut
  * @returns Array of validated JudgeIssue objects
  * @internal - Used in commented integration example
  */
-export function parseNewIssues(rawIssues: any[]): JudgeIssue[] {
+export function parseNewIssues(rawIssues: unknown[]): JudgeIssue[] {
   if (!Array.isArray(rawIssues)) {
     return [];
   }
 
   return rawIssues
-    .filter(issue => {
+    .filter((issue): issue is Record<string, unknown> => {
       // Basic validation
       return (
-        issue && typeof issue === 'object' && issue.criterion && issue.severity && issue.description
+        typeof issue === 'object' &&
+        issue !== null &&
+        'criterion' in issue &&
+        'severity' in issue &&
+        'description' in issue
       );
     })
     .map(issue => ({
-      criterion: issue.criterion,
-      severity: issue.severity,
-      location: issue.location || 'unknown',
-      description: issue.description,
-      quotedText: issue.quotedText,
-      suggestedFix: issue.suggestedFix || '',
+      criterion: issue.criterion as JudgeIssue['criterion'],
+      severity: issue.severity as JudgeIssue['severity'],
+      location: typeof issue.location === 'string' ? issue.location : 'unknown',
+      description: String(issue.description),
+      quotedText: typeof issue.quotedText === 'string' ? issue.quotedText : undefined,
+      suggestedFix: typeof issue.suggestedFix === 'string' ? issue.suggestedFix : '',
     }));
 }

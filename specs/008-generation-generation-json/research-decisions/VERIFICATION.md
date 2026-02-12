@@ -18,6 +18,7 @@
 ## File Structure Verification
 
 ### ✅ Directory Created
+
 ```
 specs/008-generation-generation-json/research-decisions/
 ├── README.md                          (6.1KB) - Directory overview
@@ -39,6 +40,7 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T002-R [ORCHESTRATOR] - Architecture Design (COMPLETE)
 
 **References Found**:
+
 - ✅ `research-decisions/rt-002-architecture-balance.md` (quick reference)
 - ✅ `research-decisions/rt-002-full-analysis.md` (full analysis)
 - ✅ `research-decisions/rt-002-rag-decision.md` (RAG decision)
@@ -54,11 +56,13 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T019 [llm-service-specialist] - metadata-generator.ts
 
 **References Found**:
+
 - ✅ RT-002 Architecture Decision (inline context)
 - ✅ RT-002 Context (inline description)
 - ✅ Reference to `research-decisions/rt-002-architecture-balance.md`
 
 **Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: Generation creates course-level metadata from Analyze's section-level structure
 - **📋 RT-002 Context**: Analyze provides section-level breakdown (3-7 sections, high-level objectives), Generation synthesizes course-level metadata
@@ -72,6 +76,7 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T020 [llm-service-specialist] - section-batch-generator.ts
 
 **References Found**:
+
 - ✅ RT-002 Architecture Decision (inline context)
 - ✅ RT-002 Context (input/output description)
 - ✅ RT-002 RAG Integration (detailed parameters)
@@ -79,6 +84,7 @@ specs/008-generation-generation-json/research-decisions/
 - ✅ Additional reference for RAG decision analysis
 
 **Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: Generation expands each section (from Analyze) into 3-5 detailed lessons with exercises
 - **📋 RT-002 Context**:
@@ -102,11 +108,13 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T021 [llm-service-specialist] - buildBatchPrompt()
 
 **References Found**:
+
 - ✅ RT-002 Prompt Engineering (inline guidance)
 - ✅ RT-002 Guidance (detailed do's and don'ts)
 - ✅ Reference to `research-decisions/rt-002-architecture-balance.md`
 
 **Context Added**:
+
 ```markdown
 - **🎯 RT-002 Prompt Engineering**: Let reasoning models reason - provide constraints, NOT instructions
 - **📋 RT-002 Guidance**:
@@ -124,11 +132,13 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T022 [ORCHESTRATOR] - qdrant-search.ts
 
 **References Found**:
+
 - ✅ RT-002 Architecture Decision (inline context)
 - ✅ RT-002 RAG Strategy (when enabled/disabled)
 - ✅ Reference to `research-decisions/rt-002-rag-decision.md` (full analysis)
 
 **Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: OPTIONAL RAG with LLM-driven autonomous decision making via tool calling
 - **📋 RT-002 RAG Strategy**:
@@ -155,15 +165,17 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T029-A [typescript-types-specialist] - generation-state.ts
 
 **References Found**:
+
 - ✅ RT-002 Architecture Decision (5-phase workflow)
 - ✅ Reference to `research-decisions/rt-002-architecture-balance.md`
 
 **Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: 5-Phase workflow (Metadata → Section Batch → Validation → Assembly → Verification)
 - **See**: `research-decisions/rt-002-architecture-balance.md` for phase descriptions
-- current_phase: 'metadata' | 'section_batch' | 'validation' | 'assembly' | 'verification'  // 5 phases per RT-002
-- modelUsed: { metadata: string, sections: string, validation?: string }  // RT-001 will define model routing
+- current_phase: 'metadata' | 'section_batch' | 'validation' | 'assembly' | 'verification' // 5 phases per RT-002
+- modelUsed: { metadata: string, sections: string, validation?: string } // RT-001 will define model routing
 ```
 
 **Type Updated**: `current_phase` with explicit union of 5 phases
@@ -175,10 +187,12 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T029-B [orchestration-logic-specialist] - generation-phases.ts
 
 **References Found**:
+
 - ✅ RT-002 Architecture Decision (5 phases, 78.5% success rate)
 - ✅ Reference to `research-decisions/rt-002-architecture-balance.md`
 
 **Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: 5 phases implementing hybrid specialization model (78.5% success rate)
 - **See**: `research-decisions/rt-002-architecture-balance.md` for phase workflow details
@@ -201,10 +215,12 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T029-C [orchestration-logic-specialist] - generation-orchestrator.ts
 
 **References Found**:
+
 - ✅ RT-002 Architecture Decision (LangGraph StateGraph)
 - ✅ Reference to `research-decisions/rt-002-architecture-balance.md`
 
 **Context Added**:
+
 ```markdown
 - **🎯 RT-002 Architecture Decision**: LangGraph StateGraph coordinating 5-phase workflow with model routing and quality gates
 - **See**: `research-decisions/rt-002-architecture-balance.md` for orchestration flow details
@@ -224,6 +240,7 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ T003-R - Token Budget Allocation (COMPLETE)
 
 **References Found**:
+
 - ✅ `research-decisions/rt-003-token-budget.md` (decision document)
 
 **Constants Documented**: 5 critical constants (TOTAL_BUDGET, INPUT_BUDGET_MAX, RAG_MAX_TOKENS, GEMINI_TRIGGER_INPUT, GEMINI_TRIGGER_TOTAL)
@@ -235,6 +252,7 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ Token Budget References in Other Tasks
 
 **Found In**:
+
 - T002-R (line 272): Reference to `rt-003-token-budget.md`
 - T019 (line 692): "USE TOKEN_BUDGET constants from `rt-003-token-budget.md`"
 - T020 (line 725): "USE TOKEN_BUDGET constants: INPUT_BUDGET_MAX, RAG_MAX_TOKENS, GEMINI_TRIGGER_INPUT"
@@ -246,13 +264,13 @@ specs/008-generation-generation-json/research-decisions/
 
 ## Reference Count Summary
 
-| Document | References in tasks.md | Status |
-|----------|------------------------|--------|
-| `rt-002-architecture-balance.md` | 8 | ✅ GOOD |
-| `rt-002-full-analysis.md` | 2 | ✅ GOOD |
-| `rt-002-rag-decision.md` | 2 | ✅ GOOD |
-| `rt-003-token-budget.md` | 5 | ✅ GOOD |
-| **TOTAL** | **17** | ✅ PASS |
+| Document                         | References in tasks.md | Status  |
+| -------------------------------- | ---------------------- | ------- |
+| `rt-002-architecture-balance.md` | 8                      | ✅ GOOD |
+| `rt-002-full-analysis.md`        | 2                      | ✅ GOOD |
+| `rt-002-rag-decision.md`         | 2                      | ✅ GOOD |
+| `rt-003-token-budget.md`         | 5                      | ✅ GOOD |
+| **TOTAL**                        | **17**                 | ✅ PASS |
 
 **Expected References**: 15-20 (actual: 17) ✅ WITHIN RANGE
 
@@ -263,16 +281,19 @@ specs/008-generation-generation-json/research-decisions/
 ### ✅ For Future Developers
 
 **Quick Start**:
+
 1. Read `research-decisions/README.md` → Overview (3 min)
 2. Read `research-decisions/INDEX.md` → Navigation (1 min)
 3. Read `research-decisions/rt-002-architecture-balance.md` → Key decisions (10 min)
 
 **Task Implementation**:
+
 - Each task has inline context (🎯 RT-002 Architecture Decision)
 - Each task has reference link (**See**: `research-decisions/...`)
 - Each task specifies WHAT to implement based on research
 
 **No Context Loss**: All critical decisions documented in 3 places:
+
 1. Inline in task description (quick reference)
 2. Quick reference document (10 min read)
 3. Full analysis document (30-40 min deep dive)
@@ -288,6 +309,7 @@ specs/008-generation-generation-json/research-decisions/
 **Checked**: No references to `.tmp/current/plans/.rt-002*` or `.tmp/current/plans/.token-budget*` in tasks.md
 
 **Command**:
+
 ```bash
 grep "\.tmp/current/plans/\.rt-002\|\.tmp/current/plans/\.token-budget" tasks.md
 # Output: (empty) ✅
@@ -309,20 +331,20 @@ grep "\.tmp/current/plans/\.rt-002\|\.tmp/current/plans/\.token-budget" tasks.md
 
 ## Final Checklist
 
-- [X] Directory created: `specs/008-generation-generation-json/research-decisions/`
-- [X] 5 documents migrated from `.tmp/` to permanent location
-- [X] README.md created (directory overview)
-- [X] INDEX.md created (quick navigation)
-- [X] VERIFICATION.md created (this file)
-- [X] 8 tasks updated in tasks.md
-- [X] 17 references updated with new paths
-- [X] Old temp paths removed from tasks.md
-- [X] Context preserved at 3 levels (inline, quick ref, full analysis)
-- [X] Token budget constants documented and referenced
-- [X] RAG strategy documented with pros/cons
-- [X] 5-phase architecture documented
-- [X] Division of labor documented
-- [X] Prompt engineering guidelines documented
+- [x] Directory created: `specs/008-generation-generation-json/research-decisions/`
+- [x] 5 documents migrated from `.tmp/` to permanent location
+- [x] README.md created (directory overview)
+- [x] INDEX.md created (quick navigation)
+- [x] VERIFICATION.md created (this file)
+- [x] 8 tasks updated in tasks.md
+- [x] 17 references updated with new paths
+- [x] Old temp paths removed from tasks.md
+- [x] Context preserved at 3 levels (inline, quick ref, full analysis)
+- [x] Token budget constants documented and referenced
+- [x] RAG strategy documented with pros/cons
+- [x] 5-phase architecture documented
+- [x] Division of labor documented
+- [x] Prompt engineering guidelines documented
 
 ---
 
@@ -335,6 +357,7 @@ grep "\.tmp/current/plans/\.rt-002\|\.tmp/current/plans/\.token-budget" tasks.md
 **Ready For**: Implementation can proceed with clear architectural guidance from `research-decisions/` directory.
 
 **Next Steps**:
+
 1. Proceed with RT-001 analysis (Multi-Model Orchestration)
 2. Proceed with RT-004 analysis (Quality Validation)
 3. Proceed with RT-006 analysis (Bloom's Taxonomy)

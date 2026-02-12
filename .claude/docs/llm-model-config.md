@@ -106,19 +106,39 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 
 ## Stage 5: Structure Generation
 
-| Phase              | Tier       | Primary Model             | Fallback Model                | Temp | Tokens |
-| ------------------ | ---------- | ------------------------- | ----------------------------- | ---- | ------ |
-| stage_5_metadata   | standard   | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.70 | 4096   |
-| stage_5_metadata   | extended   | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash          | 0.70 | 4096   |
-| stage_5_sections   | standard   | xiaomi/mimo-v2-flash      | google/gemini-2.5-flash       | 0.70 | 8000   |
-| stage_5_sections   | extended   | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash          | 0.70 | 8000   |
-| stage_5_tier1      | primary    | google/gemini-2.5-flash   | openai/gpt-oss-120b           | 0.70 | 30000  |
-| stage_5_tier1      | secondary  | openai/gpt-oss-120b       | moonshotai/kimi-k2-0905       | 0.70 | 30000  |
-| stage_5_escalation | primary    | deepseek/deepseek-v3.2    | moonshotai/kimi-k2-0905       | 0.70 | 30000  |
-| stage_5_escalation | secondary  | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905       | 0.70 | 30000  |
-| stage_5_escalation | fallback-1 | google/gemini-2.5-flash   | deepseek/deepseek-v3.2        | 0.70 | 30000  |
-| stage_5_escalation | fallback-2 | google/gemini-2.5-flash   | qwen/qwen3-235b-a22b-2507     | 0.70 | 30000  |
-| stage_5_escalation | fallback-3 | moonshotai/kimi-k2-0905   | google/gemini-2.5-flash       | 0.70 | 30000  |
+### Metadata Phase
+
+| Phase            | Tier     | Primary Model           | Fallback Model                | Temp | Tokens |
+| ---------------- | -------- | ----------------------- | ----------------------------- | ---- | ------ |
+| stage_5_metadata | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.70 | 4096   |
+| stage_5_metadata | extended | google/gemini-2.5-flash | xiaomi/mimo-v2-flash          | 0.70 | 4096   |
+
+### 3-Tier Content Generation (importance-based routing)
+
+Routing based on `sections_breakdown.importance` field from Stage 4:
+
+- **simple**: Trivial intro/overview sections → cheap model
+- **normal**: Standard course content (majority of sections) → main workhorse
+- **complex**: Hardest material + first section of every course → premium model
+
+| Phase           | Tier     | Primary Model           | Fallback Model          | Temp | Tokens | Description                          |
+| --------------- | -------- | ----------------------- | ----------------------- | ---- | ------ | ------------------------------------ |
+| stage_5_simple  | standard | openai/gpt-oss-120b     | xiaomi/mimo-v2-flash    | 0.70 | 30000  | Trivial sections (importance=simple) |
+| stage_5_simple  | extended | google/gemini-2.5-flash | openai/gpt-oss-120b     | 0.70 | 30000  | Trivial sections (large context)     |
+| stage_5_normal  | standard | xiaomi/mimo-v2-flash    | google/gemini-2.5-flash | 0.70 | 30000  | Standard sections (majority)         |
+| stage_5_normal  | extended | google/gemini-2.5-flash | xiaomi/mimo-v2-flash    | 0.70 | 30000  | Standard sections (large context)    |
+| stage_5_complex | standard | moonshotai/kimi-k2-0905 | google/gemini-2.5-flash | 0.70 | 30000  | Complex + first section (premium)    |
+| stage_5_complex | extended | google/gemini-2.5-flash | moonshotai/kimi-k2-0905 | 0.70 | 30000  | Complex + first (large context)      |
+
+### Escalation (retry fallback)
+
+| Phase              | Tier       | Primary Model             | Fallback Model            | Temp | Tokens |
+| ------------------ | ---------- | ------------------------- | ------------------------- | ---- | ------ |
+| stage_5_escalation | primary    | deepseek/deepseek-v3.2    | moonshotai/kimi-k2-0905   | 0.70 | 30000  |
+| stage_5_escalation | secondary  | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905   | 0.70 | 30000  |
+| stage_5_escalation | fallback-1 | google/gemini-2.5-flash   | deepseek/deepseek-v3.2    | 0.70 | 30000  |
+| stage_5_escalation | fallback-2 | google/gemini-2.5-flash   | qwen/qwen3-235b-a22b-2507 | 0.70 | 30000  |
+| stage_5_escalation | fallback-3 | moonshotai/kimi-k2-0905   | google/gemini-2.5-flash   | 0.70 | 30000  |
 
 ---
 
@@ -174,16 +194,37 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 
 ## Chat Phases
 
-| Phase                  | Model                | Temp | Tokens | Description               |
-| ---------------------- | -------------------- | ---- | ------ | ------------------------- |
-| chat_full_regeneration | xiaomi/mimo-v2-flash | 0.60 | 8192   | Полная перегенерация      |
-| chat_global_guidance   | xiaomi/mimo-v2-flash | 0.70 | 8192   | Общие указания            |
-| chat_node_refinement   | xiaomi/mimo-v2-flash | 0.70 | 8192   | Уточнение отдельных узлов |
+Stage-specific models with automatic fallback:
+
+| Phase                   | Stage | Primary Model           | Fallback Model            | Temp | Tokens | Description                |
+| ----------------------- | ----- | ----------------------- | ------------------------- | ---- | ------ | -------------------------- |
+| chat_stage_5_refinement | 5     | moonshotai/kimi-k2-0905 | moonshotai/kimi-k2.5      | 0.70 | 8192   | Уточнение узлов (Stage 5)  |
+| chat_stage_6_refinement | 6     | deepseek/deepseek-v3.2  | qwen/qwen3-235b-a22b-2507 | 0.70 | 8192   | Уточнение уроков (Stage 6) |
+| chat_node_refinement    | any   | moonshotai/kimi-k2-0905 | moonshotai/kimi-k2.5      | 0.70 | 8192   | Уточнение узлов (legacy)   |
+| chat_global_guidance    | any   | moonshotai/kimi-k2-0905 | moonshotai/kimi-k2.5      | 0.70 | 8192   | Общие указания             |
+| chat_full_regeneration  | any   | moonshotai/kimi-k2-0905 | moonshotai/kimi-k2.5      | 0.60 | 8192   | Полная перегенерация       |
+
+### Routing Logic
+
+- **Stage 5 node-level chat** → `chat_stage_5_refinement`
+- **Stage 6 node-level chat** → `chat_stage_6_refinement`
+- **Other stages node-level chat** → `chat_node_refinement`
+- **Global chat (any stage)** → `chat_global_guidance`
+- **Full regeneration** → `chat_full_regeneration`
 
 **Fallback конфиг** (используется если запись в БД отключена или отсутствует):
 
-- Файл: `chat.router.ts` → `CHAT_FALLBACK_CONFIG`
-- Env: `CHAT_FALLBACK_MODEL`, `CHAT_FALLBACK_TEMPERATURE`, `CHAT_FALLBACK_MAX_TOKENS`
+- Файл: `chat-mutation-helpers.ts` → `CHAT_STAGE_FALLBACK_MODELS`
+- Stage 5: kimi-k2 → kimi-k2.5, Stage 6: deepseek-v3.2 → qwen3-235b
+
+---
+
+## Inline Operations
+
+| Phase                     | Primary Model        | Fallback Model            | Temp | Tokens | Description               |
+| ------------------------- | -------------------- | ------------------------- | ---- | ------ | ------------------------- |
+| inline_block_regeneration | xiaomi/mimo-v2-flash | qwen/qwen3-235b-a22b-2507 | 0.70 | 2000   | Инлайн регенерация блоков |
+| inline_element_crud       | xiaomi/mimo-v2-flash | qwen/qwen3-235b-a22b-2507 | 0.70 | 4000   | Добавление секций/уроков  |
 
 ---
 
@@ -208,6 +249,7 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 | DeepSeek V3.2          | deepseek/deepseek-v3.2               | DeepSeek | Лучшая для русского    |
 | Qwen3 235B             | qwen/qwen3-235b-a22b-2507            | Alibaba  | Лучшая для английского |
 | Kimi K2                | moonshotai/kimi-k2-0905              | Moonshot | Мультиязычная          |
+| Kimi K2.5              | moonshotai/kimi-k2.5                 | Moonshot | Fallback для Kimi K2   |
 | Minimax M2.1           | minimax/minimax-m2.1                 | Minimax  | Стабильный tiebreaker  |
 | GPT-OSS 120B           | openai/gpt-oss-120b                  | OpenAI   | Премиум fallback       |
 | Gemini 2.5 Flash Image | google/gemini-2.5-flash-image        | Google   | Генерация изображений  |
@@ -217,7 +259,7 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 
 ## Statistics
 
-- **Total configs**: 60
-- **Active configs**: 60
-- **Last updated**: 2026-02-03
-- **Last change**: Chat phases updated in DB to xiaomi/mimo-v2-flash + 8192 tokens
+- **Total configs**: 64
+- **Active configs**: 64
+- **Last updated**: 2026-02-11
+- **Last change**: Stage-specific chat models (kimi-k2/deepseek-v3.2), replaced gpt-4o-mini with mimo-v2-flash

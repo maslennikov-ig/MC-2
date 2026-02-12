@@ -7,35 +7,35 @@
  * @module e2e/enrichment-inspector/fixtures/enrichment-fixtures
  */
 
-import type { EnrichmentType, EnrichmentStatus } from '@megacampus/shared-types';
+import type { EnrichmentType, EnrichmentStatus } from '@megacampus/shared-types'
 
 /**
  * Mock enrichment data structure
  */
 export interface MockEnrichment {
-  id: string;
-  type: EnrichmentType;
-  status: EnrichmentStatus;
-  display_order: number;
-  error_message?: string | null;
-  progress?: number;
+  id: string
+  type: EnrichmentType
+  status: EnrichmentStatus
+  display_order: number
+  error_message?: string | null
+  progress?: number
 }
 
 /**
  * Mock lesson data structure
  */
 export interface MockLesson {
-  id: string;
-  title: string;
-  enrichments: MockEnrichment[];
+  id: string
+  title: string
+  enrichments: MockEnrichment[]
 }
 
 /**
  * Mock course data structure
  */
 export interface MockCourse {
-  slug: string;
-  lessons: MockLesson[];
+  slug: string
+  lessons: MockLesson[]
 }
 
 /**
@@ -92,29 +92,27 @@ export const TEST_COURSES: Record<string, MockCourse> = {
       {
         id: 'lesson-draft-ready',
         title: 'Draft Ready Lesson',
-        enrichments: [
-          { id: 'e10', type: 'quiz', status: 'draft_ready', display_order: 1 },
-        ],
+        enrichments: [{ id: 'e10', type: 'quiz', status: 'draft_ready', display_order: 1 }],
       },
     ],
   },
-};
+}
 
 /**
  * Get a mock lesson by ID
  */
 export function getMockLesson(courseSlug: string, lessonId: string): MockLesson | undefined {
-  const course = TEST_COURSES[courseSlug];
-  if (!course) return undefined;
-  return course.lessons.find((l) => l.id === lessonId);
+  const course = TEST_COURSES[courseSlug]
+  if (!course) return undefined
+  return course.lessons.find((l) => l.id === lessonId)
 }
 
 /**
  * Get enrichments for a lesson
  */
 export function getMockEnrichments(courseSlug: string, lessonId: string): MockEnrichment[] {
-  const lesson = getMockLesson(courseSlug, lessonId);
-  return lesson?.enrichments ?? [];
+  const lesson = getMockLesson(courseSlug, lessonId)
+  return lesson?.enrichments ?? []
 }
 
 /**
@@ -123,7 +121,7 @@ export function getMockEnrichments(courseSlug: string, lessonId: string): MockEn
 export const TEST_USER = {
   id: process.env.TEST_USER_ID || '5a6f0557-613f-45bc-b591-059ffc7c7960',
   email: process.env.TEST_USER_EMAIL || 'tester@megacampus.ai',
-};
+}
 
 /**
  * Expected UI texts for English locale
@@ -169,7 +167,7 @@ export const EN_TEXTS = {
   // Error
   error: 'An error occurred',
   generationError: 'Generation Error',
-};
+}
 
 /**
  * Expected UI texts for Russian locale
@@ -215,21 +213,21 @@ export const RU_TEXTS = {
   // Error
   error: 'Произошла ошибка',
   generationError: 'Ошибка генерации',
-};
+}
 
 /**
  * Get texts for specific locale
  */
 export function getTextsForLocale(locale: 'en' | 'ru') {
-  return locale === 'ru' ? RU_TEXTS : EN_TEXTS;
+  return locale === 'ru' ? RU_TEXTS : EN_TEXTS
 }
 
 /**
  * API mock helper - intercept enrichment API calls
  */
 export async function mockEnrichmentApi(page: import('@playwright/test').Page, lessonId: string) {
-  const lesson = getMockLesson('test-course', lessonId);
-  const enrichments = lesson?.enrichments ?? [];
+  const lesson = getMockLesson('test-course', lessonId)
+  const enrichments = lesson?.enrichments ?? []
 
   await page.route('**/api/trpc/enrichment.list*', async (route) => {
     await route.fulfill({
@@ -240,8 +238,8 @@ export async function mockEnrichmentApi(page: import('@playwright/test').Page, l
           data: enrichments,
         },
       }),
-    });
-  });
+    })
+  })
 
   await page.route('**/api/trpc/enrichment.create*', async (route) => {
     await route.fulfill({
@@ -255,8 +253,8 @@ export async function mockEnrichmentApi(page: import('@playwright/test').Page, l
           },
         },
       }),
-    });
-  });
+    })
+  })
 
   await page.route('**/api/trpc/enrichment.reorder*', async (route) => {
     await route.fulfill({
@@ -267,8 +265,8 @@ export async function mockEnrichmentApi(page: import('@playwright/test').Page, l
           data: { success: true },
         },
       }),
-    });
-  });
+    })
+  })
 }
 
 /**
@@ -279,11 +277,11 @@ export async function mockGenerationProgress(
   enrichmentId: string,
   progressSteps: number[]
 ) {
-  let currentStep = 0;
+  let currentStep = 0
 
   await page.route(`**/api/trpc/enrichment.progress*${enrichmentId}*`, async (route) => {
-    const progress = progressSteps[currentStep] ?? 100;
-    currentStep++;
+    const progress = progressSteps[currentStep] ?? 100
+    currentStep++
 
     await route.fulfill({
       status: 200,
@@ -297,14 +295,18 @@ export async function mockGenerationProgress(
           },
         },
       }),
-    });
-  });
+    })
+  })
 }
 
 /**
  * API mock helper - simulate API error
  */
-export async function mockApiError(page: import('@playwright/test').Page, pattern: string, errorMessage: string) {
+export async function mockApiError(
+  page: import('@playwright/test').Page,
+  pattern: string,
+  errorMessage: string
+) {
   await page.route(pattern, async (route) => {
     await route.fulfill({
       status: 500,
@@ -314,15 +316,15 @@ export async function mockApiError(page: import('@playwright/test').Page, patter
           message: errorMessage,
         },
       }),
-    });
-  });
+    })
+  })
 }
 
 /**
  * Wait helper for animations
  */
 export async function waitForAnimation(page: import('@playwright/test').Page, ms: number = 500) {
-  await page.waitForTimeout(ms);
+  await page.waitForTimeout(ms)
 }
 
 /**
@@ -334,6 +336,6 @@ export async function takeDebugScreenshot(
   name: string
 ) {
   if (testInfo.status !== 'passed') {
-    await page.screenshot({ path: `screenshots/${testInfo.title}-${name}.png` });
+    await page.screenshot({ path: `screenshots/${testInfo.title}-${name}.png` })
   }
 }

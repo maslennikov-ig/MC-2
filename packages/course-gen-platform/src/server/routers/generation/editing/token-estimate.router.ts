@@ -92,10 +92,7 @@ export const tokenEstimateRouter = {
           .eq('course_id', courseId);
 
         if (error) {
-          logger.warn(
-            { courseId, error },
-            'Failed to count course documents for token estimate'
-          );
+          logger.warn({ courseId, error }, 'Failed to count course documents for token estimate');
           // Continue with 0 documents - will show base estimate
         } else {
           documentCount = count || 0;
@@ -109,8 +106,7 @@ export const tokenEstimateRouter = {
       }
 
       const regenerateTokens =
-        TOKEN_ESTIMATES.REGENERATE_BASE +
-        documentCount * TOKEN_ESTIMATES.REGENERATE_PER_DOCUMENT;
+        TOKEN_ESTIMATES.REGENERATE_BASE + documentCount * TOKEN_ESTIMATES.REGENERATE_PER_DOCUMENT;
 
       logger.debug(
         { courseId, documentCount, refineTokens, regenerateTokens },

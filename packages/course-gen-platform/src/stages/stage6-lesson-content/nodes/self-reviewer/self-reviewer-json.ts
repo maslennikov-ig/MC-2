@@ -30,7 +30,7 @@ export function repairTruncatedJson(jsonString: string): string {
   // Strategy 1: If patched_content is truncated, remove it entirely
   // Pattern: "patched_content": { or "patched_content": "
   // followed by incomplete content until end
-  const patchedContentMatch = repaired.match(/"patched_content"\s*:\s*[{\["]/);
+  const patchedContentMatch = repaired.match(/"patched_content"\s*:\s*[{["]/);
   if (patchedContentMatch) {
     const startIndex = patchedContentMatch.index!;
     // Check if this is at the end and truncated (no proper closing)
@@ -46,9 +46,18 @@ export function repairTruncatedJson(jsonString: string): string {
 
       for (let i = 0; i < afterPatchedContent.length; i++) {
         const c = afterPatchedContent[i];
-        if (esc) { esc = false; continue; }
-        if (c === '\\') { esc = true; continue; }
-        if (c === '"' && !esc) { inStr = !inStr; continue; }
+        if (esc) {
+          esc = false;
+          continue;
+        }
+        if (c === '\\') {
+          esc = true;
+          continue;
+        }
+        if (c === '"' && !esc) {
+          inStr = !inStr;
+          continue;
+        }
         if (inStr) continue;
 
         if (c === '{' || c === '[') {
@@ -196,12 +205,7 @@ export function parseSelfReviewerResponse(responseContent: string): SelfReviewer
     }
 
     // Validate structure - at minimum need status and reasoning
-    if (
-      parsed &&
-      typeof parsed === 'object' &&
-      'status' in parsed &&
-      'reasoning' in parsed
-    ) {
+    if (parsed && typeof parsed === 'object' && 'status' in parsed && 'reasoning' in parsed) {
       // Ensure issues array exists (may be truncated/missing)
       const result = parsed as SelfReviewerLLMResponse;
       if (!result.issues) {
@@ -213,7 +217,10 @@ export function parseSelfReviewerResponse(responseContent: string): SelfReviewer
 
     return null;
   } catch (error) {
-    logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'Failed to parse self-reviewer LLM response');
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to parse self-reviewer LLM response'
+    );
     return null;
   }
 }

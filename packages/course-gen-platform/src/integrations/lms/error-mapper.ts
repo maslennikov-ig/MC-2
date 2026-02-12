@@ -107,7 +107,8 @@ const ERROR_MESSAGE_MAP: Record<string, string> = {
   CANCELLED: 'The import was cancelled by the user.',
 
   // Unknown/Generic Errors
-  UNKNOWN_ERROR: 'An unexpected error occurred. Please try again or contact support if the issue persists.',
+  UNKNOWN_ERROR:
+    'An unexpected error occurred. Please try again or contact support if the issue persists.',
 };
 
 /**

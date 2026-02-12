@@ -66,14 +66,8 @@ import { lmsLogger } from './logger';
  * const result = await adapter.publishCourse(courseInput);
  * ```
  */
-export function createLMSAdapter(
-  type: 'openedx',
-  config: OpenEdXConfig
-): LMSAdapter<OpenEdXConfig>;
-export function createLMSAdapter(
-  type: string,
-  config: OpenEdXConfig
-): LMSAdapter<OpenEdXConfig> {
+export function createLMSAdapter(type: 'openedx', config: OpenEdXConfig): LMSAdapter<OpenEdXConfig>;
+export function createLMSAdapter(type: string, config: OpenEdXConfig): LMSAdapter<OpenEdXConfig> {
   lmsLogger.debug({ type, instanceId: config.instanceId }, 'Creating LMS adapter');
 
   switch (type) {

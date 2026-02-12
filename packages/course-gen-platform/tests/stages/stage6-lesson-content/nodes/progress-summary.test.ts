@@ -108,7 +108,9 @@ vi.mock('@/shared/llm/model-config-service', () => ({
 /**
  * Create minimal valid lesson specification
  */
-function createMockLessonSpec(overrides: Partial<LessonSpecificationV2> = {}): LessonSpecificationV2 {
+function createMockLessonSpec(
+  overrides: Partial<LessonSpecificationV2> = {}
+): LessonSpecificationV2 {
   return {
     lesson_id: 'test-lesson-1',
     title: 'Test Lesson Title',
@@ -354,8 +356,8 @@ describe('buildSelfReviewProgressSummary - Localization', () => {
 
     // Check actions are in Russian
     if (attempt.actionsPerformed.length > 0) {
-      const hasRussianText = attempt.actionsPerformed.some(
-        action => action.text.match(/Проверка|пройдена|проблем/)
+      const hasRussianText = attempt.actionsPerformed.some(action =>
+        action.text.match(/Проверка|пройдена|проблем/)
       );
       expect(hasRussianText).toBe(true);
     }
@@ -390,8 +392,8 @@ We have covered the fundamentals of TypeScript.
 
     // Check actions are in English
     if (attempt.actionsPerformed.length > 0) {
-      const hasEnglishText = attempt.actionsPerformed.some(
-        action => action.text.match(/check|passed|issues/)
+      const hasEnglishText = attempt.actionsPerformed.some(action =>
+        action.text.match(/check|passed|issues/)
       );
       expect(hasEnglishText).toBe(true);
     }
@@ -527,11 +529,11 @@ describe('buildSelfReviewProgressSummary - Edge cases', () => {
     // Actions should include language and structure checks
     expect(attempt.actionsPerformed.length).toBeGreaterThan(0);
 
-    const hasLanguageCheck = attempt.actionsPerformed.some(
-      action => action.text.match(/Проверка языка|Language check/)
+    const hasLanguageCheck = attempt.actionsPerformed.some(action =>
+      action.text.match(/Проверка языка|Language check/)
     );
-    const hasStructureCheck = attempt.actionsPerformed.some(
-      action => action.text.match(/Проверка структуры|Structure check/)
+    const hasStructureCheck = attempt.actionsPerformed.some(action =>
+      action.text.match(/Проверка структуры|Structure check/)
     );
 
     expect(hasLanguageCheck).toBe(true);
@@ -641,8 +643,8 @@ describe('buildSelfReviewProgressSummary - Issue severity mapping', () => {
     expect(attempt.issuesFound.length).toBeGreaterThan(0);
 
     // Check for Russian error messages
-    const hasRussianError = attempt.issuesFound.some(
-      issue => issue.text.match(/Критическая ошибка|ошибка/)
+    const hasRussianError = attempt.issuesFound.some(issue =>
+      issue.text.match(/Критическая ошибка|ошибка/)
     );
     expect(hasRussianError).toBe(true);
   });
@@ -661,8 +663,8 @@ describe('buildSelfReviewProgressSummary - Issue severity mapping', () => {
     expect(attempt.issuesFound.length).toBeGreaterThan(0);
 
     // Check for English error messages (case-insensitive)
-    const hasEnglishError = attempt.issuesFound.some(
-      issue => issue.text.match(/critical|error|missing/i)
+    const hasEnglishError = attempt.issuesFound.some(issue =>
+      issue.text.match(/critical|error|missing/i)
     );
     expect(hasEnglishError).toBe(true);
   });

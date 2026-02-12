@@ -8,6 +8,7 @@
 **Affects**: Stage 4 (Analyze) output, Stage 5 (Generation) input, all integration points
 
 **Related Documents**:
+
 - `specs/008-generation-generation-json/research-decisions/rt-002-architecture-balance.md`
 - `docs/investigations/INV-2025-11-11-003-regenerate-section-validation-failures.md`
 - `docs/FUTURE/SPEC-2025-11-11-001-stage4-stage5-schema-mismatch.md` (superseded by this spec)
@@ -35,12 +36,14 @@
 **Root Cause**: Schema mismatch between Stage 4 output (FULL nested schema) and Stage 5 input (SIMPLIFIED flat schema) caused by miscommunication during initial design. The `AnalysisResultSchema` in `generation-job.ts` was incorrectly designed as a simplified schema when it should mirror the full `AnalysisResult` from Stage 4.
 
 **Impact**:
+
 - ❌ Stage 5 validation fails when receiving real Stage 4 output
 - ❌ Tests failing with "Expected string, received object" errors
 - ❌ Loss of information if transformation layer added (not acceptable)
 - ❌ Architectural inconsistency violating RT-002 design principles
 
 **Architectural Clarification** (from product owner):
+
 - ✅ Title-only applies to Analyze INPUT ONLY (Analyze can work without documents)
 - ✅ **Analyze ALWAYS generates ALL 4 enhancement fields** (even if input was title-only)
 - ✅ **Generation ALWAYS receives FULL data from Analyze** (100% of cases, no exceptions)
@@ -63,12 +66,14 @@
 7. **NO transformation layer** - single source of truth
 
 **Critical Requirements**:
+
 - Analyze ALWAYS generates ALL 4 enhancement fields (even if input was title-only)
 - Generation ALWAYS receives full data from Analyze (100% of cases)
 - ALL 4 fields REQUIRED in schema (no .optional())
 - RAG usage is logic-level decision in Generation (not schema-level)
 
 **Benefits**:
+
 - ✅ Zero information loss
 - ✅ Simpler architecture (no transformation layer)
 - ✅ Aligns with RT-002 research (Generation uses full context)
@@ -115,6 +120,7 @@ course_category: z.object({
 From RT-002 research (lines 21-28):
 
 > **Analyze Stage (Stage 4)** → Section-level structure:
+>
 > - ✅ Document analysis (themes, concept graph, patterns)
 > - ✅ Pedagogical strategy (theory/practice balance, approach)
 > - ✅ Section breakdown (3-7 sections, high-level objectives)
@@ -125,9 +131,11 @@ From RT-002 research (lines 21-28):
 ### Architectural Principle Violated
 
 **RT-002 Key Insight** (line 28):
+
 > "Over-specification in Analyze reduces quality by 15-30%. Let reasoning models reason."
 
 **BUT**: Providing LESS data than Analyze produced also reduces quality. Generation needs:
+
 - `confidence` scores to assess reliability
 - `reasoning` explanations to understand context
 - All 6 `contextual_language` fields for nuanced prompt construction
@@ -144,15 +152,18 @@ From RT-002 research (lines 21-28):
 From `rt-002-architecture-balance.md` (lines 12-28):
 
 #### Analyze Stage (Stage 4)
+
 **Models**: Gemini 2.5 Flash (1M tokens context)
 **Purpose**: Process large documents, extract structure
 **Output**: FULL `AnalysisResult` with:
+
 - Nested objects with confidence scores
 - 6-field contextual_language for nuanced guidance
 - Pedagogical patterns from document analysis
 - Section-level structure (3-7 sections)
 
 #### Generation Stage (Stage 5)
+
 **Models**: qwen3-max (128K context), OSS 120B
 **Purpose**: Reasoning and detailed content creation
 **Input**: FULL `AnalysisResult` from Stage 4
@@ -163,12 +174,14 @@ From `rt-002-architecture-balance.md` (lines 12-28):
 From `rt-002-full-analysis.md` (lines 65-100):
 
 Generation must:
+
 1. **Assess confidence**: Use `course_category.confidence` to determine how strictly to follow guidance
 2. **Understand reasoning**: Use `course_category.reasoning` to grasp Analyze's logic
 3. **Nuanced prompts**: Use all 6 `contextual_language` fields for different prompt contexts
 4. **Adaptive decisions**: Use `pedagogical_patterns` to maintain consistency
 
 **Example**:
+
 ```typescript
 // Generation reasoning with FULL data:
 if (analysis.course_category.confidence < 0.7) {
@@ -206,12 +219,12 @@ export interface AnalysisResult {
   };
 
   contextual_language: {
-    why_matters_context: string;    // 50-300 chars
-    motivators: string;             // 100-600 chars
-    experience_prompt: string;      // 100-600 chars
-    problem_statement_context: string;  // 50-300 chars
-    knowledge_bridge: string;       // 100-600 chars
-    practical_benefit_focus: string;    // 100-600 chars
+    why_matters_context: string; // 50-300 chars
+    motivators: string; // 100-600 chars
+    experience_prompt: string; // 100-600 chars
+    problem_statement_context: string; // 50-300 chars
+    knowledge_bridge: string; // 100-600 chars
+    practical_benefit_focus: string; // 100-600 chars
   };
 
   topic_analysis: {
@@ -231,7 +244,12 @@ export interface AnalysisResult {
 
   // Optional enhancement fields (already in schema)
   pedagogical_patterns?: {
-    primary_strategy: 'problem-based learning' | 'lecture-based' | 'inquiry-based' | 'project-based' | 'mixed';
+    primary_strategy:
+      | 'problem-based learning'
+      | 'lecture-based'
+      | 'inquiry-based'
+      | 'project-based'
+      | 'mixed';
     theory_practice_ratio: string;
     assessment_types: string[];
     key_patterns: string[];
@@ -293,10 +311,10 @@ From investigation report `INV-2025-11-11-003`:
   "level": 50,
   "phase": "validate_input",
   "errors": [
-    "analysis_result.category: Required",  // ❌ Doesn't exist in Stage 4
-    "analysis_result.difficulty: Required",  // ❌ Doesn't exist in Stage 4
-    "analysis_result.contextual_language: Expected string, received object",  // ❌ Type mismatch
-    "analysis_result.pedagogical_strategy: Expected string, received object"  // ❌ Type mismatch
+    "analysis_result.category: Required", // ❌ Doesn't exist in Stage 4
+    "analysis_result.difficulty: Required", // ❌ Doesn't exist in Stage 4
+    "analysis_result.contextual_language: Expected string, received object", // ❌ Type mismatch
+    "analysis_result.pedagogical_strategy: Expected string, received object" // ❌ Type mismatch
   ]
 }
 ```
@@ -336,6 +354,7 @@ prompt += `**Analysis Context**:
 **Decision**: Modify Stage 5 to accept and use FULL `AnalysisResult` schema from Stage 4.
 
 **Rationale**:
+
 1. ✅ **Aligns with RT-002** - Generation uses full context for reasoning
 2. ✅ **No information loss** - All rich data preserved
 3. ✅ **Simpler architecture** - No transformation layer needed
@@ -399,6 +418,7 @@ prompt += `**Analysis Context**:
 #### 1. Update AnalysisResultSchema (generation-job.ts)
 
 **Change from** (lines 24-54):
+
 ```typescript
 export const AnalysisResultSchema = z.object({
   category: z.string(),
@@ -410,6 +430,7 @@ export const AnalysisResultSchema = z.object({
 ```
 
 **Change to**:
+
 ```typescript
 // Import from shared types (DRY principle)
 import { AnalysisResultSchema as FullAnalysisResultSchema } from '@megacampus/shared-types/analysis-result';
@@ -425,13 +446,21 @@ Create Zod validator from TypeScript interface:
 ```typescript
 // NEW FILE: packages/shared-types/src/analysis-result-validator.ts
 import { z } from 'zod';
-import type { AnalysisResult, SectionBreakdown, ExpansionArea, ResearchFlag } from './analysis-result';
+import type {
+  AnalysisResult,
+  SectionBreakdown,
+  ExpansionArea,
+  ResearchFlag,
+} from './analysis-result';
 
 export const CourseCategorySchema = z.object({
   primary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']),
   confidence: z.number().min(0).max(1),
   reasoning: z.string(),
-  secondary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']).optional().nullable(),
+  secondary: z
+    .enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'])
+    .optional()
+    .nullable(),
 });
 
 export const ContextualLanguageSchema = z.object({
@@ -462,23 +491,45 @@ export const PedagogicalStrategySchema = z.object({
   interactivity_level: z.enum(['high', 'medium', 'low']),
 });
 
-export const PedagogicalPatternsSchema = z.object({
-  primary_strategy: z.enum(['problem-based learning', 'lecture-based', 'inquiry-based', 'project-based', 'mixed']),
-  theory_practice_ratio: z.string().regex(/^\d{1,2}:\d{1,2}$/),
-  assessment_types: z.array(z.enum(['coding', 'quizzes', 'projects', 'essays', 'presentations', 'peer-review'])).min(1).max(5),
-  key_patterns: z.array(z.string()).min(1).max(5),
-}).optional();
+export const PedagogicalPatternsSchema = z
+  .object({
+    primary_strategy: z.enum([
+      'problem-based learning',
+      'lecture-based',
+      'inquiry-based',
+      'project-based',
+      'mixed',
+    ]),
+    theory_practice_ratio: z.string().regex(/^\d{1,2}:\d{1,2}$/),
+    assessment_types: z
+      .array(z.enum(['coding', 'quizzes', 'projects', 'essays', 'presentations', 'peer-review']))
+      .min(1)
+      .max(5),
+    key_patterns: z.array(z.string()).min(1).max(5),
+  })
+  .optional();
 
-export const GenerationGuidanceSchema = z.object({
-  tone: z.enum(['conversational but precise', 'formal academic', 'casual friendly', 'technical professional']),
-  use_analogies: z.boolean(),
-  specific_analogies: z.array(z.string()).optional(),
-  avoid_jargon: z.array(z.string()),
-  include_visuals: z.array(z.enum(['diagrams', 'flowcharts', 'code examples', 'screenshots', 'animations', 'plots'])),
-  exercise_types: z.array(z.enum(['coding', 'derivation', 'interpretation', 'debugging', 'refactoring', 'analysis'])),
-  contextual_language_hints: z.string().min(50).max(300),
-  real_world_examples: z.array(z.string()).optional(),
-}).optional();
+export const GenerationGuidanceSchema = z
+  .object({
+    tone: z.enum([
+      'conversational but precise',
+      'formal academic',
+      'casual friendly',
+      'technical professional',
+    ]),
+    use_analogies: z.boolean(),
+    specific_analogies: z.array(z.string()).optional(),
+    avoid_jargon: z.array(z.string()),
+    include_visuals: z.array(
+      z.enum(['diagrams', 'flowcharts', 'code examples', 'screenshots', 'animations', 'plots'])
+    ),
+    exercise_types: z.array(
+      z.enum(['coding', 'derivation', 'interpretation', 'debugging', 'refactoring', 'analysis'])
+    ),
+    contextual_language_hints: z.string().min(50).max(300),
+    real_world_examples: z.array(z.string()).optional(),
+  })
+  .optional();
 
 export const SectionBreakdownSchema = z.object({
   area: z.string(),
@@ -546,22 +597,31 @@ export const AnalysisResultSchema = z.object({
   scope_instructions: z.string().min(100).max(800),
   generation_guidance: GenerationGuidanceSchema,
   content_strategy: z.enum(['create_from_scratch', 'expand_and_enhance', 'optimize_existing']),
-  document_relevance_mapping: z.record(z.string(), z.object({
-    primary_documents: z.array(z.string()),
-    key_search_terms: z.array(z.string()),
-    expected_topics: z.array(z.string()),
-    document_processing_methods: z.record(z.string(), z.enum(['full_text', 'hierarchical'])),
-  })).optional(),
-  document_analysis: z.object({
-    source_materials: z.array(z.string()),
-    main_themes: z.array(z.object({
-      theme: z.string(),
-      importance: z.enum(['high', 'medium', 'low']),
-      coverage: z.string(),
-    })),
-    complexity_assessment: z.string(),
-    estimated_total_hours: z.number(),
-  }).optional(),
+  document_relevance_mapping: z
+    .record(
+      z.string(),
+      z.object({
+        primary_documents: z.array(z.string()),
+        key_search_terms: z.array(z.string()),
+        expected_topics: z.array(z.string()),
+        document_processing_methods: z.record(z.string(), z.enum(['full_text', 'hierarchical'])),
+      })
+    )
+    .optional(),
+  document_analysis: z
+    .object({
+      source_materials: z.array(z.string()),
+      main_themes: z.array(
+        z.object({
+          theme: z.string(),
+          importance: z.enum(['high', 'medium', 'low']),
+          coverage: z.string(),
+        })
+      ),
+      complexity_assessment: z.string(),
+      estimated_total_hours: z.number(),
+    })
+    .optional(),
   expansion_areas: z.array(ExpansionAreaSchema).nullable(),
   research_flags: z.array(ResearchFlagSchema),
   metadata: AnalysisResultMetadataSchema,
@@ -571,6 +631,7 @@ export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 ```
 
 Then in `generation-job.ts`:
+
 ```typescript
 import { AnalysisResultSchema } from '@megacampus/shared-types/analysis-result-validator';
 ```
@@ -656,7 +717,9 @@ Practical benefits: ${contextual.practical_benefit_focus}`;
  * Converts 5-field object into structured string with clear sections.
  * Use for maintaining pedagogical consistency across lessons.
  */
-export function formatPedagogicalStrategyForPrompt(strategy: AnalysisResult['pedagogical_strategy']): string {
+export function formatPedagogicalStrategyForPrompt(
+  strategy: AnalysisResult['pedagogical_strategy']
+): string {
   return `Teaching Style: ${strategy.teaching_style}
 Assessment: ${strategy.assessment_approach}
 Practical Focus: ${strategy.practical_focus}
@@ -670,7 +733,9 @@ Interactivity: ${strategy.interactivity_level}`;
  * Enhanced field for quality improvement - use to maintain consistency
  * in exercise types, theory/practice balance.
  */
-export function formatPedagogicalPatternsForPrompt(patterns?: AnalysisResult['pedagogical_patterns']): string {
+export function formatPedagogicalPatternsForPrompt(
+  patterns?: AnalysisResult['pedagogical_patterns']
+): string {
   if (!patterns) return '';
 
   return `Primary Strategy: ${patterns.primary_strategy}
@@ -684,7 +749,9 @@ Key Patterns: ${patterns.key_patterns.join('; ')}`;
  *
  * Enhanced field for quality improvement - use as constraints for generation.
  */
-export function formatGenerationGuidanceForPrompt(guidance?: AnalysisResult['generation_guidance']): string {
+export function formatGenerationGuidanceForPrompt(
+  guidance?: AnalysisResult['generation_guidance']
+): string {
   if (!guidance) return '';
 
   const analogies = guidance.specific_analogies?.length
@@ -709,7 +776,9 @@ Audience: ${guidance.contextual_language_hints}${examples}`;
  * Maps target_audience to difficulty (for backward compatibility with old code).
  * Note: Prefer using topic_analysis.target_audience directly in new code.
  */
-export function getDifficultyFromAnalysis(analysis: AnalysisResult): 'beginner' | 'intermediate' | 'advanced' {
+export function getDifficultyFromAnalysis(
+  analysis: AnalysisResult
+): 'beginner' | 'intermediate' | 'advanced' {
   const audience = analysis.topic_analysis.target_audience;
 
   // Map 'mixed' to 'intermediate' as default
@@ -739,6 +808,7 @@ function capitalize(str: string): string {
 **File**: `section-batch-generator.ts:655-658`
 
 **Change from**:
+
 ```typescript
 if (input.analysis_result) {
   prompt += `**Analysis Context** (from Stage 4):
@@ -751,12 +821,13 @@ if (input.analysis_result) {
 ```
 
 **Change to**:
+
 ```typescript
 import {
   formatCourseCategoryForPrompt,
   formatPedagogicalStrategyForPrompt,
   formatContextualLanguageForPrompt,
-  getDifficultyFromAnalysis
+  getDifficultyFromAnalysis,
 } from './analysis-formatters';
 
 if (input.analysis_result) {
@@ -800,6 +871,7 @@ ${strategy}
 **File**: `metadata-generator.ts:312-315`
 
 **Change from**:
+
 ```typescript
 const analysis = input.analysis_result!;
 prompt += `**Analysis Context**:
@@ -810,11 +882,12 @@ prompt += `**Analysis Context**:
 ```
 
 **Change to**:
+
 ```typescript
 import {
   formatCourseCategoryForPrompt,
   formatPedagogicalStrategyForPrompt,
-  getDifficultyFromAnalysis
+  getDifficultyFromAnalysis,
 } from './analysis-formatters';
 
 const analysis = input.analysis_result!;
@@ -834,15 +907,19 @@ ${strategy}
 **File**: `generation-phases.ts:725`
 
 **Change from**:
+
 ```typescript
 parts.push(input.analysis_result.pedagogical_strategy);
 ```
 
 **Change to**:
+
 ```typescript
 import { formatPedagogicalStrategyForPrompt } from './analysis-formatters';
 
-const strategyFormatted = formatPedagogicalStrategyForPrompt(input.analysis_result.pedagogical_strategy);
+const strategyFormatted = formatPedagogicalStrategyForPrompt(
+  input.analysis_result.pedagogical_strategy
+);
 parts.push(strategyFormatted);
 ```
 
@@ -853,6 +930,7 @@ parts.push(strategyFormatted);
 ### Phase 1: Schema Unification (Day 1)
 
 **Tasks**:
+
 1. ✅ Create Zod validator for full AnalysisResult
    - File: `packages/shared-types/src/analysis-result-validator.ts` (NEW)
    - Export `AnalysisResultSchema` matching TypeScript interface
@@ -874,11 +952,13 @@ parts.push(strategyFormatted);
 **Estimated Effort**: 4-6 hours
 
 **Files to Create**:
+
 - `packages/shared-types/src/analysis-result-validator.ts`
 - `packages/course-gen-platform/src/services/stage5/analysis-formatters.ts`
 - `packages/course-gen-platform/tests/unit/stage5/analysis-formatters.test.ts`
 
 **Files to Modify**:
+
 - `packages/shared-types/src/generation-job.ts` (replace schema)
 
 ---
@@ -886,6 +966,7 @@ parts.push(strategyFormatted);
 ### Phase 2: Update Stage 5 Services (Day 2)
 
 **Tasks**:
+
 1. ✅ Update section-batch-generator.ts
    - Import helper functions
    - Replace flat field access with formatters
@@ -909,6 +990,7 @@ parts.push(strategyFormatted);
 **Estimated Effort**: 6-8 hours
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/metadata-generator.ts`
 - `packages/course-gen-platform/src/services/stage5/generation-phases.ts`
@@ -919,6 +1001,7 @@ parts.push(strategyFormatted);
 ### Phase 3: Update Tests (Day 3)
 
 **Tasks**:
+
 1. ✅ Update test fixtures
    - File: `tests/contract/generation.test.ts`
    - Update `createMinimalAnalysisResult()` to return FULL schema
@@ -945,10 +1028,12 @@ parts.push(strategyFormatted);
 **Estimated Effort**: 6-8 hours
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/tests/contract/generation.test.ts`
 - 15 test files using `analysis_result`
 
 **Files to Create**:
+
 - `packages/course-gen-platform/tests/unit/stage5/analysis-formatters.test.ts`
 
 ---
@@ -956,6 +1041,7 @@ parts.push(strategyFormatted);
 ### Phase 4: Documentation and Validation (Day 4)
 
 **Tasks**:
+
 1. ✅ Update documentation
    - Update `docs/008-generation-generation-json/data-model.md`
      - Document unified schema approach
@@ -983,9 +1069,11 @@ parts.push(strategyFormatted);
 **Estimated Effort**: 4-6 hours
 
 **Files to Create**:
+
 - `docs/migrations/MIGRATION-unified-schemas.md`
 
 **Files to Modify**:
+
 - `docs/008-generation-generation-json/data-model.md`
 - `docs/FUTURE/enhance-analyze-schema-for-generation.md`
 
@@ -994,6 +1082,7 @@ parts.push(strategyFormatted);
 ### Phase 5: Final Validation and Commit (Day 4)
 
 **Tasks**:
+
 1. ✅ Run full test suite
    - Verify all unit tests pass
    - Verify all contract tests pass (17/17)
@@ -1019,6 +1108,7 @@ parts.push(strategyFormatted);
 **File**: `packages/course-gen-platform/tests/unit/stage5/analysis-formatters.test.ts`
 
 **Test Cases**:
+
 1. ✅ `formatCourseCategoryForPrompt()`
    - Test with all category types
    - Test with/without secondary category
@@ -1060,6 +1150,7 @@ parts.push(strategyFormatted);
 **File**: `packages/course-gen-platform/tests/contract/generation.test.ts`
 
 **Changes**:
+
 1. ✅ Update `createMinimalAnalysisResult()` (lines 64-141)
    - Return FULL schema with nested objects
    - Remove flat fields (category, difficulty)
@@ -1084,6 +1175,7 @@ parts.push(strategyFormatted);
 **Action**: Run `pnpm test:integration` and verify all pass
 
 **Focus Areas**:
+
 - Stage 4 → Stage 5 pipeline
 - Analysis pipeline (Phase 5 Assembly → Generation)
 - E2E tests (full pipeline)
@@ -1095,6 +1187,7 @@ parts.push(strategyFormatted);
 **Action**: Run FULL test suite after implementation
 
 **Commands**:
+
 ```bash
 # Unit tests
 pnpm test
@@ -1154,11 +1247,13 @@ pnpm lint
 ### High Risk
 
 **Risk 1: Type Errors in Zod Schema**
+
 - **Description**: Zod schema may not perfectly match TypeScript interface
 - **Mitigation**: Use TypeScript's `satisfies` operator to validate, comprehensive unit tests
 - **Impact**: MEDIUM (solvable, but time-consuming)
 
 **Risk 2: Test Regressions**
+
 - **Description**: Updating 15 test files may introduce new failures
 - **Mitigation**: Update tests incrementally, run after each file change, use Git to track
 - **Impact**: MEDIUM (time-consuming but solvable)
@@ -1166,11 +1261,13 @@ pnpm lint
 ### Medium Risk
 
 **Risk 3: Prompt Quality Changes**
+
 - **Description**: Formatted prompts may differ from original, affecting LLM output
 - **Mitigation**: Review formatted prompts manually, compare before/after, A/B test if needed
 - **Impact**: LOW (semantic similarity validation will catch quality issues)
 
 **Risk 4: Missing Usage Locations**
+
 - **Description**: May miss some files that access analysis_result fields
 - **Mitigation**: Use comprehensive grep search, type-check will catch compile errors
 - **Impact**: LOW (TypeScript catches at compile time)
@@ -1178,6 +1275,7 @@ pnpm lint
 ### Low Risk
 
 **Risk 5: Optional Fields Not Used**
+
 - **Description**: pedagogical_patterns, generation_guidance may not be populated by Stage 4 yet
 - **Mitigation**: Helper functions handle undefined gracefully, add defaults
 - **Impact**: VERY LOW (optional fields are optional, system works without them)
@@ -1212,13 +1310,13 @@ pnpm lint
 
 **Total Estimated Effort:** 3-4 days (1 developer)
 
-| Phase | Days | Tasks |
-|-------|------|-------|
-| **Phase 1: Schema Unification** | 0.5-0.75 | Create Zod validator, update generation-job.ts, create helpers |
-| **Phase 2: Update Stage 5 Services** | 0.75-1 | Update section-batch-generator, metadata-generator, generation-phases, others |
-| **Phase 3: Update Tests** | 0.75-1 | Update fixtures, 15 test files, add helper tests, run regression |
-| **Phase 4: Documentation & Validation** | 0.5-0.75 | Update docs, type-check, lint, manual testing |
-| **Phase 5: Final Validation** | 0.25-0.5 | Full test suite, acceptance criteria, commit |
+| Phase                                   | Days     | Tasks                                                                         |
+| --------------------------------------- | -------- | ----------------------------------------------------------------------------- |
+| **Phase 1: Schema Unification**         | 0.5-0.75 | Create Zod validator, update generation-job.ts, create helpers                |
+| **Phase 2: Update Stage 5 Services**    | 0.75-1   | Update section-batch-generator, metadata-generator, generation-phases, others |
+| **Phase 3: Update Tests**               | 0.75-1   | Update fixtures, 15 test files, add helper tests, run regression              |
+| **Phase 4: Documentation & Validation** | 0.5-0.75 | Update docs, type-check, lint, manual testing                                 |
+| **Phase 5: Final Validation**           | 0.25-0.5 | Full test suite, acceptance criteria, commit                                  |
 
 **Critical Path:** Phase 1 → Phase 2 → Phase 3 (cannot parallelize)
 

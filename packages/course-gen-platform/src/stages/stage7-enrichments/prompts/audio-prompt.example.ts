@@ -192,8 +192,8 @@ function example5_VoiceSettings() {
 
   // Test edge cases
   const invalidSettings = validateTTSSettings({
-    voice: 'invalid_voice' as any,
-    format: 'invalid_format' as any,
+    voice: 'invalid_voice' as unknown as 'alloy',
+    format: 'invalid_format' as unknown as 'mp3',
     speed: 10.0, // Too fast, will be clamped to 4.0
   });
 
@@ -213,7 +213,7 @@ function example6_DurationEstimation() {
 
   const speeds = [0.5, 1.0, 1.5, 2.0];
 
-  speeds.forEach((speed) => {
+  speeds.forEach(speed => {
     const duration = estimateAudioDuration(script, speed);
     const minutes = Math.floor(duration / 60);
     const seconds = duration % 60;
@@ -234,7 +234,7 @@ function example6_DurationEstimation() {
 // Example 7: Real-World Integration with OpenAI TTS API
 // ============================================================================
 
-async function example7_OpenAIIntegration() {
+function example7_OpenAIIntegration() {
   console.log('=== Example 7: OpenAI TTS Integration (Pseudo-code) ===\n');
 
   const lessonContent = `
@@ -323,7 +323,7 @@ if (require.main === module) {
   example4_ManualChunking();
   example5_VoiceSettings();
   example6_DurationEstimation();
-  example7_OpenAIIntegration();
+  void example7_OpenAIIntegration();
 
   console.log('='.repeat(70));
   console.log('All examples completed!\n');

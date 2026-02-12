@@ -17,24 +17,26 @@
 
 ## Results by Scenario
 
-| Scenario | Status | Valid Runs | Quality | Notes |
-|----------|--------|-----------|---------|-------|
-| metadata-en | ✗ FAIL | 1/3 | 33% | 2 runs truncated/empty |
-| metadata-ru | ✓ PASS | 3/3 | 85% | Consistent, good quality |
-| lesson-en | ✓ PASS | 3/3 | 75% | 1 run missing lessons array |
-| lesson-ru | ✓ PASS | 3/3 | 100% | Excellent, 3-5 lessons |
+| Scenario    | Status | Valid Runs | Quality | Notes                       |
+| ----------- | ------ | ---------- | ------- | --------------------------- |
+| metadata-en | ✗ FAIL | 1/3        | 33%     | 2 runs truncated/empty      |
+| metadata-ru | ✓ PASS | 3/3        | 85%     | Consistent, good quality    |
+| lesson-en   | ✓ PASS | 3/3        | 75%     | 1 run missing lessons array |
+| lesson-ru   | ✓ PASS | 3/3        | 100%    | Excellent, 3-5 lessons      |
 
 ---
 
 ## Key Findings
 
 ### Strengths
+
 - ✓ Excellent Russian lesson generation (100% quality, 3-5 lessons)
 - ✓ Good Russian metadata (85% quality, 3/3 success)
 - ✓ Very low cost per request
 - ✓ When it works, outputs are high-quality
 
 ### Critical Issues
+
 - ✗ **English metadata UNRELIABLE** (2/3 failures: truncated/empty)
 - ✗ 50% failure rate on English outputs overall
 - ✗ API returns truncated/empty responses without error codes
@@ -47,12 +49,14 @@
 **DO NOT USE** for production English content.
 
 **Use ONLY if**:
+
 - You need Russian content
 - You can tolerate 15% quality issues (metadata) or 0% (lessons)
 - You have retry logic implemented
 - Cost is critical (but S-TIER models are only 2-3x more expensive)
 
 **Better Alternatives**:
+
 - **Kimi K2** (S-TIER, 4/4 SUCCESS, consistent)
 - **DeepSeek v3.2 Exp** (S-TIER, 4/4 SUCCESS, fast, cheap)
 - **Grok 4 Fast** (S-TIER, 4/4 SUCCESS, fast)
@@ -62,6 +66,7 @@
 ## Sample Outputs
 
 **Best English Metadata** (run 1):
+
 ```json
 {
   "course_title": "Introduction to Python Programming",
@@ -75,21 +80,25 @@
   ]
 }
 ```
+
 Score: 100% ✓
 
 **Failed English Metadata** (run 2):
+
 ```json
 {
   "target_audience": "High school graduates who want to start a career in tech, career‑switchers from non‑technical fields seeking a practical programming foundation, junior analysts needing automation skills, and
 ```
+
 Truncated mid-sentence. Score: 0% ✗
 
 **Best Russian Lessons** (run 2):
+
 - 4 complete lessons on "Основы нейронных сетей"
 - Lesson 1: "Математические основы нейронных сетей"
 - Each with objectives, 4-5 key_topics, 2 exercises
 - Perfect snake_case, native Russian phrasing
-Score: 100% ✓
+  Score: 100% ✓
 
 ---
 

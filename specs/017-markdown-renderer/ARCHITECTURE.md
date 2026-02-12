@@ -53,13 +53,13 @@ The system uses two separate renderers because **Next.js 15 architectural constr
 
 ### Renderer Selection Guide
 
-| Use Case | Renderer | Reason |
-|----------|----------|--------|
-| Lesson pages (static) | `MarkdownRenderer` (RSC) | Full features, 0 KB client JS |
+| Use Case                  | Renderer                 | Reason                              |
+| ------------------------- | ------------------------ | ----------------------------------- |
+| Lesson pages (static)     | `MarkdownRenderer` (RSC) | Full features, 0 KB client JS       |
 | Content previews (static) | `MarkdownRenderer` (RSC) | Accurate preview with full features |
-| AI chat (streaming) | `MarkdownRendererClient` | Real-time streaming support |
-| Admin previews (dynamic) | `MarkdownRendererClient` | Client-side data fetching |
-| User comments | `MarkdownRenderer` (RSC) | Sanitization + full features |
+| AI chat (streaming)       | `MarkdownRendererClient` | Real-time streaming support         |
+| Admin previews (dynamic)  | `MarkdownRendererClient` | Client-side data fetching           |
+| User comments             | `MarkdownRenderer` (RSC) | Sanitization + full features        |
 
 ## Component Architecture
 
@@ -70,6 +70,7 @@ The system uses two separate renderers because **Next.js 15 architectural constr
 **Purpose**: Server-side rendering for static content with full feature support
 
 **Tech Stack**:
+
 - `next-mdx-remote@5.x` - MDX compilation
 - `shiki@1.24+` - Syntax highlighting (SSR)
 - `rehype-pretty-code` - Shiki integration
@@ -78,6 +79,7 @@ The system uses two separate renderers because **Next.js 15 architectural constr
 - Custom plugins for callouts, Mermaid, anchor links
 
 **Features**:
+
 - ✅ Shiki syntax highlighting (SSR, 0 KB client JS)
 - ✅ KaTeX math rendering (inline + block)
 - ✅ Mermaid diagrams (sandboxed iframe)
@@ -88,6 +90,7 @@ The system uses two separate renderers because **Next.js 15 architectural constr
 - ✅ Content sanitization (optional)
 
 **Usage**:
+
 ```tsx
 import { MarkdownRenderer } from '@/components/markdown';
 
@@ -95,12 +98,7 @@ import { MarkdownRenderer } from '@/components/markdown';
 export default async function LessonPage() {
   const lesson = await fetchLesson();
 
-  return (
-    <MarkdownRenderer
-      content={lesson.content}
-      preset="lesson"
-    />
-  );
+  return <MarkdownRenderer content={lesson.content} preset="lesson" />;
 }
 ```
 
@@ -111,11 +109,13 @@ export default async function LessonPage() {
 **Purpose**: Client-side rendering for streaming and dynamic content
 
 **Tech Stack**:
+
 - `streamdown@latest` - Vercel's streaming markdown renderer
 - Built-in basic syntax highlighting
 - Optimized for real-time updates
 
 **Features**:
+
 - ✅ Streaming support (token-by-token)
 - ✅ Basic syntax highlighting (client-side)
 - ✅ GFM support (tables, strikethrough, etc.)
@@ -126,46 +126,42 @@ export default async function LessonPage() {
 - ❌ No anchor links
 
 **Usage**:
+
 ```tsx
 'use client';
 import { MarkdownRendererClient } from '@/components/markdown';
 
 export function ChatMessage({ content, isStreaming }) {
-  return (
-    <MarkdownRendererClient
-      content={content}
-      isStreaming={isStreaming}
-    />
-  );
+  return <MarkdownRendererClient content={content} isStreaming={isStreaming} />;
 }
 ```
 
 ## Feature Comparison
 
-| Feature | MarkdownRenderer (RSC) | MarkdownRendererClient |
-|---------|----------------------|----------------------|
-| **Syntax Highlighting** | Shiki (full, SSR) | Streamdown (basic) |
-| **Math (KaTeX)** | ✅ Yes | ❌ No |
-| **Mermaid Diagrams** | ✅ Yes | ❌ No |
-| **Callouts** | ✅ Yes | ❌ No |
-| **Anchor Links** | ✅ Yes | ❌ No |
-| **Copy Button** | ✅ Yes | ❌ No |
-| **Streaming Support** | ❌ No | ✅ Yes |
-| **Client JS (syntax)** | 0 KB | ~5-10 KB |
-| **Sanitization** | ✅ Yes (optional) | ❌ No |
-| **Preset Support** | 4 presets | 2 presets |
-| **Custom Components** | ✅ MDX components | ❌ No |
+| Feature                 | MarkdownRenderer (RSC) | MarkdownRendererClient |
+| ----------------------- | ---------------------- | ---------------------- |
+| **Syntax Highlighting** | Shiki (full, SSR)      | Streamdown (basic)     |
+| **Math (KaTeX)**        | ✅ Yes                 | ❌ No                  |
+| **Mermaid Diagrams**    | ✅ Yes                 | ❌ No                  |
+| **Callouts**            | ✅ Yes                 | ❌ No                  |
+| **Anchor Links**        | ✅ Yes                 | ❌ No                  |
+| **Copy Button**         | ✅ Yes                 | ❌ No                  |
+| **Streaming Support**   | ❌ No                  | ✅ Yes                 |
+| **Client JS (syntax)**  | 0 KB                   | ~5-10 KB               |
+| **Sanitization**        | ✅ Yes (optional)      | ❌ No                  |
+| **Preset Support**      | 4 presets              | 2 presets              |
+| **Custom Components**   | ✅ MDX components      | ❌ No                  |
 
 ## Preset System
 
 ### Available Presets
 
-| Preset | Math | Mermaid | Code | Copy | Anchors | Callouts | Tables | Use Case |
-|--------|------|---------|------|------|---------|----------|--------|----------|
-| `lesson` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Full lesson pages |
-| `preview` | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | Admin content preview |
-| `chat` | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | AI chat messages |
-| `minimal` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | Simple text only |
+| Preset    | Math | Mermaid | Code | Copy | Anchors | Callouts | Tables | Use Case              |
+| --------- | ---- | ------- | ---- | ---- | ------- | -------- | ------ | --------------------- |
+| `lesson`  | ✅   | ✅      | ✅   | ✅   | ✅      | ✅       | ✅     | Full lesson pages     |
+| `preview` | ✅   | ❌      | ✅   | ✅   | ❌      | ✅       | ✅     | Admin content preview |
+| `chat`    | ❌   | ❌      | ✅   | ❌   | ❌      | ❌       | ❌     | AI chat messages      |
+| `minimal` | ❌   | ❌      | ❌   | ❌   | ❌      | ❌       | ❌     | Simple text only      |
 
 **Note**: `MarkdownRendererClient` only supports `chat` and `minimal` presets.
 
@@ -270,11 +266,16 @@ export const sanitizeSchema = {
   ...defaultSchema,
   tagNames: [
     ...(defaultSchema.tagNames ?? []),
-    'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', // KaTeX MathML
+    'math',
+    'semantics',
+    'mrow',
+    'mi',
+    'mo',
+    'mn', // KaTeX MathML
   ],
   attributes: {
     ...defaultSchema.attributes,
-    code: ['className'],  // For language-* classes
+    code: ['className'], // For language-* classes
     span: ['className', 'style'], // For Shiki highlighting
   },
 };
@@ -297,6 +298,7 @@ export const sanitizeSchema = {
 ```
 
 **Benefits**:
+
 - Main app maintains strict CSP (`no unsafe-eval`)
 - Diagrams render with isolated permissions
 - XSS attacks contained to iframe sandbox
@@ -308,6 +310,7 @@ export const sanitizeSchema = {
 **Location**: `packages/web/components/markdown/components/CodeBlock.tsx`
 
 **Features**:
+
 - Shiki syntax highlighting (180+ languages)
 - Copy-to-clipboard button
 - Language badge
@@ -316,6 +319,7 @@ export const sanitizeSchema = {
 - Line highlighting
 
 **Props**:
+
 ```typescript
 interface CodeBlockProps {
   children: React.ReactNode;
@@ -328,11 +332,12 @@ interface CodeBlockProps {
 ```
 
 **Markdown Example**:
+
 ````markdown
 ```typescript filename="example.ts" showLineNumbers {2,3}
 function greet(name: string) {
-  const message = `Hello, ${name}!`;  // highlighted
-  return message;                      // highlighted
+  const message = `Hello, ${name}!`; // highlighted
+  return message; // highlighted
 }
 ```
 ````
@@ -344,6 +349,7 @@ function greet(name: string) {
 **Types**: `note`, `tip`, `warning`, `danger`, `info`
 
 **Markdown Syntax** (GitHub-style):
+
 ```markdown
 > [!NOTE]
 > Important information
@@ -356,6 +362,7 @@ function greet(name: string) {
 ```
 
 **HTML Output**:
+
 ```html
 <aside class="callout callout-note" role="note">
   <div class="callout-icon">
@@ -373,6 +380,7 @@ function greet(name: string) {
 **Location**: `packages/web/components/markdown/components/MermaidDiagram.tsx`
 
 **Features**:
+
 - Lazy loading (only when visible)
 - Sandboxed iframe rendering
 - Dark mode support
@@ -380,6 +388,7 @@ function greet(name: string) {
 - Error handling
 
 **Markdown Syntax**:
+
 ````markdown
 ```mermaid
 flowchart TD
@@ -390,6 +399,7 @@ flowchart TD
 ````
 
 **Rendering Strategy**:
+
 1. Parse Mermaid syntax
 2. Generate HTML with embedded Mermaid library
 3. Render in sandboxed iframe with `srcdoc`
@@ -402,6 +412,7 @@ flowchart TD
 **Location**: `packages/web/tests/e2e/visual/markdown-visual.spec.ts`
 
 **Coverage**: 20+ visual test cases including:
+
 - Typography and prose styling
 - Code blocks with syntax highlighting (multiple languages)
 - Math formulas (inline and block)
@@ -413,6 +424,7 @@ flowchart TD
 - Dark mode variants
 
 **Run Tests**:
+
 ```bash
 # Run visual tests
 pnpm test:visual:markdown
@@ -422,6 +434,7 @@ pnpm test:visual:markdown:update
 ```
 
 **Playwright Configuration**:
+
 ```typescript
 // playwright.config.ts
 {
@@ -438,6 +451,7 @@ pnpm test:visual:markdown:update
 **Location**: `packages/web/components/markdown/__tests__/`
 
 **Coverage**:
+
 - MarkdownRenderer rendering
 - MarkdownRendererClient streaming
 - Component prop validation
@@ -448,12 +462,12 @@ pnpm test:visual:markdown:update
 
 ### Bundle Size Strategy
 
-| Component | Client JS | Lazy Loaded | Notes |
-|-----------|-----------|-------------|-------|
-| MarkdownRenderer | 0 KB | N/A | Pure SSR |
-| MarkdownRendererClient | ~5-10 KB | No | Always loaded |
-| MermaidDiagram | ~200 KB | Yes | Only when diagram present |
-| CodeBlock (copy) | ~2 KB | No | Minimal client interaction |
+| Component              | Client JS | Lazy Loaded | Notes                      |
+| ---------------------- | --------- | ----------- | -------------------------- |
+| MarkdownRenderer       | 0 KB      | N/A         | Pure SSR                   |
+| MarkdownRendererClient | ~5-10 KB  | No          | Always loaded              |
+| MermaidDiagram         | ~200 KB   | Yes         | Only when diagram present  |
+| CodeBlock (copy)       | ~2 KB     | No          | Minimal client interaction |
 
 ### Rendering Performance
 
@@ -471,14 +485,14 @@ pnpm test:visual:markdown:update
 
 ### WCAG AA Requirements
 
-| Component | ARIA | Keyboard | Focus | Screen Reader |
-|-----------|------|----------|-------|---------------|
-| CodeBlock | `tabIndex={0}` | Tab to focus | Visible outline | Code announced |
-| Copy Button | `aria-label="Copy code"` | Enter/Space | Button focus | Action feedback |
-| Callout | `role="note"` | - | - | Type + content read |
-| MermaidDiagram | `aria-label={desc}` | - | - | Description read |
-| Heading Anchor | `aria-hidden="true"` | Tab to anchor | Visible # | Link announced |
-| Link (external) | - | Tab | Underline | "External link" |
+| Component       | ARIA                     | Keyboard      | Focus           | Screen Reader       |
+| --------------- | ------------------------ | ------------- | --------------- | ------------------- |
+| CodeBlock       | `tabIndex={0}`           | Tab to focus  | Visible outline | Code announced      |
+| Copy Button     | `aria-label="Copy code"` | Enter/Space   | Button focus    | Action feedback     |
+| Callout         | `role="note"`            | -             | -               | Type + content read |
+| MermaidDiagram  | `aria-label={desc}`      | -             | -               | Description read    |
+| Heading Anchor  | `aria-hidden="true"`     | Tab to anchor | Visible #       | Link announced      |
+| Link (external) | -                        | Tab           | Underline       | "External link"     |
 
 ### Skip Navigation
 
@@ -497,17 +511,20 @@ Visible on keyboard focus for screen reader users.
 ### Previous Implementation: ServerRenderedMarkdown (Abandoned)
 
 **Why It Was Tried**:
+
 - Admin preview panels needed full-featured rendering
 - Client-side data fetching conflicted with Server Components
 - Server Actions seemed like a solution
 
 **Why It Failed**:
+
 - Next.js 15 production builds **prohibit** `react-dom/server` imports in:
   - Server Actions (`'use server'` functions)
   - Route Handlers (`/api/*`)
-- Error: *"You're importing a component that imports react-dom/server. This only works in a Server Component which is not supported in Server Actions."*
+- Error: _"You're importing a component that imports react-dom/server. This only works in a Server Component which is not supported in Server Actions."_
 
 **Attempted Workarounds** (all failed):
+
 1. ✗ Route Handler (`/api/markdown/render`)
 2. ✗ `serverExternalPackages: ['react-dom']` in `next.config.ts`
 3. ✗ Dynamic imports with `next/dynamic`
@@ -517,6 +534,7 @@ Visible on keyboard focus for screen reader users.
 ### Current Migrations (Completed)
 
 #### 1. ContentPreviewPanel
+
 ```diff
 - import { ServerRenderedMarkdown } from '@/components/markdown';
 + import { MarkdownRendererClient } from '@/components/markdown';
@@ -528,6 +546,7 @@ Visible on keyboard focus for screen reader users.
 **Rationale**: Admin preview panels fetch data client-side, so `MarkdownRendererClient` is appropriate despite reduced features.
 
 #### 2. LessonContentView
+
 ```diff
 - import { ServerRenderedMarkdown } from '@/components/markdown';
 + import { MarkdownRendererClient } from '@/components/markdown';
@@ -539,6 +558,7 @@ Visible on keyboard focus for screen reader users.
 **Rationale**: Same as ContentPreviewPanel - client-side context requires client renderer.
 
 #### 3. Lesson Pages (Already Completed)
+
 ```tsx
 // packages/web/app/lesson/[id]/page.tsx
 import { MarkdownRenderer } from '@/components/markdown';

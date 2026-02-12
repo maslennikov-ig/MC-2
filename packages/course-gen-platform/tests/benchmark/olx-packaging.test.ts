@@ -12,7 +12,11 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { packageOLX, calculatePackageSize, formatBytes } from '@/integrations/lms/openedx/olx/packager';
+import {
+  packageOLX,
+  calculatePackageSize,
+  formatBytes,
+} from '@/integrations/lms/openedx/olx/packager';
 import type { OLXStructure, CourseKey } from '@/integrations/lms/openedx/olx/types';
 import type { OlxCourseMeta } from '@megacampus/shared-types/lms';
 
@@ -314,7 +318,9 @@ describe('OLX Packaging Benchmark - 5MB Package', () => {
     const compressedSizeMB = result.size / (1024 * 1024);
     const compressionRatio = estimatedSize / result.size;
 
-    console.log(`\n✓ Packaging Performance (${formatBytes(estimatedSize)} → ${formatBytes(result.size)}):`);
+    console.log(
+      `\n✓ Packaging Performance (${formatBytes(estimatedSize)} → ${formatBytes(result.size)}):`
+    );
     console.log(`  Duration: ${duration}ms`);
     console.log(`  Compressed size: ${formatBytes(result.size)}`);
     console.log(`  Compression ratio: ${compressionRatio.toFixed(2)}x`);
@@ -340,7 +346,9 @@ describe('OLX Packaging Benchmark - 5MB Package', () => {
     console.log(`  Uncompressed: ${formatBytes(uncompressedSize)}`);
     console.log(`  Compressed: ${formatBytes(result.size)}`);
     console.log(`  Ratio: ${compressionRatio.toFixed(2)}x`);
-    console.log(`  Space saved: ${formatBytes(uncompressedSize - result.size)} (${((1 - result.size / uncompressedSize) * 100).toFixed(1)}%)`);
+    console.log(
+      `  Space saved: ${formatBytes(uncompressedSize - result.size)} (${((1 - result.size / uncompressedSize) * 100).toFixed(1)}%)`
+    );
   });
 
   it('should verify all files are packaged correctly', async () => {
@@ -438,8 +446,7 @@ describe('OLX Packaging Scalability', () => {
 
     // Calculate average
     const avg = durations.reduce((sum, d) => sum + d, 0) / durations.length;
-    const variance =
-      durations.reduce((sum, d) => sum + Math.pow(d - avg, 2), 0) / durations.length;
+    const variance = durations.reduce((sum, d) => sum + Math.pow(d - avg, 2), 0) / durations.length;
     const stdDev = Math.sqrt(variance);
 
     console.log(`\n✓ Performance Consistency (3 runs):`);
@@ -483,7 +490,9 @@ describe('OLX Packaging - Compression Level Testing', () => {
 
     console.log(`\n✓ Archive Format Validation:`);
     console.log(`  Format: tar.gz`);
-    console.log(`  Magic bytes: 0x${result.buffer[0].toString(16)} 0x${result.buffer[1].toString(16)}`);
+    console.log(
+      `  Magic bytes: 0x${result.buffer[0].toString(16)} 0x${result.buffer[1].toString(16)}`
+    );
     console.log(`  Size: ${formatBytes(result.size)}`);
   });
 });

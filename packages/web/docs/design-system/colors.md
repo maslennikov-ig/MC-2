@@ -13,26 +13,26 @@ Our color system follows these best practices:
 
 ### Text Colors
 
-| Class | Light Theme | Dark Theme | Usage |
-|-------|-------------|------------|--------|
-| `text-foreground` | `hsl(0 0% 3.9%)` | `hsl(210 40% 98%)` | Primary text, headings |
-| `text-muted-foreground` | `hsl(0 0% 40%)` | `hsl(215 16% 47%)` | Secondary text, descriptions |
-| `text-card-foreground` | `hsl(0 0% 3.9%)` | `hsl(210 40% 98%)` | Text on card backgrounds |
+| Class                   | Light Theme      | Dark Theme         | Usage                        |
+| ----------------------- | ---------------- | ------------------ | ---------------------------- |
+| `text-foreground`       | `hsl(0 0% 3.9%)` | `hsl(210 40% 98%)` | Primary text, headings       |
+| `text-muted-foreground` | `hsl(0 0% 40%)`  | `hsl(215 16% 47%)` | Secondary text, descriptions |
+| `text-card-foreground`  | `hsl(0 0% 3.9%)` | `hsl(210 40% 98%)` | Text on card backgrounds     |
 
 ### Background Colors
 
-| Class | Light Theme | Dark Theme | Usage |
-|-------|-------------|------------|--------|
-| `bg-background` | `hsl(0 0% 100%)` | `hsl(222 47% 11%)` | Main page background |
-| `bg-card` | `hsl(0 0% 100%)` | `hsl(217 33% 19%)` | Card backgrounds |
-| `bg-muted` | `hsl(0 0% 96.1%)` | `hsl(217 33% 17%)` | Subtle backgrounds |
+| Class           | Light Theme       | Dark Theme         | Usage                |
+| --------------- | ----------------- | ------------------ | -------------------- |
+| `bg-background` | `hsl(0 0% 100%)`  | `hsl(222 47% 11%)` | Main page background |
+| `bg-card`       | `hsl(0 0% 100%)`  | `hsl(217 33% 19%)` | Card backgrounds     |
+| `bg-muted`      | `hsl(0 0% 96.1%)` | `hsl(217 33% 17%)` | Subtle backgrounds   |
 
 ### Interactive Colors
 
-| Class | Light Theme | Dark Theme | Usage |
-|-------|-------------|------------|--------|
-| `text-primary` | `hsl(259 100% 65%)` | `hsl(259 100% 65%)` | Links, CTAs, active states |
-| `text-destructive` | `hsl(0 84.2% 60.2%)` | `hsl(0 62.8% 30.6%)` | Errors, delete actions |
+| Class              | Light Theme          | Dark Theme           | Usage                      |
+| ------------------ | -------------------- | -------------------- | -------------------------- |
+| `text-primary`     | `hsl(259 100% 65%)`  | `hsl(259 100% 65%)`  | Links, CTAs, active states |
+| `text-destructive` | `hsl(0 84.2% 60.2%)` | `hsl(0 62.8% 30.6%)` | Errors, delete actions     |
 
 ## Usage Guidelines
 
@@ -82,10 +82,10 @@ If you find components using hardcoded colors:
 
 ```tsx
 // Old approach
-className="text-gray-600 dark:text-gray-400"
+className = 'text-gray-600 dark:text-gray-400'
 
 // New approach
-className="text-muted-foreground"
+className = 'text-muted-foreground'
 ```
 
 This ensures consistent theming and easier maintenance.

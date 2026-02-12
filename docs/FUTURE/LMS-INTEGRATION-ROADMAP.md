@@ -32,6 +32,7 @@ LMS systems can call MegaCampusAI API using standard HTTP POST requests:
 ```
 
 **Key Points**:
+
 - tRPC endpoints are **standard HTTP POST** - no TypeScript required
 - Any language can call: PHP, Ruby, Python, Java, Go, etc.
 - Authentication: JWT Bearer tokens (Supabase Auth)
@@ -437,7 +438,7 @@ app.post('/api/v1/courses/:id/generate', authenticateJWT, async (req, res) => {
   try {
     const result = await trpc.generation.initiate.mutate({
       courseId: req.params.id,
-      webhookUrl: req.body.webhookUrl
+      webhookUrl: req.body.webhookUrl,
     });
     res.json(result);
   } catch (error) {
@@ -454,11 +455,13 @@ export default app;
 ```
 
 **Benefits**:
+
 - RESTful paths: `GET /api/v1/jobs/123` instead of `POST /trpc/jobs.getStatus`
 - OpenAPI/Swagger documentation auto-generation
 - Follows REST conventions (GET/POST/PUT/DELETE)
 
 **Overhead**:
+
 - ~100 lines of proxy code
 - Additional testing surface
 - Dual API maintenance (tRPC + REST)
@@ -472,11 +475,12 @@ export default app;
 ### For LMS Systems
 
 1. **User authenticates with Supabase**:
+
    ```javascript
    // LMS backend obtains JWT for service account
    const { data, error } = await supabase.auth.signInWithPassword({
      email: 'lms-service@example.com',
-     password: 'service-account-password'
+     password: 'service-account-password',
    });
 
    const jwt_token = data.session.access_token;
@@ -508,6 +512,7 @@ LMS systems can provide webhook URLs to receive async updates:
 ```
 
 **Webhook Payload** (sent when job completes):
+
 ```json
 {
   "event": "course_generation_completed",
@@ -523,6 +528,7 @@ LMS systems can provide webhook URLs to receive async updates:
 ```
 
 **LMS Webhook Handler** (PHP example):
+
 ```php
 <?php
 // Moodle webhook handler
@@ -552,44 +558,48 @@ function handle_megacampus_webhook() {
 
 ### Available Now (Stage 1)
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/trpc/generation.test` | POST | Health check (public, no auth) |
-| `/trpc/generation.initiate` | POST | Start course generation |
-| `/trpc/generation.uploadFile` | POST | Upload file for generation |
-| `/trpc/jobs.getStatus` | POST | Get job status |
-| `/trpc/jobs.cancel` | POST | Cancel running job |
-| `/trpc/jobs.list` | POST | List user's jobs |
+| Endpoint                      | Method | Purpose                        |
+| ----------------------------- | ------ | ------------------------------ |
+| `/trpc/generation.test`       | POST   | Health check (public, no auth) |
+| `/trpc/generation.initiate`   | POST   | Start course generation        |
+| `/trpc/generation.uploadFile` | POST   | Upload file for generation     |
+| `/trpc/jobs.getStatus`        | POST   | Get job status                 |
+| `/trpc/jobs.cancel`           | POST   | Cancel running job             |
+| `/trpc/jobs.list`             | POST   | List user's jobs               |
 
 ### Future (Stage N - Optional)
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `GET /api/v1/jobs/:id` | GET | Get job status (REST) |
-| `POST /api/v1/courses/:id/generate` | POST | Start generation (REST) |
-| `DELETE /api/v1/jobs/:id` | DELETE | Cancel job (REST) |
-| `GET /api/v1/courses/:id/content` | GET | Fetch generated content (REST) |
+| Endpoint                            | Method | Purpose                        |
+| ----------------------------------- | ------ | ------------------------------ |
+| `GET /api/v1/jobs/:id`              | GET    | Get job status (REST)          |
+| `POST /api/v1/courses/:id/generate` | POST   | Start generation (REST)        |
+| `DELETE /api/v1/jobs/:id`           | DELETE | Cancel job (REST)              |
+| `GET /api/v1/courses/:id/content`   | GET    | Fetch generated content (REST) |
 
 ---
 
 ## Migration Timeline
 
 ### Stage 1 (Current) - tRPC API
+
 - ✅ LMS systems call tRPC via HTTP POST
 - ✅ Documentation with PHP/Python/Ruby examples
 - ✅ Works immediately, no implementation needed
 
 ### Stage 2 (After first LMS partner)
+
 - Gather feedback on API usability
 - Document common integration patterns
 - Create official PHP/Python SDK if demand exists
 
 ### Stage 3 (If REST requested)
+
 - Implement thin REST wrapper over tRPC
 - Generate OpenAPI specification
 - Auto-generate client SDKs for multiple languages
 
 ### Stage 4 (Advanced integrations)
+
 - GraphQL endpoint (if requested)
 - WebSocket support for real-time progress
 - Batch operations API
@@ -621,6 +631,7 @@ A: Not yet. Stage 2 will create SDKs based on demand. Examples above are referen
 ## Contact
 
 For LMS integration support:
+
 - Email: integrations@megacampus.ai
 - Docs: https://docs.megacampus.ai/lms-integration
 - GitHub: https://github.com/megacampus/api-examples

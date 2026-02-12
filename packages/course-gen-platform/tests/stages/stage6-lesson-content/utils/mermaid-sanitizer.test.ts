@@ -12,9 +12,7 @@ import {
   hasBrokenMermaidSyntax,
   countMermaidBlocks,
 } from '../../../../src/stages/stage6-lesson-content/utils/mermaid-sanitizer.js';
-import {
-  checkMermaidSyntax,
-} from '../../../../src/stages/stage6-lesson-content/judge/heuristic-filter.js';
+import { checkMermaidSyntax } from '../../../../src/stages/stage6-lesson-content/judge/heuristic-filter.js';
 
 // ============================================================================
 // sanitizeMermaidBlocks Tests

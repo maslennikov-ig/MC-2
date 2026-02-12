@@ -8,6 +8,7 @@
 Stage 4 (Analyze) processes course materials (topic, documents, requirements) and generates a comprehensive English-language analysis prompt for Stage 5 (Generation). The system synthesizes user input, document summaries from Stage 3, and LLM knowledge to create structured generation requirements. Key features include multi-phase multi-model orchestration (cheap models for simple tasks, expensive models for expert analysis), research flag detection for time-sensitive content, and Stage 3 barrier enforcement (100% document processing completion required).
 
 **Technical Approach**:
+
 - Multi-phase analysis with per-phase model selection (20B for classification/scope, 120B for deep expert analysis, adaptive for document synthesis)
 - **LangChain + LangGraph** for multi-phase orchestration (StateGraph with conditional routing)
 - **OpenRouter integration** via ChatOpenAI with custom baseURL
@@ -20,6 +21,7 @@ Stage 4 (Analyze) processes course materials (topic, documents, requirements) an
 
 **Language/Version**: TypeScript 5.x + Node.js 20+
 **Primary Dependencies**:
+
 - **@langchain/core v0.3+** - LangChain TypeScript framework
 - **@langchain/openai** - ChatOpenAI wrapper for OpenRouter
 - **@langchain/langgraph** - StateGraph for workflow orchestration
@@ -32,6 +34,7 @@ Stage 4 (Analyze) processes course materials (topic, documents, requirements) an
 **Architectural Decision**: [ADR-001](../../docs/ADR-001-LLM-ORCHESTRATION-FRAMEWORK.md) - LangChain selected after evaluating 11 frameworks (scored 8.4/10)
 
 **Storage**:
+
 - PostgreSQL (courses, file_catalog, llm_model_config tables)
 - Analysis output stored in JSONB fields (courses.analysis_result)
 - Progress tracking via generation_progress JSONB
@@ -41,12 +44,14 @@ Stage 4 (Analyze) processes course materials (topic, documents, requirements) an
 **Project Type**: Monorepo (packages/course-gen-platform)
 
 **Performance Goals**:
+
 - Analysis completion: 30s-10min (quality over speed, 10min = technical timeout)
 - Minimum 10 lessons constraint enforcement (hard validation)
 - 90%+ retry resolution rate (quality gates with model escalation)
 - <5% research flag rate (conservative flagging)
 
 **Constraints**:
+
 - MUST use English for analysis output (internal processing language)
 - MUST enforce Stage 3 barrier (100% document processing completion)
 - MUST validate minimum 10 lessons (hard failure if <10)
@@ -54,6 +59,7 @@ Stage 4 (Analyze) processes course materials (topic, documents, requirements) an
 - Real-time progress updates required (6 phases, WebSocket/polling)
 
 **Scale/Scope**:
+
 - 5 analysis phases (pre-flight, classification, scope, expert, synthesis)
 - 3-tier model strategy (20B, 120B, Emergency Gemini)
 - Multi-language input (13 languages), English output
@@ -64,6 +70,7 @@ Stage 4 (Analyze) processes course materials (topic, documents, requirements) an
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### Principle I: Reliability First (PASS ✅)
+
 - ✅ **Stage 3 barrier enforcement** (100% document completion before analysis starts)
 - ✅ **Retry mechanisms** (2 attempts per phase + model escalation)
 - ✅ **Progress tracking** (6-phase progress updates via RPC)
@@ -74,6 +81,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 **Justification**: Analysis errors cascade to Stages 5-7. Stage 3 barrier prevents garbage-in-garbage-out. Quality gates ensure reliable output.
 
 ### Principle II: Atomicity & Modularity (PASS ✅)
+
 - ✅ **File size limit**: Max 200-300 lines per module
 - ✅ **Multi-phase orchestration**: 5 discrete phases with clear boundaries
 - ✅ **Service separation**: phase-1-classifier, phase-2-scope, phase-3-expert, phase-4-synthesis, phase-5-assembly
@@ -82,6 +90,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 **Justification**: Each phase = independent module. Patterns from Stage 3 proven at scale.
 
 ### Principle III: Spec-Driven Development (PASS ✅)
+
 - ✅ **Feature spec**: `specs/007-stage-4-analyze/spec.md` (complete)
 - ✅ **Implementation plan**: This file (plan.md)
 - ✅ **Research findings**: To be captured in research.md
@@ -91,6 +100,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 **Status**: Specification complete with 10 resolved clarifications (Session 2025-10-31).
 
 ### Principle IV: Incremental Testing (PASS ✅)
+
 - ✅ **Unit tests**: Phase-specific logic (classification, scope estimation, research flags)
 - ✅ **Contract tests**: tRPC endpoint validation (analysis.start, analysis.getStatus)
 - ✅ **Integration tests**: End-to-end BullMQ workflow with Stage 3 barrier validation
@@ -99,6 +109,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 **Approach**: TDD for critical paths (barrier enforcement, minimum lesson validation). Integration tests validate multi-phase orchestration.
 
 ### Principle V: Observability & Monitoring (PASS ✅)
+
 - ✅ **Structured logging**: Pino JSON logs with correlation IDs (inherited from Stage 1)
 - ✅ **Extended metrics**: Analysis duration, tokens used, model IDs, research flags count, document coverage, validation status
 - ✅ **Progress tracking**: 6-phase real-time updates via WebSocket/polling
@@ -108,6 +119,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 **Implementation**: Extended observability requirements (FR-014) include target language, research flag count, course category, document coverage percentage.
 
 ### Principle VI: Multi-Tenancy & Scalability (PASS ✅)
+
 - ✅ **Organization isolation**: Row-Level Security via JWT custom claims (inherited from Stage 1)
 - ✅ **Queue priorities**: Tier-based (FREE=1, PREMIUM=10) - inherited from Stage 1
 - ✅ **Horizontal scaling**: BullMQ worker concurrency (5 concurrent analysis jobs)
@@ -116,6 +128,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 **Status**: Multi-tenancy infrastructure complete in Stage 0-1. No additional work required.
 
 ### Principle VII: AI Model Flexibility (PASS ✅ - KEY INNOVATION)
+
 - ✅ **Multi-phase multi-model orchestration** (NEW ARCHITECTURE):
   - Phase 1 (Classification): 20B (simple task)
   - Phase 2 (Scope): 20B (mathematical)
@@ -130,6 +143,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 **Justification**: ~40-50% cost reduction vs always using 120B. Critical decisions (pedagogy, research flags) get best model from start. Extensible pattern for Stages 5-7.
 
 ### Principle VIII: Production-Ready Security (PASS ✅)
+
 - ✅ **JWT authentication**: Inherited from Stage 1
 - ✅ **RLS policies**: Organization-level isolation with JWT custom claims (50%+ faster)
 - ✅ **Role-based authorization**: Admin, Instructor, Student, SuperAdmin
@@ -141,30 +155,34 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 ### Architecture Standards (PASS ✅)
 
 **Data Storage**:
+
 - ✅ PostgreSQL courses table with analysis_result JSONB column
 - ✅ llm_model_config table for per-phase model configuration
 - ✅ file_catalog for Stage 3 barrier validation (processing_status, processed_content)
 
 **Orchestration**:
+
 - ✅ BullMQ STRUCTURE_ANALYSIS job type (inherited from Stage 0)
 - ✅ Retry logic with exponential backoff (inherited from Stage 1)
 - ✅ Progress tracking via update_course_progress RPC (inherited from Stage 1)
 
 **LLM Integration**:
+
 - ✅ Direct OpenAI SDK (inherited from Stage 3)
 - ✅ OpenRouter multi-model support (GPT OSS 20B/120B, Gemini 2.5 Flash)
 - ✅ Quality validation via Jina-v3 semantic similarity (inherited from Stage 3)
 - ✅ Token estimation (inherited from Stage 3)
 
 **Embeddings & Vector Search**:
+
 - ✅ Jina-v3 for quality validation (inherited from Stage 0)
 - ✅ NOT required for Stage 4 RAG (deferred to Stage 5 Generation)
 
 ### Violations & Justifications
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|--------------------------------------|
-| None | N/A | Constitution fully satisfied |
+| --------- | ---------- | ------------------------------------ |
+| None      | N/A        | Constitution fully satisfied         |
 
 **Summary**: Stage 4 fully complies with all constitution principles. Multi-phase multi-model orchestration aligns with Principle VII (AI Model Flexibility) and introduces production-ready cost optimization pattern for Stages 5-7.
 
@@ -268,23 +286,23 @@ List subagents available in `.claude/agents/`:
 
 **Phase 0 of /speckit.tasks will use these rules to annotate tasks with MANDATORY executor directives:**
 
-| Task Domain | Complexity | Executor | Rationale |
-|-------------|------------|----------|-----------|
-| Database migrations | All | database-architect | llm_model_config, analysis_result JSONB column |
-| RPC functions | N/A | N/A | No new RPCs (reuse update_course_progress from Stage 1) |
-| LLM integration | Multi-phase orchestration | llm-service-specialist | Per-phase model selection, OpenRouter client, token estimation |
-| Quality validation | Semantic similarity | quality-validator-specialist | Phase output validation (patterns from Stage 3) |
-| Cost tracking | Per-phase analytics | cost-calculator-specialist | Model usage, token counts per phase |
-| Type definitions | Complex schemas | typescript-types-specialist | Analysis job, result, model config types + Zod schemas |
-| Multi-phase workflow | Orchestration logic | orchestration-logic-specialist | Phase transitions, progress tracking, barrier enforcement |
-| tRPC endpoints | Analysis API | api-builder | analysis.start, analysis.getStatus, analysis.getResult |
-| BullMQ worker | STRUCTURE_ANALYSIS handler | MAIN | Worker handler follows Stage 2-3 patterns (straightforward) |
-| Phase services | Individual phase logic | MAIN | Phase-1 classifier, Phase-2 scope, Phase-3 expert, Phase-4 synthesis, Phase-5 assembly |
-| Research flag detection | Conservative logic | MAIN | Simple rule-based detection (conservatism = avoid false positives) |
-| Contextual language | Category adaptation | MAIN | Template-based adaptation for 6 categories |
-| Model selector | Per-phase selection | MAIN | Simple lookup logic with fallback |
-| Integration tests | E2E validation | integration-tester | Stage 3 barrier, multi-phase workflow, minimum lesson constraint |
-| Code review | Final validation | code-reviewer | Constitution compliance, quality gates |
+| Task Domain             | Complexity                 | Executor                       | Rationale                                                                              |
+| ----------------------- | -------------------------- | ------------------------------ | -------------------------------------------------------------------------------------- |
+| Database migrations     | All                        | database-architect             | llm_model_config, analysis_result JSONB column                                         |
+| RPC functions           | N/A                        | N/A                            | No new RPCs (reuse update_course_progress from Stage 1)                                |
+| LLM integration         | Multi-phase orchestration  | llm-service-specialist         | Per-phase model selection, OpenRouter client, token estimation                         |
+| Quality validation      | Semantic similarity        | quality-validator-specialist   | Phase output validation (patterns from Stage 3)                                        |
+| Cost tracking           | Per-phase analytics        | cost-calculator-specialist     | Model usage, token counts per phase                                                    |
+| Type definitions        | Complex schemas            | typescript-types-specialist    | Analysis job, result, model config types + Zod schemas                                 |
+| Multi-phase workflow    | Orchestration logic        | orchestration-logic-specialist | Phase transitions, progress tracking, barrier enforcement                              |
+| tRPC endpoints          | Analysis API               | api-builder                    | analysis.start, analysis.getStatus, analysis.getResult                                 |
+| BullMQ worker           | STRUCTURE_ANALYSIS handler | MAIN                           | Worker handler follows Stage 2-3 patterns (straightforward)                            |
+| Phase services          | Individual phase logic     | MAIN                           | Phase-1 classifier, Phase-2 scope, Phase-3 expert, Phase-4 synthesis, Phase-5 assembly |
+| Research flag detection | Conservative logic         | MAIN                           | Simple rule-based detection (conservatism = avoid false positives)                     |
+| Contextual language     | Category adaptation        | MAIN                           | Template-based adaptation for 6 categories                                             |
+| Model selector          | Per-phase selection        | MAIN                           | Simple lookup logic with fallback                                                      |
+| Integration tests       | E2E validation             | integration-tester             | Stage 3 barrier, multi-phase workflow, minimum lesson constraint                       |
+| Code review             | Final validation           | code-reviewer                  | Constitution compliance, quality gates                                                 |
 
 ### Parallelization Strategy
 

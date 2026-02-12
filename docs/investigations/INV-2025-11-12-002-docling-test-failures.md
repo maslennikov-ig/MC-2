@@ -14,6 +14,7 @@ investigation_type: test-failure
 **Problem**: 87 tests failing, including Docling-related tests that should be skipped when server is unavailable.
 
 **Root Causes Identified**:
+
 1. **PRIMARY**: Git worktree path not mounted in Docker - test runs from `/home/me/code/megacampus2-worktrees/generation-json` but Docker only mounts `/home/me/code/megacampus2`
 2. **SECONDARY**: `isDoclingServerAvailable()` returns `true` because server responds to HTTP (even though file access will fail)
 3. **TERTIARY**: Error code mapping incorrectly returns `PROCESSING_ERROR` instead of `FILE_NOT_FOUND` for ENOENT errors
@@ -116,6 +117,7 @@ pnpm test tests/shared/docling/client.test.ts
 **Key Findings from Code Analysis**:
 
 From `tests/shared/docling/client.test.ts:21-34`:
+
 ```typescript
 async function isDoclingServerAvailable(): Promise<boolean> {
   try {
@@ -136,6 +138,7 @@ async function isDoclingServerAvailable(): Promise<boolean> {
 **Problem**: This function checks **connection success**, not **file access capability**. Server responds with HTTP 200 + MCP protocol errors, so connection succeeds → `serverAvailable = true`.
 
 From `docker-compose.yml:30-34`:
+
 ```yaml
 volumes:
   # Mount project directory for file access
@@ -147,16 +150,13 @@ volumes:
 **Problem**: Only main worktree mounted, not worktree directories.
 
 From `src/shared/docling/client.ts:402-410`:
+
 ```typescript
 // Map common errors to DoclingErrorCode
 const errorMessage = error instanceof Error ? error.message : String(error);
 
 if (errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
-  throw new DoclingError(
-    DoclingErrorCode.FILE_NOT_FOUND,
-    'Document file not found',
-    error
-  );
+  throw new DoclingError(DoclingErrorCode.FILE_NOT_FOUND, 'Document file not found', error);
 }
 ```
 
@@ -169,6 +169,7 @@ if (errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
 ### Primary Root Cause: Docker Volume Mount Mismatch
 
 **Evidence**:
+
 1. Test runs from worktree: `/home/me/code/megacampus2-worktrees/generation-json`
 2. Docker mounts only: `/home/me/code/megacampus2`
 3. Test resolves file path to: `/home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform/tests/integration/fixtures/common/2510.13928v1.pdf`
@@ -176,6 +177,7 @@ if (errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
 5. Docling MCP returns: `[Errno 2] No such file or directory`
 
 **Mechanism of Failure**:
+
 ```
 Test File Path Resolution:
 ┌────────────────────────────────────────────────────────────────┐
@@ -207,6 +209,7 @@ Test File Path Resolution:
 ### Secondary Root Cause: Skip Logic Detection
 
 **Evidence**:
+
 1. `isDoclingServerAvailable()` calls `client.connect()`
 2. Server responds with HTTP 200 + MCP error message
 3. Connection succeeds → returns `true`
@@ -214,6 +217,7 @@ Test File Path Resolution:
 
 **Mechanism of Failure**:
 The skip logic checks if the server is **reachable**, not if it can **access test files**. A proper check would:
+
 - Test a known file conversion
 - Verify tool availability
 - Check specific error codes
@@ -222,6 +226,7 @@ The skip logic checks if the server is **reachable**, not if it can **access tes
 
 **Evidence**:
 From test output:
+
 ```json
 {
   "level": 50,
@@ -233,6 +238,7 @@ Expected error code: `FILE_NOT_FOUND`
 Actual error code: `PROCESSING_ERROR`
 
 **Mechanism of Failure**:
+
 1. Docling MCP returns error text starting with "Error"
 2. `parseToolResponse()` (line 250-256) catches this **first**
 3. Throws `DoclingError` with `PROCESSING_ERROR` code
@@ -256,11 +262,13 @@ Actual error code: `PROCESSING_ERROR`
 **Implementation Steps**:
 
 1. **Detect active worktrees dynamically**:
+
    ```bash
    git worktree list --porcelain | grep 'worktree ' | awk '{print $2}'
    ```
 
 2. **Update docker-compose.yml**:
+
    ```yaml
    volumes:
      # Mount main project directory
@@ -273,6 +281,7 @@ Actual error code: `PROCESSING_ERROR`
    ```
 
 3. **Restart Docker container**:
+
    ```bash
    docker compose restart docling-mcp
    ```
@@ -283,12 +292,14 @@ Actual error code: `PROCESSING_ERROR`
    ```
 
 **Pros**:
+
 - ✅ Fixes file access for ALL worktrees
 - ✅ No code changes required
 - ✅ Maintains separation of concerns (tests don't need to know about Docker)
 - ✅ Works for all future worktrees (once pattern established)
 
 **Cons**:
+
 - ⚠️ Requires Docker restart
 - ⚠️ Manual step when creating new worktrees
 - ⚠️ Could automate with script, but adds complexity
@@ -306,12 +317,14 @@ Actual error code: `PROCESSING_ERROR`
 **Implementation Steps**:
 
 1. **Create test fixture in mounted directory**:
+
    ```bash
    mkdir -p /home/me/code/megacampus2/.tmp/test-fixtures
    cp tests/integration/fixtures/common/2510.13928v1.pdf /home/me/code/megacampus2/.tmp/test-fixtures/
    ```
 
 2. **Update `isDoclingServerAvailable()` function**:
+
    ```typescript
    async function isDoclingServerAvailable(): Promise<boolean> {
      try {
@@ -325,7 +338,9 @@ Actual error code: `PROCESSING_ERROR`
 
        // Try to list tools to verify MCP protocol works
        const tools = await client.listTools();
-       const hasConvertTool = tools.some((t: any) => t.name === 'convert_document_into_docling_document');
+       const hasConvertTool = tools.some(
+         (t: any) => t.name === 'convert_document_into_docling_document'
+       );
 
        await client.disconnect();
        return hasConvertTool;
@@ -336,6 +351,7 @@ Actual error code: `PROCESSING_ERROR`
    ```
 
 3. **Add `.skipIf()` to manual test**:
+
    ```typescript
    // At top of file
    const serverAvailable = await isDoclingServerAvailable();
@@ -348,11 +364,13 @@ Actual error code: `PROCESSING_ERROR`
    ```
 
 **Pros**:
+
 - ✅ Tests auto-skip when server unavailable
 - ✅ Improves test reliability
 - ✅ Better error messages (skipped vs failed)
 
 **Cons**:
+
 - ❌ Doesn't fix root cause (file access still broken)
 - ⚠️ Tests silently skip in worktrees (could hide issues)
 - ⚠️ Still requires Approach 1 for tests to pass
@@ -370,6 +388,7 @@ Actual error code: `PROCESSING_ERROR`
 **Implementation Steps**:
 
 1. **Update `parseToolResponse()` method in `src/shared/docling/client.ts`**:
+
    ```typescript
    private parseToolResponse<T>(text: string, toolName: string): T {
      // Check if response is a plain text error
@@ -407,11 +426,13 @@ Actual error code: `PROCESSING_ERROR`
    ```
 
 **Pros**:
+
 - ✅ Correct error codes for better error handling
 - ✅ Test assertions pass (expected FILE_NOT_FOUND)
 - ✅ Improves production error handling
 
 **Cons**:
+
 - ❌ Doesn't fix root cause (file access still broken)
 - ⚠️ Tests still fail (just with correct error code)
 - ⚠️ String matching is brittle (Docling error format could change)
@@ -429,11 +450,13 @@ Actual error code: `PROCESSING_ERROR`
 **Implementation Steps**:
 
 1. **Create symlink directory**:
+
    ```bash
    mkdir -p /home/me/code/megacampus2/.tmp/test-symlinks
    ```
 
 2. **Link worktree fixtures**:
+
    ```bash
    ln -s /home/me/code/megacampus2-worktrees/generation-json/packages/course-gen-platform/tests/integration/fixtures \
          /home/me/code/megacampus2/.tmp/test-symlinks/fixtures
@@ -445,11 +468,13 @@ Actual error code: `PROCESSING_ERROR`
    ```
 
 **Pros**:
+
 - ✅ No Docker restart required
 - ✅ Works immediately
 - ✅ Easy to implement
 
 **Cons**:
+
 - ❌ Tests become environment-dependent
 - ❌ Symlinks can break (git operations, file moves)
 - ❌ Hard to maintain across multiple worktrees
@@ -468,16 +493,19 @@ Actual error code: `PROCESSING_ERROR`
 **Priority**: High (tests failing in CI/local development)
 
 **Files to Modify**:
+
 1. `docker-compose.yml` - add worktree volume mounts
 2. `src/shared/docling/client.ts` - fix error code detection
 3. `tests/manual/docling-pdf-direct.test.ts` - add `.skipIf()` guard
 
 **Implementation Order**:
+
 1. **First**: Apply Approach 1 (Docker mounts) - immediate fix
 2. **Second**: Apply Approach 3 (error mapping) - correct error handling
 3. **Third**: Add skip guard to manual test - prevent future issues
 
 **Validation Criteria**:
+
 ```bash
 # 1. Verify Docker mounts
 docker inspect docling-mcp-server --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}' | grep worktrees
@@ -504,6 +532,7 @@ pnpm test tests/shared/docling/client.test.ts -t "should handle file not found e
 ```
 
 **Testing Requirements**:
+
 - Unit tests: No new tests needed
 - Integration tests: Existing tests should pass after fix
 - Manual verification: Run manual Docling test in worktree
@@ -547,6 +576,7 @@ None - changes are backward compatible
 ### Tier 0: Project Internal Documentation
 
 **From `docker-compose.yml:20-38`**:
+
 ```yaml
 # Docling MCP Server for document processing (PDF, DOCX, PPTX)
 # Used by document-processing worker for text extraction
@@ -555,7 +585,7 @@ docling-mcp:
   container_name: docling-mcp-server
   restart: unless-stopped
   ports:
-    - "127.0.0.1:8000:8000"
+    - '127.0.0.1:8000:8000'
   environment:
     - PORT=8000
   volumes:
@@ -570,6 +600,7 @@ docling-mcp:
 **Key Insight**: Comments explicitly state "Mount project directory for file access" but only main repository mounted, not worktrees.
 
 **From `tests/shared/docling/client.test.ts:1-15`**:
+
 ```typescript
 /**
  * Unit and Integration tests for Docling MCP Client
@@ -591,6 +622,7 @@ docling-mcp:
 **Key Insight**: Test file clearly documents skip logic intent but `isDoclingServerAvailable()` implementation doesn't match.
 
 **From git history**:
+
 ```bash
 git log --all --grep="worktree" --oneline | head -5
 # (No recent commits about worktree + Docker)
@@ -609,16 +641,19 @@ Not applicable - issue is Docker/testing infrastructure, not framework-specific.
 ### Tier 2: Official Documentation
 
 **Docker Compose Volume Mounts**:
+
 - Reference: https://docs.docker.com/compose/compose-file/07-volumes/
 - Key concept: Bind mounts must specify both source (host) and target (container)
 - Read-only flag (`:ro`) prevents container from modifying host files
 
 **Git Worktrees**:
+
 - Reference: https://git-scm.com/docs/git-worktree
 - Key concept: Worktrees are separate working directories, can be in different paths
 - List with: `git worktree list`
 
 **Vitest Skip Conditions**:
+
 - Reference: https://vitest.dev/api/#test-skip
 - `.skipIf(condition)` - skip test if condition is true
 - Condition evaluated at test collection time (before test runs)
@@ -656,6 +691,7 @@ Not applicable - issue is Docker/testing infrastructure, not framework-specific.
 ### Follow-up Recommendations
 
 1. **Create automated worktree mount script** (nice-to-have)
+
    ```bash
    #!/bin/bash
    # scripts/update-docker-mounts.sh

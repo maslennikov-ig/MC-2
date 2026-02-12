@@ -5,7 +5,11 @@
   "target_audience": "Career changers with zero coding background, analysts who automate Excel reports, STEM undergrads needing Python for labs, and hobbyists who want to build simple automation scripts.",
   "estimated_duration_hours": 24,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Ability to install software", "High-school algebra"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software",
+    "High-school algebra"
+  ],
   "learning_outcomes": [
     "Define and explain Python 3 core data types and operators with 90% accuracy on quizzes",
     "Build command-line programs that accept user input and produce formatted output validated by unit tests",
@@ -13,5 +17,13 @@
     "Analyze runtime errors using tracebacks and implement try/except blocks to handle exceptions gracefully",
     "Design scripts that read, process, and write local CSV and JSON files to automate repetitive tasks"
   ],
-  "course_tags": ["Python", "CLI", "automation", "beginner", "data cleaning", "REST API", "portfolio project"]
+  "course_tags": [
+    "Python",
+    "CLI",
+    "automation",
+    "beginner",
+    "data cleaning",
+    "REST API",
+    "portfolio project"
+  ]
 }

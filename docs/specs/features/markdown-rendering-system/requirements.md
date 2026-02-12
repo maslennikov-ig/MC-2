@@ -9,6 +9,7 @@
 ### 1.1 Цель
 
 Создать унифицированную систему рендеринга Markdown/MDX для образовательной платформы MegaCampusAI с поддержкой:
+
 - Математических формул (LaTeX/KaTeX)
 - Диаграмм (Mermaid)
 - Подсветки кода (Shiki, VS Code качество)
@@ -77,6 +78,7 @@
 ```
 
 **Примечание:** Используем ДВА рендерера:
+
 - `next-mdx-remote` — для статического контента (RSC)
 - `react-markdown` — для streaming AI контента (Client)
 
@@ -109,30 +111,33 @@
 
 // Remark plugins (markdown AST)
 const remarkPlugins = [
-  remarkGfm,           // GitHub Flavored Markdown (tables, strikethrough)
-  remarkMath,          // Parse $...$ and $$...$$
-  remarkEmoji,         // Emoji shortcodes (:smile: → 😄)
+  remarkGfm, // GitHub Flavored Markdown (tables, strikethrough)
+  remarkMath, // Parse $...$ and $$...$$
+  remarkEmoji, // Emoji shortcodes (:smile: → 😄)
 ];
 
 // Rehype plugins for TRUSTED content (AI-generated lessons)
 const rehypePluginsTrusted = [
-  rehypeSlug,          // Add IDs to headings
+  rehypeSlug, // Add IDs to headings
   [rehypeAutolinkHeadings, { behavior: 'wrap' }], // Anchor links
-  [rehypeKatex, { output: 'htmlAndMathml' }],     // Math with accessibility
-  [rehypePrettyCode, {
-    theme: {
-      light: 'github-light',
-      dark: 'github-dark'
+  [rehypeKatex, { output: 'htmlAndMathml' }], // Math with accessibility
+  [
+    rehypePrettyCode,
+    {
+      theme: {
+        light: 'github-light',
+        dark: 'github-dark',
+      },
+      keepBackground: false,
+      defaultLang: 'plaintext',
     },
-    keepBackground: false,
-    defaultLang: 'plaintext',
-  }],
+  ],
 ];
 
 // Rehype plugins for UNTRUSTED content (user comments)
 // ВАЖНО: rehype-sanitize ДОЛЖЕН быть ПЕРВЫМ!
 const rehypePluginsUntrusted = [
-  [rehypeSanitize, sanitizeSchema],  // MUST BE FIRST for security
+  [rehypeSanitize, sanitizeSchema], // MUST BE FIRST for security
   rehypeSlug,
   [rehypeKatex, { output: 'htmlAndMathml' }],
   // НЕ используем rehype-pretty-code для UGC (performance + security)
@@ -225,7 +230,7 @@ export const presets = {
 
   preview: {
     math: true,
-    mermaid: false,  // Too heavy for preview
+    mermaid: false, // Too heavy for preview
     codeHighlight: true,
     copyButton: true,
     anchorLinks: false,
@@ -260,7 +265,7 @@ interface CodeBlockProps {
   language?: string;
   filename?: string;
   showLineNumbers?: boolean;
-  highlightLines?: number[];  // e.g., [1, 3, 5]
+  highlightLines?: number[]; // e.g., [1, 3, 5]
 }
 
 // Features:
@@ -273,6 +278,7 @@ interface CodeBlockProps {
 ```
 
 **Visual Reference:**
+
 ```
 ┌─ example.ts ──────────────────────────── [Copy] ─┐
 │  1 │ function greet(name: string) {              │
@@ -315,7 +321,7 @@ interface CalloutProps {
 'use client';
 
 interface MermaidDiagramProps {
-  chart: string;  // Mermaid syntax
+  chart: string; // Mermaid syntax
   className?: string;
 }
 
@@ -328,6 +334,7 @@ interface MermaidDiagramProps {
 ```
 
 **Loading Strategy:**
+
 ```typescript
 const Mermaid = dynamic(() => import('./MermaidCore'), {
   ssr: false,
@@ -467,25 +474,26 @@ const codeTheme = {
 
 #### Primary Markdown Rendering (react-markdown usage)
 
-| Current File | Action | Target Preset | Notes |
-|--------------|--------|---------------|-------|
-| `components/common/lesson-content.tsx` | Replace with MarkdownRenderer | `lesson` | Full feature set, student-facing |
-| `components/generation-graph/panels/output/LessonContentView.tsx` | Replace with MarkdownRenderer | `preview` | Compact preview |
-| `components/generation-graph/panels/lesson/ContentPreviewPanel.tsx` | Replace with MarkdownRenderer | `preview` | Content approval UI |
-| `components/generation-graph/panels/RefinementChat.tsx` | Replace with MarkdownRendererClient | `chat` | Streaming AI content |
+| Current File                                                        | Action                              | Target Preset | Notes                            |
+| ------------------------------------------------------------------- | ----------------------------------- | ------------- | -------------------------------- |
+| `components/common/lesson-content.tsx`                              | Replace with MarkdownRenderer       | `lesson`      | Full feature set, student-facing |
+| `components/generation-graph/panels/output/LessonContentView.tsx`   | Replace with MarkdownRenderer       | `preview`     | Compact preview                  |
+| `components/generation-graph/panels/lesson/ContentPreviewPanel.tsx` | Replace with MarkdownRenderer       | `preview`     | Content approval UI              |
+| `components/generation-graph/panels/RefinementChat.tsx`             | Replace with MarkdownRendererClient | `chat`        | Streaming AI content             |
 
 #### Related Styling to Unify
 
-| File | Current Pattern | Action |
-|------|-----------------|--------|
-| `components/course/course-viewer-enhanced.tsx` | Wraps LessonContent with `prose prose-lg prose-purple` | Remove wrapper, MarkdownRenderer handles styling |
-| `app/about/page.tsx` | `prose prose-invert` | Review - may need MarkdownRenderer if content is dynamic |
-| `components/generation-graph/panels/shared/JsonViewer.tsx` | Custom syntax highlighting | Keep separate (JSON, not Markdown) |
-| `components/generation-graph/components/trace-viewer.tsx` | `CodeBlock` component | Extract and reuse in MarkdownRenderer's CodeBlock |
+| File                                                       | Current Pattern                                        | Action                                                   |
+| ---------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------- |
+| `components/course/course-viewer-enhanced.tsx`             | Wraps LessonContent with `prose prose-lg prose-purple` | Remove wrapper, MarkdownRenderer handles styling         |
+| `app/about/page.tsx`                                       | `prose prose-invert`                                   | Review - may need MarkdownRenderer if content is dynamic |
+| `components/generation-graph/panels/shared/JsonViewer.tsx` | Custom syntax highlighting                             | Keep separate (JSON, not Markdown)                       |
+| `components/generation-graph/components/trace-viewer.tsx`  | `CodeBlock` component                                  | Extract and reuse in MarkdownRenderer's CodeBlock        |
 
 #### Patterns to Consolidate
 
 **Prose class variations found:**
+
 1. `prose prose-slate dark:prose-invert max-w-none prose-lg` + 20+ modifiers (ContentPreviewPanel)
 2. `prose prose-sm dark:prose-invert max-w-none` + arbitrary selectors (LessonContentView)
 3. `prose prose-lg dark:prose-invert max-w-none prose-purple` (course-viewer-enhanced)
@@ -532,10 +540,10 @@ Keep separate:
 
 ### 7.2 Решение: Два рендерера
 
-| Рендерер | Тип | Используется для |
-|----------|-----|------------------|
-| `MarkdownRenderer.tsx` | RSC (Server) | Уроки, preview, статический контент |
-| `MarkdownRendererClient.tsx` | Client | Streaming AI, чат, real-time preview |
+| Рендерер                     | Тип          | Используется для                     |
+| ---------------------------- | ------------ | ------------------------------------ |
+| `MarkdownRenderer.tsx`       | RSC (Server) | Уроки, preview, статический контент  |
+| `MarkdownRendererClient.tsx` | Client       | Streaming AI, чат, real-time preview |
 
 ### 7.3 MarkdownRendererClient Implementation
 
@@ -589,10 +597,7 @@ import { cache } from 'react';
 import { compileMDX } from 'next-mdx-remote/rsc';
 
 // Кэширование на уровне request (React)
-export const getCompiledMDX = cache(async (
-  content: string,
-  preset: PresetName
-) => {
+export const getCompiledMDX = cache(async (content: string, preset: PresetName) => {
   const config = getPresetConfig(preset);
 
   return compileMDX({
@@ -620,8 +625,8 @@ export const getCachedLesson = unstable_cache(
   },
   ['lesson-content'],
   {
-    revalidate: 3600,  // 1 hour
-    tags: ['lessons']  // For manual invalidation
+    revalidate: 3600, // 1 hour
+    tags: ['lessons'], // For manual invalidation
   }
 );
 
@@ -644,11 +649,11 @@ export async function updateLesson(id: string, content: string) {
 
 ### 9.1 Trusted vs Untrusted Content
 
-| Source | Trust Level | Sanitization |
-|--------|-------------|--------------|
-| AI-generated lessons | Trusted | None (performance) |
-| User comments | Untrusted | rehype-sanitize strict |
-| CMS content | Trusted | None |
+| Source               | Trust Level | Sanitization           |
+| -------------------- | ----------- | ---------------------- |
+| AI-generated lessons | Trusted     | None (performance)     |
+| User comments        | Untrusted   | rehype-sanitize strict |
+| CMS content          | Trusted     | None                   |
 
 ### 9.2 Sanitization Schema (for untrusted content)
 
@@ -657,11 +662,16 @@ const sanitizeSchema = {
   ...defaultSchema,
   tagNames: [
     ...defaultSchema.tagNames,
-    'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', // KaTeX MathML
+    'math',
+    'semantics',
+    'mrow',
+    'mi',
+    'mo',
+    'mn', // KaTeX MathML
   ],
   attributes: {
     ...defaultSchema.attributes,
-    code: ['className'],  // For language-* classes
+    code: ['className'], // For language-* classes
     span: ['className', 'style'], // For Shiki highlighting
   },
 };
@@ -678,10 +688,10 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval'",  // Mermaid требует eval
+      "script-src 'self' 'unsafe-eval'", // Mermaid требует eval
       "style-src 'self' 'unsafe-inline'", // KaTeX inline styles
-      "img-src 'self' data: blob:",       // Mermaid SVG
-      "font-src 'self'",                  // KaTeX fonts
+      "img-src 'self' data: blob:", // Mermaid SVG
+      "font-src 'self'", // KaTeX fonts
     ].join('; '),
   },
 ];
@@ -701,7 +711,7 @@ const securityHeaders = [
 - [ ] Callouts use `role="note"` or `role="alert"`
 - [ ] Math formulas include MathML (KaTeX `output: 'htmlAndMathml'`)
 - [ ] Mermaid diagrams have `aria-label` descriptions
-- [ ] Links indicate external (target="_blank") with icon
+- [ ] Links indicate external (target="\_blank") with icon
 - [ ] Color contrast meets WCAG AA (4.5:1 for text)
 
 ### 10.2 Keyboard Navigation
@@ -731,14 +741,14 @@ const securityHeaders = [
 
 ## 11. Performance Targets
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| Client JS (code highlight) | 0 KB | Shiki SSR |
-| Client JS (math) | 0 KB | KaTeX SSR + CSS only |
-| Client JS (mermaid) | Lazy | Only when diagram visible |
-| Client JS (copy button) | ~2 KB | Minimal client component |
-| KaTeX CSS | ~120 KB | Single load, cached |
-| LCP impact | < 100ms | No blocking resources |
+| Metric                     | Target  | Notes                     |
+| -------------------------- | ------- | ------------------------- |
+| Client JS (code highlight) | 0 KB    | Shiki SSR                 |
+| Client JS (math)           | 0 KB    | KaTeX SSR + CSS only      |
+| Client JS (mermaid)        | Lazy    | Only when diagram visible |
+| Client JS (copy button)    | ~2 KB   | Minimal client component  |
+| KaTeX CSS                  | ~120 KB | Single load, cached       |
+| LCP impact                 | < 100ms | No blocking resources     |
 
 ---
 
@@ -877,27 +887,27 @@ describe('MarkdownRenderer', () => {
 
 ### Risks
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Shiki SSR performance | Low | Medium | Use caching, pre-render |
-| Mermaid bundle size | Medium | Medium | Lazy loading |
-| Breaking existing content | Low | High | Thorough testing |
-| KaTeX font loading | Low | Low | Preload fonts |
+| Risk                      | Probability | Impact | Mitigation              |
+| ------------------------- | ----------- | ------ | ----------------------- |
+| Shiki SSR performance     | Low         | Medium | Use caching, pre-render |
+| Mermaid bundle size       | Medium      | Medium | Lazy loading            |
+| Breaking existing content | Low         | High   | Thorough testing        |
+| KaTeX font loading        | Low         | Low    | Preload fonts           |
 
 ---
 
 ## 16. Estimated Effort
 
-| Phase | Estimated Time | Complexity |
-|-------|----------------|------------|
-| Phase 1: Foundation | 4-6 hours | Medium |
-| Phase 2: Sub-Components | 6-8 hours | Medium |
-| Phase 3: Advanced Features | 4-6 hours | High |
-| Phase 4: Styling | 2-4 hours | Low |
-| Phase 5: Migration | 4-6 hours | Medium |
-| Phase 6: QA | 4-6 hours | Medium |
-| Phase 7: Documentation | 2-3 hours | Low |
-| **Total** | **26-39 hours** | **Medium** |
+| Phase                      | Estimated Time  | Complexity |
+| -------------------------- | --------------- | ---------- |
+| Phase 1: Foundation        | 4-6 hours       | Medium     |
+| Phase 2: Sub-Components    | 6-8 hours       | Medium     |
+| Phase 3: Advanced Features | 4-6 hours       | High       |
+| Phase 4: Styling           | 2-4 hours       | Low        |
+| Phase 5: Migration         | 4-6 hours       | Medium     |
+| Phase 6: QA                | 4-6 hours       | Medium     |
+| Phase 7: Documentation     | 2-3 hours       | Low        |
+| **Total**                  | **26-39 hours** | **Medium** |
 
 ---
 
@@ -907,13 +917,13 @@ describe('MarkdownRenderer', () => {
 
 Следующие backend модули **НЕ затрагиваются** этим ТЗ и остаются без изменений:
 
-| Модуль | Назначение | Причина |
-|--------|-----------|---------|
-| `markdown-parser.ts` | Парсинг LLM output в структурированные TypeScript объекты | Backend логика, не связана с rendering |
-| `markdown-converter.ts` | Конвертация Docling JSON → Markdown для RAG | Document processing pipeline |
-| `markdown-chunker.ts` | Token-aware chunking для векторного поиска | RAG embedding pipeline |
-| `xss-sanitizer.ts` | Server-side DOMPurify санитизация | Остается для backend validation |
-| `sanitize-llm-output.ts` | Санитизация LLM текста перед сохранением в БД | Backend security layer |
+| Модуль                   | Назначение                                                | Причина                                |
+| ------------------------ | --------------------------------------------------------- | -------------------------------------- |
+| `markdown-parser.ts`     | Парсинг LLM output в структурированные TypeScript объекты | Backend логика, не связана с rendering |
+| `markdown-converter.ts`  | Конвертация Docling JSON → Markdown для RAG               | Document processing pipeline           |
+| `markdown-chunker.ts`    | Token-aware chunking для векторного поиска                | RAG embedding pipeline                 |
+| `xss-sanitizer.ts`       | Server-side DOMPurify санитизация                         | Остается для backend validation        |
+| `sanitize-llm-output.ts` | Санитизация LLM текста перед сохранением в БД             | Backend security layer                 |
 
 Эти модули работают на сервере и не связаны с визуальным рендерингом Markdown в браузере.
 
@@ -923,17 +933,18 @@ describe('MarkdownRenderer', () => {
 
 ### 18.1 Recommended Values (из исследований)
 
-| Property | Value | Rationale |
-|----------|-------|-----------|
-| Body font size | 16-18px | WCAG minimum 16px |
-| Line height | 1.5-1.625 | WCAG recommends 1.5× minimum |
-| Line length | 65-75 characters | `max-width: 65ch` |
-| Paragraph spacing | 1.25-1.5em | Visual breathing room |
-| Heading letter-spacing | -0.025em | Tighter for display text |
+| Property               | Value            | Rationale                    |
+| ---------------------- | ---------------- | ---------------------------- |
+| Body font size         | 16-18px          | WCAG minimum 16px            |
+| Line height            | 1.5-1.625        | WCAG recommends 1.5× minimum |
+| Line length            | 65-75 characters | `max-width: 65ch`            |
+| Paragraph spacing      | 1.25-1.5em       | Visual breathing room        |
+| Heading letter-spacing | -0.025em         | Tighter for display text     |
 
 ### 18.2 Font Stack
 
 Текущий шрифт проекта сохраняется. Если нужна смена:
+
 - **Рекомендация из исследований:** Inter (используется в Notion, Linear)
 - **Альтернативы:** System UI stack, Geist (Vercel)
 
@@ -943,16 +954,17 @@ describe('MarkdownRenderer', () => {
 /* В Tailwind config или global CSS */
 .prose {
   --tw-prose-body: hsl(var(--foreground));
-  font-size: 1rem;        /* 16px base */
-  line-height: 1.625;     /* Optimal readability */
-  max-width: 65ch;        /* Comfortable line length */
+  font-size: 1rem; /* 16px base */
+  line-height: 1.625; /* Optimal readability */
+  max-width: 65ch; /* Comfortable line length */
 }
 
 .prose p + p {
-  margin-top: 1.25em;     /* Paragraph spacing */
+  margin-top: 1.25em; /* Paragraph spacing */
 }
 
-.prose h1, .prose h2 {
+.prose h1,
+.prose h2 {
   letter-spacing: -0.025em;
 }
 ```
@@ -964,6 +976,7 @@ describe('MarkdownRenderer', () => {
 **Recommendation: Direct Implementation без полной спецификации**
 
 **Причины:**
+
 1. Scope ограничен одной подсистемой (markdown rendering)
 2. Все библиотеки стандартные и хорошо документированы
 3. Patterns уже описаны в исследованиях

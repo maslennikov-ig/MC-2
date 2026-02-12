@@ -8,6 +8,7 @@
 ## Summary
 
 Replace the n8n Main Entry workflow with a backend code-based orchestrator that:
+
 1. **API Architecture**: tRPC-first approach with `generation.initiate` endpoint (T011-T019 logic consolidated)
 2. **Multi-Client Support**: TypeScript clients use tRPC, PHP/Ruby/Python LMS systems call via standard HTTP POST
 3. **Frontend Compatibility**: Next.js route (`/api/coursegen/generate`) is thin proxy to tRPC
@@ -18,6 +19,7 @@ Replace the n8n Main Entry workflow with a backend code-based orchestrator that:
 8. Tracks critical events in `system_metrics` table for Stage 8 monitoring
 
 **Technical Approach**:
+
 - **tRPC Router**: All business logic in `packages/course-gen-platform/src/server/routers/generation.ts` (T011-T019)
 - **Next.js Proxy**: Thin compatibility layer (<20 lines) at `courseai-next/app/api/coursegen/generate/route.ts`
 - **Fire-and-forget**: < 500ms response validates requests, checks concurrency, queues jobs, updates progress
@@ -32,6 +34,7 @@ Replace the n8n Main Entry workflow with a backend code-based orchestrator that:
 
 **Language/Version**: TypeScript 5.9.3, Node.js 20+
 **Primary Dependencies**:
+
 - **Pino 9.6.0** (structured JSON logging, NEW)
 - BullMQ 5.1.0 (job queue, existing)
 - Supabase JS 2.39.0 (database/auth, existing)
@@ -42,6 +45,7 @@ Replace the n8n Main Entry workflow with a backend code-based orchestrator that:
 **Storage**: PostgreSQL (Supabase managed) with new `system_metrics` table and `update_course_progress` RPC function
 
 **Testing**:
+
 - Unit tests: Vitest (existing)
 - Integration tests: Vitest with Supabase local
 - Contract tests: JSON schema validation
@@ -52,18 +56,21 @@ Replace the n8n Main Entry workflow with a backend code-based orchestrator that:
 **Project Type**: Web application (Next.js frontend + tRPC backend monorepo)
 
 **Performance Goals**:
+
 - Endpoint latency P95 < 500ms
 - RPC execution < 100ms
 - Concurrency check < 1ms (Redis)
 - Total orchestration overhead < 300ms
 
 **Constraints**:
+
 - Frontend compatibility required (no breaking changes to `generation_progress` JSONB structure)
 - Russian language step names (n8n parity)
 - Migration-first deployment (RPC before backend code)
 - Hardcoded limits in Stage 1 (dynamic tuning deferred to Stage 8)
 
 **Scale/Scope**:
+
 - FREE tier: 1 concurrent job, priority 1
 - BASIC tier: 2 concurrent jobs, priority 3
 - STANDARD tier: 3 concurrent jobs, priority 5
@@ -98,6 +105,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - ✅ Pino logger: Drop-in replacement (30 lines)
 
 **Modules**:
+
 - `src/shared/concurrency/tracker.ts` - Concurrency tracking
 - `src/shared/utils/retry.ts` - Retry logic
 - `app/api/coursegen/generate/route.ts` - API endpoint
@@ -252,20 +260,21 @@ Subagents available in `.claude/agents/`:
 
 **Phase 0 of /speckit.tasks will use these rules to annotate tasks with MANDATORY executor directives:**
 
-| Task Domain | Complexity | Executor | Rationale |
-|-------------|------------|----------|-----------|
-| Database migrations | All | database-architect | Specialized SQL/migration expertise required for ENUM types, JSONB operations |
-| RPC functions (update_course_progress) | All | database-architect | Complex JSONB manipulation, idempotency patterns, performance optimization |
-| API endpoint (POST /api/coursegen/generate) | Complex | api-builder | Authentication (JWT), authorization, Zod validation, error handling, Saga pattern |
-| Worker updates (step 1 recovery) | Small changes | MAIN | Minor edits to existing handler files (<50 lines) |
-| Frontend changes (Authorization header) | Simple edits | MAIN | Header additions, URL updates, error messages |
-| Utilities - Type definitions | All | MAIN | Simple TypeScript interfaces and enums |
-| Utilities - Pino logger | Simple | MAIN | Drop-in replacement, ~30 lines, documented in quickstart |
-| Utilities - Concurrency tracker | Complex | infrastructure-specialist OR MAIN | Redis Lua scripts, atomic operations (consider specialist if >150 lines) |
-| Utilities - Retry logic | Simple | MAIN | Pure function, <50 lines, well-documented pattern |
-| Polish/validation tasks | All | MAIN | Code cleanup, linting, quickstart testing, n8n parity verification |
+| Task Domain                                 | Complexity    | Executor                          | Rationale                                                                         |
+| ------------------------------------------- | ------------- | --------------------------------- | --------------------------------------------------------------------------------- |
+| Database migrations                         | All           | database-architect                | Specialized SQL/migration expertise required for ENUM types, JSONB operations     |
+| RPC functions (update_course_progress)      | All           | database-architect                | Complex JSONB manipulation, idempotency patterns, performance optimization        |
+| API endpoint (POST /api/coursegen/generate) | Complex       | api-builder                       | Authentication (JWT), authorization, Zod validation, error handling, Saga pattern |
+| Worker updates (step 1 recovery)            | Small changes | MAIN                              | Minor edits to existing handler files (<50 lines)                                 |
+| Frontend changes (Authorization header)     | Simple edits  | MAIN                              | Header additions, URL updates, error messages                                     |
+| Utilities - Type definitions                | All           | MAIN                              | Simple TypeScript interfaces and enums                                            |
+| Utilities - Pino logger                     | Simple        | MAIN                              | Drop-in replacement, ~30 lines, documented in quickstart                          |
+| Utilities - Concurrency tracker             | Complex       | infrastructure-specialist OR MAIN | Redis Lua scripts, atomic operations (consider specialist if >150 lines)          |
+| Utilities - Retry logic                     | Simple        | MAIN                              | Pure function, <50 lines, well-documented pattern                                 |
+| Polish/validation tasks                     | All           | MAIN                              | Code cleanup, linting, quickstart testing, n8n parity verification                |
 
 **Decision Heuristic**:
+
 - **Use specialist subagent** if: >200 lines, complex domain logic, external integrations, security-critical
 - **Use MAIN agent** if: <100 lines, type definitions, simple edits, validation/cleanup tasks
 
@@ -319,12 +328,14 @@ Subagents available in `.claude/agents/`:
 **Branch Name**: `002-main-entry-orchestrator` (from plan.md header)
 
 **Phase 0 Task T-000 Instructions**:
+
 1. Check if branch exists: `git branch --list 002-main-entry-orchestrator`
 2. If not exists: `git checkout -b 002-main-entry-orchestrator`
 3. If exists: `git checkout 002-main-entry-orchestrator`
 4. Verify clean: `git status` (should show "nothing to commit")
 
 **Commit Strategy**:
+
 - Small atomic commits per task or logical group
 - Phase checkpoints: Commit after each phase completion
 - Critical checkpoints: After T005 (migrations applied), after T019 (API endpoint complete)
@@ -369,6 +380,7 @@ _Fill ONLY if Constitution Check has violations that must be justified_
 **Status**: ✅ Complete
 
 **Outputs**:
+
 - [data-model.md](./data-model.md)
 - [contracts/api-endpoint.md](./contracts/api-endpoint.md)
 - [contracts/rpc-update-course-progress.md](./contracts/rpc-update-course-progress.md)
@@ -377,6 +389,7 @@ _Fill ONLY if Constitution Check has violations that must be justified_
 ### Data Model Summary
 
 **Entities**:
+
 1. **User** (existing, Supabase Auth) - `user_metadata.tier` determines limits
 2. **Course** (existing) - `generation_progress` JSONB stores progress
 3. **System Metrics** (NEW) - `system_metrics` table for critical events
@@ -384,6 +397,7 @@ _Fill ONLY if Constitution Check has violations that must be justified_
 5. **Redis Counters** (NEW) - `concurrency:user:{userId}`, `concurrency:global`
 
 **Database Changes**:
+
 - ✅ New table: `system_metrics` (event logging)
 - ✅ New RPC: `update_course_progress(p_course_id, p_step_id, p_status, p_message, ...)`
 - ✅ No changes to existing tables
@@ -395,6 +409,7 @@ _Fill ONLY if Constitution Check has violations that must be justified_
 **Endpoint**: `POST /api/coursegen/generate`
 
 **Request**:
+
 ```typescript
 {
   courseId: string (UUID),
@@ -404,6 +419,7 @@ _Fill ONLY if Constitution Check has violations that must be justified_
 ```
 
 **Responses**:
+
 - `200 OK` - Success: `{ success: true, jobId: string }`
 - `400 Bad Request` - Invalid payload
 - `401 Unauthorized` - Missing/invalid JWT
@@ -437,6 +453,7 @@ _Fill ONLY if Constitution Check has violations that must be justified_
 ⏳ **To be generated by `/speckit.tasks` command**
 
 Expected phases:
+
 1. **Database Setup** - Migrations (system_metrics, RPC function)
 2. **Core Utilities** - Pino logger, retry util, concurrency tracker
 3. **API Endpoint** - JWT validation, concurrency checks, job queueing, saga pattern
@@ -451,6 +468,7 @@ Expected phases:
 ### Unit Tests
 
 **Modules to Test**:
+
 - ✅ Concurrency Tracker - `checkAndReserve()`, `release()`, Redis Lua script
 - ✅ Retry Utility - Backoff logic, attempt counting, error handling
 - ✅ API Validation - Zod schema, UUID format, JWT extraction
@@ -463,6 +481,7 @@ Expected phases:
 ### Integration Tests
 
 **Scenarios**:
+
 1. ✅ End-to-end orchestration: API → concurrency check → job queue → RPC → success
 2. ✅ Concurrency limits: FREE user submits 2 jobs, 2nd rejected with 429
 3. ✅ RPC failure compensation: Simulate RPC failure, verify job rollback and metrics
@@ -476,6 +495,7 @@ Expected phases:
 ### Contract Tests
 
 **Validation**:
+
 - ✅ 200 OK response matches schema
 - ✅ 429 Too Many Requests includes details object
 - ✅ 500 Internal Server Error message in Russian
@@ -486,12 +506,14 @@ Expected phases:
 ### Manual E2E Testing
 
 **Tools**:
+
 - BullBoard dashboard (verify job creation and priority)
 - PostgreSQL client (verify progress updates)
 - Redis CLI (verify counter increments)
 - Pino logs (verify structured JSON)
 
 **Test Cases**:
+
 1. ✅ Submit course generation via frontend
 2. ✅ Monitor BullBoard for job status
 3. ✅ Poll `/api/courses/[slug]/check-status` for progress
@@ -506,6 +528,7 @@ Expected phases:
 ### Migration Strategy
 
 **Phase 1: Deploy Migrations**
+
 ```bash
 cd courseai-next
 supabase migration up --project-ref production-ref
@@ -514,6 +537,7 @@ psql -c "SELECT proname FROM pg_proc WHERE proname = 'update_course_progress';"
 ```
 
 **Phase 2: Deploy Backend Code**
+
 ```bash
 cd packages/course-gen-platform
 pnpm build
@@ -523,6 +547,7 @@ kubectl apply -f k8s/backend-deployment.yaml
 ```
 
 **Phase 3: Deploy Frontend (Update Env Variable)**
+
 ```bash
 # Update frontend environment variable
 N8N_WEBHOOK_URL=https://api.megacampusai.com/api/coursegen/generate
@@ -535,12 +560,14 @@ kubectl apply -f k8s/frontend-deployment.yaml
 ```
 
 **Phase 4: Parallel Operation (1 Week)**
+
 - Both n8n and new backend active
 - Monitor system_metrics for errors
 - Compare n8n vs backend success rates
 - Verify frontend compatibility
 
 **Phase 5: Cutover**
+
 - Switch 100% traffic to new backend
 - Disable n8n workflow (keep as backup)
 - Monitor for 24 hours
@@ -549,6 +576,7 @@ kubectl apply -f k8s/frontend-deployment.yaml
 ### Rollback Plan
 
 **If backend fails in production**:
+
 1. Revert frontend env variable to n8n URL
 2. Redeploy frontend (< 5 minutes)
 3. n8n resumes handling requests
@@ -556,6 +584,7 @@ kubectl apply -f k8s/frontend-deployment.yaml
 5. Re-deploy after fix verified in staging
 
 **Database rollback** (if needed):
+
 ```sql
 -- Rollback migrations (in reverse order)
 DROP FUNCTION IF EXISTS update_course_progress;
@@ -573,6 +602,7 @@ DROP TYPE IF EXISTS metric_event_type;
 **Probability**: Low
 **Impact**: High
 **Mitigation**:
+
 - RPC function optimized for single UPDATE (no N+1 queries)
 - Indexed by primary key (UUID)
 - Tested with pg_stat_statements for query plan
@@ -583,6 +613,7 @@ DROP TYPE IF EXISTS metric_event_type;
 **Probability**: Medium
 **Impact**: High
 **Mitigation**:
+
 - Redis persistence enabled (RDB snapshots)
 - Redis Sentinel for failover (Stage 2+)
 - Counters reconcile every 5 minutes (compare with BullMQ active jobs)
@@ -593,6 +624,7 @@ DROP TYPE IF EXISTS metric_event_type;
 **Probability**: Low
 **Impact**: Medium
 **Mitigation**:
+
 - Contract tests validate `generation_progress` JSONB structure
 - Russian step names hardcoded (verified in spec)
 - Manual QA testing with existing frontend before deployment
@@ -603,6 +635,7 @@ DROP TYPE IF EXISTS metric_event_type;
 **Probability**: Medium
 **Impact**: Low
 **Mitigation**:
+
 - Worker `finally` block always releases slot
 - TTL on user keys (1 hour) auto-expires
 - Reconciliation cron job every 5 minutes (compare Redis vs BullMQ)
@@ -683,6 +716,7 @@ DROP TYPE IF EXISTS metric_event_type;
 **Status**: ✅ All resolved (see research.md)
 
 No open questions remain. All technical unknowns were answered in Phase 0 research:
+
 1. ✅ Pino implementation strategy
 2. ✅ System metrics schema
 3. ✅ RPC function design

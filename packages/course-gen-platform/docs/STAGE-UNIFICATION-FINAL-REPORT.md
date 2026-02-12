@@ -22,14 +22,14 @@ Successfully completed the Stage Unification Refactoring project, consolidating 
 
 ### Metrics Summary
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| **Directory Structures** | 4 different patterns | 1 unified pattern | ✅ Standardized |
-| **Stage Locations** | 3 different directories | 1 directory (`stages/`) | ✅ Consolidated |
-| **Import Depth** | 5 levels max | 4 levels max | ✅ Reduced |
-| **Handler Pattern** | Inconsistent | Thin wrapper (unified) | ✅ Consistent |
-| **Test Organization** | Scattered | Mirrored structure | ✅ Organized |
-| **Type Errors** | 0 (baseline) | 0 (after) | ✅ Maintained |
+| Metric                   | Before                  | After                   | Change          |
+| ------------------------ | ----------------------- | ----------------------- | --------------- |
+| **Directory Structures** | 4 different patterns    | 1 unified pattern       | ✅ Standardized |
+| **Stage Locations**      | 3 different directories | 1 directory (`stages/`) | ✅ Consolidated |
+| **Import Depth**         | 5 levels max            | 4 levels max            | ✅ Reduced      |
+| **Handler Pattern**      | Inconsistent            | Thin wrapper (unified)  | ✅ Consistent   |
+| **Test Organization**    | Scattered               | Mirrored structure      | ✅ Organized    |
+| **Type Errors**          | 0 (baseline)            | 0 (after)               | ✅ Maintained   |
 
 ---
 
@@ -46,15 +46,18 @@ Successfully completed the Stage Unification Refactoring project, consolidating 
 #### Changes Made
 
 **Files Moved:** 18 service files + handler + orchestrator
+
 - `services/stage5/generation-orchestrator.ts` → `stages/stage5-generation/orchestrator.ts`
 - `orchestrator/handlers/stage5-generation.ts` → `stages/stage5-generation/handler.ts`
 - `services/stage5/*.ts` (15 files) → `stages/stage5-generation/utils/`
 - `services/stage5/validators/*.ts` (6 files) → `stages/stage5-generation/validators/`
 
 **Tests Moved:** 15+ unit tests
+
 - `tests/unit/stage5/*.test.ts` → `tests/unit/stages/stage5/`
 
 **Imports Updated:** 6 dependent files
+
 - `src/orchestrator/worker.ts`
 - `src/server/routers/generation.ts`
 - `src/shared/regeneration/layers/layer-2-critique-revise.ts`
@@ -82,15 +85,18 @@ Successfully completed the Stage Unification Refactoring project, consolidating 
 #### Changes Made
 
 **Files Moved:** 14 files (orchestrator + 6 phases + 7 utilities)
+
 - `orchestrator/services/analysis/analysis-orchestrator.ts` → `stages/stage4-analysis/orchestrator.ts`
 - `orchestrator/handlers/stage4-analysis.ts` → `stages/stage4-analysis/handler.ts`
 - `orchestrator/services/analysis/phase-*.ts` (6 files) → `stages/stage4-analysis/phases/`
 - `orchestrator/services/analysis/*.ts` (7 utilities) → `stages/stage4-analysis/utils/`
 
 **Tests Moved:** 3+ test files
+
 - `tests/unit/orchestrator/services/analysis/*.test.ts` → `tests/unit/stages/stage4/`
 
 **Imports Updated:** 5 dependent files
+
 - `src/orchestrator/worker.ts`
 - `src/shared/regeneration/layers/*.ts` (4 files)
 
@@ -114,6 +120,7 @@ Successfully completed the Stage Unification Refactoring project, consolidating 
 #### Changes Made
 
 **Files Created:** 9 new files (orchestrator + handler + 4 phases + types + README)
+
 - `stages/stage2-document-processing/orchestrator.ts` (NEW - extracted from 803-line handler)
 - `stages/stage2-document-processing/handler.ts` (NEW - thin wrapper)
 - `stages/stage2-document-processing/phases/phase-1-docling-conversion.ts` (NEW)
@@ -124,9 +131,11 @@ Successfully completed the Stage Unification Refactoring project, consolidating 
 - `stages/stage2-document-processing/README.md` (NEW - 366 lines)
 
 **Files Deleted:**
+
 - `orchestrator/handlers/document-processing.ts` (803 lines - monolithic handler)
 
 **Imports Updated:** 1 file
+
 - `src/orchestrator/worker.ts`
 
 #### Validation Results
@@ -139,6 +148,7 @@ Successfully completed the Stage Unification Refactoring project, consolidating 
 #### Key Achievement
 
 Successfully split 803-line monolithic handler into:
+
 - **Orchestrator:** 490 lines (main logic)
 - **Handler:** 220 lines (thin wrapper)
 - **4 Phase Files:** 77 + 80 + 45 + 46 = 248 lines
@@ -160,14 +170,17 @@ Successfully split 803-line monolithic handler into:
 #### Changes Made
 
 **Files Moved:** 3 core files
+
 - `orchestrator/services/summarization-service.ts` → `stages/stage3-summarization/orchestrator.ts` (git mv, 95% similarity)
 - `orchestrator/handlers/stage3-summarization.ts` → `stages/stage3-summarization/handler.ts` (git mv, 93% similarity)
 - `orchestrator/workers/stage3-summarization.worker.ts` → `stages/stage3-summarization/worker.ts` (git mv, 94% similarity)
 
 **Tests Moved:** 1 unit test
+
 - `tests/unit/summarization-service.test.ts` → `tests/unit/stages/stage3/orchestrator.test.ts` (git mv, 93% similarity)
 
 **Imports Updated:** 6 files
+
 - `src/orchestrator/worker.ts` (handler import)
 - `src/orchestrator/index.ts` (worker export)
 - `src/stages/stage3-summarization/orchestrator.ts` (internal imports)
@@ -186,6 +199,7 @@ Successfully split 803-line monolithic handler into:
 #### Integration Tests Verified
 
 All Stage 3 integration tests remain intact and functional:
+
 - `tests/integration/stage3-basic-summarization.test.ts`
 - `tests/integration/stage3-cost-tracking.test.ts`
 - `tests/integration/stage3-error-handling.test.ts`
@@ -228,8 +242,7 @@ packages/course-gen-platform/src/stages/
 │   │   ├── phase-2-scope.ts
 │   │   ├── phase-3-expert.ts
 │   │   ├── phase-4-synthesis.ts
-│   │   ├── phase-5-assembly.ts
-│   │   └── phase-6-rag-planning.ts
+│   │   └── phase-5-assembly.ts
 │   └── utils/
 │       ├── langchain-models.ts
 │       ├── workflow-graph.ts
@@ -280,7 +293,10 @@ import { stage3SummarizationHandler } from '../stages/stage3-summarization/handl
 import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler';
 import { stage5GenerationHandler } from '../stages/stage5-generation/handler';
 
-const jobHandlers: Record<string, BaseJobHandler<JobData> | { process: (job: Job<any>) => Promise<any> }> = {
+const jobHandlers: Record<
+  string,
+  BaseJobHandler<JobData> | { process: (job: Job<any>) => Promise<any> }
+> = {
   [JobType.DOCUMENT_PROCESSING]: documentProcessingHandler,
   STAGE_3_SUMMARIZATION: stage3SummarizationHandler,
   [JobType.STRUCTURE_ANALYSIS]: stage4AnalysisHandler,
@@ -390,6 +406,7 @@ Files Changed:
 ```
 
 **Git Similarity Preservation:**
+
 - handler.ts: 93% similar (excellent)
 - orchestrator.ts: 95% similar (excellent)
 - worker.ts: 94% similar (excellent)
@@ -402,12 +419,14 @@ Files Changed:
 ### 1. Architectural Consistency
 
 **Before:**
+
 - Stage 2: Monolithic handler (803 lines)
 - Stage 3: Handler + separate service
 - Stage 4: Handler + well-structured orchestrator in `orchestrator/services/analysis/`
 - Stage 5: Handler + **orphaned** services in `services/stage5/` (outside orchestrator!)
 
 **After:**
+
 - **All 4 stages** follow identical pattern:
   - `stages/{stage-name}/orchestrator.ts` (main logic)
   - `stages/{stage-name}/handler.ts` (thin BullMQ wrapper)
@@ -418,23 +437,27 @@ Files Changed:
 ### 2. Improved Discoverability
 
 **Before:**
+
 - "Where is Stage 5 logic?" → `services/stage5/` (orphaned, outside orchestrator)
 - "Where is Stage 4 logic?" → `orchestrator/services/analysis/`
 - "Where is Stage 3 logic?" → `orchestrator/services/summarization-service.ts`
 - "Where is Stage 2 logic?" → `orchestrator/handlers/document-processing.ts` (monolithic)
 
 **After:**
+
 - "Where is Stage N logic?" → `src/stages/stage{N}-{name}/` ✅
 - **Developers can find any stage code in <30 seconds**
 
 ### 3. Reduced Coupling
 
 **Before:**
+
 - Cross-module dependencies scattered across 3 different locations
 - Import paths varied by stage (inconsistent)
 - Difficult to understand stage boundaries
 
 **After:**
+
 - Each stage is self-contained in `stages/{stage-name}/`
 - Clear boundaries between stages
 - Consistent import patterns
@@ -442,11 +465,13 @@ Files Changed:
 ### 4. Enhanced Maintainability
 
 **Before:**
+
 - Adding new phase to Stage 2 = modify 803-line monolithic handler
 - Adding new phase to Stage 5 = create file in orphaned `services/stage5/`
 - Inconsistent patterns across stages
 
 **After:**
+
 - Adding new phase to any stage = create file in `stages/{stage-name}/phases/`
 - **Estimated time to add new phase: <2 hours** (vs 4-6 hours before)
 - **Consistent patterns across all stages**
@@ -454,10 +479,12 @@ Files Changed:
 ### 5. Improved Testability
 
 **Before:**
+
 - Tests scattered across `tests/unit/stage5/`, `tests/unit/orchestrator/services/analysis/`, etc.
 - No consistent test organization
 
 **After:**
+
 - All tests mirror source structure: `tests/unit/stages/{stage-name}/`
 - **Easy to locate and add new tests**
 - **Estimated time to write new test: <1 hour** (vs 2-3 hours before)
@@ -527,12 +554,14 @@ Files Changed:
 ### Build Time
 
 **Before Refactoring:**
+
 ```bash
 pnpm build
 # Time: ~45 seconds (baseline)
 ```
 
 **After Refactoring:**
+
 ```bash
 pnpm build
 # Time: ~45 seconds (±2%)
@@ -561,12 +590,14 @@ pnpm build
 ### Unit Tests
 
 **Before Refactoring:**
+
 - Stage 5: 15+ test files in `tests/unit/stage5/`
 - Stage 4: 3+ test files in `tests/unit/orchestrator/services/analysis/`
 - Stage 3: 1 test file in `tests/unit/summarization-service.test.ts`
 - Stage 2: 0 test files (to be added)
 
 **After Refactoring:**
+
 - Stage 5: 15+ test files in `tests/unit/stages/stage5/`
 - Stage 4: 3+ test files in `tests/unit/stages/stage4/`
 - Stage 3: 1 test file in `tests/unit/stages/stage3/orchestrator.test.ts`
@@ -588,6 +619,7 @@ pnpm build
 ### Immediate Actions (Post-Refactoring)
 
 1. **Cleanup Temporary Files**
+
    ```bash
    rm -f docs/refactoring/.refactor-plan.json
    rm -rf .tmp/current/backups/.rollback/refactor
@@ -595,6 +627,7 @@ pnpm build
    ```
 
 2. **Archive Reports**
+
    ```bash
    mkdir -p docs/reports/refactoring/2025-11/
    mv STAGE-UNIFICATION-FINAL-REPORT.md docs/reports/refactoring/2025-11/2025-11-20-stage-unification-final.md
@@ -612,6 +645,7 @@ pnpm build
 **Current State:** Stage 3 orchestrator contains all logic in one function
 
 **Recommended Split:**
+
 - `phases/phase-1-validation.ts` - Input validation
 - `phases/phase-2-summarization.ts` - LLM summarization logic
 - `phases/phase-3-metadata.ts` - Token counting + cost calculation
@@ -623,6 +657,7 @@ pnpm build
 #### 2. Add README.md to Remaining Stages
 
 **Missing READMEs:**
+
 - `stages/stage3-summarization/README.md`
 - `stages/stage4-analysis/README.md`
 - `stages/stage5-generation/README.md` (exists but may need updates)
@@ -634,6 +669,7 @@ pnpm build
 #### 3. Consolidate Duplicate Utilities
 
 **Identified Duplicates:**
+
 - `field-name-fix.ts` exists in both Stage 4 and Stage 5
 - Consider moving to `shared/utilities/`
 
@@ -644,6 +680,7 @@ pnpm build
 #### 4. Add Path Aliases in tsconfig.json
 
 **Recommended Aliases:**
+
 ```json
 {
   "compilerOptions": {
@@ -665,6 +702,7 @@ pnpm build
 #### 5. Create Stage Templates
 
 **Recommended Templates:**
+
 - `templates/stage-template/` with:
   - `orchestrator.ts` (boilerplate)
   - `handler.ts` (boilerplate)
@@ -726,11 +764,13 @@ The Stage Unification Refactoring project has been **successfully completed** wi
 ### Impact on Development Velocity
 
 **Before Refactoring:**
+
 - Finding stage code: 2-5 minutes (searching across multiple directories)
 - Adding new phase: 4-6 hours (inconsistent patterns)
 - Writing tests: 2-3 hours (unclear organization)
 
 **After Refactoring:**
+
 - Finding stage code: <30 seconds (`src/stages/{stage-name}/`)
 - Adding new phase: <2 hours (consistent patterns)
 - Writing tests: <1 hour (mirrored structure)
@@ -745,28 +785,28 @@ The Stage Unification Refactoring project has been **successfully completed** wi
 
 **Total:** 9 files, 1,378 lines
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `orchestrator.ts` | 490 | Main orchestration logic |
-| `handler.ts` | 220 | BullMQ handler (thin wrapper) |
-| `phases/phase-1-docling-conversion.ts` | 77 | Docling MCP conversion |
-| `phases/phase-4-chunking.ts` | 80 | Hierarchical chunking |
-| `phases/phase-5-embedding.ts` | 45 | Late chunking embeddings |
-| `phases/phase-6-qdrant-upload.ts` | 46 | Vector DB upload |
-| `types.ts` | 54 | Stage-specific types |
-| `README.md` | 366 | Comprehensive documentation |
-| **TOTAL** | **1,378** | |
+| File                                   | Lines     | Purpose                       |
+| -------------------------------------- | --------- | ----------------------------- |
+| `orchestrator.ts`                      | 490       | Main orchestration logic      |
+| `handler.ts`                           | 220       | BullMQ handler (thin wrapper) |
+| `phases/phase-1-docling-conversion.ts` | 77        | Docling MCP conversion        |
+| `phases/phase-4-chunking.ts`           | 80        | Hierarchical chunking         |
+| `phases/phase-5-embedding.ts`          | 45        | Late chunking embeddings      |
+| `phases/phase-6-qdrant-upload.ts`      | 46        | Vector DB upload              |
+| `types.ts`                             | 54        | Stage-specific types          |
+| `README.md`                            | 366       | Comprehensive documentation   |
+| **TOTAL**                              | **1,378** |                               |
 
 ### Stage 3 Files (After Refactoring)
 
 **Total:** 3 files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `orchestrator.ts` | ~750 | Main orchestration logic (from summarization-service.ts) |
-| `handler.ts` | ~350 | BullMQ handler (thin wrapper) |
-| `worker.ts` | ~450 | BullMQ worker configuration |
-| **TOTAL** | **~1,550** | |
+| File              | Lines      | Purpose                                                  |
+| ----------------- | ---------- | -------------------------------------------------------- |
+| `orchestrator.ts` | ~750       | Main orchestration logic (from summarization-service.ts) |
+| `handler.ts`      | ~350       | BullMQ handler (thin wrapper)                            |
+| `worker.ts`       | ~450       | BullMQ worker configuration                              |
+| **TOTAL**         | **~1,550** |                                                          |
 
 ### Stage 4 Files (After Refactoring)
 

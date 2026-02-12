@@ -133,7 +133,10 @@ export class InitializeFSMCommandHandler {
             'FSM initialization returned from Redis cache (fast path)'
           );
 
-          return { ...JSON.parse(cached), fromCache: true };
+          return {
+            ...(JSON.parse(cached) as Omit<InitializeFSMResult, 'fromCache'>),
+            fromCache: true,
+          };
         }
       } catch (redisError: unknown) {
         // Redis failures are non-fatal - graceful degradation to database-only

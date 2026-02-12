@@ -18,6 +18,8 @@
  */
 
 import 'dotenv/config';
+import { initSentry, flushSentry } from '../shared/sentry/init.js';
+initSentry();
 import { setMaxListeners } from 'events';
 import { startWorker, stopWorker } from './worker';
 import logger from '../shared/logger';
@@ -26,6 +28,7 @@ import {
   gracefulShutdown as gracefulShutdownStage6,
 } from '../stages/stage6-lesson-content/factory';
 import { REDIS_UNAVAILABLE_EVENT } from '../shared/cache/redis';
+import { closeQueueEventsBackup } from './queue-events-backup';
 
 // Increase max listeners globally to prevent MaxListenersExceededWarning
 // during parallel LLM requests with AbortSignal timeouts
@@ -35,6 +38,7 @@ import { validateEnvironment } from '../shared/config/env-validator';
 import {
   initializeModelConfigBunker,
   getModelConfigBunker,
+  validateModelAvailability,
 } from '../shared/llm/model-config-bunker';
 import { TIMEOUTS } from '../shared/constants/timeouts';
 import { refreshReadinessHeartbeat } from './worker-readiness';
@@ -222,10 +226,17 @@ async function handleWorkerShutdown(reason: string): Promise<void> {
       activeGeneralWorker = null;
     }
 
+    // Close QueueEvents backup layer
+    await closeQueueEventsBackup();
+
+    // Flush pending Sentry events before exit
+    await flushSentry();
+
     logger.info({ reason }, 'Worker shutdown complete');
     process.exit(0);
   } catch (err) {
     logger.error({ err, reason }, 'Error during worker shutdown');
+    await flushSentry();
     process.exit(1);
   }
 }
@@ -295,6 +306,11 @@ async function main() {
       'ModelConfigBunker initialized'
     );
 
+    // Non-blocking: validate model IDs against OpenRouter (warn only)
+    validateModelAvailability(getModelConfigBunker()).catch(err => {
+      logger.warn({ error: err }, 'Model availability validation failed (non-blocking)');
+    });
+
     // Check if this is a dedicated Stage 6 worker
     // Stage 6 has its own queue with 30 concurrent workers for I/O-bound LLM operations
     // @see docs/plans/sprightly-wondering-widget.md
@@ -339,12 +355,12 @@ async function main() {
         queueName: 'course-generation',
         registeredHandlers: [
           'TEST_JOB',
-          'INITIALIZE',
           'DOCUMENT_PROCESSING',
           'DOCUMENT_CLASSIFICATION',
           'STRUCTURE_ANALYSIS',
           'STRUCTURE_GENERATION',
           'LESSON_CONTENT',
+          'BLOCK_REGENERATION',
         ],
       },
       'Worker started successfully'

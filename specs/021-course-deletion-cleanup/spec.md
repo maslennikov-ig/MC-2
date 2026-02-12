@@ -102,10 +102,7 @@ await qdrantClient.delete(COLLECTION_CONFIG.name, {
 // - bull:course-generation:{courseId}:*
 // - Any other course-specific keys
 
-const patterns = [
-  `idempotency:generation-${courseId}-*`,
-  `rag:${courseId}:*`,
-];
+const patterns = [`idempotency:generation-${courseId}-*`, `rag:${courseId}:*`];
 
 for (const pattern of patterns) {
   const keys = await redis.keys(pattern);
@@ -118,11 +115,7 @@ for (const pattern of patterns) {
 ### 4. File System Cleanup
 
 ```typescript
-const uploadDir = path.join(
-  process.env.UPLOADS_DIR || 'uploads',
-  organizationId,
-  courseId
-);
+const uploadDir = path.join(process.env.UPLOADS_DIR || 'uploads', organizationId, courseId);
 
 await fs.rm(uploadDir, { recursive: true, force: true });
 ```

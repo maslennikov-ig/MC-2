@@ -703,12 +703,21 @@ export function buildGraph({
           ? ('completed' as NodeStatus)
           : currentStatus
 
-      // Stage 1 data: use preloaded data if no traces, otherwise use trace data
+      // Stage 1 data: merge preloaded course data with trace data
+      // Base data from courses table (always has topic, description, status: 'ready')
+      // Override with trace data (filename, fileSize, fileId from upload)
+      // This ensures all required fields are present even if traces are incomplete
       const effectiveInputData = isStage1
-        ? latestAttempt?.inputData || stage1CourseData?.inputData
+        ? {
+            ...(stage1CourseData?.inputData ?? {}),
+            ...(latestAttempt?.inputData ?? {}),
+          }
         : latestAttempt?.inputData
       const effectiveOutputData = isStage1
-        ? latestAttempt?.outputData || stage1CourseData?.outputData
+        ? {
+            ...(stage1CourseData?.outputData ?? {}),
+            ...(latestAttempt?.outputData ?? {}),
+          }
         : latestAttempt?.outputData
 
       newNodes.push({

@@ -64,6 +64,7 @@ This document defines the data entities, relationships, and database schema chan
 | `user_metadata` | JSONB | DEFAULT '{}' | Custom metadata including tier |
 
 **User Metadata Structure**:
+
 ```typescript
 interface UserMetadata {
   tier: 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM';
@@ -72,6 +73,7 @@ interface UserMetadata {
 ```
 
 **Tier Mapping** (from `/docs/PRICING-TIERS.md`):
+
 - `FREE` - Priority: 1, Concurrency: 1
 - `BASIC` - Priority: 3, Concurrency: 2
 - `STANDARD` - Priority: 5, Concurrency: 3
@@ -79,6 +81,7 @@ interface UserMetadata {
 - `PREMIUM` - Priority: 10, Concurrency: 5
 
 **Access Pattern**:
+
 - Read via JWT token validation: `supabase.auth.getUser(token)`
 - Tier extracted from `user.user_metadata.tier` or separate `user_profiles` table
 
@@ -108,28 +111,30 @@ interface UserMetadata {
 | `updated_at` | TIMESTAMPTZ | DEFAULT NOW() | Record update timestamp |
 
 **Generation Progress Structure** (JSONB):
+
 ```typescript
 interface GenerationProgress {
   steps: Array<{
-    id: number;                    // 1-5
-    name: string;                  // Russian step names
+    id: number; // 1-5
+    name: string; // Russian step names
     status: 'pending' | 'in_progress' | 'completed' | 'failed';
-    started_at: string | null;     // ISO8601 timestamp
-    completed_at: string | null;   // ISO8601 timestamp
-    error: string | null;          // Error message if failed
+    started_at: string | null; // ISO8601 timestamp
+    completed_at: string | null; // ISO8601 timestamp
+    error: string | null; // Error message if failed
     error_details: Record<string, unknown> | null;
   }>;
-  percentage: number;               // 0-100
-  current_step: number;             // 1-5
-  message: string;                  // Current status message
-  total_steps: number;              // Always 5
-  has_documents: boolean;           // Files present flag
-  lessons_completed: number;        // Progress counter
-  lessons_total: number;            // Total lessons
+  percentage: number; // 0-100
+  current_step: number; // 1-5
+  message: string; // Current status message
+  total_steps: number; // Always 5
+  has_documents: boolean; // Files present flag
+  lessons_completed: number; // Progress counter
+  lessons_total: number; // Total lessons
 }
 ```
 
 **Russian Step Names** (Frontend Compatibility):
+
 1. "Запуск генерации" (Launch generation)
 2. "Обработка документов" / "Анализ задачи" (Document processing / Task analysis)
 3. "Генерация структуры" (Structure generation)
@@ -137,6 +142,7 @@ interface GenerationProgress {
 5. "Финализация" (Finalization)
 
 **Status Values**:
+
 - `'initializing'` - Step 1 in progress
 - `'processing_documents'` - Step 2 (with files)
 - `'analyzing_task'` - Step 2 (without files)
@@ -146,12 +152,14 @@ interface GenerationProgress {
 - `'failed'` - Error occurred
 
 **Validation Rules**:
+
 - `generation_progress.steps` MUST have exactly 5 elements
 - `generation_progress.percentage` MUST be 0-100
 - `generation_progress.current_step` MUST be 1-5
 - `status` transitions follow linear progression
 
 **Access Pattern**:
+
 - Read: Frontend polling via GET `/api/courses/[slug]/check-status`
 - Write: RPC `update_course_progress()` called by orchestrator/worker
 - Authorization: RLS policy ensures `user_id = auth.uid()`
@@ -177,6 +185,7 @@ interface GenerationProgress {
 | `timestamp` | TIMESTAMPTZ | NOT NULL DEFAULT NOW() | Event occurrence time |
 
 **Enums**:
+
 ```sql
 CREATE TYPE metric_event_type AS ENUM (
   'job_rollback',              -- Job deleted after RPC failure
@@ -196,6 +205,7 @@ CREATE TYPE metric_severity AS ENUM (
 ```
 
 **Indexes**:
+
 ```sql
 CREATE INDEX idx_system_metrics_event_type ON system_metrics(event_type);
 CREATE INDEX idx_system_metrics_severity ON system_metrics(severity);
@@ -204,6 +214,7 @@ CREATE INDEX idx_system_metrics_course ON system_metrics(course_id) WHERE course
 ```
 
 **RLS Policies**:
+
 ```sql
 -- Admin-only read access (for Stage 8 dashboard)
 CREATE POLICY system_metrics_admin_read ON system_metrics
@@ -221,6 +232,7 @@ CREATE POLICY system_metrics_service_insert ON system_metrics
 ```
 
 **Metadata Examples**:
+
 ```typescript
 // Job rollback
 {
@@ -249,6 +261,7 @@ CREATE POLICY system_metrics_service_insert ON system_metrics
 ```
 
 **Access Pattern**:
+
 - Write: Backend inserts via `supabase.from('system_metrics').insert()`
 - Read: Stage 8 admin dashboard queries for analytics
 - Retention: Keep all records (enable partitioning in Stage 8 if volume grows)
@@ -262,13 +275,14 @@ CREATE POLICY system_metrics_service_insert ON system_metrics
 **Schema**: Stored in Redis via BullMQ (not a SQL table)
 
 **Job Data Structure** (TypeScript):
+
 ```typescript
 interface JobData {
   jobType: JobType;
-  organizationId: string;      // UUID
-  courseId: string;            // UUID
-  userId: string;              // UUID
-  createdAt: string;           // ISO8601
+  organizationId: string; // UUID
+  courseId: string; // UUID
+  userId: string; // UUID
+  createdAt: string; // ISO8601
 
   // Additional course fields for context
   title?: string;
@@ -296,27 +310,29 @@ enum JobType {
   STRUCTURE_ANALYSIS = 'structure_analysis',
   STRUCTURE_GENERATION = 'structure_generation',
   TEXT_GENERATION = 'text_generation',
-  FINALIZATION = 'finalization'
+  FINALIZATION = 'finalization',
 }
 ```
 
 **Job Options**:
+
 ```typescript
 interface JobOptions {
-  jobId?: string;              // Unique identifier
-  priority: number;            // 1-10 (based on user tier)
-  attempts: number;            // Retry count (default: 3)
+  jobId?: string; // Unique identifier
+  priority: number; // 1-10 (based on user tier)
+  attempts: number; // Retry count (default: 3)
   backoff: {
     type: 'exponential';
-    delay: number;             // Initial delay in ms
+    delay: number; // Initial delay in ms
   };
-  timeout: number;             // Job timeout in ms
-  removeOnComplete: number;    // Keep last N completed jobs
-  removeOnFail: boolean;       // Keep failed jobs for debugging
+  timeout: number; // Job timeout in ms
+  removeOnComplete: number; // Keep last N completed jobs
+  removeOnFail: boolean; // Keep failed jobs for debugging
 }
 ```
 
 **Priority Mapping** (from user tier):
+
 - FREE: 1
 - BASIC: 3
 - STANDARD: 5
@@ -324,6 +340,7 @@ interface JobOptions {
 - PREMIUM: 10
 
 **Job Lifecycle**:
+
 1. `waiting` - In queue, not yet picked up
 2. `active` - Worker processing
 3. `completed` - Successfully finished
@@ -331,6 +348,7 @@ interface JobOptions {
 5. `delayed` - Scheduled for later (backoff)
 
 **Access Pattern**:
+
 - Write: Orchestrator adds via `queue.add(jobType, jobData, options)`
 - Read: BullBoard dashboard, worker polls
 - Cleanup: Completed jobs removed after 100 (configurable)
@@ -344,12 +362,14 @@ interface JobOptions {
 **Schema**: Redis keys (not a SQL table)
 
 **Key Structure**:
+
 ```
 concurrency:user:{userId}        → INTEGER (current concurrent jobs)
 concurrency:global               → INTEGER (total active jobs)
 ```
 
 **Operations**:
+
 ```typescript
 // Reserve slot (atomic check-and-increment)
 EVAL lua_script 2 concurrency:user:{userId} concurrency:global {userLimit} {globalLimit}
@@ -362,6 +382,7 @@ DECR concurrency:global
 **TTL**: 1 hour on user keys (auto-cleanup for orphaned counters)
 
 **Access Pattern**:
+
 - Write: Orchestrator before job creation, worker on completion/failure
 - Read: Orchestrator during concurrency check
 - Reconciliation: Cron job every 5 minutes compares with BullMQ active jobs
@@ -375,6 +396,7 @@ DECR concurrency:global
 **Purpose**: Atomically update course generation progress
 
 **Signature**:
+
 ```sql
 CREATE OR REPLACE FUNCTION update_course_progress(
   p_course_id UUID,
@@ -401,6 +423,7 @@ CREATE OR REPLACE FUNCTION update_course_progress(
 **Return Value**: Updated `generation_progress` JSONB
 
 **Side Effects**:
+
 1. Updates `courses.generation_progress` JSONB
 2. Updates `courses.last_progress_update` timestamp
 3. Calculates and sets `generation_progress.percentage`
@@ -409,6 +432,7 @@ CREATE OR REPLACE FUNCTION update_course_progress(
 **Idempotency**: Safe to call multiple times with same parameters
 
 **Error Handling**:
+
 - Raises exception if `p_step_id` not in 1-5
 - Raises exception if `p_status` not in valid enum
 - Returns NULL if course not found
@@ -426,6 +450,7 @@ CREATE OR REPLACE FUNCTION update_course_progress(
 **File**: `courseai-next/supabase/migrations/{timestamp}_create_system_metrics.sql`
 
 **Content**:
+
 ```sql
 -- Create ENUM types
 CREATE TYPE metric_event_type AS ENUM (
@@ -487,6 +512,7 @@ COMMENT ON TABLE system_metrics IS 'Critical system events for Stage 8 monitorin
 **Content**: (See full implementation in `research.md` Section 3)
 
 **Summary**:
+
 - PostgreSQL function with `SECURITY DEFINER`
 - Atomic JSONB manipulation using `jsonb_set()`
 - Validates step_id (1-5) and status enum

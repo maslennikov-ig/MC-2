@@ -93,7 +93,7 @@ const diff = differ.diff(beforeConfig, afterConfig);
     mode: 'word', // Better than 'char' for readability
     wordSeparator: ' ',
   }}
-/>
+/>;
 ```
 
 #### Customization for Dark Theme
@@ -123,6 +123,7 @@ The library provides CSS classes that can be overridden with shadcn/ui theme col
 ✅ **Recommended** for LLM model configuration diffs (JSON objects)
 
 **Rationale**:
+
 - Perfect fit for structured data (model_id, temperature, max_tokens)
 - LCS array diffing handles fallback model arrays intelligently
 - Modification detection shows parameter changes clearly
@@ -186,7 +187,7 @@ import ReactDiffViewer from 'react-diff-viewer-continued';
       },
     },
   }}
-/>
+/>;
 ```
 
 #### Customization for Prompt Templates
@@ -213,7 +214,7 @@ const highlightSyntax = (str: string) => (
   useDarkTheme={true}
   renderContent={highlightSyntax}
   compareMethod="diffLines" // Better for large text
-/>
+/>;
 ```
 
 #### Recommendation for Prompt Templates
@@ -221,6 +222,7 @@ const highlightSyntax = (str: string) => (
 ✅ **Recommended** for prompt template diffs (text/XML strings)
 
 **Rationale**:
+
 - Handles large text files (10K+ chars) efficiently
 - Syntax highlighting for XML structure
 - Dark theme built-in with customization
@@ -335,6 +337,7 @@ CodeMirror 6's merge/diff view as a React component.
 🤔 **Consider as alternative** for prompt templates only
 
 **Rationale**:
+
 - Provides consistent UX with existing prompt editor
 - Good for text diffs but not ideal for JSON
 - Bundle size acceptable since CodeMirror already in use
@@ -344,15 +347,16 @@ CodeMirror 6's merge/diff view as a React component.
 
 ## Comparison Matrix
 
-| Library | JSON Diff | Text Diff | Bundle Size | React 19 | Dark Theme | Maintenance | Recommendation |
-|---------|-----------|-----------|-------------|----------|------------|-------------|----------------|
-| **json-diff-kit** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ~220KB | ⚠️ Likely | ✅ CSS Override | ✅ Active (9 days) | ✅ **For JSON** |
-| **react-diff-viewer-continued** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ~140KB | ⚠️ Workaround | ✅ Built-in | ⚠️ 2 years ago | ✅ **For Text** |
-| **react-diff-view** | ⭐⭐⭐ | ⭐⭐⭐⭐ | ~100KB? | ⚠️ Unknown | ✅ Customizable | ✅ Active | ❌ Too complex |
-| **Monaco Editor** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 🔴 ~2MB | ✅ RC | ✅ Built-in | ✅ Active | ❌ Too heavy |
-| **CodeMirror Merge** | ⭐⭐⭐ | ⭐⭐⭐⭐ | ~100KB+ | ✅ Likely | ✅ CSS | ✅ Active (5 days) | 🤔 Alternative |
+| Library                         | JSON Diff  | Text Diff  | Bundle Size | React 19      | Dark Theme      | Maintenance        | Recommendation  |
+| ------------------------------- | ---------- | ---------- | ----------- | ------------- | --------------- | ------------------ | --------------- |
+| **json-diff-kit**               | ⭐⭐⭐⭐⭐ | ⭐⭐⭐     | ~220KB      | ⚠️ Likely     | ✅ CSS Override | ✅ Active (9 days) | ✅ **For JSON** |
+| **react-diff-viewer-continued** | ⭐⭐⭐     | ⭐⭐⭐⭐⭐ | ~140KB      | ⚠️ Workaround | ✅ Built-in     | ⚠️ 2 years ago     | ✅ **For Text** |
+| **react-diff-view**             | ⭐⭐⭐     | ⭐⭐⭐⭐   | ~100KB?     | ⚠️ Unknown    | ✅ Customizable | ✅ Active          | ❌ Too complex  |
+| **Monaco Editor**               | ⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐ | 🔴 ~2MB     | ✅ RC         | ✅ Built-in     | ✅ Active          | ❌ Too heavy    |
+| **CodeMirror Merge**            | ⭐⭐⭐     | ⭐⭐⭐⭐   | ~100KB+     | ✅ Likely     | ✅ CSS          | ✅ Active (5 days) | 🤔 Alternative  |
 
 **Legend**:
+
 - ⭐⭐⭐⭐⭐ Excellent
 - ⭐⭐⭐⭐ Good
 - ⭐⭐⭐ Adequate
@@ -375,6 +379,7 @@ Use **separate libraries** optimized for each use case:
 **Install**: `npm install json-diff-kit --legacy-peer-deps`
 
 **Pros**:
+
 - Purpose-built for JSON structured diffing
 - LCS array diffing handles model arrays intelligently
 - Shows modifications clearly (not just add+remove)
@@ -382,6 +387,7 @@ Use **separate libraries** optimized for each use case:
 - Compact viewer component
 
 **Implementation**:
+
 ```tsx
 // components/admin/ModelConfigDiff.tsx
 import { Differ, Viewer } from 'json-diff-kit';
@@ -389,10 +395,10 @@ import 'json-diff-kit/dist/viewer.css';
 
 export function ModelConfigDiff({
   oldConfig,
-  newConfig
+  newConfig,
 }: {
   oldConfig: ModelConfig;
-  newConfig: ModelConfig
+  newConfig: ModelConfig;
 }) {
   const differ = new Differ({
     detectCircular: true,
@@ -400,19 +406,9 @@ export function ModelConfigDiff({
     showModifications: true,
   });
 
-  const diff = useMemo(
-    () => differ.diff(oldConfig, newConfig),
-    [oldConfig, newConfig]
-  );
+  const diff = useMemo(() => differ.diff(oldConfig, newConfig), [oldConfig, newConfig]);
 
-  return (
-    <Viewer
-      diff={diff}
-      indent={2}
-      lineNumbers={true}
-      highlightInlineDiff={true}
-    />
-  );
+  return <Viewer diff={diff} indent={2} lineNumbers={true} highlightInlineDiff={true} />;
 }
 ```
 
@@ -422,6 +418,7 @@ export function ModelConfigDiff({
 **Install**: `npm install react-diff-viewer-continued --legacy-peer-deps`
 
 **Pros**:
+
 - Built for text/code comparison
 - Syntax highlighting support
 - Dark theme with customization
@@ -429,16 +426,17 @@ export function ModelConfigDiff({
 - Simple API
 
 **Implementation**:
+
 ```tsx
 // components/admin/PromptTemplateDiff.tsx
 import ReactDiffViewer from 'react-diff-viewer-continued';
 
 export function PromptTemplateDiff({
   oldPrompt,
-  newPrompt
+  newPrompt,
 }: {
   oldPrompt: string;
-  newPrompt: string
+  newPrompt: string;
 }) {
   return (
     <ReactDiffViewer
@@ -477,9 +475,11 @@ export function PromptTemplateDiff({
 If minimizing dependencies is critical, use **json-diff-kit for both**:
 
 ### JSON Diffs
+
 Use `Viewer` component as shown above.
 
 ### Text Diffs
+
 Convert text to JSON structure and use `Viewer`:
 
 ```tsx
@@ -490,6 +490,7 @@ const diff = differ.diff(oldLines, newLines);
 ```
 
 **Trade-offs**:
+
 - ❌ Loses text-specific diff features (word-level, syntax highlighting)
 - ✅ Single dependency
 - ✅ Consistent UI
@@ -509,6 +510,7 @@ npm install react-diff-viewer-continued --legacy-peer-deps
 ```
 
 Or add to `.npmrc`:
+
 ```
 legacy-peer-deps=true
 ```
@@ -574,20 +576,24 @@ legacy-peer-deps=true
 ### Medium Risk ⚠️
 
 **React 19 compatibility**: Neither library officially supports React 19
+
 - **Mitigation**: Use `--legacy-peer-deps`, test thoroughly, monitor GitHub issues
 - **Fallback**: Downgrade to React 18 if critical issues (unlikely)
 
 **react-diff-viewer-continued maintenance**: Last update 2 years ago
+
 - **Mitigation**: Fork library if needed, or use react-diff-view as backup
 - **Fallback**: Switch to CodeMirror merge if abandoned
 
 ### Low Risk ✅
 
 **Bundle size**: Combined ~360KB package size is acceptable
+
 - **Context**: Admin-only pages, lazy-loaded
 - **Mitigation**: Code splitting, dynamic imports
 
 **Dark theme styling**: CSS customization needed
+
 - **Context**: Both libraries support style overrides
 - **Mitigation**: Use shadcn CSS variables
 

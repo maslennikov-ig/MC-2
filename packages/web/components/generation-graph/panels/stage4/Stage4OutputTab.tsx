@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useMemo } from 'react'
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -18,11 +18,11 @@ import {
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { AnalysisResultView } from '../output/AnalysisResultView'
-import { VisualStylePreview } from './VisualStylePreview'
 import { useStaticGraph } from '../../contexts/StaticGraphContext'
 import type { Stage4OutputTabProps, AnalysisHeroProps } from './types'
 import { parseAnalysisResult, type AnalysisResult } from '@megacampus/shared-types'
 import { getLearningStyleTitle } from '@/lib/constants/learning-styles'
+import { createClient } from '@/lib/supabase/client'
 
 // ============================================================================
 // CATEGORY ICON MAPPING
@@ -70,7 +70,14 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
     CATEGORY_ICONS[category as AnalysisResult['course_category']['primary']] || GraduationCap
 
   // Get translated category name
-  const categoryTranslationKey = `category${category.charAt(0).toUpperCase()}${category.slice(1)}` as 'categoryProfessional' | 'categoryPersonal' | 'categoryCreative' | 'categoryHobby' | 'categorySpiritual' | 'categoryAcademic'
+  const categoryTranslationKey =
+    `category${category.charAt(0).toUpperCase()}${category.slice(1)}` as
+      | 'categoryProfessional'
+      | 'categoryPersonal'
+      | 'categoryCreative'
+      | 'categoryHobby'
+      | 'categorySpiritual'
+      | 'categoryAcademic'
   const categoryName = t(categoryTranslationKey)
 
   // Calculate approximate total duration in hours
@@ -182,8 +189,7 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
  *
  * "The Blueprint" - displays analysis results with:
  * - AnalysisHero: Key metrics at a glance (category, lessons, duration, style)
- * - VisualStylePreview: Visual style recommendations for course imagery (generated in Stage 4)
- * - AnalysisResultView: Detailed accordion sections for all analysis data
+ * - AnalysisResultView: Detailed accordion sections for all analysis data (incl. visual style)
  *
  * Color scheme: Violet/Purple (wisdom, synthesis, strategy)
  */
@@ -204,8 +210,60 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
   const writingStyle = courseInfo.courseStyle
   const persistedAnalysisResult = courseInfo.analysisResult
 
+  // Pull-fallback: fetch analysis_result directly if not available via context/traces
+  // Retries every 3s until data is found (handles case when tab is opened before Stage 4 completes)
+  const [directFetchResult, setDirectFetchResult] = useState<AnalysisResult | null>(null)
+  const hasFetched = useRef(false)
+
+  useEffect(() => {
+    if (persistedAnalysisResult || outputData) return
+    if (hasFetched.current || !courseId) return
+
+    let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    const fetchData = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('courses')
+          .select('analysis_result')
+          .eq('id', courseId)
+          .single()
+
+        if (cancelled) return
+
+        if (data?.analysis_result) {
+          const parsed = parseAnalysisResult(data.analysis_result)
+          if (parsed) {
+            hasFetched.current = true
+            setDirectFetchResult(parsed)
+            return
+          }
+        }
+
+        // Data not yet available — retry after 3s
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void fetchData()
+        }, 3000)
+      } catch {
+        // Best-effort fallback — retry after 5s
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void fetchData()
+        }, 5000)
+      }
+    }
+
+    void fetchData()
+
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+    }
+  }, [persistedAnalysisResult, outputData, courseId])
+
   // Parse output data as AnalysisResult
-  // Priority: persisted analysis_result (from courses table, includes user edits) > outputData (from traces)
+  // Priority: persisted analysis_result (from courses table, includes user edits) > outputData (from traces) > direct fetch
   const analysisResult = useMemo((): AnalysisResult | null => {
     // First try persisted analysis_result from courses table (includes user edits)
     if (persistedAnalysisResult) {
@@ -217,8 +275,9 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
       const parsed = parseAnalysisResult(outputData)
       if (parsed) return parsed
     }
-    return null
-  }, [persistedAnalysisResult, outputData])
+    // Final fallback: direct Supabase fetch
+    return directFetchResult
+  }, [persistedAnalysisResult, outputData, directFetchResult])
 
   // Extract hero data from analysis result
   const heroData = useMemo(() => {
@@ -268,9 +327,6 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
         />
       )}
 
-      {/* Visual Style Preview - only show if visual style data is available */}
-      {visualStyle && <VisualStylePreview visualStyle={visualStyle} locale={locale} />}
-
       {/* Detailed Analysis View */}
       <AnalysisResultView
         data={analysisResult}
@@ -279,6 +335,7 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
         editable={editable}
         autoFocus={autoFocus}
         readOnly={readOnly}
+        visualStyle={visualStyle}
       />
     </div>
   )

@@ -14,10 +14,7 @@ interface SwipeOptions {
   preventDefaultTouchmoveEvent?: boolean
 }
 
-export function useSwipe(
-  handlers: SwipeHandlers,
-  options: SwipeOptions = {}
-) {
+export function useSwipe(handlers: SwipeHandlers, options: SwipeOptions = {}) {
   const { threshold = 50, preventDefaultTouchmoveEvent = false } = options
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null)
@@ -55,7 +52,7 @@ export function useSwipe(
     setTouchEnd(null)
     setTouchStart({
       x: e.targetTouches[0].clientX,
-      y: e.targetTouches[0].clientY
+      y: e.targetTouches[0].clientY,
     })
   }
 
@@ -65,7 +62,7 @@ export function useSwipe(
     }
     setTouchEnd({
       x: e.targetTouches[0].clientX,
-      y: e.targetTouches[0].clientY
+      y: e.targetTouches[0].clientY,
     })
   }
 
@@ -80,6 +77,6 @@ export function useSwipe(
     onTouchStart,
     onTouchMove,
     onTouchEnd,
-    elementRef
+    elementRef,
   }
 }

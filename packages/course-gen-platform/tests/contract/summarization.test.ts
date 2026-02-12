@@ -140,31 +140,23 @@ describe('Contract: Summarization Router', () => {
     const supabase = getSupabaseAdmin();
 
     // Insert test files with different models and costs
-    const fileId1 = await insertTestFileWithSummary(
-      TEST_COURSES.course1.id,
-      TEST_ORGS.premium.id,
-      {
-        model_used: 'openai/gpt-oss-20b',
-        estimated_cost_usd: 0.001,
-        input_tokens: 1000,
-        output_tokens: 200,
-        total_tokens: 1200,
-        processing_timestamp: new Date().toISOString(),
-      }
-    );
+    const fileId1 = await insertTestFileWithSummary(TEST_COURSES.course1.id, TEST_ORGS.premium.id, {
+      model_used: 'openai/gpt-oss-20b',
+      estimated_cost_usd: 0.001,
+      input_tokens: 1000,
+      output_tokens: 200,
+      total_tokens: 1200,
+      processing_timestamp: new Date().toISOString(),
+    });
 
-    const fileId2 = await insertTestFileWithSummary(
-      TEST_COURSES.course1.id,
-      TEST_ORGS.premium.id,
-      {
-        model_used: 'openai/gpt-oss-120b',
-        estimated_cost_usd: 0.002,
-        input_tokens: 1500,
-        output_tokens: 300,
-        total_tokens: 1800,
-        processing_timestamp: new Date().toISOString(),
-      }
-    );
+    const fileId2 = await insertTestFileWithSummary(TEST_COURSES.course1.id, TEST_ORGS.premium.id, {
+      model_used: 'openai/gpt-oss-120b',
+      estimated_cost_usd: 0.002,
+      input_tokens: 1500,
+      output_tokens: 300,
+      total_tokens: 1800,
+      processing_timestamp: new Date().toISOString(),
+    });
 
     testFileIds.push(fileId1, fileId2);
 
@@ -220,25 +212,17 @@ describe('Contract: Summarization Router', () => {
 
     // Insert file with old timestamp (31 days ago)
     const oldTimestamp = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
-    const fileId1 = await insertTestFileWithSummary(
-      TEST_COURSES.course1.id,
-      TEST_ORGS.premium.id,
-      {
-        processing_timestamp: oldTimestamp,
-        estimated_cost_usd: 0.001,
-      }
-    );
+    const fileId1 = await insertTestFileWithSummary(TEST_COURSES.course1.id, TEST_ORGS.premium.id, {
+      processing_timestamp: oldTimestamp,
+      estimated_cost_usd: 0.001,
+    });
 
     // Insert file with recent timestamp (5 days ago)
     const recentTimestamp = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
-    const fileId2 = await insertTestFileWithSummary(
-      TEST_COURSES.course1.id,
-      TEST_ORGS.premium.id,
-      {
-        processing_timestamp: recentTimestamp,
-        estimated_cost_usd: 0.002,
-      }
-    );
+    const fileId2 = await insertTestFileWithSummary(TEST_COURSES.course1.id, TEST_ORGS.premium.id, {
+      processing_timestamp: recentTimestamp,
+      estimated_cost_usd: 0.002,
+    });
 
     testFileIds.push(fileId1, fileId2);
 
@@ -300,22 +284,14 @@ describe('Contract: Summarization Router', () => {
     }
 
     // Insert file for Premium org
-    const fileId1 = await insertTestFileWithSummary(
-      TEST_COURSES.course1.id,
-      TEST_ORGS.premium.id,
-      {
-        estimated_cost_usd: 0.001,
-      }
-    );
+    const fileId1 = await insertTestFileWithSummary(TEST_COURSES.course1.id, TEST_ORGS.premium.id, {
+      estimated_cost_usd: 0.001,
+    });
 
     // Insert file for Free org using the free org course
-    const fileId2 = await insertTestFileWithSummary(
-      freeOrgCourse.id,
-      TEST_ORGS.free.id,
-      {
-        estimated_cost_usd: 0.002,
-      }
-    );
+    const fileId2 = await insertTestFileWithSummary(freeOrgCourse.id, TEST_ORGS.free.id, {
+      estimated_cost_usd: 0.002,
+    });
 
     testFileIds.push(fileId1, fileId2);
 
@@ -405,22 +381,18 @@ describe('Contract: Summarization Router', () => {
     expect(count).toBe(3);
 
     // Count by status
-    const typedFiles = files!.map((f) => ({
+    const typedFiles = files!.map(f => ({
       ...f,
       summary_metadata: f.summary_metadata as SummaryMetadata | null,
     }));
 
     const completedCount = typedFiles.filter(
-      (f) =>
-        f.processed_content !== null &&
-        f.summary_metadata?.quality_check_passed === true
+      f => f.processed_content !== null && f.summary_metadata?.quality_check_passed === true
     ).length;
 
-    const failedCount = typedFiles.filter((f) => f.error_message !== null).length;
+    const failedCount = typedFiles.filter(f => f.error_message !== null).length;
 
-    const bypassedCount = typedFiles.filter(
-      (f) => f.processing_method === 'full_text'
-    ).length;
+    const bypassedCount = typedFiles.filter(f => f.processing_method === 'full_text').length;
 
     const inProgressCount = count! - completedCount - failedCount - bypassedCount;
 

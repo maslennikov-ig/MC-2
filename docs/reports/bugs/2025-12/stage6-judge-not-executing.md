@@ -8,6 +8,7 @@
 ## Summary
 
 The Judge node in Stage 6 pipeline was exiting immediately without executing cascade evaluation (CLEV voting system). This resulted in:
+
 - `qualityScore: 0` for all generated lessons
 - No actual quality evaluation performed
 - Missing `judge_complete` trace records in database
@@ -17,6 +18,7 @@ The Judge node in Stage 6 pipeline was exiting immediately without executing cas
 ### Database Analysis
 
 **Generation trace records for stage_6:**
+
 ```
 step_name          | count
 -------------------|-------
@@ -36,16 +38,18 @@ finish             | 2
 ```
 
 **Timing evidence:**
+
 - `judge_start`: 11:32:01.673
 - `finish`: 11:32:02.683
 - **Delta: ~1 second** (cascade evaluation should take 10-30+ seconds)
 
 **Lesson content in database:**
+
 ```json
 {
   "status": "completed",
   "metadata": {
-    "qualityScore": 0,  // Default value, not from judge
+    "qualityScore": 0, // Default value, not from judge
     "total_tokens": 0,
     "model_used": null
   }
@@ -63,6 +67,7 @@ Investigation revealed **3 separate bugs** working together:
 **Problem:** The routing function checked `lessonContent !== null` BEFORE checking `needsRegeneration`. This caused the graph to exit even when regeneration was needed.
 
 **Original code:**
+
 ```typescript
 function shouldRetryAfterJudge(state: LessonGraphStateType): 'planner' | '__end__' {
   // BUG: This check came BEFORE needsRegeneration check
@@ -78,11 +83,15 @@ function shouldRetryAfterJudge(state: LessonGraphStateType): 'planner' | '__end_
 ```
 
 **Fix:** Reordered checks to prioritize `needsRegeneration`:
+
 ```typescript
 function shouldRetryAfterJudge(state: LessonGraphStateType): 'planner' | '__end__' {
   // FIXED: Check needsRegeneration FIRST
   if (state.needsRegeneration && state.retryCount < MAX_RETRIES) {
-    logger.debug({ retryCount: state.retryCount + 1 }, 'Judge routing: Routing to planner for regeneration');
+    logger.debug(
+      { retryCount: state.retryCount + 1 },
+      'Judge routing: Routing to planner for regeneration'
+    );
     return 'planner';
   }
 
@@ -100,6 +109,7 @@ function shouldRetryAfterJudge(state: LessonGraphStateType): 'planner' | '__end_
 **Problem:** The `lessonContent` reducer used `(x, y) => y ?? x` which rejects explicit `null` values. When judge returned `lessonContent: null` to trigger regeneration, the reducer kept the old value.
 
 **Original code:**
+
 ```typescript
 lessonContent: Annotation<LessonContent | null>({
   reducer: (x, y) => y ?? x,  // BUG: ?? rejects explicit null
@@ -108,6 +118,7 @@ lessonContent: Annotation<LessonContent | null>({
 ```
 
 **Fix:** Changed to accept explicit null:
+
 ```typescript
 lessonContent: Annotation<LessonContent | null>({
   reducer: (x, y) => (y !== undefined ? y : x),  // FIXED: Only reject undefined
@@ -122,6 +133,7 @@ lessonContent: Annotation<LessonContent | null>({
 **Problem:** The judge node didn't increment `retryCount` when recommending regeneration. This would have caused infinite retry loops.
 
 **Fix:** Added retryCount increment in both code paths:
+
 ```typescript
 return {
   // ... other fields
@@ -147,13 +159,13 @@ Judge routing: Ending graph (default) (retryCount: 2)
 
 ### Behavior Changes
 
-| Aspect | Before Fix | After Fix |
-|--------|------------|-----------|
-| Judge Duration | ~1 second | 5+ minutes (with retries) |
-| Cascade Evaluation | Never executed | Executes fully |
-| Regeneration Loop | Broken | Works correctly |
-| retryCount | Always 0 | Increments properly |
-| Error Handling | Silent exit | Proper routing |
+| Aspect             | Before Fix     | After Fix                 |
+| ------------------ | -------------- | ------------------------- |
+| Judge Duration     | ~1 second      | 5+ minutes (with retries) |
+| Cascade Evaluation | Never executed | Executes fully            |
+| Regeneration Loop  | Broken         | Works correctly           |
+| retryCount         | Always 0       | Increments properly       |
+| Error Handling     | Silent exit    | Proper routing            |
 
 ## Files Changed
 
@@ -169,12 +181,14 @@ Judge routing: Ending graph (default) (retryCount: 2)
 ## Impact
 
 ### Before Fix
+
 - All lessons had `qualityScore: 0`
 - No quality evaluation performed
 - Content saved even when quality gates failed
 - UI showed misleading "accept" with 0 score
 
 ### After Fix
+
 - Judge executes cascade evaluation (heuristics → single judge → CLEV voting)
 - Regeneration loop works with proper retry counting
 - Content only saved when quality passes

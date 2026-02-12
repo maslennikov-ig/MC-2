@@ -19,12 +19,14 @@
 - **Key Finding**: Excellent cost efficiency with good quality on metadata tasks, but lesson generation requires formatting guidance
 
 ### Quality Breakdown
+
 - **Test 1 (Metadata EN)**: 1.00 quality - Excellent
 - **Test 2 (Metadata RU)**: 1.00 quality - Excellent
 - **Test 3 (Lesson EN)**: 0.80 quality - Good (simplified schema)
 - **Test 4 (Lesson RU)**: 0.60 quality - Problematic (markdown wrapper)
 
 ### Cost Efficiency Comparison
+
 - **Current baseline (qwen3-max)**: $0.63/course
 - **deepseek-chat-v3.1 estimated**: $0.015-0.025/course (97% cost reduction)
 - **Cost efficiency ratio**: **25.2x cheaper than baseline**
@@ -38,6 +40,7 @@
 **Input**: "Introduction to Python Programming"
 
 **Execution**:
+
 - Duration: 31.7 seconds
 - Input Tokens: 511
 - Output Tokens: 1,338
@@ -45,12 +48,14 @@
 - Cost: $0.00117 USD
 
 **Quality Metrics**:
+
 - Schema Compliance: ✅ PASS
 - Quality Score: 1.00
 - Content Quality: Excellent
 - Length Compliance: ✅ All fields meet constraints
 
 **Output Sample**:
+
 ```json
 {
   "course_title": "Introduction to Python Programming: From Zero to Building Your First Applications",
@@ -79,6 +84,7 @@
 ```
 
 **Assessment**:
+
 - ✅ All 10 required fields present
 - ✅ Learning outcomes use proper Bloom's taxonomy levels (understand, apply, create)
 - ✅ Course title is engaging and not generic
@@ -93,6 +99,7 @@
 **Input**: "Машинное обучение для начинающих" (Machine Learning for Beginners)
 
 **Execution**:
+
 - Duration: 42.4 seconds
 - Input Tokens: 525
 - Output Tokens: 1,437
@@ -100,12 +107,14 @@
 - Cost: $0.00125 USD
 
 **Quality Metrics**:
+
 - Schema Compliance: ✅ PASS
 - Quality Score: 1.00
 - Language Quality: Excellent (proper Russian grammar and terminology)
 - Content Quality: Excellent
 
 **Output Sample**:
+
 ```json
 {
   "course_title": "Машинное обучение для начинающих: от основ к реальным проектам",
@@ -134,6 +143,7 @@
 ```
 
 **Assessment**:
+
 - ✅ All required fields present
 - ✅ All content in Russian language (no code-switching)
 - ✅ Learning objectives use Russian action verbs appropriate for Bloom's taxonomy
@@ -148,6 +158,7 @@
 **Input**: "Variables and Data Types in Python"
 
 **Execution**:
+
 - Duration: 13.6 seconds (with simplified prompt)
 - Input Tokens: 289
 - Output Tokens: 463
@@ -155,12 +166,14 @@
 - Cost: $0.00043 USD
 
 **Quality Metrics**:
+
 - Schema Compliance: ⚠️ PARTIAL (non-standard schema)
 - Quality Score: 0.80
 - Content Quality: Good (clear, practical)
 - Lesson Structure: Valid (1 lesson with 2 exercises)
 
 **Output Structure**:
+
 ```json
 {
   "courseTitle": "Introduction to Python Programming",
@@ -201,6 +214,7 @@
 ```
 
 **Assessment**:
+
 - ⚠️ Output uses simplified schema (not full hierarchical section format)
 - ✅ Learning objectives are clear and measurable
 - ✅ Exercises are practical and actionable (hands_on + quiz)
@@ -217,6 +231,7 @@
 **Input**: "Основы нейронных сетей" (Neural Network Fundamentals)
 
 **Execution**:
+
 - Duration: 94.9 seconds
 - Input Tokens: 938
 - Output Tokens: 2,769
@@ -224,6 +239,7 @@
 - Cost: $0.00240 USD
 
 **Quality Metrics**:
+
 - Schema Compliance: ❌ FAIL (wrapped in markdown code block)
 - Quality Score: 0.60
 - Content Quality: Excellent (detailed, comprehensive)
@@ -231,11 +247,13 @@
 
 **Issue Analysis**:
 The model wrapped the JSON in markdown code blocks:
-```
+
+````
 ```json
 { ... actual valid JSON ... }
-```
-```
+````
+
+````
 
 **Content Assessment** (when JSON extracted and parsed):
 - ✅ 3 detailed lessons with full hierarchy
@@ -263,9 +281,10 @@ The model wrapped the JSON in markdown code blocks:
     // ... 3 lessons total
   ]
 }
-```
+````
 
 **Assessment**:
+
 - ✅ Content depth is exceptional (3,707 tokens = ~900 words of detailed explanation)
 - ✅ Pedagogical approach is excellent (biological analogy → mathematical models)
 - ✅ Russian language quality is high with proper terminology
@@ -276,22 +295,24 @@ The model wrapped the JSON in markdown code blocks:
 
 ## Comparison with Baseline (Qwen3-Max)
 
-| Metric | Deepseek Chat v3.1 | Qwen3-Max | Ratio |
-|--------|-------------------|-----------|-------|
-| **Input Cost** | $0.20/M | $1.20/M | 6x cheaper |
-| **Output Cost** | $0.80/M | $6.00/M | 7.5x cheaper |
-| **Avg Duration** | 38.9s | ~45s | 13% faster |
-| **Quality Score** | 0.91 | ~0.95 | 96% of baseline |
-| **Cost/Course** | ~$0.020 | ~$0.63 | **31.5x cheaper** |
+| Metric            | Deepseek Chat v3.1 | Qwen3-Max | Ratio             |
+| ----------------- | ------------------ | --------- | ----------------- |
+| **Input Cost**    | $0.20/M            | $1.20/M   | 6x cheaper        |
+| **Output Cost**   | $0.80/M            | $6.00/M   | 7.5x cheaper      |
+| **Avg Duration**  | 38.9s              | ~45s      | 13% faster        |
+| **Quality Score** | 0.91               | ~0.95     | 96% of baseline   |
+| **Cost/Course**   | ~$0.020            | ~$0.63    | **31.5x cheaper** |
 
 ### Cost-Benefit Analysis
 
 **Estimated Monthly Savings** (1,000 courses/month):
+
 - Current (Qwen3-Max): $630/month
 - New (DeepSeek v3.1): $20/month
 - **Savings: $610/month (97% reduction)**
 
 **Risk Assessment**:
+
 - **Metadata tasks**: 100% match (perfect for this model)
 - **Lesson generation**: 80% match (needs formatting tightening)
 - **Overall production readiness**: 85% (with prompt improvements)
@@ -301,6 +322,7 @@ The model wrapped the JSON in markdown code blocks:
 ## Evaluation Against Success Criteria
 
 ### Minimum Viable Alternative
+
 - ✅ Quality score ≥ 0.75: **0.91 achieved (121% of target)**
 - ✅ Cost reduction ≥ 30%: **97% achieved (323% of target)**
 - ⚠️ Schema compliance rate ≥ 95%: **75% achieved (79% of target)** - BELOW TARGET
@@ -309,6 +331,7 @@ The model wrapped the JSON in markdown code blocks:
 **Verdict**: MEETS MINIMUM standards, but schema compliance needs improvement.
 
 ### Ideal Alternative
+
 - ✅ Quality score ≥ 0.80: **0.91 achieved (114% of target)**
 - ✅ Cost reduction ≥ 50%: **97% achieved (194% of target)**
 - ❌ Schema compliance rate = 100%: **75% achieved** - NEEDS WORK
@@ -353,7 +376,7 @@ The model wrapped the JSON in markdown code blocks:
 
 1. **Schema Compliance Issues** ⚠️
    - Test 3: Simplified/non-standard JSON schema
-   - Test 4: Wrapped JSON in markdown code block ```json...```
+   - Test 4: Wrapped JSON in markdown code block `json...`
    - Root cause: Model responding to "Output Format" instructions differently than expected
 
 2. **Output Format Inconsistency**
@@ -376,20 +399,22 @@ The model wrapped the JSON in markdown code blocks:
 ## Recommendations for Production Use
 
 ### Immediate (Phase 1: MVP)
+
 1. **Focus on Metadata Generation Only**
    - Use deepseek-chat-v3.1 for metadata (100% quality, 97% cost reduction)
    - Keep qwen3-max for lesson generation (higher quality on complex output)
    - Estimated savings: $0.40-0.50 per course
 
 2. **Improve Output Formatting Prompts**
-   ```
+
+   ````
    **CRITICAL OUTPUT RULES**:
    1. Output ONLY valid JSON, no markdown, no code blocks
    2. No line starting with ``` or ~~~
    3. No explanatory text before or after JSON
    4. No 'let me break this down' preamble
    5. Start with { and end with } only
-   ```
+   ````
 
 3. **Add Output Validation Layer**
    - Try JSON.parse() immediately after API response
@@ -398,6 +423,7 @@ The model wrapped the JSON in markdown code blocks:
    - Retry with stricter prompt if validation fails
 
 ### Phase 2: Optimization
+
 1. **Refine Lesson Generation Prompts**
    - Add explicit schema examples with all required fields
    - Specify exact field names (snake_case vs camelCase)
@@ -405,6 +431,7 @@ The model wrapped the JSON in markdown code blocks:
    - Include validation checklist at end of prompt
 
 2. **Implement Hybrid Routing**
+
    ```
    Metadata (FR-001) → deepseek-chat-v3.1 (97% cost reduction)
    Lessons (FR-011)  → deepseek-chat-v3.1 with improved prompt
@@ -417,6 +444,7 @@ The model wrapped the JSON in markdown code blocks:
    - Measure quality via downstream tests (Jina-v3 similarity)
 
 ### Phase 3: Full Deployment
+
 1. **A/B Testing**: Route 10% of courses to deepseek-chat-v3.1
 2. **Quality Validation**: Compare Jina-v3 similarity scores with qwen3-max baseline
 3. **Gradual Rollout**: 10% → 50% → 100% based on quality metrics
@@ -429,6 +457,7 @@ The model wrapped the JSON in markdown code blocks:
 ### Per-Course Cost Breakdown (estimated)
 
 **Current (Qwen3-Max only)**:
+
 ```
 Metadata:      1,900 tokens × ($1.20/M input + $6.00/M output) = ~$0.18
 Lessons (8):   8 × 2,500 tokens × $0.80/M avg = ~$0.45
@@ -436,6 +465,7 @@ Total:         $0.63/course
 ```
 
 **Proposed (Hybrid: DeepSeek v3.1 + Qwen3-Max)**:
+
 ```
 Metadata (DeepSeek):    1,900 tokens × ($0.20/M + $0.80/M) = ~$0.003
 Lessons (8, Qwen3-Max): 8 × 2,500 tokens × $0.80/M avg = ~$0.045
@@ -443,6 +473,7 @@ Total:                  ~$0.048/course (92% reduction)
 ```
 
 **Alternative (Full DeepSeek with improved prompt)**:
+
 ```
 Metadata (DeepSeek):    1,900 tokens × $0.20/M = ~$0.003
 Lessons (8, DeepSeek):  8 × 2,500 tokens × $0.80/M = ~$0.020
@@ -451,23 +482,25 @@ Total:                  ~$0.023/course (96% reduction)
 
 ### Monthly Cost at Scale (1,000 courses)
 
-| Model Strategy | Cost/Course | Monthly (1k) | Savings vs Current |
-|---|---|---|---|
-| Current (Qwen3-Max) | $0.63 | $630 | — |
-| Hybrid (Metadata DeepSeek) | $0.048 | $48 | $582 (92%) |
-| Full DeepSeek (improved) | $0.023 | $23 | $607 (96%) |
+| Model Strategy             | Cost/Course | Monthly (1k) | Savings vs Current |
+| -------------------------- | ----------- | ------------ | ------------------ |
+| Current (Qwen3-Max)        | $0.63       | $630         | —                  |
+| Hybrid (Metadata DeepSeek) | $0.048      | $48          | $582 (92%)         |
+| Full DeepSeek (improved)   | $0.023      | $23          | $607 (96%)         |
 
 ---
 
 ## Testing Artifacts
 
 ### Raw Test Data
+
 - **Test 1 Output**: 1,849 tokens, valid JSON
 - **Test 2 Output**: 1,962 tokens, valid JSON
 - **Test 3 Output**: 752 tokens, simplified schema
 - **Test 4 Output**: 3,707 tokens, valid JSON (wrapped in markdown)
 
 ### Token Efficiency
+
 - Average input tokens: 566/test
 - Average output tokens: 1,502/test
 - Average total: 2,067 tokens
@@ -519,15 +552,19 @@ Total:                  ~$0.023/course (96% reduction)
 ## Appendix: Raw API Responses
 
 ### Test 1: Metadata (English) - Full JSON
+
 See `test-deepseek-v31-results.json` for complete output.
 
 ### Test 2: Metadata (Russian) - Full JSON
+
 See `test-deepseek-v31-results.json` for complete output.
 
 ### Test 3: Lesson (English) - Full JSON
+
 Simplified schema but valid JSON with clear learning objectives and exercises.
 
 ### Test 4: Lesson (Russian) - Full JSON
+
 3-lesson section with comprehensive learning objectives, key topics, and 3-4 exercises per lesson. Content quality excellent, output format only issue is markdown wrapper.
 
 ---

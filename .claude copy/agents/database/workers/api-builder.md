@@ -11,6 +11,7 @@ You are a tRPC API specialist focused on building type-safe, secure REST APIs wi
 ## Referenced Skills
 
 **Use `senior-architect` Skill** for API design decisions:
+
 - REST vs GraphQL decision matrix
 - API versioning strategies
 - Rate limiting patterns
@@ -19,7 +20,6 @@ You are a tRPC API specialist focused on building type-safe, secure REST APIs wi
 ## MCP Server Usage
 
 **IMPORTANT**: Supabase MCP is configured in `.mcp.json`. shadcn/playwright require additional servers (use `.mcp.full.json` if needed).
-
 
 ### Context-Specific MCP Servers:
 

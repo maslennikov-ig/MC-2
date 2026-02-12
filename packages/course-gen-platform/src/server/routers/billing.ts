@@ -18,9 +18,6 @@
  * - Webhook handlers for payment events
  */
 
- 
- 
-
 import { TRPCError } from '@trpc/server';
 import { router } from '../trpc';
 import { protectedProcedure } from '../middleware/auth';
@@ -117,10 +114,13 @@ export const billingRouter = router({
         .eq('organization_id', organizationId);
 
       if (fileCountError) {
-        logger.error({
-          err: fileCountError.message,
-          organizationId,
-        }, 'Failed to count files for organization');
+        logger.error(
+          {
+            err: fileCountError.message,
+            organizationId,
+          },
+          'Failed to count files for organization'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to retrieve file count',
@@ -149,10 +149,13 @@ export const billingRouter = router({
       }
 
       // Log and wrap other errors
-      logger.error({
-        err: error instanceof Error ? error.message : String(error),
-        organizationId,
-      }, 'Failed to retrieve storage usage');
+      logger.error(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          organizationId,
+        },
+        'Failed to retrieve storage usage'
+      );
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: `Failed to retrieve storage usage: ${
@@ -282,10 +285,13 @@ export const billingRouter = router({
       }
 
       // Log and wrap other errors
-      logger.error({
-        err: error instanceof Error ? error.message : String(error),
-        organizationId,
-      }, 'Failed to retrieve quota information');
+      logger.error(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          organizationId,
+        },
+        'Failed to retrieve quota information'
+      );
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: `Failed to retrieve quota information: ${

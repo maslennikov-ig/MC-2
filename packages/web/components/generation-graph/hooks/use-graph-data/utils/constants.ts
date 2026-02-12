@@ -7,4 +7,4 @@ export const GRAPH_DATA_LIMITS = {
   MAX_PROCESSED_TRACES: 1000,
   /** Number of recent trace IDs to retain during cleanup */
   CLEANUP_RETAIN_COUNT: 500,
-} as const;
+} as const

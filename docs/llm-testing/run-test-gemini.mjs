@@ -24,7 +24,7 @@ if (!OPENROUTER_API_KEY) {
 const MODEL = {
   slug: 'gemini-2.5-flash-preview',
   apiName: 'google/gemini-2.5-flash-preview-05-20',
-  name: 'Gemini 2.5 Flash Preview'
+  name: 'Gemini 2.5 Flash Preview',
 };
 
 const SCENARIOS = [
@@ -48,7 +48,7 @@ Generate a JSON object with the following fields:
 - learning_outcomes: string[] (3-8 measurable outcomes using Bloom's taxonomy verbs)
 - course_tags: string[] (3-10 relevant tags)
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`,
   },
   {
     id: 'metadata-ru',
@@ -70,7 +70,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
 - learning_outcomes: string[] (3-8 измеримых результатов обучения с глаголами таксономии Блума)
 - course_tags: string[] (3-10 релевантных тегов)
 
-КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`
+КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`,
   },
   {
     id: 'lesson-en',
@@ -95,7 +95,7 @@ Generate a JSON object with the following fields:
     - exercise_title: string (5-100 chars)
     - exercise_instructions: string (20+ chars, clear and actionable)
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`,
   },
   {
     id: 'lesson-ru',
@@ -120,8 +120,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
     - exercise_title: string (5-100 символов)
     - exercise_instructions: string (20+ символов, чёткие и выполнимые)
 
-КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`
-  }
+КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`,
+  },
 ];
 
 // ============================================================================
@@ -147,17 +147,17 @@ async function callOpenRouter(model, prompt) {
   const response = await fetch(OPENROUTER_BASE_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://megacampus.ai',
-      'X-Title': 'MegaCampus LLM Testing Run 6'
+      'X-Title': 'MegaCampus LLM Testing Run 6',
     },
     body: JSON.stringify({
       model: model,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
-      max_tokens: 8000
-    })
+      max_tokens: 8000,
+    }),
   });
 
   if (!response.ok) {
@@ -203,27 +203,45 @@ async function runSingleTest(model, scenario, runNumber) {
     if (parsed) {
       writeFileSync(outputFile, JSON.stringify(parsed, null, 2), 'utf-8');
     } else {
-      writeFileSync(outputFile, JSON.stringify({
-        error: 'JSON parse error',
-        parseError,
-        rawContent: cleaned
-      }, null, 2), 'utf-8');
+      writeFileSync(
+        outputFile,
+        JSON.stringify(
+          {
+            error: 'JSON parse error',
+            parseError,
+            rawContent: cleaned,
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
     }
 
-    writeFileSync(logFile, JSON.stringify({
-      model: model.name,
-      modelSlug: model.slug,
-      scenario: scenario.id,
-      runNumber,
-      duration,
-      timestamp: new Date().toISOString(),
-      contentLength: cleaned.length,
-      parseSuccess: parsed !== null,
-      parseError
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      logFile,
+      JSON.stringify(
+        {
+          model: model.name,
+          modelSlug: model.slug,
+          scenario: scenario.id,
+          runNumber,
+          duration,
+          timestamp: new Date().toISOString(),
+          contentLength: cleaned.length,
+          parseSuccess: parsed !== null,
+          parseError,
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
     const status = parsed ? '✅' : '⚠️ JSON parse error';
-    console.log(`  [${model.slug}] ${scenario.id} run${runNumber} - ${status} (${(duration / 1000).toFixed(1)}s)`);
+    console.log(
+      `  [${model.slug}] ${scenario.id} run${runNumber} - ${status} (${(duration / 1000).toFixed(1)}s)`
+    );
 
     return {
       model: model.name,
@@ -233,14 +251,15 @@ async function runSingleTest(model, scenario, runNumber) {
       success: parsed !== null,
       duration,
       contentLength: cleaned.length,
-      parseError
+      parseError,
     };
-
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMsg = error.message || String(error);
 
-    console.log(`  [${model.slug}] ${scenario.id} run${runNumber} - ❌ Error: ${errorMsg.substring(0, 100)}`);
+    console.log(
+      `  [${model.slug}] ${scenario.id} run${runNumber} - ❌ Error: ${errorMsg.substring(0, 100)}`
+    );
 
     const modelDir = join(OUTPUT_DIR, model.slug);
     if (!existsSync(modelDir)) {
@@ -248,15 +267,23 @@ async function runSingleTest(model, scenario, runNumber) {
     }
 
     const errorFile = join(modelDir, `${scenario.id}-run${runNumber}-ERROR.json`);
-    writeFileSync(errorFile, JSON.stringify({
-      model: model.name,
-      modelSlug: model.slug,
-      scenario: scenario.id,
-      runNumber,
-      error: errorMsg,
-      duration,
-      timestamp: new Date().toISOString()
-    }, null, 2), 'utf-8');
+    writeFileSync(
+      errorFile,
+      JSON.stringify(
+        {
+          model: model.name,
+          modelSlug: model.slug,
+          scenario: scenario.id,
+          runNumber,
+          error: errorMsg,
+          duration,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
 
     return {
       model: model.name,
@@ -265,7 +292,7 @@ async function runSingleTest(model, scenario, runNumber) {
       runNumber,
       success: false,
       duration,
-      error: errorMsg
+      error: errorMsg,
     };
   }
 }
@@ -315,26 +342,38 @@ async function main() {
   console.log(`📊 Statistics:`);
   console.log(`   Total duration: ${(overallDuration / 1000 / 60).toFixed(2)} minutes`);
   console.log(`   Total tests: ${totalCount}`);
-  console.log(`   Successful: ${successCount} (${((successCount/totalCount)*100).toFixed(1)}%)`);
+  console.log(
+    `   Successful: ${successCount} (${((successCount / totalCount) * 100).toFixed(1)}%)`
+  );
   console.log(`   Failed: ${totalCount - successCount}`);
   console.log(`   Average test duration: ${(avgDuration / 1000).toFixed(1)}s\n`);
 
   // Save model summary
   const summaryFile = join(OUTPUT_DIR, MODEL.slug, 'summary.json');
-  writeFileSync(summaryFile, JSON.stringify({
-    model: MODEL.name,
-    slug: MODEL.slug,
-    apiName: MODEL.apiName,
-    totalTests: totalCount,
-    successful: successCount,
-    failed: totalCount - successCount,
-    successRate: ((successCount / totalCount) * 100).toFixed(1),
-    avgDuration: avgDuration.toFixed(0),
-    results: testResults
-  }, null, 2), 'utf-8');
+  writeFileSync(
+    summaryFile,
+    JSON.stringify(
+      {
+        model: MODEL.name,
+        slug: MODEL.slug,
+        apiName: MODEL.apiName,
+        totalTests: totalCount,
+        successful: successCount,
+        failed: totalCount - successCount,
+        successRate: ((successCount / totalCount) * 100).toFixed(1),
+        avgDuration: avgDuration.toFixed(0),
+        results: testResults,
+      },
+      null,
+      2
+    ),
+    'utf-8'
+  );
 
   const icon = successCount === totalCount ? '✅' : successCount > 8 ? '⚠️' : '❌';
-  console.log(`   ${icon} ${MODEL.name.padEnd(25)} ${successCount}/${totalCount} (${((successCount/totalCount)*100).toFixed(1)}%)`);
+  console.log(
+    `   ${icon} ${MODEL.name.padEnd(25)} ${successCount}/${totalCount} (${((successCount / totalCount) * 100).toFixed(1)}%)`
+  );
   console.log('\n✅ Tests completed!\n');
 }
 

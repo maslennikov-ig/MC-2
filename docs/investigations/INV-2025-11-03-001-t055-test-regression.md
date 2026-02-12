@@ -41,6 +41,7 @@ duration: ~30 minutes
 ### Observed Behavior
 
 **From User Report**:
+
 ```
 Regression: Раньше все 3 документа обрабатывались успешно, сейчас только 2 из 3.
 
@@ -48,6 +49,7 @@ Test timeout после 218 секунд на ожидании 3-го докум
 ```
 
 **Actual Test Output**:
+
 ```
 [T055] Document processing status: 2/3 completed, 0 failed
 [T055] Document processing status: 2/3 completed, 0 failed
@@ -147,6 +149,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 ### Data Collected
 
 **Job Creation Timeline**:
+
 ```json
 // Test course: 1dc0e4b1-cfc4-4e41-8183-d8ce4bb03fa4
 // Uploaded files:
@@ -166,6 +169,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 ```
 
 **Test Timeline** (unix timestamps):
+
 ```
 1762187592076 - Processing initiated, jobs 62,63,64 created
 1762187637659 - Job 65 (STAGE_3) queued for file 97a5c80f
@@ -182,6 +186,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 ```
 
 **Error Log**:
+
 ```json
 {
   "level": 50,
@@ -204,6 +209,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 **Evidence**:
 
 1. **Test logs show status transition error**:
+
    ```
    "Invalid generation status transition: generating_content → generating_structure"
    ```
@@ -214,6 +220,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    - File 3 (49692f): processed_content saved ✅
 
 3. **Stage 4 barrier passed validation**:
+
    ```json
    {
      "courseId": "1dc0e4b1-cfc4-4e41-8183-d8ce4bb03fa4",
@@ -225,6 +232,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    ```
 
 4. **Test completion check works correctly**:
+
    ```
    [T055] Document processing status: 3/3 completed, 0 failed
    [T055] All 3 documents processed successfully
@@ -295,6 +303,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 **Description**: Modify analysis.start to accept courses in `generating_content` status (from Stage 3 completion) and transition them to `generating_structure`.
 
 **Why This Addresses Root Cause**:
+
 - Stage 3 (summarization) legitimately updates course to `generating_content` when all summaries complete
 - Analysis (Stage 4) should be able to start from this state
 - This reflects the actual workflow: documents → summaries → analysis → structure
@@ -307,12 +316,13 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    - **Purpose**: Allow `generating_content → generating_structure` transition
 
 2. **Specific Change**:
+
    ```typescript
    // BEFORE (hypothetical - need to verify actual code):
    if (course.generation_status !== 'processing_documents') {
      throw new TRPCError({
        code: 'BAD_REQUEST',
-       message: 'Cannot start analysis: course not in processing_documents state'
+       message: 'Cannot start analysis: course not in processing_documents state',
      });
    }
 
@@ -321,24 +331,27 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    if (!validStatuses.includes(course.generation_status)) {
      throw new TRPCError({
        code: 'BAD_REQUEST',
-       message: `Cannot start analysis from status: ${course.generation_status}`
+       message: `Cannot start analysis from status: ${course.generation_status}`,
      });
    }
    ```
 
 **Testing Strategy**:
+
 - Run T055 E2E test → should pass
 - Verify analysis starts successfully after document processing
 - Check course status transitions: `processing_documents` → `generating_content` → `generating_structure`
 - Ensure no regressions in other status transitions
 
 **Pros**:
+
 - ✅ Minimal code change (single validation condition)
 - ✅ Aligns with actual workflow behavior
 - ✅ Preserves Stage 3 status update logic
 - ✅ Low risk of side effects
 
 **Cons**:
+
 - ❌ May allow invalid transitions if validation is incomplete
 - ❌ Doesn't address the conceptual confusion about status meanings
 
@@ -353,6 +366,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 **Description**: After Stage 3 completes all summaries, reset course status back to `processing_documents` instead of `generating_content`.
 
 **Why This Addresses Root Cause**:
+
 - Keeps course in `processing_documents` state until analysis explicitly starts
 - Maintains expected status for analysis.start validation
 - Stage 3 progress tracked via `generation_progress.steps[2]`, not `generation_status`
@@ -365,6 +379,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    - **Purpose**: Keep course in `processing_documents` state
 
 2. **Specific Change**:
+
    ```typescript
    // AFTER (in updateCourseProgress function, after barrier passes):
    if (barrierResult.canProceed) {
@@ -384,17 +399,20 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    - **Purpose**: Only update `generation_status` for specific steps
 
 **Testing Strategy**:
+
 - Run T055 E2E test → should pass
 - Verify course stays in `processing_documents` after Stage 3
 - Check `generation_progress.steps[2].status === 'completed'`
 - Verify analysis.start transitions to `generating_structure`
 
 **Pros**:
+
 - ✅ Maintains expected status for analysis.start
 - ✅ Clearer separation: document processing vs content generation
 - ✅ No changes to validation logic
 
 **Cons**:
+
 - ❌ May require changes to RPC function (SQL)
 - ❌ Conceptual mismatch: "generating_content" is accurate for summarization
 - ❌ More complex change across multiple layers
@@ -410,6 +428,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 **Description**: Add explicit status transition when test (or production code) completes document processing and before starting analysis.
 
 **Why This Addresses Root Cause**:
+
 - Makes status transitions explicit and controllable
 - Test can ensure course is in correct state before analysis.start
 - Decouples document processing completion from analysis readiness
@@ -426,6 +445,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    - **Purpose**: Prepare course for analysis
 
 3. **Specific Change**:
+
    ```typescript
    // After waitForDocumentProcessing completes:
    await waitForDocumentProcessing(testCourseId);
@@ -433,7 +453,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 
    // NEW: Reset status for analysis
    await client.generation.resetStatusForAnalysis.mutate({
-     courseId: testCourseId
+     courseId: testCourseId,
    });
 
    // Verify Qdrant vectors
@@ -441,18 +461,21 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    ```
 
 **Testing Strategy**:
+
 - Run T055 E2E test → should pass
 - Verify status reset is idempotent
 - Check that production code also uses this transition
 - Test error handling if status is invalid
 
 **Pros**:
+
 - ✅ Explicit, clear intent
 - ✅ Testable status transitions
 - ✅ Can be used in production code paths
 - ✅ Avoids implicit assumptions
 
 **Cons**:
+
 - ❌ Adds complexity (new API endpoint)
 - ❌ Requires changes to both test and production code
 - ❌ More surface area for bugs
@@ -479,6 +502,7 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
    - **Purpose**: Accept `generating_content` as valid pre-analysis status
 
 **Validation Criteria**:
+
 - ✅ T055 E2E test passes completely (all stages)
 - ✅ Analysis starts without status transition error
 - ✅ Course transitions: `processing_documents` → `generating_content` → `generating_structure` → `completed`
@@ -487,22 +511,26 @@ grep -A5 "Failed to start analysis" /tmp/t055-test-output.log
 **Testing Requirements**:
 
 **Unit tests**:
+
 - Test analysis.start with `generating_content` status → should succeed
 - Test analysis.start with `processing_documents` status → should succeed (backward compatibility)
 - Test analysis.start with invalid status (e.g., `completed`) → should fail with clear error
 
 **Integration tests**:
+
 - Run T055 E2E test → full pipeline completion
 - Test analysis.start after Stage 3 completion
 - Test forceRestart with `generating_content` status
 
 **Manual verification**:
+
 - Upload 3 documents → verify all process successfully
 - Check course status after document processing → `generating_content`
 - Call analysis.start → should transition to `generating_structure`
 - Verify analysis completes successfully
 
 **Dependencies**:
+
 - None (isolated change to validation logic)
 
 ---
@@ -533,6 +561,7 @@ None - additive change (accepts additional valid status), maintains backward com
 **Potential side effect**: Analysis may start before all document processing jobs complete if status is set incorrectly by another code path.
 
 **Mitigation**:
+
 - Verify Stage 4 barrier validation still runs (checks `processed_content IS NOT NULL`)
 - Add assertion in analysis.start to verify document processing completion
 - Monitor production logs for premature analysis starts
@@ -636,11 +665,12 @@ status: generating_structure
 
 ### Documentation References
 
-**Context7 Documentation Findings**: *(Investigation did not require external documentation - issue identified through log analysis and code review)*
+**Context7 Documentation Findings**: _(Investigation did not require external documentation - issue identified through log analysis and code review)_
 
 **MCP Server Usage**:
 
 **Context7 MCP**:
+
 - Libraries queried: `/taskforcesh/bullmq`
 - Topics searched: Job processing patterns
 - **Quotes/excerpts included**: Not required for this investigation
@@ -669,17 +699,20 @@ status: generating_structure
 ### Follow-Up Recommendations
 
 **Short-term**:
+
 - Implement Solution 1 to unblock test
 - Add regression test for `generating_content → generating_structure` transition
 - Document valid status transitions in architecture docs
 
 **Long-term**:
+
 - Review entire status state machine for gaps
 - Consider implementing explicit status transition validation (FSM pattern)
 - Add monitoring for invalid status transitions in production
 - Clean up orphaned jobs from previous test runs (job 59, etc.)
 
 **Process improvements**:
+
 - Add test cleanup to ensure isolated test runs (no orphaned jobs)
 - Document status transition expectations for each workflow phase
 - Consider adding status transition diagram to codebase
@@ -743,6 +776,7 @@ The problem is NOT that documents fail to process. All 3 documents process succe
 **Why this happened**: Stage 3 summarization handler was recently added (lines 202-263 in document-processing.ts). When the last summary completes, it updates the course to `generating_content` status, which is correct for that phase, but creates a mismatch with what `analysis.start` expects.
 
 **Evidence**: Test logs clearly show:
+
 ```
 [T055] Document processing status: 3/3 completed, 0 failed ✅
 [T055] All 3 documents processed successfully ✅

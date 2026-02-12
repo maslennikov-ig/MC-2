@@ -5,7 +5,27 @@
   "target_audience": "Absolute beginners with no prior coding experience; professionals in non-technical roles (e.g., marketers, analysts, administrators) seeking to automate tasks; students preparing for more advanced computer science or data science coursework; and hobbyists interested in understanding the basics of programming.",
   "estimated_duration_hours": 25,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Ability to install software on your computer", "No prior programming experience required"],
-  "learning_outcomes": ["Define core programming concepts such as variables, data types, and control flow structures", "Build functional Python scripts that utilize functions and modules for code organization", "Create practical applications including a text-based game, a file organizer, and a data processing script", "Analyze and debug code by interpreting error messages and using basic troubleshooting techniques", "Differentiate between mutable and immutable data types and apply them appropriately in programs", "Execute file input/output operations to read from and write data to external files"],
-  "course_tags": ["python", "programming", "beginner", "coding", "automation", "scripting", "data structures", "foundations"]
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software on your computer",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define core programming concepts such as variables, data types, and control flow structures",
+    "Build functional Python scripts that utilize functions and modules for code organization",
+    "Create practical applications including a text-based game, a file organizer, and a data processing script",
+    "Analyze and debug code by interpreting error messages and using basic troubleshooting techniques",
+    "Differentiate between mutable and immutable data types and apply them appropriately in programs",
+    "Execute file input/output operations to read from and write data to external files"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "automation",
+    "scripting",
+    "data structures",
+    "foundations"
+  ]
 }

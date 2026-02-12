@@ -70,6 +70,9 @@ settings.local.json
 scripts/setup-env.sh
 specs/002-main-entry-orchestrator/MANUAL-TESTING-GUIDE-RU.md
 
+# --- OAuth Secrets ---
+docs/client_secret_*.json
+
 # --- AI Memory & Private Data ---
 .gemini/memory.md
 .gemini/memories.md

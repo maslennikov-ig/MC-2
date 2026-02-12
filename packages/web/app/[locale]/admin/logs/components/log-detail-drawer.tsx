@@ -7,6 +7,7 @@ import { Loader2, Clock, Cpu, DollarSign, FileCode, Save, Copy, Check, Plus } fr
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { formatDuration } from '@megacampus/shared-utils'
 import { SeverityBadge } from './severity-badge'
 import {
   Select,
@@ -132,7 +133,7 @@ Course: ${details.courseName || 'N/A'}${details.courseId ? ` (${details.courseId
     try {
       return JSON.stringify(data, null, 2)
     } catch {
-      return String(data)
+      return String(data as unknown)
     }
   }
 
@@ -328,7 +329,7 @@ Course: ${details.courseName || 'N/A'}${details.courseId ? ` (${details.courseId
                   {details.durationMs !== null && (
                     <div className="flex items-center gap-2">
                       <Clock className="text-muted-foreground h-4 w-4" />
-                      <span>{(details.durationMs / 1000).toFixed(2)}s</span>
+                      <span>{formatDuration(details.durationMs)}</span>
                     </div>
                   )}
                 </div>

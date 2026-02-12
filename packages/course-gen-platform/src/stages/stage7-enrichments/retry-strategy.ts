@@ -204,8 +204,7 @@ export function getFallbackModel(ctx: RetryContext): string | null {
     return null;
   }
 
-  const modelConfig =
-    ctx.enrichmentType === 'quiz' ? MODEL_CONFIG.quiz : MODEL_CONFIG.presentation;
+  const modelConfig = ctx.enrichmentType === 'quiz' ? MODEL_CONFIG.quiz : MODEL_CONFIG.presentation;
 
   // If already on fallback, no further fallback
   if (ctx.currentModel === modelConfig.fallback) {
@@ -227,17 +226,13 @@ export function getFallbackModel(ctx: RetryContext): string | null {
  * @param attempt - Current attempt number (1-based)
  * @returns Model name to use
  */
-export function getModelForAttempt(
-  enrichmentType: EnrichmentType,
-  attempt: number
-): string | null {
+export function getModelForAttempt(enrichmentType: EnrichmentType, attempt: number): string | null {
   // Only LLM-based enrichments need model selection
   if (enrichmentType !== 'quiz' && enrichmentType !== 'presentation') {
     return null;
   }
 
-  const modelConfig =
-    enrichmentType === 'quiz' ? MODEL_CONFIG.quiz : MODEL_CONFIG.presentation;
+  const modelConfig = enrichmentType === 'quiz' ? MODEL_CONFIG.quiz : MODEL_CONFIG.presentation;
 
   // Use fallback after max primary attempts
   if (attempt > MODEL_CONFIG.maxPrimaryAttempts) {

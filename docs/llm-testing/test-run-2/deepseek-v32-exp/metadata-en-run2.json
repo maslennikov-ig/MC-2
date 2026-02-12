@@ -5,7 +5,26 @@
   "target_audience": "Absolute beginners with no prior coding experience; career changers looking to enter the tech industry; students in non-technical majors seeking to add a valuable skill; data-oriented professionals like analysts or marketers who want to automate repetitive tasks with scripts; and hobbyists interested in understanding how software works.",
   "estimated_duration_hours": 30,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "No prior programming experience required", "A computer capable of installing Python and a code editor"],
-  "learning_outcomes": ["Define and apply fundamental Python syntax, variables, and data types to store and manipulate information.", "Construct programs using control structures like conditional statements and loops to dictate program flow.", "Build custom functions to encapsulate code logic and promote reusability within applications.", "Develop scripts that perform file input/output operations to read data from and write results to external files.", "Create practical, small-scale Python applications such as a text-based game or a data processing script."],
-  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "scripting", "fundamentals"]
+  "prerequisites": [
+    "Basic computer literacy",
+    "No prior programming experience required",
+    "A computer capable of installing Python and a code editor"
+  ],
+  "learning_outcomes": [
+    "Define and apply fundamental Python syntax, variables, and data types to store and manipulate information.",
+    "Construct programs using control structures like conditional statements and loops to dictate program flow.",
+    "Build custom functions to encapsulate code logic and promote reusability within applications.",
+    "Develop scripts that perform file input/output operations to read data from and write results to external files.",
+    "Create practical, small-scale Python applications such as a text-based game or a data processing script."
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "scripting",
+    "fundamentals"
+  ]
 }

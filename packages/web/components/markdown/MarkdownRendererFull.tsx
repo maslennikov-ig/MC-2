@@ -52,6 +52,7 @@ import type { Components } from 'react-markdown'
 
 // KaTeX CSS for math rendering
 import 'katex/dist/katex.min.css'
+import { copyToClipboard } from '@/lib/utils/clipboard'
 
 /**
  * Props for the MarkdownRendererFull component
@@ -77,11 +78,9 @@ function CopyButton({ code }: { code: string }) {
     if (!code.trim()) return
 
     try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(code)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      }
+      await copyToClipboard(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy code:', err)
     }
@@ -281,7 +280,7 @@ export function MarkdownRendererFull({
   const wrapperClassName = cn(config.className, className)
 
   // Handle empty content - return empty article to maintain layout
-  if (!content) {
+  if (!content?.trim()) {
     return <article className={wrapperClassName} />
   }
 

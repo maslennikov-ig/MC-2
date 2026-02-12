@@ -6,9 +6,9 @@ services:
     image: redis:7-alpine
     container_name: megacampus-redis-test
     ports:
-      - "6379:6379"
+      - '6379:6379'
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 3
@@ -17,7 +17,7 @@ services:
     image: megacampus-api:test
     container_name: megacampus-api-test
     ports:
-      - "4000:4000"
+      - '4000:4000'
     env_file:
       - .env.local-docker
     environment:
@@ -28,7 +28,13 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -37,7 +43,7 @@ services:
   worker:
     image: megacampus-api:test
     container_name: megacampus-worker-test
-    command: ["tsx", "dist/orchestrator/worker-entrypoint.js"]
+    command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     env_file:
       - .env.local-docker
     environment:

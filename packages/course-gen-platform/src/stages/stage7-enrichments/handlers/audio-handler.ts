@@ -15,10 +15,7 @@
 import { logger } from '@/shared/logger';
 import OpenAI from 'openai';
 import type { EnrichmentHandler } from '../services/enrichment-router';
-import type {
-  EnrichmentHandlerInput,
-  GenerateResult,
-} from '../types';
+import type { EnrichmentHandlerInput, GenerateResult } from '../types';
 import type { AudioEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import {
   prepareAudioScript,

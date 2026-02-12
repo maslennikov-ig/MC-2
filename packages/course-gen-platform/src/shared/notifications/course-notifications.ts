@@ -43,7 +43,11 @@ interface CourseWithUser {
 async function getCourseWithUser(courseId: string): Promise<CourseWithUser | null> {
   const supabase = getSupabaseAdmin();
 
-  const { data, error } = await supabase
+  interface SupabaseCourseResponse extends Omit<CourseWithUser, 'user'> {
+    user: Record<string, unknown> | Array<Record<string, unknown>> | null;
+  }
+
+  const { data, error } = (await supabase
     .from('courses')
     .select(
       `
@@ -54,7 +58,7 @@ async function getCourseWithUser(courseId: string): Promise<CourseWithUser | nul
     `
     )
     .eq('id', courseId)
-    .single();
+    .single()) as { data: SupabaseCourseResponse | null; error: { message: string } | null };
 
   if (error || !data) {
     logger.error({ courseId, error }, 'Failed to fetch course for notifications');
@@ -62,7 +66,7 @@ async function getCourseWithUser(courseId: string): Promise<CourseWithUser | nul
   }
 
   // Handle user array from Supabase join
-  const userData = Array.isArray(data.user) ? data.user[0] : data.user;
+  const userData = (Array.isArray(data.user) ? data.user[0] : data.user) as CourseWithUser['user'];
 
   return {
     ...data,
@@ -74,9 +78,9 @@ async function getCourseWithUser(courseId: string): Promise<CourseWithUser | nul
  * Send push notification to user (via web-push)
  * Note: Requires push subscription to be stored in DB
  */
-async function sendPushToUser(userId: string, payload: NotificationPayload): Promise<boolean> {
-  // TODO: Implement web-push when push_subscriptions table is ready
-  // For now, log and return false
+function sendPushToUser(userId: string, payload: NotificationPayload): boolean {
+  // BACKLOG: Web-push notifications deferred — requires push_subscriptions table + service worker.
+  // Currently only Telegram notifications are functional.
   logger.info({ userId, payload }, 'Push notification queued (not implemented yet)');
   return false;
 }
@@ -110,7 +114,7 @@ export async function notifyCourseCompletion(courseId: string): Promise<void> {
 
   // 1. Push notification
   if (course.user_id) {
-    await sendPushToUser(course.user_id, payload);
+    sendPushToUser(course.user_id, payload);
   }
 
   // 2. Telegram notification
@@ -119,10 +123,8 @@ export async function notifyCourseCompletion(courseId: string): Promise<void> {
     await sendTelegramMessage(course.user.telegram_chat_id, message);
   }
 
-  // 3. Email notification (TODO: implement with Resend)
-  // if (course.user?.email) {
-  //   await sendEmail(course.user.email, 'course-completion', payload);
-  // }
+  // BACKLOG: Email notifications deferred — planned with Resend integration.
+  // Currently only Telegram notifications are functional.
 }
 
 /**
@@ -156,7 +158,7 @@ export async function notifyCourseError(
 
   // 1. Push notification
   if (course.user_id) {
-    await sendPushToUser(course.user_id, payload);
+    sendPushToUser(course.user_id, payload);
   }
 
   // 2. Telegram notification
@@ -195,7 +197,7 @@ export async function notifyStageComplete(courseId: string, stage: number): Prom
 
   // Only push notification for intermediate stages (lightweight)
   if (course.user_id) {
-    await sendPushToUser(course.user_id, payload);
+    sendPushToUser(course.user_id, payload);
   }
 
   // Telegram for stage notifications

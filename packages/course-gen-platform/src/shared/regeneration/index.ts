@@ -86,16 +86,10 @@ export {
 } from './bloom-validator';
 
 // Re-export semantic diff generator
-export {
-  generateSemanticDiff,
-  type SemanticDiffInput,
-} from './semantic-diff-generator';
+export { generateSemanticDiff, type SemanticDiffInput } from './semantic-diff-generator';
 
 // Re-export smart context router
-export {
-  detectContextTier,
-  getTokenBudget,
-} from './smart-context-router';
+export { detectContextTier, getTokenBudget } from './smart-context-router';
 
 // Re-export context assembler
 export {

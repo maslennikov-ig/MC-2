@@ -70,21 +70,6 @@ export interface AnalysisResult {
     progression_logic: string; // 100+ chars - how difficulty increases across lessons
   };
 
-  // NEW: Pedagogical patterns for Generation quality (Analyze Enhancement) - REQUIRED
-  pedagogical_patterns: {
-    primary_strategy:
-      | 'problem-based learning'
-      | 'lecture-based'
-      | 'inquiry-based'
-      | 'project-based'
-      | 'mixed';
-    theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    assessment_types: Array<
-      'coding' | 'quizzes' | 'projects' | 'essays' | 'presentations' | 'peer-review'
-    >;
-    key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
-  };
-
   // NEW: Structured generation guidance for Stage 5 - REQUIRED
   generation_guidance: {
     tone:
@@ -108,9 +93,6 @@ export interface AnalysisResult {
     contextual_language_hints: string; // Audience assumptions
     real_world_examples: string[]; // Applications to reference
   };
-
-  // Content strategy (Phase 5)
-  content_strategy: 'create_from_scratch' | 'expand_and_enhance' | 'optimize_existing';
 
   /**
    * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
@@ -136,9 +118,6 @@ export interface AnalysisResult {
     };
   };
 
-  // Optional expansion areas (Phase 3)
-  expansion_areas: ExpansionArea[] | null;
-
   // Research flags for time-sensitive content (Phase 3)
   research_flags: ResearchFlag[]; // Can be empty array
 
@@ -162,27 +141,23 @@ export interface AnalysisResult {
 export interface SectionBreakdown {
   area: string; // Section name/topic
   estimated_lessons: number; // Min 1
-  importance: 'core' | 'important' | 'optional';
+  importance: 'simple' | 'normal' | 'complex';
   learning_objectives: string[]; // 2-5 items
   key_topics: string[]; // 3-8 items
   pedagogical_approach: string; // 50-200 chars
-  difficulty_progression: 'flat' | 'gradual' | 'steep';
+  /**
+   * @deprecated Kept for backward compatibility with stored analysis data. No longer generated in new courses.
+   */
+  difficulty_progression?: 'flat' | 'gradual' | 'steep';
 
   // NEW: Enhanced fields for Generation (Analyze Enhancement)
   section_id?: string; // e.g., "1", "2", "3" - unique identifier
   estimated_duration_hours?: number; // 0.5-20h - time to complete section
   difficulty?: 'beginner' | 'intermediate' | 'advanced'; // Difficulty level
+  /**
+   * @deprecated Kept for backward compatibility with stored analysis data. No longer generated in new courses.
+   */
   prerequisites?: string[]; // section_ids that must be completed first (empty if none)
-}
-
-/**
- * Optional content expansion areas (Phase 3)
- */
-export interface ExpansionArea {
-  area: string; // Topic needing more detail
-  priority: 'critical' | 'important' | 'nice-to-have';
-  specific_requirements: string[]; // 1-5 items
-  estimated_lessons: number; // 1-10
 }
 
 /**
@@ -228,19 +203,6 @@ export interface Phase1Output {
     missing_elements: string[] | null;
     key_concepts: string[];
     domain_keywords: string[];
-  };
-  pedagogical_patterns: {
-    primary_strategy:
-      | 'problem-based learning'
-      | 'lecture-based'
-      | 'inquiry-based'
-      | 'project-based'
-      | 'mixed';
-    theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    assessment_types: Array<
-      'coding' | 'quizzes' | 'projects' | 'essays' | 'presentations' | 'peer-review'
-    >;
-    key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
   };
   phase_metadata: {
     duration_ms: number;
@@ -295,7 +257,6 @@ export interface Phase3Output {
     assessment_approach: string; // 50+ chars
     progression_logic: string; // 100+ chars
   };
-  expansion_areas: ExpansionArea[] | null;
   research_flags: ResearchFlag[];
   phase_metadata: {
     duration_ms: number;
@@ -332,7 +293,6 @@ export interface Phase4Output {
     contextual_language_hints: string;
     real_world_examples: string[];
   };
-  content_strategy: 'create_from_scratch' | 'expand_and_enhance' | 'optimize_existing';
   phase_metadata: {
     duration_ms: number;
     model_used: string; // Adaptive: 20B or 120B based on document count

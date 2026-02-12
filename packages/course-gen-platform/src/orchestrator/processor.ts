@@ -15,7 +15,7 @@
  * @module orchestrator/processor
  */
 
-import { SandboxedJob, Job } from 'bullmq';
+import { SandboxedJob, Job, UnrecoverableError } from 'bullmq';
 import { JobData, JobType, JobStatus } from '@megacampus/shared-types';
 /**
  * Logger is thread-safe (Pino writes to stdout/stderr atomically)
@@ -23,13 +23,15 @@ import { JobData, JobType, JobStatus } from '@megacampus/shared-types';
  */
 import logger from '../shared/logger/index.js';
 import { logPermanentFailure } from '../shared/logger/error-service.js';
+import { captureError } from '../shared/sentry/init.js';
 import { testJobHandler } from './handlers/test-handler.js';
-import { initializeJobHandler } from './handlers/initialize.js';
 import { documentProcessingHandler } from '../stages/stage2-document-processing/handler.js';
 import { stage3ClassificationHandler } from '../stages/stage3-classification/handler.js';
 import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler.js';
 import { stage5GenerationHandler } from '../stages/stage5-generation/handler.js';
 import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/handler.js';
+import type { Stage6JobInput } from '../stages/stage6-lesson-content/types';
+import { blockRegenerationHandler } from './handlers/block-regeneration-handler.js';
 import type { JobResult } from './handlers/base-handler.js';
 
 /**
@@ -75,8 +77,8 @@ type JobHandler = {
  * @param handler - A handler with a process method that accepts Job<T>
  * @returns A JobHandler that accepts SandboxedJob<JobData>
  */
-function adaptHandler(handler: {
-  process: (job: any, token?: string) => Promise<unknown>;
+function adaptHandler<T = unknown>(handler: {
+  process: (job: Job<T>, token?: string) => Promise<unknown>;
 }): JobHandler {
   return {
     process: async (job: SandboxedJob<JobData>, token?: string) => {
@@ -91,7 +93,7 @@ function adaptHandler(handler: {
         );
       }
 
-      const result = await handler.process(job as unknown as Job<any>, token);
+      const result = await handler.process(job as unknown as Job<T>, token);
       // Result is guaranteed to have at least the JobResult interface
       // (all handler results extend JobResult with { success, message?, data?, error? })
       return result as JobResult;
@@ -117,16 +119,16 @@ function adaptHandler(handler: {
  */
 const jobHandlers: Record<string, JobHandler> = {
   [JobType.TEST_JOB]: adaptHandler(testJobHandler),
-  [JobType.INITIALIZE]: adaptHandler(initializeJobHandler),
   [JobType.DOCUMENT_PROCESSING]: adaptHandler(documentProcessingHandler),
   [JobType.DOCUMENT_CLASSIFICATION]: adaptHandler(stage3ClassificationHandler),
   [JobType.STRUCTURE_ANALYSIS]: adaptHandler(stage4AnalysisHandler),
   [JobType.STRUCTURE_GENERATION]: adaptHandler(stage5GenerationHandler),
-  [JobType.LESSON_CONTENT]: adaptHandler({
-    process: async (job: Job<any>, token?: string) => {
+  [JobType.LESSON_CONTENT]: adaptHandler<Stage6JobInput>({
+    process: async (job: Job<Stage6JobInput>, token?: string) => {
       return processStage6JobAsJobResult(job, token);
     },
   }),
+  [JobType.BLOCK_REGENERATION]: adaptHandler(blockRegenerationHandler),
 };
 
 /**
@@ -136,14 +138,14 @@ const jobHandlers: Record<string, JobHandler> = {
  *
  * @returns Health check result with any validation errors
  */
-export async function healthCheck(): Promise<{ healthy: boolean; errors: string[] }> {
+export function healthCheck(): { healthy: boolean; errors: string[] } {
   const errors: string[] = [];
 
   // Validate logger works in worker thread context
   try {
     logger.debug({ check: 'processor_health' }, 'Processor health check: logger OK');
   } catch (err) {
-    errors.push(`Logger not available: ${err}`);
+    errors.push(`Logger not available: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // Validate all handlers are loadable and callable
@@ -169,8 +171,8 @@ export async function healthCheck(): Promise<{ healthy: boolean; errors: string[
       errors.push('JobType enum is empty - workspace package may not be bundled correctly');
     } else {
       // Verify at least one known enum value exists
-      if (!JobType.TEST_JOB || !JobType.INITIALIZE) {
-        errors.push('JobType enum missing expected values (TEST_JOB, INITIALIZE)');
+      if (!JobType.TEST_JOB || !JobType.DOCUMENT_PROCESSING) {
+        errors.push('JobType enum missing expected values (TEST_JOB, DOCUMENT_PROCESSING)');
       }
     }
 
@@ -193,7 +195,9 @@ export async function healthCheck(): Promise<{ healthy: boolean; errors: string[
       errors.push(`JobType.TEST_JOB value "${JobType.TEST_JOB}" not found in handler registry`);
     }
   } catch (err) {
-    errors.push(`@megacampus/shared-types bundle validation failed: ${err}`);
+    errors.push(
+      `@megacampus/shared-types bundle validation failed: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
   // Validate @megacampus/shared-logger is bundled correctly
@@ -215,7 +219,9 @@ export async function healthCheck(): Promise<{ healthy: boolean; errors: string[
       errors.push('logPermanentFailure not available from shared-logger/error-service');
     }
   } catch (err) {
-    errors.push(`@megacampus/shared-logger bundle validation failed: ${err}`);
+    errors.push(
+      `@megacampus/shared-logger bundle validation failed: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
   return {
@@ -227,21 +233,20 @@ export async function healthCheck(): Promise<{ healthy: boolean; errors: string[
 // Run health check on processor load (startup validation)
 // Skip in test environment to avoid side effects
 if (process.env.NODE_ENV !== 'test') {
-  healthCheck()
-    .then(result => {
-      if (!result.healthy) {
-        logger.error({ errors: result.errors }, 'Processor health check failed - exiting');
-        process.exit(1);
-      }
-      logger.info(
-        { handlersCount: Object.keys(jobHandlers).length },
-        'Processor health check passed'
-      );
-    })
-    .catch(err => {
-      logger.error({ error: err }, 'Processor health check threw exception - exiting');
+  try {
+    const result = healthCheck();
+    if (!result.healthy) {
+      logger.error({ errors: result.errors }, 'Processor health check failed - exiting');
       process.exit(1);
-    });
+    }
+    logger.info(
+      { handlersCount: Object.keys(jobHandlers).length },
+      'Processor health check passed'
+    );
+  } catch (err) {
+    logger.error({ error: err }, 'Processor health check threw exception - exiting');
+    process.exit(1);
+  }
 }
 
 /**
@@ -270,7 +275,8 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       },
       `Sandboxed processor: Invalid job name (${errorType})`
     );
-    throw new Error(error);
+    // Use UnrecoverableError to skip retries — corrupted job won't fix itself on retry
+    throw new UnrecoverableError(error);
   }
 
   const handler = jobHandlers[jobType];
@@ -285,7 +291,8 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       },
       'Sandboxed processor: Job handler not found'
     );
-    throw new Error(error);
+    // Use UnrecoverableError to skip retries — unknown job type won't become valid on retry
+    throw new UnrecoverableError(error);
   }
 
   const startTime = Date.now();
@@ -337,6 +344,17 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       },
       'Sandboxed processor: Job processing failed'
     );
+
+    // Report to Sentry for alerting and aggregation
+    captureError(error, {
+      tags: { component: 'processor', jobType, jobId: job.id || 'unknown' },
+      extra: {
+        courseId: job.data?.courseId,
+        attemptsMade: job.attemptsMade,
+        durationMs,
+      },
+      level: 'error',
+    });
 
     // CRITICAL: Log to error_logs table INSIDE sandbox while we have full stack trace
     // BullMQ sandbox strips stack trace when passing error to main process

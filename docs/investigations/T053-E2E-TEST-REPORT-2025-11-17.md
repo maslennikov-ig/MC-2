@@ -1,4 +1,5 @@
 # Отчет E2E тестирования: T053 Курс по продажам
+
 # Investigation Report: T053 E2E Test - Sales Course Generation
 
 **Дата**: 2025-11-17
@@ -14,6 +15,7 @@
 Проведено комплексное E2E тестирование полного пайплайна генерации курса (Stages 2-5) на реальных документах по продажам. Тест включает обработку документов (Docling OCR), Stage 4 анализ (5 фаз), и Stage 5 генерацию структуры курса.
 
 **🎯 Итоговый результат**:
+
 - ✅ Document Processing (Stage 2) - **SUCCESS** (20 sec)
 - ✅ Analysis (Stage 4) - **SUCCESS** (76 sec, 5 phases)
 - ❌ Generation (Stage 5) - **FAILED** (528 sec, section generation exhausted all repair layers)
@@ -25,6 +27,7 @@
 ## 🧪 Тестовые данные / Test Data
 
 ### Входные документы (4 PDF/DOCX, ~282KB):
+
 1. **ТЗ на курс по продажам.docx** (24.2KB)
    - Текстов: 38 блоков
    - Таблицы: 0
@@ -52,12 +55,14 @@
 ## ✅ Успешно выполнено / Successfully Completed
 
 ### 1. **Подготовка тестовой среды**
+
 - ✅ Redis очищен (29 BullMQ ключей удалено)
 - ✅ Supabase очищен (6 тестовых курсов удалено)
 - ✅ Тестовые пользователи созданы (3 auth users)
 - ✅ Организация premium tier настроена
 
 ### 2. **Stage 2: Document Processing (Docling)**
+
 - ✅ 4 документа загружены успешно
 - ✅ Все 4 документа обработаны через Docling MCP
 - ✅ OCR + image processing выполнены
@@ -66,6 +71,7 @@
 - ✅ Stage 4 Barrier passed: 4/4 completed
 
 **Метрики Document Processing**:
+
 - Время обработки: ~20 секунд
 - Quality scores: 1.0 (все документы)
 - Threshold: 0.75 (превышен)
@@ -74,12 +80,14 @@
 ### 3. **Stage 4: Analysis (5 фаз)**
 
 #### **Phase 0: Initialization** ✅
+
 - Duration: <1 sec
 - Total Files: 4
 - Completed Files: 4
 - Status: ✅ PASSED
 
 #### **Phase 1: Classification** ✅
+
 - Duration: ~12.1 sec
 - Model: `openai/gpt-oss-20b`
 - Category: `professional`
@@ -93,6 +101,7 @@
 - Status: ✅ PASSED
 
 #### **Phase 2: Scope Estimation** ⚠️ PASSED (с ретраями)
+
 - Duration: ~43.7 sec
 - Model: `openai/gpt-oss-20b`
 - Total lessons: 48
@@ -100,17 +109,20 @@
 - Estimated hours: 12
 
 **⚠️ Проблема JSON парсинга**:
+
 ```
 [Phase 2] Direct parse FAILED: Unexpected end of JSON input
 [Phase 2] Using UnifiedRegenerator with all 5 layers
 ```
 
 **✅ Решение**:
+
 - Layer 1-4 failed (FSM, brace, quote, comma repair)
 - Layer 5 (`critique-revise`) **SUCCESS** ✅
 - Post-processing: Validated 8 sections with all required fields
 
 **Metrics**:
+
 - Layer Used: `critique-revise`
 - Success: true
 - Token Cost: 1000
@@ -118,6 +130,7 @@
 - Quality Passed: true
 
 #### **Phase 3: Expert Analysis** ✅
+
 - Duration: ~6.3 sec
 - Model: `openai/gpt-oss-120b` (повышенный уровень)
 - Teaching style: `mixed`
@@ -126,6 +139,7 @@
 - Status: ✅ PASSED (direct parse SUCCESS)
 
 #### **Phase 4: Synthesis** ✅
+
 - Duration: ~5.0 sec
 - Model: `openai/gpt-oss-20b`
 - Content strategy: `create_from_scratch`
@@ -140,6 +154,7 @@
 - Status: ✅ PASSED (direct parse SUCCESS)
 
 #### **Phase 5: Assembly** ✅
+
 - Total Duration: ~72.2 sec
 - Total Tokens: 8,217
 - Total Cost: $0.00 (test mode)
@@ -149,12 +164,14 @@
 - Status: ✅ PASSED
 
 **Models Used**:
+
 - Phase 1: `openai/gpt-oss-20b`
 - Phase 2: `openai/gpt-oss-20b`
 - Phase 3: `openai/gpt-oss-120b` ⭐ (escalated)
 - Phase 4: `openai/gpt-oss-20b`
 
 **Stage 4 Total Summary**:
+
 - Total Duration: ~74 sec (1.2 min)
 - Phases Completed: 6/6
 - Total Lessons: 48
@@ -170,6 +187,7 @@
 ### 4. **Stage 5: Generation ❌ FAILED**
 
 #### **Metadata Generation** ✅ SUCCESS
+
 - Model Selected: `qwen/qwen3-235b-a22b-thinking-2507` (Russian language)
 - Language: ru
 - Layer Used: `auto-repair`
@@ -177,22 +195,26 @@
 - Status: ✅ **PASSED**
 
 #### **Section Generation** ❌ FAILED
+
 - **Batch 1, Section 0** - **FAILED after 2 attempts**
 - Duration: ~450 sec (7.5 min for 2 retries)
 - Error: "Failed to parse sections: All regeneration layers exhausted"
 - Tier: `tier2_ru_lessons`
 
 **Попытка 1** (attempt 0):
+
 - Layer 1 (auto-repair): **Quality validation failed**
 - Layer 2 (critique-revise): **Quality validation failed**
 - Result: ❌ FAILED
 
 **Попытка 2** (attempt 1):
+
 - Layer 1 (auto-repair): **Quality validation failed**
 - Layer 2 (critique-revise): **Quality validation failed**
 - Result: ❌ FAILED
 
 **❌ Финальная ошибка**:
+
 ```
 Generation failed: Section generation failed:
 Failed to generate section batch 1 (section 0) after 2 attempts:
@@ -209,31 +231,38 @@ Lesson count validation failed: Cannot validate lessons: no sections generated
 ## ⚠️ Проблемы и предупреждения / Issues & Warnings
 
 ### 1. **JSON Parsing Failures** (MEDIUM)
+
 **Фаза**: Phase 2 (Scope Estimation), Stage 5 Section Generation
 
 **Описание**:
+
 - Phase 2: Пустой JSON output от модели → все 4 repair слоя failed → critique-revise SUCCESS
 - Stage 5: Section generation failed после exhausted layers
 
 **Impact**:
+
 - Добавлено ~20 сек латентности на Phase 2 (critique-revise)
 - Stage 5 section generation застряла на retry
 
 **Root Cause**:
+
 - Модель вернула пустой/невалидный JSON
 - FSM/brace/quote/comma repair не справились
 - Потребовался LLM-based critique-revise
 
 **Рекомендации**:
+
 1. Улучшить промпты для более стабильного JSON вывода
 2. Добавить pre-validation в modельные промпты
 3. Мониторить частоту critique-revise использования (должно быть <10%)
 
 ### 2. **Status Transition Errors** (LOW - Non-Fatal)
+
 **Фаза**: Все фазы
 
 **Описание**:
 Множественные ошибки перехода статусов курса:
+
 ```
 Invalid generation status transition: pending → generating_structure
 Invalid generation status transition: analyzing_task → generating_content
@@ -241,36 +270,44 @@ Invalid generation status transition: generating_structure → initializing
 ```
 
 **Impact**:
+
 - Логи засорены warning messages
 - Фактически non-fatal (система продолжает работу)
 
 **Root Cause**:
+
 - State machine в Supabase RLS policies слишком строгая
 - Worker пытается обновлять статус в неправильных порядках
 
 **Рекомендации**:
+
 1. Пересмотреть state transitions в `courses` table trigger
 2. Добавить grace period для асинхронных обновлений
 3. Или пометить эти обновления как optional
 
 ### 3. **System Metrics Logging Failed** (LOW)
+
 **Фаза**: Все Phase 1-4
 
 **Описание**:
+
 ```
 Failed to log phase metrics to system_metrics:
 Could not find the 'message' column of 'system_metrics' in the schema cache
 ```
 
 **Impact**:
+
 - Метрики фаз не сохраняются в БД
 - Мониторинг производительности затруднен
 
 **Root Cause**:
+
 - Schema mismatch между кодом и Supabase table `system_metrics`
 - Column `message` отсутствует или переименован
 
 **Рекомендации**:
+
 1. Проверить schema `system_metrics` в Supabase
 2. Обновить INSERT queries для соответствия actual schema
 3. Добавить fallback для failed metrics logging
@@ -280,40 +317,45 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ## 📊 Метрики производительности / Performance Metrics
 
 ### Document Processing (Stage 2)
-| Метрика | Значение |
-|---------|----------|
-| Общее время | ~20 сек |
-| Документы обработано | 4/4 (100%) |
-| Quality score | 1.0 (все) |
-| Threshold | 0.75 (passed) |
-| Embedding cache hits | 100% |
+
+| Метрика              | Значение      |
+| -------------------- | ------------- |
+| Общее время          | ~20 сек       |
+| Документы обработано | 4/4 (100%)    |
+| Quality score        | 1.0 (все)     |
+| Threshold            | 0.75 (passed) |
+| Embedding cache hits | 100%          |
 
 ### Analysis (Stage 4)
-| Фаза | Длительность | Модель | Статус |
-|------|--------------|--------|--------|
-| Phase 0: Init | <1 sec | - | ✅ |
-| Phase 1: Classification | 12.1 sec | gpt-oss-20b | ✅ |
-| Phase 2: Scope | 43.7 sec | gpt-oss-20b | ⚠️ (retry) |
-| Phase 3: Expert | 6.3 sec | gpt-oss-120b | ✅ |
-| Phase 4: Synthesis | 5.0 sec | gpt-oss-20b | ✅ |
-| Phase 5: Assembly | <1 sec | - | ✅ |
-| **Total** | **~72 sec** | - | **✅** |
+
+| Фаза                    | Длительность | Модель       | Статус     |
+| ----------------------- | ------------ | ------------ | ---------- |
+| Phase 0: Init           | <1 sec       | -            | ✅         |
+| Phase 1: Classification | 12.1 sec     | gpt-oss-20b  | ✅         |
+| Phase 2: Scope          | 43.7 sec     | gpt-oss-20b  | ⚠️ (retry) |
+| Phase 3: Expert         | 6.3 sec      | gpt-oss-120b | ✅         |
+| Phase 4: Synthesis      | 5.0 sec      | gpt-oss-20b  | ✅         |
+| Phase 5: Assembly       | <1 sec       | -            | ✅         |
+| **Total**               | **~72 sec**  | -            | **✅**     |
 
 ### Generation (Stage 5) - ⏳ В ПРОЦЕССЕ
-| Фаза | Статус |
-|------|--------|
-| Metadata Generation | ⏳ STARTED |
-| Section Generation | ⚠️ RETRY (attempt 1) |
+
+| Фаза                | Статус               |
+| ------------------- | -------------------- |
+| Metadata Generation | ⏳ STARTED           |
+| Section Generation  | ⚠️ RETRY (attempt 1) |
 
 ---
 
 ## 🔧 Использованные модели / Models Used
 
 ### Stage 4 Analysis
+
 1. **Phase 1, 2, 4**: `openai/gpt-oss-20b` (default)
 2. **Phase 3**: `openai/gpt-oss-120b` (escalated for expert analysis)
 
 ### Stage 5 Generation (partial)
+
 1. **Metadata**: `qwen/qwen3-235b-a22b-thinking-2507` (Russian language)
 2. **Sections**: `tier2_ru_lessons` (language-aware routing)
 
@@ -378,6 +420,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ## 📈 Рекомендации / Recommendations
 
 ### Priority 1 (Critical - Fix ASAP)
+
 1. **Исправить Section Generation JSON Parsing**
    - Проверить промпты для section generation
    - Добавить JSON schema validation в промпт
@@ -389,6 +432,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
    - Протестировать на 10+ курсах
 
 ### Priority 2 (Important - Fix This Week)
+
 3. **Пересмотреть Status Transition Logic**
    - Документировать valid transitions
    - Обновить Supabase trigger
@@ -400,6 +444,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
    - Тестировать метрики логирование
 
 ### Priority 3 (Nice to Have - Future)
+
 5. **Добавить Performance Monitoring**
    - Dashboard для Phase latencies
    - Alerting для exhausted layers (>10%)
@@ -417,6 +462,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ### Phase 2: Scope Estimation (⚠️ Retry)
 
 **Исходная попытка (Failed)**:
+
 ```json
 {
   "phase": "phase_2_scope",
@@ -427,6 +473,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ```
 
 **Repair Layers (All Failed)**:
+
 1. ❌ `jsonrepair_fsm` - already failed
 2. ❌ `brace_counting` - failed
 3. ❌ `quote_fixing` - failed
@@ -434,6 +481,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 5. ❌ `comment_stripping` - failed
 
 **Layer 6: Critique-Revise (✅ SUCCESS)**:
+
 ```json
 {
   "layer": "critique-revise",
@@ -446,6 +494,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ```
 
 **Final Output**:
+
 - Total lessons: 48
 - Total sections: 8
 - Estimated hours: 12
@@ -454,6 +503,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ### Stage 5: Section Generation (⏳ В ПРОЦЕССЕ)
 
 **Batch 1, Section 0 - Attempt 1 (⚠️ Failed)**:
+
 ```json
 {
   "batchNum": 1,
@@ -472,9 +522,11 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ## 📝 Выводы / Conclusions
 
 ### Общая оценка системы
+
 **Оценка**: 7.5/10
 
 **Сильные стороны**:
+
 - ✅ Document processing pipeline надежный
 - ✅ Multi-phase analysis работает корректно
 - ✅ Error recovery (critique-revise) функционален
@@ -482,19 +534,23 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 - ✅ Quality validation строгая и эффективная
 
 **Слабые стороны**:
+
 - ⚠️ JSON parsing stability требует улучшения
 - ⚠️ Status transitions создают noise в логах
 - ⚠️ Metrics logging не работает
 - ⚠️ Section generation застревает на retries
 
 ### Готовность к production
+
 **Статус**: ⚠️ **PARTIAL - Требуется доработка**
 
 **Блокеры**:
+
 1. Section generation failures (Priority 1)
 2. JSON parsing instability (Priority 1)
 
 **Можно релизить после**:
+
 - Исправления Section generation промптов
 - Добавления мониторинга для exhausted layers
 - Тестирования на 20+ реальных курсах
@@ -528,6 +584,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ## 📎 Приложения / Appendices
 
 ### A. Test Configuration
+
 ```typescript
 {
   testFile: 'tests/e2e/t053-synergy-sales-course.test.ts',
@@ -542,6 +599,7 @@ Could not find the 'message' column of 'system_metrics' in the schema cache
 ```
 
 ### B. Environment
+
 ```
 Node.js: v22.18.0
 Vitest: v4.0.1
@@ -551,6 +609,7 @@ Docling MCP: localhost:8000/mcp
 ```
 
 ### C. Key Files Modified
+
 - None (read-only E2E test)
 
 ---

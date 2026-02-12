@@ -45,7 +45,7 @@ export interface AutoRepairResult {
 export function autoRepairJSON(rawJSON: string): AutoRepairResult {
   // Try direct parse first
   try {
-    const parsed = JSON.parse(rawJSON);
+    const parsed = JSON.parse(rawJSON) as unknown;
     return { success: true, parsed, strategy: 'none' };
   } catch {
     // Continue to repair

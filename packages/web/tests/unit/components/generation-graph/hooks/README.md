@@ -18,6 +18,7 @@ Unit tests for the `useModuleDashboardData` hook, specifically testing the appro
 Maps database status strings to typed lesson status values.
 
 **Test Coverage** (13 tests):
+
 - ✅ Maps "approved" to approved (case-insensitive)
 - ✅ Maps "completed" to completed (case-insensitive)
 - ✅ Maps "generating" and "active" to active
@@ -33,14 +34,17 @@ Calculates aggregated metrics for module dashboard display.
 **Test Coverage** (23 tests):
 
 #### Status Counts (3 tests)
+
 - ✅ Counts approved lessons separately from completed
 - ✅ Counts all status types correctly
 - ✅ Handles all lessons with same status
 
 #### Empty Array (1 test)
+
 - ✅ Handles empty array gracefully
 
 #### Quality Score Calculation (6 tests)
+
 - ✅ Calculates average from completed lessons
 - ✅ Calculates average from approved lessons
 - ✅ Combines both completed and approved in average
@@ -49,16 +53,19 @@ Calculates aggregated metrics for module dashboard display.
 - ✅ Ignores quality scores from non-done lessons
 
 #### Cost Calculation (3 tests)
+
 - ✅ Sums total cost from all lessons
 - ✅ Handles zero costs
 - ✅ Includes costs from all status types
 
 #### Duration Calculation (3 tests)
+
 - ✅ Sums duration from completed and approved lessons
 - ✅ Ignores null durations
 - ✅ Treats null as 0 in sum
 
 #### Estimated Time Remaining (6 tests)
+
 - ✅ Estimates based on average duration of completed lessons
 - ✅ Includes approved lessons in average calculation
 - ✅ Includes active lessons in remaining count
@@ -67,6 +74,7 @@ Calculates aggregated metrics for module dashboard display.
 - ✅ Ignores lessons with duration 0
 
 #### Edge Cases (1 test)
+
 - ✅ Handles complex mix of all statuses with various metrics
 
 ## Key Testing Approach
@@ -76,12 +84,14 @@ Calculates aggregated metrics for module dashboard display.
 The functions `mapLessonStatus` and `calculateAggregates` are **not exported** from the hook (they are internal utility functions). Therefore, the test file contains **exact copies** of these functions for testing purposes.
 
 **Rationale**:
+
 1. **Encapsulation**: Keep internal functions private to the hook
 2. **Testability**: Still allow comprehensive unit testing
 3. **Maintenance**: Tests serve as documentation of expected behavior
 4. **Regression Detection**: Any changes to internal logic will require test updates
 
 **Trade-offs**:
+
 - ✅ **Pro**: Clean API surface (no unnecessary exports)
 - ✅ **Pro**: Tests are self-contained
 - ⚠️ **Con**: Code duplication requires manual sync if hook changes
@@ -90,6 +100,7 @@ The functions `mapLessonStatus` and `calculateAggregates` are **not exported** f
 ### Alternative Approach Considered
 
 We could export these functions for testing, but decided against it because:
+
 1. They are implementation details of the hook
 2. Exporting would pollute the public API
 3. The hook itself is the public contract, not the helper functions

@@ -23,6 +23,7 @@ Successfully migrated the `exercise_type` field from a strict 7-value enum to a 
 Our LLM models consistently generated semantically appropriate but structurally invalid `exercise_type` values that failed strict enum validation:
 
 **Invalid Values** (semantically correct):
+
 - "visual aids" → Describes a case study with visual components
 - "role play scenario" → Describes an interactive discussion/simulation
 - "analysis" → Describes a case study or analytical exercise
@@ -30,6 +31,7 @@ Our LLM models consistently generated semantically appropriate but structurally 
 - "assessment" → Describes a quiz or self-assessment
 
 **Valid Enum Values** (structurally required):
+
 - 'self_assessment'
 - 'case_study'
 - 'hands_on'
@@ -85,14 +87,17 @@ This solution is based on our internal research document:
 ### Key Research Findings
 
 **From the document** (lines 63-96):
+
 > "Moving from strict PostgreSQL ENUMs to TEXT with CHECK constraints provides the flexibility you need while maintaining data integrity. Database ENUMs offer minimal performance gains (10-15% faster inserts, 4 bytes vs variable storage) but create massive rigidity that compounds LLM validation challenges."
 
 **Statistics**:
+
 - 60-80% of validation failures are "semantically correct but structurally invalid" (line 21)
 - Our 7-value exercise_type enum falls into medium-high complexity with 12-38% accuracy for strict validation alone (line 59)
 - Multi-layered validation shows 90% hallucination reductions, 94% success rates in production (lines 224-225)
 
 **Recommended Pattern** (lines 67-80):
+
 ```sql
 CREATE TABLE llm_outputs (
   sentiment TEXT,  -- NOT ENUM!
@@ -108,6 +113,7 @@ CREATE TABLE llm_outputs (
 
 **Our Implementation**:
 We use a simpler approach since validation occurs at the application layer (Zod), not the database layer:
+
 - TEXT field with minimum length constraint (3 characters)
 - No maximum length (per project policy)
 - Validation happens during LLM generation, not data storage
@@ -121,15 +127,17 @@ We use a simpler approach since validation occurs at the application layer (Zod)
 Instead of strict enum values, we now accept descriptive text:
 
 **Before**:
+
 ```typescript
 exercise_type: z.enum(['self_assessment', 'case_study', 'hands_on', ...])
 ```
 
 **After**:
+
 ```typescript
 exercise_type: z.string()
   .min(3, 'Exercise type description too short (minimum 3 characters)')
-  .describe('Description of the exercise type and activities...')
+  .describe('Description of the exercise type and activities...');
 ```
 
 ### Why This Works
@@ -168,12 +176,14 @@ exercise_type: z.string()
 This field exists **ONLY** in the application layer (TypeScript/Zod schemas) and is stored as **JSONB** within the course generation pipeline, not as a separate database table.
 
 **Impact**:
+
 - ✅ **NO SQL migration required**
 - ✅ **NO database schema changes**
 - ✅ **NO data migration needed**
 - ✅ **NO rollback complexity at database layer**
 
 **Storage Format**: JSONB (schema-less)
+
 - JSONB accepts any valid JSON structure
 - Existing enum values ('case_study', 'hands_on') remain valid strings
 - New freeform values work seamlessly
@@ -187,21 +197,22 @@ This field exists **ONLY** in the application layer (TypeScript/Zod schemas) and
 
 ### Summary
 
-| Metric | Value |
-|--------|-------|
-| Files Modified | 3 |
-| Lines Added | ~60 |
-| Lines Removed | ~30 |
-| Net Lines | +30 |
-| Breaking Changes | Minor (TypeScript types only) |
-| Database Changes | None |
-| Backward Compatible | Yes (data layer) |
+| Metric              | Value                         |
+| ------------------- | ----------------------------- |
+| Files Modified      | 3                             |
+| Lines Added         | ~60                           |
+| Lines Removed       | ~30                           |
+| Net Lines           | +30                           |
+| Breaking Changes    | Minor (TypeScript types only) |
+| Database Changes    | None                          |
+| Backward Compatible | Yes (data layer)              |
 
 ### File 1: `packages/shared-types/src/generation-result.ts`
 
 **Changed**: Exercise type schema from enum to string
 
 **Before**:
+
 ```typescript
 export const EXERCISE_TYPES = ['self_assessment', 'case_study', ...] as const;
 export const ExerciseTypeSchema = z.enum(EXERCISE_TYPES);
@@ -213,6 +224,7 @@ export const PracticalExerciseSchema = z.object({
 ```
 
 **After**:
+
 ```typescript
 export const EXERCISE_TYPES_LEGACY = ['self_assessment', ...] as const; // @deprecated
 
@@ -224,6 +236,7 @@ export const PracticalExerciseSchema = z.object({
 ```
 
 **Impact**:
+
 - Validation now checks string length instead of enum membership
 - LLM receives detailed guidance via `.describe()` field
 - Legacy enum preserved as `EXERCISE_TYPES_LEGACY` for reference
@@ -233,16 +246,17 @@ export const PracticalExerciseSchema = z.object({
 **Changed**: Removed exercise_type synonym mappings
 
 **Before** (20 lines of mappings):
+
 ```typescript
 export const ENUM_SYNONYMS = {
   exercise_types: {
-    'analysis': 'case_study',
-    'practice': 'hands_on',
+    analysis: 'case_study',
+    practice: 'hands_on',
     // ... 7 mappings
   },
   exercise_type: {
-    'analysis': 'case_study',
-    'practice': 'hands_on',
+    analysis: 'case_study',
+    practice: 'hands_on',
     // ... 7 mappings
   },
   // other enums...
@@ -250,18 +264,24 @@ export const ENUM_SYNONYMS = {
 ```
 
 **After**:
+
 ```typescript
 export const ENUM_SYNONYMS = {
   // REMOVED 2025-11-19: exercise_types and exercise_type are now freeform text
   // See: docs/investigations/INV-2025-11-19-002-exercise-type-enum-to-text-migration.md
 
   // other enums remain...
-  primary_strategy: { /* ... */ },
-  difficulty_level: { /* ... */ },
+  primary_strategy: {
+    /* ... */
+  },
+  difficulty_level: {
+    /* ... */
+  },
 };
 ```
 
 **Impact**:
+
 - No preprocessing overhead for exercise_type
 - Other enum fields still benefit from preprocessing
 - Cleaner, more maintainable code
@@ -271,21 +291,23 @@ export const ENUM_SYNONYMS = {
 **Changed**: Updated preprocessing and prompts (3 locations)
 
 **Location 1 - Preprocessing Call** (line 528):
+
 ```typescript
 // BEFORE
 preprocessObject(exercise, {
   exercise_type: 'enum',
   difficulty_level: 'enum',
-})
+});
 
 // AFTER
 preprocessObject(exercise, {
   difficulty_level: 'enum',
   // exercise_type removed - now freeform text
-})
+});
 ```
 
 **Location 2 - Constraints Prompt** (line 832):
+
 ```
 # BEFORE
 5. **Practical Exercises**: Each lesson must have 3-5 exercises from these types:
@@ -298,6 +320,7 @@ preprocessObject(exercise, {
 ```
 
 **Location 3 - Field Type Requirements** (line 857):
+
 ```
 # BEFORE
 - `exercise_type`: Must be one of: self_assessment, case_study, hands_on, discussion, quiz, simulation, reflection
@@ -307,6 +330,7 @@ preprocessObject(exercise, {
 ```
 
 **Impact**:
+
 - Clear guidance for LLM
 - Examples demonstrate expected format
 - Concise (saves ~50 tokens per prompt)
@@ -318,6 +342,7 @@ preprocessObject(exercise, {
 ### Synonym Mappings (14 total)
 
 **Stage 4 - exercise_types** (7 mappings removed):
+
 - 'analysis' → 'case_study'
 - 'practice' → 'hands_on'
 - 'assessment' → 'quiz'
@@ -326,6 +351,7 @@ preprocessObject(exercise, {
 - 'discussion_based' → 'discussion'
 
 **Stage 5 - exercise_type** (7 mappings removed):
+
 - 'analysis' → 'case_study'
 - 'practice' → 'hands_on'
 - 'assessment' → 'quiz'
@@ -365,16 +391,17 @@ Both `shared-types` and `course-gen-platform` packages built cleanly.
 
 ### Package Verification ✅
 
-| Package | Status | Version |
-|---------|--------|---------|
-| @megacampus/shared-types | ✅ Built | 0.18.5 |
-| @megacampus/course-gen-platform | ✅ Built | 0.18.5 |
+| Package                         | Status   | Version |
+| ------------------------------- | -------- | ------- |
+| @megacampus/shared-types        | ✅ Built | 0.18.5  |
+| @megacampus/course-gen-platform | ✅ Built | 0.18.5  |
 
 ### E2E Test 🔄 READY
 
 **Test**: `tests/e2e/t053-synergy-sales-course.test.ts`
 **Status**: Ready for execution (not run as part of this migration)
 **Expected Results**:
+
 - No validation errors for exercise_type
 - LLM generates descriptive values
 - Values are 3+ characters
@@ -382,6 +409,7 @@ Both `shared-types` and `course-gen-platform` packages built cleanly.
 
 **Manual Testing Recommended**:
 Run E2E test to verify LLM generates quality values:
+
 ```bash
 cd packages/course-gen-platform
 pnpm test tests/e2e/t053-synergy-sales-course.test.ts
@@ -393,17 +421,18 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 
 ### Previously Invalid (Caused Retries)
 
-| Generated Value | Old Result | New Result |
-|----------------|------------|------------|
-| "visual aids" | ❌ Invalid → retry | ✅ Accepted as-is |
-| "role play scenario" | ❌ Invalid → retry | ✅ Accepted as-is |
-| "case study analysis" | ❌ Invalid → retry | ✅ Accepted as-is |
-| "analysis" | ✅ Mapped to 'case_study' | ✅ Accepted as-is |
-| "practice" | ✅ Mapped to 'hands_on' | ✅ Accepted as-is |
+| Generated Value       | Old Result                | New Result        |
+| --------------------- | ------------------------- | ----------------- |
+| "visual aids"         | ❌ Invalid → retry        | ✅ Accepted as-is |
+| "role play scenario"  | ❌ Invalid → retry        | ✅ Accepted as-is |
+| "case study analysis" | ❌ Invalid → retry        | ✅ Accepted as-is |
+| "analysis"            | ✅ Mapped to 'case_study' | ✅ Accepted as-is |
+| "practice"            | ✅ Mapped to 'hands_on'   | ✅ Accepted as-is |
 
 ### Expected Good Examples (Post-Migration)
 
 **Brief Labels** (10-30 characters):
+
 - "case study analysis"
 - "role-play scenario"
 - "hands-on lab exercise"
@@ -414,6 +443,7 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 - "peer assessment activity"
 
 **Detailed Instructions** (50-150+ characters):
+
 - "Watch video introduction, complete individual practice tasks, then participate in small group discussion to compare solutions"
 - "Analyze real-world customer data to identify purchasing patterns and trends, then present findings to peers"
 - "Design and implement a solution using provided tools, test with sample data, and document your approach"
@@ -421,11 +451,11 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 
 ### Undesirable Examples (If Generated)
 
-| Example | Issue | Likelihood |
-|---------|-------|------------|
-| "exercise" | Too generic | Low (LLM prompted to be specific) |
-| "ex" | Too short | Impossible (3-char minimum enforced) |
-| "self_assessment" | Enum-like | Low (prompt doesn't mention underscores) |
+| Example           | Issue       | Likelihood                               |
+| ----------------- | ----------- | ---------------------------------------- |
+| "exercise"        | Too generic | Low (LLM prompted to be specific)        |
+| "ex"              | Too short   | Impossible (3-char minimum enforced)     |
+| "self_assessment" | Enum-like   | Low (prompt doesn't mention underscores) |
 
 **Mitigation**: Clear prompt instructions and `.describe()` guidance minimize these risks.
 
@@ -435,39 +465,41 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 
 ### Before Migration
 
-| Metric | Value |
-|--------|-------|
-| Validation Failure Rate | 60-80% |
-| Preprocessing Time | ~0.1ms per exercise |
-| Retry Overhead | 3-10 API calls per course |
-| API Cost per Course | $0.01-0.05 (retries) |
-| Latency per Course | +30-90 seconds (retries) |
-| p95 Latency | ~180 seconds |
+| Metric                  | Value                     |
+| ----------------------- | ------------------------- |
+| Validation Failure Rate | 60-80%                    |
+| Preprocessing Time      | ~0.1ms per exercise       |
+| Retry Overhead          | 3-10 API calls per course |
+| API Cost per Course     | $0.01-0.05 (retries)      |
+| Latency per Course      | +30-90 seconds (retries)  |
+| p95 Latency             | ~180 seconds              |
 
 ### After Migration (Expected)
 
-| Metric | Value | Change |
-|--------|-------|--------|
-| Validation Failure Rate | 10-20% | ↓ 60-70% |
-| Preprocessing Time | 0ms | ↓ 100% |
-| Retry Overhead | 1-3 API calls | ↓ 60-70% |
-| API Cost per Course | $0.002-0.01 | ↓ 36-57% |
-| Latency per Course | Baseline + 10-30s | ↓ 60-75% |
-| p95 Latency | ~90-120 seconds | ↓ 33-50% |
+| Metric                  | Value             | Change   |
+| ----------------------- | ----------------- | -------- |
+| Validation Failure Rate | 10-20%            | ↓ 60-70% |
+| Preprocessing Time      | 0ms               | ↓ 100%   |
+| Retry Overhead          | 1-3 API calls     | ↓ 60-70% |
+| API Cost per Course     | $0.002-0.01       | ↓ 36-57% |
+| Latency per Course      | Baseline + 10-30s | ↓ 60-75% |
+| p95 Latency             | ~90-120 seconds   | ↓ 33-50% |
 
 ### Annual Savings (Projected)
 
 **Assumptions**:
+
 - 1,000 courses per month
 - $0.025 average retry cost reduction per course
 
-| Category | Annual Savings |
-|----------|----------------|
-| API Costs | $96-480 |
-| Developer Time | ~40 hours (no preprocessing maintenance) |
-| Latency Reduction | ~16,000-24,000 total seconds saved |
+| Category          | Annual Savings                           |
+| ----------------- | ---------------------------------------- |
+| API Costs         | $96-480                                  |
+| Developer Time    | ~40 hours (no preprocessing maintenance) |
+| Latency Reduction | ~16,000-24,000 total seconds saved       |
 
 **Intangible Benefits**:
+
 - Improved user experience (faster generation)
 - Reduced support tickets (fewer failures)
 - Easier onboarding (simpler system)
@@ -479,12 +511,14 @@ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 ### TypeScript Types (Minor)
 
 **Before**:
+
 ```typescript
 import { ExerciseType } from '@megacampus/shared-types/generation-result';
 const myType: ExerciseType = 'case_study';
 ```
 
 **After**:
+
 ```typescript
 const myType: string = 'case study analysis';
 ```
@@ -492,6 +526,7 @@ const myType: string = 'case study analysis';
 **Migration**: Replace `ExerciseType` with `string` in consuming code.
 
 ### No Breaking Changes At:
+
 - ✅ Database layer (JSONB accepts both formats)
 - ✅ API layer (JSON serialization unchanged)
 - ✅ Storage layer (no schema changes)
@@ -533,6 +568,7 @@ cd ../course-gen-platform && pnpm build
 **Lesson**: LLMs are better at understanding concepts than memorizing exact strings.
 
 **Evidence**:
+
 - Old approach: Force LLM to output 1 of 7 exact strings
 - New approach: Trust LLM to describe exercise types naturally
 - Result: 60-80% validation failure reduction
@@ -544,6 +580,7 @@ cd ../course-gen-platform && pnpm build
 **Lesson**: Minimal constraints with clear guidance work better than strict enums.
 
 **Evidence**:
+
 - 3-character minimum prevents garbage
 - No maximum allows detailed descriptions
 - `.describe()` provides guidance without enforcement
@@ -556,6 +593,7 @@ cd ../course-gen-platform && pnpm build
 **Lesson**: Preprocessing is a band-aid for overly restrictive validation.
 
 **Evidence**:
+
 - 14 synonym mappings maintained
 - Incomplete coverage (new variations still failed)
 - Added latency and maintenance burden
@@ -568,6 +606,7 @@ cd ../course-gen-platform && pnpm build
 **Lesson**: JSONB storage enables safe schema evolution.
 
 **Evidence**:
+
 - No migration needed
 - Backward compatible
 - Zero downtime
@@ -583,14 +622,15 @@ cd ../course-gen-platform && pnpm build
 
 Consider migrating these enum fields to freeform text:
 
-| Field | Current Enum | Recommendation |
-|-------|-------------|----------------|
-| `difficulty_level` | beginner/intermediate/advanced | MAYBE - Consider "Beginner (no prerequisites)" |
-| `assessment_types` | Multiple values | YES - Allow "Weekly quizzes with immediate feedback" |
-| `primary_strategy` | Multiple values | YES - Allow "Problem-based learning with peer collaboration" |
-| `bloom_level` | 6 levels | NO - Keep for pedagogical validation |
+| Field              | Current Enum                   | Recommendation                                               |
+| ------------------ | ------------------------------ | ------------------------------------------------------------ |
+| `difficulty_level` | beginner/intermediate/advanced | MAYBE - Consider "Beginner (no prerequisites)"               |
+| `assessment_types` | Multiple values                | YES - Allow "Weekly quizzes with immediate feedback"         |
+| `primary_strategy` | Multiple values                | YES - Allow "Problem-based learning with peer collaboration" |
+| `bloom_level`      | 6 levels                       | NO - Keep for pedagogical validation                         |
 
 **Criteria for Migration**:
+
 - ✅ High validation failure rate (>20%)
 - ✅ Semantic variations common
 - ✅ Descriptive text adds value for users
@@ -599,6 +639,7 @@ Consider migrating these enum fields to freeform text:
 ### 2. Monitor Generated Values
 
 **Action Items**:
+
 1. Add logging for exercise_type values in first 100 courses
 2. Review sample to ensure quality
 3. Create dashboard to track value diversity
@@ -609,6 +650,7 @@ Consider migrating these enum fields to freeform text:
 **Current**: Basic instruction with examples
 
 **Enhancement Ideas**:
+
 - Add few-shot examples in prompt
 - Provide domain-specific examples based on course category
 - Use style parameter to adjust formality
@@ -626,11 +668,13 @@ exercise_type: {
 ```
 
 **Benefits**:
+
 - Flexibility for LLM
 - Optional structure for analytics
 - Backward compatible
 
 **Trade-offs**:
+
 - More complex schema
 - Requires LLM to generate both fields
 - May reintroduce validation issues
@@ -653,13 +697,13 @@ Successfully migrated `exercise_type` from a strict 7-value enum to a freeform t
 
 ### Risk Assessment
 
-| Category | Risk Level | Mitigation |
-|----------|-----------|------------|
-| Data Loss | NONE | JSONB unchanged |
-| Type Errors | LOW | Type-checked and built |
-| LLM Quality | LOW | Clear prompt guidance |
-| Rollback | LOW | Simple git revert |
-| Production | LOW | No breaking changes |
+| Category    | Risk Level | Mitigation             |
+| ----------- | ---------- | ---------------------- |
+| Data Loss   | NONE       | JSONB unchanged        |
+| Type Errors | LOW        | Type-checked and built |
+| LLM Quality | LOW        | Clear prompt guidance  |
+| Rollback    | LOW        | Simple git revert      |
+| Production  | LOW        | No breaking changes    |
 
 ### Next Steps
 

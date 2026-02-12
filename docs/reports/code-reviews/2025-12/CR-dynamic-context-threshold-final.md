@@ -100,6 +100,7 @@ No high-priority issues found.
 **Issue**: The `detectLanguage()` function returns `'rus'` and `'eng'`, but `getModelConfigForSummarization()` maps them to `'ru'` and `'en'`. This creates an unnecessary translation layer.
 
 **Current Code**:
+
 ```typescript
 // detectLanguage returns 'rus' or 'eng'
 function detectLanguage(text: string): string {
@@ -117,6 +118,7 @@ const langCode = language === 'rus' ? 'ru' : 'en';
 **Recommendation**: Standardize on two-letter ISO 639-1 codes (`'ru'`, `'en'`) throughout the codebase. Update `detectLanguage()` to return `'ru'` and `'en'` directly.
 
 **Suggested Fix**:
+
 ```typescript
 function detectLanguage(text: string): 'ru' | 'en' {
   const cyrillicPattern = /[\u0400-\u04FF]/;
@@ -136,6 +138,7 @@ function detectLanguage(text: string): 'ru' | 'en' {
 **Issue**: While Zod schema validates 0-1 range, there's no upper bound check that prevents impractical values like 0.99 (99% reserve).
 
 **Current Code**:
+
 ```typescript
 export const updateContextReserveSettingSchema = z.object({
   language: contextReserveLanguageSchema,
@@ -148,15 +151,20 @@ export const updateContextReserveSettingSchema = z.object({
 **Recommendation**: Add practical upper bound (e.g., 0.5 or 50%) to prevent misconfiguration.
 
 **Suggested Fix**:
+
 ```typescript
 export const updateContextReserveSettingSchema = z.object({
   language: contextReserveLanguageSchema,
-  reservePercent: z.number().min(0).max(0.5) // Practical max: 50%
+  reservePercent: z
+    .number()
+    .min(0)
+    .max(0.5) // Practical max: 50%
     .describe('Reserve percentage (0-50% recommended)'),
 });
 ```
 
 **UI Update**:
+
 ```tsx
 // In context-reserve-settings.tsx
 <Slider
@@ -182,6 +190,7 @@ Note: UI already has `max={0.5}` correctly, but schema should match for consiste
 **Issue**: Assumes 128K context for dynamic threshold calculation. If model context sizes change (e.g., Claude Opus 4.5 has 200K), this will be incorrect.
 
 **Current Code**:
+
 ```typescript
 // Assume standard model has 128K context (typical for Claude/GPT models)
 const assumedMaxContext = 128000;
@@ -192,6 +201,7 @@ const assumedMaxContext = 128000;
 **Recommendation**: Retrieve actual `max_context_tokens` from the model configuration in database instead of hardcoding.
 
 **Suggested Fix**:
+
 ```typescript
 async function getModelConfigForSummarization(
   language: string,
@@ -211,8 +221,7 @@ async function getModelConfigForSummarization(
 
     // Extract max_context from database (requires adding to PhaseModelConfig)
     // For now, use hardcoded mapping based on model ID patterns
-    if (standardConfig.modelId.includes('200k') ||
-        standardConfig.modelId.includes('opus')) {
+    if (standardConfig.modelId.includes('200k') || standardConfig.modelId.includes('opus')) {
       actualMaxContext = 200000;
     }
   } catch (err) {
@@ -241,6 +250,7 @@ Better long-term: Add `max_context_tokens` to the phase model config results.
 **Issue**: Updates three language settings with `Promise.all()` without transaction. If one update fails mid-flight, database state becomes inconsistent.
 
 **Current Code**:
+
 ```typescript
 await Promise.all([
   updateContextReserveSetting({ language: 'en', reservePercent: settings.en }),
@@ -254,6 +264,7 @@ await Promise.all([
 **Recommendation**: Implement proper error handling or use database transaction.
 
 **Suggested Fix** (Option 1 - Better error handling):
+
 ```typescript
 const handleSave = async () => {
   try {
@@ -299,6 +310,7 @@ Create a new tRPC procedure `updateAllContextReserveSettings` that updates all t
 **Recommendation**: Add cache invalidation endpoint or reduce cache TTL for context reserve settings.
 
 **Suggested Fix** (Option 1 - Add invalidation):
+
 ```typescript
 // In context-reserve.ts router
 updateContextReserveSetting: superadminProcedure
@@ -355,6 +367,7 @@ Keep 5-minute TTL for model configs, but use shorter TTL (30 seconds) for reserv
 **Issue**: Response parsing has defensive coding pattern that may mask actual response structure issues.
 
 **Current Code**:
+
 ```typescript
 const data = result.result?.data || result.result || result;
 ```
@@ -364,6 +377,7 @@ const data = result.result?.data || result.result || result;
 **Recommendation**: Standardize response structure and use consistent parsing.
 
 **Suggested Fix**:
+
 ```typescript
 // Assuming tRPC always returns result.result.data
 const data = result.result?.data;
@@ -383,6 +397,7 @@ if (!data) {
 **Issue**: Hardcoded 24-hour cache eviction age without configuration option.
 
 **Current Code**:
+
 ```typescript
 const MAX_CACHE_AGE_MS = 24 * 60 * 60 * 1000;
 ```
@@ -392,6 +407,7 @@ const MAX_CACHE_AGE_MS = 24 * 60 * 60 * 1000;
 **Recommendation**: Make configurable via environment variable or global settings.
 
 **Suggested Fix**:
+
 ```typescript
 const MAX_CACHE_AGE_MS = parseInt(
   process.env.MODEL_CONFIG_MAX_CACHE_AGE_MS ?? '86400000', // 24h default
@@ -410,6 +426,7 @@ const MAX_CACHE_AGE_MS = parseInt(
 **Issue**: Threshold examples hardcoded to 128K and 200K models. If actual model sizes differ, examples are misleading.
 
 **Current Code**:
+
 ```tsx
 <p>
   128K model → <strong>{calculateThresholdExample(128000, settings.en)}</strong>
@@ -426,11 +443,12 @@ const MAX_CACHE_AGE_MS = parseInt(
 **Recommendation**: Fetch actual model context sizes from backend and display real examples.
 
 **Suggested Enhancement**:
+
 ```tsx
 // Add to component state
-const [modelSizes, setModelSizes] = useState<{standard: number, extended: number}>({
+const [modelSizes, setModelSizes] = useState<{ standard: number; extended: number }>({
   standard: 128000,
-  extended: 200000
+  extended: 200000,
 });
 
 // Fetch actual model configs on mount
@@ -448,7 +466,7 @@ useEffect(() => {
   Standard ({(modelSizes.standard / 1000).toFixed(0)}K) →
   <strong>{calculateThresholdExample(modelSizes.standard, settings.en)}</strong>
   threshold
-</p>
+</p>;
 ```
 
 ---
@@ -462,6 +480,7 @@ useEffect(() => {
 **Issue**: `calculateContextThreshold()` function lacks JSDoc comment explaining parameters and return value.
 
 **Current Code**:
+
 ```typescript
 export function calculateContextThreshold(
   maxContextTokens: number,
@@ -476,7 +495,8 @@ export function calculateContextThreshold(
 **Recommendation**: Add comprehensive JSDoc.
 
 **Suggested Fix**:
-```typescript
+
+````typescript
 /**
  * Calculate dynamic threshold based on model's max context and reserve percentage
  *
@@ -501,7 +521,7 @@ export function calculateContextThreshold(
 ): number {
   return Math.floor(maxContextTokens * (1 - reservePercent));
 }
-```
+````
 
 ---
 
@@ -518,6 +538,7 @@ export function calculateContextThreshold(
 **Recommendation**: Export migration to SQL file for version control.
 
 **Action**:
+
 ```bash
 # Generate SQL file from Supabase schema
 pnpm supabase db diff --use-migra > \
@@ -537,6 +558,7 @@ pnpm supabase db diff --use-migra > \
 **Recommendation**: Document extension path in code or add language-agnostic admin panel.
 
 **Future Enhancement**:
+
 ```typescript
 // In context-reserve-settings.tsx
 // Add "Manage Languages" button that opens dialog to add/remove language configs
@@ -606,6 +628,7 @@ pnpm supabase db diff --use-migra > \
 **Command**: `pnpm type-check`
 
 **Output**:
+
 ```
 packages/course-gen-platform type-check: Done
 packages/shared-types type-check: Done
@@ -626,6 +649,7 @@ packages/web type-check: Done
 **Lint Warnings**: 36 ESLint warnings in unrelated files (generation-graph components, markdown renderer, UI components). None in reviewed code.
 
 **Notable**:
+
 - Next.js build completed successfully
 - Static page generation succeeded
 - No blocking errors
@@ -637,6 +661,7 @@ packages/web type-check: Done
 **Table**: `context_reserve_settings`
 
 **Structure**:
+
 ```sql
 CREATE TABLE context_reserve_settings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -649,10 +674,12 @@ CREATE TABLE context_reserve_settings (
 ```
 
 **RLS Policies**:
+
 1. "Superadmins can manage context reserve settings" (ALL operations, superadmin only)
 2. "Service role can access context reserve settings" (ALL operations, service role)
 
 **Initial Data**:
+
 - `en`: 0.15 (15% reserve)
 - `ru`: 0.25 (25% reserve)
 - `any`: 0.20 (20% reserve, fallback)
@@ -668,6 +695,7 @@ CREATE TABLE context_reserve_settings (
 **Scenario**: Table exists but no rows (e.g., after fresh migration without seed).
 
 **Behavior**:
+
 1. `listContextReserveSettings()` returns empty array
 2. UI shows default values (0.15, 0.25, 0.20) from component state
 3. `getContextReservePercent()` falls back to `DEFAULT_CONTEXT_RESERVE`
@@ -682,6 +710,7 @@ CREATE TABLE context_reserve_settings (
 **Scenario**: Supabase connection fails or times out.
 
 **Behavior**:
+
 1. Fresh request → Database query throws error
 2. SWR cache check → If stale cache exists, return with WARNING log
 3. If no cache → Falls back to `DEFAULT_CONTEXT_RESERVE`
@@ -696,6 +725,7 @@ CREATE TABLE context_reserve_settings (
 **Scenario**: Document language detected as `'fr'` (French), not configured in database.
 
 **Behavior**:
+
 1. `getContextReservePercent('fr')` checks database → Not found
 2. Fallback to `'any'` language → Returns 0.20 (20% reserve)
 3. If `'any'` also missing → Falls back to `DEFAULT_CONTEXT_RESERVE.any`
@@ -709,6 +739,7 @@ CREATE TABLE context_reserve_settings (
 **Scenario**: Stage 4 uses 200K models, other stages use 128K models.
 
 **Behavior**:
+
 1. `getModelForStage()` calls `determineTierAsync(stageNumber, tokenCount, language)`
 2. `determineTierAsync()` correctly chooses `maxContext`:
    - Stage 4: `maxContext = 200000`
@@ -719,6 +750,7 @@ CREATE TABLE context_reserve_settings (
 **Status**: HANDLED CORRECTLY
 
 **Evidence** (from model-config-service.ts:610-612):
+
 ```typescript
 // Stage 4 uses analysis models with larger context (200K)
 // Other stages use standard models (128K)
@@ -732,11 +764,13 @@ const maxContext = stageNumber === 4 ? 200000 : 128000;
 **Scenario**: Admin attempts to set reserve to 1.5 (150%) or -0.1 (-10%).
 
 **Behavior**:
+
 1. Frontend slider prevents values outside 0-0.5 range
 2. Backend Zod schema validates 0-1 range (see Medium-2 for max=0.5 recommendation)
 3. Invalid values rejected with error: "Number must be between 0 and 1"
 
 **Status**: PARTIALLY HANDLED
+
 - UI prevents: Yes (max=0.5)
 - Backend validates: Partially (max=1.0, should be 0.5)
 - Recommendation: Align backend validation to match UI (see Medium-2)
@@ -748,12 +782,14 @@ const maxContext = stageNumber === 4 ? 200000 : 128000;
 **Scenario**: Two admins update reserve settings simultaneously.
 
 **Behavior**:
+
 1. Database `updated_at` timestamp ensures last-write-wins
 2. Each admin's update succeeds independently
 3. No transaction isolation issues (single-row updates)
 4. Cache may serve stale data for up to 5 minutes (see Medium-5)
 
 **Status**: ACCEPTABLE
+
 - No data corruption risk
 - Last-write-wins is acceptable for admin config
 - Recommendation: Add optimistic cache invalidation (see Medium-5)
@@ -815,6 +851,7 @@ The Dynamic Context Threshold feature is **well-implemented** and ready for prod
 **All medium-priority improvements have been implemented** (5 issues fixed). The system now has better type safety, error handling, and cache consistency.
 
 **Strengths**:
+
 1. Formula correctness verified
 2. Security controls properly implemented
 3. Edge cases handled comprehensively
@@ -822,6 +859,7 @@ The Dynamic Context Threshold feature is **well-implemented** and ready for prod
 5. Type safety throughout
 
 **Weaknesses** (Remaining):
+
 1. No unit/integration tests (recommended for future sprint)
 2. Low-priority issues (4) remain as nice-to-have improvements
 
@@ -859,5 +897,6 @@ Watch for these patterns in logs after deployment:
 **Review Complete**. Feature approved for production deployment.
 
 **Artifacts**:
+
 - Plan file: `.tmp/current/plans/.code-review-plan.json` (not found, review conducted manually)
 - This report: `docs/reports/code-reviews/2025-12/CR-dynamic-context-threshold-final.md`

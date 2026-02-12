@@ -18,11 +18,7 @@
  * @see packages/shared-types/src/document-prioritization.ts
  */
 
-import type {
-  BudgetAllocation,
-  AnalysisModel,
-  PriorityLevel,
-} from '@megacampus/shared-types';
+import type { BudgetAllocation, AnalysisModel, PriorityLevel } from '@megacampus/shared-types';
 import {
   BudgetAllocationSchema,
   DEFAULT_HIGH_BUDGET_OSS,
@@ -104,28 +100,23 @@ interface BudgetCalculationResult {
  * // allocation.high_budget === 80_000
  * ```
  */
-export async function calculateBudgetAllocation(
-  courseId: string
-): Promise<BudgetAllocation> {
+export async function calculateBudgetAllocation(courseId: string): Promise<BudgetAllocation> {
   const startTime = Date.now();
 
-  logger.info(
-    { courseId },
-    '[BudgetAllocator] Starting budget calculation'
-  );
+  logger.info({ courseId }, '[BudgetAllocator] Starting budget calculation');
 
   const supabase = getSupabaseAdmin();
 
   // Step 1: Get document priorities from Stage 2 classification
   // NOTE: document_priorities table will be added in future migration
   // Using type assertion until DB types are regenerated
-  const { data: priorities, error: prioritiesError } = await supabase
+  const { data: priorities, error: prioritiesError } = (await supabase
     .from('document_priorities' as 'file_catalog') // Type assertion for missing table
     .select('file_id, priority, importance_score')
-    .eq('course_id', courseId) as unknown as {
-      data: Array<{ file_id: string; priority: string; importance_score: number }> | null;
-      error: Error | null;
-    };
+    .eq('course_id', courseId)) as unknown as {
+    data: Array<{ file_id: string; priority: string; importance_score: number }> | null;
+    error: Error | null;
+  };
 
   if (prioritiesError) {
     logger.error(
@@ -145,20 +136,17 @@ export async function calculateBudgetAllocation(
 
   // Step 2: Get file_catalog entries for token counts
   // NOTE: token_count column will be added in future migration
-  const fileIds = priorities.map((p) => p.file_id);
-  const { data: files, error: filesError } = await supabase
+  const fileIds = priorities.map(p => p.file_id);
+  const { data: files, error: filesError } = (await supabase
     .from('file_catalog')
     .select('id, token_count')
-    .in('id', fileIds) as unknown as {
-      data: Array<{ id: string; token_count: number | null }> | null;
-      error: Error | null;
-    };
+    .in('id', fileIds)) as unknown as {
+    data: Array<{ id: string; token_count: number | null }> | null;
+    error: Error | null;
+  };
 
   if (filesError) {
-    logger.error(
-      { courseId, error: filesError },
-      '[BudgetAllocator] Failed to fetch file catalog'
-    );
+    logger.error({ courseId, error: filesError }, '[BudgetAllocator] Failed to fetch file catalog');
     throw new Error(`Failed to fetch file catalog: ${filesError.message}`);
   }
 
@@ -293,8 +281,8 @@ export function calculatePerDocumentBudgets(
     {
       courseId: allocation.course_id,
       documentCount: documents.length,
-      fullTextCount: Array.from(budgets.values()).filter((b) => b.mode === 'full_text').length,
-      summaryCount: Array.from(budgets.values()).filter((b) => b.mode === 'summary').length,
+      fullTextCount: Array.from(budgets.values()).filter(b => b.mode === 'full_text').length,
+      summaryCount: Array.from(budgets.values()).filter(b => b.mode === 'summary').length,
     },
     '[BudgetAllocator] Per-document budgets calculated'
   );

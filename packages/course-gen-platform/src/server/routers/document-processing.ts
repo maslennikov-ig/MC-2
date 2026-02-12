@@ -75,12 +75,15 @@ async function verifyCourseAccess(
     .single();
 
   if (error || !course) {
-    logger.warn({
-      requestId,
-      courseId,
-      userId,
-      error,
-    }, 'Course not found');
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        userId,
+        error,
+      },
+      'Course not found'
+    );
 
     throw new TRPCError({
       code: 'NOT_FOUND',
@@ -90,14 +93,17 @@ async function verifyCourseAccess(
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
-    logger.warn({
-      requestId,
-      courseId,
-      userId,
-      organizationId,
-      courseOwnerId: course.user_id,
-      courseOrgId: course.organization_id,
-    }, 'Course access denied');
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        userId,
+        organizationId,
+        courseOwnerId: course.user_id,
+        courseOrgId: course.organization_id,
+      },
+      'Course access denied'
+    );
 
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -164,12 +170,15 @@ export const documentProcessingRouter = router({
       // ctx.user is guaranteed non-null by protectedProcedure middleware
       const currentUser = ctx.user;
 
-      logger.info({
-        requestId,
-        courseId,
-        fileId,
-        userId: currentUser.id,
-      }, 'Stage 2 document retry request');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          fileId,
+          userId: currentUser.id,
+        },
+        'Stage 2 document retry request'
+      );
 
       try {
         const supabase = getSupabaseAdmin();
@@ -190,12 +199,15 @@ export const documentProcessingRouter = router({
           .single();
 
         if (fileError || !file) {
-          logger.warn({
-            requestId,
-            fileId,
-            courseId,
-            error: fileError,
-          }, 'Document not found');
+          logger.warn(
+            {
+              requestId,
+              fileId,
+              courseId,
+              error: fileError,
+            },
+            'Document not found'
+          );
 
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -205,12 +217,15 @@ export const documentProcessingRouter = router({
 
         // Step 3: Verify document belongs to the course
         if (file.course_id !== courseId) {
-          logger.warn({
-            requestId,
-            fileId,
-            courseId,
-            fileCourseId: file.course_id,
-          }, 'Document does not belong to course');
+          logger.warn(
+            {
+              requestId,
+              fileId,
+              courseId,
+              fileCourseId: file.course_id,
+            },
+            'Document does not belong to course'
+          );
 
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -220,12 +235,15 @@ export const documentProcessingRouter = router({
 
         // Step 4: Verify document status is 'failed'
         if (file.vector_status !== 'failed') {
-          logger.warn({
-            requestId,
-            fileId,
-            courseId,
-            currentStatus: file.vector_status,
-          }, 'Document status is not failed');
+          logger.warn(
+            {
+              requestId,
+              fileId,
+              courseId,
+              currentStatus: file.vector_status,
+            },
+            'Document status is not failed'
+          );
 
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -248,11 +266,14 @@ export const documentProcessingRouter = router({
           .eq('id', fileId);
 
         if (updateError) {
-          logger.error({
-            requestId,
-            fileId,
-            error: updateError,
-          }, 'Failed to reset document status');
+          logger.error(
+            {
+              requestId,
+              fileId,
+              error: updateError,
+            },
+            'Failed to reset document status'
+          );
 
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
@@ -260,11 +281,14 @@ export const documentProcessingRouter = router({
           });
         }
 
-        logger.info({
-          requestId,
-          fileId,
-          courseId,
-        }, 'Document status reset to pending');
+        logger.info(
+          {
+            requestId,
+            fileId,
+            courseId,
+          },
+          'Document status reset to pending'
+        );
 
         // Step 7: Enqueue new DOCUMENT_PROCESSING job with high priority
         const jobData: DocumentProcessingJobData = {
@@ -287,12 +311,15 @@ export const documentProcessingRouter = router({
           { priority: 1 } // High priority for retries
         );
 
-        logger.info({
-          requestId,
-          courseId,
-          fileId,
-          jobId: job.id,
-        }, 'Stage 2 document retry job enqueued');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            fileId,
+            jobId: job.id,
+          },
+          'Stage 2 document retry job enqueued'
+        );
 
         return {
           success: true,
@@ -305,12 +332,15 @@ export const documentProcessingRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          requestId,
-          courseId,
-          fileId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Stage 2 document retry failed');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            fileId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Stage 2 document retry failed'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

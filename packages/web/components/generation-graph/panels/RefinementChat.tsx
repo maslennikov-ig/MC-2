@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { usePrevious } from '@/lib/hooks/use-previous'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -14,6 +15,7 @@ import {
   Wand2,
   RefreshCcw,
   Check,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
@@ -21,13 +23,7 @@ import { QuickActions, type ChatIntent } from './QuickActions'
 import { MarkdownRendererClient } from '@/components/markdown'
 import { toast } from '@/lib/toast'
 import { Proposal } from '@megacampus/shared-types/chat-types'
-
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  timestamp: string
-  pending?: boolean
-}
+import { type ChatMessage } from '../hooks/useRefinement'
 
 interface RefinementChatProps {
   courseId: string
@@ -42,6 +38,8 @@ interface RefinementChatProps {
   onAcceptProposal?: () => void
   proposalError?: string | null
   onRetryProposal?: () => void
+  onRejectProposal?: () => void
+  acceptedProposal?: Proposal | null
   selectedIntent?: ChatIntent | null
   /** Whether course generation is currently active (blocks chat interaction) */
   isGenerating?: boolean
@@ -55,6 +53,12 @@ const formatTime = (timestamp: string): string => {
   return isNaN(date.getTime()) ? '' : date.toLocaleTimeString()
 }
 
+// Helper to detect JSON content (raw or markdown-wrapped)
+function isJSONContent(content: string): boolean {
+  const trimmed = content.trimStart()
+  return trimmed.startsWith('{') || trimmed.startsWith('```json') || trimmed.startsWith('```\n{')
+}
+
 export const RefinementChat: React.FC<RefinementChatProps> = ({
   onRefine,
   history = [],
@@ -64,6 +68,8 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   onAcceptProposal,
   proposalError,
   onRetryProposal,
+  onRejectProposal,
+  acceptedProposal,
   selectedIntent: externalSelectedIntent,
   isGenerating = false,
   blockedMessage,
@@ -85,30 +91,23 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const prevHistoryLen = usePrevious(history.length)
 
   // Combine history with pending messages for display
   const displayHistory = useMemo(() => {
     return [...(history || []), ...pendingMessages]
   }, [history, pendingMessages])
 
-  // Clear pending messages when history updates (message was processed)
+  // Clear pending messages when history grows (server confirmed messages)
   useEffect(() => {
-    if (history && history.length > 0 && pendingMessages.length > 0) {
-      // Check if the last history message matches our pending user message
-      const lastHistoryMsg = history[history.length - 1]
-      const lastPendingMsg = pendingMessages[pendingMessages.length - 1]
-
-      if (
-        lastHistoryMsg &&
-        lastPendingMsg &&
-        lastHistoryMsg.role === 'user' &&
-        lastPendingMsg.role === 'user'
-      ) {
-        // Clear pending messages as they've been confirmed
-        setPendingMessages([])
-      }
+    if (
+      prevHistoryLen !== undefined &&
+      history.length > prevHistoryLen &&
+      pendingMessages.length > 0
+    ) {
+      setPendingMessages([])
     }
-  }, [history, pendingMessages])
+  }, [history.length, prevHistoryLen, pendingMessages.length])
 
   // Scroll to bottom on new messages (only within chat container, not page scroll)
   useEffect(() => {
@@ -187,7 +186,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
         pending: true,
       }
 
-      // Send immediately (consistent with GlobalCourseChat behavior)
+      // Send immediately
       // Add to pending for optimistic update
       setPendingMessages((prev) => [...prev, pendingMsg])
 
@@ -285,7 +284,11 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                       >
                         {msg.role === 'assistant' ? (
                           <MarkdownRendererClient
-                            content={msg.content}
+                            content={
+                              msg.content?.trim() && !isJSONContent(msg.content)
+                                ? msg.content
+                                : t('refinementChat.proposal.emptyResponseFallback')
+                            }
                             preset="chat"
                             isStreaming={msg.pending || false}
                           />
@@ -388,6 +391,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                   <div className="mt-4 flex gap-2">
                     <div className="h-9 w-24 rounded bg-gray-300 dark:bg-gray-600" />
                     <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
                   </div>
                 </div>
               )}
@@ -395,7 +399,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
             {latestProposal && (
               <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
                 <h4 className="mb-2 font-medium text-blue-900 dark:text-blue-100">
-                  Предложенные изменения
+                  {t('refinementChat.proposal.suggestedChanges')}
                 </h4>
 
                 {latestProposal.type === 'field_updates' && (
@@ -403,7 +407,9 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" size="sm" className="mb-2 -ml-2">
                         <ChevronDown className="mr-2 h-4 w-4" />
-                        Показать детали ({latestProposal.updates.length} изменений)
+                        {t('refinementChat.proposal.showDetails', {
+                          count: latestProposal.updates.length,
+                        })}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
@@ -451,7 +457,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                       className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300"
                     >
                       <RefreshCcw className="mr-1 h-3 w-3" />
-                      Повторить
+                      {t('refinementChat.proposal.retry')}
                     </Button>
                   </div>
                 )}
@@ -465,12 +471,12 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     {isApplying ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Применяю...
+                        {t('refinementChat.proposal.applying')}
                       </>
                     ) : (
                       <>
                         <Check className="mr-2 h-4 w-4" />
-                        Принять
+                        {t('refinementChat.proposal.accept')}
                       </>
                     )}
                   </Button>
@@ -479,9 +485,73 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     onClick={() => textareaRef.current?.focus()}
                     disabled={isApplying}
                   >
-                    Дополнить
+                    {t('refinementChat.proposal.supplement')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={onRejectProposal}
+                    disabled={isApplying}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    {t('refinementChat.proposal.reject')}
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Accepted proposal confirmation (read-only, shown after proposal was applied) */}
+            {/* Show accepted proposal (green box) only when no new proposal pending (blue box) */}
+            {!latestProposal && acceptedProposal && (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50/50 p-4 opacity-80 dark:border-green-800 dark:bg-green-900/10">
+                <h4 className="mb-2 flex items-center gap-2 text-sm font-medium text-green-800 dark:text-green-200">
+                  <Check className="h-4 w-4" />
+                  {t('refinementChat.proposal.changesApplied')}
+                </h4>
+
+                {acceptedProposal.type === 'field_updates' && (
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="mb-2 -ml-2">
+                        <ChevronDown className="mr-2 h-4 w-4" />
+                        {t('refinementChat.proposal.showDetails', {
+                          count: acceptedProposal.updates.length,
+                        })}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <ul className="mb-3 space-y-2 text-sm">
+                        {acceptedProposal.updates.map((u, i) => (
+                          <li
+                            key={i}
+                            className="rounded border border-green-200 bg-white p-2 dark:border-green-700 dark:bg-green-900/30"
+                          >
+                            <code className="block text-xs font-medium text-green-800 dark:text-green-200">
+                              {u.path}
+                            </code>
+                            {u.oldValue !== undefined && (
+                              <pre className="mt-1 max-h-20 overflow-auto text-xs text-red-600 line-through dark:text-red-400">
+                                {JSON.stringify(u.oldValue, null, 2).slice(0, 200)}
+                              </pre>
+                            )}
+                            <pre className="mt-1 max-h-20 overflow-auto text-xs text-green-600 dark:text-green-400">
+                              {JSON.stringify(u.newValue, null, 2).slice(0, 200)}
+                            </pre>
+                            {u.description && (
+                              <p className="mt-1 text-xs text-gray-500">{u.description}</p>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {acceptedProposal.type === 'lesson_patch' && (
+                  <pre className="max-h-32 overflow-auto rounded bg-green-100 p-2 text-xs dark:bg-green-800">
+                    {acceptedProposal.diffSummary}
+                  </pre>
+                )}
               </div>
             )}
 

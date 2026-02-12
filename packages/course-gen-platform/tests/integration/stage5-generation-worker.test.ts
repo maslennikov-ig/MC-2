@@ -37,11 +37,14 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { getQueue, addJob, closeQueue } from '../../src/orchestrator/queue';
+import { addJob, closeQueue } from '../../src/orchestrator/queue';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
 import { JobType } from '@megacampus/shared-types';
-import type { GenerationJobData, GenerationJobInput } from '@megacampus/shared-types/generation-job';
+import type {
+  GenerationJobData,
+  GenerationJobInput,
+} from '@megacampus/shared-types/generation-job';
 import { CourseStructureSchema } from '@megacampus/shared-types/generation-result';
 import {
   setupTestFixtures,
@@ -74,7 +77,7 @@ function generateCorrelationId(): string {
  * @param timeout - Maximum wait time in milliseconds (default: 600000 = 10 minutes)
  * @returns Job status record from database
  */
-async function waitForJobStateDB(
+async function _waitForJobStateDB(
   jobId: string,
   targetState: string | string[],
   timeout: number = 600000 // 10 minutes for LLM processing
@@ -109,8 +112,8 @@ async function waitForJobStateDB(
 
   throw new Error(
     `Timeout waiting for job ${jobId} to reach DB state(s): ${targetStates.join(', ')}. ` +
-    `Current state: ${actualState}. ` +
-    `This may indicate LLM processing is slow or worker is not running.`
+      `Current state: ${actualState}. ` +
+      `This may indicate LLM processing is slow or worker is not running.`
   );
 }
 
@@ -124,10 +127,7 @@ async function waitForJobStateDB(
  * @param timeout - Maximum wait time in milliseconds
  * @returns Course record with course_structure
  */
-async function waitForGenerationResult(
-  courseId: string,
-  timeout: number = 600000
-): Promise<any> {
+async function waitForGenerationResult(courseId: string, timeout: number = 600000): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -153,7 +153,7 @@ async function waitForGenerationResult(
 
   throw new Error(
     `Timeout waiting for course_structure to be populated in course ${courseId}. ` +
-    `This may indicate Stage 5 generation failed or worker is not running.`
+      `This may indicate Stage 5 generation failed or worker is not running.`
   );
 }
 
@@ -170,7 +170,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
     try {
       const redis = getRedisClient();
       await redis.ping();
-    } catch (error) {
+    } catch {
       console.warn('⚠️  Redis not available - tests will be skipped');
       console.warn('   Start Redis: docker run -d -p 6379:6379 redis:7-alpine');
       shouldSkipTests = true;
@@ -178,7 +178,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
     }
 
     // Setup test fixtures (organizations, users, courses)
-    await setupTestFixtures();
+    await setupTestFixtures({ skipAuthUsers: true });
 
     // Clean up any existing test jobs to start fresh
     await cleanupTestJobs(true); // obliterate = true
@@ -357,7 +357,9 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
       console.log(`   Learning Outcomes: ${validated.learning_outcomes.length}`);
       console.log(`   Total Cost: $${updatedCourse.generation_metadata.cost_usd.toFixed(4)}`);
       console.log(`   Total Tokens: ${updatedCourse.generation_metadata.total_tokens.total}`);
-      console.log(`   Overall Quality: ${updatedCourse.generation_metadata.quality_scores.overall}`);
+      console.log(
+        `   Overall Quality: ${updatedCourse.generation_metadata.quality_scores.overall}`
+      );
     },
     600000 // 10-minute test timeout
   );
@@ -628,7 +630,9 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
       console.log(`✓ STRUCTURE_GENERATION job created: ${job.id}`);
 
       // Wait for completion
-      console.log('⏳ Waiting for generation to complete (may fallback to Gemini for large context)...');
+      console.log(
+        '⏳ Waiting for generation to complete (may fallback to Gemini for large context)...'
+      );
       const updatedCourse = await waitForGenerationResult(courseId, 600000);
 
       const courseStructure = updatedCourse.course_structure;
@@ -670,7 +674,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
 
   it.skipIf(shouldSkipTests).skip(
     'should retry with OSS 120B when quality score < 0.75 threshold',
-    async () => {
+    () => {
       // NOTE: This test requires mocking quality validator to force low quality score
       // Skipped in real tests since it's difficult to reliably trigger quality failures
       // without mocking. See unit tests for quality-validator.test.ts for detailed testing.
@@ -687,7 +691,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
 
   it.skipIf(shouldSkipTests).skip(
     'should retry with minimum lessons constraint when <10 lessons generated',
-    async () => {
+    () => {
       // NOTE: This test requires mocking section generator to force <10 lessons
       // Skipped in real tests since the system is designed to always generate >=10 lessons
       // See unit tests for section-batch-generator.test.ts for detailed testing.

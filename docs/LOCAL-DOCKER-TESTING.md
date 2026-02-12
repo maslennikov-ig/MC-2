@@ -3,6 +3,7 @@
 ## Why Test Locally First?
 
 Today's deployment issues could have ALL been caught locally:
+
 - ESM module resolution (`ERR_MODULE_NOT_FOUND`)
 - Path alias resolution (`@/shared`)
 - Workspace dependencies not included (`@megacampus/shared-types`)
@@ -77,9 +78,9 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - '6379:6379'
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 3
@@ -88,7 +89,7 @@ services:
     image: megacampus-api:test
     container_name: megacampus-api-test
     ports:
-      - "4000:4000"
+      - '4000:4000'
     env_file:
       - .env.local-docker
     environment:
@@ -98,7 +99,13 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -107,7 +114,7 @@ services:
   worker:
     image: megacampus-api:test
     container_name: megacampus-worker-test
-    command: ["tsx", "dist/orchestrator/worker-entrypoint.js"]
+    command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     env_file:
       - .env.local-docker
     environment:
@@ -123,7 +130,7 @@ services:
     image: megacampus-web:test
     container_name: megacampus-web-test
     ports:
-      - "3000:3000"
+      - '3000:3000'
     env_file:
       - .env.local-docker
     environment:
@@ -275,18 +282,22 @@ log_info "Docker images are ready for deployment!"
 ## Common Issues and Solutions
 
 ### Issue: `ERR_MODULE_NOT_FOUND`
+
 **Cause**: ESM imports without `.js` extensions
 **Solution**: Use `tsx` runtime instead of `node`
 
 ### Issue: `Cannot find package '@/...'`
+
 **Cause**: Path aliases not resolved at runtime
 **Solution**: Include `tsconfig.json` with paths in Docker image
 
 ### Issue: `Cannot find package '@megacampus/shared-types'`
+
 **Cause**: Workspace deps not in `pnpm deploy --prod`
 **Solution**: Copy workspace package manually in Dockerfile
 
 ### Issue: `ERR_PACKAGE_PATH_NOT_EXPORTED`
+
 **Cause**: Missing `exports` in package.json for subpaths
 **Solution**: Add wildcard exports: `"./*": { ... }`
 
@@ -297,44 +308,44 @@ log_info "Docker images are ready for deployment!"
 Add to `.github/workflows/ci.yml`:
 
 ```yaml
-  docker-build-test:
-    name: Docker Build Test
-    runs-on: ubuntu-latest
-    needs: [build]
-    steps:
-      - uses: actions/checkout@v4
+docker-build-test:
+  name: Docker Build Test
+  runs-on: ubuntu-latest
+  needs: [build]
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Build API Docker image
-        run: |
-          docker build \
-            -f packages/course-gen-platform/Dockerfile \
-            -t megacampus-api:test \
-            .
+    - name: Build API Docker image
+      run: |
+        docker build \
+          -f packages/course-gen-platform/Dockerfile \
+          -t megacampus-api:test \
+          .
 
-      - name: Test container starts
-        run: |
-          docker run -d --name api-test \
-            -e NODE_ENV=production \
-            -e PORT=4000 \
-            -e REDIS_URL=redis://localhost:6379 \
-            -e SUPABASE_URL=https://test.supabase.co \
-            -e SUPABASE_SERVICE_KEY=test \
-            -e SUPABASE_ANON_KEY=test \
-            -e QDRANT_URL=http://localhost:6333 \
-            -e QDRANT_API_KEY=test \
-            -e JINA_API_KEY=test \
-            megacampus-api:test
+    - name: Test container starts
+      run: |
+        docker run -d --name api-test \
+          -e NODE_ENV=production \
+          -e PORT=4000 \
+          -e REDIS_URL=redis://localhost:6379 \
+          -e SUPABASE_URL=https://test.supabase.co \
+          -e SUPABASE_SERVICE_KEY=test \
+          -e SUPABASE_ANON_KEY=test \
+          -e QDRANT_URL=http://localhost:6333 \
+          -e QDRANT_API_KEY=test \
+          -e JINA_API_KEY=test \
+          megacampus-api:test
 
-          sleep 10
+        sleep 10
 
-          # Check container didn't crash
-          if ! docker ps | grep -q api-test; then
-            echo "Container crashed!"
-            docker logs api-test
-            exit 1
-          fi
+        # Check container didn't crash
+        if ! docker ps | grep -q api-test; then
+          echo "Container crashed!"
+          docker logs api-test
+          exit 1
+        fi
 
-          echo "Container running OK"
+        echo "Container running OK"
 ```
 
 ---

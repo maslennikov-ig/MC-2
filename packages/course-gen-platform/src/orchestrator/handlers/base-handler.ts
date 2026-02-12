@@ -69,7 +69,6 @@ export interface JobResult {
  */
 const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.TEST_JOB]: null,
-  [JobType.INITIALIZE]: 1,
   [JobType.DOCUMENT_PROCESSING]: 2,
   [JobType.SUMMARY_GENERATION]: 2, // Fallback - should not be used in step 1 recovery
   [JobType.DOCUMENT_CLASSIFICATION]: 2, // Stage 3 classification
@@ -78,6 +77,7 @@ const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.TEXT_GENERATION]: 4,
   [JobType.LESSON_CONTENT]: 4, // Stage 6 lesson content generation
   [JobType.ENRICHMENT_GENERATION]: null, // Stage 7 enrichments (no course progress step)
+  [JobType.BLOCK_REGENERATION]: null, // Cascade regeneration (no course progress step)
   [JobType.FINALIZATION]: 5,
 };
 
@@ -154,6 +154,10 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
           .single();
         generationCode = course?.generation_code ?? undefined;
         if (generationCode) {
+          // Prevent unbounded cache growth in long-running workers
+          if (generationCodeCache.size >= 500) {
+            generationCodeCache.clear();
+          }
           generationCodeCache.set(courseId, generationCode);
         }
       } catch {

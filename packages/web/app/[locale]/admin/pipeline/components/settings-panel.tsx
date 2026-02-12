@@ -11,82 +11,75 @@
  * @module app/admin/pipeline/components/settings-panel
  */
 
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { Loader2, Settings, Save } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { getGlobalSettings, updateGlobalSettings } from '@/app/actions/pipeline-admin';
-import type { GlobalSettings } from '@megacampus/shared-types';
-import { globalSettingsSchema } from '@megacampus/shared-types';
+import { useState, useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { toast } from 'sonner'
+import { Loader2, Settings, Save } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { trpc } from '@/lib/trpc/react'
+import type { GlobalSettings } from '@megacampus/shared-types'
+import { globalSettingsSchema } from '@megacampus/shared-types'
 
 /**
  * Settings Panel - Edit global pipeline settings
  */
 export function SettingsPanel() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { data: settings, isLoading, error } = trpc.pipelineAdmin.getGlobalSettings.useQuery()
+
+  const [isSaving, setIsSaving] = useState(false)
 
   const form = useForm<GlobalSettings>({
     resolver: zodResolver(globalSettingsSchema),
     defaultValues: {
       ragTokenBudget: 20000,
     },
-  });
+  })
 
-  // Load settings on mount
+  // Reset form when settings are loaded
   useEffect(() => {
-    async function load() {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const result = await getGlobalSettings();
-        const data = result.result?.data || result.result;
-        form.reset(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load settings');
-      } finally {
-        setIsLoading(false);
-      }
+    if (settings) {
+      form.reset(settings)
     }
-    load();
-  }, [form]);
+  }, [settings, form])
 
-  const onSubmit = async (data: GlobalSettings) => {
-    try {
-      setIsSaving(true);
-      await updateGlobalSettings(data);
-      toast.success('Settings updated successfully');
-      // Reset form dirty state after successful save
-      form.reset(data);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update settings');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const updateMutation = trpc.pipelineAdmin.updateGlobalSettings.useMutation({
+    onSuccess: (data) => {
+      toast.success('Settings updated successfully')
+      form.reset(data)
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to update settings')
+    },
+    onSettled: () => {
+      setIsSaving(false)
+    },
+  })
+
+  const onSubmit = (data: GlobalSettings) => {
+    setIsSaving(true)
+    updateMutation.mutate(data)
+  }
 
   // Error state
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive bg-destructive/10 p-6">
+      <div className="border-destructive bg-destructive/10 rounded-lg border p-6">
         <div className="flex items-center gap-3">
-          <Settings className="h-5 w-5 text-destructive" />
+          <Settings className="text-destructive h-5 w-5" />
           <div>
-            <h3 className="font-semibold text-destructive">Failed to load settings</h3>
-            <p className="text-sm text-destructive/80 mt-1">{error}</p>
+            <h3 className="text-destructive font-semibold">Failed to load settings</h3>
+            <p className="text-destructive/80 mt-1 text-sm">{error.message}</p>
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // Loading skeleton
@@ -94,23 +87,23 @@ export function SettingsPanel() {
     return (
       <div className="space-y-6">
         <div>
-          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="mb-2 h-8 w-48" />
           <Skeleton className="h-4 w-96" />
         </div>
         <Skeleton className="h-64 max-w-2xl" />
         <Skeleton className="h-10 w-32" />
       </div>
-    );
+    )
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-8">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-semibold" style={{ color: 'rgb(var(--admin-text-primary))' }}>
           Global Settings
         </h2>
-        <p className="text-sm mt-1" style={{ color: 'rgb(var(--admin-text-secondary))' }}>
+        <p className="mt-1 text-sm" style={{ color: 'rgb(var(--admin-text-secondary))' }}>
           Configure global pipeline settings
         </p>
       </div>
@@ -139,13 +132,13 @@ export function SettingsPanel() {
                 max={100000}
                 step={1000}
                 {...form.register('ragTokenBudget', { valueAsNumber: true })}
-                className="bg-transparent border-cyan-500/20 focus:border-cyan-500/50 text-white"
+                className="border-cyan-500/20 bg-transparent text-white focus:border-cyan-500/50"
               />
               <p className="text-xs" style={{ color: 'rgb(var(--admin-text-tertiary))' }}>
                 Range: 1,000 - 100,000 tokens (default: 20,000)
               </p>
               {form.formState.errors.ragTokenBudget && (
-                <p className="text-xs text-destructive">
+                <p className="text-destructive text-xs">
                   {form.formState.errors.ragTokenBudget.message}
                 </p>
               )}
@@ -163,20 +156,20 @@ export function SettingsPanel() {
         >
           {isSaving ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Saving...
             </>
           ) : (
             <>
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="mr-2 h-4 w-4" />
               Save Settings
             </>
           )}
         </Button>
         {form.formState.isDirty && (
-          <p className="text-sm text-amber-400 font-medium">You have unsaved changes</p>
+          <p className="text-sm font-medium text-amber-400">You have unsaved changes</p>
         )}
       </div>
     </form>
-  );
+  )
 }

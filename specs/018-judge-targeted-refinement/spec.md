@@ -15,12 +15,13 @@ The current Judge system in Stage 6 (lesson content generation) triggers **full 
 3. **Ignored judge feedback** - specific recommendations from judges aren't applied surgically
 
 The goal is to implement a **Targeted Refinement** system that:
+
 - Applies **surgical fixes** to specific sections instead of full regeneration
 - **Preserves quality sections** that already passed evaluation
 - **Reduces token costs** by 60-70%
 - Supports **two operation modes**: Semi-Auto (with human escalation) and Full-Auto (best-effort results)
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Full-Auto Content Generation (Priority: P1)
 
@@ -29,6 +30,7 @@ A content creator initiates lesson generation and expects to receive the best po
 **Why this priority**: This is the primary use case - most users want hands-off generation with quality content delivered automatically. Full-auto mode must work reliably before semi-auto adds value.
 
 **Independent Test**: Can be tested by triggering a lesson generation with known issues and verifying that:
+
 1. Only problematic sections are modified
 2. Good sections are preserved
 3. Best available content is returned even if not perfect
@@ -125,7 +127,7 @@ Users see real-time progress of the refinement process, including which sections
 - What if a section has no context anchors (first or last section)? Uses available context only.
 - What if judge output lacks targetSectionId? Falls back to full section analysis.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -231,7 +233,7 @@ Users see real-time progress of the refinement process, including which sections
 - **BestEffortDisplay**: UI representation of best-effort result info for Admin UI
 - **UniversalReadabilityMetrics**: Language-agnostic readability metrics (avgSentenceLength, avgWordLength, paragraphBreakRatio)
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 
@@ -276,27 +278,28 @@ Users see real-time progress of the refinement process, including which sections
 LLMs frequently generate invalid Mermaid syntax, especially escaped quotes (`\"`) that break rendering.
 The implementation adds a 3-layer defense:
 
-| Layer | Component | File Location | Description |
-|-------|-----------|---------------|-------------|
-| 1 | Prevention | `src/shared/prompts/prompt-registry.ts` | Prompt instructions to avoid escaped quotes |
-| 2 | Auto-fix | `utils/mermaid-sanitizer.ts` | Automatically removes `\"` from Mermaid blocks |
-| 3 | Detection | `judge/heuristic-filter.ts` (`checkMermaidSyntax()`) | Detects remaining issues, routes to REGENERATE |
+| Layer | Component  | File Location                                        | Description                                    |
+| ----- | ---------- | ---------------------------------------------------- | ---------------------------------------------- |
+| 1     | Prevention | `src/shared/prompts/prompt-registry.ts`              | Prompt instructions to avoid escaped quotes    |
+| 2     | Auto-fix   | `utils/mermaid-sanitizer.ts`                         | Automatically removes `\"` from Mermaid blocks |
+| 3     | Detection  | `judge/heuristic-filter.ts` (`checkMermaidSyntax()`) | Detects remaining issues, routes to REGENERATE |
 
 **Key Design Decision**: Mermaid issues have `severity: CRITICAL` which triggers `REGENERATE`, NOT `FLAG_TO_JUDGE`.
 This avoids expensive Judge calls for easily fixable syntax issues.
 
 ### Severity Routing Table
 
-| Severity | Issue Types | Action | Description |
-|----------|-------------|--------|-------------|
-| `CRITICAL` | Mermaid syntax, truncation, empty sections | `REGENERATE` | Cheap model self-regeneration |
-| `COMPLEX` | Factual errors, major structural issues | `FLAG_TO_JUDGE` | Full Judge evaluation |
-| `FIXABLE` | Clarity, tone, minor grammar | `SURGICAL_EDIT` | Patcher applies targeted fix |
-| `INFO` | Minor observations, suggestions | Pass through | No action needed |
+| Severity   | Issue Types                                | Action          | Description                   |
+| ---------- | ------------------------------------------ | --------------- | ----------------------------- |
+| `CRITICAL` | Mermaid syntax, truncation, empty sections | `REGENERATE`    | Cheap model self-regeneration |
+| `COMPLEX`  | Factual errors, major structural issues    | `FLAG_TO_JUDGE` | Full Judge evaluation         |
+| `FIXABLE`  | Clarity, tone, minor grammar               | `SURGICAL_EDIT` | Patcher applies targeted fix  |
+| `INFO`     | Minor observations, suggestions            | Pass through    | No action needed              |
 
 ### Best-Effort Fallback Implementation
 
 When max iterations reached (default: 3) without meeting quality threshold:
+
 - System selects iteration with **HIGHEST score** (not original content)
 - `improvementHints` are extracted from `fixInstructions` of unresolved issues
 - `qualityStatus` set to 'good' | 'acceptable' | 'below_standard'
@@ -308,22 +311,24 @@ This minimizes refinement costs while maintaining acceptable quality.
 
 ### Test Coverage
 
-| Test Suite | Tests | Description |
-|------------|-------|-------------|
-| `mermaid-sanitizer.test.ts` | 20 | Unit tests for Mermaid sanitizer |
-| `mermaid-fix-pipeline.e2e.test.ts` | 27 | E2E pipeline with real DB data |
-| `targeted-refinement-cycle.e2e.test.ts` | 23 | Full refinement cycle E2E |
-| Total Stage 6 | 262+ | All passing |
+| Test Suite                              | Tests | Description                      |
+| --------------------------------------- | ----- | -------------------------------- |
+| `mermaid-sanitizer.test.ts`             | 20    | Unit tests for Mermaid sanitizer |
+| `mermaid-fix-pipeline.e2e.test.ts`      | 27    | E2E pipeline with real DB data   |
+| `targeted-refinement-cycle.e2e.test.ts` | 23    | Full refinement cycle E2E        |
+| Total Stage 6                           | 262+  | All passing                      |
 
 ### Files Created/Modified
 
 **New Files:**
+
 - `src/stages/stage6-lesson-content/utils/mermaid-sanitizer.ts` - Layer 2 auto-fix
 - `tests/stages/stage6-lesson-content/utils/mermaid-sanitizer.test.ts` - Unit tests
 - `tests/stages/stage6-lesson-content/mermaid-fix-pipeline.e2e.test.ts` - E2E tests
 - `tests/stages/stage6-lesson-content/targeted-refinement-cycle.e2e.test.ts` - Full cycle E2E
 
 **Modified Files:**
+
 - `judge/heuristic-filter.ts` - Added `checkMermaidSyntax()` (Layer 3)
 - `nodes/generator.ts` - Integrated mermaid sanitizer after generation
 - `nodes/self-reviewer-node.ts` - CRITICAL severity for Mermaid issues

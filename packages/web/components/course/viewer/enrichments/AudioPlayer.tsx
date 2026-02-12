@@ -1,8 +1,8 @@
-"use client"
+'use client'
 
-import React, { useState, useRef, useEffect } from "react"
-import { useTranslations } from "next-intl"
-import { motion } from "framer-motion"
+import React, { useState, useRef, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
+import { motion } from 'framer-motion'
 import {
   Play,
   Pause,
@@ -14,12 +14,12 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
-import { Card, CardContent } from "@/components/ui/card"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import type { Database } from "@/types/database.generated"
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
+import { Card, CardContent } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import type { Database } from '@/types/database.generated'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -153,9 +153,9 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
 
   if (!playbackUrl) {
     return (
-      <Card className="bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/30">
-        <CardContent className="py-6 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-purple-500 mr-2" />
+      <Card className="border-purple-200 bg-purple-50 dark:border-purple-800/30 dark:bg-purple-900/20">
+        <CardContent className="flex items-center justify-center py-6">
+          <Loader2 className="mr-2 h-6 w-6 animate-spin text-purple-500" />
           <span className="text-gray-600 dark:text-gray-400">{t('viewer.loadingAudio')}</span>
         </CardContent>
       </Card>
@@ -163,12 +163,12 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
   }
 
   return (
-    <Card className="overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-800/30">
+    <Card className="overflow-hidden border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 dark:border-purple-800/30 dark:from-purple-900/20 dark:to-indigo-900/20">
       <CardContent className="p-6">
         <audio ref={audioRef} src={playbackUrl} preload="metadata" />
 
         {/* Main Player Controls */}
-        <div className="flex items-center gap-4 mb-4">
+        <div className="mb-4 flex items-center gap-4">
           {/* Play/Pause Button */}
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -177,14 +177,14 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
             disabled={isLoading}
             aria-label={isPlaying ? t('viewer.pause') : t('viewer.play')}
             aria-pressed={isPlaying}
-            className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg transition-shadow hover:shadow-xl disabled:opacity-50"
           >
             {isLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <Loader2 className="h-6 w-6 animate-spin" />
             ) : isPlaying ? (
-              <Pause className="w-6 h-6" />
+              <Pause className="h-6 w-6" />
             ) : (
-              <Play className="w-6 h-6 ml-1" />
+              <Play className="ml-1 h-6 w-6" />
             )}
           </motion.button>
 
@@ -210,16 +210,31 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Skip Buttons */}
-            <Button size="sm" variant="ghost" onClick={() => skip(-10)} aria-label={t('viewer.skipBack')}>
-              <SkipBack className="w-4 h-4" />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => skip(-10)}
+              aria-label={t('viewer.skipBack')}
+            >
+              <SkipBack className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => skip(10)} aria-label={t('viewer.skipForward')}>
-              <SkipForward className="w-4 h-4" />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => skip(10)}
+              aria-label={t('viewer.skipForward')}
+            >
+              <SkipForward className="h-4 w-4" />
             </Button>
 
             {/* Volume */}
-            <Button size="sm" variant="ghost" onClick={toggleMute} aria-label={isMuted ? t('viewer.unmute') : t('viewer.mute')}>
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={toggleMute}
+              aria-label={isMuted ? t('viewer.unmute') : t('viewer.mute')}
+            >
+              {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </Button>
             <Slider
               value={[isMuted ? 0 : volume * 100]}
@@ -234,7 +249,12 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
 
           <div className="flex items-center gap-2">
             {/* Playback Rate */}
-            <Button size="sm" variant="outline" onClick={changePlaybackRate} aria-label={t('viewer.playbackSpeed', { rate: playbackRate })}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={changePlaybackRate}
+              aria-label={t('viewer.playbackSpeed', { rate: playbackRate })}
+            >
               {playbackRate}x
             </Button>
 
@@ -242,10 +262,21 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
             {content?.script && (
               <Collapsible open={showScript} onOpenChange={setShowScript}>
                 <CollapsibleTrigger asChild>
-                  <Button size="sm" variant="outline" className="gap-1" aria-label={showScript ? t('viewer.hideTranscript') : t('viewer.showTranscript')}>
-                    <FileText className="w-4 h-4" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1"
+                    aria-label={
+                      showScript ? t('viewer.hideTranscript') : t('viewer.showTranscript')
+                    }
+                  >
+                    <FileText className="h-4 w-4" />
                     {t('viewer.transcript')}
-                    {showScript ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    {showScript ? (
+                      <ChevronUp className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
                   </Button>
                 </CollapsibleTrigger>
               </Collapsible>
@@ -257,8 +288,8 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
         {content?.script && (
           <Collapsible open={showScript} onOpenChange={setShowScript}>
             <CollapsibleContent>
-              <div className="mt-4 p-4 bg-white/50 dark:bg-gray-900/50 rounded-lg max-h-60 overflow-y-auto">
-                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              <div className="mt-4 max-h-60 overflow-y-auto rounded-lg bg-white/50 p-4 dark:bg-gray-900/50">
+                <p className="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">
                   {content.script}
                 </p>
               </div>

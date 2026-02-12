@@ -8,13 +8,14 @@
 ## Clarifications
 
 ### Session 2025-11-28
+
 - Q: How should content refinement attempts be represented in the graph structure? → A: Internal Versioning (Refinements add to an "Attempts" list inside the node drawer; graph structure remains unchanged).
 - Q: Should users be allowed to manually skip failed pipeline stages? → A: No Skipping (User cannot skip stages; all nodes must complete successfully to proceed to maintain data integrity).
 - Q: Where should the compute-heavy graph layout calculations (ElkJS) be executed? → A: Web Worker (ElkJS runs in a background thread to prevent UI blocking and ensure smooth performance).
 - Q: How should localization strings be handled without a full i18n library? → A: Separate Files (Create `lib/translations.ts` with objects for RU/EN; components import strings from there).
 - Q: Where should the primary "Approve/Reject" actions be located in the UI? → A: Dual Location (Primary actions in global MissionControlBanner; secondary context actions inside the node details drawer).
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Pipeline Visualization & Monitoring (Priority: P1)
 
@@ -52,7 +53,7 @@ As a user, I want to inspect any node in the graph to view its specific input, p
 
 As a user, I want to see parallel processes (like multiple documents or lessons) as individual branched nodes to track the status of each item independently.
 
-**Why this priority**: Hiding parallel processes obscures failures. If one document fails, the user needs to know *which* one, not just that the "stage failed".
+**Why this priority**: Hiding parallel processes obscures failures. If one document fails, the user needs to know _which_ one, not just that the "stage failed".
 
 **Independent Test**: Generate a course with 3 documents and verify 3 separate nodes appear in the Document Processing stage.
 
@@ -124,7 +125,7 @@ As an admin or superadmin, I want to view generation history across all accounts
 - **Tab Closure During Generation**: If the user closes the tab during active generation, session storage must preserve the last known state for recovery on return.
 - **Partial Parallel Failure**: If 3 of 5 documents succeed but 2 fail, the system must show individual status per node (not a single "stage failed" message).
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -176,7 +177,7 @@ As an admin or superadmin, I want to view generation history across all accounts
 - **GenerationTrace**: The source of truth record containing input/output data, metrics, and status for each step.
 - **Course**: The parent entity whose state drives the overall graph progression.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

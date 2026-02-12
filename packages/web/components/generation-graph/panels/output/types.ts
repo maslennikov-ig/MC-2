@@ -93,7 +93,6 @@ export const ANALYSIS_RESULT_FIELDS: FieldConfig[] = [
     type: 'textarea',
     regeneratable: true,
   },
-  { path: 'pedagogical_patterns.assessment_types', label: 'Типы заданий', type: 'chips' },
 
   // Generation Guidance
   {

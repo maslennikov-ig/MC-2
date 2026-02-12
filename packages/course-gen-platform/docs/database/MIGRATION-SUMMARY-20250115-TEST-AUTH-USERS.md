@@ -33,6 +33,7 @@ Created two PostgreSQL migrations to enable test fixtures to create Supabase Aut
 ### Entity-Relationship Context
 
 **Existing Schema**:
+
 ```
 auth.users (Supabase managed)
   ↓
@@ -42,6 +43,7 @@ public.courses, job_status, etc.
 ```
 
 **New Capability**:
+
 - Direct INSERT into `auth.users` via RPC (bypasses Supabase Admin API)
 - Enables test fixtures with stable, predefined UUIDs
 
@@ -76,6 +78,7 @@ public.courses, job_status, etc.
 **Location**: `packages/course-gen-platform/supabase/migrations/20250115000001_create_test_auth_user_function.sql`
 
 **Signature**:
+
 ```sql
 CREATE OR REPLACE FUNCTION public.create_test_auth_user(
   p_user_id UUID,
@@ -87,6 +90,7 @@ RETURNS JSONB
 ```
 
 **Key Features**:
+
 - Environment check: `app.environment = 'test'`
 - Idempotent: `ON CONFLICT (id) DO NOTHING`
 - Returns structured JSONB response
@@ -94,11 +98,13 @@ RETURNS JSONB
 - Comprehensive error handling
 
 **Security**:
+
 - `SECURITY DEFINER` with `SET search_path`
 - Granted to `service_role` and `postgres` only
 - Revoked from `authenticated`, `anon`, `PUBLIC`
 
 **Verification Block**:
+
 - Checks function exists
 - Validates SECURITY DEFINER mode
 - Reports to migration log
@@ -108,12 +114,14 @@ RETURNS JSONB
 **Location**: `packages/course-gen-platform/supabase/migrations/20250115000002_create_hash_password_helper.sql`
 
 **Signature**:
+
 ```sql
 CREATE OR REPLACE FUNCTION public.hash_password(password TEXT)
 RETURNS TEXT
 ```
 
 **Key Features**:
+
 - Uses `crypt(password, gen_salt('bf'))` (Blowfish)
 - Same algorithm as Supabase Auth
 - `IMMUTABLE` for caching
@@ -121,6 +129,7 @@ RETURNS TEXT
 - `PARALLEL SAFE`
 
 **Security**:
+
 - `SECURITY DEFINER` (access to crypt function)
 - Granted to `service_role` and `postgres` only
 - Minimal attack surface (read-only operation)
@@ -130,6 +139,7 @@ RETURNS TEXT
 Both migrations use `CREATE OR REPLACE FUNCTION`, so they're safe to re-run.
 
 **Manual Rollback** (if needed):
+
 ```sql
 -- Rollback migration 20250115000002
 DROP FUNCTION IF EXISTS public.hash_password(TEXT);
@@ -153,6 +163,7 @@ DROP FUNCTION IF EXISTS public.create_test_auth_user(UUID, TEXT, TEXT, BOOLEAN);
 ### 1. Test Environment Enforcement
 
 **Mechanism**:
+
 ```sql
 v_environment := current_setting('app.environment', true);
 
@@ -162,6 +173,7 @@ END IF;
 ```
 
 **Setup**:
+
 ```sql
 -- Database-level (persistent across connections)
 ALTER DATABASE postgres SET app.environment = 'test';
@@ -171,6 +183,7 @@ SET app.environment = 'test';
 ```
 
 **Verification**:
+
 ```sql
 SHOW app.environment;
 -- Expected: test
@@ -189,6 +202,7 @@ RLS not applicable - these are utility functions, not table operations.
 **Mitigations Implemented**:
 
 1. **SET search_path**: Prevents search path injection
+
    ```sql
    SET search_path = auth, public, pg_temp
    ```
@@ -204,15 +218,18 @@ RLS not applicable - these are utility functions, not table operations.
 ### 4. Access Control
 
 **Granted Roles**:
+
 - `service_role` (Supabase service key - for backend/tests)
 - `postgres` (superuser - for local development)
 
 **Revoked Roles**:
+
 - `authenticated` (logged-in users)
 - `anon` (anonymous users)
 - `PUBLIC` (everyone)
 
 **Enforcement**:
+
 ```sql
 REVOKE ALL ON FUNCTION public.create_test_auth_user FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.create_test_auth_user FROM authenticated;
@@ -229,6 +246,7 @@ GRANT EXECUTE ON FUNCTION public.create_test_auth_user TO postgres;
 **Not Required**: These functions don't perform queries against large tables.
 
 **Existing Indexes** on `auth.users`:
+
 - Primary key on `id` (already indexed)
 - Unique constraint on `email` (already indexed)
 
@@ -237,6 +255,7 @@ No additional indexes needed for this feature.
 ### 2. Query Performance
 
 **`create_test_auth_user` Performance**:
+
 - Single INSERT statement (O(1) operation)
 - ON CONFLICT check uses primary key index (very fast)
 - No JOINs or complex queries
@@ -246,11 +265,13 @@ No additional indexes needed for this feature.
 ### 3. Function Properties
 
 **`hash_password` Optimizations**:
+
 - `IMMUTABLE`: PostgreSQL can cache results for same input
 - `PARALLEL SAFE`: Can be used in parallel query plans
 - `STRICT`: Skips execution for NULL inputs
 
 **Blowfish Cost Factor**:
+
 - Uses default cost factor (typically 6)
 - Balance between security and performance
 - ~10-20ms per hash operation
@@ -260,6 +281,7 @@ No additional indexes needed for this feature.
 **No Impact**: Functions don't hold locks or long-lived connections.
 
 **Test Suite Impact**:
+
 - Each test run creates ~5-10 auth users
 - Total time: ~50-200ms (acceptable for test fixtures)
 - Idempotency prevents duplicate work on re-runs
@@ -273,12 +295,14 @@ No additional indexes needed for this feature.
 Both migrations include verification blocks that run after function creation:
 
 **Checks Performed**:
+
 1. Function exists in `public` schema
 2. SECURITY DEFINER mode enabled
 3. Correct volatility (`IMMUTABLE` for hash_password)
 4. Permissions granted correctly
 
 **Output** (visible in migration logs):
+
 ```
 NOTICE: Verification passed: create_test_auth_user function created successfully
 NOTICE:   - Function exists: true
@@ -290,6 +314,7 @@ NOTICE:   - Environment check: ENFORCED (test only)
 ### Manual Testing (SQL Console)
 
 **Test 1: Create Test User**
+
 ```sql
 -- Setup
 SET app.environment = 'test';
@@ -312,6 +337,7 @@ DELETE FROM auth.users WHERE email = 'test-manual@example.com';
 ```
 
 **Expected Result**:
+
 ```json
 {
   "success": true,
@@ -322,6 +348,7 @@ DELETE FROM auth.users WHERE email = 'test-manual@example.com';
 ```
 
 **Test 2: Idempotency Check**
+
 ```sql
 -- Create user twice
 SELECT create_test_auth_user(
@@ -348,6 +375,7 @@ DELETE FROM auth.users WHERE email = 'test-idempotent@example.com';
 ```
 
 **Test 3: Security Check (Should Fail)**
+
 ```sql
 -- Try without setting environment
 -- (First unset it if previously set)
@@ -363,6 +391,7 @@ SELECT create_test_auth_user(
 ```
 
 **Expected Error**:
+
 ```
 ERROR: create_test_auth_user can only be called in test environment (app.environment = 'test'). Current: NULL
 HINT: Set app.environment via: ALTER DATABASE postgres SET app.environment = 'test';
@@ -375,6 +404,7 @@ HINT: Set app.environment via: ALTER DATABASE postgres SET app.environment = 'te
 **Test Suite**: Run existing integration tests after updating `createAuthUser()` function
 
 **Success Criteria**:
+
 - All tests in `tests/integration/` pass
 - Auth users created with stable IDs (00000000-0000-0000-0000-000000000012, etc.)
 - No "Database error creating new user" errors
@@ -383,6 +413,7 @@ HINT: Set app.environment via: ALTER DATABASE postgres SET app.environment = 'te
 ### Acceptance Tests
 
 **Test Case 1: Create Single Auth User**
+
 ```typescript
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 
@@ -405,6 +436,7 @@ describe('create_test_auth_user', () => {
 ```
 
 **Test Case 2: Idempotency**
+
 ```typescript
 it('should be idempotent (safe to call twice)', async () => {
   const supabase = getSupabaseAdmin();
@@ -435,6 +467,7 @@ it('should be idempotent (safe to call twice)', async () => {
 ```
 
 **Test Case 3: Password Hashing**
+
 ```typescript
 it('should hash passwords correctly', async () => {
   const supabase = getSupabaseAdmin();
@@ -458,15 +491,16 @@ it('should hash passwords correctly', async () => {
 **Reason**: Migrations created as SQL files, not applied via MCP in this session.
 
 **Next Steps**: Use MCP to apply migrations:
+
 ```typescript
 mcp__supabase__apply_migration({
-  migration_name: "create_test_auth_user_function",
-  migration_sql: "..." // contents of 20250115000001_create_test_auth_user_function.sql
+  migration_name: 'create_test_auth_user_function',
+  migration_sql: '...', // contents of 20250115000001_create_test_auth_user_function.sql
 });
 
 mcp__supabase__apply_migration({
-  migration_name: "create_hash_password_helper",
-  migration_sql: "..." // contents of 20250115000002_create_hash_password_helper.sql
+  migration_name: 'create_hash_password_helper',
+  migration_sql: '...', // contents of 20250115000002_create_hash_password_helper.sql
 });
 ```
 
@@ -475,6 +509,7 @@ mcp__supabase__apply_migration({
 **Reason**: Implementation follows standard PostgreSQL patterns and Supabase best practices.
 
 **Documentation Consulted** (via local knowledge):
+
 - Supabase Auth schema
 - PostgreSQL SECURITY DEFINER best practices
 - CVE-2024-10976 mitigation strategies
@@ -486,6 +521,7 @@ mcp__supabase__apply_migration({
 ### 1. Schema Validation Tests
 
 **Test Migration Application**:
+
 ```bash
 cd packages/course-gen-platform
 supabase db reset --db-url "$DATABASE_URL"
@@ -493,6 +529,7 @@ supabase migration up
 ```
 
 **Verify Functions Exist**:
+
 ```sql
 \df public.create_test_auth_user
 \df public.hash_password
@@ -501,16 +538,19 @@ supabase migration up
 ### 2. Integration Tests
 
 **Update Test Fixtures** (Priority 1):
+
 - File: `tests/fixtures/index.ts`
 - Function: `createAuthUser()`
 - Replace `auth.admin.createUser()` with RPC call
 
 **Run Test Suite**:
+
 ```bash
 npm test -- tests/integration/
 ```
 
 **Expected**:
+
 - All tests pass
 - No "Database error creating new user" errors
 - Stable test user IDs across runs
@@ -518,6 +558,7 @@ npm test -- tests/integration/
 ### 3. Contract Tests
 
 **Add RPC Contract Tests**:
+
 ```typescript
 describe('RPC: create_test_auth_user', () => {
   it('should return JSONB with success=true', async () => {
@@ -541,11 +582,12 @@ describe('RPC: create_test_auth_user', () => {
 ### 4. Security Tests
 
 **Test Environment Gating**:
+
 ```typescript
 it('should reject calls in non-test environment', async () => {
   // Unset environment
   await supabase.rpc('execute_sql', {
-    query: "RESET app.environment;"
+    query: 'RESET app.environment;',
   });
 
   const result = await supabase.rpc('create_test_auth_user', {
@@ -563,6 +605,7 @@ it('should reject calls in non-test environment', async () => {
 ### 5. Sample Queries for Acceptance Testing
 
 **Query 1: Count Test Users Created**
+
 ```sql
 SELECT COUNT(*) as test_user_count
 FROM auth.users
@@ -570,6 +613,7 @@ WHERE email LIKE '%@megacampus.com';
 ```
 
 **Query 2: Verify Email Confirmation**
+
 ```sql
 SELECT
   email,
@@ -582,6 +626,7 @@ LIMIT 10;
 ```
 
 **Query 3: Check Password Hashes**
+
 ```sql
 SELECT
   email,
@@ -599,6 +644,7 @@ LIMIT 5;
 ### 1. Test Fixtures (`tests/fixtures/index.ts`)
 
 **Current Code** (BROKEN):
+
 ```typescript
 const { data, error } = await supabase.auth.admin.createUser({
   id: userId, // ← Doesn't work!
@@ -610,6 +656,7 @@ const { data, error } = await supabase.auth.admin.createUser({
 ```
 
 **New Code** (WORKING):
+
 ```typescript
 // Hash password
 const { data: hashedPassword } = await supabase.rpc('hash_password', {
@@ -632,13 +679,14 @@ if (error || !data.success) {
 ### 2. Test Setup (`tests/setup.ts`)
 
 **Add Global Environment Setup**:
+
 ```typescript
 beforeAll(async () => {
   const supabase = getSupabaseAdmin();
 
   // Set test environment
   await supabase.rpc('execute_sql', {
-    query: "SET app.environment = 'test';"
+    query: "SET app.environment = 'test';",
   });
 });
 ```
@@ -648,6 +696,7 @@ beforeAll(async () => {
 **No Changes Required**: These are standard migrations applied via `supabase migration up`.
 
 **Recommendation**: Add smoke test to verify functions exist:
+
 ```bash
 # In CI pipeline
 psql "$DATABASE_URL" -c "SELECT proname FROM pg_proc WHERE proname IN ('create_test_auth_user', 'hash_password');"
@@ -692,12 +741,14 @@ psql "$DATABASE_URL" -c "SELECT proname FROM pg_proc WHERE proname IN ('create_t
 ### Immediate (Before Testing)
 
 1. **Apply Migrations**
+
    ```bash
    cd packages/course-gen-platform
    supabase migration up
    ```
 
 2. **Set Test Environment**
+
    ```sql
    ALTER DATABASE postgres SET app.environment = 'test';
    ```
@@ -716,6 +767,7 @@ psql "$DATABASE_URL" -c "SELECT proname FROM pg_proc WHERE proname IN ('create_t
    - Add `hashPassword()` helper
 
 5. **Run Integration Tests**
+
    ```bash
    npm test -- tests/integration/
    ```
@@ -727,11 +779,13 @@ psql "$DATABASE_URL" -c "SELECT proname FROM pg_proc WHERE proname IN ('create_t
 ### Validation Phase
 
 7. **Run Contract Tests**
+
    ```bash
    npm test -- tests/contract/
    ```
 
 8. **Run Full Test Suite**
+
    ```bash
    npm test
    ```
@@ -761,37 +815,44 @@ psql "$DATABASE_URL" -c "SELECT proname FROM pg_proc WHERE proname IN ('create_t
 ### Database Constraints
 
 **Unique Email Constraint**:
+
 - `auth.users.email` has UNIQUE constraint
 - If test email already exists with different ID, RPC will return idempotent message
 - Recommendation: Always delete auth users in `afterAll` hooks
 
 **Foreign Key Triggers**:
+
 - Creating auth user triggers creation of `public.users` entry
 - Ensure proper cleanup order: `public.users` → `auth.users`
 
 ### Performance Impact
 
 **Blowfish Hashing Cost**:
+
 - Default cost factor is 6 (adjustable via `gen_salt('bf', 6)`)
 - Higher cost = more secure but slower
 - Current setting: ~10-20ms per hash (acceptable for tests)
 
 **Connection Pooling**:
+
 - RPC functions don't hold connections
 - Safe for concurrent test execution
 
 ### Security Considerations
 
 **Production Safety**:
+
 - Functions check `app.environment = 'test'` before executing
 - **CRITICAL**: Ensure production database never has `app.environment = 'test'`
 - Recommendation: Add monitoring/alerts for this setting in production
 
 **Audit Logging**:
+
 - All auth user creation logged in PostgreSQL logs
 - Searchable via: `grep "create_test_auth_user" /var/log/postgresql/*.log`
 
 **CVE-2024-10976 Compliance**:
+
 - Functions use `SET search_path` to prevent injection
 - No dynamic SQL construction
 - All inputs validated before use
@@ -825,17 +886,20 @@ psql "$DATABASE_URL" -c "SELECT proname FROM pg_proc WHERE proname IN ('create_t
 ## Summary
 
 ✅ **Deliverables Complete**:
+
 - Two migration files created and verified
 - Comprehensive integration guide written
 - Security considerations documented
 - Testing strategy defined
 
 ✅ **Ready for**:
+
 - Migration application (`supabase migration up`)
 - Test fixture integration
 - Integration testing
 
 ✅ **Follow-up Required**:
+
 - Apply migrations to test database
 - Update `tests/fixtures/index.ts`
 - Run test suite for validation

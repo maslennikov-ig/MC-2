@@ -34,6 +34,7 @@ CREATE OR REPLACE FUNCTION initialize_fsm_with_outbox(
 **Objective**: Verify function creates FSM state + outbox entries atomically
 
 **Query**:
+
 ```sql
 SELECT initialize_fsm_with_outbox(
   '00000000-0000-0000-0000-000000000021'::uuid,
@@ -53,6 +54,7 @@ SELECT initialize_fsm_with_outbox(
 **Result**: ✅ **PASS**
 
 **Returned JSONB**:
+
 ```json
 {
   "fsmState": {
@@ -67,8 +69,8 @@ SELECT initialize_fsm_with_outbox(
       "outbox_id": "1743bd37-4ffe-4b6e-8c54-2ba1e9dcf2b1",
       "queue_name": "document-processing",
       "entity_id": "00000000-0000-0000-0000-000000000021",
-      "job_data": {"step": 2, "courseId": "..."},
-      "job_options": {"priority": 10},
+      "job_data": { "step": 2, "courseId": "..." },
+      "job_options": { "priority": 10 },
       "processed_at": null,
       "created_at": "2025-11-18T07:01:44.973209+00:00"
     },
@@ -76,8 +78,8 @@ SELECT initialize_fsm_with_outbox(
       "outbox_id": "2ad96afd-6872-4191-8c81-779dd8855b42",
       "queue_name": "summarization",
       "entity_id": "00000000-0000-0000-0000-000000000021",
-      "job_data": {"step": 3, "courseId": "..."},
-      "job_options": {"priority": 5},
+      "job_data": { "step": 3, "courseId": "..." },
+      "job_options": { "priority": 5 },
       "processed_at": null,
       "created_at": "2025-11-18T07:01:44.973209+00:00"
     }
@@ -86,6 +88,7 @@ SELECT initialize_fsm_with_outbox(
 ```
 
 **Verification**:
+
 - ✅ FSM state updated in `courses.generation_status`
 - ✅ 2 outbox entries created in `job_outbox`
 - ✅ 1 audit event created in `fsm_events`
@@ -99,6 +102,7 @@ SELECT initialize_fsm_with_outbox(
 **Objective**: Verify duplicate requests return cached result without re-executing
 
 **Query**:
+
 ```sql
 WITH
 first_call AS (
@@ -114,6 +118,7 @@ SELECT
 **Result**: ✅ **PASS**
 
 **Outcome**:
+
 ```
 results_identical: true
 first_outbox_count: 1
@@ -123,6 +128,7 @@ second_queue_should_be_same: "test-queue"
 ```
 
 **Verification**:
+
 - ✅ Second call returned **exact same JSONB** as first call
 - ✅ No duplicate outbox entries created
 - ✅ No duplicate FSM events logged
@@ -137,6 +143,7 @@ second_queue_should_be_same: "test-queue"
 **Objective**: Verify error handling and transaction rollback
 
 **Query**:
+
 ```sql
 SELECT initialize_fsm_with_outbox(
   '00000000-0000-0000-0000-999999999999'::uuid,  -- Nonexistent course
@@ -147,12 +154,14 @@ SELECT initialize_fsm_with_outbox(
 **Result**: ✅ **PASS**
 
 **Error Message**:
+
 ```
 ERROR:  P0001: Course not found: 00000000-0000-0000-0000-999999999999
 CONTEXT:  PL/pgSQL function initialize_fsm_with_outbox(...) line 25 at RAISE
 ```
 
 **Verification**:
+
 - ✅ Exception raised with descriptive message
 - ✅ Transaction rolled back (no records in any table)
 - ✅ No partial state created
@@ -164,6 +173,7 @@ CONTEXT:  PL/pgSQL function initialize_fsm_with_outbox(...) line 25 at RAISE
 **Objective**: Verify function executes within performance target
 
 **Query**:
+
 ```sql
 EXPLAIN ANALYZE
 SELECT initialize_fsm_with_outbox(
@@ -180,12 +190,14 @@ SELECT initialize_fsm_with_outbox(
 **Result**: ✅ **PASS**
 
 **Performance Metrics**:
+
 ```
 Planning Time: 0.074 ms
 Execution Time: 11.167 ms  ⭐ (Target: <50ms)
 ```
 
 **Analysis**:
+
 - **11.167ms** execution time is **77.7% faster** than 50ms target
 - Single transaction with 3 outbox inserts
 - Efficient index usage confirmed
@@ -198,6 +210,7 @@ Execution Time: 11.167 ms  ⭐ (Target: <50ms)
 **Objective**: Verify full rollback if ANY operation fails
 
 **Setup**:
+
 ```sql
 -- Before counts
 outbox_before: 5
@@ -206,6 +219,7 @@ idem_before: 2
 ```
 
 **Query** (intentional failure with invalid enum):
+
 ```sql
 SELECT initialize_fsm_with_outbox(
   ...,
@@ -217,6 +231,7 @@ SELECT initialize_fsm_with_outbox(
 **Result**: ✅ **PASS**
 
 **After counts**:
+
 ```sql
 outbox_after: 5  ✅ (unchanged)
 events_after: 2  ✅ (unchanged)
@@ -224,6 +239,7 @@ idem_after: 2    ✅ (unchanged)
 ```
 
 **Verification**:
+
 - ✅ Transaction rolled back completely
 - ✅ No orphaned records in any table
 - ✅ Database remained consistent
@@ -235,12 +251,14 @@ idem_after: 2    ✅ (unchanged)
 **Security Scan**: ✅ **NO CRITICAL ISSUES**
 
 ### Findings:
+
 - ✅ **search_path protection**: Function uses `SET search_path = public, pg_temp`
 - ✅ **SECURITY DEFINER**: Properly configured with permissions
 - ✅ **No RLS bypass issues**: Uses service_role appropriately
 - ✅ **No leaked password warnings**: Auth configuration unrelated
 
 **Pre-existing warnings** (not related to this function):
+
 - WARN: Multiple SECURITY DEFINER views (existing admin dashboard views)
 - WARN: Some functions lack search_path (existing functions, not ours)
 
@@ -251,11 +269,13 @@ idem_after: 2    ✅ (unchanged)
 **Performance Scan**: ✅ **NO CRITICAL ISSUES**
 
 ### Findings:
+
 - ✅ **Indexes utilized**: `idx_job_outbox_entity`, `idx_idempotency_expires`
 - ✅ **No unused indexes** on new tables (too new to be flagged)
 - ✅ **RLS policies optimized**: No initplan issues for our tables
 
 **Pre-existing info** (not related to this function):
+
 - INFO: Some unused indexes on other tables (expected in development)
 - WARN: RLS initplan on existing tables (pre-existing, not our changes)
 
@@ -266,6 +286,7 @@ idem_after: 2    ✅ (unchanged)
 ### ✅ Validation: p_initiated_by Normalization
 
 **Tested Values**:
+
 - ✅ 'API' → 'API' (pass-through)
 - ✅ 'QUEUE' → 'QUEUE' (pass-through)
 - ✅ 'WORKER' → 'WORKER' (pass-through)
@@ -273,6 +294,7 @@ idem_after: 2    ✅ (unchanged)
 - ✅ 'ADMIN' → 'API' (mapped to valid value)
 
 **Constraint Enforcement**:
+
 - `fsm_events.created_by` CHECK constraint requires `IN ('API', 'QUEUE', 'WORKER')`
 - Function properly maps all inputs to valid values
 
@@ -281,14 +303,17 @@ idem_after: 2    ✅ (unchanged)
 ## Database State Verification
 
 ### Tables Created (Task 1):
+
 ✅ `job_outbox` (3 indexes, RLS enabled)
 ✅ `idempotency_keys` (2 indexes, RLS enabled)
 ✅ `fsm_events` (2 indexes, RLS enabled)
 
 ### Function Created (Task 3):
+
 ✅ `initialize_fsm_with_outbox` (SECURITY DEFINER)
 
 ### Permissions Granted:
+
 ✅ EXECUTE to `service_role`
 ✅ EXECUTE to `authenticated`
 
@@ -297,11 +322,13 @@ idem_after: 2    ✅ (unchanged)
 ## Integration Verification
 
 ### TypeScript Integration (Task 2):
+
 ✅ Function signature matches `InitializeFSMCommand` interface
 ✅ Return type matches `InitializeFSMResult` interface
 ✅ Handler can call function via Supabase RPC
 
 **Remaining TypeScript Work**:
+
 - Remove `(as any)` type assertion in `fsm-initialization-command-handler.ts` (line 178)
 - Add Zod validation for RPC response using `InitializeFSMResultSchema`
 

@@ -58,6 +58,7 @@ Comprehensive code review completed for Stage 7 Admin Pipeline implementation ad
   - Inconsistency between backend capability and frontend visibility
   - If users create document enrichments via API, they won't be able to configure models in admin panel
 - **Recommendation**:
+
   ```typescript
   // Option 1: Re-enable in UI with clear "stub" indicator
   { key: 'document', icon: FileText, label: 'Document (Stub)', labelRu: 'Документ (Заглушка)', color: 'text-blue-500' },
@@ -115,6 +116,7 @@ Comprehensive code review completed for Stage 7 Admin Pipeline implementation ad
   3. Consider separate models for different aspect ratios if image quality differs
 
 **Evidence from Code**:
+
 ```typescript
 // card-handler.ts line 6-7
 /**
@@ -155,6 +157,7 @@ modelId: 'bytedance-seed/seedream-4.5',
   ```
 
 **Translation Evidence**:
+
 - EN: `"card": "AI-generated 1:1 thumbnail for course catalog and navigation (automatic)"`
 - RU: `"card": "AI-миниатюра 1:1 для каталога курсов и навигации (автоматическая)"`
 
@@ -220,23 +223,27 @@ packages/course-gen-platform/supabase/migrations/20260105...sql                (
 ### Notable Changes
 
 **1. Type Definitions (model-config.ts, pipeline-admin.ts)**
+
 - Added `stage_7_card` to `PhaseName` type union
 - Added `stage_7_card` to `phaseNameSchema` Zod enum
 - Change is consistent with existing Stage 7 phases
 
 **2. Backend Configuration (langchain-models.ts, constants.ts)**
+
 - Added fallback config for `stage_7_card` phase
 - Uses same model as `stage_7_cover` (SeedDream 4.5)
 - Temperature: 0.7, MaxTokens: 1024 (same as cover)
 - Includes fallback to DEFAULT_MODEL_ID
 
 **3. Admin UI (stage-detail-sheet.tsx)**
+
 - Added `card` to `ENRICHMENT_ACTIVITIES` array
 - Icon: `LayoutGrid`, Color: `text-pink-500`
 - English label: "Visual Card", Russian: "Карточка"
 - Properly integrated with tab rendering logic
 
 **4. Database Migration**
+
 - Updates `llm_model_config_phase_name_check` constraint
 - Inserts 7 new model configs (cover, card, video, audio, quiz, presentation, document)
 - All configs use `language: 'any'` and `context_tier: 'standard'`
@@ -305,14 +312,14 @@ packages/course-gen-platform/supabase/migrations/20260105...sql                (
 
 All 6 locations where `stage_7_card` appears are synchronized:
 
-| Location | Status | Phase Name |
-|----------|--------|------------|
-| `model-config.ts` (Type) | PRESENT | `'stage_7_card'` |
-| `pipeline-admin.ts` (Schema) | PRESENT | `'stage_7_card'` |
-| `langchain-models.ts` (Fallback) | PRESENT | `stage_7_card` |
-| `constants.ts` (Default) | PRESENT | `stage_7_card` |
-| `stage-detail-sheet.tsx` (UI) | PRESENT | `card` → `stage_7_card` |
-| Migration (DB) | PRESENT | `'stage_7_card'` |
+| Location                         | Status  | Phase Name              |
+| -------------------------------- | ------- | ----------------------- |
+| `model-config.ts` (Type)         | PRESENT | `'stage_7_card'`        |
+| `pipeline-admin.ts` (Schema)     | PRESENT | `'stage_7_card'`        |
+| `langchain-models.ts` (Fallback) | PRESENT | `stage_7_card`          |
+| `constants.ts` (Default)         | PRESENT | `stage_7_card`          |
+| `stage-detail-sheet.tsx` (UI)    | PRESENT | `card` → `stage_7_card` |
+| Migration (DB)                   | PRESENT | `'stage_7_card'`        |
 
 **Verification**: Grepped codebase for `stage_7_card` - found 10 occurrences, all appropriate.
 
@@ -372,6 +379,7 @@ Based on `.claude/docs/enrichment-guide.md` checklist:
 **Status**: PASSED
 
 **Output**:
+
 ```
 Scope: 5 of 6 workspace projects
 packages/shared-logger type-check: Done
@@ -465,6 +473,7 @@ Follows the standard pattern:
 
 **Current**: Adequate inline comments
 **Recommendation**: Consider adding JSDoc to:
+
 - `ENRICHMENT_ACTIVITIES` constant explaining the structure
 - Database migration explaining why these specific models were chosen
 
@@ -472,6 +481,7 @@ Follows the standard pattern:
 
 **Current**: Not verified (no test files in diff)
 **Recommendation**:
+
 - Add integration test for admin UI displaying card tab
 - Add test for model config lookup for `stage_7_card` phase
 - Verify card handler is called correctly from enrichment router
@@ -600,10 +610,10 @@ Recent commits show `card` enrichment was added progressively:
 
 ## Appendix C: Translation Coverage
 
-| Language | Card Type | Card Description | Card Label (Viewer) |
-|----------|-----------|------------------|---------------------|
-| English | "Visual Card" | "AI-generated 1:1 thumbnail for course catalog and navigation (automatic)" | "Visual Card" |
-| Russian | "Карточка" | "AI-миниатюра 1:1 для каталога курсов и навигации (автоматическая)" | "Карточка" |
+| Language | Card Type     | Card Description                                                           | Card Label (Viewer) |
+| -------- | ------------- | -------------------------------------------------------------------------- | ------------------- |
+| English  | "Visual Card" | "AI-generated 1:1 thumbnail for course catalog and navigation (automatic)" | "Visual Card"       |
+| Russian  | "Карточка"    | "AI-миниатюра 1:1 для каталога курсов и навигации (автоматическая)"        | "Карточка"          |
 
 **Status**: Complete coverage in both languages
 

@@ -4,7 +4,8 @@
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
 ## Phase 1: Setup
-*Goal: Initialize project structure and shared utilities.*
+
+_Goal: Initialize project structure and shared utilities._
 
 - [x] T001 Create directory structure for celestial components in `packages/web/components/generation-celestial/`
 - [x] T002 Implement `SpaceBackground.tsx` with dark gradient theme in `packages/web/components/generation-celestial/SpaceBackground.tsx`
@@ -12,16 +13,18 @@
 - [x] T004 Create barrel file `packages/web/components/generation-celestial/index.ts` exporting created components
 
 ## Phase 2: Foundational Components
-*Goal: Build the core visual elements of the celestial timeline.*
-*Prerequisites: Phase 1*
+
+_Goal: Build the core visual elements of the celestial timeline._
+_Prerequisites: Phase 1_
 
 - [x] T005 [P] Implement `TrajectoryLine.tsx` with animated SVG dashed line in `packages/web/components/generation-celestial/TrajectoryLine.tsx`
 - [x] T006 [P] Implement `PlanetNode.tsx` handling all 5 states (pending, active, completed, error, awaiting) with Lucide icons in `packages/web/components/generation-celestial/PlanetNode.tsx`
 - [x] T007 Implement `CelestialJourney.tsx` layout container combining Planets and Trajectory in `packages/web/components/generation-celestial/CelestialJourney.tsx`
 
 ## Phase 3: User Story 1 - Visualize Progress
-*Goal: Replace the old progress bar with the Celestial Journey visualization.*
-*Priority: P1*
+
+_Goal: Replace the old progress bar with the Celestial Journey visualization._
+_Priority: P1_
 
 - [x] T008 [US1] [P] Implement `CelestialHeader.tsx` with rocket icon and overall progress in `packages/web/components/generation-celestial/CelestialHeader.tsx`
 - [x] T009 [US1] [P] Implement `PhaseProgress.tsx` for showing granular progress within an active stage in `packages/web/components/generation-celestial/PhaseProgress.tsx`
@@ -32,22 +35,25 @@
 - [x] T014 [US1] Update `ProgressSkeleton.tsx` to match the new celestial layout in `packages/web/app/courses/generating/[slug]/ProgressSkeleton.tsx`
 
 ## Phase 4: User Story 2 - Stage Approval Flow
-*Goal: Enable users to review and approve stages via Mission Control.*
-*Priority: P1*
+
+_Goal: Enable users to review and approve stages via Mission Control._
+_Priority: P1_
 
 - [x] T015 [US2] Implement `MissionControlBanner.tsx` with "Approve" and "Cancel" actions in `packages/web/components/generation-celestial/MissionControlBanner.tsx`
 - [x] T016 [US2] Integrate `MissionControlBanner` into `GenerationProgressContainerEnhanced.tsx` handling `approveStage` and `cancelGeneration` server actions in `packages/web/app/courses/generating/[slug]/GenerationProgressContainerEnhanced.tsx`
 
 ## Phase 5: User Story 3 - Detailed Stage Inspection
-*Goal: Allow deep dive into stage results.*
-*Priority: P2*
+
+_Goal: Allow deep dive into stage results._
+_Priority: P2_
 
 - [x] T017 [US3] Implement `StageResultsDrawer.tsx` wrapping existing `StageResultsPreview` logic and integrating `ActivityLog.tsx` (moved from main view) in `packages/web/components/generation-celestial/StageResultsDrawer.tsx`
 - [x] T018 [US3] Connect `StageResultsDrawer` to `CelestialJourney` (click handler) and `MissionControlBanner` (View Results button) in `packages/web/app/courses/generating/[slug]/GenerationProgressContainerEnhanced.tsx`
 
 ## Phase 6: User Story 4 - Real-time Updates & Polish
-*Goal: Ensure real-time data consistency and refine UI experience.*
-*Priority: P2*
+
+_Goal: Ensure real-time data consistency and refine UI experience._
+_Priority: P2_
 
 - [x] T019 [US4] Write unit tests for `utils.ts` to verify status mapping scenarios in `packages/web/components/generation-celestial/utils.test.ts`
 - [x] T020 [US4] Verify real-time trace updates in `ActiveStageCard` via `GenerationRealtimeProvider` context in `packages/web/components/generation-celestial/ActiveStageCard.tsx`
@@ -59,8 +65,9 @@
 - [x] T026 [Polish] Verify mobile responsiveness for timeline and drawer in all new components
 
 ## Phase 7: Theme Support & Cleanup
-*Goal: Ensure full light/dark theme support and remove deprecated code.*
-*Priority: P2*
+
+_Goal: Ensure full light/dark theme support and remove deprecated code._
+_Priority: P2_
 
 - [x] T027 [Theme] Define celestial CSS variables for both light and dark themes in `packages/web/app/globals.css`
 - [x] T028 [Theme] Implement `SpaceBackground.tsx` with dual theme support (dark space / light ethereal gradient) in `packages/web/components/generation-celestial/SpaceBackground.tsx`
@@ -71,8 +78,9 @@
 - [x] T033 [QA] Manual testing: verify all 8 generation states render correctly in both light and dark themes
 
 ## Phase 8: Final QA & Documentation
-*Goal: Comprehensive testing and documentation update.*
-*Priority: P3*
+
+_Goal: Comprehensive testing and documentation update._
+_Priority: P3_
 
 - [x] T034 [QA] Run full E2E test suite for generation progress page
 - [x] T035 [Docs] Update component documentation with celestial theme usage examples

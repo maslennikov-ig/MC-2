@@ -161,11 +161,11 @@ help with keyword coverage. We include markdown and structure throughout the les
       expect(result.passed).toBe(false);
 
       // Should have failures from markdown structure filter
-      const markdownFailures = result.failures.filter((f) => f.filter === 'markdownStructure');
+      const markdownFailures = result.failures.filter(f => f.filter === 'markdownStructure');
       expect(markdownFailures.length).toBeGreaterThan(0);
 
       // Should have critical severity failure
-      const criticalFailure = markdownFailures.find((f) => f.severity === 'critical');
+      const criticalFailure = markdownFailures.find(f => f.severity === 'critical');
       expect(criticalFailure).toBeDefined();
       expect(criticalFailure?.actual).toContain('critical');
     });
@@ -206,9 +206,7 @@ The conclusion wraps up with markdown structure validation concepts.
 
         if (!hasCriticalOrMajor) {
           // No markdown failures should be present
-          const markdownFailures = result.failures.filter(
-            (f) => f.filter === 'markdownStructure'
-          );
+          const markdownFailures = result.failures.filter(f => f.filter === 'markdownStructure');
           expect(markdownFailures.length).toBe(0);
         }
 
@@ -326,7 +324,7 @@ More content here to ensure adequate length and density for testing purposes.
       const result = runHeuristicFilters(content, createMockLessonSpec());
 
       // Markdown issues should be captured in failures
-      const markdownFailures = result.failures.filter((f) => f.filter === 'markdownStructure');
+      const markdownFailures = result.failures.filter(f => f.filter === 'markdownStructure');
 
       if (markdownFailures.length > 0) {
         // Should have at least one markdown failure
@@ -361,7 +359,7 @@ More content to meet word count requirements for heuristic filter passing.
       // If markdown validation failed, suggestions should be present
       if (!result.passed && (result.metrics.markdownStructure?.totalIssues ?? 0) > 0) {
         // Suggestions array should include markdown-related items
-        const markdownSuggestion = result.suggestions.find((s) =>
+        const markdownSuggestion = result.suggestions.find(s =>
           s.toLowerCase().includes('markdown')
         );
         expect(markdownSuggestion).toBeDefined();
@@ -422,7 +420,7 @@ Short content.
 
       // Should likely fail on word count, not markdown
       if (!result.passed) {
-        const wordCountFailure = result.failures.find((f) => f.filter === 'wordCount');
+        const wordCountFailure = result.failures.find(f => f.filter === 'wordCount');
         expect(wordCountFailure).toBeDefined();
       }
     });

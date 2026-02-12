@@ -12,6 +12,7 @@ Upgraded the Mermaid diagram LLM fixer from `google/gemini-2.0-flash-001` to `mi
 ## Problem Statement
 
 ### Original Issue
+
 The Mermaid diagram generation pipeline was using `google/gemini-2.0-flash-001` for fixing broken diagrams. While functional, this model had limitations:
 
 1. **Russian Language Support**: Suboptimal handling of Cyrillic text in diagram labels
@@ -19,6 +20,7 @@ The Mermaid diagram generation pipeline was using `google/gemini-2.0-flash-001` 
 3. **Test Coverage**: Limited test variations for edge cases
 
 ### Specific Bug Pattern
+
 LLM-generated mindmaps frequently contained arrow syntax (`-->`) which is invalid for Mermaid mindmaps. Mindmaps use **indentation-only** hierarchy:
 
 ```mermaid
@@ -53,6 +55,7 @@ const LLM_MODEL_ID = 'minimax/minimax-m2.1';
 ```
 
 **Rationale**:
+
 - MiniMax M2.1 has excellent Russian language support
 - 10B activated parameters (230B total) with MoE architecture
 - Optimized for coding and structured output tasks
@@ -63,12 +66,14 @@ const LLM_MODEL_ID = 'minimax/minimax-m2.1';
 Added new model pricing to cost tracking systems:
 
 **File**: `src/shared/metrics/cost-tracker.ts`
+
 ```typescript
 'minimax/minimax-m2': { input: 0.255, output: 1.02 },  // Legacy
 'minimax/minimax-m2.1': { input: 0.30, output: 1.20 }, // New recommended
 ```
 
 **File**: `src/shared/llm/cost-calculator.ts`
+
 ```typescript
 "minimax/minimax-m2.1": {
   inputPricePerMillion: 0.30,
@@ -81,6 +86,7 @@ Added new model pricing to cost tracking systems:
 **File**: `supabase/migrations/20251210141900_seed_judge_model_configs.sql`
 
 Updated 3 tiebreaker judge configurations (ru, en, any languages):
+
 ```sql
 ('global', 'stage_6_judge', 'minimax/minimax-m2.1', 'openai/gpt-oss-120b',
  0.3, 4096, 'ru', 'extended', true, 'tiebreaker', 0.72,
@@ -91,16 +97,16 @@ Updated 3 tiebreaker judge configurations (ru, en, any languages):
 
 Added 8 new test variations to `mermaid-generation.e2e.test.ts`:
 
-| Test Category | Test Name | Purpose |
-|--------------|-----------|---------|
-| Subgraphs | Flowchart with subgraphs | Validate nested flowchart structures |
-| Deep Hierarchy | Mindmap with 5+ levels | Test deep indentation handling |
-| Wide Hierarchy | Mindmap with many siblings | Test horizontal scaling |
-| Advanced Sequence | Loops and alt blocks | Test complex sequence diagrams |
-| Notes | Sequence with notes | Test annotation syntax |
-| Stress | Large flowchart (20+ nodes) | Performance validation |
-| Stress | Near size limit (1500 chars) | Boundary testing |
-| Statistics | LLM fixer metrics | JSON export of fix statistics |
+| Test Category     | Test Name                    | Purpose                              |
+| ----------------- | ---------------------------- | ------------------------------------ |
+| Subgraphs         | Flowchart with subgraphs     | Validate nested flowchart structures |
+| Deep Hierarchy    | Mindmap with 5+ levels       | Test deep indentation handling       |
+| Wide Hierarchy    | Mindmap with many siblings   | Test horizontal scaling              |
+| Advanced Sequence | Loops and alt blocks         | Test complex sequence diagrams       |
+| Notes             | Sequence with notes          | Test annotation syntax               |
+| Stress            | Large flowchart (20+ nodes)  | Performance validation               |
+| Stress            | Near size limit (1500 chars) | Boundary testing                     |
+| Statistics        | LLM fixer metrics            | JSON export of fix statistics        |
 
 ### 5. Statistics Collection
 
@@ -110,17 +116,23 @@ Added metrics export for monitoring fixer performance:
 describe('Statistics Collection', () => {
   it('should collect and report LLM fixer statistics', async () => {
     const metrics = getLLMFixerMetrics();
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      model: FIXER_MODEL,
-      metrics: {
-        totalAttempts: metrics.totalAttempts,
-        successfulFixes: metrics.successfulFixes,
-        failedFixes: metrics.failedFixes,
-        successRate: `${(metrics.successRate * 100).toFixed(1)}%`,
-        totalTokensUsed: metrics.totalTokensUsed,
-      }
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          timestamp: new Date().toISOString(),
+          model: FIXER_MODEL,
+          metrics: {
+            totalAttempts: metrics.totalAttempts,
+            successfulFixes: metrics.successfulFixes,
+            failedFixes: metrics.failedFixes,
+            successRate: `${(metrics.successRate * 100).toFixed(1)}%`,
+            totalTokensUsed: metrics.totalTokensUsed,
+          },
+        },
+        null,
+        2
+      )
+    );
   });
 });
 ```
@@ -128,34 +140,39 @@ describe('Statistics Collection', () => {
 ## Files Changed
 
 ### Core Implementation
-| File | Change |
-|------|--------|
+
+| File                                                          | Change               |
+| ------------------------------------------------------------- | -------------------- |
 | `src/stages/stage6-lesson-content/utils/mermaid-llm-fixer.ts` | Model ID + docstring |
-| `src/shared/metrics/cost-tracker.ts` | Added m2.1 pricing |
-| `src/shared/llm/cost-calculator.ts` | Added m2.1 pricing |
+| `src/shared/metrics/cost-tracker.ts`                          | Added m2.1 pricing   |
+| `src/shared/llm/cost-calculator.ts`                           | Added m2.1 pricing   |
 
 ### Configuration
-| File | Change |
-|------|--------|
-| `src/config/config-seed.json` | Updated model_id |
-| `supabase/migrations/20251210141900_seed_judge_model_configs.sql` | 3 occurrences |
+
+| File                                                              | Change           |
+| ----------------------------------------------------------------- | ---------------- |
+| `src/config/config-seed.json`                                     | Updated model_id |
+| `supabase/migrations/20251210141900_seed_judge_model_configs.sql` | 3 occurrences    |
 
 ### Experiments
-| File | Change |
-|------|--------|
-| `experiments/models/run-parallel-test-v3.ts` | slug + apiName |
-| `experiments/models/run-parallel-test-v4.ts` | slug + apiName |
-| `experiments/models/run-parallel-test-v5.ts` | slug + apiName |
+
+| File                                             | Change                |
+| ------------------------------------------------ | --------------------- |
+| `experiments/models/run-parallel-test-v3.ts`     | slug + apiName        |
+| `experiments/models/run-parallel-test-v4.ts`     | slug + apiName        |
+| `experiments/models/run-parallel-test-v5.ts`     | slug + apiName        |
 | `experiments/models/test-models-with-quality.ts` | name + slug + apiName |
 
 ### Tests
-| File | Change |
-|------|--------|
+
+| File                                                                | Change                    |
+| ------------------------------------------------------------------- | ------------------------- |
 | `tests/stages/stage6-lesson-content/mermaid-generation.e2e.test.ts` | FIXER_MODEL + 8 new tests |
 
 ## Test Results
 
 ### Final Test Run
+
 ```
 Total tests: 32
 Passed: 30
@@ -170,16 +187,18 @@ Breakdown:
 ```
 
 ### Key Fixer Results
+
 All fixer tests passed with `minimax/minimax-m2.1`:
 
-| Test | Duration | Result |
-|------|----------|--------|
-| Fix flowchart invalid arrows | 2568ms | ✓ |
-| Fix mindmap arrows → indentation | 4573ms | ✓ |
-| Fix mindmap with brackets | 6688ms | ✓ |
-| Fix real broken mindmap | 8730ms | ✓ |
+| Test                             | Duration | Result |
+| -------------------------------- | -------- | ------ |
+| Fix flowchart invalid arrows     | 2568ms   | ✓      |
+| Fix mindmap arrows → indentation | 4573ms   | ✓      |
+| Fix mindmap with brackets        | 6688ms   | ✓      |
+| Fix real broken mindmap          | 8730ms   | ✓      |
 
 ### Regression Test Success
+
 Real broken mindmap from production course was successfully fixed:
 
 ```
@@ -209,18 +228,21 @@ mindmap
 ## How to Reproduce
 
 ### Run All Mermaid Tests
+
 ```bash
 cd packages/course-gen-platform
 pnpm vitest run tests/stages/stage6-lesson-content/mermaid-generation.e2e.test.ts
 ```
 
 ### Run Fast Validation Tests Only
+
 ```bash
 pnpm vitest run tests/stages/stage6-lesson-content/mermaid-generation.e2e.test.ts \
   --testNamePattern="Validation|Additional|Stress|Statistics"
 ```
 
 ### Run LLM Fixer Tests Only
+
 ```bash
 pnpm vitest run tests/stages/stage6-lesson-content/mermaid-generation.e2e.test.ts \
   --testNamePattern="LLM Fixer"
@@ -229,24 +251,32 @@ pnpm vitest run tests/stages/stage6-lesson-content/mermaid-generation.e2e.test.t
 ## Key Learnings
 
 ### 1. Mermaid Mindmap Syntax
+
 Mindmaps in Mermaid use **indentation-only** hierarchy. Arrows (`-->`) are flowchart syntax and will either:
+
 - Cause parse errors (Mermaid <11)
 - Render as literal text in nodes (Mermaid 11+)
 
 ### 2. Model Selection for Structured Output
+
 MiniMax M2.1 performs well for:
+
 - Russian language content
 - Structured diagram syntax
 - Cost-sensitive applications
 
 ### 3. Test Timeout Management
+
 LLM-dependent tests need generous timeouts (`LLM_TIMEOUT * 2`) due to:
+
 - Network latency variability
 - OpenRouter API response times
 - Model inference time
 
 ### 4. Backwards Compatibility
+
 Keep legacy model pricing in cost calculators for:
+
 - Historical cost analysis
 - Gradual migration support
 - Fallback scenarios

@@ -1,34 +1,40 @@
-'use client';
+'use client'
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { PhaseAccordion, AccordionItem } from './PhaseAccordion';
-import { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import { Clock, Users, BookOpen, GraduationCap, Eye, FileText, Target, ClipboardCheck, CheckCircle2 } from 'lucide-react';
-import { SectionAccordion } from './SectionAccordion';
-import { LessonRow } from './LessonRow';
-import { AddElementChat } from './AddElementChat';
-import { VirtualizedSectionsList, shouldUseVirtualization } from './VirtualizedSectionsList';
-import { produce } from 'immer';
-import { useEditingShortcuts } from '../../hooks/useEditingShortcuts';
-import { toast } from 'sonner';
-import { useEditHistoryStore } from '@/stores/useEditHistoryStore';
-import { updateFieldAction } from '@/app/actions/admin-generation';
+import React, { useEffect, useState, useCallback } from 'react'
+import { PhaseAccordion, AccordionItem } from './PhaseAccordion'
+import { CourseStructure, Section, Lesson } from '@megacampus/shared-types'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+import { Clock, Users, BookOpen, GraduationCap, Eye, FileText, Target } from 'lucide-react'
+import { SectionAccordion } from './SectionAccordion'
+import { LessonRow } from './LessonRow'
+import { AddElementChat } from './AddElementChat'
+import { VirtualizedSectionsList, shouldUseVirtualization } from './VirtualizedSectionsList'
+import { produce } from 'immer'
+import { useEditingShortcuts } from '../../hooks/useEditingShortcuts'
+import { toast } from 'sonner'
+import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
+import { updateFieldAction } from '@/app/actions/admin-generation'
 
 interface CourseStructureViewProps {
-  data: CourseStructure;
-  locale?: 'ru' | 'en';
-  courseId?: string;        // Required for editing
-  editMode?: boolean;       // Enable editing
-  onStructureChange?: (data: CourseStructure) => void; // Optimistic update callback
-  autoFocus?: boolean;      // Auto-focus first editable field
-  readOnly?: boolean;       // View-only mode (hides edit and regenerate buttons)
+  data: CourseStructure
+  locale?: 'ru' | 'en'
+  courseId?: string // Required for editing
+  editMode?: boolean // Enable editing
+  onStructureChange?: (data: CourseStructure) => void // Optimistic update callback
+  autoFocus?: boolean // Auto-focus first editable field
+  readOnly?: boolean // View-only mode (hides edit and regenerate buttons)
 }
 
 // Helper for displaying lists as chips
-const ChipList = ({ items, variant = 'secondary' }: { items: string[]; variant?: 'secondary' | 'outline' }) => (
+const ChipList = ({
+  items,
+  variant = 'secondary',
+}: {
+  items: string[]
+  variant?: 'secondary' | 'outline'
+}) => (
   <div className="flex flex-wrap gap-1.5">
     {items.map((item, i) => (
       <Badge key={i} variant={variant} className="text-xs">
@@ -36,30 +42,38 @@ const ChipList = ({ items, variant = 'secondary' }: { items: string[]; variant?:
       </Badge>
     ))}
   </div>
-);
+)
 
 // Helper for labeled value display
-const LabeledValue = ({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) => (
-  <div className={cn("space-y-1", className)}>
+const LabeledValue = ({
+  label,
+  value,
+  className,
+}: {
+  label: string
+  value: React.ReactNode
+  className?: string
+}) => (
+  <div className={cn('space-y-1', className)}>
     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span>
     <div className="text-sm text-slate-900 dark:text-slate-100">{value}</div>
   </div>
-);
+)
 
 // Helper for duration formatting
 const formatDuration = (minutes: number, locale: 'ru' | 'en'): string => {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  const t = translations[locale];
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  const t = translations[locale]
 
   if (hours > 0 && mins > 0) {
-    return `${hours} ${t.hours} ${mins} ${t.minutes}`;
+    return `${hours} ${t.hours} ${mins} ${t.minutes}`
   } else if (hours > 0) {
-    return `${hours} ${t.hours}`;
+    return `${hours} ${t.hours}`
   } else {
-    return `${mins} ${t.minutes}`;
+    return `${mins} ${t.minutes}`
   }
-};
+}
 
 const translations = {
   ru: {
@@ -81,10 +95,6 @@ const translations = {
     description: 'Описание',
     overview: 'Обзор',
     learningOutcomes: 'Результаты обучения',
-    assessment: 'Оценивание',
-    quizPerSection: 'Тест в конце каждого модуля',
-    finalExam: 'Финальный экзамен',
-    practicalProjects: 'Практических проектов',
   },
   en: {
     courseInfo: 'Course Information',
@@ -105,12 +115,8 @@ const translations = {
     description: 'Description',
     overview: 'Overview',
     learningOutcomes: 'Learning Outcomes',
-    assessment: 'Assessment',
-    quizPerSection: 'Quiz at the end of each module',
-    finalExam: 'Comprehensive final exam',
-    practicalProjects: 'Practical projects',
   },
-};
+}
 
 const difficultyLabels = {
   ru: {
@@ -123,7 +129,7 @@ const difficultyLabels = {
     intermediate: 'Intermediate',
     advanced: 'Advanced',
   },
-};
+}
 
 export const CourseStructureView = ({
   data,
@@ -132,229 +138,219 @@ export const CourseStructureView = ({
   editMode = false,
   onStructureChange,
   autoFocus = false,
-  readOnly = false
+  readOnly = false,
 }: CourseStructureViewProps) => {
-  const t = translations[locale];
-  const difficultyLabel = difficultyLabels[locale][data.difficulty_level];
+  const t = translations[locale]
+  const difficultyLabel = difficultyLabels[locale][data.difficulty_level]
 
   // Track section modification timestamps for stale detection
-  const [sectionTimestamps, setSectionTimestamps] = useState<Map<number, Date>>(new Map());
+  const [sectionTimestamps, setSectionTimestamps] = useState<Map<number, Date>>(new Map())
 
   // Track lesson modification timestamps for stale detection
-  const [lessonTimestamps, setLessonTimestamps] = useState<Map<string, Date>>(new Map());
+  const [lessonTimestamps, setLessonTimestamps] = useState<Map<string, Date>>(new Map())
 
   // Effective edit mode is false when readOnly is true
-  const canEdit = editMode && !readOnly;
+  const canEdit = editMode && !readOnly
 
   // Determine if virtualization should be used
   const useVirtualization = React.useMemo(() => {
-    return shouldUseVirtualization(data.sections);
-  }, [data.sections]);
+    return shouldUseVirtualization(data.sections)
+  }, [data.sections])
 
   // Calculate total duration in minutes
   const totalMinutes = data.sections.reduce(
     (sum, section) => sum + section.estimated_duration_minutes,
     0
-  );
+  )
 
   // Edit history store
-  const { undo, redo, canUndo, canRedo } = useEditHistoryStore();
+  const { undo, redo, canUndo, canRedo } = useEditHistoryStore()
 
   // Helper function to apply a value at a field path using Immer
   const applyFieldValue = useCallback(<T,>(data: T, path: string, value: unknown): T => {
     return produce(data, (draft) => {
-      const parts = path.replace(/\[/g, '.').replace(/\]/g, '').split('.');
-       
-      let current: Record<string, unknown> = draft as Record<string, unknown>;
+      const parts = path.replace(/\[/g, '.').replace(/\]/g, '').split('.')
+
+      let current: Record<string, unknown> = draft as Record<string, unknown>
 
       for (let i = 0; i < parts.length - 1; i++) {
-        current = current[parts[i]] as Record<string, unknown>;
+        current = current[parts[i]] as Record<string, unknown>
       }
 
-      current[parts[parts.length - 1]] = value;
-    });
-  }, []);
+      current[parts[parts.length - 1]] = value
+    })
+  }, [])
 
   // Keyboard shortcut handlers
   const handleForceSave = useCallback(() => {
-    if (!canEdit) return;
+    if (!canEdit) return
     // Trigger a visual feedback - actual saving happens via auto-save in child components
-    toast.success(locale === 'ru' ? 'Сохранение изменений...' : 'Saving changes...');
-  }, [canEdit, locale]);
+    toast.success(locale === 'ru' ? 'Сохранение изменений...' : 'Saving changes...')
+  }, [canEdit, locale])
 
   const handleUndo = useCallback(async () => {
-    if (!courseId) return;
+    if (!courseId) return
 
-    const entry = undo();
-    if (!entry) return;
+    const entry = undo()
+    if (!entry) return
 
     // Apply the previous value to UI
     if (onStructureChange && entry.stageId === 'stage_5') {
       // Reconstruct structure with previous value
-      const updatedStructure = applyFieldValue(data, entry.fieldPath, entry.previousValue);
-      onStructureChange(updatedStructure);
+      const updatedStructure = applyFieldValue(data, entry.fieldPath, entry.previousValue)
+      onStructureChange(updatedStructure)
 
       // Persist via Server Action
       try {
-        await updateFieldAction(
-          entry.courseId,
-          entry.stageId,
-          entry.fieldPath,
-          entry.previousValue
-        );
-        toast.success(locale === 'ru' ? 'Изменение отменено' : 'Change undone');
+        await updateFieldAction(entry.courseId, entry.stageId, entry.fieldPath, entry.previousValue)
+        toast.success(locale === 'ru' ? 'Изменение отменено' : 'Change undone')
       } catch (error) {
-        console.error('Failed to undo:', error);
-        toast.error(locale === 'ru' ? 'Ошибка при отмене' : 'Failed to undo');
+        console.error('Failed to undo:', error)
+        toast.error(locale === 'ru' ? 'Ошибка при отмене' : 'Failed to undo')
       }
     }
-  }, [undo, onStructureChange, data, locale, courseId, applyFieldValue]);
+  }, [undo, onStructureChange, data, locale, courseId, applyFieldValue])
 
   const handleRedo = useCallback(async () => {
-    if (!courseId) return;
+    if (!courseId) return
 
-    const entry = redo();
-    if (!entry) return;
+    const entry = redo()
+    if (!entry) return
 
     // Apply the new value back
     if (onStructureChange && entry.stageId === 'stage_5') {
-      const updatedStructure = applyFieldValue(data, entry.fieldPath, entry.newValue);
-      onStructureChange(updatedStructure);
+      const updatedStructure = applyFieldValue(data, entry.fieldPath, entry.newValue)
+      onStructureChange(updatedStructure)
 
       // Persist via Server Action
       try {
-        await updateFieldAction(
-          entry.courseId,
-          entry.stageId,
-          entry.fieldPath,
-          entry.newValue
-        );
-        toast.success(locale === 'ru' ? 'Изменение повторено' : 'Change redone');
+        await updateFieldAction(entry.courseId, entry.stageId, entry.fieldPath, entry.newValue)
+        toast.success(locale === 'ru' ? 'Изменение повторено' : 'Change redone')
       } catch (error) {
-        console.error('Failed to redo:', error);
-        toast.error(locale === 'ru' ? 'Ошибка при повторе' : 'Failed to redo');
+        console.error('Failed to redo:', error)
+        toast.error(locale === 'ru' ? 'Ошибка при повторе' : 'Failed to redo')
       }
     }
-  }, [redo, onStructureChange, data, locale, courseId, applyFieldValue]);
+  }, [redo, onStructureChange, data, locale, courseId, applyFieldValue])
 
   const handleCancelEdit = useCallback(() => {
-    if (!canEdit) return;
+    if (!canEdit) return
     // Blur the active element to trigger auto-save flush
-    const activeElement = document.activeElement as HTMLElement;
-    activeElement?.blur();
-    toast.info(locale === 'ru' ? 'Редактирование отменено' : 'Edit cancelled');
-  }, [canEdit, locale]);
+    const activeElement = document.activeElement as HTMLElement
+    activeElement?.blur()
+    toast.info(locale === 'ru' ? 'Редактирование отменено' : 'Edit cancelled')
+  }, [canEdit, locale])
 
   // Register keyboard shortcuts with undo/redo
   useEditingShortcuts({
     onSave: handleForceSave,
-    onUndo: canUndo() ? handleUndo : undefined,
-    onRedo: canRedo() ? handleRedo : undefined,
+    onUndo: canUndo() ? () => void handleUndo() : undefined,
+    onRedo: canRedo() ? () => void handleRedo() : undefined,
     onCancel: handleCancelEdit,
     enabled: !!canEdit,
-  });
+  })
 
   // Initialize section timestamps from course structure on mount
   useEffect(() => {
     if (data?.sections) {
-      const initial = new Map<number, Date>();
+      const initial = new Map<number, Date>()
       data.sections.forEach((_, idx) => {
         // Set to current time for initial load
-        initial.set(idx, new Date());
-      });
-      setSectionTimestamps(initial);
+        initial.set(idx, new Date())
+      })
+      setSectionTimestamps(initial)
     }
-  }, [data]);
+  }, [data])
 
   // Auto-focus first editable field when panel opens automatically
   useEffect(() => {
-    if (!autoFocus || !canEdit) return;
+    if (!autoFocus || !canEdit) return
 
     const timer = setTimeout(() => {
       // Find first editable input/textarea and focus it
-      const firstInput = document.querySelector(
-        '[data-auto-focus-target="true"]'
-      ) as HTMLElement;
-      firstInput?.focus();
-    }, 200);
+      const firstInput = document.querySelector('[data-auto-focus-target="true"]') as HTMLElement
+      firstInput?.focus()
+    }, 200)
 
-    return () => clearTimeout(timer);
-  }, [autoFocus, canEdit]);
+    return () => clearTimeout(timer)
+  }, [autoFocus, canEdit])
 
   // Handler for lesson changes (optimistic updates)
   const handleLessonChange = (sectionIdx: number, lessonIdx: number, updatedLesson: Lesson) => {
-    if (!onStructureChange) return;
+    if (!onStructureChange) return
 
     // Update lesson timestamp
     setLessonTimestamps((prev) => {
-      const updated = new Map(prev);
-      updated.set(`${sectionIdx}-${lessonIdx}`, new Date());
-      return updated;
-    });
+      const updated = new Map(prev)
+      updated.set(`${sectionIdx}-${lessonIdx}`, new Date())
+      return updated
+    })
 
     const updatedStructure = produce(data, (draft) => {
-      draft.sections[sectionIdx].lessons[lessonIdx] = updatedLesson;
-    });
+      draft.sections[sectionIdx].lessons[lessonIdx] = updatedLesson
+    })
 
-    onStructureChange(updatedStructure);
-  };
+    onStructureChange(updatedStructure)
+  }
 
   // Handler for section changes (optimistic updates)
   const handleSectionChange = (sectionIdx: number, field: string, value: unknown) => {
-    if (!onStructureChange) return;
+    if (!onStructureChange) return
 
     // Update section timestamp
     setSectionTimestamps((prev) => {
-      const updated = new Map(prev);
-      updated.set(sectionIdx, new Date());
-      return updated;
-    });
+      const updated = new Map(prev)
+      updated.set(sectionIdx, new Date())
+      return updated
+    })
 
     const updatedStructure = produce(data, (draft) => {
       // Dynamic field assignment requires index signature access
-      const section = draft.sections[sectionIdx] as Section & Record<string, unknown>;
-      section[field] = value;
-    });
+      const section = draft.sections[sectionIdx] as Section & Record<string, unknown>
+      section[field] = value
+    })
 
-    onStructureChange(updatedStructure);
-  };
+    onStructureChange(updatedStructure)
+  }
 
   // Handler for lesson added (optimistic updates)
   const handleLessonAdded = (sectionIdx: number, newLesson: Lesson) => {
-    if (!onStructureChange) return;
+    if (!onStructureChange) return
 
     const updatedStructure = produce(data, (draft) => {
-      draft.sections[sectionIdx].lessons.push(newLesson);
-    });
+      draft.sections[sectionIdx].lessons.push(newLesson)
+    })
 
-    onStructureChange(updatedStructure);
-  };
+    onStructureChange(updatedStructure)
+  }
 
   // Handler for section added (optimistic updates)
   const handleSectionAdded = (newSection: Section) => {
-    if (!onStructureChange) return;
+    if (!onStructureChange) return
 
     const updatedStructure = produce(data, (draft) => {
-      draft.sections.push(newSection);
-    });
+      draft.sections.push(newSection)
+    })
 
-    onStructureChange(updatedStructure);
-  };
+    onStructureChange(updatedStructure)
+  }
 
   return (
     <div className="space-y-4 p-2">
       {/* Show read-only banner when in read-only mode */}
       {readOnly && (
-        <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
-          <Eye className="inline-block w-4 h-4 mr-2" />
+        <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+          <Eye className="mr-2 inline-block h-4 w-4" />
           Режим просмотра / View Only
         </div>
       )}
 
       {/* Metadata Header Section (always visible) */}
-      <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 p-4 space-y-4">
+      <div className="space-y-4 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
         {/* Course Title */}
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{data.course_title}</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          {data.course_title}
+        </h2>
 
         {/* Course Description */}
         <p className="text-sm text-slate-700 dark:text-slate-300">{data.course_description}</p>
@@ -365,8 +361,8 @@ export const CourseStructureView = ({
             label={t.overview}
             value={
               <div className="flex items-start gap-2">
-                <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400 mt-0.5 shrink-0" />
-                <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                <p className="text-sm whitespace-pre-wrap text-slate-700 dark:text-slate-300">
                   {data.course_overview}
                 </p>
               </div>
@@ -375,7 +371,7 @@ export const CourseStructureView = ({
         )}
 
         {/* Metadata Grid */}
-        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-700">
+        <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-2 dark:border-slate-700">
           <LabeledValue
             label={t.targetAudience}
             value={
@@ -383,9 +379,11 @@ export const CourseStructureView = ({
                 <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 <span>
                   {data.target_audience ||
-                    (data.difficulty_level === 'beginner' ? 'Beginners with no prior experience' :
-                     data.difficulty_level === 'advanced' ? 'Advanced learners with strong background' :
-                     'Intermediate learners with basic knowledge')}
+                    (data.difficulty_level === 'beginner'
+                      ? 'Beginners with no prior experience'
+                      : data.difficulty_level === 'advanced'
+                        ? 'Advanced learners with strong background'
+                        : 'Intermediate learners with basic knowledge')}
                 </span>
               </div>
             }
@@ -414,7 +412,8 @@ export const CourseStructureView = ({
               <div className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 <span>
-                  {data.sections.length} {t.sections.toLowerCase()} · {data.sections.reduce((sum, s) => sum + s.lessons.length, 0)} {t.lessons}
+                  {data.sections.length} {t.sections.toLowerCase()} ·{' '}
+                  {data.sections.reduce((sum, s) => sum + s.lessons.length, 0)} {t.lessons}
                 </span>
               </div>
             }
@@ -428,16 +427,15 @@ export const CourseStructureView = ({
             data.prerequisites.length > 0 ? (
               <ChipList items={data.prerequisites} variant="outline" />
             ) : (
-              <span className="text-sm text-slate-500 dark:text-slate-400">{t.noPrerequisites}</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                {t.noPrerequisites}
+              </span>
             )
           }
         />
 
         {/* Course Tags */}
-        <LabeledValue
-          label={t.tags}
-          value={<ChipList items={data.course_tags} />}
-        />
+        <LabeledValue label={t.tags} value={<ChipList items={data.course_tags} />} />
 
         {/* Learning Outcomes */}
         {data.learning_outcomes && data.learning_outcomes.length > 0 && (
@@ -447,55 +445,21 @@ export const CourseStructureView = ({
               <div className="space-y-2">
                 {data.learning_outcomes.map((outcome, idx) => {
                   // Handle both object format {id, text, language} and string format
-                  const text = typeof outcome === 'string' ? outcome : outcome.text;
-                  const key = typeof outcome === 'string' ? idx : outcome.id || idx;
+                  const text = typeof outcome === 'string' ? outcome : outcome.text
+                  const key = typeof outcome === 'string' ? idx : outcome.id || idx
                   return (
                     <div key={key} className="flex items-start gap-2">
-                      <Target className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 shrink-0" />
+                      <Target className="mt-0.5 h-4 w-4 shrink-0 text-green-500 dark:text-green-400" />
                       <span className="text-sm text-slate-700 dark:text-slate-300">{text}</span>
                     </div>
-                  );
+                  )
                 })}
               </div>
             }
           />
         )}
 
-        {/* Assessment Strategy */}
-        {data.assessment_strategy && (
-          <LabeledValue
-            label={t.assessment}
-            value={
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2">
-                  {data.assessment_strategy.quiz_per_section && (
-                    <Badge variant="outline" className="text-xs flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      {t.quizPerSection}
-                    </Badge>
-                  )}
-                  {data.assessment_strategy.final_exam && (
-                    <Badge variant="outline" className="text-xs flex items-center gap-1">
-                      <ClipboardCheck className="h-3 w-3" />
-                      {t.finalExam}
-                    </Badge>
-                  )}
-                  {data.assessment_strategy.practical_projects > 0 && (
-                    <Badge variant="outline" className="text-xs flex items-center gap-1">
-                      <BookOpen className="h-3 w-3" />
-                      {data.assessment_strategy.practical_projects} {t.practicalProjects}
-                    </Badge>
-                  )}
-                </div>
-                {data.assessment_strategy.assessment_description && (
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    {data.assessment_strategy.assessment_description}
-                  </p>
-                )}
-              </div>
-            }
-          />
-        )}
+        {/* assessment_strategy display REMOVED — not consumed by downstream pipeline */}
       </div>
 
       {/* Sections with Lessons */}
@@ -527,7 +491,7 @@ export const CourseStructureView = ({
                 sectionTimestamps={sectionTimestamps}
               >
                 {(section, sectionIdx) => (
-                  <div className="border border-slate-100 dark:border-slate-700 rounded-md overflow-hidden">
+                  <div className="overflow-hidden rounded-md border border-slate-100 dark:border-slate-700">
                     {section.lessons.map((lesson, lessonIdx) => (
                       <LessonRow
                         key={`lesson-${section.section_number ?? sectionIdx}-${lesson.lesson_number ?? lessonIdx}`}
@@ -538,7 +502,9 @@ export const CourseStructureView = ({
                         locale={locale}
                         editMode={canEdit}
                         courseId={courseId}
-                        onLessonChange={(updatedLesson) => handleLessonChange(sectionIdx, lessonIdx, updatedLesson)}
+                        onLessonChange={(updatedLesson) =>
+                          handleLessonChange(sectionIdx, lessonIdx, updatedLesson)
+                        }
                         isFirstLesson={sectionIdx === 0 && lessonIdx === 0}
                         lessonLastModified={lessonTimestamps.get(`${sectionIdx}-${lessonIdx}`)}
                         sectionLastModified={sectionTimestamps.get(sectionIdx)}
@@ -566,14 +532,14 @@ export const CourseStructureView = ({
         </AccordionItem>
       </PhaseAccordion>
     </div>
-  );
-};
+  )
+}
 
 // Skeleton loader for CourseStructureView
 export const CourseStructureViewSkeleton = () => (
   <div className="space-y-4 p-2">
     {/* Metadata Header Skeleton */}
-    <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 p-4 space-y-4">
+    <div className="space-y-4 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
       {/* Title */}
       <Skeleton className="h-8 w-3/4" />
 
@@ -582,7 +548,7 @@ export const CourseStructureViewSkeleton = () => (
       <Skeleton className="h-4 w-5/6" />
 
       {/* Metadata Grid */}
-      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-700">
+      <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-2 dark:border-slate-700">
         <div className="space-y-2">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-5 w-32" />
@@ -625,14 +591,17 @@ export const CourseStructureViewSkeleton = () => (
     </div>
 
     {/* Sections Skeleton */}
-    <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
       <div className="px-4 py-3">
-        <Skeleton className="h-4 w-32 mb-1" />
+        <Skeleton className="mb-1 h-4 w-32" />
         <Skeleton className="h-3 w-40" />
       </div>
-      <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700 space-y-3">
+      <div className="space-y-3 border-t border-slate-100 px-4 py-3 dark:border-slate-700">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="border-b border-slate-100 dark:border-slate-700 pb-2 last:border-0">
+          <div
+            key={i}
+            className="border-b border-slate-100 pb-2 last:border-0 dark:border-slate-700"
+          >
             <div className="flex items-center justify-between">
               <Skeleton className="h-4 w-48" />
               <div className="flex items-center gap-3">
@@ -645,4 +614,4 @@ export const CourseStructureViewSkeleton = () => (
       </div>
     </div>
   </div>
-);
+)

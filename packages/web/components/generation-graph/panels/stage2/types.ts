@@ -12,7 +12,7 @@
 /**
  * Valid tier keys matching database tier enum
  */
-export type TierKey = 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+export type TierKey = 'trial' | 'free' | 'basic' | 'standard' | 'premium'
 
 /**
  * Stage 2 input data structure
@@ -20,21 +20,21 @@ export type TierKey = 'trial' | 'free' | 'basic' | 'standard' | 'premium';
  */
 export interface Stage2InputData {
   /** File UUID */
-  fileId: string;
+  fileId: string
   /** Original filename (what user uploaded) */
-  originalFilename: string;
+  originalFilename: string
   /** File path in storage */
-  filePath?: string;
+  filePath?: string
   /** MIME type (application/pdf, etc.) */
-  mimeType: string;
+  mimeType: string
   /** File size in bytes */
-  fileSize?: number;
+  fileSize?: number
   /** Organization ID for tier lookup */
-  organizationId?: string;
+  organizationId?: string
   /** Subscription tier determines available features */
-  tier: TierKey;
+  tier: TierKey
   /** Number of pages (if document) */
-  pageCount?: number;
+  pageCount?: number
 }
 
 /**
@@ -42,13 +42,13 @@ export interface Stage2InputData {
  */
 export interface TierFeatures {
   /** Docling document conversion */
-  doclingConversion: boolean;
+  doclingConversion: boolean
   /** OCR text extraction from images */
-  ocrExtraction: boolean;
+  ocrExtraction: boolean
   /** Image and table analysis */
-  visualAnalysis: boolean;
+  visualAnalysis: boolean
   /** Enhanced image processing */
-  enhancedVisuals: boolean;
+  enhancedVisuals: boolean
 }
 
 /**
@@ -94,14 +94,14 @@ export const DEFAULT_TIER_FEATURES: Record<TierKey, TierFeatures> = {
     visualAnalysis: true,
     enhancedVisuals: true,
   },
-};
+}
 
 /**
  * Get default tier features based on subscription level.
  * For DB-driven features, use parseTierFeaturesFromDB instead.
  */
 export function getTierFeatures(tier: TierKey): TierFeatures {
-  return DEFAULT_TIER_FEATURES[tier] ?? DEFAULT_TIER_FEATURES.basic;
+  return DEFAULT_TIER_FEATURES[tier] ?? DEFAULT_TIER_FEATURES.basic
 }
 
 /**
@@ -135,10 +135,10 @@ export function parseTierFeaturesFromDB(
   features: Record<string, unknown> | null | undefined,
   tier: TierKey
 ): TierFeatures {
-  const defaults = DEFAULT_TIER_FEATURES[tier] ?? DEFAULT_TIER_FEATURES.basic;
+  const defaults = DEFAULT_TIER_FEATURES[tier] ?? DEFAULT_TIER_FEATURES.basic
 
   if (!features || typeof features !== 'object') {
-    return defaults;
+    return defaults
   }
 
   // Helper to validate and warn on invalid types
@@ -148,22 +148,34 @@ export function parseTierFeaturesFromDB(
     defaultValue: boolean
   ): boolean => {
     if (typeof value === 'boolean') {
-      return value;
+      return value
     }
     if (value !== undefined) {
       console.warn(
         `[parseTierFeaturesFromDB] Invalid type for "${key}": expected boolean, got ${typeof value}. Using default: ${defaultValue}`
-      );
+      )
     }
-    return defaultValue;
-  };
+    return defaultValue
+  }
 
   return {
-    doclingConversion: getBooleanField('doclingConversion', features.doclingConversion, defaults.doclingConversion),
+    doclingConversion: getBooleanField(
+      'doclingConversion',
+      features.doclingConversion,
+      defaults.doclingConversion
+    ),
     ocrExtraction: getBooleanField('ocrExtraction', features.ocrExtraction, defaults.ocrExtraction),
-    visualAnalysis: getBooleanField('visualAnalysis', features.visualAnalysis, defaults.visualAnalysis),
-    enhancedVisuals: getBooleanField('enhancedVisuals', features.enhancedVisuals, defaults.enhancedVisuals),
-  };
+    visualAnalysis: getBooleanField(
+      'visualAnalysis',
+      features.visualAnalysis,
+      defaults.visualAnalysis
+    ),
+    enhancedVisuals: getBooleanField(
+      'enhancedVisuals',
+      features.enhancedVisuals,
+      defaults.enhancedVisuals
+    ),
+  }
 }
 
 // ============================================================================
@@ -176,24 +188,24 @@ export function parseTierFeaturesFromDB(
  */
 export interface Stage2OutputData {
   /** Processed markdown content */
-  markdownContent?: string;
+  markdownContent?: string
   /** Vector indexing status */
-  vectorStatus: 'pending' | 'indexing' | 'indexed' | 'failed';
+  vectorStatus: 'pending' | 'indexing' | 'indexed' | 'failed'
   /** Document summarization results */
   summarization?: {
     /** Whether summarization succeeded */
-    success: boolean;
+    success: boolean
     /** Method used for summarization */
-    method: 'full_text' | 'hierarchical';
+    method: 'full_text' | 'hierarchical'
     /** Summary text */
-    summaryText?: string;
+    summaryText?: string
     /** Summary token count */
-    summaryTokens: number;
+    summaryTokens: number
     /** Quality score (0-1, where 1 is 100%) */
-    qualityScore: number;
-  };
+    qualityScore: number
+  }
   /** Processing statistics */
-  stats?: DocumentStats;
+  stats?: DocumentStats
 }
 
 /**
@@ -201,21 +213,21 @@ export interface Stage2OutputData {
  */
 export interface DocumentStats {
   /** Number of pages processed */
-  pages: number;
+  pages: number
   /** Number of images extracted */
-  images: number;
+  images: number
   /** Number of tables detected */
-  tables: number;
+  tables: number
   /** Number of sections identified */
-  sections: number;
+  sections: number
   /** Length of processed markdown */
-  markdownLength: number;
+  markdownLength: number
   /** Number of chunks created */
-  chunksCreated: number;
+  chunksCreated: number
   /** Total tokens embedded */
-  tokensEmbedded: number;
+  tokensEmbedded: number
   /** Total processing time in ms */
-  processingTimeMs: number;
+  processingTimeMs: number
 }
 
 // ============================================================================
@@ -226,39 +238,39 @@ export interface DocumentStats {
  * Processing phase IDs (7 phases in pipeline)
  */
 export type ProcessingPhaseId =
-  | 'docling'      // Phase 1: Docling conversion
-  | 'markdown'     // Phase 2: Markdown processing
-  | 'images'       // Phase 3: Image extraction
-  | 'chunking'     // Phase 4: Hierarchical chunking
-  | 'embedding'    // Phase 5: Embedding generation
-  | 'qdrant'       // Phase 6: Qdrant upload
-  | 'summarization'; // Phase 7: Document summarization
+  | 'docling' // Phase 1: Docling conversion
+  | 'markdown' // Phase 2: Markdown processing
+  | 'images' // Phase 3: Image extraction
+  | 'chunking' // Phase 4: Hierarchical chunking
+  | 'embedding' // Phase 5: Embedding generation
+  | 'qdrant' // Phase 6: Qdrant upload
+  | 'summarization' // Phase 7: Document summarization
 
 /**
  * Processing phase status
  */
-export type ProcessingPhaseStatus = 'pending' | 'active' | 'completed' | 'skipped' | 'error';
+export type ProcessingPhaseStatus = 'pending' | 'active' | 'completed' | 'skipped' | 'error'
 
 /**
  * Single processing phase in the pipeline
  */
 export interface ProcessingPhase {
   /** Phase identifier */
-  id: ProcessingPhaseId;
+  id: ProcessingPhaseId
   /** Phase display name (translated) */
-  name: string;
+  name: string
   /** Phase description (live status text) */
-  description?: string;
+  description?: string
   /** Phase status */
-  status: ProcessingPhaseStatus;
+  status: ProcessingPhaseStatus
   /** Execution time in milliseconds */
-  durationMs?: number;
+  durationMs?: number
   /** Progress percentage (0-100) for active phase */
-  progress?: number;
+  progress?: number
   /** Metrics specific to this phase */
-  metrics?: Record<string, number | string>;
+  metrics?: Record<string, number | string>
   /** Error message if status is 'error' */
-  errorMessage?: string;
+  errorMessage?: string
 }
 
 /**
@@ -266,13 +278,13 @@ export interface ProcessingPhase {
  */
 export interface TerminalLogEntry {
   /** Entry timestamp */
-  timestamp: Date;
+  timestamp: Date
   /** Log level */
-  level: 'info' | 'success' | 'warning' | 'error';
+  level: 'info' | 'success' | 'warning' | 'error'
   /** Phase that generated this log */
-  phase: ProcessingPhaseId;
+  phase: ProcessingPhaseId
   /** Log message */
-  message: string;
+  message: string
 }
 
 // ============================================================================
@@ -284,15 +296,15 @@ export interface TerminalLogEntry {
  */
 export interface ActivityPhaseGroup {
   /** Phase identifier */
-  phaseId: ProcessingPhaseId;
+  phaseId: ProcessingPhaseId
   /** Phase display name */
-  phaseName: string;
+  phaseName: string
   /** Total duration of this phase */
-  totalDurationMs: number;
+  totalDurationMs: number
   /** Number of events in this group */
-  eventCount: number;
+  eventCount: number
   /** Events in this phase (collapsed by default) */
-  events: ActivityEvent[];
+  events: ActivityEvent[]
 }
 
 /**
@@ -300,19 +312,19 @@ export interface ActivityPhaseGroup {
  */
 export interface ActivityEvent {
   /** Event UUID */
-  id: string;
+  id: string
   /** Event timestamp */
-  timestamp: Date;
+  timestamp: Date
   /** Who performed the action */
-  actor: 'user' | 'system' | 'ai';
+  actor: 'user' | 'system' | 'ai'
   /** Event type for styling */
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error'
   /** Event message */
-  message: string;
+  message: string
   /** Delta time from previous event (for +120ms display) */
-  deltaMs?: number;
+  deltaMs?: number
   /** Additional details */
-  details?: Record<string, unknown>;
+  details?: Record<string, unknown>
 }
 
 // ============================================================================
@@ -321,46 +333,46 @@ export interface ActivityEvent {
 
 export interface Stage2InputTabProps {
   /** Document ID to fetch data from Zustand store */
-  documentId?: string;
+  documentId?: string
   /** Input data from trace (fallback if documentId not provided) */
-  inputData?: Stage2InputData | unknown;
+  inputData?: Stage2InputData | unknown
   /** Locale for translations */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage2ProcessTabProps {
   /** Document ID to fetch phases from Zustand store */
-  documentId?: string;
+  documentId?: string
   /** Processing phases with status (override, will use Zustand if not provided) */
-  phases?: ProcessingPhase[];
+  phases?: ProcessingPhase[]
   /** Terminal log entries for live console */
-  terminalLogs?: TerminalLogEntry[];
+  terminalLogs?: TerminalLogEntry[]
   /** Current status */
-  status?: 'pending' | 'active' | 'completed' | 'error';
+  status?: 'pending' | 'active' | 'completed' | 'error'
   /** Total progress (0-100) */
-  totalProgress?: number;
+  totalProgress?: number
   /** Locale for translations */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage2OutputTabProps {
   /** Output data from trace */
-  outputData?: Stage2OutputData | unknown;
+  outputData?: Stage2OutputData | unknown
   /** Course ID for markdown inspection */
-  courseId?: string;
+  courseId?: string
   /** Document ID for markdown inspection */
-  documentId?: string;
+  documentId?: string
   /** Locale for translations */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage2ActivityTabProps {
   /** Node ID (document node) */
-  nodeId: string | null;
+  nodeId: string | null
   /** Document ID for filtering traces */
-  documentId?: string;
+  documentId?: string
   /** Course ID for context */
-  courseId?: string;
+  courseId?: string
   /** Locale for translations */
-  locale?: 'ru' | 'en';
+  locale?: 'ru' | 'en'
 }

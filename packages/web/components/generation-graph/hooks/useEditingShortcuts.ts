@@ -1,13 +1,13 @@
-'use client';
+'use client'
 
-import { useEffect } from 'react';
+import { useEffect } from 'react'
 
 export interface UseEditingShortcutsOptions {
-  onSave?: () => void;
-  onUndo?: () => void;
-  onRedo?: () => void;
-  onCancel?: () => void;
-  enabled?: boolean;
+  onSave?: () => void
+  onUndo?: () => void
+  onRedo?: () => void
+  onCancel?: () => void
+  enabled?: boolean
 }
 
 /**
@@ -33,61 +33,61 @@ export interface UseEditingShortcutsOptions {
  * ```
  */
 export function useEditingShortcuts(options: UseEditingShortcutsOptions) {
-  const { onSave, onUndo, onRedo, onCancel, enabled = true } = options;
+  const { onSave, onUndo, onRedo, onCancel, enabled = true } = options
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isModifierKey = e.ctrlKey || e.metaKey;
+      const isModifierKey = e.ctrlKey || e.metaKey
 
       // Ctrl+S or Cmd+S: Force save
       if (isModifierKey && e.key === 's') {
-        e.preventDefault();
-        onSave?.();
-        return;
+        e.preventDefault()
+        onSave?.()
+        return
       }
 
       // Ctrl+Z or Cmd+Z: Undo
       if (isModifierKey && e.key === 'z' && !e.shiftKey) {
         // Only prevent default if handler exists
         if (onUndo) {
-          e.preventDefault();
-          onUndo();
+          e.preventDefault()
+          onUndo()
         }
-        return;
+        return
       }
 
       // Ctrl+Shift+Z or Cmd+Shift+Z: Redo
       if (isModifierKey && e.key === 'z' && e.shiftKey) {
         // Only prevent default if handler exists
         if (onRedo) {
-          e.preventDefault();
-          onRedo();
+          e.preventDefault()
+          onRedo()
         }
-        return;
+        return
       }
 
       // Escape: Cancel current edit
       if (e.key === 'Escape') {
         // Only trigger if we're in an editing context (input/textarea focused)
-        const activeElement = document.activeElement;
+        const activeElement = document.activeElement
         const isEditing =
           activeElement?.tagName === 'INPUT' ||
           activeElement?.tagName === 'TEXTAREA' ||
-          activeElement?.hasAttribute('contenteditable');
+          activeElement?.hasAttribute('contenteditable')
 
         if (isEditing && onCancel) {
-          e.preventDefault();
-          onCancel();
+          e.preventDefault()
+          onCancel()
         }
-        return;
+        return
       }
-    };
+    }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, onSave, onUndo, onRedo, onCancel]);
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [enabled, onSave, onUndo, onRedo, onCancel])
 }
 
 /**
@@ -96,7 +96,7 @@ export function useEditingShortcuts(options: UseEditingShortcutsOptions) {
  * @returns '⌘' on macOS, 'Ctrl' on other platforms
  */
 export function getModifierKeyDisplay(): string {
-  if (typeof window === 'undefined') return 'Ctrl';
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  return isMac ? '⌘' : 'Ctrl';
+  if (typeof window === 'undefined') return 'Ctrl'
+  const isMac = navigator.platform.toUpperCase().includes('MAC')
+  return isMac ? '⌘' : 'Ctrl'
 }

@@ -45,7 +45,7 @@ export interface RegenerationHistoryEntry {
   timestamp: string;
   /** Model used for regeneration */
   model_used: string;
-  /** Model tier used (tier1_oss120b | tier2_qwen3Max | tier3_gemini) */
+  /** Model tier used (simple | normal | complex | tier3_gemini) */
   tier: string;
   /** Tokens consumed during regeneration */
   tokens_used: number;
@@ -288,9 +288,9 @@ export class SectionRegenerationService {
     );
 
     const result = await this.sectionBatchGenerator.generateBatch(
-      sectionNumber,      // batchNum
-      sectionIndex,       // startSection
-      sectionIndex + 1,   // endSection (exclusive)
+      sectionNumber, // batchNum
+      sectionIndex, // startSection
+      sectionIndex + 1, // endSection (exclusive)
       jobInput,
       this.qdrantClient
     );

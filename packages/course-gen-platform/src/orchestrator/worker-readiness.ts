@@ -194,9 +194,7 @@ function getWorkerId(): string {
  * Called by worker process after pre-flight checks complete.
  * API server reads this status via getReadinessFromRedis().
  */
-export async function saveReadinessToRedis(
-  status: WorkerReadinessStatus
-): Promise<boolean> {
+export async function saveReadinessToRedis(status: WorkerReadinessStatus): Promise<boolean> {
   try {
     const redisStatus: RedisReadinessStatus = {
       ready: status.ready,
@@ -222,10 +220,7 @@ export async function saveReadinessToRedis(
 
     return success;
   } catch (error) {
-    logger.error(
-      { error: (error as Error).message },
-      'Error saving readiness to Redis'
-    );
+    logger.error({ error: (error as Error).message }, 'Error saving readiness to Redis');
     return false;
   }
 }
@@ -252,10 +247,7 @@ export async function getReadinessFromRedis(): Promise<WorkerReadinessStatus | n
       lastCheckAt: new Date(redisStatus.lastCheckAt),
     };
   } catch (error) {
-    logger.error(
-      { error: (error as Error).message },
-      'Error reading readiness from Redis'
-    );
+    logger.error({ error: (error as Error).message }, 'Error reading readiness from Redis');
     return null;
   }
 }
@@ -275,7 +267,7 @@ export async function refreshReadinessHeartbeat(): Promise<boolean> {
  * Sleep helper
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
@@ -316,10 +308,7 @@ export async function checkUploadsDirectory(): Promise<PreFlightCheckResult> {
       }
 
       const durationMs = Date.now() - startTime;
-      logger.info(
-        { path: uploadsPath, attempts, durationMs },
-        WORKER_MESSAGES.UPLOADS_ACCESSIBLE
-      );
+      logger.info({ path: uploadsPath, attempts, durationMs }, WORKER_MESSAGES.UPLOADS_ACCESSIBLE);
 
       return {
         name: CHECK_NAMES.UPLOADS_DIRECTORY,
@@ -392,10 +381,7 @@ export async function checkDiskSpace(): Promise<PreFlightCheckResult> {
       };
     }
 
-    logger.info(
-      { path: uploadsPath, availableGB, durationMs },
-      WORKER_MESSAGES.DISK_ADEQUATE
-    );
+    logger.info({ path: uploadsPath, availableGB, durationMs }, WORKER_MESSAGES.DISK_ADEQUATE);
 
     return {
       name: CHECK_NAMES.DISK_SPACE,
@@ -444,10 +430,7 @@ export async function checkRedisConnection(): Promise<PreFlightCheckResult> {
     };
   } catch (error) {
     const durationMs = Date.now() - startTime;
-    logger.error(
-      { durationMs, error: (error as Error).message },
-      WORKER_MESSAGES.REDIS_FAILED
-    );
+    logger.error({ durationMs, error: (error as Error).message }, WORKER_MESSAGES.REDIS_FAILED);
 
     return {
       name: CHECK_NAMES.REDIS_CONNECTION,
@@ -467,9 +450,7 @@ export async function checkRedisConnection(): Promise<PreFlightCheckResult> {
  * @param failFast - If true, stop on first failure
  * @returns Array of check results
  */
-export async function runPreFlightChecks(
-  failFast = true
-): Promise<PreFlightCheckResult[]> {
+export async function runPreFlightChecks(failFast = true): Promise<PreFlightCheckResult[]> {
   // Thread-safe: prevent concurrent runs
   if (!workerReadiness.tryMarkStarting()) {
     logger.warn(WORKER_MESSAGES.PRE_FLIGHT_ALREADY_RUNNING);
@@ -516,17 +497,17 @@ export async function runPreFlightChecks(
     // - Docling MCP availability (checked by handlers)
 
     // All checks passed
-    const allPassed = results.every((r) => r.passed);
+    const allPassed = results.every(r => r.passed);
     if (allPassed) {
       workerReadiness.markReady();
       logger.info(
-        { checks: results.map((r) => ({ name: r.name, passed: r.passed })) },
+        { checks: results.map(r => ({ name: r.name, passed: r.passed })) },
         WORKER_MESSAGES.ALL_CHECKS_PASSED
       );
     } else {
       workerReadiness.markNotReady();
       logger.error(
-        { checks: results.map((r) => ({ name: r.name, passed: r.passed })) },
+        { checks: results.map(r => ({ name: r.name, passed: r.passed })) },
         WORKER_MESSAGES.PRE_FLIGHT_FAILED
       );
     }

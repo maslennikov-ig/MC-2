@@ -4,12 +4,10 @@
  *
  * Tests T024 requirements:
  * 1. generateBatch() returns valid Section[] (verify schema compliance)
- * 2. generateBatch() includes lessons with practical_exercises (3-5 per lesson, FR-010)
  * 3. generateBatch() handles retry on validation failure (2 attempts)
  * 4. buildBatchPrompt() includes style integration (getStylePrompt called)
  * 5. parseSections() handles malformed JSON (json-repair.ts)
- * 6. Tiered model routing (RT-001): OSS 120B → qwen3-max escalation
- * 7. Complexity and criticality scoring for pre-routing
+ * 6. Tiered model routing: 3-tier importance-based routing (simple/normal/complex)
  * 8. UnifiedRegenerator integration with Layers 1-2 (RT-005)
  *
  * @module tests/unit/stage5/section-batch-generator.test
@@ -49,14 +47,19 @@ vi.mock('@/shared/logger', () => ({
     error: vi.fn(),
   },
 }));
-// Mock getModelForPhase to return expected models for tier routing tests
-vi.mock('@/shared/llm/langchain-models', () => ({
-  getModelForPhase: vi.fn().mockResolvedValue({
-    model: 'deepseek/deepseek-v3.1-terminus',
-  }),
-  createModel: vi.fn().mockImplementation(() => ({
-    invoke: vi.fn(),
+// Mock model-config-service for tier routing
+vi.mock('@/shared/llm/model-config-service', () => ({
+  createModelConfigService: vi.fn(() => ({
+    getModelForPhase: vi.fn().mockResolvedValue({
+      modelId: 'test-model-from-db',
+      source: 'database',
+    }),
   })),
+}));
+
+// Mock global-settings-service for RAG token budget
+vi.mock('@/services/global-settings-service', () => ({
+  getRagTokenBudget: vi.fn().mockResolvedValue(4000),
 }));
 
 /**
@@ -82,26 +85,6 @@ function createValidMockSection(overrides: Partial<Section> = {}): Section {
         ],
         key_topics: ['topic one', 'topic two'], // min 5 chars each
         estimated_duration_minutes: 20, // RT-006 duration validator
-        practical_exercises: [
-          {
-            exercise_type: 'hands_on',
-            exercise_title: 'Exercise 1 Title (min 5 chars)',
-            exercise_description:
-              'Exercise description text that meets minimum 10 character requirement',
-          },
-          {
-            exercise_type: 'quiz',
-            exercise_title: 'Exercise 2 Title (min 5 chars)',
-            exercise_description:
-              'Exercise description text that meets minimum 10 character requirement',
-          },
-          {
-            exercise_type: 'case_study',
-            exercise_title: 'Exercise 3 Title (min 5 chars)',
-            exercise_description:
-              'Exercise description text that meets minimum 10 character requirement',
-          },
-        ],
       },
     ],
     ...overrides,
@@ -133,23 +116,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the key components and structure of neural networks'],
             key_topics: ['neurons', 'layers', 'activation functions'],
             estimated_duration_minutes: 20,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Build a Simple Perceptron',
-                exercise_description: 'Implement a perceptron from scratch using NumPy',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Neural Network Basics Quiz',
-                exercise_description: 'Test your understanding of neural network fundamentals',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Real-World Neural Network Applications',
-                exercise_description: 'Analyze how neural networks are used in image recognition',
-              },
-            ],
           },
           {
             lesson_number: 2,
@@ -157,23 +123,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Implement the backpropagation algorithm using gradient descent'],
             key_topics: ['chain rule', 'gradients', 'weight updates'],
             estimated_duration_minutes: 25,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Backpropagation Implementation',
-                exercise_description: 'Code backpropagation step by step',
-              },
-              {
-                exercise_type: 'self_assessment',
-                exercise_title: 'Gradient Calculation Exercise',
-                exercise_description: 'Calculate gradients manually for a simple network',
-              },
-              {
-                exercise_type: 'discussion',
-                exercise_title: 'Vanishing Gradient Problem',
-                exercise_description: 'Discuss challenges with deep networks',
-              },
-            ],
           },
           {
             lesson_number: 3,
@@ -183,23 +132,6 @@ describe('SectionBatchGenerator', () => {
             ],
             key_topics: ['sigmoid', 'tanh activation', 'ReLU activation', 'softmax'],
             estimated_duration_minutes: 20,
-            practical_exercises: [
-              {
-                exercise_type: 'simulation',
-                exercise_title: 'Activation Function Comparison',
-                exercise_description: 'Visualize different activation functions',
-              },
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Implement Custom Activation',
-                exercise_description: 'Create a custom activation function',
-              },
-              {
-                exercise_type: 'reflection',
-                exercise_title: 'When to Use Which Activation',
-                exercise_description: 'Reflect on use cases for each activation function',
-              },
-            ],
           },
         ],
       };
@@ -261,8 +193,6 @@ describe('SectionBatchGenerator', () => {
       // Verify model tier metadata
       expect(result.modelUsed).toBeDefined();
       expect(result.tier).toBeDefined();
-      expect(result.complexityScore).toBeGreaterThanOrEqual(0);
-      expect(result.complexityScore).toBeLessThanOrEqual(1);
     });
 
     it('should throw error when batch size is invalid', async () => {
@@ -307,11 +237,10 @@ describe('SectionBatchGenerator', () => {
   });
 
   /**
-   * Test 2: generateBatch() includes practical_exercises (3-5 per lesson, FR-010)
-   * Requirement: T024.2 - Verify FR-010 compliance
+   * Test 2 removed: practical_exercises field no longer exists
    */
-  describe('generateBatch - practical_exercises validation', () => {
-    it('should include 3-5 practical exercises per lesson (FR-010)', async () => {
+  describe.skip('generateBatch - practical_exercises validation (REMOVED)', () => {
+    it('should include 3-5 practical exercises per lesson (FR-010) - FIELD REMOVED', async () => {
       const mockSection = createValidMockSection();
 
       vi.mocked(ChatOpenAI).mockImplementation(
@@ -450,7 +379,7 @@ describe('SectionBatchGenerator', () => {
       expect(mockInvoke).toHaveBeenCalledTimes(2);
     });
 
-    it('should escalate from Tier 1 (OSS 120B) to Tier 2 (qwen3-max) on failure', async () => {
+    it('should escalate from simple tier to complex tier on failure', async () => {
       const validSection: Section = {
         section_number: 1,
         section_title: 'Valid Section',
@@ -464,23 +393,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -518,7 +430,7 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
 
-      // Low complexity section -> should start with Tier 1 (OSS 120B)
+      // Section with simple importance -> should start with simple tier
       const mockJobInput: GenerationJobInput = {
         course_id: 'course-123',
         organization_id: 'org-456',
@@ -534,8 +446,7 @@ describe('SectionBatchGenerator', () => {
       const result = await generator.generateBatch(0, 0, 1, mockJobInput);
 
       // Verify escalation happened
-      expect(result.tier).toBe('tier2_en_lessons');
-      expect(result.modelUsed).toBe('deepseek/deepseek-v3.1-terminus');
+      expect(result.tier).toBe('complex');
       expect(result.retryCount).toBe(1);
     });
 
@@ -600,23 +511,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -688,23 +582,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -773,23 +650,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -866,14 +726,14 @@ describe('SectionBatchGenerator', () => {
   });
 
   /**
-   * Test 6: Tiered model routing (RT-001)
-   * Requirement: Verify OSS 120B → qwen3-max escalation
+   * Test 6: Tiered model routing
+   * Requirement: Verify importance-based 3-tier routing
    */
-  describe('Tiered model routing (RT-001)', () => {
-    it('should use Tier 1 (OSS 120B) for low complexity sections', async () => {
+  describe('Tiered model routing (importance-based)', () => {
+    it('should use complex tier for first section (sectionIndex=0)', async () => {
       const mockSection: Section = {
         section_number: 1,
-        section_title: 'Simple Section',
+        section_title: 'First Section',
         section_description: 'Introduction to foundational concepts and basic principles',
         learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 30,
@@ -884,23 +744,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -930,7 +773,7 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
 
-      // Low complexity: few topics, few objectives, few lessons, optional importance
+      // Even with simple importance, first section should get complex tier
       const mockJobInput: GenerationJobInput = {
         course_id: 'course-123',
         organization_id: 'org-456',
@@ -943,15 +786,14 @@ describe('SectionBatchGenerator', () => {
       };
 
       const generator = new SectionBatchGenerator();
+      // sectionIndex=0 → first section → always complex tier
       const result = await generator.generateBatch(0, 0, 1, mockJobInput);
 
-      // Verify Tier 1 (OSS 120B) was used
-      expect(result.tier).toBe('tier1_oss120b');
-      expect(result.modelUsed).toBe('openai/gpt-oss-120b');
-      expect(result.complexityScore).toBeLessThan(0.75);
+      // First section always gets complex tier regardless of importance
+      expect(result.tier).toBe('complex');
     });
 
-    it('should use Tier 2 (qwen3-max) for high complexity sections', async () => {
+    it('should use complex tier for complex importance sections', async () => {
       const mockSection: Section = {
         section_number: 1,
         section_title: 'Complex Section',
@@ -965,23 +807,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 20,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1011,7 +836,7 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
 
-      // High complexity: many topics, many objectives, many lessons, core importance
+      // High complexity: importance='complex' in fixture
       const mockJobInput: GenerationJobInput = {
         course_id: 'course-123',
         organization_id: 'org-456',
@@ -1024,184 +849,10 @@ describe('SectionBatchGenerator', () => {
       };
 
       const generator = new SectionBatchGenerator();
+      // sectionIndex=0, but importance=complex too → complex tier
       const result = await generator.generateBatch(0, 0, 1, mockJobInput);
 
-      // Verify Tier 2 (qwen3-max) was used due to high complexity
-      expect(result.tier).toBe('tier2_en_lessons');
-      expect(result.modelUsed).toBe('deepseek/deepseek-v3.1-terminus');
-      expect(result.complexityScore).toBeGreaterThanOrEqual(0.75);
-    });
-
-    it('should use Tier 2 (qwen3-max) for high criticality sections', async () => {
-      const mockSection: Section = {
-        section_number: 1,
-        section_title: 'Introduction to Fundamentals',
-        section_description: 'Fundamental principles and core concepts for beginners',
-        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
-        estimated_duration_minutes: 45,
-        lessons: [
-          {
-            lesson_number: 1,
-            lesson_title: 'Lesson 1',
-            lesson_objectives: ['Define the core principles and fundamental concepts'],
-            key_topics: ['fundamentals', 'principles'],
-            estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
-          },
-        ],
-      };
-
-      vi.mocked(ChatOpenAI).mockImplementation(
-        class {
-          invoke = vi.fn().mockResolvedValue({
-            content: JSON.stringify({ sections: [mockSection] }),
-          });
-        } as any
-      );
-
-      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
-        class {
-          regenerate = vi.fn().mockResolvedValue({
-            success: true,
-            data: { sections: [mockSection] },
-            metadata: {
-              layerUsed: 'auto-repair',
-              retryCount: 0,
-              qualityPassed: true,
-              tokenCost: 0,
-            },
-          });
-        } as any
-      );
-
-      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
-
-      // High criticality: core importance + foundational keywords
-      const mockJobInput: GenerationJobInput = {
-        course_id: 'course-123',
-        organization_id: 'org-456',
-        user_id: 'user-789',
-        analysis_result: createFullAnalysisResult('Fundamentals'),
-        frontend_parameters: {
-          course_title: 'Fundamentals Course',
-        },
-        vectorized_documents: false,
-      };
-
-      const generator = new SectionBatchGenerator();
-      const result = await generator.generateBatch(0, 0, 1, mockJobInput);
-
-      // Verify Tier 2 (qwen3-max) was used due to high criticality
-      expect(result.tier).toBe('tier2_en_lessons');
-      expect(result.modelUsed).toBe('deepseek/deepseek-v3.1-terminus');
-      expect(result.criticalityScore).toBeGreaterThanOrEqual(0.8);
-    });
-  });
-
-  /**
-   * Test 7: Complexity and criticality scoring
-   * Requirement: Verify pre-routing calculations
-   */
-  describe('Complexity and criticality scoring', () => {
-    it('should calculate complexity score based on topics, objectives, lessons', async () => {
-      const mockSection: Section = {
-        section_number: 1,
-        section_title: 'Test Section',
-        section_description: 'Comprehensive introduction to test concepts and methodologies',
-        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
-        estimated_duration_minutes: 45,
-        lessons: [
-          {
-            lesson_number: 1,
-            lesson_title: 'Lesson 1',
-            lesson_objectives: ['Define the core principles and fundamental concepts'],
-            key_topics: ['fundamentals', 'principles'],
-            estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
-          },
-        ],
-      };
-
-      vi.mocked(ChatOpenAI).mockImplementation(
-        class {
-          invoke = vi.fn().mockResolvedValue({
-            content: JSON.stringify({ sections: [mockSection] }),
-          });
-        } as any
-      );
-
-      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
-        class {
-          regenerate = vi.fn().mockResolvedValue({
-            success: true,
-            data: { sections: [mockSection] },
-            metadata: {
-              layerUsed: 'auto-repair',
-              retryCount: 0,
-              qualityPassed: true,
-              tokenCost: 0,
-            },
-          });
-        } as any
-      );
-
-      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
-
-      const mockJobInput: GenerationJobInput = {
-        course_id: 'course-123',
-        organization_id: 'org-456',
-        user_id: 'user-789',
-        analysis_result: createFullAnalysisResult('Test Course'),
-        frontend_parameters: {
-          course_title: 'Test',
-        },
-        vectorized_documents: false,
-      };
-
-      const generator = new SectionBatchGenerator();
-      const result = await generator.generateBatch(0, 0, 1, mockJobInput);
-
-      // Verify complexity score is calculated
-      expect(result.complexityScore).toBeDefined();
-      expect(result.complexityScore).toBeGreaterThanOrEqual(0);
-      expect(result.complexityScore).toBeLessThanOrEqual(1);
-
-      // Verify criticality score is calculated
-      expect(result.criticalityScore).toBeDefined();
-      expect(result.criticalityScore).toBeGreaterThanOrEqual(0);
-      expect(result.criticalityScore).toBeLessThanOrEqual(1);
+      expect(result.tier).toBe('complex');
     });
   });
 
@@ -1224,23 +875,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1311,23 +945,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1440,23 +1057,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1537,23 +1137,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1626,23 +1209,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1718,23 +1284,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1814,23 +1363,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -1907,23 +1439,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -2000,23 +1515,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };
@@ -2093,23 +1591,6 @@ describe('SectionBatchGenerator', () => {
             lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
-            practical_exercises: [
-              {
-                exercise_type: 'hands_on',
-                exercise_title: 'Exercise 1',
-                exercise_description: 'Description 1',
-              },
-              {
-                exercise_type: 'quiz',
-                exercise_title: 'Exercise 2',
-                exercise_description: 'Description 2',
-              },
-              {
-                exercise_type: 'case_study',
-                exercise_title: 'Exercise 3',
-                exercise_description: 'Description 3',
-              },
-            ],
           },
         ],
       };

@@ -5,7 +5,11 @@
   "target_audience": "Aspiring programmers, students, or professionals with no prior coding experience seeking to enter the field of software development.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Curiosity about programming", "Access to a Python-compatible environment"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Curiosity about programming",
+    "Access to a Python-compatible environment"
+  ],
   "learning_outcomes": [
     "Write and execute basic Python scripts using proper syntax",
     "Apply fundamental data structures (lists, dictionaries, tuples) to organize information",
@@ -13,5 +17,16 @@
     "Design algorithms to solve computational problems with control flow statements",
     "Explain core programming concepts like variables, functions, and object-oriented basics"
   ],
-  "course_tags": ["Python", "programming", "beginner", "coding", "scripts", "data structures", "problem-solving", "debugging", "algorithms", "software development"]
+  "course_tags": [
+    "Python",
+    "programming",
+    "beginner",
+    "coding",
+    "scripts",
+    "data structures",
+    "problem-solving",
+    "debugging",
+    "algorithms",
+    "software development"
+  ]
 }

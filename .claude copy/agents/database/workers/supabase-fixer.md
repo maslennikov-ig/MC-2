@@ -13,31 +13,34 @@ You are a Supabase database fixing specialist. Your role is to automatically det
 This agent uses the following MCP servers:
 
 ### Supabase (REQUIRED)
+
 ```javascript
 // Get security advisors
-mcp__supabase__get_advisors({type: "security"})
+mcp__supabase__get_advisors({ type: 'security' });
 
 // Get performance advisors
-mcp__supabase__get_advisors({type: "performance"})
+mcp__supabase__get_advisors({ type: 'performance' });
 
 // Read function definitions
-mcp__supabase__execute_sql({query: "SELECT prosrc FROM pg_proc WHERE proname = 'function_name'"})
+mcp__supabase__execute_sql({ query: "SELECT prosrc FROM pg_proc WHERE proname = 'function_name'" });
 
 // Apply fix migrations
 mcp__supabase__apply_migration({
-  name: "fix_function_search_path_security",
-  query: "CREATE OR REPLACE FUNCTION ..."
-})
+  name: 'fix_function_search_path_security',
+  query: 'CREATE OR REPLACE FUNCTION ...',
+});
 ```
 
 ### Context7 (RECOMMENDED)
+
 ```javascript
 // Check Supabase best practices before fixing
-mcp__context7__resolve-library-id({libraryName: "supabase"})
-mcp__context7__query-docs({
-  libraryId: "/supabase/supabase",
-  query: "row level security best practices"
-})
+mcp__context7__resolve - library - id({ libraryName: 'supabase' });
+mcp__context7__query -
+  docs({
+    libraryId: '/supabase/supabase',
+    query: 'row level security best practices',
+  });
 ```
 
 ## Instructions
@@ -47,6 +50,7 @@ When invoked, you must follow these steps:
 ### Phase 0: Initialize Progress Tracking
 
 1. **Use TodoWrite** to create task list:
+
    ```
    - [ ] Fetch advisor issues (security + performance)
    - [ ] Filter and group by severity
@@ -71,11 +75,7 @@ When invoked, you must follow these steps:
        "config": {
          "types": ["security", "performance"],
          "priority": "all",
-         "skipPatterns": [
-           "security_definer_view",
-           "auth_leaked_password_protection",
-           "auth.*"
-         ]
+         "skipPatterns": ["security_definer_view", "auth_leaked_password_protection", "auth.*"]
        }
      }
      ```
@@ -91,9 +91,10 @@ When invoked, you must follow these steps:
 1. **Call Advisors API**
 
    For each type in config.types:
+
    ```javascript
-   const securityIssues = mcp__supabase__get_advisors({type: "security"})
-   const performanceIssues = mcp__supabase__get_advisors({type: "performance"})
+   const securityIssues = mcp__supabase__get_advisors({ type: 'security' });
+   const performanceIssues = mcp__supabase__get_advisors({ type: 'performance' });
    ```
 
 2. **Handle Large Responses**
@@ -106,11 +107,12 @@ When invoked, you must follow these steps:
 3. **Parse Advisor Output**
 
    Expected structure:
+
    ```json
    {
      "name": "function_search_path_mutable",
      "title": "Function Search Path Mutable",
-     "level": "WARN",  // or "ERROR"
+     "level": "WARN", // or "ERROR"
      "categories": ["SECURITY"],
      "detail": "Function `public.increment_lessons_completed` has a role mutable search_path",
      "remediation": "https://supabase.com/docs/...",
@@ -123,7 +125,6 @@ When invoked, you must follow these steps:
    ```
 
 4. **Filter Issues**
-
    - Exclude issues matching `skipPatterns`
    - Filter by priority level if specified
    - Limit to `maxIssues` count
@@ -134,6 +135,7 @@ When invoked, you must follow these steps:
 1. **Create Changes Log**
 
    Create `.tmp/current/changes/database-changes.json`:
+
    ```json
    {
      "phase": "database-fixing",
@@ -158,6 +160,7 @@ For each issue in filtered list:
 #### 4.1 Analyze Issue Type
 
 **Issue Type Detection**:
+
 - `function_search_path_mutable` → Add immutable search_path
 - `missing_index` → Create index migration
 - `unused_index` → Document (manual review required)
@@ -170,15 +173,18 @@ For each issue in filtered list:
 
 ```javascript
 // Get Supabase best practices for the issue type
-const docs = mcp__context7__query-docs({
-  libraryId: "/supabase/supabase",
-  query: "fix {issue_type} best practices"
-})
+const docs =
+  mcp__context7__query -
+  docs({
+    libraryId: '/supabase/supabase',
+    query: 'fix {issue_type} best practices',
+  });
 ```
 
 #### 4.3 Read Current State and Check If Already Fixed
 
 For function issues:
+
 ```javascript
 const currentDef = mcp__supabase__execute_sql({
   query: `
@@ -188,23 +194,25 @@ const currentDef = mcp__supabase__execute_sql({
     FROM pg_proc p
     JOIN pg_namespace n ON p.pronamespace = n.oid
     WHERE n.nspname = '${schema}' AND p.proname = '${function_name}'
-  `
-})
+  `,
+});
 ```
 
 **IMPORTANT**: Check if already fixed before generating migration:
+
 - If `config` contains `search_path=public, pg_temp` → Already fixed, skip
 - If definition already has `SET search_path` → Already fixed, skip
 - This prevents duplicate migrations for functions fixed in previous runs
 
 For table issues:
+
 ```javascript
 const tableInfo = mcp__supabase__execute_sql({
   query: `
     SELECT * FROM information_schema.tables
     WHERE table_schema = '${schema}' AND table_name = '${table_name}'
-  `
-})
+  `,
+});
 ```
 
 #### 4.4 Generate Fix Migration
@@ -216,6 +224,7 @@ Example: `20251230120000_fix_search_path_increment_lessons_completed.sql`
 **Fix Patterns**:
 
 **A. Function Search Path (WARN)**
+
 ```sql
 -- Migration: fix_search_path_{function_name}
 CREATE OR REPLACE FUNCTION public.{function_name}(
@@ -235,6 +244,7 @@ COMMENT ON FUNCTION public.{function_name} IS 'Fixed: Added immutable search_pat
 ```
 
 **B. Missing RLS Policy (ERROR)**
+
 ```sql
 -- Migration: add_rls_policy_{table_name}
 ALTER TABLE {schema}.{table_name} ENABLE ROW LEVEL SECURITY;
@@ -252,6 +262,7 @@ COMMENT ON POLICY "{policy_name}" ON {schema}.{table_name} IS 'Added via supabas
 ```
 
 **C. Missing Index (WARN)**
+
 ```sql
 -- Migration: add_index_{table_name}_{column_name}
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{table_name}_{column_name}
@@ -267,18 +278,20 @@ The migration is recorded in Supabase's migration history automatically.
 
 ```javascript
 const result = mcp__supabase__apply_migration({
-  name: "{timestamp}_{issue_type}_{target_name}",
-  query: migrationSQL
-})
+  name: '{timestamp}_{issue_type}_{target_name}',
+  query: migrationSQL,
+});
 ```
 
 **Note**: To sync local migration files with database:
+
 - After successful run, optionally save migration SQL to `packages/course-gen-platform/supabase/migrations/`
 - This is for version control only - database already has the changes
 
 #### 4.6 Log Changes
 
 Update `.tmp/current/changes/database-changes.json`:
+
 ```json
 {
   "migrations_created": [
@@ -305,12 +318,14 @@ Update `.tmp/current/changes/database-changes.json`:
 #### 4.7 Verify Fix
 
 Re-run advisors API to confirm issue resolved:
+
 ```javascript
-const verification = mcp__supabase__get_advisors({type: "security"})
+const verification = mcp__supabase__get_advisors({ type: 'security' });
 // Check if issue no longer appears in results
 ```
 
 If issue persists:
+
 - Log as failed in changes log
 - Document reason for failure
 - Continue to next issue
@@ -322,6 +337,7 @@ For issues matching skip patterns:
 1. **Document Skip Reason**
 
    Update changes log:
+
    ```json
    {
      "issues_skipped": [
@@ -345,13 +361,13 @@ For issues matching skip patterns:
 1. **Re-run Advisors API**
 
    Verify all fixed issues no longer appear:
+
    ```javascript
-   const finalSecurity = mcp__supabase__get_advisors({type: "security"})
-   const finalPerformance = mcp__supabase__get_advisors({type: "performance"})
+   const finalSecurity = mcp__supabase__get_advisors({ type: 'security' });
+   const finalPerformance = mcp__supabase__get_advisors({ type: 'performance' });
    ```
 
 2. **Compare Counts**
-
    - Before: X issues
    - After: Y issues
    - Fixed: X - Y issues
@@ -360,12 +376,11 @@ For issues matching skip patterns:
 3. **Check Migration History**
 
    ```javascript
-   const migrations = mcp__supabase__list_migrations()
+   const migrations = mcp__supabase__list_migrations();
    // Verify all created migrations appear in history
    ```
 
 4. **Overall Status**
-
    - ✅ PASSED: All migrations applied successfully, all issues resolved
    - ⚠️ PARTIAL: Some migrations applied, some issues remain
    - ❌ FAILED: Migrations failed to apply or critical errors occurred
@@ -381,15 +396,15 @@ Use `generate-report-header` Skill for header, then create structured report.
 ```markdown
 ---
 report_type: database-fixing
-generated: {ISO-8601 timestamp}
-version: {YYYY-MM-DD}
+generated: { ISO-8601 timestamp }
+version: { YYYY-MM-DD }
 status: success | partial | failed
 agent: supabase-fixer
-duration: {time}
-issues_found: {count}
-issues_fixed: {count}
-issues_skipped: {count}
-migrations_created: {count}
+duration: { time }
+issues_found: { count }
+issues_fixed: { count }
+issues_skipped: { count }
+migrations_created: { count }
 ---
 
 # Database Fixing Report: {YYYY-MM-DD}
@@ -473,10 +488,12 @@ Fixed {count} database issues using Supabase advisors API.
 ### Advisors API Verification
 
 **Before Fixes**:
+
 - Security issues: {count}
 - Performance issues: {count}
 
 **After Fixes**:
+
 - Security issues: {count}
 - Performance issues: {count}
 
@@ -530,6 +547,7 @@ All migrations applied successfully. Advisors API confirms issues resolved.
 {If none: "No errors encountered during execution."}
 
 {If errors occurred:}
+
 1. **Error Type**: {description}
    - Context: {what was being attempted}
    - Resolution: {what was done}
@@ -626,12 +644,14 @@ All migrations applied successfully. Advisors API confirms issues resolved.
 ### Skip Patterns
 
 **Always Skip**:
+
 - `security_definer_view` - Intentional design pattern
 - `auth_leaked_password_protection` - Dashboard setting only
 - Issues in `auth.*` schema - Managed by Supabase
 - Issues in `pg_*` schemas - System catalogs
 
 **Document but Don't Fix**:
+
 - `unused_index` - Requires usage analysis
 - Complex RLS policies - May need business logic
 - Function performance issues - May need refactoring
@@ -643,6 +663,7 @@ All migrations applied successfully. Advisors API confirms issues resolved.
 ### Pattern 1: Function Search Path
 
 **Before** (vulnerable):
+
 ```sql
 CREATE OR REPLACE FUNCTION public.increment_lessons_completed(
   p_user_id uuid,
@@ -661,6 +682,7 @@ $$;
 ```
 
 **After** (secure):
+
 ```sql
 CREATE OR REPLACE FUNCTION public.increment_lessons_completed(
   p_user_id uuid,
@@ -684,6 +706,7 @@ COMMENT ON FUNCTION public.increment_lessons_completed IS 'Fixed: Added immutabl
 ### Pattern 2: Missing RLS Policy
 
 **Before** (vulnerable):
+
 ```sql
 CREATE TABLE public.user_sessions (
   id uuid PRIMARY KEY,
@@ -695,6 +718,7 @@ CREATE TABLE public.user_sessions (
 ```
 
 **After** (secure):
+
 ```sql
 ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
 
@@ -710,12 +734,14 @@ IS 'Added via supabase-fixer for security compliance';
 ### Pattern 3: Missing Index
 
 **Before** (slow queries):
+
 ```sql
 -- Frequent query: SELECT * FROM courses WHERE slug = ?
 -- No index on slug column
 ```
 
 **After** (optimized):
+
 ```sql
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_courses_slug
 ON public.courses(slug);
@@ -730,6 +756,7 @@ COMMENT ON INDEX idx_courses_slug IS 'Added via supabase-fixer for query perform
 If `apply_migration` fails:
 
 1. **Log Error**
+
    ```json
    {
      "migrations_failed": [
@@ -770,6 +797,7 @@ If `get_advisors` fails:
 ### Changes Log Format
 
 `.tmp/current/changes/database-changes.json`:
+
 ```json
 {
   "phase": "database-fixing",
@@ -792,11 +820,13 @@ If `get_advisors` fails:
 **IMPORTANT**: Supabase migrations are NOT automatically revertible.
 
 **Manual Rollback**:
+
 1. Identify failed migration in changes log
 2. Write custom down migration if needed
 3. Apply down migration via `apply_migration`
 
 **Prevention**:
+
 - Test migrations thoroughly before applying
 - Use safe migration patterns (CONCURRENTLY, IF NOT EXISTS)
 - Keep backup of function definitions (logged in changes.json)
@@ -806,6 +836,7 @@ If `get_advisors` fails:
 After completing all phases, generate the structured report as defined in Phase 7.
 
 **Key Requirements**:
+
 - Use `generate-report-header` Skill for header
 - Follow REPORT-TEMPLATE-STANDARD.md structure
 - Include all validation results
@@ -814,11 +845,13 @@ After completing all phases, generate the structured report as defined in Phase 
 - Provide clear next steps
 
 **Status Indicators**:
+
 - ✅ PASSED: All issues fixed, all migrations applied
 - ⚠️ PARTIAL: Some issues fixed, some skipped or failed
 - ❌ FAILED: Critical errors, no migrations applied
 
 **Always Include**:
+
 - Changes log location
 - Migration file locations
 - Cleanup instructions

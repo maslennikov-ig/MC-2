@@ -63,7 +63,7 @@ const purify = DOMPurify(window);
  * // Returns: { title: "Title", count: 5 }
  * ```
  */
-function sanitizeValue(value: any): any {
+function sanitizeValue(value: unknown): unknown {
   // Handle null/undefined
   if (value === null || value === undefined) {
     return value;
@@ -75,10 +75,10 @@ function sanitizeValue(value: any): any {
     // DOMPurify will strip <script> tags but may keep their text content
     // With KEEP_CONTENT: true, it preserves safe text while removing dangerous HTML
     const purified = purify.sanitize(value, {
-      ALLOWED_TAGS: [],       // Strip ALL HTML tags
-      ALLOWED_ATTR: [],       // Strip ALL attributes
-      KEEP_CONTENT: true,     // Keep text content even if tags are removed
-      RETURN_DOM: false,      // Return string (not DOM object)
+      ALLOWED_TAGS: [], // Strip ALL HTML tags
+      ALLOWED_ATTR: [], // Strip ALL attributes
+      KEEP_CONTENT: true, // Keep text content even if tags are removed
+      RETURN_DOM: false, // Return string (not DOM object)
       RETURN_DOM_FRAGMENT: false,
     });
 
@@ -88,13 +88,13 @@ function sanitizeValue(value: any): any {
 
   // Handle arrays - recursively sanitize elements
   if (Array.isArray(value)) {
-    return value.map(sanitizeValue);
+    return value.map(val => sanitizeValue(val));
   }
 
   // Handle objects - recursively sanitize all properties
   if (typeof value === 'object') {
-    const sanitized: Record<string, any> = {};
-    for (const [key, val] of Object.entries(value)) {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
       sanitized[key] = sanitizeValue(val);
     }
     return sanitized;
@@ -166,9 +166,7 @@ function sanitizeValue(value: any): any {
  * // }
  * ```
  */
-export function sanitizeCourseStructure(
-  courseStructure: CourseStructure
-): CourseStructure {
+export function sanitizeCourseStructure(courseStructure: CourseStructure): CourseStructure {
   logger.info('Sanitizing CourseStructure for XSS prevention (FR-008)');
 
   // Recursively sanitize entire structure

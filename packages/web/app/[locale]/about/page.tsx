@@ -1,61 +1,70 @@
-import { Metadata } from "next"
-import { setRequestLocale } from 'next-intl/server';
-import { Locale } from '@/src/i18n/config';
+import { Metadata } from 'next'
+import { setRequestLocale } from 'next-intl/server'
+import { Locale } from '@/src/i18n/config'
 import { Link } from '@/src/i18n/navigation'
-import Logo from "@/components/common/logo"
+import Logo from '@/components/common/logo'
 
 export const metadata: Metadata = {
-  title: "О платформе",
-  description: "Узнайте больше о MegaCampusAI - инновационной платформе для автоматической генерации образовательных курсов с использованием искусственного интеллекта.",
-  keywords: ["о платформе", "MegaCampusAI", "автоматизация обучения", "AI образование", "технологии"],
+  title: 'О платформе',
+  description:
+    'Узнайте больше о MegaCampusAI - инновационной платформе для автоматической генерации образовательных курсов с использованием искусственного интеллекта.',
+  keywords: [
+    'о платформе',
+    'MegaCampusAI',
+    'автоматизация обучения',
+    'AI образование',
+    'технологии',
+  ],
   openGraph: {
-    title: "О платформе MegaCampusAI",
-    description: "Узнайте больше о MegaCampusAI - инновационной платформе для автоматической генерации образовательных курсов",
-    url: "/about",
-    type: "website",
+    title: 'О платформе MegaCampusAI',
+    description:
+      'Узнайте больше о MegaCampusAI - инновационной платформе для автоматической генерации образовательных курсов',
+    url: '/about',
+    type: 'website',
   },
   twitter: {
-    title: "О платформе MegaCampusAI",
-    description: "Узнайте больше о MegaCampusAI - инновационной платформе для автоматической генерации образовательных курсов",
+    title: 'О платформе MegaCampusAI',
+    description:
+      'Узнайте больше о MegaCampusAI - инновационной платформе для автоматической генерации образовательных курсов',
   },
   alternates: {
-    canonical: "/about",
+    canonical: '/about',
   },
 }
 
 type Props = {
-  params: Promise<{ locale: Locale }>;
-};
+  params: Promise<{ locale: Locale }>
+}
 
 export default async function AboutPage({ params }: Props) {
-  const { locale } = await params;
-  setRequestLocale(locale); // Enable static rendering
+  const { locale } = await params
+  setRequestLocale(locale) // Enable static rendering
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
       <div className="container mx-auto px-4 py-16">
-        <div className="flex items-center justify-between mb-8">
-          <Link href="/" className="text-white/70 hover:text-white transition-colors">
+        <div className="mb-8 flex items-center justify-between">
+          <Link href="/" className="text-white/70 transition-colors hover:text-white">
             ← Назад
           </Link>
           <Logo variant="compact" size="md" />
         </div>
 
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-white mb-8">О платформе MegaCampusAI</h1>
-          
+        <div className="mx-auto max-w-4xl">
+          <h1 className="mb-8 text-4xl font-bold text-white">О платформе MegaCampusAI</h1>
+
           <div className="prose prose-invert max-w-none">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 mb-8 border border-white/20">
-              <h2 className="text-2xl font-semibold text-white mb-4">Что такое MegaCampusAI?</h2>
-              <p className="text-white/80 mb-4">
-                MegaCampusAI - это инновационная платформа для автоматической генерации образовательных курсов 
-                с использованием искусственного интеллекта. Мы превращаем ваши документы и идеи в полноценные 
-                учебные материалы за считанные минуты.
+            <div className="mb-8 rounded-lg border border-white/20 bg-white/10 p-8 backdrop-blur-sm">
+              <h2 className="mb-4 text-2xl font-semibold text-white">Что такое MegaCampusAI?</h2>
+              <p className="mb-4 text-white/80">
+                MegaCampusAI - это инновационная платформа для автоматической генерации
+                образовательных курсов с использованием искусственного интеллекта. Мы превращаем
+                ваши документы и идеи в полноценные учебные материалы за считанные минуты.
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 mb-8 border border-white/20">
-              <h2 className="text-2xl font-semibold text-white mb-4">Наши возможности</h2>
+            <div className="mb-8 rounded-lg border border-white/20 bg-white/10 p-8 backdrop-blur-sm">
+              <h2 className="mb-4 text-2xl font-semibold text-white">Наши возможности</h2>
               <ul className="space-y-3 text-white/80">
                 <li>✨ Автоматическая генерация структуры курса</li>
                 <li>📝 Создание текстового контента на основе ваших документов</li>
@@ -66,9 +75,9 @@ export default async function AboutPage({ params }: Props) {
               </ul>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 mb-8 border border-white/20">
-              <h2 className="text-2xl font-semibold text-white mb-4">Технологии</h2>
-              <p className="text-white/80 mb-4">
+            <div className="mb-8 rounded-lg border border-white/20 bg-white/10 p-8 backdrop-blur-sm">
+              <h2 className="mb-4 text-2xl font-semibold text-white">Технологии</h2>
+              <p className="mb-4 text-white/80">
                 Платформа построена на основе передовых технологий:
               </p>
               <ul className="space-y-2 text-white/80">
@@ -80,11 +89,11 @@ export default async function AboutPage({ params }: Props) {
               </ul>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 border border-white/20">
-              <h2 className="text-2xl font-semibold text-white mb-4">Контакты</h2>
+            <div className="rounded-lg border border-white/20 bg-white/10 p-8 backdrop-blur-sm">
+              <h2 className="mb-4 text-2xl font-semibold text-white">Контакты</h2>
               <p className="text-white/80">
-                Есть вопросы или предложения? Свяжитесь с нами через Telegram-бота 
-                или отправьте email на support@ai.megacampus.ru
+                Есть вопросы или предложения? Свяжитесь с нами через Telegram-бота или отправьте
+                email на support@ai.megacampus.ru
               </p>
             </div>
           </div>

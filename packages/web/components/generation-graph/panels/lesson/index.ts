@@ -4,7 +4,7 @@
  * @module components/generation-graph/panels/lesson
  */
 
-export { LessonInspectorLayout } from './LessonInspectorLayout';
-export { PipelinePanel } from './PipelinePanel';
-export { ContentPreviewPanel, ContentPreviewPanelSkeleton } from './ContentPreviewPanel';
-export { LessonInspector } from './LessonInspector';
+export { LessonInspectorLayout } from './LessonInspectorLayout'
+export { PipelinePanel } from './PipelinePanel'
+export { ContentPreviewPanel, ContentPreviewPanelSkeleton } from './ContentPreviewPanel'
+export { LessonInspector } from './LessonInspector'

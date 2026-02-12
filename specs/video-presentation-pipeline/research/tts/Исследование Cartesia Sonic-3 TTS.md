@@ -10,12 +10,12 @@
 
 С точки зрения видеопайплайна, такая низкая задержка позволяет реализовать потоковую генерацию контента, когда аудиофайлы создаются практически в режиме реального времени параллельно с рендерингом видео. Это критически важно для систем, использующих динамическую генерацию уроков на основе ответов пользователя или оперативного обновления учебных материалов. Модель Sonic-3 демонстрирует стабильную производительность даже при пиковых нагрузках, что подтверждается измерениями P90 (90-й перцентиль задержки), где она значительно опережает таких конкурентов, как ElevenLabs и Azure.7
 
-| Характеристика архитектуры | Cartesia Sonic-3 (SSM) | Стандартные Трансформеры |
-| :---- | :---- | :---- |
-| Сложность вычислений | Линейная $O(L)$ 4 | Квадратичная $O(L^2)$ 5 |
-| Задержка (TTFA) | 40-90 мс 1 | 300-800 мс 7 |
-| Стабильность при длинных текстах | Высокая (фиксированная задержка) 6 | Снижается (задержка растет) 10 |
-| Эффективность на edge-устройствах | Оптимизирована 2 | Требует значительных ресурсов 7 |
+| Характеристика архитектуры        | Cartesia Sonic-3 (SSM)             | Стандартные Трансформеры        |
+| :-------------------------------- | :--------------------------------- | :------------------------------ |
+| Сложность вычислений              | Линейная $O(L)$ 4                  | Квадратичная $O(L^2)$ 5         |
+| Задержка (TTFA)                   | 40-90 мс 1                         | 300-800 мс 7                    |
+| Стабильность при длинных текстах  | Высокая (фиксированная задержка) 6 | Снижается (задержка растет) 10  |
+| Эффективность на edge-устройствах | Оптимизирована 2                   | Требует значительных ресурсов 7 |
 
 ## **Временная синхронизация и метаданные (Timestamps)**
 
@@ -29,21 +29,21 @@
 
 ### **Уровни детализации: Word-level vs Phoneme-level**
 
-Cartesia предоставляет два типа временных меток, которые активируются через параметры add\_timestamps и add\_phoneme\_timestamps.11
+Cartesia предоставляет два типа временных меток, которые активируются через параметры add_timestamps и add_phoneme_timestamps.11
 
-* **Word-level (на уровне слов):** Возвращает массив объектов с указанием текста слова, времени начала и времени окончания в секундах. Это основной инструмент для генерации субтитров и управления визуальными акцентами в видео.  
-* **Phoneme-level (на уровне фонем):** Предоставляет сверхдетализированную информацию о каждой произнесенной фонеме. Для видеопроизводства это основа для реализации качественного lip-sync. Хотя Cartesia не выдает напрямую данные в формате Visemes (визуальные соответствия фонем), ее phoneme-timestamps базируются на стандарте MFA-style IPA, что позволяет легко транслировать их в виземы через стандартные таблицы соответствия для таких движков, как Unreal Engine или Unity.15
+- **Word-level (на уровне слов):** Возвращает массив объектов с указанием текста слова, времени начала и времени окончания в секундах. Это основной инструмент для генерации субтитров и управления визуальными акцентами в видео.
+- **Phoneme-level (на уровне фонем):** Предоставляет сверхдетализированную информацию о каждой произнесенной фонеме. Для видеопроизводства это основа для реализации качественного lip-sync. Хотя Cartesia не выдает напрямую данные в формате Visemes (визуальные соответствия фонем), ее phoneme-timestamps базируются на стандарте MFA-style IPA, что позволяет легко транслировать их в виземы через стандартные таблицы соответствия для таких движков, как Unreal Engine или Unity.15
 
 Точность выравнивания (alignment) составляет в среднем $\\pm 10$ мс, что превосходит порог восприятия рассинхрона человеческим глазом, составляющий около 40-50 мс для видео.17
 
-| Язык | sonic (Stable) | sonic-preview | Рекомендация для Pipeline |
-| :---- | :---- | :---- | :---- |
-| English (en) | Поддерживается 13 | Поддерживается | Использовать sonic |
-| Spanish (es) | Поддерживается 13 | Поддерживается | Использовать sonic |
-| Russian (ru) | Нет | Поддерживается 12 | Использовать sonic-preview |
-| Chinese (zh) | Нет | Поддерживается 12 | Использовать sonic-preview |
-| Arabic (ar) | Нет | Поддерживается 12 | Использовать sonic-preview |
-| Japanese (ja) | Нет | Поддерживается 12 | Использовать sonic-preview |
+| Язык          | sonic (Stable)    | sonic-preview     | Рекомендация для Pipeline  |
+| :------------ | :---------------- | :---------------- | :------------------------- |
+| English (en)  | Поддерживается 13 | Поддерживается    | Использовать sonic         |
+| Spanish (es)  | Поддерживается 13 | Поддерживается    | Использовать sonic         |
+| Russian (ru)  | Нет               | Поддерживается 12 | Использовать sonic-preview |
+| Chinese (zh)  | Нет               | Поддерживается 12 | Использовать sonic-preview |
+| Arabic (ar)   | Нет               | Поддерживается 12 | Использовать sonic-preview |
+| Japanese (ja) | Нет               | Поддерживается 12 | Использовать sonic-preview |
 
 ## **Контроль эмоций и невербальная экспрессия**
 
@@ -53,7 +53,7 @@ Cartesia предоставляет два типа временных мето�
 
 Модель поддерживает два основных механизма добавления экспрессии:
 
-1. **Теги эмоций:** Используется синтаксис \<emotion value="emotion\_name" /\>. Это позволяет задать тон для последующего блока текста. Например, в образовательном видео можно использовать \<emotion value="enthusiastic" /\> для объявления новой темы или \<emotion value="calm" /\> для детального разбора сложной формулы.14  
+1. **Теги эмоций:** Используется синтаксис \<emotion value="emotion_name" /\>. Это позволяет задать тон для последующего блока текста. Например, в образовательном видео можно использовать \<emotion value="enthusiastic" /\> для объявления новой темы или \<emotion value="calm" /\> для детального разбора сложной формулы.14
 2. **Невербальные вставки:** Тег \[laughter\] позволяет модели генерировать естественный смех, интегрированный в ритмику фразы. Это уникальная фича, которая делает ИИ-инструктора более "человечным".14
 
 Список поддерживаемых эмоций разделен на первичные (наиболее стабильные) и расширенные. К первичным относятся: neutral, angry, excited, content, sad и scared.14 Полный список включает более 50 оттенков, таких как sarcastic, whispering, triumphant и apologetic, что открывает широкие возможности для сценарной работы.14
@@ -70,32 +70,32 @@ Cartesia предоставляет два типа временных мето�
 
 Русский сегмент в Sonic-3 демонстрирует высокое качество просодии. Система успешно справляется со сложной морфологией и вариативностью ударений, что часто является "камнем преткновения" для зарубежных движков.
 
-* **Технические термины:** В ходе тестов со смешанным контентом (RU \+ EN) модель показала отличную способность к code-switching. Фразы типа "Импортируем библиотеку NumPy" произносятся с корректным английским произношением названия библиотеки и естественным переходом обратно на русский синтаксис.1  
-* **Голоса:** Доступен выбор из нескольких мужских и женских голосов, включая варианты, оптимизированные для длинного повествования (narrative) и коротких диалогов (conversational).14  
-* **Временные метки:** Стабильно работают через sonic-preview, обеспечивая точность, необходимую для синхронизации кода на экране с речью диктора.12
+- **Технические термины:** В ходе тестов со смешанным контентом (RU \+ EN) модель показала отличную способность к code-switching. Фразы типа "Импортируем библиотеку NumPy" произносятся с корректным английским произношением названия библиотеки и естественным переходом обратно на русский синтаксис.1
+- **Голоса:** Доступен выбор из нескольких мужских и женских голосов, включая варианты, оптимизированные для длинного повествования (narrative) и коротких диалогов (conversational).14
+- **Временные метки:** Стабильно работают через sonic-preview, обеспечивая точность, необходимую для синхронизации кода на экране с речью диктора.12
 
 ### **Китайский язык (zh)**
 
 Поддержка китайского языка сфокусирована на мандаринском диалекте (Putonghua).
 
-* **Тональность:** Благодаря архитектуре SSM, модель крайне точно воспроизводит четыре основных тона мандарина, что минимизирует риск искажения смысла слов (проблема, характерная для менее продвинутых моделей).24  
-* **Кантонский диалект:** На текущий момент кантонский (Cantonese) не выделен как отдельная опция в основном списке, что может потребовать использования сторонних решений или специфической настройки (fine-tuning), если этот регион является приоритетным.11  
-* **Голоса:** Представлены специализированные голоса, такие как "Chinese Lecturer Man", идеально подходящие для академического контента.25
+- **Тональность:** Благодаря архитектуре SSM, модель крайне точно воспроизводит четыре основных тона мандарина, что минимизирует риск искажения смысла слов (проблема, характерная для менее продвинутых моделей).24
+- **Кантонский диалект:** На текущий момент кантонский (Cantonese) не выделен как отдельная опция в основном списке, что может потребовать использования сторонних решений или специфической настройки (fine-tuning), если этот регион является приоритетным.11
+- **Голоса:** Представлены специализированные голоса, такие как "Chinese Lecturer Man", идеально подходящие для академического контента.25
 
 ### **Арабский язык (ar)**
 
 Арабский язык представлен в варианте Modern Standard Arabic (MSA).
 
-* **Диалекты:** Хотя голоса звучат естественно для образовательных целей, они не поддерживают специфические региональные диалекты (египетский, заливский или магрибский) в их чистом виде. Для e-learning это скорее плюс, так как MSA является стандартом для обучения во всем арабском мире.23  
-* **RTL (Right-to-Left):** API корректно обрабатывает арабскую вязь, но при интеграции в видеопайплайн необходимо учитывать особенности рендеринга субтитров, чтобы знаки препинания не "перепрыгивали" в начало строки.1
+- **Диалекты:** Хотя голоса звучат естественно для образовательных целей, они не поддерживают специфические региональные диалекты (египетский, заливский или магрибский) в их чистом виде. Для e-learning это скорее плюс, так как MSA является стандартом для обучения во всем арабском мире.23
+- **RTL (Right-to-Left):** API корректно обрабатывает арабскую вязь, но при интеграции в видеопайплайн необходимо учитывать особенности рендеринга субтитров, чтобы знаки препинания не "перепрыгивали" в начало строки.1
 
 ### **Японский язык (ja)**
 
 Японский синтез требует высокого качества обработки иероглифов (Kanji) и их чтений в зависимости от контекста.
 
-* **Чтение кандзи:** Sonic-3 демонстрирует продвинутые алгоритмы лингвистического анализа, успешно различая оммёми и кунъёми чтения.  
-* **Музыкальное ударение (Pitch Accent):** Модель хорошо воспроизводит стандартный токийский акцент, что критично для того, чтобы речь не воспринималась как "иностранная".6  
-* **Голоса:** Наличие голоса "Kenji" (спокойный мужской голос для повествования) закрывает большинство потребностей в создании обучающих видео.28
+- **Чтение кандзи:** Sonic-3 демонстрирует продвинутые алгоритмы лингвистического анализа, успешно различая оммёми и кунъёми чтения.
+- **Музыкальное ударение (Pitch Accent):** Модель хорошо воспроизводит стандартный токийский акцент, что критично для того, чтобы речь не воспринималась как "иностранная".6
+- **Голоса:** Наличие голоса "Kenji" (спокойный мужской голос для повествования) закрывает большинство потребностей в создании обучающих видео.28
 
 ### **Английский (en) и Испанский (es)**
 
@@ -107,24 +107,24 @@ Cartesia использует систему кредитов, где базов
 
 ### **Тарифные планы (при годовой оплате)**
 
-| План | Стоимость | Кредиты в месяц | Особенности |
-| :---- | :---- | :---- | :---- |
-| **Free** | $0 | 20,000 | Личное использование, 2 параллельных запроса 31 |
-| **Pro** | $4 | 100,000 | Коммерческое использование, Instant Voice Cloning 31 |
-| **Startup** | $39 | 1,250,000 | Организации, Pro Voice Cloning (PVC) 31 |
-| **Scale** | $239 | 8,000,000 | Высокие лимиты, приоритетная поддержка 31 |
-| **Enterprise** | Custom | Custom | SLA, HIPAA, выделенная поддержка в Slack 11 |
+| План           | Стоимость | Кредиты в месяц | Особенности                                          |
+| :------------- | :-------- | :-------------- | :--------------------------------------------------- |
+| **Free**       | $0        | 20,000          | Личное использование, 2 параллельных запроса 31      |
+| **Pro**        | $4        | 100,000         | Коммерческое использование, Instant Voice Cloning 31 |
+| **Startup**    | $39       | 1,250,000       | Организации, Pro Voice Cloning (PVC) 31              |
+| **Scale**      | $239      | 8,000,000       | Высокие лимиты, приоритетная поддержка 31            |
+| **Enterprise** | Custom    | Custom          | SLA, HIPAA, выделенная поддержка в Slack 11          |
 
 ### **Расчет для масштаба проекта**
 
 Для расчета возьмем средний объем урока в 25,000 символов (примерно 15-20 минут речи).
 
-1. **500 уроков/месяц (12.5 млн символов):**  
-   * Потребуется план **Scale** плюс покупка дополнительных кредитов. На этом уровне стоимость 1 млн символов составляет примерно $30-$47 в зависимости от объема дозакупки. Итоговый бюджет: \~$450-$550/мес.  
-2. **2,500 уроков/месяц (62.5 млн символов):**  
-   * Однозначный переход на **Enterprise**. Здесь можно обсуждать индивидуальные ставки, которые могут снизить цену до $15-$25 за 1 млн символов при гарантированных объемах. Итоговый бюджет: \~$1,000-$1,500/мес.  
-3. **5,000 уроков/месяц (125 млн символов):**  
-   * Крупномасштабный Enterprise-контракт. Основной фокус смещается с цены на надежность и поддержку. На таком объеме критически важны высокие лимиты на параллельные запросы (concurrency), так как пайплайн рендеринга видео будет работать в режиме 24/7.31
+1. **500 уроков/месяц (12.5 млн символов):**
+   - Потребуется план **Scale** плюс покупка дополнительных кредитов. На этом уровне стоимость 1 млн символов составляет примерно $30-$47 в зависимости от объема дозакупки. Итоговый бюджет: \~$450-$550/мес.
+2. **2,500 уроков/месяц (62.5 млн символов):**
+   - Однозначный переход на **Enterprise**. Здесь можно обсуждать индивидуальные ставки, которые могут снизить цену до $15-$25 за 1 млн символов при гарантированных объемах. Итоговый бюджет: \~$1,000-$1,500/мес.
+3. **5,000 уроков/месяц (125 млн символов):**
+   - Крупномасштабный Enterprise-контракт. Основной фокус смещается с цены на надежность и поддержку. На таком объеме критически важны высокие лимиты на параллельные запросы (concurrency), так как пайплайн рендеринга видео будет работать в режиме 24/7.31
 
 ## **Технические возможности и API интеграция**
 
@@ -134,8 +134,8 @@ Cartesia предлагает два основных способа взаим�
 
 В контексте автоматизированного производства видео выбор зависит от архитектуры рендерера:
 
-* **WebSocket:** Позволяет получать аудиоданные и временные метки по мере их генерации. Это идеально подходит для систем, где видео "собирается" на лету. Использование WebSocket также позволяет избежать задержки на установку соединения для каждого нового фрагмента текста, что экономит до 200 мс на запрос.12  
-* **REST API (Bytes endpoint):** Более прост в реализации, если пайплайн работает по принципу "сначала сгенерировать всё аудио, затем начать монтаж". Поддерживает форматы WAV, MP3 и PCM.11
+- **WebSocket:** Позволяет получать аудиоданные и временные метки по мере их генерации. Это идеально подходит для систем, где видео "собирается" на лету. Использование WebSocket также позволяет избежать задержки на установку соединения для каждого нового фрагмента текста, что экономит до 200 мс на запрос.12
+- **REST API (Bytes endpoint):** Более прост в реализации, если пайплайн работает по принципу "сначала сгенерировать всё аудио, затем начать монтаж". Поддерживает форматы WAV, MP3 и PCM.11
 
 ### **Ограничения и лимиты**
 
@@ -153,8 +153,8 @@ Python и Node.js SDK от Cartesia оцениваются разработчи�
 
 ### **Instant vs Professional Voice Cloning**
 
-* **Instant Voice Cloning (IVC):** Требует всего 3-5 секунд аудиозаписи.2 Это позволяет быстро создавать "черновики" уроков голосом автора. Качество поразительно высокое, сохраняется акцент и манера речи оригинала.30  
-* **Professional Voice Cloning (PVC):** Требует около часа качественной записи и 1 млн кредитов на обучение модели.2 Результат — практически неотличимая от оригинала копия, способная передавать тончайшие эмоциональные нюансы. Это выбор для создания основного "бренд-голоса" платформы.
+- **Instant Voice Cloning (IVC):** Требует всего 3-5 секунд аудиозаписи.2 Это позволяет быстро создавать "черновики" уроков голосом автора. Качество поразительно высокое, сохраняется акцент и манера речи оригинала.30
+- **Professional Voice Cloning (PVC):** Требует около часа качественной записи и 1 млн кредитов на обучение модели.2 Результат — практически неотличимая от оригинала копия, способная передавать тончайшие эмоциональные нюансы. Это выбор для создания основного "бренд-голоса" платформы.
 
 ### **Кросс-языковое использование**
 
@@ -176,18 +176,18 @@ Cartesia, несмотря на относительную молодость, �
 
 В таблице ниже приведено прямое сравнение Cartesia Sonic-3 с основными альтернативами на рынке.
 
-| Критерий | Cartesia Sonic-3 | ElevenLabs | Microsoft Azure TTS |
-| :---- | :---- | :---- | :---- |
-| **Сильная сторона** | Экстремальная скорость и SSM 1 | Максимальное качество голоса 7 | Масштаб и языковое покрытие 9 |
-| **Задержка** | 40-90 мс 1 | 135-800 мс 4 | 300-800 мс 7 |
-| **Цена за 1M симв.** | \~$30-$47 31 | \~$150-$300 7 | \~$16-$24 7 |
-| **Эмоции** | Тэги \+ Смех 3 | Просодия по контексту 7 | Базовые стили (Cheerful и т.д.) 9 |
-| **Lip-sync поддержка** | Phoneme-timestamps 11 | Word-timestamps 10 | Visemes \+ Timestamps 9 |
+| Критерий               | Cartesia Sonic-3               | ElevenLabs                     | Microsoft Azure TTS               |
+| :--------------------- | :----------------------------- | :----------------------------- | :-------------------------------- |
+| **Сильная сторона**    | Экстремальная скорость и SSM 1 | Максимальное качество голоса 7 | Масштаб и языковое покрытие 9     |
+| **Задержка**           | 40-90 мс 1                     | 135-800 мс 4                   | 300-800 мс 7                      |
+| **Цена за 1M симв.**   | \~$30-$47 31                   | \~$150-$300 7                  | \~$16-$24 7                       |
+| **Эмоции**             | Тэги \+ Смех 3                 | Просодия по контексту 7        | Базовые стили (Cheerful и т.д.) 9 |
+| **Lip-sync поддержка** | Phoneme-timestamps 11          | Word-timestamps 10             | Visemes \+ Timestamps 9           |
 
 **Честные минусы Cartesia:**
 
-1. **Зависимость от Preview:** Ключевые для глобального рынка языки (RU, ZH, AR, JA) требуют использования sonic-preview для получения временных меток.12  
-2. **Библиотека голосов:** Пока меньше, чем у ElevenLabs (около 130 против тысяч), хотя клонирование нивелирует этот недостаток.2  
+1. **Зависимость от Preview:** Ключевые для глобального рынка языки (RU, ZH, AR, JA) требуют использования sonic-preview для получения временных меток.12
+2. **Библиотека голосов:** Пока меньше, чем у ElevenLabs (около 130 против тысяч), хотя клонирование нивелирует этот недостаток.2
 3. **Возраст компании:** Меньший послужной список по сравнению с гигантами вроде Microsoft, что может быть фактором при оценке долгосрочных рисков.9
 
 ## **Анализ тестовых сценариев**
@@ -221,69 +221,69 @@ Cartesia Sonic-3 является на текущий момент одним и
 
 ### **Ключевые преимущества:**
 
-* **Скорость:** Возможность генерации аудио почти синхронно с обработкой текста LLM.  
-* **Эмоции:** "Живой" лектор со смехом и вариативным тоном.  
-* **Цена:** В 5-10 раз дешевле ElevenLabs при сопоставимом качестве.  
-* **Синхронизация:** Наличие фонетических меток для лип-синка.
+- **Скорость:** Возможность генерации аудио почти синхронно с обработкой текста LLM.
+- **Эмоции:** "Живой" лектор со смехом и вариативным тоном.
+- **Цена:** В 5-10 раз дешевле ElevenLabs при сопоставимом качестве.
+- **Синхронизация:** Наличие фонетических меток для лип-синка.
 
 ### **Главные риски:**
 
-1. **Timestamps на 6 языках:** Необходимость использования sonic-preview для русского, китайского, японского и арабского. Это означает, что API может измениться в будущем без долгого переходного периода.  
+1. **Timestamps на 6 языках:** Необходимость использования sonic-preview для русского, китайского, японского и арабского. Это означает, что API может измениться в будущем без долгого переходного периода.
 2. **Молодость платформы:** Несмотря на SOC 2, компания все еще находится в стадии активного роста, что требует регулярного мониторинга обновлений SDK.
 
 ### **Стратегия внедрения:**
 
 Рекомендуется **гибридная стратегия**:
 
-1. Использовать Cartesia Sonic-3 как основной движок для всех языков, где важна эмоциональность и скорость.  
-2. Для языков, требующих временных меток, закладывать в архитектуру возможность работы с sonic-preview.  
-3. Иметь резервный пайплайн на базе Azure TTS. Azure может использоваться для менее критичных к эмоциям, но требовательных к стабильности "архивных" уроков или языков, которые Cartesia пока поддерживает хуже.  
+1. Использовать Cartesia Sonic-3 как основной движок для всех языков, где важна эмоциональность и скорость.
+2. Для языков, требующих временных меток, закладывать в архитектуру возможность работы с sonic-preview.
+3. Иметь резервный пайплайн на базе Azure TTS. Azure может использоваться для менее критичных к эмоциям, но требовательных к стабильности "архивных" уроков или языков, которые Cartesia пока поддерживает хуже.
 4. Внедрить систему кэширования аудиофрагментов по хешу текста, чтобы минимизировать затраты кредитов при мелких правках сценария.
 
 Cartesia Sonic-3 предоставляет все необходимые инструменты для создания нового поколения образовательного контента, превращая сухой синтез речи в динамичное и эмоциональное повествование.3
 
 #### **Источники**
 
-1. Real-time TTS API with AI laughter and emotion | Cartesia Sonic-3, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/sonic](https://cartesia.ai/sonic)  
-2. Cartesia AI: The Ultimate Guide to Real-Time Voice Intelligence \- Skywork.ai, дата последнего обращения: декабря 25, 2025, [https://skywork.ai/skypage/en/Cartesia-AI-The-Ultimate-Guide-to-Real-Time-Voice-Intelligence/1976180708227084288](https://skywork.ai/skypage/en/Cartesia-AI-The-Ultimate-Guide-to-Real-Time-Voice-Intelligence/1976180708227084288)  
-3. An honest look at the Cartesia Sonic 3 API for Voice AI (2025), дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-api](https://www.eesel.ai/blog/cartesia-sonic-3-api)  
-4. Cartesia Vs ElevenLabs, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/vs/cartesia-vs-elevenlabs](https://cartesia.ai/vs/cartesia-vs-elevenlabs)  
-5. Cartesia vs Resemble, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/vs/cartesia-vs-resemble](https://cartesia.ai/vs/cartesia-vs-resemble)  
-6. A complete Cartesia Sonic 3 review for 2025 \- eesel AI, дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-review](https://www.eesel.ai/blog/cartesia-sonic-3-review)  
-7. ElevenLabs vs Microsoft Azure Text-to-Speech \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/vs/elevenlabs-vs-microsoft-azure-text-to-speech](https://cartesia.ai/vs/elevenlabs-vs-microsoft-azure-text-to-speech)  
-8. Cartesia vs OpenAI TTS, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/vs/cartesia-vs-openai-tts](https://cartesia.ai/vs/cartesia-vs-openai-tts)  
-9. A guide to Cartesia Sonic 3 vs Azure Speech for AI voice agents, дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-vs-azure-speech](https://www.eesel.ai/blog/cartesia-sonic-3-vs-azure-speech)  
-10. ElevenLabs vs. Cartesia (June 2025), дата последнего обращения: декабря 25, 2025, [https://elevenlabs.io/blog/elevenlabs-vs-cartesia](https://elevenlabs.io/blog/elevenlabs-vs-cartesia)  
-11. Text to Speech (SSE) \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/api-reference/tts/sse](https://docs.cartesia.ai/api-reference/tts/sse)  
-12. How to build a voice AI agent with Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/blog/how-to-build-a-voice-ai-agent-with-cartesia](https://cartesia.ai/blog/how-to-build-a-voice-ai-agent-with-cartesia)  
-13. Compare TTS Endpoints \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/api-reference/tts/compare-tts-endpoints](https://docs.cartesia.ai/api-reference/tts/compare-tts-endpoints)  
-14. Sonic 3 \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/build-with-cartesia/tts-models/latest](https://docs.cartesia.ai/build-with-cartesia/tts-models/latest)  
-15. cartesia-ai/cartesia-python: The official Cartesia client for ... \- GitHub, дата последнего обращения: декабря 25, 2025, [https://github.com/cartesia-ai/cartesia-python](https://github.com/cartesia-ai/cartesia-python)  
-16. Custom Pronunciations \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/build-with-cartesia/sonic-3/custom-pronunciations](https://docs.cartesia.ai/build-with-cartesia/sonic-3/custom-pronunciations)  
-17. cartesia-ai/cartesia-aws \- GitHub, дата последнего обращения: декабря 25, 2025, [https://github.com/cartesia-ai/cartesia-aws](https://github.com/cartesia-ai/cartesia-aws)  
-18. Cartesia TTS plugin guide \- LiveKit docs, дата последнего обращения: декабря 25, 2025, [https://docs.livekit.io/agents/integrations/cartesia/](https://docs.livekit.io/agents/integrations/cartesia/)  
-19. An in-depth overview of Cartesia Sonic 3 text to speech in 2025 \- eesel AI, дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-text-to-speech](https://www.eesel.ai/blog/cartesia-sonic-3-text-to-speech)  
-20. Faster, more expressive voice AI agents with Cartesia Sonic-3 \- Layercode, дата последнего обращения: декабря 25, 2025, [https://layercode.com/blog/faster-more-expressive-voice-ai-agents-with-cartesia-sonic-3](https://layercode.com/blog/faster-more-expressive-voice-ai-agents-with-cartesia-sonic-3)  
-21. Choosing a Voice \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/build-with-cartesia/capability-guides/choosing-a-voice](https://docs.cartesia.ai/build-with-cartesia/capability-guides/choosing-a-voice)  
-22. Build Using Free Cartesia Sonic 3 TTS All Week on Vapi \- Vapi AI Blog, дата последнего обращения: декабря 25, 2025, [https://vapi.ai/blog/Cartesia-free-sonic-3-TTS](https://vapi.ai/blog/Cartesia-free-sonic-3-TTS)  
-23. Multilingual voice AI for a global presence \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/all-languages](https://cartesia.ai/all-languages)  
-24. Low Latency Text-to-Speech Voice AI for China \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/regions/china](https://cartesia.ai/regions/china)  
-25. Low Latency Chinese Text-to-Speech Voice AI \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/languages/chinese](https://cartesia.ai/languages/chinese)  
-26. Modern Standard Arabic vs Dialects: A Guide for Effective Localization and Translation, дата последнего обращения: декабря 25, 2025, [https://acutrans.com/modern-standard-arabic-vs-dialects-a-guide-for-effective-localization-and-translation/](https://acutrans.com/modern-standard-arabic-vs-dialects-a-guide-for-effective-localization-and-translation/)  
-27. Low Latency Text-to-Speech Voice AI for Middle East \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/regions/middle-east](https://cartesia.ai/regions/middle-east)  
-28. Low Latency Japanese Text-to-Speech Voice AI \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/languages/japanese](https://cartesia.ai/languages/japanese)  
-29. Evaluating leading text-to-speech models \- Labelbox, дата последнего обращения: декабря 25, 2025, [https://labelbox.com/guides/evaluating-leading-text-to-speech-models/](https://labelbox.com/guides/evaluating-leading-text-to-speech-models/)  
-30. AI Voice Generator \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/product/ai-voice-generator](https://cartesia.ai/product/ai-voice-generator)  
-31. Pricing \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/pricing](https://cartesia.ai/pricing)  
-32. An honest look at Cartesia Sonic 3 pricing and features \- eesel AI, дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-pricing](https://www.eesel.ai/blog/cartesia-sonic-3-pricing)  
-33. Concurrency and WebSocket Limits \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/use-the-api/concurrency-limits-and-timeouts](https://docs.cartesia.ai/use-the-api/concurrency-limits-and-timeouts)  
-34. Cartesia AI Review 2025: Features, Pricing, And Comparison, дата последнего обращения: декабря 25, 2025, [https://smallest.ai/blog/cartesia-ai-review-2025-features-pricing-and-comparison](https://smallest.ai/blog/cartesia-ai-review-2025-features-pricing-and-comparison)  
-35. Text to Speech API \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/product/python-text-to-speech-api-tts](https://cartesia.ai/product/python-text-to-speech-api-tts)  
-36. Voice Conversion \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/product/voice-conversion](https://cartesia.ai/product/voice-conversion)  
-37. Cartesia AI Status, дата последнего обращения: декабря 25, 2025, [https://status.cartesia.ai/](https://status.cartesia.ai/)  
-38. Uptime History \- Cartesia AI Status, дата последнего обращения: декабря 25, 2025, [https://status.cartesia.ai/uptime](https://status.cartesia.ai/uptime)  
-39. Incident History \- Cartesia AI Status, дата последнего обращения: декабря 25, 2025, [https://status.cartesia.ai/history](https://status.cartesia.ai/history)  
-40. Customer Service | Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/use-cases/customer-service](https://cartesia.ai/use-cases/customer-service)  
-41. Hospitality | Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/industries/hospitality](https://cartesia.ai/industries/hospitality)  
-42. Best TTS APIs in 2025: Top 12 Text-to-Speech services for developers \- Speechmatics, дата последнего обращения: декабря 25, 2025, [https://www.speechmatics.com/company/articles-and-news/best-tts-apis-in-2025-top-12-text-to-speech-services-for-developers](https://www.speechmatics.com/company/articles-and-news/best-tts-apis-in-2025-top-12-text-to-speech-services-for-developers)  
+1. Real-time TTS API with AI laughter and emotion | Cartesia Sonic-3, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/sonic](https://cartesia.ai/sonic)
+2. Cartesia AI: The Ultimate Guide to Real-Time Voice Intelligence \- Skywork.ai, дата последнего обращения: декабря 25, 2025, [https://skywork.ai/skypage/en/Cartesia-AI-The-Ultimate-Guide-to-Real-Time-Voice-Intelligence/1976180708227084288](https://skywork.ai/skypage/en/Cartesia-AI-The-Ultimate-Guide-to-Real-Time-Voice-Intelligence/1976180708227084288)
+3. An honest look at the Cartesia Sonic 3 API for Voice AI (2025), дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-api](https://www.eesel.ai/blog/cartesia-sonic-3-api)
+4. Cartesia Vs ElevenLabs, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/vs/cartesia-vs-elevenlabs](https://cartesia.ai/vs/cartesia-vs-elevenlabs)
+5. Cartesia vs Resemble, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/vs/cartesia-vs-resemble](https://cartesia.ai/vs/cartesia-vs-resemble)
+6. A complete Cartesia Sonic 3 review for 2025 \- eesel AI, дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-review](https://www.eesel.ai/blog/cartesia-sonic-3-review)
+7. ElevenLabs vs Microsoft Azure Text-to-Speech \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/vs/elevenlabs-vs-microsoft-azure-text-to-speech](https://cartesia.ai/vs/elevenlabs-vs-microsoft-azure-text-to-speech)
+8. Cartesia vs OpenAI TTS, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/vs/cartesia-vs-openai-tts](https://cartesia.ai/vs/cartesia-vs-openai-tts)
+9. A guide to Cartesia Sonic 3 vs Azure Speech for AI voice agents, дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-vs-azure-speech](https://www.eesel.ai/blog/cartesia-sonic-3-vs-azure-speech)
+10. ElevenLabs vs. Cartesia (June 2025), дата последнего обращения: декабря 25, 2025, [https://elevenlabs.io/blog/elevenlabs-vs-cartesia](https://elevenlabs.io/blog/elevenlabs-vs-cartesia)
+11. Text to Speech (SSE) \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/api-reference/tts/sse](https://docs.cartesia.ai/api-reference/tts/sse)
+12. How to build a voice AI agent with Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/blog/how-to-build-a-voice-ai-agent-with-cartesia](https://cartesia.ai/blog/how-to-build-a-voice-ai-agent-with-cartesia)
+13. Compare TTS Endpoints \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/api-reference/tts/compare-tts-endpoints](https://docs.cartesia.ai/api-reference/tts/compare-tts-endpoints)
+14. Sonic 3 \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/build-with-cartesia/tts-models/latest](https://docs.cartesia.ai/build-with-cartesia/tts-models/latest)
+15. cartesia-ai/cartesia-python: The official Cartesia client for ... \- GitHub, дата последнего обращения: декабря 25, 2025, [https://github.com/cartesia-ai/cartesia-python](https://github.com/cartesia-ai/cartesia-python)
+16. Custom Pronunciations \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/build-with-cartesia/sonic-3/custom-pronunciations](https://docs.cartesia.ai/build-with-cartesia/sonic-3/custom-pronunciations)
+17. cartesia-ai/cartesia-aws \- GitHub, дата последнего обращения: декабря 25, 2025, [https://github.com/cartesia-ai/cartesia-aws](https://github.com/cartesia-ai/cartesia-aws)
+18. Cartesia TTS plugin guide \- LiveKit docs, дата последнего обращения: декабря 25, 2025, [https://docs.livekit.io/agents/integrations/cartesia/](https://docs.livekit.io/agents/integrations/cartesia/)
+19. An in-depth overview of Cartesia Sonic 3 text to speech in 2025 \- eesel AI, дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-text-to-speech](https://www.eesel.ai/blog/cartesia-sonic-3-text-to-speech)
+20. Faster, more expressive voice AI agents with Cartesia Sonic-3 \- Layercode, дата последнего обращения: декабря 25, 2025, [https://layercode.com/blog/faster-more-expressive-voice-ai-agents-with-cartesia-sonic-3](https://layercode.com/blog/faster-more-expressive-voice-ai-agents-with-cartesia-sonic-3)
+21. Choosing a Voice \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/build-with-cartesia/capability-guides/choosing-a-voice](https://docs.cartesia.ai/build-with-cartesia/capability-guides/choosing-a-voice)
+22. Build Using Free Cartesia Sonic 3 TTS All Week on Vapi \- Vapi AI Blog, дата последнего обращения: декабря 25, 2025, [https://vapi.ai/blog/Cartesia-free-sonic-3-TTS](https://vapi.ai/blog/Cartesia-free-sonic-3-TTS)
+23. Multilingual voice AI for a global presence \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/all-languages](https://cartesia.ai/all-languages)
+24. Low Latency Text-to-Speech Voice AI for China \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/regions/china](https://cartesia.ai/regions/china)
+25. Low Latency Chinese Text-to-Speech Voice AI \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/languages/chinese](https://cartesia.ai/languages/chinese)
+26. Modern Standard Arabic vs Dialects: A Guide for Effective Localization and Translation, дата последнего обращения: декабря 25, 2025, [https://acutrans.com/modern-standard-arabic-vs-dialects-a-guide-for-effective-localization-and-translation/](https://acutrans.com/modern-standard-arabic-vs-dialects-a-guide-for-effective-localization-and-translation/)
+27. Low Latency Text-to-Speech Voice AI for Middle East \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/regions/middle-east](https://cartesia.ai/regions/middle-east)
+28. Low Latency Japanese Text-to-Speech Voice AI \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/languages/japanese](https://cartesia.ai/languages/japanese)
+29. Evaluating leading text-to-speech models \- Labelbox, дата последнего обращения: декабря 25, 2025, [https://labelbox.com/guides/evaluating-leading-text-to-speech-models/](https://labelbox.com/guides/evaluating-leading-text-to-speech-models/)
+30. AI Voice Generator \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/product/ai-voice-generator](https://cartesia.ai/product/ai-voice-generator)
+31. Pricing \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/pricing](https://cartesia.ai/pricing)
+32. An honest look at Cartesia Sonic 3 pricing and features \- eesel AI, дата последнего обращения: декабря 25, 2025, [https://www.eesel.ai/blog/cartesia-sonic-3-pricing](https://www.eesel.ai/blog/cartesia-sonic-3-pricing)
+33. Concurrency and WebSocket Limits \- Cartesia Docs, дата последнего обращения: декабря 25, 2025, [https://docs.cartesia.ai/use-the-api/concurrency-limits-and-timeouts](https://docs.cartesia.ai/use-the-api/concurrency-limits-and-timeouts)
+34. Cartesia AI Review 2025: Features, Pricing, And Comparison, дата последнего обращения: декабря 25, 2025, [https://smallest.ai/blog/cartesia-ai-review-2025-features-pricing-and-comparison](https://smallest.ai/blog/cartesia-ai-review-2025-features-pricing-and-comparison)
+35. Text to Speech API \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/product/python-text-to-speech-api-tts](https://cartesia.ai/product/python-text-to-speech-api-tts)
+36. Voice Conversion \- Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/product/voice-conversion](https://cartesia.ai/product/voice-conversion)
+37. Cartesia AI Status, дата последнего обращения: декабря 25, 2025, [https://status.cartesia.ai/](https://status.cartesia.ai/)
+38. Uptime History \- Cartesia AI Status, дата последнего обращения: декабря 25, 2025, [https://status.cartesia.ai/uptime](https://status.cartesia.ai/uptime)
+39. Incident History \- Cartesia AI Status, дата последнего обращения: декабря 25, 2025, [https://status.cartesia.ai/history](https://status.cartesia.ai/history)
+40. Customer Service | Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/use-cases/customer-service](https://cartesia.ai/use-cases/customer-service)
+41. Hospitality | Cartesia, дата последнего обращения: декабря 25, 2025, [https://cartesia.ai/industries/hospitality](https://cartesia.ai/industries/hospitality)
+42. Best TTS APIs in 2025: Top 12 Text-to-Speech services for developers \- Speechmatics, дата последнего обращения: декабря 25, 2025, [https://www.speechmatics.com/company/articles-and-news/best-tts-apis-in-2025-top-12-text-to-speech-services-for-developers](https://www.speechmatics.com/company/articles-and-news/best-tts-apis-in-2025-top-12-text-to-speech-services-for-developers)
 43. Top 10 Text-to-Speech ElevenLabs Alternatives for Production Use \- Deepgram, дата последнего обращения: декабря 25, 2025, [https://deepgram.com/learn/text-to-speech-elevenlabs-alternatives](https://deepgram.com/learn/text-to-speech-elevenlabs-alternatives)

@@ -7,6 +7,874 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.9] - 2026-02-12
+
+### Added
+
+- **web**: add 3 source file(s), update 1 source file(s), +1 more (01c0da53)
+- **jina**: replace in-process rate/concurrency limiters with Redis-based distributed versions (7648f119)
+
+### Fixed
+
+- **tests**: remove BullMQ worker from contract tests (e88226ca)
+- **auth**: add local JWT verification fallback for test environments (dd939dc9)
+- **tests**: remove fake session_id from mock JWT + fix reregeneration typo (aeff1b60)
+- **tests**: fix 32 CI contract test failures — JWT secret, stale enums, wrong namespace (3e82eb2c)
+- **stage4**: add .default() to SuggestedAnswerSchema.rationale for LLM output resilience (f7eb27b8)
+
+### Other
+
+- upgrade Node.js from 20 to 22 (Active LTS) (2537f573)
+- bd daemon export: 2026-02-12 11:16:38 (b62c830d)
+- bd daemon export: 2026-02-12 11:09:51 (7b3fa017)
+- bd daemon export: 2026-02-12 11:08:30 (e7eca65b)
+- bd daemon export: 2026-02-12 10:57:27 (e8f08eff)
+- bd daemon export: 2026-02-12 10:20:09 (4dab1a64)
+- bd daemon export: 2026-02-12 10:20:05 (85d40d18)
+- bd daemon export: 2026-02-12 09:53:10 (5e58e11c)
+- bd daemon export: 2026-02-12 09:49:27 (6aed30b4)
+- bd daemon export: 2026-02-12 09:49:22 (699ded6e)
+- bd daemon export: 2026-02-12 09:47:31 (ece5ebe5)
+- bd daemon export: 2026-02-12 09:16:29 (2dc4e559)
+- bd daemon export: 2026-02-12 09:16:24 (4c878e24)
+- bd daemon export: 2026-02-12 09:11:13 (aa39a70b)
+- bd daemon export: 2026-02-12 08:42:58 (49b9a731)
+- bd daemon export: 2026-02-11 22:10:34 (3991eabd)
+- bd daemon export: 2026-02-11 22:10:30 (bc784560)
+
+## [0.29.8] - 2026-02-11
+
+### Changed
+
+- code review tech debt — DRY model constants, ModelConfigService migration, startup validation (315f882f)
+
+### Fixed
+
+- **lint**: resolve 23 ESLint errors across web package + suppress test false positives (55d7d2f8)
+- **chat**: address code review findings CR-004/005/006/007/009/010 (5ac360d6)
+- **chat**: fix 500 error, add stage-specific models, replace deprecated models (276b4646)
+- **refinement-chat**: improve JSON content detection (46f16985)
+- **bunker**: use randomUUID for atomic temp files instead of process.pid (e5225d64)
+- **logger,stage4**: LKG race condition, error serialization, rationale validation (c8dff77c)
+- **chat**: improve JSON detection + add trim guard + telemetry (code review) (c4e6707e)
+- **chat**: prevent empty chat bubbles and blank lesson content (EGT-1521, GDK-6714) (dfa17983)
+
+### Other
+
+- bd daemon export: 2026-02-11 21:52:43 (3d800f1b)
+- bd daemon export: 2026-02-11 21:52:41 (1654f52c)
+- bd daemon export: 2026-02-11 21:52:39 (35217c54)
+- bd daemon export: 2026-02-11 21:45:52 (3e9498b2)
+- bd daemon export: 2026-02-11 21:45:51 (68d3fd63)
+- bd daemon export: 2026-02-11 21:45:50 (e8a730b5)
+- bd daemon export: 2026-02-11 21:24:19 (b077fde3)
+- bd daemon export: 2026-02-11 21:24:16 (f35165b6)
+- bd daemon export: 2026-02-11 21:24:14 (9c4ca116)
+- bd daemon export: 2026-02-11 20:29:41 (e2b12d27)
+- bd daemon export: 2026-02-11 20:09:29 (a9469a4a)
+- bd daemon export: 2026-02-11 20:09:24 (2a3d2137)
+- bd daemon export: 2026-02-11 14:12:42 (8e8a3172)
+- bd daemon export: 2026-02-11 13:59:32 (dbd54580)
+- bd daemon export: 2026-02-11 13:59:28 (152d9b8f)
+- bd daemon export: 2026-02-11 12:09:01 (808148c9)
+- bd daemon export: 2026-02-11 12:06:36 (52bf5ed0)
+- bd daemon export: 2026-02-11 12:05:39 (cb94a0ab)
+- bd daemon export: 2026-02-11 11:55:40 (71aa03b1)
+- bd daemon export: 2026-02-11 11:50:32 (5ab168a7)
+- bd daemon export: 2026-02-11 11:50:27 (cfc19876)
+- update aidevteam server audit — all fixes applied (da56ad23)
+
+## [0.29.7] - 2026-02-10
+
+### Security
+
+- aidevteam server audit — cryptominer killed, ports fixed (d4e4bc9d)
+- server hardening — SSH, Bull Board, nginx, kernel update (70a483b3)
+
+### Added
+
+- add CategoryBadge to ClarifyingPanel wizard + bulk error log cleanup (54c35dbe)
+- **logs**: add auto-resolve RPC for stale to_verify fingerprints (00818944)
+
+### Changed
+
+- split 5 largest files into modular structure (5b1d9451)
+- split prompt-registry.ts into per-stage modules (1e0ed052)
+
+### Fixed
+
+- **chat**: empty assistant bubble + irrelevant proposals in refinement chat (508572ae)
+- add ARIA labels + 44 unit tests for CategoryBadge (235a2077)
+- address code review findings from refactoring (cc4c3917)
+- **tests**: update 14 stale judge tests to match current implementations (0410c481)
+- **tests**: mock Supabase Auth tokens locally to eliminate flaky CI failures (dd917931)
+- **i18n**: extract hardcoded strings from RefinementChat + useRefinement (74f123b5)
+
+### Other
+
+- update docs (88d76615)
+- bd daemon export: 2026-02-10 20:49:37 (6aa279d7)
+- bd daemon export: 2026-02-10 20:46:27 (2767810f)
+- bd daemon export: 2026-02-10 20:45:42 (7a1883b9)
+- bd daemon export: 2026-02-10 20:45:41 (82ac41ea)
+- bd daemon export: 2026-02-10 20:45:32 (94533fcd)
+- bd daemon export: 2026-02-10 20:45:31 (b8be08a3)
+- bd daemon export: 2026-02-10 20:06:57 (56103e90)
+- bd daemon export: 2026-02-10 20:01:29 (88fe294b)
+- bd daemon export: 2026-02-10 20:01:23 (25c3e3bc)
+- bd daemon export: 2026-02-10 18:03:39 (7484b8c8)
+- bd daemon export: 2026-02-10 16:37:05 (f0f0f8a9)
+- bd daemon export: 2026-02-10 16:36:53 (55424fc2)
+- bd daemon export: 2026-02-10 16:36:51 (2337b500)
+- bd daemon export: 2026-02-10 16:36:50 (a48c69ae)
+- bd daemon export: 2026-02-10 16:35:08 (8eae646b)
+- bd daemon export: 2026-02-10 16:35:01 (bf33995f)
+- bd daemon export: 2026-02-10 16:35:00 (e5227d1a)
+- bd daemon export: 2026-02-10 16:34:59 (a088f4cb)
+- bd daemon export: 2026-02-10 16:28:03 (e72b8955)
+- bd daemon export: 2026-02-10 16:14:02 (24df61cf)
+- bd daemon export: 2026-02-10 16:08:15 (0b344e91)
+- bd daemon export: 2026-02-10 16:03:03 (d99c30dc)
+- bd daemon export: 2026-02-10 16:02:55 (3077763c)
+- bd daemon export: 2026-02-10 16:00:16 (df09f066)
+
+## [0.29.6] - 2026-02-10
+
+### Added
+
+- add Phase 0.5 unit tests + Admin Clarifying Q&A tab (c128250a)
+- **stage4**: pass course_description to Phase 1/2 + expand Phase 0.5 clarifying system (690cfe54)
+
+### Fixed
+
+- **chat**: code review v2 — dedup ChatMessage, fix rejectProposal cleanup, add 6 tests (4bfa2e30)
+- **chat**: address code review findings — skeleton, redundant check, generic message (f16d1c1e)
+- **chat**: add Reject button + post-accept guidance message (22dd7ef4)
+- **chat**: improve chat UX — remove toast, keep proposal after accept, add Stage 6 per-lesson chat (a745089a)
+- **stage4**: address code review findings for Phase 0.5 multi-round clarification (0910efae)
+
+### Other
+
+- bd daemon export: 2026-02-10 15:21:19 (d2edf982)
+- bd daemon export: 2026-02-10 14:39:07 (37188049)
+- bd daemon export: 2026-02-10 14:31:59 (59134ad5)
+- bd daemon export: 2026-02-10 14:31:53 (e7352656)
+
+## [0.29.5] - 2026-02-10
+
+### Security
+
+- add authentication to Telegram webhook endpoint (mc2-gqfj) (d7fcd587)
+
+### Added
+
+- **web**: sync full_name to auth metadata on profile save (524564e5)
+
+### Fixed
+
+- **worker**: resolve log warnings from course generation QGN-6607 (eebd44ef)
+- address code review HIGH findings — IPv6 SSRF + cleanup audit trail (fb149c4b)
+- healthcheck cycle — auth, types, atomic deletion, security hardening (54e55885)
+- **web**: replace i18n 'as any' with '@ts-expect-error' + add SSRF protection (1d489750)
+- **security**: timing-safe metrics API key comparison (236a379b)
+- healthcheck batch 2 — 6 bugs fixed, bundle optimization (98caead2)
+- **web**: improve auth sync error handling + sync avatar_url (3e920773)
+- **security**: healthcheck — 9 bugs fixed (5 critical, 3 high, 1 medium) (74122fa8)
+
+### Other
+
+- update 5 agent(s), update docs (7674eb7b)
+- bd daemon export: 2026-02-10 12:18:21 (9d145f6a)
+- bd daemon export: 2026-02-10 12:10:12 (6fa1ba10)
+- bd daemon export: 2026-02-10 12:10:06 (260dbd4a)
+- bd daemon export: 2026-02-10 12:10:05 (d5d974b7)
+- bd daemon export: 2026-02-10 12:10:03 (8636d76b)
+- bd daemon export: 2026-02-10 11:20:29 (855cfb1e)
+- bd daemon export: 2026-02-10 11:12:23 (c6b3b95a)
+- add healthcheck code review report (Feb 2026) (fc2aef15)
+- bd daemon export: 2026-02-10 09:40:04 (1967a9d8)
+- bd daemon export: 2026-02-10 09:39:59 (fc519acd)
+- bd daemon export: 2026-02-10 09:39:56 (b67630c1)
+- bd daemon export: 2026-02-10 09:39:55 (ad8892d1)
+- bd daemon export: 2026-02-10 09:39:53 (fd3bdf9a)
+- bd daemon export: 2026-02-10 09:39:48 (60a25ca5)
+- bd daemon export: 2026-02-10 09:39:47 (5277e8bc)
+- bd daemon export: 2026-02-10 09:39:46 (5425dcc9)
+- bd daemon export: 2026-02-10 09:39:47 (4fa325c4)
+- bd daemon export: 2026-02-10 09:39:46 (490204b9)
+- bd daemon export: 2026-02-10 09:33:06 (fbf48c85)
+- bd daemon export: 2026-02-10 09:33:02 (e7dfd747)
+- bd daemon export: 2026-02-10 09:30:20 (45f33478)
+- bd daemon export: 2026-02-10 09:29:30 (6905c2e6)
+- bd daemon export: 2026-02-10 09:25:11 (e290e87f)
+- bd daemon export: 2026-02-10 09:21:05 (49da4317)
+- bd daemon export: 2026-02-10 09:17:57 (0513c064)
+- bd daemon export: 2026-02-10 09:17:54 (0c2899f6)
+- bd daemon export: 2026-02-10 09:17:52 (373fdb60)
+- bd daemon export: 2026-02-10 09:11:12 (ff43aa6a)
+- bd daemon export: 2026-02-10 09:11:09 (333d5f79)
+- bd daemon export: 2026-02-10 09:11:02 (67671465)
+- bd daemon export: 2026-02-10 08:58:10 (76a1ef8d)
+- bd daemon export: 2026-02-10 08:58:08 (9945f9c0)
+- bd daemon export: 2026-02-10 08:58:07 (6a18e531)
+- bd daemon export: 2026-02-10 08:58:05 (dfb79c23)
+- bd daemon export: 2026-02-10 08:58:04 (aef19004)
+- bd daemon export: 2026-02-10 08:58:03 (7df23771)
+- bd daemon export: 2026-02-10 08:57:41 (7f193a99)
+- bd daemon export: 2026-02-10 08:57:08 (f90d1157)
+- bd daemon export: 2026-02-10 08:57:07 (adf5da53)
+- bd daemon export: 2026-02-10 08:57:05 (ef50b7eb)
+- bd daemon export: 2026-02-10 08:48:56 (a2aa6c8e)
+- bd daemon export: 2026-02-10 08:48:21 (6a7ca752)
+- bd daemon export: 2026-02-10 08:47:33 (00354b19)
+- bd daemon export: 2026-02-10 08:46:28 (f355e3f9)
+- bd daemon export: 2026-02-10 08:45:45 (2ba6c105)
+- bd daemon export: 2026-02-10 08:45:43 (3e60eb52)
+- bd daemon export: 2026-02-10 08:45:41 (d41b32c4)
+- bd daemon export: 2026-02-10 08:45:40 (26590a86)
+- bd daemon export: 2026-02-10 08:45:37 (eb6ece5b)
+- bd daemon export: 2026-02-10 08:45:31 (1e4de84d)
+- bd daemon export: 2026-02-10 08:45:28 (fec05c27)
+- bd daemon export: 2026-02-10 08:45:24 (0403aeb3)
+- bd daemon export: 2026-02-10 08:45:21 (567f8dce)
+- bd daemon export: 2026-02-10 08:45:18 (5368eee1)
+- bd daemon export: 2026-02-10 08:45:16 (c98f1df8)
+- bd daemon export: 2026-02-10 08:45:14 (c7ee2621)
+- bd daemon export: 2026-02-10 08:45:11 (6e5f13e8)
+- bd daemon export: 2026-02-10 08:31:40 (09b48e00)
+- bd daemon export: 2026-02-10 08:29:53 (da0a5d09)
+- bd daemon export: 2026-02-10 08:29:30 (efca56e7)
+- bd daemon export: 2026-02-10 08:28:31 (712e9871)
+- bd daemon export: 2026-02-10 08:28:30 (34f4719b)
+- bd daemon export: 2026-02-10 08:25:53 (01932ca4)
+- bd daemon export: 2026-02-10 08:25:51 (3ec9bdc1)
+- bd daemon export: 2026-02-10 08:25:50 (fc862953)
+- bd daemon export: 2026-02-10 08:25:46 (ec369e48)
+- bd daemon export: 2026-02-10 08:25:44 (45aeda16)
+- bd daemon export: 2026-02-10 08:25:42 (7c0f6927)
+- bd daemon export: 2026-02-10 08:25:41 (9f6cd325)
+- bd daemon export: 2026-02-10 08:25:39 (734e3dce)
+- bd daemon export: 2026-02-10 08:25:33 (1764d911)
+- bd daemon export: 2026-02-10 08:25:32 (37e182f3)
+- bd daemon export: 2026-02-10 08:25:30 (a36b9f45)
+- bd daemon export: 2026-02-10 08:25:29 (07a4d00f)
+- bd daemon export: 2026-02-10 08:25:27 (b4ef01ef)
+
+## [0.29.4] - 2026-02-09
+
+### Added
+
+- **stage6**: pass lessonSpec to LessonInspector Blueprint tab (3407df8a)
+- **pipeline**: add unified course-level token tracking (31e2a1aa)
+- **ui**: add token aggregation to ModuleDashboard (daff2fb4)
+- **error-handling**: standardize wrapTRPCError with AppError/PipelineError support (6d8e716a)
+- **shared-utils**: create shared-utils package and migrate imports (0cfb492c)
+- **web**: migrate env.ts to @t3-oss/env-nextjs with Zod validation (0c2c37c4)
+
+### Changed
+
+- **dry**: extract completePhaseWithTrace, getErrorMessage, progress constants (8bee6c4b)
+- **lint**: structural batch 3 — extract 14 top-warning files into helpers (158→119 warnings) (9a0026cd)
+- **review**: implement code review recommendations — type safety, constants, docs (1165a065)
+- **lint**: structural batch 2 addendum — split phase-2-scope + phase-6-summarization (8 warnings fixed) (4b0f68ef)
+- **lint**: structural batch 2 — split 7 large files (30 warnings fixed) (9f1772c8)
+- **lint**: structural batch 1 — split 3 largest router files (18 warnings fixed) (50e5d51d)
+- **stage4**: remove dead Phase 6 RAG Planning code (1e93bc5e)
+- remove dead code InitializeJobHandler (mc2-qt9i) (01ccb5c9)
+- **api**: split lifecycle.router.ts into lifecycle/ subdirectory (280c0097)
+- **web**: consolidate validation-utils.ts into validation.ts (3496658d)
+- **shared-utils**: narrow normalizeLanguageCode return type, remove unknown code passthrough (e6d40e06)
+- **shared-utils**: code review improvements — named constants, JSDoc, fallback param, tests (36041574)
+- consolidate formatNumber, formatFileSize, sanitization configs to shared packages (a3404e16)
+- **course-gen-platform**: replace `as string` assertions with getTextContent() for LangChain messages (c72aab21)
+
+### Fixed
+
+- **web**: update 1 source file(s), update 5 agent(s), +1 more (64483538)
+- **ci**: build shared packages before lint to resolve type-aware rules (bb2608ff)
+- **lint**: add JSDoc and standardize error handling in batch 3 helpers (bc5ca4f5)
+- **web**: refetch traces on stage restart to clear stale error nodes (d9dc62be)
+- **tests**: replace inline getAuthToken with centralized singleton in generation contract tests (c6faa188)
+- **lint**: code review fixes — Supabase types, re-exports, floating promise (45baee55)
+- **web**: resolve TS7030 in GlobalCourseChat useEffect — not all code paths return value (1d8f5359)
+- prevent test errors in prod logs + auto-mute rules for infra errors (a7262256)
+- cap totalSections to available sections in Stage 5 (B1) (b8e5dea7)
+- clean up courseEntries on eviction and metrics on cancellation (CR follow-up) (7736ff96)
+- memory/resource leak audit fixes (mc2-yqyx) (7e5284cc)
+- **docker**: add shared-utils to both API and Web Dockerfiles (64fcf0ce)
+- **lint**: batch 6 — fix all 108 remaining fixable ESLint warnings (5c03b042)
+- **ui**: rename misleading "Regenerate All" button to "Retry Failed" (116f23f4)
+- **web**: extract uuid-validation to avoid jsdom in API route bundles (910c4fa1)
+- **pipeline**: idempotent token tracking — no double-count on retry (CR-006) (d34afe7a)
+- add missing migration file and fix zero-token display (CR-001, CR-009) (779a08a0)
+- **lint**: batch 5 — fix 39 ESLint warnings in 7 files (ee4bafc1)
+- **ci**: add shared-utils build step to CI pipeline (3eb45e91)
+- **api**: apply 3 remaining code review improvements (77e01b78)
+- **course-gen-platform**: fix 82 ESLint warnings in batch 4 (10 files) (61f76741)
+- **api**: apply code review fixes to lifecycle sub-routers (f2f10997)
+- **course-gen-platform**: fix 81 ESLint warnings in batch 3 (handlers, routers, judges, prompts) (73c0c3c5)
+- **course-gen-platform**: fix 85 ESLint warnings in batch 2 (logger, client, routers, sanitizer) (88f5ccf9)
+- **course-gen-platform**: fix 135 ESLint warnings in benchmarks, regeneration and chat routers (126fa6f6)
+- **web**: address code review findings for env migration (deff7008)
+- **course-gen-platform**: code review follow-up improvements (e04e3227)
+
+### Other
+
+- bd daemon export: 2026-02-09 21:05:27 (1f16f3b1)
+- bd daemon export: 2026-02-09 21:05:20 (814bb49f)
+- bd daemon export: 2026-02-09 21:05:14 (8a3884cc)
+- bd daemon export: 2026-02-09 19:48:08 (4d66166d)
+- bd daemon export: 2026-02-09 19:40:36 (3008222e)
+- bd daemon export: 2026-02-09 19:40:31 (058c5330)
+- bd daemon export: 2026-02-09 19:09:42 (b07cd76c)
+- bd daemon export: 2026-02-09 19:09:40 (4a29906d)
+- bd daemon export: 2026-02-09 19:07:48 (b412f386)
+- bd daemon export: 2026-02-09 19:07:47 (b14a8aa6)
+- bd daemon export: 2026-02-09 18:55:52 (b7def577)
+- bd daemon export: 2026-02-09 18:55:50 (ad1a6075)
+- bd daemon export: 2026-02-09 18:50:54 (5691e5cf)
+- bd daemon export: 2026-02-09 18:12:51 (879e394b)
+- bd daemon export: 2026-02-09 17:57:19 (0cfc94f8)
+- bd daemon export: 2026-02-09 17:47:29 (9899cf0b)
+- bd daemon export: 2026-02-09 17:47:25 (e0bbe876)
+- bd daemon export: 2026-02-09 17:41:45 (d878ccc9)
+- bd daemon export: 2026-02-09 17:39:36 (095b0e4e)
+- bd daemon export: 2026-02-09 17:39:32 (fa30bd7b)
+- bd daemon export: 2026-02-09 17:22:04 (f36ef46a)
+- bd daemon export: 2026-02-09 17:18:23 (8121b1ed)
+- bd daemon export: 2026-02-09 17:18:18 (6b65a5aa)
+- bd daemon export: 2026-02-09 17:17:46 (4fef387b)
+- bd daemon export: 2026-02-09 17:10:28 (ea2b2c18)
+- bd daemon export: 2026-02-09 17:09:11 (bbe39dde)
+- bd daemon export: 2026-02-09 17:09:01 (642b3c95)
+- bd daemon export: 2026-02-09 17:01:54 (bb7358be)
+- bd daemon export: 2026-02-09 17:01:53 (66b9889a)
+- add tests for muteTestEnvironmentLog + new auto-mute rules + fix rule count (09aa8947)
+- bd daemon export: 2026-02-09 16:56:52 (2628944a)
+- bd daemon export: 2026-02-09 16:56:51 (aca963e4)
+- bd daemon export: 2026-02-09 16:56:44 (f8a943f3)
+- bd daemon export: 2026-02-09 16:56:03 (0e3c379a)
+- bd daemon export: 2026-02-09 16:35:38 (fd0de306)
+- bd daemon export: 2026-02-09 16:35:31 (e0878981)
+- bd daemon export: 2026-02-09 16:33:13 (6290d191)
+- bd daemon export: 2026-02-09 16:20:25 (dcd43b13)
+- bd daemon export: 2026-02-09 16:19:30 (761cf11a)
+- **deps**: align tRPC 11.8→11.9 in course-gen-platform (9f0dc6b8)
+- bd daemon export: 2026-02-09 16:19:11 (a4817c10)
+- bd daemon export: 2026-02-09 16:19:07 (a5c5a0e8)
+- bd daemon export: 2026-02-09 16:15:14 (f1ce7b28)
+- bd daemon export: 2026-02-09 16:15:00 (490a7d8a)
+- bd daemon export: 2026-02-09 16:11:36 (dd669e0f)
+- bd daemon export: 2026-02-09 16:09:16 (a1da9d8c)
+- **deps**: update react-resizable-panels 3.0.6 → 4.6.2 (76b9ab7c)
+- bd daemon export: 2026-02-09 16:06:18 (07f8cef8)
+- bd daemon export: 2026-02-09 15:55:49 (8c5c6546)
+- clean up remaining Phase 6 RAG Planning references (73cbf27c)
+- bd daemon export: 2026-02-09 15:42:51 (157d699c)
+- bd daemon export: 2026-02-09 15:36:03 (7e2eb254)
+- bd daemon export: 2026-02-09 15:26:42 (f1224e6f)
+- bd daemon export: 2026-02-09 15:25:29 (5175a5e7)
+- bd daemon export: 2026-02-09 15:23:18 (5b3793f1)
+- bd daemon export: 2026-02-09 15:23:14 (38ddf8bd)
+- bd daemon export: 2026-02-09 15:21:02 (3a5ae00b)
+- bd daemon export: 2026-02-09 15:17:15 (2def7415)
+- bd daemon export: 2026-02-09 14:58:55 (31ce9b48)
+- bd daemon export: 2026-02-09 14:49:35 (4fab649b)
+- bd daemon export: 2026-02-09 14:49:20 (04186206)
+- bd daemon export: 2026-02-09 14:49:16 (e51554a9)
+- bd daemon export: 2026-02-09 14:45:56 (6de0d39d)
+- bd daemon export: 2026-02-09 14:41:09 (e186c09c)
+- bd daemon export: 2026-02-09 14:34:15 (616a73ed)
+- bd daemon export: 2026-02-09 14:27:40 (5c8813d2)
+- bd daemon export: 2026-02-09 14:25:11 (1f2ffb70)
+- bd daemon export: 2026-02-09 14:18:18 (1beffbe0)
+- bd daemon export: 2026-02-09 14:18:12 (0429ff5a)
+- bd daemon export: 2026-02-09 14:18:05 (471992ac)
+- bd daemon export: 2026-02-09 14:17:28 (2e7a10fa)
+- bd daemon export: 2026-02-09 14:17:23 (c4e7e59f)
+- bd daemon export: 2026-02-09 14:09:02 (d30841db)
+- bd daemon export: 2026-02-09 14:08:57 (28dbd840)
+- bd daemon export: 2026-02-09 14:08:48 (ce05657e)
+- bd daemon export: 2026-02-09 14:04:29 (a9fbe9a4)
+- bd daemon export: 2026-02-09 14:00:32 (77714e2d)
+- bd daemon export: 2026-02-09 13:58:08 (d789d9d6)
+- **deps**: upgrade @langchain/langgraph 1.0.5 → 1.1.4 (1e0ed153)
+- bd daemon export: 2026-02-09 13:58:02 (97c8c456)
+- bd daemon export: 2026-02-09 13:57:56 (509b28a9)
+- bd daemon export: 2026-02-09 13:56:49 (2edc1233)
+- bd daemon export: 2026-02-09 13:56:45 (ce6dab67)
+- bd daemon export: 2026-02-09 13:56:32 (fe4e9e8d)
+- bd daemon export: 2026-02-09 13:56:27 (2dc0f212)
+- bd daemon export: 2026-02-09 13:56:22 (a1ebd5bf)
+- bd daemon export: 2026-02-09 13:55:55 (8465dde1)
+- bd daemon export: 2026-02-09 13:55:44 (cfbec119)
+- bd daemon export: 2026-02-09 13:52:50 (ca29998e)
+- bd daemon export: 2026-02-09 13:50:17 (75c25983)
+- bd daemon export: 2026-02-09 13:50:12 (d968e948)
+- bd daemon export: 2026-02-09 13:48:53 (3d7dfa02)
+- bd daemon export: 2026-02-09 13:47:12 (db9ff622)
+- bd daemon export: 2026-02-09 13:39:27 (04c16b1d)
+- bd daemon export: 2026-02-09 13:39:23 (b1072b3d)
+- bd daemon export: 2026-02-09 13:39:17 (810d3977)
+- bd daemon export: 2026-02-09 13:34:16 (d9ca3445)
+- bd daemon export: 2026-02-09 13:33:30 (8f884b3d)
+- bd daemon export: 2026-02-09 13:31:25 (afd07ff5)
+- bd daemon export: 2026-02-09 13:31:21 (d64f568e)
+- bd daemon export: 2026-02-09 13:27:03 (7b57e52b)
+- bd daemon export: 2026-02-09 13:20:12 (12a9ec31)
+- bd daemon export: 2026-02-09 13:20:10 (585dd140)
+- bd daemon export: 2026-02-09 13:20:08 (8d1f3430)
+- bd daemon export: 2026-02-09 13:13:13 (c656f1e0)
+- bd daemon export: 2026-02-09 13:11:59 (4c8027dd)
+- bd daemon export: 2026-02-09 13:11:53 (d98ec99d)
+- bd daemon export: 2026-02-09 13:11:46 (54583dc1)
+- bd daemon export: 2026-02-09 13:09:16 (3ee39ab0)
+- bd daemon export: 2026-02-09 13:09:11 (c82b0464)
+- bd daemon export: 2026-02-09 13:09:09 (013d6e0f)
+- bd daemon export: 2026-02-09 13:09:07 (9a9a1287)
+- bd daemon export: 2026-02-09 13:09:06 (f4014e29)
+- bd daemon export: 2026-02-09 11:51:56 (3fd640dd)
+- bd daemon export: 2026-02-09 10:28:25 (87dbdc88)
+- **web**: extract env schemas + add env variables guide (e96e8bf5)
+- bd daemon export: 2026-02-09 10:14:42 (5a139960)
+- bd daemon export: 2026-02-09 10:14:19 (526c8e7e)
+- bd daemon export: 2026-02-09 10:00:05 (4fbeb96a)
+- bd daemon export: 2026-02-09 10:00:01 (01cfa73e)
+- bd daemon export: 2026-02-09 09:59:51 (de12ba6b)
+- bd daemon export: 2026-02-09 09:14:04 (b6621249)
+- bd daemon export: 2026-02-09 09:06:22 (09745c1d)
+- bd daemon export: 2026-02-09 09:05:17 (4b77f28b)
+- bd daemon export: 2026-02-09 09:05:14 (981c22e7)
+- bd daemon export: 2026-02-09 09:00:51 (739e0ecd)
+- bd daemon export: 2026-02-09 08:54:34 (52516a87)
+- bd daemon export: 2026-02-09 08:54:23 (30f7aa8a)
+- bd daemon export: 2026-02-09 08:30:13 (1b225281)
+
+## [0.29.3] - 2026-02-09
+
+### Changed
+
+- add Redis LLM cache, optimize API queries, parallelize retry (ce467d21)
+
+### Fixed
+
+- **course-gen-platform**: update 28 source file(s), update 2 test(s), +2 more (4c02bb76)
+- address remaining code review issues #6-#15 (4b5dd107)
+- address code review issues for perf optimization (40349eaa)
+
+### Other
+
+- bd daemon export: 2026-02-09 08:24:24 (15ab3a0a)
+- bd daemon export: 2026-02-09 08:22:20 (6a8a581d)
+- bd daemon export: 2026-02-09 08:22:12 (bb47c73e)
+- bd daemon export: 2026-02-09 08:18:55 (2a4a8b11)
+- bd daemon export: 2026-02-09 08:15:06 (225eb02e)
+- bd daemon export: 2026-02-09 08:14:59 (fbcfa081)
+- bd daemon export: 2026-02-09 08:11:29 (ff2ed051)
+- bd daemon export: 2026-02-09 08:08:13 (808aea38)
+- bd daemon export: 2026-02-09 08:01:43 (465e0985)
+- bd daemon sync: 2026-02-09 07:48:12 (df5b16e6)
+
+## [0.29.2] - 2026-02-08
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), add 2 test(s), +1 more (5bdbf2ef)
+- 3-tier model routing for Stage 5 based on section importance (7a7a067c)
+
+### Changed
+
+- remove dead complexity/criticality scoring from Stage 5 (d1065cd4)
+- extract regex to PATTERNS constant, add SSOT JSDoc, fix lastIndex bug (11a61c17)
+- migrate tRPC architecture to @trpc/react-query with typesafe hooks (ec8c8b6e)
+- expand optimizePackageImports with all Radix UI + framer-motion (2d59ec84)
+
+### Fixed
+
+- harden sanitize.fileName, fix tests, extract CONTROL_CHAR_REGEX (b81fc39a)
+- **ci**: build course-gen-platform before type-check (aa5d0654)
+- remove type safety bypasses in ClarifyingPanel (#4, #5) (fbbf6378)
+- address code review findings for tRPC migration (dd0b1caf)
+- **tests**: repair unit test suite — 83/83 pass, no hanging (e4eb3e33)
+- **tests**: repair 10 pre-existing broken unit tests after deduplication (0289aa25)
+
+### Other
+
+- cleanup from code review — remove dead code, fix test assertions (fc239e70)
+- consolidate Zod schemas — delete dead code, use shared languageSchema (0be33c62)
+- **tests**: remove duplicate trpc test file (28f45c2f)
+- bd daemon export: 2026-02-08 16:53:12 (f2218a42)
+- bd daemon export: 2026-02-08 16:53:10 (19fe301a)
+- bd daemon export: 2026-02-08 16:53:07 (1a7cf2a4)
+- bd daemon export: 2026-02-08 16:43:32 (c7915994)
+- bd daemon export: 2026-02-08 16:38:49 (f5375682)
+- bd daemon export: 2026-02-08 16:36:36 (579ddf70)
+- bd daemon export: 2026-02-08 16:29:31 (6c2785f4)
+- bd daemon export: 2026-02-08 16:26:58 (eb4770e2)
+- bd daemon export: 2026-02-08 16:26:57 (76ee74f7)
+- bd daemon export: 2026-02-08 16:26:55 (aa1a2142)
+- bd daemon export: 2026-02-08 16:26:54 (cefb4952)
+- bd daemon export: 2026-02-08 16:26:53 (3f377ad1)
+- bd daemon export: 2026-02-08 16:26:52 (70dbd2d9)
+- bd daemon export: 2026-02-08 16:26:50 (b06428ec)
+- bd daemon export: 2026-02-08 16:26:47 (78d95783)
+- bd daemon export: 2026-02-08 16:26:09 (15329d25)
+- clean up stale docs, empty dirs, and leftover test artifacts (8e6e9eac)
+- bd daemon export: 2026-02-08 16:16:06 (f3eb7449)
+- bd daemon export: 2026-02-08 15:48:54 (10b9253e)
+- bd daemon export: 2026-02-08 15:48:49 (b0704eab)
+- bd daemon export: 2026-02-08 15:48:46 (5ec81ec6)
+- bd daemon export: 2026-02-08 15:48:36 (f93b41bb)
+- bd daemon export: 2026-02-08 15:48:33 (1f525aa3)
+- bd daemon export: 2026-02-08 15:48:30 (37ef6419)
+- bd daemon export: 2026-02-08 15:48:23 (fb31fa2b)
+- bd daemon export: 2026-02-08 15:48:19 (5b57fa23)
+- bd daemon export: 2026-02-08 15:48:17 (23c6ff99)
+- bd daemon export: 2026-02-08 15:48:04 (5fabdcbb)
+- bd daemon export: 2026-02-08 15:48:00 (fb52d602)
+- bd daemon export: 2026-02-08 15:47:57 (8d31861d)
+- bd daemon export: 2026-02-08 15:47:48 (c5f96695)
+- bd daemon export: 2026-02-08 15:47:46 (367f3d75)
+- bd daemon export: 2026-02-08 15:47:43 (c01db15a)
+
+## [0.29.1] - 2026-02-08
+
+### Other
+
+- sync all pending changes from multi-agent work (b9fd2c1b)
+
+## [0.28.62] - 2026-02-07
+
+### Added
+
+- **stage4**: swap Phase 1 and Phase 0.5 for data-driven clarifying questions (8939e47b)
+- **web**: show classification_rationale in Stage 3 & pedagogical_patterns in Stage 4 (264b6191)
+
+### Changed
+
+- **stage4**: move Visual Style to accordion, remove deprecated Document Relations (a2c91488)
+- **pipeline**: remove dead content_strategy field from analysis_result (b8d49516)
+
+### Fixed
+
+- **shared-types,web**: add pedagogical_patterns to editable whitelist & guard empty .in() (a6a18fe4)
+- **stage4,stage5**: retry pull-fallback + accept any assessment_types type (a8e6f5f6)
+
+### Other
+
+- bd daemon export: 2026-02-07 20:05:04 (c1e2092b)
+- bd daemon export: 2026-02-07 20:00:25 (399798f6)
+- bd daemon export: 2026-02-07 20:00:20 (6cf6b958)
+- bd daemon export: 2026-02-07 19:38:45 (d7749bf2)
+- **stage4**: remove content_strategy from README (b085102a)
+- bd daemon export: 2026-02-07 19:29:41 (bd9001b0)
+- bd daemon export: 2026-02-07 19:29:36 (ca8c70b0)
+- bd daemon export: 2026-02-07 19:28:13 (05c50d3d)
+- bd daemon export: 2026-02-07 19:07:28 (8c24ea49)
+- bd daemon export: 2026-02-07 18:45:49 (333ca892)
+- bd daemon export: 2026-02-07 18:45:47 (5c2e12a7)
+- bd daemon export: 2026-02-07 18:43:20 (09aaba04)
+- bd daemon export: 2026-02-07 18:43:16 (1dd92a52)
+- bd daemon export: 2026-02-07 18:37:00 (3b3b3c3e)
+- bd daemon export: 2026-02-07 18:36:57 (7f2181ce)
+- bd daemon export: 2026-02-07 18:36:55 (dd59d0de)
+- bd daemon export: 2026-02-07 18:36:54 (de059ea9)
+- bd daemon export: 2026-02-07 18:36:52 (0c4e9bea)
+- bd daemon export: 2026-02-07 18:36:45 (21f2f541)
+- bd daemon export: 2026-02-07 18:36:41 (560e53fb)
+- bd daemon export: 2026-02-07 18:36:38 (9021dff7)
+- bd daemon export: 2026-02-07 18:36:36 (12d60349)
+- bd daemon export: 2026-02-07 18:07:13 (ad02288f)
+- remove deprecated assessment_types field from entire codebase (e30c54bf)
+- bd daemon export: 2026-02-07 17:52:29 (6066348c)
+- bd daemon export: 2026-02-07 17:52:04 (a9c107f6)
+- bd daemon export: 2026-02-07 17:03:27 (7c2c589f)
+
+## [0.28.61] - 2026-02-07
+
+### Fixed
+
+- **pipeline**: sync course style injection across all generation stages (40f07187)
+- **stage4**: pass document content to clarifying questions prompt (973ae217)
+
+### Other
+
+- bd daemon export: 2026-02-07 16:47:02 (bb67f311)
+- bd daemon export: 2026-02-07 16:45:49 (6eb0b288)
+- bd daemon export: 2026-02-07 16:45:45 (a4948922)
+- bd daemon export: 2026-02-07 16:30:11 (abddf8a1)
+- bd daemon export: 2026-02-07 16:30:07 (5223ca45)
+
+## [0.28.60] - 2026-02-07
+
+### Added
+
+- **web**: add 1 source file(s), update 12 source file(s), +1 more (3a5a24f5)
+
+### Fixed
+
+- **userback**: use identify() for form pre-fill instead of init options (76e8d600)
+
+### Other
+
+- bd daemon export: 2026-02-07 15:58:05 (cbcac66f)
+- bd daemon export: 2026-02-07 15:57:58 (b6f9471b)
+
+## [0.28.59] - 2026-02-07
+
+### Fixed
+
+- **course-gen-platform**: update 1 source file(s), update docs (51a92b9b)
+- **graph**: fix Stage 4 results spinner — shared ref race condition + missing complete statuses (669b8010)
+- **stage7**: fix double retry bug causing enrichments stuck in generating (3368a98b)
+- **anti-overlap**: remaining code review issues (1.3, 2.3, 5.3, security, i18n) (1eab7489)
+- **anti-overlap**: address code review findings for overlap detection (3c1b418f)
+- **pipeline**: prevent duplicate lessons via anti-overlap prompts and cross-section detection (c78ef5ac)
+
+### Other
+
+- bd daemon export: 2026-02-07 15:30:59 (5ecc937e)
+- **stage7**: add unit tests for retry logic and time guard (d958676a)
+- bd daemon export: 2026-02-07 15:30:41 (2d68f8df)
+- bd daemon export: 2026-02-07 15:30:33 (67d3c246)
+- bd daemon export: 2026-02-07 15:23:25 (3b37fd71)
+- **stage7**: remove redundant retryAttempt field from Stage7JobInput (2ef7f8f6)
+- bd daemon export: 2026-02-07 15:20:55 (fbddd7b2)
+- bd daemon export: 2026-02-07 15:20:54 (e14c30d3)
+- bd daemon export: 2026-02-07 15:20:47 (c069621b)
+- bd daemon export: 2026-02-07 15:20:07 (92c43b12)
+- bd daemon export: 2026-02-07 15:09:49 (06b456ce)
+- bd daemon export: 2026-02-07 15:01:27 (75d54694)
+- bd daemon export: 2026-02-07 15:01:23 (c7527f10)
+- bd daemon export: 2026-02-07 14:57:48 (48c488e3)
+- bd daemon export: 2026-02-07 14:53:39 (5f2bebf7)
+- bd daemon export: 2026-02-07 14:53:33 (bd56edca)
+- bd daemon export: 2026-02-07 13:36:30 (876c36f3)
+- bd daemon export: 2026-02-07 13:28:35 (072f6a33)
+- bd daemon export: 2026-02-07 13:28:31 (0893f023)
+
+## [0.28.58] - 2026-02-07
+
+### Fixed
+
+- **userback**: localize widget greeting to Russian (e01f3118)
+
+## [0.28.57] - 2026-02-07
+
+### Fixed
+
+- **userback**: add font-src CSP and prefill email/name in widget (7ddb716f)
+
+### Other
+
+- update docs (f9f846cb)
+
+## [0.28.56] - 2026-02-06
+
+### Fixed
+
+- **csp**: add static.userback.io to style-src and connect-src (6b5a5e3c)
+
+### Other
+
+- update docs (b74f44ae)
+- bd daemon export: 2026-02-06 22:28:52 (9150a34f)
+- bd daemon export: 2026-02-06 22:28:45 (2750b793)
+
+## [0.28.55] - 2026-02-06
+
+### Fixed
+
+- **auth**: code review fixes — security, i18n, UX improvements (d59f78e3)
+
+### Other
+
+- add Userback env vars to Docker build and CI/CD pipeline (87e5e60a)
+- bd daemon export: 2026-02-06 20:39:59 (b3a551a5)
+
+## [0.28.54] - 2026-02-06
+
+### Added
+
+- **web**: add 4 source file(s), update 5 source file(s), +2 more (abd0f463)
+- **web**: embed Userback feedback widget with SPA support and CSP (b0708fdb)
+
+### Fixed
+
+- remove unused InvitationType imports + fix NODE_ENV test assertions (c281d10e)
+- health check phase 2 - 13 deferred bugs fixed (2ce5fb94)
+- health check - 8 bugs fixed (mc2-wisp-0t4) (18f64595)
+- **worker**: use actual path in EACCES fix instructions (ba1eb1c4)
+- shared Jina rate limiter (100 RPM) + EACCES improvements + auto-mute rules (ff86957d)
+
+### Other
+
+- bd daemon export: 2026-02-06 20:10:43 (d40d2b70)
+- bd daemon export: 2026-02-06 20:06:05 (ad71bbd9)
+- bd daemon export: 2026-02-06 20:05:48 (dda1de70)
+- bd daemon export: 2026-02-06 19:52:20 (8b0366f2)
+- bd daemon export: 2026-02-06 19:52:18 (489770ef)
+- bd daemon export: 2026-02-06 19:52:17 (4986ee8a)
+- bd daemon export: 2026-02-06 19:43:58 (3602ee91)
+- bd daemon export: 2026-02-06 19:43:50 (157c671b)
+- bd daemon export: 2026-02-06 19:43:46 (a0ede9b8)
+- bd daemon export: 2026-02-06 14:17:09 (7337a248)
+- bd daemon export: 2026-02-06 14:16:53 (7d62222c)
+- bd daemon export: 2026-02-06 14:16:41 (bc545786)
+- bd daemon export: 2026-02-06 14:10:19 (deb251f0)
+- bd daemon export: 2026-02-06 14:10:13 (ce38f0c3)
+- bd daemon export: 2026-02-06 14:06:43 (0381d5c8)
+- bd daemon export: 2026-02-06 14:06:38 (0590a2d2)
+- bd daemon export: 2026-02-06 14:06:22 (3c7a0816)
+- bd daemon export: 2026-02-06 14:04:11 (ec1b292d)
+- bd daemon export: 2026-02-06 14:03:45 (4918a733)
+- bd daemon export: 2026-02-06 14:03:34 (32861fb1)
+- bd daemon export: 2026-02-06 14:03:08 (fe92ce20)
+- bd daemon export: 2026-02-06 14:03:05 (f2be86a5)
+- bd daemon export: 2026-02-06 14:03:02 (833424cf)
+- bd daemon export: 2026-02-06 14:02:59 (74b8acf7)
+- bd daemon export: 2026-02-06 14:02:55 (f7b54cf3)
+- bd daemon export: 2026-02-06 14:02:48 (83f7b335)
+- bd daemon export: 2026-02-06 14:02:44 (bdb6b9c5)
+- bd daemon export: 2026-02-06 12:18:56 (7a780f32)
+- bd daemon export: 2026-02-06 12:17:44 (fe799c4a)
+- bd daemon export: 2026-02-06 12:17:40 (cd1a0a6c)
+- bd daemon export: 2026-02-06 12:17:27 (110a99fe)
+- bd daemon export: 2026-02-06 12:16:01 (2844be0c)
+- bd daemon export: 2026-02-06 12:15:56 (b99396ae)
+
+## [0.28.53] - 2026-02-06
+
+### Added
+
+- **orchestrator**: add BLOCK_REGENERATION job type and Sentry monitoring (bea0acd4)
+- **lesson-editor**: add inline markdown editor for lesson content (6c6f7034)
+- **generation-graph**: implement NodeDetailsDrawer action handlers (1e0b66f4)
+- **logger**: add 2 new auto-mute rules for expected errors (3ef9dbf7)
+
+### Fixed
+
+- **block-regen**: optimistic locking, cache limit, shared setNestedValue (19a14297)
+- **orchestrator**: address code review findings for BLOCK_REGENERATION (fef61064)
+- **ci**: add concurrency group and paths-ignore for .beads (097adf4c)
+- **lesson-editor**: concurrent save guard, draft toast, save feedback, ARIA (bb47fc8f)
+- **lesson-editor**: CSS, dark mode, autosave, context refactor, and tests (0d9d95bf)
+- **lesson-editor**: address code review findings (e0f9025c)
+- resolve 3 production error categories (348b2462)
+- **workflow**: merge stage1CourseData with traces for Stage 1 nodes (ae729a95)
+
+### Other
+
+- update docs (053d760b)
+- bd daemon export: 2026-02-06 11:52:40 (e40c5a8d)
+- bd daemon export: 2026-02-06 11:52:38 (964ee345)
+- bd daemon export: 2026-02-06 11:52:36 (27e41292)
+- bd daemon export: 2026-02-06 11:44:03 (de2937cd)
+- bd daemon export: 2026-02-06 11:43:52 (cb0bbcd1)
+- bd daemon export: 2026-02-06 11:43:51 (62ecd354)
+- bd daemon export: 2026-02-06 10:37:46 (d3c6ba0e)
+- bd daemon export: 2026-02-06 10:37:45 (916877af)
+- bd daemon export: 2026-02-06 10:09:49 (23855dad)
+- bd daemon export: 2026-02-06 10:09:48 (42414ac5)
+- bd daemon export: 2026-02-06 09:50:37 (1dc54c24)
+- bd daemon export: 2026-02-06 09:50:35 (82a2d53f)
+- bd daemon export: 2026-02-06 09:48:59 (563d3bab)
+- bd daemon export: 2026-02-06 09:48:57 (39d5e946)
+- bd daemon export: 2026-02-06 09:48:52 (3a8328b6)
+- bd daemon export: 2026-02-06 09:48:51 (328b1d71)
+- bd daemon export: 2026-02-06 09:41:05 (5ede5241)
+- bd daemon export: 2026-02-06 09:37:23 (58543776)
+- bd daemon export: 2026-02-06 09:35:16 (facf43cf)
+- bd daemon export: 2026-02-06 09:31:20 (3d5788da)
+- bd daemon export: 2026-02-06 09:31:15 (faf4c39c)
+- bd daemon export: 2026-02-06 09:30:00 (e366119d)
+- bd daemon export: 2026-02-06 09:29:19 (6941ad0b)
+- bd daemon export: 2026-02-06 09:19:56 (5e117377)
+- bd daemon export: 2026-02-06 09:19:51 (e335756a)
+- bd daemon export: 2026-02-06 09:17:35 (7f400430)
+- bd daemon export: 2026-02-06 09:17:28 (d92aa335)
+- bd daemon export: 2026-02-06 09:17:26 (3904a17e)
+- bd daemon export: 2026-02-06 09:17:25 (918338dc)
+- bd daemon export: 2026-02-06 09:17:23 (069633b0)
+- bd daemon export: 2026-02-06 09:12:39 (a9ed145c)
+- bd daemon export: 2026-02-06 09:12:34 (dc364a0e)
+- bd daemon export: 2026-02-05 22:32:36 (c05ebd6c)
+- bd daemon export: 2026-02-05 22:20:55 (0c7db4f2)
+- bd daemon export: 2026-02-05 22:19:20 (4e17da55)
+- bd daemon export: 2026-02-05 22:19:13 (e6d97f1d)
+- bd daemon export: 2026-02-05 22:12:23 (a8b1600e)
+- bd daemon export: 2026-02-05 22:11:41 (4dedce7d)
+- bd daemon export: 2026-02-05 22:11:40 (bd5cfe78)
+- bd daemon export: 2026-02-05 22:11:31 (88dc13ff)
+- bd daemon export: 2026-02-05 22:05:31 (4aa2aac2)
+- bd daemon export: 2026-02-05 21:57:25 (9f49ec2c)
+- bd daemon export: 2026-02-05 21:57:16 (1a1fb759)
+- bd daemon export: 2026-02-05 21:57:07 (838ec327)
+- bd daemon export: 2026-02-05 21:56:58 (35c6aa9d)
+- bd daemon export: 2026-02-05 14:22:52 (38c92a88)
+- remove deprecated assessment_types field from pedagogical_patterns (a472b968)
+- bd daemon export: 2026-02-05 14:13:03 (bb643af1)
+- bd daemon export: 2026-02-05 14:12:50 (e2b95603)
+
+## [0.28.52] - 2026-02-04
+
+### Changed
+
+- **chat**: extract getUpdatedFieldsForProposal helper function (524e1e30)
+- **stage4**: move suggested_answers normalization to Zod z.preprocess() (da3a51d7)
+- **export-lessons**: optimize DB query with lessons_with_latest_content view (c80ff3dd)
+
+### Fixed
+
+- **chat**: resolve message duplication and data not refreshing after apply (f4c9d9fb)
+- **tests**: sync test data with updated Zod schemas (9 failing tests) (47ca6e6f)
+- **tests**: fix fetch mocking in jina-reranker-client unit test (5180e8bc)
+- **admin**: fix null filters breaking /admin/logs page (500 error) (e39ead00)
+- **stage4**: enforce min length + filter invalid answers in normalization (08d12455)
+- process error logs — 3 bug fixes + 3 auto-mute rules (d4e3e078)
+- **stage6**: prevent "sections is not iterable" error in judge (bfbe3b66)
+
+### Other
+
+- bd daemon export: 2026-02-04 21:41:47 (565ca490)
+- **chat**: add unit tests for RefinementChat and useRefinement fixes (bc98dac6)
+- **migration**: add post-deployment verification queries (e6c91935)
+- bd daemon export: 2026-02-04 21:37:32 (7d896575)
+- **export-lessons**: code review fixes + integration tests (0ed9f21b)
+- bd daemon export: 2026-02-04 21:36:07 (118eb231)
+- bd daemon export: 2026-02-04 21:34:56 (5913f12d)
+- bd daemon export: 2026-02-04 21:34:50 (db1b2aa4)
+- bd daemon export: 2026-02-04 21:34:48 (dd2964e8)
+- bd daemon export: 2026-02-04 21:26:24 (4068ff9e)
+- bd daemon export: 2026-02-04 21:26:01 (0baba67b)
+- bd daemon export: 2026-02-04 21:25:59 (3a0b18f8)
+- bd daemon export: 2026-02-04 21:24:29 (d29e234c)
+- bd daemon export: 2026-02-04 21:24:25 (0b387833)
+- bd daemon export: 2026-02-04 21:18:36 (e7ae2f43)
+- bd daemon export: 2026-02-04 21:09:59 (fe7fab51)
+- bd daemon export: 2026-02-04 21:05:09 (6565ec64)
+- **tests**: remove dead `answers` field from test fixtures (b3a49e0d)
+- bd daemon export: 2026-02-04 20:42:22 (e6e2e666)
+- bd daemon export: 2026-02-04 20:42:19 (70aee722)
+- bd daemon export: 2026-02-04 20:27:27 (9e9b7c8b)
+- bd daemon export: 2026-02-04 20:19:12 (ea766792)
+- bd daemon export: 2026-02-04 20:17:08 (541b0af1)
+- bd daemon export: 2026-02-04 20:13:04 (0b5da826)
+- bd daemon export: 2026-02-04 19:33:01 (d2a8a7a2)
+- bd daemon export: 2026-02-04 19:32:56 (5b27658a)
+- bd daemon export: 2026-02-04 19:16:12 (f086c83b)
+- bd daemon export: 2026-02-04 19:16:10 (93865f61)
+- bd daemon export: 2026-02-04 19:16:04 (80d7f0ca)
+- bd daemon export: 2026-02-04 19:13:19 (d40e6e14)
+- bd daemon export: 2026-02-04 19:13:18 (b2f2e3dc)
+- bd daemon export: 2026-02-04 19:13:16 (7a9517f1)
+- bd daemon export: 2026-02-04 19:11:12 (6c1372ec)
+- bd daemon export: 2026-02-04 19:09:30 (35037f26)
+- bd daemon export: 2026-02-04 19:09:03 (f48b409f)
+- bd daemon export: 2026-02-04 19:07:37 (1abbca4b)
+- bd daemon export: 2026-02-04 19:07:36 (b6adea5d)
+- bd daemon export: 2026-02-04 19:07:34 (4602bbed)
+
 ## [0.28.51] - 2026-02-04
 
 ### Fixed

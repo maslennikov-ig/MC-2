@@ -25,12 +25,14 @@ ffmpeg -i slides.mp4 -i avatar.mp4 \
 ```
 
 **Positioning reference** (all with 10-20px padding):
+
 - Top-left: `overlay=20:20`
 - Top-right: `overlay=main_w-overlay_w-20:20`
 - Bottom-left: `overlay=20:main_h-overlay_h-20`
 - Bottom-right: `overlay=main_w-overlay_w-20:main_h-overlay_h-20` (recommended for e-learning)
 
 **Animated PiP with fade transitions**:
+
 ```bash
 ffmpeg -i slides.mp4 -i avatar.mp4 \
   -filter_complex "
@@ -65,13 +67,14 @@ ffmpeg -i avatar_intro.mp4 -i slides_content.mp4 \
 
 ### Alpha channel compositing for transparent avatars
 
-| Format | Quality | File Size | Web Support | Recommended Use |
-|--------|---------|-----------|-------------|-----------------|
-| ProRes 4444 | Excellent | Very Large | Mac only | Editing intermediate |
-| VP9 WebM | Good | Medium | Chrome/Firefox | **Web delivery** |
-| PNG Sequence | Lossless | Huge | N/A | Short clips only |
+| Format       | Quality   | File Size  | Web Support    | Recommended Use      |
+| ------------ | --------- | ---------- | -------------- | -------------------- |
+| ProRes 4444  | Excellent | Very Large | Mac only       | Editing intermediate |
+| VP9 WebM     | Good      | Medium     | Chrome/Firefox | **Web delivery**     |
+| PNG Sequence | Lossless  | Huge       | N/A            | Short clips only     |
 
 **VP9 WebM with alpha** (recommended for web):
+
 ```bash
 # Encode avatar with transparency
 ffmpeg -i avatar_alpha.mov \
@@ -87,6 +90,7 @@ ffmpeg -i slides.mp4 -i avatar_transparent.webm \
 ### Segment assembly: concat demuxer vs filter
 
 **Concat demuxer** (stream copy, no re-encoding—**5-10x faster**):
+
 ```bash
 # segments.txt
 file 'intro.mp4'
@@ -96,9 +100,11 @@ file 'outro.mp4'
 
 ffmpeg -f concat -safe 0 -i segments.txt -c copy output.mp4
 ```
-*Requirement*: All segments must have identical codecs, resolution, and frame rate.
+
+_Requirement_: All segments must have identical codecs, resolution, and frame rate.
 
 **Concat filter** (handles mismatched properties, requires re-encoding):
+
 ```bash
 ffmpeg -i segment1.mp4 -i segment2.mp4 -i segment3.mp4 \
   -filter_complex "
@@ -109,6 +115,7 @@ ffmpeg -i segment1.mp4 -i segment2.mp4 -i segment3.mp4 \
 ```
 
 **A/V sync preservation** (critical for segment boundaries):
+
 ```bash
 # Always reset timestamps at segment boundaries
 [0:v]setpts=PTS-STARTPTS[v0];
@@ -117,14 +124,15 @@ ffmpeg -i segment1.mp4 -i segment2.mp4 -i segment3.mp4 \
 
 ### Encoding optimization for e-learning content
 
-| Codec | Compression | Speed | Compatibility | Recommendation |
-|-------|-------------|-------|---------------|----------------|
-| H.264 | Baseline | Fast | Universal | **Primary delivery** |
-| H.265 | 30-40% better | Medium | Good | 4K content |
-| VP9 | Similar to HEVC | Slow | Chrome/Firefox | YouTube delivery |
-| AV1 | 50% better | Very slow | Limited | Future-proofing |
+| Codec | Compression     | Speed     | Compatibility  | Recommendation       |
+| ----- | --------------- | --------- | -------------- | -------------------- |
+| H.264 | Baseline        | Fast      | Universal      | **Primary delivery** |
+| H.265 | 30-40% better   | Medium    | Good           | 4K content           |
+| VP9   | Similar to HEVC | Slow      | Chrome/Firefox | YouTube delivery     |
+| AV1   | 50% better      | Very slow | Limited        | Future-proofing      |
 
 **Production encoding template** for e-learning:
+
 ```bash
 ffmpeg -i input.mp4 \
   -c:v libx264 \
@@ -144,16 +152,17 @@ ffmpeg -i input.mp4 \
 **Resolution and bitrate targets**:
 
 | Resolution | Talking Head | Slides + Code | CRF Value |
-|------------|--------------|---------------|-----------|
-| 720p | 1.5-2.5 Mbps | 2-3 Mbps | 23 |
-| **1080p** | **3-5 Mbps** | **4-6 Mbps** | **22** |
-| 4K | 15-25 Mbps | 20-35 Mbps | 24-26 |
+| ---------- | ------------ | ------------- | --------- |
+| 720p       | 1.5-2.5 Mbps | 2-3 Mbps      | 23        |
+| **1080p**  | **3-5 Mbps** | **4-6 Mbps**  | **22**    |
+| 4K         | 15-25 Mbps   | 20-35 Mbps    | 24-26     |
 
 ### Hardware acceleration with NVENC
 
 NVENC delivers **5-10x faster encoding** versus CPU, making it essential at scale. Allocate **10-15% higher bitrate** to match libx264 quality.
 
 **High-quality NVENC template** (RunPod GPU):
+
 ```bash
 ffmpeg -y -vsync 0 \
   -hwaccel cuda -hwaccel_output_format cuda \
@@ -178,6 +187,7 @@ ffmpeg -y -vsync 0 \
 ```
 
 **Multi-resolution encoding** (single input, multiple outputs):
+
 ```bash
 ffmpeg -y -vsync 0 \
   -hwaccel cuda -hwaccel_output_format cuda \
@@ -188,6 +198,7 @@ ffmpeg -y -vsync 0 \
 ```
 
 **Cost comparison at 100 videos/day**:
+
 - CPU encoding (libx264 medium): ~$150-200/day compute
 - NVENC (RunPod A40): ~$30-50/day compute
 - **Savings: 70-80%** with acceptable quality trade-off
@@ -200,11 +211,11 @@ Remotion excels at programmatic video generation with React components, but has 
 
 ### Licensing costs (2025)
 
-| Tier | Cost | Includes |
-|------|------|----------|
-| Free | $0 | Teams ≤3 people, unlimited videos |
-| Company | $100+/month minimum | $25/developer + $10/render tier |
-| Enterprise | $500+/month | Private support, consulting |
+| Tier       | Cost                | Includes                          |
+| ---------- | ------------------- | --------------------------------- |
+| Free       | $0                  | Teams ≤3 people, unlimited videos |
+| Company    | $100+/month minimum | $25/developer + $10/render tier   |
+| Enterprise | $500+/month         | Private support, consulting       |
 
 **Lambda cloud rendering** requires additional Cloud Rendering Units for teams of 4+ people.
 
@@ -220,6 +231,7 @@ Remotion excels at programmatic video generation with React components, but has 
 **Critical limitation**: Videos exceeding **30 minutes experience significant performance degradation**. GitHub discussions report "cache pruning" messages and slowdowns after ~20% progress on long renders. The `OffthreadVideo` component struggles with 45+ minute source videos.
 
 **Workarounds for long content**:
+
 - Increase `offthreadVideoCacheSizeInBytes` (default is half system memory)
 - Split long videos into chapters, render separately
 - Use self-hosted rendering with generous memory allocation
@@ -247,16 +259,16 @@ const { steps } = parseRoot(Content, Schema);
 
 ### Remotion vs FFmpeg decision matrix
 
-| Use Case | Recommendation | Rationale |
-|----------|----------------|-----------|
-| Avatar intro (15-30s) | **Remotion** | Template-based, animated text |
-| Code visualizations | **Remotion + Code Hike** | Token animations, syntax highlighting |
-| Animated slide transitions | **Remotion** | Complex motion graphics |
-| TTS audio overlay | **FFmpeg** | Simple audio muxing |
-| Long-form content (45+ min) | **FFmpeg** | Remotion performance issues |
-| Simple PiP composition | **FFmpeg** | Lower overhead |
-| Final segment assembly | **FFmpeg concat** | No re-encoding needed |
-| High-volume processing | **FFmpeg** | Predictable at scale |
+| Use Case                    | Recommendation           | Rationale                             |
+| --------------------------- | ------------------------ | ------------------------------------- |
+| Avatar intro (15-30s)       | **Remotion**             | Template-based, animated text         |
+| Code visualizations         | **Remotion + Code Hike** | Token animations, syntax highlighting |
+| Animated slide transitions  | **Remotion**             | Complex motion graphics               |
+| TTS audio overlay           | **FFmpeg**               | Simple audio muxing                   |
+| Long-form content (45+ min) | **FFmpeg**               | Remotion performance issues           |
+| Simple PiP composition      | **FFmpeg**               | Lower overhead                        |
+| Final segment assembly      | **FFmpeg concat**        | No re-encoding needed                 |
+| High-volume processing      | **FFmpeg**               | Predictable at scale                  |
 
 ### Recommended hybrid architecture
 
@@ -311,12 +323,12 @@ Content-addressed caching with DAG-based dependency tracking enables **85-95% ti
 
 ### Change scenario analysis
 
-| Scenario | Regenerate | Reuse | Time Savings |
-|----------|------------|-------|--------------|
-| **Typo in one slide** | 1 slide + concat | Audio, avatar, other slides | **85-90%** |
-| **Voice change** | TTS + avatar + timing | All slides, code viz | **30-40%** |
-| **Avatar change** | Avatar + composition | TTS audio, slides, code | **60-70%** |
-| **Add new section** | New segment + concat | All existing segments | **90-95%** |
+| Scenario              | Regenerate            | Reuse                       | Time Savings |
+| --------------------- | --------------------- | --------------------------- | ------------ |
+| **Typo in one slide** | 1 slide + concat      | Audio, avatar, other slides | **85-90%**   |
+| **Voice change**      | TTS + avatar + timing | All slides, code viz        | **30-40%**   |
+| **Avatar change**     | Avatar + composition  | TTS audio, slides, code     | **60-70%**   |
+| **Add new section**   | New segment + concat  | All existing segments       | **90-95%**   |
 
 ### Content hashing implementation
 
@@ -326,15 +338,15 @@ Use **xxHash64** for content hashing—**50x faster** than SHA-256 with negligib
 import { xxh64 } from 'xxhash-wasm';
 
 interface AssetHash {
-  contentHash: string;    // Hash of raw content
-  settingsHash: string;   // Hash of generation settings
+  contentHash: string; // Hash of raw content
+  settingsHash: string; // Hash of generation settings
   dependencyHash: string; // Hash of parent asset versions
-  computedHash: string;   // Combined cache key
+  computedHash: string; // Combined cache key
 }
 
 async function computeAssetHash(
-  content: string, 
-  settings: Record<string, any>, 
+  content: string,
+  settings: Record<string, any>,
   parentHashes: string[]
 ): Promise<string> {
   const contentHash = await xxh64(content);
@@ -353,19 +365,19 @@ CREATE TABLE assets (
   video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
   type VARCHAR(50) NOT NULL,
   version INT NOT NULL DEFAULT 1,
-  
+
   -- Content tracking
   content_hash VARCHAR(64) NOT NULL,
   settings_hash VARCHAR(64) NOT NULL,
   computed_hash VARCHAR(64) NOT NULL,
-  
+
   -- Status and storage
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   storage_url TEXT,
   is_current BOOLEAN NOT NULL DEFAULT true,
-  
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
+
   UNIQUE(video_id, type, version)
 );
 
@@ -408,21 +420,21 @@ async function createVideoFlow(videoId: string, content: VideoContent) {
           {
             name: `tts:${videoId}`,
             queueName: 'tts-generation',
-            data: { videoId, script: content.script, voiceId: content.voiceId }
-          }
-        ]
+            data: { videoId, script: content.script, voiceId: content.voiceId },
+          },
+        ],
       },
       ...content.slides.map((slide, i) => ({
         name: `slide:${videoId}:${i}`,
         queueName: 'slide-rendering',
-        data: { videoId, slideIndex: i, content: slide }
+        data: { videoId, slideIndex: i, content: slide },
       })),
       ...content.codeBlocks.map((block, i) => ({
         name: `code:${videoId}:${i}`,
         queueName: 'code-visualization',
-        data: { videoId, blockIndex: i, code: block }
-      }))
-    ]
+        data: { videoId, blockIndex: i, code: block },
+      })),
+    ],
   });
 }
 
@@ -432,11 +444,13 @@ async function regenerateSlide(videoId: string, slideIndex: number, newContent: 
     name: `recompose:${videoId}`,
     queueName: 'composition',
     data: { videoId, partialMode: true },
-    children: [{
-      name: `slide:${videoId}:${slideIndex}`,
-      queueName: 'slide-rendering',
-      data: { videoId, slideIndex, content: newContent }
-    }]
+    children: [
+      {
+        name: `slide:${videoId}:${slideIndex}`,
+        queueName: 'slide-rendering',
+        data: { videoId, slideIndex, content: newContent },
+      },
+    ],
   });
 }
 ```
@@ -444,37 +458,41 @@ async function regenerateSlide(videoId: string, slideIndex: number, newContent: 
 ### Worker with cache-first strategy
 
 ```typescript
-const slideWorker = new Worker('slide-rendering', async (job) => {
-  const { videoId, slideIndex, content } = job.data;
-  
-  // Compute hash for cache lookup
-  const computedHash = await computeAssetHash(content, { theme: 'default' }, []);
-  
-  // Check global cache first
-  const { data: cached } = await supabase
-    .from('asset_cache')
-    .select('storage_url')
-    .eq('computed_hash', computedHash)
-    .single();
-  
-  if (cached) {
-    // Cache hit - increment counter and return
-    await supabase.rpc('increment_cache_hit', { hash: computedHash });
-    return { storageUrl: cached.storage_url, cached: true };
-  }
-  
-  // Cache miss - render and store
-  const renderedPath = await renderSlide(content);
-  const storageUrl = await uploadToStorage(renderedPath);
-  
-  await supabase.from('asset_cache').upsert({
-    computed_hash: computedHash,
-    storage_url: storageUrl,
-    asset_type: 'rendered_slide'
-  });
-  
-  return { storageUrl, cached: false };
-}, { connection: redis, concurrency: 5 });
+const slideWorker = new Worker(
+  'slide-rendering',
+  async job => {
+    const { videoId, slideIndex, content } = job.data;
+
+    // Compute hash for cache lookup
+    const computedHash = await computeAssetHash(content, { theme: 'default' }, []);
+
+    // Check global cache first
+    const { data: cached } = await supabase
+      .from('asset_cache')
+      .select('storage_url')
+      .eq('computed_hash', computedHash)
+      .single();
+
+    if (cached) {
+      // Cache hit - increment counter and return
+      await supabase.rpc('increment_cache_hit', { hash: computedHash });
+      return { storageUrl: cached.storage_url, cached: true };
+    }
+
+    // Cache miss - render and store
+    const renderedPath = await renderSlide(content);
+    const storageUrl = await uploadToStorage(renderedPath);
+
+    await supabase.from('asset_cache').upsert({
+      computed_hash: computedHash,
+      storage_url: storageUrl,
+      asset_type: 'rendered_slide',
+    });
+
+    return { storageUrl, cached: false };
+  },
+  { connection: redis, concurrency: 5 }
+);
 ```
 
 ---
@@ -483,16 +501,17 @@ const slideWorker = new Worker('slide-rendering', async (job) => {
 
 ### Platform cost analysis (3,000 videos/month × 15 min average)
 
-| Platform | Storage | Delivery | Encoding | **Total/Month** |
-|----------|---------|----------|----------|-----------------|
-| **Cloudflare Stream** | $225 | $450 | $0 | **$675** |
-| Mux (Basic) | $135 | $383-680 | $0 | $518-815 |
-| AWS S3 + CloudFront | $39 | ~$200 | ~$1,350 | ~$1,589 |
-| Supabase Storage | $36 | $510-1,530 | Self-managed | $546-1,566+ |
+| Platform              | Storage | Delivery   | Encoding     | **Total/Month** |
+| --------------------- | ------- | ---------- | ------------ | --------------- |
+| **Cloudflare Stream** | $225    | $450       | $0           | **$675**        |
+| Mux (Basic)           | $135    | $383-680   | $0           | $518-815        |
+| AWS S3 + CloudFront   | $39     | ~$200      | ~$1,350      | ~$1,589         |
+| Supabase Storage      | $36     | $510-1,530 | Self-managed | $546-1,566+     |
 
 ### Recommended architecture: Cloudflare Stream
 
 **Why Cloudflare Stream wins**:
+
 - All-inclusive pricing (encoding, CDN, adaptive streaming included)
 - **330+ global edge locations** for low-latency delivery
 - Automatic HLS/DASH packaging—no FFmpeg pipeline needed
@@ -509,25 +528,25 @@ class VideoDeliveryService {
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${CF_API_TOKEN}` },
-        body: JSON.stringify({ maxDurationSeconds: 3600, meta: metadata })
+        body: JSON.stringify({ maxDurationSeconds: 3600, meta: metadata }),
       }
     );
-    
+
     const { uploadURL } = await response.json();
-    
+
     // Upload via TUS protocol
     const video = await this.tusUpload(uploadURL, filePath);
-    
+
     // Store reference in Supabase
     await supabase.from('videos').insert({
       cf_uid: video.uid,
       hls_url: video.playback.hls,
-      duration: video.duration
+      duration: video.duration,
     });
-    
+
     return video;
   }
-  
+
   getPlaybackUrl(cfUid: string): string {
     return `https://customer-${CF_ACCOUNT_ID}.cloudflarestream.com/${cfUid}/manifest/video.m3u8`;
   }
@@ -536,12 +555,12 @@ class VideoDeliveryService {
 
 ### Intermediate asset storage strategy
 
-| Asset Type | Format | Size (15 min video) | Retention |
-|------------|--------|---------------------|-----------|
-| TTS Audio | MP3 128kbps | ~15MB | 7-14 days |
-| Rendered Slides | WebP | ~50-100MB | 7 days |
-| Avatar Segments | H.264 MP4 | ~200-500MB | 7 days |
-| Timing Metadata | JSON | ~10-50KB | 30+ days |
+| Asset Type      | Format      | Size (15 min video) | Retention |
+| --------------- | ----------- | ------------------- | --------- |
+| TTS Audio       | MP3 128kbps | ~15MB               | 7-14 days |
+| Rendered Slides | WebP        | ~50-100MB           | 7 days    |
+| Avatar Segments | H.264 MP4   | ~200-500MB          | 7 days    |
+| Timing Metadata | JSON        | ~10-50KB            | 30+ days  |
 
 **Cost trade-off**: At $0.02/GB/month storage vs $0.50+ regeneration cost, **retain intermediates for 7-14 days**.
 
@@ -575,27 +594,30 @@ ffmpeg -i input.mp4 \
 
 ### Industry standards and thresholds
 
-| Metric | Pass | Warning | Fail |
-|--------|------|---------|------|
-| A/V Sync | ±20ms | ±45ms | >60ms |
-| Audio Loudness (LUFS) | -14 to -18 | ±2 | >±4 |
-| True Peak | ≤-1.5dB | -1.0dB | >-1.0dB |
-| Silence Duration | <3s | 3-5s | >5s |
-| Quality Score | ≥80 | 70-79 | <70 |
+| Metric                | Pass       | Warning | Fail    |
+| --------------------- | ---------- | ------- | ------- |
+| A/V Sync              | ±20ms      | ±45ms   | >60ms   |
+| Audio Loudness (LUFS) | -14 to -18 | ±2      | >±4     |
+| True Peak             | ≤-1.5dB    | -1.0dB  | >-1.0dB |
+| Silence Duration      | <3s        | 3-5s    | >5s     |
+| Quality Score         | ≥80        | 70-79   | <70     |
 
 ### FFmpeg QA commands
 
 **Silence detection** (TTS-optimized):
+
 ```bash
 ffmpeg -i video.mp4 -af "silencedetect=noise=-35dB:d=3.0" -f null - 2>&1 | grep silence
 ```
 
 **Loudness measurement** (LUFS):
+
 ```bash
 ffmpeg -i video.mp4 -af "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json" -f null - 2>&1 | tail -12
 ```
 
 **Two-pass loudness normalization**:
+
 ```bash
 # Pass 1: Measure
 LOUDNESS=$(ffmpeg -i input.mp4 -af "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json" -f null - 2>&1 | tail -12)
@@ -609,6 +631,7 @@ ffmpeg -i input.mp4 -af "loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=$INPUT_I:measu
 ```
 
 **Technical validation** (ffprobe):
+
 ```bash
 ffprobe -v quiet -print_format json -show_format -show_streams video.mp4 | jq '{
   container: .format.format_name,
@@ -637,55 +660,59 @@ interface QAResult {
   triggers: ReviewTrigger[];
 }
 
-const qaWorker = new Worker('video-qa', async (job) => {
-  const { videoId, videoPath, isNewLanguage, isNewAvatar } = job.data;
-  
-  // Run all checks in parallel
-  const [technical, loudness, silence, avSync] = await Promise.all([
-    validateTechnical(videoPath),
-    measureLoudness(videoPath),
-    detectSilence(videoPath, -35, 3),
-    checkAVSync(videoPath)
-  ]);
-  
-  // Calculate composite score
-  const score = calculateQualityScore({ technical, loudness, silence, avSync });
-  
-  // Evaluate review triggers
-  const triggers: ReviewTrigger[] = [];
-  
-  if (isNewLanguage) triggers.push({ type: 'new_language', priority: 'critical' });
-  if (isNewAvatar) triggers.push({ type: 'new_avatar', priority: 'critical' });
-  if (score < 70) triggers.push({ type: 'low_quality_score', priority: 'high' });
-  if (Math.abs(avSync.drift_ms) > 45) triggers.push({ type: 'av_drift', priority: 'high' });
-  if (silence.segments.some(s => s.duration > 5)) {
-    triggers.push({ type: 'silence_error', priority: 'medium' });
-  }
-  
-  // Auto-remediate where possible
-  if (loudness.lufs < -18 || loudness.lufs > -14) {
-    await normalizeAudio(videoPath);
-  }
-  
-  // Queue for human review if needed
-  if (triggers.some(t => !canAutoRemediate(t))) {
-    await addToReviewQueue(videoId, triggers);
-  }
-  
-  return { videoId, passed: triggers.length === 0, score, triggers };
-}, { connection: redis, concurrency: 5 });
+const qaWorker = new Worker(
+  'video-qa',
+  async job => {
+    const { videoId, videoPath, isNewLanguage, isNewAvatar } = job.data;
+
+    // Run all checks in parallel
+    const [technical, loudness, silence, avSync] = await Promise.all([
+      validateTechnical(videoPath),
+      measureLoudness(videoPath),
+      detectSilence(videoPath, -35, 3),
+      checkAVSync(videoPath),
+    ]);
+
+    // Calculate composite score
+    const score = calculateQualityScore({ technical, loudness, silence, avSync });
+
+    // Evaluate review triggers
+    const triggers: ReviewTrigger[] = [];
+
+    if (isNewLanguage) triggers.push({ type: 'new_language', priority: 'critical' });
+    if (isNewAvatar) triggers.push({ type: 'new_avatar', priority: 'critical' });
+    if (score < 70) triggers.push({ type: 'low_quality_score', priority: 'high' });
+    if (Math.abs(avSync.drift_ms) > 45) triggers.push({ type: 'av_drift', priority: 'high' });
+    if (silence.segments.some(s => s.duration > 5)) {
+      triggers.push({ type: 'silence_error', priority: 'medium' });
+    }
+
+    // Auto-remediate where possible
+    if (loudness.lufs < -18 || loudness.lufs > -14) {
+      await normalizeAudio(videoPath);
+    }
+
+    // Queue for human review if needed
+    if (triggers.some(t => !canAutoRemediate(t))) {
+      await addToReviewQueue(videoId, triggers);
+    }
+
+    return { videoId, passed: triggers.length === 0, score, triggers };
+  },
+  { connection: redis, concurrency: 5 }
+);
 ```
 
 ### Human review trigger matrix
 
-| Condition | Priority | Auto-Remediate | Action |
-|-----------|----------|----------------|--------|
-| First video in new language | Critical | No | Mandatory review |
-| New avatar debut | Critical | No | Full QA review |
-| Quality score <70 | High | No | Priority review |
-| A/V drift >60ms | High | Attempt | Review if fix fails |
-| Silence >5s mid-content | Medium | No | Review segment |
-| LUFS outside range | Low | Yes | Auto-normalize |
+| Condition                   | Priority | Auto-Remediate | Action              |
+| --------------------------- | -------- | -------------- | ------------------- |
+| First video in new language | Critical | No             | Mandatory review    |
+| New avatar debut            | Critical | No             | Full QA review      |
+| Quality score <70           | High     | No             | Priority review     |
+| A/V drift >60ms             | High     | Attempt        | Review if fix fails |
+| Silence >5s mid-content     | Medium   | No             | Review segment      |
+| LUFS outside range          | Low      | Yes            | Auto-normalize      |
 
 ### Monitoring metrics for dashboard
 
@@ -695,16 +722,16 @@ interface PipelineMetrics {
   videosProcessed24h: number;
   averageProcessingTime: number;
   queueDepth: number;
-  
+
   // Quality
-  passRate: number;              // Target: >95%
-  averageQualityScore: number;   // Target: >85
-  humanReviewRate: number;       // Target: <10%
-  
+  passRate: number; // Target: >95%
+  averageQualityScore: number; // Target: >85
+  humanReviewRate: number; // Target: <10%
+
   // Cost tracking
   avgCostPerVideo: number;
   computeUtilization: number;
-  
+
   // Error breakdown
   errorsByCategory: {
     encoding_failure: number;
@@ -716,6 +743,7 @@ interface PipelineMetrics {
 ```
 
 **Alerting thresholds**:
+
 - Critical: Failure rate >5% (1h window), queue backlog >500 (15m)
 - Warning: Pass rate <95% (4h), human review rate >20% (4h)
 
@@ -725,13 +753,13 @@ interface PipelineMetrics {
 
 ### Infrastructure costs at scale (100 videos/day)
 
-| Component | Monthly Cost |
-|-----------|--------------|
-| Cloudflare Stream (delivery) | ~$675 |
-| Supabase (storage + database) | ~$75-150 |
-| RunPod GPU (NVENC encoding) | ~$900-1,500 |
-| Remotion License | ~$150-300 |
-| **Total** | **~$1,800-2,625/month** |
+| Component                     | Monthly Cost            |
+| ----------------------------- | ----------------------- |
+| Cloudflare Stream (delivery)  | ~$675                   |
+| Supabase (storage + database) | ~$75-150                |
+| RunPod GPU (NVENC encoding)   | ~$900-1,500             |
+| Remotion License              | ~$150-300               |
+| **Total**                     | **~$1,800-2,625/month** |
 
 ### Key architectural decisions
 

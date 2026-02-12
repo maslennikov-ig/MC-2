@@ -33,7 +33,7 @@ import { xmlEscape } from '../../utils/xml-escape';
  */
 export function generateSequentialXml(sequential: OlxSequential): string {
   const verticalRefs = sequential.verticals
-    .map((vertical) => `  <vertical url_name="${xmlEscape(vertical.url_name)}"/>`)
+    .map(vertical => `  <vertical url_name="${xmlEscape(vertical.url_name)}"/>`)
     .join('\n');
 
   return `<sequential url_name="${xmlEscape(sequential.url_name)}" display_name="${xmlEscape(sequential.display_name)}">

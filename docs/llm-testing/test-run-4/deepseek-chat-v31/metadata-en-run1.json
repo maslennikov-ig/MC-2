@@ -6,6 +6,21 @@
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
   "prerequisites": ["Basic computer literacy", "Ability to install software on your computer"],
-  "learning_outcomes": ["Explain core Python programming concepts and syntax", "Apply data structures like lists and dictionaries to store information", "Construct programs using loops and conditional logic to control program flow", "Create reusable functions to organize and simplify code", "Develop simple scripts to automate basic tasks and solve problems"],
-  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Automation", "Learn to Code", "Introductory"]
+  "learning_outcomes": [
+    "Explain core Python programming concepts and syntax",
+    "Apply data structures like lists and dictionaries to store information",
+    "Construct programs using loops and conditional logic to control program flow",
+    "Create reusable functions to organize and simplify code",
+    "Develop simple scripts to automate basic tasks and solve problems"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Automation",
+    "Learn to Code",
+    "Introductory"
+  ]
 }

@@ -91,7 +91,7 @@ function createSoftEnumArraySchema<T extends string>(
       }
     }
 
-    if (unknown.length > 0) {
+    if (unknown.length > 0 && process.env.NODE_ENV === 'development') {
       console.warn(
         `[GenerationGuidance] Unknown ${fieldName} values filtered: ${unknown.join(', ')}. ` +
           `Known values: ${knownValues.join(', ')}`
@@ -109,18 +109,20 @@ function createSoftEnumArraySchema<T extends string>(
 export const SectionBreakdownSchema = z.object({
   area: z.string().min(1), // Removed .max(200) - allow detailed section names
   estimated_lessons: z.number().int().min(1, 'Section must have at least 1 lesson'),
-  importance: z.enum(['core', 'important', 'optional']),
+  importance: z.enum(['simple', 'normal', 'complex']),
   learning_objectives: z
     .array(z.string().min(1))
     .min(2, 'Must have at least 2 learning objectives'), // Removed .max(5) - encourage comprehensive objectives
   key_topics: z.array(z.string().min(1)).min(3, 'Must have at least 3 key topics'), // Removed .max(8) - allow extensive topic coverage
   pedagogical_approach: z.string().min(20, 'Pedagogical approach must be at least 20 characters'), // Removed .max(200) - encourage detailed approaches
-  difficulty_progression: z.enum(['flat', 'gradual', 'steep']),
+  // Deprecated: kept optional for backward compat with stored analysis data
+  difficulty_progression: z.enum(['flat', 'gradual', 'steep']).optional(),
 
   // NEW: Analyze Enhancement fields (optional for backward compatibility)
   section_id: z.string().optional(), // Unique identifier (e.g., "1", "2", "3")
   estimated_duration_hours: z.number().min(0.5).max(20).optional(), // Time to complete section
   difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(), // Difficulty level
+  // Deprecated: kept optional for backward compat with stored analysis data
   prerequisites: z.array(z.string()).optional(), // section_ids that must be completed first
 });
 
@@ -336,24 +338,6 @@ export const Phase2InputSchema = z.object({
 });
 
 /**
- * NEW: Pedagogical patterns schema (Analyze Enhancement)
- */
-export const PedagogicalPatternsSchema = z.object({
-  primary_strategy: z.enum([
-    'problem-based learning',
-    'lecture-based',
-    'inquiry-based',
-    'project-based',
-    'mixed',
-  ]),
-  theory_practice_ratio: z.string().regex(/^\d+:\d+$/, 'Must be format "XX:YY" (e.g., "30:70")'),
-  assessment_types: z.array(
-    z.enum(['coding', 'quizzes', 'projects', 'essays', 'presentations', 'peer-review'])
-  ),
-  key_patterns: z.array(z.string()), // e.g., ["build incrementally", "learn by refactoring"]
-});
-
-/**
  * Phase 1 output schema: Course classification and contextual language
  * Used to validate Phase 1 output before returning (enables retry-with-escalation)
  */
@@ -387,7 +371,6 @@ export const Phase1OutputSchema = z.object({
     key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
     domain_keywords: z.array(z.string()).min(5), // Removed .max(15) - allow extensive keyword coverage
   }),
-  pedagogical_patterns: PedagogicalPatternsSchema,
   phase_metadata: z.object({
     duration_ms: z.number().int().nonnegative(),
     model_used: z.string().min(1),
@@ -435,16 +418,6 @@ export const ResearchFlagSchema = z.object({
 });
 
 /**
- * Expansion area schema (Phase 3)
- */
-export const ExpansionAreaSchema = z.object({
-  area: z.string().min(3), // Removed .max(100) - allow detailed area descriptions
-  priority: z.enum(['critical', 'important', 'nice-to-have']),
-  specific_requirements: z.array(z.string()).min(1), // Removed .max(5) - encourage comprehensive requirements
-  estimated_lessons: z.number().int().min(1), // Removed .max(10) - let LLM decide optimal count
-});
-
-/**
  * Phase 3 output schema: Expert pedagogical analysis
  */
 export const Phase3OutputSchema = z.object({
@@ -453,7 +426,6 @@ export const Phase3OutputSchema = z.object({
     assessment_approach: z.string().min(50), // How learners demonstrate understanding
     progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
-  expansion_areas: z.array(ExpansionAreaSchema).nullable(),
   research_flags: z.array(ResearchFlagSchema),
   phase_metadata: z.object({
     duration_ms: z.number().int().min(0),
@@ -476,7 +448,6 @@ export const Phase4OutputSchema = z.object({
     specific_analogies: z.array(z.string()), // REQUIRED in Phase 4 output
     real_world_examples: z.array(z.string()), // REQUIRED in Phase 4 output
   }),
-  content_strategy: z.enum(['create_from_scratch', 'expand_and_enhance', 'optimize_existing']),
   phase_metadata: z.object({
     duration_ms: z.number().int().min(0),
     model_used: z.string(),
@@ -516,7 +487,7 @@ export const SectionRAGPlanSchema = z.object({
 });
 
 /**
- * NEW: Document relevance mapping schema (RAG Planning, CRITICAL for T022)
+ * Document relevance mapping schema (deprecated — kept for backward compat)
  */
 export const DocumentRelevanceMappingSchema = z.record(
   z.string(), // section_id
@@ -577,12 +548,7 @@ export const AnalysisResultSchema = z.object({
     progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
 
-  content_strategy: z.enum(['create_from_scratch', 'expand_and_enhance', 'optimize_existing']),
-  expansion_areas: z.array(ExpansionAreaSchema).nullable(),
   research_flags: z.array(ResearchFlagSchema),
-
-  // REQUIRED enhancement fields from Analyze Enhancement (production Best Practice)
-  pedagogical_patterns: PedagogicalPatternsSchema,
 
   generation_guidance: GenerationGuidanceSchema.extend({
     specific_analogies: z.array(z.string()), // REQUIRED
@@ -618,19 +584,16 @@ export type Phase2Output = z.infer<typeof Phase2OutputSchema>;
 export type Phase2Input = z.infer<typeof Phase2InputSchema>;
 export type Phase3Output = z.infer<typeof Phase3OutputSchema>;
 export type Phase4Output = z.infer<typeof Phase4OutputSchema>;
-export type PedagogicalPatterns = z.infer<typeof PedagogicalPatternsSchema>;
 export type GenerationGuidance = z.infer<typeof GenerationGuidanceSchema>;
 export type SectionRAGPlan = z.infer<typeof SectionRAGPlanSchema>;
 export type DocumentRelevanceMapping = z.infer<typeof DocumentRelevanceMappingSchema>;
 export type ResearchFlag = z.infer<typeof ResearchFlagSchema>;
-export type ExpansionArea = z.infer<typeof ExpansionAreaSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 
 /**
  * Input type aliases (for backward compatibility)
  */
 export type ResearchFlagInput = z.infer<typeof ResearchFlagSchema>;
-export type ExpansionAreaInput = z.infer<typeof ExpansionAreaSchema>;
 export type SectionBreakdownInput = z.infer<typeof SectionBreakdownSchema>;
 export type AnalysisResultInput = z.infer<typeof AnalysisResultSchema>;
 export type Phase1OutputInput = z.infer<typeof Phase1OutputSchema>;

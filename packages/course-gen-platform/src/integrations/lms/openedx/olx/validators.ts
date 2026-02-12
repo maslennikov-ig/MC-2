@@ -430,7 +430,7 @@ export function validateContentTypes(input: CourseInput): ContentValidationResul
         const location = `Chapter ${chapterIdx + 1}, Section ${sectionIdx + 1}, Unit ${unitIdx + 1} ("${unit.title}")`;
 
         // Check for video content
-        if (videoPatterns.some((pattern) => pattern.test(content))) {
+        if (videoPatterns.some(pattern => pattern.test(content))) {
           if (!issuedWarnings.has('video')) {
             warnings.push(
               'Video content detected: Open edX will render video elements as placeholder text. ' +
@@ -442,7 +442,7 @@ export function validateContentTypes(input: CourseInput): ContentValidationResul
         }
 
         // Check for quiz/assessment content
-        if (quizPatterns.some((pattern) => pattern.test(content))) {
+        if (quizPatterns.some(pattern => pattern.test(content))) {
           if (!issuedWarnings.has('quiz')) {
             warnings.push(
               'Quiz/assessment content detected: Interactive quizzes and assessments are not supported in the current MVP. ' +

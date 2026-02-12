@@ -9,8 +9,10 @@
 ## High Priority (Stage 0 Completion)
 
 ### 1. Server Cleanup Handlers
+
 **File**: `src/server/index.ts:344`
 **TODO**: Add cleanup for:
+
 - Worker connections
 - Queue connections
 - Redis client
@@ -23,11 +25,13 @@
 **Action**: Create GitHub issue
 
 **Impact**:
+
 - Without cleanup, server shutdown may leave dangling connections
 - Could cause connection pool exhaustion in production
 - Important for container orchestration (Docker/Kubernetes)
 
 **Suggested Implementation**:
+
 ```typescript
 process.on('SIGTERM', async () => {
   await worker.close();
@@ -41,8 +45,10 @@ process.on('SIGTERM', async () => {
 ---
 
 ### 2. Stalled Job Recovery
+
 **File**: `src/orchestrator/handlers/error-handler.ts:222`
 **TODO**: Implement stalled job recovery
+
 - Detect jobs stuck in 'active' state
 - Auto-retry or move to failed queue
 
@@ -53,11 +59,13 @@ process.on('SIGTERM', async () => {
 **Action**: Create GitHub issue
 
 **Impact**:
+
 - Jobs that crash without cleanup remain in 'active' state forever
 - Blocks queue processing and wastes resources
 - Critical for production reliability
 
 **Suggested Implementation**:
+
 ```typescript
 // In error-handler.ts
 export async function recoverStalledJobs() {
@@ -77,8 +85,10 @@ export async function recoverStalledJobs() {
 ## Medium Priority (Future Enhancement)
 
 ### 3. Failure Notifications
+
 **File**: `src/orchestrator/handlers/error-handler.ts:199`
 **TODO**: Send failure notifications
+
 - Email alerts for critical errors
 - Webhook notifications for integrations
 
@@ -89,6 +99,7 @@ export async function recoverStalledJobs() {
 **Action**: Create GitHub issue for Stage 1
 
 **Impact**:
+
 - Users don't get notified when generation fails
 - Requires email infrastructure (not in Stage 0 scope)
 - Can be added incrementally
@@ -96,8 +107,10 @@ export async function recoverStalledJobs() {
 ---
 
 ### 4. Timeout-Specific Handling
+
 **File**: `src/orchestrator/handlers/error-handler.ts:244`
 **TODO**: Implement timeout-specific handling
+
 - Different retry logic for timeouts
 - Exponential backoff for timeout retries
 
@@ -108,6 +121,7 @@ export async function recoverStalledJobs() {
 **Action**: Create GitHub issue
 
 **Impact**:
+
 - Generic error handling may not be optimal for timeouts
 - Timeouts often indicate external service issues (better to retry)
 - Can be implemented when needed based on production metrics
@@ -117,8 +131,10 @@ export async function recoverStalledJobs() {
 ## Low Priority (Stage 1+ Deferred)
 
 ### 5-8. Stage 1 Placeholders (initialize.ts)
+
 **File**: `src/orchestrator/handlers/initialize.ts:49,57,65,73`
 **TODOs**:
+
 - Line 49: Validate course configuration
 - Line 57: Create course record in database
 - Line 65: Initialize course generation state
@@ -131,6 +147,7 @@ export async function recoverStalledJobs() {
 **Action**: Document as Stage 1 requirements
 
 **Impact**:
+
 - These are intentional placeholders for Stage 1 development
 - Stage 0 only validates infrastructure
 - No action needed now
@@ -138,8 +155,10 @@ export async function recoverStalledJobs() {
 ---
 
 ### 9. Worker Handler Registration
+
 **File**: `src/orchestrator/worker.ts:46`
 **TODO**: Register additional handlers
+
 - Document processing handler
 - Generation handler
 - Post-processing handler
@@ -151,6 +170,7 @@ export async function recoverStalledJobs() {
 **Action**: Document as Stage 1 requirements
 
 **Impact**:
+
 - Stage 0 only has INITIALIZE handler
 - Additional handlers come in later stages
 - No action needed now
@@ -158,8 +178,10 @@ export async function recoverStalledJobs() {
 ---
 
 ### 10. Cache Detection (docling)
+
 **File**: `src/shared/docling/client.ts:242`
 **TODO**: Detect cache hits from response
+
 - Parse Docling response headers
 - Determine if result came from cache
 
@@ -170,6 +192,7 @@ export async function recoverStalledJobs() {
 **Action**: Create GitHub issue as enhancement
 
 **Impact**:
+
 - Currently hardcoded to `from_cache: false`
 - Would help with debugging and monitoring
 - Not critical for functionality
@@ -179,11 +202,13 @@ export async function recoverStalledJobs() {
 ## Summary
 
 ### By Priority
+
 - **HIGH**: 2 TODOs (10 hours effort)
 - **MEDIUM**: 2 TODOs (7 hours effort)
 - **LOW**: 6 TODOs (Stage 1 deferred or low-impact)
 
 ### Recommended Actions
+
 1. **Immediate** (Stage 0 Completion):
    - Create GitHub issue for server cleanup handlers (#1)
    - Create GitHub issue for stalled job recovery (#2)
@@ -199,30 +224,35 @@ export async function recoverStalledJobs() {
 ### GitHub Issues to Create
 
 **Issue #1: Implement Graceful Shutdown Handlers**
+
 - Title: "Add cleanup for worker/queue/Redis connections on server shutdown"
 - Labels: reliability, production, medium-priority
 - Milestone: Stage 0 Completion
 - Effort: 2 hours
 
 **Issue #2: Implement Stalled Job Recovery**
+
 - Title: "Detect and recover stalled BullMQ jobs"
 - Labels: reliability, production, high-priority
 - Milestone: Stage 0 Completion
 - Effort: 8 hours
 
 **Issue #3: Implement Failure Notifications**
+
 - Title: "Send email/webhook notifications for job failures"
 - Labels: feature, monitoring, medium-priority
 - Milestone: Stage 1
 - Effort: 4 hours
 
 **Issue #4: Improve Timeout Error Handling**
+
 - Title: "Implement retry logic specific to timeout errors"
 - Labels: enhancement, error-handling, medium-priority
 - Milestone: Future
 - Effort: 3 hours
 
 **Issue #5: Detect Docling Cache Hits**
+
 - Title: "Parse Docling response to detect cache hits"
 - Labels: enhancement, observability, low-priority
 - Milestone: Backlog

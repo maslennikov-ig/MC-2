@@ -43,7 +43,7 @@ export function generateCourseXml(
   chapters: Array<{ url_name: string }>
 ): string {
   const chapterRefs = chapters
-    .map((chapter) => `  <chapter url_name="${xmlEscape(chapter.url_name)}"/>`)
+    .map(chapter => `  <chapter url_name="${xmlEscape(chapter.url_name)}"/>`)
     .join('\n');
 
   const startAttr = meta.start ? ` start="${xmlEscape(meta.start)}"` : '';

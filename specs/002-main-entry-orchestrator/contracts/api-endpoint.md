@@ -26,12 +26,13 @@ This endpoint replaces the n8n Main Entry webhook, accepting course generation r
 
 ### Headers
 
-| Header | Type | Required | Description |
-|--------|------|----------|-------------|
-| `Authorization` | string | ✅ Yes | Bearer token from Supabase Auth session |
-| `Content-Type` | string | ✅ Yes | Must be `application/json` |
+| Header          | Type   | Required | Description                             |
+| --------------- | ------ | -------- | --------------------------------------- |
+| `Authorization` | string | ✅ Yes   | Bearer token from Supabase Auth session |
+| `Content-Type`  | string | ✅ Yes   | Must be `application/json`              |
 
 **Example**:
+
 ```http
 POST /api/coursegen/generate HTTP/1.1
 Host: api.megacampusai.com
@@ -41,12 +42,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### Body
 
-| Field | Type | Required | Constraints | Description |
-|-------|------|----------|-------------|-------------|
-| `courseId` | string | ✅ Yes | Valid UUID | Course ID to generate |
-| `webhookUrl` | string | ❌ No | Valid URL or null | Optional callback URL for progress updates |
+| Field        | Type   | Required | Constraints       | Description                                |
+| ------------ | ------ | -------- | ----------------- | ------------------------------------------ |
+| `courseId`   | string | ✅ Yes   | Valid UUID        | Course ID to generate                      |
+| `webhookUrl` | string | ❌ No    | Valid URL or null | Optional callback URL for progress updates |
 
 **JSON Schema**:
+
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -69,6 +71,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 **Example**:
+
 ```json
 {
   "courseId": "550e8400-e29b-41d4-a716-446655440000",
@@ -85,6 +88,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Status Code**: `200 OK`
 
 **Body**:
+
 ```typescript
 {
   success: true,
@@ -94,6 +98,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 **Example**:
+
 ```json
 {
   "success": true,
@@ -111,11 +116,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Status Code**: `400 Bad Request`
 
 **Causes**:
+
 - Missing `courseId` field
 - Invalid UUID format
 - Invalid JSON body
 
 **Body**:
+
 ```typescript
 {
   error: string,
@@ -124,6 +131,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 **Example**:
+
 ```json
 {
   "error": "Invalid courseId format",
@@ -142,19 +150,22 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Status Code**: `401 Unauthorized`
 
 **Causes**:
+
 - Missing `Authorization` header
 - Invalid JWT token
 - Expired token
 - Token signature verification failed
 
 **Body**:
+
 ```typescript
 {
-  error: string
+  error: string;
 }
 ```
 
 **Example**:
+
 ```json
 {
   "error": "Unauthorized: Invalid or missing authentication token"
@@ -168,17 +179,20 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Status Code**: `403 Forbidden`
 
 **Causes**:
+
 - Course belongs to different user
 - User trying to access another user's course
 
 **Body**:
+
 ```typescript
 {
-  error: string
+  error: string;
 }
 ```
 
 **Example**:
+
 ```json
 {
   "error": "Forbidden: You do not have access to this course"
@@ -192,17 +206,20 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Status Code**: `404 Not Found`
 
 **Causes**:
+
 - `courseId` does not exist in database
 - Course was deleted
 
 **Body**:
+
 ```typescript
 {
-  error: string
+  error: string;
 }
 ```
 
 **Example**:
+
 ```json
 {
   "error": "Course not found"
@@ -216,10 +233,12 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Status Code**: `429 Too Many Requests`
 
 **Causes**:
+
 - User exceeded per-tier concurrent job limit
 - Global concurrency limit reached
 
 **Body**:
+
 ```typescript
 {
   error: string,
@@ -234,6 +253,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 **Example (User Limit)**:
+
 ```json
 {
   "error": "Too many concurrent jobs. FREE tier allows 1 concurrent course generation.",
@@ -246,6 +266,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 **Example (Global Limit)**:
+
 ```json
 {
   "error": "System at capacity. Please try again in a few minutes.",
@@ -266,18 +287,21 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Status Code**: `500 Internal Server Error`
 
 **Causes**:
+
 - RPC `update_course_progress` failed after 3 retries
 - Redis connection failure
 - BullMQ job creation failed
 
 **Body**:
+
 ```typescript
 {
-  error: string
+  error: string;
 }
 ```
 
 **Example**:
+
 ```json
 {
   "error": "Не удалось инициализировать генерацию курса. Попробуйте позже."
@@ -333,6 +357,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ### Job Creation Flow
 
 1. Prepare job data:
+
    ```typescript
    {
      jobType: hasFiles ? 'DOCUMENT_PROCESSING' : 'STRUCTURE_ANALYSIS',
@@ -357,10 +382,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
    ```
 
 2. Add job to BullMQ:
+
    ```typescript
    const job = await queue.add(jobType, jobData, {
      priority: TIER_PRIORITY[tier],
-     jobId: `course-gen-${Date.now()}-${nanoid(6)}`
+     jobId: `course-gen-${Date.now()}-${nanoid(6)}`,
    });
    ```
 
@@ -369,24 +395,28 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ### Progress Update Flow (Saga Pattern)
 
 1. Call RPC `update_course_progress` with retry:
+
    ```typescript
-   await retryWithBackoff(async () => {
-     return await supabase.rpc('update_course_progress', {
-       p_course_id: courseId,
-       p_step_id: 1,
-       p_status: 'completed',
-       p_message: 'Инициализация завершена',
-       p_metadata: {
-         job_id: jobId,
-         executor: 'orchestrator',
-         tier: tier,
-         priority: TIER_PRIORITY[tier]
-       }
-     });
-   }, {
-     attempts: 3,
-     backoff: [100, 200, 400] // exponential backoff in ms
-   });
+   await retryWithBackoff(
+     async () => {
+       return await supabase.rpc('update_course_progress', {
+         p_course_id: courseId,
+         p_step_id: 1,
+         p_status: 'completed',
+         p_message: 'Инициализация завершена',
+         p_metadata: {
+           job_id: jobId,
+           executor: 'orchestrator',
+           tier: tier,
+           priority: TIER_PRIORITY[tier],
+         },
+       });
+     },
+     {
+       attempts: 3,
+       backoff: [100, 200, 400], // exponential backoff in ms
+     }
+   );
    ```
 
 2. On retry failure → Execute compensation:
@@ -403,8 +433,8 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
        metadata: {
          reason: 'rpc_update_course_progress_failed',
          attempts: 3,
-         last_error: error.message
-       }
+         last_error: error.message,
+       },
      });
      ```
    - Return 500 Internal Server Error
@@ -416,6 +446,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ## Rate Limiting
 
 **Per-User Limits** (enforced by concurrency check):
+
 - FREE: 1 concurrent job
 - BASIC: 2 concurrent jobs
 - STANDARD: 3 concurrent jobs
@@ -423,12 +454,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - PREMIUM: 5 concurrent jobs
 
 **Global Limit** (shared across all users):
+
 - Stage 1: Hardcoded to `3` concurrent jobs
 - Stage 8: Dynamic (3-10) based on system load
 
 **Time Window**: Not time-based, count-based (concurrent jobs)
 
 **429 Response Headers** (optional for Stage 2+):
+
 ```
 Retry-After: 60
 X-RateLimit-Limit: 1
@@ -500,18 +533,21 @@ X-RateLimit-Reset: 1698765432
 All requests logged with Pino structured JSON:
 
 ```typescript
-logger.child({
-  requestId: nanoid(),
-  userId: userId,
-  tier: tier,
-  courseId: courseId,
-  endpoint: '/api/coursegen/generate'
-}).info('Course generation request received');
+logger
+  .child({
+    requestId: nanoid(),
+    userId: userId,
+    tier: tier,
+    courseId: courseId,
+    endpoint: '/api/coursegen/generate',
+  })
+  .info('Course generation request received');
 ```
 
 ### Metrics
 
 Written to `system_metrics` table:
+
 - `job_rollback` - RPC failure after retries
 - `concurrency_limit_hit` - 429 responses
 - `rpc_retry_exhausted` - All 3 RPC attempts failed
@@ -618,7 +654,7 @@ describe('API Contract Validation', () => {
     const response = {
       success: true,
       jobId: 'course-gen-1234',
-      message: 'Генерация курса инициализирована'
+      message: 'Генерация курса инициализирована',
     };
 
     expect(response).toMatchSchema(schemas.post_coursegen_generate_200);
@@ -630,8 +666,8 @@ describe('API Contract Validation', () => {
       details: {
         tier: 'FREE',
         user_limit: 1,
-        current_user_jobs: 1
-      }
+        current_user_jobs: 1,
+      },
     };
 
     expect(response).toMatchSchema(schemas.post_coursegen_generate_429);

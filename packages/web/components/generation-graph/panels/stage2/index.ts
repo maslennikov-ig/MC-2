@@ -6,11 +6,11 @@
  */
 
 // Components
-export { Stage2InputTab } from './Stage2InputTab';
-export { Stage2ProcessTab } from './Stage2ProcessTab';
-export { Stage2OutputTab } from './Stage2OutputTab';
-export { Stage2ActivityTab } from './Stage2ActivityTab';
-export { Stage2Dashboard } from './Stage2Dashboard';
+export { Stage2InputTab } from './Stage2InputTab'
+export { Stage2ProcessTab } from './Stage2ProcessTab'
+export { Stage2OutputTab } from './Stage2OutputTab'
+export { Stage2ActivityTab } from './Stage2ActivityTab'
+export { Stage2Dashboard } from './Stage2Dashboard'
 
 // Types
 export type {
@@ -28,12 +28,9 @@ export type {
   Stage2ProcessTabProps,
   Stage2OutputTabProps,
   Stage2ActivityTabProps,
-} from './types';
+} from './types'
 
-export type {
-  Stage2DashboardData,
-  DocumentMatrixRow,
-} from './Stage2Dashboard';
+export type { Stage2DashboardData, DocumentMatrixRow } from './Stage2Dashboard'
 
 // Utilities
-export { getTierFeatures } from './types';
+export { getTierFeatures } from './types'

@@ -166,6 +166,9 @@ const DEFAULT_CONFIG: Required<RAGCacheConfig> = {
  * ```
  */
 export class RAGContextCache {
+  /** Maximum cache entries before eviction */
+  private static readonly MAX_ENTRIES = 5000;
+
   /** In-memory cache: ragContextId -> CachedRAGContext */
   private cache: Map<string, CachedRAGContext>;
 
@@ -204,10 +207,13 @@ export class RAGContextCache {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.stats = { hits: 0, misses: 0 };
 
-    logger.debug({
-      maxEntriesPerCourse: this.config.maxEntriesPerCourse,
-      enablePersistence: this.config.enablePersistence,
-    }, '[RAG Cache] Initialized');
+    logger.debug(
+      {
+        maxEntriesPerCourse: this.config.maxEntriesPerCourse,
+        enablePersistence: this.config.enablePersistence,
+      },
+      '[RAG Cache] Initialized'
+    );
   }
 
   /**
@@ -232,11 +238,29 @@ export class RAGContextCache {
    * // ragContextId = 'rag_course-uuid-123_1_1700000000000'
    * ```
    */
-  async store(
-    courseId: string,
-    sectionId: string,
-    result: SectionRAGResult
-  ): Promise<string> {
+  async store(courseId: string, sectionId: string, result: SectionRAGResult): Promise<string> {
+    // Evict oldest entries if cache exceeds max size
+    if (this.cache.size >= RAGContextCache.MAX_ENTRIES) {
+      const toEvict = Math.floor(this.cache.size * 0.2);
+      const keys = Array.from(this.cache.keys());
+      for (let i = 0; i < toEvict; i++) {
+        const key = keys[i];
+        // Clean up courseEntries index before deleting from cache
+        const entry = this.cache.get(key);
+        if (entry) {
+          const courseSet = this.courseEntries.get(entry.courseId);
+          if (courseSet) {
+            courseSet.delete(key);
+            if (courseSet.size === 0) {
+              this.courseEntries.delete(entry.courseId);
+            }
+          }
+        }
+        this.cache.delete(key);
+      }
+      logger.warn({ evicted: toEvict, remaining: this.cache.size }, '[RAGContextCache] Evicted entries due to max size');
+    }
+
     // Generate unique rag_context_id
     const ragContextId = this.generateContextId(courseId, sectionId);
 
@@ -263,13 +287,16 @@ export class RAGContextCache {
     }
     this.courseEntries.get(courseId)!.add(ragContextId);
 
-    logger.debug({
-      ragContextId,
-      courseId,
-      sectionId,
-      chunkCount: entry.chunks.length,
-      coverageScore: entry.coverageScore.toFixed(2),
-    }, '[RAG Cache] Stored context');
+    logger.debug(
+      {
+        ragContextId,
+        courseId,
+        sectionId,
+        chunkCount: entry.chunks.length,
+        coverageScore: entry.coverageScore.toFixed(2),
+      },
+      '[RAG Cache] Stored context'
+    );
 
     // Persist to Supabase if enabled
     if (this.config.enablePersistence) {
@@ -301,10 +328,13 @@ export class RAGContextCache {
 
     if (cached) {
       this.stats.hits++;
-      logger.debug({
-        ragContextId,
-        source: 'memory',
-      }, '[RAG Cache] Cache hit');
+      logger.debug(
+        {
+          ragContextId,
+          source: 'memory',
+        },
+        '[RAG Cache] Cache hit'
+      );
       return cached;
     }
 
@@ -320,18 +350,24 @@ export class RAGContextCache {
         this.courseEntries.get(persisted.courseId)!.add(ragContextId);
 
         this.stats.hits++;
-        logger.debug({
-          ragContextId,
-          source: 'supabase',
-        }, '[RAG Cache] Cache hit (from persistence)');
+        logger.debug(
+          {
+            ragContextId,
+            source: 'supabase',
+          },
+          '[RAG Cache] Cache hit (from persistence)'
+        );
         return persisted;
       }
     }
 
     this.stats.misses++;
-    logger.debug({
-      ragContextId,
-    }, '[RAG Cache] Cache miss');
+    logger.debug(
+      {
+        ragContextId,
+      },
+      '[RAG Cache] Cache miss'
+    );
     return null;
   }
 
@@ -390,11 +426,14 @@ export class RAGContextCache {
     }
 
     // Cache miss - retrieve fresh context
-    logger.debug({
-      ragContextId,
-      courseId,
-      sectionId,
-    }, '[RAG Cache] Cache miss - retrieving fresh context');
+    logger.debug(
+      {
+        ragContextId,
+        courseId,
+        sectionId,
+      },
+      '[RAG Cache] Cache miss - retrieving fresh context'
+    );
 
     const result = await retriever();
 
@@ -423,10 +462,13 @@ export class RAGContextCache {
       await this.persistToSupabase(entry);
     }
 
-    logger.debug({
-      ragContextId,
-      chunkCount: entry.chunks.length,
-    }, '[RAG Cache] Stored fresh context');
+    logger.debug(
+      {
+        ragContextId,
+        chunkCount: entry.chunks.length,
+      },
+      '[RAG Cache] Stored fresh context'
+    );
 
     return entry;
   }
@@ -449,9 +491,12 @@ export class RAGContextCache {
     const contextIds = this.courseEntries.get(courseId);
 
     if (!contextIds || contextIds.size === 0) {
-      logger.debug({
-        courseId,
-      }, '[RAG Cache] No entries to clear for course');
+      logger.debug(
+        {
+          courseId,
+        },
+        '[RAG Cache] No entries to clear for course'
+      );
       return;
     }
 
@@ -468,10 +513,13 @@ export class RAGContextCache {
       await this.clearCourseFromSupabase(courseId);
     }
 
-    logger.info({
-      courseId,
-      entriesCleared: count,
-    }, '[RAG Cache] Cleared course entries');
+    logger.info(
+      {
+        courseId,
+        entriesCleared: count,
+      },
+      '[RAG Cache] Cleared course entries'
+    );
   }
 
   /**
@@ -492,10 +540,13 @@ export class RAGContextCache {
     this.courseEntries.clear();
     this.stats = { hits: 0, misses: 0 };
 
-    logger.info({
-      entriesCleared: totalEntries,
-      coursesCleared: courseCount,
-    }, '[RAG Cache] Cache cleared');
+    logger.info(
+      {
+        entriesCleared: totalEntries,
+        coursesCleared: courseCount,
+      },
+      '[RAG Cache] Cache cleared'
+    );
     return Promise.resolve();
   }
 
@@ -570,11 +621,14 @@ export class RAGContextCache {
         contextIds.delete(entry.ragContextId);
       }
 
-      logger.debug({
-        courseId,
-        removed: toRemove.length,
-        remaining: contextIds.size,
-      }, '[RAG Cache] Evicted oldest entries');
+      logger.debug(
+        {
+          courseId,
+          removed: toRemove.length,
+          remaining: contextIds.size,
+        },
+        '[RAG Cache] Evicted oldest entries'
+      );
     }
   }
 
@@ -589,9 +643,8 @@ export class RAGContextCache {
     try {
       const supabase = getSupabaseAdmin() as unknown as SupabaseClient<LocalDatabase>;
 
-      const { error } = await supabase
-        .from('rag_context_cache')
-        .upsert({
+      const { error } = await supabase.from('rag_context_cache').upsert(
+        {
           course_id: entry.courseId,
           section_id: entry.sectionId,
           rag_context_id: entry.ragContextId,
@@ -600,25 +653,36 @@ export class RAGContextCache {
           search_queries_used: entry.searchQueriesUsed,
           created_at: entry.retrievedAt.toISOString(),
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour expiry
-        }, {
+        },
+        {
           onConflict: 'rag_context_id',
-        });
+        }
+      );
 
       if (error) {
-        logger.warn({
-          err: error.message,
-          ragContextId: entry.ragContextId,
-        }, '[RAG Cache] Failed to persist to Supabase');
+        logger.warn(
+          {
+            err: error.message,
+            ragContextId: entry.ragContextId,
+          },
+          '[RAG Cache] Failed to persist to Supabase'
+        );
       } else {
-        logger.debug({
-          ragContextId: entry.ragContextId,
-        }, '[RAG Cache] Persisted to Supabase');
+        logger.debug(
+          {
+            ragContextId: entry.ragContextId,
+          },
+          '[RAG Cache] Persisted to Supabase'
+        );
       }
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        ragContextId: entry.ragContextId,
-      }, '[RAG Cache] Supabase persistence error');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          ragContextId: entry.ragContextId,
+        },
+        '[RAG Cache] Supabase persistence error'
+      );
     }
   }
 
@@ -648,9 +712,12 @@ export class RAGContextCache {
 
       // Check if expired
       if (row.expires_at && new Date(row.expires_at) < new Date()) {
-        logger.debug({
-          ragContextId,
-        }, '[RAG Cache] Supabase entry expired');
+        logger.debug(
+          {
+            ragContextId,
+          },
+          '[RAG Cache] Supabase entry expired'
+        );
         return null;
       }
 
@@ -664,10 +731,13 @@ export class RAGContextCache {
         searchQueriesUsed: row.search_queries_used || [],
       };
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        ragContextId,
-      }, '[RAG Cache] Failed to load from Supabase');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          ragContextId,
+        },
+        '[RAG Cache] Failed to load from Supabase'
+      );
       return null;
     }
   }
@@ -691,10 +761,13 @@ export class RAGContextCache {
         .gt('expires_at', new Date().toISOString());
 
       if (error) {
-        logger.warn({
-          err: error.message,
-          courseId,
-        }, '[RAG Cache] Failed to load from Supabase');
+        logger.warn(
+          {
+            err: error.message,
+            courseId,
+          },
+          '[RAG Cache] Failed to load from Supabase'
+        );
         return;
       }
 
@@ -723,15 +796,21 @@ export class RAGContextCache {
         this.courseEntries.get(courseId)!.add(entry.ragContextId);
       }
 
-      logger.debug({
-        courseId,
-        entriesLoaded: data.length,
-      }, '[RAG Cache] Loaded from Supabase');
+      logger.debug(
+        {
+          courseId,
+          entriesLoaded: data.length,
+        },
+        '[RAG Cache] Loaded from Supabase'
+      );
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        courseId,
-      }, '[RAG Cache] Supabase load error');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          courseId,
+        },
+        '[RAG Cache] Supabase load error'
+      );
     }
   }
 
@@ -744,26 +823,32 @@ export class RAGContextCache {
     try {
       const supabase = getSupabaseAdmin() as unknown as SupabaseClient<LocalDatabase>;
 
-      const { error } = await supabase
-        .from('rag_context_cache')
-        .delete()
-        .eq('course_id', courseId);
+      const { error } = await supabase.from('rag_context_cache').delete().eq('course_id', courseId);
 
       if (error) {
-        logger.warn({
-          err: error.message,
-          courseId,
-        }, '[RAG Cache] Failed to clear from Supabase');
+        logger.warn(
+          {
+            err: error.message,
+            courseId,
+          },
+          '[RAG Cache] Failed to clear from Supabase'
+        );
       } else {
-        logger.debug({
-          courseId,
-        }, '[RAG Cache] Cleared from Supabase');
+        logger.debug(
+          {
+            courseId,
+          },
+          '[RAG Cache] Cleared from Supabase'
+        );
       }
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        courseId,
-      }, '[RAG Cache] Supabase clear error');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          courseId,
+        },
+        '[RAG Cache] Supabase clear error'
+      );
     }
   }
 }

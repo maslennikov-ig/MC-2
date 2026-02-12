@@ -20,7 +20,7 @@ import {
   CourseMetadataSchema,
   CourseMetadataWithoutInjectedFieldsSchema,
 } from '@megacampus/shared-types/generation-result';
-import { getStylePrompt } from '@megacampus/shared-types/style-prompts';
+import { getStylePrompt, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import { z } from 'zod';
@@ -29,13 +29,13 @@ import {
   getCategoryFromAnalysis,
   formatPedagogicalStrategyForPrompt,
 } from './analysis-formatters';
-import { normalizeLanguageCode } from '@/shared/utils/language-utils';
+import { normalizeLanguageCode } from '@megacampus/shared-utils';
 import { buildUserContextSection } from './prompt-helpers';
 import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm/cost-calculator';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import logger from '@/shared/logger';
-import { getModelForPhase } from '@/shared/llm/langchain-models';
+import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 
 // ============================================================================
 // CONSTANTS
@@ -156,7 +156,7 @@ export class MetadataGenerator {
     const language = this.extractLanguage(input);
 
     // Step 2: Get style prompt (FR-028)
-    const style = input.frontend_parameters.style || 'conversational';
+    const style = input.frontend_parameters.style || DEFAULT_COURSE_STYLE;
     const stylePrompt = getStylePrompt(style);
 
     // Step 3: Build metadata prompt
@@ -238,7 +238,7 @@ export class MetadataGenerator {
 
     // Invoke model
     const response = await model.invoke(prompt);
-    const rawContent = response.content.toString();
+    const rawContent = getTextContent(response.content);
 
     // TIER 1: PREPROCESSING (before UnifiedRegenerator)
     // Stage 5: NO warning fallback - database must be strict
@@ -249,18 +249,8 @@ export class MetadataGenerator {
       if (parsedRaw.learning_outcomes && Array.isArray(parsedRaw.learning_outcomes)) {
         parsedRaw.learning_outcomes = parsedRaw.learning_outcomes.map((outcome: unknown) =>
           preprocessObject(outcome as Record<string, unknown>, {
-            cognitiveLevel: 'enum',
             difficulty_level: 'enum',
           })
-        );
-      }
-      // Preprocess pedagogical_strategy if present
-      if (parsedRaw.pedagogical_strategy) {
-        parsedRaw.pedagogical_strategy = preprocessObject(
-          parsedRaw.pedagogical_strategy as Record<string, unknown>,
-          {
-            primary_strategy: 'enum',
-          }
         );
       }
       preprocessedContent = JSON.stringify(parsedRaw);
@@ -570,7 +560,9 @@ You MUST respond with valid JSON matching this schema:
 ${schemaDescription}
 
 **Quality Requirements**:
-1. Learning outcomes must be measurable and use action verbs (Bloom's taxonomy)
+1. Learning outcomes MUST use measurable action verbs (Bloom's taxonomy).
+   BAD: "Understand X", "Know Y", "Learn Z", "Be familiar with X" (non-measurable, cannot assess)
+   GOOD: "Explain X", "Implement Y", "Design Z", "Compare X and Y" (measurable, verifiable)
 2. Course overview must comprehensively describe course content and value
 3. Target audience must clearly define who will benefit from this course
 4. Assessment strategy must align with pedagogical approach and learning outcomes
@@ -608,7 +600,7 @@ ${schemaDescription}
       'estimated_duration_hours',
       'difficulty_level',
       'learning_outcomes',
-      'assessment_strategy',
+      // 'assessment_strategy' REMOVED — not consumed by Stage 6 or downstream
       'course_tags',
     ];
 
@@ -765,7 +757,7 @@ ${schemaDescription}
       difficulty_level: parsed.difficulty_level,
       prerequisites: parsed.prerequisites,
       learning_outcomes: parsed.learning_outcomes,
-      assessment_strategy: parsed.assessment_strategy,
+      // assessment_strategy: REMOVED — not consumed by Stage 6 or downstream
       course_tags: parsed.course_tags,
     };
   }

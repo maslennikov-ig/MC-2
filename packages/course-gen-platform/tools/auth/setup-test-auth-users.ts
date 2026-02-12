@@ -21,23 +21,25 @@ interface TestUser {
   role: string;
 }
 
+const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || 'test-password-secure-local';
+
 const TEST_USERS: TestUser[] = [
   {
     id: '00000000-0000-0000-0000-000000000012',
     email: 'test-instructor1@megacampus.com',
-    password: 'test-password-123',
+    password: TEST_PASSWORD,
     role: 'instructor',
   },
   {
     id: '00000000-0000-0000-0000-000000000013',
     email: 'test-instructor2@megacampus.com',
-    password: 'test-password-456',
+    password: TEST_PASSWORD,
     role: 'instructor',
   },
   {
     id: '00000000-0000-0000-0000-000000000014',
     email: 'test-student@megacampus.com',
-    password: 'test-password-789',
+    password: TEST_PASSWORD,
     role: 'student',
   },
 ];
@@ -61,7 +63,9 @@ async function setupTestAuthUsers() {
   // Step 2: Cleanup existing test users
   console.log('Step 2: Cleaning up existing test users...');
   for (const testUser of TEST_USERS) {
-    const existingUser = existingUsers.users.find((u) => u.email === testUser.email || u.id === testUser.id);
+    const existingUser = existingUsers.users.find(
+      u => u.email === testUser.email || u.id === testUser.id
+    );
 
     if (existingUser) {
       console.log(`  Deleting existing user: ${existingUser.email} (${existingUser.id})`);
@@ -106,8 +110,8 @@ async function setupTestAuthUsers() {
   console.log('SUMMARY');
   console.log('='.repeat(60));
 
-  const successCount = results.filter((r) => r.success).length;
-  const failCount = results.filter((r) => !r.success).length;
+  const successCount = results.filter(r => r.success).length;
+  const failCount = results.filter(r => !r.success).length;
 
   console.log(`✅ Successfully created: ${successCount}/${TEST_USERS.length}`);
   console.log(`❌ Failed: ${failCount}/${TEST_USERS.length}`);
@@ -115,8 +119,8 @@ async function setupTestAuthUsers() {
   if (failCount > 0) {
     console.log('\nFailed users:');
     results
-      .filter((r) => !r.success)
-      .forEach((r) => {
+      .filter(r => !r.success)
+      .forEach(r => {
         console.log(`  - ${r.user}: ${r.error?.message || 'Unknown error'}`);
       });
   }
@@ -126,7 +130,7 @@ async function setupTestAuthUsers() {
   process.exit(failCount > 0 ? 1 : 0);
 }
 
-setupTestAuthUsers().catch((error) => {
+setupTestAuthUsers().catch(error => {
   console.error('Fatal error:', error);
   process.exit(1);
 });

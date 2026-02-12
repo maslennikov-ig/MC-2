@@ -6,11 +6,13 @@ import { cookies } from 'next/headers'
 
 export async function checkAuthStatus() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   return {
     isAuthenticated: !!user,
-    user: user ? { id: user.id, email: user.email } : null
+    user: user ? { id: user.id, email: user.email } : null,
   }
 }
 
@@ -20,19 +22,21 @@ export async function refreshAuthState() {
   revalidatePath('/courses', 'layout')
   revalidatePath('/create', 'layout')
   revalidatePath('/courses/[orgSlug]/[courseSlug]', 'layout')
-  
+
   // Revalidate auth tag if we use it
   revalidateTag('auth')
-  
+
   // Force cookies refresh
   await cookies()
   const supabase = await createClient()
-  
+
   // Verify session is valid
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  return { 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  return {
     success: true,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
   }
 }

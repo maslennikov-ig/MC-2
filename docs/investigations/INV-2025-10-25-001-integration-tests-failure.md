@@ -21,6 +21,7 @@ duration: 45min
 Comprehensive investigation of integration test failures in the document processing pipeline revealed **4 critical root causes** affecting 15 out of 17 tests. The failures stem from incomplete implementation, missing error handling, and architectural mismatches between the handler implementation and test expectations.
 
 **Root Causes Identified**:
+
 1. **Docling MCP JSON Parsing Error**: MCP server returns error messages as plain text instead of structured JSON, causing parse failures
 2. **Vector Indexing Pipeline Incomplete**: document-processing handler stops at 'indexing' status without completing embedding/upload, causing 60s timeouts
 3. **Error Message Propagation Failure**: Error handling chain doesn't reliably extract and store error messages
@@ -46,17 +47,21 @@ Comprehensive investigation of integration test failures in the document process
 **Three Failure Patterns**:
 
 1. **PDF Processing JSON Parse Error** (3 tests):
+
    ```
    Unexpected token 'E', "Error exec..." is not valid JSON
    ```
+
    - Affects: TRIAL/STANDARD/PREMIUM tier PDF tests
    - Immediate failure, no timeout
 
 2. **Vector Indexing Timeout** (13 tests):
+
    ```
    Test timed out in 60000ms
    Jobs stuck waiting for vector_status='indexed'
    ```
+
    - Affects: All TXT and DOCX file tests across all tiers
    - All timeout after exactly 60 seconds
    - Tests continuously poll file_catalog.vector_status
@@ -69,6 +74,7 @@ Comprehensive investigation of integration test failures in the document process
 ### Expected Behavior
 
 **For Document Processing Tests**:
+
 1. File uploaded to file_catalog with vector_status='pending'
 2. DOCUMENT_PROCESSING job triggered via BullMQ
 3. Document converted to markdown (PDF/DOCX via Docling, TXT direct read)
@@ -79,6 +85,7 @@ Comprehensive investigation of integration test failures in the document process
 8. Test assertions verify vector count, dimensions, structure
 
 **For Error Handling Tests**:
+
 - Failed jobs should have error_message populated in job_status table
 - Permanent failures should be logged to error_logs table with full context
 
@@ -129,6 +136,7 @@ Comprehensive investigation of integration test failures in the document process
 ### Files Examined
 
 #### Docling MCP Client
+
 - **`packages/course-gen-platform/src/shared/docling/client.ts`**
   - Lines 44-47: Accept header correctly includes 'application/json, text/event-stream'
   - Lines 290-293: JSON.parse() of tool response (convert_document_into_docling_document)
@@ -136,6 +144,7 @@ Comprehensive investigation of integration test failures in the document process
   - **Issue**: No error handling for non-JSON responses from MCP server
 
 #### Document Processing Handler
+
 - **`packages/course-gen-platform/src/orchestrator/handlers/document-processing.ts`**
   - Lines 86-157: execute() method - main processing flow
   - Line 126: Sets vector_status='indexing' (not 'ready' as comment claims)
@@ -143,6 +152,7 @@ Comprehensive investigation of integration test failures in the document process
   - **Issue**: No chunking, embedding, or Qdrant upload - pipeline incomplete
 
 #### Markdown Converter
+
 - **`packages/course-gen-platform/src/shared/embeddings/markdown-converter.ts`**
   - Lines 190-279: convertDocumentToMarkdown() - entry point
   - Line 205: Calls client.convertToMarkdown(filePath)
@@ -150,6 +160,7 @@ Comprehensive investigation of integration test failures in the document process
   - **Issue**: Catches all errors but doesn't inspect response format
 
 #### Worker & Error Handling
+
 - **`packages/course-gen-platform/src/orchestrator/worker.ts`**
   - Lines 152-200: 'failed' event handler
   - Line 193: Calls handleJobFailure(job, error)
@@ -157,12 +168,14 @@ Comprehensive investigation of integration test failures in the document process
   - **Issue**: Never calls logPermanentFailure() for error_logs table
 
 #### Error Logging Module
+
 - **`packages/course-gen-platform/src/orchestrator/types/error-logs.ts`**
   - Lines 118-161: logPermanentFailure() function - UNUSED
   - Line 125: Inserts to error_logs table with full context
   - **Issue**: Well-implemented but never integrated with error handler
 
 #### Test Infrastructure
+
 - **`packages/course-gen-platform/tests/integration/document-processing-worker.test.ts`**
   - Lines 158-193: waitForVectorIndexing() - polls for status='indexed'
   - Line 176: Success condition: file.vector_status === 'indexed'
@@ -205,6 +218,7 @@ docker compose exec -T docling-mcp docling-mcp-server --help
 ### Data Collected
 
 **Docker Status**:
+
 ```
 NAME: docling-mcp-server
 STATUS: Up 3 hours (unhealthy)
@@ -213,19 +227,22 @@ HEALTH: Failing (404 on /health endpoint)
 ```
 
 **MCP Server Logs**:
+
 - Repeated 404 errors for GET /health (from Docker health check)
 - No actual conversion attempts logged
 - Server appears to be waiting for connections
 
 **Docling Client Configuration** (client.ts:44-47):
+
 ```typescript
 const headers: Record<string, string> = {
   'Content-Type': 'application/json',
-  'Accept': 'application/json, text/event-stream',  // ✅ CORRECT
+  Accept: 'application/json, text/event-stream', // ✅ CORRECT
 };
 ```
 
 **Document Processing Handler Flow**:
+
 ```
 execute() [Line 87]
   ↓
@@ -265,6 +282,7 @@ processDocumentByTier() [Line 203]
 ```
 
 **Vector Status Progression** (Expected vs Actual):
+
 ```
 Expected Flow:
 pending → indexing → indexed
@@ -292,20 +310,24 @@ The Docling MCP server returns error messages as plain text instead of structure
 **Evidence**:
 
 1. **Client Code** (docling/client.ts:290-293):
+
    ```typescript
    const conversionResult = JSON.parse(textContent.text) as {
      from_cache: boolean;
      document_key: string;
    };
    ```
+
    - Assumes `textContent.text` is always valid JSON
    - No try-catch around parse operation
    - No validation of response format before parsing
 
 2. **Error Message**:
+
    ```
    Unexpected token 'E', "Error exec..." is not valid JSON
    ```
+
    - Token 'E' suggests text starts with "Error"
    - Full message likely: "Error executing document conversion: [details]"
    - This is plain text, not JSON structure
@@ -345,6 +367,7 @@ The document-processing handler only performs markdown conversion and stops, lea
 **Evidence**:
 
 1. **Handler Execution Flow** (document-processing.ts:86-157):
+
    ```typescript
    async execute(jobData, job): Promise<JobResult> {
      // Step 1-2: Get metadata, process document
@@ -360,21 +383,25 @@ The document-processing handler only performs markdown conversion and stops, lea
      return { success: true, message: 'Document processed successfully' };  // Line 134
    }
    ```
+
    - No chunking step
    - No embedding generation
    - No Qdrant upload
    - Status left at 'indexing' forever
 
 2. **Comment vs Implementation Mismatch** (document-processing.ts:9):
+
    ```typescript
    // Comment says: "Updates vector_status to 'ready' for subsequent chunking (T075)"
    // Code does (line 126): await this.updateVectorStatus(fileId, 'indexing')
    ```
+
    - Comment implies handoff to another system
    - Code sets status='indexing' (implying work in progress)
    - Neither matches test expectations of 'indexed'
 
 3. **No Follow-Up Job** (worker.ts:42-52):
+
    ```typescript
    const jobHandlers: Record<string, BaseJobHandler<JobData>> = {
      [JobType.TEST_JOB]: testJobHandler,
@@ -383,11 +410,13 @@ The document-processing handler only performs markdown conversion and stops, lea
      // No CHUNKING, EMBEDDING, or VECTOR_INDEXING handlers
    };
    ```
+
    - No job type for second stage of pipeline
    - Document-processing handler is the ONLY handler for this workflow
    - Nothing picks up files with status='indexing'
 
 4. **Test Expectations** (document-processing-worker.test.ts:158-193):
+
    ```typescript
    async function waitForVectorIndexing(fileId: string, timeoutMs = 60000) {
      while (Date.now() - startTime < timeoutMs) {
@@ -397,14 +426,16 @@ The document-processing handler only performs markdown conversion and stops, lea
          .eq('id', fileId)
          .single();
 
-       if (file.vector_status === 'indexed') {  // Line 176
+       if (file.vector_status === 'indexed') {
+         // Line 176
          return { success: true, status: 'indexed' };
        }
        // ... poll every 1 second
      }
-     return { success: false, status: 'timeout' };  // After 60 seconds
+     return { success: false, status: 'timeout' }; // After 60 seconds
    }
    ```
+
    - Tests expect status='indexed'
    - Poll every 1 second for 60 seconds
    - All 13 tests timeout waiting for status that never comes
@@ -453,6 +484,7 @@ When jobs fail, the error message is not reliably extracted and stored in the jo
 **Evidence**:
 
 1. **Worker Failed Event** (worker.ts:152-200):
+
    ```typescript
    worker.on('failed', async (job: Job<JobData> | undefined, error: Error) => {
      if (!job) {
@@ -463,11 +495,12 @@ When jobs fail, the error message is not reliably extracted and stored in the jo
      // ... cancellation check ...
 
      // Regular failure handling
-     handleJobFailure(job, error);  // Line 193
+     handleJobFailure(job, error); // Line 193
 
-     await markJobFailed(job, error);  // Line 197
+     await markJobFailed(job, error); // Line 197
    });
    ```
+
    - Calls markJobFailed with (job, error)
    - Assumes error.message exists and is meaningful
 
@@ -482,6 +515,7 @@ When jobs fail, the error message is not reliably extracted and stored in the jo
    "source": "Worker error handling logic",
    "affected_tests": ["Stalled Job Detection > should recover from worker crash"]
    ```
+
    - Test expects error_message to be populated
    - Finds undefined instead
 
@@ -507,6 +541,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Evidence**:
 
 1. **Error Logs Module Exists** (error-logs.ts:118-161):
+
    ```typescript
    export async function logPermanentFailure(
      params: CreateErrorLogParams
@@ -523,15 +558,18 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
      logger.info({ ... }, 'Permanent failure logged to error_logs table');
    }
    ```
+
    - Well-implemented with proper error handling
    - Includes all necessary context (org_id, file_name, job_id, etc.)
    - Ready to use
 
 2. **Error Handler Doesn't Call It** (error-handler.ts):
+
    ```bash
    grep -r "logPermanentFailure" src/orchestrator/handlers/error-handler.ts
    # Result: No matches found
    ```
+
    - error-handler.ts never imports error-logs.ts
    - handleJobFailure() doesn't call logPermanentFailure()
    - All errors logged to Pino only, not database
@@ -542,6 +580,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    "source": "Error logging mechanism not triggering",
    "affected_tests": ["Error Logging > should log permanent failures to error_logs table"]
    ```
+
    - Test expects entries in error_logs after failures
    - Finds empty table
 
@@ -566,6 +605,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Description**: Extend the document-processing handler to include full pipeline: markdown conversion → chunking → embedding → Qdrant upload → status='indexed'
 
 **Why This Addresses Root Causes**:
+
 - **RC#2 (Timeout)**: Completes full pipeline, sets status='indexed' as tests expect
 - **RC#1 (JSON Parse)**: Can add better error handling around Docling calls
 - **RC#3 (Error Message)**: Centralized error handling for entire pipeline
@@ -574,6 +614,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Implementation Steps**:
 
 1. **Add chunking step** (document-processing.ts:131):
+
    ```typescript
    // After markdown conversion
    const processingResult = await this.processDocumentByTier(...);
@@ -592,6 +633,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 2. **Add embedding generation** (document-processing.ts:140):
+
    ```typescript
    // NEW: Generate embeddings
    await this.updateProgress(job, 70, 'Generating embeddings');
@@ -604,6 +646,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 3. **Add Qdrant upload** (document-processing.ts:150):
+
    ```typescript
    // NEW: Upload to Qdrant
    await this.updateProgress(job, 85, 'Uploading vectors');
@@ -621,6 +664,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 4. **Update final status** (document-processing.ts:160):
+
    ```typescript
    // NEW: Set status='indexed' (not 'indexing')
    await this.updateProgress(job, 95, 'Finalizing');
@@ -628,6 +672,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 5. **Add JSON parse error handling** (docling/client.ts:288-295):
+
    ```typescript
    // IMPROVED: Validate before parsing
    if (!textContent || !textContent.text) {
@@ -658,6 +703,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 6. **Add error logging** (document-processing.ts:142-157):
+
    ```typescript
    catch (error) {
      this.log(job, 'error', 'Document processing failed', { error, fileId });
@@ -700,6 +746,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    - **Purpose**: Write errors to error_logs table
 
 **Validation Criteria**:
+
 - ✅ TXT files complete full pipeline within 60s
 - ✅ DOCX files complete full pipeline within 60s
 - ✅ PDF files either succeed or return meaningful error (not JSON parse error)
@@ -709,11 +756,13 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 - ✅ job_status.error_message populated on failures
 
 **Testing Requirements**:
+
 - Unit tests: Mock each pipeline stage separately
 - Integration tests: Run existing test suite (should pass all 17 tests)
 - Manual verification: Upload PDF/DOCX/TXT via UI, verify vectors in Qdrant
 
 **Pros**:
+
 - ✅ Fixes all 4 root causes in one solution
 - ✅ Maintains single-job simplicity
 - ✅ No new job types or workers needed
@@ -722,6 +771,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 - ✅ Atomic operation: all-or-nothing processing
 
 **Cons**:
+
 - ❌ Long-running single job (60-120s for large files)
 - ❌ No partial progress persistence (if crashes at embedding stage, restart from scratch)
 - ❌ BullMQ timeout needs to be high (2+ minutes)
@@ -732,6 +782,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Risk Level**: Low (extends existing handler, doesn't change architecture)
 
 **Estimated Effort**: 4-6 hours
+
 - 2 hours: Add chunking + embedding + upload steps
 - 1 hour: Error handling improvements
 - 1 hour: Error logging integration
@@ -744,6 +795,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Description**: Keep document-processing as Stage 1 (markdown only), create new VECTOR_INDEXING job type for Stage 2 (chunking → embedding → upload), with clear handoff via status='ready'
 
 **Why This Addresses Root Causes**:
+
 - **RC#2 (Timeout)**: Second job completes pipeline to 'indexed'
 - **RC#1 (JSON Parse)**: Can fix error handling in Stage 1
 - **RC#3 (Error Message)**: Each stage has own error handling
@@ -752,6 +804,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Implementation Steps**:
 
 1. **Fix Stage 1 status** (document-processing.ts:126):
+
    ```typescript
    // Change from 'indexing' to 'ready'
    await this.updateVectorStatus(fileId, 'ready');
@@ -768,6 +821,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 2. **Create Stage 2 handler** (NEW: `handlers/vector-indexing.ts`):
+
    ```typescript
    export class VectorIndexingHandler extends BaseJobHandler<VectorIndexingJobData> {
      async execute(jobData, job): Promise<JobResult> {
@@ -800,6 +854,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 3. **Register handler** (worker.ts:42-52):
+
    ```typescript
    import { vectorIndexingHandler } from './handlers/vector-indexing';
 
@@ -807,21 +862,23 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
      [JobType.TEST_JOB]: testJobHandler,
      [JobType.INITIALIZE]: initializeJobHandler,
      [JobType.DOCUMENT_PROCESSING]: documentProcessingHandler,
-     [JobType.VECTOR_INDEXING]: vectorIndexingHandler,  // NEW
+     [JobType.VECTOR_INDEXING]: vectorIndexingHandler, // NEW
    };
    ```
 
 4. **Add job type** (shared-types):
+
    ```typescript
    export enum JobType {
      TEST_JOB = 'test_job',
      INITIALIZE = 'initialize',
      DOCUMENT_PROCESSING = 'document_processing',
-     VECTOR_INDEXING = 'vector_indexing',  // NEW
+     VECTOR_INDEXING = 'vector_indexing', // NEW
    }
    ```
 
 5. **Update tests** (document-processing-worker.test.ts:158-193):
+
    ```typescript
    // Option A: Wait for both jobs
    async function waitForVectorIndexing(fileId: string) {
@@ -870,6 +927,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    - **Lines 158-193**: Update waitForVectorIndexing to handle two stages
 
 **Validation Criteria**:
+
 - ✅ Stage 1 completes to status='ready' within 30s
 - ✅ Stage 2 automatically triggered
 - ✅ Stage 2 completes to status='indexed' within 60s
@@ -877,6 +935,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 - ✅ Tests pass with two-stage expectations
 
 **Pros**:
+
 - ✅ Shorter individual jobs (easier to debug)
 - ✅ Partial progress persistence (Stage 1 markdown saved)
 - ✅ Can retry Stage 2 independently
@@ -884,6 +943,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 - ✅ Better resource allocation (can prioritize conversion over indexing)
 
 **Cons**:
+
 - ❌ More complex architecture (two job types, handoff logic)
 - ❌ Requires test updates
 - ❌ Need to handle Stage 2 failures gracefully (what if Stage 2 never runs?)
@@ -895,6 +955,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Risk Level**: Medium (architectural change, more moving parts)
 
 **Estimated Effort**: 8-10 hours
+
 - 3 hours: Create vector-indexing handler
 - 2 hours: Update document-processing to trigger Stage 2
 - 1 hour: Error handling for both stages
@@ -908,6 +969,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Description**: Keep handler as-is (only markdown conversion), update tests to wait for status='indexing' instead of 'indexed', and clearly document that full pipeline is not yet implemented
 
 **Why This Addresses Root Causes**:
+
 - **RC#2 (Timeout)**: Tests stop waiting for 'indexed', accept 'indexing'
 - **RC#1 (JSON Parse)**: Still needs fixing
 - **RC#3 (Error Message)**: Still needs fixing
@@ -916,6 +978,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Implementation Steps**:
 
 1. **Update test expectations** (document-processing-worker.test.ts:176):
+
    ```typescript
    async function waitForVectorIndexing(fileId: string, timeoutMs = 60000) {
      // ... polling logic ...
@@ -932,6 +995,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 2. **Remove vector assertions** (document-processing-worker.test.ts:382-438):
+
    ```typescript
    it('should process TXT file successfully', async () => {
      const { fileId } = await uploadFileAndProcess(...);
@@ -958,6 +1022,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 3. **Add documentation** (document-processing.ts:1-15):
+
    ```typescript
    /**
     * Document Processing Job Handler
@@ -982,6 +1047,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    ```
 
 4. **Fix JSON parse error** (docling/client.ts:288-295):
+
    ```typescript
    // Same as Solution 1, Step 5
    ```
@@ -1008,6 +1074,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    - **Purpose**: Handle non-JSON responses gracefully
 
 **Validation Criteria**:
+
 - ✅ Tests wait for status='indexing' (not 'indexed')
 - ✅ Tests verify markdown_content exists
 - ✅ Tests pass without vector assertions
@@ -1015,6 +1082,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 - ✅ Error logging works
 
 **Pros**:
+
 - ✅ Minimal code changes
 - ✅ Tests pass quickly (no 60s timeouts)
 - ✅ Documents current implementation state
@@ -1022,6 +1090,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 - ✅ Low risk
 
 **Cons**:
+
 - ❌ Doesn't actually fix the incomplete pipeline
 - ❌ Tests no longer validate full workflow
 - ❌ Technical debt: Stage 2 still needs implementation
@@ -1032,6 +1101,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Risk Level**: Very Low (test-only changes mostly)
 
 **Estimated Effort**: 2-3 hours
+
 - 1 hour: Update test assertions
 - 30 minutes: Add documentation
 - 30 minutes: Fix JSON parse error
@@ -1073,6 +1143,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
    - **Code**: `import { logPermanentFailure } from '../types/error-logs.js';`
 
 **Dependencies**:
+
 - Chunking module: Already exists at `shared/embeddings/chunking.ts` (verify)
 - Embedding module: Already exists at `shared/embeddings/generate.ts` (verified)
 - Upload module: Already exists at `shared/qdrant/upload.ts` (verified)
@@ -1099,6 +1170,7 @@ The logPermanentFailure() function is fully implemented and ready to use, but is
 **Rollback Plan**:
 
 If implementation fails:
+
 1. Revert document-processing.ts changes
 2. Apply Solution 3 instead (quick fix: update tests)
 3. Tests will pass but pipeline still incomplete
@@ -1153,21 +1225,25 @@ If implementation fails:
 ### Performance Impact
 
 **Current Performance**:
+
 - TXT files: ~5s (markdown conversion only)
 - DOCX files: ~10s (markdown conversion only)
 - PDF files: Failing immediately (JSON parse error)
 
 **Expected Performance After Fix**:
+
 - TXT files: ~15-20s (conversion + chunking + embedding + upload)
 - DOCX files: ~30-40s (conversion + chunking + embedding + upload)
 - PDF files: ~40-60s (conversion + chunking + embedding + upload)
 
 **Bottlenecks**:
+
 - Docling MCP conversion: 10-20s for PDF/DOCX
 - Jina-v3 embedding API: 5-10s for 100 chunks
 - Qdrant upload: 2-5s for 100 vectors
 
 **Optimization Opportunities**:
+
 - Batch embeddings more aggressively (500 chunks per request)
 - Parallel upload to Qdrant (multiple batch requests)
 - Cache Docling conversions (use document_key for deduplication)
@@ -1177,6 +1253,7 @@ If implementation fails:
 **None** - This is a bug fix, not a breaking change.
 
 All existing functionality preserved:
+
 - API contracts unchanged
 - Database schema unchanged
 - tRPC endpoints unchanged
@@ -1185,11 +1262,13 @@ All existing functionality preserved:
 ### Side Effects
 
 **Positive Side Effects**:
+
 - Better error visibility (error_logs table populated)
 - More reliable pipeline (no hanging 'indexing' status)
 - Improved debugging (full error context)
 
 **Potential Negative Side Effects**:
+
 - Longer job execution time (15-60s vs 5-10s)
 - Higher memory usage (embeddings in memory)
 - More database writes (chunk_count, error_logs)
@@ -1386,6 +1465,7 @@ Error Path:
 ```
 
 **Divergence Point**: After markdown conversion
+
 - **Current**: Stops, sets status='indexing', returns success
 - **Fixed**: Continues with chunking → embedding → upload → status='indexed'
 
@@ -1396,25 +1476,30 @@ Error Path:
 ### Related Issues
 
 **GitHub Issues** (if applicable):
+
 - None found - this is new integration test suite
 
 **Similar Problems** (from search):
+
 - BullMQ jobs stuck in 'active' state (different issue, but similar symptoms)
 - Docling conversion timeout (related, but JSON parse is new)
 
 ### Documentation References
 
 **BullMQ Documentation**:
+
 - [Worker Error Handling](https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/guide/workers/README.md) - Event listeners for 'failed'
 - [Job Timeouts](https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/patterns/timeout-jobs.md) - AbortController pattern
 - Context7 ID: `/taskforcesh/bullmq`
 
 **Vitest Documentation**:
+
 - [Async Polling with vi.waitFor](https://github.com/vitest-dev/vitest/blob/main/docs/api/vi.md) - Waiting for async conditions
 - [Test Timeouts](https://github.com/vitest-dev/vitest/blob/main/docs/guide/filtering.md) - Setting per-test timeouts
 - Context7 ID: `/vitest-dev/vitest`
 
 **Docling MCP** (inferred from code):
+
 - Tools: `convert_document_into_docling_document`, `export_docling_document_to_markdown`
 - Protocol: MCP over Streamable HTTP
 - Expected response format: `{"from_cache": boolean, "document_key": string}`
@@ -1423,15 +1508,18 @@ Error Path:
 ### MCP Server Usage
 
 **Context7 MCP**:
+
 - Used to fetch BullMQ documentation
 - Query: "worker job status timeout error handling"
 - Provided insights on BullMQ event handling and timeout patterns
 
 **Supabase MCP** (not used in this investigation):
+
 - Available but not needed
 - Could be used to inspect error_logs table schema
 
 **Sequential Thinking MCP**:
+
 - Used for multi-step root cause analysis
 - 10 thought steps to trace through complex execution flows
 - Helped identify architectural mismatch between handler and tests
@@ -1467,23 +1555,27 @@ Error Path:
 ### Follow-Up Recommendations
 
 **Short-term** (next sprint):
+
 - Monitor job execution times (ensure no performance regression)
 - Add alerting for jobs stuck in 'indexing' status > 2 minutes
 - Improve Docling error messages (coordinate with docling-mcp project)
 
 **Long-term** (next quarter):
+
 - Consider Solution 2 architecture for better scalability
 - Add job progress tracking (% complete, stage name)
 - Implement partial retry (e.g., retry just embedding if Qdrant upload fails)
 - Add comprehensive error taxonomy (categorize all error types)
 
 **Process Improvements**:
+
 - Add integration tests to CI/CD pipeline (currently not automated)
 - Require integration tests to pass before merging
 - Document architectural decisions (why single-job vs two-job pipeline)
 - Create runbook for debugging stuck jobs
 
 **Monitoring Recommendations**:
+
 - Dashboard: Jobs by status (pending/active/completed/failed)
 - Alert: Jobs in 'active' state > 5 minutes
 - Alert: Error_logs table growth rate > 100/hour

@@ -18,32 +18,35 @@ import { validateStage4Barrier } from '../../../shared/fsm/stage-barrier';
 import logger from '../../../shared/logger';
 
 /**
- * Russian progress messages for each phase (FR-018)
+ * i18n progress message keys for each phase (FR-018)
  *
  * Matches internal phases to user-facing status updates:
  * - Phase 0: Pre-flight validation (barrier check, document completeness)
  * - Phase 1: Basic classification (category, audience, topic parsing)
  * - Phase 2: Scope analysis (lesson count, hours, module breakdown)
- * - Phase 3: Deep expert analysis (research flags, pedagogy, expansion areas)
+ * - Phase 3: Deep expert analysis (research flags, pedagogy)
  * - Phase 4: Document synthesis (multi-source integration)
- * - Phase 6: RAG planning (document-to-section mapping for Generation)
  * - Phase 5: Final assembly (validation, quality checks)
+ *
+ * These keys are translated on the frontend using next-intl.
  */
 export const PROGRESS_MESSAGES = {
-  step_0_start: 'Проверка документов...',
-  step_0_complete: 'Проверка завершена',
-  step_1_start: 'Базовая категоризация курса...',
-  step_1_complete: 'Категоризация завершена',
-  step_2_start: 'Оценка объема и структуры...',
-  step_2_complete: 'Оценка завершена',
-  step_3_start: 'Глубокий экспертный анализ...',
-  step_3_complete: 'Экспертный анализ завершен',
-  step_4_start: 'Синтез документов...',
-  step_4_complete: 'Синтез завершен',
-  step_6_start: 'Планирование RAG для генерации...',
-  step_6_complete: 'Планирование RAG завершено',
-  step_5_start: 'Финализация анализа...',
-  step_5_complete: 'Анализ завершен',
+  step_0_start: 'progress.step_0_start',
+  step_0_complete: 'progress.step_0_complete',
+  step_1_start: 'progress.step_1_start',
+  step_1_complete: 'progress.step_1_complete',
+  step_0_5_start: 'progress.step_0_5_start',
+  step_0_5_complete: 'progress.step_0_5_complete',
+  step_2_start: 'progress.step_2_start',
+  step_2_complete: 'progress.step_2_complete',
+  step_3_start: 'progress.step_3_start',
+  step_3_complete: 'progress.step_3_complete',
+  step_4_start: 'progress.step_4_start',
+  step_4_complete: 'progress.step_4_complete',
+  step_6_start: 'progress.step_6_start',
+  step_6_complete: 'progress.step_6_complete',
+  step_5_start: 'progress.step_5_start',
+  step_5_complete: 'progress.step_5_complete',
 } as const;
 
 /**
@@ -53,9 +56,10 @@ export const PROGRESS_MESSAGES = {
  */
 export const PROGRESS_RANGES = {
   step_0: { start: 0, end: 10 },
-  step_1: { start: 10, end: 20 },
-  step_2: { start: 20, end: 35 },
-  step_3: { start: 35, end: 60 },
+  step_1: { start: 12, end: 25 }, // Phase 1 now runs before Phase 0.5
+  step_0_5: { start: 25, end: 28 },
+  step_2: { start: 28, end: 45 },
+  step_3: { start: 45, end: 60 },
   step_4: { start: 60, end: 75 },
   step_6: { start: 75, end: 85 },
   step_5: { start: 85, end: 100 },
@@ -179,7 +183,7 @@ export async function validateStage3Barrier(
 /**
  * Format error message for course progress update
  *
- * Converts internal error codes to user-friendly Russian messages.
+ * Converts internal error codes to i18n keys for frontend translation.
  *
  * Error Code Mapping:
  * - BARRIER_FAILED: Document processing incomplete
@@ -188,24 +192,24 @@ export async function validateStage3Barrier(
  * - Default: Generic analysis error
  *
  * @param error - Error object or string
- * @returns User-friendly Russian error message
+ * @returns i18n key for error message
  *
  * @example
  * const message = formatErrorMessage(new Error('BARRIER_FAILED: 2 docs incomplete'));
- * // Returns: 'Обработка документов не завершена - требуется ручное вмешательство'
+ * // Returns: 'errors.barrier_failed'
  */
 export function formatErrorMessage(error: Error | string): string {
   const errorStr = error instanceof Error ? error.message : String(error);
 
   if (errorStr.startsWith('BARRIER_FAILED:')) {
-    return 'Обработка документов не завершена - требуется ручное вмешательство';
+    return 'errors.barrier_failed';
   } else if (errorStr.includes('Insufficient scope for minimum 10 lessons')) {
-    return 'Недостаточный объем для минимума 10 уроков - расширьте тему';
+    return 'errors.insufficient_scope';
   } else if (errorStr.startsWith('LLM_ERROR:')) {
-    return 'Ошибка обработки LLM - обратитесь в поддержку';
+    return 'errors.llm_error';
   }
 
-  return 'Ошибка при анализе курса';
+  return 'errors.analysis_generic';
 }
 
 /**
@@ -282,7 +286,9 @@ export async function completePhase(
   phaseNumber: 0 | 1 | 2 | 3 | 4 | 5 | 6,
   courseId: string,
   supabase: ReturnType<typeof getSupabaseAdmin>,
-  phaseLogger: { info: (msg: string) => void; } & { info: (metadata: Record<string, unknown>, msg: string) => void },
+  phaseLogger: { info: (msg: string) => void } & {
+    info: (metadata: Record<string, unknown>, msg: string) => void;
+  },
   metadata?: Record<string, unknown>
 ): Promise<void> {
   const stepKey = `step_${phaseNumber}` as const;

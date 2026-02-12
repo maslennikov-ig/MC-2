@@ -4,6 +4,7 @@
 **Status**: ✅ Complete (consolidated from prior research)
 
 **Source Documents**:
+
 - `docs/architecture/STAGE4-STAGE5-STAGE6-FINAL-ARCHITECTURE.md` (v2.2.0)
 - Worktree version (v2.1.0) — LLM Parameters detail
 - `docs/research/010-stage6-generation-strategy/`
@@ -22,6 +23,7 @@ All technical unknowns from the spec have been resolved through prior research. 
 **Decision**: **Hybrid Map-Reduce-Refine via LangGraph**
 
 **Rationale**:
+
 - Skeleton-of-Thought rejected: 40% coherence degradation for educational content
 - Single-pass insufficient: Limited recovery from failures, no parallelization
 - Hybrid approach: Planner → Parallel Expanders → Assembler → Smoother
@@ -44,15 +46,16 @@ All technical unknowns from the spec have been resolved through prior research. 
 
 **Decision**: Language-aware routing with model fallback
 
-| Task | RU Primary | EN Primary | Fallback |
-|------|------------|------------|----------|
-| Metadata | Qwen3-235B | DeepSeek Terminus | Kimi K2 |
-| Lessons | Qwen3-235B | DeepSeek Terminus | Kimi K2 |
-| Stage 6 Content | Qwen3-235B | DeepSeek Terminus | Kimi K2 |
-| Analysis | OSS 20B/120B | OSS 20B/120B | — |
-| Large Context | Grok 4 Fast | Grok 4 Fast | Gemini Flash |
+| Task            | RU Primary   | EN Primary        | Fallback     |
+| --------------- | ------------ | ----------------- | ------------ |
+| Metadata        | Qwen3-235B   | DeepSeek Terminus | Kimi K2      |
+| Lessons         | Qwen3-235B   | DeepSeek Terminus | Kimi K2      |
+| Stage 6 Content | Qwen3-235B   | DeepSeek Terminus | Kimi K2      |
+| Analysis        | OSS 20B/120B | OSS 20B/120B      | —            |
+| Large Context   | Grok 4 Fast  | Grok 4 Fast       | Gemini Flash |
 
 **Rationale**:
+
 - Qwen3-235B: Best RU quality (9.2/10), 100% reliability, $0.11/$0.60
 - DeepSeek Terminus: Best EN quality (9.0/10), 100% reliability
 - Kimi K2: Premium fallback for failures (9.5/10 RU, 9.2/10 EN)
@@ -69,8 +72,9 @@ All technical unknowns from the spec have been resolved through prior research. 
 **Decision**: LangGraph StateGraph with typed state
 
 **Implementation Pattern**:
+
 ```typescript
-import { StateGraph, Annotation } from "@langchain/langgraph";
+import { StateGraph, Annotation } from '@langchain/langgraph';
 
 // Define typed state
 const LessonState = Annotation.Root({
@@ -85,18 +89,19 @@ const LessonState = Annotation.Root({
 
 // Build graph
 const graph = new StateGraph(LessonState)
-  .addNode("planner", plannerNode)
-  .addNode("expander", expanderNode)
-  .addNode("assembler", assemblerNode)
-  .addNode("smoother", smootherNode)
-  .addEdge("__start__", "planner")
-  .addConditionalEdges("planner", shouldExpand)
-  .addEdge("expander", "assembler")
-  .addEdge("assembler", "smoother")
-  .addEdge("smoother", "__end__");
+  .addNode('planner', plannerNode)
+  .addNode('expander', expanderNode)
+  .addNode('assembler', assemblerNode)
+  .addNode('smoother', smootherNode)
+  .addEdge('__start__', 'planner')
+  .addConditionalEdges('planner', shouldExpand)
+  .addEdge('expander', 'assembler')
+  .addEdge('assembler', 'smoother')
+  .addEdge('smoother', '__end__');
 ```
 
 **Rationale**:
+
 - TypeScript-first with proper state typing
 - Built-in retry and fallback support
 - State persistence for debugging
@@ -113,11 +118,13 @@ const graph = new StateGraph(LessonState)
 **Decision**: Store until course generation completes, then delete. Persist query parameters long-term.
 
 **Rationale**:
+
 - Retry consistency: Same context for retries
 - Storage efficiency: Delete after success
 - Reproducibility: Query params allow regeneration
 
 **Implementation**:
+
 ```typescript
 interface RAGContextCache {
   context_id: string;
@@ -138,12 +145,12 @@ interface RAGContextCache {
 
 **Decision**: Single temperature per lesson based on dominant archetype
 
-| Archetype | Temperature | Top-p | Rationale |
-|-----------|-------------|-------|-----------|
-| code_tutorial | 0.2-0.3 | 0.7 | Syntax precision |
-| concept_explainer | 0.6-0.7 | 0.9 | Educational clarity |
-| case_study | 0.5-0.6 | 0.9 | Narrative coherence |
-| legal_warning | 0.0-0.1 | 0.7 | Zero error tolerance |
+| Archetype         | Temperature | Top-p | Rationale            |
+| ----------------- | ----------- | ----- | -------------------- |
+| code_tutorial     | 0.2-0.3     | 0.7   | Syntax precision     |
+| concept_explainer | 0.6-0.7     | 0.9   | Educational clarity  |
+| case_study        | 0.5-0.6     | 0.9   | Narrative coherence  |
+| legal_warning     | 0.0-0.1     | 0.7   | Zero error tolerance |
 
 **Rejected Alternative**: Per-section dynamic temperature — 5-7x cost increase, zero production adoption
 
@@ -158,11 +165,13 @@ interface RAGContextCache {
 **Decision**: Integrated into Stage 2 + Stage 3 (not separate stage)
 
 **Flow**:
+
 1. **Stage 2 (Processing)**: LLM Classification → HIGH/LOW priority
 2. **Stage 3 (Summarization)**: Budget Allocation → adaptive summarization
 3. **Vectorization**: ALL from originals (not summaries)
 
 **Rationale**:
+
 - No new stage needed — enhances existing stages
 - Classification naturally fits document processing
 - Budget allocation naturally fits summarization
@@ -176,20 +185,22 @@ interface RAGContextCache {
 **Decision**: 30 concurrent workers (configurable)
 
 **Rationale**:
+
 - 10-30 lessons per course typical
 - ~55s per lesson average
 - Total course: ~3-5 minutes with full parallelization
 - Memory: ~500MB per worker (acceptable)
 
 **Configuration**:
+
 ```typescript
 const worker = new Worker('stage6-lesson-content', processor, {
   connection: redis,
   concurrency: 30,
   limiter: {
     max: 30,
-    duration: 1000 // Rate limit if needed
-  }
+    duration: 1000, // Rate limit if needed
+  },
 });
 ```
 
@@ -265,6 +276,7 @@ const worker = new Worker('stage6-lesson-content', processor, {
 ### Per-Section Dynamic Temperature: NOT RECOMMENDED ❌
 
 **Why Production Rejects**:
+
 - Cost: 5-7x base (5 API calls per lesson)
 - Latency: +10-20 seconds
 - Zero production adoption
@@ -275,16 +287,19 @@ const worker = new Worker('stage6-lesson-content', processor, {
 ### OSS Model-Specific Guidance
 
 **Llama 3.x** (via OpenRouter):
+
 - Classification: temp 0.2, top-p 0.7, top-k 5-10
 - Strategic: temp 0.5, top-p 0.95
 - Creative: temp 0.7-0.8, top-p 0.95, top-k 40
 
 **Qwen 2.5/3** (via OpenRouter):
+
 - Reasoning (thinking mode): **temp 0.6**, top-p 0.95, **do_sample=True** (critical)
 - Classification: temp 0.2-0.3
 - Creative: temp 0.7-0.9
 
 **Mistral 7B/8x7B**:
+
 - **Maximum temp 0.7** (official limit)
 - Classification: temp 0.0-0.2
 - Strategic: temp 0.3-0.5
@@ -316,18 +331,18 @@ Direct API costs:           1.0x (baseline)
 
 ### Cost Targets by Scale
 
-| Scale | Requests/month | Cost/month | Focus |
-|-------|----------------|------------|-------|
-| **MVP** | <100K | $500-2,000 | Prove value |
-| **Growth** | 100K-1M | $2,000-10,000 | Efficiency |
-| **Scale** | 1M+ | $10,000-50,000 | Sustainability |
+| Scale      | Requests/month | Cost/month     | Focus          |
+| ---------- | -------------- | -------------- | -------------- |
+| **MVP**    | <100K          | $500-2,000     | Prove value    |
+| **Growth** | 100K-1M        | $2,000-10,000  | Efficiency     |
+| **Scale**  | 1M+            | $10,000-50,000 | Sustainability |
 
 ### Single-Stage vs Two-Stage Economics
 
-| Approach | Cost | Latency | Complexity |
-|----------|------|---------|------------|
-| Single-stage (MVP) | 1.0x | 2-4s | Low |
-| Two-stage | **1.12x** (NOT 2.0x) | 4-8s | Moderate |
+| Approach           | Cost                 | Latency | Complexity |
+| ------------------ | -------------------- | ------- | ---------- |
+| Single-stage (MVP) | 1.0x                 | 2-4s    | Low        |
+| Two-stage          | **1.12x** (NOT 2.0x) | 4-8s    | Moderate   |
 
 **Recommendation**: Start single-stage. Consider two-stage only if quality issues emerge.
 
@@ -383,11 +398,13 @@ Direct API costs:           1.0x (baseline)
 ### Symptoms of Incorrect Temperature
 
 **Too low** (<0.3 for strategic tasks):
+
 - Repetitive outputs
 - "Robotic" feel
 - **Fix**: Increase to 0.4-0.6
 
 **Too high** (>0.7 for factual content):
+
 - Factual hallucinations
 - Nonsensical analogies
 - **Fix**: Decrease to 0.2-0.5
@@ -405,6 +422,7 @@ Direct API costs:           1.0x (baseline)
 ### Diagnostic Checklist
 
 **Before production**:
+
 - [ ] Model costs at 10x current usage
 - [ ] Include retry overhead (1.3x minimum)
 - [ ] Budget for monitoring (30-40% overhead)
@@ -413,6 +431,7 @@ Direct API costs:           1.0x (baseline)
 - [ ] Validate temperatures on n=20+ samples
 
 **During scaling (first 2 months)**:
+
 - [ ] Monitor prompt length growth
 - [ ] Track cache hit rates (target 50%+)
 - [ ] Retry limits (3 max)
@@ -420,6 +439,7 @@ Direct API costs:           1.0x (baseline)
 - [ ] Human review 5-10% outputs
 
 **Optimization triggers**:
+
 - Cost/lesson >$1: Implement caching
 - Cost/lesson >$2: Add model routing
 - Volume >1M tokens/day: Consider fine-tuning

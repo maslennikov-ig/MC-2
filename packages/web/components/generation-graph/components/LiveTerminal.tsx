@@ -32,13 +32,12 @@ const LOG_LEVEL_COLORS: Record<LessonLogEntry['level'], string> = {
 }
 
 /** Color classes for node tags
- * 4-node pipeline: generator, selfReviewer, judge, coverGenerator
+ * 3-node pipeline: generator, selfReviewer, judge
  */
 const NODE_TAG_COLORS: Record<Stage6NodeName | 'system', string> = {
   generator: 'text-indigo-400',
   selfReviewer: 'text-teal-400',
   judge: 'text-orange-400',
-  coverGenerator: 'text-pink-400',
   system: 'text-slate-500',
 }
 

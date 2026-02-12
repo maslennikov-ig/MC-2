@@ -26,18 +26,11 @@ import { getLearningStyleByValue } from '@/lib/constants/learning-styles'
 import { useTranslations } from 'next-intl'
 import { getCourseSizeLabels } from '@megacampus/shared-types'
 import type { Stage1InputTabProps, Stage1InputData } from './types'
+import { formatFileSize } from '@megacampus/shared-utils'
 
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-function formatFileSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
-  if (bytes === 0) return '0 B'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 const STRATEGY_COLORS: Record<string, string> = {
   auto: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
@@ -95,7 +88,11 @@ interface DescriptionWithToggleProps {
   showLessLabel: string
 }
 
-function DescriptionWithToggle({ description, showMoreLabel, showLessLabel }: DescriptionWithToggleProps) {
+function DescriptionWithToggle({
+  description,
+  showMoreLabel,
+  showLessLabel,
+}: DescriptionWithToggleProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   // Estimate ~80 chars per line, 3 lines = 240 chars threshold
@@ -159,7 +156,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
   ]
 
   // Format labels mapped from translations
-  const formatLabels: Record<typeof allFormats[number], string> = {
+  const formatLabels: Record<(typeof allFormats)[number], string> = {
     text: t('formatText'),
     audio: t('formatAudio'),
     video: t('formatVideo'),
@@ -182,11 +179,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
   }
 
   if (!data) {
-    return (
-      <div className="text-muted-foreground p-4 text-center">
-        {t('notSpecified')}
-      </div>
-    )
+    return <div className="text-muted-foreground p-4 text-center">{t('notSpecified')}</div>
   }
 
   return (
@@ -245,9 +238,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
         <CardContent className="space-y-4">
           {/* Strategy Badge */}
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs">
-              {t('strategy')}:
-            </span>
+            <span className="text-muted-foreground text-xs">{t('strategy')}:</span>
             <Badge className={cn('border', getStrategyColor(data.content_strategy))}>
               {getStrategyLabel(data.content_strategy)}
             </Badge>
@@ -258,9 +249,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
             <Users className="text-muted-foreground h-4 w-4" />
             <span className="text-sm">
               {data.target_audience || (
-                <span className="text-muted-foreground italic">
-                  {t('notSpecified')}
-                </span>
+                <span className="text-muted-foreground italic">{t('notSpecified')}</span>
               )}
             </span>
           </div>
@@ -268,9 +257,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {/* Style */}
           {learningStyle && (
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-xs">
-                {t('style')}:
-              </span>
+              <span className="text-muted-foreground text-xs">{t('style')}:</span>
               <Badge variant="outline">{learningStyle.title}</Badge>
             </div>
           )}
@@ -278,18 +265,14 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {/* Lesson Count - Large number */}
           <div className="flex items-baseline gap-2 pt-2">
             <span className="text-3xl font-bold">{data.estimated_lessons ?? '--'}</span>
-            <span className="text-muted-foreground text-sm">
-              {t('lessonsCount')}
-            </span>
+            <span className="text-muted-foreground text-sm">{t('lessonsCount')}</span>
           </div>
 
           {/* Sections Count */}
           {data.estimated_sections !== undefined && (
             <div className="flex items-center gap-2">
               <span className="text-xl font-semibold">{data.estimated_sections}</span>
-              <span className="text-muted-foreground text-xs">
-                {t('sectionsCount')}
-              </span>
+              <span className="text-muted-foreground text-xs">{t('sectionsCount')}</span>
             </div>
           )}
 
@@ -315,9 +298,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {data.course_size && (
             <div className="flex items-center gap-2">
               <Layers className="text-muted-foreground h-4 w-4" />
-              <span className="text-muted-foreground text-xs">
-                {t('courseSize')}:
-              </span>
+              <span className="text-muted-foreground text-xs">{t('courseSize')}:</span>
               <Badge variant="outline">{getCourseSizeLabels(locale, data.course_size).title}</Badge>
             </div>
           )}
@@ -325,9 +306,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {/* Generation Mode */}
           {data.generation_mode && (
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-xs">
-                {t('generationMode')}:
-              </span>
+              <span className="text-muted-foreground text-xs">{t('generationMode')}:</span>
               <Badge variant="outline" className="flex items-center gap-1">
                 {data.generation_mode === 'automatic' ? (
                   <>
@@ -368,9 +347,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
 
           {/* Output Formats */}
           <div className="border-border/50 border-t pt-2">
-            <span className="text-muted-foreground mb-2 block text-xs">
-              {t('formats')}:
-            </span>
+            <span className="text-muted-foreground mb-2 block text-xs">{t('formats')}:</span>
             <div className="flex items-center gap-4">
               {allFormats.map((format) => (
                 <FormatIcon
@@ -419,9 +396,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           ) : (
             <div className="py-6 text-center">
               <FolderOpen className="text-muted-foreground/50 mx-auto mb-2 h-8 w-8" />
-              <p className="text-muted-foreground text-sm italic">
-                {t('noFiles')}
-              </p>
+              <p className="text-muted-foreground text-sm italic">{t('noFiles')}</p>
             </div>
           )}
         </CardContent>

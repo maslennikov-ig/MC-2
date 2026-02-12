@@ -15,8 +15,19 @@ import { z } from 'zod';
 
 export const DifficultyLevelSchema = z.enum(['beginner', 'intermediate', 'advanced']);
 export const LanguageSchema = z.enum(['en', 'ru']);
-export const ContentArchetypeSchema = z.enum(['code_tutorial', 'concept_explainer', 'case_study', 'legal_warning']);
-export const LessonStatusSchema = z.enum(['pending', 'generating', 'completed', 'failed', 'review_required']);
+export const ContentArchetypeSchema = z.enum([
+  'code_tutorial',
+  'concept_explainer',
+  'case_study',
+  'legal_warning',
+]);
+export const LessonStatusSchema = z.enum([
+  'pending',
+  'generating',
+  'completed',
+  'failed',
+  'review_required',
+]);
 
 // ============================================================================
 // Document Prioritization (Stage 2 Enhancement)
@@ -78,7 +89,12 @@ export const SectionRAGPlanSchema = z.object({
 export const DocumentRelevanceMappingSchema = z.record(z.string(), SectionRAGPlanSchema);
 
 export const GenerationGuidanceSchema = z.object({
-  tone: z.enum(['conversational but precise', 'formal academic', 'casual friendly', 'technical professional']),
+  tone: z.enum([
+    'conversational but precise',
+    'formal academic',
+    'casual friendly',
+    'technical professional',
+  ]),
   use_analogies: z.boolean(),
   specific_analogies: z.array(z.string()).optional(),
   avoid_jargon: z.array(z.string()),
@@ -104,20 +120,22 @@ export const AnalysisResultEnhancedSchema = z.object({
     estimated_content_hours: z.number().positive(),
     difficulty_level: DifficultyLevelSchema,
   }),
-  sections_breakdown: z.array(z.object({
-    section_id: z.string(),
-    area: z.string(),
-    estimated_lessons: z.number().int().min(3).max(5),
-    importance: z.enum(['core', 'important', 'optional']),
-    learning_objectives: z.array(z.string()),
-    key_topics: z.array(z.string()),
-    pedagogical_approach: z.string(),
-    difficulty_progression: z.enum(['flat', 'gradual', 'steep']),
-    // NEW fields
-    estimated_duration_hours: z.number().positive(),
-    difficulty: DifficultyLevelSchema,
-    prerequisites: z.array(z.string()),
-  })),
+  sections_breakdown: z.array(
+    z.object({
+      section_id: z.string(),
+      area: z.string(),
+      estimated_lessons: z.number().int().min(3).max(5),
+      importance: z.enum(['core', 'important', 'optional']),
+      learning_objectives: z.array(z.string()),
+      key_topics: z.array(z.string()),
+      pedagogical_approach: z.string(),
+      difficulty_progression: z.enum(['flat', 'gradual', 'steep']),
+      // NEW fields
+      estimated_duration_hours: z.number().positive(),
+      difficulty: DifficultyLevelSchema,
+      prerequisites: z.array(z.string()),
+    })
+  ),
   // NEW: RAG Planning output
   document_relevance_mapping: DocumentRelevanceMappingSchema.optional(),
   // NEW: Structured guidance
@@ -365,35 +383,43 @@ export const RefusalResultSchema = z.object({
 export const LessonSpecificationV1Schema = z.object({
   lesson_id: z.string(),
   title: z.string(),
-  learning_objectives: z.array(z.object({
-    verb: z.string(),
-    content: z.string(),
-    bloom_level: z.string(),
-  })),
+  learning_objectives: z.array(
+    z.object({
+      verb: z.string(),
+      content: z.string(),
+      bloom_level: z.string(),
+    })
+  ),
   content_structure: z.object({
     intro: z.object({
-      hook: z.string(),  // V1: exact text
+      hook: z.string(), // V1: exact text
       context: z.string(),
     }),
-    main_sections: z.array(z.object({
-      section: z.string(),
-      rag_query: z.string(),  // V1: query string
-      expected_content_type: z.string(),
-      word_count: z.number(),  // V1: exact number
-    })),
-    examples: z.array(z.object({
-      type: z.string(),
-      topic: z.string(),
-      rag_query: z.string(),
-      format: z.string(),
-    })),
-    exercises: z.array(z.object({
-      type: z.string(),
-      difficulty: z.string(),
-      specification: z.string(),
-      rag_query: z.string(),
-      grading_rubric: z.string().optional(),  // V1: string
-    })),
+    main_sections: z.array(
+      z.object({
+        section: z.string(),
+        rag_query: z.string(), // V1: query string
+        expected_content_type: z.string(),
+        word_count: z.number(), // V1: exact number
+      })
+    ),
+    examples: z.array(
+      z.object({
+        type: z.string(),
+        topic: z.string(),
+        rag_query: z.string(),
+        format: z.string(),
+      })
+    ),
+    exercises: z.array(
+      z.object({
+        type: z.string(),
+        difficulty: z.string(),
+        specification: z.string(),
+        rag_query: z.string(),
+        grading_rubric: z.string().optional(), // V1: string
+      })
+    ),
   }),
   rag_context: z.object({
     primary_documents: z.array(z.string()),
@@ -409,7 +435,9 @@ export const LessonSpecificationV1Schema = z.object({
  */
 export const V1toV2TransformConfigSchema = z.object({
   default_target_audience: z.enum(['executive', 'practitioner', 'novice']).default('practitioner'),
-  default_tone: z.enum(['formal', 'conversational-professional']).default('conversational-professional'),
+  default_tone: z
+    .enum(['formal', 'conversational-professional'])
+    .default('conversational-professional'),
   default_compliance_level: z.enum(['strict', 'standard']).default('standard'),
 });
 
@@ -426,12 +454,14 @@ export const Stage6PromptStructureSchema = z.object({
     refusal: z.literal('If RAG insufficient, output "INSUFFICIENT_CONTEXT"'),
   }),
   lesson_blueprint: LessonSpecificationV2Schema,
-  rag_context: z.array(z.object({
-    chunk_id: z.string(),
-    content: z.string(),
-    document_name: z.string(),
-    relevance_score: z.number(),
-  })),
+  rag_context: z.array(
+    z.object({
+      chunk_id: z.string(),
+      content: z.string(),
+      document_name: z.string(),
+      relevance_score: z.number(),
+    })
+  ),
   generation_steps: z.array(z.string()),
   output_format: z.literal('Markdown only. No JSON wrapper.'),
 });

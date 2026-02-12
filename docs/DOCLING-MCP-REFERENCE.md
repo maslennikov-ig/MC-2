@@ -17,6 +17,7 @@ Document Cache (_cache/) ← Volume Mount → .tmp/docling-cache/
 ```
 
 **Ключевое нововведение (T074.5)**:
+
 - Volume mount для прямого доступа к JSON кэшу
 - Метод `getDoclingDocumentJSON()` возвращает полную структуру документа
 - Никаких изменений в MCP сервере - используем существующий инструмент `save_docling_document`
@@ -35,6 +36,7 @@ docling-mcp:
 ```
 
 **Критично**: Оба volume mount'а обязательны:
+
 1. Проектная директория (read-only) - для чтения файлов
 2. Cache директория (read-write) - для доступа к JSON exports (NEW в T074.5)
 
@@ -103,23 +105,23 @@ MCP сервер предоставляет 19 инструментов. **Ос�
 
 ```typescript
 interface DoclingDocument {
-  schema_name: "DoclingDocument";
-  version: "1.7.0";
+  schema_name: 'DoclingDocument';
+  version: '1.7.0';
   name: string;
 
   // Content
-  texts: DoclingText[];         // Все текстовые элементы
-  pictures: DoclingPicture[];   // Изображения с OCR
-  tables: DoclingTable[];       // Таблицы
+  texts: DoclingText[]; // Все текстовые элементы
+  pictures: DoclingPicture[]; // Изображения с OCR
+  tables: DoclingTable[]; // Таблицы
   pages: Record<string, PageMetadata>;
 
   // Metadata
-  origin?: { filename, mimetype, binary_hash };
-  metadata?: { page_count, format, processing };
+  origin?: { filename; mimetype; binary_hash };
+  metadata?: { page_count; format; processing };
 }
 
 interface DoclingText {
-  label: "title" | "heading" | "text" | "list-item" | "code" | "formula";
+  label: 'title' | 'heading' | 'text' | 'list-item' | 'code' | 'formula';
   text: string;
   page_no: number;
   bbox?: [x, y, width, height];
@@ -130,15 +132,16 @@ interface DoclingText {
 
 ## Tier Processing
 
-| Tier | Formats | Docling | OCR | Images | Tables |
-|------|---------|---------|-----|--------|--------|
-| FREE | None | ❌ | ❌ | ❌ | ❌ |
-| BASIC | TXT, MD | ❌ | ❌ | ❌ | ❌ |
-| TRIAL | PDF, DOCX, PPTX, HTML, TXT, MD | ✅ | ✅ | ✅ | ✅ |
-| STANDARD | PDF, DOCX, PPTX, HTML, TXT, MD | ✅ | ✅ | ❌ | ✅ |
-| PREMIUM | All + PNG, JPG | ✅ | ✅ | ✅ | ✅ |
+| Tier     | Formats                        | Docling | OCR | Images | Tables |
+| -------- | ------------------------------ | ------- | --- | ------ | ------ |
+| FREE     | None                           | ❌      | ❌  | ❌     | ❌     |
+| BASIC    | TXT, MD                        | ❌      | ❌  | ❌     | ❌     |
+| TRIAL    | PDF, DOCX, PPTX, HTML, TXT, MD | ✅      | ✅  | ✅     | ✅     |
+| STANDARD | PDF, DOCX, PPTX, HTML, TXT, MD | ✅      | ✅  | ❌     | ✅     |
+| PREMIUM  | All + PNG, JPG                 | ✅      | ✅  | ✅     | ✅     |
 
 **Handler**: `src/orchestrator/handlers/document-processing.ts`
+
 - `processBasicTier()` - прямое чтение файла
 - `processStandardTier()` - Docling + OCR
 - `processPremiumTier()` - Docling + OCR + images
@@ -166,6 +169,7 @@ pnpm test tests/integration/docling-json-export.test.ts
 ## Troubleshooting
 
 ### 1. "File not found"
+
 ```bash
 # Проверить volume mount
 docker exec docling-mcp-server ls /home/me/code/megacampus2/packages/...
@@ -175,6 +179,7 @@ const absolutePath = path.resolve(filePath);
 ```
 
 ### 2. "Missing session ID"
+
 ```typescript
 // Всегда подключаться перед использованием
 await client.connect();
@@ -182,9 +187,11 @@ await client.convertToMarkdown(filePath);
 ```
 
 ### 3. Container Unhealthy
+
 **Не критично** - сервер работает. Health check ищет `/health` endpoint (его нет).
 
 ### 4. Timeout
+
 ```typescript
 // Увеличить timeout для больших файлов
 const client = new DoclingClient('http://localhost:8000/mcp', 600000); // 10 min
@@ -205,27 +212,32 @@ DOCLING_MCP_TIMEOUT=300000  # 5 minutes
 ## Implementation Status
 
 ### ✅ T074.3 (2025-10-27)
+
 - MCP client + session management
 - Markdown conversion
 - Docker integration
 - Tier-based processing
 
 ### ✅ T074.5 (2025-10-28)
+
 **Problem**: Stub создавал пустой DoclingDocument (texts[], pictures[], tables[] были пусты)
 
 **Solution**:
+
 - Обнаружили существующий инструмент `save_docling_document`
 - Добавили cache volume mount
 - Реализовали `getDoclingDocumentJSON()` - читает JSON из кэша
 - Заменили stub в `markdown-converter.ts`
 
 **Benefits**:
+
 - ✅ Без форка MCP сервера
 - ✅ Полная метадата: texts[], pictures[], tables[], pages{}
 - ✅ Прямой доступ к файлам (быстро)
 - ✅ Тесты: 3/3 passed
 
 **Files Changed**:
+
 1. `docker-compose.yml` - cache volume mount
 2. `src/shared/docling/client.ts` - new method
 3. `src/shared/embeddings/markdown-converter.ts` - stub → real API
@@ -235,12 +247,12 @@ DOCLING_MCP_TIMEOUT=300000  # 5 minutes
 
 ## Performance (краткие цифры)
 
-| File Type | Size | Processing Time |
-|-----------|------|-----------------|
-| TXT | 10 KB | 50ms |
-| PDF (5 pages) | 500 KB | 2.5s |
-| PDF (50 pages) | 5 MB | 15s |
-| DOCX | 200 KB | 1.8s |
+| File Type      | Size   | Processing Time |
+| -------------- | ------ | --------------- |
+| TXT            | 10 KB  | 50ms            |
+| PDF (5 pages)  | 500 KB | 2.5s            |
+| PDF (50 pages) | 5 MB   | 15s             |
+| DOCX           | 200 KB | 1.8s            |
 
 **Cache hit**: ~15-20ms независимо от размера
 

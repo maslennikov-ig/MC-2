@@ -1,13 +1,13 @@
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import remarkEmoji from 'remark-emoji';
-import rehypeSlug from 'rehype-slug';
-import rehypeKatex from 'rehype-katex';
-import rehypePrettyCode from 'rehype-pretty-code';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import remarkEmoji from 'remark-emoji'
+import rehypeSlug from 'rehype-slug'
+import rehypeKatex from 'rehype-katex'
+import rehypePrettyCode from 'rehype-pretty-code'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 
-import type { FeatureFlags } from './types';
-import { rehypePrettyCodeOptions } from './shiki-config';
+import type { FeatureFlags } from './types'
+import { rehypePrettyCodeOptions } from './shiki-config'
 
 /**
  * Get remark plugins based on feature flags
@@ -19,15 +19,15 @@ import { rehypePrettyCodeOptions } from './shiki-config';
  * @returns Array of remark plugins
  */
 export function getRemarkPlugins(features: FeatureFlags) {
-  const plugins: unknown[] = [remarkGfm];
+  const plugins: unknown[] = [remarkGfm]
 
   if (features.math) {
-    plugins.push(remarkMath);
+    plugins.push(remarkMath)
   }
 
-  plugins.push(remarkEmoji);
+  plugins.push(remarkEmoji)
 
-  return plugins;
+  return plugins
 }
 
 /**
@@ -41,23 +41,23 @@ export function getRemarkPlugins(features: FeatureFlags) {
  * @returns Array of rehype plugins
  */
 export function getRehypePluginsTrusted(features: FeatureFlags) {
-  const plugins: unknown[] = [];
+  const plugins: unknown[] = []
 
   // rehype-slug adds IDs to headings for anchor links
   // The Heading component handles the anchor UI (hover icon, copy link)
   if (features.anchorLinks) {
-    plugins.push(rehypeSlug);
+    plugins.push(rehypeSlug)
   }
 
   if (features.math) {
-    plugins.push([rehypeKatex, { output: 'htmlAndMathml' }]);
+    plugins.push([rehypeKatex, { output: 'htmlAndMathml' }])
   }
 
   if (features.codeHighlight) {
-    plugins.push([rehypePrettyCode, rehypePrettyCodeOptions]);
+    plugins.push([rehypePrettyCode, rehypePrettyCodeOptions])
   }
 
-  return plugins;
+  return plugins
 }
 
 /**
@@ -76,28 +76,36 @@ export function getRehypePluginsUntrusted(features: FeatureFlags) {
     ...defaultSchema,
     tagNames: [
       ...(defaultSchema.tagNames || []),
-      'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac',
+      'math',
+      'semantics',
+      'mrow',
+      'mi',
+      'mo',
+      'mn',
+      'msup',
+      'msub',
+      'mfrac',
     ],
     attributes: {
       ...defaultSchema.attributes,
       code: ['className'],
       span: ['className', 'style'],
     },
-  };
+  }
 
   const plugins: unknown[] = [
     [rehypeSanitize, sanitizeSchema], // MUST BE FIRST
-  ];
+  ]
 
   if (features.anchorLinks) {
-    plugins.push(rehypeSlug);
+    plugins.push(rehypeSlug)
   }
 
   if (features.math) {
-    plugins.push([rehypeKatex, { output: 'htmlAndMathml' }]);
+    plugins.push([rehypeKatex, { output: 'htmlAndMathml' }])
   }
 
   // NO rehype-pretty-code for UGC (performance + security)
 
-  return plugins;
+  return plugins
 }

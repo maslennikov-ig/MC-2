@@ -20,6 +20,7 @@ E2E test T053 fails because RPC function returns success, but database queries f
 ## ✅ What's Already Done (90% Complete)
 
 **Transactional Outbox Implementation:**
+
 - ✅ 12/13 tasks complete
 - ✅ Race conditions ELIMINATED by design
 - ✅ Three-layer defense architecture
@@ -28,6 +29,7 @@ E2E test T053 fails because RPC function returns success, but database queries f
 - ✅ Deployment checklist ready
 
 **What Was Fixed:**
+
 - Original problem: Jobs created before FSM initialized → "Invalid state transition" errors
 - Solution: Atomic PostgreSQL transaction (FSM + jobs in single COMMIT)
 - Architecture: Bulletproof, industry-standard Transactional Outbox pattern
@@ -42,21 +44,21 @@ E2E test T053 fails because RPC function returns success, but database queries f
 // Command handler calls RPC
 const result = await commandHandler.handle({
   entityId: course.id,
-  jobs: [/* 4 jobs */]
+  jobs: [
+    /* 4 jobs */
+  ],
 });
 
 console.log(result.outboxEntries.length); // Output: 4 ✅
 
 // Test helper queries database
-const { data } = await supabase
-  .from('job_outbox')
-  .select('*')
-  .eq('entity_id', course.id);
+const { data } = await supabase.from('job_outbox').select('*').eq('entity_id', course.id);
 
 console.log(data.length); // Output: 0 ❌ PROBLEM
 ```
 
 **Same issue for:**
+
 - `job_outbox` table: 0 rows (expected 4)
 - `fsm_events` table: 0 rows (expected 1)
 - `idempotency_keys` table: 0 rows (expected 1)
@@ -66,6 +68,7 @@ console.log(data.length); // Output: 0 ❌ PROBLEM
 ## 🔍 Investigation Needed
 
 **Possible Causes:**
+
 1. Transaction not committed (unlikely - plpgsql auto-commits)
 2. Different database connections/sessions
 3. Transaction isolation level issue
@@ -73,6 +76,7 @@ console.log(data.length); // Output: 0 ❌ PROBLEM
 5. Supabase client pooling configuration
 
 **Investigation Steps:**
+
 1. Test RPC directly in Supabase SQL Editor (isolate issue)
 2. Add debug logging to see actual SQL queries
 3. Check SECURITY DEFINER transaction behavior
@@ -84,6 +88,7 @@ console.log(data.length); // Output: 0 ❌ PROBLEM
 ## 📂 Key Files to Read
 
 **Test File (failure point):**
+
 ```
 packages/course-gen-platform/tests/e2e/t053-synergy-sales-course.test.ts
 Line 600: await waitForOutboxProcessing(course.id, 10000);
@@ -91,18 +96,21 @@ Line 272-300: waitForOutboxProcessing() helper function
 ```
 
 **Command Handler:**
+
 ```
 packages/course-gen-platform/src/services/fsm-initialization-command-handler.ts
 Line ~80-150: handle() method that calls RPC
 ```
 
 **RPC Function:**
+
 ```
 packages/course-gen-platform/supabase/migrations/20251118095804_create_initialize_fsm_with_outbox_rpc.sql
 Line ~30-120: initialize_fsm_with_outbox() function logic
 ```
 
 **Full Investigation Plan:**
+
 ```
 specs/008-generation-generation-json/TASK-2025-11-18-FIX-TRANSACTION-VISIBILITY-ISSUE.md
 ```
@@ -112,6 +120,7 @@ specs/008-generation-generation-json/TASK-2025-11-18-FIX-TRANSACTION-VISIBILITY-
 ## 🎯 Next Actions (Start Here)
 
 ### Step 1: SQL Editor Test (5 min)
+
 ```sql
 -- In Supabase Dashboard → SQL Editor
 SELECT initialize_fsm_with_outbox(
@@ -133,6 +142,7 @@ SELECT * FROM job_outbox WHERE entity_id = 'test-course-id'::uuid;
 **If data NOT visible:** Issue is in RPC function (transaction commit)
 
 ### Step 2: Add Debug Logging (10 min)
+
 ```typescript
 // In command handler AFTER RPC call
 logger.info({ result }, 'RPC completed, waiting 100ms...');
@@ -145,6 +155,7 @@ console.log(`[DEBUG] Query result:`, { count: data?.length, error });
 ```
 
 ### Step 3: Read Full Spec & Investigate
+
 ```
 Read: TASK-2025-11-18-FIX-TRANSACTION-VISIBILITY-ISSUE.md
 Follow: Phase 1 → Phase 2 → Phase 3 investigation steps
@@ -156,6 +167,7 @@ Implement: Fix based on findings
 ## 📊 Success Criteria
 
 When fixed, should see:
+
 ```bash
 $ pnpm test tests/e2e/t053-synergy-sales-course.test.ts
 
@@ -174,11 +186,13 @@ Test Files  1 passed (1)
 ## 🚀 Deployment Status
 
 **Current State:**
+
 - Implementation: ✅ 100% complete
 - Testing: ❌ Blocked by this bug
 - Deployment: ⏸️ Waiting for test to pass
 
 **After Fix:**
+
 - Run E2E test (should pass)
 - Run integration tests (should maintain 16/20)
 - Update progress docs

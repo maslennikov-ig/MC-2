@@ -1,13 +1,12 @@
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import { SectionWithoutInjectedFieldsSchema } from '@megacampus/shared-types/generation-result';
-import { getStylePrompt } from '@megacampus/shared-types/style-prompts';
+import { getStylePrompt, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import {
   getDifficultyFromAnalysis,
   formatCourseCategoryForPrompt,
   formatPedagogicalStrategyForPrompt,
-  formatPedagogicalPatternsForPrompt,
   formatGenerationGuidanceForPrompt,
 } from '../analysis-formatters';
 import { extractSection } from './utils';
@@ -29,6 +28,30 @@ export interface CourseConstraints {
 }
 
 /**
+ * Build a course structure map showing all sections and their topics.
+ * Used to give each section generator awareness of the full course structure,
+ * preventing content overlap between sections.
+ *
+ * @param input - Generation job input with analysis_result
+ * @param currentSectionIndex - Index of the section being generated (0-based)
+ * @returns Formatted course map string, empty if no analysis_result
+ */
+function buildCourseStructureMap(input: GenerationJobInput, currentSectionIndex: number): string {
+  const sections = input.analysis_result?.recommended_structure?.sections_breakdown || [];
+  if (sections.length === 0) return '';
+
+  const map = sections
+    .map((s, i) => {
+      const marker = i === currentSectionIndex ? ' [CURRENT]' : '';
+      const topics = (s.key_topics || []).join('; ') || 'None specified';
+      return `  ${i + 1}. ${s.area || 'Untitled'}${marker}\n     Topics: ${topics}`;
+    })
+    .join('\n');
+
+  return `**FULL COURSE STRUCTURE MAP** (${sections.length} sections total):\n${map}`;
+}
+
+/**
  * Build batch prompt with RT-002 prompt engineering (T021)
  *
  * @param input - Generation job input with course context and analysis
@@ -46,7 +69,7 @@ export function buildBatchPrompt(
   constraints?: CourseConstraints
 ): string {
   const language = input.frontend_parameters.language || 'en';
-  const style = input.frontend_parameters.style || 'conversational';
+  const style = input.frontend_parameters.style || DEFAULT_COURSE_STYLE;
   const stylePrompt = getStylePrompt(style);
 
   const section = extractSection(input, sectionIndex);
@@ -55,19 +78,48 @@ export function buildBatchPrompt(
   const keyTopics = section.key_topics || [];
   const estimatedLessons = section.estimated_lessons || 3;
 
+  // Sanitize user-provided fields to prevent prompt injection
+  const sanitize = (s: string) => s.replace(/[\n\r]+/g, ' ').trim();
+  const safeTitle = sanitize(input.frontend_parameters.course_title || '');
+  const safeAudience = input.frontend_parameters.target_audience
+    ? sanitize(input.frontend_parameters.target_audience)
+    : '';
+
   let prompt = `You are an expert course designer expanding section-level structure into detailed lessons.
 
 **Course Context**:
-- Course Title: ${input.frontend_parameters.course_title}
+- Course Title: ${safeTitle}
 - Target Language: ${language}
 - Content Style: ${stylePrompt}
-${input.frontend_parameters.target_audience ? `- Target Audience: ${input.frontend_parameters.target_audience}` : ''}
+${safeAudience ? `- Target Audience: ${safeAudience}` : ''}
 `;
 
   // Add user-provided context
   const userContext = buildUserContextSection(input.frontend_parameters);
   if (userContext) {
     prompt += `\n${userContext}`;
+  }
+
+  // Add cross-section context map BEFORE "Section to Expand" for higher LLM attention weight
+  const courseStructureMap = buildCourseStructureMap(input, sectionIndex);
+  if (courseStructureMap) {
+    const antiOverlapLang =
+      language !== 'en'
+        ? `\nNote: Section titles and topics above are in ${language}. Apply these rules regardless of language.`
+        : '';
+
+    prompt += `
+${courseStructureMap}
+
+**ANTI-OVERLAP RULES** (CRITICAL — failure to follow will cause rejection):
+1. YOU are generating Section ${sectionIndex + 1} ONLY. Each section above has its OWN unique topic area.
+2. DO NOT create lessons that cover topics assigned to OTHER sections in the course map above.
+3. If a concept (e.g., KPI, dashboards) appears in YOUR section AND other sections, focus EXCLUSIVELY on the unique angle defined by YOUR section's key topics.
+4. Before finalizing each lesson, verify: "Would this lesson fit better in another section?" If yes — do NOT include it here.
+5. Lessons MUST be DISTINCT from all other sections' topics listed in the course map.
+6. SELF-CHECK BEFORE OUTPUT: For EACH lesson you generate, verify its title and content do NOT match topics from other sections. If they do — REJECT and create a different lesson.
+${antiOverlapLang}
+`;
   }
 
   prompt += `
@@ -83,7 +135,6 @@ ${input.frontend_parameters.target_audience ? `- Target Audience: ${input.fronte
     const difficulty = getDifficultyFromAnalysis(input.analysis_result);
     const category = formatCourseCategoryForPrompt(input.analysis_result.course_category);
     const strategy = formatPedagogicalStrategyForPrompt(input.analysis_result.pedagogical_strategy);
-    const patterns = formatPedagogicalPatternsForPrompt(input.analysis_result.pedagogical_patterns);
     const guidance = formatGenerationGuidanceForPrompt(input.analysis_result.generation_guidance);
 
     prompt += `**Analysis Context** (from Stage 4):
@@ -93,9 +144,6 @@ ${input.frontend_parameters.target_audience ? `- Target Audience: ${input.fronte
 
 **Pedagogical Strategy**:
 ${strategy}
-
-**Pedagogical Patterns**:
-${patterns}
 
 **Generation Guidance**:
 ${guidance}
@@ -138,12 +186,7 @@ ${schemaDescription}
    - FR-030: Apply ${style} style to objectives (e.g., storytelling: "explore", "discover"; academic: "analyze", "evaluate")
 3. **Key Topics** (FR-011): Each lesson must have 2-10 specific key topics
    - FR-030: Frame topics in ${style} style (e.g., conversational: "Let's learn about...", professional: "Core competency:")
-4. **Practical Exercises** (FR-010): Each lesson must have 3-5 exercises:
-   - **exercise_type**: Brief labels (10-30 chars) - e.g., "case study analysis", "role-play scenario"
-   - **exercise_title**: Specific title (min 5 chars) - e.g., "Create a Personal Daily Schedule"
-   - **exercise_description**: DETAILED instructions (min 50 chars) explaining WHAT to do, HOW to do it, and expected outcome
-     Example: "Create a detailed daily schedule for tomorrow. Include all tasks, meetings, and breaks. Use time-blocking technique to allocate specific hours for each activity."
-5. **Coherence**: Lessons must follow logical progression, build on prerequisites
+4. **Coherence**: Lessons must follow logical progression, build on prerequisites
 6. **Language**: All content in ${language}
 
 **CRITICAL - FORBIDDEN PATTERNS** (will cause automatic rejection):
@@ -168,26 +211,22 @@ ${schemaDescription}
     prompt += `**Output Format**: Valid JSON matching the schema above (1 section with 3-5 lessons).
 
 **CRITICAL Field Type Requirements** (common mistakes to avoid):
-- 
+-
 learning_objectives
-: Must be array of STRINGS (NOT objects with id/text/language/cognitiveLevel)
-- 
+: REQUIRED, array of STRINGS (NOT objects with id/text/language)
+-
 lesson_objectives
-: Must be array of STRINGS (NOT objects)
-- 
-exercise_type
-: Descriptive text (min 3 chars) explaining exercise format and activities. Be specific about interaction model and learning activities.
-- 
+: REQUIRED for EVERY lesson, array of 1-5 STRINGS (NOT objects). Each string 10-600 chars.
+-
 section_number
 : Integer (${sectionIndex + 1})
-- 
+-
 section_title
 : String ("${sectionTitle}")
 
 **Quality Requirements**:
 - Objectives: Measurable action verbs (analyze, create, implement, evaluate - NOT "understand", "know")
 - Topics: Specific, concrete (NOT generic like "Introduction", "Overview")
-- Exercises: Actionable with clear, detailed instructions
 
 **Output**: Valid JSON only, no markdown, no code blocks, no explanations.
 `;
@@ -198,7 +237,7 @@ section_title
 2. **Valid Schema**: Match exact structure above
 3. **Section/Lesson Numbers**: Use sequential integers starting from 1
 4. **Enum Values**: Use exact cognitive levels (optional): remember, understand, apply, analyze, evaluate, create
-5. **Array Lengths**: 1-5 learning_objectives per section, 3-5 lessons, 1-5 lesson_objectives per lesson, 3-5 practical_exercises per lesson
+5. **Array Lengths**: 1-5 learning_objectives per section, 3-5 lessons, 1-5 lesson_objectives per lesson
 6. **String Lengths**: Respect min/max character limits
 
 **Output Format**: Single JSON object starting with { and ending with }. No extra text.

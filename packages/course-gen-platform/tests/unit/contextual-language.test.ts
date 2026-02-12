@@ -15,7 +15,7 @@ import {
   CATEGORY_TEMPLATES,
   type CourseCategory,
   type CategoryTemplate,
-} from '../../src/orchestrator/services/analysis/contextual-language';
+} from '../../src/stages/stage4-analysis/utils/contextual-language';
 
 describe('Contextual Language Generator', () => {
   /**
@@ -46,16 +46,16 @@ describe('Contextual Language Generator', () => {
     it('should define templates for all 6 categories', () => {
       expect(Object.keys(CATEGORY_TEMPLATES)).toHaveLength(6);
 
-      ALL_CATEGORIES.forEach((category) => {
+      ALL_CATEGORIES.forEach(category => {
         expect(CATEGORY_TEMPLATES).toHaveProperty(category);
       });
     });
 
     it('should have all 6 fields for each category', () => {
-      ALL_CATEGORIES.forEach((category) => {
+      ALL_CATEGORIES.forEach(category => {
         const template = CATEGORY_TEMPLATES[category];
 
-        TEMPLATE_FIELDS.forEach((field) => {
+        TEMPLATE_FIELDS.forEach(field => {
           expect(template).toHaveProperty(field);
           expect(typeof template[field]).toBe('string');
           expect(template[field].length).toBeGreaterThan(0);
@@ -64,10 +64,10 @@ describe('Contextual Language Generator', () => {
     });
 
     it('should have non-empty string values for all fields', () => {
-      ALL_CATEGORIES.forEach((category) => {
+      ALL_CATEGORIES.forEach(category => {
         const template = CATEGORY_TEMPLATES[category];
 
-        TEMPLATE_FIELDS.forEach((field) => {
+        TEMPLATE_FIELDS.forEach(field => {
           const value = template[field];
           expect(value.trim()).toBe(value); // No leading/trailing whitespace
           expect(value.length).toBeGreaterThan(10); // Meaningful content
@@ -93,11 +93,19 @@ describe('Contextual Language Generator', () => {
         const template = CATEGORY_TEMPLATES.professional;
 
         expect(template.why_matters).toBe('career advancement and professional competitiveness');
-        expect(template.motivators).toBe('increased earning potential, job security, industry recognition');
-        expect(template.experience_prompt).toBe('workplace challenges and professional growth opportunities');
+        expect(template.motivators).toBe(
+          'increased earning potential, job security, industry recognition'
+        );
+        expect(template.experience_prompt).toBe(
+          'workplace challenges and professional growth opportunities'
+        );
         expect(template.problem_statement).toBe('skills gap affecting career progression');
-        expect(template.knowledge_bridge).toBe('practical application in current or future professional roles');
-        expect(template.practical_benefit).toBe('immediate applicability to job responsibilities and career goals');
+        expect(template.knowledge_bridge).toBe(
+          'practical application in current or future professional roles'
+        );
+        expect(template.practical_benefit).toBe(
+          'immediate applicability to job responsibilities and career goals'
+        );
       });
     });
 
@@ -219,11 +227,11 @@ describe('Contextual Language Generator', () => {
      */
 
     it('should have reasonable template string lengths', () => {
-      ALL_CATEGORIES.forEach((category) => {
+      ALL_CATEGORIES.forEach(category => {
         const template = CATEGORY_TEMPLATES[category];
 
         // Templates should be concise but meaningful
-        TEMPLATE_FIELDS.forEach((field) => {
+        TEMPLATE_FIELDS.forEach(field => {
           const value = template[field];
           expect(value.length).toBeGreaterThanOrEqual(20); // Minimum meaningful length
           expect(value.length).toBeLessThanOrEqual(200); // Templates are concise patterns
@@ -242,7 +250,7 @@ describe('Contextual Language Generator', () => {
         academic: 0,
       };
 
-      ALL_CATEGORIES.forEach((category) => {
+      ALL_CATEGORIES.forEach(category => {
         const template = CATEGORY_TEMPLATES[category];
         const totalLength = TEMPLATE_FIELDS.reduce((sum, field) => sum + template[field].length, 0);
         templateLengths[category] = totalLength;
@@ -252,7 +260,7 @@ describe('Contextual Language Generator', () => {
       const lengths = Object.values(templateLengths);
       const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
 
-      lengths.forEach((length) => {
+      lengths.forEach(length => {
         expect(length).toBeGreaterThan(avgLength * 0.5);
         expect(length).toBeLessThan(avgLength * 1.5);
       });
@@ -261,7 +269,7 @@ describe('Contextual Language Generator', () => {
 
   describe('Category Uniqueness Validation', () => {
     it('should have unique motivator language per category', () => {
-      const motivators = ALL_CATEGORIES.map((cat) => CATEGORY_TEMPLATES[cat].motivators);
+      const motivators = ALL_CATEGORIES.map(cat => CATEGORY_TEMPLATES[cat].motivators);
 
       // Each category should have different motivators
       const uniqueMotivators = new Set(motivators);
@@ -269,7 +277,7 @@ describe('Contextual Language Generator', () => {
     });
 
     it('should have unique why_matters language per category', () => {
-      const whyMatters = ALL_CATEGORIES.map((cat) => CATEGORY_TEMPLATES[cat].why_matters);
+      const whyMatters = ALL_CATEGORIES.map(cat => CATEGORY_TEMPLATES[cat].why_matters);
 
       // Each category should have different why_matters
       const uniqueWhyMatters = new Set(whyMatters);
@@ -277,7 +285,7 @@ describe('Contextual Language Generator', () => {
     });
 
     it('should have unique practical_benefit language per category', () => {
-      const benefits = ALL_CATEGORIES.map((cat) => CATEGORY_TEMPLATES[cat].practical_benefit);
+      const benefits = ALL_CATEGORIES.map(cat => CATEGORY_TEMPLATES[cat].practical_benefit);
 
       // Each category should have different practical benefits
       const uniqueBenefits = new Set(benefits);
@@ -355,7 +363,7 @@ describe('Contextual Language Generator', () => {
     });
 
     it('should return templates with all 6 fields for every category', () => {
-      ALL_CATEGORIES.forEach((category) => {
+      ALL_CATEGORIES.forEach(category => {
         const template = getContextualLanguageTemplates(category);
 
         expect(template).toHaveProperty('why_matters');
@@ -380,7 +388,7 @@ describe('Contextual Language Generator', () => {
     it('should include all 6 categories in the prompt section', () => {
       const promptSection = buildContextualLanguagePromptSection();
 
-      ALL_CATEGORIES.forEach((category) => {
+      ALL_CATEGORIES.forEach(category => {
         expect(promptSection).toContain(category.toUpperCase());
       });
     });
@@ -448,19 +456,19 @@ describe('Contextual Language Generator', () => {
         'academic',
       ];
 
-      const templates = categories.map((category) => getContextualLanguageTemplates(category));
+      const templates = categories.map(category => getContextualLanguageTemplates(category));
 
       // All templates should exist
       expect(templates).toHaveLength(6);
 
       // All templates should have motivators
-      templates.forEach((template) => {
+      templates.forEach(template => {
         expect(template.motivators).toBeDefined();
         expect(template.motivators.length).toBeGreaterThan(0);
       });
 
       // All motivators should be unique
-      const motivators = templates.map((t) => t.motivators);
+      const motivators = templates.map(t => t.motivators);
       const uniqueMotivators = new Set(motivators);
       expect(uniqueMotivators.size).toBe(6);
     });

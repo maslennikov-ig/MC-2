@@ -169,7 +169,11 @@ export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>;
 export const organizationWithMembershipSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(255),
-  slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  slug: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
   tier: organizationTierSchema,
   settings: organizationSettingsSchema,
   createdAt: z.string().datetime(),
@@ -193,7 +197,8 @@ export type OrganizationWithMembership = z.infer<typeof organizationWithMembersh
  */
 export const createOrgInputSchema = z.object({
   name: z.string().min(1, 'Organization name is required').max(255),
-  slug: z.string()
+  slug: z
+    .string()
     .min(1, 'Slug is required')
     .max(255)
     .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
@@ -212,7 +217,8 @@ export type CreateOrgInput = z.infer<typeof createOrgInputSchema>;
  */
 export const updateOrgInputSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  slug: z.string()
+  slug: z
+    .string()
     .min(1)
     .max(255)
     .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens')
@@ -226,26 +232,28 @@ export type UpdateOrgInput = z.infer<typeof updateOrgInputSchema>;
 /**
  * Create invitation input schema
  */
-export const createInvitationInputSchema = z.object({
-  organizationId: z.string().uuid(),
-  invitationType: invitationTypeSchema,
-  email: z.string().email().optional(),
-  role: orgRoleSchema,
-  expiresInDays: z.number().int().positive().default(7),
-  maxUses: z.number().int().positive().optional(),
-}).refine(
-  (data) => {
-    // Email invitations must have email
-    if (data.invitationType === 'email' && !data.email) {
-      return false;
+export const createInvitationInputSchema = z
+  .object({
+    organizationId: z.string().uuid(),
+    invitationType: invitationTypeSchema,
+    email: z.string().email().optional(),
+    role: orgRoleSchema,
+    expiresInDays: z.number().int().positive().default(7),
+    maxUses: z.number().int().positive().optional(),
+  })
+  .refine(
+    data => {
+      // Email invitations must have email
+      if (data.invitationType === 'email' && !data.email) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Email is required for email invitations',
+      path: ['email'],
     }
-    return true;
-  },
-  {
-    message: 'Email is required for email invitations',
-    path: ['email'],
-  }
-);
+  );
 
 /** Inferred CreateInvitationInput type from schema */
 export type CreateInvitationInput = z.infer<typeof createInvitationInputSchema>;
@@ -253,15 +261,14 @@ export type CreateInvitationInput = z.infer<typeof createInvitationInputSchema>;
 /**
  * Accept invitation input schema
  */
-export const acceptInvitationInputSchema = z.object({
-  token: z.string().optional(),
-  code: z.string().optional(),
-}).refine(
-  (data) => data.token || data.code,
-  {
+export const acceptInvitationInputSchema = z
+  .object({
+    token: z.string().optional(),
+    code: z.string().optional(),
+  })
+  .refine(data => data.token || data.code, {
     message: 'Either token or code is required',
-  }
-);
+  });
 
 /** Inferred AcceptInvitationInput type from schema */
 export type AcceptInvitationInput = z.infer<typeof acceptInvitationInputSchema>;
@@ -310,7 +317,9 @@ export const organizationInvitationWithCreatorSchema = organizationInvitationSch
 });
 
 /** Inferred OrganizationInvitationWithCreator type from schema */
-export type OrganizationInvitationWithCreator = z.infer<typeof organizationInvitationWithCreatorSchema>;
+export type OrganizationInvitationWithCreator = z.infer<
+  typeof organizationInvitationWithCreatorSchema
+>;
 
 export const listInvitationsOutputSchema = z.array(organizationInvitationWithCreatorSchema);
 

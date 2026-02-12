@@ -16,7 +16,7 @@
 - Q: How should the system handle OAuth2 token expiration during long-running import operations? → A: Refresh token proactively before expiry
 - Q: What is the maximum course package size that should be validated before upload? → A: 100 MB (matches Open edX default limit)
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Publish AI-Generated Course to LMS (Priority: P1)
 
@@ -100,7 +100,7 @@ As an instructor, I want to view the history of my course publications so that I
 - What happens when course content contains duplicate internal identifiers? System should detect and resolve duplicates during conversion (e.g., by appending suffixes).
 - What happens when the authenticated user lacks permissions for the target course in LMS? System should surface a clear "Insufficient permissions" error with guidance on required access levels.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -127,7 +127,7 @@ As an instructor, I want to view the history of my course publications so that I
 - **Section**: Subdivision within a chapter (equivalent to "Subsection" or "Lesson" in Open edX).
 - **Unit**: Individual learning unit containing HTML content (equivalent to "Vertical" with "HTML Component" in Open edX).
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

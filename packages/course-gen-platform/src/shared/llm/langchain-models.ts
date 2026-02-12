@@ -24,11 +24,16 @@
 
 import { ChatOpenAI } from '@langchain/openai';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
-import { DEFAULT_MODEL_ID, MODEL_DEFAULTS } from '@megacampus/shared-types';
+import {
+  DEFAULT_MODEL_ID,
+  MODEL_DEFAULTS,
+  CHAT_PRIMARY_MODEL_ID,
+  CHAT_STAGE6_PRIMARY_MODEL_ID,
+} from '@megacampus/shared-types';
 import { createModelConfigService } from './model-config-service';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
-import type { LanguageCode } from '../utils/language-utils';
+import type { LanguageCode } from '@megacampus/shared-utils';
 
 /**
  * OpenRouter API base URL
@@ -178,11 +183,6 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 15000,
   },
   // Stage 6: Lesson generation phases
-  stage_6_rag_planning: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.7,
-    maxTokens: 4096,
-  },
   stage_6_judge: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.3,
@@ -286,6 +286,43 @@ const PHASE_FALLBACK_CONFIG: Record<
     modelId: DEFAULT_MODEL_ID,
     temperature: MODEL_DEFAULTS.temperature,
     maxTokens: MODEL_DEFAULTS.maxTokens,
+  },
+  // Chat phases (model IDs from @megacampus/shared-types)
+  chat_node_refinement: {
+    modelId: CHAT_PRIMARY_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  chat_global_guidance: {
+    modelId: CHAT_PRIMARY_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  chat_full_regeneration: {
+    modelId: CHAT_PRIMARY_MODEL_ID,
+    temperature: 0.6,
+    maxTokens: 8192,
+  },
+  chat_stage_5_refinement: {
+    modelId: CHAT_PRIMARY_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  chat_stage_6_refinement: {
+    modelId: CHAT_STAGE6_PRIMARY_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  // Inline operations
+  inline_block_regeneration: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 2000,
+  },
+  inline_element_crud: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 4000,
   },
 };
 
@@ -486,4 +523,12 @@ async function getHardcodedFallbackModelAsync(phase: PhaseName): Promise<ChatOpe
   }
 
   return await createOpenRouterModelAsync(config.modelId, config.temperature, config.maxTokens);
+}
+
+/**
+ * Safely extract text from LangChain MessageContent (string | ContentBlock[]).
+ * Returns string as-is; for non-string content, returns JSON representation.
+ */
+export function getTextContent(content: string | unknown[]): string {
+  return typeof content === 'string' ? content : JSON.stringify(content);
 }

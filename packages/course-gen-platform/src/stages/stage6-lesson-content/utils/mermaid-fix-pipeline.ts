@@ -91,7 +91,14 @@ function getDiagramSnippet(diagram: string, maxLength = 100): string {
 /**
  * Pipeline stage names for structured logging
  */
-type PipelineStage = 'START' | 'REGEX_SANITIZE' | 'VALIDATE' | 'LLM_FIX' | 'REVALIDATE' | 'FALLBACK' | 'COMPLETE';
+type PipelineStage =
+  | 'START'
+  | 'REGEX_SANITIZE'
+  | 'VALIDATE'
+  | 'LLM_FIX'
+  | 'REVALIDATE'
+  | 'FALLBACK'
+  | 'COMPLETE';
 
 /**
  * Log pipeline stage for observability
@@ -101,10 +108,7 @@ function logPipelineStage(
   blockIndex: number,
   data: Record<string, unknown> = {}
 ): void {
-  logger.debug(
-    { stage, blockIndex, ...data },
-    `Mermaid pipeline stage: ${stage}`
-  );
+  logger.debug({ stage, blockIndex, ...data }, `Mermaid pipeline stage: ${stage}`);
 }
 
 // ============================================================================
@@ -218,10 +222,7 @@ function extractMermaidBlocks(content: string): MermaidBlock[] {
     });
   }
 
-  logger.debug(
-    { blockCount: blocks.length },
-    'Mermaid pipeline: Extracted blocks'
-  );
+  logger.debug({ blockCount: blocks.length }, 'Mermaid pipeline: Extracted blocks');
 
   return blocks;
 }
@@ -315,10 +316,13 @@ export async function runMermaidFixPipeline(
 ): Promise<MermaidPipelineResult> {
   const startTime = Date.now();
 
-  logger.info({
-    contentLength: content.length,
-    skipLLM: options?.skipLLM ?? false,
-  }, 'Mermaid pipeline: Starting fix pipeline');
+  logger.info(
+    {
+      contentLength: content.length,
+      skipLLM: options?.skipLLM ?? false,
+    },
+    'Mermaid pipeline: Starting fix pipeline'
+  );
 
   try {
     // Initialize metrics
@@ -345,9 +349,12 @@ export async function runMermaidFixPipeline(
       };
     }
 
-    logger.info({
-      blockCount: blocks.length,
-    }, 'Mermaid pipeline: Processing blocks');
+    logger.info(
+      {
+        blockCount: blocks.length,
+      },
+      'Mermaid pipeline: Processing blocks'
+    );
 
     // Track LLM usage across all blocks
     let llmFixCount = 0;
@@ -359,10 +366,13 @@ export async function runMermaidFixPipeline(
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
 
-      logger.debug({
-        blockIndex: i,
-        codeLength: block.code.length,
-      }, 'Mermaid pipeline: Processing block');
+      logger.debug(
+        {
+          blockIndex: i,
+          codeLength: block.code.length,
+        },
+        'Mermaid pipeline: Processing block'
+      );
 
       // Log pipeline start
       logPipelineStage('START', i, { codeLength: block.code.length });
@@ -382,9 +392,12 @@ export async function runMermaidFixPipeline(
 
       if (regexModified) {
         anyModified = true;
-        logger.debug({
-          blockIndex: i,
-        }, 'Mermaid pipeline: Regex sanitization modified block');
+        logger.debug(
+          {
+            blockIndex: i,
+          },
+          'Mermaid pipeline: Regex sanitization modified block'
+        );
       }
 
       // Log regex sanitization result
@@ -395,23 +408,32 @@ export async function runMermaidFixPipeline(
       // -------------------------------------------------------------------------
       let validation = await validateMermaidSyntax(fixedCode);
 
-      logger.debug({
-        blockIndex: i,
-        valid: validation.valid,
-        diagramType: validation.diagramType,
-      }, 'Mermaid pipeline: Initial validation');
+      logger.debug(
+        {
+          blockIndex: i,
+          valid: validation.valid,
+          diagramType: validation.diagramType,
+        },
+        'Mermaid pipeline: Initial validation'
+      );
 
       // Log validation result
-      logPipelineStage('VALIDATE', i, { valid: validation.valid, diagramType: validation.diagramType });
+      logPipelineStage('VALIDATE', i, {
+        valid: validation.valid,
+        diagramType: validation.diagramType,
+      });
 
       if (validation.valid) {
         // Fixed by regex sanitization
         if (regexModified) {
           metrics.diagramsFixedRegex++;
-          logger.info({
-            blockIndex: i,
-            diagramType: validation.diagramType,
-          }, 'Mermaid pipeline: Fixed by regex');
+          logger.info(
+            {
+              blockIndex: i,
+              diagramType: validation.diagramType,
+            },
+            'Mermaid pipeline: Fixed by regex'
+          );
         }
 
         processedBlocks.push({ block, fixedCode });
@@ -426,11 +448,14 @@ export async function runMermaidFixPipeline(
         llmFixCount < MAX_LLM_FIXES_PER_LESSON &&
         validation.errors.length > 0
       ) {
-        logger.info({
-          blockIndex: i,
-          error: validation.errors[0],
-          llmFixCount,
-        }, 'Mermaid pipeline: Attempting LLM fix');
+        logger.info(
+          {
+            blockIndex: i,
+            error: validation.errors[0],
+            llmFixCount,
+          },
+          'Mermaid pipeline: Attempting LLM fix'
+        );
 
         // Log LLM fix attempt
         logPipelineStage('LLM_FIX', i, { attempting: true });
@@ -461,30 +486,39 @@ export async function runMermaidFixPipeline(
               llmFixCount++;
               anyModified = true;
 
-              logger.debug({
-                blockIndex: i,
-                llmFixCount,
-              }, 'Mermaid pipeline: LLM fix applied');
+              logger.debug(
+                {
+                  blockIndex: i,
+                  llmFixCount,
+                },
+                'Mermaid pipeline: LLM fix applied'
+              );
 
               // -----------------------------------------------------------------------
               // Stage 4: Re-validation
               // -----------------------------------------------------------------------
               validation = await validateMermaidSyntax(fixedCode);
 
-              logger.debug({
-                blockIndex: i,
-                valid: validation.valid,
-              }, 'Mermaid pipeline: Re-validation after LLM fix');
+              logger.debug(
+                {
+                  blockIndex: i,
+                  valid: validation.valid,
+                },
+                'Mermaid pipeline: Re-validation after LLM fix'
+              );
 
               // Log re-validation result
               logPipelineStage('REVALIDATE', i, { valid: validation.valid });
 
               if (validation.valid) {
                 metrics.diagramsFixedLLM++;
-                logger.info({
-                  blockIndex: i,
-                  diagramType: validation.diagramType,
-                }, 'Mermaid pipeline: Fixed by LLM');
+                logger.info(
+                  {
+                    blockIndex: i,
+                    diagramType: validation.diagramType,
+                  },
+                  'Mermaid pipeline: Fixed by LLM'
+                );
 
                 processedBlocks.push({ block, fixedCode });
                 continue;
@@ -492,30 +526,42 @@ export async function runMermaidFixPipeline(
             }
           }
         } catch (error) {
-          logger.warn({
-            blockIndex: i,
-            error: error instanceof Error ? error.message : String(error),
-          }, 'Mermaid pipeline: LLM fix failed');
+          logger.warn(
+            {
+              blockIndex: i,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Mermaid pipeline: LLM fix failed'
+          );
         }
       } else if (options?.skipLLM) {
-        logger.debug({
-          blockIndex: i,
-        }, 'Mermaid pipeline: Skipping LLM fix (skipLLM option)');
+        logger.debug(
+          {
+            blockIndex: i,
+          },
+          'Mermaid pipeline: Skipping LLM fix (skipLLM option)'
+        );
       } else if (llmFixCount >= MAX_LLM_FIXES_PER_LESSON) {
-        logger.warn({
-          blockIndex: i,
-          llmFixCount,
-        }, 'Mermaid pipeline: LLM budget exhausted');
+        logger.warn(
+          {
+            blockIndex: i,
+            llmFixCount,
+          },
+          'Mermaid pipeline: LLM budget exhausted'
+        );
       }
 
       // -------------------------------------------------------------------------
       // Stage 5: Fallback
       // -------------------------------------------------------------------------
-      logger.warn({
-        blockIndex: i,
-        errors: validation.errors,
-        snippet: getDiagramSnippet(block.code),
-      }, 'Mermaid pipeline: All fixes failed, using fallback');
+      logger.warn(
+        {
+          blockIndex: i,
+          errors: validation.errors,
+          snippet: getDiagramSnippet(block.code),
+        },
+        'Mermaid pipeline: All fixes failed, using fallback'
+      );
 
       // Log fallback
       logPipelineStage('FALLBACK', i, { reason: 'all_fixes_failed' });
@@ -541,21 +587,31 @@ export async function runMermaidFixPipeline(
 
         // Validate indices
         if (current.startIndex >= current.endIndex) {
-          logger.error({
-            blockIndex: i,
-            startIndex: current.startIndex,
-            endIndex: current.endIndex,
-            snippet: getDiagramSnippet(current.code)
-          }, 'Invalid block indices');
-          throw new Error(`Invalid block indices at position ${i}: start=${current.startIndex} >= end=${current.endIndex}`);
+          logger.error(
+            {
+              blockIndex: i,
+              startIndex: current.startIndex,
+              endIndex: current.endIndex,
+              snippet: getDiagramSnippet(current.code),
+            },
+            'Invalid block indices'
+          );
+          throw new Error(
+            `Invalid block indices at position ${i}: start=${current.startIndex} >= end=${current.endIndex}`
+          );
         }
 
         // Check for overlaps with next block
         if (i < processedBlocks.length - 1) {
           const next = processedBlocks[i + 1].block;
           if (current.endIndex > next.startIndex) {
-            logger.error({ currentEnd: current.endIndex, nextStart: next.startIndex }, 'Overlapping blocks detected');
-            throw new Error(`Overlapping mermaid blocks: block ${i} ends at ${current.endIndex}, block ${i+1} starts at ${next.startIndex}`);
+            logger.error(
+              { currentEnd: current.endIndex, nextStart: next.startIndex },
+              'Overlapping blocks detected'
+            );
+            throw new Error(
+              `Overlapping mermaid blocks: block ${i} ends at ${current.endIndex}, block ${i + 1} starts at ${next.startIndex}`
+            );
           }
         }
       }
@@ -601,10 +657,7 @@ export async function runMermaidFixPipeline(
   } catch (error) {
     // Re-throw after logging - don't swallow errors
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error(
-      { error: errorMessage },
-      'Mermaid pipeline: Unexpected error during processing'
-    );
+    logger.error({ error: errorMessage }, 'Mermaid pipeline: Unexpected error during processing');
     throw error;
   }
   // Note: No finally/cleanup block here.

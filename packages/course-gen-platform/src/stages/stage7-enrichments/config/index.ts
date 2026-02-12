@@ -47,13 +47,13 @@ export const DEFAULT_JOB_TIMEOUT_MS = 600_000;
 export const MODEL_CONFIG = {
   /** Primary model for quiz generation */
   quiz: {
-    primary: 'anthropic/claude-sonnet-4-20250514',
-    fallback: 'openai/gpt-4o-mini',
+    primary: 'xiaomi/mimo-v2-flash',
+    fallback: 'qwen/qwen3-235b-a22b-2507',
   },
   /** Primary model for presentation generation */
   presentation: {
-    primary: 'anthropic/claude-sonnet-4-20250514',
-    fallback: 'openai/gpt-4o-mini',
+    primary: 'xiaomi/mimo-v2-flash',
+    fallback: 'qwen/qwen3-235b-a22b-2507',
   },
   /** Max attempts before switching to fallback model */
   maxPrimaryAttempts: 2,
@@ -96,7 +96,13 @@ export const AUTO_GENERATED_ENRICHMENT_TYPES = ['cover', 'card'] as const;
  * Enrichment types that are generated on-demand only (not in pipeline).
  * These are triggered manually by users from the course viewer UI.
  */
-export const ON_DEMAND_ENRICHMENT_TYPES = ['quiz', 'audio', 'presentation', 'video', 'banner'] as const;
+export const ON_DEMAND_ENRICHMENT_TYPES = [
+  'quiz',
+  'audio',
+  'presentation',
+  'video',
+  'banner',
+] as const;
 
 /**
  * Audio generation configuration

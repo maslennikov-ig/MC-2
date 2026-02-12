@@ -22,6 +22,7 @@ This quickstart guide walks you through implementing and testing the Main Entry 
 ### Existing Setup (Stage 0)
 
 Ensure Stage 0 infrastructure is running:
+
 - ✅ Supabase local instance
 - ✅ Redis instance
 - ✅ BullMQ queue configured
@@ -177,9 +178,10 @@ const logger = pino({
     environment: process.env.NODE_ENV || 'development',
     version: process.env.APP_VERSION || '0.0.0',
   },
-  transport: process.env.NODE_ENV === 'development'
-    ? { target: 'pino-pretty', options: { colorize: true } }
-    : undefined,
+  transport:
+    process.env.NODE_ENV === 'development'
+      ? { target: 'pino-pretty', options: { colorize: true } }
+      : undefined,
 });
 
 export default logger;
@@ -261,14 +263,14 @@ export class ConcurrencyTracker {
     `;
 
     try {
-      const result = await this.redis.eval(
+      const result = (await this.redis.eval(
         script,
         2, // 2 keys
         `concurrency:user:${userId}`,
         'concurrency:global',
         userLimit,
         globalLimit
-      ) as string[];
+      )) as string[];
 
       const [success, reason, userCount, userLimitStr, globalCount, globalLimitStr] = result;
 
@@ -301,7 +303,7 @@ export class ConcurrencyTracker {
     try {
       await Promise.all([
         this.redis.decr(`concurrency:user:${userId}`),
-        this.redis.decr('concurrency:global')
+        this.redis.decr('concurrency:global'),
       ]);
 
       logger.debug('Concurrency slot released', { userId });
@@ -339,7 +341,7 @@ export async function retryWithBackoff<T>(
       if (attempt === options.attempts) {
         logger.error('All retry attempts exhausted', {
           attempts: options.attempts,
-          error
+          error,
         });
         return null;
       }
@@ -349,7 +351,7 @@ export async function retryWithBackoff<T>(
         attempt,
         maxAttempts: options.attempts,
         delay,
-        error
+        error,
       });
 
       if (options.onRetry) {
@@ -376,7 +378,7 @@ import { addJob, JobType } from '@megacampus/shared-types';
 import {
   concurrencyTracker,
   TIER_PRIORITY,
-  UserTier
+  UserTier,
 } from '@megacampus/course-gen-platform/src/shared/concurrency/tracker';
 import { retryWithBackoff } from '@megacampus/course-gen-platform/src/shared/utils/retry';
 import logger from '@megacampus/course-gen-platform/src/shared/logger';
@@ -407,7 +409,10 @@ export async function POST(request: NextRequest) {
 
     // 2. Authenticate user
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
       requestLogger.warn('Unauthorized request', { authError });
@@ -430,10 +435,7 @@ export async function POST(request: NextRequest) {
 
     if (courseError || !course) {
       userLogger.warn('Course not found', { courseError });
-      return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Course not found' }, { status: 404 });
     }
 
     if (course.user_id !== userId) {
@@ -458,24 +460,23 @@ export async function POST(request: NextRequest) {
         metadata: {
           tier,
           ...concurrencyCheck,
-          rejected_course_id: courseId
-        }
+          rejected_course_id: courseId,
+        },
       });
 
-      const errorMessage = concurrencyCheck.reason === 'user_limit'
-        ? `Too many concurrent jobs. ${tier} tier allows ${concurrencyCheck.user_limit} concurrent course generation.`
-        : 'System at capacity. Please try again in a few minutes.';
+      const errorMessage =
+        concurrencyCheck.reason === 'user_limit'
+          ? `Too many concurrent jobs. ${tier} tier allows ${concurrencyCheck.user_limit} concurrent course generation.`
+          : 'System at capacity. Please try again in a few minutes.';
 
-      return NextResponse.json(
-        { error: errorMessage, details: concurrencyCheck },
-        { status: 429 }
-      );
+      return NextResponse.json({ error: errorMessage, details: concurrencyCheck }, { status: 429 });
     }
 
     // 5. Determine job type based on files
-    const hasFiles = course.generation_progress?.files &&
-                     Array.isArray(course.generation_progress.files) &&
-                     course.generation_progress.files.length > 0;
+    const hasFiles =
+      course.generation_progress?.files &&
+      Array.isArray(course.generation_progress.files) &&
+      course.generation_progress.files.length > 0;
 
     const jobType = hasFiles ? JobType.DOCUMENT_PROCESSING : JobType.STRUCTURE_ANALYSIS;
     const priority = TIER_PRIORITY[tier];
@@ -484,53 +485,60 @@ export async function POST(request: NextRequest) {
     let jobId: string | null = null;
 
     try {
-      const job = await addJob(jobType, {
+      const job = await addJob(
         jobType,
-        organizationId: userId, // Or course.organization_id if exists
-        courseId,
-        userId,
-        createdAt: new Date().toISOString(),
-        // Include course context
-        title: course.title,
-        language: course.language,
-        style: course.style,
-        course_description: course.course_description,
-        target_audience: course.target_audience,
-        difficulty: course.difficulty,
-        learning_outcomes: course.learning_outcomes,
-        estimated_lessons: course.estimated_lessons,
-        estimated_sections: course.estimated_sections,
-        content_strategy: course.content_strategy,
-        output_formats: course.output_formats,
-      }, { priority });
+        {
+          jobType,
+          organizationId: userId, // Or course.organization_id if exists
+          courseId,
+          userId,
+          createdAt: new Date().toISOString(),
+          // Include course context
+          title: course.title,
+          language: course.language,
+          style: course.style,
+          course_description: course.course_description,
+          target_audience: course.target_audience,
+          difficulty: course.difficulty,
+          learning_outcomes: course.learning_outcomes,
+          estimated_lessons: course.estimated_lessons,
+          estimated_sections: course.estimated_sections,
+          content_strategy: course.content_strategy,
+          output_formats: course.output_formats,
+        },
+        { priority }
+      );
 
       jobId = job.id!;
       userLogger.info('Job created', { jobId, jobType, priority });
 
       // 7. Update progress with retry (Saga pattern)
-      const updated = await retryWithBackoff(async () => {
-        const { data, error } = await supabase.rpc('update_course_progress', {
-          p_course_id: courseId,
-          p_step_id: 1,
-          p_status: 'completed',
-          p_message: 'Инициализация завершена',
-          p_metadata: {
-            job_id: jobId,
-            executor: 'orchestrator',
-            tier,
-            priority
-          }
-        });
+      const updated = await retryWithBackoff(
+        async () => {
+          const { data, error } = await supabase.rpc('update_course_progress', {
+            p_course_id: courseId,
+            p_step_id: 1,
+            p_status: 'completed',
+            p_message: 'Инициализация завершена',
+            p_metadata: {
+              job_id: jobId,
+              executor: 'orchestrator',
+              tier,
+              priority,
+            },
+          });
 
-        if (error) throw error;
-        return data;
-      }, {
-        attempts: 3,
-        backoff: [100, 200, 400],
-        onRetry: (attempt, error) => {
-          userLogger.warn('RPC retry', { attempt, error: error.message });
+          if (error) throw error;
+          return data;
+        },
+        {
+          attempts: 3,
+          backoff: [100, 200, 400],
+          onRetry: (attempt, error) => {
+            userLogger.warn('RPC retry', { attempt, error: error.message });
+          },
         }
-      });
+      );
 
       if (!updated) {
         throw new Error('RPC update_course_progress failed after 3 retries');
@@ -539,12 +547,14 @@ export async function POST(request: NextRequest) {
       userLogger.info('Progress updated', { step: 1, percentage: updated.percentage });
 
       // 8. Return success
-      return NextResponse.json({
-        success: true,
-        jobId,
-        message: 'Генерация курса инициализирована'
-      }, { status: 200 });
-
+      return NextResponse.json(
+        {
+          success: true,
+          jobId,
+          message: 'Генерация курса инициализирована',
+        },
+        { status: 200 }
+      );
     } catch (error) {
       // Compensation: Rollback job
       if (jobId) {
@@ -562,8 +572,8 @@ export async function POST(request: NextRequest) {
           metadata: {
             reason: 'rpc_update_course_progress_failed',
             attempts: 3,
-            last_error: String(error)
-          }
+            last_error: String(error),
+          },
         });
       }
 
@@ -575,13 +585,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
   } catch (error) {
     requestLogger.error('Unexpected error', { error });
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 ```
@@ -619,8 +625,8 @@ async function handleJob(job: Job<JobData>) {
         p_message: 'Инициализация завершена (восстановлено воркером)',
         p_metadata: {
           recovered_by_worker: true,
-          job_id: job.id
-        }
+          job_id: job.id,
+        },
       });
 
       // Log recovery event
@@ -630,13 +636,12 @@ async function handleJob(job: Job<JobData>) {
         user_id: userId,
         course_id: courseId,
         job_id: job.id,
-        metadata: { recovery_step: 1 }
+        metadata: { recovery_step: 1 },
       });
     }
 
     // Continue with job processing...
     jobLogger.info('Job processing started');
-
   } catch (error) {
     jobLogger.error('Job failed', { error });
     throw error;
@@ -780,6 +785,7 @@ open http://localhost:3001/admin/queues
 **Error**: `function update_course_progress(uuid, integer, text, text) does not exist`
 
 **Solution**:
+
 ```bash
 cd courseai-next
 supabase db reset
@@ -792,6 +798,7 @@ supabase migration list
 **Error**: `ECONNREFUSED` on port 6379
 
 **Solution**:
+
 ```bash
 # Check Redis running
 docker ps | grep redis
@@ -807,6 +814,7 @@ docker restart redis
 **Error**: User always gets 429 even after jobs complete
 
 **Solution**:
+
 ```bash
 # Reset Redis counters
 redis-cli
@@ -820,6 +828,7 @@ redis-cli
 **Error**: JWT token validation fails
 
 **Solution**:
+
 ```bash
 # Get fresh token
 cd courseai-next

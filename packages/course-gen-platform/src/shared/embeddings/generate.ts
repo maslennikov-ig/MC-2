@@ -17,47 +17,22 @@
  * @see https://jina.ai/news/late-chunking-in-long-context-embedding-models/
  */
 
-import { createHash } from 'crypto';
 import type { EnrichedChunk } from './metadata-enricher';
 import { cache } from '../cache/redis';
 import logger from '../logger';
-import { jinaConcurrencyLimiter } from './jina-client';
-
-/**
- * Jina-v3 API request with late chunking support
- */
-interface JinaV3Request {
-  /** Model identifier */
-  model: 'jina-embeddings-v3';
-  /** Text input(s) - array for late chunking */
-  input: string[];
-  /** Task type for task-specific adapters */
-  task: 'retrieval.passage' | 'retrieval.query';
-  /** Embedding dimensions (default: 1024, we use 768) */
-  dimensions?: number;
-  /** Enable late chunking (default: false) */
-  late_chunking?: boolean;
-}
-
-/**
- * Jina-v3 API response
- */
-interface JinaV3Response {
-  /** Array of embedding data */
-  data: Array<{
-    /** Embedding vector */
-    embedding: number[];
-    /** Text index in input array */
-    index: number;
-  }>;
-  /** Token usage statistics */
-  usage: {
-    /** Total tokens processed */
-    total_tokens: number;
-    /** Prompt tokens (for late chunking) */
-    prompt_tokens?: number;
-  };
-}
+import { ContentPolicyError } from '../errors/pipeline-errors';
+import { jinaConcurrencyLimiter, jinaRateLimiter } from './jina-client';
+import {
+  generateCacheKey,
+  sleep,
+  EMBEDDING_CACHE_TTL,
+  EFFECTIVE_TOKEN_LIMIT,
+  FETCH_TIMEOUT_MS,
+  MAX_RETRIES,
+  BASE_RETRY_DELAY_MS,
+  type JinaV3Request,
+  type JinaV3Response,
+} from './generate-utils';
 
 /**
  * Jina API error response structure
@@ -98,19 +73,6 @@ export interface BatchEmbeddingResult {
     late_chunking_enabled: boolean;
   };
 }
-
-/**
- * Cache TTL for embeddings (1 hour = 3600 seconds)
- */
-const EMBEDDING_CACHE_TTL = 3600;
-
-/**
- * Jina API maximum tokens per batch (8194 tokens total)
- * Apply 95% safety margin to avoid edge cases
- */
-const JINA_MAX_TOKENS = 8194;
-const SAFETY_MARGIN = 0.95;
-const EFFECTIVE_TOKEN_LIMIT = Math.floor(JINA_MAX_TOKENS * SAFETY_MARGIN);
 
 /**
  * Creates token-aware batches from chunks
@@ -191,18 +153,6 @@ function createTokenAwareBatches(chunks: EnrichedChunk[]): EnrichedChunk[][] {
 }
 
 /**
- * Generates a cache key for embedding
- *
- * @param text - Text content to embed
- * @param task - Task type (retrieval.passage or retrieval.query)
- * @returns Cache key with embedding namespace
- */
-function generateCacheKey(text: string, task: string): string {
-  const hash = createHash('sha256').update(`${text}:${task}`).digest('hex');
-  return `embedding:${hash}`;
-}
-
-/**
  * Validates Jina API configuration
  */
 function validateJinaConfig(): void {
@@ -214,49 +164,8 @@ function validateJinaConfig(): void {
   }
 }
 
-/**
- * Rate limiter for Jina API (1500 RPM = 40ms between requests)
- */
-class RateLimiter {
-  private lastRequestTime = 0;
-  private readonly minInterval = 40; // milliseconds
-
-  async waitForSlot(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-
-    if (timeSinceLastRequest < this.minInterval) {
-      const waitTime = this.minInterval - timeSinceLastRequest;
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    this.lastRequestTime = Date.now();
-  }
-}
-
-const rateLimiter = new RateLimiter();
-
-/**
- * Fetch timeout in milliseconds (30 seconds)
- */
-const FETCH_TIMEOUT_MS = 30000;
-
-/**
- * Maximum retry attempts for transient errors
- */
-const MAX_RETRIES = 3;
-
-/**
- * Base delay for exponential backoff (1 second)
- */
-const BASE_RETRY_DELAY_MS = 1000;
-
-/**
- * Sleep utility for retry delays
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+// Rate limiter: using shared jinaRateLimiter from jina-client.ts (100 RPM)
+const rateLimiter = jinaRateLimiter;
 
 /**
  * Checks if an error is retryable (network issues, timeouts, server errors)
@@ -281,6 +190,110 @@ function isRetryableError(error: unknown): boolean {
 }
 
 /**
+ * Extracts error message from Jina API error response
+ */
+function extractJinaErrorMessage(response: Response, errorData: JinaAPIErrorData): string {
+  return (
+    errorData.error?.message ||
+    errorData.error?.detail ||
+    errorData.detail ||
+    errorData.message ||
+    `Jina API request failed with status ${response.status}`
+  );
+}
+
+/**
+ * Handles retry logic for server errors
+ */
+async function handleServerErrorRetry(
+  response: Response,
+  errorMessage: string,
+  attempt: number,
+  maxRetries: number
+): Promise<boolean> {
+  if (response.status >= 500 && attempt < maxRetries) {
+    logger.warn(
+      {
+        status: response.status,
+        attempt,
+        maxRetries: maxRetries,
+      },
+      'Jina API server error, retrying...'
+    );
+    const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+    await sleep(delay);
+    return true; // Continue retry loop
+  }
+
+  // Content policy rejection (e.g., Jina 451 for PII)
+  if (response.status === 451) {
+    throw new ContentPolicyError(errorMessage, 'errors.content_policy', {
+      status: 451,
+      originalMessage: errorMessage,
+    });
+  }
+
+  logger.error(
+    {
+      status: response.status,
+      err: errorMessage,
+    },
+    'Jina API request failed'
+  );
+
+  throw new Error(`Jina API Error: ${errorMessage}`);
+}
+
+/**
+ * Makes a single fetch request to Jina API with timeout
+ */
+async function makeSingleJinaRequest(payload: JinaV3Request): Promise<JinaV3Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch('https://api.jina.ai/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorMessage = `Jina API request failed with status ${response.status}`;
+
+      try {
+        const errorData = (await response.json()) as JinaAPIErrorData;
+        errorMessage = extractJinaErrorMessage(response, errorData);
+      } catch {
+        // JSON parsing failed, fall back to status text
+        errorMessage = response.statusText || errorMessage;
+      }
+
+      return { error: true, status: response.status, message: errorMessage } as never;
+    }
+
+    const data = (await response.json()) as JinaV3Response;
+
+    // Validate response
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+      throw new Error('Invalid response from Jina API: missing or empty data array');
+    }
+
+    return data;
+  } catch (fetchError) {
+    clearTimeout(timeoutId);
+    throw fetchError;
+  }
+}
+
+/**
  * Makes a request to Jina-v3 API with late chunking
  * Includes retry logic for transient errors and fetch timeout
  *
@@ -300,80 +313,24 @@ async function makeJinaV3Request(payload: JinaV3Request): Promise<JinaV3Response
       try {
         await rateLimiter.waitForSlot();
 
-        // Create abort controller for timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        const response = await makeSingleJinaRequest(payload);
 
-        try {
-          const response = await fetch('https://api.jina.ai/v1/embeddings', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${process.env.JINA_API_KEY}`,
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            let errorMessage = `Jina API request failed with status ${response.status}`;
-
-            try {
-              const errorData = (await response.json()) as JinaAPIErrorData;
-              // Safely extract error message from various possible error structures
-              errorMessage =
-                errorData.error?.message ||
-                errorData.error?.detail ||
-                errorData.detail ||
-                errorData.message ||
-                errorMessage;
-            } catch {
-              // JSON parsing failed, fall back to status text
-              errorMessage = response.statusText || errorMessage;
-            }
-
-            // Retry on 5xx server errors
-            if (response.status >= 500 && attempt < MAX_RETRIES) {
-              logger.warn(
-                {
-                  status: response.status,
-                  attempt,
-                  maxRetries: MAX_RETRIES,
-                },
-                'Jina API server error, retrying...'
-              );
-              lastError = new Error(`Jina API Error: ${errorMessage}`);
-              const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
-              await sleep(delay);
-              continue;
-            }
-
-            logger.error(
-              {
-                status: response.status,
-                err: errorMessage,
-              },
-              'Jina API request failed'
-            );
-
-            throw new Error(`Jina API Error: ${errorMessage}`);
+        // Check if response is an error (has our error flag from helper)
+        if ((response as unknown as { error?: boolean }).error) {
+          const errorResp = response as unknown as { status: number; message: string };
+          const shouldRetry = await handleServerErrorRetry(
+            { status: errorResp.status } as Response,
+            errorResp.message,
+            attempt,
+            MAX_RETRIES
+          );
+          if (shouldRetry) {
+            lastError = new Error(`Jina API Error: ${errorResp.message}`);
+            continue;
           }
-
-          const data = (await response.json()) as JinaV3Response;
-
-          // Validate response
-          if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-            throw new Error('Invalid response from Jina API: missing or empty data array');
-          }
-
-          return data;
-        } catch (fetchError) {
-          clearTimeout(timeoutId);
-          throw fetchError;
         }
+
+        return response;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -482,146 +439,13 @@ export async function generateEmbeddingsWithLateChunking(
 
   // Process token-aware batches
   for (const batch of batches) {
-    const textsToEmbed: string[] = [];
-    const chunkIndexMap: number[] = []; // Maps API response index to batch index
-    const cachedResults: Map<number, number[]> = new Map(); // batch index -> cached embedding
+    const result = await processSingleBatch(batch, task, late_chunking, batchCount);
 
-    // Check cache for each chunk in batch
-    for (let j = 0; j < batch.length; j++) {
-      const chunk = batch[j];
-      const cacheKey = generateCacheKey(chunk.content, task);
+    embeddings.push(...result.embeddings);
+    totalTokens += result.tokensUsed;
 
-      try {
-        const cached = await cache.get<number[]>(cacheKey);
-        if (cached && Array.isArray(cached) && cached.length === 768) {
-          cachedResults.set(j, cached);
-          logger.debug(
-            {
-              cacheKey,
-              chunkId: chunk.chunk_id,
-              task,
-            },
-            'Embedding cache hit'
-          );
-        } else {
-          // Not in cache or invalid, need to embed
-          textsToEmbed.push(chunk.content);
-          chunkIndexMap.push(j);
-        }
-      } catch (error) {
-        // Cache error - fall back to API call
-        logger.warn(
-          {
-            err: error,
-            chunkId: chunk.chunk_id,
-          },
-          'Cache read error, falling back to API'
-        );
-        textsToEmbed.push(chunk.content);
-        chunkIndexMap.push(j);
-      }
-    }
-
-    logger.info(
-      {
-        batchSize: batch.length,
-        cacheHits: cachedResults.size,
-        cacheMisses: textsToEmbed.length,
-        task,
-      },
-      'Embedding batch cache status'
-    );
-
-    // If we have texts that need embedding, call API
-    if (textsToEmbed.length > 0) {
-      try {
-        // Make request with late chunking enabled
-        const response = await makeJinaV3Request({
-          model: 'jina-embeddings-v3',
-          input: textsToEmbed,
-          task,
-          dimensions: 768, // Match Qdrant collection
-          late_chunking, // Enable context-aware embeddings
-        });
-
-        // Validate and extract embeddings
-        if (response.data.length !== textsToEmbed.length) {
-          throw new Error(
-            `Embedding count mismatch: expected ${textsToEmbed.length}, got ${response.data.length}`
-          );
-        }
-
-        // Cache newly generated embeddings
-        for (let apiIndex = 0; apiIndex < response.data.length; apiIndex++) {
-          const batchIndex = chunkIndexMap[apiIndex];
-          const chunk = batch[batchIndex];
-          const embeddingData = response.data[apiIndex];
-
-          // Validate embedding dimensions
-          if (embeddingData.embedding.length !== 768) {
-            throw new Error(
-              `Invalid embedding dimensions: expected 768, got ${embeddingData.embedding.length}`
-            );
-          }
-
-          // Cache the embedding with 1-hour TTL
-          const cacheKey = generateCacheKey(chunk.content, task);
-          try {
-            const cacheResult = await cache.set(cacheKey, embeddingData.embedding, {
-              ttl: EMBEDDING_CACHE_TTL,
-            });
-            if (cacheResult) {
-              logger.debug(
-                {
-                  cacheKey: cacheKey.substring(0, 30) + '...',
-                  chunkId: chunk.chunk_id,
-                  ttl: EMBEDDING_CACHE_TTL,
-                },
-                'Embedding cached successfully'
-              );
-            } else {
-              logger.warn(
-                {
-                  cacheKey: cacheKey.substring(0, 30) + '...',
-                  chunkId: chunk.chunk_id,
-                },
-                'Cache write returned false - Redis may not be connected'
-              );
-            }
-          } catch (error) {
-            // Log cache write error but continue
-            logger.warn(
-              {
-                err: error instanceof Error ? error.message : String(error),
-                chunkId: chunk.chunk_id,
-              },
-              'Cache write error, continuing without caching'
-            );
-          }
-
-          cachedResults.set(batchIndex, embeddingData.embedding);
-        }
-
-        totalTokens += response.usage.total_tokens;
-        batchCount++;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(
-          {
-            batchNumber: batchCount + 1,
-            batchSize: textsToEmbed.length,
-            err: errorMessage,
-          },
-          'Embedding batch failed after all retries'
-        );
-        throw new Error(
-          `Failed to generate embeddings for batch ${batchCount + 1}: ${errorMessage}`
-        );
-      }
-    }
-
-    // Log batch progress
-    if (batchCount > 0) {
+    if (result.tokensUsed > 0) {
+      batchCount++;
       logger.info(
         {
           batchNumber: batchCount,
@@ -631,22 +455,6 @@ export async function generateEmbeddingsWithLateChunking(
         },
         'Embedding batch completed'
       );
-    }
-
-    // Build final embeddings array from cached and newly generated embeddings
-    for (let j = 0; j < batch.length; j++) {
-      const chunk = batch[j];
-      const embedding = cachedResults.get(j);
-
-      if (!embedding) {
-        throw new Error(`Missing embedding for chunk ${chunk.chunk_id} at batch index ${j}`);
-      }
-
-      embeddings.push({
-        chunk,
-        dense_vector: embedding,
-        token_count: chunk.token_count,
-      });
     }
   }
 
@@ -719,7 +527,8 @@ export async function generateQueryEmbedding(queryText: string): Promise<number[
   );
 
   validateJinaConfig();
-  await rateLimiter.waitForSlot();
+  // Note: rateLimiter.waitForSlot() is called inside makeJinaV3Request(),
+  // so we don't call it here to avoid double-waiting
 
   const response = await makeJinaV3Request({
     model: 'jina-embeddings-v3',
@@ -783,6 +592,206 @@ export async function healthCheck(): Promise<boolean> {
       `Jina API health check failed: ${error instanceof Error ? error.message : String(error)}`
     );
   }
+}
+
+/**
+ * Processes cache lookups for a batch of chunks
+ */
+async function processBatchCacheHits(
+  batch: EnrichedChunk[],
+  task: 'retrieval.passage' | 'retrieval.query'
+): Promise<{
+  textsToEmbed: string[];
+  chunkIndexMap: number[];
+  cachedResults: Map<number, number[]>;
+}> {
+  const textsToEmbed: string[] = [];
+  const chunkIndexMap: number[] = []; // Maps API response index to batch index
+  const cachedResults: Map<number, number[]> = new Map(); // batch index -> cached embedding
+
+  // Check cache for each chunk in batch
+  for (let j = 0; j < batch.length; j++) {
+    const chunk = batch[j];
+    const cacheKey = generateCacheKey(chunk.content, task);
+
+    try {
+      const cached = await cache.get<number[]>(cacheKey);
+      if (cached && Array.isArray(cached) && cached.length === 768) {
+        cachedResults.set(j, cached);
+        logger.debug(
+          {
+            cacheKey,
+            chunkId: chunk.chunk_id,
+            task,
+          },
+          'Embedding cache hit'
+        );
+      } else {
+        // Not in cache or invalid, need to embed
+        textsToEmbed.push(chunk.content);
+        chunkIndexMap.push(j);
+      }
+    } catch (error) {
+      // Cache error - fall back to API call
+      logger.warn(
+        {
+          err: error,
+          chunkId: chunk.chunk_id,
+        },
+        'Cache read error, falling back to API'
+      );
+      textsToEmbed.push(chunk.content);
+      chunkIndexMap.push(j);
+    }
+  }
+
+  return { textsToEmbed, chunkIndexMap, cachedResults };
+}
+
+/**
+ * Caches newly generated embeddings
+ */
+async function cacheNewEmbeddings(
+  response: JinaV3Response,
+  chunkIndexMap: number[],
+  batch: EnrichedChunk[],
+  task: 'retrieval.passage' | 'retrieval.query',
+  cachedResults: Map<number, number[]>
+): Promise<void> {
+  for (let apiIndex = 0; apiIndex < response.data.length; apiIndex++) {
+    const batchIndex = chunkIndexMap[apiIndex];
+    const chunk = batch[batchIndex];
+    const embeddingData = response.data[apiIndex];
+
+    // Validate embedding dimensions
+    if (embeddingData.embedding.length !== 768) {
+      throw new Error(
+        `Invalid embedding dimensions: expected 768, got ${embeddingData.embedding.length}`
+      );
+    }
+
+    // Cache the embedding with 1-hour TTL
+    const cacheKey = generateCacheKey(chunk.content, task);
+    try {
+      const cacheResult = await cache.set(cacheKey, embeddingData.embedding, {
+        ttl: EMBEDDING_CACHE_TTL,
+      });
+      if (cacheResult) {
+        logger.debug(
+          {
+            cacheKey: cacheKey.substring(0, 30) + '...',
+            chunkId: chunk.chunk_id,
+            ttl: EMBEDDING_CACHE_TTL,
+          },
+          'Embedding cached successfully'
+        );
+      } else {
+        logger.warn(
+          {
+            cacheKey: cacheKey.substring(0, 30) + '...',
+            chunkId: chunk.chunk_id,
+          },
+          'Cache write returned false - Redis may not be connected'
+        );
+      }
+    } catch (error) {
+      // Log cache write error but continue
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          chunkId: chunk.chunk_id,
+        },
+        'Cache write error, continuing without caching'
+      );
+    }
+
+    cachedResults.set(batchIndex, embeddingData.embedding);
+  }
+}
+
+/**
+ * Processes a single batch for embedding generation
+ */
+async function processSingleBatch(
+  batch: EnrichedChunk[],
+  task: 'retrieval.passage' | 'retrieval.query',
+  late_chunking: boolean,
+  batchCount: number
+): Promise<{ embeddings: EmbeddingResult[]; tokensUsed: number }> {
+  const { textsToEmbed, chunkIndexMap, cachedResults } = await processBatchCacheHits(batch, task);
+
+  logger.info(
+    {
+      batchSize: batch.length,
+      cacheHits: cachedResults.size,
+      cacheMisses: textsToEmbed.length,
+      task,
+    },
+    'Embedding batch cache status'
+  );
+
+  let tokensUsed = 0;
+
+  // If we have texts that need embedding, call API
+  if (textsToEmbed.length > 0) {
+    try {
+      // Make request with late chunking enabled
+      const response = await makeJinaV3Request({
+        model: 'jina-embeddings-v3',
+        input: textsToEmbed,
+        task,
+        dimensions: 768, // Match Qdrant collection
+        late_chunking, // Enable context-aware embeddings
+      });
+
+      // Validate and extract embeddings
+      if (response.data.length !== textsToEmbed.length) {
+        throw new Error(
+          `Embedding count mismatch: expected ${textsToEmbed.length}, got ${response.data.length}`
+        );
+      }
+
+      // Cache newly generated embeddings
+      await cacheNewEmbeddings(response, chunkIndexMap, batch, task, cachedResults);
+
+      tokensUsed = response.usage.total_tokens;
+    } catch (error) {
+      // Content policy errors propagate as-is (user-facing, not technical)
+      if (error instanceof ContentPolicyError) {
+        throw error;
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(
+        {
+          batchNumber: batchCount + 1,
+          batchSize: textsToEmbed.length,
+          err: errorMessage,
+        },
+        'Embedding batch failed after all retries'
+      );
+      throw new Error(`Failed to generate embeddings for batch ${batchCount + 1}: ${errorMessage}`);
+    }
+  }
+
+  // Build final embeddings array from cached and newly generated embeddings
+  const embeddings: EmbeddingResult[] = [];
+  for (let j = 0; j < batch.length; j++) {
+    const chunk = batch[j];
+    const embedding = cachedResults.get(j);
+
+    if (!embedding) {
+      throw new Error(`Missing embedding for chunk ${chunk.chunk_id} at batch index ${j}`);
+    }
+
+    embeddings.push({
+      chunk,
+      dense_vector: embedding,
+      token_count: chunk.token_count,
+    });
+  }
+
+  return { embeddings, tokensUsed };
 }
 
 /**

@@ -3,12 +3,14 @@
 ## Текущая ситуация
 
 ### Архитектура Judge фазы
+
 - **3 судьи** (CLEV voting: 2 judges + conditional 3rd)
 - Каждый судья выносит вердикт по нескольким критериям
 - При расхождении - третий судья
 - Финальное решение: approve / refine / reject
 
 ### Текущее поведение (проблемное)
+
 1. Judge выносит вердикт "refine" → **полная регенерация** (planner → expander → assembler → smoother)
 2. Нет механизма **минорных правок** (targeted refinement)
 3. Все рекомендации судей **игнорируются** при регенерации
@@ -17,6 +19,7 @@
 ## Желаемое поведение
 
 ### Стратегия правок
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     JUDGE VERDICT                           │
@@ -42,17 +45,20 @@
 ### Минорные правки (Targeted Self-Refinement)
 
 **Вход:**
+
 - Контент секции
 - Конкретные рекомендации от судей
 - Критерии, которые не прошли
 
 **Процесс:**
+
 1. Judge выявляет конкретные проблемы
 2. Формирует **конкретное задание** для правки
 3. LLM вносит **точечные изменения** (не переписывает всё)
 4. Повторная оценка **только исправленных мест**
 
 **Пример:**
+
 ```
 Судья: "В секции 2 недостаточно практических примеров"
 Задание: "Добавь 2 конкретных примера в секцию 'Воронка продаж'"
@@ -102,12 +108,12 @@
 // packages/shared-types/src/judge-types.ts
 
 interface JudgeVerdict {
-  overallScore: number;           // 0-1 scale
-  passed: boolean;                // passed quality threshold
+  overallScore: number; // 0-1 scale
+  passed: boolean; // passed quality threshold
   confidence: 'high' | 'medium' | 'low';
   criteriaScores: CriteriaScores; // 6 dimensions
-  issues: JudgeIssue[];           // identified problems
-  strengths: string[];            // what to preserve
+  issues: JudgeIssue[]; // identified problems
+  strengths: string[]; // what to preserve
   recommendation: JudgeRecommendation;
   judgeModel: string;
   temperature: number;
@@ -118,11 +124,11 @@ interface JudgeVerdict {
 // 6 criteria with OSCQR-based weights
 interface CriteriaScores {
   learning_objective_alignment: number; // 25%
-  pedagogical_structure: number;        // 20%
-  factual_accuracy: number;             // 15%
-  clarity_readability: number;          // 15%
-  engagement_examples: number;          // 15%
-  completeness: number;                 // 10%
+  pedagogical_structure: number; // 20%
+  factual_accuracy: number; // 15%
+  clarity_readability: number; // 15%
+  engagement_examples: number; // 15%
+  completeness: number; // 10%
 }
 ```
 
@@ -130,12 +136,12 @@ interface CriteriaScores {
 
 ```typescript
 interface JudgeIssue {
-  criterion: JudgeCriterion;        // which criteria failed
+  criterion: JudgeCriterion; // which criteria failed
   severity: 'critical' | 'major' | 'minor';
-  location: string;                 // "section 2, paragraph 3"
-  description: string;              // what is wrong
-  quotedText?: string;              // exact problematic text
-  suggestedFix: string;             // actionable suggestion
+  location: string; // "section 2, paragraph 3"
+  description: string; // what is wrong
+  quotedText?: string; // exact problematic text
+  suggestedFix: string; // actionable suggestion
 }
 ```
 
@@ -143,22 +149,23 @@ interface JudgeIssue {
 
 ```typescript
 type JudgeRecommendation =
-  | 'ACCEPT'                      // score >= 0.90
-  | 'ACCEPT_WITH_MINOR_REVISION'  // score 0.75-0.90, <= 3 issues
-  | 'ITERATIVE_REFINEMENT'        // score 0.60-0.75
-  | 'REGENERATE'                  // score < 0.60
-  | 'ESCALATE_TO_HUMAN';          // low confidence
+  | 'ACCEPT' // score >= 0.90
+  | 'ACCEPT_WITH_MINOR_REVISION' // score 0.75-0.90, <= 3 issues
+  | 'ITERATIVE_REFINEMENT' // score 0.60-0.75
+  | 'REGENERATE' // score < 0.60
+  | 'ESCALATE_TO_HUMAN'; // low confidence
 ```
 
 #### FixRecommendation (для таргетированных правок)
 
 ```typescript
 interface FixRecommendation {
-  issues: JudgeIssue[];            // issues to address
-  sectionsToPreserve: string[];    // don't modify these
-  sectionsToModify: string[];      // target these
-  preserveTerminology: string[];   // maintain consistency
-  iterationHistory: Array<{        // for self-refine
+  issues: JudgeIssue[]; // issues to address
+  sectionsToPreserve: string[]; // don't modify these
+  sectionsToModify: string[]; // target these
+  preserveTerminology: string[]; // maintain consistency
+  iterationHistory: Array<{
+    // for self-refine
     feedback: string;
     score: number;
   }>;
@@ -171,10 +178,10 @@ interface FixRecommendation {
 // packages/shared-types/src/judge-types.ts
 
 const SCORE_THRESHOLDS = {
-  ACCEPT: 0.90,           // Auto-publish
-  MINOR_REVISION: 0.75,   // Small fixes
-  REFINEMENT: 0.60,       // Iteration needed
-  REGENERATE: 0.60,       // Below this = regenerate
+  ACCEPT: 0.9, // Auto-publish
+  MINOR_REVISION: 0.75, // Small fixes
+  REFINEMENT: 0.6, // Iteration needed
+  REGENERATE: 0.6, // Below this = regenerate
 };
 
 const MAX_REFINEMENT_ITERATIONS = 2;
@@ -186,9 +193,9 @@ const MAX_REFINEMENT_ITERATIONS = 2;
 // packages/course-gen-platform/src/stages/stage6-lesson-content/judge/clev-voter.ts
 
 interface CLEVVoterConfig {
-  agreementThreshold: number;      // 0.1 (10% difference)
+  agreementThreshold: number; // 0.1 (10% difference)
   minConfidence: 'high' | 'medium' | 'low';
-  maxTotalTokens: number;          // 10000
+  maxTotalTokens: number; // 10000
   rubric?: OSCQRRubric;
 }
 
@@ -197,8 +204,8 @@ interface CLEVVoterConfig {
 // Other languages (generated by deepseek) → judges: qwen3/kimi/minimax
 
 const AVAILABLE_JUDGE_MODELS = {
-  'qwen3': { weight: 0.75, role: 'primary' },
-  'deepseek': { weight: 0.74, role: 'secondary' },
+  qwen3: { weight: 0.75, role: 'primary' },
+  deepseek: { weight: 0.74, role: 'secondary' },
   'kimi-k2': { weight: 0.73, role: 'secondary' },
   'minimax-m2': { weight: 0.72, role: 'tiebreaker' },
   'glm-4': { weight: 0.71, role: 'tiebreaker' },
@@ -212,11 +219,11 @@ const AVAILABLE_JUDGE_MODELS = {
 // packages/course-gen-platform/src/stages/stage6-lesson-content/judge/heuristic-filter.ts
 
 interface HeuristicFilterConfig {
-  wordCount: { min: 500, max: 10000 };
-  fleschKincaid: { min: 6, max: 14, target: 10 };
+  wordCount: { min: 500; max: 10000 };
+  fleschKincaid: { min: 6; max: 14; target: 10 };
   requiredSections: ['introduction', 'conclusion'];
-  keywordCoverageThreshold: 0.5;   // 50%
-  contentDensityThreshold: 100;    // words per section
+  keywordCoverageThreshold: 0.5; // 50%
+  contentDensityThreshold: 100; // words per section
 }
 
 // Dynamic word count based on lesson duration
@@ -236,14 +243,14 @@ interface HeuristicResults {
   passed: boolean;
   wordCount: number;
   fleschKincaid: number;
-  fleschKincaidSkipped: boolean;   // true for non-English
+  fleschKincaidSkipped: boolean; // true for non-English
   sectionsPresent: boolean;
   missingSections: string[];
-  keywordCoverage: number;         // 0-1
+  keywordCoverage: number; // 0-1
   examplesCount: number;
   exercisesCount: number;
-  failureReasons: string[];        // blocking
-  warnings: string[];              // non-blocking
+  failureReasons: string[]; // blocking
+  warnings: string[]; // non-blocking
 }
 ```
 
@@ -262,7 +269,7 @@ const DEFAULT_OSCQR_RUBRIC = {
     },
     {
       criterion: 'pedagogical_structure',
-      weight: 0.20,
+      weight: 0.2,
       description: 'Logical flow, scaffolding, progressive complexity...',
     },
     {
@@ -282,7 +289,7 @@ const DEFAULT_OSCQR_RUBRIC = {
     },
     {
       criterion: 'completeness',
-      weight: 0.10,
+      weight: 0.1,
       description: 'All sections present, appropriate depth...',
     },
   ],
@@ -294,36 +301,42 @@ const DEFAULT_OSCQR_RUBRIC = {
 ## Открытые вопросы для исследования
 
 ### 1. Консолидация рекомендаций от 3 судей
+
 - Как объединять рекомендации, если судьи указывают на разные проблемы?
 - Приоритизация: severity > weight > frequency?
 - Дедупликация похожих рекомендаций
 - **Текущая реализация**: `combineIssues()` дедуплицирует по `criterion:description`, сортирует по severity
 
 ### 2. Формат задания на правку
+
 - Насколько конкретным должно быть задание?
 - XML tags vs natural language?
 - Включать ли примеры желаемого результата?
 - **Текущая структура**: `JudgeIssue.suggestedFix` + `JudgeIssue.location`
 
 ### 3. Верификация исправлений
+
 - Как убедиться, что правка выполнена?
 - Полная повторная оценка vs проверка только исправленного?
 - Semantic similarity vs keyword matching?
 - **Текущее**: Нет механизма верификации отдельных правок
 
 ### 4. Предотвращение бесконечных циклов
+
 - Максимум итераций минорных правок
 - Escalation logic: minor → major → reject
 - Когда отказаться и принять "достаточно хорошо"?
 - **Текущее**: `MAX_REFINEMENT_ITERATIONS = 2`
 
 ### 5. Гранулярность правок
+
 - Уровень секции vs уровень параграфа?
 - Как изолировать контекст для правки?
 - Сохранение coherence после точечных изменений?
 - **Текущее**: `sectionsToPreserve`, `sectionsToModify` в `FixRecommendation`
 
 ### 6. Routing Logic
+
 - Как определить тип правки (minor vs major vs regenerate)?
 - Критерии для каждого пути?
 - **Текущее**: `determineRecommendation()` использует score + issues count
@@ -513,19 +526,23 @@ Provide complete implementation plan with:
 ## Связанные файлы
 
 ### Core Judge Implementation
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/cascade-evaluator.ts` - cascading evaluation logic
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/clev-voter.ts` - CLEV voting orchestrator
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/heuristic-filter.ts` - heuristic pre-filters
 
 ### Type Definitions
+
 - `packages/shared-types/src/judge-types.ts` - JudgeVerdict, JudgeIssue, FixRecommendation
 - `packages/shared-types/src/judge-rubric.ts` - OSCQR rubric configuration
 - `packages/shared-types/src/judge-thresholds.ts` - dynamic threshold calculations
 
 ### Pipeline Integration
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/orchestrator.ts` - routing logic
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/` - pipeline nodes
 
 ### Research Documents
+
 - `docs/research/010-stage6-generation-strategy/` - original cascade research
 - `specs/010-stages-456-pipeline/data-model.md` - data model specification

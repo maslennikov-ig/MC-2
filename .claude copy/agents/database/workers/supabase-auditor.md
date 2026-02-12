@@ -37,6 +37,7 @@ mcp__supabase__generate_typescript_types({})
 ### Context7 Integration (RECOMMENDED)
 
 Use Context7 for Supabase best practices:
+
 ```bash
 mcp__context7__resolve-library-id({libraryName: "supabase"})
 mcp__context7__get-library-docs({
@@ -74,6 +75,7 @@ When invoked, follow these phases systematically:
    - If unavailable: Log warning, report to user, suggest switching MCP config
 
 2. **Gather Project Info**:
+
    ```bash
    # Get project details
    mcp__supabase__get_project_url({})
@@ -91,11 +93,13 @@ When invoked, follow these phases systematically:
 ### Phase 2: Schema Audit
 
 4. **List All Tables**:
+
    ```bash
    mcp__supabase__list_tables({schemas: ["public", "auth", ...]})
    ```
 
 5. **For Each Table, Gather Metadata**:
+
    ```sql
    -- Get table structure
    SELECT
@@ -110,6 +114,7 @@ When invoked, follow these phases systematically:
    ```
 
 6. **Check Foreign Key Relationships**:
+
    ```sql
    SELECT
      tc.constraint_name,
@@ -137,6 +142,7 @@ When invoked, follow these phases systematically:
 ### Phase 3: RLS Policy Audit
 
 8. **Check RLS Enablement**:
+
    ```sql
    SELECT
      schemaname,
@@ -148,6 +154,7 @@ When invoked, follow these phases systematically:
    ```
 
 9. **List All RLS Policies**:
+
    ```sql
    SELECT
      schemaname,
@@ -182,6 +189,7 @@ When invoked, follow these phases systematically:
 ### Phase 4: Index Analysis
 
 12. **List All Indexes**:
+
     ```sql
     SELECT
       schemaname,
@@ -194,6 +202,7 @@ When invoked, follow these phases systematically:
     ```
 
 13. **Analyze Index Usage**:
+
     ```sql
     SELECT
       schemaname,
@@ -217,11 +226,13 @@ When invoked, follow these phases systematically:
 ### Phase 5: Migration Audit
 
 15. **List Migration History**:
+
     ```bash
     mcp__supabase__list_migrations({})
     ```
 
 16. **Check Migration Consistency**:
+
     ```sql
     -- Check if migrations table exists
     SELECT EXISTS (
@@ -245,11 +256,13 @@ When invoked, follow these phases systematically:
 ### Phase 6: Performance Audit
 
 18. **Run Performance Advisors**:
+
     ```bash
     mcp__supabase__get_advisors({type: "performance"})
     ```
 
 19. **Analyze Query Performance**:
+
     ```sql
     -- Slowest queries (if pg_stat_statements available)
     SELECT
@@ -265,6 +278,7 @@ When invoked, follow these phases systematically:
     ```
 
 20. **Check Database Statistics**:
+
     ```sql
     -- Table sizes
     SELECT
@@ -291,6 +305,7 @@ When invoked, follow these phases systematically:
 ### Phase 7: Security Audit
 
 21. **Run Security Advisors**:
+
     ```bash
     mcp__supabase__get_advisors({type: "security"})
     ```
@@ -303,6 +318,7 @@ When invoked, follow these phases systematically:
     - Publicly accessible tables without RLS
 
 23. **Validate Triggers and Functions**:
+
     ```sql
     -- List all triggers
     SELECT
@@ -330,6 +346,7 @@ When invoked, follow these phases systematically:
 ### Phase 8: Extension Audit
 
 24. **List Installed Extensions**:
+
     ```bash
     mcp__supabase__list_extensions({})
     ```
@@ -342,8 +359,10 @@ When invoked, follow these phases systematically:
 ### Phase 9: Generate Report
 
 26. **Use generate-report-header Skill**:
+
     ```markdown
     Use generate-report-header Skill with:
+
     - report_type: "supabase-audit"
     - workflow: "database"
     - phase: "audit"
@@ -360,6 +379,7 @@ When invoked, follow these phases systematically:
 ### Phase 10: Update Documentation (if config.updateDocs = true)
 
 29. **Update Database Schema Docs**:
+
     ```markdown
     # Expected location: docs/database/schema.md
 
@@ -369,6 +389,7 @@ When invoked, follow these phases systematically:
     ```
 
 30. **Update RLS Policy Docs**:
+
     ```markdown
     # Expected location: docs/database/rls-policies.md
 
@@ -378,6 +399,7 @@ When invoked, follow these phases systematically:
     ```
 
 31. **Update Migration History**:
+
     ```markdown
     # Expected location: docs/database/migrations.md
 
@@ -387,6 +409,7 @@ When invoked, follow these phases systematically:
     ```
 
 32. **Generate TypeScript Types**:
+
     ```bash
     mcp__supabase__generate_typescript_types({})
 
@@ -403,17 +426,21 @@ When invoked, follow these phases systematically:
     - Actionable recommendations provided
 
 34. **Save Report**:
+
     ```markdown
     # Temporary location (worker writes here first):
+
     .tmp/current/reports/supabase-audit-report.md
 
     # Orchestrator moves to permanent location after validation:
+
     docs/reports/database/{YYYY-MM}/{date}-supabase-audit.md
     ```
 
 ### Phase 12: Return Control
 
 35. **Report Summary to User**:
+
     ```
     ✅ Supabase Audit Complete
 
@@ -440,22 +467,22 @@ When invoked, follow these phases systematically:
 
 Follow REPORT-TEMPLATE-STANDARD.md with these domain-specific sections:
 
-```markdown
+````markdown
 ---
 report_type: supabase-audit
-generated: {ISO-8601 timestamp}
-version: {date or phase identifier}
+generated: { ISO-8601 timestamp }
+version: { date or phase identifier }
 status: success | partial | failed
 agent: supabase-auditor
-duration: {execution time}
-project_ref: {supabase project ref}
-schemas_audited: {array of schemas}
-tables_audited: {count}
-issues_found: {count}
-critical_count: {count}
-high_count: {count}
-medium_count: {count}
-low_count: {count}
+duration: { execution time }
+project_ref: { supabase project ref }
+schemas_audited: { array of schemas }
+tables_audited: { count }
+issues_found: { count }
+critical_count: { count }
+high_count: { count }
+medium_count: { count }
+low_count: { count }
 ---
 
 # Supabase Audit Report: {Project Name}
@@ -493,10 +520,10 @@ Comprehensive Supabase database audit completed for {project_name}.
 
 ### Tables Overview
 
-| Schema | Table | Rows | Size | Primary Key | Foreign Keys | RLS Enabled |
-|--------|-------|------|------|-------------|--------------|-------------|
-| public | users | 1,234 | 1.2 MB | ✅ | 0 | ✅ |
-| public | courses | 567 | 3.4 MB | ✅ | 2 | ❌ |
+| Schema | Table   | Rows  | Size   | Primary Key | Foreign Keys | RLS Enabled |
+| ------ | ------- | ----- | ------ | ----------- | ------------ | ----------- |
+| public | users   | 1,234 | 1.2 MB | ✅          | 0            | ✅          |
+| public | courses | 567   | 3.4 MB | ✅          | 2            | ❌          |
 
 ### Schema Issues
 
@@ -651,7 +678,7 @@ Comprehensive Supabase database audit completed for {project_name}.
 
 ### Performance Advisor Findings
 
-{Output from mcp__supabase__get_advisors({type: "performance"})}
+{Output from mcp**supabase**get_advisors({type: "performance"})}
 
 ### Performance Metrics
 
@@ -680,7 +707,7 @@ Comprehensive Supabase database audit completed for {project_name}.
 
 ### Security Advisor Findings
 
-{Output from mcp__supabase__get_advisors({type: "security"})}
+{Output from mcp**supabase**get_advisors({type: "security"})}
 
 ### Security Issues
 
@@ -699,10 +726,10 @@ Comprehensive Supabase database audit completed for {project_name}.
 
 ### Installed Extensions
 
-| Extension | Version | Schema | Description |
-|-----------|---------|--------|-------------|
-| uuid-ossp | 1.1 | public | UUID generation |
-| pg_stat_statements | 1.9 | public | Query statistics |
+| Extension          | Version | Schema | Description      |
+| ------------------ | ------- | ------ | ---------------- |
+| uuid-ossp          | 1.1     | public | UUID generation  |
+| pg_stat_statements | 1.9     | public | Query statistics |
 
 ### Extension Issues
 
@@ -774,7 +801,9 @@ No orphaned tables found.
 **Status**: ✅ PASSED
 
 \```bash
+
 # Successfully connected to Supabase project
+
 Project: <project-name> (<project-ref>)
 Region: <region>
 \```
@@ -861,13 +890,13 @@ Database is accessible and operational, but critical security and performance is
 ### Security Advisors
 
 \```json
-{Output from mcp__supabase__get_advisors({type: "security"})}
+{Output from mcp**supabase**get_advisors({type: "security"})}
 \```
 
 ### Performance Advisors
 
 \```json
-{Output from mcp__supabase__get_advisors({type: "performance"})}
+{Output from mcp**supabase**get_advisors({type: "performance"})}
 \```
 
 ---
@@ -876,14 +905,14 @@ Database is accessible and operational, but critical security and performance is
 
 \```json
 {
-  "projectRef": "<your-project-ref>",
-  "schemas": ["public", "auth"],
-  "checkMigrations": true,
-  "checkRLS": true,
-  "checkIndexes": true,
-  "updateDocs": true,
-  "severityThreshold": "medium",
-  "phase": "full"
+"projectRef": "<your-project-ref>",
+"schemas": ["public", "auth"],
+"checkMigrations": true,
+"checkRLS": true,
+"checkIndexes": true,
+"updateDocs": true,
+"severityThreshold": "medium",
+"phase": "full"
 }
 \```
 
@@ -898,7 +927,7 @@ Database is accessible and operational, but critical security and performance is
 📊 Documentation updated in `docs/database/` directory.
 
 🔄 Use `supabase-fixer` agent (when available) to apply recommended migrations.
-```
+````
 
 ## Output Example
 
@@ -944,6 +973,7 @@ Returning control to main session.
 Current MCP config does not include Supabase server.
 
 To run this audit, switch to Supabase-enabled config:
+
 1. Run: ./switch-mcp.sh
 2. Select option 2 (SUPABASE) or 6 (FULL)
 3. Restart Claude Code
@@ -961,12 +991,14 @@ Audit aborted.
 Could not connect to Supabase project: {project_ref}
 
 Possible causes:
+
 1. Invalid project reference
 2. Network connectivity issues
 3. Supabase project paused/deleted
 4. Missing credentials in .env.local
 
 Recommended actions:
+
 1. Verify project ref in plan file or environment
 2. Check Supabase dashboard for project status
 3. Verify SUPABASE_URL and SUPABASE_ANON_KEY in .env.local
@@ -980,12 +1012,14 @@ Audit aborted.
 ⚠️ Partial Audit Completion
 
 Some audit phases failed:
+
 - Schema Audit: ✅ Complete
 - RLS Audit: ✅ Complete
 - Index Analysis: ❌ Failed (insufficient permissions)
 - Security Advisors: ⚠️ Partial (2/5 checks failed)
 
 Issues:
+
 - `pg_stat_statements` extension not available
 - Insufficient permissions to query pg_stat_user_indexes
 
@@ -1008,32 +1042,32 @@ Use supabase-auditor agent with plan file: .tmp/current/plans/.supabase-audit-pl
 
 ### Orchestrator Integration
 
-```markdown
+````markdown
 ## Phase 1: Database Audit (in /health-database workflow)
 
 Orchestrator creates plan file:
 \```json
 {
-  "phase": 1,
-  "config": {
-    "projectRef": "auto-detect",
-    "schemas": ["public", "auth"],
-    "checkMigrations": true,
-    "checkRLS": true,
-    "checkIndexes": true,
-    "updateDocs": true,
-    "severityThreshold": "medium"
-  },
-  "validation": {
-    "required": ["database_accessible", "schemas_readable"],
-    "optional": ["advisory_checks"]
-  },
-  "nextAgent": "supabase-auditor"
+"phase": 1,
+"config": {
+"projectRef": "auto-detect",
+"schemas": ["public", "auth"],
+"checkMigrations": true,
+"checkRLS": true,
+"checkIndexes": true,
+"updateDocs": true,
+"severityThreshold": "medium"
+},
+"validation": {
+"required": ["database_accessible", "schemas_readable"],
+"optional": ["advisory_checks"]
+},
+"nextAgent": "supabase-auditor"
 }
 \```
 
 Main session invokes supabase-auditor → generates report → orchestrator validates
-```
+````
 
 ### Post-Migration Verification
 

@@ -12,7 +12,7 @@ import * as path from 'path';
 const OUTPUT_DIR = '/tmp/quality-tests/deepseek-v32-exp';
 const MODEL = {
   name: 'DeepSeek v3.2 Exp',
-  slug: 'deepseek-v32-exp'
+  slug: 'deepseek-v32-exp',
 };
 
 interface SchemaScore {
@@ -47,9 +47,10 @@ function validateSchema(output: any, entityType: 'metadata' | 'lesson'): SchemaS
   }
 
   // Required fields (0.25)
-  const requiredFields = entityType === 'metadata'
-    ? ['course_title', 'course_description', 'course_overview', 'learning_outcomes']
-    : ['section_number', 'section_title', 'lessons'];
+  const requiredFields =
+    entityType === 'metadata'
+      ? ['course_title', 'course_description', 'course_overview', 'learning_outcomes']
+      : ['section_number', 'section_title', 'lessons'];
 
   const hasRequiredFields = requiredFields.every(field => field in output);
   if (hasRequiredFields) {
@@ -61,8 +62,8 @@ function validateSchema(output: any, entityType: 'metadata' | 'lesson'): SchemaS
 
   // Snake case (0.25)
   const allKeys = getAllKeys(output);
-  const allFieldsSnakeCase = allKeys.every(key =>
-    /^[a-z_0-9]+$/.test(key) || key === key.toLowerCase()
+  const allFieldsSnakeCase = allKeys.every(
+    key => /^[a-z_0-9]+$/.test(key) || key === key.toLowerCase()
   );
   if (allFieldsSnakeCase) {
     score += 0.25;
@@ -84,7 +85,7 @@ function validateSchema(output: any, entityType: 'metadata' | 'lesson'): SchemaS
     hasRequiredFields,
     usesSnakeCase: allFieldsSnakeCase,
     correctDataTypes: correctTypes,
-    score
+    score,
   };
 }
 
@@ -112,13 +113,11 @@ function validateTypes(output: any, entityType: 'metadata' | 'lesson'): boolean 
     return (
       typeof output.course_title === 'string' &&
       Array.isArray(output.learning_outcomes) &&
-      (typeof output.estimated_duration_hours === 'number' || output.estimated_duration_hours === undefined)
+      (typeof output.estimated_duration_hours === 'number' ||
+        output.estimated_duration_hours === undefined)
     );
   } else {
-    return (
-      typeof output.section_number === 'number' &&
-      Array.isArray(output.lessons)
-    );
+    return typeof output.section_number === 'number' && Array.isArray(output.lessons);
   }
 }
 
@@ -144,7 +143,7 @@ function analyzeMetadataContent(output: any): { score: number; issues: string[] 
   if (followsBloomsTaxonomy(outcomes)) {
     score += 0.1;
   } else {
-    issues.push('Learning outcomes do not follow Bloom\'s Taxonomy progression');
+    issues.push("Learning outcomes do not follow Bloom's Taxonomy progression");
   }
 
   if (isMeasurable(outcomes)) {
@@ -249,20 +248,42 @@ function analyzeLessonContent(output: any): { score: number; issues: string[] } 
 
 // Helper functions
 function hasActionVerbs(outcomes: string[]): boolean {
-  const actionVerbs = ['define', 'build', 'create', 'analyze', 'evaluate', 'design', 'implement', 'apply', 'construct', 'interpret', 'проектировать', 'анализировать', 'создавать', 'определять', 'интерпретировать'];
-  return outcomes.some(outcome =>
-    actionVerbs.some(verb => outcome.toLowerCase().includes(verb))
-  );
+  const actionVerbs = [
+    'define',
+    'build',
+    'create',
+    'analyze',
+    'evaluate',
+    'design',
+    'implement',
+    'apply',
+    'construct',
+    'interpret',
+    'проектировать',
+    'анализировать',
+    'создавать',
+    'определять',
+    'интерпретировать',
+  ];
+  return outcomes.some(outcome => actionVerbs.some(verb => outcome.toLowerCase().includes(verb)));
 }
 
 function followsBloomsTaxonomy(outcomes: string[]): boolean {
   const levels = {
     remember: ['define', 'list', 'recall', 'identify', 'определять', 'различать'],
-    understand: ['explain', 'describe', 'summarize', 'interpret', 'объяснить', 'опиcать', 'сравнить'],
+    understand: [
+      'explain',
+      'describe',
+      'summarize',
+      'interpret',
+      'объяснить',
+      'опиcать',
+      'сравнить',
+    ],
     apply: ['use', 'implement', 'apply', 'execute', 'рассчитать'],
     analyze: ['analyze', 'compare', 'contrast', 'examine', 'анализировать', 'сравнить'],
     evaluate: ['evaluate', 'assess', 'judge', 'critique'],
-    create: ['create', 'design', 'build', 'develop', 'создавать', 'проектировать']
+    create: ['create', 'design', 'build', 'develop', 'создавать', 'проектировать'],
   };
 
   let foundLevels = 0;
@@ -284,7 +305,12 @@ function isMeasurable(outcomes: string[]): boolean {
 }
 
 function hasSpecificExamples(overview: string): boolean {
-  return overview.includes('например') || overview.includes('example') || overview.includes('таких как') || overview.includes('such as');
+  return (
+    overview.includes('например') ||
+    overview.includes('example') ||
+    overview.includes('таких как') ||
+    overview.includes('such as')
+  );
 }
 
 function hasStructure(overview: string): boolean {
@@ -308,14 +334,30 @@ function objectivesAreMeasurable(lessons: any[]): boolean {
 }
 
 function objectivesUseActionVerbs(lessons: any[]): boolean {
-  const actionVerbs = ['define', 'build', 'create', 'analyze', 'рассчитать', 'опиcать', 'сравнить', 'объяснить'];
+  const actionVerbs = [
+    'define',
+    'build',
+    'create',
+    'analyze',
+    'рассчитать',
+    'опиcать',
+    'сравнить',
+    'объяснить',
+  ];
   return lessons.some(l =>
     actionVerbs.some(verb => l.lesson_objective?.toLowerCase().includes(verb))
   );
 }
 
 function topicsAreSpecific(lessons: any[]): boolean {
-  const genericPhrases = ['introduction to', 'overview of', 'basics of', 'fundamentals of', 'введение в', 'обзор'];
+  const genericPhrases = [
+    'introduction to',
+    'overview of',
+    'basics of',
+    'fundamentals of',
+    'введение в',
+    'обзор',
+  ];
   for (const lesson of lessons) {
     const topics = lesson.key_topics || [];
     for (const topic of topics) {
@@ -360,7 +402,11 @@ function analyzeLanguageQuality(output: any, language: 'en' | 'ru'): number {
 }
 
 // Main analysis
-async function analyzeOutput(filePath: string, scenario: string, runNumber: number): Promise<QualityAnalysis | null> {
+async function analyzeOutput(
+  filePath: string,
+  scenario: string,
+  runNumber: number
+): Promise<QualityAnalysis | null> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     const output = JSON.parse(content);
@@ -369,16 +415,12 @@ async function analyzeOutput(filePath: string, scenario: string, runNumber: numb
     const language = scenario.includes('-ru') ? 'ru' : 'en';
 
     const schemaScore = validateSchema(output, entityType);
-    const contentAnalysis = entityType === 'metadata'
-      ? analyzeMetadataContent(output)
-      : analyzeLessonContent(output);
+    const contentAnalysis =
+      entityType === 'metadata' ? analyzeMetadataContent(output) : analyzeLessonContent(output);
     const languageScore = analyzeLanguageQuality(output, language);
 
-    const overallScore = (
-      schemaScore.score * 0.4 +
-      contentAnalysis.score * 0.4 +
-      languageScore * 0.2
-    );
+    const overallScore =
+      schemaScore.score * 0.4 + contentAnalysis.score * 0.4 + languageScore * 0.2;
 
     return {
       scenario,
@@ -387,7 +429,7 @@ async function analyzeOutput(filePath: string, scenario: string, runNumber: numb
       contentScore: contentAnalysis.score,
       languageScore,
       overallScore,
-      issues: contentAnalysis.issues
+      issues: contentAnalysis.issues,
     };
   } catch (error: any) {
     console.error(`Failed to analyze ${filePath}:`, error.message);
@@ -419,7 +461,9 @@ async function main() {
       const analysis = await analyzeOutput(filePath, scenario, runNumber);
       if (analysis) {
         analyses.push(analysis);
-        console.log(`[${scenario}] Run ${runNumber}: Overall ${(analysis.overallScore * 100).toFixed(1)}% (Schema: ${(analysis.schemaScore.score * 100).toFixed(0)}%, Content: ${(analysis.contentScore * 100).toFixed(0)}%, Language: ${(analysis.languageScore * 100).toFixed(0)}%)`);
+        console.log(
+          `[${scenario}] Run ${runNumber}: Overall ${(analysis.overallScore * 100).toFixed(1)}% (Schema: ${(analysis.schemaScore.score * 100).toFixed(0)}%, Content: ${(analysis.contentScore * 100).toFixed(0)}%, Language: ${(analysis.languageScore * 100).toFixed(0)}%)`
+        );
         if (analysis.issues.length > 0) {
           analysis.issues.forEach(issue => console.log(`  ⚠ ${issue}`));
         }
@@ -437,18 +481,27 @@ async function main() {
   for (const scenario of scenarios) {
     const scenarioAnalyses = analyses.filter(a => a.scenario === scenario);
     if (scenarioAnalyses.length > 0) {
-      const avgScore = scenarioAnalyses.reduce((sum, a) => sum + a.overallScore, 0) / scenarioAnalyses.length;
-      const bestRun = scenarioAnalyses.reduce((best, a) => a.overallScore > best.overallScore ? a : best);
-      const worstRun = scenarioAnalyses.reduce((worst, a) => a.overallScore < worst.overallScore ? a : worst);
+      const avgScore =
+        scenarioAnalyses.reduce((sum, a) => sum + a.overallScore, 0) / scenarioAnalyses.length;
+      const bestRun = scenarioAnalyses.reduce((best, a) =>
+        a.overallScore > best.overallScore ? a : best
+      );
+      const worstRun = scenarioAnalyses.reduce((worst, a) =>
+        a.overallScore < worst.overallScore ? a : worst
+      );
 
       console.log(`${scenario}:`);
       console.log(`  Runs: ${scenarioAnalyses.length}`);
       console.log(`  Average: ${(avgScore * 100).toFixed(1)}%`);
       console.log(`  Best: Run ${bestRun.runNumber} (${(bestRun.overallScore * 100).toFixed(1)}%)`);
-      console.log(`  Worst: Run ${worstRun.runNumber} (${(worstRun.overallScore * 100).toFixed(1)}%)`);
+      console.log(
+        `  Worst: Run ${worstRun.runNumber} (${(worstRun.overallScore * 100).toFixed(1)}%)`
+      );
 
       // Consistency
-      const variance = scenarioAnalyses.reduce((sum, a) => sum + Math.pow(a.overallScore - avgScore, 2), 0) / scenarioAnalyses.length;
+      const variance =
+        scenarioAnalyses.reduce((sum, a) => sum + Math.pow(a.overallScore - avgScore, 2), 0) /
+        scenarioAnalyses.length;
       const stdDev = Math.sqrt(variance);
       const consistency = Math.max(0, 1 - stdDev);
       console.log(`  Consistency: ${(consistency * 100).toFixed(1)}%`);
@@ -460,8 +513,10 @@ async function main() {
   const overallAvg = analyses.reduce((sum, a) => sum + a.overallScore, 0) / analyses.length;
   const metadataAnalyses = analyses.filter(a => a.scenario.includes('metadata'));
   const lessonAnalyses = analyses.filter(a => a.scenario.includes('lesson'));
-  const metadataAvg = metadataAnalyses.reduce((sum, a) => sum + a.overallScore, 0) / metadataAnalyses.length;
-  const lessonAvg = lessonAnalyses.reduce((sum, a) => sum + a.overallScore, 0) / lessonAnalyses.length;
+  const metadataAvg =
+    metadataAnalyses.reduce((sum, a) => sum + a.overallScore, 0) / metadataAnalyses.length;
+  const lessonAvg =
+    lessonAnalyses.reduce((sum, a) => sum + a.overallScore, 0) / lessonAnalyses.length;
 
   console.log('='.repeat(80));
   console.log('Overall Model Performance');
@@ -474,15 +529,22 @@ async function main() {
 
   // Save detailed report
   const reportPath = path.join(OUTPUT_DIR, 'quality-analysis.json');
-  await fs.writeFile(reportPath, JSON.stringify({
-    model: MODEL.name,
-    modelSlug: MODEL.slug,
-    timestamp: new Date().toISOString(),
-    overallQuality: overallAvg,
-    metadataQuality: metadataAvg,
-    lessonQuality: lessonAvg,
-    analyses
-  }, null, 2));
+  await fs.writeFile(
+    reportPath,
+    JSON.stringify(
+      {
+        model: MODEL.name,
+        modelSlug: MODEL.slug,
+        timestamp: new Date().toISOString(),
+        overallQuality: overallAvg,
+        metadataQuality: metadataAvg,
+        lessonQuality: lessonAvg,
+        analyses,
+      },
+      null,
+      2
+    )
+  );
 
   console.log(`Detailed analysis saved to: ${reportPath}`);
   console.log();

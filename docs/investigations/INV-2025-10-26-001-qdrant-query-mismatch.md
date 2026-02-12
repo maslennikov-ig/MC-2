@@ -37,6 +37,7 @@ Investigation into why Qdrant vector queries return 0 results despite successful
 ### Observed Behavior
 
 Integration tests are failing with the following error:
+
 ```
 expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(7)
 Actual: totalVectors=0
@@ -121,6 +122,7 @@ mcp__context7__get-library-docs({
 ### Data Collected
 
 **From upload-helpers.ts (toQdrantPoint function, lines 78-124)**:
+
 ```typescript
 const rawPayload = {
   // Chunk metadata
@@ -129,7 +131,7 @@ const rawPayload = {
   // ... other fields ...
 
   // Document metadata
-  document_id: chunk.document_id,  // ← USES document_id
+  document_id: chunk.document_id, // ← USES document_id
   document_name: chunk.document_name,
   document_version: chunk.document_version,
   version_hash: chunk.version_hash,
@@ -139,27 +141,29 @@ const rawPayload = {
 ```
 
 **From test file (queryVectorsByFileId function, lines 208-221)**:
+
 ```typescript
 const scrollResponse = await qdrantClient.scroll(collectionName, {
   filter: {
     must: [
       {
-        key: 'file_id',  // ← QUERIES file_id (WRONG)
-        match: { value: fileId }
-      }
-    ]
+        key: 'file_id', // ← QUERIES file_id (WRONG)
+        match: { value: fileId },
+      },
+    ],
   },
   limit: 100,
   with_payload: true,
-  with_vector: true
-})
+  with_vector: true,
+});
 ```
 
 **From create-collection.ts (PAYLOAD_INDEXES, lines 103-116)**:
+
 ```typescript
 export const PAYLOAD_INDEXES = [
   {
-    field_name: 'file_id',  // ← INDEX DEFINED BUT NEVER POPULATED
+    field_name: 'file_id', // ← INDEX DEFINED BUT NEVER POPULATED
     field_schema: 'keyword' as const,
   },
   {
@@ -184,6 +188,7 @@ export const PAYLOAD_INDEXES = [
 The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payload (inherited from the `EnrichedChunk` type), while the test code in `document-processing-worker.test.ts` queries for `file_id`.
 
 **Evidence**:
+
 1. **Upload code (upload-helpers.ts:98)**: `document_id: chunk.document_id` - stores document_id
 2. **Query code (test file:213)**: `key: 'file_id'` - queries for file_id
 3. **Type definition (metadata-enricher.ts:21)**: `document_id: string;` - EnrichedChunk uses document_id
@@ -203,12 +208,14 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 ### Contributing Factors
 
 **Factor 1**: Inconsistent field naming convention
+
 - Database table uses `file_catalog` with `id` column (the "file ID")
 - TypeScript types use `document_id` field name
 - Payload index configuration uses `file_id` field name
 - No single source of truth for field naming
 
 **Factor 2**: Payload index defined for non-existent field
+
 - `create-collection.ts` defines `file_id` payload index
 - This index is never populated because upload code uses `document_id`
 - The index definition creates expectation that `file_id` should exist
@@ -225,6 +232,7 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 **Why This Addresses Root Cause**: Aligns query field name with the actual payload field that upload code populates
 
 **Implementation Steps**:
+
 1. Open `packages/course-gen-platform/tests/integration/document-processing-worker.test.ts`
 2. Locate `queryVectorsByFileId` function (line 198)
 3. Change line 213 from:
@@ -238,17 +246,20 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 4. Optionally rename function from `queryVectorsByFileId` to `queryVectorsByDocumentId` for clarity
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/tests/integration/document-processing-worker.test.ts`
   - **Line 213**: Change filter key from 'file_id' to 'document_id'
   - **Line 198** (optional): Rename function for semantic accuracy
 
 **Testing Strategy**:
+
 - Run integration tests: `pnpm test tests/integration/document-processing-worker.test.ts`
 - Verify all tier tests pass (TRIAL, FREE, BASIC, STANDARD, PREMIUM)
 - Confirm `vectorStats.totalVectors` returns expected counts (7-22 vectors)
 - Validate hierarchical structure assertions pass
 
 **Pros**:
+
 - ✅ Minimal code change (single line)
 - ✅ Low risk - only affects test code
 - ✅ Matches actual implementation
@@ -256,6 +267,7 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 - ✅ No production code changes needed
 
 **Cons**:
+
 - ❌ Leaves inconsistency in naming (file_id index vs document_id payload)
 - ❌ Does not address unused payload index
 
@@ -274,6 +286,7 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 **Why This Addresses Root Cause**: Eliminates naming inconsistency by choosing one canonical field name
 
 **Implementation Steps**:
+
 1. Update test query (same as Solution 1)
 2. Remove `file_id` from PAYLOAD_INDEXES in `create-collection.ts`:
    ```typescript
@@ -300,17 +313,20 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 5. Optionally remove unused `file_id` index from collection
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/tests/integration/document-processing-worker.test.ts` - Update query
 - `packages/course-gen-platform/src/shared/qdrant/create-collection.ts` - Update indexes
 - Create migration script to update existing collection indexes
 
 **Testing Strategy**:
+
 - Same as Solution 1, plus:
 - Verify `document_id` payload index created successfully
 - Test query performance with new index
 - Confirm no production queries depend on `file_id`
 
 **Pros**:
+
 - ✅ Eliminates naming confusion
 - ✅ Proper indexing for actual payload field
 - ✅ Better query performance for document_id filters
@@ -318,6 +334,7 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 - ✅ Future-proof against similar issues
 
 **Cons**:
+
 - ❌ Requires production code changes
 - ❌ Requires index migration on existing collections
 - ❌ More testing required
@@ -338,37 +355,44 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 **Why This Addresses Root Cause**: Maintains backward compatibility while allowing either field name in queries
 
 **Implementation Steps**:
+
 1. Modify `toQdrantPoint` in `upload-helpers.ts`:
+
    ```typescript
    const rawPayload = {
      // ... existing fields ...
 
      // Document metadata
      document_id: chunk.document_id,
-     file_id: chunk.document_id,  // ADD: Alias for backward compatibility
+     file_id: chunk.document_id, // ADD: Alias for backward compatibility
      document_name: chunk.document_name,
      // ... rest of fields ...
    };
    ```
+
 2. No test changes needed - query will work with `file_id`
 
 **Files to Modify**:
+
 - `packages/course-gen-platform/src/shared/qdrant/upload-helpers.ts`
   - **Line 98**: Add `file_id: chunk.document_id` after document_id
 
 **Testing Strategy**:
+
 - Run integration tests (should pass without modification)
 - Test queries using both `document_id` and `file_id` filters
 - Verify no payload size increase issues
 - Confirm both indexes work correctly
 
 **Pros**:
+
 - ✅ No test changes needed
 - ✅ Backward compatible with existing queries
 - ✅ Supports both field names
 - ✅ Minimal code change
 
 **Cons**:
+
 - ❌ Duplicates data in payload (storage overhead)
 - ❌ Perpetuates naming confusion
 - ❌ Technical debt - two names for same field
@@ -394,6 +418,7 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
 **Files Requiring Changes**:
 
 **Solution 1 (Recommended)**:
+
 1. `packages/course-gen-platform/tests/integration/document-processing-worker.test.ts`
    - **Line Range**: 213
    - **Change Type**: modify
@@ -408,12 +433,14 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
      ```
 
 **Validation Criteria**:
+
 - ✅ Test query uses `document_id` field in filter - Verify line 213 updated
 - ✅ All integration tests pass - Run test suite successfully
 - ✅ Vector counts match expected ranges - Verify assertions pass (totalVectors >= 7-22)
 - ✅ No other `file_id` queries in test code - Search for remaining instances
 
 **Testing Requirements**:
+
 - **Unit tests**: N/A (test-only change)
 - **Integration tests**:
   - Run: `pnpm test tests/integration/document-processing-worker.test.ts`
@@ -424,6 +451,7 @@ The upload code in `upload-helpers.ts` stores `document_id` in the Qdrant payloa
   - Verify hierarchical structure assertions pass
 
 **Dependencies**:
+
 - None - self-contained test fix
 
 ---
@@ -473,16 +501,17 @@ Future consideration: Standardize field naming across codebase (Solution 2 long-
 **From Qdrant-JS Documentation** (Context7: `/qdrant/qdrant-js`):
 
 > **Scroll API with Match Filter (TypeScript)**
+>
 > ```typescript
-> client.scroll("{collection_name}", {
+> client.scroll('{collection_name}', {
 >   filter: {
 >     must: [
 >       {
->         key: "field_name",  // Must match exact payload field
->         match: { value: "value" }
->       }
->     ]
->   }
+>         key: 'field_name', // Must match exact payload field
+>         match: { value: 'value' },
+>       },
+>     ],
+>   },
 > });
 > ```
 
@@ -491,18 +520,21 @@ Future consideration: Standardize field naming across codebase (Solution 2 long-
 > **Scroll API with Filters**: "The filter key must match the exact field name stored in the payload. Qdrant performs exact string matching on field names."
 
 **Key Insights from Context7**:
+
 - Filter `key` parameter must exactly match payload field name (case-sensitive)
 - Qdrant does not perform fuzzy matching or field name aliasing
 - Common error: querying for field that doesn't exist in payload returns 0 results
 - Best practice: Use single canonical field name throughout application
 
 **What Context7 Provided**:
+
 - Correct Qdrant scroll API syntax and filter structure
 - Confirmation that field names must match exactly
 - Examples of proper TypeScript client usage
 - Troubleshooting guidance for zero-result queries
 
 **What Was Missing from Context7**:
+
 - Project-specific field naming conventions (document_id vs file_id)
 - Payload structure documentation (application-level concern)
 
@@ -513,6 +545,7 @@ Future consideration: Standardize field naming across codebase (Solution 2 long-
 ## MCP Server Usage
 
 **Context7 MCP**:
+
 - Libraries queried:
   - `/qdrant/qdrant-js` - TypeScript client library
   - `/websites/qdrant_tech` - Official Qdrant documentation
@@ -536,6 +569,7 @@ Future consideration: Standardize field naming across codebase (Solution 2 long-
 ### Related Issues
 
 This issue relates to broader field naming standardization concerns:
+
 - Database uses `file_catalog` table with `id` column
 - Code uses `document_id` in types
 - Configuration uses `file_id` in indexes
@@ -549,6 +583,7 @@ This issue relates to broader field naming standardization concerns:
    - Index naming conventions
 
 2. **Type Safety**: Consider adding TypeScript type for Qdrant payload structure:
+
    ```typescript
    type QdrantPayload = {
      document_id: string;
@@ -559,6 +594,7 @@ This issue relates to broader field naming standardization concerns:
    ```
 
 3. **Test Utilities**: Create reusable test helper that validates payload structure:
+
    ```typescript
    function assertPayloadStructure(payload: unknown) {
      expect(payload).toHaveProperty('document_id');
@@ -625,19 +661,23 @@ mkdir -p docs/investigations
 
 ```javascript
 // 1. Resolve Qdrant library
-mcp__context7__resolve-library-id({ libraryName: "qdrant" })
+mcp__context7__resolve - library - id({ libraryName: 'qdrant' });
 
 // 2. Get Qdrant JS client documentation
-mcp__context7__get-library-docs({
-  context7CompatibleLibraryID: "/qdrant/qdrant-js",
-  topic: "payload filtering scroll query"
-})
+mcp__context7__get -
+  library -
+  docs({
+    context7CompatibleLibraryID: '/qdrant/qdrant-js',
+    topic: 'payload filtering scroll query',
+  });
 
 // 3. Get Qdrant official documentation
-mcp__context7__get-library-docs({
-  context7CompatibleLibraryID: "/websites/qdrant_tech",
-  topic: "scroll payload filter must match"
-})
+mcp__context7__get -
+  library -
+  docs({
+    context7CompatibleLibraryID: '/websites/qdrant_tech',
+    topic: 'scroll payload filter must match',
+  });
 ```
 
 ---
@@ -645,6 +685,7 @@ mcp__context7__get-library-docs({
 ## Code Snippets
 
 ### Current Test Code (BROKEN)
+
 ```typescript
 // packages/course-gen-platform/tests/integration/document-processing-worker.test.ts
 async function queryVectorsByFileId(
@@ -677,6 +718,7 @@ async function queryVectorsByFileId(
 ```
 
 ### Fixed Test Code (SOLUTION 1)
+
 ```typescript
 // packages/course-gen-platform/tests/integration/document-processing-worker.test.ts
 async function queryVectorsByFileId(  // Could rename to queryVectorsByDocumentId
@@ -709,6 +751,7 @@ async function queryVectorsByFileId(  // Could rename to queryVectorsByDocumentI
 ```
 
 ### Upload Code (CURRENT - NO CHANGES NEEDED FOR SOLUTION 1)
+
 ```typescript
 // packages/course-gen-platform/src/shared/qdrant/upload-helpers.ts
 export function toQdrantPoint(
@@ -721,7 +764,7 @@ export function toQdrantPoint(
     // ... chunk metadata ...
 
     // Document metadata
-    document_id: chunk.document_id,  // ✅ This is what gets stored
+    document_id: chunk.document_id, // ✅ This is what gets stored
     document_name: chunk.document_name,
     document_version: chunk.document_version,
     version_hash: chunk.version_hash,

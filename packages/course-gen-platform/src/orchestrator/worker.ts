@@ -12,7 +12,6 @@
  * @module orchestrator/worker
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 /* eslint-disable @typescript-eslint/no-misused-promises */
@@ -36,6 +35,8 @@ import {
   markJobCancelled,
 } from './job-status-tracker';
 import { JobCancelledError } from '../server/errors/typed-errors';
+import { costTracker } from '../shared/metrics/cost-tracker';
+import { stageMetricsCollector } from '../shared/metrics/stage-metrics';
 
 /**
  * Get the processor file path for sandboxed processing
@@ -119,12 +120,12 @@ let circuitBreakerInterval: NodeJS.Timeout | null = null;
  */
 const registeredJobTypes = [
   JobType.TEST_JOB,
-  JobType.INITIALIZE,
   JobType.DOCUMENT_PROCESSING,
   JobType.DOCUMENT_CLASSIFICATION,
   JobType.STRUCTURE_ANALYSIS,
   JobType.STRUCTURE_GENERATION,
   JobType.LESSON_CONTENT,
+  JobType.BLOCK_REGENERATION,
   // TODO (Stage 1+): Register additional handlers
   // JobType.SUMMARY_GENERATION,
   // JobType.TEXT_GENERATION,
@@ -294,6 +295,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             );
           });
         }
+
+        // Clean up in-memory metrics for completed course
+        const courseId = job.data?.courseId;
+        if (courseId) {
+          costTracker.clearCourse(courseId);
+          stageMetricsCollector.clearCourse(courseId);
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error({ jobId: job.id, err: errorMessage }, 'Error in completed handler');
@@ -343,6 +351,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             });
           }
 
+          // Clean up in-memory metrics for cancelled course
+          const cancelledCourseId = job.data?.courseId;
+          if (cancelledCourseId) {
+            costTracker.clearCourse(cancelledCourseId);
+            stageMetricsCollector.clearCourse(cancelledCourseId);
+          }
+
           return; // Don't call handleJobFailure for cancelled jobs
         }
 
@@ -363,6 +378,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
               'Failed to mark job as failed (non-fatal)'
             );
           });
+        }
+
+        // Clean up in-memory metrics for failed course
+        const courseId = job.data?.courseId;
+        if (courseId) {
+          costTracker.clearCourse(courseId);
+          stageMetricsCollector.clearCourse(courseId);
         }
       } catch (dbError) {
         const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);

@@ -12,6 +12,7 @@
 Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orchestration to analyze course materials and generate structured output. The workflow consists of 5 sequential phases with complex requirements:
 
 **Workflow Requirements**:
+
 1. **Pre-Flight**: Stage 3 barrier validation (100% document processing completion)
 2. **Phase 1**: Course classification (category detection, contextual language generation)
 3. **Phase 2**: Scope analysis (lesson count estimation, minimum 10 lessons constraint)
@@ -20,6 +21,7 @@ Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orche
 6. **Phase 5**: Final assembly (no LLM, pure logic)
 
 **Critical Technical Challenges**:
+
 - **Per-phase model selection**: Different complexity levels require different models (20B for simple, 120B for expert, Gemini for emergency)
 - **Retry with escalation**: Failed quality checks must retry with progressively expensive models (20B → 120B → Gemini)
 - **Quality validation gates**: Semantic similarity checks after each phase (Jina-v3 embeddings)
@@ -28,6 +30,7 @@ Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orche
 - **Execution window**: 30 seconds to 10 minutes per course
 
 **Framework Options Evaluated**:
+
 1. Direct OpenAI SDK + Custom Orchestration
 2. LangChain + LangGraph
 3. Vercel AI SDK + Langfuse
@@ -38,17 +41,20 @@ Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orche
 ## Decision Drivers
 
 ### Primary Drivers (High Weight)
+
 1. **Orchestration Complexity** (15%): Multi-phase sequential workflow with conditional routing
 2. **Retry & Fallback Logic** (20%): Built-in model escalation patterns
 3. **Quality Validation** (20%): Integration with semantic similarity checks
 4. **Model Routing** (20%): Per-phase model selection with database configuration
 
 ### Secondary Drivers (Medium Weight)
+
 5. **Cost Tracking** (15%): Automated token usage and cost calculation
 6. **TypeScript Maturity** (10%): First-class TypeScript support, type safety
 7. **Observability** (10%): Production-ready monitoring and debugging
 
 ### Tertiary Drivers (Low Weight)
+
 8. **Maintainability** (5%): Learning curve, community support, documentation
 9. **Performance** (5%): Execution overhead (acceptable for 30s-10min workflows)
 
@@ -61,6 +67,7 @@ Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orche
 **Approach**: Continue Stage 3 pattern - direct SDK calls with manual orchestration.
 
 **Pros**:
+
 - ✅ Zero learning curve (team already experienced from Stage 3)
 - ✅ Maximum control and transparency
 - ✅ No framework dependencies
@@ -68,6 +75,7 @@ Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orche
 - ✅ Zero performance overhead
 
 **Cons**:
+
 - ❌ Custom state machine required (~300-400 lines)
 - ❌ Manual retry/escalation logic (~100 lines)
 - ❌ Repetitive boilerplate for each phase
@@ -83,6 +91,7 @@ Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orche
 **Approach**: Use LangGraph StateGraph for workflow orchestration with LangChain LLM wrappers.
 
 **Pros**:
+
 - ✅ **Perfect architectural match**: StateGraph designed for multi-phase sequential workflows
 - ✅ **Built-in retry/escalation**: `withRetry()` + `withFallbacks()` implement 20B→120B→Gemini pattern natively
 - ✅ **Conditional routing**: Quality validation gates as conditional edges (native concept)
@@ -94,6 +103,7 @@ Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orche
 - ✅ **Less code**: 100-200 lines vs 400-600 with custom approach
 
 **Cons**:
+
 - ⚠️ Learning curve: 2-3 days for team onboarding (runnables, chains, graphs)
 - ⚠️ Framework overhead: 1-10ms per phase (negligible for 30s-10min workflows)
 - ⚠️ Abstraction layer: Less direct control, debugging through framework
@@ -102,9 +112,10 @@ Stage 4 of the MegaCampus2 platform requires sophisticated multi-phase LLM orche
 **Score**: 9.5/10 (for long-term perspective)
 
 **Implementation Pattern**:
+
 ```typescript
-import { StateGraph, START, END, Annotation } from "@langchain/langgraph";
-import { ChatOpenAI } from "@langchain/openai";
+import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
+import { ChatOpenAI } from '@langchain/openai';
 
 // State schema
 const WorkflowState = Annotation.Root({
@@ -113,42 +124,43 @@ const WorkflowState = Annotation.Root({
   phase2_output: Annotation<Phase2Output | null>,
   // ...
   tokens_used: Annotation<Record<string, number>>,
-  total_cost: Annotation<number>
+  total_cost: Annotation<number>,
 });
 
 // Configure models with OpenRouter
 const model20B = new ChatOpenAI({
-  modelName: "openai/gpt-oss-20b",
-  configuration: { baseURL: "https://openrouter.ai/api/v1" },
-  apiKey: process.env.OPENROUTER_API_KEY
+  modelName: 'openai/gpt-oss-20b',
+  configuration: { baseURL: 'https://openrouter.ai/api/v1' },
+  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 const model120B = new ChatOpenAI({
-  modelName: "openai/gpt-oss-120b",
-  configuration: { baseURL: "https://openrouter.ai/api/v1" },
-  apiKey: process.env.OPENROUTER_API_KEY
+  modelName: 'openai/gpt-oss-120b',
+  configuration: { baseURL: 'https://openrouter.ai/api/v1' },
+  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 // Build workflow graph
 const workflow = new StateGraph(WorkflowState)
-  .addNode("preFlight", preFlightNode)
-  .addNode("phase1", phase1Node.withRetry().withFallbacks([model120B]))
-  .addNode("phase2", phase2Node.withRetry().withFallbacks([model120B]))
-  .addNode("validateMinLessons", validateMinLessonsNode)
-  .addNode("phase3", phase3Node) // Always 120B
-  .addNode("phase4", adaptivePhase4Node)
-  .addNode("phase5", phase5AssemblyNode)
-  .addEdge(START, "preFlight")
-  .addEdge("preFlight", "phase1")
-  .addEdge("phase1", "phase2")
-  .addConditionalEdges("phase2",
-    (state) => state.phase2_output.total_lessons >= 10 ? "continue" : "reject",
-    { continue: "validateMinLessons", reject: END }
+  .addNode('preFlight', preFlightNode)
+  .addNode('phase1', phase1Node.withRetry().withFallbacks([model120B]))
+  .addNode('phase2', phase2Node.withRetry().withFallbacks([model120B]))
+  .addNode('validateMinLessons', validateMinLessonsNode)
+  .addNode('phase3', phase3Node) // Always 120B
+  .addNode('phase4', adaptivePhase4Node)
+  .addNode('phase5', phase5AssemblyNode)
+  .addEdge(START, 'preFlight')
+  .addEdge('preFlight', 'phase1')
+  .addEdge('phase1', 'phase2')
+  .addConditionalEdges(
+    'phase2',
+    state => (state.phase2_output.total_lessons >= 10 ? 'continue' : 'reject'),
+    { continue: 'validateMinLessons', reject: END }
   )
-  .addEdge("validateMinLessons", "phase3")
-  .addEdge("phase3", "phase4")
-  .addEdge("phase4", "phase5")
-  .addEdge("phase5", END);
+  .addEdge('validateMinLessons', 'phase3')
+  .addEdge('phase3', 'phase4')
+  .addEdge('phase4', 'phase5')
+  .addEdge('phase5', END);
 
 const app = workflow.compile();
 ```
@@ -160,6 +172,7 @@ const app = workflow.compile();
 **Approach**: Minimal abstraction with official OpenRouter provider + external observability.
 
 **Pros**:
+
 - ✅ Minimal overhead (~1-2ms)
 - ✅ Official OpenRouter support (@openrouter/ai-sdk-provider v1.2.0)
 - ✅ Excellent TypeScript DX
@@ -167,6 +180,7 @@ const app = workflow.compile();
 - ✅ Simple mental model
 
 **Cons**:
+
 - ❌ Still requires custom orchestration (state machine)
 - ❌ Manual retry/escalation logic
 - ❌ External observability dependency
@@ -181,11 +195,13 @@ const app = workflow.compile();
 **Approach**: Modern TypeScript-first framework with built-in orchestration + observability.
 
 **Pros**:
+
 - ✅ Complete solution (workflow + observability + agents)
 - ✅ Modern TypeScript architecture
 - ✅ XState-based workflow engine
 
 **Cons**:
+
 - ❌ **Beta status** (launched Oct 2024, only 2 months old)
 - ❌ Small community, limited documentation
 - ❌ Unproven at production scale
@@ -216,12 +232,14 @@ const app = workflow.compile();
 **Decision**: Use custom metrics tracking in Supabase instead of LangSmith.
 
 **Reasons**:
+
 - LangSmith FREE tier (5,000 traces/month, 14-day retention) insufficient for production
 - LangSmith PAID tier ($39/month) adds SaaS dependency
 - Existing Supabase infrastructure already supports metrics tracking
 - Full control over observability data
 
 **Implementation**:
+
 ```typescript
 async function trackPhase(phase: string, fn: () => Promise<any>) {
   const startTime = Date.now();
@@ -238,7 +256,7 @@ async function trackPhase(phase: string, fn: () => Promise<any>) {
       latency_ms: Date.now() - startTime,
       success: true,
       quality_score: await validateSemantic(result.content),
-      created_at: new Date()
+      created_at: new Date(),
     });
     return result;
   } catch (error) {
@@ -248,7 +266,7 @@ async function trackPhase(phase: string, fn: () => Promise<any>) {
       success: false,
       error_message: error.message,
       latency_ms: Date.now() - startTime,
-      created_at: new Date()
+      created_at: new Date(),
     });
     throw error;
   }
@@ -280,12 +298,14 @@ async function trackPhase(phase: string, fn: () => Promise<any>) {
 ## Validation & Rollback Strategy
 
 ### Phased Rollout
+
 1. **Week 1-2**: Implement Stage 4 with LangGraph behind feature flag
 2. **Week 3**: Run parallel implementations (LangGraph + Direct SDK for comparison)
 3. **Week 4**: Gradual traffic shift (10% → 25% → 50% → 100%)
 4. **Week 5**: Deprecate Direct SDK fallback
 
 ### Success Metrics
+
 - ✅ All 5 phases execute correctly (100% test coverage)
 - ✅ Cost tracking matches OpenRouter billing (±5% accuracy)
 - ✅ Quality scores match Direct SDK baseline (>0.95 correlation)
@@ -293,6 +313,7 @@ async function trackPhase(phase: string, fn: () => Promise<any>) {
 - ✅ Zero data loss or corruption
 
 ### Rollback Trigger
+
 - Feature flag: `ENABLE_LANGGRAPH_WORKFLOW=false`
 - Automatic rollback if error rate >5% for 1 hour
 - Manual rollback if critical bugs discovered
@@ -302,23 +323,27 @@ async function trackPhase(phase: string, fn: () => Promise<any>) {
 ## Implementation Timeline
 
 **Phase 0: Foundation** (COMPLETE ✅)
+
 - Database migrations (llm_model_config, analysis_result)
 - TypeScript types and Zod schemas
 - OpenRouter integration verified
 
 **Phase 1: LangChain Setup** (3-4 days)
+
 - Install dependencies (@langchain/core, @langchain/openai, @langchain/langgraph)
 - Team onboarding (LangChain concepts, graph patterns)
 - OpenRouter model configuration (20B, 120B, Gemini)
 - Custom observability wrapper (Supabase metrics tracking)
 
 **Phase 2: Workflow Implementation** (4-6 days)
+
 - Build StateGraph with 6 nodes (pre-flight + 5 phases)
 - Implement retry/fallback chains
 - Add conditional validation edges
 - BullMQ worker integration
 
 **Phase 3: Testing & Validation** (2-3 days)
+
 - Unit tests (phase services, quality validation)
 - Integration tests (full workflow, barrier enforcement)
 - Regression tests (compare outputs vs Direct SDK)
@@ -330,6 +355,7 @@ async function trackPhase(phase: string, fn: () => Promise<any>) {
 ## Alternatives Considered for Future Stages
 
 **Stage 5-7 Considerations**:
+
 - If workflow complexity remains similar → Keep LangChain
 - If complexity decreases significantly → Consider migrating back to Direct SDK
 - If observability needs grow → Evaluate LangSmith PAID tier or self-hosted Langfuse
@@ -348,6 +374,7 @@ async function trackPhase(phase: string, fn: () => Promise<any>) {
 ---
 
 **Decision Log**:
+
 - 2025-11-01: ADR created and ACCEPTED
 - 2025-11-01: Research completed (11 frameworks evaluated, LangChain scored 8.4/10)
 - 2025-11-01: Custom observability strategy defined (Supabase instead of LangSmith)

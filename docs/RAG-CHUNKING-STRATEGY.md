@@ -18,20 +18,20 @@
 
 ```typescript
 DEFAULT_CHUNKING_CONFIG = {
-  parent_chunk_size: 1500,      // Parent: context for LLM
-  child_chunk_size: 400,        // Child: precision retrieval
-  child_chunk_overlap: 50,      // Overlap: boundary continuity
-  tiktoken_model: 'gpt-3.5-turbo'
-}
+  parent_chunk_size: 1500, // Parent: context for LLM
+  child_chunk_size: 400, // Child: precision retrieval
+  child_chunk_overlap: 50, // Overlap: boundary continuity
+  tiktoken_model: 'gpt-3.5-turbo',
+};
 ```
 
 ### Character Approximations (Russian)
 
-| Parameter | Tokens | Chars (Russian) | Purpose |
-|-----------|--------|-----------------|---------|
-| Child chunk | 400 | ~1,000 | **Precision retrieval** |
-| Parent chunk | 1500 | ~3,750 | **Context for LLM** |
-| Overlap | 50 | ~125 | **Boundary continuity** |
+| Parameter    | Tokens | Chars (Russian) | Purpose                 |
+| ------------ | ------ | --------------- | ----------------------- |
+| Child chunk  | 400    | ~1,000          | **Precision retrieval** |
+| Parent chunk | 1500   | ~3,750          | **Context for LLM**     |
+| Overlap      | 50     | ~125            | **Boundary continuity** |
 
 **Rationale**: Jina-v3 uses ~2.5 chars/token for Russian (vs 4-5 for English)
 
@@ -94,13 +94,13 @@ Each chunk includes:
 
 ## Performance Characteristics
 
-| Metric | Value |
-|--------|-------|
-| Retrieval failure rate | <2% (baseline: 5-6%) |
-| Precision@5 | 85-90% (baseline: 70%) |
-| Context sufficiency | 92% (baseline: 75%) |
-| Storage overhead | +30% (parent + child stored) |
-| Processing cost | $0.02-0.025/1M tokens |
+| Metric                 | Value                        |
+| ---------------------- | ---------------------------- |
+| Retrieval failure rate | <2% (baseline: 5-6%)         |
+| Precision@5            | 85-90% (baseline: 70%)       |
+| Context sufficiency    | 92% (baseline: 75%)          |
+| Storage overhead       | +30% (parent + child stored) |
+| Processing cost        | $0.02-0.025/1M tokens        |
 
 **Improvement**: -67% retrieval failures, +15-20pp precision
 
@@ -128,12 +128,12 @@ Each chunk includes:
 
 ## Russian Language Optimization
 
-| Aspect | Details |
-|--------|---------|
-| Token premium | 1.4-1.8x vs English |
-| Chars/token | ~2.5 (vs 4-5 for English) |
-| Multilingual support | 89 languages via Jina-v3 |
-| Sentence boundaries | LangChain RecursiveCharacterTextSplitter |
+| Aspect               | Details                                  |
+| -------------------- | ---------------------------------------- |
+| Token premium        | 1.4-1.8x vs English                      |
+| Chars/token          | ~2.5 (vs 4-5 for English)                |
+| Multilingual support | 89 languages via Jina-v3                 |
+| Sentence boundaries  | LangChain RecursiveCharacterTextSplitter |
 
 **Note**: No language-specific optimizations needed - Jina-v3 handles multilingual content natively.
 
@@ -182,7 +182,7 @@ console.log(`Avg child tokens: ${result.metadata.avg_child_tokens}`);
 
 // Upload to Qdrant
 await uploadChunksToQdrant(result.child_chunks); // Index children
-await storeParentChunks(result.parent_chunks);   // Store parents for retrieval
+await storeParentChunks(result.parent_chunks); // Store parents for retrieval
 ```
 
 ---

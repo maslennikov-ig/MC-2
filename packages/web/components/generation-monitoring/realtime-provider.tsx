@@ -252,7 +252,7 @@ export function GenerationRealtimeProvider({
   // Initial fetch of existing traces - wait for session
   useEffect(() => {
     if (!isLoading && session) {
-      fetchTraces()
+      void fetchTraces()
     }
   }, [fetchTraces, isLoading, session])
 
@@ -270,7 +270,7 @@ export function GenerationRealtimeProvider({
 
     // Cleanup previous subscription
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current)
+      void supabase.removeChannel(channelRef.current)
     }
 
     const channel = supabase
@@ -309,6 +309,14 @@ export function GenerationRealtimeProvider({
           const newStatus = payload.new.generation_status as CourseStatus
           if (newStatus) {
             setStatus(newStatus)
+
+            // Detect restart or stage transition: refetch traces from DB
+            // On restart: RPC already deleted old traces, fetch returns clean state
+            // On normal flow: fetch returns same data (no visual change)
+            if (newStatus.endsWith('_init')) {
+              void fetchTraces()
+            }
+
             if (newStatus === 'failed') {
               toast.error('Generation failed')
             } else if (newStatus === 'completed') {
@@ -368,8 +376,8 @@ export function GenerationRealtimeProvider({
       if (channel) {
         try {
           // Proper cleanup: unsubscribe first, then remove channel
-          channel.unsubscribe()
-          supabase.removeChannel(channel)
+          void channel.unsubscribe()
+          void supabase.removeChannel(channel)
         } catch (error) {
           console.error('[RealtimeProvider] Cleanup error:', error)
         } finally {

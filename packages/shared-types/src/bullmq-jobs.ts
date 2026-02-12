@@ -27,7 +27,6 @@ import { courseSizeSchema } from './course-size';
 export enum JobType {
   // Test jobs (Stage 0)
   TEST_JOB = 'test_job',
-  INITIALIZE = 'initialize',
 
   // Document processing (Stage 1+)
   DOCUMENT_PROCESSING = 'document_processing',
@@ -50,6 +49,9 @@ export enum JobType {
 
   // Enrichment generation (Stage 7+)
   ENRICHMENT_GENERATION = 'enrichment_generation',
+
+  // Block regeneration (cascade dependency update)
+  BLOCK_REGENERATION = 'block_regeneration',
 
   // Finalization (Stage 5+)
   FINALIZATION = 'finalization',
@@ -106,16 +108,6 @@ export type TestJobData = z.infer<typeof TestJobDataSchema>;
 // ============================================================================
 // Initialize Job Schema (Stage 0)
 // ============================================================================
-
-/**
- * Initialize course generation job
- */
-export const InitializeJobDataSchema = BaseJobDataSchema.extend({
-  jobType: z.literal(JobType.INITIALIZE),
-  metadata: z.record(z.unknown()).optional(),
-});
-
-export type InitializeJobData = z.infer<typeof InitializeJobDataSchema>;
 
 // ============================================================================
 // Document Processing Job Schema (Stage 1+)
@@ -341,6 +333,31 @@ export const EnrichmentGenerationJobDataSchema = BaseJobDataSchema.extend({
 export type EnrichmentGenerationJobData = z.infer<typeof EnrichmentGenerationJobDataSchema>;
 
 // ============================================================================
+// Block Regeneration Job Schema (Cascade Dependency Update)
+// ============================================================================
+
+/**
+ * Block regeneration job - cascade dependency update
+ *
+ * Queued when a parent element in the course structure changes and
+ * downstream elements need to be regenerated to align with the changes.
+ * Uses the same LLM regeneration flow as the inline regenerateBlock endpoint.
+ */
+export const BlockRegenerationJobDataSchema = BaseJobDataSchema.extend({
+  jobType: z.literal(JobType.BLOCK_REGENERATION),
+  /** JSON path of the block to regenerate (e.g., "sections[0].lessons[1].lesson_title") */
+  blockPath: z.string(),
+  /** Parent job ID that triggered this regeneration (for tracking) */
+  parentJobId: z.string(),
+  /** Instruction for LLM on what to regenerate (1-500 chars) */
+  instruction: z.string().min(1).max(500).default('Update to align with parent changes'),
+  /** Stage identifier for context routing */
+  stageId: z.enum(['stage_4', 'stage_5']).default('stage_5'),
+});
+
+export type BlockRegenerationJobData = z.infer<typeof BlockRegenerationJobDataSchema>;
+
+// ============================================================================
 // Union Type for All Jobs
 // ============================================================================
 
@@ -349,7 +366,6 @@ export type EnrichmentGenerationJobData = z.infer<typeof EnrichmentGenerationJob
  */
 export type JobData =
   | TestJobData
-  | InitializeJobData
   | DocumentProcessingJobData
   | SummaryGenerationJobData
   | DocumentClassificationJobData
@@ -358,6 +374,7 @@ export type JobData =
   | TextGenerationJobData
   | LessonContentJobData
   | EnrichmentGenerationJobData
+  | BlockRegenerationJobData
   | FinalizationJobData;
 
 /**
@@ -365,7 +382,6 @@ export type JobData =
  */
 export const JobDataSchema = z.discriminatedUnion('jobType', [
   TestJobDataSchema,
-  InitializeJobDataSchema,
   DocumentProcessingJobDataSchema,
   SummaryGenerationJobDataSchema,
   DocumentClassificationJobDataSchema,
@@ -374,6 +390,7 @@ export const JobDataSchema = z.discriminatedUnion('jobType', [
   TextGenerationJobDataSchema,
   LessonContentJobDataSchema,
   EnrichmentGenerationJobDataSchema,
+  BlockRegenerationJobDataSchema,
   FinalizationJobDataSchema,
 ]);
 
@@ -434,13 +451,6 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     removeOnComplete: true,
     removeOnFail: false,
   },
-  [JobType.INITIALIZE]: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 1000 },
-    timeout: 30000,
-    removeOnComplete: 100,
-    removeOnFail: false,
-  },
   [JobType.DOCUMENT_PROCESSING]: {
     attempts: 5,
     backoff: { type: 'exponential', delay: 2000 },
@@ -498,6 +508,13 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     removeOnComplete: 100,
     removeOnFail: false,
     priority: 5, // Medium priority
+  },
+  [JobType.BLOCK_REGENERATION]: {
+    attempts: 5,
+    backoff: { type: 'exponential', delay: 5000 },
+    timeout: 180000, // 3 minutes (LLM calls can be slow)
+    removeOnComplete: 100,
+    removeOnFail: false,
   },
   [JobType.FINALIZATION]: {
     attempts: 3,

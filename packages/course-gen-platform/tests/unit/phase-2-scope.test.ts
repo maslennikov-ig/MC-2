@@ -34,13 +34,7 @@ describe('Phase 2: Scope Analysis', () => {
       target_audience: 'intermediate' as const,
       missing_elements: ['Practical case studies'],
       key_concepts: ['procurement procedures', 'legal framework', 'compliance'],
-      domain_keywords: [
-        'procurement',
-        'government',
-        'regulations',
-        'compliance',
-        'contracts',
-      ],
+      domain_keywords: ['procurement', 'government', 'regulations', 'compliance', 'contracts'],
     },
     phase_metadata: {
       duration_ms: 5000,
@@ -67,19 +61,14 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Introduction to Procurement Law',
               estimated_lessons: 5,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: [
                 'Understand basic procurement principles',
                 'Identify key legal frameworks',
               ],
-              key_topics: [
-                'Legal foundations',
-                'Procurement procedures',
-                'Regulatory compliance',
-              ],
+              key_topics: ['Legal foundations', 'Procurement procedures', 'Regulatory compliance'],
               pedagogical_approach:
                 'Start with theory, move to practical examples, include case studies',
-              difficulty_progression: 'gradual',
             },
           ],
         },
@@ -99,34 +88,34 @@ describe('Phase 2: Scope Analysis', () => {
       expect(validated.recommended_structure.sections_breakdown).toHaveLength(1);
     });
 
-    it('should enforce minimum 10 lessons constraint (FR-015)', () => {
-      const invalidOutput = {
+    it('should allow total_lessons < 10 in Zod schema (FR-015 enforced at runtime)', () => {
+      const output = {
         recommended_structure: {
           estimated_content_hours: 1.0,
-          scope_reasoning: 'Very narrow scope',
+          scope_reasoning:
+            'Very narrow scope focusing on a single introductory topic that only requires a handful of lessons to cover adequately',
           lesson_duration_minutes: 15,
-          calculation_explanation: '1 hour × 60 min/hour ÷ 15 min/lesson = 4 lessons',
-          total_lessons: 4, // INVALID: < 10 lessons
+          calculation_explanation:
+            '1 hour × 60 min/hour ÷ 15 min/lesson = 4 lessons in total for this micro-course',
+          total_lessons: 4, // Below 10 but Zod allows min(1)
           total_sections: 2,
           scope_warning: 'Scope too narrow',
           sections_breakdown: [
             {
               area: 'Overview',
               estimated_lessons: 2,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: ['Understand basics', 'Apply knowledge'],
               key_topics: ['Topic A', 'Topic B', 'Topic C'],
               pedagogical_approach: 'Theory-first with examples and practice exercises',
-              difficulty_progression: 'flat',
             },
             {
               area: 'Details',
               estimated_lessons: 2,
-              importance: 'important',
+              importance: 'normal',
               learning_objectives: ['Deep dive', 'Master concepts'],
               key_topics: ['Detail A', 'Detail B', 'Detail C'],
               pedagogical_approach: 'Hands-on practice with real-world scenarios',
-              difficulty_progression: 'gradual',
             },
           ],
         },
@@ -139,26 +128,24 @@ describe('Phase 2: Scope Analysis', () => {
         },
       };
 
-      // Should fail validation due to < 10 lessons
-      expect(() => Phase2OutputSchema.parse(invalidOutput)).toThrow(
-        'Minimum 10 lessons required'
-      );
+      // Zod schema allows total_lessons >= 1 (dynamic min based on course_size preset)
+      // FR-015 minimum 10 lessons is enforced at runtime in phase-2-scope.ts
+      const validated = Phase2OutputSchema.parse(output);
+      expect(validated.recommended_structure.total_lessons).toBe(4);
     });
 
     it('should validate sections_breakdown structure', () => {
       const sectionOutput = {
         area: 'Advanced Topics',
         estimated_lessons: 10,
-        importance: 'important' as const,
+        importance: 'normal' as const,
         learning_objectives: [
           'Apply advanced concepts',
           'Analyze complex scenarios',
           'Design solutions',
         ],
         key_topics: ['Topic 1', 'Topic 2', 'Topic 3', 'Topic 4'],
-        pedagogical_approach:
-          'Project-based learning with real-world case studies and peer review',
-        difficulty_progression: 'steep' as const,
+        pedagogical_approach: 'Project-based learning with real-world case studies and peer review',
       };
 
       expect(sectionOutput.estimated_lessons).toBeGreaterThanOrEqual(1);
@@ -190,8 +177,7 @@ describe('Phase 2: Scope Analysis', () => {
           scope_reasoning:
             'Minimal viable scope for this topic based on fundamental coverage requirements and target audience needs',
           lesson_duration_minutes: 15,
-          calculation_explanation:
-            '2.5 hours × 60 min/hour ÷ 15 min/lesson = 10 lessons total',
+          calculation_explanation: '2.5 hours × 60 min/hour ÷ 15 min/lesson = 10 lessons total',
           total_lessons: 10, // Exactly at minimum
           total_sections: 3,
           scope_warning: 'Course has exactly minimum 10 lessons. Consider expanding scope.',
@@ -199,32 +185,29 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Fundamentals',
               estimated_lessons: 4,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: ['Learn basics', 'Understand concepts'],
               key_topics: ['A', 'B', 'C'],
               pedagogical_approach:
                 'Theory with examples and guided practice exercises to build foundation',
-              difficulty_progression: 'flat',
             },
             {
               area: 'Application',
               estimated_lessons: 3,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: ['Apply knowledge', 'Practice skills'],
               key_topics: ['X', 'Y', 'Z'],
               pedagogical_approach:
                 'Hands-on exercises with immediate feedback and real-world scenarios',
-              difficulty_progression: 'gradual',
             },
             {
               area: 'Summary',
               estimated_lessons: 3,
-              importance: 'important',
+              importance: 'normal',
               learning_objectives: ['Review key points', 'Assess understanding'],
               key_topics: ['Review', 'Assessment', 'Next steps'],
               pedagogical_approach:
                 'Self-assessment with quizzes, reflection exercises, and knowledge checks',
-              difficulty_progression: 'flat',
             },
           ],
         },
@@ -232,7 +215,7 @@ describe('Phase 2: Scope Analysis', () => {
           duration_ms: 6000,
           model_used: 'openai/gpt-oss-20b',
           tokens: { input: 1200, output: 500, total: 1700 },
-          quality_score: 0.80,
+          quality_score: 0.8,
           retry_count: 0,
         },
       };
@@ -246,7 +229,7 @@ describe('Phase 2: Scope Analysis', () => {
     it('should validate lesson duration range (3-45 minutes)', () => {
       const validDurations = [15, 20, 30]; // Test subset that keeps lessons under 100
 
-      validDurations.forEach((duration) => {
+      validDurations.forEach(duration => {
         const lessonsCount = Math.ceil((10 * 60) / duration);
         const output: Phase2Output = {
           recommended_structure: {
@@ -262,12 +245,11 @@ describe('Phase 2: Scope Analysis', () => {
               {
                 area: 'Section 1',
                 estimated_lessons: lessonsCount,
-                importance: 'core',
+                importance: 'complex',
                 learning_objectives: ['Objective 1', 'Objective 2'],
                 key_topics: ['A', 'B', 'C'],
                 pedagogical_approach:
                   'Structured learning with clear objectives and progressive difficulty levels',
-                difficulty_progression: 'gradual',
               },
             ],
           },
@@ -302,12 +284,10 @@ describe('Phase 2: Scope Analysis', () => {
             {
               area: 'Core Concepts',
               estimated_lessons: 60,
-              importance: 'core',
+              importance: 'complex',
               learning_objectives: ['Master fundamentals', 'Apply principles'],
               key_topics: ['A', 'B', 'C'],
-              pedagogical_approach:
-                'Interactive learning with theory, practice, and assessment',
-              difficulty_progression: 'gradual',
+              pedagogical_approach: 'Interactive learning with theory, practice, and assessment',
             },
           ],
         },
@@ -315,7 +295,7 @@ describe('Phase 2: Scope Analysis', () => {
           duration_ms: 10000,
           model_used: expectedModelId,
           tokens: { input: 2000, output: 1000, total: 3000 },
-          quality_score: 0.90,
+          quality_score: 0.9,
           retry_count: 0,
         },
       };

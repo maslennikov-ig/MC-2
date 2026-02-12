@@ -22,7 +22,8 @@ import { router } from '../trpc';
 import { protectedProcedure } from '../middleware/auth';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { addJob } from '../../orchestrator/queue';
-import { JobType } from '@megacampus/shared-types';
+import { JobType, type JobData } from '@megacampus/shared-types';
+import type { Database } from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
 import { createRateLimiter } from '../middleware/rate-limit.js';
 import { nanoid } from 'nanoid';
@@ -304,8 +305,10 @@ export const analysisRouter = router({
           try {
             await supabase
               .from('courses')
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .update({ generation_status: previousStatus as any })
+              .update({
+                generation_status:
+                  previousStatus as Database['public']['Enums']['generation_status'],
+              })
               .eq('id', courseId)
               .eq('organization_id', organizationId);
 
@@ -420,9 +423,9 @@ export const analysisRouter = router({
           created_at: new Date().toISOString(),
         };
 
-        // Cast to any for addJob to avoid union mismatch if strict types don't match this hybrid object
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as any, { priority });
+        const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as unknown as JobData, {
+          priority,
+        });
         const jobId = job.id as string;
 
         logger.info(
@@ -464,8 +467,10 @@ export const analysisRouter = router({
           try {
             await supabase
               .from('courses')
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .update({ generation_status: previousStatus as any })
+              .update({
+                generation_status:
+                  previousStatus as Database['public']['Enums']['generation_status'],
+              })
               .eq('id', courseId)
               .eq('organization_id', organizationId);
 

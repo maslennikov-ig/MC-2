@@ -52,9 +52,9 @@ Current specification requires LLM Judge with 3x voting (temperature 0.0) for St
 
 11. What context should be passed to Judge for lesson evaluation?
     - Generated content only?
-    - + LessonSpecification (expectations)?
-    - + RAG context (sources)?
-    - + Course learning objectives?
+    - - LessonSpecification (expectations)?
+    - - RAG context (sources)?
+    - - Course learning objectives?
 12. Does Judge need RAG access for factual grounding verification? Or is this too expensive/complex?
 13. How can Judge verify factual accuracy without RAG access?
 
@@ -111,6 +111,7 @@ Current specification requires LLM Judge with 3x voting (temperature 0.0) for St
 ## Post-Research Actions
 
 After receiving research results:
+
 1. Update `spec.md` with LLM Judge requirements for Stage 6 (if recommended)
 2. Add detailed Judge architecture to `plan.md`
 3. Create specific tasks in `tasks.md` for Judge implementation
@@ -118,4 +119,4 @@ After receiving research results:
 
 ---
 
-*This prompt is designed for Deep Research tools (Perplexity Pro, ChatGPT Deep Research, Claude with web search, etc.)*
+_This prompt is designed for Deep Research tools (Perplexity Pro, ChatGPT Deep Research, Claude with web search, etc.)_

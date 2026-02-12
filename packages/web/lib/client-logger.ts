@@ -19,31 +19,30 @@
  */
 
 const isDevelopment =
-  process.env.NEXT_PUBLIC_NODE_ENV === 'development' ||
-  process.env.NODE_ENV === 'development';
+  process.env.NEXT_PUBLIC_NODE_ENV === 'development' || process.env.NODE_ENV === 'development'
 
 /**
  * Check if value is an Error or error-like object
  * Handles cross-realm errors (e.g., Supabase AuthError) where instanceof fails
  */
 function isErrorLike(arg: unknown): arg is Error & { code?: string; status?: number } {
-  if (arg instanceof Error) return true;
-  if (!arg || typeof arg !== 'object') return false;
-  const obj = arg as Record<string, unknown>;
+  if (arg instanceof Error) return true
+  if (!arg || typeof arg !== 'object') return false
+  const obj = arg as Record<string, unknown>
   return (
     typeof obj.message === 'string' &&
     (typeof obj.name === 'string' || typeof obj.stack === 'string' || 'code' in obj)
-  );
+  )
 }
 
 /**
  * Format error for console output
  */
 function formatError(error: Error & { code?: string; status?: number }): string {
-  const parts = [error.message];
-  if (error.code) parts.push(`[${error.code}]`);
-  if (error.status) parts.push(`(${error.status})`);
-  return parts.join(' ');
+  const parts = [error.message]
+  if (error.code) parts.push(`[${error.code}]`)
+  if (error.status) parts.push(`(${error.status})`)
+  return parts.join(' ')
 }
 
 /**
@@ -53,34 +52,34 @@ function formatError(error: Error & { code?: string; status?: number }): string 
 function processArgs(args: unknown[]): unknown[] {
   return args.map((arg) => {
     if (isErrorLike(arg)) {
-      return formatError(arg);
+      return formatError(arg)
     }
-    return arg;
-  });
+    return arg
+  })
 }
 
 interface ClientLogger {
-  debug: (msg: string, ...args: unknown[]) => void;
-  info: (msg: string, ...args: unknown[]) => void;
-  warn: (msg: string, ...args: unknown[]) => void;
-  error: (msg: string, ...args: unknown[]) => void;
-  fatal: (msg: string, ...args: unknown[]) => void;
-  devLog: (msg: string, ...args: unknown[]) => void;
-  child: (bindings: Record<string, unknown>) => ClientLogger;
+  debug: (msg: string, ...args: unknown[]) => void
+  info: (msg: string, ...args: unknown[]) => void
+  warn: (msg: string, ...args: unknown[]) => void
+  error: (msg: string, ...args: unknown[]) => void
+  fatal: (msg: string, ...args: unknown[]) => void
+  devLog: (msg: string, ...args: unknown[]) => void
+  child: (bindings: Record<string, unknown>) => ClientLogger
 }
 
 function createClientLogger(context?: Record<string, unknown>): ClientLogger {
-  const contextStr = context ? ` ${JSON.stringify(context)}` : '';
+  const contextStr = context ? ` ${JSON.stringify(context)}` : ''
 
   return {
     debug: (msg: string, ...args: unknown[]) => {
-      if (!isDevelopment) return;
+      if (!isDevelopment) return
       console.debug(
         '%c[DEBUG]%c ' + msg + contextStr,
         'color: #888; font-weight: bold',
         'color: inherit',
         ...processArgs(args)
-      );
+      )
     },
 
     info: (msg: string, ...args: unknown[]) => {
@@ -89,7 +88,7 @@ function createClientLogger(context?: Record<string, unknown>): ClientLogger {
         'color: #2196F3; font-weight: bold',
         'color: inherit',
         ...processArgs(args)
-      );
+      )
     },
 
     warn: (msg: string, ...args: unknown[]) => {
@@ -98,7 +97,7 @@ function createClientLogger(context?: Record<string, unknown>): ClientLogger {
         'color: #FF9800; font-weight: bold',
         'color: inherit',
         ...processArgs(args)
-      );
+      )
     },
 
     error: (msg: string, ...args: unknown[]) => {
@@ -107,7 +106,7 @@ function createClientLogger(context?: Record<string, unknown>): ClientLogger {
         'color: #F44336; font-weight: bold',
         'color: inherit',
         ...processArgs(args)
-      );
+      )
     },
 
     /**
@@ -121,7 +120,7 @@ function createClientLogger(context?: Record<string, unknown>): ClientLogger {
         'color: #FFFFFF; background: #B71C1C; font-weight: bold; padding: 2px 6px; border-radius: 2px',
         'color: inherit',
         ...processArgs(args)
-      );
+      )
     },
 
     /**
@@ -129,13 +128,13 @@ function createClientLogger(context?: Record<string, unknown>): ClientLogger {
      * Useful for debugging without cluttering production logs
      */
     devLog: (msg: string, ...args: unknown[]) => {
-      if (!isDevelopment) return;
+      if (!isDevelopment) return
       console.debug(
         '%c[DEV]%c ' + msg + contextStr,
         'color: #9C27B0; font-weight: bold',
         'color: inherit',
         ...processArgs(args)
-      );
+      )
     },
 
     /**
@@ -156,9 +155,9 @@ function createClientLogger(context?: Record<string, unknown>): ClientLogger {
      * ```
      */
     child: (bindings: Record<string, unknown>) => {
-      return createClientLogger({ ...context, ...bindings });
+      return createClientLogger({ ...context, ...bindings })
     },
-  };
+  }
 }
 
 /**
@@ -166,7 +165,7 @@ function createClientLogger(context?: Record<string, unknown>): ClientLogger {
  *
  * Use this in 'use client' components instead of the server logger.
  */
-export const logger = createClientLogger();
+export const logger = createClientLogger()
 
 /**
  * Create a child logger with context for a specific component or feature
@@ -178,13 +177,13 @@ export const logger = createClientLogger();
  * ```
  */
 export function createLogger(context: Record<string, unknown>): ClientLogger {
-  return createClientLogger(context);
+  return createClientLogger(context)
 }
 
 /**
  * @deprecated Use `logger` from '@/lib/client-logger' instead
  * This export is for backward compatibility only.
  */
-export const clientLogger = logger;
+export const clientLogger = logger
 
-export default logger;
+export default logger

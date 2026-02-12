@@ -162,7 +162,7 @@ function setAtPath(obj: unknown, path: ParsedPath, value: unknown): unknown {
       throw new Error(`Cannot access array property "${firstSegment.name}" on non-object`);
     }
 
-    const arr = (obj as Record<string, unknown>)[firstSegment.name];
+    const arr = (obj as Record<string, unknown>)[firstSegment.name] as unknown[];
     if (!Array.isArray(arr)) {
       throw new Error(`Expected array at "${firstSegment.name}"`);
     }

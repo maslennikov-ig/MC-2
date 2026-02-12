@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getSupabaseClient } from '@/lib/supabase/browser-client';
-import { logger } from '@/lib/client-logger';
-import type { Database } from '@/types/database.generated';
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { getSupabaseClient } from '@/lib/supabase/browser-client'
+import { logger } from '@/lib/client-logger'
+import type { Database } from '@/types/database.generated'
 import type {
   ModuleDashboardData,
   ModuleDashboardAggregates,
@@ -12,32 +12,34 @@ import type {
   Stage6NodeName,
   Stage6NodeStatus,
   CourseStructure,
-} from '@megacampus/shared-types';
+} from '@megacampus/shared-types'
 
 /**
  * Metadata structure from lesson_contents.metadata JSONB column
  */
 interface LessonMetadata {
-  cost_usd?: number;
-  quality_score?: number;
-  generation_duration_ms?: number;
-  total_tokens?: number;
-  [key: string]: unknown;
+  cost_usd?: number
+  quality_score?: number
+  generation_duration_ms?: number
+  total_tokens?: number
+  [key: string]: unknown
 }
 
 /**
  * Type alias for lesson_contents table row
  */
-type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row'];
+type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 /**
  * Safely parse metadata from Json type
  */
-function parseMetadata(metadata: Database['public']['Tables']['lesson_contents']['Row']['metadata']): LessonMetadata | null {
+function parseMetadata(
+  metadata: Database['public']['Tables']['lesson_contents']['Row']['metadata']
+): LessonMetadata | null {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-    return null;
+    return null
   }
-  return metadata as LessonMetadata;
+  return metadata as LessonMetadata
 }
 
 /**
@@ -45,13 +47,13 @@ function parseMetadata(metadata: Database['public']['Tables']['lesson_contents']
  */
 export interface UseModuleDashboardDataReturn {
   /** Aggregated module dashboard data */
-  data: ModuleDashboardData | null;
+  data: ModuleDashboardData | null
   /** Loading state */
-  isLoading: boolean;
+  isLoading: boolean
   /** Error state */
-  error: Error | null;
+  error: Error | null
   /** Manual refetch function */
-  refetch: () => void;
+  refetch: () => void
 }
 
 /**
@@ -59,35 +61,37 @@ export interface UseModuleDashboardDataReturn {
  */
 export interface UseModuleDashboardDataOptions {
   /** Module ID (e.g., "module_1") - null when not viewing a module */
-  moduleId: string | null;
+  moduleId: string | null
   /** Course ID */
-  courseId: string;
+  courseId: string
   /** Course structure from courses.course_structure */
-  courseStructure?: CourseStructure | null;
+  courseStructure?: CourseStructure | null
   /** Enable realtime subscriptions */
-  enableRealtime?: boolean;
+  enableRealtime?: boolean
   /** Whether hook should fetch data */
-  enabled?: boolean;
+  enabled?: boolean
 }
 
 /**
  * Map database status to Stage6NodeStatus
  */
-function mapLessonStatus(status: string): 'pending' | 'active' | 'completed' | 'approved' | 'error' {
+function mapLessonStatus(
+  status: string
+): 'pending' | 'active' | 'completed' | 'approved' | 'error' {
   switch (status.toLowerCase()) {
     case 'approved':
-      return 'approved';
+      return 'approved'
     case 'completed':
-      return 'completed';
+      return 'completed'
     case 'generating':
     case 'active':
-      return 'active';
+      return 'active'
     case 'failed':
     case 'error':
-      return 'error';
+      return 'error'
     case 'pending':
     default:
-      return 'pending';
+      return 'pending'
   }
 }
 
@@ -98,84 +102,80 @@ function mapLessonStatus(status: string): 'pending' | 'active' | 'completed' | '
  * parse it to extract detailed pipeline node states.
  * For now, we derive state from status column only.
  */
-function extractPipelineState(
-  status: string,
-  _metadata: LessonMetadata | null
-): MicroStepperState {
-  const lessonStatus = mapLessonStatus(status);
+function extractPipelineState(status: string, _metadata: LessonMetadata | null): MicroStepperState {
+  const lessonStatus = mapLessonStatus(status)
 
   // Default pipeline: all nodes pending (3-node pipeline: generator → selfReviewer → judge)
   const nodes: Array<{ node: Stage6NodeName; status: Stage6NodeStatus }> = [
     { node: 'generator', status: 'pending' },
     { node: 'selfReviewer', status: 'pending' },
     { node: 'judge', status: 'pending' },
-  ];
+  ]
 
   // Map overall lesson status to pipeline state
   if (lessonStatus === 'completed') {
     // All nodes completed
     nodes.forEach((node) => {
-      node.status = 'completed';
-    });
+      node.status = 'completed'
+    })
   } else if (lessonStatus === 'active') {
     // First node active, rest pending (simplified)
-    nodes[0].status = 'active';
+    nodes[0].status = 'active'
   } else if (lessonStatus === 'error') {
     // First node error, rest pending (simplified)
-    nodes[0].status = 'error';
+    nodes[0].status = 'error'
   }
 
-  return { nodes };
+  return { nodes }
 }
 
 /**
  * Calculate aggregated metrics from lesson rows
  */
-function calculateAggregates(
-  lessons: LessonMatrixRow[]
-): ModuleDashboardAggregates {
-  const totalLessons = lessons.length;
-  const completedLessons = lessons.filter((l) => l.status === 'completed').length;
-  const approvedLessons = lessons.filter((l) => l.status === 'approved').length;
-  const activeLessons = lessons.filter((l) => l.status === 'active').length;
-  const errorLessons = lessons.filter((l) => l.status === 'error').length;
-  const pendingLessons = lessons.filter((l) => l.status === 'pending').length;
+function calculateAggregates(lessons: LessonMatrixRow[]): ModuleDashboardAggregates {
+  const totalLessons = lessons.length
+  const completedLessons = lessons.filter((l) => l.status === 'completed').length
+  const approvedLessons = lessons.filter((l) => l.status === 'approved').length
+  const activeLessons = lessons.filter((l) => l.status === 'active').length
+  const errorLessons = lessons.filter((l) => l.status === 'error').length
+  const pendingLessons = lessons.filter((l) => l.status === 'pending').length
 
   // Sum total cost
-  const totalCostUsd = lessons.reduce((sum, l) => sum + l.costUsd, 0);
+  const totalCostUsd = lessons.reduce((sum, l) => sum + l.costUsd, 0)
+
+  // Sum total tokens
+  const totalTokens = lessons.reduce((sum, l) => sum + (l.totalTokens || 0), 0)
 
   // Calculate average quality score (from completed and approved lessons - they are "done")
   const doneWithQuality = lessons.filter(
     (l) => (l.status === 'completed' || l.status === 'approved') && l.qualityScore !== null
-  );
+  )
   const avgQualityScore =
     doneWithQuality.length > 0
-      ? doneWithQuality.reduce((sum, l) => sum + (l.qualityScore || 0), 0) /
-        doneWithQuality.length
-      : null;
+      ? doneWithQuality.reduce((sum, l) => sum + (l.qualityScore || 0), 0) / doneWithQuality.length
+      : null
 
   // Sum total duration (only completed and approved lessons)
-  const totalDurationMs = lessons.reduce(
-    (sum, l) => sum + (l.durationMs || 0),
-    0
-  );
+  const totalDurationMs = lessons.reduce((sum, l) => sum + (l.durationMs || 0), 0)
 
   // Estimate time remaining
   // Average duration per done lesson × number of pending/active lessons
   const doneWithDuration = lessons.filter(
-    (l) => (l.status === 'completed' || l.status === 'approved') && l.durationMs !== null && l.durationMs > 0
-  );
+    (l) =>
+      (l.status === 'completed' || l.status === 'approved') &&
+      l.durationMs !== null &&
+      l.durationMs > 0
+  )
   const avgDurationPerLesson =
     doneWithDuration.length > 0
-      ? doneWithDuration.reduce((sum, l) => sum + (l.durationMs || 0), 0) /
-        doneWithDuration.length
-      : null;
+      ? doneWithDuration.reduce((sum, l) => sum + (l.durationMs || 0), 0) / doneWithDuration.length
+      : null
 
-  const remainingLessons = pendingLessons + activeLessons;
+  const remainingLessons = pendingLessons + activeLessons
   const estimatedTimeRemainingMs =
     avgDurationPerLesson !== null && remainingLessons > 0
       ? avgDurationPerLesson * remainingLessons
-      : null;
+      : null
 
   return {
     totalLessons,
@@ -188,23 +188,22 @@ function calculateAggregates(
     avgQualityScore,
     totalDurationMs,
     estimatedTimeRemainingMs,
-  };
+    totalTokens,
+  }
 }
 
 /**
  * Determine overall module status from lessons
  */
-function getModuleStatus(
-  lessons: LessonMatrixRow[]
-): 'pending' | 'active' | 'completed' | 'error' {
-  if (lessons.length === 0) return 'pending';
+function getModuleStatus(lessons: LessonMatrixRow[]): 'pending' | 'active' | 'completed' | 'error' {
+  if (lessons.length === 0) return 'pending'
 
-  if (lessons.some((l) => l.status === 'error')) return 'error';
-  if (lessons.some((l) => l.status === 'active')) return 'active';
+  if (lessons.some((l) => l.status === 'error')) return 'error'
+  if (lessons.some((l) => l.status === 'active')) return 'active'
   // Module is completed if all lessons are either 'completed' or 'approved'
-  if (lessons.every((l) => l.status === 'completed' || l.status === 'approved')) return 'completed';
+  if (lessons.every((l) => l.status === 'completed' || l.status === 'approved')) return 'completed'
 
-  return 'pending';
+  return 'pending'
 }
 
 /**
@@ -248,34 +247,36 @@ export function useModuleDashboardData({
   enableRealtime = true,
   enabled = true,
 }: UseModuleDashboardDataOptions): UseModuleDashboardDataReturn {
-  const [data, setData] = useState<ModuleDashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [internalCourseStructure, setInternalCourseStructure] = useState<CourseStructure | null>(null);
+  const [data, setData] = useState<ModuleDashboardData | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+  const [internalCourseStructure, setInternalCourseStructure] = useState<CourseStructure | null>(
+    null
+  )
 
   // Track current fetch to avoid race conditions
-  const fetchIdRef = useRef(0);
+  const fetchIdRef = useRef(0)
   // Track lesson content IDs in this module for filtering realtime updates
-  const moduleContentIdsRef = useRef<Set<string>>(new Set());
+  const moduleContentIdsRef = useRef<Set<string>>(new Set())
   // Track lesson IDs (from lessons table) for this module - used to detect new INSERTs
-  const moduleLessonIdsRef = useRef<Set<string>>(new Set());
-  const supabase = getSupabaseClient();
+  const moduleLessonIdsRef = useRef<Set<string>>(new Set())
+  const supabase = getSupabaseClient()
 
   // Use external courseStructure if provided, otherwise use internal
-  const courseStructure = externalCourseStructure ?? internalCourseStructure;
+  const courseStructure = externalCourseStructure ?? internalCourseStructure
 
   // Skip hook if disabled or missing moduleId
-  const shouldFetch = enabled && !!moduleId;
+  const shouldFetch = enabled && !!moduleId
 
   // Fetch courseStructure from database if not provided externally
   useEffect(() => {
-    if (!shouldFetch || !courseId || externalCourseStructure) return;
+    if (!shouldFetch || !courseId || externalCourseStructure) return
 
     // Race condition guard: prevents stale responses from updating state
     // when user rapidly switches between modules
-    let ignore = false;
+    let ignore = false
 
-    logger.debug('[useModuleDashboardData] Fetching course structure', { courseId, moduleId });
+    logger.debug('[useModuleDashboardData] Fetching course structure', { courseId, moduleId })
 
     const fetchCourseStructure = async () => {
       try {
@@ -283,36 +284,36 @@ export function useModuleDashboardData({
           .from('courses')
           .select('course_structure')
           .eq('id', courseId)
-          .single();
+          .single()
 
         // Skip state update if effect was cleaned up (user switched modules)
-        if (ignore) return;
+        if (ignore) return
 
-        if (courseError) throw courseError;
+        if (courseError) throw courseError
 
         if (courseData?.course_structure) {
           logger.debug('[useModuleDashboardData] Course structure loaded', {
             courseId,
             sectionsCount: (courseData.course_structure as CourseStructure)?.sections?.length,
-          });
-          setInternalCourseStructure(courseData.course_structure as CourseStructure);
+          })
+          setInternalCourseStructure(courseData.course_structure as CourseStructure)
         } else {
-          logger.warn('[useModuleDashboardData] Course structure is empty', { courseId });
+          logger.warn('[useModuleDashboardData] Course structure is empty', { courseId })
         }
       } catch (err) {
         // Skip error handling if effect was cleaned up (user switched modules)
-        if (ignore) return;
-        console.error('[useModuleDashboardData] Course structure fetch error:', err);
-        logger.error('Failed to fetch course structure', { courseId, error: err });
+        if (ignore) return
+        console.error('[useModuleDashboardData] Course structure fetch error:', err)
+        logger.error('Failed to fetch course structure', { courseId, error: err })
       }
-    };
+    }
 
-    fetchCourseStructure();
+    fetchCourseStructure()
 
     return () => {
-      ignore = true;
-    };
-  }, [shouldFetch, courseId, externalCourseStructure, supabase, moduleId]);
+      ignore = true
+    }
+  }, [shouldFetch, courseId, externalCourseStructure, supabase, moduleId])
 
   /**
    * Get expected lesson count for this module from course structure
@@ -320,20 +321,20 @@ export function useModuleDashboardData({
    */
   const getLessonCountForModule = useCallback(
     (modId: string): number => {
-      if (!courseStructure?.sections) return 0;
+      if (!courseStructure?.sections) return 0
 
       // Extract module number from moduleId (e.g., "module_1" -> 1)
-      const moduleNumber = parseInt(modId.replace('module_', ''), 10);
-      if (isNaN(moduleNumber)) return 0;
+      const moduleNumber = parseInt(modId.replace('module_', ''), 10)
+      if (isNaN(moduleNumber)) return 0
 
       // Find the corresponding section (moduleNumber is 1-based)
-      const sectionIndex = moduleNumber - 1;
-      const section = courseStructure.sections[sectionIndex];
+      const sectionIndex = moduleNumber - 1
+      const section = courseStructure.sections[sectionIndex]
 
-      return section?.lessons?.length ?? 0;
+      return section?.lessons?.length ?? 0
     },
     [courseStructure]
-  );
+  )
 
   /**
    * Fetch lesson content data from database
@@ -350,27 +351,27 @@ export function useModuleDashboardData({
       moduleId: moduleId || 'undefined',
       hasCourseStructure: !!courseStructure,
       sectionsCount: courseStructure?.sections?.length ?? 0,
-    });
+    })
 
     if (!shouldFetch || !courseId || !moduleId || !courseStructure) {
-      setData(null);
-      setIsLoading(false);
-      return;
+      setData(null)
+      setIsLoading(false)
+      return
     }
 
-    const fetchId = ++fetchIdRef.current;
-    setIsLoading(true);
-    setError(null);
+    const fetchId = ++fetchIdRef.current
+    setIsLoading(true)
+    setError(null)
 
     try {
       // Extract module metadata from course structure
-      const moduleNumber = parseInt(moduleId.replace('module_', ''), 10);
+      const moduleNumber = parseInt(moduleId.replace('module_', ''), 10)
       if (isNaN(moduleNumber)) {
-        throw new Error(`Invalid module ID: ${moduleId}`);
+        throw new Error(`Invalid module ID: ${moduleId}`)
       }
 
-      const sectionIndex = moduleNumber - 1;
-      const section = courseStructure.sections?.[sectionIndex];
+      const sectionIndex = moduleNumber - 1
+      const section = courseStructure.sections?.[sectionIndex]
 
       logger.debug('[useModuleDashboardData] Looking for section', {
         moduleId,
@@ -378,14 +379,16 @@ export function useModuleDashboardData({
         sectionIndex,
         availableSections: courseStructure.sections?.length ?? 0,
         foundSection: !!section,
-      });
+      })
 
       if (!section) {
-        throw new Error(`Module ${moduleNumber} not found in course structure (sections: ${courseStructure.sections?.length ?? 0})`);
+        throw new Error(
+          `Module ${moduleNumber} not found in course structure (sections: ${courseStructure.sections?.length ?? 0})`
+        )
       }
 
-      const moduleTitle = section.section_title || `Модуль ${moduleNumber}`;
-      const expectedLessonCount = getLessonCountForModule(moduleId);
+      const moduleTitle = section.section_title || `Модуль ${moduleNumber}`
+      const expectedLessonCount = getLessonCountForModule(moduleId)
 
       if (expectedLessonCount === 0) {
         // Empty module - return empty dashboard
@@ -406,10 +409,11 @@ export function useModuleDashboardData({
             avgQualityScore: null,
             totalDurationMs: 0,
             estimatedTimeRemainingMs: null,
+            totalTokens: 0,
           },
-        });
-        setIsLoading(false);
-        return;
+        })
+        setIsLoading(false)
+        return
       }
 
       // Step 1: Get section UUID from sections table
@@ -418,29 +422,36 @@ export function useModuleDashboardData({
         .select('id, title')
         .eq('course_id', courseId)
         .eq('order_index', moduleNumber) // order_index is 1-based
-        .single();
+        .single()
 
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) return
 
       if (sectionError || !sectionData) {
-        logger.warn('[useModuleDashboardData] Section not found in database, returning empty data', {
-          moduleNumber,
-          courseId,
-          error: sectionError?.message,
-        });
+        logger.warn(
+          '[useModuleDashboardData] Section not found in database, returning empty data',
+          {
+            moduleNumber,
+            courseId,
+            error: sectionError?.message,
+          }
+        )
         // Section not yet created in DB - show pending state with expected lessons
-        const pendingLessons: LessonMatrixRow[] = Array.from({ length: expectedLessonCount }, (_, idx) => ({
-          lessonId: `${moduleNumber}.${idx + 1}`,
-          lessonNumber: idx + 1,
-          title: section.lessons?.[idx]?.lesson_title || `Урок ${idx + 1}`,
-          status: 'pending' as const,
-          pipelineState: extractPipelineState('pending', null),
-          qualityScore: null,
-          costUsd: 0,
-          durationMs: null,
-          retryCount: 0,
-          canRetry: false,
-        }));
+        const pendingLessons: LessonMatrixRow[] = Array.from(
+          { length: expectedLessonCount },
+          (_, idx) => ({
+            lessonId: `${moduleNumber}.${idx + 1}`,
+            lessonNumber: idx + 1,
+            title: section.lessons?.[idx]?.lesson_title || `Урок ${idx + 1}`,
+            status: 'pending' as const,
+            pipelineState: extractPipelineState('pending', null),
+            qualityScore: null,
+            costUsd: 0,
+            durationMs: null,
+            retryCount: 0,
+            canRetry: false,
+            totalTokens: null,
+          })
+        )
 
         setData({
           moduleId,
@@ -449,70 +460,73 @@ export function useModuleDashboardData({
           status: 'pending',
           lessons: pendingLessons,
           aggregates: calculateAggregates(pendingLessons),
-        });
-        setIsLoading(false);
-        return;
+        })
+        setIsLoading(false)
+        return
       }
 
-      const sectionId = sectionData.id;
+      const sectionId = sectionData.id
 
       // Step 2: Get lessons from lessons table
       const { data: lessonsData, error: lessonsError } = await supabase
         .from('lessons')
         .select('id, title, order_index')
         .eq('section_id', sectionId)
-        .order('order_index', { ascending: true });
+        .order('order_index', { ascending: true })
 
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) return
 
       if (lessonsError) {
-        throw new Error(`Failed to fetch lessons: ${lessonsError.message}`);
+        throw new Error(`Failed to fetch lessons: ${lessonsError.message}`)
       }
 
-      const lessons = lessonsData || [];
-      const lessonIds = lessons.map(l => l.id);
+      const lessons = lessonsData || []
+      const lessonIds = lessons.map((l) => l.id)
 
       // Store lesson IDs for filtering realtime INSERT events
-      moduleLessonIdsRef.current = new Set(lessonIds);
+      moduleLessonIdsRef.current = new Set(lessonIds)
 
       logger.debug('[useModuleDashboardData] Fetched lessons from DB', {
         sectionId,
         lessonsCount: lessons.length,
         lessonIds,
-      });
+      })
 
       // Step 3: Get lesson contents (only if we have lessons)
-      let lessonContents: LessonContentRow[] = [];
+      let lessonContents: LessonContentRow[] = []
       if (lessonIds.length > 0) {
         const { data: contentsData, error: contentsError } = await supabase
           .from('lesson_contents')
           .select('*')
           .eq('course_id', courseId)
-          .in('lesson_id', lessonIds);
+          .in('lesson_id', lessonIds)
 
-        if (fetchId !== fetchIdRef.current) return;
+        if (fetchId !== fetchIdRef.current) return
 
         if (contentsError) {
-          throw new Error(`Failed to fetch lesson contents: ${contentsError.message}`);
+          throw new Error(`Failed to fetch lesson contents: ${contentsError.message}`)
         }
 
-        lessonContents = contentsData || [];
+        lessonContents = contentsData || []
 
         // Store lesson content IDs for filtering realtime updates
-        moduleContentIdsRef.current = new Set(lessonContents.map(lc => lc.id));
+        moduleContentIdsRef.current = new Set(lessonContents.map((lc) => lc.id))
       }
 
       // Build lesson matrix rows
       // Use lessons from DB if available, otherwise use expected count from course structure
-      const lessonRows: LessonMatrixRow[] = [];
+      const lessonRows: LessonMatrixRow[] = []
 
       if (lessons.length > 0) {
         // Use actual lessons from database
         for (const lesson of lessons) {
-          const contentRow = lessonContents.find(c => c.lesson_id === lesson.id);
-          const lessonNumber = lesson.order_index;
-          const lessonTitle = lesson.title || section.lessons?.[lessonNumber - 1]?.lesson_title || `Урок ${lessonNumber}`;
-          const lessonLabel = `${moduleNumber}.${lessonNumber}`;
+          const contentRow = lessonContents.find((c) => c.lesson_id === lesson.id)
+          const lessonNumber = lesson.order_index
+          const lessonTitle =
+            lesson.title ||
+            section.lessons?.[lessonNumber - 1]?.lesson_title ||
+            `Урок ${lessonNumber}`
+          const lessonLabel = `${moduleNumber}.${lessonNumber}`
 
           if (!contentRow) {
             lessonRows.push({
@@ -526,11 +540,12 @@ export function useModuleDashboardData({
               durationMs: null,
               retryCount: 0,
               canRetry: false,
-            });
+              totalTokens: null,
+            })
           } else {
-            const status = mapLessonStatus(contentRow.status);
-            const metadata = parseMetadata(contentRow.metadata);
-            const pipelineState = extractPipelineState(contentRow.status, metadata);
+            const status = mapLessonStatus(contentRow.status)
+            const metadata = parseMetadata(contentRow.metadata)
+            const pipelineState = extractPipelineState(contentRow.status, metadata)
 
             lessonRows.push({
               lessonId: lessonLabel,
@@ -543,15 +558,16 @@ export function useModuleDashboardData({
               durationMs: metadata?.generation_duration_ms ?? null,
               retryCount: contentRow.generation_attempt > 1 ? contentRow.generation_attempt - 1 : 0,
               canRetry: status === 'error',
-            });
+              totalTokens: metadata?.total_tokens ?? null,
+            })
           }
         }
       } else {
         // No lessons in DB yet - show pending based on course structure
         for (let idx = 0; idx < expectedLessonCount; idx++) {
-          const lessonNumber = idx + 1;
-          const lessonTitle = section.lessons?.[idx]?.lesson_title || `Урок ${lessonNumber}`;
-          const lessonLabel = `${moduleNumber}.${lessonNumber}`;
+          const lessonNumber = idx + 1
+          const lessonTitle = section.lessons?.[idx]?.lesson_title || `Урок ${lessonNumber}`
+          const lessonLabel = `${moduleNumber}.${lessonNumber}`
 
           lessonRows.push({
             lessonId: lessonLabel,
@@ -564,15 +580,16 @@ export function useModuleDashboardData({
             durationMs: null,
             retryCount: 0,
             canRetry: false,
-          });
+            totalTokens: null,
+          })
         }
       }
 
       // Calculate aggregates
-      const aggregates = calculateAggregates(lessonRows);
+      const aggregates = calculateAggregates(lessonRows)
 
       // Determine module status
-      const moduleStatus = getModuleStatus(lessonRows);
+      const moduleStatus = getModuleStatus(lessonRows)
 
       const dashboardData: ModuleDashboardData = {
         moduleId,
@@ -581,70 +598,70 @@ export function useModuleDashboardData({
         status: moduleStatus,
         lessons: lessonRows,
         aggregates,
-      };
+      }
 
-      setData(dashboardData);
+      setData(dashboardData)
 
       logger.debug('Module dashboard data fetched', {
         moduleId,
         courseId,
         lessonsCount: lessonRows.length,
         status: moduleStatus,
-      });
+      })
     } catch (err) {
       // Skip if a newer fetch was started
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) return
 
-      const fetchError = err instanceof Error ? err : new Error('Ошибка загрузки данных');
-      setError(fetchError);
-      setData(null);
+      const fetchError = err instanceof Error ? err : new Error('Ошибка загрузки данных')
+      setError(fetchError)
+      setData(null)
 
       // Log the actual error for debugging
-      console.error('[useModuleDashboardData] Fetch error:', err);
+      console.error('[useModuleDashboardData] Fetch error:', err)
       logger.error('Failed to fetch module dashboard data', {
         moduleId: moduleId || 'undefined',
         courseId: courseId || 'undefined',
         error: fetchError.message,
         stack: fetchError.stack,
-      });
+      })
     } finally {
       // Skip if a newer fetch was started
       if (fetchId === fetchIdRef.current) {
-        setIsLoading(false);
+        setIsLoading(false)
       }
     }
-  }, [shouldFetch, courseId, moduleId, courseStructure, getLessonCountForModule, supabase]);
+  }, [shouldFetch, courseId, moduleId, courseStructure, getLessonCountForModule, supabase])
 
   // Fetch on mount and when dependencies change
   useEffect(() => {
     // Race condition guard: capture current fetchId BEFORE calling fetchLessonData
     // fetchLessonData increments fetchIdRef.current internally and checks against it
     // When user rapidly switches modules, old requests will be ignored
-    const currentFetchId = fetchIdRef.current;
-    fetchLessonData();
+    const currentFetchId = fetchIdRef.current
+    fetchLessonData()
 
     return () => {
       // Cleanup: increment fetchId to mark current fetch as stale
       // This ensures any pending setState calls in fetchLessonData are skipped
       // We captured currentFetchId above to satisfy eslint exhaustive-deps rule
-       
-      void currentFetchId; // Reference to satisfy linter (pattern requires ref mutation)
-      fetchIdRef.current++;
-    };
-  }, [fetchLessonData]);
+
+      void currentFetchId // Reference to satisfy linter (pattern requires ref mutation)
+      fetchIdRef.current++
+    }
+  }, [fetchLessonData])
 
   // Set up realtime subscription
   useEffect(() => {
-    if (!enableRealtime || !courseId || !moduleId) return;
+    if (!enableRealtime || !courseId || !moduleId) return
 
-    const expectedLessonCount = getLessonCountForModule(moduleId);
-    if (expectedLessonCount === 0) return;
+    const expectedLessonCount = getLessonCountForModule(moduleId)
+    if (expectedLessonCount === 0) return
 
     logger.debug('Setting up realtime subscription for module', {
       moduleId,
       courseId,
       lessonCount: expectedLessonCount,
-    });
+    })
 
     // Subscribe to changes in lesson_contents for this course
     // We filter by course_id (simpler Postgres filter) but only react to changes
@@ -660,19 +677,17 @@ export function useModuleDashboardData({
           filter: `course_id=eq.${courseId}`,
         },
         (payload) => {
-          const newRow = payload.new as Partial<LessonContentRow> | undefined;
-          const oldRow = payload.old as Partial<LessonContentRow> | undefined;
-          const changedId = newRow?.id || oldRow?.id;
-          const lessonId = newRow?.lesson_id || oldRow?.lesson_id;
+          const newRow = payload.new as Partial<LessonContentRow> | undefined
+          const oldRow = payload.old as Partial<LessonContentRow> | undefined
+          const changedId = newRow?.id || oldRow?.id
+          const lessonId = newRow?.lesson_id || oldRow?.lesson_id
 
           // Only refetch if the changed lesson content is in THIS module
           // For UPDATE/DELETE: check if content ID is in our tracked set
           // For INSERT: check if the lesson_id belongs to this module
-          const isExistingContentInModule = changedId && moduleContentIdsRef.current.has(changedId);
+          const isExistingContentInModule = changedId && moduleContentIdsRef.current.has(changedId)
           const isNewContentForModuleLesson =
-            payload.eventType === 'INSERT' &&
-            lessonId &&
-            moduleLessonIdsRef.current.has(lessonId);
+            payload.eventType === 'INSERT' && lessonId && moduleLessonIdsRef.current.has(lessonId)
 
           if (isExistingContentInModule || isNewContentForModuleLesson) {
             logger.debug('Realtime update received for module lesson', {
@@ -681,36 +696,36 @@ export function useModuleDashboardData({
               lessonId,
               isExistingContentInModule,
               isNewContentForModuleLesson,
-            });
+            })
 
             // Refetch data to get updated state
-            fetchLessonData();
+            fetchLessonData()
           } else {
             logger.debug('Realtime update ignored (not in current module)', {
               event: payload.eventType,
               lessonContentId: changedId,
               lessonId,
-            });
+            })
           }
         }
       )
-      .subscribe();
+      .subscribe()
 
     return () => {
-      logger.debug('Unsubscribing from realtime channel', { moduleId });
-      channel.unsubscribe();
-    };
-  }, [enableRealtime, courseId, moduleId, getLessonCountForModule, fetchLessonData, supabase]);
+      logger.debug('Unsubscribing from realtime channel', { moduleId })
+      channel.unsubscribe()
+    }
+  }, [enableRealtime, courseId, moduleId, getLessonCountForModule, fetchLessonData, supabase])
 
   // Refetch function for manual refresh
   const refetch = useCallback(() => {
-    fetchLessonData();
-  }, [fetchLessonData]);
+    fetchLessonData()
+  }, [fetchLessonData])
 
   return {
     data,
     isLoading,
     error,
     refetch,
-  };
+  }
 }

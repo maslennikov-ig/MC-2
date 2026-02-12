@@ -48,6 +48,7 @@ Comprehensive code review completed for the pricing tiers implementation. The im
 **Issue**: Cache refresh after tier update is non-blocking and failures are only logged as warnings. If cache refresh fails silently, users will see stale data for up to 5 minutes.
 
 **Current Code**:
+
 ```typescript
 // Refresh cache after update
 try {
@@ -56,7 +57,10 @@ try {
 } catch (cacheError) {
   // Log but don't fail the request
   logger.warn(
-    { err: cacheError instanceof Error ? cacheError.message : String(cacheError), tierKey: input.tierKey },
+    {
+      err: cacheError instanceof Error ? cacheError.message : String(cacheError),
+      tierKey: input.tierKey,
+    },
     '[TiersRouter] Failed to refresh cache after tier update'
   );
 }
@@ -65,12 +69,14 @@ try {
 **Impact**: After an admin updates tier settings, other users might continue seeing old limits for up to 5 minutes, potentially causing validation errors or inconsistent behavior.
 
 **Recommendation**:
+
 1. Make cache refresh blocking for mutation operations
 2. Return an error to admin if cache refresh fails
 3. Add retry logic with exponential backoff
 4. Consider invalidating cache immediately and forcing DB fetch on next request if refresh fails
 
 **Suggested Fix**:
+
 ```typescript
 // Make cache refresh blocking for mutations
 try {
@@ -78,15 +84,20 @@ try {
   logger.info({ tierKey: input.tierKey }, '[TiersRouter] Cache refreshed after tier update');
 } catch (cacheError) {
   logger.error(
-    { err: cacheError instanceof Error ? cacheError.message : String(cacheError), tierKey: input.tierKey },
+    {
+      err: cacheError instanceof Error ? cacheError.message : String(cacheError),
+      tierKey: input.tierKey,
+    },
     '[TiersRouter] CRITICAL: Failed to refresh cache after tier update'
   );
   // Clear cache to force DB fetch on next request
   clearCache();
   throw new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
-    message: ErrorMessages.internalError('Cache refresh after tier update',
-      cacheError instanceof Error ? cacheError.message : undefined),
+    message: ErrorMessages.internalError(
+      'Cache refresh after tier update',
+      cacheError instanceof Error ? cacheError.message : undefined
+    ),
   });
 }
 ```
@@ -102,19 +113,21 @@ try {
 **Issue**: While Zod schema validates that numeric fields are positive/non-negative, there are no upper bounds or business logic validations to prevent absurd values.
 
 **Current Validation**:
+
 ```typescript
 const updateTierInputSchema = z.object({
   tierKey: tierKeySchema,
   displayName: z.string().min(1).max(50).optional(),
-  storageQuotaBytes: z.number().positive().optional(),  // No upper bound
-  maxFileSizeBytes: z.number().positive().optional(),   // No upper bound
+  storageQuotaBytes: z.number().positive().optional(), // No upper bound
+  maxFileSizeBytes: z.number().positive().optional(), // No upper bound
   maxFilesPerCourse: z.number().nonnegative().optional(), // Could be millions
-  maxConcurrentJobs: z.number().positive().optional(),  // No upper bound
+  maxConcurrentJobs: z.number().positive().optional(), // No upper bound
   // ...
 });
 ```
 
 **Impact**: An admin could accidentally set:
+
 - Storage quota to 999TB (causing massive costs)
 - Max concurrent jobs to 10,000 (DoS attack vector)
 - Max files per course to 1,000,000 (performance issues)
@@ -122,17 +135,18 @@ const updateTierInputSchema = z.object({
 **Recommendation**: Add reasonable upper bounds based on infrastructure limits.
 
 **Suggested Fix**:
+
 ```typescript
 const updateTierInputSchema = z.object({
   tierKey: tierKeySchema,
   displayName: z.string().min(1).max(50).optional(),
   storageQuotaBytes: z.number().positive().max(1099511627776).optional(), // Max 1 TB
-  maxFileSizeBytes: z.number().positive().max(1073741824).optional(),     // Max 1 GB
-  maxFilesPerCourse: z.number().nonnegative().max(100).optional(),        // Max 100 files
-  maxConcurrentJobs: z.number().positive().max(50).optional(),            // Max 50 jobs
-  allowedMimeTypes: z.array(z.string()).max(50).optional(),               // Max 50 MIME types
-  allowedExtensions: z.array(z.string()).max(50).optional(),              // Max 50 extensions
-  monthlyPriceCents: z.number().nonnegative().max(99999900).optional(),   // Max $999,999
+  maxFileSizeBytes: z.number().positive().max(1073741824).optional(), // Max 1 GB
+  maxFilesPerCourse: z.number().nonnegative().max(100).optional(), // Max 100 files
+  maxConcurrentJobs: z.number().positive().max(50).optional(), // Max 50 jobs
+  allowedMimeTypes: z.array(z.string()).max(50).optional(), // Max 50 MIME types
+  allowedExtensions: z.array(z.string()).max(50).optional(), // Max 50 extensions
+  monthlyPriceCents: z.number().nonnegative().max(99999900).optional(), // Max $999,999
   features: z.record(z.unknown()).optional(),
   isActive: z.boolean().optional(),
 });
@@ -151,17 +165,19 @@ const updateTierInputSchema = z.object({
 **Issue**: Default monthly prices in tiers router differ from migration seed data.
 
 **Router Defaults**:
+
 ```typescript
 const DEFAULT_MONTHLY_PRICES: Record<string, number> = {
   trial: 0,
   free: 0,
-  basic: 990,    // $9.90
+  basic: 990, // $9.90
   standard: 2990, // $29.90
-  premium: 9990,  // $99.90
+  premium: 9990, // $99.90
 };
 ```
 
 **Migration Seed Data** (from `20251221120000_create_tier_settings.sql`):
+
 ```sql
 basic: 1900,    -- $19.00
 standard: 4900, -- $49.00
@@ -171,11 +187,13 @@ premium: 14900, -- $149.00
 **Impact**: If admin uses "reset to defaults" feature, they'll get incorrect pricing that differs from initial seed data.
 
 **Recommendation**:
+
 1. Extract default values to shared-types constant
 2. Import and use same constant in both migration and router
 3. Create `tier-defaults.ts` in shared-types package
 
 **Suggested Fix**:
+
 ```typescript
 // packages/shared-types/src/tier-defaults.ts
 export const DEFAULT_TIER_PRICES = {
@@ -208,11 +226,12 @@ export const DEFAULT_STORAGE_QUOTAS = {
 **Issue**: Admin can enter arbitrary MIME types without validation. Invalid MIME types will be accepted and stored in database.
 
 **Current Code**:
+
 ```typescript
 const allowedMimeTypes = mimeTypesText
   .split(',')
-  .map((s) => s.trim())
-  .filter((s) => s.length > 0);
+  .map(s => s.trim())
+  .filter(s => s.length > 0);
 ```
 
 **Impact**: Typos or invalid MIME types (e.g., "application/pf" instead of "application/pdf") will be stored, causing file upload validation to fail silently.
@@ -220,19 +239,18 @@ const allowedMimeTypes = mimeTypesText
 **Recommendation**: Add MIME type format validation.
 
 **Suggested Fix**:
+
 ```typescript
 // Validate MIME type format
 const MIME_TYPE_REGEX = /^[a-z]+\/[a-z0-9\-\+\.]+$/i;
 
 const allowedMimeTypes = mimeTypesText
   .split(',')
-  .map((s) => s.trim())
-  .filter((s) => s.length > 0);
+  .map(s => s.trim())
+  .filter(s => s.length > 0);
 
 // Validate each MIME type
-const invalidMimeTypes = allowedMimeTypes.filter(
-  (mime) => !MIME_TYPE_REGEX.test(mime)
-);
+const invalidMimeTypes = allowedMimeTypes.filter(mime => !MIME_TYPE_REGEX.test(mime));
 
 if (invalidMimeTypes.length > 0) {
   toast.error(`Invalid MIME types: ${invalidMimeTypes.join(', ')}`);
@@ -246,6 +264,7 @@ if (invalidMimeTypes.length > 0) {
 #### 5. Duplicate Default Constants
 
 **Files**:
+
 - `packages/course-gen-platform/src/server/routers/admin/tiers.ts` (lines 73-115)
 - `packages/course-gen-platform/src/shared/tier/tier-settings-service.ts` (lines 47-86)
 
@@ -268,6 +287,7 @@ if (invalidMimeTypes.length > 0) {
 **Issue**: Server actions catch all errors generically without differentiating error types or providing user-friendly messages.
 
 **Current Code**:
+
 ```typescript
 try {
   const res = await fetch(`${TRPC_URL}/admin.listTiers`, {
@@ -292,6 +312,7 @@ try {
 **Recommendation**: Parse error responses and provide specific error messages.
 
 **Suggested Fix**:
+
 ```typescript
 try {
   const res = await fetch(`${TRPC_URL}/admin.listTiers`, {
@@ -353,6 +374,7 @@ try {
 **Issue**: Storage unit conversion between MB/GB could result in precision loss or overflow.
 
 **Current Code**:
+
 ```typescript
 const gbToBytes = (gb: number) => Math.round(gb * 1024 * 1024 * 1024);
 
@@ -363,6 +385,7 @@ const gbToBytes = (gb: number) => Math.round(gb * 1024 * 1024 * 1024);
 **Impact**: Precision loss during conversion could lead to unexpected quota limits.
 
 **Recommendation**:
+
 1. Add validation for max GB value (e.g., max 1000 GB)
 2. Warn user if conversion will lose precision
 3. Store original unit and value for reference
@@ -380,6 +403,7 @@ const gbToBytes = (gb: number) => Math.round(gb * 1024 * 1024 * 1024);
 **Issue**: `Json` type is used for features field but requires manual casting.
 
 **Current Code**:
+
 ```typescript
 type Json = Database['public']['Tables']['tier_settings']['Row']['features'];
 
@@ -406,6 +430,7 @@ if (input.features !== undefined) {
 **Recommendation**: Store tier display names as i18n keys and translate them in UI.
 
 **Suggested Approach**:
+
 ```typescript
 // Store key in DB: "tier.basic.name"
 // Translate in UI: t(tier.displayName)
@@ -434,6 +459,7 @@ if (input.features !== undefined) {
 **Issue**: Partial index on `is_active` only covers `is_active = true`, but queries for inactive tiers would be slow.
 
 **Current Index**:
+
 ```sql
 CREATE INDEX idx_tier_settings_is_active
 ON public.tier_settings(is_active)
@@ -451,6 +477,7 @@ WHERE is_active = true;
 ### Authentication & Authorization
 
 PASSED - All tier management endpoints properly protected:
+
 - `/admin/pricing` route requires superadmin role
 - tRPC procedures use `superadminProcedure`
 - RLS policies correctly restrict write access to superadmins
@@ -458,6 +485,7 @@ PASSED - All tier management endpoints properly protected:
 ### Input Validation
 
 PARTIAL - See High Priority Issue #2:
+
 - Basic Zod validation in place
 - Missing upper bounds on numeric fields
 - MIME type validation missing in UI
@@ -469,6 +497,7 @@ PASSED - All queries use parameterized queries via Supabase client
 ### RLS Policies
 
 PASSED - Comprehensive RLS policies:
+
 - Public read for active tiers (needed for pricing page)
 - Superadmin read all (including inactive)
 - Superadmin exclusive write access
@@ -484,6 +513,7 @@ PASSED - No hardcoded credentials found
 ### TypeScript Compliance
 
 PASSED - All files pass type-check:
+
 ```
 pnpm type-check
 ✓ packages/shared-types
@@ -494,6 +524,7 @@ pnpm type-check
 ### Type Consistency
 
 GOOD - Type definitions properly shared:
+
 - `TierSettings` interface in shared-types
 - `TierSettingsRow` for database types
 - Conversion function `toTierSettings()` maintains type safety
@@ -501,6 +532,7 @@ GOOD - Type definitions properly shared:
 ### Recommendations
 
 1. Consider using Zod schema inference instead of separate interfaces:
+
 ```typescript
 export const tierSettingsSchema = z.object({
   tierKey: z.enum(['trial', 'free', 'basic', 'standard', 'premium']),
@@ -518,11 +550,13 @@ export type TierSettings = z.infer<typeof tierSettingsSchema>;
 ### Caching Strategy
 
 GOOD - 5-minute TTL cache implemented:
+
 - In-memory cache with expiration
 - Automatic fallback to hardcoded defaults
 - Cache invalidation on updates
 
 **Potential Improvements**:
+
 1. Consider Redis cache for multi-instance deployments
 2. Add cache warming on application startup
 3. Implement stale-while-revalidate pattern
@@ -530,6 +564,7 @@ GOOD - 5-minute TTL cache implemented:
 ### Database Queries
 
 GOOD - Efficient query patterns:
+
 - Indexed lookups by `tier_key`
 - Partial index for active tiers
 - No N+1 query issues detected
@@ -545,6 +580,7 @@ MINIMAL - New code adds ~15KB to bundle size (acceptable)
 ### Code Organization
 
 EXCELLENT - Clear separation of concerns:
+
 - Database layer: migrations + RLS
 - Service layer: tier-settings-service
 - API layer: tRPC router
@@ -553,6 +589,7 @@ EXCELLENT - Clear separation of concerns:
 ### Error Handling
 
 GOOD - Consistent error patterns:
+
 - TRPCError for API errors
 - ValidationError for validation failures
 - Proper error logging throughout
@@ -562,6 +599,7 @@ GOOD - Consistent error patterns:
 ### Documentation
 
 EXCELLENT:
+
 - Comprehensive JSDoc comments
 - Migration includes detailed comments
 - PRICING-TIERS.md provides complete documentation
@@ -569,6 +607,7 @@ EXCELLENT:
 ### Code Duplication
 
 MINOR - See Medium Priority Issue #5:
+
 - Default constants duplicated
 - Otherwise follows DRY principle well
 
@@ -579,6 +618,7 @@ MINOR - See Medium Priority Issue #5:
 ### Project Conventions
 
 PASSED - Follows MegaCampusAI conventions:
+
 - Types in shared-types package
 - Service layer in course-gen-platform
 - UI in web package
@@ -587,12 +627,14 @@ PASSED - Follows MegaCampusAI conventions:
 ### Single Source of Truth
 
 GOOD - Database now source of truth for tier settings:
+
 - Hardcoded constants only used as fallback
 - Admin can update without code deployment
 
 ### Backward Compatibility
 
 EXCELLENT - Maintains backward compatibility:
+
 - FILE_UPLOAD constants preserved
 - Fallback to defaults if DB unavailable
 - No breaking changes to existing APIs
@@ -647,6 +689,7 @@ EXCELLENT - Maintains backward compatibility:
 **File**: `20251221120000_create_tier_settings.sql`
 
 PASSED - Safe migration:
+
 - Uses `CREATE TABLE IF NOT EXISTS`
 - Uses `ON CONFLICT DO UPDATE` for idempotency
 - Includes rollback-safe seed data
@@ -655,6 +698,7 @@ PASSED - Safe migration:
 ### Data Integrity
 
 GOOD - Constraints properly defined:
+
 - CHECK constraints on numeric fields
 - UNIQUE constraint on tier_key
 - NOT NULL on required fields
@@ -718,6 +762,7 @@ Before deploying to production:
 The pricing tiers implementation is **well-architected and production-ready** with minor improvements needed. The code demonstrates:
 
 Strengths:
+
 - Clean separation of concerns
 - Proper security (RLS policies, superadmin checks)
 - Type safety maintained throughout
@@ -726,6 +771,7 @@ Strengths:
 - Proper caching strategy
 
 Areas for Improvement:
+
 - Cache refresh error handling (High Priority)
 - Input validation bounds (High Priority)
 - Some code duplication (Medium Priority)

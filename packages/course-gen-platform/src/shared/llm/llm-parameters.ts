@@ -235,10 +235,7 @@ export function getTemperatureRange(archetype: ContentArchetype): TemperatureRan
  * isTemperatureValid(0.65, 'concept_explainer'); // true
  * ```
  */
-export function isTemperatureValid(
-  temperature: number,
-  archetype: ContentArchetype
-): boolean {
+export function isTemperatureValid(temperature: number, archetype: ContentArchetype): boolean {
   const range = ARCHETYPE_TEMPERATURE_RANGES[archetype];
   return temperature >= range.min && temperature <= range.max;
 }

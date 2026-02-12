@@ -207,3 +207,37 @@ export async function exportModuleLessons(
     lessonsCount: result?.lessonsCount ?? 0,
   }
 }
+
+/**
+ * Retry generation of multiple failed lessons (batch)
+ * Uses partialGenerate which supports multiple lessonIds
+ *
+ * @param courseId - Course UUID
+ * @param lessonIds - Array of lesson IDs in format "section.lesson" (e.g., ["1.1", "2.3"])
+ * @param priority - Job priority 1-10 (default: 8 for retries)
+ */
+export async function retryMultipleLessons(
+  courseId: string,
+  lessonIds: string[],
+  priority: number = 8
+): Promise<{ success: boolean; jobCount: number }> {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(`${TRPC_URL}/lessonContent.partialGenerate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ courseId, lessonIds, priority }),
+  })
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to retry lessons')
+  }
+
+  const data = await response.json()
+  const result = data?.result?.data || data
+
+  return {
+    success: result?.success ?? false,
+    jobCount: result?.jobCount ?? 0,
+  }
+}

@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
 
 interface RestartStageInput {
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
 
     // Call tRPC endpoint
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const backendUrl = ENV.COURSEGEN_BACKEND_URL
     const tRPCUrl = `${backendUrl}/trpc`
 
     const tRPCResponse = await fetch(`${tRPCUrl}/generation.restartStage`, {
@@ -190,7 +191,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         route: '/api/courses/[orgSlug]/[courseSlug]/restart-stage',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Internal server error', code: 'INTERNAL_ERROR' },

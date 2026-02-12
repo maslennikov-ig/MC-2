@@ -4,7 +4,7 @@ import logger from '@/shared/logger';
 import { SectionBatchResult, SectionBatchResultV2 } from './types';
 import { SECTIONS_PER_BATCH } from './constants';
 import { extractSection } from './utils';
-import { calculateComplexityScore, assessCriticality, selectModelTier } from './model-selector';
+import { selectModelTier } from './model-selector';
 import { generateWithRetry } from './generator-core';
 import { convertSectionToV2Specs } from './v2-converter';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
@@ -32,8 +32,6 @@ export class SectionBatchGenerator {
 
     const sectionIndex = startSection;
     const section = extractSection(input, sectionIndex);
-    const complexityScore = calculateComplexityScore(section);
-    const criticalityScore = assessCriticality(section);
     const language = input.frontend_parameters.language || 'en';
 
     logger.info({
@@ -87,13 +85,7 @@ export class SectionBatchGenerator {
       }
     }
 
-    const modelTier = await selectModelTier(
-      complexityScore,
-      criticalityScore,
-      input,
-      qdrantClient,
-      language
-    );
+    const modelTier = await selectModelTier(input, qdrantClient, language, sectionIndex, section);
 
     logger.info({
       msg: 'Model tier selected for section batch',
@@ -102,8 +94,6 @@ export class SectionBatchGenerator {
       tier: modelTier.tier,
       model: modelTier.model,
       reason: modelTier.reason,
-      complexityScore: complexityScore.toFixed(2),
-      criticalityScore: criticalityScore.toFixed(2),
     });
 
     return await generateWithRetry(
@@ -112,8 +102,6 @@ export class SectionBatchGenerator {
       input,
       modelTier,
       qdrantClient,
-      complexityScore,
-      criticalityScore,
       language,
       constraints
     );
@@ -147,12 +135,11 @@ export class SectionBatchGenerator {
 
     const lessonSpecs: LessonSpecificationV2[] = [];
 
-    // NOTE: allSections should ideally contain ALL sections from the entire course
-    // for proper inter-lesson context. Currently we only have access to the current
-    // batch's sections. In the future, this should be called after all batches are
-    // generated and sections are collected (similar to generation-phases.ts line 550).
-    // For now, we pass undefined to maintain backward compatibility.
-    const allSections = undefined; // TODO: Pass all course sections when available
+    // Pass generated sections from this batch for inter-lesson context.
+    // This provides intra-section lesson context (previous/next lessons).
+    // For full cross-section context, the caller in generation-phases.ts
+    // collects all sections after all batches complete (line ~559).
+    const allSections = sectionResult.sections;
 
     for (let i = 0; i < sectionResult.sections.length; i++) {
       const section = sectionResult.sections[i];
@@ -177,8 +164,6 @@ export class SectionBatchGenerator {
       tier: sectionResult.tier,
       tokensUsed: sectionResult.tokensUsed,
       retryCount: sectionResult.retryCount,
-      complexityScore: sectionResult.complexityScore,
-      criticalityScore: sectionResult.criticalityScore,
       regenerationMetrics: sectionResult.regenerationMetrics,
     };
   }

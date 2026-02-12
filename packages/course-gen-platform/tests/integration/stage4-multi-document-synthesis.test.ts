@@ -14,7 +14,6 @@
  *    - Correct model selection based on document count
  *    - metadata.model_usage.phase_4 matches expected model
  *    - scope_instructions populated (100-800 chars)
- *    - content_strategy set correctly
  *
  * Prerequisites:
  * - Redis >= 5.0.0 running at redis://localhost:6379
@@ -36,7 +35,7 @@ import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
 import { JobType } from '@megacampus/shared-types';
 import type { StructureAnalysisJob } from '@megacampus/shared-types';
-import { AnalysisResultSchema } from '../../src/types/analysis-result';
+import { AnalysisResultSchema } from '@megacampus/shared-types';
 import {
   setupTestFixtures,
   cleanupTestFixtures,
@@ -69,10 +68,7 @@ function generateCorrelationId(): string {
  * @param timeout - Maximum wait time in milliseconds
  * @returns Course record with analysis_result
  */
-async function waitForAnalysisResult(
-  courseId: string,
-  timeout: number = 600000
-): Promise<any> {
+async function waitForAnalysisResult(courseId: string, timeout: number = 600000): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -98,7 +94,7 @@ async function waitForAnalysisResult(
 
   throw new Error(
     `Timeout waiting for analysis_result to be populated in course ${courseId}. ` +
-    `This may indicate Stage 4 analysis failed or worker is not running.`
+      `This may indicate Stage 4 analysis failed or worker is not running.`
   );
 }
 
@@ -142,6 +138,7 @@ describe('Stage 4: Multi-Document Synthesis (US2)', () => {
 
     // Setup test fixtures with unique fixtures for this test file
     await setupTestFixtures({
+      skipAuthUsers: true,
       customFixtures: { TEST_USERS, TEST_ORGS },
     });
 
@@ -297,25 +294,14 @@ describe('Stage 4: Multi-Document Synthesis (US2)', () => {
       expect(validated.scope_instructions.length).toBeGreaterThanOrEqual(100);
       expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 
-      console.log(
-        `✓ scope_instructions populated: ${validated.scope_instructions.length} chars`
-      );
+      console.log(`✓ scope_instructions populated: ${validated.scope_instructions.length} chars`);
 
       // =====================================================================
-      // STEP 8: Verify content_strategy
-      // =====================================================================
-      // With <3 documents, should be create_from_scratch
-      expect(validated.content_strategy).toBe('create_from_scratch');
-
-      console.log(`✓ content_strategy: ${validated.content_strategy}`);
-
-      // =====================================================================
-      // STEP 9: Log Analysis Summary
+      // STEP 8: Log Analysis Summary
       // =====================================================================
       console.log('\n📊 Analysis Summary (1 Document):');
       console.log(`   Model Used: ${validated.metadata.model_usage.phase_4}`);
       console.log(`   Phase 4 Duration: ${validated.metadata.phase_durations_ms.phase_4}ms`);
-      console.log(`   Content Strategy: ${validated.content_strategy}`);
       console.log(`   Scope Instructions Length: ${validated.scope_instructions.length} chars`);
     },
     600000 // 10-minute test timeout
@@ -420,25 +406,14 @@ describe('Stage 4: Multi-Document Synthesis (US2)', () => {
       expect(validated.scope_instructions.length).toBeGreaterThanOrEqual(100);
       expect(validated.scope_instructions.length).toBeLessThanOrEqual(800);
 
-      console.log(
-        `✓ scope_instructions populated: ${validated.scope_instructions.length} chars`
-      );
+      console.log(`✓ scope_instructions populated: ${validated.scope_instructions.length} chars`);
 
       // =====================================================================
-      // STEP 7: Verify content_strategy
-      // =====================================================================
-      // With 3 documents, should be expand_and_enhance
-      expect(validated.content_strategy).toBe('expand_and_enhance');
-
-      console.log(`✓ content_strategy: ${validated.content_strategy}`);
-
-      // =====================================================================
-      // STEP 8: Log Analysis Summary
+      // STEP 7: Log Analysis Summary
       // =====================================================================
       console.log('\n📊 Analysis Summary (3 Documents):');
       console.log(`   Model Used: ${validated.metadata.model_usage.phase_4}`);
       console.log(`   Phase 4 Duration: ${validated.metadata.phase_durations_ms.phase_4}ms`);
-      console.log(`   Content Strategy: ${validated.content_strategy}`);
       console.log(`   Scope Instructions Length: ${validated.scope_instructions.length} chars`);
     },
     600000 // 10-minute test timeout
@@ -446,134 +421,4 @@ describe('Stage 4: Multi-Document Synthesis (US2)', () => {
 
   // ==========================================================================
   // Test 3: Content Strategy Logic Verification
-  // ==========================================================================
-
-  it.skipIf(shouldSkipTests)(
-    'should set content_strategy correctly based on document count',
-    async () => {
-      const supabase = getSupabaseAdmin();
-
-      // =====================================================================
-      // SCENARIO 1: Zero documents → create_from_scratch
-      // =====================================================================
-      console.log('\n📝 Testing content_strategy: 0 documents');
-
-      const { data: courseNoDocs, error: nodocsError } = await supabase
-        .from('courses')
-        .insert({
-          organization_id: TEST_ORGS.premium.id,
-          user_id: TEST_USERS.instructor1.id,
-          title: 'Test Course - React Hooks (No Docs)',
-          slug: `test-course-react-hooks-nodocs-${Date.now()}`,
-          generation_status: 'processing_documents',
-          status: 'draft',
-        })
-        .select()
-        .single();
-
-      if (nodocsError || !courseNoDocs) {
-        throw new Error(`Failed to create test course: ${nodocsError?.message || 'Unknown error'}`);
-      }
-
-      testCourseIds.push(courseNoDocs.id);
-
-      const jobNoDocs: StructureAnalysisJob = {
-        course_id: courseNoDocs.id,
-        organization_id: TEST_ORGS.premium.id,
-        user_id: TEST_USERS.instructor1.id,
-        input: {
-          topic: 'React Hooks',
-          language: 'en',
-          style: 'professional',
-          target_audience: 'intermediate',
-          difficulty: 'intermediate',
-          lesson_duration_minutes: 5,
-          // No document_summaries
-        },
-        priority: 5,
-        attempt_count: 0,
-        created_at: new Date().toISOString(),
-      };
-
-      const jobNoDocsRef = await addJob(JobType.STRUCTURE_ANALYSIS, jobNoDocs);
-      console.log(`✓ Job created (no docs): ${jobNoDocsRef.id}`);
-
-      const resultNoDocs = await waitForAnalysisResult(courseNoDocs.id, 600000);
-      const validatedNoDocs = AnalysisResultSchema.parse(resultNoDocs.analysis_result);
-
-      expect(validatedNoDocs.content_strategy).toBe('create_from_scratch');
-      console.log(`✓ 0 documents → content_strategy: ${validatedNoDocs.content_strategy}`);
-
-      // =====================================================================
-      // SCENARIO 2: 5 documents → expand_and_enhance
-      // =====================================================================
-      console.log('\n📝 Testing content_strategy: 5 documents');
-
-      const { data: course5Docs, error: docs5Error } = await supabase
-        .from('courses')
-        .insert({
-          organization_id: TEST_ORGS.premium.id,
-          user_id: TEST_USERS.instructor1.id,
-          title: 'Test Course - React Hooks (5 Docs)',
-          slug: `test-course-react-hooks-5docs-${Date.now()}`,
-          generation_status: 'processing_documents',
-          status: 'draft',
-        })
-        .select()
-        .single();
-
-      if (docs5Error || !course5Docs) {
-        throw new Error(`Failed to create test course: ${docs5Error?.message || 'Unknown error'}`);
-      }
-
-      testCourseIds.push(course5Docs.id);
-
-      const job5Docs: StructureAnalysisJob = {
-        course_id: course5Docs.id,
-        organization_id: TEST_ORGS.premium.id,
-        user_id: TEST_USERS.instructor1.id,
-        input: {
-          topic: 'React Hooks',
-          language: 'en',
-          style: 'professional',
-          target_audience: 'intermediate',
-          difficulty: 'intermediate',
-          lesson_duration_minutes: 5,
-          document_summaries: [
-            createMockDocumentSummary(1),
-            createMockDocumentSummary(2),
-            createMockDocumentSummary(3),
-            createMockDocumentSummary(4),
-            createMockDocumentSummary(5),
-          ], // 5 documents
-        },
-        priority: 5,
-        attempt_count: 0,
-        created_at: new Date().toISOString(),
-      };
-
-      const job5DocsRef = await addJob(JobType.STRUCTURE_ANALYSIS, job5Docs);
-      console.log(`✓ Job created (5 docs): ${job5DocsRef.id}`);
-
-      const result5Docs = await waitForAnalysisResult(course5Docs.id, 600000);
-      const validated5Docs = AnalysisResultSchema.parse(result5Docs.analysis_result);
-
-      expect(validated5Docs.content_strategy).toBe('expand_and_enhance');
-      console.log(`✓ 5 documents → content_strategy: ${validated5Docs.content_strategy}`);
-
-      // =====================================================================
-      // SCENARIO 3: Verify model selection for 5 documents (should be 120B)
-      // =====================================================================
-      expect(validated5Docs.metadata.model_usage.phase_4).toBe('openai/gpt-oss-120b');
-      console.log(`✓ 5 documents → model: ${validated5Docs.metadata.model_usage.phase_4}`);
-
-      // =====================================================================
-      // STEP 8: Summary
-      // =====================================================================
-      console.log('\n📊 Content Strategy Verification Complete:');
-      console.log(`   0 docs → ${validatedNoDocs.content_strategy} (20B model)`);
-      console.log(`   5 docs → ${validated5Docs.content_strategy} (120B model)`);
-    },
-    1800000 // 30-minute test timeout (3 analysis runs)
-  );
 });

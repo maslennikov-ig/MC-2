@@ -22,7 +22,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { isValidUUID } from '@/lib/validation-utils'
+import { ENV } from '@/lib/env'
+import { isValidUUID } from '@/lib/uuid-validation'
 
 /**
  * Input schema for file upload request
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
 
     // Call tRPC endpoint
     // Use COURSEGEN_BACKEND_URL from .env (single source of truth)
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const backendUrl = ENV.COURSEGEN_BACKEND_URL
     const tRPCUrl = `${backendUrl}/trpc`
 
     // tRPC v11 with Express adapter expects plain input data (not wrapped in { json: ... })
@@ -196,7 +197,7 @@ export async function POST(request: NextRequest) {
         route: '/api/coursegen/upload',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       { error: 'Внутренняя ошибка сервера', code: 'INTERNAL_ERROR' },

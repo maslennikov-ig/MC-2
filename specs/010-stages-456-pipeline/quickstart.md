@@ -162,17 +162,16 @@ export function generateRAGPlan(
 
   for (const section of sections) {
     // Find relevant documents
-    const relevantDocs = documents.filter(doc =>
-      section.key_topics.some(topic =>
-        doc.content_for_analysis.toLowerCase().includes(topic.toLowerCase())
+    const relevantDocs = documents
+      .filter(doc =>
+        section.key_topics.some(topic =>
+          doc.content_for_analysis.toLowerCase().includes(topic.toLowerCase())
+        )
       )
-    ).sort((a, b) => b.importance_score - a.importance_score);
+      .sort((a, b) => b.importance_score - a.importance_score);
 
     // Generate search queries
-    const searchQueries = [
-      ...section.key_topics,
-      ...section.learning_objectives.slice(0, 2),
-    ];
+    const searchQueries = [...section.key_topics, ...section.learning_objectives.slice(0, 2)];
 
     // Determine confidence
     const allFullText = relevantDocs.every(d => d.processing_mode === 'full_text');
@@ -183,9 +182,8 @@ export function generateRAGPlan(
       search_queries: searchQueries,
       expected_topics: section.key_topics,
       confidence,
-      note: confidence === 'medium'
-        ? 'Some documents summarized. Use broader RAG search.'
-        : undefined,
+      note:
+        confidence === 'medium' ? 'Some documents summarized. Use broader RAG search.' : undefined,
     };
   }
 
@@ -226,15 +224,11 @@ export function inferHookStrategy(
   audience: string
 ): 'analogy' | 'statistic' | 'challenge' | 'question' {
   // Technical topics benefit from analogies
-  const isTechnical = topics.some(t =>
-    /algorithm|code|system|architecture/i.test(t)
-  );
+  const isTechnical = topics.some(t => /algorithm|code|system|architecture/i.test(t));
   if (isTechnical) return 'analogy';
 
   // Business topics benefit from statistics
-  const isBusiness = topics.some(t =>
-    /business|market|roi|cost/i.test(t)
-  );
+  const isBusiness = topics.some(t => /business|market|roi|cost/i.test(t));
   if (isBusiness) return 'statistic';
 
   // Novice audience benefits from questions
@@ -243,7 +237,9 @@ export function inferHookStrategy(
   return 'challenge';
 }
 
-export function mapDepthFromWordCount(wordCount: number): 'summary' | 'detailed_analysis' | 'comprehensive' {
+export function mapDepthFromWordCount(
+  wordCount: number
+): 'summary' | 'detailed_analysis' | 'comprehensive' {
   if (wordCount < 300) return 'summary';
   if (wordCount < 600) return 'detailed_analysis';
   return 'comprehensive';
@@ -280,7 +276,7 @@ const workflow = new StateGraph(LessonGraphState)
   .addNode('assembler', assemblerNode)
   .addNode('smoother', smootherNode)
   .addEdge('__start__', 'planner')
-  .addConditionalEdges('planner', (state) => {
+  .addConditionalEdges('planner', state => {
     if (state.errors.length > 0) return '__end__';
     return 'expander';
   })
@@ -297,12 +293,15 @@ export async function generateLessonContent(
   lessonSpec: LessonSpecificationV2,
   ragChunks: RAGChunk[]
 ): Promise<LessonContent> {
-  const result = await lessonGraph.invoke({
-    lessonSpec,
-    ragChunks,
-  }, {
-    configurable: { thread_id: lessonSpec.lesson_id },
-  });
+  const result = await lessonGraph.invoke(
+    {
+      lessonSpec,
+      ragChunks,
+    },
+    {
+      configurable: { thread_id: lessonSpec.lesson_id },
+    }
+  );
 
   if (result.errors.length > 0) {
     throw new Error(`Generation failed: ${result.errors.join(', ')}`);
@@ -318,7 +317,12 @@ export async function generateLessonContent(
 
 ```typescript
 type ContentArchetype = 'code_tutorial' | 'concept_explainer' | 'case_study' | 'legal_warning';
-type Stage = 'stage2_classification' | 'stage4_analysis' | 'stage5_generation' | 'stage6_content' | 'llm_judge';
+type Stage =
+  | 'stage2_classification'
+  | 'stage4_analysis'
+  | 'stage5_generation'
+  | 'stage6_content'
+  | 'llm_judge';
 
 interface LLMParameters {
   temperature: number;
@@ -331,35 +335,35 @@ interface LLMParameters {
 // Stage-specific parameters (from research)
 const STAGE_PARAMS: Record<Stage, LLMParameters> = {
   stage2_classification: {
-    temperature: 0.0,  // Binary decision - max determinism
+    temperature: 0.0, // Binary decision - max determinism
     top_p: 0.7,
     frequency_penalty: 0.0,
     presence_penalty: 0.0,
     max_tokens: 20,
   },
   stage4_analysis: {
-    temperature: 0.4,  // Strategic reasoning (NOT 0.8!)
+    temperature: 0.4, // Strategic reasoning (NOT 0.8!)
     top_p: 0.9,
     frequency_penalty: 0.2,
     presence_penalty: 0.1,
     max_tokens: 2500,
   },
   stage5_generation: {
-    temperature: 0.5,  // RAG synthesis
+    temperature: 0.5, // RAG synthesis
     top_p: 0.9,
     frequency_penalty: 0.2,
     presence_penalty: 0.1,
     max_tokens: 3000,
   },
   stage6_content: {
-    temperature: 0.5,  // Default, overridden by archetype
+    temperature: 0.5, // Default, overridden by archetype
     top_p: 0.9,
     frequency_penalty: 0.2,
     presence_penalty: 0.1,
     max_tokens: 3000,
   },
   llm_judge: {
-    temperature: 0.0,  // Industry consensus: temp 0.0 + 3x voting
+    temperature: 0.0, // Industry consensus: temp 0.0 + 3x voting
     top_p: 1.0,
     frequency_penalty: 0.0,
     presence_penalty: 0.0,
@@ -370,28 +374,28 @@ const STAGE_PARAMS: Record<Stage, LLMParameters> = {
 // Content archetype parameters for Stage 6
 const ARCHETYPE_PARAMS: Record<ContentArchetype, LLMParameters> = {
   code_tutorial: {
-    temperature: 0.25,  // Syntax precision
+    temperature: 0.25, // Syntax precision
     top_p: 0.7,
     frequency_penalty: 0.1,
     presence_penalty: 0.1,
     max_tokens: 2500,
   },
   concept_explainer: {
-    temperature: 0.65,  // Educational clarity (NOT 1.0!)
+    temperature: 0.65, // Educational clarity (NOT 1.0!)
     top_p: 0.9,
     frequency_penalty: 0.3,
     presence_penalty: 0.2,
     max_tokens: 3000,
   },
   case_study: {
-    temperature: 0.55,  // Narrative coherence
+    temperature: 0.55, // Narrative coherence
     top_p: 0.9,
     frequency_penalty: 0.2,
     presence_penalty: 0.15,
     max_tokens: 2200,
   },
   legal_warning: {
-    temperature: 0.05,  // Zero error tolerance
+    temperature: 0.05, // Zero error tolerance
     top_p: 0.7,
     frequency_penalty: 0.0,
     presence_penalty: 0.0,
@@ -408,9 +412,10 @@ export function getParametersForArchetype(archetype: ContentArchetype): LLMParam
 }
 
 export function selectModel(language: 'en' | 'ru', fallbackIndex: number = 0): string {
-  const models = language === 'ru'
-    ? ['qwen/qwen3-235b-a22b-2507', 'moonshotai/kimi-k2-0905']
-    : ['deepseek/deepseek-v3.1-terminus', 'moonshotai/kimi-k2-0905'];
+  const models =
+    language === 'ru'
+      ? ['qwen/qwen3-235b-a22b-2507', 'moonshotai/kimi-k2-0905']
+      : ['deepseek/deepseek-v3.1-terminus', 'moonshotai/kimi-k2-0905'];
 
   return models[Math.min(fallbackIndex, models.length - 1)];
 }

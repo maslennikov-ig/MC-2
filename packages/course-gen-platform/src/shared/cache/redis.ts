@@ -62,9 +62,9 @@ function handleShutdownSignal(signal: string): void {
   logger.info({ signal }, 'Shutdown signal received, stopping Redis reconnection attempts');
 }
 
-// Register once at module load
-process.on('SIGTERM', () => handleShutdownSignal('SIGTERM'));
-process.on('SIGINT', () => handleShutdownSignal('SIGINT'));
+// Register once at module load (use process.once to prevent handler stacking on re-import)
+process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));
+process.once('SIGINT', () => handleShutdownSignal('SIGINT'));
 
 export function getRedisClient(): Redis {
   if (!redisClient) {
@@ -119,7 +119,7 @@ export function getRedisClient(): Redis {
 
           // Emit event for workers to perform graceful shutdown
           // Workers should listen: process.on('REDIS_UNAVAILABLE', () => gracefulShutdown())
-          process.emit(REDIS_UNAVAILABLE_EVENT as any);
+          (process as NodeJS.EventEmitter).emit(REDIS_UNAVAILABLE_EVENT);
 
           // Give workers time to finish current jobs before forced exit
           setTimeout(() => {

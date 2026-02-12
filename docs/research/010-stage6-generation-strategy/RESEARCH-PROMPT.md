@@ -6,6 +6,7 @@
 **Type**: DeepResearch
 
 **Results**:
+
 - [Optimal Strategy Report](Optimal%20Strategy%20for%20Educational%20Lesson%20Content%20Generation%20Research%20Report.md)
 - [LLM Content Generation Strategy](LLM%20Content%20Generation%20Strategy%20Research.md)
 
@@ -16,6 +17,7 @@
 ## Research Question
 
 What is the optimal strategy for generating educational lesson content (3-5K words per lesson) in a production B2B course generation pipeline, considering:
+
 1. Single-pass generation vs Skeleton-of-Thought (parallel section expansion)
 2. LangChain's latest capabilities for orchestrating multi-step generation
 3. Quality, cost, and latency trade-offs
@@ -27,6 +29,7 @@ What is the optimal strategy for generating educational lesson content (3-5K wor
 ### System Overview
 
 We are building Stage 6 of a course generation pipeline that:
+
 - Receives detailed lesson specifications from Stage 5 (including intro_blueprint, sections with RAG queries, exercises)
 - Generates complete lesson content (3-5K words) with RAG grounding
 - Runs 10-30 lessons in parallel via BullMQ workers
@@ -35,12 +38,14 @@ We are building Stage 6 of a course generation pipeline that:
 ### Current Architecture Document Proposals
 
 **Option A: Single-Pass Generation**
+
 - One LLM call per lesson
 - Input: Full lesson specification + RAG context
 - Output: Complete lesson (intro, sections, examples, exercises)
 - Simpler implementation
 
 **Option B: Skeleton-of-Thought (Two-Stage)**
+
 - Stage 5 generates outline/skeleton (section titles + key points)
 - Stage 6 expands each section in parallel
 - Then assembles and adds transitions
@@ -134,6 +139,7 @@ We are building Stage 6 of a course generation pipeline that:
 ## Output Format
 
 Please provide:
+
 1. Executive summary with clear recommendation
 2. Detailed analysis for each research question
 3. LangChain code examples (TypeScript)

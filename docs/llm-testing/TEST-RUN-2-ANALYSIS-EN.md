@@ -34,59 +34,59 @@ Each generation is automatically scored across three dimensions:
 
 **Best models for generating comprehensive course metadata in English:**
 
-| Rank | Model | Overall | Schema | Content | Language | Success Rate |
-|------|-------|---------|--------|---------|----------|-------------|
-| 1 | **Kimi K2 0905** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
-| 2 | **Kimi K2 Thinking** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
-| 3 | **DeepSeek v3.2 Exp** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
+| Rank | Model                 | Overall | Schema | Content | Language | Success Rate |
+| ---- | --------------------- | ------- | ------ | ------- | -------- | ------------ |
+| 1    | **Kimi K2 0905**      | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
+| 2    | **Kimi K2 Thinking**  | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
+| 3    | **DeepSeek v3.2 Exp** | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
 
 ### 2. Metadata Generation (Russian)
 
 **Best models for generating comprehensive course metadata in Russian:**
 
-| Rank | Model | Overall | Schema | Content | Language | Success Rate |
-|------|-------|---------|--------|---------|----------|-------------|
-| 1 | **Kimi K2 0905** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
-| 2 | **Kimi K2 Thinking** | 100.0% | 100.0% | 100.0% | 100.0% | 1/3 |
-| 3 | **DeepSeek v3.2 Exp** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
+| Rank | Model                 | Overall | Schema | Content | Language | Success Rate |
+| ---- | --------------------- | ------- | ------ | ------- | -------- | ------------ |
+| 1    | **Kimi K2 0905**      | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
+| 2    | **Kimi K2 Thinking**  | 100.0%  | 100.0% | 100.0%  | 100.0%   | 1/3          |
+| 3    | **DeepSeek v3.2 Exp** | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
 
 ### 3. Lesson Structure Generation (English)
 
 **Best models for generating structured lessons with exercises in English:**
 
-| Rank | Model | Overall | Schema | Content | Language | Success Rate |
-|------|-------|---------|--------|---------|----------|-------------|
-| 1 | **Kimi K2 0905** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
-| 2 | **DeepSeek v3.2 Exp** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
-| 3 | **DeepSeek Chat v3.1** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
+| Rank | Model                  | Overall | Schema | Content | Language | Success Rate |
+| ---- | ---------------------- | ------- | ------ | ------- | -------- | ------------ |
+| 1    | **Kimi K2 0905**       | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
+| 2    | **DeepSeek v3.2 Exp**  | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
+| 3    | **DeepSeek Chat v3.1** | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
 
 ### 4. Lesson Structure Generation (Russian)
 
 **Best models for generating structured lessons with exercises in Russian:**
 
-| Rank | Model | Overall | Schema | Content | Language | Success Rate |
-|------|-------|---------|--------|---------|----------|-------------|
-| 1 | **Kimi K2 0905** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
-| 2 | **DeepSeek v3.2 Exp** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
-| 3 | **DeepSeek Chat v3.1** | 100.0% | 100.0% | 100.0% | 100.0% | 3/3 |
+| Rank | Model                  | Overall | Schema | Content | Language | Success Rate |
+| ---- | ---------------------- | ------- | ------ | ------- | -------- | ------------ |
+| 1    | **Kimi K2 0905**       | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
+| 2    | **DeepSeek v3.2 Exp**  | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
+| 3    | **DeepSeek Chat v3.1** | 100.0%  | 100.0% | 100.0%  | 100.0%   | 3/3          |
 
 ## Detailed Model Comparison
 
 **Overall performance across all 4 categories:**
 
-| Model | Metadata EN | Metadata RU | Lesson EN | Lesson RU | Overall |
-|-------|-------------|-------------|-----------|-----------|--------|
-| **Kimi K2 0905** | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
-| **Kimi K2 Thinking** | 100.0% | 100.0% | 0.0% | 0.0% | 100.0% |
-| **DeepSeek v3.2 Exp** | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
-| **DeepSeek Chat v3.1** | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
-| **Grok 4 Fast** | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
-| **GLM 4.6** | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
-| **MiniMax M2** | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
-| **Qwen3 32B** | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
-| **Qwen3 235B A22B** | 0.0% | 0.0% | 100.0% | 100.0% | 100.0% |
-| **Qwen3 235B Thinking** | 100.0% | 100.0% | 100.0% | 95.7% | 98.9% |
-| **OSS 120B** | 98.3% | 100.0% | 100.0% | 76.7% | 93.8% |
+| Model                   | Metadata EN | Metadata RU | Lesson EN | Lesson RU | Overall |
+| ----------------------- | ----------- | ----------- | --------- | --------- | ------- |
+| **Kimi K2 0905**        | 100.0%      | 100.0%      | 100.0%    | 100.0%    | 100.0%  |
+| **Kimi K2 Thinking**    | 100.0%      | 100.0%      | 0.0%      | 0.0%      | 100.0%  |
+| **DeepSeek v3.2 Exp**   | 100.0%      | 100.0%      | 100.0%    | 100.0%    | 100.0%  |
+| **DeepSeek Chat v3.1**  | 100.0%      | 100.0%      | 100.0%    | 100.0%    | 100.0%  |
+| **Grok 4 Fast**         | 100.0%      | 100.0%      | 100.0%    | 100.0%    | 100.0%  |
+| **GLM 4.6**             | 100.0%      | 100.0%      | 100.0%    | 100.0%    | 100.0%  |
+| **MiniMax M2**          | 100.0%      | 100.0%      | 100.0%    | 100.0%    | 100.0%  |
+| **Qwen3 32B**           | 100.0%      | 100.0%      | 100.0%    | 100.0%    | 100.0%  |
+| **Qwen3 235B A22B**     | 0.0%        | 0.0%        | 100.0%    | 100.0%    | 100.0%  |
+| **Qwen3 235B Thinking** | 100.0%      | 100.0%      | 100.0%    | 95.7%     | 98.9%   |
+| **OSS 120B**            | 98.3%       | 100.0%      | 100.0%    | 76.7%     | 93.8%   |
 
 ## Key Findings
 
@@ -96,4 +96,3 @@ Each generation is automatically scored across three dimensions:
 - **Best for Metadata (Russian):** Kimi K2 0905 (100.0%)
 - **Best for Lessons (English):** Kimi K2 0905 (100.0%)
 - **Best for Lessons (Russian):** Kimi K2 0905 (100.0%)
-

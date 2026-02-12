@@ -34,6 +34,7 @@
 **Validation Results**: ✅ ALL CHECKS PASS
 
 **Rationale**:
+
 - Spec is based on real gap analysis comparing n8n workflow, frontend code, and Stage 0 backend
 - All requirements are derived from actual code inspection (not assumptions)
 - User stories reflect real integration points (webhook endpoint, HMAC validation, progress tracking RPC)

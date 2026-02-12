@@ -1,29 +1,35 @@
-'use client';
+'use client'
 
-import React, { useState, useCallback } from 'react';
-import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, RefreshCw, CheckCircle2, Circle, AlertCircle, Loader2, Sparkles, Scale, ThumbsUp, ThumbsDown, AlertTriangle, Maximize2 } from 'lucide-react';
-import * as Accordion from '@radix-ui/react-accordion';
-import { cn } from '@/lib/utils';
+import React, { useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ChevronDown,
+  RefreshCw,
+  CheckCircle2,
+  Circle,
+  AlertCircle,
+  Loader2,
+  Sparkles,
+  Scale,
+  ThumbsUp,
+  ThumbsDown,
+  AlertTriangle,
+} from 'lucide-react'
+import * as Accordion from '@radix-ui/react-accordion'
+import { cn } from '@/lib/utils'
+import { formatDuration } from '@megacampus/shared-utils'
 import {
   PipelineNodeState,
   Stage6NodeName,
   STAGE6_NODE_LABELS,
-  Stage6NodeStatus
-} from '@megacampus/shared-types';
-import type { ProgressSummary } from '@megacampus/shared-types/judge-types';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { ProgressSummaryDisplay } from './ProgressSummaryDisplay';
-import { ErrorBoundary } from 'react-error-boundary';
+  Stage6NodeStatus,
+} from '@megacampus/shared-types'
+import type { ProgressSummary } from '@megacampus/shared-types/judge-types'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { ProgressSummaryDisplay } from './ProgressSummaryDisplay'
+import { ErrorBoundary } from 'react-error-boundary'
 
 // =============================================================================
 // Error Boundary Fallback
@@ -31,11 +37,11 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 function NodeOutputErrorFallback({ error }: { error: Error }) {
   return (
-    <div className="text-xs text-red-500 dark:text-red-400 p-2 rounded bg-red-50 dark:bg-red-900/20">
+    <div className="rounded bg-red-50 p-2 text-xs text-red-500 dark:bg-red-900/20 dark:text-red-400">
       <span className="font-medium">Ошибка отображения:</span>{' '}
       <span className="text-slate-600 dark:text-slate-400">{error.message}</span>
     </div>
-  );
+  )
 }
 
 // =============================================================================
@@ -44,17 +50,16 @@ function NodeOutputErrorFallback({ error }: { error: Error }) {
 
 export interface VerticalPipelineStepperProps {
   /** Pipeline nodes with their state */
-  nodes: PipelineNodeState[];
+  nodes: PipelineNodeState[]
   /** Currently active node (null if not started or completed) */
-  currentNode: Stage6NodeName | null;
+  currentNode: Stage6NodeName | null
   /** Callback when user requests node retry */
-  onRetryNode?: (node: Stage6NodeName) => void;
+  onRetryNode?: (node: Stage6NodeName) => void
   /** Callback when user wants to view node output */
-  onViewOutput?: (node: Stage6NodeName, output: unknown) => void;
+  onViewOutput?: (node: Stage6NodeName, output: unknown) => void
   /** Additional CSS classes */
-  className?: string;
+  className?: string
 }
-
 
 // =============================================================================
 // Helper Functions
@@ -64,15 +69,7 @@ export interface VerticalPipelineStepperProps {
  * Format tokens with thousands separator
  */
 function formatTokens(tokens: number): string {
-  return tokens.toLocaleString('ru-RU');
-}
-
-/**
- * Format duration in seconds
- */
-function formatDuration(durationMs: number): string {
-  const seconds = (durationMs / 1000).toFixed(1);
-  return `${seconds}с`;
+  return tokens.toLocaleString('ru-RU')
 }
 
 /** Labels for judge criteria scores (Russian) */
@@ -81,16 +78,20 @@ const CRITERION_LABELS: Record<string, string> = {
   accuracy: 'Точность',
   completeness: 'Полнота',
   readability: 'Читаемость',
-};
+}
 
 /**
  * Format criterion score as percentage with label
  * Returns null if value is undefined
  */
 function formatCriterionScore(key: string, value: number | undefined): React.ReactNode {
-  if (value === undefined) return null;
-  const label = CRITERION_LABELS[key] || key;
-  return <span key={key}>{label}: {Math.round(value * 100)}%</span>;
+  if (value === undefined) return null
+  const label = CRITERION_LABELS[key] || key
+  return (
+    <span key={key}>
+      {label}: {Math.round(value * 100)}%
+    </span>
+  )
 }
 
 /**
@@ -98,11 +99,11 @@ function formatCriterionScore(key: string, value: number | undefined): React.Rea
  */
 function getStatusIcon(status: Stage6NodeStatus, isActive: boolean): React.ReactNode {
   if (status === 'completed') {
-    return <CheckCircle2 className="w-5 h-5 text-emerald-500" />;
+    return <CheckCircle2 className="h-5 w-5 text-emerald-500" />
   }
 
   if (status === 'error') {
-    return <AlertCircle className="w-5 h-5 text-red-500" />;
+    return <AlertCircle className="h-5 w-5 text-red-500" />
   }
 
   if (status === 'active' || isActive) {
@@ -111,13 +112,13 @@ function getStatusIcon(status: Stage6NodeStatus, isActive: boolean): React.React
         animate={{ rotate: 360 }}
         transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
       >
-        <Loader2 className="w-5 h-5 text-blue-500" />
+        <Loader2 className="h-5 w-5 text-blue-500" />
       </motion.div>
-    );
+    )
   }
 
   // Pending
-  return <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600" />;
+  return <Circle className="h-5 w-5 text-slate-300 dark:text-slate-600" />
 }
 
 // =============================================================================
@@ -128,82 +129,91 @@ function getStatusIcon(status: Stage6NodeStatus, isActive: boolean): React.React
  * Output data types for pipeline stages (3-node pipeline)
  */
 interface GeneratorOutput {
-  smoothedLength?: number;
-  wordCount?: number;
-  sectionsCount?: number;
-  improvementsMade?: number;
+  smoothedLength?: number
+  wordCount?: number
+  sectionsCount?: number
+  improvementsMade?: number
 }
 
 interface JudgeVote {
-  judgeId?: string;
-  modelId?: string;
-  modelDisplayName?: string;
-  verdict?: 'accept' | 'reject' | 'revise' | 'ACCEPT' | 'REJECT' | 'ACCEPT_WITH_MINOR_REVISION' | 'ITERATIVE_REFINEMENT' | 'REGENERATE' | 'ESCALATE_TO_HUMAN';
-  score?: number;
-  confidence?: number;
-  reasoning?: string;
+  judgeId?: string
+  modelId?: string
+  modelDisplayName?: string
+  verdict?:
+    | 'accept'
+    | 'reject'
+    | 'revise'
+    | 'ACCEPT'
+    | 'REJECT'
+    | 'ACCEPT_WITH_MINOR_REVISION'
+    | 'ITERATIVE_REFINEMENT'
+    | 'REGENERATE'
+    | 'ESCALATE_TO_HUMAN'
+  score?: number
+  confidence?: number
+  reasoning?: string
   criteria?: {
-    coherence?: number;
-    accuracy?: number;
-    completeness?: number;
-    readability?: number;
-  };
+    coherence?: number
+    accuracy?: number
+    completeness?: number
+    readability?: number
+  }
 }
 
 interface HeuristicsData {
-  passed?: boolean;
-  wordCount?: number;
-  fleschKincaid?: number;
-  examplesCount?: number;
-  exercisesCount?: number;
-  failureReasons?: string[];
+  passed?: boolean
+  wordCount?: number
+  fleschKincaid?: number
+  examplesCount?: number
+  exercisesCount?: number
+  failureReasons?: string[]
 }
 
 interface SingleJudgeData {
-  model?: string;
-  score?: number;
-  confidence?: string;
-  criteriaScores?: Record<string, number>;
+  model?: string
+  score?: number
+  confidence?: string
+  criteriaScores?: Record<string, number>
   issues?: Array<{
-    criterion?: string;
-    severity?: string;
-    description?: string;
-  }>;
-  strengths?: string[];
-  recommendation?: string;
+    criterion?: string
+    severity?: string
+    description?: string
+  }>
+  strengths?: string[]
+  recommendation?: string
 }
 
 interface JudgeOutput {
-  finalRecommendation?: 'accept' | 'reject' | 'revise';
-  qualityScore?: number;
-  needsRegeneration?: boolean;
-  needsHumanReview?: boolean;
-  cascadeStage?: string;
-  stageReason?: string;
-  criteriaEvaluated?: number;
-  passedCriteria?: number;
-  failedCriteria?: number;
-  modelUsed?: string;
+  finalRecommendation?: 'accept' | 'reject' | 'revise'
+  qualityScore?: number
+  needsRegeneration?: boolean
+  needsHumanReview?: boolean
+  cascadeStage?: string
+  stageReason?: string
+  criteriaEvaluated?: number
+  passedCriteria?: number
+  failedCriteria?: number
+  modelUsed?: string
   // Enriched cascade data
-  heuristics?: HeuristicsData;
-  singleJudge?: SingleJudgeData;
-  costSavingsRatio?: number;
-  retryCount?: number;
+  heuristics?: HeuristicsData
+  singleJudge?: SingleJudgeData
+  costSavingsRatio?: number
+  retryCount?: number
   // CLEV voting data
-  votes?: JudgeVote[];
-  consensusMethod?: string;
-  isThirdJudgeInvoked?: boolean;
-  tieBreakerId?: string;
+  votes?: JudgeVote[]
+  consensusMethod?: string
+  isThirdJudgeInvoked?: boolean
+  tieBreakerId?: string
   // Backward compat
-  heuristics_passed?: boolean;
-  heuristics_issues?: string[];
+  heuristics_passed?: boolean
+  heuristics_issues?: string[]
 }
 
 /**
  * Format number with Russian locale
  */
 function formatNumber(num: number): string {
-  return num.toLocaleString('ru-RU');
+  return num.toLocaleString('ru-RU')
 }
 
 /**
@@ -213,26 +223,32 @@ function GeneratorOutputDisplay({ output }: { output: GeneratorOutput }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-        <Sparkles className="w-4 h-4 text-cyan-500" />
+        <Sparkles className="h-4 w-4 text-cyan-500" />
         <span className="text-sm font-medium">Редактирование</span>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs">
         {output.sectionsCount !== undefined && (
-          <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-lg p-2">
-            <div className="text-cyan-600 dark:text-cyan-400 font-medium">Секций обработано</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{output.sectionsCount}</div>
+          <div className="rounded-lg bg-cyan-50 p-2 dark:bg-cyan-900/20">
+            <div className="font-medium text-cyan-600 dark:text-cyan-400">Секций обработано</div>
+            <div className="font-mono text-slate-900 dark:text-slate-100">
+              {output.sectionsCount}
+            </div>
           </div>
         )}
         {output.wordCount !== undefined && (
-          <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-lg p-2">
-            <div className="text-cyan-600 dark:text-cyan-400 font-medium">Слов в итоге</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{formatNumber(output.wordCount)}</div>
+          <div className="rounded-lg bg-cyan-50 p-2 dark:bg-cyan-900/20">
+            <div className="font-medium text-cyan-600 dark:text-cyan-400">Слов в итоге</div>
+            <div className="font-mono text-slate-900 dark:text-slate-100">
+              {formatNumber(output.wordCount)}
+            </div>
           </div>
         )}
         {output.smoothedLength !== undefined && (
-          <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-lg p-2 col-span-2">
-            <div className="text-cyan-600 dark:text-cyan-400 font-medium">Итоговый размер</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{formatNumber(output.smoothedLength)} символов</div>
+          <div className="col-span-2 rounded-lg bg-cyan-50 p-2 dark:bg-cyan-900/20">
+            <div className="font-medium text-cyan-600 dark:text-cyan-400">Итоговый размер</div>
+            <div className="font-mono text-slate-900 dark:text-slate-100">
+              {formatNumber(output.smoothedLength)} символов
+            </div>
           </div>
         )}
       </div>
@@ -242,14 +258,14 @@ function GeneratorOutputDisplay({ output }: { output: GeneratorOutput }) {
         </div>
       )}
     </div>
-  );
+  )
 }
 
 /**
  * Get localized verdict label
  */
 function getVerdictLabel(verdict?: string): string {
-  if (!verdict) return 'Неизвестно';
+  if (!verdict) return 'Неизвестно'
 
   const labels: Record<string, string> = {
     ACCEPT: 'Принято',
@@ -259,16 +275,16 @@ function getVerdictLabel(verdict?: string): string {
     ITERATIVE_REFINEMENT: 'Итеративная доработка',
     REGENERATE: 'Переделать',
     ESCALATE_TO_HUMAN: 'Ручная проверка',
-  };
+  }
 
-  return labels[verdict.toUpperCase()] || verdict;
+  return labels[verdict.toUpperCase()] || verdict
 }
 
 /**
  * Get Tailwind color class for verdict
  */
 function getVerdictColorClass(verdict?: string): string {
-  if (!verdict) return 'text-slate-600 dark:text-slate-400';
+  if (!verdict) return 'text-slate-600 dark:text-slate-400'
 
   const colors: Record<string, string> = {
     ACCEPT: 'text-emerald-600 dark:text-emerald-400',
@@ -278,17 +294,17 @@ function getVerdictColorClass(verdict?: string): string {
     ITERATIVE_REFINEMENT: 'text-orange-600 dark:text-orange-400',
     REGENERATE: 'text-red-600 dark:text-red-400',
     ESCALATE_TO_HUMAN: 'text-purple-600 dark:text-purple-400',
-  };
+  }
 
-  return colors[verdict.toUpperCase()] || 'text-slate-600 dark:text-slate-400';
+  return colors[verdict.toUpperCase()] || 'text-slate-600 dark:text-slate-400'
 }
 
 /**
  * Judge output display component props
  */
 interface JudgeOutputDisplayProps {
-  output: JudgeOutput;
-  isLoading?: boolean;
+  output: JudgeOutput
+  isLoading?: boolean
 }
 
 /**
@@ -298,71 +314,80 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
   // Show loading state
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
-        <div className="w-3 h-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+      <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+        <div className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
         <span>Загрузка данных оценки...</span>
       </div>
-    );
+    )
   }
   const getRecommendationBadge = () => {
     switch (output.finalRecommendation) {
       case 'accept':
         return (
-          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
-            <ThumbsUp className="w-3 h-3 mr-1" />
+          <Badge className="border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+            <ThumbsUp className="mr-1 h-3 w-3" />
             Принято
           </Badge>
-        );
+        )
       case 'reject':
         return (
-          <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800">
-            <ThumbsDown className="w-3 h-3 mr-1" />
+          <Badge className="border-red-200 bg-red-100 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+            <ThumbsDown className="mr-1 h-3 w-3" />
             Отклонено
           </Badge>
-        );
+        )
       case 'revise':
         return (
-          <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800">
-            <AlertTriangle className="w-3 h-3 mr-1" />
+          <Badge className="border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+            <AlertTriangle className="mr-1 h-3 w-3" />
             Требует доработки
           </Badge>
-        );
+        )
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   // Handle qualityScore that might be 0-1 (decimal) or 0-100 (percentage)
-  const rawScore = output.qualityScore;
-  const scorePercent = rawScore !== undefined
-    ? (rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore))
-    : null;
+  const rawScore = output.qualityScore
+  const scorePercent =
+    rawScore !== undefined
+      ? rawScore <= 1
+        ? Math.round(rawScore * 100)
+        : Math.round(rawScore)
+      : null
 
-  const scoreColor = scorePercent !== null
-    ? scorePercent >= 80
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : scorePercent >= 60
-        ? 'text-amber-600 dark:text-amber-400'
-        : 'text-red-600 dark:text-red-400'
-    : '';
+  const scoreColor =
+    scorePercent !== null
+      ? scorePercent >= 80
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : scorePercent >= 60
+          ? 'text-amber-600 dark:text-amber-400'
+          : 'text-red-600 dark:text-red-400'
+      : ''
 
   // Check if we have any data to display
-  const hasAnyData = output.finalRecommendation ||
+  const hasAnyData =
+    output.finalRecommendation ||
     scorePercent !== null ||
     output.votes?.length ||
     output.modelUsed ||
-    output.criteriaEvaluated !== undefined;
+    output.criteriaEvaluated !== undefined
 
   // Get heuristics data (new format or backward compat)
-  const heuristicsData = output.heuristics || (output.heuristics_passed !== undefined ? {
-    passed: output.heuristics_passed,
-    failureReasons: output.heuristics_issues,
-  } : null);
+  const heuristicsData =
+    output.heuristics ||
+    (output.heuristics_passed !== undefined
+      ? {
+          passed: output.heuristics_passed,
+          failureReasons: output.heuristics_issues,
+        }
+      : null)
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-        <Scale className="w-4 h-4 text-indigo-500" />
+        <Scale className="h-4 w-4 text-indigo-500" />
         <span className="text-sm font-medium">Оценка качества</span>
       </div>
 
@@ -373,9 +398,12 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
             variant="outline"
             className={cn(
               'text-xs',
-              output.cascadeStage === 'heuristic' && 'border-red-400 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
-              output.cascadeStage === 'single_judge' && 'border-blue-400 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
-              output.cascadeStage === 'clev_voting' && 'border-purple-400 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20'
+              output.cascadeStage === 'heuristic' &&
+                'border-red-400 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
+              output.cascadeStage === 'single_judge' &&
+                'border-blue-400 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400',
+              output.cascadeStage === 'clev_voting' &&
+                'border-purple-400 bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400'
             )}
           >
             {output.cascadeStage === 'heuristic' && 'Эвристика'}
@@ -386,7 +414,10 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
             <span className="text-xs text-slate-500 dark:text-slate-400">{output.stageReason}</span>
           ) : null}
           {output.costSavingsRatio !== undefined && output.costSavingsRatio > 0 ? (
-            <Badge variant="outline" className="text-xs border-emerald-400 text-emerald-600 dark:text-emerald-400">
+            <Badge
+              variant="outline"
+              className="border-emerald-400 text-xs text-emerald-600 dark:text-emerald-400"
+            >
               Экономия: {Math.round(output.costSavingsRatio * 100)}%
             </Badge>
           ) : null}
@@ -394,33 +425,44 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
       ) : null}
 
       {/* Heuristics Details (new enriched data) */}
-      {heuristicsData && (heuristicsData.wordCount !== undefined || heuristicsData.failureReasons?.length) ? (
-        <div className={cn(
-          'p-2 rounded-lg border text-xs',
-          heuristicsData.passed !== false
-            ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
-            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-        )}>
-          <div className="font-medium mb-1 text-slate-700 dark:text-slate-300">Эвристики</div>
+      {heuristicsData &&
+      (heuristicsData.wordCount !== undefined || heuristicsData.failureReasons?.length) ? (
+        <div
+          className={cn(
+            'rounded-lg border p-2 text-xs',
+            heuristicsData.passed !== false
+              ? 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50'
+              : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+          )}
+        >
+          <div className="mb-1 font-medium text-slate-700 dark:text-slate-300">Эвристики</div>
           <div className="grid grid-cols-2 gap-1 text-slate-600 dark:text-slate-400">
             {heuristicsData.wordCount !== undefined ? (
-              <span>Слов: <span className="font-mono">{formatNumber(heuristicsData.wordCount)}</span></span>
+              <span>
+                Слов: <span className="font-mono">{formatNumber(heuristicsData.wordCount)}</span>
+              </span>
             ) : null}
             {heuristicsData.fleschKincaid !== undefined ? (
-              <span>FK: <span className="font-mono">{heuristicsData.fleschKincaid.toFixed(1)}</span></span>
+              <span>
+                FK: <span className="font-mono">{heuristicsData.fleschKincaid.toFixed(1)}</span>
+              </span>
             ) : null}
             {heuristicsData.examplesCount !== undefined ? (
-              <span>Примеров: <span className="font-mono">{heuristicsData.examplesCount}</span></span>
+              <span>
+                Примеров: <span className="font-mono">{heuristicsData.examplesCount}</span>
+              </span>
             ) : null}
             {heuristicsData.exercisesCount !== undefined ? (
-              <span>Упражнений: <span className="font-mono">{heuristicsData.exercisesCount}</span></span>
+              <span>
+                Упражнений: <span className="font-mono">{heuristicsData.exercisesCount}</span>
+              </span>
             ) : null}
           </div>
           {heuristicsData.failureReasons && heuristicsData.failureReasons.length > 0 ? (
             <div className="mt-1 text-red-600 dark:text-red-400">
               {heuristicsData.failureReasons.map((r, i) => (
                 <div key={i} className="flex items-start gap-1">
-                  <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
                   <span>{r}</span>
                 </div>
               ))}
@@ -431,7 +473,7 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
 
       {/* Empty state message */}
       {!hasAnyData ? (
-        <div className="text-xs text-slate-500 dark:text-slate-400 italic py-2">
+        <div className="py-2 text-xs text-slate-500 italic dark:text-slate-400">
           Данные оценки еще не доступны. Ожидание завершения судейства...
         </div>
       ) : null}
@@ -455,8 +497,11 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
             value={scorePercent}
             className={cn(
               'h-2',
-              scorePercent >= 80 ? '[&>div]:bg-emerald-500' :
-                scorePercent >= 60 ? '[&>div]:bg-amber-500' : '[&>div]:bg-red-500'
+              scorePercent >= 80
+                ? '[&>div]:bg-emerald-500'
+                : scorePercent >= 60
+                  ? '[&>div]:bg-amber-500'
+                  : '[&>div]:bg-red-500'
             )}
           />
         </div>
@@ -464,17 +509,20 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
 
       {/* CLEV Voting Panel - Individual Judge Votes */}
       {output.votes && output.votes.length > 0 ? (
-        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
               Голосование судей ({output.votes.length})
             </span>
             {output.consensusMethod ? (
               <Badge variant="outline" className="text-xs">
-                {output.consensusMethod === 'unanimous' ? 'Единогласно' :
-                 output.consensusMethod === 'majority' ? 'Большинство' :
-                 output.consensusMethod === 'tiebreaker' ? 'Тай-брейк' :
-                 output.consensusMethod}
+                {output.consensusMethod === 'unanimous'
+                  ? 'Единогласно'
+                  : output.consensusMethod === 'majority'
+                    ? 'Большинство'
+                    : output.consensusMethod === 'tiebreaker'
+                      ? 'Тай-брейк'
+                      : output.consensusMethod}
               </Badge>
             ) : null}
           </div>
@@ -484,9 +532,9 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
             {output.votes.map((vote, idx) => (
               <div
                 key={vote.judgeId || idx}
-                className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2 text-xs"
+                className="rounded-lg bg-slate-50 p-2 text-xs dark:bg-slate-800/50"
               >
-                <div className="flex items-center justify-between mb-1">
+                <div className="mb-1 flex items-center justify-between">
                   <span className="font-medium text-slate-700 dark:text-slate-300">
                     {vote.modelDisplayName || vote.modelId || `Судья ${idx + 1}`}
                   </span>
@@ -499,12 +547,16 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
                 <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
                   {vote.score !== undefined ? (
                     <span>
-                      Оценка: <span className="font-mono">{vote.score <= 1 ? Math.round(vote.score * 100) : Math.round(vote.score)}%</span>
+                      Оценка:{' '}
+                      <span className="font-mono">
+                        {vote.score <= 1 ? Math.round(vote.score * 100) : Math.round(vote.score)}%
+                      </span>
                     </span>
                   ) : null}
                   {vote.confidence !== undefined ? (
                     <span>
-                      Уверенность: <span className="font-mono">{Math.round(vote.confidence * 100)}%</span>
+                      Уверенность:{' '}
+                      <span className="font-mono">{Math.round(vote.confidence * 100)}%</span>
                     </span>
                   ) : null}
                 </div>
@@ -521,7 +573,7 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
 
                 {/* Reasoning */}
                 {vote.reasoning ? (
-                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400 italic line-clamp-2">
+                  <p className="mt-1 line-clamp-2 text-xs text-slate-600 italic dark:text-slate-400">
                     {vote.reasoning}
                   </p>
                 ) : null}
@@ -531,8 +583,8 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
 
           {/* Third judge indicator */}
           {output.isThirdJudgeInvoked ? (
-            <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />
+            <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-3 w-3" />
               Третий судья был привлечен для разрешения конфликта
             </div>
           ) : null}
@@ -547,40 +599,52 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
       ) : null}
 
       {/* Criteria Stats */}
-      {(output.criteriaEvaluated !== undefined || output.passedCriteria !== undefined) ? (
+      {output.criteriaEvaluated !== undefined || output.passedCriteria !== undefined ? (
         <div className="grid grid-cols-3 gap-2 text-xs">
           {output.criteriaEvaluated !== undefined ? (
-            <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-2 text-center">
-              <div className="text-indigo-600 dark:text-indigo-400 font-medium">Критериев</div>
-              <div className="text-slate-900 dark:text-slate-100 font-mono">{output.criteriaEvaluated}</div>
+            <div className="rounded-lg bg-indigo-50 p-2 text-center dark:bg-indigo-900/20">
+              <div className="font-medium text-indigo-600 dark:text-indigo-400">Критериев</div>
+              <div className="font-mono text-slate-900 dark:text-slate-100">
+                {output.criteriaEvaluated}
+              </div>
             </div>
           ) : null}
           {output.passedCriteria !== undefined ? (
-            <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-2 text-center">
-              <div className="text-emerald-600 dark:text-emerald-400 font-medium">Пройдено</div>
-              <div className="text-slate-900 dark:text-slate-100 font-mono">{output.passedCriteria}</div>
+            <div className="rounded-lg bg-emerald-50 p-2 text-center dark:bg-emerald-900/20">
+              <div className="font-medium text-emerald-600 dark:text-emerald-400">Пройдено</div>
+              <div className="font-mono text-slate-900 dark:text-slate-100">
+                {output.passedCriteria}
+              </div>
             </div>
           ) : null}
           {output.failedCriteria !== undefined ? (
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2 text-center">
-              <div className="text-red-600 dark:text-red-400 font-medium">Не пройдено</div>
-              <div className="text-slate-900 dark:text-slate-100 font-mono">{output.failedCriteria}</div>
+            <div className="rounded-lg bg-red-50 p-2 text-center dark:bg-red-900/20">
+              <div className="font-medium text-red-600 dark:text-red-400">Не пройдено</div>
+              <div className="font-mono text-slate-900 dark:text-slate-100">
+                {output.failedCriteria}
+              </div>
             </div>
           ) : null}
         </div>
       ) : null}
 
       {/* Additional Flags */}
-      {(output.needsRegeneration || output.needsHumanReview) ? (
+      {output.needsRegeneration || output.needsHumanReview ? (
         <div className="flex flex-wrap gap-2">
           {output.needsRegeneration ? (
-            <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
-              <RefreshCw className="w-3 h-3 mr-1" />
+            <Badge
+              variant="outline"
+              className="border-amber-500 text-xs text-amber-600 dark:text-amber-400"
+            >
+              <RefreshCw className="mr-1 h-3 w-3" />
               Нужна перегенерация
             </Badge>
           ) : null}
           {output.needsHumanReview ? (
-            <Badge variant="outline" className="text-xs border-blue-500 text-blue-600 dark:text-blue-400">
+            <Badge
+              variant="outline"
+              className="border-blue-500 text-xs text-blue-600 dark:text-blue-400"
+            >
               Требует проверки
             </Badge>
           ) : null}
@@ -594,56 +658,58 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
         </div>
       ) : null}
     </div>
-  );
+  )
 }
 
 /**
  * SelfReviewer output structure
  */
 interface SelfReviewerOutput {
-  status?: string;
-  issuesCount?: number;
-  criticalIssuesCount?: number;
-  heuristicsPassed?: boolean;
+  status?: string
+  issuesCount?: number
+  criticalIssuesCount?: number
+  heuristicsPassed?: boolean
   heuristicDetails?: {
     languageCheck?: {
-      passed: boolean;
-      foreignCharCount?: number;
-      threshold?: number;
-    };
+      passed: boolean
+      foreignCharCount?: number
+      threshold?: number
+    }
     truncationCheck?: {
-      passed: boolean;
-      hasEndMarker?: boolean;
-      unexpectedEnd?: boolean;
-    };
-  };
-  progressSummary?: unknown;
+      passed: boolean
+      hasEndMarker?: boolean
+      unexpectedEnd?: boolean
+    }
+  }
+  progressSummary?: unknown
 }
 
 /**
  * Render human-readable output for SelfReviewer stage
  */
 function SelfReviewerOutputDisplay({ output }: { output: SelfReviewerOutput }) {
-  const statusLabel = output.status === 'PASS'
-    ? 'Пройдено'
-    : output.status === 'PASS_WITH_FLAGS'
-      ? 'Пройдено с замечаниями'
-      : output.status === 'REGENERATE'
-        ? 'Требует перегенерации'
-        : output.status || 'Неизвестно';
+  const statusLabel =
+    output.status === 'PASS'
+      ? 'Пройдено'
+      : output.status === 'PASS_WITH_FLAGS'
+        ? 'Пройдено с замечаниями'
+        : output.status === 'REGENERATE'
+          ? 'Требует перегенерации'
+          : output.status || 'Неизвестно'
 
-  const statusColor = output.status === 'PASS'
-    ? 'text-emerald-600 dark:text-emerald-400'
-    : output.status === 'PASS_WITH_FLAGS'
-      ? 'text-amber-600 dark:text-amber-400'
-      : output.status === 'REGENERATE'
-        ? 'text-red-600 dark:text-red-400'
-        : 'text-slate-600 dark:text-slate-400';
+  const statusColor =
+    output.status === 'PASS'
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : output.status === 'PASS_WITH_FLAGS'
+        ? 'text-amber-600 dark:text-amber-400'
+        : output.status === 'REGENERATE'
+          ? 'text-red-600 dark:text-red-400'
+          : 'text-slate-600 dark:text-slate-400'
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-        <CheckCircle2 className="w-4 h-4 text-cyan-500" />
+        <CheckCircle2 className="h-4 w-4 text-cyan-500" />
         <span className="text-sm font-medium">Самопроверка</span>
       </div>
 
@@ -657,27 +723,33 @@ function SelfReviewerOutputDisplay({ output }: { output: SelfReviewerOutput }) {
       {(output.issuesCount !== undefined || output.criticalIssuesCount !== undefined) && (
         <div className="grid grid-cols-2 gap-2 text-xs">
           {output.issuesCount !== undefined && (
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2">
-              <div className="text-slate-600 dark:text-slate-400 font-medium">Всего проблем</div>
-              <div className="text-slate-900 dark:text-slate-100 font-mono">{output.issuesCount}</div>
+            <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/50">
+              <div className="font-medium text-slate-600 dark:text-slate-400">Всего проблем</div>
+              <div className="font-mono text-slate-900 dark:text-slate-100">
+                {output.issuesCount}
+              </div>
             </div>
           )}
           {output.criticalIssuesCount !== undefined && (
-            <div className={cn(
-              'rounded-lg p-2',
-              output.criticalIssuesCount > 0
-                ? 'bg-red-50 dark:bg-red-900/20'
-                : 'bg-emerald-50 dark:bg-emerald-900/20'
-            )}>
-              <div className={cn(
-                'font-medium',
+            <div
+              className={cn(
+                'rounded-lg p-2',
                 output.criticalIssuesCount > 0
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-emerald-600 dark:text-emerald-400'
-              )}>
+                  ? 'bg-red-50 dark:bg-red-900/20'
+                  : 'bg-emerald-50 dark:bg-emerald-900/20'
+              )}
+            >
+              <div
+                className={cn(
+                  'font-medium',
+                  output.criticalIssuesCount > 0
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+                )}
+              >
                 Критических
               </div>
-              <div className="text-slate-900 dark:text-slate-100 font-mono">
+              <div className="font-mono text-slate-900 dark:text-slate-100">
                 {output.criticalIssuesCount}
               </div>
             </div>
@@ -691,9 +763,9 @@ function SelfReviewerOutputDisplay({ output }: { output: SelfReviewerOutput }) {
           {output.heuristicDetails.languageCheck && (
             <div className="flex items-center gap-2">
               {output.heuristicDetails.languageCheck.passed ? (
-                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
               ) : (
-                <AlertCircle className="w-3 h-3 text-amber-500" />
+                <AlertCircle className="h-3 w-3 text-amber-500" />
               )}
               <span className="text-slate-600 dark:text-slate-400">
                 Проверка языка: {output.heuristicDetails.languageCheck.passed ? 'OK' : 'Замечания'}
@@ -703,12 +775,13 @@ function SelfReviewerOutputDisplay({ output }: { output: SelfReviewerOutput }) {
           {output.heuristicDetails.truncationCheck && (
             <div className="flex items-center gap-2">
               {output.heuristicDetails.truncationCheck.passed ? (
-                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
               ) : (
-                <AlertCircle className="w-3 h-3 text-red-500" />
+                <AlertCircle className="h-3 w-3 text-red-500" />
               )}
               <span className="text-slate-600 dark:text-slate-400">
-                Проверка целостности: {output.heuristicDetails.truncationCheck.passed ? 'OK' : 'Обрезан'}
+                Проверка целостности:{' '}
+                {output.heuristicDetails.truncationCheck.passed ? 'OK' : 'Обрезан'}
               </span>
             </div>
           )}
@@ -730,195 +803,75 @@ function SelfReviewerOutputDisplay({ output }: { output: SelfReviewerOutput }) {
         </Badge>
       )}
     </div>
-  );
+  )
 }
 
 /**
  * Check if we have a specialized display for this node type
- * 4-node pipeline: generator, selfReviewer, judge, coverGenerator
+ * 3-node pipeline: generator, selfReviewer, judge
  */
 function hasSpecializedDisplay(node: Stage6NodeName): boolean {
-  return ['generator', 'selfReviewer', 'judge', 'coverGenerator'].includes(node);
-}
-
-/**
- * Cover Generator output structure
- */
-interface CoverGeneratorOutput {
-  status?: string;
-  imageUrl?: string;
-  model?: string;
-  durationMs?: number;
-  enrichmentId?: string;
-}
-
-/**
- * Render human-readable output for CoverGenerator stage
- */
-function CoverGeneratorOutputDisplay({ output }: { output: CoverGeneratorOutput }) {
-  const [isImageOpen, setIsImageOpen] = useState(false);
-
-  const statusLabel = output.status === 'completed'
-    ? 'Готово'
-    : output.status === 'generating'
-      ? 'Генерируется...'
-      : output.status === 'failed'
-        ? 'Ошибка'
-        : output.status || 'Ожидание';
-
-  const statusColor = output.status === 'completed'
-    ? 'text-emerald-600 dark:text-emerald-400'
-    : output.status === 'generating'
-      ? 'text-blue-600 dark:text-blue-400'
-      : output.status === 'failed'
-        ? 'text-red-600 dark:text-red-400'
-        : 'text-slate-600 dark:text-slate-400';
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-        <Sparkles className="w-4 h-4 text-pink-500" />
-        <span className="text-sm font-medium">Генерация обложки</span>
-      </div>
-
-      {/* Status */}
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-slate-600 dark:text-slate-400">Статус:</span>
-        <span className={cn('font-semibold', statusColor)}>{statusLabel}</span>
-      </div>
-
-      {/* Model used */}
-      {output.model && (
-        <div className="text-xs text-slate-500 dark:text-slate-400">
-          Модель: <span className="font-mono">{output.model}</span>
-        </div>
-      )}
-
-      {/* Image preview - larger and clickable */}
-      {output.imageUrl && output.status === 'completed' && (
-        <>
-          <div className="mt-3 relative group">
-            <button
-              onClick={() => setIsImageOpen(true)}
-              className="block w-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg overflow-hidden"
-            >
-              <Image
-                src={output.imageUrl}
-                alt="Обложка урока"
-                width={640}
-                height={360}
-                className="w-full aspect-video object-cover rounded-lg border border-slate-200 dark:border-slate-700 transition-transform group-hover:scale-[1.02]"
-              />
-              {/* Hover overlay */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
-                <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
-              </div>
-            </button>
-            <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-1">
-              Нажмите для увеличения
-            </p>
-          </div>
-
-          {/* Fullscreen dialog */}
-          <Dialog open={isImageOpen} onOpenChange={setIsImageOpen}>
-            <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
-              <DialogHeader className="p-4 pb-2">
-                <DialogTitle>Обложка урока</DialogTitle>
-              </DialogHeader>
-              <div className="p-4 pt-0">
-                <Image
-                  src={output.imageUrl}
-                  alt="Обложка урока"
-                  width={896}
-                  height={504}
-                  className="w-full h-auto rounded-lg"
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
-
-      {/* Generating state */}
-      {output.status === 'generating' && (
-        <div className="mt-3 flex items-center justify-center py-8 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-slate-400 mx-auto mb-2" />
-            <p className="text-xs text-slate-500">Генерация изображения...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Pending/No data state */}
-      {(!output.status || output.status === 'pending') && !output.imageUrl && (
-        <div className="mt-3 flex items-center justify-center py-6 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
-          <div className="text-center">
-            <Sparkles className="w-6 h-6 text-slate-300 mx-auto mb-2" />
-            <p className="text-xs text-slate-500">Обложка ещё не сгенерирована</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return ['generator', 'selfReviewer', 'judge'].includes(node)
 }
 
 /**
  * Render human-readable output based on node type
- * 4-node pipeline: generator, selfReviewer, judge, coverGenerator
+ * 3-node pipeline: generator, selfReviewer, judge
  */
 function NodeOutputDisplay({ node, output }: { node: Stage6NodeName; output: unknown }) {
   if (!output || typeof output !== 'object') {
-    return null;
+    return null
   }
 
   switch (node) {
     case 'generator':
-      return <GeneratorOutputDisplay output={output as GeneratorOutput} />;
+      return <GeneratorOutputDisplay output={output as GeneratorOutput} />
     case 'selfReviewer':
-      return <SelfReviewerOutputDisplay output={output as SelfReviewerOutput} />;
+      return <SelfReviewerOutputDisplay output={output as SelfReviewerOutput} />
     case 'judge':
-      return <JudgeOutputDisplay output={output as JudgeOutput} />;
-    case 'coverGenerator':
-      return <CoverGeneratorOutputDisplay output={output as CoverGeneratorOutput} />;
+      return <JudgeOutputDisplay output={output as JudgeOutput} />
     default:
-      return null;
+      return null
   }
 }
 
 /**
  * Render human-readable output with JSON fallback for unsupported types
  */
-function NodeOutputDisplayWithFallback({ node, output }: { node: Stage6NodeName; output: unknown }) {
+function NodeOutputDisplayWithFallback({
+  node,
+  output,
+}: {
+  node: Stage6NodeName
+  output: unknown
+}) {
   // If output is invalid, show fallback message
   if (!output) {
-    // Special case for coverGenerator - show placeholder
-    if (node === 'coverGenerator') {
-      return <CoverGeneratorOutputDisplay output={{}} />;
-    }
     return (
-      <div className="text-xs text-slate-500 dark:text-slate-400 italic">
+      <div className="text-xs text-slate-500 italic dark:text-slate-400">
         Данные вывода недоступны
       </div>
-    );
+    )
   }
 
   // Extract progressSummary if present
-  const outputObj = output as Record<string, unknown>;
-  const progressSummary = outputObj?.progressSummary as ProgressSummary | undefined;
+  const outputObj = output as Record<string, unknown>
+  const progressSummary = outputObj?.progressSummary as ProgressSummary | undefined
 
   // If we have a specialized display for this node, use it
   if (hasSpecializedDisplay(node) && typeof output === 'object') {
     // Filter progressSummary attempts to show only those for the current node
     // This prevents duplication while preserving detailed information
-    const filteredProgressSummary = progressSummary ? {
-      ...progressSummary,
-      attempts: progressSummary.attempts?.filter(
-        (attempt) => attempt.node === node
-      ),
-    } : undefined;
+    const filteredProgressSummary = progressSummary
+      ? {
+          ...progressSummary,
+          attempts: progressSummary.attempts?.filter((attempt) => attempt.node === node),
+        }
+      : undefined
 
     // Only show if there are filtered attempts
-    const hasFilteredAttempts = filteredProgressSummary?.attempts && filteredProgressSummary.attempts.length > 0;
+    const hasFilteredAttempts =
+      filteredProgressSummary?.attempts && filteredProgressSummary.attempts.length > 0
 
     return (
       <div className="space-y-4">
@@ -929,61 +882,58 @@ function NodeOutputDisplayWithFallback({ node, output }: { node: Stage6NodeName;
         {/* Then show specialized output display */}
         <NodeOutputDisplay node={node} output={output} />
       </div>
-    );
+    )
   }
 
   // Fallback: show progress summary + raw JSON for unknown node types
   return (
     <div className="space-y-4">
-      {progressSummary && (
-        <ProgressSummaryDisplay progressSummary={progressSummary} />
-      )}
-      <pre className="text-xs text-slate-700 dark:text-slate-300 overflow-x-auto max-h-48 overflow-y-auto">
+      {progressSummary && <ProgressSummaryDisplay progressSummary={progressSummary} />}
+      <pre className="max-h-48 overflow-x-auto overflow-y-auto text-xs text-slate-700 dark:text-slate-300">
         {JSON.stringify(output, null, 2)}
       </pre>
     </div>
-  );
+  )
 }
-
 
 // =============================================================================
 // Pipeline Node Card Component
 // =============================================================================
 
 interface PipelineNodeCardProps {
-  node: PipelineNodeState;
-  isActive: boolean;
-  onRetry?: () => void;
-  onViewOutput?: () => void;
+  node: PipelineNodeState
+  isActive: boolean
+  onRetry?: () => void
+  onViewOutput?: () => void
 }
 
 function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNodeCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const labels = STAGE6_NODE_LABELS[node.node];
+  const [isExpanded, setIsExpanded] = useState(false)
+  const labels = STAGE6_NODE_LABELS[node.node]
   // Use explicit boolean check to avoid rendering 0
   // Note: costUsd is NOT required - some models (free/trial) may not report cost
-  const hasMetrics = node.status === 'completed' &&
-    node.tokensUsed !== undefined &&
-    node.durationMs !== undefined;
-  const hasOutput = node.output != null;
-  // coverGenerator is always expandable (shows placeholder if no output)
-  const isCoverGenerator = node.node === 'coverGenerator';
-  const canExpand = hasOutput || (node.status === 'error' && node.errorMessage) || isCoverGenerator;
+  const hasMetrics =
+    node.status === 'completed' && node.tokensUsed !== undefined && node.durationMs !== undefined
+  const hasOutput = node.output != null
+  const canExpand = hasOutput || (node.status === 'error' && node.errorMessage)
 
   // Handle card click to toggle accordion
   const handleCardClick = useCallback(() => {
     if (canExpand) {
-      setIsExpanded((prev) => !prev);
+      setIsExpanded((prev) => !prev)
     }
-  }, [canExpand]);
+  }, [canExpand])
 
   // Handle keyboard interaction
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (canExpand && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault();
-      handleCardClick();
-    }
-  }, [canExpand, handleCardClick]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (canExpand && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault()
+        handleCardClick()
+      }
+    },
+    [canExpand, handleCardClick]
+  )
 
   return (
     <motion.div
@@ -998,34 +948,39 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
       className={cn(
         'relative rounded-lg border p-4 transition-all duration-300',
         // Status-based styling
-        node.status === 'completed' && 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-900/10',
-        node.status === 'error' && 'border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-900/10',
-        isActive && 'border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-900/10 shadow-lg shadow-blue-500/10',
-        node.status === 'pending' && 'border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/30',
+        node.status === 'completed' &&
+          'border-emerald-200 bg-emerald-50/30 dark:border-emerald-800 dark:bg-emerald-900/10',
+        node.status === 'error' &&
+          'border-red-200 bg-red-50/30 dark:border-red-800 dark:bg-red-900/10',
+        isActive &&
+          'border-blue-300 bg-blue-50/30 shadow-lg shadow-blue-500/10 dark:border-blue-700 dark:bg-blue-900/10',
+        node.status === 'pending' &&
+          'border-slate-200 bg-slate-50/30 dark:border-slate-700 dark:bg-slate-800/30',
         // Pulse animation for active node
         isActive && 'animate-pulse-slow',
         // Clickable styling
-        canExpand && 'cursor-pointer hover:shadow-md hover:scale-[1.01] transition-shadow'
+        canExpand && 'cursor-pointer transition-shadow hover:scale-[1.01] hover:shadow-md'
       )}
     >
       {/* Header Row */}
       <div className="flex items-start gap-3">
         {/* Status Icon */}
-        <div className="mt-0.5">
-          {getStatusIcon(node.status, isActive)}
-        </div>
+        <div className="mt-0.5">{getStatusIcon(node.status, isActive)}</div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           {/* Title Row */}
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-bold uppercase text-slate-900 dark:text-slate-100">
+          <div className="mb-1 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-900 uppercase dark:text-slate-100">
               {labels.ru}
             </h3>
 
             {/* Status Badge for active/error/loop */}
             {node.status === 'active' && (
-              <Badge variant="outline" className="text-xs border-blue-500 text-blue-600 dark:text-blue-400">
+              <Badge
+                variant="outline"
+                className="border-blue-500 text-xs text-blue-600 dark:text-blue-400"
+              >
                 В процессе
               </Badge>
             )}
@@ -1035,43 +990,41 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
               </Badge>
             )}
             {node.status === 'loop' && (
-              <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+              <Badge
+                variant="outline"
+                className="border-amber-500 text-xs text-amber-600 dark:text-amber-400"
+              >
                 Повтор
               </Badge>
             )}
 
             {/* Checkmark for completed */}
-            {node.status === 'completed' && (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            )}
+            {node.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
           </div>
 
           {/* Description */}
-          <p className="text-xs text-slate-600 dark:text-slate-400">
-            {labels.description}
-          </p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{labels.description}</p>
 
           {/* Metrics Row (only for completed nodes with metrics) */}
           {hasMetrics ? (
-            <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 dark:text-slate-400">
+            <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-mono">{formatTokens(node.tokensUsed!)} tok</span>
               <span className="text-slate-300 dark:text-slate-600">•</span>
-              <span className="font-mono">{formatDuration(node.durationMs!)}</span>
+              <span className="font-mono">{formatDuration(node.durationMs)}</span>
             </div>
           ) : null}
 
-
           {/* Retry Indicator (for loop/retry attempts) */}
           {node.retryAttempt != null && node.retryAttempt > 0 ? (
-            <div className="flex items-center gap-1 mt-2 text-xs text-amber-600 dark:text-amber-400">
-              <RefreshCw className="w-3 h-3" />
+            <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+              <RefreshCw className="h-3 w-3" />
               <span>Попытка {node.retryAttempt + 1}</span>
             </div>
           ) : null}
 
           {/* Error Message (collapsed by default) */}
           {node.status === 'error' && node.errorMessage && (
-            <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs text-red-700 dark:text-red-400">
+            <div className="mt-2 rounded border border-red-200 bg-red-100 p-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
               {node.errorMessage}
             </div>
           )}
@@ -1088,18 +1041,18 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
               <Accordion.Item value="output" className="border-none">
                 <Accordion.Header>
                   <Accordion.Trigger
-                    className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group"
+                    className="group flex items-center gap-1 text-xs text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                     onClick={(e) => {
                       // Prevent double-toggle from card click
-                      e.stopPropagation();
+                      e.stopPropagation()
                     }}
                   >
                     <span>Показать результат</span>
-                    <ChevronDown className="w-3 h-3 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                    <ChevronDown className="h-3 w-3 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                   </Accordion.Trigger>
                 </Accordion.Header>
-                <Accordion.Content className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
-                  <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                <Accordion.Content className="data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up overflow-hidden">
+                  <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
                     {/* Human-readable output display with error boundary */}
                     <ErrorBoundary FallbackComponent={NodeOutputErrorFallback}>
                       <NodeOutputDisplayWithFallback node={node.node} output={node.output} />
@@ -1112,10 +1065,10 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
                         size="sm"
                         onClick={(e) => {
                           // Prevent card click from toggling accordion
-                          e.stopPropagation();
-                          onViewOutput();
+                          e.stopPropagation()
+                          onViewOutput()
                         }}
-                        className="mt-3 text-xs h-7 w-full justify-center text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                        className="mt-3 h-7 w-full justify-center text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       >
                         Показать сырые данные (JSON)
                       </Button>
@@ -1134,18 +1087,18 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
             size="sm"
             onClick={(e) => {
               // Prevent card click from toggling accordion
-              e.stopPropagation();
-              onRetry();
+              e.stopPropagation()
+              onRetry()
             }}
-            className="shrink-0 text-xs h-8"
+            className="h-8 shrink-0 text-xs"
           >
-            <RefreshCw className="w-3 h-3 mr-1" />
+            <RefreshCw className="mr-1 h-3 w-3" />
             Повтор
           </Button>
         )}
       </div>
     </motion.div>
-  );
+  )
 }
 
 // =============================================================================
@@ -1155,21 +1108,21 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
 function ConnectingLine({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex justify-center py-2">
-      <div className="relative w-px h-8">
+      <div className="relative h-8 w-px">
         {/* Base line */}
         <div className="absolute inset-0 bg-slate-200 dark:bg-slate-700" />
 
         {/* Animated dot for active state */}
         {isActive && (
           <motion.div
-            className="absolute left-1/2 -translate-x-1/2 w-2 h-2 bg-blue-500 rounded-full"
+            className="absolute left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-blue-500"
             animate={{ y: [0, 32, 0] }}
             transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
           />
         )}
       </div>
     </div>
-  );
+  )
 }
 
 // =============================================================================
@@ -1198,21 +1151,22 @@ export function VerticalPipelineStepper({
   onViewOutput,
   className,
 }: VerticalPipelineStepperProps) {
-  // Sort nodes in pipeline order (4-node pipeline with cover generation)
-  const nodeOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge', 'coverGenerator'];
-  const sortedNodes = nodeOrder.map(nodeName =>
-    nodes.find(n => n.node === nodeName) || {
-      node: nodeName,
-      status: 'pending' as Stage6NodeStatus,
-    }
-  );
+  // Sort nodes in pipeline order (3-node pipeline)
+  const nodeOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge']
+  const sortedNodes = nodeOrder.map(
+    (nodeName) =>
+      nodes.find((n) => n.node === nodeName) || {
+        node: nodeName,
+        status: 'pending' as Stage6NodeStatus,
+      }
+  )
 
   return (
     <div className={cn('space-y-0', className)}>
       <AnimatePresence mode="sync">
         {sortedNodes.map((node, index) => {
-          const isActive = currentNode === node.node;
-          const isLastNode = index === sortedNodes.length - 1;
+          const isActive = currentNode === node.node
+          const isLastNode = index === sortedNodes.length - 1
 
           return (
             <React.Fragment key={node.node}>
@@ -1221,9 +1175,7 @@ export function VerticalPipelineStepper({
                 node={node}
                 isActive={isActive}
                 onRetry={
-                  node.status === 'error' && onRetryNode
-                    ? () => onRetryNode(node.node)
-                    : undefined
+                  node.status === 'error' && onRetryNode ? () => onRetryNode(node.node) : undefined
                 }
                 onViewOutput={
                   node.output && onViewOutput
@@ -1233,17 +1185,13 @@ export function VerticalPipelineStepper({
               />
 
               {/* Connecting Line */}
-              {!isLastNode && (
-                <ConnectingLine
-                  isActive={node.status === 'completed' && isActive}
-                />
-              )}
+              {!isLastNode && <ConnectingLine isActive={node.status === 'completed' && isActive} />}
             </React.Fragment>
-          );
+          )
         })}
       </AnimatePresence>
     </div>
-  );
+  )
 }
 
 // =============================================================================

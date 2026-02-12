@@ -38,10 +38,12 @@ Seven integration tests fail with Qdrant vector count mismatches. Tests correctl
 ### Observed Behavior
 
 Seven integration tests fail with consistent patterns:
+
 - **TXT files**: Expected 22 vectors, assertion receives 1
 - **DOCX files**: Expected 54 vectors, assertion receives 27 (exactly half!)
 
 Failing tests:
+
 1. TRIAL Tier > TXT file processing
 2. TRIAL Tier > DOCX file processing
 3. BASIC Tier > TXT file processing
@@ -149,6 +151,7 @@ grep -A 20 "QUERY RESULTS" /tmp/task3-final.log
 ### Data Collected
 
 **Test Execution Trace (TXT file)**:
+
 ```
 Line 478: Upload TXT file → fileId: 99b758be-9e3e-44a7-8302-bfb8caff774b
 Line 489: Wait for vector indexing → success, status='indexed'
@@ -160,6 +163,7 @@ Line 572: Assert payload.total_chunks === 22 → FAILS (got 1) ❌
 ```
 
 **Test Execution Trace (DOCX file)**:
+
 ```
 Similar flow to TXT
 Query #1 returns 54 vectors ✅
@@ -169,6 +173,7 @@ Query #2 assertion fails: expected 54, got 27 ❌
 **Chunk Structure Analysis**:
 
 TXT file (22 total chunks):
+
 ```
 Structure: 1 parent + 21 children
 Parent chunk: { level: "parent", total_chunks: 1 }  ← Number of parents
@@ -176,6 +181,7 @@ Child chunks: { level: "child", total_chunks: 21 }  ← Children in this parent
 ```
 
 DOCX file (54 total chunks):
+
 ```
 Structure: 2 parents + ~52 children (26-27 per parent)
 Parent chunk 0: { level: "parent", total_chunks: 2 }    ← Number of parents
@@ -185,6 +191,7 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 ```
 
 **Debug Log Evidence**:
+
 ```
 🔍 [QUERY] Querying vectors for fileId: 99b758be-9e3e-44a7-8302-bfb8caff774b
 📊 [QUERY RESULTS] Total vectors found: 22  ← Helper correctly counts all vectors
@@ -205,6 +212,7 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 **Evidence**:
 
 1. **From markdown-chunker.ts (lines 249, 296, 318-321)**:
+
    ```typescript
    // Line 249: Parent chunks get total_chunks = 0 initially
    total_chunks: 0, // Will be updated later
@@ -219,15 +227,17 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
    ```
 
 2. **From test code (line 572)**:
+
    ```typescript
-   const firstPoint = scrollResponse.points[0]
-   const payload = firstPoint.payload as any
-   expect(payload.total_chunks).toBe(vectorStats.totalVectors)
+   const firstPoint = scrollResponse.points[0];
+   const payload = firstPoint.payload as any;
+   expect(payload.total_chunks).toBe(vectorStats.totalVectors);
    //      ^^^^^^^^^^^^^^^^^^^^      ^^^^^^^^^^^^^^^^^^^^^^^
    //      Hierarchy-level count     Total document chunks (22 or 54)
    ```
 
 3. **From test logs**:
+
    ```
    TXT: expected 1 to be 22
         ↑           ↑
@@ -257,16 +267,19 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 ### Contributing Factors
 
 **Factor 1**: Field name mismatches in test code
+
 - Test checks `parent_id` but field is `parent_chunk_id`
 - Test logs `chunk_type` but field is `level`
 - This prevents correct parent/child filtering and debugging
 
 **Factor 2**: Ambiguous field name `total_chunks`
+
 - Name suggests "total chunks in document"
 - Actually means "total chunks at this hierarchy level"
 - No documentation clarifying the semantic difference
 
 **Factor 3**: Arbitrary Qdrant scroll ordering
+
 - No `order_by` specified in scroll query
 - First point could be parent or child
 - Makes `points[0].payload.total_chunks` unpredictable
@@ -280,6 +293,7 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 **Description**: Replace `payload.total_chunks` comparison with `scrollResponse.points.length`, which represents the actual number of vectors retrieved from Qdrant.
 
 **Why This Addresses Root Cause**:
+
 - `scrollResponse.points.length` counts ALL vectors returned by the scroll query
 - This matches `vectorStats.totalVectors` (which is `points.length` from helper)
 - No dependency on arbitrary first point selection or hierarchy-level semantics
@@ -287,12 +301,13 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 **Implementation Steps**:
 
 1. Replace line 572 (and similar lines in other tests):
+
    ```typescript
    // OLD (line 572):
-   expect(payload.total_chunks).toBe(vectorStats.totalVectors)
+   expect(payload.total_chunks).toBe(vectorStats.totalVectors);
 
    // NEW:
-   expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
+   expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
    ```
 
 2. Update all 7 failing tests with same pattern
@@ -300,6 +315,7 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 3. Optional: Remove `total_chunks` assertion entirely since it validates hierarchy structure, not upload completeness
 
 **Files to Modify**:
+
 - `tests/integration/document-processing-worker.test.ts`
   - **Line 572**: TRIAL TXT test assertion
   - **Line 701**: TRIAL DOCX test assertion
@@ -310,12 +326,14 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
   - **Line 2381**: PREMIUM DOCX test assertion
 
 **Testing Strategy**:
+
 - Run all 7 failing tests: `pnpm test:integration document-processing-worker`
 - Verify assertions pass for both TXT (22) and DOCX (54)
 - Verify hierarchical structure tests still pass (parent/child filtering)
 - Check test logs confirm vector counts match expectations
 
 **Pros**:
+
 - ✅ Minimal code change (1 line per test)
 - ✅ Directly validates upload completeness
 - ✅ No dependency on hierarchy semantics
@@ -323,6 +341,7 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 - ✅ Self-documenting intent (count vectors)
 
 **Cons**:
+
 - ❌ Loses validation of `total_chunks` metadata accuracy
 - ❌ Doesn't fix field name mismatches (`parent_id` vs `parent_chunk_id`)
 
@@ -339,26 +358,28 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 **Description**: Determine if first point is parent or child, then assert against appropriate expected value.
 
 **Why This Addresses Root Cause**:
+
 - Accounts for hierarchy-level semantics of `total_chunks`
 - Validates metadata field accuracy
 
 **Implementation Steps**:
 
 1. Add logic to determine first point type:
+
    ```typescript
-   const firstPoint = scrollResponse.points[0]
-   const payload = firstPoint.payload as any
+   const firstPoint = scrollResponse.points[0];
+   const payload = firstPoint.payload as any;
 
    // Determine if parent or child
-   const isParent = payload.parent_chunk_id === null || payload.parent_chunk_id === undefined
+   const isParent = payload.parent_chunk_id === null || payload.parent_chunk_id === undefined;
 
    if (isParent) {
      // For parent: total_chunks = number of parents
-     expect(payload.total_chunks).toBeGreaterThanOrEqual(1)
+     expect(payload.total_chunks).toBeGreaterThanOrEqual(1);
    } else {
      // For child: total_chunks = children in that parent
-     expect(payload.total_chunks).toBeGreaterThan(0)
-     expect(payload.total_chunks).toBeLessThanOrEqual(vectorStats.totalVectors)
+     expect(payload.total_chunks).toBeGreaterThan(0);
+     expect(payload.total_chunks).toBeLessThanOrEqual(vectorStats.totalVectors);
    }
    ```
 
@@ -369,19 +390,23 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 3. Update all 7 tests
 
 **Files to Modify**:
+
 - Same 7 test assertion locations as Solution 1
 - `queryVectorsByFileId()` helper (lines 252-253, 264) to use correct field names
 
 **Testing Strategy**:
+
 - Same as Solution 1
 - Additionally verify field name fixes allow parent/child filtering
 
 **Pros**:
+
 - ✅ Validates `total_chunks` metadata accuracy
 - ✅ Fixes field name mismatches
 - ✅ More comprehensive validation
 
 **Cons**:
+
 - ❌ More complex logic (conditional assertions)
 - ❌ Test intent less clear (what are we validating?)
 - ❌ Doesn't validate total document chunks (original intent)
@@ -400,12 +425,14 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 **Description**: Calculate document total by summing unique hierarchy-level counts.
 
 **Why This Addresses Root Cause**:
+
 - Uses `total_chunks` field but accounts for hierarchy semantics
 - Calculates true document total
 
 **Implementation Steps**:
 
 1. Aggregate counts from all points:
+
    ```typescript
    const scrollResponse = await qdrantClient.scroll(...)
 
@@ -427,17 +454,21 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 2. Update all 7 tests
 
 **Files to Modify**:
+
 - Same 7 test locations
 
 **Testing Strategy**:
+
 - Same as Solution 1
 
 **Pros**:
+
 - ✅ Uses existing metadata
 - ✅ Validates document totals correctly
 - ✅ Accounts for hierarchy semantics
 
 **Cons**:
+
 - ❌ Most complex solution
 - ❌ Essentially reimplements `points.length` (Solution 1)
 - ❌ Adds unnecessary computation
@@ -462,11 +493,12 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 
 1. `tests/integration/document-processing-worker.test.ts`
    - **Line 572**: TRIAL TXT
+
      ```typescript
      // OLD:
-     expect(payload.total_chunks).toBe(vectorStats.totalVectors)
+     expect(payload.total_chunks).toBe(vectorStats.totalVectors);
      // NEW:
-     expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
+     expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
      ```
 
    - **Line 701**: TRIAL DOCX (same change)
@@ -477,6 +509,7 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
    - **Line 2381**: PREMIUM DOCX (same change)
 
 **Validation Criteria**:
+
 - ✅ All 7 tests pass after fix
 - ✅ TXT tests assert `scrollResponse.points.length === 22` ±2 tolerance
 - ✅ DOCX tests assert `scrollResponse.points.length === 54` ±3 tolerance
@@ -488,6 +521,7 @@ Child chunks (parent 1): { level: "child", total_chunks: 27 } ← Children in pa
 Unit tests: N/A (test-only fix)
 
 Integration tests:
+
 ```bash
 # Run all document processing tests
 pnpm test:integration document-processing-worker
@@ -503,6 +537,7 @@ pnpm test:integration document-processing-worker
 ```
 
 Manual verification:
+
 1. Check test output shows correct vector counts in logs
 2. Verify `scrollResponse.points.length` matches `vectorStats.totalVectors`
 3. Confirm no "expected X to be Y" errors
@@ -553,15 +588,18 @@ Not applicable - investigation focused on internal codebase logic and Qdrant cli
 ### Field Name Mismatches (Secondary Issue)
 
 While investigating, discovered test code uses incorrect field names:
+
 - Test uses: `parent_id` → Actual field: `parent_chunk_id`
 - Test uses: `chunk_type` → Actual field: `level`
 
 **Impact**:
+
 - Prevents proper parent/child filtering in test logic
 - Helper function logs show "UNDEFINED" for these fields
 - Skipped parent/child assertions would fail if unskipped
 
 **Recommendation**: Address in separate cleanup task after tests pass:
+
 1. Replace all `parent_id` with `parent_chunk_id`
 2. Replace all `chunk_type` with `level`
 3. Unskip parent/child assertion tests to validate hierarchical structure
@@ -583,11 +621,13 @@ While investigating, discovered test code uses incorrect field names:
 ### Follow-Up Recommendations
 
 **Short-term** (after tests pass):
+
 1. Address field name mismatches (`parent_id` → `parent_chunk_id`, `chunk_type` → `level`)
 2. Unskip parent/child hierarchical structure tests
 3. Add comments explaining `total_chunks` semantic meaning
 
 **Long-term** (technical debt):
+
 1. Rename `total_chunks` field to clarify hierarchy-level meaning:
    - Parent chunks: `parent_count` or `total_parents`
    - Child chunks: `sibling_count` or `children_in_parent`

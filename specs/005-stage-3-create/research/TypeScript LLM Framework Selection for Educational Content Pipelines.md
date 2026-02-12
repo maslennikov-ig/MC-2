@@ -84,10 +84,10 @@ const { object } = await generateObject({
   schema: z.object({
     summary: z.string(),
     keyPoints: z.array(z.string()),
-    topics: z.array(z.string())
+    topics: z.array(z.string()),
   }),
   prompt: `Summarize: ${documentText}`,
-  maxRetries: 3
+  maxRetries: 3,
 });
 // object is fully typed with autocomplete
 ```
@@ -97,13 +97,16 @@ Dependencies total just 3 packages (ai, @ai-sdk/openai, zod) with excellent Type
 **LangChain.js requires 40-150 lines** for equivalent functionality with 6-7 dependencies (@langchain/core, @langchain/openai, @langchain/community, @langchain/textsplitters, @langchain/langgraph, cheerio). TypeScript quality scores only 4/10 due to not being type-safe by default, complex type inference for chains, and common runtime type errors.
 
 The "Stuff" method for basic summarization:
+
 ```typescript
-const loader = new CheerioWebBaseLoader("https://example.com/doc");
+const loader = new CheerioWebBaseLoader('https://example.com/doc');
 const docs = await loader.load();
-const llm = new ChatOpenAI({ model: "gpt-4o-mini" });
-const prompt = PromptTemplate.fromTemplate("Summarize: {context}");
+const llm = new ChatOpenAI({ model: 'gpt-4o-mini' });
+const prompt = PromptTemplate.fromTemplate('Summarize: {context}');
 const chain = await createStuffDocumentsChain({
-  llm, outputParser: new StringOutputParser(), prompt
+  llm,
+  outputParser: new StringOutputParser(),
+  prompt,
 });
 const result = await chain.invoke({ context: docs });
 ```
@@ -212,6 +215,7 @@ Only consider LangChain if: already heavily invested with dedicated maintenance 
 **Phase 3 (Stage 6 + complex workflows): Evaluate LangGraph** if you need conditional logic, parallel lesson generation with coordination, or state persistence across long-running jobs. Migrate incrementally by wrapping existing Vercel AI SDK calls as graph nodes. Maintain observability with LangSmith or continue using Langfuse.
 
 **Production checklist for all architectures**:
+
 - Multi-provider support with failover (OpenRouter + direct APIs)
 - Comprehensive error handling with exponential backoff
 - Observability from day one (Langfuse or LangSmith)

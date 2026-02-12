@@ -13,13 +13,13 @@
  * @module components/generation-graph/panels/stage7/EnrichmentInspectorPanel
  */
 
-'use client';
+'use client'
 
-import React, { useEffect, Suspense, lazy } from 'react';
-import { useTranslations } from 'next-intl';
-import { ChevronLeft, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import React, { useEffect, Suspense, lazy } from 'react'
+import { useTranslations } from 'next-intl'
+import { ChevronLeft, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import {
   useEnrichmentInspectorStore,
   useInspectorView,
@@ -28,22 +28,26 @@ import {
   useCanGoBack,
   type InspectorView,
   type CreateEnrichmentType,
-} from '../../stores/enrichment-inspector-store';
-import { RootView } from './views/RootView';
-import { EnrichmentInspectorErrorBoundary } from './EnrichmentInspectorErrorBoundary';
-import { DiscardChangesDialog, useDiscardDialog } from './components/DiscardChangesDialog';
-import type { CreateViewProps } from './views/CreateView';
+} from '../../stores/enrichment-inspector-store'
+import { RootView } from './views/RootView'
+import { EnrichmentInspectorErrorBoundary } from './EnrichmentInspectorErrorBoundary'
+import { DiscardChangesDialog, useDiscardDialog } from './components/DiscardChangesDialog'
+import type { CreateViewProps } from './views/CreateView'
 
 // Lazy load heavy views to reduce initial bundle
-const CreateViewLazy = lazy(() => import('./views/CreateView').then(m => ({ default: m.CreateView })));
-const DetailViewLazy = lazy(() => import('./views/DetailView').then(m => ({ default: m.DetailView })));
+const CreateViewLazy = lazy(() =>
+  import('./views/CreateView').then((m) => ({ default: m.CreateView }))
+)
+const DetailViewLazy = lazy(() =>
+  import('./views/DetailView').then((m) => ({ default: m.DetailView }))
+)
 
 /**
  * CreateView supported types - subset of CreateEnrichmentType
  * Maps store types to CreateView types where applicable
  */
-type SupportedCreateType = CreateViewProps['type'];
-const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'video', 'audio', 'presentation', 'cover']);
+type SupportedCreateType = CreateViewProps['type']
+const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'video', 'audio', 'presentation', 'cover'])
 
 /**
  * Map CreateEnrichmentType to CreateView type if supported
@@ -52,16 +56,16 @@ const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'video', 'audio', 'prese
 function mapToCreateViewType(type: CreateEnrichmentType): SupportedCreateType | null {
   // Direct mappings
   if (SUPPORTED_CREATE_TYPES.has(type)) {
-    return type as SupportedCreateType;
+    return type as SupportedCreateType
   }
   // Alias mappings for backward compatibility with store types
   if (type === 'podcast') {
-    return 'audio';
+    return 'audio'
   }
   if (type === 'mindmap') {
-    return 'presentation';
+    return 'presentation'
   }
-  return null;
+  return null
 }
 
 /**
@@ -69,9 +73,9 @@ function mapToCreateViewType(type: CreateEnrichmentType): SupportedCreateType | 
  */
 export interface EnrichmentInspectorPanelProps {
   /** Lesson ID to inspect enrichments for */
-  lessonId: string;
+  lessonId: string
   /** Optional className override */
-  className?: string;
+  className?: string
 }
 
 /**
@@ -85,23 +89,23 @@ function InspectorHeader({
   canGoBack,
   onBack,
 }: {
-  view: InspectorView;
-  createType: CreateEnrichmentType | null;
-  canGoBack: boolean;
-  onBack: () => void;
+  view: InspectorView
+  createType: CreateEnrichmentType | null
+  canGoBack: boolean
+  onBack: () => void
 }) {
-  const t = useTranslations('enrichments');
+  const t = useTranslations('enrichments')
 
   // Build title based on view
-  let title = t(`inspector.views.${view}`);
+  let title = t(`inspector.views.${view}`)
   if (view === 'create' && createType) {
-    title = `${t('inspector.createPrefix')} ${t(`types.${createType}`)}`;
+    title = `${t('inspector.createPrefix')} ${t(`types.${createType}`)}`
   }
 
   return (
     <div
       data-testid="inspector-header"
-      className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background/50 backdrop-blur-sm"
+      className="border-border bg-background/50 flex items-center gap-2 border-b px-4 py-3 backdrop-blur-sm"
     >
       {canGoBack && (
         <Button
@@ -111,14 +115,14 @@ function InspectorHeader({
           data-testid="back-button"
           aria-label={t('inspector.back')}
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="h-4 w-4" />
         </Button>
       )}
-      <h2 data-testid="header-title" className="font-medium text-sm text-foreground">
+      <h2 data-testid="header-title" className="text-foreground text-sm font-medium">
         {title}
       </h2>
     </div>
-  );
+  )
 }
 
 /**
@@ -126,10 +130,10 @@ function InspectorHeader({
  */
 function ViewLoadingSpinner() {
   return (
-    <div className="flex items-center justify-center h-full">
-      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+    <div className="flex h-full items-center justify-center">
+      <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
     </div>
-  );
+  )
 }
 
 /**
@@ -137,10 +141,10 @@ function ViewLoadingSpinner() {
  */
 function UnsupportedCreateTypePlaceholder({ type }: { type: string }) {
   return (
-    <div className="flex items-center justify-center h-full p-4 text-muted-foreground text-sm">
+    <div className="text-muted-foreground flex h-full items-center justify-center p-4 text-sm">
       Form for &quot;{type}&quot; coming soon
     </div>
-  );
+  )
 }
 
 /**
@@ -154,75 +158,67 @@ function UnsupportedCreateTypePlaceholder({ type }: { type: string }) {
  * <EnrichmentInspectorPanel lessonId="lesson-123" />
  * ```
  */
-export function EnrichmentInspectorPanel({
-  lessonId,
-  className,
-}: EnrichmentInspectorPanelProps) {
+export function EnrichmentInspectorPanel({ lessonId, className }: EnrichmentInspectorPanelProps) {
   // Store hooks
-  const currentView = useInspectorView();
-  const selectedEnrichmentId = useSelectedEnrichmentId();
-  const createType = useCreateEnrichmentType();
-  const canGoBack = useCanGoBack();
-  const goBack = useEnrichmentInspectorStore((s) => s.goBack);
-  const isDirty = useEnrichmentInspectorStore((s) => s.dirty);
-  const setDirty = useEnrichmentInspectorStore((s) => s.setDirty);
+  const currentView = useInspectorView()
+  const selectedEnrichmentId = useSelectedEnrichmentId()
+  const createType = useCreateEnrichmentType()
+  const canGoBack = useCanGoBack()
+  const goBack = useEnrichmentInspectorStore((s) => s.goBack)
+  const isDirty = useEnrichmentInspectorStore((s) => s.dirty)
+  const setDirty = useEnrichmentInspectorStore((s) => s.setDirty)
 
   // Discard dialog for header back button (only active in create view)
-  const {
-    showDialog,
-    handleNavigation,
-    handleConfirm,
-    handleCancel,
-  } = useDiscardDialog(
+  const { showDialog, handleNavigation, handleConfirm, handleCancel } = useDiscardDialog(
     currentView === 'create' && isDirty,
     () => setDirty(false)
-  );
+  )
 
   // Handle header back button with discard check
   const handleBack = () => {
-    handleNavigation(goBack);
-  };
+    handleNavigation(goBack)
+  }
 
   // Initialize on lessonId change
   // Using getState() to avoid putting openRoot in deps (causes infinite loop)
   useEffect(() => {
-    useEnrichmentInspectorStore.getState().openRoot(lessonId);
-  }, [lessonId]);
+    useEnrichmentInspectorStore.getState().openRoot(lessonId)
+  }, [lessonId])
 
   // Render view based on current state
   const renderView = () => {
     switch (currentView) {
       case 'root':
-        return <RootView lessonId={lessonId} />;
+        return <RootView lessonId={lessonId} />
       case 'create': {
-        if (!createType) return null;
-        const mappedType = mapToCreateViewType(createType);
+        if (!createType) return null
+        const mappedType = mapToCreateViewType(createType)
         if (mappedType) {
           return (
             <Suspense fallback={<ViewLoadingSpinner />}>
               <CreateViewLazy type={mappedType} lessonId={lessonId} />
             </Suspense>
-          );
+          )
         }
         // Fallback for unsupported types
-        return <UnsupportedCreateTypePlaceholder type={createType} />;
+        return <UnsupportedCreateTypePlaceholder type={createType} />
       }
       case 'detail':
         return selectedEnrichmentId ? (
           <Suspense fallback={<ViewLoadingSpinner />}>
             <DetailViewLazy enrichmentId={selectedEnrichmentId} />
           </Suspense>
-        ) : null;
+        ) : null
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   return (
     <EnrichmentInspectorErrorBoundary>
       <div
         data-testid="enrichment-inspector-panel"
-        className={cn('flex flex-col h-full bg-background', className)}
+        className={cn('bg-background flex h-full flex-col', className)}
       >
         {/* Header with back button */}
         <InspectorHeader
@@ -233,9 +229,7 @@ export function EnrichmentInspectorPanel({
         />
 
         {/* View content */}
-        <div className="flex-1 overflow-hidden">
-          {renderView()}
-        </div>
+        <div className="flex-1 overflow-hidden">{renderView()}</div>
       </div>
 
       {/* Discard Changes Confirmation Dialog (for header back button) */}
@@ -243,13 +237,13 @@ export function EnrichmentInspectorPanel({
         open={showDialog}
         onOpenChange={(open) => !open && handleCancel()}
         onConfirm={() => {
-          handleConfirm();
-          goBack();
+          handleConfirm()
+          goBack()
         }}
         onCancel={handleCancel}
       />
     </EnrichmentInspectorErrorBoundary>
-  );
+  )
 }
 
-export default EnrichmentInspectorPanel;
+export default EnrichmentInspectorPanel

@@ -44,7 +44,6 @@ Research on LLM routers demonstrates that threshold-based escalation significant
 - **Schema validation errors**: Structural issues need improved understanding (escalate from 20B to 120B)[^31][^24]
 - **Retry count ≥ 2**: Multiple failures indicate task complexity exceeds current model capability[^30][^22]
 
-
 ### Field-Level ROI Analysis
 
 This analysis reveals where qwen3-max provides measurable value versus where cheaper models suffice. Research on LLM task decomposition shows that breaking complex workflows into field-specific assignments can reduce costs by 70-90% while maintaining quality.[^5][^4]
@@ -107,7 +106,6 @@ These rules translate research findings into implementable logic:
 - **Use OSS 120B when**: Generating batch content (sections, lessons) with complete analysis_result guidance OR single validation failure needs better reasoning than 20B OR schema errors from OSS 20B indicate structural misunderstanding
 - **Use OSS 20B when**: Performing schema validation OR quality checks (semantic similarity computation) OR simple counting/verification tasks OR generating high-volume templated content (exercises)
 - **Use Gemini 2.5 Flash when**: Token count exceeds 100K (only model with sufficient 1M context window)
-
 
 ### Expected Outcomes
 
@@ -348,4 +346,3 @@ This strategy balances cost efficiency with quality requirements by applying exp
 [^112]: https://github.com/lm-sys/RouteLLM
 
 [^113]: https://www.getmaxim.ai/articles/the-technical-guide-to-managing-llm-costs-strategies-for-optimization-and-roi/
-

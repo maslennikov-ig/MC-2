@@ -54,45 +54,41 @@ async function sleep(ms: number): Promise<void> {
 // Test Setup
 // ============================================================================
 
-async function createTestCourse(): Promise<{ courseId: string; organizationId: string; userId: string }> {
+async function createTestCourse(): Promise<{
+  courseId: string;
+  organizationId: string;
+  userId: string;
+}> {
   const supabase = getSupabaseAdmin();
 
   // Find existing organization or use a test one
-  const { data: orgs } = await supabase
-    .from('organizations')
-    .select('id')
-    .limit(1);
+  const { data: orgs } = await supabase.from('organizations').select('id').limit(1);
 
   const organizationId = orgs?.[0]?.id || uuidv4();
 
   // Find existing user or use a test one
-  const { data: users } = await supabase
-    .from('users')
-    .select('id')
-    .limit(1);
+  const { data: users } = await supabase.from('users').select('id').limit(1);
 
   const userId = users?.[0]?.id || uuidv4();
 
   // Create test course
   const courseId = uuidv4();
   const slug = `test-stage4-${Date.now()}`;
-  const { error: courseError } = await supabase
-    .from('courses')
-    .insert({
-      id: courseId,
-      organization_id: organizationId,
-      user_id: userId,
-      title: 'Test Course for Stage 4 Naming Fix',
-      slug,
-      language: 'ru',
-      style: 'practical',
-      difficulty: 'intermediate',
-      generation_status: 'pending',
-      settings: {
-        lesson_duration_minutes: 15,
-        topic: 'Введение в машинное обучение',
-      },
-    });
+  const { error: courseError } = await supabase.from('courses').insert({
+    id: courseId,
+    organization_id: organizationId,
+    user_id: userId,
+    title: 'Test Course for Stage 4 Naming Fix',
+    slug,
+    language: 'ru',
+    style: 'practical',
+    difficulty: 'intermediate',
+    generation_status: 'pending',
+    settings: {
+      lesson_duration_minutes: 15,
+      topic: 'Введение в машинное обучение',
+    },
+  });
 
   if (courseError) {
     throw new Error(`Failed to create test course: ${courseError.message}`);

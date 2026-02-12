@@ -199,12 +199,15 @@ async getJudgeModels(language: string): Promise<JudgeModelsResult> {
 ## Tasks
 
 ### Task 1: Implement StaleWhileRevalidateCache Class
+
 **Subagent**: `llm-service-specialist`
 
 **Files to modify:**
+
 - `packages/course-gen-platform/src/shared/llm/model-config-service.ts`
 
 **Changes:**
+
 1. Create new `StaleWhileRevalidateCache<T>` class with:
    - `get(key)` returns `{ data, isStale, age } | null`
    - `set(key, data)` stores with current timestamp
@@ -224,6 +227,7 @@ async getJudgeModels(language: string): Promise<JudgeModelsResult> {
    - No stale cache: throw explicit error
 
 **Context - Current ConfigCache:**
+
 ```typescript
 // Location: packages/course-gen-platform/src/shared/llm/model-config-service.ts:68-101
 
@@ -243,7 +247,7 @@ class ConfigCache<T> {
 
     const now = Date.now();
     if (now - entry.timestamp > CACHE_TTL_MS) {
-      this.cache.delete(key);  // PROBLEM: Deletes stale data
+      this.cache.delete(key); // PROBLEM: Deletes stale data
       return null;
     }
 
@@ -261,12 +265,15 @@ class ConfigCache<T> {
 ```
 
 ### Task 2: Remove Hardcoded Fallbacks from ModelConfigService
+
 **Subagent**: `llm-service-specialist`
 
 **Files to modify:**
+
 - `packages/course-gen-platform/src/shared/llm/model-config-service.ts`
 
 **Changes:**
+
 1. Remove `getHardcodedJudgeConfig()` method entirely
 2. Remove `getHardcodedStageConfig()` method entirely
 3. Remove `getHardcodedPhaseConfig()` method entirely
@@ -275,6 +282,7 @@ class ConfigCache<T> {
    - Throw explicit error when no cache available
 
 **Context - Methods to remove:**
+
 ```typescript
 // getHardcodedJudgeConfig() - lines ~520-560
 // getHardcodedStageConfig() - lines ~420-450
@@ -282,12 +290,15 @@ class ConfigCache<T> {
 ```
 
 ### Task 3: Remove Hardcoded Constants from CLEV Voter
+
 **Subagent**: `judge-specialist`
 
 **Files to modify:**
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/clev-voter.ts`
 
 **Changes:**
+
 1. Delete `AVAILABLE_JUDGE_MODELS` constant entirely
 2. Delete `GENERATION_MODELS` constant entirely
 3. Delete `selectJudgeModelsHardcoded()` function entirely
@@ -296,6 +307,7 @@ class ConfigCache<T> {
 6. Update `getModelWeight()` function to fetch weights from ModelConfigService instead of `AVAILABLE_JUDGE_MODELS`
 
 **Context - Constants to remove:**
+
 ```typescript
 // GENERATION_MODELS - line ~111
 export const GENERATION_MODELS = {
@@ -314,15 +326,18 @@ export const CLEV_JUDGE_MODELS = selectJudgeModelsHardcoded('en');
 ```
 
 ### Task 4: Remove Hardcoded Constants from Node Files
+
 **Subagent**: `code-structure-refactorer`
 
 **Files to modify:**
+
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/planner.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/expander.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/smoother.ts`
 - `packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/assembler.ts`
 
 **Changes for each file:**
+
 1. Remove `DEFAULT_*_MODEL` constant
 2. Update model selection logic to:
    - Call `ModelConfigService.getModelForPhase()`
@@ -330,6 +345,7 @@ export const CLEV_JUDGE_MODELS = selectJudgeModelsHardcoded('en');
    - Remove try/catch that falls back to hardcoded
 
 **Context - Pattern to change:**
+
 ```typescript
 // Current pattern (with hardcoded fallback):
 let modelId = DEFAULT_PLANNER_MODEL;
@@ -347,20 +363,25 @@ const modelId = config.modelId;
 ```
 
 ### Task 5: Remove Hardcoded Constants from model-selector.ts (Optional)
+
 **Subagent**: `code-structure-refactorer`
 
 **Files to modify:**
+
 - `packages/course-gen-platform/src/shared/llm/model-selector.ts`
 
 **Analysis needed:**
+
 - Check if `MODEL_TIERS` and `STAGE4_MODELS` are still used
 - If used only as fallback → remove
 - If used for other purposes → keep but document
 
 ### Task 6: Update Tests
+
 **Subagent**: `test-writer`
 
 **Files to modify:**
+
 - Create/update tests for `StaleWhileRevalidateCache`
 - Update tests for `ModelConfigService` to verify:
   - Fresh cache returns immediately
@@ -368,9 +389,11 @@ const modelId = config.modelId;
   - Error thrown when no cache and DB fails
 
 ### Task 7: Add Observability (Optional Enhancement)
+
 **Subagent**: `infrastructure-specialist`
 
 **Changes:**
+
 1. Add Prometheus metrics for:
    - `model_config_cache_hits_total{status="fresh|stale"}`
    - `model_config_db_failures_total`
@@ -414,14 +437,17 @@ Wave 4 (Optional - Observability):
 ## Risk Assessment
 
 **Risk: Cold start without database**
+
 - Mitigation: System will fail to start with clear error message
 - This is acceptable - better to fail explicitly than run with outdated config
 
 **Risk: Extended DB outage with stale cache**
+
 - Mitigation: WARNING logs provide visibility
 - Future: Add alerting when stale cache age exceeds threshold (e.g., 1 hour)
 
 **Risk: Cache memory growth**
+
 - Mitigation: Cache entries are small (model configs ~1KB each)
 - Maximum expected entries: ~50 (all phases × languages × tiers)
 - Total memory: <100KB - negligible

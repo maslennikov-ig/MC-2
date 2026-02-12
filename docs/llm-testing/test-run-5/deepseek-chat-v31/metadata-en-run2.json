@@ -6,6 +6,19 @@
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
   "prerequisites": ["Basic computer literacy", "Ability to install software on your computer"],
-  "learning_outcomes": ["Explain fundamental programming concepts and Python syntax", "Write Python scripts using variables, conditional logic, and loops", "Construct reusable code by defining and calling functions", "Develop simple applications to solve basic computational problems"],
-  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Automation", "Scripting"]
+  "learning_outcomes": [
+    "Explain fundamental programming concepts and Python syntax",
+    "Write Python scripts using variables, conditional logic, and loops",
+    "Construct reusable code by defining and calling functions",
+    "Develop simple applications to solve basic computational problems"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Automation",
+    "Scripting"
+  ]
 }

@@ -3,6 +3,7 @@
 ## Pre-Deployment Verification
 
 ### 1. Server Configuration
+
 - [x] Git remote changed to new repository (MC-2)
 - [x] Branch switched from main to master
 - [x] Deploy scripts updated and copied to server
@@ -10,12 +11,14 @@
 - [x] Backup of previous configuration created
 
 ### 2. GitHub Configuration
+
 - [ ] Verify GitHub Secrets are configured (see below)
 - [ ] Verify SSH deploy key has access to server
 - [ ] Verify GitHub Token has packages:write permission
 - [ ] Test SSH connection from GitHub Actions
 
 ### 3. Local Changes
+
 - [x] `.github/workflows/ci.yml` - Updated to use master branch
 - [x] `.github/workflows/deploy.yml` - Updated to use master branch
 - [x] `scripts/deploy.sh` - Updated for dynamic branch detection
@@ -25,11 +28,13 @@
 ### 4. Required GitHub Secrets
 
 Run this check:
+
 ```bash
 gh secret list
 ```
 
 Expected secrets:
+
 - `DEPLOY_SSH_KEY` - SSH private key for claude-deploy@95.81.98.230
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
@@ -70,6 +75,7 @@ docker ps
 ### Option A: Automatic Deployment (Recommended)
 
 1. **Commit and push changes**:
+
    ```bash
    git add .
    git commit -m "Configure automatic deployment to production server"
@@ -77,6 +83,7 @@ docker ps
    ```
 
 2. **Monitor GitHub Actions**:
+
    ```bash
    # Watch workflow progress
    gh run watch
@@ -86,6 +93,7 @@ docker ps
    ```
 
 3. **Verify deployment**:
+
    ```bash
    # Check if new images are running
    ssh megacampus-prod "docker ps --format 'table {{.Names}}\t{{.Image}}'"
@@ -97,6 +105,7 @@ docker ps
 ### Option B: Manual Deployment (Testing)
 
 1. **Build and push images locally** (optional test):
+
    ```bash
    # Build web image
    docker build -f packages/web/Dockerfile -t ghcr.io/maslennikov-ig/mc-2/web:test .
@@ -106,6 +115,7 @@ docker ps
    ```
 
 2. **Deploy manually on server**:
+
    ```bash
    ssh megacampus-prod
    cd /opt/megacampus
@@ -127,6 +137,7 @@ docker ps
 ## Post-Deployment Verification
 
 ### 1. Service Health
+
 ```bash
 # Check all containers are running
 ssh megacampus-prod "docker ps"
@@ -138,6 +149,7 @@ ssh megacampus-prod "docker inspect --format='{{.State.Health.Status}}' megacamp
 ```
 
 ### 2. Application Health
+
 ```bash
 # Web health check
 curl -s https://ai.megacampus.ru/api/health | jq
@@ -147,6 +159,7 @@ ssh megacampus-prod "curl -s http://localhost:4000/health | jq"
 ```
 
 ### 3. Container Logs
+
 ```bash
 # Check for errors
 ssh megacampus-prod "docker logs --tail 50 megacampus-web"
@@ -155,6 +168,7 @@ ssh megacampus-prod "docker logs --tail 50 megacampus-worker"
 ```
 
 ### 4. Verify New Images
+
 ```bash
 # Should show mc-2 images, not megacampusai
 ssh megacampus-prod "docker images | grep megacampus"
@@ -165,9 +179,11 @@ ssh megacampus-prod "docker images | grep megacampus"
 If deployment fails:
 
 ### Automatic Rollback
+
 GitHub Actions will automatically rollback on failure.
 
 ### Manual Rollback
+
 ```bash
 ssh megacampus-prod
 cd /opt/megacampus
@@ -175,6 +191,7 @@ bash scripts/rollback.sh
 ```
 
 ### Emergency Rollback to Old Images
+
 ```bash
 ssh megacampus-prod
 cd /opt/megacampus
@@ -193,6 +210,7 @@ docker compose -f docker-compose.production.yml up -d --force-recreate
 ### Issue: Cannot pull images from new registry
 
 **Solution**: Images need to be built first. Either:
+
 1. Trigger GitHub Actions to build images, OR
 2. Build and push images manually:
    ```bash
@@ -204,6 +222,7 @@ docker compose -f docker-compose.production.yml up -d --force-recreate
 ### Issue: GitHub Actions SSH connection failed
 
 **Solution**: Verify deploy key:
+
 1. Check secret exists: `gh secret list | grep DEPLOY_SSH_KEY`
 2. Verify key has access to server
 3. Test manually: `ssh -i ~/.ssh/megacampus/claude-deploy claude-deploy@95.81.98.230`
@@ -211,6 +230,7 @@ docker compose -f docker-compose.production.yml up -d --force-recreate
 ### Issue: Containers start but health checks fail
 
 **Solution**:
+
 1. Check environment variables: `ssh megacampus-prod "cat /opt/megacampus/.env.production"`
 2. Check container logs: `ssh megacampus-prod "docker logs megacampus-web"`
 3. Verify secrets are correct in GitHub
@@ -250,6 +270,7 @@ ssh megacampus-prod "docker compose -f /opt/megacampus/docker-compose.production
 ## Contact
 
 For deployment issues:
+
 - Check GitHub Actions logs first
 - Review `/opt/megacampus/logs/` on server
 - Check container logs with `docker logs`

@@ -3,7 +3,14 @@
   "title": "Changes Log Schema",
   "description": "Schema for tracking changes during workflow phases to enable automatic rollback",
   "type": "object",
-  "required": ["phase", "timestamp", "files_modified", "files_created", "commands_executed", "git_commits"],
+  "required": [
+    "phase",
+    "timestamp",
+    "files_modified",
+    "files_created",
+    "commands_executed",
+    "git_commits"
+  ],
   "properties": {
     "phase": {
       "type": "string",

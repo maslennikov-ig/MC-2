@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger, logPermanentFailure } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
-import { isValidUUID } from '@/lib/validation-utils'
+import { isValidUUID } from '@/lib/uuid-validation'
 import {
   updateOrgInputSchema,
   type OrganizationWithMembership,
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           route: `/api/organizations/${orgId}`,
           errorCode: 'INTERNAL_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
     }
 
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         route: '/api/organizations/[orgId]',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -259,7 +259,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           route: `/api/organizations/${orgId}`,
           errorCode: 'INTERNAL_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to update organization' }, { status: 500 })
     }
 
@@ -307,7 +307,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         route: '/api/organizations/[orgId]',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -357,7 +357,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
           route: `/api/organizations/${orgId}`,
           errorCode: 'INTERNAL_ERROR',
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
       return NextResponse.json({ error: 'Failed to delete organization' }, { status: 500 })
     }
 
@@ -377,7 +377,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         route: '/api/organizations/[orgId]',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -13,10 +13,7 @@
  * - @megacampus/shared-types/judge-types.ts (REFINEMENT_CONFIG)
  */
 
-import type {
-  IterationControllerInput,
-  IterationControllerOutput,
-} from '@megacampus/shared-types';
+import type { IterationControllerInput, IterationControllerOutput } from '@megacampus/shared-types';
 import { REFINEMENT_CONFIG } from '@megacampus/shared-types';
 
 // ============================================================================
@@ -76,17 +73,11 @@ export type StoppingReason =
  * ```
  */
 export function shouldContinueIteration(
-  input: IterationControllerInput,
+  input: IterationControllerInput
 ): IterationControllerOutput {
   const { currentState, latestScore, operationMode } = input;
-  const {
-    iteration,
-    scoreHistory,
-    lockedSections,
-    sectionEditCount,
-    tokensUsed,
-    startTime,
-  } = currentState;
+  const { iteration, scoreHistory, lockedSections, sectionEditCount, tokensUsed, startTime } =
+    currentState;
 
   // Get mode-specific thresholds
   const modeConfig = REFINEMENT_CONFIG.modes[operationMode];
@@ -202,7 +193,7 @@ export function shouldContinueIteration(
  */
 export function updateSectionLocks(
   sectionEditCount: Record<string, number>,
-  maxEdits: number,
+  maxEdits: number
 ): string[] {
   const lockedSections: string[] = [];
 
@@ -243,10 +234,7 @@ export function updateSectionLocks(
  * detectConvergence([0.70, 0.75], 0.02); // false
  * ```
  */
-export function detectConvergence(
-  scoreHistory: number[],
-  threshold: number,
-): boolean {
+export function detectConvergence(scoreHistory: number[], threshold: number): boolean {
   // Need at least 3 data points to detect plateau
   if (scoreHistory.length < 3) {
     return false;

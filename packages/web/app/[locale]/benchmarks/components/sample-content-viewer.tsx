@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { getBenchmarkSampleAction, type BenchmarkSample } from '@/app/actions/benchmarks'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { FileText, Clock, Hash, Loader2 } from 'lucide-react'
+import { benchmarkQueries } from '@/lib/queries/benchmarks'
 
 interface SampleContentViewerProps {
   modelSlug: string
@@ -24,29 +25,15 @@ interface SampleContentViewerProps {
 
 export function SampleContentViewer({ modelSlug, modelName }: SampleContentViewerProps) {
   const t = useTranslations('benchmarks.sampleViewer')
-  const [sample, setSample] = useState<BenchmarkSample | null>(null)
-  const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
 
-  const loadSample = async () => {
-    if (sample) return // Already loaded
-
-    setLoading(true)
-    try {
-      const data = await getBenchmarkSampleAction(modelSlug)
-      setSample(data)
-    } catch (error) {
-      console.error('Failed to load sample:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: sample, isLoading: loading } = useQuery({
+    ...benchmarkQueries.sample(modelSlug),
+    enabled: open,
+  })
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen)
-    if (isOpen) {
-      void loadSample()
-    }
   }
 
   const getTierColor = (tier: string | null) => {

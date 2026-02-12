@@ -1,5 +1,5 @@
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -10,15 +10,15 @@ RUN corepack enable pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/shared-logger/package.json ./packages/shared-logger/
+COPY packages/shared-utils/package.json ./packages/shared-utils/
 COPY packages/course-gen-platform/package.json ./packages/course-gen-platform/
-COPY packages/trpc-client-sdk/package.json ./packages/trpc-client-sdk/
 COPY packages/web/package.json ./packages/web/
 
 # Install all workspace dependencies
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Enable corepack for pnpm
@@ -28,8 +28,8 @@ RUN corepack enable pnpm
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/shared-types/node_modules ./packages/shared-types/node_modules
 COPY --from=deps /app/packages/shared-logger/node_modules ./packages/shared-logger/node_modules
+COPY --from=deps /app/packages/shared-utils/node_modules ./packages/shared-utils/node_modules
 COPY --from=deps /app/packages/course-gen-platform/node_modules ./packages/course-gen-platform/node_modules
-COPY --from=deps /app/packages/trpc-client-sdk/node_modules ./packages/trpc-client-sdk/node_modules
 COPY --from=deps /app/packages/web/node_modules ./packages/web/node_modules
 
 # Copy source code, excluding test files and directories
@@ -43,9 +43,8 @@ RUN rm -rf tests __tests__ scripts/test-* **/*.test.* **/*.spec.*
 RUN rm -rf packages/web/.next node_modules/.cache tsconfig.tsbuildinfo
 RUN rm -rf packages/shared-types/dist packages/shared-types/tsconfig.tsbuildinfo
 RUN rm -rf packages/shared-logger/dist packages/shared-logger/tsconfig.tsbuildinfo
+RUN rm -rf packages/shared-utils/dist packages/shared-utils/tsconfig.tsbuildinfo
 RUN rm -rf packages/course-gen-platform/dist packages/course-gen-platform/tsconfig.tsbuildinfo
-RUN rm -rf packages/trpc-client-sdk/dist packages/trpc-client-sdk/tsconfig.tsbuildinfo
-
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED=1
 # Increase Node.js heap size for build to prevent OOM errors (2GB limit to avoid server freeze)
@@ -56,11 +55,19 @@ ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG SUPABASE_SERVICE_ROLE_KEY
 ARG SUPABASE_JWT_SECRET
 ARG NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api
+ARG NEXT_PUBLIC_FEATURE_USERBACK=false
+ARG NEXT_PUBLIC_USERBACK_TOKEN
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
+ARG NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 ENV SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
 ENV SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
 ENV NEXT_PUBLIC_COURSEGEN_BACKEND_URL=${NEXT_PUBLIC_COURSEGEN_BACKEND_URL}
+ENV NEXT_PUBLIC_FEATURE_USERBACK=${NEXT_PUBLIC_FEATURE_USERBACK}
+ENV NEXT_PUBLIC_USERBACK_TOKEN=${NEXT_PUBLIC_USERBACK_TOKEN}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
 
 # Extract version from package.json and save to file for runner stage
 RUN node -p "require('./packages/web/package.json').version" > /tmp/app_version.txt
@@ -68,11 +75,12 @@ RUN node -p "require('./packages/web/package.json').version" > /tmp/app_version.
 # Build shared packages first (other packages depend on them)
 RUN pnpm --filter @megacampus/shared-types build
 RUN pnpm --filter @megacampus/shared-logger build
+RUN pnpm --filter @megacampus/shared-utils build
 # Build all remaining packages
 RUN pnpm build
 
 # Stage 3: Runner
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

@@ -40,7 +40,9 @@ async function main() {
 
   // Step 3: Import hierarchicalChunking
   console.log('\n--- Importing hierarchicalChunking ---');
-  const { hierarchicalChunking } = await import('../../src/shared/summarization/hierarchical-chunking.js');
+  const { hierarchicalChunking } = await import(
+    '../../src/shared/summarization/hierarchical-chunking.js'
+  );
   forceGC();
   logMemory('After hierarchicalChunking import');
 
@@ -69,19 +71,14 @@ async function main() {
   }, 100);
 
   try {
-    const result = await hierarchicalChunking(
-      markdown,
-      'rus',
-      'Test document',
-      {
-        targetTokens: 4096,
-        maxIterations: 3,
-        chunkSize: 115000,
-        overlapPercent: 5,
-        temperature: 0.7,
-        maxTokensPerChunk: 10000,
-      }
-    );
+    const result = await hierarchicalChunking(markdown, 'rus', 'Test document', {
+      targetTokens: 4096,
+      maxIterations: 3,
+      chunkSize: 115000,
+      overlapPercent: 5,
+      temperature: 0.7,
+      maxTokensPerChunk: 10000,
+    });
 
     clearInterval(memoryInterval);
     console.log('\n--- hierarchicalChunking completed ---');
@@ -89,7 +86,6 @@ async function main() {
     console.log(`Iterations: ${result.iterations}`);
     forceGC();
     logMemory('After hierarchicalChunking');
-
   } catch (error) {
     clearInterval(memoryInterval);
     console.error('Error:', error);

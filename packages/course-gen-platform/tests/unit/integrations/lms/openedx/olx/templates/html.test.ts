@@ -201,7 +201,8 @@ describe('generateHtmlContent - OLX .html content file template', () => {
 
   describe('Cyrillic and Unicode Content', () => {
     it('should preserve Cyrillic content in CDATA', () => {
-      const content = '<h2>Переменные в Python</h2><p>Переменные - это контейнеры для хранения данных.</p>';
+      const content =
+        '<h2>Переменные в Python</h2><p>Переменные - это контейнеры для хранения данных.</p>';
 
       const result = generateHtmlContent(content);
 

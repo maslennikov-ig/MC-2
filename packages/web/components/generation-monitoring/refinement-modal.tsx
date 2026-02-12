@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -10,54 +10,61 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Sparkles, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
-import { regenerateLessonWithRefinement } from '@/app/actions/admin-generation';
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Sparkles, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
+import { regenerateLessonWithRefinement } from '@/app/actions/admin-generation'
 
 interface RefinementModalProps {
-  lessonId: string;
-  lessonTitle: string;
-  trigger?: React.ReactNode;
-  onSuccess?: () => void;
+  lessonId: string
+  lessonTitle: string
+  trigger?: React.ReactNode
+  onSuccess?: () => void
 }
 
-export function RefinementModal({ lessonId, lessonTitle, trigger, onSuccess }: RefinementModalProps) {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [refinementType, setRefinementType] = useState<'fix' | 'add' | 'simplify' | 'restructure' | 'custom'>('fix');
-  const [instructions, setInstructions] = useState('');
+export function RefinementModal({
+  lessonId,
+  lessonTitle,
+  trigger,
+  onSuccess,
+}: RefinementModalProps) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [refinementType, setRefinementType] = useState<
+    'fix' | 'add' | 'simplify' | 'restructure' | 'custom'
+  >('fix')
+  const [instructions, setInstructions] = useState('')
 
   const handleSubmit = async () => {
     if (!instructions.trim()) {
-      toast.error('Please provide instructions');
-      return;
+      toast.error('Please provide instructions')
+      return
     }
 
     try {
-      setLoading(true);
-      await regenerateLessonWithRefinement(lessonId, refinementType, instructions);
-      toast.success('Refinement queued successfully');
-      setOpen(false);
-      setInstructions('');
-      if (onSuccess) onSuccess();
+      setLoading(true)
+      await regenerateLessonWithRefinement(lessonId, refinementType, instructions)
+      toast.success('Refinement queued successfully')
+      setOpen(false)
+      setInstructions('')
+      if (onSuccess) onSuccess()
     } catch (error) {
-      void error;
-      toast.error('Failed to queue refinement');
+      void error
+      toast.error('Failed to queue refinement')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className="mr-2 h-4 w-4" />
             Refine
           </Button>
         )}
@@ -75,14 +82,16 @@ export function RefinementModal({ lessonId, lessonTitle, trigger, onSuccess }: R
             <RadioGroup
               defaultValue="fix"
               value={refinementType}
-              onValueChange={(v) => setRefinementType(v as 'fix' | 'add' | 'simplify' | 'restructure' | 'custom')}
+              onValueChange={(v) =>
+                setRefinementType(v as 'fix' | 'add' | 'simplify' | 'restructure' | 'custom')
+              }
               className="grid grid-cols-2 gap-4"
             >
               <div>
                 <RadioGroupItem value="fix" id="fix" className="peer sr-only" />
                 <Label
                   htmlFor="fix"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                  className="border-muted bg-popover hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary flex flex-col items-center justify-between rounded-md border-2 p-4"
                 >
                   <span className="text-sm font-semibold">Fix Issue</span>
                 </Label>
@@ -91,7 +100,7 @@ export function RefinementModal({ lessonId, lessonTitle, trigger, onSuccess }: R
                 <RadioGroupItem value="add" id="add" className="peer sr-only" />
                 <Label
                   htmlFor="add"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                  className="border-muted bg-popover hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary flex flex-col items-center justify-between rounded-md border-2 p-4"
                 >
                   <span className="text-sm font-semibold">Add Content</span>
                 </Label>
@@ -100,7 +109,7 @@ export function RefinementModal({ lessonId, lessonTitle, trigger, onSuccess }: R
                 <RadioGroupItem value="simplify" id="simplify" className="peer sr-only" />
                 <Label
                   htmlFor="simplify"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                  className="border-muted bg-popover hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary flex flex-col items-center justify-between rounded-md border-2 p-4"
                 >
                   <span className="text-sm font-semibold">Simplify</span>
                 </Label>
@@ -109,7 +118,7 @@ export function RefinementModal({ lessonId, lessonTitle, trigger, onSuccess }: R
                 <RadioGroupItem value="custom" id="custom" className="peer sr-only" />
                 <Label
                   htmlFor="custom"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                  className="border-muted bg-popover hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary flex flex-col items-center justify-between rounded-md border-2 p-4"
                 >
                   <span className="text-sm font-semibold">Custom</span>
                 </Label>
@@ -144,5 +153,5 @@ export function RefinementModal({ lessonId, lessonTitle, trigger, onSuccess }: R
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

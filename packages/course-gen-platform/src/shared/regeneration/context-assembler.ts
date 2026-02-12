@@ -128,7 +128,7 @@ export function getFieldValue(data: unknown, path: string): unknown {
   // "sections[0].lessons[1].lesson_title" → ["sections", "0", "lessons", "1", "lesson_title"]
   const parts = path.replace(/\[/g, '.').replace(/\]/g, '').split('.');
 
-  let current: any = data;
+  let current: unknown = data;
 
   for (const part of parts) {
     if (current === null || current === undefined) {
@@ -139,8 +139,10 @@ export function getFieldValue(data: unknown, path: string): unknown {
     const index = parseInt(part, 10);
     if (!isNaN(index) && Array.isArray(current)) {
       current = current[index];
+    } else if (typeof current === 'object' && current !== null) {
+      current = (current as Record<string, unknown>)[part];
     } else {
-      current = current[part];
+      return undefined;
     }
   }
 
@@ -483,7 +485,7 @@ function assembleGlobalContext(
  * console.log(context.metadata.blocksIncluded); // ['sections[0].section_title', ...]
  * ```
  */
-export async function assembleContext(input: AssemblerInput): Promise<AssembledContext> {
+export function assembleContext(input: AssemblerInput): AssembledContext {
   const { courseId, stageId, blockPath, tier, analysisResult, courseStructure } = input;
 
   logger.info(
@@ -536,7 +538,7 @@ export async function assembleContext(input: AssemblerInput): Promise<AssembledC
       break;
 
     default:
-      throw new Error(`ContextAssembler: Unknown tier: ${tier}`);
+      throw new Error(`ContextAssembler: Unknown tier: ${String(tier)}`);
   }
 
   // Build final context string
@@ -601,7 +603,7 @@ export async function assembleContext(input: AssemblerInput): Promise<AssembledC
  * @param input - Assembler input configuration
  * @returns Static context with token estimate
  */
-export async function assembleStaticContext(input: AssemblerInput): Promise<StaticContext> {
+export function assembleStaticContext(input: AssemblerInput): StaticContext {
   const { tier, analysisResult, courseStructure } = input;
 
   const contextParts: string[] = [];
@@ -671,7 +673,7 @@ export async function assembleStaticContext(input: AssemblerInput): Promise<Stat
  * @param input - Assembler input configuration
  * @returns Dynamic context with token estimate
  */
-export async function assembleDynamicContext(input: AssemblerInput): Promise<DynamicContext> {
+export function assembleDynamicContext(input: AssemblerInput): DynamicContext {
   const { tier, blockPath, analysisResult, courseStructure } = input;
 
   // Select source data based on stageId
@@ -785,7 +787,7 @@ export async function assembleDynamicContext(input: AssemblerInput): Promise<Dyn
       break;
 
     default:
-      throw new Error(`ContextAssembler: Unknown tier: ${tier}`);
+      throw new Error(`ContextAssembler: Unknown tier: ${String(tier)}`);
   }
 
   const content = contextParts.join('\n');

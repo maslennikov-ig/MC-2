@@ -127,7 +127,7 @@ export function hasStructuredContent(parsed: ParsedLessonContent): boolean {
   const { sections, keyPoints, examples } = parsed.structured
   return Boolean(
     (sections && sections.length > 0) ||
-    (keyPoints && keyPoints.length > 0) ||
-    (examples && examples.length > 0)
+      (keyPoints && keyPoints.length > 0) ||
+      (examples && examples.length > 0)
   )
 }

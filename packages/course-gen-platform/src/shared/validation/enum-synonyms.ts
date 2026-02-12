@@ -13,18 +13,6 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
   // See: docs/investigations/INV-2025-11-19-002-exercise-type-enum-to-text-migration.md
   // Legacy mappings preserved in git history if needed for rollback
 
-  // primary_strategy
-  primary_strategy: {
-    'problem based learning': 'problem-based learning',
-    problem_based_learning: 'problem-based learning',
-    'lecture based': 'lecture-based',
-    lecture_based: 'lecture-based',
-    'inquiry based': 'inquiry-based',
-    inquiry_based: 'inquiry-based',
-    'project based': 'project-based',
-    project_based: 'project-based',
-  },
-
   // target_audience
   target_audience: {
     'entry-level': 'beginner',
@@ -50,32 +38,28 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
     expert: 'advanced',
   },
 
-  // importance (sections_breakdown.importance: 'core' | 'important' | 'optional')
+  // importance (sections_breakdown.importance: 'simple' | 'normal' | 'complex')
   // LLMs often confuse this with difficulty enum values
   importance: {
-    advanced: 'important', // Misuse of difficulty value
-    intermediate: 'important', // Misuse of difficulty value
-    beginner: 'core', // Misuse of difficulty value
-    high: 'core',
-    medium: 'important',
-    low: 'optional',
-    critical: 'core',
-    essential: 'core',
-    main: 'core',
-    primary: 'core',
-    secondary: 'important',
-    supplementary: 'optional',
-    extra: 'optional',
-    bonus: 'optional',
-  },
-
-  // bloom_level (cognitiveLevel)
-  cognitiveLevel: {
-    recall: 'remember',
-    comprehend: 'understand',
-    apply_knowledge: 'apply',
-    analyse: 'analyze', // UK spelling
-    synthesis: 'create',
+    // Backward compat: old enum values → new
+    core: 'complex',
+    important: 'normal',
+    optional: 'simple',
+    // LLM synonym mappings (remapped to new values)
+    advanced: 'normal',
+    intermediate: 'normal',
+    beginner: 'complex', // LLMs confuse difficulty with importance
+    high: 'complex',
+    medium: 'normal',
+    low: 'simple',
+    critical: 'complex',
+    essential: 'complex',
+    main: 'complex',
+    primary: 'complex',
+    secondary: 'normal',
+    supplementary: 'simple',
+    extra: 'simple',
+    bonus: 'simple',
   },
 
   // Add more mappings as discovered from logs

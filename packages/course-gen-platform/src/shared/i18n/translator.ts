@@ -61,7 +61,10 @@ export function getTranslator(locale: Locale = 'ru'): TranslatorFn {
 
       // Validate that the locale value is a string
       if (typeof localeValue !== 'string') {
-        logger.warn({ key, locale, valueType: typeof localeValue }, 'Translation value is not a string');
+        logger.warn(
+          { key, locale, valueType: typeof localeValue },
+          'Translation value is not a string'
+        );
         return key;
       }
 

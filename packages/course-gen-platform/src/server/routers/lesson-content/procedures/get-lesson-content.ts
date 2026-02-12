@@ -76,13 +76,16 @@ export const getLessonContent = protectedProcedure
           .single();
 
         if (lessonError || !lessonData) {
-          logger.debug({
-            requestId,
-            courseId,
-            lessonId,
-            sectionNum,
-            lessonNum,
-          }, 'Lesson not found by section.lesson format');
+          logger.debug(
+            {
+              requestId,
+              courseId,
+              lessonId,
+              sectionNum,
+              lessonNum,
+            },
+            'Lesson not found by section.lesson format'
+          );
           return null;
         }
 
@@ -103,14 +106,18 @@ export const getLessonContent = protectedProcedure
         .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-        logger.error({
-          requestId,
-          courseId,
-          lessonId,
-          lessonUuid,
-          error: error.message,
-        }, 'Failed to fetch lesson content from lesson_contents');
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = not found
+        logger.error(
+          {
+            requestId,
+            courseId,
+            lessonId,
+            lessonUuid,
+            error: error.message,
+          },
+          'Failed to fetch lesson content from lesson_contents'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -118,14 +125,17 @@ export const getLessonContent = protectedProcedure
         });
       }
 
-      logger.debug({
-        requestId,
-        courseId,
-        lessonId,
-        lessonUuid,
-        found: !!data,
-        contentLength: data?.content ? JSON.stringify(data.content).length : 0,
-      }, 'Retrieved lesson content from lesson_contents');
+      logger.debug(
+        {
+          requestId,
+          courseId,
+          lessonId,
+          lessonUuid,
+          found: !!data,
+          contentLength: data?.content ? JSON.stringify(data.content).length : 0,
+        },
+        'Retrieved lesson content from lesson_contents'
+      );
 
       return data;
     } catch (error) {
@@ -135,12 +145,15 @@ export const getLessonContent = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        courseId,
-        lessonId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Failed to get lesson content');
+      logger.error(
+        {
+          requestId,
+          courseId,
+          lessonId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Failed to get lesson content'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

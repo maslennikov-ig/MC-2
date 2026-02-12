@@ -13,7 +13,7 @@ export function getSecureCookieOptions(
   options?: Partial<Omit<ResponseCookie, 'name' | 'value'>>
 ): Omit<ResponseCookie, 'name' | 'value'> {
   const isProduction = process.env.NODE_ENV === 'production'
-  
+
   // Base secure settings - always applied
   const baseOptions = {
     httpOnly: true,
@@ -38,30 +38,34 @@ export function getSecureCookieOptions(
  */
 export const COOKIE_CONFIG = {
   // Authentication cookies - shorter lived, stricter settings
-  auth: () => getSecureCookieOptions({
-    maxAge: 7 * 24 * 60 * 60, // 7 days
-    sameSite: 'lax',
-  }),
-  
+  auth: () =>
+    getSecureCookieOptions({
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      sameSite: 'lax',
+    }),
+
   // Session cookies - no maxAge (expires with browser session)
-  session: () => getSecureCookieOptions({
-    maxAge: undefined,
-    sameSite: 'lax',
-  }),
-  
+  session: () =>
+    getSecureCookieOptions({
+      maxAge: undefined,
+      sameSite: 'lax',
+    }),
+
   // Preference cookies - longer lived, less strict
-  preferences: () => getSecureCookieOptions({
-    maxAge: 365 * 24 * 60 * 60, // 1 year
-    httpOnly: false, // Can be read by client-side JS for UI preferences
-  }),
-  
+  preferences: () =>
+    getSecureCookieOptions({
+      maxAge: 365 * 24 * 60 * 60, // 1 year
+      httpOnly: false, // Can be read by client-side JS for UI preferences
+    }),
+
   // Analytics cookies - if needed
-  analytics: () => getSecureCookieOptions({
-    maxAge: 2 * 365 * 24 * 60 * 60, // 2 years
-    httpOnly: false,
-    sameSite: 'none', // For cross-site analytics
-  }),
-  
+  analytics: () =>
+    getSecureCookieOptions({
+      maxAge: 2 * 365 * 24 * 60 * 60, // 2 years
+      httpOnly: false,
+      sameSite: 'none', // For cross-site analytics
+    }),
+
   // Default secure settings for any cookie
   default: () => getSecureCookieOptions(),
 }

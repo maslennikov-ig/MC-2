@@ -8,7 +8,7 @@ This document defines the module boundaries, responsibilities, and import rules 
 packages/
 ├── course-gen-platform/   # Main API server and orchestration
 ├── shared-types/          # Shared TypeScript types and schemas
-└── trpc-client-sdk/       # External client SDK for consuming the API
+└── web/                   # Next.js frontend application
 ```
 
 ## Package Responsibilities
@@ -100,57 +100,29 @@ pnpm --filter @megacampus/shared-types generate:types
 
 ---
 
-### 3. `@megacampus/trpc-client-sdk`
-
-**Purpose**: External client SDK for consuming the tRPC API
-
-**Responsibilities**:
-
-- Type-safe tRPC client factory
-- Exports `AppRouter` type for external consumers
-- Simplifies client-side API calls
-- Future: Authentication helpers, retry logic, error handling
-
-**Key Files**:
-
-- `src/index.ts` - Client SDK entrypoint
-
-**Dependencies**:
-
-- `@trpc/client` - tRPC client library
-- `@megacampus/shared-types` - For shared type definitions
-
-**Usage Example**:
-
-```typescript
-import { createTRPCClient } from '@megacampus/trpc-client-sdk';
-
-const client = createTRPCClient({
-  url: 'https://ai.megacampus.ru/api/trpc',
-  headers: {
-    Authorization: 'Bearer <jwt_token>',
-  },
-});
-
-const courses = await client.generation.listCourses.query();
-```
-
----
-
 ## Import Rules and Dependency Graph
 
 ### Allowed Import Directions
 
 ```
 ┌─────────────────────────────┐
+│ web                         │
+│ (Next.js Frontend)          │
+│                             │
+│ ✅ CAN import from:         │
+│    - shared-types           │
+│    - course-gen-platform    │
+│      (type-only: AppRouter) │
+└─────────────────────────────┘
+              │
+              │ depends on (types)
+              ▼
+┌─────────────────────────────┐
 │ course-gen-platform         │
 │ (Main API Server)           │
 │                             │
 │ ✅ CAN import from:         │
 │    - shared-types           │
-│                             │
-│ ❌ CANNOT import from:       │
-│    - trpc-client-sdk        │
 └─────────────────────────────┘
               │
               │ depends on
@@ -161,23 +133,6 @@ const courses = await client.generation.listCourses.query();
 │                             │
 │ ✅ CAN import from:         │
 │    - zod only               │
-│                             │
-│ ❌ CANNOT import from:       │
-│    - course-gen-platform    │
-│    - trpc-client-sdk        │
-└─────────────────────────────┘
-              ▲
-              │ depends on
-              │
-┌─────────────────────────────┐
-│ trpc-client-sdk             │
-│ (Client SDK)                │
-│                             │
-│ ✅ CAN import from:         │
-│    - shared-types           │
-│                             │
-│ ❌ CANNOT import from:       │
-│    - course-gen-platform    │
 └─────────────────────────────┘
 ```
 
@@ -193,10 +148,10 @@ const courses = await client.generation.listCourses.query();
    - Uses generated database types
    - Exports tRPC router type (`AppRouter`)
 
-3. **`trpc-client-sdk` depends on `shared-types`**:
+3. **`web` depends on `shared-types` and `course-gen-platform` (type-only)**:
    - Imports shared types for type inference
-   - Re-exports `AppRouter` type from `course-gen-platform`
-   - Client-side only - never imported by server
+   - Imports `AppRouter` type from `course-gen-platform` for tRPC client
+   - Uses `@trpc/react-query` for type-safe API hooks
 
 4. **Circular dependencies are PROHIBITED**:
    - TypeScript project references enforce this
@@ -317,7 +272,7 @@ course-gen-platform/
 ### Never Import Secrets Across Boundaries
 
 - Environment variables loaded **only** in `course-gen-platform`
-- Secrets never passed through `shared-types` or `trpc-client-sdk`
+- Secrets never passed through `shared-types`
 - Use dependency injection for clients requiring secrets
 
 ### Type Safety First
@@ -335,8 +290,8 @@ course-gen-platform/
 TypeScript project references ensure correct build order:
 
 1. `shared-types` (foundation)
-2. `trpc-client-sdk` (depends on shared-types)
-3. `course-gen-platform` (depends on shared-types)
+2. `course-gen-platform` (depends on shared-types)
+3. `web` (depends on shared-types, course-gen-platform types)
 
 ### Build Commands
 
@@ -399,16 +354,16 @@ pnpm --filter @megacampus/course-gen-platform verify:structure
 
 ## Summary
 
-| Package               | Responsibility             | Can Import From | Imported By                  |
-| --------------------- | -------------------------- | --------------- | ---------------------------- |
-| `shared-types`        | Type definitions & schemas | `zod` only      | All other packages           |
-| `course-gen-platform` | Main API server            | `shared-types`  | None (server entrypoint)     |
-| `trpc-client-sdk`     | External client SDK        | `shared-types`  | External clients (frontends) |
+| Package               | Responsibility             | Can Import From                               | Imported By                |
+| --------------------- | -------------------------- | --------------------------------------------- | -------------------------- |
+| `shared-types`        | Type definitions & schemas | `zod` only                                    | All other packages         |
+| `course-gen-platform` | Main API server            | `shared-types`                                | None (server entrypoint)   |
+| `web`                 | Next.js frontend           | `shared-types`, `course-gen-platform` (types) | None (frontend entrypoint) |
 
 **Golden Rules**:
 
 1. ✅ `shared-types` is the source of truth for types
-2. ✅ Import direction: `course-gen-platform` → `shared-types` ← `trpc-client-sdk`
+2. ✅ Import direction: `web` → `course-gen-platform` (types) → `shared-types`
 3. ✅ No circular dependencies allowed
 4. ✅ Target 200-300 lines per file (max 500)
 5. ✅ One responsibility per file

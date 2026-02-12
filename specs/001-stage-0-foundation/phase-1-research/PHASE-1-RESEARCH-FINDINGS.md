@@ -9,6 +9,7 @@
 ## Executive Summary
 
 This report synthesizes research from Context7 documentation covering:
+
 1. Anthropic's official Claude Code patterns
 2. Claude Code Templates (davila7) - production-ready orchestrator patterns
 3. Awesome Claude Agents (vijaythecoder) - agent architecture patterns
@@ -24,14 +25,17 @@ This report synthesizes research from Context7 documentation covering:
 From **multiple authoritative sources**, the Signal Readiness pattern works differently than our architecture guide describes:
 
 #### From Anthropic Official Docs:
+
 - Orchestrators **DO NOT** use Task tool to invoke subagents
 - Main Claude session **automatically invokes** subagents based on context matching
 - Agent descriptions with keywords like "Use proactively" trigger auto-invocation
 - Orchestrators coordinate by creating artifacts and signaling readiness
 
 #### From Claude Code Templates (davila7):
+
 ```markdown
 ## Orchestrator Pattern (Correct):
+
 1. Orchestrator creates plan file: `.{workflow}-plan.json`
 2. Orchestrator signals: "Ready for {specialist} invocation"
 3. Main Claude session sees context and auto-invokes specialist
@@ -42,6 +46,7 @@ From **multiple authoritative sources**, the Signal Readiness pattern works diff
 **CRITICAL INSIGHT**: The "waiting" mechanism is **automatic context matching**, not explicit invocation!
 
 #### Example from davila7/claude-code-templates:
+
 ```python
 class ProjectSupervisorOrchestrator:
     def dispatch_agents(self, agent_sequence, data):
@@ -56,6 +61,7 @@ class ProjectSupervisorOrchestrator:
 ```
 
 #### From awesome-claude-agents (vijaythecoder):
+
 ```yaml
 # Tech Lead Orchestrator Pattern
 1. Analyze task
@@ -68,14 +74,16 @@ class ProjectSupervisorOrchestrator:
 ### How Our Current Implementation Deviates
 
 **OUR ARCHITECTURE GUIDE SAYS** (Line 686-707):
+
 ```markdown
 ## Phase 2: AI Updates
 
 Invoke the version-updater agent using Task tool:
-[Uses Task tool]  ❌ WRONG
+[Uses Task tool] ❌ WRONG
 ```
 
 **BUT OUR ORCHESTRATORS ACTUALLY DO** (health orchestrators):
+
 ```markdown
 1. Create plan files ✅ CORRECT
 2. Signal readiness ✅ CORRECT
@@ -91,6 +99,7 @@ Invoke the version-updater agent using Task tool:
 ### Discovery from Research
 
 #### Plan File Structure (from davila7):
+
 ```json
 {
   "phase": 1,
@@ -107,24 +116,28 @@ Invoke the version-updater agent using Task tool:
 ```
 
 #### Signal File Pattern:
+
 **NOT NEEDED!** Signals are **text messages to user**, not files.
 
 From Anthropic docs:
+
 ```markdown
 orchestrator:
-  "Phase 1 complete. Ready for AI version updates.
+"Phase 1 complete. Ready for AI version updates.
 
-   The version-updater agent will now be automatically invoked to:
-   - Update all version references
-   - Skip historical CHANGELOG entries
-   - Generate validation report
+The version-updater agent will now be automatically invoked to:
 
-   Note: You do not need to manually invoke the agent."
+- Update all version references
+- Skip historical CHANGELOG entries
+- Generate validation report
+
+Note: You do not need to manually invoke the agent."
 ```
 
 ### Our Current Implementation
 
 ✅ **WE'RE DOING THIS RIGHT!** Our orchestrators create proper plan files:
+
 - `.bug-hunter-plan.json`
 - `.security-scanner-plan.json`
 - `.version-update-plan.json`
@@ -140,6 +153,7 @@ But we use inconsistent terminology in describing this process.
 Skills are **NOT DOCUMENTED IN CONTEXT7 RESEARCH**.
 
 However, from Claude Code official docs references:
+
 - Skills are simpler than agents
 - Skills don't have isolated context
 - Skills are for utility functions
@@ -147,17 +161,18 @@ However, from Claude Code official docs references:
 
 ### When to Use Skills vs Agents
 
-| Criterion | Use Skill | Use Agent |
-|-----------|-----------|-----------|
-| **Complexity** | Single utility function | Multi-step workflow |
-| **Context** | Stateless | Needs context isolation |
-| **Coordination** | Standalone | Coordinates other agents |
-| **Tools** | Limited, specific | Full tool access |
-| **Invocation** | Direct function call | Context-based auto-invoke |
+| Criterion        | Use Skill               | Use Agent                 |
+| ---------------- | ----------------------- | ------------------------- |
+| **Complexity**   | Single utility function | Multi-step workflow       |
+| **Context**      | Stateless               | Needs context isolation   |
+| **Coordination** | Standalone              | Coordinates other agents  |
+| **Tools**        | Limited, specific       | Full tool access          |
+| **Invocation**   | Direct function call    | Context-based auto-invoke |
 
 ### Examples
 
 **Should be Skills**:
+
 - Format JSON output
 - Validate file paths
 - Parse git diff
@@ -165,6 +180,7 @@ However, from Claude Code official docs references:
 - Generate timestamps
 
 **Should be Agents**:
+
 - bug-hunter (multi-step: scan → analyze → report)
 - version-updater (multi-step: find → update → validate)
 - orchestrators (coordinate multiple agents)
@@ -205,7 +221,7 @@ Phase N-1 (Orchestrator):
   output:
     - Create plan file
     - Update TodoWrite (mark phase ready)
-    - Signal to user: "Ready for [phase name]"
+    - Signal to user: 'Ready for [phase name]'
 
 Phase N (Main Claude auto-invokes Specialist):
   input:
@@ -225,7 +241,7 @@ Phase N+1 (Orchestrator):
     - Validate results
     - Update TodoWrite (mark phase complete)
   output:
-    - Signal to user: "Phase N validated"
+    - Signal to user: 'Phase N validated'
 ```
 
 ### Our Current Implementation
@@ -233,11 +249,13 @@ Phase N+1 (Orchestrator):
 ✅ **MOSTLY CORRECT** but has issues:
 
 **GOOD**:
+
 - We create plan files
 - We create report files
 - We use TodoWrite for tracking
 
 **BAD**:
+
 - Terminology says "Launch" instead of "Signal"
 - Documentation shows Task tool usage (anti-pattern)
 - No standardized report format across agents
@@ -263,16 +281,18 @@ description: |
     assistant: "I'll use agent-name"
     <commentary>Why this agent is appropriate</commentary>
   </example>
-tools: Read, Write, Bash  # Explicitly list or omit for all
+tools: Read, Write, Bash # Explicitly list or omit for all
 ---
 ```
 
 **KEY INSIGHTS**:
+
 1. Use "MUST BE USED" or "Use PROACTIVELY" for auto-activation
 2. Provide XML-style examples showing usage context
 3. Be specific about when agent should be invoked
 
 #### Our Agents:
+
 ✅ Most follow this pattern already
 ⚠️ Some descriptions are too generic
 
@@ -281,16 +301,20 @@ tools: Read, Write, Bash  # Explicitly list or omit for all
 #### Orchestrator Best Practices:
 
 1. **Pre-Flight Validation**
+
    ```markdown
    Phase 0: Pre-Flight Validation
+
    1. Validate environment
    2. Check preconditions
    3. Initialize tracking (TodoWrite)
    ```
 
 2. **Quality Gates**
+
    ```markdown
    Gate Criteria:
+
    - Tests passing
    - Type check passing
    - Build successful
@@ -308,6 +332,7 @@ tools: Read, Write, Bash  # Explicitly list or omit for all
    ```
 
 #### Our Orchestrators:
+
 ✅ We have validation steps
 ✅ We have error handling
 ❌ We don't have explicit quality gates with metrics
@@ -320,13 +345,17 @@ From davila7, there's a pattern for **automated validation hooks**:
 ```json
 {
   "hooks": {
-    "PreToolUse": [{
-      "matcher": "Write",
-      "hooks": [{
-        "type": "command",
-        "command": "bash .claude/hooks/validate-location.sh"
-      }]
-    }]
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/validate-location.sh"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -346,35 +375,43 @@ From davila7, there's a pattern for **automated validation hooks**:
 #### Anti-Pattern 1: Direct Task Execution by Orchestrator
 
 **WRONG**:
+
 ```markdown
 orchestrator:
-  1. Create plan
-  2. Run pnpm type-check  ❌
-  3. Run pnpm build  ❌
-  4. Generate report  ❌
+
+1. Create plan
+2. Run pnpm type-check ❌
+3. Run pnpm build ❌
+4. Generate report ❌
 ```
 
 **RIGHT**:
+
 ```markdown
 orchestrator:
-  1. Create plan
-  2. Signal for worker invocation
-  3. Wait for worker completion
-  4. Validate worker report
+
+1. Create plan
+2. Signal for worker invocation
+3. Wait for worker completion
+4. Validate worker report
 ```
 
 #### Anti-Pattern 2: Using Task Tool to Invoke Subagents
 
 **WRONG**:
+
 ```markdown
 ## Phase 2
+
 Invoke specialist using Task tool:
-Task(subagent_type="specialist", prompt="Do work")  ❌
+Task(subagent_type="specialist", prompt="Do work") ❌
 ```
 
 **RIGHT**:
+
 ```markdown
 ## Phase 2
+
 Signal readiness:
 "Ready for specialist invocation. Specialist will be automatically
 invoked based on context matching."
@@ -383,20 +420,23 @@ invoked based on context matching."
 #### Anti-Pattern 3: No Handoff Artifacts
 
 **WRONG**:
+
 ```markdown
 orchestrator: "Go do the work"
-specialist: [Guesses what to do]  ❌
+specialist: [Guesses what to do] ❌
 ```
 
 **RIGHT**:
+
 ```markdown
 orchestrator:
-  1. Create .specialist-plan.json
-  2. Signal readiness
-specialist:
-  1. Read .specialist-plan.json
-  2. Execute based on plan
-  3. Create specialist-report.md
+
+1. Create .specialist-plan.json
+2. Signal readiness
+   specialist:
+3. Read .specialist-plan.json
+4. Execute based on plan
+5. Create specialist-report.md
 ```
 
 #### Anti-Pattern 4: Agent Does Too Much
@@ -404,6 +444,7 @@ specialist:
 **WRONG**: One agent for authentication, authorization, session management, password reset, 2FA, OAuth...
 
 **RIGHT**:
+
 - auth-architect: Designs the system
 - auth-implementer: Implements specific features
 - auth-security-reviewer: Reviews security aspects
@@ -433,6 +474,7 @@ specialist:
 **PURPOSE**: Central routing eliminates peer-to-peer chaos
 
 **OUR STATUS**:
+
 - We have `code-health-orchestrator` which acts as hub for health domain
 - Could extend this pattern to other domains
 
@@ -445,6 +487,7 @@ specialist:
 ### Question 1: How do orchestrators properly "wait" for workers?
 
 **ANSWER**: They don't actively wait. They:
+
 1. Create plan file
 2. Signal readiness to user
 3. **Return control to main session**
@@ -456,6 +499,7 @@ specialist:
 ### Question 2: What triggers worker invocation?
 
 **ANSWER**: Main Claude session triggers based on:
+
 - Agent description matching context keywords
 - "Use proactively" or "MUST BE USED" in descriptions
 - XML examples showing similar use cases
@@ -464,6 +508,7 @@ specialist:
 ### Question 3: Exact format of plan files?
 
 **ANSWER**: JSON with these common fields:
+
 ```json
 {
   "phase": <number>,
@@ -485,6 +530,7 @@ specialist:
 **ANSWER**: Natural language messages to user:
 
 **Template**:
+
 ```
 Phase X complete. Ready for [agent-name] invocation.
 
@@ -503,6 +549,7 @@ Note: You do not need to manually invoke the agent.
 **ANSWER**: Yes, but with constraints:
 
 **ALLOWED**:
+
 - Read: Check for output files
 - Write: Create plan files, summaries
 - Glob/Grep: Discover files
@@ -510,6 +557,7 @@ Note: You do not need to manually invoke the agent.
 - TodoWrite: Progress tracking
 
 **NOT ALLOWED**:
+
 - Task: To invoke subagents (violates pattern)
 - Bash: To execute worker tasks (npm test, pnpm build)
 - Edit: To do implementation work
@@ -521,12 +569,14 @@ Note: You do not need to manually invoke the agent.
 **ANSWER FROM RESEARCH**: Skills NOT well-documented in Context7 sources
 
 **INFERENCE**:
+
 - Skills: Simple utility functions, stateless, no context isolation
 - Agents: Complex workflows, stateful, context isolated
 - Agents CAN use Skills (like library functions)
 - Skills CANNOT coordinate agents
 
 **OUR NEED**: We should create Skills for:
+
 - JSON validation
 - File path checking
 - Version number parsing
@@ -590,6 +640,7 @@ Note: You do not need to manually invoke the agent.
 ### Phase 2: Architecture Design
 
 **Priority Actions**:
+
 1. ✅ Fix architecture guide anti-patterns (remove Task tool examples)
 2. ✅ Standardize terminology (Launch → Signal)
 3. ✅ Add explicit quality gate patterns
@@ -600,6 +651,7 @@ Note: You do not need to manually invoke the agent.
 ### Phase 3: Implementation Planning
 
 **Priority Actions**:
+
 1. Create refactoring spec for 5 orchestrators (terminology fixes)
 2. Create Skills implementation spec (migrate simple utilities)
 3. Create standardized report template
@@ -608,6 +660,7 @@ Note: You do not need to manually invoke the agent.
 ### Phase 4: Implementation
 
 **Priority Actions**:
+
 1. Fix orchestrator terminology (23 places)
 2. Update architecture guide (remove anti-patterns)
 3. Create first Skills (5-10 simple utilities)
@@ -617,6 +670,7 @@ Note: You do not need to manually invoke the agent.
 ### Phase 5: Validation
 
 **Priority Actions**:
+
 1. Test `/health quick` end-to-end
 2. Test `/health full` end-to-end
 3. Validate all orchestrators follow patterns
@@ -692,7 +746,9 @@ From Anthropic docs: Use WebFetch to get latest documentation
 
 ```markdown
 ### Phase 1: Research
+
 Before implementing, fetch current documentation:
+
 1. Use WebFetch to load official docs
 2. Review best practices
 3. Check for breaking changes
@@ -805,6 +861,7 @@ Our current architecture is **fundamentally sound** but needs:
 
 **Report Generated**: 2025-10-16
 **Sources**:
+
 - /anthropics/claude-code via Context7
 - /davila7/claude-code-templates via Context7
 - /vijaythecoder/awesome-claude-agents via Context7

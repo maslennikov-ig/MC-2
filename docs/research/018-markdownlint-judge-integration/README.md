@@ -11,12 +11,12 @@ Integrate [markdownlint](https://github.com/DavidAnson/markdownlint) as a **FREE
 
 ### Value Proposition
 
-| Metric | Current | With Markdownlint |
-|--------|---------|-------------------|
-| Structural issues caught | LLM-dependent | Pre-filtered (FREE) |
-| Cost per structural check | ~$0.001 (LLM) | $0 (local) |
-| Detection reliability | Variable | Deterministic |
-| Feedback specificity | General | Line-level precision |
+| Metric                    | Current       | With Markdownlint    |
+| ------------------------- | ------------- | -------------------- |
+| Structural issues caught  | LLM-dependent | Pre-filtered (FREE)  |
+| Cost per structural check | ~$0.001 (LLM) | $0 (local)           |
+| Detection reliability     | Variable      | Deterministic        |
+| Feedback specificity      | General       | Line-level precision |
 
 ## Problem Statement
 
@@ -29,14 +29,14 @@ Current Judge Pipeline evaluates **pedagogical quality** but lacks **structural 
 
 ### Common Structural Issues in LLM-Generated Content
 
-| Issue | Frequency | Impact |
-|-------|-----------|--------|
-| Heading level skips (H1 → H3) | ~15% | Broken TOC, a11y issues |
-| Code blocks without language | ~25% | No syntax highlighting |
-| Inconsistent list formatting | ~10% | Visual inconsistency |
-| Missing blank lines around blocks | ~20% | Rendering issues |
-| Multiple H1 headings | ~8% | SEO, structure issues |
-| Trailing spaces | ~40% | Git diffs, rendering |
+| Issue                             | Frequency | Impact                  |
+| --------------------------------- | --------- | ----------------------- |
+| Heading level skips (H1 → H3)     | ~15%      | Broken TOC, a11y issues |
+| Code blocks without language      | ~25%      | No syntax highlighting  |
+| Inconsistent list formatting      | ~10%      | Visual inconsistency    |
+| Missing blank lines around blocks | ~20%      | Rendering issues        |
+| Multiple H1 headings              | ~8%       | SEO, structure issues   |
+| Trailing spaces                   | ~40%      | Git diffs, rendering    |
 
 ## Proposed Solution
 
@@ -105,51 +105,51 @@ export const LESSON_MARKDOWNLINT_CONFIG: Configuration = {
   // === ENABLED (Critical for lesson quality) ===
 
   // Heading structure
-  'MD001': true,  // Heading levels increment by one (no H1 → H3 skips)
-  'MD003': { style: 'atx' },  // ATX-style headings (# Heading)
-  'MD022': true,  // Headings surrounded by blank lines
-  'MD025': true,  // Single top-level heading (H1)
-  'MD041': false, // First line H1 - DISABLED (lessons may start with metadata)
+  MD001: true, // Heading levels increment by one (no H1 → H3 skips)
+  MD003: { style: 'atx' }, // ATX-style headings (# Heading)
+  MD022: true, // Headings surrounded by blank lines
+  MD025: true, // Single top-level heading (H1)
+  MD041: false, // First line H1 - DISABLED (lessons may start with metadata)
 
   // Code blocks (critical for technical content)
-  'MD031': true,  // Fenced code blocks surrounded by blank lines
-  'MD040': true,  // Fenced code blocks should have language specified
-  'MD046': { style: 'fenced' },  // Code block style (fenced, not indented)
-  'MD048': { style: 'backtick' }, // Code fence style (backticks, not tildes)
+  MD031: true, // Fenced code blocks surrounded by blank lines
+  MD040: true, // Fenced code blocks should have language specified
+  MD046: { style: 'fenced' }, // Code block style (fenced, not indented)
+  MD048: { style: 'backtick' }, // Code fence style (backticks, not tildes)
 
   // Lists
-  'MD004': { style: 'dash' },  // Unordered list style (consistent)
-  'MD005': true,   // Consistent list indentation
-  'MD007': { indent: 2 },  // Unordered list indentation (2 spaces)
-  'MD030': true,   // Spaces after list markers
-  'MD032': true,   // Lists surrounded by blank lines
+  MD004: { style: 'dash' }, // Unordered list style (consistent)
+  MD005: true, // Consistent list indentation
+  MD007: { indent: 2 }, // Unordered list indentation (2 spaces)
+  MD030: true, // Spaces after list markers
+  MD032: true, // Lists surrounded by blank lines
 
   // Emphasis & inline formatting
-  'MD037': true,  // No spaces inside emphasis markers
-  'MD038': true,  // No spaces inside code span elements
-  'MD049': { style: 'asterisk' },  // Emphasis style (*)
-  'MD050': { style: 'asterisk' },  // Strong style (**)
+  MD037: true, // No spaces inside emphasis markers
+  MD038: true, // No spaces inside code span elements
+  MD049: { style: 'asterisk' }, // Emphasis style (*)
+  MD050: { style: 'asterisk' }, // Strong style (**)
 
   // Links & images
-  'MD039': true,  // No spaces inside link text
-  'MD042': true,  // No empty links
-  'MD045': true,  // Images should have alt text (accessibility)
+  MD039: true, // No spaces inside link text
+  MD042: true, // No empty links
+  MD045: true, // Images should have alt text (accessibility)
 
   // Whitespace & formatting
-  'MD009': true,   // No trailing spaces
-  'MD010': true,   // No hard tabs
-  'MD012': { maximum: 2 },  // Max consecutive blank lines
-  'MD047': true,   // Files should end with single newline
+  MD009: true, // No trailing spaces
+  MD010: true, // No hard tabs
+  MD012: { maximum: 2 }, // Max consecutive blank lines
+  MD047: true, // Files should end with single newline
 
   // === DISABLED (Incompatible with LLM-generated content) ===
 
-  'MD013': false,  // Line length - LLM writes long lines, handled by UI
-  'MD024': false,  // No duplicate headings - lessons may repeat section titles
-  'MD026': false,  // No trailing punctuation in headings - allows "What is X?"
-  'MD033': false,  // No inline HTML - we allow callouts via HTML comments
-  'MD034': false,  // No bare URLs - sometimes useful in educational content
-  'MD036': false,  // No emphasis as heading - can be stylistic choice
-  'MD044': false,  // Proper names capitalization - too strict for lessons
+  MD013: false, // Line length - LLM writes long lines, handled by UI
+  MD024: false, // No duplicate headings - lessons may repeat section titles
+  MD026: false, // No trailing punctuation in headings - allows "What is X?"
+  MD033: false, // No inline HTML - we allow callouts via HTML comments
+  MD034: false, // No bare URLs - sometimes useful in educational content
+  MD036: false, // No emphasis as heading - can be stylistic choice
+  MD044: false, // Proper names capitalization - too strict for lessons
 };
 ```
 
@@ -171,46 +171,46 @@ export type MarkdownSeverity = 'critical' | 'major' | 'minor';
 
 export const RULE_SEVERITY: Record<string, MarkdownSeverity> = {
   // Critical - affects rendering/accessibility
-  'MD001': 'critical',  // Heading hierarchy broken
-  'MD025': 'critical',  // Multiple H1 headings
-  'MD031': 'critical',  // Code blocks not separated
-  'MD040': 'critical',  // Code blocks without language
-  'MD045': 'critical',  // Images without alt text
-  'MD046': 'critical',  // Wrong code block style
+  MD001: 'critical', // Heading hierarchy broken
+  MD025: 'critical', // Multiple H1 headings
+  MD031: 'critical', // Code blocks not separated
+  MD040: 'critical', // Code blocks without language
+  MD045: 'critical', // Images without alt text
+  MD046: 'critical', // Wrong code block style
 
   // Major - affects readability
-  'MD003': 'major',     // Inconsistent heading style
-  'MD004': 'major',     // Inconsistent list style
-  'MD005': 'major',     // Inconsistent list indentation
-  'MD022': 'major',     // Headings not separated
-  'MD032': 'major',     // Lists not separated
-  'MD037': 'major',     // Spaces in emphasis
-  'MD038': 'major',     // Spaces in code spans
-  'MD042': 'major',     // Empty links
+  MD003: 'major', // Inconsistent heading style
+  MD004: 'major', // Inconsistent list style
+  MD005: 'major', // Inconsistent list indentation
+  MD022: 'major', // Headings not separated
+  MD032: 'major', // Lists not separated
+  MD037: 'major', // Spaces in emphasis
+  MD038: 'major', // Spaces in code spans
+  MD042: 'major', // Empty links
 
   // Minor - cosmetic
-  'MD007': 'minor',     // List indentation amount
-  'MD009': 'minor',     // Trailing spaces
-  'MD010': 'minor',     // Hard tabs
-  'MD012': 'minor',     // Multiple blank lines
-  'MD030': 'minor',     // Spaces after list markers
-  'MD039': 'minor',     // Spaces in link text
-  'MD047': 'minor',     // File ending newline
-  'MD048': 'minor',     // Code fence style
-  'MD049': 'minor',     // Emphasis style
-  'MD050': 'minor',     // Strong style
+  MD007: 'minor', // List indentation amount
+  MD009: 'minor', // Trailing spaces
+  MD010: 'minor', // Hard tabs
+  MD012: 'minor', // Multiple blank lines
+  MD030: 'minor', // Spaces after list markers
+  MD039: 'minor', // Spaces in link text
+  MD047: 'minor', // File ending newline
+  MD048: 'minor', // Code fence style
+  MD049: 'minor', // Emphasis style
+  MD050: 'minor', // Strong style
 };
 
 export const SEVERITY_PENALTIES: Record<MarkdownSeverity, number> = {
-  critical: 10,  // -10 points per critical issue
-  major: 3,      // -3 points per major issue
-  minor: 1,      // -1 point per minor issue
+  critical: 10, // -10 points per critical issue
+  major: 3, // -3 points per major issue
+  minor: 1, // -1 point per minor issue
 };
 ```
 
 ### 4. Filter Implementation
 
-```typescript
+````typescript
 // packages/course-gen-platform/src/stages/stage6-lesson-content/judge/markdown-structure-filter.ts
 
 import { lint } from 'markdownlint/sync';
@@ -308,7 +308,7 @@ export function validateMarkdownStructure(markdownContent: string): MarkdownStru
   const errors: LintError[] = lintResults['content'] ?? [];
 
   // Classify and count by severity
-  const issues: MarkdownStructureIssue[] = errors.map((error) => ({
+  const issues: MarkdownStructureIssue[] = errors.map(error => ({
     ruleId: error.ruleNames[0] ?? 'unknown',
     ruleAliases: error.ruleNames.slice(1),
     description: error.ruleDescription,
@@ -320,9 +320,9 @@ export function validateMarkdownStructure(markdownContent: string): MarkdownStru
     fixable: error.fixInfo !== null,
   }));
 
-  const criticalCount = issues.filter((i) => i.severity === 'critical').length;
-  const majorCount = issues.filter((i) => i.severity === 'major').length;
-  const minorCount = issues.filter((i) => i.severity === 'minor').length;
+  const criticalCount = issues.filter(i => i.severity === 'critical').length;
+  const majorCount = issues.filter(i => i.severity === 'major').length;
+  const minorCount = issues.filter(i => i.severity === 'minor').length;
 
   // Calculate score: start at 100, subtract penalties
   const totalPenalty =
@@ -372,34 +372,34 @@ export function toJudgeIssue(issue: MarkdownStructureIssue): {
  */
 function getFixSuggestion(issue: MarkdownStructureIssue): string {
   const suggestions: Record<string, string> = {
-    'MD001': 'Adjust heading levels to increment by one (e.g., H2 after H1, not H3)',
-    'MD003': 'Use ATX-style headings (# Heading) consistently',
-    'MD004': 'Use consistent list markers (prefer - for unordered lists)',
-    'MD005': 'Fix list indentation to be consistent',
-    'MD007': 'Use 2 spaces for list indentation',
-    'MD009': 'Remove trailing spaces from line end',
-    'MD010': 'Replace hard tabs with spaces',
-    'MD012': 'Remove extra blank lines (max 2 consecutive)',
-    'MD022': 'Add blank lines before and after headings',
-    'MD025': 'Use only one H1 heading per document',
-    'MD031': 'Add blank lines before and after fenced code blocks',
-    'MD032': 'Add blank lines before and after lists',
-    'MD037': 'Remove spaces inside emphasis markers (*text* not * text *)',
-    'MD038': 'Remove spaces inside code spans (`code` not ` code `)',
-    'MD039': 'Remove spaces inside link text',
-    'MD040': 'Add language identifier to fenced code block (e.g., ```javascript)',
-    'MD042': 'Add URL to empty link or remove the link',
-    'MD045': 'Add alt text to image for accessibility',
-    'MD046': 'Use fenced code blocks (```) instead of indented code',
-    'MD047': 'Add newline at end of file',
-    'MD048': 'Use backticks (```) for code fences, not tildes (~~~)',
-    'MD049': 'Use asterisks (*) for emphasis, not underscores (_)',
-    'MD050': 'Use asterisks (**) for strong emphasis, not underscores (__)',
+    MD001: 'Adjust heading levels to increment by one (e.g., H2 after H1, not H3)',
+    MD003: 'Use ATX-style headings (# Heading) consistently',
+    MD004: 'Use consistent list markers (prefer - for unordered lists)',
+    MD005: 'Fix list indentation to be consistent',
+    MD007: 'Use 2 spaces for list indentation',
+    MD009: 'Remove trailing spaces from line end',
+    MD010: 'Replace hard tabs with spaces',
+    MD012: 'Remove extra blank lines (max 2 consecutive)',
+    MD022: 'Add blank lines before and after headings',
+    MD025: 'Use only one H1 heading per document',
+    MD031: 'Add blank lines before and after fenced code blocks',
+    MD032: 'Add blank lines before and after lists',
+    MD037: 'Remove spaces inside emphasis markers (*text* not * text *)',
+    MD038: 'Remove spaces inside code spans (`code` not ` code `)',
+    MD039: 'Remove spaces inside link text',
+    MD040: 'Add language identifier to fenced code block (e.g., ```javascript)',
+    MD042: 'Add URL to empty link or remove the link',
+    MD045: 'Add alt text to image for accessibility',
+    MD046: 'Use fenced code blocks (```) instead of indented code',
+    MD047: 'Add newline at end of file',
+    MD048: 'Use backticks (```) for code fences, not tildes (~~~)',
+    MD049: 'Use asterisks (*) for emphasis, not underscores (_)',
+    MD050: 'Use asterisks (**) for strong emphasis, not underscores (__)',
   };
 
   return suggestions[issue.ruleId] ?? `Fix ${issue.ruleId}: ${issue.description}`;
 }
-```
+````
 
 ### 5. Integration with Heuristic Filters
 
@@ -497,7 +497,7 @@ export type HeuristicCheckName =
   | 'required_sections'
   | 'keyword_coverage'
   | 'content_density'
-  | 'markdown_structure';  // NEW
+  | 'markdown_structure'; // NEW
 
 /**
  * Markdown structure specific details in heuristic result.
@@ -642,18 +642,21 @@ describe('heuristic filters with markdown structure', () => {
 ## Rollout Plan
 
 ### Phase 1: Shadow Mode (Week 1-2)
+
 - Deploy markdownlint filter
 - Log results but don't affect pipeline decisions
 - Collect metrics on issue frequency
 - Tune rule configuration based on real data
 
 ### Phase 2: Soft Enforcement (Week 3-4)
+
 - Enable as non-blocking filter
 - Add issues to refinement feedback (but don't fail)
 - Monitor refinement success rate
 - Adjust severity classifications
 
 ### Phase 3: Full Enforcement (Week 5+)
+
 - Enable as blocking filter (score < 75 = fail)
 - Integrate with Decision Engine
 - Auto-fix minor issues if feasible
@@ -662,12 +665,12 @@ describe('heuristic filters with markdown structure', () => {
 
 ### Success Metrics
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Filter execution time | < 50ms p95 | Prometheus histogram |
-| False positive rate | < 5% | Manual review sample |
-| Issues caught per lesson | Track trend | Counter per severity |
-| Refinement success rate | Improve by 10% | Before/after comparison |
+| Metric                   | Target         | Measurement             |
+| ------------------------ | -------------- | ----------------------- |
+| Filter execution time    | < 50ms p95     | Prometheus histogram    |
+| False positive rate      | < 5%           | Manual review sample    |
+| Issues caught per lesson | Track trend    | Counter per severity    |
+| Refinement success rate  | Improve by 10% | Before/after comparison |
 
 ### Dashboards
 
@@ -680,28 +683,29 @@ markdownlint_filter_pass_rate
 
 ## Cost Analysis
 
-| Component | Cost | Notes |
-|-----------|------|-------|
-| markdownlint package | 0 | MIT license |
-| Execution | ~0.001ms CPU | Negligible |
-| Memory | ~5MB peak | Temporary |
-| **Total per evaluation** | **$0** | vs $0.001+ for LLM |
+| Component                | Cost         | Notes              |
+| ------------------------ | ------------ | ------------------ |
+| markdownlint package     | 0            | MIT license        |
+| Execution                | ~0.001ms CPU | Negligible         |
+| Memory                   | ~5MB peak    | Temporary          |
+| **Total per evaluation** | **$0**       | vs $0.001+ for LLM |
 
 ### ROI Projection
 
 Assuming 1000 lessons/day:
+
 - Current: All structural issues reach LLM ($1-2/day wasted)
 - With filter: 30-50% pre-filtered (saves $0.30-1/day)
 - **Annual savings**: ~$100-350 + improved quality
 
 ## Risks & Mitigations
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| False positives block good content | Medium | High | Shadow mode first, tune rules |
-| LLM output incompatible with rules | Low | Medium | Disable problematic rules |
-| Performance regression | Low | Low | Async execution, timeout |
-| Maintenance burden | Low | Low | Stable library, minimal config |
+| Risk                               | Probability | Impact | Mitigation                     |
+| ---------------------------------- | ----------- | ------ | ------------------------------ |
+| False positives block good content | Medium      | High   | Shadow mode first, tune rules  |
+| LLM output incompatible with rules | Low         | Medium | Disable problematic rules      |
+| Performance regression             | Low         | Low    | Async execution, timeout       |
+| Maintenance burden                 | Low         | Low    | Stable library, minimal config |
 
 ## Open Questions
 
@@ -727,51 +731,54 @@ Assuming 1000 lessons/day:
 
 ## Appendix A: Full Rule Reference
 
-| Rule | Name | Enabled | Severity | Reason |
-|------|------|---------|----------|--------|
-| MD001 | heading-increment | Yes | Critical | Broken TOC, a11y |
-| MD003 | heading-style | Yes (atx) | Major | Consistency |
-| MD004 | ul-style | Yes (dash) | Major | Consistency |
-| MD005 | list-indent | Yes | Major | Readability |
-| MD007 | ul-indent | Yes (2) | Minor | Style |
-| MD009 | no-trailing-spaces | Yes | Minor | Clean diffs |
-| MD010 | no-hard-tabs | Yes | Minor | Rendering |
-| MD012 | no-multiple-blanks | Yes (2) | Minor | Clean formatting |
-| MD013 | line-length | No | - | LLM writes long |
-| MD022 | blanks-around-headings | Yes | Major | Readability |
-| MD024 | no-duplicate-heading | No | - | Lessons repeat |
-| MD025 | single-h1 | Yes | Critical | Structure |
-| MD026 | no-trailing-punctuation | No | - | Questions OK |
-| MD031 | blanks-around-fences | Yes | Critical | Rendering |
-| MD032 | blanks-around-lists | Yes | Major | Readability |
-| MD033 | no-inline-html | No | - | Callouts use HTML |
-| MD034 | no-bare-urls | No | - | Educational content |
-| MD037 | no-space-in-emphasis | Yes | Major | Rendering |
-| MD038 | no-space-in-code | Yes | Major | Rendering |
-| MD039 | no-space-in-links | Yes | Minor | Clean formatting |
-| MD040 | fenced-code-language | Yes | Critical | Syntax highlighting |
-| MD041 | first-line-h1 | No | - | Metadata first |
-| MD042 | no-empty-links | Yes | Major | Broken links |
-| MD045 | no-alt-text | Yes | Critical | Accessibility |
-| MD046 | code-block-style | Yes (fenced) | Critical | Consistency |
-| MD047 | single-trailing-newline | Yes | Minor | Clean EOF |
-| MD048 | code-fence-style | Yes (backtick) | Minor | Consistency |
-| MD049 | emphasis-style | Yes (*) | Minor | Consistency |
-| MD050 | strong-style | Yes (**) | Minor | Consistency |
+| Rule  | Name                    | Enabled        | Severity | Reason              |
+| ----- | ----------------------- | -------------- | -------- | ------------------- |
+| MD001 | heading-increment       | Yes            | Critical | Broken TOC, a11y    |
+| MD003 | heading-style           | Yes (atx)      | Major    | Consistency         |
+| MD004 | ul-style                | Yes (dash)     | Major    | Consistency         |
+| MD005 | list-indent             | Yes            | Major    | Readability         |
+| MD007 | ul-indent               | Yes (2)        | Minor    | Style               |
+| MD009 | no-trailing-spaces      | Yes            | Minor    | Clean diffs         |
+| MD010 | no-hard-tabs            | Yes            | Minor    | Rendering           |
+| MD012 | no-multiple-blanks      | Yes (2)        | Minor    | Clean formatting    |
+| MD013 | line-length             | No             | -        | LLM writes long     |
+| MD022 | blanks-around-headings  | Yes            | Major    | Readability         |
+| MD024 | no-duplicate-heading    | No             | -        | Lessons repeat      |
+| MD025 | single-h1               | Yes            | Critical | Structure           |
+| MD026 | no-trailing-punctuation | No             | -        | Questions OK        |
+| MD031 | blanks-around-fences    | Yes            | Critical | Rendering           |
+| MD032 | blanks-around-lists     | Yes            | Major    | Readability         |
+| MD033 | no-inline-html          | No             | -        | Callouts use HTML   |
+| MD034 | no-bare-urls            | No             | -        | Educational content |
+| MD037 | no-space-in-emphasis    | Yes            | Major    | Rendering           |
+| MD038 | no-space-in-code        | Yes            | Major    | Rendering           |
+| MD039 | no-space-in-links       | Yes            | Minor    | Clean formatting    |
+| MD040 | fenced-code-language    | Yes            | Critical | Syntax highlighting |
+| MD041 | first-line-h1           | No             | -        | Metadata first      |
+| MD042 | no-empty-links          | Yes            | Major    | Broken links        |
+| MD045 | no-alt-text             | Yes            | Critical | Accessibility       |
+| MD046 | code-block-style        | Yes (fenced)   | Critical | Consistency         |
+| MD047 | single-trailing-newline | Yes            | Minor    | Clean EOF           |
+| MD048 | code-fence-style        | Yes (backtick) | Minor    | Consistency         |
+| MD049 | emphasis-style          | Yes (\*)       | Minor    | Consistency         |
+| MD050 | strong-style            | Yes (\*\*)     | Minor    | Consistency         |
 
 ---
 
 ## Appendix B: Example Output
 
 ### Input (problematic lesson)
+
 ```markdown
 # Introduction to JavaScript
 
 ### Variables
-Variables store data...
 
+Variables store data...
 ```
+
 let x = 1
+
 ```
 
 ## Functions
@@ -779,7 +786,8 @@ Functions are...
 ```
 
 ### Markdownlint Output
-```json
+
+````json
 {
   "score": 60,
   "passed": false,
@@ -812,4 +820,4 @@ Functions are...
   ],
   "durationMs": 12
 }
-```
+````

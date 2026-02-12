@@ -30,7 +30,7 @@ Rollback failed workflow phases by reading changes log and reversing tracked mod
 {
   "phase": "bug-fixing",
   "timestamp": "2025-10-18T14:30:00Z",
-  "files_modified": [{"path": "src/app.ts", "backup": ".rollback/src-app.ts.backup"}],
+  "files_modified": [{ "path": "src/app.ts", "backup": ".rollback/src-app.ts.backup" }],
   "files_created": ["src/new-file.ts"],
   "commands_executed": ["pnpm install", "pnpm build"],
   "git_commits": ["abc123"],
@@ -41,33 +41,40 @@ Rollback failed workflow phases by reading changes log and reversing tracked mod
 ## Process
 
 ### 1. Read & Parse Changes Log
+
 Use Read tool to load JSON. Validate required fields: phase, timestamp, files_modified, files_created, commands_executed, git_commits.
 
 ### 2. Request Confirmation (if required)
+
 Show summary of changes to revert. If user declines, return dry run result.
 
 ### 3. Restore Modified Files
+
 ```bash
 cp "{backup}" "{path}"  # For each {path, backup} in files_modified
 ```
 
 ### 4. Delete Created Files
+
 ```bash
 rm -f "{file}"  # For each file in files_created
 ```
 
 ### 5. Revert Commands
+
 - `pnpm install` → re-run to restore lockfile
 - `git add *` → `git restore --staged .`
 - `pnpm build` → `rm -rf dist/`
 - Other → log warning (cannot auto-revert)
 
 ### 6. Revert Git Commits
+
 ```bash
 git revert --no-edit {sha}  # In reverse order
 ```
 
 ### 7. Cleanup Artifacts
+
 Remove plan files and temporary artifacts.
 
 ## Output
@@ -102,6 +109,7 @@ Remove plan files and temporary artifacts.
 ## Worker Integration
 
 Workers should track changes during operations:
+
 1. Create `.{domain}-changes.json` before modifications
 2. Create backups in `.rollback/` for modified files
 3. Log all file creates, commands, and commits

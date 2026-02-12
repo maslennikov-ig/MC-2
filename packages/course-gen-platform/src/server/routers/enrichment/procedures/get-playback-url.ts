@@ -46,11 +46,14 @@ export const getPlaybackUrl = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.debug({
-      requestId,
-      enrichmentId,
-      userId: currentUser.id,
-    }, 'Get playback URL request');
+    logger.debug(
+      {
+        requestId,
+        enrichmentId,
+        userId: currentUser.id,
+      },
+      'Get playback URL request'
+    );
 
     try {
       // Step 1: Verify enrichment access and get current data
@@ -63,12 +66,15 @@ export const getPlaybackUrl = protectedProcedure
 
       // Step 2: Check if enrichment has an asset
       if (!enrichment.asset_id) {
-        logger.debug({
-          requestId,
-          enrichmentId,
-          enrichmentType: enrichment.enrichment_type,
-          status: enrichment.status,
-        }, 'Enrichment has no asset');
+        logger.debug(
+          {
+            requestId,
+            enrichmentId,
+            enrichmentType: enrichment.enrichment_type,
+            status: enrichment.status,
+          },
+          'Enrichment has no asset'
+        );
 
         return {
           url: null,
@@ -79,11 +85,14 @@ export const getPlaybackUrl = protectedProcedure
       // Step 3: Check if enrichment type supports playback
       const playbackTypes = ['audio', 'video'];
       if (!playbackTypes.includes(enrichment.enrichment_type)) {
-        logger.debug({
-          requestId,
-          enrichmentId,
-          enrichmentType: enrichment.enrichment_type,
-        }, 'Enrichment type does not support playback');
+        logger.debug(
+          {
+            requestId,
+            enrichmentId,
+            enrichmentType: enrichment.enrichment_type,
+          },
+          'Enrichment type does not support playback'
+        );
 
         return {
           url: null,
@@ -104,14 +113,19 @@ export const getPlaybackUrl = protectedProcedure
       const signedUrl = await getSignedUrl(assetPath, STORAGE_CONFIG.SIGNED_URL_EXPIRES_IN);
 
       // Calculate expiration time
-      const expiresAt = new Date(Date.now() + STORAGE_CONFIG.SIGNED_URL_EXPIRES_IN * 1000).toISOString();
+      const expiresAt = new Date(
+        Date.now() + STORAGE_CONFIG.SIGNED_URL_EXPIRES_IN * 1000
+      ).toISOString();
 
-      logger.debug({
-        requestId,
-        enrichmentId,
-        assetPath,
-        expiresIn: STORAGE_CONFIG.SIGNED_URL_EXPIRES_IN,
-      }, 'Signed playback URL generated');
+      logger.debug(
+        {
+          requestId,
+          enrichmentId,
+          assetPath,
+          expiresIn: STORAGE_CONFIG.SIGNED_URL_EXPIRES_IN,
+        },
+        'Signed playback URL generated'
+      );
 
       return {
         url: signedUrl,
@@ -124,11 +138,14 @@ export const getPlaybackUrl = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        enrichmentId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Get playback URL failed');
+      logger.error(
+        {
+          requestId,
+          enrichmentId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Get playback URL failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

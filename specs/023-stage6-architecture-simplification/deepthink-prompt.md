@@ -37,6 +37,7 @@ Proposed: LessonSpec → Generator → SelfReviewer → Judge
 **Question**: Is single-pass generation viable for 5000-word Russian educational lessons with modern LLMs (128K+ context)?
 
 Consider:
+
 - Qwen3-235B, DeepSeek V3, Gemini 2.5 Flash capabilities
 - Russian text tokenization (1.3-1.5x more tokens than English)
 - 5000 words ≈ 7500-8500 tokens for Russian
@@ -52,6 +53,7 @@ Consider:
 **Question**: What's the optimal `max_tokens` setting for Russian educational content generation?
 
 Consider:
+
 - Target: 3000-5000 words per lesson
 - Russian tokenization overhead (Cyrillic vs Latin)
 - Need buffer for formatting (markdown headers, lists, code blocks)
@@ -77,6 +79,7 @@ Current nodes:
 | Judge | LLM quality evaluation (CLEV voting) | ? |
 
 Consider:
+
 - LessonSpec already contains section structure, key_points, objectives
 - Planner may be redundant
 - Smoother is the source of truncation bugs
@@ -98,6 +101,7 @@ C. Reduce lesson scope in Stage 5 (prevent long lessons)
 D. Other approach
 
 Consider:
+
 - How rare are these cases? (estimate %)
 - Cost of complexity vs benefit
 - Risk of quality degradation
@@ -117,6 +121,7 @@ C. Post-generation transition injection (rule-based)
 D. Accept that single-pass LLM naturally creates transitions
 
 Consider:
+
 - Modern LLMs (128K context) see full lesson while generating
 - They naturally create coherent narratives
 - Smoother was needed for parallel generation (sections didn't see each other)
@@ -131,6 +136,7 @@ Consider:
 **Question**: If single-pass generation shows quality regression, what's the rollback plan?
 
 Consider:
+
 - A/B testing approach
 - Quality metrics to monitor
 - How to detect regression quickly
@@ -145,6 +151,7 @@ Consider:
 ### Current Token Usage (from logs)
 
 Lesson 2.2 generation:
+
 - Total tokens used: 54,976
 - Duration: 268 seconds
 - Final word count: 3,059 words
@@ -152,12 +159,12 @@ Lesson 2.2 generation:
 
 ### Model Capabilities
 
-| Model | Context | Output Limit | Speed |
-|-------|---------|--------------|-------|
-| Qwen3-235B | 128K | 32K | ~50 TPS |
-| DeepSeek V3 | 128K | 32K | ~60 TPS |
-| Gemini 2.5 Flash | 1M | 64K | ~100 TPS |
-| Xiaomi MiMo-v2-Flash | 128K | 16K | ~80 TPS |
+| Model                | Context | Output Limit | Speed    |
+| -------------------- | ------- | ------------ | -------- |
+| Qwen3-235B           | 128K    | 32K          | ~50 TPS  |
+| DeepSeek V3          | 128K    | 32K          | ~60 TPS  |
+| Gemini 2.5 Flash     | 1M      | 64K          | ~100 TPS |
+| Xiaomi MiMo-v2-Flash | 128K    | 16K          | ~80 TPS  |
 
 ### Research Findings (from our docs)
 

@@ -24,12 +24,12 @@
 
 В контексте React Flow это реализуется через разделение состояния. При клике на узел (onNodeClick) его идентификатор передается в глобальный менеджер состояния. Компонент боковой панели (Sidebar) подписывается на изменения выбранного ID, извлекает полный объект данных узла и рендерит соответствующую форму.5
 
-| Характеристика | Внутри Узла (Canvas) | В Инспекторе (Sidebar) | Обоснование UX |
-| :---- | :---- | :---- | :---- |
-| **Тип данных** | Идентификационные (Заголовок, Статус, Приоритет) | Конфигурационные (Промпты, API ключи, JSON-схемы) | Узел должен отвечать на вопрос "Что это?", Инспектор — "Как это работает?".1 |
-| **Частота взаимодействия** | Высокая (Навигация, быстрые правки) | Средняя/Низкая (Глубокая настройка) | Часто используемые элементы должны быть доступны с минимальным количеством кликов (Закон Фиттса). |
-| **Сложность UI** | Минимальная (Текст, Иконки, Простые инпуты) | Высокая (Multi-select, Code Editor, Rich Text) | Сложные контроли внутри зумируемого холста (React Flow) вызывают проблемы с юзабилити и производительностью. |
-| **Техническая реализация** | Кастомные узлы React Flow (nodeTypes) | Отдельный React-компонент вне ReactFlow провайдера | Разделение рендеринга улучшает производительность графа при вводе текста в инспекторе. |
+| Характеристика             | Внутри Узла (Canvas)                             | В Инспекторе (Sidebar)                             | Обоснование UX                                                                                               |
+| :------------------------- | :----------------------------------------------- | :------------------------------------------------- | :----------------------------------------------------------------------------------------------------------- |
+| **Тип данных**             | Идентификационные (Заголовок, Статус, Приоритет) | Конфигурационные (Промпты, API ключи, JSON-схемы)  | Узел должен отвечать на вопрос "Что это?", Инспектор — "Как это работает?".1                                 |
+| **Частота взаимодействия** | Высокая (Навигация, быстрые правки)              | Средняя/Низкая (Глубокая настройка)                | Часто используемые элементы должны быть доступны с минимальным количеством кликов (Закон Фиттса).            |
+| **Сложность UI**           | Минимальная (Текст, Иконки, Простые инпуты)      | Высокая (Multi-select, Code Editor, Rich Text)     | Сложные контроли внутри зумируемого холста (React Flow) вызывают проблемы с юзабилити и производительностью. |
+| **Техническая реализация** | Кастомные узлы React Flow (nodeTypes)            | Отдельный React-компонент вне ReactFlow провайдера | Разделение рендеринга улучшает производительность графа при вводе текста в инспекторе.                       |
 
 ### **1.3 Реализация Боковой Панели в React Flow**
 
@@ -51,9 +51,9 @@
 
 Рекомендуемый паттерн поведения:
 
-1. **Состояние Чтения:** По умолчанию текст отображается как \<span\> или \<div\>. Он должен выглядеть как статический текст, чтобы не загромождать интерфейс визуальным шумом полей ввода (границы, фон).  
-2. **Триггер Редактирования:** Переход в режим редактирования осуществляется по двойному клику (double-click) или клику по иконке карандаша, появляющейся при наведении (hover). Одиночный клик обычно резервируется для выделения узла.12  
-3. **Состояние Редактирования:** Текстовый элемент заменяется на \<input\> или \<textarea\>, который автоматически получает фокус. Размеры инпута должны соответствовать размерам исходного текста, чтобы избежать скачков верстки.  
+1. **Состояние Чтения:** По умолчанию текст отображается как \<span\> или \<div\>. Он должен выглядеть как статический текст, чтобы не загромождать интерфейс визуальным шумом полей ввода (границы, фон).
+2. **Триггер Редактирования:** Переход в режим редактирования осуществляется по двойному клику (double-click) или клику по иконке карандаша, появляющейся при наведении (hover). Одиночный клик обычно резервируется для выделения узла.12
+3. **Состояние Редактирования:** Текстовый элемент заменяется на \<input\> или \<textarea\>, который автоматически получает фокус. Размеры инпута должны соответствовать размерам исходного текста, чтобы избежать скачков верстки.
 4. **Сохранение:** Сохранение происходит по событию onBlur (потеря фокуса) или при нажатии клавиши Enter. Нажатие Escape должно отменять изменения.
 
 ### **2.2 Техническая Реализация в React Flow: Проблема Drag-событий**
@@ -72,12 +72,12 @@
 
 Анализ различных подходов к редактированию данных в визуальных интерфейсах позволяет выделить следующую матрицу применимости:
 
-| Паттерн | Применимость в Пайплайне Курсов | Преимущества | Недостатки |
-| :---- | :---- | :---- | :---- |
-| **Инлайн (В узле)** | Заголовки, краткие описания, переключатели статуса. | Максимальная скорость, сохранение контекста. | Ограниченное пространство, риск визуального шума. |
-| **Тулбар (Над узлом)** | Действия (Удалить, Запустить), быстрые настройки. | Не занимает место постоянно, контекстно-зависим. | Исчезает при потере фокуса, не подходит для форм. |
-| **Инспектор (Сбоку)** | Промпты, настройки моделей, JSON-конфиги, предпросмотр контента. | Полноценный UX форм, много места, валидация. | Разрывает визуальную связь, требует движения глаз/мыши. |
-| **Модальное окно** | Критические настройки, подтверждение удаления. | Полный фокус внимания. | Блокирует интерфейс, прерывает поток работы. |
+| Паттерн                | Применимость в Пайплайне Курсов                                  | Преимущества                                     | Недостатки                                              |
+| :--------------------- | :--------------------------------------------------------------- | :----------------------------------------------- | :------------------------------------------------------ |
+| **Инлайн (В узле)**    | Заголовки, краткие описания, переключатели статуса.              | Максимальная скорость, сохранение контекста.     | Ограниченное пространство, риск визуального шума.       |
+| **Тулбар (Над узлом)** | Действия (Удалить, Запустить), быстрые настройки.                | Не занимает место постоянно, контекстно-зависим. | Исчезает при потере фокуса, не подходит для форм.       |
+| **Инспектор (Сбоку)**  | Промпты, настройки моделей, JSON-конфиги, предпросмотр контента. | Полноценный UX форм, много места, валидация.     | Разрывает визуальную связь, требует движения глаз/мыши. |
+| **Модальное окно**     | Критические настройки, подтверждение удаления.                   | Полный фокус внимания.                           | Блокирует интерфейс, прерывает поток работы.            |
 
 ## ---
 
@@ -89,11 +89,11 @@
 
 Узел утверждения (Approval Node) функционально отличается от узлов обработки данных. Он не трансформирует данные, а оценивает их. Следовательно, он должен быть визуально дистинктивным.
 
-* **Форма:** Использование ромба (стандартный символ принятия решения в блок-схемах) или восьмиугольника позволяет пользователю мгновенно идентифицировать точки остановки процесса.15  
-* **Цветовое кодирование:**  
-  * *Ожидание (Waiting):* Янтарный или желтый цвет, возможно с пульсирующей анимацией, привлекающей внимание к необходимости действия.  
-  * *Утверждено (Approved):* Зеленый цвет или галочка, символизирующая пропуск данных дальше по потоку.  
-  * *Отклонено (Rejected):* Красный цвет, блокирующий дальнейшее выполнение ветки.16
+- **Форма:** Использование ромба (стандартный символ принятия решения в блок-схемах) или восьмиугольника позволяет пользователю мгновенно идентифицировать точки остановки процесса.15
+- **Цветовое кодирование:**
+  - _Ожидание (Waiting):_ Янтарный или желтый цвет, возможно с пульсирующей анимацией, привлекающей внимание к необходимости действия.
+  - _Утверждено (Approved):_ Зеленый цвет или галочка, символизирующая пропуск данных дальше по потоку.
+  - _Отклонено (Rejected):_ Красный цвет, блокирующий дальнейшее выполнение ветки.16
 
 ### **3.2 Сценарии Взаимодействия: Синхронный и Асинхронный**
 
@@ -103,23 +103,23 @@ UX реализации шлюзов утверждения должен учи�
 Когда пайплайн достигает шлюза утверждения, выполнение приостанавливается. Узел переходит в состояние "Ожидание". Если пользователь находится в интерфейсе, узел должен визуально сигнализировать о необходимости внимания. Клик по такому узлу должен открывать не стандартный инспектор свойств, а специализированный интерфейс рецензирования (Review Modal/Panel).  
 Этот интерфейс должен отображать:
 
-1. **Артефакт:** То, что было сгенерировано (текст, видео, структура).  
-2. **Контекст:** Исходные параметры (промпт, тема), на основе которых был создан артефакт.  
+1. **Артефакт:** То, что было сгенерировано (текст, видео, структура).
+2. **Контекст:** Исходные параметры (промпт, тема), на основе которых был создан артефакт.
 3. **Действия:** Кнопки "Утвердить" и "Отклонить" (с обязательным полем для комментария/причины).17
 
 Сценарий Б: Внешнее уведомление (Асинхронный)  
 Для длительных процессов критически важна интеграция с внешними каналами связи (Slack, Email, Microsoft Teams).
 
-* Пайплайн отправляет уведомление с активной ссылкой на конкретный узел утверждения.  
-* Ссылка должна вести либо глубоко в интерфейс редактора графа (Deep Linking), фокусируя камеру на нужном узле, либо на упрощенную веб\-страницу утверждения, доступную без входа в сложный редактор (паттерн, используемый в n8n и Zapier).16  
-* Использование HMAC-подписей для ссылок утверждения позволяет обеспечить безопасность без необходимости сложной авторизации для внешних рецензентов.16
+- Пайплайн отправляет уведомление с активной ссылкой на конкретный узел утверждения.
+- Ссылка должна вести либо глубоко в интерфейс редактора графа (Deep Linking), фокусируя камеру на нужном узле, либо на упрощенную веб\-страницу утверждения, доступную без входа в сложный редактор (паттерн, используемый в n8n и Zapier).16
+- Использование HMAC-подписей для ссылок утверждения позволяет обеспечить безопасность без необходимости сложной авторизации для внешних рецензентов.16
 
 ### **3.3 Логика Отклонения и Циклы Доработки**
 
 Бинарная логика "Утвердить/Отклонить" часто недостаточна. В создании курсов "Отклонить" часто означает "Отправить на доработку".
 
-* **Ветвление:** Отклонение должно не просто останавливать процесс, а активировать альтернативный путь выполнения. В React Flow это визуализируется через использование нескольких выходных портов (Handles) у узла утверждения: порт "Approved" ведет к следующему этапу (например, публикации), порт "Changes Requested" ведет обратно к этапу редактирования или генерации.15  
-* **Визуализация обратной связи:** Если рецензент запрашивает изменения, его комментарий должен быть передан как контекст (input) в узел генерации для следующей итерации. Визуально это может быть представлено пунктирным ребром, идущим против основного потока данных, создавая цикл обратной связи.19
+- **Ветвление:** Отклонение должно не просто останавливать процесс, а активировать альтернативный путь выполнения. В React Flow это визуализируется через использование нескольких выходных портов (Handles) у узла утверждения: порт "Approved" ведет к следующему этапу (например, публикации), порт "Changes Requested" ведет обратно к этапу редактирования или генерации.15
+- **Визуализация обратной связи:** Если рецензент запрашивает изменения, его комментарий должен быть передан как контекст (input) в узел генерации для следующей итерации. Визуально это может быть представлено пунктирным ребром, идущим против основного потока данных, создавая цикл обратной связи.19
 
 ## ---
 
@@ -131,18 +131,18 @@ UX реализации шлюзов утверждения должен учи�
 
 Инструмент управления задачами **Linear** задал высокий стандарт UX для работы с приоритетами, который можно адаптировать для узловых интерфейсов.20
 
-* **Иконография:** Использование узнаваемых символов (сигнальные полоски) вместо текста экономит место на узле.  
-* **Цветовое кодирование:** Красный (Urgent), Оранжевый (High), Желтый (Medium), Серый (Low/No Priority). Это создает визуальную тепловую карту важности задач на холсте.  
-* **Взаимодействие:** Изменение приоритета должно быть доступно через микро-взаимодействие. Клик по иконке приоритета на заголовке узла открывает компактное всплывающее меню (Popover), позволяющее сменить статус в два клика. Это быстрее, чем искать настройку в боковой панели.22  
-* **Горячие клавиши:** Для профессиональных пользователей ("power users") должна быть реализована поддержка клавиатуры. При выбранном узле нажатие клавиш 1, 2, 3 должно мгновенно устанавливать соответствующий приоритет.
+- **Иконография:** Использование узнаваемых символов (сигнальные полоски) вместо текста экономит место на узле.
+- **Цветовое кодирование:** Красный (Urgent), Оранжевый (High), Желтый (Medium), Серый (Low/No Priority). Это создает визуальную тепловую карту важности задач на холсте.
+- **Взаимодействие:** Изменение приоритета должно быть доступно через микро-взаимодействие. Клик по иконке приоритета на заголовке узла открывает компактное всплывающее меню (Popover), позволяющее сменить статус в два клика. Это быстрее, чем искать настройку в боковой панели.22
+- **Горячие клавиши:** Для профессиональных пользователей ("power users") должна быть реализована поддержка клавиатуры. При выбранном узле нажатие клавиш 1, 2, 3 должно мгновенно устанавливать соответствующий приоритет.
 
 ### **4.2 Визуализация Очереди Исполнения**
 
 В графе зависимостей (DAG) визуальное расположение узлов также может нести информацию о приоритете.
 
-* **Визуальная сортировка:** Использование алгоритмов автоматической раскладки (таких как Dagre или Elk.js), настроенных на учет приоритета. Узлы с высоким приоритетом могут располагаться выше или левее в потоке, визуально демонстрируя свою первоочередность.23  
-* **Визуализация потока ("Swimlanes"):** Если граф поддерживает параллельные ветки выполнения, их можно визуально разделить на горизонтальные дорожки (swimlanes) по уровню приоритета.  
-* **Индикация "Горячих точек":** Узлы с приоритетом "Urgent", ожидающие выполнения, могут иметь дополнительную визуальную индикацию, например, пульсирующую красную обводку или эффект свечения (glow effect), чтобы менеджер пайплайна мог мгновенно идентифицировать узкие места в очереди.21
+- **Визуальная сортировка:** Использование алгоритмов автоматической раскладки (таких как Dagre или Elk.js), настроенных на учет приоритета. Узлы с высоким приоритетом могут располагаться выше или левее в потоке, визуально демонстрируя свою первоочередность.23
+- **Визуализация потока ("Swimlanes"):** Если граф поддерживает параллельные ветки выполнения, их можно визуально разделить на горизонтальные дорожки (swimlanes) по уровню приоритета.
+- **Индикация "Горячих точек":** Узлы с приоритетом "Urgent", ожидающие выполнения, могут иметь дополнительную визуальную индикацию, например, пульсирующую красную обводку или эффект свечения (glow effect), чтобы менеджер пайплайна мог мгновенно идентифицировать узкие места в очереди.21
 
 ### **4.3 Динамическая Ре-приоритизация**
 
@@ -159,11 +159,11 @@ UX реализации шлюзов утверждения должен учи�
 
 Профессиональные инструменты визуальных эффектов (VFX), такие как **Nuke** и **Houdini**, выработали эффективные паттерны для решения этой проблемы.25
 
-* **Распространение инвалидации:** При изменении любого параметра узла (onChange), система должна рекурсивно обойти всех его потомков в графе и пометить их как "грязные" (dirty/outdated).  
-* **Визуальный индикатор:** Устаревшие узлы должны визуально отличаться от актуальных.  
-  * *Паттерн Nuke:* Красная полоса или значок "Update Needed" на узле.25  
-  * *Паттерн Blender:* Затемнение (dimming) узла или связи, показывающее, что данные не синхронизированы.27  
-  * *Текстовое предупреждение:* Явный лейбл "Requires Regeneration" внутри узла.
+- **Распространение инвалидации:** При изменении любого параметра узла (onChange), система должна рекурсивно обойти всех его потомков в графе и пометить их как "грязные" (dirty/outdated).
+- **Визуальный индикатор:** Устаревшие узлы должны визуально отличаться от актуальных.
+  - _Паттерн Nuke:_ Красная полоса или значок "Update Needed" на узле.25
+  - _Паттерн Blender:_ Затемнение (dimming) узла или связи, показывающее, что данные не синхронизированы.27
+  - _Текстовое предупреждение:_ Явный лейбл "Requires Regeneration" внутри узла.
 
 ### **5.2 Анимация Распространения Изменений**
 
@@ -173,9 +173,9 @@ UX реализации шлюзов утверждения должен учи�
 
 В генеративных пайплайнах автоматический перезапуск (auto-run) часто нежелателен из\-за стоимости API вызовов и времени генерации.
 
-* **Паттерн "Кнопка Обновления":** Устаревший узел должен предоставлять кнопку "Regenerate" или "Update". Это дает пользователю контроль над расходом ресурсов.  
-* **Глобальное Обновление:** В тулбаре графа должна быть кнопка "Update All Stale Nodes", позволяющая запустить пакетную актуализацию всего пайплайна.  
-* **Блокировка Экспорта:** Система не должна позволять финальный экспорт курса, если в графе присутствуют "грязные" узлы, требуя сначала их актуализации.
+- **Паттерн "Кнопка Обновления":** Устаревший узел должен предоставлять кнопку "Regenerate" или "Update". Это дает пользователю контроль над расходом ресурсов.
+- **Глобальное Обновление:** В тулбаре графа должна быть кнопка "Update All Stale Nodes", позволяющая запустить пакетную актуализацию всего пайплайна.
+- **Блокировка Экспорта:** Система не должна позволять финальный экспорт курса, если в графе присутствуют "грязные" узлы, требуя сначала их актуализации.
 
 ## ---
 
@@ -187,25 +187,25 @@ UX реализации шлюзов утверждения должен учи�
 
 Рекомендуется использовать внешнюю библиотеку управления состоянием, такую как **Zustand** или **Redux**, в связке с React Flow.6
 
-* **Хранилище (Store):** Должно содержать не только массив nodes и edges, но и метаданные пайплайна (статус выполнения, пользовательские настройки).  
-* **Селекторы (Selectors):** Компоненты интерфейса (например, боковая панель) должны подписываться только на необходимые им части состояния (например, selectedNodeId). Это предотвращает ненужные ре-рендеры всего приложения при каждом нажатии клавиши в форме инспектора.  
-* **Разделение Данных:** Легковесные данные для отображения графа (координаты, лейблы, статусы) хранятся в объекте nodes. Тяжеловесные данные (полный текст курса, бинарные данные видео) должны храниться отдельно (например, в словаре nodeDataById) и подгружаться по требованию.
+- **Хранилище (Store):** Должно содержать не только массив nodes и edges, но и метаданные пайплайна (статус выполнения, пользовательские настройки).
+- **Селекторы (Selectors):** Компоненты интерфейса (например, боковая панель) должны подписываться только на необходимые им части состояния (например, selectedNodeId). Это предотвращает ненужные ре-рендеры всего приложения при каждом нажатии клавиши в форме инспектора.
+- **Разделение Данных:** Легковесные данные для отображения графа (координаты, лейблы, статусы) хранятся в объекте nodes. Тяжеловесные данные (полный текст курса, бинарные данные видео) должны храниться отдельно (например, в словаре nodeDataById) и подгружаться по требованию.
 
 ### **6.2 Оптимистичные Обновления (Optimistic UI)**
 
 Пользователь ожидает мгновенной реакции интерфейса. При изменении имени узла или его приоритета, интерфейс не должен ждать ответа от сервера.
 
-1. **Немедленное обновление:** Локальное состояние React обновляется мгновенно.  
-2. **Фоновая синхронизация:** Запрос отправляется на сервер асинхронно.  
+1. **Немедленное обновление:** Локальное состояние React обновляется мгновенно.
+2. **Фоновая синхронизация:** Запрос отправляется на сервер асинхронно.
 3. **Обработка ошибок:** Если сервер возвращает ошибку (например, "Нет прав на изменение приоритета"), интерфейс должен откатить изменение (rollback) и показать уведомление. Для этого необходимо хранить предыдущее состояние перед применением оптимистичного обновления.24
 
 ### **6.3 Middleware для Undo/Redo**
 
 Возможность отмены действий критична для сложных редакторов. Реализация Undo/Redo должна быть сделана на уровне middleware стора.
 
-* Каждое действие, изменяющее топологию или данные узлов, должно сохранять "снимок" (snapshot) или "патч" (patch) изменений в стек истории.  
-* Библиотеки типа zundo (для Zustand) или redux-undo позволяют реализовать это с минимальными усилиями.  
-* Важно исключить из истории такие действия, как выделение узла (selection) или зуммирование (viewport change), чтобы кнопка "Назад" отменяла именно изменения данных, а не навигацию.30
+- Каждое действие, изменяющее топологию или данные узлов, должно сохранять "снимок" (snapshot) или "патч" (patch) изменений в стек истории.
+- Библиотеки типа zundo (для Zustand) или redux-undo позволяют реализовать это с минимальными усилиями.
+- Важно исключить из истории такие действия, как выделение узла (selection) или зуммирование (viewport change), чтобы кнопка "Назад" отменяла именно изменения данных, а не навигацию.30
 
 ## ---
 
@@ -213,16 +213,16 @@ UX реализации шлюзов утверждения должен учи�
 
 Ниже приведена сводная таблица рекомендуемых паттернов для различных действий в пайплайне генерации курсов:
 
-| Действие Пользователя | Рекомендуемый UX Паттерн | Визуальное Представление | Модель Взаимодействия |
-| :---- | :---- | :---- | :---- |
-| **Изменение названия модуля** | Инлайн-ввод (Inline Input) | Текст превращается в инпут при клике. | Прямое манипулирование на холсте. |
-| **Настройка промпта AI** | Панель Инспектора (Inspector) | Детальная форма с подсветкой синтаксиса. | Выбор узла \-\> Редактирование сбоку. |
-| **Рецензирование контента** | Узел Утверждения (Approval Gate) | Ромбовидный узел, модальное окно просмотра. | Клик открывает интерфейс сравнения/утверждения. |
-| **Установка приоритета** | Поповер (Badge Popover) | Цветной бейдж с иконкой на узле. | Клик открывает мини-меню выбора. |
-| **Реорганизация структуры** | Drag & Drop на холсте | Перетаскивание узлов с прилипанием (snap). | Пространственное управление топологией. |
-| **Добавление нового шага** | Drag & Drop из палитры | Перетаскивание из боковой панели на холст. | Создание экземпляров из шаблонов. |
-| **Отслеживание зависимостей** | Подсветка пути (Edge Highlight) | При наведении подсвечиваются связи. | Ховер-эффект для анализа потока. |
-| **Исправление устаревших данных** | Индикатор "Dirty State" | Желтый предупреждающий значок, кнопка Update. | Визуализация необходимости действия. |
+| Действие Пользователя             | Рекомендуемый UX Паттерн         | Визуальное Представление                      | Модель Взаимодействия                           |
+| :-------------------------------- | :------------------------------- | :-------------------------------------------- | :---------------------------------------------- |
+| **Изменение названия модуля**     | Инлайн-ввод (Inline Input)       | Текст превращается в инпут при клике.         | Прямое манипулирование на холсте.               |
+| **Настройка промпта AI**          | Панель Инспектора (Inspector)    | Детальная форма с подсветкой синтаксиса.      | Выбор узла \-\> Редактирование сбоку.           |
+| **Рецензирование контента**       | Узел Утверждения (Approval Gate) | Ромбовидный узел, модальное окно просмотра.   | Клик открывает интерфейс сравнения/утверждения. |
+| **Установка приоритета**          | Поповер (Badge Popover)          | Цветной бейдж с иконкой на узле.              | Клик открывает мини-меню выбора.                |
+| **Реорганизация структуры**       | Drag & Drop на холсте            | Перетаскивание узлов с прилипанием (snap).    | Пространственное управление топологией.         |
+| **Добавление нового шага**        | Drag & Drop из палитры           | Перетаскивание из боковой панели на холст.    | Создание экземпляров из шаблонов.               |
+| **Отслеживание зависимостей**     | Подсветка пути (Edge Highlight)  | При наведении подсвечиваются связи.           | Ховер-эффект для анализа потока.                |
+| **Исправление устаревших данных** | Индикатор "Dirty State"          | Желтый предупреждающий значок, кнопка Update. | Визуализация необходимости действия.            |
 
 ## ---
 
@@ -236,34 +236,34 @@ UX реализации шлюзов утверждения должен учи�
 
 #### **Источники**
 
-1. Graphical Editor Patterns: Edit nodes a) inline b) with a dedicated edit view/dialog or c) a mixture of both \- UX Stack Exchange, дата последнего обращения: декабря 2, 2025, [https://ux.stackexchange.com/questions/79357/graphical-editor-patterns-edit-nodes-a-inline-b-with-a-dedicated-edit-view-di](https://ux.stackexchange.com/questions/79357/graphical-editor-patterns-edit-nodes-a-inline-b-with-a-dedicated-edit-view-di)  
-2. I Finally Understand Why Everyone's Building Node Editors (And It's Way Cooler Than I Expected) | by Prachimehta \- Medium, дата последнего обращения: декабря 2, 2025, [https://medium.com/@prachimehta0213/i-finally-understand-why-everyones-building-node-editors-and-it-s-way-cooler-than-i-expected-01eca0005dbc](https://medium.com/@prachimehta0213/i-finally-understand-why-everyones-building-node-editors-and-it-s-way-cooler-than-i-expected-01eca0005dbc)  
-3. Logic Pro for Mac inspector interface \- Apple Support, дата последнего обращения: декабря 2, 2025, [https://support.apple.com/guide/logicpro/inspector-interface-lgcpe9cc3b1d/mac](https://support.apple.com/guide/logicpro/inspector-interface-lgcpe9cc3b1d/mac)  
-4. Node Properties \- AVEVA™ Documentation, дата последнего обращения: декабря 2, 2025, [https://docs.aveva.com/bundle/xr-studio/page/547563.html](https://docs.aveva.com/bundle/xr-studio/page/547563.html)  
-5. Update name of selected node from sidebar in React Flow \- Stack Overflow, дата последнего обращения: декабря 2, 2025, [https://stackoverflow.com/questions/70238289/update-name-of-selected-node-from-sidebar-in-react-flow](https://stackoverflow.com/questions/70238289/update-name-of-selected-node-from-sidebar-in-react-flow)  
-6. Using a State Management Library \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/learn/advanced-use/state-management](https://reactflow.dev/learn/advanced-use/state-management)  
-7. The ReactFlowProvider component \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/api-reference/react-flow-provider](https://reactflow.dev/api-reference/react-flow-provider)  
-8. ReactFlowProvider \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/misc/provider](https://reactflow.dev/examples/misc/provider)  
-9. Custom Nodes \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/nodes/custom-node](https://reactflow.dev/examples/nodes/custom-node)  
-10. Updating Nodes \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/nodes/update-node](https://reactflow.dev/examples/nodes/update-node)  
-11. Drag and Drop \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/interaction/drag-and-drop](https://reactflow.dev/examples/interaction/drag-and-drop)  
-12. Best Practices for Inline Editing in Table Design \- UX World, дата последнего обращения: декабря 2, 2025, [https://uxdworld.com/inline-editing-in-tables-design/](https://uxdworld.com/inline-editing-in-tables-design/)  
-13. Custom Nodes \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/learn/customization/custom-nodes](https://reactflow.dev/learn/customization/custom-nodes)  
-14. Node Toolbar \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/nodes/node-toolbar](https://reactflow.dev/examples/nodes/node-toolbar)  
-15. A Very Simple "Human in the Loop" Email Response System Using AI and IMAP \- N8N, дата последнего обращения: декабря 2, 2025, [https://n8n.io/workflows/2907-a-very-simple-human-in-the-loop-email-response-system-using-ai-and-imap/](https://n8n.io/workflows/2907-a-very-simple-human-in-the-loop-email-response-system-using-ai-and-imap/)  
-16. Create Secure Human-in-the-Loop Approval Flows with Postgres and Telegram \- N8N, дата последнего обращения: декабря 2, 2025, [https://n8n.io/workflows/9039-create-secure-human-in-the-loop-approval-flows-with-postgres-and-telegram/](https://n8n.io/workflows/9039-create-secure-human-in-the-loop-approval-flows-with-postgres-and-telegram/)  
-17. Interactive Slack Approval & Data Submission System with Webhooks | n8n workflow template, дата последнего обращения: декабря 2, 2025, [https://n8n.io/workflows/5049-interactive-slack-approval-and-data-submission-system-with-webhooks/](https://n8n.io/workflows/5049-interactive-slack-approval-and-data-submission-system-with-webhooks/)  
-18. How to write interactive workflows \- Prefect, дата последнего обращения: декабря 2, 2025, [https://docs.prefect.io/v3/advanced/interactive](https://docs.prefect.io/v3/advanced/interactive)  
-19. Master React Flow in 1 Video \- React Flow Advanced Course \- YouTube, дата последнего обращения: декабря 2, 2025, [https://www.youtube.com/watch?v=rk\_WSjrmHp8](https://www.youtube.com/watch?v=rk_WSjrmHp8)  
-20. Priority – Linear Docs, дата последнего обращения: декабря 2, 2025, [https://linear.app/docs/priority](https://linear.app/docs/priority)  
-21. Priority for projects – Changelog \- Linear, дата последнего обращения: декабря 2, 2025, [https://linear.app/changelog/2024-07-25-priority-for-projects-and-micro-adjust](https://linear.app/changelog/2024-07-25-priority-for-projects-and-micro-adjust)  
-22. How to Create a Priority List, Guide to Getting Sh\*t Done | ClickUp, дата последнего обращения: декабря 2, 2025, [https://clickup.com/blog/priority-list/](https://clickup.com/blog/priority-list/)  
-23. Overview \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/learn/layouting/layouting](https://reactflow.dev/learn/layouting/layouting)  
-24. What Are Optimistic Updates? \- Medium, дата последнего обращения: декабря 2, 2025, [https://medium.com/@kyledeguzmanx/what-are-optimistic-updates-483662c3e171](https://medium.com/@kyledeguzmanx/what-are-optimistic-updates-483662c3e171)  
-25. Localizing Files for Better Performance \- Foundry Learn, дата последнего обращения: декабря 2, 2025, [https://learn.foundry.com/nuke/content/getting\_started/managing\_scripts/caching\_files\_locally.html](https://learn.foundry.com/nuke/content/getting_started/managing_scripts/caching_files_locally.html)  
-26. Node Editor Tutorial 46: How to create Node State Flags for evaluation \- YouTube, дата последнего обращения: декабря 2, 2025, [https://www.youtube.com/watch?v=NgBhr2k5IJs](https://www.youtube.com/watch?v=NgBhr2k5IJs)  
-27. Viewer Node — Blender Manual, дата последнего обращения: декабря 2, 2025, [https://docs.blender.org/manual/en/3.6/modeling/geometry\_nodes/output/viewer.html](https://docs.blender.org/manual/en/3.6/modeling/geometry_nodes/output/viewer.html)  
-28. DAG use cases and best practices \- dbt Labs, дата последнего обращения: декабря 2, 2025, [https://www.getdbt.com/blog/dag-use-cases-and-best-practices](https://www.getdbt.com/blog/dag-use-cases-and-best-practices)  
-29. Mutations & Updates | Relay, дата последнего обращения: декабря 2, 2025, [https://relay.dev/docs/tutorial/mutations-updates/](https://relay.dev/docs/tutorial/mutations-updates/)  
-30. Undo and Redo \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/interaction/undo-redo](https://reactflow.dev/examples/interaction/undo-redo)  
+1. Graphical Editor Patterns: Edit nodes a) inline b) with a dedicated edit view/dialog or c) a mixture of both \- UX Stack Exchange, дата последнего обращения: декабря 2, 2025, [https://ux.stackexchange.com/questions/79357/graphical-editor-patterns-edit-nodes-a-inline-b-with-a-dedicated-edit-view-di](https://ux.stackexchange.com/questions/79357/graphical-editor-patterns-edit-nodes-a-inline-b-with-a-dedicated-edit-view-di)
+2. I Finally Understand Why Everyone's Building Node Editors (And It's Way Cooler Than I Expected) | by Prachimehta \- Medium, дата последнего обращения: декабря 2, 2025, [https://medium.com/@prachimehta0213/i-finally-understand-why-everyones-building-node-editors-and-it-s-way-cooler-than-i-expected-01eca0005dbc](https://medium.com/@prachimehta0213/i-finally-understand-why-everyones-building-node-editors-and-it-s-way-cooler-than-i-expected-01eca0005dbc)
+3. Logic Pro for Mac inspector interface \- Apple Support, дата последнего обращения: декабря 2, 2025, [https://support.apple.com/guide/logicpro/inspector-interface-lgcpe9cc3b1d/mac](https://support.apple.com/guide/logicpro/inspector-interface-lgcpe9cc3b1d/mac)
+4. Node Properties \- AVEVA™ Documentation, дата последнего обращения: декабря 2, 2025, [https://docs.aveva.com/bundle/xr-studio/page/547563.html](https://docs.aveva.com/bundle/xr-studio/page/547563.html)
+5. Update name of selected node from sidebar in React Flow \- Stack Overflow, дата последнего обращения: декабря 2, 2025, [https://stackoverflow.com/questions/70238289/update-name-of-selected-node-from-sidebar-in-react-flow](https://stackoverflow.com/questions/70238289/update-name-of-selected-node-from-sidebar-in-react-flow)
+6. Using a State Management Library \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/learn/advanced-use/state-management](https://reactflow.dev/learn/advanced-use/state-management)
+7. The ReactFlowProvider component \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/api-reference/react-flow-provider](https://reactflow.dev/api-reference/react-flow-provider)
+8. ReactFlowProvider \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/misc/provider](https://reactflow.dev/examples/misc/provider)
+9. Custom Nodes \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/nodes/custom-node](https://reactflow.dev/examples/nodes/custom-node)
+10. Updating Nodes \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/nodes/update-node](https://reactflow.dev/examples/nodes/update-node)
+11. Drag and Drop \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/interaction/drag-and-drop](https://reactflow.dev/examples/interaction/drag-and-drop)
+12. Best Practices for Inline Editing in Table Design \- UX World, дата последнего обращения: декабря 2, 2025, [https://uxdworld.com/inline-editing-in-tables-design/](https://uxdworld.com/inline-editing-in-tables-design/)
+13. Custom Nodes \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/learn/customization/custom-nodes](https://reactflow.dev/learn/customization/custom-nodes)
+14. Node Toolbar \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/nodes/node-toolbar](https://reactflow.dev/examples/nodes/node-toolbar)
+15. A Very Simple "Human in the Loop" Email Response System Using AI and IMAP \- N8N, дата последнего обращения: декабря 2, 2025, [https://n8n.io/workflows/2907-a-very-simple-human-in-the-loop-email-response-system-using-ai-and-imap/](https://n8n.io/workflows/2907-a-very-simple-human-in-the-loop-email-response-system-using-ai-and-imap/)
+16. Create Secure Human-in-the-Loop Approval Flows with Postgres and Telegram \- N8N, дата последнего обращения: декабря 2, 2025, [https://n8n.io/workflows/9039-create-secure-human-in-the-loop-approval-flows-with-postgres-and-telegram/](https://n8n.io/workflows/9039-create-secure-human-in-the-loop-approval-flows-with-postgres-and-telegram/)
+17. Interactive Slack Approval & Data Submission System with Webhooks | n8n workflow template, дата последнего обращения: декабря 2, 2025, [https://n8n.io/workflows/5049-interactive-slack-approval-and-data-submission-system-with-webhooks/](https://n8n.io/workflows/5049-interactive-slack-approval-and-data-submission-system-with-webhooks/)
+18. How to write interactive workflows \- Prefect, дата последнего обращения: декабря 2, 2025, [https://docs.prefect.io/v3/advanced/interactive](https://docs.prefect.io/v3/advanced/interactive)
+19. Master React Flow in 1 Video \- React Flow Advanced Course \- YouTube, дата последнего обращения: декабря 2, 2025, [https://www.youtube.com/watch?v=rk_WSjrmHp8](https://www.youtube.com/watch?v=rk_WSjrmHp8)
+20. Priority – Linear Docs, дата последнего обращения: декабря 2, 2025, [https://linear.app/docs/priority](https://linear.app/docs/priority)
+21. Priority for projects – Changelog \- Linear, дата последнего обращения: декабря 2, 2025, [https://linear.app/changelog/2024-07-25-priority-for-projects-and-micro-adjust](https://linear.app/changelog/2024-07-25-priority-for-projects-and-micro-adjust)
+22. How to Create a Priority List, Guide to Getting Sh\*t Done | ClickUp, дата последнего обращения: декабря 2, 2025, [https://clickup.com/blog/priority-list/](https://clickup.com/blog/priority-list/)
+23. Overview \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/learn/layouting/layouting](https://reactflow.dev/learn/layouting/layouting)
+24. What Are Optimistic Updates? \- Medium, дата последнего обращения: декабря 2, 2025, [https://medium.com/@kyledeguzmanx/what-are-optimistic-updates-483662c3e171](https://medium.com/@kyledeguzmanx/what-are-optimistic-updates-483662c3e171)
+25. Localizing Files for Better Performance \- Foundry Learn, дата последнего обращения: декабря 2, 2025, [https://learn.foundry.com/nuke/content/getting_started/managing_scripts/caching_files_locally.html](https://learn.foundry.com/nuke/content/getting_started/managing_scripts/caching_files_locally.html)
+26. Node Editor Tutorial 46: How to create Node State Flags for evaluation \- YouTube, дата последнего обращения: декабря 2, 2025, [https://www.youtube.com/watch?v=NgBhr2k5IJs](https://www.youtube.com/watch?v=NgBhr2k5IJs)
+27. Viewer Node — Blender Manual, дата последнего обращения: декабря 2, 2025, [https://docs.blender.org/manual/en/3.6/modeling/geometry_nodes/output/viewer.html](https://docs.blender.org/manual/en/3.6/modeling/geometry_nodes/output/viewer.html)
+28. DAG use cases and best practices \- dbt Labs, дата последнего обращения: декабря 2, 2025, [https://www.getdbt.com/blog/dag-use-cases-and-best-practices](https://www.getdbt.com/blog/dag-use-cases-and-best-practices)
+29. Mutations & Updates | Relay, дата последнего обращения: декабря 2, 2025, [https://relay.dev/docs/tutorial/mutations-updates/](https://relay.dev/docs/tutorial/mutations-updates/)
+30. Undo and Redo \- React Flow, дата последнего обращения: декабря 2, 2025, [https://reactflow.dev/examples/interaction/undo-redo](https://reactflow.dev/examples/interaction/undo-redo)
 31. How to Implement Undo/Redo Functionality in React Forms with a Custom Hook \- Medium, дата последнего обращения: декабря 2, 2025, [https://medium.com/@yaashjainn/how-to-implement-undo-redo-functionality-in-react-forms-with-a-custom-hook-de76d6711691](https://medium.com/@yaashjainn/how-to-implement-undo-redo-functionality-in-react-forms-with-a-custom-hook-de76d6711691)

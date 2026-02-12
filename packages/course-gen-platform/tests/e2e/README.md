@@ -9,6 +9,7 @@ This directory contains comprehensive end-to-end tests for the MegaCampusAI cour
 **Purpose**: Validate Stage 3 document summarization workflow with production-grade Russian documents.
 
 **Test Coverage**:
+
 - PDF document processing with Docling extraction (622KB, 23 pages)
 - Large TXT document processing with hierarchical chunking (275KB)
 - Small TXT document processing (70KB)
@@ -18,11 +19,13 @@ This directory contains comprehensive end-to-end tests for the MegaCampusAI cour
 - Multi-document progress tracking
 
 **Test Documents** (located in `/home/me/code/megacampus2/.tmp/`):
+
 1. `Письмо Минфина России от 31.01.2025 № 24 -01-06-8697.pdf` - Russian government ministry letter
 2. `Постановление Правительства РФ от 23.12.2024 N 1875 О мерах по предоставлению национального режима.txt` - Government decree
 3. `Презентация и обучение.txt` - Business presentation
 
 **Test Cases**:
+
 1. **Test 1**: PDF Document Processing
    - Validates PDF upload to Supabase storage
    - Tests Docling extraction pipeline
@@ -53,6 +56,7 @@ This directory contains comprehensive end-to-end tests for the MegaCampusAI cour
    - Validates key information preservation
 
 **Prerequisites**:
+
 ```bash
 # Required environment variables (in .env.local):
 OPENROUTER_API_KEY=sk-or-...
@@ -68,6 +72,7 @@ JINA_API_KEY=jina_...
 ```
 
 **Running Tests**:
+
 ```bash
 # Run all E2E tests
 pnpm test tests/e2e/stage3-real-documents.test.ts
@@ -80,6 +85,7 @@ pnpm test tests/e2e/stage3-real-documents.test.ts -t "Test 1"
 ```
 
 **Expected Output**:
+
 ```
 ✓ Test 1: Should process Russian government letter (PDF, 622KB, 23 pages) (Xs)
   📄 Processing: Russian government ministry letter (PDF, 23 pages, 622KB)
@@ -103,18 +109,21 @@ pnpm test tests/e2e/stage3-real-documents.test.ts -t "Test 1"
 ```
 
 **Timeout Configuration**:
+
 - Per-test timeout: 10 minutes (600,000ms)
 - Sufficient for large document processing with LLM calls
 
 **Manual Verification Steps**:
 
 After running Test 4 (Cost Accuracy):
+
 1. Visit OpenRouter dashboard: https://openrouter.ai/activity
 2. Check recent API usage (last 15-20 minutes)
 3. Verify costs match within ±10% tolerance
 4. Compare dashboard costs to test output
 
 After running Test 5 (Quality Comparison):
+
 1. Review summary previews in console output
 2. Verify key information is preserved:
    - Document dates and numbers
@@ -124,6 +133,7 @@ After running Test 5 (Quality Comparison):
 4. Verify compression ratios are reasonable (5-30%)
 
 **Known Limitations**:
+
 - PDF processing relies on Docling service availability
 - If Docling is unavailable, Test 1 will be skipped gracefully
 - Tests require real API keys (no mocking for E2E validation)
@@ -132,23 +142,29 @@ After running Test 5 (Quality Comparison):
 **Troubleshooting**:
 
 If tests are skipped:
+
 ```
 ⚠️  OPENROUTER_API_KEY not found - tests will be skipped
    Set in .env.local: OPENROUTER_API_KEY=sk-or-...
 ```
+
 Solution: Add missing API keys to `.env.local`
 
 If tests timeout:
+
 ```
 Error: Timeout waiting for summary completion on file ...
 ```
+
 Solution: Check:
+
 - Stage 3 worker is running
 - Redis connection is active
 - OpenRouter API is responding
 - Network connectivity
 
 If quality scores are low:
+
 - Check document language matches `jobData.language`
 - Verify Jina API key is valid
 - Review summary content for accuracy
@@ -165,6 +181,7 @@ If quality scores are low:
 ## Future Test Coverage
 
 Planned additions:
+
 - Multi-language document testing (English, Spanish, etc.)
 - Very large document handling (>500KB)
 - Error recovery scenarios (API failures, timeouts)

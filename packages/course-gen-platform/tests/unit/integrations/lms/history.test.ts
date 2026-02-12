@@ -49,7 +49,9 @@ const TEST_JOB_ID = '550e8400-e29b-41d4-a716-446655440001';
 /**
  * Mock LMS import job
  */
-const createMockJob = (overrides?: Partial<LmsImportJob>): LmsImportJob & {
+const createMockJob = (
+  overrides?: Partial<LmsImportJob>
+): LmsImportJob & {
   courses: { title: string; user_id: string; organization_id: string };
   lms_configurations: { name: string };
 } => ({
@@ -361,7 +363,7 @@ describe('LMS History Router Unit Tests', () => {
     // Test 11: Throws FORBIDDEN when user doesn't own course
     // ==========================================================================
 
-    it('should throw FORBIDDEN when user doesn\'t own course', () => {
+    it("should throw FORBIDDEN when user doesn't own course", () => {
       const differentUserId = '00000000-0000-0000-0000-000000000099';
       const mockJob = createMockJob({
         courses: {
@@ -547,7 +549,7 @@ describe('LMS History Router Unit Tests', () => {
     // Test 17: Throws FORBIDDEN when user doesn't have access
     // ==========================================================================
 
-    it('should throw FORBIDDEN when user doesn\'t have access', () => {
+    it("should throw FORBIDDEN when user doesn't have access", () => {
       const differentUserId = '00000000-0000-0000-0000-000000000099';
       const mockJob = createMockJob({
         user_id: differentUserId,

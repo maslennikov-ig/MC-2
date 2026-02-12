@@ -57,11 +57,13 @@
 ## Data Flow
 
 ### Read Flow (Query)
+
 ```
 Component → useState/useEffect → Server Action → tRPC Query → Supabase → Response
 ```
 
 ### Write Flow (Mutation)
+
 ```
 User Action → Form Submit → Server Action → tRPC Mutation → Supabase →
   → Create new version (is_active=true)
@@ -70,6 +72,7 @@ User Action → Form Submit → Server Action → tRPC Mutation → Supabase →
 ```
 
 ### Versioning Flow
+
 ```
 UPDATE model_config:
 1. Find current active version for (phase_name, config_type)
@@ -127,6 +130,7 @@ PipelineAdminPage (page.tsx)
 ## Database Schema
 
 ### model_configs
+
 ```sql
 id              UUID PRIMARY KEY
 phase_name      TEXT NOT NULL (stage_3..stage_6, summarizer, etc.)
@@ -147,6 +151,7 @@ UNIQUE INDEX ON (phase_name, config_type, course_id) WHERE is_active = true
 ```
 
 ### prompt_templates
+
 ```sql
 id              UUID PRIMARY KEY
 stage           TEXT NOT NULL CHECK (stage IN ('stage_3','stage_4','stage_5','stage_6'))
@@ -166,6 +171,7 @@ UNIQUE INDEX ON (stage, prompt_key) WHERE is_active = true
 ```
 
 ### pipeline_global_settings
+
 ```sql
 id              UUID PRIMARY KEY
 setting_key     TEXT NOT NULL UNIQUE
@@ -177,6 +183,7 @@ created_by      UUID REFERENCES users(id)
 ```
 
 ### model_config_history (audit)
+
 ```sql
 id              UUID PRIMARY KEY
 model_config_id UUID REFERENCES model_configs(id)
@@ -191,44 +198,49 @@ created_at      TIMESTAMPTZ
 ## tRPC Procedures Reference
 
 ### Models
-| Procedure | Input | Output | Notes |
-|-----------|-------|--------|-------|
-| `listModelConfigs` | none | ModelConfig[] | Active only |
-| `updateModelConfig` | {id, modelId?, ...} | ModelConfig | Creates new version |
-| `getModelConfigHistory` | {phaseName, configType?, courseId?} | HistoryEntry[] | All versions |
-| `revertModelConfigToVersion` | {phaseName, targetVersion} | ModelConfig | Creates new version |
-| `resetModelConfigToDefault` | {phaseName} | ModelConfig | From hardcoded |
+
+| Procedure                    | Input                               | Output         | Notes               |
+| ---------------------------- | ----------------------------------- | -------------- | ------------------- |
+| `listModelConfigs`           | none                                | ModelConfig[]  | Active only         |
+| `updateModelConfig`          | {id, modelId?, ...}                 | ModelConfig    | Creates new version |
+| `getModelConfigHistory`      | {phaseName, configType?, courseId?} | HistoryEntry[] | All versions        |
+| `revertModelConfigToVersion` | {phaseName, targetVersion}          | ModelConfig    | Creates new version |
+| `resetModelConfigToDefault`  | {phaseName}                         | ModelConfig    | From hardcoded      |
 
 ### Prompts
-| Procedure | Input | Output | Notes |
-|-----------|-------|--------|-------|
-| `listPromptTemplates` | none | GroupedByStage | Active only |
-| `updatePromptTemplate` | {id, promptTemplate?, ...} | PromptTemplate | Creates new version |
-| `getPromptHistory` | {stage, promptKey} | HistoryEntry[] | All versions |
+
+| Procedure               | Input                             | Output         | Notes               |
+| ----------------------- | --------------------------------- | -------------- | ------------------- |
+| `listPromptTemplates`   | none                              | GroupedByStage | Active only         |
+| `updatePromptTemplate`  | {id, promptTemplate?, ...}        | PromptTemplate | Creates new version |
+| `getPromptHistory`      | {stage, promptKey}                | HistoryEntry[] | All versions        |
 | `revertPromptToVersion` | {stage, promptKey, targetVersion} | PromptTemplate | Creates new version |
 
 ### Settings
-| Procedure | Input | Output | Notes |
-|-----------|-------|--------|-------|
-| `getGlobalSettings` | none | SettingsObject | Merged from DB |
+
+| Procedure              | Input                  | Output         | Notes          |
+| ---------------------- | ---------------------- | -------------- | -------------- |
+| `getGlobalSettings`    | none                   | SettingsObject | Merged from DB |
 | `updateGlobalSettings` | {ragTokenBudget?, ...} | SettingsObject | Partial update |
 
 ### Export/Import
-| Procedure | Input | Output | Notes |
-|-----------|-------|--------|-------|
-| `exportConfiguration` | none | ExportData | Full config dump |
-| `validateImport` | {exportData} | ValidationResult | Dry run |
-| `importConfiguration` | {exportData, options} | ImportResult | With backup option |
-| `listBackups` | none | Backup[] | In-memory storage |
-| `restoreFromBackup` | {backupId, options} | RestoreResult | Selective restore |
+
+| Procedure             | Input                 | Output           | Notes              |
+| --------------------- | --------------------- | ---------------- | ------------------ |
+| `exportConfiguration` | none                  | ExportData       | Full config dump   |
+| `validateImport`      | {exportData}          | ValidationResult | Dry run            |
+| `importConfiguration` | {exportData, options} | ImportResult     | With backup option |
+| `listBackups`         | none                  | Backup[]         | In-memory storage  |
+| `restoreFromBackup`   | {backupId, options}   | RestoreResult    | Selective restore  |
 
 ### Utilities
-| Procedure | Input | Output | Notes |
-|-----------|-------|--------|-------|
-| `getStagesInfo` | none | StageInfo[] | Static metadata |
-| `getPipelineStats` | {periodDays?} | Stats | From course_generations |
-| `listOpenRouterModels` | {filters?} | Model[] | Cached 1 hour |
-| `refreshOpenRouterModels` | none | Model[] | Force refresh |
+
+| Procedure                 | Input         | Output      | Notes                   |
+| ------------------------- | ------------- | ----------- | ----------------------- |
+| `getStagesInfo`           | none          | StageInfo[] | Static metadata         |
+| `getPipelineStats`        | {periodDays?} | Stats       | From course_generations |
+| `listOpenRouterModels`    | {filters?}    | Model[]     | Cached 1 hour           |
+| `refreshOpenRouterModels` | none          | Model[]     | Force refresh           |
 
 ---
 
@@ -264,24 +276,26 @@ PROMPTS (source of truth for seed):
 
 ## Access Control Matrix
 
-| Resource | superadmin | admin | user |
-|----------|------------|-------|------|
-| /admin/pipeline | ✅ | ❌ | ❌ |
-| model_configs (RLS) | ✅ | ❌ | ❌ |
-| prompt_templates (RLS) | ✅ | ❌ | ❌ |
-| pipeline_global_settings (RLS) | ✅ | ❌ | ❌ |
-| tRPC pipelineAdmin.* | ✅ | ❌ | ❌ |
+| Resource                       | superadmin | admin | user |
+| ------------------------------ | ---------- | ----- | ---- |
+| /admin/pipeline                | ✅         | ❌    | ❌   |
+| model_configs (RLS)            | ✅         | ❌    | ❌   |
+| prompt_templates (RLS)         | ✅         | ❌    | ❌   |
+| pipeline_global_settings (RLS) | ✅         | ❌    | ❌   |
+| tRPC pipelineAdmin.\*          | ✅         | ❌    | ❌   |
 
 ---
 
 ## Common Tasks
 
 ### Add new prompt template
+
 1. Add to `prompt-registry.ts` (hardcoded fallback)
 2. Add INSERT to seed migration
 3. Run migration or INSERT directly
 
 ### Add new global setting
+
 1. Add INSERT to `20251203140300_create_pipeline_global_settings.sql`
 2. Update `GlobalSettings` type in `pipeline-admin.ts`
 3. Update `globalSettingsSchema` in `pipeline-admin-schemas.ts`
@@ -289,12 +303,14 @@ PROMPTS (source of truth for seed):
 5. Update `getGlobalSettings` and `updateGlobalSettings` procedures
 
 ### Add new model config phase
+
 1. Add to `phase_name` CHECK constraint (new migration)
 2. Add default config INSERT (new migration)
 3. Update `PIPELINE_PHASES` constant if exists
 4. Update `PipelineOverview` component if needed
 
 ### Enable database prompts for pipeline
+
 1. Set `useDatabasePrompts: true` in pipeline_global_settings
 2. Update stage executors to call prompt service instead of PROMPT_REGISTRY
 3. Test each stage with DB prompts

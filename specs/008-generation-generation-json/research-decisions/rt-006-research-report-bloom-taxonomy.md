@@ -61,13 +61,18 @@ The **comprehensive placeholder detection** combines all patterns into single re
 ```typescript
 const COMPREHENSIVE_PLACEHOLDER = new RegExp(
   '(' +
-    '\\b(TODO|FIXME|XXX|TBD|PLACEHOLDER|HACK|BUG)\\b:?' + '|' +
-    '\\[(Insert|Add|Your|Topic|Replace)\\s+[^\\]]{0,50}\\]' + '|' +
-    '[<{](placeholder|topic|content|text)[}>]' + '|' +
-    '(example|your topic here|insert \\w+ here|customize this)' + '|' +
-    '\\[(Вставить|Ваша)\\s+[^\\]]{0,50}\\]' + '|' +
+    '\\b(TODO|FIXME|XXX|TBD|PLACEHOLDER|HACK|BUG)\\b:?' +
+    '|' +
+    '\\[(Insert|Add|Your|Topic|Replace)\\s+[^\\]]{0,50}\\]' +
+    '|' +
+    '[<{](placeholder|topic|content|text)[}>]' +
+    '|' +
+    '(example|your topic here|insert \\w+ here|customize this)' +
+    '|' +
+    '\\[(Вставить|Ваша)\\s+[^\\]]{0,50}\\]' +
+    '|' +
     '\\.{3,}|…' +
-  ')',
+    ')',
   'gi'
 );
 ```

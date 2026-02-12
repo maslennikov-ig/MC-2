@@ -5,5 +5,5 @@
  * Each tab provides a different view of the lesson generation pipeline.
  */
 
-export { Stage6QualityTab } from './Stage6QualityTab';
-export { Stage6BlueprintTab } from './Stage6BlueprintTab';
+export { Stage6QualityTab } from './Stage6QualityTab'
+export { Stage6BlueprintTab } from './Stage6BlueprintTab'

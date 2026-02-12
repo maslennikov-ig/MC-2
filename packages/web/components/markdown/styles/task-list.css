@@ -23,7 +23,7 @@
 }
 
 /* Checkbox styling */
-.prose ul.contains-task-list > li.task-list-item > input[type="checkbox"] {
+.prose ul.contains-task-list > li.task-list-item > input[type='checkbox'] {
   /* Remove default appearance */
   appearance: none;
   -webkit-appearance: none;
@@ -51,13 +51,13 @@
 }
 
 /* Checkbox hover state */
-.prose ul.contains-task-list > li.task-list-item > input[type="checkbox"]:hover {
+.prose ul.contains-task-list > li.task-list-item > input[type='checkbox']:hover {
   border-color: hsl(var(--primary));
   background-color: hsl(var(--accent));
 }
 
 /* Checkbox focus state */
-.prose ul.contains-task-list > li.task-list-item > input[type="checkbox"]:focus {
+.prose ul.contains-task-list > li.task-list-item > input[type='checkbox']:focus {
   outline: none;
   ring: 2px;
   ring-offset: 2px;
@@ -66,7 +66,7 @@
 }
 
 /* Checked state */
-.prose ul.contains-task-list > li.task-list-item > input[type="checkbox"]:checked {
+.prose ul.contains-task-list > li.task-list-item > input[type='checkbox']:checked {
   background-color: hsl(var(--primary));
   border-color: hsl(var(--primary));
 
@@ -78,7 +78,7 @@
 }
 
 /* Checked text styling - strikethrough */
-.prose ul.contains-task-list > li.task-list-item:has(input[type="checkbox"]:checked) {
+.prose ul.contains-task-list > li.task-list-item:has(input[type='checkbox']:checked) {
   color: hsl(var(--muted-foreground));
 }
 

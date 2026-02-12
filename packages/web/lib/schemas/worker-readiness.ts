@@ -27,14 +27,16 @@ export const PreFlightCheckSchema = z.object({
  */
 export const WorkerReadinessBackendSchema = z.object({
   success: z.boolean(),
-  data: z.object({
-    ready: z.boolean(),
-    uploadsPath: z.string().optional(),
-    checks: z.array(PreFlightCheckSchema).optional(),
-    startedAt: z.string().nullable().optional(),
-    readyAt: z.string().nullable().optional(),
-    lastCheckAt: z.string().optional(),
-  }).optional(),
+  data: z
+    .object({
+      ready: z.boolean(),
+      uploadsPath: z.string().optional(),
+      checks: z.array(PreFlightCheckSchema).optional(),
+      startedAt: z.string().nullable().optional(),
+      readyAt: z.string().nullable().optional(),
+      lastCheckAt: z.string().optional(),
+    })
+    .optional(),
   timestamp: z.string().optional(),
 })
 

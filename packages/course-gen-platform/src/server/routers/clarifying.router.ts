@@ -26,176 +26,44 @@ import { router } from '../trpc';
 import { protectedProcedure } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/rate-limit.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
-import { addJob } from '../../orchestrator/queue';
-import { JobType, ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
+import { ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@megacampus/shared-types';
 
-// ============================================================================
-// INPUT SCHEMAS
-// ============================================================================
+import {
+  CLARIFYING_RATE_LIMITS,
+  getQuestionsSchema,
+  submitAnswerSchema,
+  submitMultipleAnswersSchema,
+  skipQuestionSchema,
+  approveAndProceedSchema,
+} from './clarifying-schemas';
 
-/**
- * MEDIUM-005: Text sanitization for answer inputs
- *
- * - Trims whitespace
- * - Collapses multiple spaces to single
- * - Removes control characters (except newlines for multi-line answers)
- * - Enforces hard character limit
- */
-const MAX_ANSWER_LENGTH = 5000;
-const MAX_WORD_COUNT = 1000;
+import {
+  verifyCourseAccess,
+  verifyQuestionAccess,
+  validateAnswerForQuestionType,
+  validateAnswerSource,
+  validateSuggestionIndexes,
+  persistAnswer,
+  checkCanProceed,
+  executeAtomicApproval,
+  verifyStatusTransition,
+  fetchAnsweredQuestions,
+  fetchCourseDetailsForJob,
+  fetchDocumentSummaries,
+  createAnalysisJob,
+} from './clarifying-helpers';
 
-function sanitizeAnswerText(text: string): string {
-  return (
-    text
-      .trim()
-      .replace(/[^\S\n]+/g, ' ') // Collapse spaces (preserve newlines)
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control chars except \n \r \t
-      .slice(0, MAX_ANSWER_LENGTH)
-  );
-}
+import {
+  analyzeSufficiency,
+  storeQuestions,
+  extractAnswerString,
+  type Phase05Input,
+} from '../../stages/stage4-analysis/phases/phase-0.5-clarifying';
 
-/**
- * LOW-002: Rate limit configuration with documented rationale
- *
- * These values are tuned based on:
- * - Typical user behavior during clarifying questions phase
- * - Prevention of accidental DoS from UI bugs
- * - Balance between usability and server protection
- */
-export const CLARIFYING_RATE_LIMITS = {
-  /** Read operations - frequent polling allowed */
-  GET_QUESTIONS: {
-    requests: 60,
-    windowSeconds: 60,
-    rationale: 'Read-heavy endpoint, allow frequent polling for real-time updates',
-  },
-  /** Single answer submission */
-  SUBMIT_ANSWER: {
-    requests: 30,
-    windowSeconds: 60,
-    rationale: 'User typically answers 3-7 questions, allow burst with buffer for edits',
-  },
-  /** Batch answer submission */
-  SUBMIT_BATCH: {
-    requests: 10,
-    windowSeconds: 60,
-    rationale: 'Batch replaces multiple single calls, stricter limit',
-  },
-  /** Skip question */
-  SKIP_QUESTION: {
-    requests: 30,
-    windowSeconds: 60,
-    rationale: 'Same as submit - users may skip multiple questions',
-  },
-  /** Job creation endpoint */
-  APPROVE_AND_PROCEED: {
-    requests: 10,
-    windowSeconds: 60,
-    rationale: 'Job creation endpoint - very strict to prevent duplicate jobs',
-  },
-} as const;
-
-/**
- * Schema for getQuestions endpoint
- */
-const getQuestionsSchema = z.object({
-  courseId: z.string().uuid('Invalid course ID'),
-});
-
-/**
- * Schema for submitAnswer endpoint
- *
- * Supports three answer modes:
- * - suggested: User selected a suggested answer (requires selectedSuggestionIndex)
- * - modified: User modified a suggested answer (requires selectedSuggestionIndex + userModification)
- * - custom: User wrote a completely custom answer
- *
- * For multi_choice questions:
- * - Use answers (array) instead of answer (string)
- * - selectedSuggestionIndexes (array) instead of selectedSuggestionIndex
- */
-const submitAnswerSchema = z.object({
-  questionId: z.string().uuid('Invalid question ID'),
-  // MEDIUM-005: Stricter validation with sanitization
-  // Single answer for open/single_choice
-  answer: z
-    .string()
-    .transform(sanitizeAnswerText)
-    .pipe(
-      z
-        .string()
-        .min(3, 'Answer must be at least 3 characters')
-        .max(MAX_ANSWER_LENGTH, `Answer too long (max ${MAX_ANSWER_LENGTH} characters)`)
-        .refine(
-          val => val.split(/\s+/).filter(Boolean).length <= MAX_WORD_COUNT,
-          `Answer exceeds word limit (max ${MAX_WORD_COUNT} words)`
-        )
-    )
-    .optional(),
-  // Multiple answers for multi_choice
-  answers: z
-    .array(z.string().transform(sanitizeAnswerText).pipe(z.string().min(1).max(MAX_ANSWER_LENGTH)))
-    .min(1, 'At least one answer required')
-    .max(10, 'Too many answers')
-    .optional(),
-  answerSource: z.enum(['suggested', 'modified', 'custom']),
-  selectedSuggestionIndex: z.number().int().min(0).optional(),
-  // Multiple indexes for multi_choice
-  selectedSuggestionIndexes: z.array(z.number().int().min(0)).optional(),
-  userModification: z
-    .string()
-    .transform(sanitizeAnswerText)
-    .pipe(
-      z.string().max(MAX_ANSWER_LENGTH, `Modification too long (max ${MAX_ANSWER_LENGTH} chars)`)
-    )
-    .optional(),
-});
-
-/**
- * Schema for submitMultipleAnswers endpoint (batch)
- *
- * Allows submitting multiple answers in a single request.
- * Used by "Accept All" feature to avoid rate limiting issues.
- */
-const submitMultipleAnswersSchema = z.object({
-  submissions: z
-    .array(
-      z.object({
-        questionId: z.string().uuid('Invalid question ID'),
-        // MEDIUM-005: Consistent sanitization in batch endpoint
-        answer: z
-          .string()
-          .transform(sanitizeAnswerText)
-          .pipe(z.string().min(1, 'Answer is required').max(MAX_ANSWER_LENGTH, 'Answer too long')),
-        answerSource: z.enum(['suggested', 'modified', 'custom']),
-        selectedSuggestionIndex: z.number().int().min(0).optional(),
-      })
-    )
-    .min(1, 'At least one submission required')
-    .max(20, 'Maximum 20 submissions per batch'),
-});
-
-/**
- * Schema for skipQuestion endpoint
- */
-const skipQuestionSchema = z.object({
-  questionId: z.string().uuid('Invalid question ID'),
-});
-
-/**
- * Schema for approveAndProceed endpoint
- */
-const approveAndProceedSchema = z.object({
-  courseId: z.string().uuid('Invalid course ID'),
-});
-
-// ============================================================================
-// TYPES
-// ============================================================================
+// Re-export public API from extracted modules
+export { CLARIFYING_RATE_LIMITS } from './clarifying-schemas';
+export type { CourseRow, CourseDetails } from './clarifying-helpers';
 
 /**
  * Type re-exports for convenience
@@ -206,164 +74,6 @@ export type {
   UserAnswerValue,
   ClarifyingQuestionRow,
 } from '@megacampus/shared-types';
-
-/**
- * Course row for access verification
- */
-interface CourseRow {
-  id: string;
-  user_id: string;
-  organization_id: string;
-  generation_status: string;
-}
-
-/**
- * Course details for analysis job
- */
-interface CourseDetails {
-  id: string;
-  title: string;
-  course_description: string | null;
-  language: string | null;
-  style: string | null;
-  target_audience: string | null;
-  difficulty: string | null;
-  settings: Record<string, unknown> | null;
-  organization: { tier?: string } | null;
-}
-
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-/**
- * Get Supabase admin client with full Database type safety
- *
- * Returns properly typed Supabase client for accessing clarifying_questions table.
- * JSONB columns (user_answer, suggested_answers) are correctly typed via
- * ClarifyingQuestionRow interface from shared-types.
- *
- * @returns SupabaseClient<Database> with full type safety for all tables
- */
-function getTypedSupabaseAdmin(): SupabaseClient<Database> {
-  return getSupabaseAdmin();
-}
-
-/**
- * Verify user has access to course (course owner or same organization)
- *
- * @param courseId - Course UUID
- * @param userId - User UUID
- * @param organizationId - User's organization UUID
- * @param requestId - Request ID for logging
- * @returns Course data if access allowed
- * @throws TRPCError if course not found or access denied
- */
-async function verifyCourseAccess(
-  courseId: string,
-  userId: string,
-  organizationId: string,
-  requestId: string
-): Promise<CourseRow> {
-  const supabase = getSupabaseAdmin();
-
-  const { data: course, error } = await supabase
-    .from('courses')
-    .select('id, user_id, organization_id, generation_status')
-    .eq('id', courseId)
-    .single();
-
-  if (error || !course) {
-    logger.warn({ requestId, courseId, userId, error }, 'Course not found');
-
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Course not found',
-    });
-  }
-
-  // Check ownership or same organization
-  if (course.user_id !== userId && course.organization_id !== organizationId) {
-    logger.warn(
-      {
-        requestId,
-        courseId,
-        userId,
-        organizationId,
-        courseOwnerId: course.user_id,
-        courseOrgId: course.organization_id,
-      },
-      'Course access denied'
-    );
-
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'You do not have access to this course',
-    });
-  }
-
-  return course as CourseRow;
-}
-
-/**
- * Verify question belongs to course and user has access
- *
- * @param questionId - Question UUID
- * @param userId - User UUID
- * @param organizationId - User's organization UUID
- * @param requestId - Request ID for logging
- * @returns Question data if access allowed
- * @throws TRPCError if question not found or access denied
- */
-async function verifyQuestionAccess(
-  questionId: string,
-  userId: string,
-  organizationId: string,
-  requestId: string
-): Promise<{ question: ClarifyingQuestionRow; course: CourseRow }> {
-  const supabase = getTypedSupabaseAdmin();
-
-  // Fetch question
-  const { data: question, error } = await supabase
-    .from('clarifying_questions')
-    .select('*')
-    .eq('id', questionId)
-    .single();
-
-  if (error || !question) {
-    logger.warn({ requestId, questionId, userId, error }, 'Question not found');
-
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Question not found',
-    });
-  }
-
-  // Verify course access
-  const course = await verifyCourseAccess(question.course_id, userId, organizationId, requestId);
-
-  return { question: question as ClarifyingQuestionRow, course };
-}
-
-/**
- * Get tier-based priority for BullMQ job
- */
-function getTierPriority(tier: string | null): number {
-  switch (tier) {
-    case 'free':
-      return 1;
-    case 'basic':
-      return 3;
-    case 'standard':
-      return 5;
-    case 'premium':
-      return 7;
-    case 'enterprise':
-      return 10;
-    default:
-      return 1;
-  }
-}
 
 // ============================================================================
 // ROUTER
@@ -379,31 +89,10 @@ function getTierPriority(tier: string | null): number {
  * - submitAnswer: Submit an answer to a question
  * - skipQuestion: Skip a nice_to_have question
  * - approveAndProceed: Approve answers and continue to analysis
- * - requestSecondRound: Request additional questions
  */
 export const clarifyingRouter = router({
   /**
    * Check if clarifying questions are enabled for a course
-   *
-   * Purpose: Lightweight check to determine if clarifying questions feature
-   * is enabled for a course. Used by GraphView to avoid unnecessary getProgress
-   * queries when clarifying is disabled.
-   *
-   * Authorization: Requires authenticated user (protectedProcedure)
-   *
-   * Input:
-   * - courseId: UUID of the course
-   *
-   * Output:
-   * - enabled: Boolean indicating if clarifying questions are enabled
-   *
-   * @example
-   * ```typescript
-   * const result = await trpc.clarifying.isEnabled.query({
-   *   courseId: '3f8e1cd4-0c6e-43cf-8264-57c470a6c102',
-   * });
-   * // { enabled: true }
-   * ```
    */
   isEnabled: protectedProcedure
     .input(z.object({ courseId: z.string().uuid('Invalid course ID') }))
@@ -411,7 +100,6 @@ export const clarifyingRouter = router({
       const { courseId } = input;
       const supabase = getSupabaseAdmin();
 
-      // Fetch only the settings.clarifying_questions_enabled field
       const { data: course, error } = await supabase
         .from('courses')
         .select('settings')
@@ -419,7 +107,6 @@ export const clarifyingRouter = router({
         .single();
 
       if (error) {
-        // If course not found or error, return disabled
         return { enabled: false };
       }
 
@@ -431,25 +118,6 @@ export const clarifyingRouter = router({
 
   /**
    * Get all questions for a course
-   *
-   * Purpose: Retrieves all clarifying questions for a course, ordered by
-   * priority (critical first) and then by order_index.
-   *
-   * Authorization: Requires authenticated user (protectedProcedure)
-   *
-   * Input:
-   * - courseId: UUID of the course
-   *
-   * Output:
-   * - questions: Array of clarifying questions with all fields
-   *
-   * @example
-   * ```typescript
-   * const result = await trpc.clarifying.getQuestions.query({
-   *   courseId: '3f8e1cd4-0c6e-43cf-8264-57c470a6c102',
-   * });
-   * // { questions: [{ id: '...', question_text: '...', ... }] }
-   * ```
    */
   getQuestions: protectedProcedure
     .use(
@@ -467,12 +135,10 @@ export const clarifyingRouter = router({
       logger.debug({ requestId, courseId, userId: currentUser.id }, 'Get questions request');
 
       try {
-        // Verify course access
         await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
 
-        const supabase = getTypedSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
 
-        // Fetch questions ordered by priority and order_index
         const { data: questions, error } = await supabase
           .from('clarifying_questions')
           .select('*')
@@ -481,7 +147,6 @@ export const clarifyingRouter = router({
 
         if (error) {
           logger.error({ requestId, courseId, error: error.message }, 'Failed to fetch questions');
-
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to fetch questions',
@@ -527,33 +192,6 @@ export const clarifyingRouter = router({
 
   /**
    * Get progress statistics for clarifying questions
-   *
-   * Purpose: Returns progress statistics for a course's clarifying questions.
-   *
-   * Authorization: Requires authenticated user (protectedProcedure)
-   *
-   * Input:
-   * - courseId: UUID of the course
-   *
-   * Output:
-   * - total: Total number of questions
-   * - answered: Number of answered questions
-   * - skipped: Number of skipped questions
-   * - pending: Number of pending questions
-   * - criticalTotal: Total critical questions
-   * - criticalAnswered: Number of answered critical questions
-   * - importantTotal: Total important questions
-   * - importantAnswered: Number of answered important questions
-   * - canProceed: Boolean indicating if all required questions are answered
-   * - currentRound: Current iteration round
-   *
-   * @example
-   * ```typescript
-   * const result = await trpc.clarifying.getProgress.query({
-   *   courseId: '3f8e1cd4-0c6e-43cf-8264-57c470a6c102',
-   * });
-   * // { total: 10, answered: 8, skipped: 1, pending: 1, canProceed: true, ... }
-   * ```
    */
   getProgress: protectedProcedure
     .use(
@@ -569,19 +207,16 @@ export const clarifyingRouter = router({
       const currentUser = ctx.user;
 
       try {
-        // Verify course access
         await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
 
-        const supabase = getTypedSupabaseAdmin();
-        const typedSupabase = getSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
 
-        // Fetch all questions and course generation_mode in parallel
         const [questionsResult, courseResult] = await Promise.all([
           supabase
             .from('clarifying_questions')
             .select('id, question_priority, status, iteration_round')
             .eq('course_id', courseId),
-          typedSupabase.from('courses').select('generation_mode').eq('id', courseId).single(),
+          supabase.from('courses').select('generation_mode').eq('id', courseId).single(),
         ]);
 
         if (questionsResult.error) {
@@ -589,7 +224,6 @@ export const clarifyingRouter = router({
             { requestId, courseId, error: questionsResult.error.message },
             'Failed to fetch questions for progress'
           );
-
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to fetch progress',
@@ -601,7 +235,6 @@ export const clarifyingRouter = router({
           'id' | 'question_priority' | 'status' | 'iteration_round'
         >[];
 
-        // Calculate statistics
         const total = allQuestions.length;
         const answered = allQuestions.filter(q => q.status === 'answered').length;
         const skipped = allQuestions.filter(q => q.status === 'skipped').length;
@@ -615,14 +248,14 @@ export const clarifyingRouter = router({
         const importantTotal = importantQuestions.length;
         const importantAnswered = importantQuestions.filter(q => q.status === 'answered').length;
 
-        // Can proceed if all critical and important questions are answered
         const canProceed =
           criticalAnswered === criticalTotal && importantAnswered === importantTotal;
 
-        // Round 2 removed - always 1
-        const currentRound = 1;
+        // Calculate current round from max iteration_round
+        const maxRound = allQuestions.reduce((max, q) => Math.max(max, q.iteration_round || 1), 1);
+        const currentRound = maxRound;
+        const maxRounds = 3;
 
-        // Check if course is in automatic mode
         const isAutomatic = courseResult.data?.generation_mode === 'automatic';
 
         logger.debug(
@@ -636,6 +269,8 @@ export const clarifyingRouter = router({
             criticalAnswered,
             criticalTotal,
             canProceed,
+            currentRound,
+            maxRounds,
             isAutomatic,
           },
           'Progress calculated'
@@ -652,6 +287,7 @@ export const clarifyingRouter = router({
           importantAnswered,
           canProceed,
           currentRound,
+          maxRounds,
           isAutomatic,
         };
       } catch (error) {
@@ -669,34 +305,6 @@ export const clarifyingRouter = router({
 
   /**
    * Submit answer to a question
-   *
-   * Purpose: Submits an answer to a clarifying question. Supports three modes:
-   * - suggested: User selected a suggested answer
-   * - modified: User modified a suggested answer
-   * - custom: User wrote a completely custom answer
-   *
-   * Authorization: Requires authenticated user (protectedProcedure)
-   *
-   * Input:
-   * - questionId: UUID of the question
-   * - answer: The answer text
-   * - answerSource: 'suggested' | 'modified' | 'custom'
-   * - selectedSuggestionIndex: Index of selected suggestion (for suggested/modified)
-   * - userModification: Modification text (for modified mode)
-   *
-   * Output:
-   * - success: Boolean success flag
-   * - canProceed: Whether all required questions are now answered
-   *
-   * @example
-   * ```typescript
-   * const result = await trpc.clarifying.submitAnswer.mutate({
-   *   questionId: '...',
-   *   answer: 'Beginners with no prior experience',
-   *   answerSource: 'custom',
-   * });
-   * // { success: true, canProceed: false }
-   * ```
    */
   submitAnswer: protectedProcedure
     .use(
@@ -725,7 +333,6 @@ export const clarifyingRouter = router({
       );
 
       try {
-        // Verify question access
         const { question, course } = await verifyQuestionAccess(
           questionId,
           currentUser.id,
@@ -736,172 +343,34 @@ export const clarifyingRouter = router({
         const questionType = question.question_type || 'open';
         const isMultiChoice = questionType === 'multi_choice';
 
-        // Validate input based on question type
-        if (isMultiChoice) {
-          if (!answers || answers.length === 0) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'answers array is required for multi_choice questions',
-            });
-          }
-        } else {
-          if (!answer) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'answer is required for open/single_choice questions',
-            });
-          }
-        }
+        validateAnswerForQuestionType(questionType, answer, answers);
 
-        // Validate answer source requirements
-        if (answerSource === 'suggested') {
-          if (isMultiChoice) {
-            if (!selectedSuggestionIndexes || selectedSuggestionIndexes.length === 0) {
-              throw new TRPCError({
-                code: 'BAD_REQUEST',
-                message: 'selectedSuggestionIndexes is required for suggested multi_choice answers',
-              });
-            }
-          } else if (selectedSuggestionIndex === undefined) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'selectedSuggestionIndex is required for suggested answers',
-            });
-          }
-        }
+        const effectiveAnswerSource = validateAnswerSource(
+          answerSource,
+          questionType,
+          selectedSuggestionIndex,
+          selectedSuggestionIndexes,
+          userModification,
+          questionId
+        );
 
-        // Validate 'modified' source requirements
-        // For multi_choice: selectedSuggestionIndexes required (user selected suggestions + added custom)
-        // For open/single_choice: selectedSuggestionIndex + userModification required
-        // Auto-correct: if 'modified' but no suggestions selected, treat as 'custom'
-        let effectiveAnswerSource = answerSource;
-        if (answerSource === 'modified') {
-          if (isMultiChoice) {
-            // multi_choice modified = selected suggestions + custom answer in answers array
-            if (!selectedSuggestionIndexes || selectedSuggestionIndexes.length === 0) {
-              // Auto-correct to 'custom' instead of throwing error
-              effectiveAnswerSource = 'custom';
-              logger.info(
-                { questionId, originalSource: 'modified', correctedSource: 'custom' },
-                'Auto-corrected answerSource: modified → custom (no suggestions selected)'
-              );
-            }
-          } else {
-            // open/single_choice modified = suggestion + userModification
-            if (selectedSuggestionIndex === undefined || !userModification) {
-              throw new TRPCError({
-                code: 'BAD_REQUEST',
-                message:
-                  'selectedSuggestionIndex and userModification are required for modified answers',
-              });
-            }
-          }
-        }
-
-        // Custom answers should not have suggestion-related fields
-        if (effectiveAnswerSource === 'custom' && selectedSuggestionIndex !== undefined) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Custom answers should not include selectedSuggestionIndex',
-          });
-        }
-
-        // Validate suggestion indexes if provided
         const suggestions = question.suggested_answers || [];
-        if (selectedSuggestionIndex !== undefined) {
-          if (selectedSuggestionIndex >= suggestions.length) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Invalid suggestion index',
-            });
-          }
-        }
-        if (selectedSuggestionIndexes) {
-          // HIGH-001 fix: Validate each index is within bounds
-          for (const idx of selectedSuggestionIndexes) {
-            if (idx >= suggestions.length) {
-              throw new TRPCError({
-                code: 'BAD_REQUEST',
-                message: `Invalid suggestion index: ${idx}`,
-              });
-            }
-          }
+        validateSuggestionIndexes(suggestions, selectedSuggestionIndex, selectedSuggestionIndexes);
 
-          // HIGH-001 fix: Check for duplicate indexes
-          if (new Set(selectedSuggestionIndexes).size !== selectedSuggestionIndexes.length) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Duplicate selections detected',
-            });
-          }
+        await persistAnswer({
+          questionId,
+          isMultiChoice,
+          answer,
+          answers,
+          effectiveAnswerSource,
+          selectedSuggestionIndex,
+          selectedSuggestionIndexes,
+          userModification,
+          questionMetadata: question.metadata,
+          requestId,
+        });
 
-          // HIGH-001 fix: Ensure count doesn't exceed available suggestions
-          if (selectedSuggestionIndexes.length > suggestions.length) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: `Cannot select more than ${suggestions.length} options`,
-            });
-          }
-        }
-
-        const supabase = getTypedSupabaseAdmin();
-
-        // Build user_answer as JSONB based on question type
-        const userAnswerValue: UserAnswerValue = isMultiChoice
-          ? { values: answers }
-          : { value: answer };
-
-        // Update question with answer
-        // Note: Cast to unknown needed because database.types.ts incorrectly types
-        // user_answer as string instead of JSONB. The actual column is JSONB.
-        const { error: updateError } = await supabase
-          .from('clarifying_questions')
-          .update({
-            user_answer: userAnswerValue as unknown as string,
-            answer_source: effectiveAnswerSource,
-            selected_suggestion_index: isMultiChoice ? null : (selectedSuggestionIndex ?? null),
-            user_modification: userModification ?? null,
-            status: 'answered',
-            answered_at: new Date().toISOString(),
-            // Store multi_choice indexes in metadata
-            metadata:
-              isMultiChoice && selectedSuggestionIndexes
-                ? ({
-                    selected_suggestion_indexes: selectedSuggestionIndexes,
-                  } as unknown as Database['public']['Tables']['clarifying_questions']['Update']['metadata'])
-                : (question.metadata as unknown as Database['public']['Tables']['clarifying_questions']['Update']['metadata']),
-          })
-          .eq('id', questionId);
-
-        if (updateError) {
-          logger.error(
-            { requestId, questionId, error: updateError.message },
-            'Failed to update question'
-          );
-
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to submit answer',
-          });
-        }
-
-        // Check if all critical/important questions are now answered
-        const { data: remainingRequired, error: checkError } = await supabase
-          .from('clarifying_questions')
-          .select('id')
-          .eq('course_id', course.id)
-          .in('question_priority', ['critical', 'important'])
-          .eq('status', 'pending');
-
-        if (checkError) {
-          logger.warn(
-            { requestId, courseId: course.id, error: checkError.message },
-            'Failed to check remaining required questions'
-          );
-        }
-
-        const canProceed = !remainingRequired || remainingRequired.length === 0;
-
+        const canProceed = await checkCanProceed(course.id, requestId);
         logger.info({ requestId, questionId, canProceed }, 'Answer submitted successfully');
 
         return { success: true, canProceed };
@@ -920,35 +389,6 @@ export const clarifyingRouter = router({
 
   /**
    * Submit multiple answers in a batch
-   *
-   * Purpose: Allows submitting multiple answers in a single API call.
-   * Used by "Accept All" feature to avoid rate limiting issues.
-   * All answers are submitted atomically in a single database transaction.
-   *
-   * Authorization: Requires authenticated user (protectedProcedure)
-   *
-   * Input:
-   * - submissions: Array of answer submissions (max 20)
-   *   - questionId: UUID of the question
-   *   - answer: The answer text
-   *   - answerSource: 'suggested' | 'modified' | 'custom'
-   *   - selectedSuggestionIndex: Index of selected suggestion (for suggested)
-   *
-   * Output:
-   * - successCount: Number of successfully submitted answers
-   * - failedIds: Array of question IDs that failed
-   * - canProceed: Whether all required questions are now answered
-   *
-   * @example
-   * ```typescript
-   * const result = await trpc.clarifying.submitMultipleAnswers.mutate({
-   *   submissions: [
-   *     { questionId: '...', answer: 'Answer 1', answerSource: 'suggested', selectedSuggestionIndex: 0 },
-   *     { questionId: '...', answer: 'Answer 2', answerSource: 'suggested', selectedSuggestionIndex: 0 },
-   *   ],
-   * });
-   * // { successCount: 2, failedIds: [], canProceed: true }
-   * ```
    */
   submitMultipleAnswers: protectedProcedure
     .use(
@@ -969,14 +409,12 @@ export const clarifyingRouter = router({
       );
 
       try {
-        const supabase = getTypedSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
         const successfulIds: string[] = [];
         const failedIds: string[] = [];
 
-        // Verify all questions belong to the same course and user has access
         const questionIds = submissions.map(s => s.questionId);
 
-        // Fetch all questions in one query
         const { data: questions, error: fetchError } = await supabase
           .from('clarifying_questions')
           .select('id, course_id, status, suggested_answers')
@@ -1000,7 +438,6 @@ export const clarifyingRouter = router({
           suggested_answers: Array<{ text: string }> | null;
         }>;
 
-        // Validate all questions exist
         const foundIds = new Set(questionList.map(q => q.id));
         const missingIds = questionIds.filter(id => !foundIds.has(id));
         if (missingIds.length > 0) {
@@ -1010,7 +447,6 @@ export const clarifyingRouter = router({
           });
         }
 
-        // Validate all questions belong to the same course
         const courseIds = new Set(questionList.map(q => q.course_id));
         if (courseIds.size > 1) {
           throw new TRPCError({
@@ -1020,14 +456,9 @@ export const clarifyingRouter = router({
         }
 
         const courseId = questionList[0].course_id;
-
-        // Verify course access
         await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
 
-        // Create a map for quick question lookup
         const questionMap = new Map(questionList.map(q => [q.id, q]));
-
-        // Process each submission
         const now = new Date().toISOString();
 
         for (const submission of submissions) {
@@ -1037,7 +468,6 @@ export const clarifyingRouter = router({
             continue;
           }
 
-          // Skip already answered questions
           if (question.status === 'answered') {
             logger.debug(
               { requestId, questionId: submission.questionId },
@@ -1047,7 +477,6 @@ export const clarifyingRouter = router({
             continue;
           }
 
-          // Validate suggestion index if provided
           const suggestions = question.suggested_answers || [];
           if (
             submission.answerSource === 'suggested' &&
@@ -1068,10 +497,8 @@ export const clarifyingRouter = router({
             }
           }
 
-          // Build user_answer as JSONB
           const userAnswerValue: UserAnswerValue = { value: submission.answer };
 
-          // Update question with answer
           const { error: updateError } = await supabase
             .from('clarifying_questions')
             .update({
@@ -1094,15 +521,7 @@ export const clarifyingRouter = router({
           }
         }
 
-        // Check if all critical/important questions are now answered
-        const { data: remainingRequired } = await supabase
-          .from('clarifying_questions')
-          .select('id')
-          .eq('course_id', courseId)
-          .in('question_priority', ['critical', 'important'])
-          .eq('status', 'pending');
-
-        const canProceed = !remainingRequired || remainingRequired.length === 0;
+        const canProceed = await checkCanProceed(courseId, requestId);
 
         logger.info(
           {
@@ -1114,11 +533,7 @@ export const clarifyingRouter = router({
           'Batch answer submission completed'
         );
 
-        return {
-          successCount: successfulIds.length,
-          failedIds,
-          canProceed,
-        };
+        return { successCount: successfulIds.length, failedIds, canProceed };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         logger.error(
@@ -1133,26 +548,7 @@ export const clarifyingRouter = router({
     }),
 
   /**
-   * Skip a question
-   *
-   * Purpose: Marks a question as skipped. Only nice_to_have priority questions
-   * can be skipped. Critical and important questions must be answered.
-   *
-   * Authorization: Requires authenticated user (protectedProcedure)
-   *
-   * Input:
-   * - questionId: UUID of the question to skip
-   *
-   * Output:
-   * - success: Boolean success flag
-   *
-   * @example
-   * ```typescript
-   * const result = await trpc.clarifying.skipQuestion.mutate({
-   *   questionId: '...',
-   * });
-   * // { success: true }
-   * ```
+   * Skip a question (only nice_to_have priority)
    */
   skipQuestion: protectedProcedure
     .use(
@@ -1170,7 +566,6 @@ export const clarifyingRouter = router({
       logger.info({ requestId, questionId, userId: currentUser.id }, 'Skip question request');
 
       try {
-        // Verify question access
         const { question } = await verifyQuestionAccess(
           questionId,
           currentUser.id,
@@ -1178,27 +573,22 @@ export const clarifyingRouter = router({
           requestId
         );
 
-        // Only nice_to_have questions can be skipped
         if (question.question_priority !== 'nice_to_have') {
           logger.warn(
             { requestId, questionId, priority: question.question_priority },
             'Cannot skip non-optional question'
           );
-
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: `Cannot skip ${question.question_priority} priority questions. Only nice_to_have questions can be skipped.`,
           });
         }
 
-        const supabase = getTypedSupabaseAdmin();
+        const supabase = getSupabaseAdmin();
 
-        // Mark question as skipped
         const { error: updateError } = await supabase
           .from('clarifying_questions')
-          .update({
-            status: 'skipped',
-          })
+          .update({ status: 'skipped' })
           .eq('id', questionId);
 
         if (updateError) {
@@ -1206,7 +596,6 @@ export const clarifyingRouter = router({
             { requestId, questionId, error: updateError.message },
             'Failed to skip question'
           );
-
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to skip question',
@@ -1214,7 +603,6 @@ export const clarifyingRouter = router({
         }
 
         logger.info({ requestId, questionId }, 'Question skipped successfully');
-
         return { success: true };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
@@ -1230,31 +618,9 @@ export const clarifyingRouter = router({
     }),
 
   /**
-   * Approve answers and proceed to analysis
-   *
-   * Purpose: Verifies all critical/important questions are answered and
-   * enqueues the STRUCTURE_ANALYSIS job to continue Stage 4. Transitions
-   * course status from stage_4_clarifying to stage_4_analyzing.
-   *
-   * Uses atomic RPC function `approve_and_proceed_atomic` with FOR UPDATE lock
-   * to prevent race conditions during status transition.
-   *
-   * Authorization: Requires authenticated user (protectedProcedure)
-   *
-   * Input:
-   * - courseId: UUID of the course
-   *
-   * Output:
-   * - success: Boolean success flag
-   * - jobId: BullMQ job ID for tracking
-   *
-   * @example
-   * ```typescript
-   * const result = await trpc.clarifying.approveAndProceed.mutate({
-   *   courseId: '...',
-   * });
-   * // { success: true, jobId: '123' }
-   * ```
+   * Approve answers and proceed to analysis.
+   * Uses atomic RPC function with FOR UPDATE lock to prevent race conditions.
+   * Supports multi-round clarification (up to 3 rounds).
    */
   approveAndProceed: protectedProcedure
     .use(
@@ -1265,322 +631,197 @@ export const clarifyingRouter = router({
     )
     .input(approveAndProceedSchema)
     .mutation(async ({ ctx, input }) => {
-      const { courseId } = input;
+      const { courseId, forceProceed } = input;
       const requestId = nanoid();
       const currentUser = ctx.user;
 
-      logger.info({ requestId, courseId, userId: currentUser.id }, 'Approve and proceed request');
+      logger.info(
+        { requestId, courseId, userId: currentUser.id, forceProceed },
+        'Approve and proceed request'
+      );
 
       try {
-        const supabase = getTypedSupabaseAdmin();
-        const typedSupabase = getSupabaseAdmin();
-
-        // Use atomic RPC function to validate and transition status
-        // This prevents race conditions with FOR UPDATE lock
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: rpcResult, error: rpcError } = await (supabase as any).rpc(
-          'approve_and_proceed_atomic',
-          {
-            p_course_id: courseId,
-            p_user_id: currentUser.id,
-            p_org_id: currentUser.organizationId,
-          }
+        const result = await executeAtomicApproval(
+          courseId,
+          currentUser.id,
+          currentUser.organizationId,
+          requestId
         );
 
-        if (rpcError) {
-          logger.error(
-            { requestId, courseId, error: rpcError.message },
-            'RPC approve_and_proceed_atomic failed'
-          );
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to proceed',
-          });
-        }
-
-        // Handle RPC result errors
-        // Note: RPC function not in generated database.types.ts, manual typing required
-        const result = rpcResult as unknown as {
-          success: boolean;
-          error?: string;
-          code?: string;
-          unanswered_critical?: number;
-          unanswered_important?: number;
-          current_status?: string;
-          existing_job_id?: string;
-          is_duplicate?: boolean;
-        };
-
-        if (!result.success) {
-          logger.warn({ requestId, courseId, rpcResult: result }, 'RPC returned failure');
-
-          // Map RPC error codes to TRPC errors
-          switch (result.code) {
-            case 'NOT_FOUND':
-              throw new TRPCError({
-                code: 'NOT_FOUND',
-                message: 'Course not found',
-              });
-            case 'FORBIDDEN':
-              throw new TRPCError({
-                code: 'FORBIDDEN',
-                message: 'You do not have access to this course',
-              });
-            case 'INVALID_STATUS':
-              throw new TRPCError({
-                code: 'BAD_REQUEST',
-                message: `Cannot proceed from status '${result.current_status}'. Expected: stage_4_clarifying`,
-              });
-            case 'UNANSWERED_QUESTIONS':
-              throw new TRPCError({
-                code: 'BAD_REQUEST',
-                message: `Cannot proceed. ${result.unanswered_critical} critical and ${result.unanswered_important} important questions remain unanswered.`,
-              });
-            case 'CONCURRENT_REQUEST':
-              // Race condition: another request is already processing this course
-              throw new TRPCError({
-                code: 'CONFLICT',
-                message: 'Another request is already processing this course. Please wait.',
-              });
-            default:
-              throw new TRPCError({
-                code: 'INTERNAL_SERVER_ERROR',
-                message: result.error || 'Failed to proceed',
-              });
-          }
-        }
-
-        // RACE CONDITION PROTECTION: If this is a duplicate request, return existing job ID
+        // Duplicate request detected: return existing job ID
         if (result.is_duplicate && result.existing_job_id) {
           logger.info(
-            {
-              requestId,
-              courseId,
-              existingJobId: result.existing_job_id,
-            },
+            { requestId, courseId, existingJobId: result.existing_job_id },
             'Returning existing job ID (duplicate request detected)'
           );
           return { success: true, jobId: result.existing_job_id };
         }
 
-        // Status successfully transitioned to stage_4_analyzing
-        // Now fetch data needed for the job
+        const supabase = getSupabaseAdmin();
 
-        // Defensive check: verify status hasn't changed (Issue #1 race condition protection)
-        const { data: statusCheck } = await typedSupabase
-          .from('courses')
-          .select('generation_status')
-          .eq('id', courseId)
-          .single();
+        await verifyStatusTransition(supabase, courseId, requestId);
 
-        if (statusCheck?.generation_status !== 'stage_4_analyzing') {
-          logger.warn(
-            {
-              requestId,
-              courseId,
-              expectedStatus: 'stage_4_analyzing',
-              actualStatus: statusCheck?.generation_status,
-            },
-            'Course status changed during operation (race condition detected)'
-          );
-          throw new TRPCError({
-            code: 'CONFLICT',
-            message: 'Course status changed during operation. Please try again.',
-          });
-        }
+        // Multi-round sufficiency analysis (if not forced and not at max rounds)
+        if (!forceProceed) {
+          // Get current max round
+          const { data: roundData } = await supabase
+            .from('clarifying_questions')
+            .select('iteration_round')
+            .eq('course_id', courseId)
+            .order('iteration_round', { ascending: false })
+            .limit(1);
 
-        // Fetch all answered questions to include in analysis job
-        const { data: answeredQuestions, error: questionsError } = await supabase
-          .from('clarifying_questions')
-          .select('*')
-          .eq('course_id', courseId)
-          .eq('status', 'answered');
+          const currentRound =
+            (roundData?.[0] as { iteration_round: number } | undefined)?.iteration_round || 1;
 
-        if (questionsError) {
-          logger.error(
-            { requestId, courseId, error: questionsError.message },
-            'Failed to fetch answered questions'
+          logger.debug(
+            { requestId, courseId, currentRound },
+            'Checking if sufficiency analysis needed'
           );
 
-          // Rollback status on failure
-          await typedSupabase
-            .from('courses')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ generation_status: 'stage_4_clarifying' as any })
-            .eq('id', courseId);
+          if (currentRound < 3) {
+            // Get all answered questions for sufficiency analysis
+            const allAnswered = await fetchAnsweredQuestions(supabase, courseId, requestId);
+            const answersForAnalysis = allAnswered.map(q => ({
+              question: q.question_text,
+              answer: extractAnswerString(q.user_answer),
+              category: q.question_category,
+            }));
 
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to fetch answers',
-          });
-        }
+            // Build Phase 0.5 input for sufficiency analysis
+            const { data: courseForInput } = await supabase
+              .from('courses')
+              .select('title, course_description, target_audience, language')
+              .eq('id', courseId)
+              .single();
 
-        const answeredList = (answeredQuestions || []) as ClarifyingQuestionRow[];
+            if (!courseForInput) {
+              throw new TRPCError({
+                code: 'NOT_FOUND',
+                message: 'Course not found for sufficiency analysis',
+              });
+            }
 
-        // Fetch course details for analysis job
-        const { data: courseDetails, error: courseError } = await typedSupabase
-          .from('courses')
-          .select(
-            `
-            *,
-            organization:organizations(tier)
-          `
-          )
-          .eq('id', courseId)
-          .single();
-
-        if (courseError || !courseDetails) {
-          logger.error(
-            { requestId, courseId, error: courseError?.message },
-            'Failed to fetch course details'
-          );
-
-          // Rollback status
-          await typedSupabase
-            .from('courses')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ generation_status: 'stage_4_clarifying' as any })
-            .eq('id', courseId);
-
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to fetch course details',
-          });
-        }
-
-        const typedCourseDetails = courseDetails as unknown as CourseDetails;
-
-        // Fetch document summaries for analysis
-        const { data: documents, error: documentsError } = await typedSupabase
-          .from('file_catalog')
-          .select('id, filename, processed_content, processing_method, summary_metadata')
-          .eq('course_id', courseId)
-          .not('processed_content', 'is', null)
-          .not('processing_method', 'is', null);
-
-        if (documentsError) {
-          logger.error(
-            { requestId, courseId, error: documentsError.message },
-            'Failed to fetch document summaries'
-          );
-
-          // Rollback status
-          await typedSupabase
-            .from('courses')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ generation_status: 'stage_4_clarifying' as any })
-            .eq('id', courseId);
-
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to fetch document summaries',
-          });
-        }
-
-        // Map documents to document_summaries format
-        const document_summaries = (documents || []).map(doc => ({
-          document_id: doc.id,
-          file_name: doc.filename,
-          processed_content: doc.processed_content,
-          processing_method: doc.processing_method,
-          summary_metadata: doc.summary_metadata,
-        }));
-
-        // Format clarifying answers for analysis job
-        const clarifyingAnswers = answeredList.map(q => ({
-          question: q.question_text,
-          answer: q.user_answer,
-          priority: q.question_priority,
-          category: q.question_category,
-        }));
-
-        // Get tier-based priority
-        const tier = typedCourseDetails.organization?.tier || 'free';
-        const priority = getTierPriority(tier);
-
-        // Extract settings for analysis input
-        const settings = typedCourseDetails.settings || {};
-        const topic =
-          (settings.topic as string) ||
-          typedCourseDetails.title ||
-          typedCourseDetails.course_description ||
-          '';
-        const lessonDuration = (settings.lesson_duration_minutes as number) || 30;
-
-        // Create STRUCTURE_ANALYSIS job with clarifying answers
-        const jobData: Record<string, unknown> = {
-          jobType: JobType.STRUCTURE_ANALYSIS,
-          organizationId: currentUser.organizationId,
-          courseId,
-          userId: currentUser.id,
-          createdAt: new Date().toISOString(),
-          course_id: courseId,
-          organization_id: currentUser.organizationId,
-          user_id: currentUser.id,
-          input: {
-            topic,
-            language: typedCourseDetails.language || 'en',
-            style: typedCourseDetails.style || 'formal',
-            target_audience: typedCourseDetails.target_audience || '',
-            difficulty: typedCourseDetails.difficulty || 'intermediate',
-            lesson_duration_minutes: lessonDuration,
-            document_summaries,
-            clarifying_answers: clarifyingAnswers,
-          },
-          priority,
-          attempt_count: 0,
-          created_at: new Date().toISOString(),
-        };
-
-        // Create job with rollback on failure
-        let jobId: string;
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as any, { priority });
-          jobId = job.id as string;
-
-          // RACE CONDITION PROTECTION: Set proceed_job_id after successful job creation
-          // This prevents duplicate jobs by tracking the created job ID in the database
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: setJobIdError } = await (supabase as any).rpc('set_proceed_job_id', {
-            p_course_id: courseId,
-            p_job_id: jobId,
-          });
-
-          if (setJobIdError) {
-            // Non-fatal: log warning but continue - job was created successfully
-            logger.warn(
-              {
-                requestId,
-                courseId,
-                jobId,
-                error: setJobIdError.message,
+            const phase05Input: Phase05Input = {
+              course_id: courseId,
+              budgetAllocation: null,
+              courseContext: {
+                title: courseForInput.title || '',
+                description: courseForInput.course_description || undefined,
+                target_audience: courseForInput.target_audience || undefined,
               },
-              'Failed to set proceed_job_id (non-fatal)'
+              language: courseForInput.language || 'en',
+            };
+
+            logger.info(
+              { requestId, courseId, currentRound, answerCount: answersForAnalysis.length },
+              'Running sufficiency analysis'
+            );
+
+            let verdict: Awaited<ReturnType<typeof analyzeSufficiency>>;
+            try {
+              verdict = await analyzeSufficiency(phase05Input, answersForAnalysis, currentRound);
+            } catch (sufficiencyError) {
+              // MEDIUM-002: Rollback status on analyzeSufficiency failure
+              logger.error(
+                {
+                  requestId,
+                  courseId,
+                  currentRound,
+                  error:
+                    sufficiencyError instanceof Error
+                      ? sufficiencyError.message
+                      : String(sufficiencyError),
+                },
+                'Sufficiency analysis failed, rolling back to clarifying'
+              );
+
+              await supabase
+                .from('courses')
+                .update({
+                  generation_status: 'stage_4_clarifying',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', courseId);
+
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Sufficiency analysis failed. Please try again.',
+              });
+            }
+
+            if (
+              !verdict.is_sufficient &&
+              verdict.follow_up_questions &&
+              verdict.follow_up_questions.length > 0
+            ) {
+              // Store follow-up questions with next round
+              const nextRound = currentRound + 1;
+              await storeQuestions(courseId, verdict.follow_up_questions, nextRound);
+
+              // Rollback status to clarifying
+              await supabase
+                .from('courses')
+                .update({
+                  generation_status: 'stage_4_clarifying',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', courseId);
+
+              logger.info(
+                {
+                  requestId,
+                  courseId,
+                  currentRound,
+                  nextRound,
+                  followUpCount: verdict.follow_up_questions.length,
+                  confidence: verdict.confidence,
+                  gapCount: verdict.gaps.length,
+                },
+                'Follow-up questions generated, returning to clarifying'
+              );
+
+              return {
+                success: true,
+                needsFollowUp: true,
+                round: nextRound,
+                gaps: verdict.gaps,
+                followUpCount: verdict.follow_up_questions.length,
+              };
+            }
+
+            logger.info(
+              { requestId, courseId, currentRound, confidence: verdict.confidence },
+              'Sufficiency analysis passed, proceeding to analysis'
+            );
+            // If sufficient — fall through to create analysis job
+          } else {
+            logger.info(
+              { requestId, courseId, currentRound },
+              'Max rounds reached, proceeding to analysis'
             );
           }
-        } catch (jobError) {
-          // Rollback status on job creation failure
-          logger.error(
-            {
-              requestId,
-              courseId,
-              error: jobError instanceof Error ? jobError.message : String(jobError),
-            },
-            'Failed to create analysis job, rolling back status'
-          );
-
-          await typedSupabase
-            .from('courses')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .update({ generation_status: 'stage_4_clarifying' as any })
-            .eq('id', courseId);
-
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to create analysis job',
-          });
+          // If currentRound >= 3 — fall through to create analysis job (no more follow-ups)
+        } else {
+          logger.info({ requestId, courseId }, 'Force proceed enabled, skipping sufficiency check');
         }
+
+        // Fetch data and create analysis job
+        const [answeredList, courseDetails, documentSummaries] = await Promise.all([
+          fetchAnsweredQuestions(supabase, courseId, requestId),
+          fetchCourseDetailsForJob(supabase, courseId, requestId),
+          fetchDocumentSummaries(supabase, courseId, requestId),
+        ]);
+
+        const jobId = await createAnalysisJob({
+          courseId,
+          userId: currentUser.id,
+          organizationId: currentUser.organizationId,
+          courseDetails,
+          answeredQuestions: answeredList,
+          documentSummaries,
+          requestId,
+        });
 
         logger.info(
           {
@@ -1588,7 +829,7 @@ export const clarifyingRouter = router({
             courseId,
             jobId,
             answeredCount: answeredList.length,
-            documentCount: document_summaries.length,
+            documentCount: documentSummaries.length,
           },
           'Analysis job created after clarifying questions'
         );

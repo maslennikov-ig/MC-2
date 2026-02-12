@@ -41,20 +41,18 @@ export const getByLesson = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.debug({
-      requestId,
-      lessonId,
-      userId: currentUser.id,
-    }, 'Get enrichments by lesson request');
+    logger.debug(
+      {
+        requestId,
+        lessonId,
+        userId: currentUser.id,
+      },
+      'Get enrichments by lesson request'
+    );
 
     try {
       // Step 1: Verify lesson access
-      await verifyLessonAccess(
-        lessonId,
-        currentUser.id,
-        currentUser.organizationId,
-        requestId
-      );
+      await verifyLessonAccess(lessonId, currentUser.id, currentUser.organizationId, requestId);
 
       // Step 2: Query enrichments
       const supabase = getSupabaseAdmin();
@@ -65,11 +63,14 @@ export const getByLesson = protectedProcedure
         .order('order_index', { ascending: true });
 
       if (error) {
-        logger.error({
-          requestId,
-          lessonId,
-          error: error.message,
-        }, 'Failed to fetch enrichments');
+        logger.error(
+          {
+            requestId,
+            lessonId,
+            error: error.message,
+          },
+          'Failed to fetch enrichments'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -77,11 +78,14 @@ export const getByLesson = protectedProcedure
         });
       }
 
-      logger.debug({
-        requestId,
-        lessonId,
-        count: enrichments?.length || 0,
-      }, 'Enrichments fetched');
+      logger.debug(
+        {
+          requestId,
+          lessonId,
+          count: enrichments?.length || 0,
+        },
+        'Enrichments fetched'
+      );
 
       return enrichments || [];
     } catch (error) {
@@ -91,11 +95,14 @@ export const getByLesson = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        lessonId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Get enrichments by lesson failed');
+      logger.error(
+        {
+          requestId,
+          lessonId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Get enrichments by lesson failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

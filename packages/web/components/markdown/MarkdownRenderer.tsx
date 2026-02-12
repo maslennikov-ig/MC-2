@@ -25,16 +25,24 @@
  * ```
  */
 
-import * as React from 'react';
-import { compileMDX } from 'next-mdx-remote/rsc';
-import { getPresetConfig } from './presets';
+import * as React from 'react'
+import { compileMDX } from 'next-mdx-remote/rsc'
+import { getPresetConfig } from './presets'
+import { getRemarkPlugins, getRehypePluginsTrusted, getRehypePluginsUntrusted } from './plugins'
 import {
-  getRemarkPlugins,
-  getRehypePluginsTrusted,
-  getRehypePluginsUntrusted,
-} from './plugins';
-import { CodeBlock, MermaidDiagram, Callout, H1, H2, H3, H4, H5, H6, ResponsiveTable, Link } from './components';
-import type { MarkdownRendererProps, CalloutType } from './types';
+  CodeBlock,
+  MermaidDiagram,
+  Callout,
+  H1,
+  H2,
+  H3,
+  H4,
+  H5,
+  H6,
+  ResponsiveTable,
+  Link,
+} from './components'
+import type { MarkdownRendererProps, CalloutType } from './types'
 
 /**
  * Server-side markdown renderer component
@@ -61,34 +69,40 @@ export async function MarkdownRenderer({
 }: MarkdownRendererProps): Promise<React.JSX.Element | null> {
   // Handle empty content - return null to avoid rendering empty elements
   if (!content || content.trim() === '') {
-    return null;
+    return null
   }
 
   // Get merged preset configuration with feature overrides
-  const config = getPresetConfig(preset, features);
+  const config = getPresetConfig(preset, features)
 
   // Select plugins based on trust level
   // Trusted: full feature set without sanitization
   // Untrusted: includes rehype-sanitize for XSS protection
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const remarkPlugins = getRemarkPlugins(config) as any[];
-  const rehypePlugins = (trusted
-    ? getRehypePluginsTrusted(config)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    : getRehypePluginsUntrusted(config)) as any[];
+  const remarkPlugins = getRemarkPlugins(config) as any[]
+  const rehypePlugins = (
+    trusted
+      ? getRehypePluginsTrusted(config)
+      : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getRehypePluginsUntrusted(config)
+  ) as any[]
 
   // Build components map based on features
-  const mdxComponents: Record<string, React.ComponentType<unknown>> = {};
+  const mdxComponents: Record<string, React.ComponentType<unknown>> = {}
 
   // Always use Link component for accessibility (external link indicators, focus styles)
   mdxComponents.a = ((props: unknown) => {
     const { href, children, title, ...rest } = props as {
-      href?: string;
-      children: React.ReactNode;
-      title?: string;
-    };
-    return <Link href={href} title={title} {...rest}>{children}</Link>;
-  }) as React.ComponentType<unknown>;
+      href?: string
+      children: React.ReactNode
+      title?: string
+    }
+    return (
+      <Link href={href} title={title} {...rest}>
+        {children}
+      </Link>
+    )
+  }) as React.ComponentType<unknown>
 
   // Add CodeBlock wrapper for pre elements when copyButton is enabled
   // AND handle Mermaid diagrams when mermaid feature is enabled
@@ -98,22 +112,20 @@ export async function MarkdownRenderer({
   // 2. Wrap with CodeBlock for copy functionality
   if (config.copyButton && config.codeHighlight) {
     mdxComponents.pre = ((props: unknown) => {
-      const { children, ...rest } = props as React.PropsWithChildren<
-        Record<string, unknown>
-      >;
+      const { children, ...rest } = props as React.PropsWithChildren<Record<string, unknown>>
       // Extract language from data attribute set by rehype-pretty-code
-      const dataLanguage = (rest as Record<string, string>)['data-language'];
+      const dataLanguage = (rest as Record<string, string>)['data-language']
 
       // Handle Mermaid diagrams when feature is enabled
       if (config.mermaid && dataLanguage === 'mermaid') {
         // Extract code content from children structure: <code>text</code>
         const codeElement = React.isValidElement(children)
           ? (children as React.ReactElement<{ children: React.ReactNode }>)
-          : null;
-        const codeContent = codeElement?.props?.children;
-        const chartText = typeof codeContent === 'string' ? codeContent : '';
+          : null
+        const codeContent = codeElement?.props?.children
+        const chartText = typeof codeContent === 'string' ? codeContent : ''
 
-        return <MermaidDiagram chart={chartText} />;
+        return <MermaidDiagram chart={chartText} />
       }
 
       // Default: wrap with CodeBlock for copy functionality
@@ -121,30 +133,28 @@ export async function MarkdownRenderer({
         <CodeBlock language={dataLanguage}>
           <pre {...rest}>{children}</pre>
         </CodeBlock>
-      );
-    }) as React.ComponentType<unknown>;
+      )
+    }) as React.ComponentType<unknown>
   } else if (config.mermaid) {
     // When only mermaid is enabled (no copyButton or codeHighlight)
     // Still need to intercept pre elements for mermaid diagrams
     mdxComponents.pre = ((props: unknown) => {
-      const { children, ...rest } = props as React.PropsWithChildren<
-        Record<string, unknown>
-      >;
-      const dataLanguage = (rest as Record<string, string>)['data-language'];
+      const { children, ...rest } = props as React.PropsWithChildren<Record<string, unknown>>
+      const dataLanguage = (rest as Record<string, string>)['data-language']
 
       if (dataLanguage === 'mermaid') {
         const codeElement = React.isValidElement(children)
           ? (children as React.ReactElement<{ children: React.ReactNode }>)
-          : null;
-        const codeContent = codeElement?.props?.children;
-        const chartText = typeof codeContent === 'string' ? codeContent : '';
+          : null
+        const codeContent = codeElement?.props?.children
+        const chartText = typeof codeContent === 'string' ? codeContent : ''
 
-        return <MermaidDiagram chart={chartText} />;
+        return <MermaidDiagram chart={chartText} />
       }
 
       // Not mermaid - render as plain pre
-      return <pre {...rest}>{children}</pre>;
-    }) as React.ComponentType<unknown>;
+      return <pre {...rest}>{children}</pre>
+    }) as React.ComponentType<unknown>
   }
 
   // Add heading components with anchor links when feature is enabled
@@ -152,104 +162,121 @@ export async function MarkdownRenderer({
     // Map MDX heading elements to our Heading components
     // rehype-slug provides the id attribute automatically
     mdxComponents.h1 = ((props: unknown) => {
-      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode };
-      return <H1 id={id} {...rest}>{children}</H1>;
-    }) as React.ComponentType<unknown>;
+      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode }
+      return (
+        <H1 id={id} {...rest}>
+          {children}
+        </H1>
+      )
+    }) as React.ComponentType<unknown>
 
     mdxComponents.h2 = ((props: unknown) => {
-      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode };
-      return <H2 id={id} {...rest}>{children}</H2>;
-    }) as React.ComponentType<unknown>;
+      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode }
+      return (
+        <H2 id={id} {...rest}>
+          {children}
+        </H2>
+      )
+    }) as React.ComponentType<unknown>
 
     mdxComponents.h3 = ((props: unknown) => {
-      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode };
-      return <H3 id={id} {...rest}>{children}</H3>;
-    }) as React.ComponentType<unknown>;
+      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode }
+      return (
+        <H3 id={id} {...rest}>
+          {children}
+        </H3>
+      )
+    }) as React.ComponentType<unknown>
 
     mdxComponents.h4 = ((props: unknown) => {
-      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode };
-      return <H4 id={id} {...rest}>{children}</H4>;
-    }) as React.ComponentType<unknown>;
+      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode }
+      return (
+        <H4 id={id} {...rest}>
+          {children}
+        </H4>
+      )
+    }) as React.ComponentType<unknown>
 
     mdxComponents.h5 = ((props: unknown) => {
-      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode };
-      return <H5 id={id} {...rest}>{children}</H5>;
-    }) as React.ComponentType<unknown>;
+      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode }
+      return (
+        <H5 id={id} {...rest}>
+          {children}
+        </H5>
+      )
+    }) as React.ComponentType<unknown>
 
     mdxComponents.h6 = ((props: unknown) => {
-      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode };
-      return <H6 id={id} {...rest}>{children}</H6>;
-    }) as React.ComponentType<unknown>;
+      const { id, children, ...rest } = props as { id?: string; children: React.ReactNode }
+      return (
+        <H6 id={id} {...rest}>
+          {children}
+        </H6>
+      )
+    }) as React.ComponentType<unknown>
   }
 
   // Handle GitHub-style callouts in blockquotes: > [!NOTE] content
   if (config.callouts) {
     mdxComponents.blockquote = ((props: unknown) => {
-      const { children, ...rest } = props as React.PropsWithChildren<
-        Record<string, unknown>
-      >;
+      const { children, ...rest } = props as React.PropsWithChildren<Record<string, unknown>>
 
       // Try to detect GitHub-style callout syntax: [!TYPE]
       // The structure from MDX is usually: blockquote > p > text
-      const firstChild = React.Children.toArray(children)[0];
+      const firstChild = React.Children.toArray(children)[0]
 
       if (React.isValidElement(firstChild) && firstChild.type === 'p') {
         const pChildren = (firstChild as React.ReactElement<{ children: React.ReactNode }>).props
-          .children;
+          .children
 
         // Extract text from first paragraph child
-        let textContent = '';
+        let textContent = ''
         if (typeof pChildren === 'string') {
-          textContent = pChildren;
+          textContent = pChildren
         } else if (Array.isArray(pChildren)) {
-          const firstText = pChildren.find((c) => typeof c === 'string');
+          const firstText = pChildren.find((c) => typeof c === 'string')
           if (firstText) {
-            textContent = firstText as string;
+            textContent = firstText as string
           }
         }
 
         // Match pattern like [!NOTE], [!TIP], [!WARNING], [!DANGER], [!INFO]
-        const match = textContent.match(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i);
+        const match = textContent.match(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i)
 
         if (match) {
-          const type = match[1].toLowerCase() as CalloutType;
+          const type = match[1].toLowerCase() as CalloutType
 
           // Remove the [!TYPE] marker from the text
-          const remainingText = textContent.replace(
-            /^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]\s*/i,
-            ''
-          );
+          const remainingText = textContent.replace(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]\s*/i, '')
 
           // Reconstruct children without the marker
-          const newFirstParagraph = remainingText ? <p>{remainingText}</p> : null;
-          const restChildren = React.Children.toArray(children).slice(1);
+          const newFirstParagraph = remainingText ? <p>{remainingText}</p> : null
+          const restChildren = React.Children.toArray(children).slice(1)
 
           return (
             <Callout type={type}>
               {newFirstParagraph}
               {restChildren}
             </Callout>
-          );
+          )
         }
       }
 
       // Default blockquote rendering (no callout pattern detected)
-      return <blockquote {...rest}>{children}</blockquote>;
-    }) as React.ComponentType<unknown>;
+      return <blockquote {...rest}>{children}</blockquote>
+    }) as React.ComponentType<unknown>
   }
 
   // Wrap tables in responsive scroll container
   if (config.responsiveTables) {
     mdxComponents.table = ((props: unknown) => {
-      const { children, ...rest } = props as React.PropsWithChildren<
-        Record<string, unknown>
-      >;
+      const { children, ...rest } = props as React.PropsWithChildren<Record<string, unknown>>
       return (
         <ResponsiveTable>
           <table {...rest}>{children}</table>
         </ResponsiveTable>
-      );
-    }) as React.ComponentType<unknown>;
+      )
+    }) as React.ComponentType<unknown>
   }
 
   // Compile MDX content on the server
@@ -266,13 +293,11 @@ export async function MarkdownRenderer({
       // User-provided components can override defaults
       ...components,
     },
-  });
+  })
 
   // Merge preset className with custom className
-  const wrapperClassName = className
-    ? `${config.className} ${className}`
-    : config.className;
+  const wrapperClassName = className ? `${config.className} ${className}` : config.className
 
   // Render compiled content in semantic article wrapper
-  return <article className={wrapperClassName}>{compiledContent}</article>;
+  return <article className={wrapperClassName}>{compiledContent}</article>
 }

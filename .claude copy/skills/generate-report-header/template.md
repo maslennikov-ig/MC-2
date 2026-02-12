@@ -28,6 +28,7 @@ ISO-8601 or human-readable: "YYYY-MM-DD HH:mm:ss UTC"
 ## Optional Metadata Fields
 
 Common additional fields:
+
 - **Agent**: Worker agent name
 - **Duration**: Execution time
 - **Files Processed**: Number of files

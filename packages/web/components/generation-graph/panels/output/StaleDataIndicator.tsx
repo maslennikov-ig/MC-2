@@ -1,24 +1,19 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { AlertTriangle, AlertCircle } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { AlertTriangle, AlertCircle } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
-export type StaleStatus = 'fresh' | 'potentially_stale' | 'stale';
+export type StaleStatus = 'fresh' | 'potentially_stale' | 'stale'
 
 interface StaleDataIndicatorProps {
-  status: StaleStatus;
-  lastModified?: Date;
-  parentLastModified?: Date;
-  locale?: 'ru' | 'en';
-  className?: string;
-  children?: React.ReactNode;
+  status: StaleStatus
+  lastModified?: Date
+  parentLastModified?: Date
+  locale?: 'ru' | 'en'
+  className?: string
+  children?: React.ReactNode
 }
 
 const translations = {
@@ -32,25 +27,25 @@ const translations = {
     potentially_stale: 'Parent data modified. Review recommended',
     stale: 'Data may be outdated. Update required',
   },
-};
+}
 
 function getTooltipText(status: StaleStatus, locale: 'ru' | 'en' = 'ru'): string {
-  return translations[locale][status];
+  return translations[locale][status]
 }
 
 function formatTimeDiff(lastModified: Date, parentLastModified: Date): string {
   const diffMinutes = Math.floor(
     (parentLastModified.getTime() - lastModified.getTime()) / (1000 * 60)
-  );
+  )
 
-  if (diffMinutes < 1) return 'только что';
-  if (diffMinutes < 60) return `${diffMinutes} мин назад`;
+  if (diffMinutes < 1) return 'только что'
+  if (diffMinutes < 60) return `${diffMinutes} мин назад`
 
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} ч назад`;
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours} ч назад`
 
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} дн назад`;
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays} дн назад`
 }
 
 export const StaleDataIndicator: React.FC<StaleDataIndicatorProps> = ({
@@ -76,10 +71,10 @@ export const StaleDataIndicator: React.FC<StaleDataIndicatorProps> = ({
           <TooltipTrigger asChild>
             <div className="flex items-start gap-2">
               {status === 'potentially_stale' && (
-                <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-500" />
               )}
               {status === 'stale' && (
-                <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
               )}
               <div className="flex-1">{children}</div>
             </div>
@@ -88,7 +83,7 @@ export const StaleDataIndicator: React.FC<StaleDataIndicatorProps> = ({
             <TooltipContent>
               <p>{getTooltipText(status, locale)}</p>
               {lastModified && parentLastModified && (
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                   {formatTimeDiff(lastModified, parentLastModified)}
                 </p>
               )}
@@ -97,8 +92,8 @@ export const StaleDataIndicator: React.FC<StaleDataIndicatorProps> = ({
         </Tooltip>
       </TooltipProvider>
     </div>
-  );
-};
+  )
+}
 
 /**
  * Calculate the staleness status based on modification times
@@ -112,11 +107,10 @@ export function calculateStaleStatus(
   parentLastModified: Date,
   thresholdMinutes: number = 30
 ): StaleStatus {
-  if (parentLastModified <= lastModified) return 'fresh';
+  if (parentLastModified <= lastModified) return 'fresh'
 
-  const diffMinutes =
-    (parentLastModified.getTime() - lastModified.getTime()) / (1000 * 60);
+  const diffMinutes = (parentLastModified.getTime() - lastModified.getTime()) / (1000 * 60)
 
-  if (diffMinutes < thresholdMinutes) return 'potentially_stale';
-  return 'stale';
+  if (diffMinutes < thresholdMinutes) return 'potentially_stale'
+  return 'stale'
 }

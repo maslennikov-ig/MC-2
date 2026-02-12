@@ -50,18 +50,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
-import { addJob, closeQueue } from '../../src/orchestrator/queue';
+import { closeQueue } from '../../src/orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import { CourseStructureSchema } from '@megacampus/shared-types/generation-result';
 import { InitializeFSMCommandHandler } from '../../src/shared/fsm/fsm-initialization-command-handler';
 import { OutboxProcessor } from '../../src/orchestrator/outbox-processor';
-import {
-  setupTestFixtures,
-  cleanupTestFixtures,
-  cleanupTestJobs,
-  TEST_ORGS,
-  TEST_USERS,
-} from '../fixtures';
+import { setupTestFixtures, cleanupTestJobs, TEST_ORGS, TEST_USERS } from '../fixtures';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -86,7 +80,10 @@ const TEST_DOCUMENTS = [
   },
   {
     filename: 'Модуль 1_Продажа_билетов_на_крупные_массовые_образовательные_мероприятия.pdf',
-    path: path.join(TEST_DOCS_DIR, 'Модуль 1_Продажа_билетов_на_крупные_массовые_образовательные_мероприятия.pdf'),
+    path: path.join(
+      TEST_DOCS_DIR,
+      'Модуль 1_Продажа_билетов_на_крупные_массовые_образовательные_мероприятия.pdf'
+    ),
     mimeType: 'application/pdf',
     description: 'Module 1: Ticket sales for large-scale events',
   },
@@ -109,7 +106,7 @@ const TEST_CONFIG = {
   MAX_WAIT_TIME: 600000, // 10 minutes for generation to complete
   POLL_INTERVAL: 2000, // 2 seconds between status checks
   EXPECTED_MIN_LESSONS: 10, // FR-015 requirement
-  EXPECTED_MAX_COST: 0.40, // SC-010 maximum cost
+  EXPECTED_MAX_COST: 0.4, // SC-010 maximum cost
   EXPECTED_MIN_QUALITY: 0.75, // SC-004 quality threshold
 };
 
@@ -148,7 +145,7 @@ async function uploadDocuments(courseId: string, organizationId: string): Promis
 
     // Insert metadata into file_catalog
     const relativeStoragePath = path.relative(process.cwd(), storagePath);
-    const { data: fileRecord, error } = await supabase
+    const { data: _fileRecord, error } = await supabase
       .from('file_catalog')
       .insert({
         id: fileId,
@@ -179,7 +176,10 @@ async function uploadDocuments(courseId: string, organizationId: string): Promis
 /**
  * Wait for generation to complete
  */
-async function waitForGeneration(courseId: string, timeout: number = TEST_CONFIG.MAX_WAIT_TIME): Promise<any> {
+async function waitForGeneration(
+  courseId: string,
+  timeout: number = TEST_CONFIG.MAX_WAIT_TIME
+): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -197,7 +197,7 @@ async function waitForGeneration(courseId: string, timeout: number = TEST_CONFIG
     }
 
     const status = course.generation_status as string;
-    const progress = course.generation_progress || 0;
+    const progress = Number(course.generation_progress) || 0;
 
     console.log(`[T053] Status: ${status}, Progress: ${progress}%`);
 
@@ -235,10 +235,14 @@ function validateCourseStructure(courseStructure: any): void {
   // FR-015: Minimum 10 lessons
   const totalLessons = structure.sections.reduce((sum, section) => sum + section.lessons.length, 0);
   if (totalLessons < TEST_CONFIG.EXPECTED_MIN_LESSONS) {
-    throw new Error(`Minimum lessons requirement not met: ${totalLessons} < ${TEST_CONFIG.EXPECTED_MIN_LESSONS}`);
+    throw new Error(
+      `Minimum lessons requirement not met: ${totalLessons} < ${TEST_CONFIG.EXPECTED_MIN_LESSONS}`
+    );
   }
 
-  console.log(`[T053] ✓ Course structure valid: ${structure.sections.length} sections, ${totalLessons} lessons`);
+  console.log(
+    `[T053] ✓ Course structure valid: ${structure.sections.length} sections, ${totalLessons} lessons`
+  );
 }
 
 /**
@@ -248,7 +252,9 @@ function validateGenerationMetadata(metadata: any): void {
   // Check cost
   const totalCost = metadata.cost?.total_cost_usd || 0;
   if (totalCost > TEST_CONFIG.EXPECTED_MAX_COST) {
-    console.warn(`[T053] ⚠ Cost exceeded threshold: $${totalCost} > $${TEST_CONFIG.EXPECTED_MAX_COST}`);
+    console.warn(
+      `[T053] ⚠ Cost exceeded threshold: $${totalCost} > $${TEST_CONFIG.EXPECTED_MAX_COST}`
+    );
   } else {
     console.log(`[T053] ✓ Cost within budget: $${totalCost}`);
   }
@@ -256,7 +262,9 @@ function validateGenerationMetadata(metadata: any): void {
   // Check quality
   const qualityScore = metadata.quality?.overall_quality || 0;
   if (qualityScore < TEST_CONFIG.EXPECTED_MIN_QUALITY) {
-    console.warn(`[T053] ⚠ Quality below threshold: ${qualityScore} < ${TEST_CONFIG.EXPECTED_MIN_QUALITY}`);
+    console.warn(
+      `[T053] ⚠ Quality below threshold: ${qualityScore} < ${TEST_CONFIG.EXPECTED_MIN_QUALITY}`
+    );
   } else {
     console.log(`[T053] ✓ Quality meets threshold: ${qualityScore}`);
   }
@@ -325,7 +333,9 @@ async function waitForOutboxProcessing(courseId: string, timeout = 10000): Promi
       .select('processed_at, attempts, last_error')
       .eq('entity_id', courseId);
 
-    console.log(`[T053] [waitForOutboxProcessing] Query result - entries: ${outboxEntries?.length}, error: ${error?.message || 'none'}`);
+    console.log(
+      `[T053] [waitForOutboxProcessing] Query result - entries: ${outboxEntries?.length}, error: ${error?.message || 'none'}`
+    );
 
     // Check for query errors
     if (error) {
@@ -380,7 +390,9 @@ async function validateFSMEvents(courseId: string, expectedState: string): Promi
   const eventState = latestEvent.event_data?.initial_state;
   expect(eventState).toBe(expectedState);
 
-  console.log(`[T053] ✓ FSM events validated: ${events!.length} events, latest state: ${eventState}`);
+  console.log(
+    `[T053] ✓ FSM events validated: ${events!.length} events, latest state: ${eventState}`
+  );
 }
 
 // ============================================================================
@@ -389,7 +401,7 @@ async function validateFSMEvents(courseId: string, expectedState: string): Promi
 
 describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
   let shouldSkipTests = false;
-  let testCourseIds: string[] = [];
+  const testCourseIds: string[] = [];
   let commandHandler: InitializeFSMCommandHandler;
   let outboxProcessor: OutboxProcessor;
 
@@ -431,7 +443,7 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
       try {
         await fs.access(doc.path);
         console.log(`[T053] ✓ Found ${doc.filename}`);
-      } catch (error) {
+      } catch {
         console.error(`[T053] ✗ Missing ${doc.filename} at ${doc.path}`);
         shouldSkipTests = true;
         return;
@@ -439,7 +451,7 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
     }
 
     // Setup test fixtures
-    await setupTestFixtures();
+    await setupTestFixtures({ skipAuthUsers: true });
     console.log('[T053] ✓ Test fixtures ready');
 
     // Initialize command handler
@@ -460,7 +472,7 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
 
     // Stop outbox processor gracefully
     if (outboxProcessor) {
-      await outboxProcessor.stop();
+      outboxProcessor.stop();
       console.log('[T053] ✓ Outbox processor stopped');
     }
 
@@ -479,423 +491,28 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
   // Scenario 1: Title-Only Course Generation (FR-003, US1)
   // ==========================================================================
 
-  it.skip('Scenario 1: Title-Only Course Generation', async () => {
-    if (shouldSkipTests) {
-      console.log('[T053] Skipping test - prerequisites not met');
-      return;
-    }
-
-    const supabase = getSupabaseAdmin();
-    const testOrg = TEST_ORGS.premium;
-    const testUser = TEST_USERS.instructor1;
-
-    // Create course with ONLY title
-    const { data: course, error } = await supabase
-      .from('courses')
-      .insert({
-        organization_id: testOrg.id,
-        user_id: testUser.id,
-        title: 'Курс по продажам в сфере образования',
-        slug: 'kurs-po-prodazham-v-sfere-obrazovaniya-' + Date.now(),
-        language: 'ru',
-        style: 'practical',
-        generation_status: 'pending',
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    testCourseIds.push(course.id);
-
-    console.log(`[T053] Created title-only course: ${course.id}`);
-
-    // Trigger generation using Transactional Outbox pattern
-    const jobData = {
-      course_id: course.id,
-      organization_id: testOrg.id,
-      user_id: testUser.id,
-      analysis_result: null, // Title-only scenario
-      frontend_parameters: {
-        course_title: course.title,
-        language: 'ru',
-        style: 'practical',
-      },
-      vectorized_documents: false,
-      document_summaries: [],
-    };
-
-    const result = await commandHandler.handle({
-      entityId: course.id,
-      userId: testUser.id,
-      organizationId: testOrg.id,
-      idempotencyKey: `t053-scenario1-${Date.now()}`,
-      initiatedBy: 'TEST',
-      initialState: 'stage_5_init',
-      data: {
-        courseTitle: course.title,
-        scenario: 'title-only',
-      },
-      jobs: [{
-        queue: JobType.STRUCTURE_GENERATION, // 'structure_generation'
-        data: jobData,
-        options: { priority: 10 },
-      }],
-    });
-
-    console.log(`[T053] ✓ FSM initialized: ${result.fsmState.state}`);
-    console.log(`[T053] ✓ Outbox entries created: ${result.outboxEntries.length}`);
-    console.log(`[T053] ✓ From cache: ${result.fromCache}`);
-
-    // Validate outbox entries created
-    expect(result.outboxEntries).toBeDefined();
-    expect(result.outboxEntries.length).toBe(1);
-    expect(result.outboxEntries[0].status).toBeNull(); // pending (processed_at IS NULL)
-    expect(result.outboxEntries[0].queue_name).toBe(JobType.STRUCTURE_GENERATION);
-
-    // Validate FSM state initialized
-    expect(result.fsmState).toBeDefined();
-    expect(result.fsmState.entity_id).toBe(course.id);
-    expect(result.fsmState.state).toBe('stage_5_init');
-
-    // Wait for background processor to create BullMQ jobs
-    await waitForOutboxProcessing(course.id, 10000);
-
-    // Validate FSM events
-    await validateFSMEvents(course.id, 'stage_5_init');
-
-    // Wait for completion
-    const generationResult = await waitForGeneration(course.id);
-
-    // Validate results
-    validateCourseStructure(generationResult.course_structure);
-    validateGenerationMetadata(generationResult.generation_metadata);
-
-    // Scenario-specific checks
-    expect(generationResult.course_structure.sections.length).toBeGreaterThanOrEqual(4);
-    expect(generationResult.course_structure.sections.length).toBeLessThanOrEqual(10);
-  }, TEST_CONFIG.MAX_WAIT_TIME + 60000);
-
-  // ==========================================================================
-  // Scenario 2: Full Pipeline - Analyze + Generate + Style (US2)
-  // Flow: Create → Upload Docs → Stage 4 Analyze → Stage 5 Generate
-  // ==========================================================================
-
-  it('Scenario 2: Full Pipeline - Analyze + Generate + Style (US2)', async () => {
-    if (shouldSkipTests) {
-      console.log('[T053] Skipping test - prerequisites not met');
-      return;
-    }
-
-    console.log('[T053] ========================================');
-    console.log('[T053] Scenario 2: Full Pipeline - Analyze + Generate');
-    console.log('[T053] ========================================');
-
-    const supabase = getSupabaseAdmin();
-    const testOrg = TEST_ORGS.premium;
-    const testUser = TEST_USERS.instructor1;
-
-    // Step 1: Create course
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .insert({
-        organization_id: testOrg.id,
-        user_id: testUser.id,
-        title: 'Курс по продажам',
-        slug: 'kurs-po-prodazham-' + Date.now(),
-        language: 'ru',
-        style: 'academic',
-        settings: {
-          desired_lessons_count: 25,
-          target_audience: 'Менеджеры по продажам в сфере образования',
-        },
-        generation_status: 'pending',
-      })
-      .select()
-      .single();
-
-    if (courseError) throw courseError;
-    testCourseIds.push(course.id);
-
-    console.log(`[T053] ✓ Created course: ${course.id}`);
-
-    // Step 2: Upload documents
-    console.log('[T053] Uploading 4 documents (~282KB)...');
-    const fileIds = await uploadDocuments(course.id, testOrg.id);
-    console.log(`[T053] ✓ Uploaded ${fileIds.length} documents`);
-
-    // Step 3: Process documents (Stage 2) - Use Transactional Outbox pattern
-    console.log('[T053] Stage 2: Processing documents using Transactional Outbox...');
-
-    // Build job data array for all documents
-    const documentJobs = [];
-    for (const fileId of fileIds) {
-      const { data: file } = await supabase
-        .from('file_catalog')
-        .select('storage_path, mime_type')
-        .eq('id', fileId)
-        .single();
-
-      const absolutePath = path.join(process.cwd(), file!.storage_path);
-
-      documentJobs.push({
-        queue: JobType.DOCUMENT_PROCESSING, // 'document_processing'
-        data: {
-          jobType: JobType.DOCUMENT_PROCESSING,
-          organizationId: testOrg.id,
-          courseId: course.id,
-          userId: testUser.id,
-          createdAt: new Date().toISOString(),
-          fileId,
-          filePath: absolutePath,
-          mimeType: file!.mime_type,
-          chunkSize: 512,
-          chunkOverlap: 50,
-        },
-        options: { priority: 10 },
-      });
-    }
-
-    // Initialize FSM for Stage 2 with all document processing jobs
-    const stage2Result = await commandHandler.handle({
-      entityId: course.id,
-      userId: testUser.id,
-      organizationId: testOrg.id,
-      idempotencyKey: `t053-scenario2-stage2-${Date.now()}`,
-      initiatedBy: 'TEST',
-      initialState: 'stage_2_init',
-      data: {
-        courseTitle: course.title,
-        scenario: 'full-pipeline-stage2',
-        fileCount: fileIds.length,
-      },
-      jobs: documentJobs,
-    });
-
-    console.log(`[T053] ✓ Stage 2 FSM initialized: ${stage2Result.fsmState.state}`);
-    console.log(`[T053] ✓ Stage 2 outbox entries created: ${stage2Result.outboxEntries.length}`);
-
-    // Wait for background processor to create BullMQ jobs
-    await waitForOutboxProcessing(course.id, 10000);
-
-    // Wait for Stage 2 to reach stage_2_complete
-    console.log('[T053] Waiting for Stage 2 to complete...');
-    await waitForStageCompletion(course.id, 'stage_2_complete', 120000); // 2 minutes max
-
-    // === STAGE 3: SUMMARIZATION ===
-    console.log('[T053] ========================================');
-    console.log('[T053] Stage 3: Initializing Summarization (FSM state transition)...');
-    console.log('[T053] ========================================');
-
-    // Initialize Stage 3 FSM state (jobs already queued by document processing)
-    const stage3Result = await commandHandler.handle({
-      entityId: course.id,
-      userId: testUser.id,
-      organizationId: testOrg.id,
-      idempotencyKey: `t053-scenario2-stage3-${Date.now()}`,
-      initiatedBy: 'TEST',
-      initialState: 'stage_3_init',
-      data: {
-        generation_id: course.id,
-        file_ids: fileIds,
-        scenario: 'full-pipeline-stage3',
-      },
-      jobs: [], // Jobs already queued by document processing handler
-    });
-
-    console.log(`[T053] ✓ Stage 3 FSM initialized: ${stage3Result.fsmState.state}`);
-
-    // Wait for Stage 3 completion (summarization jobs to complete)
-    await waitForStageCompletion(course.id, 'stage_3_complete', 120000); // 2 minutes max
-
-    // === STAGE 4: ANALYZE ===
-    console.log('[T053] ========================================');
-    console.log('[T053] Stage 4: Running Structure Analysis using Transactional Outbox...');
-    console.log('[T053] ========================================');
-
-    // Create STRUCTURE_ANALYSIS job using Transactional Outbox
-    const analyzeJobData = {
-      course_id: course.id,
-      organization_id: testOrg.id,
-      user_id: testUser.id,
-      input: {
-        topic: 'Продажи образовательных продуктов',
-        language: 'ru',
-        style: 'academic',
-        target_audience: 'intermediate' as const,
-        difficulty: 'intermediate',
-        lesson_duration_minutes: 5,
-        answers: course.settings?.target_audience,
-      },
-      priority: 10,
-      attempt_count: 0,
-      created_at: new Date().toISOString(),
-    };
-
-    const stage4Result = await commandHandler.handle({
-      entityId: course.id,
-      userId: testUser.id,
-      organizationId: testOrg.id,
-      idempotencyKey: `t053-scenario2-stage4-${Date.now()}`,
-      initiatedBy: 'TEST',
-      initialState: 'stage_4_init',
-      data: {
-        courseTitle: course.title,
-        scenario: 'full-pipeline-stage4',
-      },
-      jobs: [{
-        queue: JobType.STRUCTURE_ANALYSIS, // 'structure_analysis'
-        data: analyzeJobData,
-        options: { priority: 10 },
-      }],
-    });
-
-    console.log(`[T053] ✓ Stage 4 FSM initialized: ${stage4Result.fsmState.state}`);
-    console.log(`[T053] ✓ Stage 4 outbox entries created: ${stage4Result.outboxEntries.length}`);
-
-    // Wait for background processor to create BullMQ jobs (Stage 4 analysis takes 2-5 minutes)
-    await waitForOutboxProcessing(course.id, 600000);
-
-    // Wait for analysis_result to be populated
-    console.log('[T053] Waiting for analysis to complete (max 10 minutes)...');
-    let analyzeComplete = false;
-    let attempts = 0;
-    const maxAttempts = 120; // 10 minutes max (polling every 5s)
-    const startTime = Date.now();
-
-    while (!analyzeComplete && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Poll every 5s
-
-      const { data: analyzedCourse } = await supabase
-        .from('courses')
-        .select('analysis_result, generation_status')
-        .eq('id', course.id)
-        .single();
-
-      if (analyzedCourse?.analysis_result !== null) {
-        analyzeComplete = true;
-        const elapsed = Math.round((Date.now() - startTime) / 1000);
-        console.log(`[T053] ✓ Analysis complete in ${elapsed}s`);
-      } else {
-        process.stdout.write('.');
+  it.skip(
+    'Scenario 1: Title-Only Course Generation',
+    async () => {
+      if (shouldSkipTests) {
+        console.log('[T053] Skipping test - prerequisites not met');
+        return;
       }
 
-      attempts++;
-    }
+      const supabase = getSupabaseAdmin();
+      const testOrg = TEST_ORGS.premium;
+      const testUser = TEST_USERS.instructor1;
 
-    if (!analyzeComplete) {
-      throw new Error('Stage 4 Analyze did not complete within 10 minutes');
-    }
-
-    // Verify analysis_result is populated
-    const { data: verifiedCourse } = await supabase
-      .from('courses')
-      .select('analysis_result')
-      .eq('id', course.id)
-      .single();
-
-    expect(verifiedCourse?.analysis_result).toBeTruthy();
-    expect(verifiedCourse?.analysis_result).not.toBeNull();
-    console.log('[T053] ✓ analysis_result verified and populated');
-
-    // === STAGE 5: GENERATION ===
-    console.log('[T053] ========================================');
-    console.log('[T053] Stage 5: Running Structure Generation using Transactional Outbox...');
-    console.log('[T053] ========================================');
-
-    // Trigger generation with populated analysis_result using Transactional Outbox
-    const generationJobData = {
-      course_id: course.id,
-      organization_id: testOrg.id,
-      user_id: testUser.id,
-      analysis_result: verifiedCourse.analysis_result, // NOW POPULATED!
-      frontend_parameters: {
-        course_title: course.title,
-        language: 'ru',
-        style: 'academic',
-        desired_lessons_count: 25,
-        target_audience: 'Менеджеры по продажам в сфере образования',
-      },
-      vectorized_documents: true, // Documents processed
-      document_summaries: [],
-    };
-
-    const stage5Result = await commandHandler.handle({
-      entityId: course.id,
-      userId: testUser.id,
-      organizationId: testOrg.id,
-      idempotencyKey: `t053-scenario2-stage5-${Date.now()}`,
-      initiatedBy: 'TEST',
-      initialState: 'stage_5_init',
-      data: {
-        courseTitle: course.title,
-        scenario: 'full-pipeline-stage5',
-      },
-      jobs: [{
-        queue: JobType.STRUCTURE_GENERATION, // 'structure_generation'
-        data: generationJobData,
-        options: { priority: 10 },
-      }],
-    });
-
-    console.log(`[T053] ✓ Stage 5 FSM initialized: ${stage5Result.fsmState.state}`);
-    console.log(`[T053] ✓ Stage 5 outbox entries created: ${stage5Result.outboxEntries.length}`);
-
-    // Wait for background processor to create BullMQ jobs (Stage 5 generation takes 2-5 minutes)
-    await waitForOutboxProcessing(course.id, 600000);
-
-    // Validate FSM events for Stage 5
-    await validateFSMEvents(course.id, 'stage_5_init');
-
-    // Wait for completion
-    const result = await waitForGeneration(course.id);
-
-    // Validate results
-    validateCourseStructure(result.course_structure);
-    validateGenerationMetadata(result.generation_metadata);
-
-    // Scenario-specific checks
-    const totalLessons = result.course_structure.sections.reduce(
-      (sum: number, s: any) => sum + s.lessons.length,
-      0
-    );
-    expect(totalLessons).toBeGreaterThanOrEqual(20); // Minimum 20 lessons
-    // No maximum check - model can generate as many lessons as needed for complex topics
-
-    console.log('[T053] ========================================');
-    console.log('[T053] ✓ Scenario 2 PASSED');
-    console.log('[T053] ========================================');
-  }, TEST_CONFIG.MAX_WAIT_TIME + 720000); // 10min generation + 10min analysis + 2min buffer
-
-  // ==========================================================================
-  // Scenario 3: Different Styles Test (US4)
-  // ==========================================================================
-
-  it.skip('Scenario 3: Different Styles Test', async () => {
-    if (shouldSkipTests) {
-      console.log('[T053] Skipping test - prerequisites not met');
-      return;
-    }
-
-    const supabase = getSupabaseAdmin();
-    const testOrg = TEST_ORGS.premium;
-    const testUser = TEST_USERS.instructor1;
-
-    const styles = ['conversational', 'storytelling', 'practical', 'gamified'];
-    const results: any[] = [];
-
-    for (const style of styles) {
-      console.log(`[T053] Testing style: ${style}`);
-
-      // Create course
+      // Create course with ONLY title
       const { data: course, error } = await supabase
         .from('courses')
         .insert({
           organization_id: testOrg.id,
           user_id: testUser.id,
-          title: `Курс по продажам (${style})`,
-          slug: `kurs-po-prodazham-${style}-` + Date.now(),
+          title: 'Курс по продажам в сфере образования',
+          slug: 'kurs-po-prodazham-v-sfere-obrazovaniya-' + Date.now(),
           language: 'ru',
-          style,
+          style: 'practical',
           generation_status: 'pending',
         })
         .select()
@@ -904,67 +521,486 @@ describe('T053: Stage 5 Generation - Synergy Sales Course E2E', () => {
       if (error) throw error;
       testCourseIds.push(course.id);
 
+      console.log(`[T053] Created title-only course: ${course.id}`);
+
       // Trigger generation using Transactional Outbox pattern
       const jobData = {
         course_id: course.id,
         organization_id: testOrg.id,
         user_id: testUser.id,
-        analysis_result: null,
+        analysis_result: null, // Title-only scenario
         frontend_parameters: {
           course_title: course.title,
           language: 'ru',
-          style,
+          style: 'practical',
         },
         vectorized_documents: false,
         document_summaries: [],
       };
 
-      const fsmResult = await commandHandler.handle({
+      const result = await commandHandler.handle({
         entityId: course.id,
         userId: testUser.id,
         organizationId: testOrg.id,
-        idempotencyKey: `t053-scenario3-${style}-${Date.now()}`,
+        idempotencyKey: `t053-scenario1-${Date.now()}`,
         initiatedBy: 'TEST',
         initialState: 'stage_5_init',
         data: {
           courseTitle: course.title,
-          scenario: `different-styles-${style}`,
+          scenario: 'title-only',
         },
-        jobs: [{
-          queue: JobType.STRUCTURE_GENERATION, // 'structure_generation'
-          data: jobData,
-          options: { priority: 10 },
-        }],
+        jobs: [
+          {
+            queue: JobType.STRUCTURE_GENERATION, // 'structure_generation'
+            data: jobData,
+            options: { priority: 10 },
+          },
+        ],
       });
 
-      console.log(`[T053] ✓ ${style}: FSM initialized (${fsmResult.fsmState.state})`);
+      console.log(`[T053] ✓ FSM initialized: ${result.fsmState.state}`);
+      console.log(`[T053] ✓ Outbox entries created: ${result.outboxEntries.length}`);
+      console.log(`[T053] ✓ From cache: ${result.fromCache}`);
 
-      // Wait for background processor
+      // Validate outbox entries created
+      expect(result.outboxEntries).toBeDefined();
+      expect(result.outboxEntries.length).toBe(1);
+      expect(result.outboxEntries[0].status).toBeNull(); // pending (processed_at IS NULL)
+      expect(result.outboxEntries[0].queue_name).toBe(JobType.STRUCTURE_GENERATION);
+
+      // Validate FSM state initialized
+      expect(result.fsmState).toBeDefined();
+      expect(result.fsmState.entity_id).toBe(course.id);
+      expect(result.fsmState.state).toBe('stage_5_init');
+
+      // Wait for background processor to create BullMQ jobs
       await waitForOutboxProcessing(course.id, 10000);
+
+      // Validate FSM events
+      await validateFSMEvents(course.id, 'stage_5_init');
+
+      // Wait for completion
+      const generationResult = await waitForGeneration(course.id);
+
+      // Validate results
+      validateCourseStructure(generationResult.course_structure);
+      validateGenerationMetadata(generationResult.generation_metadata);
+
+      // Scenario-specific checks
+      expect(generationResult.course_structure.sections.length).toBeGreaterThanOrEqual(4);
+      expect(generationResult.course_structure.sections.length).toBeLessThanOrEqual(10);
+    },
+    TEST_CONFIG.MAX_WAIT_TIME + 60000
+  );
+
+  // ==========================================================================
+  // Scenario 2: Full Pipeline - Analyze + Generate + Style (US2)
+  // Flow: Create → Upload Docs → Stage 4 Analyze → Stage 5 Generate
+  // ==========================================================================
+
+  it(
+    'Scenario 2: Full Pipeline - Analyze + Generate + Style (US2)',
+    async () => {
+      if (shouldSkipTests) {
+        console.log('[T053] Skipping test - prerequisites not met');
+        return;
+      }
+
+      console.log('[T053] ========================================');
+      console.log('[T053] Scenario 2: Full Pipeline - Analyze + Generate');
+      console.log('[T053] ========================================');
+
+      const supabase = getSupabaseAdmin();
+      const testOrg = TEST_ORGS.premium;
+      const testUser = TEST_USERS.instructor1;
+
+      // Step 1: Create course
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          organization_id: testOrg.id,
+          user_id: testUser.id,
+          title: 'Курс по продажам',
+          slug: 'kurs-po-prodazham-' + Date.now(),
+          language: 'ru',
+          style: 'academic',
+          settings: {
+            desired_lessons_count: 25,
+            target_audience: 'Менеджеры по продажам в сфере образования',
+          },
+          generation_status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (courseError) throw courseError;
+      testCourseIds.push(course.id);
+
+      console.log(`[T053] ✓ Created course: ${course.id}`);
+
+      // Step 2: Upload documents
+      console.log('[T053] Uploading 4 documents (~282KB)...');
+      const fileIds = await uploadDocuments(course.id, testOrg.id);
+      console.log(`[T053] ✓ Uploaded ${fileIds.length} documents`);
+
+      // Step 3: Process documents (Stage 2) - Use Transactional Outbox pattern
+      console.log('[T053] Stage 2: Processing documents using Transactional Outbox...');
+
+      // Build job data array for all documents
+      const documentJobs = [];
+      for (const fileId of fileIds) {
+        const { data: file } = await supabase
+          .from('file_catalog')
+          .select('storage_path, mime_type')
+          .eq('id', fileId)
+          .single();
+
+        const absolutePath = path.join(process.cwd(), file!.storage_path);
+
+        documentJobs.push({
+          queue: JobType.DOCUMENT_PROCESSING, // 'document_processing'
+          data: {
+            jobType: JobType.DOCUMENT_PROCESSING,
+            organizationId: testOrg.id,
+            courseId: course.id,
+            userId: testUser.id,
+            createdAt: new Date().toISOString(),
+            fileId,
+            filePath: absolutePath,
+            mimeType: file!.mime_type,
+            chunkSize: 512,
+            chunkOverlap: 50,
+          },
+          options: { priority: 10 },
+        });
+      }
+
+      // Initialize FSM for Stage 2 with all document processing jobs
+      const stage2Result = await commandHandler.handle({
+        entityId: course.id,
+        userId: testUser.id,
+        organizationId: testOrg.id,
+        idempotencyKey: `t053-scenario2-stage2-${Date.now()}`,
+        initiatedBy: 'TEST',
+        initialState: 'stage_2_init',
+        data: {
+          courseTitle: course.title,
+          scenario: 'full-pipeline-stage2',
+          fileCount: fileIds.length,
+        },
+        jobs: documentJobs,
+      });
+
+      console.log(`[T053] ✓ Stage 2 FSM initialized: ${stage2Result.fsmState.state}`);
+      console.log(`[T053] ✓ Stage 2 outbox entries created: ${stage2Result.outboxEntries.length}`);
+
+      // Wait for background processor to create BullMQ jobs
+      await waitForOutboxProcessing(course.id, 10000);
+
+      // Wait for Stage 2 to reach stage_2_complete
+      console.log('[T053] Waiting for Stage 2 to complete...');
+      await waitForStageCompletion(course.id, 'stage_2_complete', 120000); // 2 minutes max
+
+      // === STAGE 3: SUMMARIZATION ===
+      console.log('[T053] ========================================');
+      console.log('[T053] Stage 3: Initializing Summarization (FSM state transition)...');
+      console.log('[T053] ========================================');
+
+      // Initialize Stage 3 FSM state (jobs already queued by document processing)
+      const stage3Result = await commandHandler.handle({
+        entityId: course.id,
+        userId: testUser.id,
+        organizationId: testOrg.id,
+        idempotencyKey: `t053-scenario2-stage3-${Date.now()}`,
+        initiatedBy: 'TEST',
+        initialState: 'stage_3_init',
+        data: {
+          generation_id: course.id,
+          file_ids: fileIds,
+          scenario: 'full-pipeline-stage3',
+        },
+        jobs: [], // Jobs already queued by document processing handler
+      });
+
+      console.log(`[T053] ✓ Stage 3 FSM initialized: ${stage3Result.fsmState.state}`);
+
+      // Wait for Stage 3 completion (summarization jobs to complete)
+      await waitForStageCompletion(course.id, 'stage_3_complete', 120000); // 2 minutes max
+
+      // === STAGE 4: ANALYZE ===
+      console.log('[T053] ========================================');
+      console.log('[T053] Stage 4: Running Structure Analysis using Transactional Outbox...');
+      console.log('[T053] ========================================');
+
+      // Create STRUCTURE_ANALYSIS job using Transactional Outbox
+      const analyzeJobData = {
+        course_id: course.id,
+        organization_id: testOrg.id,
+        user_id: testUser.id,
+        input: {
+          topic: 'Продажи образовательных продуктов',
+          language: 'ru',
+          style: 'academic',
+          target_audience: 'intermediate' as const,
+          difficulty: 'intermediate',
+          lesson_duration_minutes: 5,
+          answers: course.settings?.target_audience,
+        },
+        priority: 10,
+        attempt_count: 0,
+        created_at: new Date().toISOString(),
+      };
+
+      const stage4Result = await commandHandler.handle({
+        entityId: course.id,
+        userId: testUser.id,
+        organizationId: testOrg.id,
+        idempotencyKey: `t053-scenario2-stage4-${Date.now()}`,
+        initiatedBy: 'TEST',
+        initialState: 'stage_4_init',
+        data: {
+          courseTitle: course.title,
+          scenario: 'full-pipeline-stage4',
+        },
+        jobs: [
+          {
+            queue: JobType.STRUCTURE_ANALYSIS, // 'structure_analysis'
+            data: analyzeJobData,
+            options: { priority: 10 },
+          },
+        ],
+      });
+
+      console.log(`[T053] ✓ Stage 4 FSM initialized: ${stage4Result.fsmState.state}`);
+      console.log(`[T053] ✓ Stage 4 outbox entries created: ${stage4Result.outboxEntries.length}`);
+
+      // Wait for background processor to create BullMQ jobs (Stage 4 analysis takes 2-5 minutes)
+      await waitForOutboxProcessing(course.id, 600000);
+
+      // Wait for analysis_result to be populated
+      console.log('[T053] Waiting for analysis to complete (max 10 minutes)...');
+      let analyzeComplete = false;
+      let attempts = 0;
+      const maxAttempts = 120; // 10 minutes max (polling every 5s)
+      const startTime = Date.now();
+
+      while (!analyzeComplete && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Poll every 5s
+
+        const { data: analyzedCourse } = await supabase
+          .from('courses')
+          .select('analysis_result, generation_status')
+          .eq('id', course.id)
+          .single();
+
+        if (analyzedCourse?.analysis_result !== null) {
+          analyzeComplete = true;
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          console.log(`[T053] ✓ Analysis complete in ${elapsed}s`);
+        } else {
+          process.stdout.write('.');
+        }
+
+        attempts++;
+      }
+
+      if (!analyzeComplete) {
+        throw new Error('Stage 4 Analyze did not complete within 10 minutes');
+      }
+
+      // Verify analysis_result is populated
+      const { data: verifiedCourse } = await supabase
+        .from('courses')
+        .select('analysis_result')
+        .eq('id', course.id)
+        .single();
+
+      expect(verifiedCourse?.analysis_result).toBeTruthy();
+      expect(verifiedCourse?.analysis_result).not.toBeNull();
+      console.log('[T053] ✓ analysis_result verified and populated');
+
+      // === STAGE 5: GENERATION ===
+      console.log('[T053] ========================================');
+      console.log('[T053] Stage 5: Running Structure Generation using Transactional Outbox...');
+      console.log('[T053] ========================================');
+
+      // Trigger generation with populated analysis_result using Transactional Outbox
+      const generationJobData = {
+        course_id: course.id,
+        organization_id: testOrg.id,
+        user_id: testUser.id,
+        analysis_result: verifiedCourse.analysis_result, // NOW POPULATED!
+        frontend_parameters: {
+          course_title: course.title,
+          language: 'ru',
+          style: 'academic',
+          desired_lessons_count: 25,
+          target_audience: 'Менеджеры по продажам в сфере образования',
+        },
+        vectorized_documents: true, // Documents processed
+        document_summaries: [],
+      };
+
+      const stage5Result = await commandHandler.handle({
+        entityId: course.id,
+        userId: testUser.id,
+        organizationId: testOrg.id,
+        idempotencyKey: `t053-scenario2-stage5-${Date.now()}`,
+        initiatedBy: 'TEST',
+        initialState: 'stage_5_init',
+        data: {
+          courseTitle: course.title,
+          scenario: 'full-pipeline-stage5',
+        },
+        jobs: [
+          {
+            queue: JobType.STRUCTURE_GENERATION, // 'structure_generation'
+            data: generationJobData,
+            options: { priority: 10 },
+          },
+        ],
+      });
+
+      console.log(`[T053] ✓ Stage 5 FSM initialized: ${stage5Result.fsmState.state}`);
+      console.log(`[T053] ✓ Stage 5 outbox entries created: ${stage5Result.outboxEntries.length}`);
+
+      // Wait for background processor to create BullMQ jobs (Stage 5 generation takes 2-5 minutes)
+      await waitForOutboxProcessing(course.id, 600000);
+
+      // Validate FSM events for Stage 5
+      await validateFSMEvents(course.id, 'stage_5_init');
 
       // Wait for completion
       const result = await waitForGeneration(course.id);
-      results.push({ style, structure: result.course_structure });
 
-      console.log(`[T053] ✓ Completed ${style} generation`);
-    }
+      // Validate results
+      validateCourseStructure(result.course_structure);
+      validateGenerationMetadata(result.generation_metadata);
 
-    // Compare results
-    console.log('[T053] Comparing style differences...');
-    // TODO: Implement style comparison logic
-  }, TEST_CONFIG.MAX_WAIT_TIME * 4 + 60000);
+      // Scenario-specific checks
+      const totalLessons = result.course_structure.sections.reduce(
+        (sum: number, s: { lessons: { length: number } }) => sum + s.lessons.length,
+        0
+      );
+      expect(totalLessons).toBeGreaterThanOrEqual(20); // Minimum 20 lessons
+      // No maximum check - model can generate as many lessons as needed for complex topics
+
+      console.log('[T053] ========================================');
+      console.log('[T053] ✓ Scenario 2 PASSED');
+      console.log('[T053] ========================================');
+    },
+    TEST_CONFIG.MAX_WAIT_TIME + 720000
+  ); // 10min generation + 10min analysis + 2min buffer
+
+  // ==========================================================================
+  // Scenario 3: Different Styles Test (US4)
+  // ==========================================================================
+
+  it.skip(
+    'Scenario 3: Different Styles Test',
+    async () => {
+      if (shouldSkipTests) {
+        console.log('[T053] Skipping test - prerequisites not met');
+        return;
+      }
+
+      const supabase = getSupabaseAdmin();
+      const testOrg = TEST_ORGS.premium;
+      const testUser = TEST_USERS.instructor1;
+
+      const styles = ['conversational', 'storytelling', 'practical', 'gamified'];
+      const results: any[] = [];
+
+      for (const style of styles) {
+        console.log(`[T053] Testing style: ${style}`);
+
+        // Create course
+        const { data: course, error } = await supabase
+          .from('courses')
+          .insert({
+            organization_id: testOrg.id,
+            user_id: testUser.id,
+            title: `Курс по продажам (${style})`,
+            slug: `kurs-po-prodazham-${style}-` + Date.now(),
+            language: 'ru',
+            style,
+            generation_status: 'pending',
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        testCourseIds.push(course.id);
+
+        // Trigger generation using Transactional Outbox pattern
+        const jobData = {
+          course_id: course.id,
+          organization_id: testOrg.id,
+          user_id: testUser.id,
+          analysis_result: null,
+          frontend_parameters: {
+            course_title: course.title,
+            language: 'ru',
+            style,
+          },
+          vectorized_documents: false,
+          document_summaries: [],
+        };
+
+        const fsmResult = await commandHandler.handle({
+          entityId: course.id,
+          userId: testUser.id,
+          organizationId: testOrg.id,
+          idempotencyKey: `t053-scenario3-${style}-${Date.now()}`,
+          initiatedBy: 'TEST',
+          initialState: 'stage_5_init',
+          data: {
+            courseTitle: course.title,
+            scenario: `different-styles-${style}`,
+          },
+          jobs: [
+            {
+              queue: JobType.STRUCTURE_GENERATION, // 'structure_generation'
+              data: jobData,
+              options: { priority: 10 },
+            },
+          ],
+        });
+
+        console.log(`[T053] ✓ ${style}: FSM initialized (${fsmResult.fsmState.state})`);
+
+        // Wait for background processor
+        await waitForOutboxProcessing(course.id, 10000);
+
+        // Wait for completion
+        const result = await waitForGeneration(course.id);
+        results.push({ style, structure: result.course_structure });
+
+        console.log(`[T053] ✓ Completed ${style} generation`);
+      }
+
+      // Compare results
+      console.log('[T053] Comparing style differences...');
+      // TODO: Implement style comparison logic
+    },
+    TEST_CONFIG.MAX_WAIT_TIME * 4 + 60000
+  );
 
   // ==========================================================================
   // Scenario 4: RAG-Heavy Generation
   // ==========================================================================
 
-  it.skip('Scenario 4: RAG-Heavy Generation', async () => {
-    if (shouldSkipTests) {
-      console.log('[T053] Skipping test - prerequisites not met');
-      return;
-    }
+  it.skip(
+    'Scenario 4: RAG-Heavy Generation',
+    () => {
+      if (shouldSkipTests) {
+        console.log('[T053] Skipping test - prerequisites not met');
+        return;
+      }
 
-    // TODO: Implement RAG test after Stage 2/3/4 are fully tested
-    console.log('[T053] ⚠ RAG test requires full pipeline with vectorization');
-  }, TEST_CONFIG.MAX_WAIT_TIME + 60000);
+      // TODO: Implement RAG test after Stage 2/3/4 are fully tested
+      console.log('[T053] ⚠ RAG test requires full pipeline with vectorization');
+    },
+    TEST_CONFIG.MAX_WAIT_TIME + 60000
+  );
 });

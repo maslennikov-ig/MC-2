@@ -203,7 +203,9 @@ export async function rollbackMigration(version: string): Promise<void> {
 }
 
 // CLI support (ESM compatible)
-const isMainModule = import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/').split('/').pop() || '');
+const isMainModule = import.meta.url.endsWith(
+  process.argv[1]?.replace(/\\/g, '/').split('/').pop() || ''
+);
 if (isMainModule) {
   const command = process.argv[2];
 

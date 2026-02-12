@@ -1,4 +1,3 @@
-
 {
   "course_title": "Introduction to Python Programming",
   "course_description": "This beginner-level technical programming course introduces students to the fundamentals of Python programming. Through hands-on exercises and practical projects, participants will learn to write clean, efficient Python code while developing problem-solving skills essential for software development. The course covers core concepts including variables, data types, control structures, functions, and basic object-oriented programming principles, providing a solid foundation for further study in computer science or data analysis.",
@@ -6,7 +5,12 @@
   "target_audience": "This course is ideal for absolute beginners with no prior programming experience, career changers transitioning to tech roles, college students in non-computer science majors who need programming skills, data analysts looking to expand into programming, hobbyists interested in creating personal projects, and professionals seeking to automate repetitive tasks at work.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with operating systems (Windows/Mac/Linux)", "Logical thinking ability", "High school mathematics knowledge"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with operating systems (Windows/Mac/Linux)",
+    "Logical thinking ability",
+    "High school mathematics knowledge"
+  ],
   "learning_outcomes": [
     "Define fundamental programming concepts including variables, data types, and operators",
     "Build conditional statements and loops to control program flow",
@@ -16,5 +20,14 @@
     "Design simple object-oriented programs using classes and objects",
     "Develop basic Python applications that solve real-world problems"
   ],
-  "course_tags": ["Python", "Programming", "Beginner", "Computer Science", "Software Development", "Coding", "Programming Fundamentals", "Object-Oriented Programming"]
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Computer Science",
+    "Software Development",
+    "Coding",
+    "Programming Fundamentals",
+    "Object-Oriented Programming"
+  ]
 }

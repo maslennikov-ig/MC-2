@@ -27,7 +27,6 @@ export { setupBullBoardUI, createMetricsRouter } from './ui';
 export { BaseJobHandler } from './handlers/base-handler';
 export type { JobResult } from './handlers/base-handler';
 export { testJobHandler } from './handlers/test-handler';
-export { initializeJobHandler } from './handlers/initialize';
 export {
   classifyError,
   shouldRetryJob,

@@ -77,7 +77,8 @@ export interface QuotaInfo {
  * This alias is kept for backward compatibility with existing tests.
  * @see DEFAULT_STORAGE_QUOTAS in @megacampus/shared-types
  */
-export const TIER_QUOTAS: Record<Database['public']['Enums']['tier'], number> = DEFAULT_STORAGE_QUOTAS;
+export const TIER_QUOTAS: Record<Database['public']['Enums']['tier'], number> =
+  DEFAULT_STORAGE_QUOTAS;
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -337,10 +338,7 @@ export async function decrementQuota(organizationId: string, fileSize: number): 
  * // Returns quota info with premium tier limits (10 GB)
  * ```
  */
-export async function getQuotaInfo(
-  organizationId: string,
-  userRole?: Role
-): Promise<QuotaInfo> {
+export async function getQuotaInfo(organizationId: string, userRole?: Role): Promise<QuotaInfo> {
   // Superadmin bypass - return premium tier limits
   if (shouldBypassTierRestrictions(userRole)) {
     const storageQuotaBytes = SUPERADMIN_LIMITS.storageQuotaBytes;

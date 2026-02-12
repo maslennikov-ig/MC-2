@@ -31,10 +31,10 @@
  * Test execution: pnpm test tests/integration/document-processing-worker.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
-import { readFileSync } from 'fs'
-import { randomUUID } from 'crypto'
-import { QdrantClient } from '@qdrant/js-client-rest'
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { readFileSync } from 'fs';
+import { randomUUID } from 'crypto';
+import { QdrantClient } from '@qdrant/js-client-rest';
 import {
   createTestOrg,
   createTestUser,
@@ -43,24 +43,24 @@ import {
   EXPECTED_CHUNKS,
   TEST_TIMEOUTS,
   type TestOrganization,
-  type TestUser
-} from './helpers/test-orgs'
-import { getTestSupabaseClient } from '../helpers/shared-supabase'
+  type TestUser,
+} from './helpers/test-orgs';
+import { getTestSupabaseClient } from '../helpers/shared-supabase';
 
 // ============================================================================
 // Environment Setup
 // ============================================================================
 
-const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333'
-const qdrantApiKey = process.env.QDRANT_API_KEY
+const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
+const qdrantApiKey = process.env.QDRANT_API_KEY;
 
 // Use shared singleton client to prevent connection pool exhaustion in CI/CD
-const supabaseAdmin = getTestSupabaseClient()
+const supabaseAdmin = getTestSupabaseClient();
 
 const qdrantClient = new QdrantClient({
   url: qdrantUrl,
-  apiKey: qdrantApiKey
-})
+  apiKey: qdrantApiKey,
+});
 
 // ============================================================================
 // Test Helpers
@@ -78,20 +78,20 @@ async function uploadFileAndProcess(
   mimeType: string
 ): Promise<{ fileId: string; jobId: string }> {
   // Read file content
-  const fileBuffer = readFileSync(filePath)
-  const base64Content = fileBuffer.toString('base64')
+  const fileBuffer = readFileSync(filePath);
+  const base64Content = fileBuffer.toString('base64');
 
   // Derive file_type from filename extension
-  const fileExtension = filename.split('.').pop()?.toLowerCase() || 'unknown'
+  const fileExtension = filename.split('.').pop()?.toLowerCase() || 'unknown';
   const fileTypeMap: Record<string, string> = {
     pdf: 'pdf',
     txt: 'txt',
     docx: 'docx',
     doc: 'doc',
     md: 'markdown',
-    html: 'html'
-  }
-  const fileType = fileTypeMap[fileExtension] || fileExtension
+    html: 'html',
+  };
+  const fileType = fileTypeMap[fileExtension] || fileExtension;
 
   // Insert into file_catalog
   const { data: file, error: fileError } = await supabaseAdmin
@@ -106,20 +106,20 @@ async function uploadFileAndProcess(
       storage_path: `${orgId}/${courseId}/${filename}`,
       vector_status: 'pending',
       markdown_content: base64Content, // Temporary storage for test (using markdown_content field)
-      hash: `test-hash-${Date.now()}` // Add required hash field
+      hash: `test-hash-${Date.now()}`, // Add required hash field
     })
     .select('id')
-    .single()
+    .single();
 
   if (fileError || !file) {
-    throw new Error(`Failed to insert file: ${fileError?.message}`)
+    throw new Error(`Failed to insert file: ${fileError?.message}`);
   }
 
   // Trigger DOCUMENT_PROCESSING job via BullMQ
-  const jobId = `test-job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const jobId = `test-job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const { addJob } = await import('../../src/orchestrator/queue.js')
-  const { JobType } = await import('@megacampus/shared-types')
+  const { addJob } = await import('../../src/orchestrator/queue.js');
+  const { JobType } = await import('@megacampus/shared-types');
 
   // Create document processing job
   await addJob(
@@ -131,15 +131,15 @@ async function uploadFileAndProcess(
       userId,
       fileId: file.id,
       filePath, // Use the original file path from fixtures
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     },
     { jobId }
-  )
+  );
 
   return {
     fileId: file.id,
-    jobId
-  }
+    jobId,
+  };
 }
 
 /**
@@ -149,37 +149,37 @@ async function waitForVectorIndexing(
   fileId: string,
   timeoutMs: number = TEST_TIMEOUTS.documentProcessing
 ): Promise<{ success: boolean; status: string; errorMessage?: string }> {
-  const startTime = Date.now()
-  const pollInterval = TEST_TIMEOUTS.jobPollingInterval
+  const startTime = Date.now();
+  const pollInterval = TEST_TIMEOUTS.jobPollingInterval;
 
   while (Date.now() - startTime < timeoutMs) {
     const { data: file, error } = await supabaseAdmin
       .from('file_catalog')
       .select('vector_status')
       .eq('id', fileId)
-      .single()
+      .single();
 
     if (error) {
-      throw new Error(`Failed to query file_catalog: ${error.message}`)
+      throw new Error(`Failed to query file_catalog: ${error.message}`);
     }
 
     if (file.vector_status === 'indexed') {
-      return { success: true, status: 'indexed' }
+      return { success: true, status: 'indexed' };
     }
 
     if (file.vector_status === 'failed') {
       return {
         success: false,
         status: 'failed',
-        errorMessage: 'Processing failed (check error_logs table for details)'
-      }
+        errorMessage: 'Processing failed (check error_logs table for details)',
+      };
     }
 
     // Wait before next poll
-    await new Promise(resolve => setTimeout(resolve, pollInterval))
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
 
-  return { success: false, status: 'timeout' }
+  return { success: false, status: 'timeout' };
 }
 
 /**
@@ -189,15 +189,15 @@ async function queryVectorsByFileId(
   fileId: string,
   collectionName: string = 'course_embeddings'
 ): Promise<{
-  totalVectors: number
-  parentChunks: number
-  childChunks: number
-  dimensions: number
+  totalVectors: number;
+  parentChunks: number;
+  childChunks: number;
+  dimensions: number;
 }> {
   try {
-    console.log(`🔍 [QUERY] Querying vectors for fileId: ${fileId}`)
-    console.log(`   Collection: ${collectionName}`)
-    console.log(`   Filter: document_id="${fileId}"`)
+    console.log(`🔍 [QUERY] Querying vectors for fileId: ${fileId}`);
+    console.log(`   Collection: ${collectionName}`);
+    console.log(`   Filter: document_id="${fileId}"`);
 
     // Scroll through all vectors with this document_id
     // IMPORTANT: Use named vector format for collections with named vectors
@@ -207,79 +207,85 @@ async function queryVectorsByFileId(
         must: [
           {
             key: 'document_id',
-            match: { value: fileId }
-          }
-        ]
+            match: { value: fileId },
+          },
+        ],
       },
       limit: 100,
       with_payload: true,
-      with_vector: true // Request vectors
-    })
+      with_vector: true, // Request vectors
+    });
 
-    const points = scrollResponse.points || []
-    const totalVectors = points.length
+    const points = scrollResponse.points || [];
+    const totalVectors = points.length;
 
-    console.log(`📊 [QUERY RESULTS] Total vectors found: ${totalVectors}`)
+    console.log(`📊 [QUERY RESULTS] Total vectors found: ${totalVectors}`);
 
     // Debug: Log query results
     if (totalVectors === 0) {
-      console.log(`⚠️  [DEBUG] No vectors found for fileId: ${fileId} in collection: ${collectionName}`)
+      console.log(
+        `⚠️  [DEBUG] No vectors found for fileId: ${fileId} in collection: ${collectionName}`
+      );
       // Try querying without filter to see if collection has any points
-      const allPoints = await qdrantClient.scroll(collectionName, { limit: 5, with_payload: true })
-      console.log(`   Collection has ${allPoints.points?.length || 0} total points (showing first 5)`)
+      const allPoints = await qdrantClient.scroll(collectionName, { limit: 5, with_payload: true });
+      console.log(
+        `   Collection has ${allPoints.points?.length || 0} total points (showing first 5)`
+      );
       if (allPoints.points && allPoints.points.length > 0) {
-        console.log(`   Sample payload keys:`, Object.keys(allPoints.points[0].payload || {}))
-        console.log(`   Sample document_id:`, (allPoints.points[0].payload as any)?.document_id)
+        console.log(`   Sample payload keys:`, Object.keys(allPoints.points[0].payload || {}));
+        console.log(`   Sample document_id:`, (allPoints.points[0].payload as any)?.document_id);
       }
     } else {
       // Log first 3 payloads to understand what we got
-      console.log(`   First ${Math.min(3, totalVectors)} payloads:`)
+      console.log(`   First ${Math.min(3, totalVectors)} payloads:`);
       points.slice(0, 3).forEach((point, idx) => {
-        const payload = point.payload as any
-        console.log(`     [${idx}] document_id: ${payload?.document_id || 'UNDEFINED'}`)
-        console.log(`         organization_id: ${payload?.organization_id || 'UNDEFINED'}`)
-        console.log(`         course_id: ${payload?.course_id || 'UNDEFINED'}`)
-        console.log(`         chunk_type: ${payload?.chunk_type || 'UNDEFINED'}`)
-        console.log(`         parent_id: ${payload?.parent_id !== undefined ? payload.parent_id : 'UNDEFINED'}`)
-      })
+        const payload = point.payload as any;
+        console.log(`     [${idx}] document_id: ${payload?.document_id || 'UNDEFINED'}`);
+        console.log(`         organization_id: ${payload?.organization_id || 'UNDEFINED'}`);
+        console.log(`         course_id: ${payload?.course_id || 'UNDEFINED'}`);
+        console.log(`         chunk_type: ${payload?.chunk_type || 'UNDEFINED'}`);
+        console.log(
+          `         parent_id: ${payload?.parent_id !== undefined ? payload.parent_id : 'UNDEFINED'}`
+        );
+      });
     }
 
     // Count parent vs child chunks
-    let parentChunks = 0
-    let childChunks = 0
-    let dimensions = 0
+    let parentChunks = 0;
+    let childChunks = 0;
+    let dimensions = 0;
 
     points.forEach(point => {
-      const payload = point.payload as any
+      const payload = point.payload as any;
       if (payload.parent_id === null || payload.parent_id === undefined) {
-        parentChunks++
+        parentChunks++;
       } else {
-        childChunks++
+        childChunks++;
       }
 
       // Get vector dimensions from first point
       // For named vectors, access point.vector.dense (not point.vector directly)
       if (dimensions === 0 && point.vector && typeof point.vector === 'object') {
-        const namedVectors = point.vector as Record<string, number[]>
-        const denseVector = namedVectors.dense
-        dimensions = Array.isArray(denseVector) ? denseVector.length : 0
+        const namedVectors = point.vector as Record<string, number[]>;
+        const denseVector = namedVectors.dense;
+        dimensions = Array.isArray(denseVector) ? denseVector.length : 0;
       }
-    })
+    });
 
     return {
       totalVectors,
       parentChunks,
       childChunks,
-      dimensions
-    }
+      dimensions,
+    };
   } catch (error) {
-    console.error('Error querying Qdrant:', error)
+    console.error('Error querying Qdrant:', error);
     return {
       totalVectors: 0,
       parentChunks: 0,
       childChunks: 0,
-      dimensions: 0
-    }
+      dimensions: 0,
+    };
   }
 }
 
@@ -305,43 +311,46 @@ async function waitForQdrantVectors(
   collectionName: string = 'course_embeddings',
   maxWaitMs: number = 5000
 ): Promise<void> {
-  const startTime = Date.now()
-  const pollInterval = 100 // 100ms between polls
+  const startTime = Date.now();
+  const pollInterval = 100; // 100ms between polls
 
-  console.log(`⏳ [WAIT] Waiting for ${expectedCount} vectors to be indexed...`)
-  console.log(`   File ID: ${fileId}`)
-  console.log(`   Collection: ${collectionName}`)
-  console.log(`   Timeout: ${maxWaitMs}ms`)
+  console.log(`⏳ [WAIT] Waiting for ${expectedCount} vectors to be indexed...`);
+  console.log(`   File ID: ${fileId}`);
+  console.log(`   Collection: ${collectionName}`);
+  console.log(`   Timeout: ${maxWaitMs}ms`);
 
   while (Date.now() - startTime < maxWaitMs) {
-    const result = await queryVectorsByFileId(fileId, collectionName)
+    const result = await queryVectorsByFileId(fileId, collectionName);
 
     if (result.totalVectors >= expectedCount) {
-      console.log(`✅ [WAIT] Vectors indexed successfully!`)
-      console.log(`   Got: ${result.totalVectors}/${expectedCount}`)
-      console.log(`   Time: ${Date.now() - startTime}ms`)
-      return
+      console.log(`✅ [WAIT] Vectors indexed successfully!`);
+      console.log(`   Got: ${result.totalVectors}/${expectedCount}`);
+      console.log(`   Time: ${Date.now() - startTime}ms`);
+      return;
     }
 
-    console.log(`⏳ [WAIT] Still indexing... (${result.totalVectors}/${expectedCount})`)
-    await new Promise(resolve => setTimeout(resolve, pollInterval))
+    console.log(`⏳ [WAIT] Still indexing... (${result.totalVectors}/${expectedCount})`);
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
 
   // Timeout - get final count
-  const finalResult = await queryVectorsByFileId(fileId, collectionName)
-  const error = `Timeout waiting for vector indexing after ${maxWaitMs}ms. Expected ${expectedCount} vectors, got ${finalResult.totalVectors}`
-  console.error(`❌ [WAIT ERROR] ${error}`)
-  throw new Error(error)
+  const finalResult = await queryVectorsByFileId(fileId, collectionName);
+  const error = `Timeout waiting for vector indexing after ${maxWaitMs}ms. Expected ${expectedCount} vectors, got ${finalResult.totalVectors}`;
+  console.error(`❌ [WAIT ERROR] ${error}`);
+  throw new Error(error);
 }
 
 /**
  * Clean up test vectors from Qdrant
  */
-async function cleanupVectors(fileId: string, collectionName: string = 'course_embeddings'): Promise<void> {
+async function cleanupVectors(
+  fileId: string,
+  collectionName: string = 'course_embeddings'
+): Promise<void> {
   try {
-    console.log(`🧹 [CLEANUP] Cleaning up vectors for fileId: ${fileId}`)
-    console.log(`   Collection: ${collectionName}`)
-    console.log(`   Filter: document_id="${fileId}"`)
+    console.log(`🧹 [CLEANUP] Cleaning up vectors for fileId: ${fileId}`);
+    console.log(`   Collection: ${collectionName}`);
+    console.log(`   Filter: document_id="${fileId}"`);
 
     // Check how many vectors exist before deletion
     const beforeCleanup = await qdrantClient.scroll(collectionName, {
@@ -349,15 +358,15 @@ async function cleanupVectors(fileId: string, collectionName: string = 'course_e
         must: [
           {
             key: 'document_id',
-            match: { value: fileId }
-          }
-        ]
+            match: { value: fileId },
+          },
+        ],
       },
       limit: 1,
-      with_payload: false
-    })
-    const vectorsBeforeCleanup = beforeCleanup.points?.length || 0
-    console.log(`   Vectors before cleanup: ${vectorsBeforeCleanup}`)
+      with_payload: false,
+    });
+    const vectorsBeforeCleanup = beforeCleanup.points?.length || 0;
+    console.log(`   Vectors before cleanup: ${vectorsBeforeCleanup}`);
 
     // Delete vectors
     const deleteResult = await qdrantClient.delete(collectionName, {
@@ -365,14 +374,14 @@ async function cleanupVectors(fileId: string, collectionName: string = 'course_e
         must: [
           {
             key: 'document_id',
-            match: { value: fileId }
-          }
-        ]
-      }
-    })
+            match: { value: fileId },
+          },
+        ],
+      },
+    });
 
-    console.log(`   Deletion operation completed`)
-    console.log(`   Result status: ${deleteResult.status}`)
+    console.log(`   Deletion operation completed`);
+    console.log(`   Result status: ${deleteResult.status}`);
 
     // Verify deletion by querying again
     const afterCleanup = await qdrantClient.scroll(collectionName, {
@@ -380,22 +389,24 @@ async function cleanupVectors(fileId: string, collectionName: string = 'course_e
         must: [
           {
             key: 'document_id',
-            match: { value: fileId }
-          }
-        ]
+            match: { value: fileId },
+          },
+        ],
       },
       limit: 1,
-      with_payload: false
-    })
-    const vectorsAfterCleanup = afterCleanup.points?.length || 0
+      with_payload: false,
+    });
+    const vectorsAfterCleanup = afterCleanup.points?.length || 0;
 
     if (vectorsAfterCleanup > 0) {
-      console.log(`⚠️  [CLEANUP WARNING] ${vectorsAfterCleanup} vectors still remain after cleanup (should be 0)`)
+      console.log(
+        `⚠️  [CLEANUP WARNING] ${vectorsAfterCleanup} vectors still remain after cleanup (should be 0)`
+      );
     } else {
-      console.log(`✅ [CLEANUP SUCCESS] All vectors cleaned up successfully`)
+      console.log(`✅ [CLEANUP SUCCESS] All vectors cleaned up successfully`);
     }
   } catch (error) {
-    console.warn(`❌ [CLEANUP ERROR] Failed to cleanup vectors for file ${fileId}:`, error)
+    console.warn(`❌ [CLEANUP ERROR] Failed to cleanup vectors for file ${fileId}:`, error);
   }
 }
 
@@ -405,14 +416,14 @@ async function cleanupVectors(fileId: string, collectionName: string = 'course_e
 
 describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
   describe('TRIAL Tier', () => {
-    let trialOrg: TestOrganization
-    let trialUser: TestUser
-    let testCourseId: string
+    let trialOrg: TestOrganization;
+    let trialUser: TestUser;
+    let testCourseId: string;
 
     beforeAll(async () => {
       // Create TRIAL tier test organization
-      trialOrg = await createTestOrg('trial')
-      trialUser = await createTestUser(trialOrg.id, 'admin')
+      trialOrg = await createTestOrg('trial');
+      trialUser = await createTestUser(trialOrg.id, 'admin');
 
       // Create test course
       const { data: course, error: courseError } = await supabaseAdmin
@@ -422,22 +433,22 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           user_id: trialUser.id, // REQUIRED field (NOT NULL constraint)
           title: 'Test Course - TRIAL Tier',
           slug: `test-course-trial-${Date.now()}`,
-          status: 'draft'
+          status: 'draft',
         })
         .select('id')
-        .single()
+        .single();
 
       if (courseError || !course) {
-        throw new Error(`Failed to create test course: ${courseError?.message}`)
+        throw new Error(`Failed to create test course: ${courseError?.message}`);
       }
 
-      testCourseId = course.id
-    })
+      testCourseId = course.id;
+    });
 
     afterAll(async () => {
       // Cleanup test organization (CASCADE deletes courses, files, etc.)
-      await cleanupTestOrg(trialOrg.id)
-    })
+      await cleanupTestOrg(trialOrg.id);
+    });
 
     /**
      * T017: TRIAL Tier TXT Upload Success Test
@@ -458,113 +469,121 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - 768-dimensional vectors (Jina-v3)
      * - Processing completes within 60s timeout
      */
-    it('should process TXT file successfully', async () => {
-      // Arrange
-      const txtFixturePath = getFixturePath('txt')
-      const filename = 'sample-course-material.txt'
-      const mimeType = 'text/plain'
+    it(
+      'should process TXT file successfully',
+      async () => {
+        // Arrange
+        const txtFixturePath = getFixturePath('txt');
+        const filename = 'sample-course-material.txt';
+        const mimeType = 'text/plain';
 
-      // Act: Upload file and trigger processing
-      const { fileId, jobId } = await uploadFileAndProcess(
-        trialOrg.id,
-        trialUser.id,
-        testCourseId,
-        txtFixturePath,
-        filename,
-        mimeType
-      )
+        // Act: Upload file and trigger processing
+        const { fileId, jobId } = await uploadFileAndProcess(
+          trialOrg.id,
+          trialUser.id,
+          testCourseId,
+          txtFixturePath,
+          filename,
+          mimeType
+        );
 
-      try {
-        // Assert: Wait for vector indexing to complete
-        const indexingResult = await waitForVectorIndexing(fileId)
+        try {
+          // Assert: Wait for vector indexing to complete
+          const indexingResult = await waitForVectorIndexing(fileId);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+          expect(indexingResult.success).toBe(true);
+          expect(indexingResult.status).toBe('indexed');
 
-        if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          if (!indexingResult.success) {
+            throw new Error(
+              `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+            );
+          }
+
+          // Assert: Verify file_catalog entry updated
+          const { data: file, error: fileError } = await supabaseAdmin
+            .from('file_catalog')
+            .select('vector_status, chunk_count, error_message')
+            .eq('id', fileId)
+            .single();
+
+          expect(fileError).toBeNull();
+          expect(file).toBeDefined();
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
+          expect(file!.error_message).toBeNull();
+
+          // TIMING FIX: Wait for vectors to appear in Qdrant
+          // Even after vector_status='indexed', Qdrant may still be indexing points
+          await waitForQdrantVectors(fileId, EXPECTED_CHUNKS.txt.total - 2);
+
+          // Assert: Query Qdrant for vectors
+          const vectorStats = await queryVectorsByFileId(fileId);
+
+          // Verify vector counts (approximate, allow ±2 tolerance)
+          expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.total - 2);
+          expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.total + 2);
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.parents - 1)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.parents + 1)
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.children - 2)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.children + 2)
+
+          // Verify vector dimensions (Jina-v3 = 768D)
+          expect(vectorStats.dimensions).toBe(768);
+
+          // Assert: Verify hierarchical structure (children reference parents)
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+          });
+
+          const childPoints = scrollResponse.points.filter(
+            p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
+          );
+
+          // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
+
+          // Verify at least one child has a valid parent reference
+          const parentIds = new Set(
+            scrollResponse.points
+              .filter(
+                p =>
+                  (p.payload as any).parent_id === null ||
+                  (p.payload as any).parent_id === undefined
+              )
+              .map(p => (p.payload as any).chunk_id)
+          );
+
+          const childrenWithValidParents = childPoints.filter(child => {
+            const parentId = (child.payload as any).parent_id;
+            return parentIds.has(parentId);
+          });
+
+          // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
+
+          // Assert: Verify metadata in Qdrant
+          const firstPoint = scrollResponse.points[0];
+          const payload = firstPoint.payload as any;
+
+          expect(payload.organization_id).toBe(trialOrg.id);
+          expect(payload.document_id).toBe(fileId);
+          expect(payload.course_id).toBe(testCourseId);
+          expect(payload.content).toBeDefined();
+          expect(payload.content.length).toBeGreaterThan(0);
+          expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
+          expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
+        } finally {
+          // Cleanup: Remove vectors from Qdrant
+          await cleanupVectors(fileId);
         }
-
-        // Assert: Verify file_catalog entry updated
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .select('vector_status, chunk_count, error_message')
-          .eq('id', fileId)
-          .single()
-
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
-
-        // TIMING FIX: Wait for vectors to appear in Qdrant
-        // Even after vector_status='indexed', Qdrant may still be indexing points
-        await waitForQdrantVectors(fileId, EXPECTED_CHUNKS.txt.total - 2)
-
-        // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
-
-        // Verify vector counts (approximate, allow ±2 tolerance)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.total - 2)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.total + 2)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.parents - 1)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.parents + 1)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.children - 2)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.children + 2)
-
-        // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
-
-        // Assert: Verify hierarchical structure (children reference parents)
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true
-        })
-
-        const childPoints = scrollResponse.points.filter(
-          p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
-
-        // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
-
-        // Verify at least one child has a valid parent reference
-        const parentIds = new Set(
-          scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
-            .map(p => (p.payload as any).chunk_id)
-        )
-
-        const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
-
-        // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
-
-        // Assert: Verify metadata in Qdrant
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
-
-        expect(payload.organization_id).toBe(trialOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
-        expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
-      } finally {
-        // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
 
     /**
      * T016: TRIAL Tier DOCX Upload Success Test
@@ -587,113 +606,121 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      *
      * SKIPPED: DOCX fixture file not available
      */
-    it('should process DOCX file successfully', async () => {
-      // Arrange
-      const docxFixturePath = getFixturePath('docx')
-      const filename = 'sample-course-material.docx'
-      const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    it(
+      'should process DOCX file successfully',
+      async () => {
+        // Arrange
+        const docxFixturePath = getFixturePath('docx');
+        const filename = 'sample-course-material.docx';
+        const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-      // Act: Upload file and trigger processing
-      const { fileId, jobId } = await uploadFileAndProcess(
-        trialOrg.id,
-        trialUser.id,
-        testCourseId,
-        docxFixturePath,
-        filename,
-        mimeType
-      )
+        // Act: Upload file and trigger processing
+        const { fileId, jobId } = await uploadFileAndProcess(
+          trialOrg.id,
+          trialUser.id,
+          testCourseId,
+          docxFixturePath,
+          filename,
+          mimeType
+        );
 
-      try {
-        // Assert: Wait for vector indexing to complete
-        const indexingResult = await waitForVectorIndexing(fileId)
+        try {
+          // Assert: Wait for vector indexing to complete
+          const indexingResult = await waitForVectorIndexing(fileId);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+          expect(indexingResult.success).toBe(true);
+          expect(indexingResult.status).toBe('indexed');
 
-        if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          if (!indexingResult.success) {
+            throw new Error(
+              `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+            );
+          }
+
+          // Assert: Verify file_catalog entry updated
+          const { data: file, error: fileError } = await supabaseAdmin
+            .from('file_catalog')
+            .select('vector_status, chunk_count, error_message')
+            .eq('id', fileId)
+            .single();
+
+          expect(fileError).toBeNull();
+          expect(file).toBeDefined();
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
+          expect(file!.error_message).toBeNull();
+
+          // TIMING FIX: Wait for vectors to appear in Qdrant
+          // Even after vector_status='indexed', Qdrant may still be indexing points
+          await waitForQdrantVectors(fileId, EXPECTED_CHUNKS.docx.total - 3);
+
+          // Assert: Query Qdrant for vectors
+          const vectorStats = await queryVectorsByFileId(fileId);
+
+          // Verify vector counts (approximate, allow ±3 tolerance for DOCX)
+          expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.total - 3);
+          expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.total + 3);
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.parents - 1)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.parents + 1)
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.children - 3)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.children + 3)
+
+          // Verify vector dimensions (Jina-v3 = 768D)
+          expect(vectorStats.dimensions).toBe(768);
+
+          // Assert: Verify hierarchical structure (children reference parents)
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+          });
+
+          const childPoints = scrollResponse.points.filter(
+            p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
+          );
+
+          // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
+
+          // Verify at least one child has a valid parent reference
+          const parentIds = new Set(
+            scrollResponse.points
+              .filter(
+                p =>
+                  (p.payload as any).parent_id === null ||
+                  (p.payload as any).parent_id === undefined
+              )
+              .map(p => (p.payload as any).chunk_id)
+          );
+
+          const childrenWithValidParents = childPoints.filter(child => {
+            const parentId = (child.payload as any).parent_id;
+            return parentIds.has(parentId);
+          });
+
+          // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
+
+          // Assert: Verify metadata in Qdrant
+          const firstPoint = scrollResponse.points[0];
+          const payload = firstPoint.payload as any;
+
+          expect(payload.organization_id).toBe(trialOrg.id);
+          expect(payload.document_id).toBe(fileId);
+          expect(payload.course_id).toBe(testCourseId);
+          expect(payload.content).toBeDefined();
+          expect(payload.content.length).toBeGreaterThan(0);
+          expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
+          expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
+        } finally {
+          // Cleanup: Remove vectors from Qdrant
+          await cleanupVectors(fileId);
         }
-
-        // Assert: Verify file_catalog entry updated
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .select('vector_status, chunk_count, error_message')
-          .eq('id', fileId)
-          .single()
-
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
-
-        // TIMING FIX: Wait for vectors to appear in Qdrant
-        // Even after vector_status='indexed', Qdrant may still be indexing points
-        await waitForQdrantVectors(fileId, EXPECTED_CHUNKS.docx.total - 3)
-
-        // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
-
-        // Verify vector counts (approximate, allow ±3 tolerance for DOCX)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.total - 3)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.total + 3)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.parents - 1)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.parents + 1)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.children - 3)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.children + 3)
-
-        // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
-
-        // Assert: Verify hierarchical structure (children reference parents)
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true
-        })
-
-        const childPoints = scrollResponse.points.filter(
-          p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
-
-        // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
-
-        // Verify at least one child has a valid parent reference
-        const parentIds = new Set(
-          scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
-            .map(p => (p.payload as any).chunk_id)
-        )
-
-        const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
-
-        // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
-
-        // Assert: Verify metadata in Qdrant
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
-
-        expect(payload.organization_id).toBe(trialOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
-        expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
-      } finally {
-        // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
 
     /**
      * T015: TRIAL Tier PDF Upload Success Test
@@ -714,11 +741,12 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - 768-dimensional vectors (Jina-v3)
      * - Processing completes within 60s timeout
      */
-    it('should process PDF file successfully', async () => { // tsvector removed - now supports large PDFs
+    it('should process PDF file successfully', async () => {
+      // tsvector removed - now supports large PDFs
       // Arrange
-      const pdfFixturePath = getFixturePath('pdf')
-      const filename = '2510.13928v1.pdf'
-      const mimeType = 'application/pdf'
+      const pdfFixturePath = getFixturePath('pdf');
+      const filename = '2510.13928v1.pdf';
+      const mimeType = 'application/pdf';
 
       // Act: Upload file and trigger processing
       const { fileId, jobId } = await uploadFileAndProcess(
@@ -728,17 +756,19 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
         pdfFixturePath,
         filename,
         mimeType
-      )
+      );
 
       try {
         // Assert: Wait for vector indexing to complete (120s timeout for large PDFs)
-        const indexingResult = await waitForVectorIndexing(fileId, 120000)
+        const indexingResult = await waitForVectorIndexing(fileId, 120000);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+        expect(indexingResult.success).toBe(true);
+        expect(indexingResult.status).toBe('indexed');
 
         if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          throw new Error(
+            `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+          );
         }
 
         // Assert: Verify file_catalog entry updated
@@ -746,24 +776,24 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           .from('file_catalog')
           .select('vector_status, chunk_count, error_message, file_size')
           .eq('id', fileId)
-          .single()
+          .single();
 
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
+        expect(fileError).toBeNull();
+        expect(file).toBeDefined();
+        expect(file!.vector_status).toBe('indexed');
+        expect(file!.chunk_count).toBeGreaterThan(0);
+        expect(file!.error_message).toBeNull();
 
         // Assert: Verify file size is within expected range (1MB PDF)
-        expect(file!.file_size).toBeGreaterThan(500_000) // At least 500KB
-        expect(file!.file_size).toBeLessThan(2_000_000) // Less than 2MB
+        expect(file!.file_size).toBeGreaterThan(500_000); // At least 500KB
+        expect(file!.file_size).toBeLessThan(2_000_000); // Less than 2MB
 
         // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
+        const vectorStats = await queryVectorsByFileId(fileId);
 
         // Verify vector counts (approximate, allow ±3 tolerance for PDF variability)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.total - 3)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.total + 3)
+        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.total - 3);
+        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.total + 3);
 
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.parents - 2)
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.parents + 2)
@@ -772,78 +802,81 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.children + 3)
 
         // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
+        expect(vectorStats.dimensions).toBe(768);
 
         // Assert: Verify hierarchical structure (children reference parents)
         const scrollResponse = await qdrantClient.scroll('course_embeddings', {
           filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
+            must: [{ key: 'document_id', match: { value: fileId } }],
           },
           limit: 100,
-          with_payload: true
-        })
+          with_payload: true,
+        });
 
         const childPoints = scrollResponse.points.filter(
           p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
+        );
 
         // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
 
         // Verify all children have valid parent references
         const parentIds = new Set(
           scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
+            .filter(
+              p =>
+                (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined
+            )
             .map(p => (p.payload as any).chunk_id)
-        )
+        );
 
         const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
+          const parentId = (child.payload as any).parent_id;
+          return parentIds.has(parentId);
+        });
 
         // All children should reference valid parents
         // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBe(childPoints.length)
 
         // Assert: Verify metadata in Qdrant payload
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
+        const firstPoint = scrollResponse.points[0];
+        const payload = firstPoint.payload as any;
 
-        expect(payload.organization_id).toBe(trialOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
+        expect(payload.organization_id).toBe(trialOrg.id);
+        expect(payload.document_id).toBe(fileId);
+        expect(payload.course_id).toBe(testCourseId);
+        expect(payload.content).toBeDefined();
+        expect(payload.content.length).toBeGreaterThan(0);
+        expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
         // Note: total_chunks represents parent chunks count for parent-level chunks,
         // or sibling count for child chunks - not total vectors
-        expect(payload.total_chunks).toBeGreaterThan(0)
+        expect(payload.total_chunks).toBeGreaterThan(0);
 
-        console.log(`✅ T015 PASSED: PDF processed successfully`)
-        console.log(`   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`)
-        console.log(`   - Dimensions: ${vectorStats.dimensions}`)
-        console.log(`   - File size: ${(file!.file_size / 1024).toFixed(0)}KB`)
+        console.log(`✅ T015 PASSED: PDF processed successfully`);
+        console.log(
+          `   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`
+        );
+        console.log(`   - Dimensions: ${vectorStats.dimensions}`);
+        console.log(`   - File size: ${(file!.file_size / 1024).toFixed(0)}KB`);
       } finally {
         // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
+        await cleanupVectors(fileId);
       }
-    }, 180000) // 180s timeout for large PDF processing
-  })
+    }, 180000); // 180s timeout for large PDF processing
+  });
 
   // ============================================================================
   // Test Suite: FREE Tier - Upload Rejection Tests
   // ============================================================================
 
   describe('FREE Tier', () => {
-    let freeOrg: TestOrganization
-    let freeUser: TestUser
-    let testCourseId: string
+    let freeOrg: TestOrganization;
+    let freeUser: TestUser;
+    let testCourseId: string;
 
     beforeAll(async () => {
       // Create FREE tier test organization
-      freeOrg = await createTestOrg('free')
-      freeUser = await createTestUser(freeOrg.id, 'admin')
+      freeOrg = await createTestOrg('free');
+      freeUser = await createTestUser(freeOrg.id, 'admin');
 
       // Create test course
       const { data: course, error: courseError } = await supabaseAdmin
@@ -853,22 +886,22 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           user_id: freeUser.id, // REQUIRED field (NOT NULL constraint)
           title: 'Test Course - FREE Tier',
           slug: `test-course-free-${Date.now()}`,
-          status: 'draft'
+          status: 'draft',
         })
         .select('id')
-        .single()
+        .single();
 
       if (courseError || !course) {
-        throw new Error(`Failed to create test course: ${courseError?.message}`)
+        throw new Error(`Failed to create test course: ${courseError?.message}`);
       }
 
-      testCourseId = course.id
-    })
+      testCourseId = course.id;
+    });
 
     afterAll(async () => {
       // Cleanup test organization (CASCADE deletes courses, files, etc.)
-      await cleanupTestOrg(freeOrg.id)
-    })
+      await cleanupTestOrg(freeOrg.id);
+    });
 
     /**
      * T018: FREE Tier File Upload Rejection Test
@@ -896,165 +929,170 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      *
      * All formats should be rejected equally (no processing occurs).
      */
-    it('should reject all file uploads with 403 Forbidden', async () => {
-      // Test multiple file formats to ensure consistent rejection
-      // Note: Testing with available fixtures (PDF, TXT) + DOCX validation logic
-      const testFiles = [
-        {
-          format: 'pdf',
-          fixturePath: getFixturePath('pdf'),
-          filename: '2510.13928v1.pdf',
-          mimeType: 'application/pdf'
-        },
-        {
-          format: 'txt',
-          fixturePath: getFixturePath('txt'),
-          filename: 'sample-course-material.txt',
-          mimeType: 'text/plain'
-        }
-      ]
-
-      // Also test DOCX validation logic (without fixture file)
-      const docxValidationTests = [
-        {
-          format: 'docx',
-          filename: 'sample-course-material.docx',
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          fileSize: 500_000 // 500KB simulated size
-        }
-      ]
-
-      for (const testFile of testFiles) {
-        // Arrange: Read file content
-        const fileBuffer = readFileSync(testFile.fixturePath)
-        const base64Content = fileBuffer.toString('base64')
-
-        // Act: Attempt to insert file into file_catalog (simulating API call)
-        // This should fail at validation layer before any processing occurs
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .insert({
-            organization_id: freeOrg.id,
-            course_id: testCourseId,
-            filename: testFile.filename,
-            mime_type: testFile.mimeType,
-            file_size: fileBuffer.length,
-            storage_path: `${freeOrg.id}/${testCourseId}/${testFile.filename}`,
-            vector_status: 'pending',
-            markdown_content: base64Content,
-            hash: `test-hash-${Date.now()}`
-          })
-          .select('id')
-          .single()
-
-        // Assert: Backend validation rejects upload
-        // Note: In production, this validation happens at the tRPC endpoint level
-        // before the file_catalog insert. For this integration test, we verify
-        // that the validation logic exists and works correctly.
-
-        // For this test, we'll use the file-validator directly to simulate
-        // the backend validation that should occur at the API endpoint
-        const { validateFile } = await import('../../src/shared/validation/file-validator')
-
-        const validationResult = validateFile(
+    it(
+      'should reject all file uploads with 403 Forbidden',
+      async () => {
+        // Test multiple file formats to ensure consistent rejection
+        // Note: Testing with available fixtures (PDF, TXT) + DOCX validation logic
+        const testFiles = [
           {
-            filename: testFile.filename,
-            fileSize: fileBuffer.length,
-            mimeType: testFile.mimeType
+            format: 'pdf',
+            fixturePath: getFixturePath('pdf'),
+            filename: '2510.13928v1.pdf',
+            mimeType: 'application/pdf',
           },
-          'free',
-          0 // Current file count (0 for first upload)
-        )
+          {
+            format: 'txt',
+            fixturePath: getFixturePath('txt'),
+            filename: 'sample-course-material.txt',
+            mimeType: 'text/plain',
+          },
+        ];
 
-        // Assert: Validation MUST fail for FREE tier
-        expect(validationResult.valid).toBe(false)
-        expect(validationResult.error).toBeDefined()
-        expect(validationResult.userMessage).toBeDefined()
-        expect(validationResult.suggestedTier).toBe('basic')
+        // Also test DOCX validation logic (without fixture file)
+        const docxValidationTests = [
+          {
+            format: 'docx',
+            filename: 'sample-course-material.docx',
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            fileSize: 500_000, // 500KB simulated size
+          },
+        ];
 
-        // Assert: Error message indicates FREE tier limitation
-        expect(validationResult.userMessage).toMatch(/Free tier.*not support file uploads/i)
-        expect(validationResult.userMessage).toMatch(/Upgrade to Basic/i)
+        for (const testFile of testFiles) {
+          // Arrange: Read file content
+          const fileBuffer = readFileSync(testFile.fixturePath);
+          const base64Content = fileBuffer.toString('base64');
 
-        // Assert: All validation checks fail for FREE tier
-        expect(validationResult.checks.size.valid).toBe(false)
-        expect(validationResult.checks.mimeType.valid).toBe(false)
-        expect(validationResult.checks.count.valid).toBe(false)
-
-        // Cleanup: Remove any files that were accidentally inserted (shouldn't happen)
-        if (file?.id) {
-          await supabaseAdmin
+          // Act: Attempt to insert file into file_catalog (simulating API call)
+          // This should fail at validation layer before any processing occurs
+          const { data: file, error: fileError } = await supabaseAdmin
             .from('file_catalog')
-            .delete()
-            .eq('id', file.id)
+            .insert({
+              organization_id: freeOrg.id,
+              course_id: testCourseId,
+              filename: testFile.filename,
+              mime_type: testFile.mimeType,
+              file_size: fileBuffer.length,
+              storage_path: `${freeOrg.id}/${testCourseId}/${testFile.filename}`,
+              vector_status: 'pending',
+              markdown_content: base64Content,
+              hash: `test-hash-${Date.now()}`,
+            })
+            .select('id')
+            .single();
+
+          // Assert: Backend validation rejects upload
+          // Note: In production, this validation happens at the tRPC endpoint level
+          // before the file_catalog insert. For this integration test, we verify
+          // that the validation logic exists and works correctly.
+
+          // For this test, we'll use the file-validator directly to simulate
+          // the backend validation that should occur at the API endpoint
+          const { validateFile } = await import('../../src/shared/validation/file-validator');
+
+          const validationResult = validateFile(
+            {
+              filename: testFile.filename,
+              fileSize: fileBuffer.length,
+              mimeType: testFile.mimeType,
+            },
+            'free',
+            0 // Current file count (0 for first upload)
+          );
+
+          // Assert: Validation MUST fail for FREE tier
+          expect(validationResult.valid).toBe(false);
+          expect(validationResult.error).toBeDefined();
+          expect(validationResult.userMessage).toBeDefined();
+          expect(validationResult.suggestedTier).toBe('basic');
+
+          // Assert: Error message indicates FREE tier limitation
+          expect(validationResult.userMessage).toMatch(/Free tier.*not support file uploads/i);
+          expect(validationResult.userMessage).toMatch(/Upgrade to Basic/i);
+
+          // Assert: All validation checks fail for FREE tier
+          expect(validationResult.checks.size.valid).toBe(false);
+          expect(validationResult.checks.mimeType.valid).toBe(false);
+          expect(validationResult.checks.count.valid).toBe(false);
+
+          // Cleanup: Remove any files that were accidentally inserted (shouldn't happen)
+          if (file?.id) {
+            await supabaseAdmin.from('file_catalog').delete().eq('id', file.id);
+          }
+
+          console.log(
+            `✅ T018 PASSED (${testFile.format.toUpperCase()}): FREE tier correctly rejects ${testFile.format.toUpperCase()} upload`
+          );
+          console.log(`   - Validation error: ${validationResult.error}`);
+          console.log(`   - User message: ${validationResult.userMessage}`);
+          console.log(`   - Suggested tier: ${validationResult.suggestedTier}`);
         }
 
-        console.log(`✅ T018 PASSED (${testFile.format.toUpperCase()}): FREE tier correctly rejects ${testFile.format.toUpperCase()} upload`)
-        console.log(`   - Validation error: ${validationResult.error}`)
-        console.log(`   - User message: ${validationResult.userMessage}`)
-        console.log(`   - Suggested tier: ${validationResult.suggestedTier}`)
-      }
+        // Test DOCX validation logic (without actual file upload)
+        const { validateFile } = await import('../../src/shared/validation/file-validator');
 
-      // Test DOCX validation logic (without actual file upload)
-      const { validateFile } = await import('../../src/shared/validation/file-validator')
+        for (const testCase of docxValidationTests) {
+          const validationResult = validateFile(
+            {
+              filename: testCase.filename,
+              fileSize: testCase.fileSize,
+              mimeType: testCase.mimeType,
+            },
+            'free',
+            0
+          );
 
-      for (const testCase of docxValidationTests) {
-        const validationResult = validateFile(
-          {
-            filename: testCase.filename,
-            fileSize: testCase.fileSize,
-            mimeType: testCase.mimeType
-          },
-          'free',
-          0
-        )
+          // Assert: DOCX validation MUST also fail for FREE tier
+          expect(validationResult.valid).toBe(false);
+          expect(validationResult.error).toBeDefined();
+          expect(validationResult.userMessage).toBeDefined();
+          expect(validationResult.suggestedTier).toBe('basic');
+          expect(validationResult.userMessage).toMatch(/Free tier.*not support file uploads/i);
 
-        // Assert: DOCX validation MUST also fail for FREE tier
-        expect(validationResult.valid).toBe(false)
-        expect(validationResult.error).toBeDefined()
-        expect(validationResult.userMessage).toBeDefined()
-        expect(validationResult.suggestedTier).toBe('basic')
-        expect(validationResult.userMessage).toMatch(/Free tier.*not support file uploads/i)
+          console.log(
+            `✅ T018 PASSED (${testCase.format.toUpperCase()}): FREE tier correctly rejects ${testCase.format.toUpperCase()} validation`
+          );
+          console.log(`   - Validation error: ${validationResult.error}`);
+          console.log(`   - User message: ${validationResult.userMessage}`);
+        }
 
-        console.log(`✅ T018 PASSED (${testCase.format.toUpperCase()}): FREE tier correctly rejects ${testCase.format.toUpperCase()} validation`)
-        console.log(`   - Validation error: ${validationResult.error}`)
-        console.log(`   - User message: ${validationResult.userMessage}`)
-      }
+        // Assert: No files should exist in file_catalog for this course
+        const { data: catalogFiles, error: catalogError } = await supabaseAdmin
+          .from('file_catalog')
+          .select('id')
+          .eq('course_id', testCourseId);
 
-      // Assert: No files should exist in file_catalog for this course
-      const { data: catalogFiles, error: catalogError } = await supabaseAdmin
-        .from('file_catalog')
-        .select('id')
-        .eq('course_id', testCourseId)
+        expect(catalogError).toBeNull();
+        expect(catalogFiles).toHaveLength(0);
 
-      expect(catalogError).toBeNull()
-      expect(catalogFiles).toHaveLength(0)
+        // Assert: No vectors should exist in Qdrant for this organization
+        const vectorStats = await queryVectorsByFileId(`${freeOrg.id}-nonexistent`);
+        expect(vectorStats.totalVectors).toBe(0);
 
-      // Assert: No vectors should exist in Qdrant for this organization
-      const vectorStats = await queryVectorsByFileId(`${freeOrg.id}-nonexistent`)
-      expect(vectorStats.totalVectors).toBe(0)
-
-      console.log(`✅ T018 COMPLETE: All FREE tier upload rejection tests passed`)
-      console.log(`   - Tested formats: PDF, DOCX, TXT`)
-      console.log(`   - All uploads correctly rejected`)
-      console.log(`   - No file_catalog entries created`)
-      console.log(`   - No Qdrant vectors created`)
-    }, TEST_TIMEOUTS.fileUpload * 3) // 30 seconds (10s per file format)
-  })
+        console.log(`✅ T018 COMPLETE: All FREE tier upload rejection tests passed`);
+        console.log(`   - Tested formats: PDF, DOCX, TXT`);
+        console.log(`   - All uploads correctly rejected`);
+        console.log(`   - No file_catalog entries created`);
+        console.log(`   - No Qdrant vectors created`);
+      },
+      TEST_TIMEOUTS.fileUpload * 3
+    ); // 30 seconds (10s per file format)
+  });
 
   // ============================================================================
   // Test Suite: BASIC Tier - Format Restriction Tests
   // ============================================================================
 
   describe('BASIC Tier', () => {
-    let basicOrg: TestOrganization
-    let basicUser: TestUser
-    let testCourseId: string
+    let basicOrg: TestOrganization;
+    let basicUser: TestUser;
+    let testCourseId: string;
 
     beforeAll(async () => {
       // Create BASIC tier test organization
-      basicOrg = await createTestOrg('basic')
-      basicUser = await createTestUser(basicOrg.id, 'admin')
+      basicOrg = await createTestOrg('basic');
+      basicUser = await createTestUser(basicOrg.id, 'admin');
 
       // Create test course
       const { data: course, error: courseError } = await supabaseAdmin
@@ -1064,22 +1102,22 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           user_id: basicUser.id, // REQUIRED field (NOT NULL constraint)
           title: 'Test Course - BASIC Tier',
           slug: `test-course-basic-${Date.now()}`,
-          status: 'draft'
+          status: 'draft',
         })
         .select('id')
-        .single()
+        .single();
 
       if (courseError || !course) {
-        throw new Error(`Failed to create test course: ${courseError?.message}`)
+        throw new Error(`Failed to create test course: ${courseError?.message}`);
       }
 
-      testCourseId = course.id
-    })
+      testCourseId = course.id;
+    });
 
     afterAll(async () => {
       // Cleanup test organization (CASCADE deletes courses, files, etc.)
-      await cleanupTestOrg(basicOrg.id)
-    })
+      await cleanupTestOrg(basicOrg.id);
+    });
 
     /**
      * T019: BASIC Tier PDF Upload Rejection Test
@@ -1104,94 +1142,95 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - FREE tier: All uploads rejected (no fileUpload capability)
      * - BASIC tier: Only specific formats rejected (has fileUpload but restricted formats)
      */
-    it('should reject PDF upload with tier restriction error', async () => {
-      // Arrange: Prepare PDF file
-      const pdfFixturePath = getFixturePath('pdf')
-      const filename = '2510.13928v1.pdf'
-      const mimeType = 'application/pdf'
-      const fileBuffer = readFileSync(pdfFixturePath)
-      const base64Content = fileBuffer.toString('base64')
+    it(
+      'should reject PDF upload with tier restriction error',
+      async () => {
+        // Arrange: Prepare PDF file
+        const pdfFixturePath = getFixturePath('pdf');
+        const filename = '2510.13928v1.pdf';
+        const mimeType = 'application/pdf';
+        const fileBuffer = readFileSync(pdfFixturePath);
+        const base64Content = fileBuffer.toString('base64');
 
-      // Act: Attempt to insert PDF file into file_catalog
-      // This should fail at validation layer before any processing occurs
-      const { data: file, error: fileError } = await supabaseAdmin
-        .from('file_catalog')
-        .insert({
-          organization_id: basicOrg.id,
-          course_id: testCourseId,
-          filename,
-          mime_type: mimeType,
-          file_size: fileBuffer.length,
-          storage_path: `${basicOrg.id}/${testCourseId}/${filename}`,
-          vector_status: 'pending',
-          markdown_content: base64Content,
-          hash: `test-hash-${Date.now()}`
-        })
-        .select('id')
-        .single()
-
-      // Assert: Backend validation rejects upload
-      // Import file-validator to simulate backend validation at tRPC endpoint
-      const { validateFile } = await import('../../src/shared/validation/file-validator')
-
-      const validationResult = validateFile(
-        {
-          filename,
-          fileSize: fileBuffer.length,
-          mimeType
-        },
-        'basic',
-        0 // Current file count (0 for first upload)
-      )
-
-      // Assert: Validation MUST fail for PDF on BASIC tier
-      expect(validationResult.valid).toBe(false)
-      expect(validationResult.error).toBeDefined()
-      expect(validationResult.userMessage).toBeDefined()
-      // PDF is supported from TRIAL tier upwards (trial, standard, premium)
-      expect(validationResult.suggestedTier).toMatch(/^(trial|standard|premium)$/)
-
-      // Assert: Error message indicates BASIC tier format limitation
-      expect(validationResult.userMessage).toMatch(/File type not supported/i)
-      expect(validationResult.userMessage).toMatch(/Basic.*allows.*TXT.*MD/i)
-      expect(validationResult.userMessage).toMatch(/Upgrade to/i)
-
-      // Assert: MIME type validation check specifically fails
-      expect(validationResult.checks.mimeType.valid).toBe(false)
-      expect(validationResult.checks.mimeType.error).toMatch(/not allowed.*basic tier/i)
-
-      // Assert: Size and count checks should pass (format is the issue)
-      expect(validationResult.checks.size.valid).toBe(true)
-      expect(validationResult.checks.count.valid).toBe(true)
-
-      // Cleanup: Remove any files that were accidentally inserted (shouldn't happen)
-      if (file?.id) {
-        await supabaseAdmin
+        // Act: Attempt to insert PDF file into file_catalog
+        // This should fail at validation layer before any processing occurs
+        const { data: file, error: fileError } = await supabaseAdmin
           .from('file_catalog')
-          .delete()
-          .eq('id', file.id)
-      }
+          .insert({
+            organization_id: basicOrg.id,
+            course_id: testCourseId,
+            filename,
+            mime_type: mimeType,
+            file_size: fileBuffer.length,
+            storage_path: `${basicOrg.id}/${testCourseId}/${filename}`,
+            vector_status: 'pending',
+            markdown_content: base64Content,
+            hash: `test-hash-${Date.now()}`,
+          })
+          .select('id')
+          .single();
 
-      // Assert: No files should exist in file_catalog for this course
-      const { data: catalogFiles, error: catalogError } = await supabaseAdmin
-        .from('file_catalog')
-        .select('id')
-        .eq('course_id', testCourseId)
+        // Assert: Backend validation rejects upload
+        // Import file-validator to simulate backend validation at tRPC endpoint
+        const { validateFile } = await import('../../src/shared/validation/file-validator');
 
-      expect(catalogError).toBeNull()
-      expect(catalogFiles).toHaveLength(0)
+        const validationResult = validateFile(
+          {
+            filename,
+            fileSize: fileBuffer.length,
+            mimeType,
+          },
+          'basic',
+          0 // Current file count (0 for first upload)
+        );
 
-      // Assert: No vectors should exist in Qdrant for this file
-      const vectorStats = await queryVectorsByFileId(`${basicOrg.id}-nonexistent`)
-      expect(vectorStats.totalVectors).toBe(0)
+        // Assert: Validation MUST fail for PDF on BASIC tier
+        expect(validationResult.valid).toBe(false);
+        expect(validationResult.error).toBeDefined();
+        expect(validationResult.userMessage).toBeDefined();
+        // PDF is supported from TRIAL tier upwards (trial, standard, premium)
+        expect(validationResult.suggestedTier).toMatch(/^(trial|standard|premium)$/);
 
-      console.log(`✅ T019 PASSED: BASIC tier correctly rejects PDF upload`)
-      console.log(`   - Validation error: ${validationResult.error}`)
-      console.log(`   - User message: ${validationResult.userMessage}`)
-      console.log(`   - Suggested tier: ${validationResult.suggestedTier}`)
-      console.log(`   - Format check error: ${validationResult.checks.mimeType.error}`)
-      console.log(`   - Size/count checks passed (format is the only restriction)`)
-    }, TEST_TIMEOUTS.fileUpload)
+        // Assert: Error message indicates BASIC tier format limitation
+        expect(validationResult.userMessage).toMatch(/File type not supported/i);
+        expect(validationResult.userMessage).toMatch(/Basic.*allows.*TXT.*MD/i);
+        expect(validationResult.userMessage).toMatch(/Upgrade to/i);
+
+        // Assert: MIME type validation check specifically fails
+        expect(validationResult.checks.mimeType.valid).toBe(false);
+        expect(validationResult.checks.mimeType.error).toMatch(/not allowed.*basic tier/i);
+
+        // Assert: Size and count checks should pass (format is the issue)
+        expect(validationResult.checks.size.valid).toBe(true);
+        expect(validationResult.checks.count.valid).toBe(true);
+
+        // Cleanup: Remove any files that were accidentally inserted (shouldn't happen)
+        if (file?.id) {
+          await supabaseAdmin.from('file_catalog').delete().eq('id', file.id);
+        }
+
+        // Assert: No files should exist in file_catalog for this course
+        const { data: catalogFiles, error: catalogError } = await supabaseAdmin
+          .from('file_catalog')
+          .select('id')
+          .eq('course_id', testCourseId);
+
+        expect(catalogError).toBeNull();
+        expect(catalogFiles).toHaveLength(0);
+
+        // Assert: No vectors should exist in Qdrant for this file
+        const vectorStats = await queryVectorsByFileId(`${basicOrg.id}-nonexistent`);
+        expect(vectorStats.totalVectors).toBe(0);
+
+        console.log(`✅ T019 PASSED: BASIC tier correctly rejects PDF upload`);
+        console.log(`   - Validation error: ${validationResult.error}`);
+        console.log(`   - User message: ${validationResult.userMessage}`);
+        console.log(`   - Suggested tier: ${validationResult.suggestedTier}`);
+        console.log(`   - Format check error: ${validationResult.checks.mimeType.error}`);
+        console.log(`   - Size/count checks passed (format is the only restriction)`);
+      },
+      TEST_TIMEOUTS.fileUpload
+    );
 
     /**
      * T020: BASIC Tier DOCX Upload Rejection Test
@@ -1217,93 +1256,94 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      *
      * SKIPPED: DOCX fixture file not available
      */
-    it('should reject DOCX upload with tier restriction error', async () => {
-      // Arrange: Prepare DOCX file
-      const docxFixturePath = getFixturePath('docx')
-      const filename = 'sample-course-material.docx'
-      const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      const fileBuffer = readFileSync(docxFixturePath)
-      const base64Content = fileBuffer.toString('base64')
+    it(
+      'should reject DOCX upload with tier restriction error',
+      async () => {
+        // Arrange: Prepare DOCX file
+        const docxFixturePath = getFixturePath('docx');
+        const filename = 'sample-course-material.docx';
+        const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        const fileBuffer = readFileSync(docxFixturePath);
+        const base64Content = fileBuffer.toString('base64');
 
-      // Act: Attempt to insert DOCX file into file_catalog
-      // This should fail at validation layer before any processing occurs
-      const { data: file, error: fileError } = await supabaseAdmin
-        .from('file_catalog')
-        .insert({
-          organization_id: basicOrg.id,
-          course_id: testCourseId,
-          filename,
-          mime_type: mimeType,
-          file_size: fileBuffer.length,
-          storage_path: `${basicOrg.id}/${testCourseId}/${filename}`,
-          vector_status: 'pending',
-          markdown_content: base64Content,
-          hash: `test-hash-${Date.now()}`
-        })
-        .select('id')
-        .single()
-
-      // Assert: Backend validation rejects upload
-      // Import file-validator to simulate backend validation at tRPC endpoint
-      const { validateFile } = await import('../../src/shared/validation/file-validator')
-
-      const validationResult = validateFile(
-        {
-          filename,
-          fileSize: fileBuffer.length,
-          mimeType
-        },
-        'basic',
-        0 // Current file count (0 for first upload)
-      )
-
-      // Assert: Validation MUST fail for DOCX on BASIC tier
-      expect(validationResult.valid).toBe(false)
-      expect(validationResult.error).toBeDefined()
-      expect(validationResult.userMessage).toBeDefined()
-      expect(validationResult.suggestedTier).toBe('trial')  // DOCX requires trial tier
-
-      // Assert: Error message indicates BASIC tier format limitation
-      expect(validationResult.error).toMatch(/File type.*not allowed for basic tier/i)
-      expect(validationResult.userMessage).toMatch(/Basic.*TXT, MD/i)
-      expect(validationResult.userMessage).toMatch(/Upgrade to Trial/i)
-
-      // Assert: MIME type validation check specifically fails
-      expect(validationResult.checks.mimeType.valid).toBe(false)
-      expect(validationResult.checks.mimeType.error).toMatch(/not allowed.*basic tier/i)
-
-      // Assert: Size and count checks should pass (format is the issue)
-      expect(validationResult.checks.size.valid).toBe(true)
-      expect(validationResult.checks.count.valid).toBe(true)
-
-      // Cleanup: Remove any files that were accidentally inserted (shouldn't happen)
-      if (file?.id) {
-        await supabaseAdmin
+        // Act: Attempt to insert DOCX file into file_catalog
+        // This should fail at validation layer before any processing occurs
+        const { data: file, error: fileError } = await supabaseAdmin
           .from('file_catalog')
-          .delete()
-          .eq('id', file.id)
-      }
+          .insert({
+            organization_id: basicOrg.id,
+            course_id: testCourseId,
+            filename,
+            mime_type: mimeType,
+            file_size: fileBuffer.length,
+            storage_path: `${basicOrg.id}/${testCourseId}/${filename}`,
+            vector_status: 'pending',
+            markdown_content: base64Content,
+            hash: `test-hash-${Date.now()}`,
+          })
+          .select('id')
+          .single();
 
-      // Assert: No files should exist in file_catalog for this course
-      const { data: catalogFiles, error: catalogError } = await supabaseAdmin
-        .from('file_catalog')
-        .select('id')
-        .eq('course_id', testCourseId)
+        // Assert: Backend validation rejects upload
+        // Import file-validator to simulate backend validation at tRPC endpoint
+        const { validateFile } = await import('../../src/shared/validation/file-validator');
 
-      expect(catalogError).toBeNull()
-      expect(catalogFiles).toHaveLength(0)
+        const validationResult = validateFile(
+          {
+            filename,
+            fileSize: fileBuffer.length,
+            mimeType,
+          },
+          'basic',
+          0 // Current file count (0 for first upload)
+        );
 
-      // Assert: No vectors should exist in Qdrant for this file
-      const vectorStats = await queryVectorsByFileId(`${basicOrg.id}-nonexistent`)
-      expect(vectorStats.totalVectors).toBe(0)
+        // Assert: Validation MUST fail for DOCX on BASIC tier
+        expect(validationResult.valid).toBe(false);
+        expect(validationResult.error).toBeDefined();
+        expect(validationResult.userMessage).toBeDefined();
+        expect(validationResult.suggestedTier).toBe('trial'); // DOCX requires trial tier
 
-      console.log(`✅ T020 PASSED: BASIC tier correctly rejects DOCX upload`)
-      console.log(`   - Validation error: ${validationResult.error}`)
-      console.log(`   - User message: ${validationResult.userMessage}`)
-      console.log(`   - Suggested tier: ${validationResult.suggestedTier}`)
-      console.log(`   - Format check error: ${validationResult.checks.mimeType.error}`)
-      console.log(`   - Size/count checks passed (format is the only restriction)`)
-    }, TEST_TIMEOUTS.fileUpload)
+        // Assert: Error message indicates BASIC tier format limitation
+        expect(validationResult.error).toMatch(/File type.*not allowed for basic tier/i);
+        expect(validationResult.userMessage).toMatch(/Basic.*TXT, MD/i);
+        expect(validationResult.userMessage).toMatch(/Upgrade to Trial/i);
+
+        // Assert: MIME type validation check specifically fails
+        expect(validationResult.checks.mimeType.valid).toBe(false);
+        expect(validationResult.checks.mimeType.error).toMatch(/not allowed.*basic tier/i);
+
+        // Assert: Size and count checks should pass (format is the issue)
+        expect(validationResult.checks.size.valid).toBe(true);
+        expect(validationResult.checks.count.valid).toBe(true);
+
+        // Cleanup: Remove any files that were accidentally inserted (shouldn't happen)
+        if (file?.id) {
+          await supabaseAdmin.from('file_catalog').delete().eq('id', file.id);
+        }
+
+        // Assert: No files should exist in file_catalog for this course
+        const { data: catalogFiles, error: catalogError } = await supabaseAdmin
+          .from('file_catalog')
+          .select('id')
+          .eq('course_id', testCourseId);
+
+        expect(catalogError).toBeNull();
+        expect(catalogFiles).toHaveLength(0);
+
+        // Assert: No vectors should exist in Qdrant for this file
+        const vectorStats = await queryVectorsByFileId(`${basicOrg.id}-nonexistent`);
+        expect(vectorStats.totalVectors).toBe(0);
+
+        console.log(`✅ T020 PASSED: BASIC tier correctly rejects DOCX upload`);
+        console.log(`   - Validation error: ${validationResult.error}`);
+        console.log(`   - User message: ${validationResult.userMessage}`);
+        console.log(`   - Suggested tier: ${validationResult.suggestedTier}`);
+        console.log(`   - Format check error: ${validationResult.checks.mimeType.error}`);
+        console.log(`   - Size/count checks passed (format is the only restriction)`);
+      },
+      TEST_TIMEOUTS.fileUpload
+    );
 
     /**
      * T021: BASIC Tier TXT Upload Success Test
@@ -1335,130 +1375,140 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - Validates BASIC tier CAN upload allowed formats successfully
      * - Validates tier-based format filtering works correctly
      */
-    it('should process TXT file successfully', async () => {
-      // Arrange
-      const txtFixturePath = getFixturePath('txt')
-      const filename = 'sample-course-material.txt'
-      const mimeType = 'text/plain'
+    it(
+      'should process TXT file successfully',
+      async () => {
+        // Arrange
+        const txtFixturePath = getFixturePath('txt');
+        const filename = 'sample-course-material.txt';
+        const mimeType = 'text/plain';
 
-      // Act: Upload file and trigger processing
-      const { fileId, jobId } = await uploadFileAndProcess(
-        basicOrg.id,
-        basicUser.id,
-        testCourseId,
-        txtFixturePath,
-        filename,
-        mimeType
-      )
+        // Act: Upload file and trigger processing
+        const { fileId, jobId } = await uploadFileAndProcess(
+          basicOrg.id,
+          basicUser.id,
+          testCourseId,
+          txtFixturePath,
+          filename,
+          mimeType
+        );
 
-      try {
-        // Assert: Wait for vector indexing to complete
-        const indexingResult = await waitForVectorIndexing(fileId)
+        try {
+          // Assert: Wait for vector indexing to complete
+          const indexingResult = await waitForVectorIndexing(fileId);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+          expect(indexingResult.success).toBe(true);
+          expect(indexingResult.status).toBe('indexed');
 
-        if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          if (!indexingResult.success) {
+            throw new Error(
+              `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+            );
+          }
+
+          // Assert: Verify file_catalog entry updated
+          const { data: file, error: fileError } = await supabaseAdmin
+            .from('file_catalog')
+            .select('vector_status, chunk_count, error_message')
+            .eq('id', fileId)
+            .single();
+
+          expect(fileError).toBeNull();
+          expect(file).toBeDefined();
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
+          expect(file!.error_message).toBeNull();
+
+          // Assert: Query Qdrant for vectors
+          const vectorStats = await queryVectorsByFileId(fileId);
+
+          // Verify vector counts (approximate, allow ±2 tolerance)
+          expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.total - 2);
+          expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.total + 2);
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.parents - 1)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.parents + 1)
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.children - 2)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.children + 2)
+
+          // Verify vector dimensions (Jina-v3 = 768D)
+          expect(vectorStats.dimensions).toBe(768);
+
+          // Assert: Verify hierarchical structure (children reference parents)
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+          });
+
+          const childPoints = scrollResponse.points.filter(
+            p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
+          );
+
+          // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
+
+          // Verify at least one child has a valid parent reference
+          const parentIds = new Set(
+            scrollResponse.points
+              .filter(
+                p =>
+                  (p.payload as any).parent_id === null ||
+                  (p.payload as any).parent_id === undefined
+              )
+              .map(p => (p.payload as any).chunk_id)
+          );
+
+          const childrenWithValidParents = childPoints.filter(child => {
+            const parentId = (child.payload as any).parent_id;
+            return parentIds.has(parentId);
+          });
+
+          // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
+
+          // Assert: Verify metadata in Qdrant
+          const firstPoint = scrollResponse.points[0];
+          const payload = firstPoint.payload as any;
+
+          expect(payload.organization_id).toBe(basicOrg.id);
+          expect(payload.document_id).toBe(fileId);
+          expect(payload.course_id).toBe(testCourseId);
+          expect(payload.content).toBeDefined();
+          expect(payload.content.length).toBeGreaterThan(0);
+          expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
+          expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
+
+          console.log(`✅ T021 PASSED: BASIC tier TXT file processed successfully`);
+          console.log(
+            `   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`
+          );
+          console.log(`   - Dimensions: ${vectorStats.dimensions}`);
+          console.log(`   - Organization: ${basicOrg.tier} tier`);
+          console.log(`   - Validates BASIC tier can process allowed formats (TXT/MD)`);
+        } finally {
+          // Cleanup: Remove vectors from Qdrant
+          await cleanupVectors(fileId);
         }
-
-        // Assert: Verify file_catalog entry updated
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .select('vector_status, chunk_count, error_message')
-          .eq('id', fileId)
-          .single()
-
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
-
-        // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
-
-        // Verify vector counts (approximate, allow ±2 tolerance)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.total - 2)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.total + 2)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.parents - 1)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.parents + 1)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.children - 2)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.children + 2)
-
-        // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
-
-        // Assert: Verify hierarchical structure (children reference parents)
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true
-        })
-
-        const childPoints = scrollResponse.points.filter(
-          p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
-
-        // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
-
-        // Verify at least one child has a valid parent reference
-        const parentIds = new Set(
-          scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
-            .map(p => (p.payload as any).chunk_id)
-        )
-
-        const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
-
-        // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
-
-        // Assert: Verify metadata in Qdrant
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
-
-        expect(payload.organization_id).toBe(basicOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
-        expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
-
-        console.log(`✅ T021 PASSED: BASIC tier TXT file processed successfully`)
-        console.log(`   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`)
-        console.log(`   - Dimensions: ${vectorStats.dimensions}`)
-        console.log(`   - Organization: ${basicOrg.tier} tier`)
-        console.log(`   - Validates BASIC tier can process allowed formats (TXT/MD)`)
-      } finally {
-        // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
-  })
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
+  });
 
   // ============================================================================
   // Test Suite: STANDARD Tier - All Formats Supported
   // ============================================================================
 
   describe('STANDARD Tier', () => {
-    let standardOrg: TestOrganization
-    let standardUser: TestUser
-    let testCourseId: string
+    let standardOrg: TestOrganization;
+    let standardUser: TestUser;
+    let testCourseId: string;
 
     beforeAll(async () => {
       // Create STANDARD tier test organization
-      standardOrg = await createTestOrg('standard')
-      standardUser = await createTestUser(standardOrg.id, 'admin')
+      standardOrg = await createTestOrg('standard');
+      standardUser = await createTestUser(standardOrg.id, 'admin');
 
       // Create test course
       const { data: course, error: courseError } = await supabaseAdmin
@@ -1468,22 +1518,22 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           user_id: standardUser.id, // REQUIRED field (NOT NULL constraint)
           title: 'Test Course - STANDARD Tier',
           slug: `test-course-standard-${Date.now()}`,
-          status: 'draft'
+          status: 'draft',
         })
         .select('id')
-        .single()
+        .single();
 
       if (courseError || !course) {
-        throw new Error(`Failed to create test course: ${courseError?.message}`)
+        throw new Error(`Failed to create test course: ${courseError?.message}`);
       }
 
-      testCourseId = course.id
-    })
+      testCourseId = course.id;
+    });
 
     afterAll(async () => {
       // Cleanup test organization (CASCADE deletes courses, files, etc.)
-      await cleanupTestOrg(standardOrg.id)
-    })
+      await cleanupTestOrg(standardOrg.id);
+    });
 
     /**
      * T022: STANDARD Tier PDF Upload Success Test
@@ -1515,11 +1565,12 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - Validates STANDARD tier has full format support
      * - Validates tier-based limits (file size, count) are enforced correctly
      */
-    it('should process PDF file successfully', async () => { // tsvector removed - now supports large PDFs
+    it('should process PDF file successfully', async () => {
+      // tsvector removed - now supports large PDFs
       // Arrange
-      const pdfFixturePath = getFixturePath('pdf')
-      const filename = '2510.13928v1.pdf'
-      const mimeType = 'application/pdf'
+      const pdfFixturePath = getFixturePath('pdf');
+      const filename = '2510.13928v1.pdf';
+      const mimeType = 'application/pdf';
 
       // Act: Upload file and trigger processing
       const { fileId, jobId } = await uploadFileAndProcess(
@@ -1529,17 +1580,19 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
         pdfFixturePath,
         filename,
         mimeType
-      )
+      );
 
       try {
         // Assert: Wait for vector indexing to complete (120s timeout for large PDFs)
-        const indexingResult = await waitForVectorIndexing(fileId, 120000)
+        const indexingResult = await waitForVectorIndexing(fileId, 120000);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+        expect(indexingResult.success).toBe(true);
+        expect(indexingResult.status).toBe('indexed');
 
         if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          throw new Error(
+            `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+          );
         }
 
         // Assert: Verify file_catalog entry updated
@@ -1547,24 +1600,24 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           .from('file_catalog')
           .select('vector_status, chunk_count, error_message, file_size')
           .eq('id', fileId)
-          .single()
+          .single();
 
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
+        expect(fileError).toBeNull();
+        expect(file).toBeDefined();
+        expect(file!.vector_status).toBe('indexed');
+        expect(file!.chunk_count).toBeGreaterThan(0);
+        expect(file!.error_message).toBeNull();
 
         // Assert: Verify file size is within expected range (2MB PDF)
-        expect(file!.file_size).toBeGreaterThan(500_000) // At least 500KB
-        expect(file!.file_size).toBeLessThan(3_000_000) // Less than 3MB
+        expect(file!.file_size).toBeGreaterThan(500_000); // At least 500KB
+        expect(file!.file_size).toBeLessThan(3_000_000); // Less than 3MB
 
         // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
+        const vectorStats = await queryVectorsByFileId(fileId);
 
         // Verify vector counts (approximate, allow ±3 tolerance for PDF variability)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.total - 3)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.total + 3)
+        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.total - 3);
+        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.total + 3);
 
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.parents - 2)
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.parents + 2)
@@ -1573,65 +1626,68 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.children + 3)
 
         // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
+        expect(vectorStats.dimensions).toBe(768);
 
         // Assert: Verify hierarchical structure (children reference parents)
         const scrollResponse = await qdrantClient.scroll('course_embeddings', {
           filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
+            must: [{ key: 'document_id', match: { value: fileId } }],
           },
           limit: 100,
-          with_payload: true
-        })
+          with_payload: true,
+        });
 
         const childPoints = scrollResponse.points.filter(
           p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
+        );
 
         // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
 
         // Verify all children have valid parent references
         const parentIds = new Set(
           scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
+            .filter(
+              p =>
+                (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined
+            )
             .map(p => (p.payload as any).chunk_id)
-        )
+        );
 
         const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
+          const parentId = (child.payload as any).parent_id;
+          return parentIds.has(parentId);
+        });
 
         // All children should reference valid parents
         // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBe(childPoints.length)
 
         // Assert: Verify metadata in Qdrant payload
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
+        const firstPoint = scrollResponse.points[0];
+        const payload = firstPoint.payload as any;
 
-        expect(payload.organization_id).toBe(standardOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
+        expect(payload.organization_id).toBe(standardOrg.id);
+        expect(payload.document_id).toBe(fileId);
+        expect(payload.course_id).toBe(testCourseId);
+        expect(payload.content).toBeDefined();
+        expect(payload.content.length).toBeGreaterThan(0);
+        expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
         // Note: total_chunks represents parent chunks count for parent-level chunks,
         // or sibling count for child chunks - not total vectors
-        expect(payload.total_chunks).toBeGreaterThan(0)
+        expect(payload.total_chunks).toBeGreaterThan(0);
 
-        console.log(`✅ T022 PASSED: STANDARD tier PDF file processed successfully`)
-        console.log(`   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`)
-        console.log(`   - Dimensions: ${vectorStats.dimensions}`)
-        console.log(`   - File size: ${(file!.file_size / 1024).toFixed(0)}KB`)
-        console.log(`   - Organization: ${standardOrg.tier} tier`)
-        console.log(`   - Validates STANDARD tier has full format support (same as TRIAL)`)
+        console.log(`✅ T022 PASSED: STANDARD tier PDF file processed successfully`);
+        console.log(
+          `   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`
+        );
+        console.log(`   - Dimensions: ${vectorStats.dimensions}`);
+        console.log(`   - File size: ${(file!.file_size / 1024).toFixed(0)}KB`);
+        console.log(`   - Organization: ${standardOrg.tier} tier`);
+        console.log(`   - Validates STANDARD tier has full format support (same as TRIAL)`);
       } finally {
         // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
+        await cleanupVectors(fileId);
       }
-    }, 180000) // 180s timeout for large PDF processing
+    }, 180000); // 180s timeout for large PDF processing
 
     /**
      * T023: STANDARD Tier DOCX Upload Success Test
@@ -1665,115 +1721,125 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      *
      * SKIPPED: DOCX fixture file not available
      */
-    it('should process DOCX file successfully', async () => {
-      // Arrange
-      const docxFixturePath = getFixturePath('docx')
-      const filename = 'sample-course-material.docx'
-      const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    it(
+      'should process DOCX file successfully',
+      async () => {
+        // Arrange
+        const docxFixturePath = getFixturePath('docx');
+        const filename = 'sample-course-material.docx';
+        const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-      // Act: Upload file and trigger processing
-      const { fileId, jobId } = await uploadFileAndProcess(
-        standardOrg.id,
-        standardUser.id,
-        testCourseId,
-        docxFixturePath,
-        filename,
-        mimeType
-      )
+        // Act: Upload file and trigger processing
+        const { fileId, jobId } = await uploadFileAndProcess(
+          standardOrg.id,
+          standardUser.id,
+          testCourseId,
+          docxFixturePath,
+          filename,
+          mimeType
+        );
 
-      try {
-        // Assert: Wait for vector indexing to complete
-        const indexingResult = await waitForVectorIndexing(fileId)
+        try {
+          // Assert: Wait for vector indexing to complete
+          const indexingResult = await waitForVectorIndexing(fileId);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+          expect(indexingResult.success).toBe(true);
+          expect(indexingResult.status).toBe('indexed');
 
-        if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          if (!indexingResult.success) {
+            throw new Error(
+              `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+            );
+          }
+
+          // Assert: Verify file_catalog entry updated
+          const { data: file, error: fileError } = await supabaseAdmin
+            .from('file_catalog')
+            .select('vector_status, chunk_count, error_message')
+            .eq('id', fileId)
+            .single();
+
+          expect(fileError).toBeNull();
+          expect(file).toBeDefined();
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
+          expect(file!.error_message).toBeNull();
+
+          // Assert: Query Qdrant for vectors
+          const vectorStats = await queryVectorsByFileId(fileId);
+
+          // Verify vector counts (approximate, allow ±3 tolerance for DOCX)
+          expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.total - 3);
+          expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.total + 3);
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.parents - 1)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.parents + 1)
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.children - 3)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.children + 3)
+
+          // Verify vector dimensions (Jina-v3 = 768D)
+          expect(vectorStats.dimensions).toBe(768);
+
+          // Assert: Verify hierarchical structure (children reference parents)
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+          });
+
+          const childPoints = scrollResponse.points.filter(
+            p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
+          );
+
+          // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
+
+          // Verify at least one child has a valid parent reference
+          const parentIds = new Set(
+            scrollResponse.points
+              .filter(
+                p =>
+                  (p.payload as any).parent_id === null ||
+                  (p.payload as any).parent_id === undefined
+              )
+              .map(p => (p.payload as any).chunk_id)
+          );
+
+          const childrenWithValidParents = childPoints.filter(child => {
+            const parentId = (child.payload as any).parent_id;
+            return parentIds.has(parentId);
+          });
+
+          // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
+
+          // Assert: Verify metadata in Qdrant
+          const firstPoint = scrollResponse.points[0];
+          const payload = firstPoint.payload as any;
+
+          expect(payload.organization_id).toBe(standardOrg.id);
+          expect(payload.document_id).toBe(fileId);
+          expect(payload.course_id).toBe(testCourseId);
+          expect(payload.content).toBeDefined();
+          expect(payload.content.length).toBeGreaterThan(0);
+          expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
+          expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
+
+          console.log(`✅ T023 PASSED: STANDARD tier DOCX file processed successfully`);
+          console.log(
+            `   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`
+          );
+          console.log(`   - Dimensions: ${vectorStats.dimensions}`);
+          console.log(`   - Organization: ${standardOrg.tier} tier`);
+          console.log(`   - Validates STANDARD tier supports DOCX format (unlike BASIC tier)`);
+        } finally {
+          // Cleanup: Remove vectors from Qdrant
+          await cleanupVectors(fileId);
         }
-
-        // Assert: Verify file_catalog entry updated
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .select('vector_status, chunk_count, error_message')
-          .eq('id', fileId)
-          .single()
-
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
-
-        // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
-
-        // Verify vector counts (approximate, allow ±3 tolerance for DOCX)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.total - 3)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.total + 3)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.parents - 1)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.parents + 1)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.children - 3)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.children + 3)
-
-        // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
-
-        // Assert: Verify hierarchical structure (children reference parents)
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true
-        })
-
-        const childPoints = scrollResponse.points.filter(
-          p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
-
-        // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
-
-        // Verify at least one child has a valid parent reference
-        const parentIds = new Set(
-          scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
-            .map(p => (p.payload as any).chunk_id)
-        )
-
-        const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
-
-        // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
-
-        // Assert: Verify metadata in Qdrant
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
-
-        expect(payload.organization_id).toBe(standardOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
-        expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
-
-        console.log(`✅ T023 PASSED: STANDARD tier DOCX file processed successfully`)
-        console.log(`   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`)
-        console.log(`   - Dimensions: ${vectorStats.dimensions}`)
-        console.log(`   - Organization: ${standardOrg.tier} tier`)
-        console.log(`   - Validates STANDARD tier supports DOCX format (unlike BASIC tier)`)
-      } finally {
-        // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
 
     /**
      * T024: STANDARD Tier TXT Upload Success Test
@@ -1805,130 +1871,140 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - Validates STANDARD tier supports all formats including TXT
      * - Part of comprehensive STANDARD tier coverage (T022-T024)
      */
-    it('should process TXT file successfully', async () => {
-      // Arrange
-      const txtFixturePath = getFixturePath('txt')
-      const filename = 'sample-course-material.txt'
-      const mimeType = 'text/plain'
+    it(
+      'should process TXT file successfully',
+      async () => {
+        // Arrange
+        const txtFixturePath = getFixturePath('txt');
+        const filename = 'sample-course-material.txt';
+        const mimeType = 'text/plain';
 
-      // Act: Upload file and trigger processing
-      const { fileId, jobId } = await uploadFileAndProcess(
-        standardOrg.id,
-        standardUser.id,
-        testCourseId,
-        txtFixturePath,
-        filename,
-        mimeType
-      )
+        // Act: Upload file and trigger processing
+        const { fileId, jobId } = await uploadFileAndProcess(
+          standardOrg.id,
+          standardUser.id,
+          testCourseId,
+          txtFixturePath,
+          filename,
+          mimeType
+        );
 
-      try {
-        // Assert: Wait for vector indexing to complete
-        const indexingResult = await waitForVectorIndexing(fileId)
+        try {
+          // Assert: Wait for vector indexing to complete
+          const indexingResult = await waitForVectorIndexing(fileId);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+          expect(indexingResult.success).toBe(true);
+          expect(indexingResult.status).toBe('indexed');
 
-        if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          if (!indexingResult.success) {
+            throw new Error(
+              `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+            );
+          }
+
+          // Assert: Verify file_catalog entry updated
+          const { data: file, error: fileError } = await supabaseAdmin
+            .from('file_catalog')
+            .select('vector_status, chunk_count, error_message')
+            .eq('id', fileId)
+            .single();
+
+          expect(fileError).toBeNull();
+          expect(file).toBeDefined();
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
+          expect(file!.error_message).toBeNull();
+
+          // Assert: Query Qdrant for vectors
+          const vectorStats = await queryVectorsByFileId(fileId);
+
+          // Verify vector counts (approximate, allow ±2 tolerance)
+          expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.total - 2);
+          expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.total + 2);
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.parents - 1)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.parents + 1)
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.children - 2)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.children + 2)
+
+          // Verify vector dimensions (Jina-v3 = 768D)
+          expect(vectorStats.dimensions).toBe(768);
+
+          // Assert: Verify hierarchical structure (children reference parents)
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+          });
+
+          const childPoints = scrollResponse.points.filter(
+            p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
+          );
+
+          // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
+
+          // Verify at least one child has a valid parent reference
+          const parentIds = new Set(
+            scrollResponse.points
+              .filter(
+                p =>
+                  (p.payload as any).parent_id === null ||
+                  (p.payload as any).parent_id === undefined
+              )
+              .map(p => (p.payload as any).chunk_id)
+          );
+
+          const childrenWithValidParents = childPoints.filter(child => {
+            const parentId = (child.payload as any).parent_id;
+            return parentIds.has(parentId);
+          });
+
+          // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
+
+          // Assert: Verify metadata in Qdrant
+          const firstPoint = scrollResponse.points[0];
+          const payload = firstPoint.payload as any;
+
+          expect(payload.organization_id).toBe(standardOrg.id);
+          expect(payload.document_id).toBe(fileId);
+          expect(payload.course_id).toBe(testCourseId);
+          expect(payload.content).toBeDefined();
+          expect(payload.content.length).toBeGreaterThan(0);
+          expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
+          expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
+
+          console.log(`✅ T024 PASSED: STANDARD tier TXT file processed successfully`);
+          console.log(
+            `   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`
+          );
+          console.log(`   - Dimensions: ${vectorStats.dimensions}`);
+          console.log(`   - Organization: ${standardOrg.tier} tier`);
+          console.log(`   - Validates STANDARD tier supports all formats (TXT, MD, PDF, DOCX)`);
+        } finally {
+          // Cleanup: Remove vectors from Qdrant
+          await cleanupVectors(fileId);
         }
-
-        // Assert: Verify file_catalog entry updated
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .select('vector_status, chunk_count, error_message')
-          .eq('id', fileId)
-          .single()
-
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
-
-        // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
-
-        // Verify vector counts (approximate, allow ±2 tolerance)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.total - 2)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.total + 2)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.parents - 1)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.parents + 1)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.children - 2)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.children + 2)
-
-        // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
-
-        // Assert: Verify hierarchical structure (children reference parents)
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true
-        })
-
-        const childPoints = scrollResponse.points.filter(
-          p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
-
-        // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
-
-        // Verify at least one child has a valid parent reference
-        const parentIds = new Set(
-          scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
-            .map(p => (p.payload as any).chunk_id)
-        )
-
-        const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
-
-        // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
-
-        // Assert: Verify metadata in Qdrant
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
-
-        expect(payload.organization_id).toBe(standardOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
-        expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
-
-        console.log(`✅ T024 PASSED: STANDARD tier TXT file processed successfully`)
-        console.log(`   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`)
-        console.log(`   - Dimensions: ${vectorStats.dimensions}`)
-        console.log(`   - Organization: ${standardOrg.tier} tier`)
-        console.log(`   - Validates STANDARD tier supports all formats (TXT, MD, PDF, DOCX)`)
-      } finally {
-        // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
-  })
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
+  });
 
   // ============================================================================
   // Test Suite: PREMIUM Tier - Maximum Features
   // ============================================================================
 
   describe('PREMIUM Tier', () => {
-    let premiumOrg: TestOrganization
-    let premiumUser: TestUser
-    let testCourseId: string
+    let premiumOrg: TestOrganization;
+    let premiumUser: TestUser;
+    let testCourseId: string;
 
     beforeAll(async () => {
       // Create PREMIUM tier test organization
-      premiumOrg = await createTestOrg('premium')
-      premiumUser = await createTestUser(premiumOrg.id, 'admin')
+      premiumOrg = await createTestOrg('premium');
+      premiumUser = await createTestUser(premiumOrg.id, 'admin');
 
       // Create test course
       const { data: course, error: courseError } = await supabaseAdmin
@@ -1938,22 +2014,22 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           user_id: premiumUser.id, // REQUIRED field (NOT NULL constraint)
           title: 'Test Course - PREMIUM Tier',
           slug: `test-course-premium-${Date.now()}`,
-          status: 'draft'
+          status: 'draft',
         })
         .select('id')
-        .single()
+        .single();
 
       if (courseError || !course) {
-        throw new Error(`Failed to create test course: ${courseError?.message}`)
+        throw new Error(`Failed to create test course: ${courseError?.message}`);
       }
 
-      testCourseId = course.id
-    })
+      testCourseId = course.id;
+    });
 
     afterAll(async () => {
       // Cleanup test organization (CASCADE deletes courses, files, etc.)
-      await cleanupTestOrg(premiumOrg.id)
-    })
+      await cleanupTestOrg(premiumOrg.id);
+    });
 
     /**
      * T025: PREMIUM Tier PDF Upload Success Test
@@ -1989,11 +2065,12 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - Image OCR flag should be enabled (PREMIUM-specific)
      * - Part of comprehensive PREMIUM tier coverage (T025-T027)
      */
-    it('should process PDF file successfully', async () => { // tsvector removed - now supports large PDFs
+    it('should process PDF file successfully', async () => {
+      // tsvector removed - now supports large PDFs
       // Arrange
-      const pdfFixturePath = getFixturePath('pdf')
-      const filename = '2510.13928v1.pdf'
-      const mimeType = 'application/pdf'
+      const pdfFixturePath = getFixturePath('pdf');
+      const filename = '2510.13928v1.pdf';
+      const mimeType = 'application/pdf';
 
       // Act: Upload file and trigger processing
       const { fileId, jobId } = await uploadFileAndProcess(
@@ -2003,17 +2080,19 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
         pdfFixturePath,
         filename,
         mimeType
-      )
+      );
 
       try {
         // Assert: Wait for vector indexing to complete (120s timeout for large PDFs)
-        const indexingResult = await waitForVectorIndexing(fileId, 120000)
+        const indexingResult = await waitForVectorIndexing(fileId, 120000);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+        expect(indexingResult.success).toBe(true);
+        expect(indexingResult.status).toBe('indexed');
 
         if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          throw new Error(
+            `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+          );
         }
 
         // Assert: Verify file_catalog entry updated
@@ -2021,24 +2100,24 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           .from('file_catalog')
           .select('vector_status, chunk_count, error_message, file_size')
           .eq('id', fileId)
-          .single()
+          .single();
 
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
+        expect(fileError).toBeNull();
+        expect(file).toBeDefined();
+        expect(file!.vector_status).toBe('indexed');
+        expect(file!.chunk_count).toBeGreaterThan(0);
+        expect(file!.error_message).toBeNull();
 
         // Assert: Verify file size is within expected range (2MB PDF)
-        expect(file!.file_size).toBeGreaterThan(500_000) // At least 500KB
-        expect(file!.file_size).toBeLessThan(3_000_000) // Less than 3MB
+        expect(file!.file_size).toBeGreaterThan(500_000); // At least 500KB
+        expect(file!.file_size).toBeLessThan(3_000_000); // Less than 3MB
 
         // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
+        const vectorStats = await queryVectorsByFileId(fileId);
 
         // Verify vector counts (approximate, allow ±3 tolerance for PDF variability)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.total - 3)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.total + 3)
+        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.total - 3);
+        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.total + 3);
 
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.pdf.parents - 2)
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.parents + 2)
@@ -2047,72 +2126,75 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
         // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.pdf.children + 3)
 
         // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
+        expect(vectorStats.dimensions).toBe(768);
 
         // Assert: Verify hierarchical structure (children reference parents)
         const scrollResponse = await qdrantClient.scroll('course_embeddings', {
           filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
+            must: [{ key: 'document_id', match: { value: fileId } }],
           },
           limit: 100,
-          with_payload: true
-        })
+          with_payload: true,
+        });
 
         const childPoints = scrollResponse.points.filter(
           p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
+        );
 
         // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
 
         // Verify all children have valid parent references
         const parentIds = new Set(
           scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
+            .filter(
+              p =>
+                (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined
+            )
             .map(p => (p.payload as any).chunk_id)
-        )
+        );
 
         const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
+          const parentId = (child.payload as any).parent_id;
+          return parentIds.has(parentId);
+        });
 
         // All children should reference valid parents
         // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBe(childPoints.length)
 
         // Assert: Verify metadata in Qdrant payload
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
+        const firstPoint = scrollResponse.points[0];
+        const payload = firstPoint.payload as any;
 
-        expect(payload.organization_id).toBe(premiumOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
+        expect(payload.organization_id).toBe(premiumOrg.id);
+        expect(payload.document_id).toBe(fileId);
+        expect(payload.course_id).toBe(testCourseId);
+        expect(payload.content).toBeDefined();
+        expect(payload.content.length).toBeGreaterThan(0);
+        expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
         // Note: total_chunks represents parent chunks count for parent-level chunks,
         // or sibling count for child chunks - not total vectors
-        expect(payload.total_chunks).toBeGreaterThan(0)
+        expect(payload.total_chunks).toBeGreaterThan(0);
 
         // Assert: Verify PREMIUM tier-specific features
         // Note: Image OCR flag would be set during Docling conversion for PREMIUM tier
         // This is a configuration-level feature, not a runtime payload field
         // We validate it by checking the tier configuration
-        expect(premiumOrg.tier).toBe('premium')
+        expect(premiumOrg.tier).toBe('premium');
 
-        console.log(`✅ T025 PASSED: PREMIUM tier PDF file processed successfully`)
-        console.log(`   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`)
-        console.log(`   - Dimensions: ${vectorStats.dimensions}`)
-        console.log(`   - File size: ${(file!.file_size / 1024).toFixed(0)}KB`)
-        console.log(`   - Organization: ${premiumOrg.tier} tier`)
-        console.log(`   - PREMIUM features: Image OCR enabled, 100MB max file size, 200 max files`)
-        console.log(`   - Storage limit: 50GB, Concurrent uploads: 10`)
+        console.log(`✅ T025 PASSED: PREMIUM tier PDF file processed successfully`);
+        console.log(
+          `   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`
+        );
+        console.log(`   - Dimensions: ${vectorStats.dimensions}`);
+        console.log(`   - File size: ${(file!.file_size / 1024).toFixed(0)}KB`);
+        console.log(`   - Organization: ${premiumOrg.tier} tier`);
+        console.log(`   - PREMIUM features: Image OCR enabled, 100MB max file size, 200 max files`);
+        console.log(`   - Storage limit: 50GB, Concurrent uploads: 10`);
       } finally {
         // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
+        await cleanupVectors(fileId);
       }
-    }, 180000) // 180s timeout for large PDF processing
+    }, 180000); // 180s timeout for large PDF processing
 
     /**
      * T026: PREMIUM Tier DOCX Upload Success Test
@@ -2148,115 +2230,125 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      *
      * SKIPPED: DOCX fixture file not available
      */
-    it('should process DOCX file successfully', async () => {
-      // Arrange
-      const docxFixturePath = getFixturePath('docx')
-      const filename = 'sample-course-material.docx'
-      const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    it(
+      'should process DOCX file successfully',
+      async () => {
+        // Arrange
+        const docxFixturePath = getFixturePath('docx');
+        const filename = 'sample-course-material.docx';
+        const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-      // Act: Upload file and trigger processing
-      const { fileId, jobId } = await uploadFileAndProcess(
-        premiumOrg.id,
-        premiumUser.id,
-        testCourseId,
-        docxFixturePath,
-        filename,
-        mimeType
-      )
+        // Act: Upload file and trigger processing
+        const { fileId, jobId } = await uploadFileAndProcess(
+          premiumOrg.id,
+          premiumUser.id,
+          testCourseId,
+          docxFixturePath,
+          filename,
+          mimeType
+        );
 
-      try {
-        // Assert: Wait for vector indexing to complete
-        const indexingResult = await waitForVectorIndexing(fileId)
+        try {
+          // Assert: Wait for vector indexing to complete
+          const indexingResult = await waitForVectorIndexing(fileId);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+          expect(indexingResult.success).toBe(true);
+          expect(indexingResult.status).toBe('indexed');
 
-        if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          if (!indexingResult.success) {
+            throw new Error(
+              `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+            );
+          }
+
+          // Assert: Verify file_catalog entry updated
+          const { data: file, error: fileError } = await supabaseAdmin
+            .from('file_catalog')
+            .select('vector_status, chunk_count, error_message')
+            .eq('id', fileId)
+            .single();
+
+          expect(fileError).toBeNull();
+          expect(file).toBeDefined();
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
+          expect(file!.error_message).toBeNull();
+
+          // Assert: Query Qdrant for vectors
+          const vectorStats = await queryVectorsByFileId(fileId);
+
+          // Verify vector counts (approximate, allow ±3 tolerance for DOCX)
+          expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.total - 3);
+          expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.total + 3);
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.parents - 1)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.parents + 1)
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.children - 3)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.children + 3)
+
+          // Verify vector dimensions (Jina-v3 = 768D)
+          expect(vectorStats.dimensions).toBe(768);
+
+          // Assert: Verify hierarchical structure (children reference parents)
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+          });
+
+          const childPoints = scrollResponse.points.filter(
+            p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
+          );
+
+          // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
+
+          // Verify at least one child has a valid parent reference
+          const parentIds = new Set(
+            scrollResponse.points
+              .filter(
+                p =>
+                  (p.payload as any).parent_id === null ||
+                  (p.payload as any).parent_id === undefined
+              )
+              .map(p => (p.payload as any).chunk_id)
+          );
+
+          const childrenWithValidParents = childPoints.filter(child => {
+            const parentId = (child.payload as any).parent_id;
+            return parentIds.has(parentId);
+          });
+
+          // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
+
+          // Assert: Verify metadata in Qdrant
+          const firstPoint = scrollResponse.points[0];
+          const payload = firstPoint.payload as any;
+
+          expect(payload.organization_id).toBe(premiumOrg.id);
+          expect(payload.document_id).toBe(fileId);
+          expect(payload.course_id).toBe(testCourseId);
+          expect(payload.content).toBeDefined();
+          expect(payload.content.length).toBeGreaterThan(0);
+          expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
+          expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
+
+          console.log(`✅ T026 PASSED: PREMIUM tier DOCX file processed successfully`);
+          console.log(
+            `   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`
+          );
+          console.log(`   - Dimensions: ${vectorStats.dimensions}`);
+          console.log(`   - Organization: ${premiumOrg.tier} tier`);
+          console.log(`   - Validates PREMIUM tier supports all formats with maximum limits`);
+        } finally {
+          // Cleanup: Remove vectors from Qdrant
+          await cleanupVectors(fileId);
         }
-
-        // Assert: Verify file_catalog entry updated
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .select('vector_status, chunk_count, error_message')
-          .eq('id', fileId)
-          .single()
-
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
-
-        // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
-
-        // Verify vector counts (approximate, allow ±3 tolerance for DOCX)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.total - 3)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.total + 3)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.parents - 1)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.parents + 1)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.docx.children - 3)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.docx.children + 3)
-
-        // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
-
-        // Assert: Verify hierarchical structure (children reference parents)
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true
-        })
-
-        const childPoints = scrollResponse.points.filter(
-          p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
-
-        // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
-
-        // Verify at least one child has a valid parent reference
-        const parentIds = new Set(
-          scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
-            .map(p => (p.payload as any).chunk_id)
-        )
-
-        const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
-
-        // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
-
-        // Assert: Verify metadata in Qdrant
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
-
-        expect(payload.organization_id).toBe(premiumOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
-        expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
-
-        console.log(`✅ T026 PASSED: PREMIUM tier DOCX file processed successfully`)
-        console.log(`   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`)
-        console.log(`   - Dimensions: ${vectorStats.dimensions}`)
-        console.log(`   - Organization: ${premiumOrg.tier} tier`)
-        console.log(`   - Validates PREMIUM tier supports all formats with maximum limits`)
-      } finally {
-        // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
 
     /**
      * T027: PREMIUM Tier TXT Upload Success Test
@@ -2292,118 +2384,129 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - Part of comprehensive PREMIUM tier coverage (T025-T027)
      * - Last of the tier-specific upload success tests
      */
-    it('should process TXT file successfully', async () => {
-      // Arrange
-      const txtFixturePath = getFixturePath('txt')
-      const filename = 'sample-course-material.txt'
-      const mimeType = 'text/plain'
+    it(
+      'should process TXT file successfully',
+      async () => {
+        // Arrange
+        const txtFixturePath = getFixturePath('txt');
+        const filename = 'sample-course-material.txt';
+        const mimeType = 'text/plain';
 
-      // Act: Upload file and trigger processing
-      const { fileId, jobId } = await uploadFileAndProcess(
-        premiumOrg.id,
-        premiumUser.id,
-        testCourseId,
-        txtFixturePath,
-        filename,
-        mimeType
-      )
+        // Act: Upload file and trigger processing
+        const { fileId, jobId } = await uploadFileAndProcess(
+          premiumOrg.id,
+          premiumUser.id,
+          testCourseId,
+          txtFixturePath,
+          filename,
+          mimeType
+        );
 
-      try {
-        // Assert: Wait for vector indexing to complete
-        const indexingResult = await waitForVectorIndexing(fileId)
+        try {
+          // Assert: Wait for vector indexing to complete
+          const indexingResult = await waitForVectorIndexing(fileId);
 
-        expect(indexingResult.success).toBe(true)
-        expect(indexingResult.status).toBe('indexed')
+          expect(indexingResult.success).toBe(true);
+          expect(indexingResult.status).toBe('indexed');
 
-        if (!indexingResult.success) {
-          throw new Error(`Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`)
+          if (!indexingResult.success) {
+            throw new Error(
+              `Indexing failed: ${indexingResult.errorMessage || indexingResult.status}`
+            );
+          }
+
+          // Assert: Verify file_catalog entry updated
+          const { data: file, error: fileError } = await supabaseAdmin
+            .from('file_catalog')
+            .select('vector_status, chunk_count, error_message')
+            .eq('id', fileId)
+            .single();
+
+          expect(fileError).toBeNull();
+          expect(file).toBeDefined();
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
+          expect(file!.error_message).toBeNull();
+
+          // Assert: Query Qdrant for vectors
+          const vectorStats = await queryVectorsByFileId(fileId);
+
+          // Verify vector counts (approximate, allow ±2 tolerance)
+          expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.total - 2);
+          expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.total + 2);
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.parents - 1)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.parents + 1)
+
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.children - 2)
+          // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.children + 2)
+
+          // Verify vector dimensions (Jina-v3 = 768D)
+          expect(vectorStats.dimensions).toBe(768);
+
+          // Assert: Verify hierarchical structure (children reference parents)
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+          });
+
+          const childPoints = scrollResponse.points.filter(
+            p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
+          );
+
+          // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
+
+          // Verify at least one child has a valid parent reference
+          const parentIds = new Set(
+            scrollResponse.points
+              .filter(
+                p =>
+                  (p.payload as any).parent_id === null ||
+                  (p.payload as any).parent_id === undefined
+              )
+              .map(p => (p.payload as any).chunk_id)
+          );
+
+          const childrenWithValidParents = childPoints.filter(child => {
+            const parentId = (child.payload as any).parent_id;
+            return parentIds.has(parentId);
+          });
+
+          // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
+
+          // Assert: Verify metadata in Qdrant
+          const firstPoint = scrollResponse.points[0];
+          const payload = firstPoint.payload as any;
+
+          expect(payload.organization_id).toBe(premiumOrg.id);
+          expect(payload.document_id).toBe(fileId);
+          expect(payload.course_id).toBe(testCourseId);
+          expect(payload.content).toBeDefined();
+          expect(payload.content.length).toBeGreaterThan(0);
+          expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
+          expect(scrollResponse.points.length).toBe(vectorStats.totalVectors);
+
+          console.log(`✅ T027 PASSED: PREMIUM tier TXT file processed successfully`);
+          console.log(
+            `   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`
+          );
+          console.log(`   - Dimensions: ${vectorStats.dimensions}`);
+          console.log(`   - Organization: ${premiumOrg.tier} tier`);
+          console.log(`   - Validates PREMIUM tier supports all formats including TXT`);
+          console.log(
+            `   - PREMIUM features: 100MB max file size, 200 max files, 50GB storage, 10 concurrent uploads`
+          );
+        } finally {
+          // Cleanup: Remove vectors from Qdrant
+          await cleanupVectors(fileId);
         }
-
-        // Assert: Verify file_catalog entry updated
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .select('vector_status, chunk_count, error_message')
-          .eq('id', fileId)
-          .single()
-
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
-        expect(file!.error_message).toBeNull()
-
-        // Assert: Query Qdrant for vectors
-        const vectorStats = await queryVectorsByFileId(fileId)
-
-        // Verify vector counts (approximate, allow ±2 tolerance)
-        expect(vectorStats.totalVectors).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.total - 2)
-        expect(vectorStats.totalVectors).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.total + 2)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.parents - 1)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.parentChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.parents + 1)
-
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeGreaterThanOrEqual(EXPECTED_CHUNKS.txt.children - 2)
-        // SKIP: Parent/child distinction not implemented -         expect(vectorStats.childChunks).toBeLessThanOrEqual(EXPECTED_CHUNKS.txt.children + 2)
-
-        // Verify vector dimensions (Jina-v3 = 768D)
-        expect(vectorStats.dimensions).toBe(768)
-
-        // Assert: Verify hierarchical structure (children reference parents)
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true
-        })
-
-        const childPoints = scrollResponse.points.filter(
-          p => (p.payload as any).parent_id !== null && (p.payload as any).parent_id !== undefined
-        )
-
-        // SKIP: Parent/child distinction not implemented -         expect(childPoints.length).toBeGreaterThan(0)
-
-        // Verify at least one child has a valid parent reference
-        const parentIds = new Set(
-          scrollResponse.points
-            .filter(p => (p.payload as any).parent_id === null || (p.payload as any).parent_id === undefined)
-            .map(p => (p.payload as any).chunk_id)
-        )
-
-        const childrenWithValidParents = childPoints.filter(child => {
-          const parentId = (child.payload as any).parent_id
-          return parentIds.has(parentId)
-        })
-
-        // SKIP: Parent/child distinction not implemented -         expect(childrenWithValidParents.length).toBeGreaterThan(0)
-
-        // Assert: Verify metadata in Qdrant
-        const firstPoint = scrollResponse.points[0]
-        const payload = firstPoint.payload as any
-
-        expect(payload.organization_id).toBe(premiumOrg.id)
-        expect(payload.document_id).toBe(fileId)
-        expect(payload.course_id).toBe(testCourseId)
-        expect(payload.content).toBeDefined()
-        expect(payload.content.length).toBeGreaterThan(0)
-        expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
-        expect(scrollResponse.points.length).toBe(vectorStats.totalVectors)
-
-        console.log(`✅ T027 PASSED: PREMIUM tier TXT file processed successfully`)
-        console.log(`   - Vectors: ${vectorStats.totalVectors} (${vectorStats.parentChunks} parents, ${vectorStats.childChunks} children)`)
-        console.log(`   - Dimensions: ${vectorStats.dimensions}`)
-        console.log(`   - Organization: ${premiumOrg.tier} tier`)
-        console.log(`   - Validates PREMIUM tier supports all formats including TXT`)
-        console.log(`   - PREMIUM features: 100MB max file size, 200 max files, 50GB storage, 10 concurrent uploads`)
-      } finally {
-        // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
-  })
-
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
+  });
 
   // ==========================================================================
   // T028: Hierarchical Chunking Validation
@@ -2426,325 +2529,346 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
      * - Query all chunks from Qdrant by file_id
      * - Validate chunk sizes, parent-child relationships, metadata
      */
-    it('should produce correct parent-child structure', async () => { // Fixed: Test was looking for wrong field name (parent_id vs parent_chunk_id)
-      // Setup: Create TRIAL tier organization (any tier works for chunking validation)
-      const trialOrg = await createTestOrg('trial')
-      const testUser = await createTestUser(trialOrg.id, 'admin')
-      const testCourseId = randomUUID()
+    it(
+      'should produce correct parent-child structure',
+      async () => {
+        // Fixed: Test was looking for wrong field name (parent_id vs parent_chunk_id)
+        // Setup: Create TRIAL tier organization (any tier works for chunking validation)
+        const trialOrg = await createTestOrg('trial');
+        const testUser = await createTestUser(trialOrg.id, 'admin');
+        const testCourseId = randomUUID();
 
-      await supabaseAdmin.from('courses').insert({
-        id: testCourseId,
-        organization_id: trialOrg.id,
-        user_id: testUser.id, // REQUIRED field (NOT NULL constraint)
-        title: 'T028 Chunking Validation Test Course',
-        slug: `t028-chunking-${Date.now()}`, // REQUIRED field (NOT NULL constraint)
-        status: 'draft'
-      })
+        await supabaseAdmin.from('courses').insert({
+          id: testCourseId,
+          organization_id: trialOrg.id,
+          user_id: testUser.id, // REQUIRED field (NOT NULL constraint)
+          title: 'T028 Chunking Validation Test Course',
+          slug: `t028-chunking-${Date.now()}`, // REQUIRED field (NOT NULL constraint)
+          status: 'draft',
+        });
 
-      try {
-        // When: Upload Markdown file with hierarchical structure
-        const mdFixturePath = getFixturePath('md')
-        const { fileId } = await uploadFileAndProcess(
-          trialOrg.id,
-          testUser.id,
-          testCourseId,
-          mdFixturePath,
-          'hierarchical-test.md',
-          'text/markdown'
-        )
+        try {
+          // When: Upload Markdown file with hierarchical structure
+          const mdFixturePath = getFixturePath('md');
+          const { fileId } = await uploadFileAndProcess(
+            trialOrg.id,
+            testUser.id,
+            testCourseId,
+            mdFixturePath,
+            'hierarchical-test.md',
+            'text/markdown'
+          );
 
-        // Wait for processing to complete
-        const indexingResult = await waitForVectorIndexing(fileId)
-        expect(indexingResult.success).toBe(true)
+          // Wait for processing to complete
+          const indexingResult = await waitForVectorIndexing(fileId);
+          expect(indexingResult.success).toBe(true);
 
-        // Assert: File successfully indexed
-        const { data: file, error: fileError } = await supabaseAdmin
-          .from('file_catalog')
-          .select('*')
-          .eq('id', fileId)
-          .single()
+          // Assert: File successfully indexed
+          const { data: file, error: fileError } = await supabaseAdmin
+            .from('file_catalog')
+            .select('*')
+            .eq('id', fileId)
+            .single();
 
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
-        expect(file!.vector_status).toBe('indexed')
-        expect(file!.chunk_count).toBeGreaterThan(0)
+          expect(fileError).toBeNull();
+          expect(file).toBeDefined();
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
 
-        // Then: Query all chunks from Qdrant
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true,
-          with_vector: ['dense']
-        })
+          // Then: Query all chunks from Qdrant
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+            with_vector: ['dense'],
+          });
 
-        const allChunks = scrollResponse.points
-        expect(allChunks.length).toBeGreaterThan(0)
+          const allChunks = scrollResponse.points;
+          expect(allChunks.length).toBeGreaterThan(0);
 
-        // Separate parent and child chunks
-        const parentChunks = allChunks.filter(
-          p => (p.payload as any).parent_chunk_id === null || (p.payload as any).parent_chunk_id === undefined
-        )
-        const childChunks = allChunks.filter(
-          p => (p.payload as any).parent_chunk_id !== null && (p.payload as any).parent_chunk_id !== undefined
-        )
+          // Separate parent and child chunks
+          const parentChunks = allChunks.filter(
+            p =>
+              (p.payload as any).parent_chunk_id === null ||
+              (p.payload as any).parent_chunk_id === undefined
+          );
+          const childChunks = allChunks.filter(
+            p =>
+              (p.payload as any).parent_chunk_id !== null &&
+              (p.payload as any).parent_chunk_id !== undefined
+          );
 
-        expect(parentChunks.length).toBeGreaterThan(0)
-        expect(childChunks.length).toBeGreaterThan(0)
+          expect(parentChunks.length).toBeGreaterThan(0);
+          expect(childChunks.length).toBeGreaterThan(0);
 
-        console.log(`📊 Chunk Distribution:`)
-        console.log(`   - Total chunks: ${allChunks.length}`)
-        console.log(`   - Parent chunks: ${parentChunks.length}`)
-        console.log(`   - Child chunks: ${childChunks.length}`)
+          console.log(`📊 Chunk Distribution:`);
+          console.log(`   - Total chunks: ${allChunks.length}`);
+          console.log(`   - Parent chunks: ${parentChunks.length}`);
+          console.log(`   - Child chunks: ${childChunks.length}`);
 
-        // Assert: All child chunks have parent_chunk_id reference
-        childChunks.forEach((childChunk, index) => {
-          const childPayload = childChunk.payload as any
-          expect(childPayload.parent_chunk_id).toBeDefined()
-          expect(childPayload.parent_chunk_id).not.toBeNull()
+          // Assert: All child chunks have parent_chunk_id reference
+          childChunks.forEach((childChunk, index) => {
+            const childPayload = childChunk.payload as any;
+            expect(childPayload.parent_chunk_id).toBeDefined();
+            expect(childPayload.parent_chunk_id).not.toBeNull();
 
-          // Verify parent exists in parent chunks
-          const parentExists = parentChunks.some(
-            p => (p.payload as any).chunk_id === childPayload.parent_chunk_id
-          )
-          expect(parentExists).toBe(true)
-        })
+            // Verify parent exists in parent chunks
+            const parentExists = parentChunks.some(
+              p => (p.payload as any).chunk_id === childPayload.parent_chunk_id
+            );
+            expect(parentExists).toBe(true);
+          });
 
-        console.log(`✅ All ${childChunks.length} child chunks reference valid parent chunks`)
+          console.log(`✅ All ${childChunks.length} child chunks reference valid parent chunks`);
 
-        // Assert: Parent chunks token size (1000-1500 tokens, target=1500)
-        // Note: Approximate token count = characters / 4 (standard estimation)
-        const parentTokenCounts = parentChunks.map(p => {
-          const chunkText = (p.payload as any).content
-          const estimatedTokens = Math.round(chunkText.length / 4)
-          return estimatedTokens
-        })
+          // Assert: Parent chunks token size (1000-1500 tokens, target=1500)
+          // Note: Approximate token count = characters / 4 (standard estimation)
+          const parentTokenCounts = parentChunks.map(p => {
+            const chunkText = (p.payload as any).content;
+            const estimatedTokens = Math.round(chunkText.length / 4);
+            return estimatedTokens;
+          });
 
-        // Allow tolerance: target=1500, min=1000, max=1500
-        // But be flexible for small documents (minimum 100 tokens for valid chunk)
-        parentTokenCounts.forEach((tokenCount, index) => {
-          if (tokenCount > 100) { // Only validate non-trivial chunks
-            expect(tokenCount).toBeGreaterThanOrEqual(100) // Minimum valid chunk
-            expect(tokenCount).toBeLessThanOrEqual(1800) // Allow 20% tolerance over 1500
-          }
-        })
+          // Allow tolerance: target=1500, min=1000, max=1500
+          // But be flexible for small documents (minimum 100 tokens for valid chunk)
+          parentTokenCounts.forEach((tokenCount, index) => {
+            if (tokenCount > 100) {
+              // Only validate non-trivial chunks
+              expect(tokenCount).toBeGreaterThanOrEqual(100); // Minimum valid chunk
+              expect(tokenCount).toBeLessThanOrEqual(1800); // Allow 20% tolerance over 1500
+            }
+          });
 
-        const avgParentTokens = Math.round(
-          parentTokenCounts.reduce((sum, count) => sum + count, 0) / parentTokenCounts.length
-        )
-        console.log(`✅ Parent chunks token count: avg=${avgParentTokens}, range=[${Math.min(...parentTokenCounts)}, ${Math.max(...parentTokenCounts)}]`)
-        console.log(`   (Target: 1500 tokens, Min: 1000, Max: 1500)`)
+          const avgParentTokens = Math.round(
+            parentTokenCounts.reduce((sum, count) => sum + count, 0) / parentTokenCounts.length
+          );
+          console.log(
+            `✅ Parent chunks token count: avg=${avgParentTokens}, range=[${Math.min(...parentTokenCounts)}, ${Math.max(...parentTokenCounts)}]`
+          );
+          console.log(`   (Target: 1500 tokens, Min: 1000, Max: 1500)`);
 
-        // Assert: Child chunks token size (300-400 tokens, target=400)
-        const childTokenCounts = childChunks.map(c => {
-          const chunkText = (c.payload as any).content
-          const estimatedTokens = Math.round(chunkText.length / 4)
-          return estimatedTokens
-        })
+          // Assert: Child chunks token size (300-400 tokens, target=400)
+          const childTokenCounts = childChunks.map(c => {
+            const chunkText = (c.payload as any).content;
+            const estimatedTokens = Math.round(chunkText.length / 4);
+            return estimatedTokens;
+          });
 
-        // Allow tolerance: target=400, min=300, max=500 (25% tolerance)
-        childTokenCounts.forEach((tokenCount, index) => {
-          if (tokenCount > 50) { // Only validate non-trivial chunks
-            expect(tokenCount).toBeGreaterThanOrEqual(50) // Minimum valid chunk
-            expect(tokenCount).toBeLessThanOrEqual(600) // Allow 50% tolerance over 400
-          }
-        })
+          // Allow tolerance: target=400, min=300, max=500 (25% tolerance)
+          childTokenCounts.forEach((tokenCount, index) => {
+            if (tokenCount > 50) {
+              // Only validate non-trivial chunks
+              expect(tokenCount).toBeGreaterThanOrEqual(50); // Minimum valid chunk
+              expect(tokenCount).toBeLessThanOrEqual(600); // Allow 50% tolerance over 400
+            }
+          });
 
-        const avgChildTokens = Math.round(
-          childTokenCounts.reduce((sum, count) => sum + count, 0) / childTokenCounts.length
-        )
-        console.log(`✅ Child chunks token count: avg=${avgChildTokens}, range=[${Math.min(...childTokenCounts)}, ${Math.max(...childTokenCounts)}]`)
-        console.log(`   (Target: 400 tokens, Min: 300, Max: 400, Overlap: 50)`)
+          const avgChildTokens = Math.round(
+            childTokenCounts.reduce((sum, count) => sum + count, 0) / childTokenCounts.length
+          );
+          console.log(
+            `✅ Child chunks token count: avg=${avgChildTokens}, range=[${Math.min(...childTokenCounts)}, ${Math.max(...childTokenCounts)}]`
+          );
+          console.log(`   (Target: 400 tokens, Min: 300, Max: 400, Overlap: 50)`);
 
-        // Assert: Child chunk overlap validation (50 tokens)
-        // Strategy: For each child within same parent, check overlap
-        const parentGroups = new Map<string, any[]>()
-        childChunks.forEach(child => {
-          const parentId = (child.payload as any).parent_id
-          if (!parentGroups.has(parentId)) {
-            parentGroups.set(parentId, [])
-          }
-          parentGroups.get(parentId)!.push(child.payload)
-        })
+          // Assert: Child chunk overlap validation (50 tokens)
+          // Strategy: For each child within same parent, check overlap
+          const parentGroups = new Map<string, any[]>();
+          childChunks.forEach(child => {
+            const parentId = (child.payload as any).parent_id;
+            if (!parentGroups.has(parentId)) {
+              parentGroups.set(parentId, []);
+            }
+            parentGroups.get(parentId)!.push(child.payload);
+          });
 
-        let overlapValidations = 0
-        parentGroups.forEach((siblings, parentId) => {
-          if (siblings.length >= 2) {
-            // Sort siblings by chunk_index
-            siblings.sort((a, b) => a.chunk_index - b.chunk_index)
+          let overlapValidations = 0;
+          parentGroups.forEach((siblings, parentId) => {
+            if (siblings.length >= 2) {
+              // Sort siblings by chunk_index
+              siblings.sort((a, b) => a.chunk_index - b.chunk_index);
 
-            // Check consecutive siblings for overlap
-            for (let i = 0; i < siblings.length - 1; i++) {
-              const current = siblings[i]
-              const next = siblings[i + 1]
+              // Check consecutive siblings for overlap
+              for (let i = 0; i < siblings.length - 1; i++) {
+                const current = siblings[i];
+                const next = siblings[i + 1];
 
-              const currentText = current.content || current.chunk_text
-              const nextText = next.content || next.chunk_text
+                const currentText = current.content || current.chunk_text;
+                const nextText = next.content || next.chunk_text;
 
-              // Skip if either chunk doesn't have text content
-              if (!currentText || !nextText) {
-                continue
-              }
+                // Skip if either chunk doesn't have text content
+                if (!currentText || !nextText) {
+                  continue;
+                }
 
-              // Find overlap: last N characters of current should match first N of next
-              const overlapLength = 200 // Approximate 50 tokens = 200 chars
-              const currentSuffix = currentText.slice(-overlapLength)
-              const nextPrefix = nextText.slice(0, overlapLength)
+                // Find overlap: last N characters of current should match first N of next
+                const overlapLength = 200; // Approximate 50 tokens = 200 chars
+                const currentSuffix = currentText.slice(-overlapLength);
+                const nextPrefix = nextText.slice(0, overlapLength);
 
-              // Check for any overlap (flexible, real implementation may vary)
-              const hasOverlap = nextPrefix.includes(currentSuffix.slice(-100)) ||
-                                 currentSuffix.includes(nextPrefix.slice(0, 100))
+                // Check for any overlap (flexible, real implementation may vary)
+                const hasOverlap =
+                  nextPrefix.includes(currentSuffix.slice(-100)) ||
+                  currentSuffix.includes(nextPrefix.slice(0, 100));
 
-              if (hasOverlap) {
-                overlapValidations++
+                if (hasOverlap) {
+                  overlapValidations++;
+                }
               }
             }
-          }
-        })
+          });
 
-        console.log(`✅ Overlap validation: ${overlapValidations} consecutive chunk pairs validated`)
+          console.log(
+            `✅ Overlap validation: ${overlapValidations} consecutive chunk pairs validated`
+          );
 
-        // Assert: Chunk metadata includes heading information
-        const chunksWithHeadings = allChunks.filter(chunk => {
-          const payload = chunk.payload as any
-          // Check for heading metadata (implementation may vary)
-          return payload.heading || payload.section_title || payload.metadata?.heading
-        })
+          // Assert: Chunk metadata includes heading information
+          const chunksWithHeadings = allChunks.filter(chunk => {
+            const payload = chunk.payload as any;
+            // Check for heading metadata (implementation may vary)
+            return payload.heading || payload.section_title || payload.metadata?.heading;
+          });
 
-        // At least some chunks should have heading info (Markdown has headings)
-        // Be flexible: if document has headings, at least 1 chunk should capture it
-        console.log(`✅ Chunks with heading metadata: ${chunksWithHeadings.length}/${allChunks.length}`)
+          // At least some chunks should have heading info (Markdown has headings)
+          // Be flexible: if document has headings, at least 1 chunk should capture it
+          console.log(
+            `✅ Chunks with heading metadata: ${chunksWithHeadings.length}/${allChunks.length}`
+          );
 
-        // Validate basic chunk metadata
-        allChunks.forEach(chunk => {
-          const payload = chunk.payload as any
-          expect(payload.organization_id).toBe(trialOrg.id)
-          expect(payload.document_id).toBe(fileId)
-          expect(payload.course_id).toBe(testCourseId)
-          expect(payload.chunk_id).toBeDefined()
-          // Note: Payload uses 'content' field for chunk text, not 'chunk_text'
-          const chunkText = payload.content || payload.chunk_text
-          expect(chunkText).toBeDefined()
-          expect(chunkText.length).toBeGreaterThan(0)
-          expect(payload.chunk_index).toBeGreaterThanOrEqual(0)
-          // Note: total_chunks represents parent chunks count for parent-level chunks,
-          // or sibling count for child chunks - not total vectors
-          expect(payload.total_chunks).toBeGreaterThan(0)
-        })
+          // Validate basic chunk metadata
+          allChunks.forEach(chunk => {
+            const payload = chunk.payload as any;
+            expect(payload.organization_id).toBe(trialOrg.id);
+            expect(payload.document_id).toBe(fileId);
+            expect(payload.course_id).toBe(testCourseId);
+            expect(payload.chunk_id).toBeDefined();
+            // Note: Payload uses 'content' field for chunk text, not 'chunk_text'
+            const chunkText = payload.content || payload.chunk_text;
+            expect(chunkText).toBeDefined();
+            expect(chunkText.length).toBeGreaterThan(0);
+            expect(payload.chunk_index).toBeGreaterThanOrEqual(0);
+            // Note: total_chunks represents parent chunks count for parent-level chunks,
+            // or sibling count for child chunks - not total vectors
+            expect(payload.total_chunks).toBeGreaterThan(0);
+          });
 
-        console.log(`✅ T028 PASSED: Hierarchical chunking validation complete`)
-        console.log(`   - Parent chunks: ${parentChunks.length} (avg ${avgParentTokens} tokens)`)
-        console.log(`   - Child chunks: ${childChunks.length} (avg ${avgChildTokens} tokens)`)
-        console.log(`   - All children reference valid parents`)
-        console.log(`   - Token sizes within expected ranges`)
-        console.log(`   - Metadata validation passed`)
-      } finally {
-        // Cleanup: Remove test organization and all associated data
-        await cleanupTestOrg(trialOrg.id)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
-  })
+          console.log(`✅ T028 PASSED: Hierarchical chunking validation complete`);
+          console.log(`   - Parent chunks: ${parentChunks.length} (avg ${avgParentTokens} tokens)`);
+          console.log(`   - Child chunks: ${childChunks.length} (avg ${avgChildTokens} tokens)`);
+          console.log(`   - All children reference valid parents`);
+          console.log(`   - Token sizes within expected ranges`);
+          console.log(`   - Metadata validation passed`);
+        } finally {
+          // Cleanup: Remove test organization and all associated data
+          await cleanupTestOrg(trialOrg.id);
+        }
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
+  });
   // ==========================================================================
   // T029: Jina-v3 Embedding Validation
   // ==========================================================================
 
   describe('Embedding Validation', () => {
-    it('should generate 768D Jina-v3 embeddings with late chunking', async () => {
-      // Given: A TRIAL tier organization (any tier works - testing embedding model, not tier restrictions)
-      const trialOrg = await createTestOrg('trial')
-      const testUser = await createTestUser(trialOrg.id, 'admin')
-      const testCourseId = randomUUID()
+    it(
+      'should generate 768D Jina-v3 embeddings with late chunking',
+      async () => {
+        // Given: A TRIAL tier organization (any tier works - testing embedding model, not tier restrictions)
+        const trialOrg = await createTestOrg('trial');
+        const testUser = await createTestUser(trialOrg.id, 'admin');
+        const testCourseId = randomUUID();
 
-      await supabaseAdmin.from('courses').insert({
-        id: testCourseId,
-        organization_id: trialOrg.id,
-        user_id: testUser.id, // REQUIRED field (NOT NULL constraint)
-        title: 'T029 Embedding Validation Test Course',
-        slug: `t029-embedding-${Date.now()}`, // REQUIRED field (NOT NULL constraint)
-        status: 'draft'
-      })
+        await supabaseAdmin.from('courses').insert({
+          id: testCourseId,
+          organization_id: trialOrg.id,
+          user_id: testUser.id, // REQUIRED field (NOT NULL constraint)
+          title: 'T029 Embedding Validation Test Course',
+          slug: `t029-embedding-${Date.now()}`, // REQUIRED field (NOT NULL constraint)
+          status: 'draft',
+        });
 
-      // When: Upload any text file (TXT is simplest)
-      const fixturePath = getFixturePath('txt')
-      const { fileId } = await uploadFileAndProcess(
-        trialOrg.id,
-        testUser.id,
-        testCourseId,
-        fixturePath,
-        'test-embedding-validation.txt',
-        'text/plain'
-      )
+        // When: Upload any text file (TXT is simplest)
+        const fixturePath = getFixturePath('txt');
+        const { fileId } = await uploadFileAndProcess(
+          trialOrg.id,
+          testUser.id,
+          testCourseId,
+          fixturePath,
+          'test-embedding-validation.txt',
+          'text/plain'
+        );
 
-      try {
-        // Trigger processing
-        const result = await waitForVectorIndexing(fileId)
+        try {
+          // Trigger processing
+          const result = await waitForVectorIndexing(fileId);
 
-        // Then: Assert processing completed successfully
-        expect(result.success).toBe(true)
-        expect(result.status).toBe('indexed')
+          // Then: Assert processing completed successfully
+          expect(result.success).toBe(true);
+          expect(result.status).toBe('indexed');
 
-        // Assert: Query Qdrant for vectors
-        const scrollResponse = await qdrantClient.scroll('course_embeddings', {
-          filter: {
-            must: [
-              { key: 'document_id', match: { value: fileId } }
-            ]
-          },
-          limit: 100,
-          with_payload: true,
-          with_vector: ['dense'] // IMPORTANT: Request named vector for dimension validation
-        })
+          // Assert: Query Qdrant for vectors
+          const scrollResponse = await qdrantClient.scroll('course_embeddings', {
+            filter: {
+              must: [{ key: 'document_id', match: { value: fileId } }],
+            },
+            limit: 100,
+            with_payload: true,
+            with_vector: ['dense'], // IMPORTANT: Request named vector for dimension validation
+          });
 
-        expect(scrollResponse.points.length).toBeGreaterThan(0)
+          expect(scrollResponse.points.length).toBeGreaterThan(0);
 
-        // Assert: Vector dimensions = 768 (Jina-v3 standard)
-        // Check ALL vectors to ensure consistency
-        for (const point of scrollResponse.points) {
-          const namedVectors = point.vector as Record<string, number[]>
-          const vector = namedVectors.dense
-          expect(vector).toBeDefined()
-          expect(Array.isArray(vector)).toBe(true)
-          expect(vector.length).toBe(768) // Jina-v3 produces exactly 768-dimensional embeddings
+          // Assert: Vector dimensions = 768 (Jina-v3 standard)
+          // Check ALL vectors to ensure consistency
+          for (const point of scrollResponse.points) {
+            const namedVectors = point.vector as Record<string, number[]>;
+            const vector = namedVectors.dense;
+            expect(vector).toBeDefined();
+            expect(Array.isArray(vector)).toBe(true);
+            expect(vector.length).toBe(768); // Jina-v3 produces exactly 768-dimensional embeddings
+          }
+
+          // Assert: Verify embedding configuration in code
+          // NOTE: late_chunking and task parameters are passed to the Jina API, not stored in Qdrant
+          // We validate these through code inspection and documentation:
+          // 1. late_chunking = true (default in generateEmbeddingsWithLateChunking function)
+          //    Source: src/shared/embeddings/generate.ts:254
+          // 2. task = 'retrieval.passage' (default for document indexing)
+          //    Source: src/shared/embeddings/generate.ts:253
+          //
+          // These parameters are configured at embedding generation time and affect
+          // the quality of the 768D vectors stored in Qdrant.
+
+          console.log(`✅ T029 PASSED: Jina-v3 embedding validation successful`);
+          console.log(`   - Total vectors: ${scrollResponse.points.length}`);
+          console.log(`   - Vector dimensions: 768 (Jina-v3 standard) ✓`);
+          console.log(`   - late_chunking: true (default configuration) ✓`);
+          console.log(`   - task: 'retrieval.passage' (document indexing) ✓`);
+          console.log(`   - All vectors validated for correct dimensionality`);
+        } finally {
+          // Cleanup: Remove vectors from Qdrant
+          await cleanupVectors(fileId);
+          // Cleanup: Remove test organization
+          await cleanupTestOrg(trialOrg.id);
         }
-
-        // Assert: Verify embedding configuration in code
-        // NOTE: late_chunking and task parameters are passed to the Jina API, not stored in Qdrant
-        // We validate these through code inspection and documentation:
-        // 1. late_chunking = true (default in generateEmbeddingsWithLateChunking function)
-        //    Source: src/shared/embeddings/generate.ts:254
-        // 2. task = 'retrieval.passage' (default for document indexing)
-        //    Source: src/shared/embeddings/generate.ts:253
-        //
-        // These parameters are configured at embedding generation time and affect
-        // the quality of the 768D vectors stored in Qdrant.
-
-        console.log(`✅ T029 PASSED: Jina-v3 embedding validation successful`)
-        console.log(`   - Total vectors: ${scrollResponse.points.length}`)
-        console.log(`   - Vector dimensions: 768 (Jina-v3 standard) ✓`)
-        console.log(`   - late_chunking: true (default configuration) ✓`)
-        console.log(`   - task: 'retrieval.passage' (document indexing) ✓`)
-        console.log(`   - All vectors validated for correct dimensionality`)
-      } finally {
-        // Cleanup: Remove vectors from Qdrant
-        await cleanupVectors(fileId)
-        // Cleanup: Remove test organization
-        await cleanupTestOrg(trialOrg.id)
-      }
-    }, TEST_TIMEOUTS.documentProcessing)
-  })
+      },
+      TEST_TIMEOUTS.documentProcessing
+    );
+  });
 
   // ==========================================================================
   // PARALLEL-GROUP-ADVANCED: BullMQ Infrastructure Tests
   // ==========================================================================
 
   describe('Stalled Job Detection', () => {
-    it('should recover from worker crash within 90 seconds (T031)', async () => { // tsvector removed - PDF works now
+    it('should recover from worker crash within 90 seconds (T031)', async () => {
+      // tsvector removed - PDF works now
       // Given: STANDARD tier organization with PDF file
-      const standardOrg = await createTestOrg('standard')
-      const standardUser = await createTestUser(standardOrg.id, 'admin')
+      const standardOrg = await createTestOrg('standard');
+      const standardUser = await createTestUser(standardOrg.id, 'admin');
 
       // Create test course
       const { data: course, error: courseError } = await supabaseAdmin
@@ -2755,22 +2879,22 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           slug: 'test-course-stalled-job-recovery-' + Date.now(),
           title: 'Test Course - Stalled Job Recovery',
           course_description: 'Test course for stalled job detection', // Use course_description (actual column name)
-          status: 'draft'
+          status: 'draft',
         })
         .select()
-        .single()
+        .single();
 
-      expect(courseError).toBeNull()
-      expect(course).toBeDefined()
-      const testCourseId = course!.id
+      expect(courseError).toBeNull();
+      expect(course).toBeDefined();
+      const testCourseId = course!.id;
 
-      let fileId: string | undefined
+      let fileId: string | undefined;
 
       try {
         // When: Upload PDF file and start DOCUMENT_PROCESSING job
-        const filePath = getFixturePath('pdf')
-        const filename = '2510.13928v1.pdf'
-        const mimeType = 'application/pdf'
+        const filePath = getFixturePath('pdf');
+        const filename = '2510.13928v1.pdf';
+        const mimeType = 'application/pdf';
 
         const uploadResult = await uploadFileAndProcess(
           standardOrg.id,
@@ -2779,24 +2903,24 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
           filePath,
           filename,
           mimeType
-        )
+        );
 
-        fileId = uploadResult.fileId
-        const jobId = uploadResult.jobId
+        fileId = uploadResult.fileId;
+        const jobId = uploadResult.jobId;
 
-        console.log(`⏳ T031: Uploaded file ${fileId}, job ${jobId}`)
+        console.log(`⏳ T031: Uploaded file ${fileId}, job ${jobId}`);
 
         // Wait for job to start processing (active state)
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         // Simulate worker crash: Force stop worker immediately
-        console.log(`💥 T031: Simulating worker crash...`)
-        const { stopWorker } = await import('../../src/orchestrator/worker')
-        await stopWorker(true) // Force close immediately (simulates crash)
+        console.log(`💥 T031: Simulating worker crash...`);
+        const { stopWorker } = await import('../../src/orchestrator/worker');
+        await stopWorker(true); // Force close immediately (simulates crash)
 
         // Record crash time
-        const crashTime = Date.now()
-        console.log(`🕐 T031: Worker crashed at ${new Date(crashTime).toISOString()}`)
+        const crashTime = Date.now();
+        console.log(`🕐 T031: Worker crashed at ${new Date(crashTime).toISOString()}`);
 
         // BullMQ stalled job detection should:
         // 1. Detect stall within stalledInterval (30s)
@@ -2804,91 +2928,95 @@ describe('DOCUMENT_PROCESSING Worker - Integration Tests', () => {
         // 3. Retry job (maxStalledCount: 2 attempts)
 
         // Wait for stalled job detection (30s interval)
-        await new Promise(resolve => setTimeout(resolve, 35000))
-        console.log(`🔍 T031: Stalled detection window passed (30s + 5s buffer)`)
+        await new Promise(resolve => setTimeout(resolve, 35000));
+        console.log(`🔍 T031: Stalled detection window passed (30s + 5s buffer)`);
 
         // Restart worker to process the recovered job
-        console.log(`🔄 T031: Restarting worker...`)
-        const { getWorker } = await import('../../src/orchestrator/worker')
-        getWorker(1) // Restart worker
+        console.log(`🔄 T031: Restarting worker...`);
+        const { getWorker } = await import('../../src/orchestrator/worker');
+        getWorker(1); // Restart worker
 
         // Wait for lock release and retry (60s lockDuration + processing time)
-        await new Promise(resolve => setTimeout(resolve, 70000))
+        await new Promise(resolve => setTimeout(resolve, 70000));
 
         // Calculate total recovery time
-        const recoveryTime = Date.now() - crashTime
-        console.log(`⏱️  T031: Total recovery time: ${recoveryTime}ms (${(recoveryTime / 1000).toFixed(1)}s)`)
+        const recoveryTime = Date.now() - crashTime;
+        console.log(
+          `⏱️  T031: Total recovery time: ${recoveryTime}ms (${(recoveryTime / 1000).toFixed(1)}s)`
+        );
 
         // Assert: Total recovery time < 90s (30s detection + 60s lock = 90s theoretical max)
         // Allow some buffer for processing and PDF complexity
-        expect(recoveryTime).toBeLessThan(120000) // 120s with 30s buffer for large PDFs
+        expect(recoveryTime).toBeLessThan(120000); // 120s with 30s buffer for large PDFs
 
         // Assert: Check final file status
         const { data: file, error: fileError } = await supabaseAdmin
           .from('file_catalog')
           .select('*')
           .eq('id', fileId)
-          .single()
+          .single();
 
-        expect(fileError).toBeNull()
-        expect(file).toBeDefined()
+        expect(fileError).toBeNull();
+        expect(file).toBeDefined();
 
         // Job should either succeed or fail depending on maxStalledCount
         if (file!.vector_status === 'indexed') {
           // Recovery successful
-          console.log(`✅ T031: Job recovered successfully`)
-          expect(file!.vector_status).toBe('indexed')
-          expect(file!.chunk_count).toBeGreaterThan(0)
-          expect(file!.error_message).toBeNull()
+          console.log(`✅ T031: Job recovered successfully`);
+          expect(file!.vector_status).toBe('indexed');
+          expect(file!.chunk_count).toBeGreaterThan(0);
+          expect(file!.error_message).toBeNull();
 
           // Verify vectors were created
-          const vectorStats = await queryVectorsByFileId(fileId)
-          expect(vectorStats.totalVectors).toBeGreaterThan(0)
+          const vectorStats = await queryVectorsByFileId(fileId);
+          expect(vectorStats.totalVectors).toBeGreaterThan(0);
         } else if (file!.vector_status === 'failed') {
           // Max stalled count exceeded
-          console.log(`⚠️  T031: Job failed after max stalled attempts`)
-          expect(file!.vector_status).toBe('failed')
-          expect(file!.error_message).toBeDefined()
+          console.log(`⚠️  T031: Job failed after max stalled attempts`);
+          expect(file!.vector_status).toBe('failed');
+          expect(file!.error_message).toBeDefined();
 
           // Note: error_logs table doesn't have file_id column
           // Just verify the job failed with an error message
-          console.log(`   Error message: ${file!.error_message}`)
+          console.log(`   Error message: ${file!.error_message}`);
         } else {
-          throw new Error(`Unexpected vector_status: ${file!.vector_status}`)
+          throw new Error(`Unexpected vector_status: ${file!.vector_status}`);
         }
 
         // Assert: Recovery time within acceptable bounds
-        console.log(`✅ T031 PASSED: Stalled job detection and recovery working`)
-        console.log(`   - Crash time: ${new Date(crashTime).toISOString()}`)
-        console.log(`   - Recovery time: ${(recoveryTime / 1000).toFixed(1)}s (< 90s target)`)
-        console.log(`   - Final status: ${file!.vector_status}`)
-        console.log(`   - Validates BullMQ stalled job detection (stalledInterval: 30s, lockDuration: 60s, maxStalledCount: 2)`)
+        console.log(`✅ T031 PASSED: Stalled job detection and recovery working`);
+        console.log(`   - Crash time: ${new Date(crashTime).toISOString()}`);
+        console.log(`   - Recovery time: ${(recoveryTime / 1000).toFixed(1)}s (< 90s target)`);
+        console.log(`   - Final status: ${file!.vector_status}`);
+        console.log(
+          `   - Validates BullMQ stalled job detection (stalledInterval: 30s, lockDuration: 60s, maxStalledCount: 2)`
+        );
       } finally {
         // Cleanup: Remove vectors from Qdrant if they exist
         if (fileId) {
-          await cleanupVectors(fileId)
+          await cleanupVectors(fileId);
         }
 
         // Cleanup: Remove test organization
-        await cleanupTestOrg(standardOrg.id)
+        await cleanupTestOrg(standardOrg.id);
       }
-    }, 180000) // 180s timeout (3 minutes) for full recovery cycle
-  })
-})
+    }, 180000); // 180s timeout (3 minutes) for full recovery cycle
+  });
+});
 
 // ============================================================================
 // Test Suite: Error Logging
 // ============================================================================
 
 describe('Error Logging', () => {
-  let testOrg: TestOrganization
-  let testUser: TestUser
-  let testCourseId: string
+  let testOrg: TestOrganization;
+  let testUser: TestUser;
+  let testCourseId: string;
 
   beforeAll(async () => {
     // Create test organization (STANDARD tier)
-    testOrg = await createTestOrg('standard')
-    testUser = await createTestUser(testOrg.id, 'admin')
+    testOrg = await createTestOrg('standard');
+    testUser = await createTestUser(testOrg.id, 'admin');
 
     // Create test course
     const { data: course, error: courseError } = await supabaseAdmin
@@ -2898,22 +3026,22 @@ describe('Error Logging', () => {
         user_id: testUser.id,
         title: 'Test Course - Error Logging',
         slug: `error-logging-test-${Date.now()}`,
-        status: 'draft'
+        status: 'draft',
       })
       .select('id')
-      .single()
+      .single();
 
     if (courseError || !course) {
-      throw new Error(`Failed to create test course: ${courseError?.message}`)
+      throw new Error(`Failed to create test course: ${courseError?.message}`);
     }
 
-    testCourseId = course.id
-  })
+    testCourseId = course.id;
+  });
 
   afterAll(async () => {
     // Cleanup organization and all related data
-    await cleanupTestOrg(testOrg.id)
-  })
+    await cleanupTestOrg(testOrg.id);
+  });
 
   /**
    * T030: Error Logging Validation
@@ -2948,192 +3076,193 @@ describe('Error Logging', () => {
    * - Waiting ~8-10 seconds for 5 retry attempts
    * - This is better suited for E2E/chaos testing
    */
-  it('should log permanent failures to error_logs table', async () => { // tsvector removed - PDF works now
-    console.log('\n╭──────────────────────────────────────────────────────────────────╮')
-    console.log('│                    T030: Error Logging Test                      │')
-    console.log('╰──────────────────────────────────────────────────────────────────╯')
+  it(
+    'should log permanent failures to error_logs table',
+    async () => {
+      // tsvector removed - PDF works now
+      console.log('\n╭──────────────────────────────────────────────────────────────────╮');
+      console.log('│                    T030: Error Logging Test                      │');
+      console.log('╰──────────────────────────────────────────────────────────────────╯');
 
-    // ============================================================================
-    // GIVEN: Upload a test file
-    // ============================================================================
+      // ============================================================================
+      // GIVEN: Upload a test file
+      // ============================================================================
 
-    const testFile = getFixturePath('pdf')
-    const filename = 'sample.pdf'
-    const mimeType = 'application/pdf'
+      const testFile = getFixturePath('pdf');
+      const filename = 'sample.pdf';
+      const mimeType = 'application/pdf';
 
-    const { fileId, jobId } = await uploadFileAndProcess(
-      testOrg.id,
-      testUser.id,
-      testCourseId,
-      testFile,
-      filename,
-      mimeType
-    )
+      const { fileId, jobId } = await uploadFileAndProcess(
+        testOrg.id,
+        testUser.id,
+        testCourseId,
+        testFile,
+        filename,
+        mimeType
+      );
 
-    console.log(`✓ Test file uploaded (ID: ${fileId})`)
-    console.log(`✓ Job ID: ${jobId}`)
+      console.log(`✓ Test file uploaded (ID: ${fileId})`);
+      console.log(`✓ Job ID: ${jobId}`);
 
-    // Get file metadata for error logging
-    const { data: file, error: fileError } = await supabaseAdmin
-      .from('file_catalog')
-      .select('filename, file_size, mime_type')
-      .eq('id', fileId)
-      .single()
+      // Get file metadata for error logging
+      const { data: file, error: fileError } = await supabaseAdmin
+        .from('file_catalog')
+        .select('filename, file_size, mime_type')
+        .eq('id', fileId)
+        .single();
 
-    expect(fileError).toBeNull()
-    expect(file).toBeDefined()
+      expect(fileError).toBeNull();
+      expect(file).toBeDefined();
 
-    // ============================================================================
-    // WHEN: Simulate permanent failure and log to error_logs
-    // ============================================================================
+      // ============================================================================
+      // WHEN: Simulate permanent failure and log to error_logs
+      // ============================================================================
 
-    // Import error logging function
-    const { logPermanentFailure } = await import('../../src/orchestrator/types/error-logs')
+      // Import error logging function
+      const { logPermanentFailure } = await import('../../src/orchestrator/types/error-logs');
 
-    // Simulate a Qdrant connection failure (as would happen after 5 retries)
-    const simulatedError = new Error('Qdrant connection failed after 5 retry attempts')
-    const stackTrace = simulatedError.stack || 'No stack trace available'
+      // Simulate a Qdrant connection failure (as would happen after 5 retries)
+      const simulatedError = new Error('Qdrant connection failed after 5 retry attempts');
+      const stackTrace = simulatedError.stack || 'No stack trace available';
 
-    // Log the permanent failure
-    try {
-      await logPermanentFailure({
-        organization_id: testOrg.id,
-        user_id: testUser.id,
-        error_message: simulatedError.message,
-        stack_trace: stackTrace,
-        severity: 'ERROR',
-        file_name: file!.filename,
-        file_size: file!.file_size,
-        file_format: file!.mime_type,
-        job_id: jobId,
-        job_type: 'DOCUMENT_PROCESSING',
-        metadata: {
-          retry_count: 5,
-          tier: testOrg.tier,
-          failure_type: 'qdrant_connection',
-          timeout_ms: 5000
-        }
-      })
+      // Log the permanent failure
+      try {
+        await logPermanentFailure({
+          organization_id: testOrg.id,
+          user_id: testUser.id,
+          error_message: simulatedError.message,
+          stack_trace: stackTrace,
+          severity: 'ERROR',
+          file_name: file!.filename,
+          file_size: file!.file_size,
+          file_format: file!.mime_type,
+          job_id: jobId,
+          job_type: 'DOCUMENT_PROCESSING',
+          metadata: {
+            retry_count: 5,
+            tier: testOrg.tier,
+            failure_type: 'qdrant_connection',
+            timeout_ms: 5000,
+          },
+        });
 
-      console.log(`✓ Permanent failure logged to error_logs`)
-    } catch (logError) {
-      console.error(`❌ Failed to log permanent failure:`, logError)
-      throw logError
-    }
+        console.log(`✓ Permanent failure logged to error_logs`);
+      } catch (logError) {
+        console.error(`❌ Failed to log permanent failure:`, logError);
+        throw logError;
+      }
 
-    // Wait a moment for database write to complete (increased for reliability)
-    await new Promise(resolve => setTimeout(resolve, 2000))
+      // Wait a moment for database write to complete (increased for reliability)
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // ============================================================================
-    // THEN: Verify error_logs entry exists and is complete
-    // ============================================================================
+      // ============================================================================
+      // THEN: Verify error_logs entry exists and is complete
+      // ============================================================================
 
-    // Query error_logs table for organization_id
-    const { data: errorLogs, error: errorLogsError } = await supabaseAdmin
-      .from('error_logs')
-      .select('*')
-      .eq('organization_id', testOrg.id)
-      .eq('job_id', jobId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    // Assert: error_logs query succeeds
-    expect(errorLogsError).toBeNull()
-    expect(errorLogs).toBeDefined()
-
-    // Add debug logging if no error logs found
-    if (!errorLogs || errorLogs.length === 0) {
-      console.error(`❌ No error logs found for org ${testOrg.id} and job ${jobId}`)
-      console.error(`   Querying all error_logs for this org...`)
-      const { data: allOrgLogs } = await supabaseAdmin
+      // Query error_logs table for organization_id
+      const { data: errorLogs, error: errorLogsError } = await supabaseAdmin
         .from('error_logs')
         .select('*')
         .eq('organization_id', testOrg.id)
-      console.error(`   Found ${allOrgLogs?.length || 0} error logs for this org`)
-      if (allOrgLogs && allOrgLogs.length > 0) {
-        console.error(`   Latest error log job_id: ${allOrgLogs[0].job_id}`)
-        console.error(`   Expected job_id: ${jobId}`)
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      // Assert: error_logs query succeeds
+      expect(errorLogsError).toBeNull();
+      expect(errorLogs).toBeDefined();
+
+      // Add debug logging if no error logs found
+      if (!errorLogs || errorLogs.length === 0) {
+        console.error(`❌ No error logs found for org ${testOrg.id} and job ${jobId}`);
+        console.error(`   Querying all error_logs for this org...`);
+        const { data: allOrgLogs } = await supabaseAdmin
+          .from('error_logs')
+          .select('*')
+          .eq('organization_id', testOrg.id);
+        console.error(`   Found ${allOrgLogs?.length || 0} error logs for this org`);
+        if (allOrgLogs && allOrgLogs.length > 0) {
+          console.error(`   Latest error log job_id: ${allOrgLogs[0].job_id}`);
+          console.error(`   Expected job_id: ${jobId}`);
+        }
       }
-    }
 
-    expect(errorLogs!.length).toBeGreaterThan(0)
+      expect(errorLogs!.length).toBeGreaterThan(0);
 
-    const errorLog = errorLogs![0]
+      const errorLog = errorLogs![0];
 
-    console.log(`✓ Error log entry found (ID: ${errorLog.id})`)
+      console.log(`✓ Error log entry found (ID: ${errorLog.id})`);
 
-    // Assert: error_logs entry exists
-    expect(errorLog).toBeDefined()
-    expect(errorLog.id).toBeDefined()
-    expect(errorLog.created_at).toBeDefined()
+      // Assert: error_logs entry exists
+      expect(errorLog).toBeDefined();
+      expect(errorLog.id).toBeDefined();
+      expect(errorLog.created_at).toBeDefined();
 
-    // Assert: severity is ERROR or CRITICAL
-    expect(['ERROR', 'CRITICAL']).toContain(errorLog.severity)
-    console.log(`✓ Severity: ${errorLog.severity}`)
+      // Assert: severity is ERROR or CRITICAL
+      expect(['ERROR', 'CRITICAL']).toContain(errorLog.severity);
+      console.log(`✓ Severity: ${errorLog.severity}`);
 
-    // Assert: error_message contains descriptive text
-    expect(errorLog.error_message).toBeDefined()
-    expect(errorLog.error_message).toContain('Qdrant')
-    expect(errorLog.error_message).toContain('retry')
-    console.log(`✓ Error message: ${errorLog.error_message}`)
+      // Assert: error_message contains descriptive text
+      expect(errorLog.error_message).toBeDefined();
+      expect(errorLog.error_message).toContain('Qdrant');
+      expect(errorLog.error_message).toContain('retry');
+      console.log(`✓ Error message: ${errorLog.error_message}`);
 
-    // Assert: stack_trace is populated
-    expect(errorLog.stack_trace).toBeDefined()
-    expect(errorLog.stack_trace).not.toBe('')
-    expect(errorLog.stack_trace?.length).toBeGreaterThan(0)
-    console.log(`✓ Stack trace populated (${errorLog.stack_trace?.length} characters)`)
+      // Assert: stack_trace is populated
+      expect(errorLog.stack_trace).toBeDefined();
+      expect(errorLog.stack_trace).not.toBe('');
+      expect(errorLog.stack_trace?.length).toBeGreaterThan(0);
+      console.log(`✓ Stack trace populated (${errorLog.stack_trace?.length} characters)`);
 
-    // Assert: file metadata is populated
-    expect(errorLog.file_name).toBe(filename)
-    expect(errorLog.file_size).toBe(file!.file_size)
-    expect(errorLog.file_format).toBe(mimeType)
-    console.log(`✓ File metadata: ${errorLog.file_name} (${errorLog.file_size} bytes, ${errorLog.file_format})`)
+      // Assert: file metadata is populated
+      expect(errorLog.file_name).toBe(filename);
+      expect(errorLog.file_size).toBe(file!.file_size);
+      expect(errorLog.file_format).toBe(mimeType);
+      console.log(
+        `✓ File metadata: ${errorLog.file_name} (${errorLog.file_size} bytes, ${errorLog.file_format})`
+      );
 
-    // Assert: user_id and organization_id are populated
-    expect(errorLog.user_id).toBe(testUser.id)
-    expect(errorLog.organization_id).toBe(testOrg.id)
-    console.log(`✓ User ID: ${errorLog.user_id}`)
-    console.log(`✓ Organization ID: ${errorLog.organization_id}`)
+      // Assert: user_id and organization_id are populated
+      expect(errorLog.user_id).toBe(testUser.id);
+      expect(errorLog.organization_id).toBe(testOrg.id);
+      console.log(`✓ User ID: ${errorLog.user_id}`);
+      console.log(`✓ Organization ID: ${errorLog.organization_id}`);
 
-    // Assert: job_id matches BullMQ job ID
-    expect(errorLog.job_id).toBe(jobId)
-    console.log(`✓ Job ID matches: ${errorLog.job_id}`)
+      // Assert: job_id matches BullMQ job ID
+      expect(errorLog.job_id).toBe(jobId);
+      console.log(`✓ Job ID matches: ${errorLog.job_id}`);
 
-    // Assert: job_type is correct
-    expect(errorLog.job_type).toBe('DOCUMENT_PROCESSING')
-    console.log(`✓ Job type: ${errorLog.job_type}`)
+      // Assert: job_type is correct
+      expect(errorLog.job_type).toBe('DOCUMENT_PROCESSING');
+      console.log(`✓ Job type: ${errorLog.job_type}`);
 
-    // Assert: metadata contains retry information
-    expect(errorLog.metadata).toBeDefined()
-    expect(errorLog.metadata).toHaveProperty('retry_count')
-    expect(errorLog.metadata).toHaveProperty('tier')
-    expect(errorLog.metadata).toHaveProperty('failure_type')
-    expect((errorLog.metadata as any).retry_count).toBe(5)
-    expect((errorLog.metadata as any).tier).toBe(testOrg.tier)
-    console.log(`✓ Metadata: ${JSON.stringify(errorLog.metadata, null, 2)}`)
+      // Assert: metadata contains retry information
+      expect(errorLog.metadata).toBeDefined();
+      expect(errorLog.metadata).toHaveProperty('retry_count');
+      expect(errorLog.metadata).toHaveProperty('tier');
+      expect(errorLog.metadata).toHaveProperty('failure_type');
+      expect((errorLog.metadata as any).retry_count).toBe(5);
+      expect((errorLog.metadata as any).tier).toBe(testOrg.tier);
+      console.log(`✓ Metadata: ${JSON.stringify(errorLog.metadata, null, 2)}`);
 
-    // ============================================================================
-    // Cleanup
-    // ============================================================================
+      // ============================================================================
+      // Cleanup
+      // ============================================================================
 
-    // Delete error log entry (for test isolation)
-    await supabaseAdmin
-      .from('error_logs')
-      .delete()
-      .eq('id', errorLog.id)
+      // Delete error log entry (for test isolation)
+      await supabaseAdmin.from('error_logs').delete().eq('id', errorLog.id);
 
-    // Delete file from file_catalog
-    await supabaseAdmin
-      .from('file_catalog')
-      .delete()
-      .eq('id', fileId)
+      // Delete file from file_catalog
+      await supabaseAdmin.from('file_catalog').delete().eq('id', fileId);
 
-    console.log(`✅ T030 COMPLETE: Error logging validation passed`)
-    console.log(`   - error_logs entry created successfully`)
-    console.log(`   - All required fields populated correctly`)
-    console.log(`   - Severity: ${errorLog.severity}`)
-    console.log(`   - File metadata preserved`)
-    console.log(`   - Job metadata preserved`)
-    console.log(`   - Validates FR-020 error_logs schema compliance`)
-  }, TEST_TIMEOUTS.documentProcessing) // 60 seconds (includes PDF processing and async logging)
-})
+      console.log(`✅ T030 COMPLETE: Error logging validation passed`);
+      console.log(`   - error_logs entry created successfully`);
+      console.log(`   - All required fields populated correctly`);
+      console.log(`   - Severity: ${errorLog.severity}`);
+      console.log(`   - File metadata preserved`);
+      console.log(`   - Job metadata preserved`);
+      console.log(`   - Validates FR-020 error_logs schema compliance`);
+    },
+    TEST_TIMEOUTS.documentProcessing
+  ); // 60 seconds (includes PDF processing and async logging)
+});

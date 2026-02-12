@@ -6,6 +6,8 @@
  * Schema matches: specs/003-stage-2-implementation/data-model.md lines 32-105
  */
 
+import type { Json } from '@megacampus/shared-types';
+
 /**
  * Error severity levels
  */
@@ -14,7 +16,7 @@ export type ErrorSeverity = 'WARNING' | 'ERROR' | 'CRITICAL';
 /**
  * Environment type for tracking where the error occurred
  */
-export type LogEnvironment = 'dev' | 'stage';
+export type LogEnvironment = 'dev' | 'stage' | 'test';
 
 /**
  * Complete error_logs table record
@@ -49,7 +51,7 @@ export interface ErrorLog {
   /** Job type (e.g., DOCUMENT_PROCESSING) (nullable) */
   job_type: string | null;
   /** Additional metadata as JSONB (nullable) */
-  metadata: Record<string, unknown> | null;
+  metadata: Json | null;
   /** Course ID for course-related errors */
   course_id: string | null;
   /** Lesson ID for lesson-related errors */
@@ -59,7 +61,7 @@ export interface ErrorLog {
   /** tRPC procedure path */
   trpc_path: string | null;
   /** Sanitized tRPC input */
-  trpc_input: Record<string, unknown> | null;
+  trpc_input: Json | null;
   /** Value that caused error (e.g. invalid status) */
   attempted_value: string | null;
 }
@@ -192,7 +194,7 @@ export interface CreateErrorLogParams {
   /** Job type (e.g., DOCUMENT_PROCESSING) (optional) */
   job_type?: string;
   /** Additional metadata (optional) */
-  metadata?: Record<string, unknown>;
+  metadata?: Json;
   /** Course ID for course-related errors */
   course_id?: string;
   /** Lesson ID for lesson-related errors */
@@ -202,7 +204,7 @@ export interface CreateErrorLogParams {
   /** tRPC procedure path */
   trpc_path?: string;
   /** Sanitized tRPC input */
-  trpc_input?: Record<string, unknown>;
+  trpc_input?: Json;
   /** Value that caused the error */
   attempted_value?: string;
 }

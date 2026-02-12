@@ -34,12 +34,10 @@ import {
 } from '../../stages/stage3-classification/phases/phase-classification';
 
 // Import budget allocation functions
-import {
-  calculateBudgetAllocation,
-} from '../../shared/budget/budget-allocator';
+import { calculateBudgetAllocation } from '../../shared/budget/budget-allocator';
 
 // Import shared types
-import type { BudgetAllocation } from '@megacampus/shared-types';
+import type { BudgetAllocation, Json } from '@megacampus/shared-types';
 
 // ============================================================================
 // Input Schemas
@@ -105,12 +103,15 @@ async function verifyCourseAccess(
     .single();
 
   if (error || !course) {
-    logger.warn({
-      requestId,
-      courseId,
-      organizationId,
-      error,
-    }, 'Course not found or access denied');
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        organizationId,
+        error,
+      },
+      'Course not found or access denied'
+    );
 
     throw new TRPCError({
       code: 'NOT_FOUND',
@@ -143,7 +144,7 @@ async function getCourseFileIds(courseId: string): Promise<string[]> {
     });
   }
 
-  return files?.map((f) => f.id) || [];
+  return files?.map(f => f.id) || [];
 }
 
 // ============================================================================
@@ -207,12 +208,15 @@ export const courseRouter = router({
       const currentUser = ctx.user;
       const organizationId = currentUser.organizationId;
 
-      logger.info({
-        requestId,
-        courseId,
-        userId: currentUser.id,
-        organizationId,
-      }, 'Document classification request');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          userId: currentUser.id,
+          organizationId,
+        },
+        'Document classification request'
+      );
 
       try {
         // Step 1: Verify course access
@@ -228,11 +232,14 @@ export const courseRouter = router({
           });
         }
 
-        logger.info({
-          requestId,
-          courseId,
-          fileCount: fileIds.length,
-        }, 'Starting document classification');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            fileCount: fileIds.length,
+          },
+          'Starting document classification'
+        );
 
         // Step 3: Execute document classification
         const classifications = await executeDocumentClassification(
@@ -242,20 +249,19 @@ export const courseRouter = router({
         );
 
         // Step 4: Calculate summary statistics
-        const highPriorityCount = classifications.filter(
-          (c) => c.priority === 'HIGH'
-        ).length;
-        const lowPriorityCount = classifications.filter(
-          (c) => c.priority === 'LOW'
-        ).length;
+        const highPriorityCount = classifications.filter(c => c.priority === 'HIGH').length;
+        const lowPriorityCount = classifications.filter(c => c.priority === 'LOW').length;
 
-        logger.info({
-          requestId,
-          courseId,
-          totalClassified: classifications.length,
-          highPriorityCount,
-          lowPriorityCount,
-        }, 'Document classification completed');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            totalClassified: classifications.length,
+            highPriorityCount,
+            lowPriorityCount,
+          },
+          'Document classification completed'
+        );
 
         return {
           classifications,
@@ -270,11 +276,14 @@ export const courseRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Document classification failed');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Document classification failed'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -332,11 +341,14 @@ export const courseRouter = router({
           (a, b) => b.importance_score - a.importance_score
         );
 
-        logger.debug({
-          requestId,
-          courseId,
-          totalDocuments: sortedPriorities.length,
-        }, 'Retrieved document priorities');
+        logger.debug(
+          {
+            requestId,
+            courseId,
+            totalDocuments: sortedPriorities.length,
+          },
+          'Retrieved document priorities'
+        );
 
         return {
           priorities: sortedPriorities,
@@ -349,11 +361,14 @@ export const courseRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Failed to get document priorities');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Failed to get document priorities'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -414,12 +429,15 @@ export const courseRouter = router({
       const currentUser = ctx.user;
       const organizationId = currentUser.organizationId;
 
-      logger.info({
-        requestId,
-        courseId,
-        userId: currentUser.id,
-        organizationId,
-      }, 'Budget allocation request');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          userId: currentUser.id,
+          organizationId,
+        },
+        'Budget allocation request'
+      );
 
       try {
         // Step 1: Verify course access
@@ -428,15 +446,18 @@ export const courseRouter = router({
         // Step 2: Calculate budget allocation
         const allocation = await calculateBudgetAllocation(courseId);
 
-        logger.info({
-          requestId,
-          courseId,
-          selectedModel: allocation.selected_model,
-          highBudget: allocation.high_budget,
-          lowBudget: allocation.low_budget,
-          totalHighTokens: allocation.total_high_priority_tokens,
-          totalLowTokens: allocation.total_low_priority_tokens,
-        }, 'Budget allocation completed');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            selectedModel: allocation.selected_model,
+            highBudget: allocation.high_budget,
+            lowBudget: allocation.low_budget,
+            totalHighTokens: allocation.total_high_priority_tokens,
+            totalLowTokens: allocation.total_low_priority_tokens,
+          },
+          'Budget allocation completed'
+        );
 
         return {
           allocation,
@@ -448,11 +469,14 @@ export const courseRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Budget allocation failed');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Budget allocation failed'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -516,11 +540,14 @@ export const courseRouter = router({
         const cachedAllocation = settings?.budget_allocation as BudgetAllocation | undefined;
 
         if (cachedAllocation && cachedAllocation.course_id === courseId) {
-          logger.debug({
-            requestId,
-            courseId,
-            cached: true,
-          }, 'Retrieved cached budget allocation');
+          logger.debug(
+            {
+              requestId,
+              courseId,
+              cached: true,
+            },
+            'Retrieved cached budget allocation'
+          );
 
           return {
             allocation: cachedAllocation,
@@ -542,18 +569,20 @@ export const courseRouter = router({
           budget_allocation: allocationForStorage,
         };
 
-        // Type assertion needed because JSONB settings can have arbitrary shape
-        await (supabase as any)
+        await supabase
           .from('courses')
-          .update({ settings: updatedSettings })
+          .update({ settings: updatedSettings as Json })
           .eq('id', courseId);
 
-        logger.info({
-          requestId,
-          courseId,
-          cached: false,
-          selectedModel: allocation.selected_model,
-        }, 'Calculated and cached budget allocation');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            cached: false,
+            selectedModel: allocation.selected_model,
+          },
+          'Calculated and cached budget allocation'
+        );
 
         return {
           allocation,
@@ -566,11 +595,14 @@ export const courseRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Failed to get budget allocation');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Failed to get budget allocation'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

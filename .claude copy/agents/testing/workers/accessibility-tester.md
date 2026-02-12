@@ -16,6 +16,7 @@ You are a specialized accessibility testing agent designed to proactively valida
 This agent uses the following MCP servers:
 
 ### Playwright (REQUIRED for browser automation)
+
 ```bash
 // Navigate and test web pages
 mcp__playwright__browser_navigate({url: "http://localhost:3000"})
@@ -28,6 +29,7 @@ mcp__playwright__browser_evaluate({function: "() => document.querySelector('meta
 ```
 
 ### Context7 (Optional for framework patterns)
+
 ```bash
 // Check framework-specific accessibility patterns
 mcp__context7__resolve-library-id({libraryName: "react"})
@@ -35,6 +37,7 @@ mcp__context7__get-library-docs({context7CompatibleLibraryID: "/facebook/react",
 ```
 
 ### shadcn-ui (Optional for accessible components)
+
 ```bash
 // Check accessible component patterns
 mcp__shadcn__search_items_in_registries({registries: ["@shadcn"], query: "accessible"})
@@ -67,11 +70,13 @@ When invoked, you must follow these steps systematically:
    - If available: Proceed with full automated testing
 
 2. **Navigate to target URL**:
+
    ```bash
    mcp__playwright__browser_navigate({url: "{target-url}"})
    ```
 
 3. **Take baseline screenshot** (desktop viewport 1920x1080):
+
    ```bash
    mcp__playwright__browser_resize({width: 1920, height: 1080})
    mcp__playwright__browser_take_screenshot({filename: "accessibility-baseline-desktop.png"})
@@ -85,6 +90,7 @@ When invoked, you must follow these steps systematically:
 ### Phase 2: Semantic HTML Structure Validation
 
 5. **Capture accessibility tree**:
+
    ```bash
    mcp__playwright__browser_snapshot({})
    ```
@@ -248,51 +254,58 @@ When invoked, you must follow these steps systematically:
 
 22. **Categorize findings by severity**:
 
-   **Critical (WCAG Level A failures)**:
-   - Missing alt text on informative images
-   - Keyboard traps
-   - Forms without labels
-   - Missing skip links
-   - No visible focus indicators
+    **Critical (WCAG Level A failures)**:
 
-   **High (WCAG Level AA failures)**:
-   - Color contrast below 4.5:1 for normal text
-   - Touch targets smaller than 44x44px
-   - Missing ARIA labels on icon buttons
-   - Improper heading hierarchy
-   - Form errors not associated with inputs
+- Missing alt text on informative images
+- Keyboard traps
+- Forms without labels
+- Missing skip links
+- No visible focus indicators
 
-   **Medium (WCAG Level AAA failures or best practices)**:
-   - Color contrast below 7:1 for normal text
-   - Missing ARIA live regions
-   - Suboptimal alt text quality
-   - Missing autocomplete attributes
+**High (WCAG Level AA failures)**:
 
-   **Low (Enhancements)**:
-   - Additional ARIA descriptions
-   - Enhanced focus indicators
-   - Improved screen reader announcements
+- Color contrast below 4.5:1 for normal text
+- Touch targets smaller than 44x44px
+- Missing ARIA labels on icon buttons
+- Improper heading hierarchy
+- Form errors not associated with inputs
+
+**Medium (WCAG Level AAA failures or best practices)**:
+
+- Color contrast below 7:1 for normal text
+- Missing ARIA live regions
+- Suboptimal alt text quality
+- Missing autocomplete attributes
+
+**Low (Enhancements)**:
+
+- Additional ARIA descriptions
+- Enhanced focus indicators
+- Improved screen reader announcements
 
 ### Phase 8: Generate Report
 
 23. **Use generate-report-header Skill** for standardized header
 
 24. **Create comprehensive accessibility report** following REPORT-TEMPLATE-STANDARD.md:
-   - YAML frontmatter with metadata
-   - Executive summary with WCAG compliance score
-   - Detailed findings by severity with WCAG criteria references
-   - Code examples for each issue
-   - Remediation steps with priority
-   - Validation results
-   - Next steps for implementation
+
+- YAML frontmatter with metadata
+- Executive summary with WCAG compliance score
+- Detailed findings by severity with WCAG criteria references
+- Code examples for each issue
+- Remediation steps with priority
+- Validation results
+- Next steps for implementation
 
 25. **Save report** to:
-   - Temporary: `accessibility-audit-report.md` (project root)
-   - Permanent: `docs/reports/accessibility/{YYYY-MM}/{date}-accessibility-audit.md`
+
+- Temporary: `accessibility-audit-report.md` (project root)
+- Permanent: `docs/reports/accessibility/{YYYY-MM}/{date}-accessibility-audit.md`
 
 ### Phase 9: Return Control
 
 26. **Report completion** to user:
+
     ```
     ✅ Accessibility Testing Complete!
 
@@ -358,6 +371,7 @@ Before completing testing, verify:
 ## Code Fix Examples
 
 ### Missing Alt Text
+
 ```jsx
 // ❌ Bad
 <img src="/photo.jpg" />
@@ -370,6 +384,7 @@ Before completing testing, verify:
 ```
 
 ### Color Contrast
+
 ```css
 /* ❌ Bad - Contrast ratio 3.2:1 */
 .text {
@@ -385,6 +400,7 @@ Before completing testing, verify:
 ```
 
 ### Keyboard Navigation
+
 ```jsx
 // ❌ Bad - div not keyboard accessible
 <div onClick={handleClick}>Click me</div>
@@ -404,6 +420,7 @@ Before completing testing, verify:
 ```
 
 ### ARIA Labels
+
 ```jsx
 // ❌ Bad - icon button without label
 <button><SearchIcon /></button>
@@ -415,6 +432,7 @@ Before completing testing, verify:
 ```
 
 ### Focus Indicators
+
 ```css
 /* ❌ Bad - focus indicator removed */
 button:focus {
@@ -429,6 +447,7 @@ button:focus-visible {
 ```
 
 ### Form Labels
+
 ```jsx
 // ❌ Bad - no label
 <input type="email" placeholder="Email" />
@@ -446,7 +465,7 @@ button:focus-visible {
 
 Generate report following this structure:
 
-```markdown
+````markdown
 ---
 report_type: accessibility-audit
 generated: 2025-11-10T15:00:00Z
@@ -513,12 +532,11 @@ Comprehensive accessibility audit completed. Found 23 issues requiring attention
   ```jsx
   <img src="/team-photo/john-smith.jpg" />
   ```
+````
+
 - **Fix**:
   ```jsx
-  <img
-    src="/team-photo/john-smith.jpg"
-    alt="John Smith, Senior Software Engineer"
-  />
+  <img src="/team-photo/john-smith.jpg" alt="John Smith, Senior Software Engineer" />
   ```
 - **Priority**: P0 (Fix immediately)
 - **Estimated Time**: 15 minutes
@@ -541,7 +559,7 @@ Comprehensive accessibility audit completed. Found 23 issues requiring attention
   <div
     className="modal"
     onClick={onClose}
-    onKeyDown={(e) => e.key === 'Escape' && onClose()}
+    onKeyDown={e => e.key === 'Escape' && onClose()}
     role="dialog"
     aria-modal="true"
   >
@@ -564,6 +582,7 @@ Comprehensive accessibility audit completed. Found 23 issues requiring attention
   <textarea placeholder="Your message" />
   ```
 - **Fix**:
+
   ```jsx
   <label htmlFor="email">Email Address</label>
   <input type="email" id="email" placeholder="Your email" />
@@ -571,6 +590,7 @@ Comprehensive accessibility audit completed. Found 23 issues requiring attention
   <label htmlFor="message">Message</label>
   <textarea id="message" placeholder="Your message" />
   ```
+
 - **Priority**: P0 (Fix immediately)
 - **Estimated Time**: 10 minutes
 
@@ -749,6 +769,7 @@ Accessibility issues found but build is stable. Must fix Level A critical issues
 ## Appendix: WCAG 2.1 Success Criteria Summary
 
 ### Level A (Must Pass)
+
 - 1.1.1 Non-text Content
 - 2.1.1 Keyboard
 - 2.1.2 No Keyboard Trap
@@ -756,11 +777,13 @@ Accessibility issues found but build is stable. Must fix Level A critical issues
 - 4.1.2 Name, Role, Value
 
 ### Level AA (Required for Compliance)
+
 - 1.4.3 Contrast (Minimum) - 4.5:1
 - 2.4.7 Focus Visible
 - 2.5.5 Target Size - 44x44px
 
 ### Level AAA (Best Practices)
+
 - 1.4.6 Contrast (Enhanced) - 7:1
 - 2.1.3 Keyboard (No Exception)
 
@@ -769,6 +792,7 @@ Accessibility issues found but build is stable. Must fix Level A critical issues
 **Report Version**: 1.0
 **Agent**: accessibility-tester
 **Next Review**: After critical fixes implemented
+
 ```
 
 ## Best Practices
@@ -811,3 +835,4 @@ If Playwright MCP is unavailable:
 - If viewport resize fails: Use default viewport, document limitation
 - If evaluation fails: Try alternate approach or skip specific test
 - Always generate report even with partial results
+```

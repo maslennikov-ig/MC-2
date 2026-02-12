@@ -1,20 +1,12 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  ChevronDown,
-  ChevronUp,
-  ArrowRight,
-  FileText,
-  Hash,
-  Clock,
-  Cpu,
-  Zap,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { ChevronDown, ChevronUp, ArrowRight, FileText, Hash, Clock, Cpu, Zap } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { formatNumber } from '@megacampus/shared-utils'
 
 /**
  * NodeInputOutput - Input/Output summary for pipeline nodes
@@ -32,35 +24,35 @@ import { cn } from '@/lib/utils';
 
 interface NodeInputOutputProps {
   /** Node type for display - 3-node pipeline: generator, selfReviewer, judge */
-  nodeType: 'generator' | 'selfReviewer' | 'judge';
+  nodeType: 'generator' | 'selfReviewer' | 'judge'
   /** Input data summary */
   input?: {
     /** Primary input description */
-    primary?: string;
+    primary?: string
     /** Secondary details */
-    details?: Array<{ label: string; value: string | number }>;
+    details?: Array<{ label: string; value: string | number }>
     /** Raw input data (optional) */
-    raw?: Record<string, unknown>;
-  };
+    raw?: Record<string, unknown>
+  }
   /** Output data summary */
   output?: {
     /** Primary output description */
-    primary?: string;
+    primary?: string
     /** Secondary details */
-    details?: Array<{ label: string; value: string | number }>;
+    details?: Array<{ label: string; value: string | number }>
     /** Raw output data (optional) */
-    raw?: Record<string, unknown>;
-  };
+    raw?: Record<string, unknown>
+  }
   /** Metrics for the node */
   metrics?: {
-    tokensUsed?: number;
-    durationMs?: number;
-    modelUsed?: string;
-    temperature?: number;
-  };
-  className?: string;
+    tokensUsed?: number
+    durationMs?: number
+    modelUsed?: string
+    temperature?: number
+  }
+  className?: string
   /** Start collapsed */
-  defaultCollapsed?: boolean;
+  defaultCollapsed?: boolean
 }
 
 /**
@@ -70,7 +62,7 @@ const NODE_TYPE_LABELS: Record<string, string> = {
   generator: 'Генератор',
   selfReviewer: 'Самопроверка',
   judge: 'Судья',
-};
+}
 
 /**
  * Node type colors - 3-node pipeline
@@ -79,61 +71,49 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   generator: 'text-indigo-600 dark:text-indigo-400',
   selfReviewer: 'text-teal-600 dark:text-teal-400',
   judge: 'text-red-600 dark:text-red-400',
-};
-
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return num.toString();
 }
 
 function formatDuration(ms: number): string {
   if (ms >= 60000) {
-    return `${(ms / 60000).toFixed(1)}м`;
+    return `${(ms / 60000).toFixed(1)}м`
   }
   if (ms >= 1000) {
-    return `${(ms / 1000).toFixed(1)}с`;
+    return `${(ms / 1000).toFixed(1)}с`
   }
-  return `${ms}мс`;
+  return `${ms}мс`
 }
 
 interface DataSectionProps {
-  title: string;
-  icon: React.ElementType;
-  iconColor: string;
-  primary?: string;
-  details?: Array<{ label: string; value: string | number }>;
-  raw?: Record<string, unknown>;
+  title: string
+  icon: React.ElementType
+  iconColor: string
+  primary?: string
+  details?: Array<{ label: string; value: string | number }>
+  raw?: Record<string, unknown>
 }
 
 function DataSection({ title, icon: Icon, iconColor, primary, details, raw }: DataSectionProps) {
-  const [showRaw, setShowRaw] = useState(false);
+  const [showRaw, setShowRaw] = useState(false)
 
   if (!primary && !details?.length && !raw) {
-    return null;
+    return null
   }
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <Icon className={cn('w-4 h-4', iconColor)} />
+        <Icon className={cn('h-4 w-4', iconColor)} />
         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{title}</span>
       </div>
 
-      {primary && (
-        <p className="text-sm text-slate-600 dark:text-slate-400 pl-6">{primary}</p>
-      )}
+      {primary && <p className="pl-6 text-sm text-slate-600 dark:text-slate-400">{primary}</p>}
 
       {details && details.length > 0 && (
-        <div className="pl-6 grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 pl-6">
           {details.map((detail, idx) => (
             <div key={idx} className="flex items-center gap-2">
               <span className="text-xs text-slate-500">{detail.label}:</span>
-              <Badge variant="outline" className="text-xs font-mono">
+              <Badge variant="outline" className="font-mono text-xs">
                 {typeof detail.value === 'number' ? formatNumber(detail.value) : detail.value}
               </Badge>
             </div>
@@ -145,10 +125,10 @@ function DataSection({ title, icon: Icon, iconColor, primary, details, raw }: Da
         <div className="pl-6">
           <button
             onClick={() => setShowRaw(!showRaw)}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+            className="flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
           >
             {showRaw ? 'Скрыть JSON' : 'Показать JSON'}
-            {showRaw ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {showRaw ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
           <AnimatePresence>
             {showRaw && (
@@ -156,7 +136,7 @@ function DataSection({ title, icon: Icon, iconColor, primary, details, raw }: Da
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded text-xs overflow-auto max-h-48 font-mono"
+                className="mt-2 max-h-48 overflow-auto rounded bg-slate-100 p-2 font-mono text-xs dark:bg-slate-800"
               >
                 {JSON.stringify(raw, null, 2)}
               </motion.pre>
@@ -165,7 +145,7 @@ function DataSection({ title, icon: Icon, iconColor, primary, details, raw }: Da
         </div>
       )}
     </div>
-  );
+  )
 }
 
 export function NodeInputOutput({
@@ -176,34 +156,34 @@ export function NodeInputOutput({
   className,
   defaultCollapsed = false,
 }: NodeInputOutputProps) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed)
 
-  const nodeLabel = NODE_TYPE_LABELS[nodeType] || nodeType;
-  const nodeColor = NODE_TYPE_COLORS[nodeType] || 'text-slate-600';
+  const nodeLabel = NODE_TYPE_LABELS[nodeType] || nodeType
+  const nodeColor = NODE_TYPE_COLORS[nodeType] || 'text-slate-600'
 
   return (
     <Card className={cn('w-full', className)}>
       <CardHeader
-        className="pb-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+        className="cursor-pointer pb-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
         onClick={() => setCollapsed(!collapsed)}
       >
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
             <span className={nodeColor}>{nodeLabel}</span>
-            <ArrowRight className="w-3 h-3 text-slate-400" />
-            <span className="text-slate-500 font-normal">Вход/Выход</span>
+            <ArrowRight className="h-3 w-3 text-slate-400" />
+            <span className="font-normal text-slate-500">Вход/Выход</span>
           </CardTitle>
           <div className="flex items-center gap-2">
             {metrics?.tokensUsed && (
               <Badge variant="outline" className="text-xs">
-                <Zap className="w-3 h-3 mr-1" />
+                <Zap className="mr-1 h-3 w-3" />
                 {formatNumber(metrics.tokensUsed)} токенов
               </Badge>
             )}
             {collapsed ? (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
+              <ChevronDown className="h-4 w-4 text-slate-400" />
             ) : (
-              <ChevronUp className="w-4 h-4 text-slate-400" />
+              <ChevronUp className="h-4 w-4 text-slate-400" />
             )}
           </div>
         </div>
@@ -220,22 +200,22 @@ export function NodeInputOutput({
             <CardContent className="space-y-4 pt-0">
               {/* Metrics Row */}
               {metrics && (
-                <div className="flex flex-wrap gap-2 pb-3 border-b border-slate-200 dark:border-slate-700">
+                <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 dark:border-slate-700">
                   {metrics.modelUsed && (
                     <Badge variant="secondary" className="text-xs">
-                      <Cpu className="w-3 h-3 mr-1" />
+                      <Cpu className="mr-1 h-3 w-3" />
                       {metrics.modelUsed}
                     </Badge>
                   )}
                   {metrics.durationMs !== undefined && (
                     <Badge variant="secondary" className="text-xs">
-                      <Clock className="w-3 h-3 mr-1" />
+                      <Clock className="mr-1 h-3 w-3" />
                       {formatDuration(metrics.durationMs)}
                     </Badge>
                   )}
                   {metrics.temperature !== undefined && (
                     <Badge variant="secondary" className="text-xs">
-                      <Hash className="w-3 h-3 mr-1" />
+                      <Hash className="mr-1 h-3 w-3" />
                       t={metrics.temperature}
                     </Badge>
                   )}
@@ -270,5 +250,5 @@ export function NodeInputOutput({
         )}
       </AnimatePresence>
     </Card>
-  );
+  )
 }

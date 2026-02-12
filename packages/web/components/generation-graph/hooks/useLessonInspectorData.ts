@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSupabase } from '@/lib/supabase/browser-client';
-import { RealtimeChannel } from '@supabase/supabase-js';
-import { logger } from '@/lib/client-logger';
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSupabase } from '@/lib/supabase/browser-client'
+import { RealtimeChannel } from '@supabase/supabase-js'
+import { logger } from '@/lib/client-logger'
 import {
   LessonInspectorData,
   PipelineNodeState,
@@ -17,25 +17,25 @@ import {
   CLEVVotingResult,
   ConsensusMethod,
   SourceDocument,
-} from '@megacampus/shared-types';
-import { isValidSourceDocument } from '../panels/lesson/SourceDocumentsPanel';
-import type { Database } from '@/types/database.generated';
+} from '@megacampus/shared-types'
+import { isValidSourceDocument } from '../panels/lesson/SourceDocumentsPanel'
+import type { Database } from '@/types/database.generated'
 
-type GenerationTraceRow = Database['public']['Tables']['generation_trace']['Row'];
-type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row'];
+type GenerationTraceRow = Database['public']['Tables']['generation_trace']['Row']
+type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 /**
  * Return type for useLessonInspectorData hook
  */
 export interface UseLessonInspectorDataReturn {
   /** Complete lesson inspector data */
-  data: LessonInspectorData | null;
+  data: LessonInspectorData | null
   /** Whether data is being fetched */
-  isLoading: boolean;
+  isLoading: boolean
   /** Fetch error if any */
-  error: Error | null;
+  error: Error | null
   /** Manually refetch data */
-  refetch: () => void;
+  refetch: () => void
 }
 
 /**
@@ -46,26 +46,24 @@ const NODE_PATTERNS: { pattern: RegExp; node: Stage6NodeName }[] = [
   { pattern: /^generator/i, node: 'generator' },
   { pattern: /^selfReviewer/i, node: 'selfReviewer' },
   { pattern: /^judge/i, node: 'judge' },
-  { pattern: /^coverGenerator/i, node: 'coverGenerator' },
-];
+]
 
 /**
  * Map phase field to Stage6NodeName
  * Backend records: phase: 'generator', 'selfReviewer', 'judge', 'init', 'complete'
  */
 const PHASE_TO_NODE_MAP: Record<string, Stage6NodeName> = {
-  'generator': 'generator',
-  'selfreviewer': 'selfReviewer',
-  'judge': 'judge',
-  'covergenerator': 'coverGenerator',
-};
+  generator: 'generator',
+  selfreviewer: 'selfReviewer',
+  judge: 'judge',
+}
 
 /**
  * Get node name from phase field (preferred method)
  */
 function getNodeFromPhase(phase: string | null): Stage6NodeName | null {
-  if (!phase) return null;
-  return PHASE_TO_NODE_MAP[phase.toLowerCase()] || null;
+  if (!phase) return null
+  return PHASE_TO_NODE_MAP[phase.toLowerCase()] || null
 }
 
 /**
@@ -76,84 +74,84 @@ function normalizeStepName(stepName: string): Stage6NodeName | null {
   // Try pattern matching for step names with suffixes
   for (const { pattern, node } of NODE_PATTERNS) {
     if (pattern.test(stepName)) {
-      return node;
+      return node
     }
   }
 
-  return null;
+  return null
 }
 
 /**
  * Determine node status from step_name suffix
  */
 function getStatusFromStepName(stepName: string, trace: GenerationTraceRow): Stage6NodeStatus {
-  const lower = stepName.toLowerCase();
+  const lower = stepName.toLowerCase()
 
   // Priority: explicit suffixes
   if (lower.endsWith('_error') || trace.error_data) {
-    return 'error';
+    return 'error'
   }
   if (lower.endsWith('_complete') || trace.output_data) {
-    return 'completed';
+    return 'completed'
   }
   if (lower.endsWith('_start')) {
-    return 'active';
+    return 'active'
   }
 
   // Fallback based on data presence
-  if (trace.error_data) return 'error';
-  if (trace.output_data) return 'completed';
-  return 'active';
+  if (trace.error_data) return 'error'
+  if (trace.output_data) return 'completed'
+  return 'active'
 }
 
 /**
  * Build pipeline node states from generation traces
  */
 function buildPipelineState(traces: GenerationTraceRow[]): {
-  pipelineNodes: PipelineNodeState[];
-  currentNode: Stage6NodeName | null;
-  totalTokensUsed: number;
-  totalCostUsd: number;
-  totalDurationMs: number;
-  retryCount: number;
+  pipelineNodes: PipelineNodeState[]
+  currentNode: Stage6NodeName | null
+  totalTokensUsed: number
+  totalCostUsd: number
+  totalDurationMs: number
+  retryCount: number
 } {
-  const nodeMap = new Map<Stage6NodeName, PipelineNodeState>();
-  let currentNode: Stage6NodeName | null = null;
-  let totalTokensUsed = 0;
-  let totalCostUsd = 0;
-  let totalDurationMs = 0;
-  let retryCount = 0;
+  const nodeMap = new Map<Stage6NodeName, PipelineNodeState>()
+  let currentNode: Stage6NodeName | null = null
+  let totalTokensUsed = 0
+  let totalCostUsd = 0
+  let totalDurationMs = 0
+  let retryCount = 0
 
   // Sort traces by creation time (oldest first)
   const sortedTraces = [...traces].sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  )
 
   for (const trace of sortedTraces) {
     // Prefer phase field over step_name for node identification
-    const nodeName = getNodeFromPhase(trace.phase) || normalizeStepName(trace.step_name);
-    if (!nodeName) continue;
+    const nodeName = getNodeFromPhase(trace.phase) || normalizeStepName(trace.step_name)
+    if (!nodeName) continue
 
     // Aggregate metrics
-    if (trace.tokens_used) totalTokensUsed += trace.tokens_used;
-    if (trace.cost_usd) totalCostUsd += trace.cost_usd;
-    if (trace.duration_ms) totalDurationMs += trace.duration_ms;
-    if (trace.retry_attempt && trace.retry_attempt > 0) retryCount++;
+    if (trace.tokens_used) totalTokensUsed += trace.tokens_used
+    if (trace.cost_usd) totalCostUsd += trace.cost_usd
+    if (trace.duration_ms) totalDurationMs += trace.duration_ms
+    if (trace.retry_attempt && trace.retry_attempt > 0) retryCount++
 
     // Determine node status from step_name suffix
-    const status = getStatusFromStepName(trace.step_name, trace);
+    const status = getStatusFromStepName(trace.step_name, trace)
 
     // Update or create node state
-    const existingNode = nodeMap.get(nodeName);
+    const existingNode = nodeMap.get(nodeName)
     if (existingNode) {
       // Update existing node (keep completed status if already completed, unless error)
-      let finalStatus: Stage6NodeStatus;
+      let finalStatus: Stage6NodeStatus
       if (status === 'error') {
-        finalStatus = 'error';
+        finalStatus = 'error'
       } else if (existingNode.status === 'completed') {
-        finalStatus = 'completed';
+        finalStatus = 'completed'
       } else {
-        finalStatus = status;
+        finalStatus = status
       }
 
       nodeMap.set(nodeName, {
@@ -166,7 +164,7 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
         errorMessage: trace.error_data ? String(trace.error_data) : existingNode.errorMessage,
         retryAttempt: Math.max(existingNode.retryAttempt || 0, trace.retry_attempt || 0),
         output: trace.output_data || existingNode.output,
-      });
+      })
     } else {
       // Create new node state
       nodeMap.set(nodeName, {
@@ -180,42 +178,42 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
         errorMessage: trace.error_data ? String(trace.error_data) : undefined,
         retryAttempt: trace.retry_attempt || 0,
         output: trace.output_data || undefined,
-      });
+      })
     }
 
     // Track current active node (latest non-completed)
     if (status === 'active' || status === 'error') {
-      currentNode = nodeName;
+      currentNode = nodeName
     }
   }
 
   // Check if there's a "finish" trace indicating pipeline completion
-  const hasFinishTrace = traces.some(t => t.step_name === 'finish' && t.phase === 'complete');
-  const finishTrace = traces.find(t => t.step_name === 'finish' && t.phase === 'complete');
+  const hasFinishTrace = traces.some((t) => t.step_name === 'finish' && t.phase === 'complete')
+  const finishTrace = traces.find((t) => t.step_name === 'finish' && t.phase === 'complete')
 
   // If pipeline finished successfully, mark all "active" nodes as "completed"
   // This handles cases where individual *_complete traces might be missing
-  if (hasFinishTrace && !traces.some(t => t.error_data != null)) {
+  if (hasFinishTrace && !traces.some((t) => t.error_data != null)) {
     for (const [nodeName, nodeState] of nodeMap.entries()) {
       if (nodeState.status === 'active') {
         nodeMap.set(nodeName, {
           ...nodeState,
           status: 'completed',
           completedAt: finishTrace ? new Date(finishTrace.created_at) : nodeState.completedAt,
-        });
+        })
       }
     }
     // Clear current node since pipeline is complete
-    currentNode = null;
+    currentNode = null
   }
 
   // Enrich judge node with data from finish trace if judge_complete is missing
-  const judgeNode = nodeMap.get('judge');
+  const judgeNode = nodeMap.get('judge')
   if (judgeNode && finishTrace?.output_data && typeof finishTrace.output_data === 'object') {
-    const finishOutput = finishTrace.output_data as Record<string, unknown>;
+    const finishOutput = finishTrace.output_data as Record<string, unknown>
     // If judge has no output or incomplete output, populate from finish trace
     if (!judgeNode.output || Object.keys(judgeNode.output as object).length === 0) {
-      const qualityScore = finishOutput.qualityScore as number | undefined;
+      const qualityScore = finishOutput.qualityScore as number | undefined
       nodeMap.set('judge', {
         ...judgeNode,
         output: {
@@ -223,15 +221,15 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
           finalRecommendation: qualityScore !== undefined && qualityScore > 0 ? 'accept' : 'accept',
           modelUsed: finishOutput.modelUsed as string | undefined,
         },
-      });
+      })
     }
   }
 
-  // Convert map to array in pipeline order (4-node pipeline with cover generation)
-  const pipelineOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge', 'coverGenerator'];
+  // Convert map to array in pipeline order (3-node pipeline)
+  const pipelineOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge']
   const pipelineNodes = pipelineOrder
     .map((node) => nodeMap.get(node))
-    .filter((node): node is PipelineNodeState => node !== undefined);
+    .filter((node): node is PipelineNodeState => node !== undefined)
 
   return {
     pipelineNodes,
@@ -240,26 +238,26 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
     totalCostUsd,
     totalDurationMs,
     retryCount,
-  };
+  }
 }
 
 /**
  * Parse lesson content body into preview format
  */
 function parseLessonContent(contentRow: LessonContentRow): LessonContentPreview | null {
-  if (!contentRow.content || typeof contentRow.content !== 'object') return null;
+  if (!contentRow.content || typeof contentRow.content !== 'object') return null
 
-  let contentObj = contentRow.content as Record<string, unknown>;
+  let contentObj = contentRow.content as Record<string, unknown>
 
   // Handle nested structure: {status, content: {...}, metadata: {...}}
   if (contentObj.content && typeof contentObj.content === 'object') {
-    contentObj = contentObj.content as Record<string, unknown>;
+    contentObj = contentObj.content as Record<string, unknown>
   }
 
-  const intro = contentObj.intro as string | undefined;
-  const sections = contentObj.sections as Array<Record<string, unknown>> | undefined;
-  const summary = contentObj.summary as string | undefined;
-  const exercises = contentObj.exercises as Array<unknown> | undefined;
+  const intro = contentObj.intro as string | undefined
+  const sections = contentObj.sections as Array<Record<string, unknown>> | undefined
+  const summary = contentObj.summary as string | undefined
+  const exercises = contentObj.exercises as Array<unknown> | undefined
 
   return {
     introduction: intro || '',
@@ -271,15 +269,15 @@ function parseLessonContent(contentRow: LessonContentRow): LessonContentPreview 
       })) || [],
     summary: summary || '',
     exerciseCount: exercises?.length || 0,
-  };
+  }
 }
 
 /**
  * Truncate content to max length
  */
 function truncateContent(content: string, maxLength: number): string {
-  if (content.length <= maxLength) return content;
-  return content.substring(0, maxLength) + '...';
+  if (content.length <= maxLength) return content
+  return content.substring(0, maxLength) + '...'
 }
 
 /**
@@ -287,22 +285,22 @@ function truncateContent(content: string, maxLength: number): string {
  */
 function extractKeyPoints(content: string): string[] {
   // Extract bullet points or numbered lists
-  const lines = content.split('\n');
-  const keyPoints: string[] = [];
+  const lines = content.split('\n')
+  const keyPoints: string[] = []
 
   for (const line of lines) {
-    const trimmed = line.trim();
+    const trimmed = line.trim()
     // Match bullet points (-, *, +) or numbered lists (1., 2., etc.)
     if (/^[-*+]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
-      const point = trimmed.replace(/^[-*+\d.]\s+/, '').trim();
+      const point = trimmed.replace(/^[-*+\d.]\s+/, '').trim()
       if (point.length > 0 && point.length < 200) {
-        keyPoints.push(point);
+        keyPoints.push(point)
       }
     }
-    if (keyPoints.length >= 5) break; // Limit to 5 key points
+    if (keyPoints.length >= 5) break // Limit to 5 key points
   }
 
-  return keyPoints;
+  return keyPoints
 }
 
 /**
@@ -319,83 +317,83 @@ function extractKeyPoints(content: string): string[] {
 function buildMarkdownFromContent(content: Record<string, unknown>): string {
   // Case 1: Check for raw markdown in common locations
   if (content.markdown && typeof content.markdown === 'string') {
-    return content.markdown;
+    return content.markdown
   }
   if (content.rawMarkdown && typeof content.rawMarkdown === 'string') {
-    return content.rawMarkdown;
+    return content.rawMarkdown
   }
   if (content.raw_markdown && typeof content.raw_markdown === 'string') {
-    return content.raw_markdown;
+    return content.raw_markdown
   }
   // Check for text field (some content formats use this)
   if (content.text && typeof content.text === 'string') {
-    return content.text;
+    return content.text
   }
 
   // Case 2: Structured content
-  const sections = content.sections as Array<Record<string, unknown>> | undefined;
-  const exercises = content.exercises as Array<Record<string, unknown>> | undefined;
+  const sections = content.sections as Array<Record<string, unknown>> | undefined
+  const exercises = content.exercises as Array<Record<string, unknown>> | undefined
 
   // Pre-allocate array capacity: intro + sections*2 + summary + exercises*3
-  const estimatedSize = 1 + (sections?.length || 0) * 2 + 1 + (exercises?.length || 0) * 3;
-  const parts: string[] = [];
-  parts.length = estimatedSize; // Pre-allocate
-  let idx = 0;
+  const estimatedSize = 1 + (sections?.length || 0) * 2 + 1 + (exercises?.length || 0) * 3
+  const parts: string[] = []
+  parts.length = estimatedSize // Pre-allocate
+  let idx = 0
 
   // Introduction (check both 'intro' and 'introduction')
-  const intro = content.intro || content.introduction;
+  const intro = content.intro || content.introduction
   if (intro && typeof intro === 'string') {
-    parts[idx++] = `## Введение\n\n${intro}`;
+    parts[idx++] = `## Введение\n\n${intro}`
   }
 
   // Main content (if present as a separate field)
   if (content.mainContent && typeof content.mainContent === 'string') {
-    parts[idx++] = `## Основной контент\n\n${content.mainContent}`;
+    parts[idx++] = `## Основной контент\n\n${content.mainContent}`
   }
   if (content.main_content && typeof content.main_content === 'string') {
-    parts[idx++] = `## Основной контент\n\n${content.main_content}`;
+    parts[idx++] = `## Основной контент\n\n${content.main_content}`
   }
 
   // Sections
   if (sections && Array.isArray(sections)) {
     for (const section of sections) {
       if (section.title && typeof section.title === 'string') {
-        parts[idx++] = `\n## ${section.title}\n`;
+        parts[idx++] = `\n## ${section.title}\n`
       }
       if (section.content && typeof section.content === 'string') {
-        parts[idx++] = section.content;
+        parts[idx++] = section.content
       }
     }
   }
 
   // Summary
   if (content.summary && typeof content.summary === 'string') {
-    parts[idx++] = `\n## Заключение\n${content.summary}`;
+    parts[idx++] = `\n## Заключение\n${content.summary}`
   }
 
   // Exercises
   if (exercises && Array.isArray(exercises)) {
-    parts[idx++] = '\n## Упражнения\n';
+    parts[idx++] = '\n## Упражнения\n'
     for (const exercise of exercises) {
       if (exercise.title && typeof exercise.title === 'string') {
-        parts[idx++] = `### ${exercise.title}`;
+        parts[idx++] = `### ${exercise.title}`
       }
       if (exercise.description && typeof exercise.description === 'string') {
-        parts[idx++] = exercise.description;
+        parts[idx++] = exercise.description
       }
     }
   }
 
   // Trim to actual size and join
-  parts.length = idx;
-  const result = parts.join('\n\n');
+  parts.length = idx
+  const result = parts.join('\n\n')
 
   // Case 3: If no structured content found, check for body field as fallback
   if (!result && content.body && typeof content.body === 'string') {
-    return content.body;
+    return content.body
   }
 
-  return result;
+  return result
 }
 
 /**
@@ -413,73 +411,83 @@ function parseJudgeResult(
   traces: GenerationTraceRow[]
 ): JudgeVerdictDisplay | null {
   // Try to extract judge result from metadata
-  const metadata = contentRow.metadata as Record<string, unknown> | null;
-  const qualityScore = (metadata?.quality_score as number | undefined);
+  const metadata = contentRow.metadata as Record<string, unknown> | null
+  const qualityScore = metadata?.quality_score as number | undefined
 
   // Find judge traces (prefer phase field, fallback to step_name pattern)
   const judgeTraces = traces.filter(
-    (t) => (getNodeFromPhase(t.phase) === 'judge' || normalizeStepName(t.step_name) === 'judge') && t.output_data
-  );
+    (t) =>
+      (getNodeFromPhase(t.phase) === 'judge' || normalizeStepName(t.step_name) === 'judge') &&
+      t.output_data
+  )
 
   if (judgeTraces.length === 0) {
     // No judge traces found in generation traces
-    return null;
+    return null
   }
 
   // Use latest judge trace
-  const latestJudge = judgeTraces[judgeTraces.length - 1];
-  const judgeOutput = latestJudge.output_data as Record<string, unknown> | null;
+  const latestJudge = judgeTraces[judgeTraces.length - 1]
+  const judgeOutput = latestJudge.output_data as Record<string, unknown> | null
 
-  if (!judgeOutput) return null;
+  if (!judgeOutput) return null
 
   // Extract enriched cascade data (new format)
-  const cascadeStage = judgeOutput.cascadeStage as string | undefined;
-  const heuristicsData = judgeOutput.heuristics as Record<string, unknown> | undefined;
+  const cascadeStage = judgeOutput.cascadeStage as string | undefined
+  const heuristicsData = judgeOutput.heuristics as Record<string, unknown> | undefined
 
   // Judge result parsed successfully
 
   // Parse CLEV voting result (handles both old and new formats)
-  const votingResult = parseVotingResult(judgeOutput, qualityScore || 0, cascadeStage);
+  const votingResult = parseVotingResult(judgeOutput, qualityScore || 0, cascadeStage)
 
   // Parse heuristics with fallback to old format
-  const heuristicsPassed = heuristicsData?.passed as boolean ??
-    (judgeOutput.heuristics_passed as boolean) ?? true;
+  const heuristicsPassed =
+    (heuristicsData?.passed as boolean) ?? (judgeOutput.heuristics_passed as boolean) ?? true
 
-  const heuristicsIssues = (heuristicsData?.failureReasons as string[]) ??
-    (judgeOutput.heuristics_issues as string[]) ?? [];
+  const heuristicsIssues =
+    (heuristicsData?.failureReasons as string[]) ??
+    (judgeOutput.heuristics_issues as string[]) ??
+    []
 
   // Parse highlighted sections (from verdict issues)
   const highlightedSections =
-    (judgeOutput.highlighted_sections as Array<Record<string, unknown>>) ?? [];
+    (judgeOutput.highlighted_sections as Array<Record<string, unknown>>) ?? []
 
   // Parse single judge result for cascade stage visibility
-  const singleJudgeData = judgeOutput.singleJudge as Record<string, unknown> | undefined;
-  const singleJudgeResult = singleJudgeData ? {
-    model: (singleJudgeData.model as string) || 'unknown',
-    score: (singleJudgeData.score as number) || 0,
-    confidence: (singleJudgeData.confidence as 'high' | 'medium' | 'low') || 'medium',
-    criteriaScores: singleJudgeData.criteriaScores as Record<string, number> | undefined,
-    issues: singleJudgeData.issues as Array<{
-      criterion: string;
-      severity: string;
-      location?: string;
-      description: string;
-      suggestedFix?: string;
-    }> | undefined,
-    strengths: singleJudgeData.strengths as string[] | undefined,
-    recommendation: (singleJudgeData.recommendation as string) || 'ACCEPT',
-  } : undefined;
+  const singleJudgeData = judgeOutput.singleJudge as Record<string, unknown> | undefined
+  const singleJudgeResult = singleJudgeData
+    ? {
+        model: (singleJudgeData.model as string) || 'unknown',
+        score: (singleJudgeData.score as number) || 0,
+        confidence: (singleJudgeData.confidence as 'high' | 'medium' | 'low') || 'medium',
+        criteriaScores: singleJudgeData.criteriaScores as Record<string, number> | undefined,
+        issues: singleJudgeData.issues as
+          | Array<{
+              criterion: string
+              severity: string
+              location?: string
+              description: string
+              suggestedFix?: string
+            }>
+          | undefined,
+        strengths: singleJudgeData.strengths as string[] | undefined,
+        recommendation: (singleJudgeData.recommendation as string) || 'ACCEPT',
+      }
+    : undefined
 
   // Parse heuristics result for cascade stage visibility
-  const heuristicsResult = heuristicsData ? {
-    passed: (heuristicsData.passed as boolean) ?? true,
-    wordCount: heuristicsData.wordCount as number | undefined,
-    fleschKincaid: heuristicsData.fleschKincaid as number | undefined,
-    fleschKincaidSkipped: heuristicsData.fleschKincaidSkipped as boolean | undefined,
-    examplesCount: heuristicsData.examplesCount as number | undefined,
-    exercisesCount: heuristicsData.exercisesCount as number | undefined,
-    failureReasons: (heuristicsData.failureReasons as string[]) || [],
-  } : undefined;
+  const heuristicsResult = heuristicsData
+    ? {
+        passed: (heuristicsData.passed as boolean) ?? true,
+        wordCount: heuristicsData.wordCount as number | undefined,
+        fleschKincaid: heuristicsData.fleschKincaid as number | undefined,
+        fleschKincaidSkipped: heuristicsData.fleschKincaidSkipped as boolean | undefined,
+        examplesCount: heuristicsData.examplesCount as number | undefined,
+        exercisesCount: heuristicsData.exercisesCount as number | undefined,
+        failureReasons: (heuristicsData.failureReasons as string[]) || [],
+      }
+    : undefined
 
   return {
     votingResult,
@@ -495,7 +503,7 @@ function parseJudgeResult(
     cascadeStage: cascadeStage as 'heuristic' | 'single_judge' | 'clev_voting' | undefined,
     singleJudgeResult,
     heuristicsResult,
-  };
+  }
 }
 
 /**
@@ -513,10 +521,10 @@ function parseVotingResult(
   qualityScore: number,
   cascadeStage?: string
 ): CLEVVotingResult {
-  const votes = (judgeOutput.votes as Array<Record<string, unknown>>) ?? [];
-  let parsedVotes: IndividualJudgeVote[] = [];
-  let consensusMethod: ConsensusMethod = 'unanimous';
-  let finalVerdict: JudgeVerdictType = determineVerdict(qualityScore);
+  const votes = (judgeOutput.votes as Array<Record<string, unknown>>) ?? []
+  let parsedVotes: IndividualJudgeVote[] = []
+  let consensusMethod: ConsensusMethod = 'unanimous'
+  let finalVerdict: JudgeVerdictType = determineVerdict(qualityScore)
 
   // Processing cascade stage voting result
 
@@ -525,52 +533,57 @@ function parseVotingResult(
     if (cascadeStage === 'heuristic') {
       // Heuristic stage - creating synthetic vote
       // Heuristic stage: create synthetic vote indicating heuristic failure
-      const heuristicIssues = (judgeOutput.heuristics_issues as string[]) ?? [];
+      const heuristicIssues = (judgeOutput.heuristics_issues as string[]) ?? []
 
-      parsedVotes = [{
-        judgeId: 'heuristic-filter',
-        modelId: 'heuristic',
-        modelDisplayName: 'Heuristic Filter',
-        verdict: 'REGENERATE',
-        score: 0,
-        criteria: {
-          coherence: 0,
-          accuracy: 0,
-          completeness: 0,
-          readability: 0,
+      parsedVotes = [
+        {
+          judgeId: 'heuristic-filter',
+          modelId: 'heuristic',
+          modelDisplayName: 'Heuristic Filter',
+          verdict: 'REGENERATE',
+          score: 0,
+          criteria: {
+            coherence: 0,
+            accuracy: 0,
+            completeness: 0,
+            readability: 0,
+          },
+          reasoning:
+            heuristicIssues.length > 0
+              ? `Failed heuristic checks: ${heuristicIssues.join(', ')}`
+              : 'Content failed heuristic validation',
+          evaluatedAt: new Date(),
         },
-        reasoning: heuristicIssues.length > 0
-          ? `Failed heuristic checks: ${heuristicIssues.join(', ')}`
-          : 'Content failed heuristic validation',
-        evaluatedAt: new Date(),
-      }];
+      ]
 
-      consensusMethod = 'unanimous';
-      finalVerdict = 'REGENERATE';
+      consensusMethod = 'unanimous'
+      finalVerdict = 'REGENERATE'
     } else if (cascadeStage === 'single_judge' && judgeOutput.singleJudge) {
       // Single judge stage evaluation
       // Single judge stage: extract verdict from singleJudge object
-      const sj = judgeOutput.singleJudge as Record<string, unknown>;
-      const criteriaScores = sj.criteriaScores as Record<string, number> | undefined;
+      const sj = judgeOutput.singleJudge as Record<string, unknown>
+      const criteriaScores = sj.criteriaScores as Record<string, number> | undefined
 
-      parsedVotes = [{
-        judgeId: 'single-judge',
-        modelId: (sj.model as string) || 'unknown',
-        modelDisplayName: (sj.model as string) || 'Single Judge',
-        verdict: (sj.recommendation as JudgeVerdictType) || determineVerdict(qualityScore),
-        score: (sj.score as number) || qualityScore,
-        criteria: {
-          coherence: criteriaScores?.learning_objective_alignment ?? qualityScore,
-          accuracy: criteriaScores?.factual_accuracy ?? qualityScore,
-          completeness: criteriaScores?.completeness ?? qualityScore,
-          readability: criteriaScores?.clarity_readability ?? qualityScore,
+      parsedVotes = [
+        {
+          judgeId: 'single-judge',
+          modelId: (sj.model as string) || 'unknown',
+          modelDisplayName: (sj.model as string) || 'Single Judge',
+          verdict: (sj.recommendation as JudgeVerdictType) || determineVerdict(qualityScore),
+          score: (sj.score as number) || qualityScore,
+          criteria: {
+            coherence: criteriaScores?.learning_objective_alignment ?? qualityScore,
+            accuracy: criteriaScores?.factual_accuracy ?? qualityScore,
+            completeness: criteriaScores?.completeness ?? qualityScore,
+            readability: criteriaScores?.clarity_readability ?? qualityScore,
+          },
+          reasoning: ((sj.strengths as string[]) || []).join('; ') || undefined,
+          evaluatedAt: new Date(),
         },
-        reasoning: ((sj.strengths as string[]) || []).join('; ') || undefined,
-        evaluatedAt: new Date(),
-      }];
+      ]
 
-      consensusMethod = 'unanimous';
-      finalVerdict = (sj.recommendation as JudgeVerdictType) || determineVerdict(qualityScore);
+      consensusMethod = 'unanimous'
+      finalVerdict = (sj.recommendation as JudgeVerdictType) || determineVerdict(qualityScore)
     } else if (cascadeStage === 'clev_voting' && votes.length > 0) {
       // CLEV voting stage evaluation
       // CLEV voting stage: parse multiple votes
@@ -587,11 +600,12 @@ function parseVotingResult(
           readability: (vote.readability as number) || qualityScore,
         },
         reasoning: vote.reasoning as string | undefined,
-        evaluatedAt: new Date(vote.evaluated_at as string || new Date().toISOString()),
-      }));
+        evaluatedAt: new Date((vote.evaluated_at as string) || new Date().toISOString()),
+      }))
 
-      consensusMethod = (judgeOutput.consensus_method as ConsensusMethod) ?? 'majority';
-      finalVerdict = (judgeOutput.final_verdict as JudgeVerdictType) ?? determineVerdict(qualityScore);
+      consensusMethod = (judgeOutput.consensus_method as ConsensusMethod) ?? 'majority'
+      finalVerdict =
+        (judgeOutput.final_verdict as JudgeVerdictType) ?? determineVerdict(qualityScore)
     }
   }
 
@@ -611,11 +625,11 @@ function parseVotingResult(
         readability: (vote.readability as number) || qualityScore,
       },
       reasoning: vote.reasoning as string | undefined,
-      evaluatedAt: new Date(vote.evaluated_at as string || new Date().toISOString()),
-    }));
+      evaluatedAt: new Date((vote.evaluated_at as string) || new Date().toISOString()),
+    }))
 
-    consensusMethod = (judgeOutput.consensus_method as ConsensusMethod) ?? 'unanimous';
-    finalVerdict = (judgeOutput.final_verdict as JudgeVerdictType) ?? determineVerdict(qualityScore);
+    consensusMethod = (judgeOutput.consensus_method as ConsensusMethod) ?? 'unanimous'
+    finalVerdict = (judgeOutput.final_verdict as JudgeVerdictType) ?? determineVerdict(qualityScore)
   }
 
   return {
@@ -625,18 +639,18 @@ function parseVotingResult(
     finalScore: qualityScore,
     tieBreakerId: judgeOutput.tie_breaker_id as string | undefined,
     isThirdJudgeInvoked: (judgeOutput.is_third_judge_invoked as boolean) ?? false,
-  };
+  }
 }
 
 /**
  * Determine verdict from quality score (fallback)
  */
 function determineVerdict(score: number): JudgeVerdictType {
-  if (score >= 0.9) return 'ACCEPT';
-  if (score >= 0.75) return 'ACCEPT_WITH_MINOR_REVISION';
-  if (score >= 0.6) return 'ITERATIVE_REFINEMENT';
-  if (score >= 0.4) return 'REGENERATE';
-  return 'ESCALATE_TO_HUMAN';
+  if (score >= 0.9) return 'ACCEPT'
+  if (score >= 0.75) return 'ACCEPT_WITH_MINOR_REVISION'
+  if (score >= 0.6) return 'ITERATIVE_REFINEMENT'
+  if (score >= 0.4) return 'REGENERATE'
+  return 'ESCALATE_TO_HUMAN'
 }
 
 /**
@@ -645,16 +659,16 @@ function determineVerdict(score: number): JudgeVerdictType {
 function buildLogEntries(traces: GenerationTraceRow[]): LessonLogEntry[] {
   return traces.map((trace) => {
     // Prefer phase field for node identification
-    const nodeName = getNodeFromPhase(trace.phase) || normalizeStepName(trace.step_name);
-    const level = trace.error_data ? 'error' : 'info';
+    const nodeName = getNodeFromPhase(trace.phase) || normalizeStepName(trace.step_name)
+    const level = trace.error_data ? 'error' : 'info'
 
-    let message = `${trace.step_name}: ${trace.phase}`;
+    let message = `${trace.step_name}: ${trace.phase}`
     if (trace.error_data) {
-      message += ` - ERROR`;
+      message += ` - ERROR`
     } else if (trace.output_data) {
-      message += ` - Completed`;
+      message += ` - Completed`
     } else {
-      message += ` - Started`;
+      message += ` - Started`
     }
 
     return {
@@ -673,8 +687,8 @@ function buildLogEntries(traces: GenerationTraceRow[]): LessonLogEntry[] {
         model_used: trace.model_used,
         error: trace.error_data,
       },
-    };
-  });
+    }
+  })
 }
 
 /**
@@ -702,11 +716,11 @@ function buildLogEntries(traces: GenerationTraceRow[]): LessonLogEntry[] {
  */
 export interface UseLessonInspectorDataOptions {
   /** Course ID */
-  courseId: string;
+  courseId: string
   /** Lesson ID label (e.g., "1.2") - null when not viewing a lesson */
-  lessonId: string | null;
+  lessonId: string | null
   /** Whether hook should fetch data */
-  enabled?: boolean;
+  enabled?: boolean
 }
 
 export function useLessonInspectorData({
@@ -714,27 +728,27 @@ export function useLessonInspectorData({
   lessonId,
   enabled = true,
 }: UseLessonInspectorDataOptions): UseLessonInspectorDataReturn {
-  const { supabase, session, isLoading: authLoading } = useSupabase();
-  const [data, setData] = useState<LessonInspectorData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const fetchIdRef = useRef(0);
+  const { supabase, session, isLoading: authLoading } = useSupabase()
+  const [data, setData] = useState<LessonInspectorData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const fetchIdRef = useRef(0)
   // Store lesson UUID for realtime subscription
-  const [lessonUuidForRealtime, setLessonUuidForRealtime] = useState<string | null>(null);
+  const [lessonUuidForRealtime, setLessonUuidForRealtime] = useState<string | null>(null)
   // Debounce timer ref for realtime updates
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Stable refs to prevent re-renders on session/auth changes
   // Session object reference changes on every token refresh, but we only need to check existence
-  const sessionRef = useRef(session);
-  const authLoadingRef = useRef(authLoading);
-  const isAuthenticatedRef = useRef(!!session && !authLoading);
+  const sessionRef = useRef(session)
+  const authLoadingRef = useRef(authLoading)
+  const isAuthenticatedRef = useRef(!!session && !authLoading)
 
   // Update refs synchronously (no effect, no re-render trigger)
-  sessionRef.current = session;
-  authLoadingRef.current = authLoading;
-  isAuthenticatedRef.current = !!session && !authLoading;
+  sessionRef.current = session
+  authLoadingRef.current = authLoading
+  isAuthenticatedRef.current = !!session && !authLoading
 
   /**
    * Fetch lesson data from database
@@ -745,349 +759,328 @@ export function useLessonInspectorData({
    * 3. Get lesson contents from lesson_contents table (by lesson UUID)
    * 4. Get generation traces from generation_trace table (by lesson UUID)
    */
-  const fetchLessonData = useCallback(async (options?: { silent?: boolean }) => {
-    const { silent = false } = options || {};
+  const fetchLessonData = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const { silent = false } = options || {}
 
-    // Extract module/lesson numbers from lesson label (e.g., "1.2" -> module 1, lesson 2)
-    const lessonParts = lessonId ? lessonId.split('.') : null;
-    const moduleNumber = lessonParts ? parseInt(lessonParts[0], 10) : null;
-    const lessonNumber = lessonParts && lessonParts.length > 1 ? parseInt(lessonParts[1], 10) : null;
-    const moduleId = moduleNumber ? `module_${moduleNumber}` : null;
+      // Extract module/lesson numbers from lesson label (e.g., "1.2" -> module 1, lesson 2)
+      const lessonParts = lessonId ? lessonId.split('.') : null
+      const moduleNumber = lessonParts ? parseInt(lessonParts[0], 10) : null
+      const lessonNumber =
+        lessonParts && lessonParts.length > 1 ? parseInt(lessonParts[1], 10) : null
+      const moduleId = moduleNumber ? `module_${moduleNumber}` : null
 
-    // Skip if disabled or missing required data
-    // Use refs to avoid recreating callback on session changes
-    if (!enabled || !lessonId || !moduleId || !moduleNumber || !lessonNumber || !isAuthenticatedRef.current || !courseId) {
-      setIsLoading(false);
-      return;
-    }
-
-    const fetchId = ++fetchIdRef.current;
-    // Only show loading spinner on initial load, not on realtime updates (silent mode)
-    if (!silent) {
-      setIsLoading(true);
-    }
-    setError(null);
-
-    try {
-      logger.debug('[useLessonInspectorData] Fetching lesson data', {
-        courseId,
-        lessonId,
-        moduleNumber,
-        lessonNumber,
-      });
-
-      // Step 0: Get organization tier for model naming
-      let tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' = 'standard';
-      const { data: orgData } = await supabase
-        .from('courses')
-        .select('organization_id, organizations!inner(tier)')
-        .eq('id', courseId)
-        .single();
-
-      if (orgData) {
-        const org = orgData.organizations as { tier?: string } | null;
-        tier = (org?.tier as typeof tier) || 'standard';
+      // Skip if disabled or missing required data
+      // Use refs to avoid recreating callback on session changes
+      if (
+        !enabled ||
+        !lessonId ||
+        !moduleId ||
+        !moduleNumber ||
+        !lessonNumber ||
+        !isAuthenticatedRef.current ||
+        !courseId
+      ) {
+        setIsLoading(false)
+        return
       }
 
-      // Step 1: Get section UUID
-      const { data: sectionData, error: sectionError } = await supabase
-        .from('sections')
-        .select('id, title')
-        .eq('course_id', courseId)
-        .eq('order_index', moduleNumber)
-        .single();
+      const fetchId = ++fetchIdRef.current
+      // Only show loading spinner on initial load, not on realtime updates (silent mode)
+      if (!silent) {
+        setIsLoading(true)
+      }
+      setError(null)
 
-      if (sectionError || !sectionData) {
-        logger.warn('[useLessonInspectorData] Section not found', { moduleNumber, error: sectionError?.message });
-        // No section yet - lesson is pending
-        setData({
+      try {
+        logger.debug('[useLessonInspectorData] Fetching lesson data', {
+          courseId,
           lessonId,
-          lessonUuid: null,
+          moduleNumber,
           lessonNumber,
-          moduleId,
-          title: `Урок ${lessonNumber}`,
-          status: 'pending',
-          pipelineNodes: [],
-          currentNode: null,
-          content: null,
-          rawMarkdown: null,
-          judgeResult: null,
-          totalTokensUsed: 0,
-          totalCostUsd: 0,
-          totalDurationMs: 0,
-          retryCount: 0,
-          refinementIterations: 0,
-          logs: [],
-          canRegenerate: false,
-          canApprove: false,
-          canEdit: false,
-        });
-        setIsLoading(false);
-        return;
-      }
+        })
 
-      // Step 2: Get lesson UUID and source_documents
-      const { data: lessonData, error: lessonError } = await supabase
-        .from('lessons')
-        .select('id, title, source_documents')
-        .eq('section_id', sectionData.id)
-        .eq('order_index', lessonNumber)
-        .single();
+        // Step 0: Get organization tier for model naming
+        let tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' = 'standard'
+        const { data: orgData } = await supabase
+          .from('courses')
+          .select('organization_id, organizations!inner(tier)')
+          .eq('id', courseId)
+          .single()
 
-      if (lessonError || !lessonData) {
-        logger.warn('[useLessonInspectorData] Lesson not found', { lessonNumber, error: lessonError?.message });
-        // No lesson yet - lesson is pending
-        setData({
-          lessonId,
-          lessonUuid: null,
-          lessonNumber,
-          moduleId,
-          title: `Урок ${lessonNumber}`,
-          status: 'pending',
-          pipelineNodes: [],
-          currentNode: null,
-          content: null,
-          rawMarkdown: null,
-          judgeResult: null,
-          totalTokensUsed: 0,
-          totalCostUsd: 0,
-          totalDurationMs: 0,
-          retryCount: 0,
-          refinementIterations: 0,
-          logs: [],
-          canRegenerate: false,
-          canApprove: false,
-          canEdit: false,
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      const lessonUuid = lessonData.id;
-      const lessonTitle = lessonData.title || `Урок ${lessonNumber}`;
-
-      // Parse source_documents from lesson data
-      // Use type guard to filter invalid/malformed documents (fixes Issue #4: type bypass)
-      // Cast to unknown[] first so the type guard can properly narrow the type
-      const sourceDocuments: SourceDocument[] = Array.isArray(lessonData.source_documents)
-        ? (lessonData.source_documents as unknown[]).filter(isValidSourceDocument)
-        : [];
-
-      // Store UUID for realtime subscription
-      setLessonUuidForRealtime(lessonUuid);
-
-      logger.debug('[useLessonInspectorData] Found lesson UUID', { lessonId, lessonUuid, lessonTitle });
-
-      // Step 3: Fetch lesson content using UUID
-      const { data: contentData, error: contentError } = await supabase
-        .from('lesson_contents')
-        .select('*')
-        .eq('lesson_id', lessonUuid)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (contentError) throw contentError;
-
-      // Step 4: Fetch generation traces for this lesson using UUID
-      const { data: tracesData, error: tracesError } = await supabase
-        .from('generation_trace')
-        .select('*')
-        .eq('lesson_id', lessonUuid)
-        .eq('stage', 'stage_6')
-        .order('created_at', { ascending: true });
-
-      if (tracesError) throw tracesError;
-
-      // Step 5: Fetch lesson enrichment (card) for this lesson
-      // Card enrichments are triggered after Stage 6 via triggerLessonCard()
-      const { data: enrichmentData } = await supabase
-        .from('lesson_enrichments')
-        .select('id, status, enrichment_type, asset_id, content, metadata, created_at, updated_at')
-        .eq('lesson_id', lessonUuid)
-        .eq('enrichment_type', 'card')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // Skip if a newer fetch was started
-      if (fetchId !== fetchIdRef.current) return;
-
-      const traces = tracesData || [];
-
-      // Build pipeline state
-      const {
-        pipelineNodes: basePipelineNodes,
-        currentNode,
-        totalTokensUsed,
-        totalCostUsd,
-        totalDurationMs,
-        retryCount,
-      } = buildPipelineState(traces);
-
-      // Add coverGenerator node based on enrichment status
-      const pipelineNodes = [...basePipelineNodes];
-      if (enrichmentData) {
-        // Map enrichment status to node status
-        // Enrichment statuses: pending, failed, cancelled, draft_generating, draft_ready, generating, completed
-        let coverStatus: Stage6NodeStatus = 'pending';
-        if (enrichmentData.status === 'draft_ready' || enrichmentData.status === 'completed') {
-          coverStatus = 'completed';
-        } else if (enrichmentData.status === 'generating' || enrichmentData.status === 'draft_generating') {
-          coverStatus = 'active';
-        } else if (enrichmentData.status === 'failed' || enrichmentData.status === 'cancelled') {
-          coverStatus = 'error';
+        if (orgData) {
+          const org = orgData.organizations as { tier?: string } | null
+          tier = (org?.tier as typeof tier) || 'standard'
         }
 
-        const coverNode: PipelineNodeState = {
-          node: 'coverGenerator',
-          status: coverStatus,
-          startedAt: enrichmentData.created_at ? new Date(enrichmentData.created_at) : undefined,
-          completedAt: coverStatus === 'completed' && enrichmentData.updated_at
-            ? new Date(enrichmentData.updated_at)
-            : undefined,
-          output: {
-            status: enrichmentData.status,
-            assetId: enrichmentData.asset_id || undefined,
-            enrichmentId: enrichmentData.id,
-            // Extract imageUrl from content (CoverEnrichmentContent uses 'imageUrl' field)
-            imageUrl: (enrichmentData.content as Record<string, unknown>)?.imageUrl as string || undefined,
-            ...(enrichmentData.metadata as Record<string, unknown> || {}),
-          },
-        };
+        // Step 1: Get section UUID
+        const { data: sectionData, error: sectionError } = await supabase
+          .from('sections')
+          .select('id, title')
+          .eq('course_id', courseId)
+          .eq('order_index', moduleNumber)
+          .single()
 
-        // Add or replace coverGenerator node
-        const existingCoverIndex = pipelineNodes.findIndex(n => n.node === 'coverGenerator');
-        if (existingCoverIndex >= 0) {
-          pipelineNodes[existingCoverIndex] = coverNode;
-        } else {
-          pipelineNodes.push(coverNode);
-        }
-      } else {
-        // No enrichment yet - check if judge is completed to show pending cover
-        const judgeNode = basePipelineNodes.find(n => n.node === 'judge');
-        if (judgeNode?.status === 'completed') {
-          // Judge completed but no cover yet - show as pending/generating
-          pipelineNodes.push({
-            node: 'coverGenerator',
+        if (sectionError || !sectionData) {
+          logger.warn('[useLessonInspectorData] Section not found', {
+            moduleNumber,
+            error: sectionError?.message,
+          })
+          // No section yet - lesson is pending
+          setData({
+            lessonId,
+            lessonUuid: null,
+            lessonNumber,
+            moduleId,
+            title: `Урок ${lessonNumber}`,
             status: 'pending',
-          });
+            pipelineNodes: [],
+            currentNode: null,
+            content: null,
+            rawMarkdown: null,
+            judgeResult: null,
+            totalTokensUsed: 0,
+            totalCostUsd: 0,
+            totalDurationMs: 0,
+            retryCount: 0,
+            refinementIterations: 0,
+            logs: [],
+            canRegenerate: false,
+            canApprove: false,
+            canEdit: false,
+          })
+          setIsLoading(false)
+          return
+        }
+
+        // Step 2: Get lesson UUID and source_documents
+        const { data: lessonData, error: lessonError } = await supabase
+          .from('lessons')
+          .select('id, title, source_documents')
+          .eq('section_id', sectionData.id)
+          .eq('order_index', lessonNumber)
+          .single()
+
+        if (lessonError || !lessonData) {
+          logger.warn('[useLessonInspectorData] Lesson not found', {
+            lessonNumber,
+            error: lessonError?.message,
+          })
+          // No lesson yet - lesson is pending
+          setData({
+            lessonId,
+            lessonUuid: null,
+            lessonNumber,
+            moduleId,
+            title: `Урок ${lessonNumber}`,
+            status: 'pending',
+            pipelineNodes: [],
+            currentNode: null,
+            content: null,
+            rawMarkdown: null,
+            judgeResult: null,
+            totalTokensUsed: 0,
+            totalCostUsd: 0,
+            totalDurationMs: 0,
+            retryCount: 0,
+            refinementIterations: 0,
+            logs: [],
+            canRegenerate: false,
+            canApprove: false,
+            canEdit: false,
+          })
+          setIsLoading(false)
+          return
+        }
+
+        const lessonUuid = lessonData.id
+        const lessonTitle = lessonData.title || `Урок ${lessonNumber}`
+
+        // Parse source_documents from lesson data
+        // Use type guard to filter invalid/malformed documents (fixes Issue #4: type bypass)
+        // Cast to unknown[] first so the type guard can properly narrow the type
+        const sourceDocuments: SourceDocument[] = Array.isArray(lessonData.source_documents)
+          ? (lessonData.source_documents as unknown[]).filter(isValidSourceDocument)
+          : []
+
+        // Store UUID for realtime subscription
+        setLessonUuidForRealtime(lessonUuid)
+
+        logger.debug('[useLessonInspectorData] Found lesson UUID', {
+          lessonId,
+          lessonUuid,
+          lessonTitle,
+        })
+
+        // Step 3: Fetch lesson content using UUID
+        const { data: contentData, error: contentError } = await supabase
+          .from('lesson_contents')
+          .select('*')
+          .eq('lesson_id', lessonUuid)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (contentError) throw contentError
+
+        // Step 4: Fetch generation traces for this lesson using UUID
+        const { data: tracesData, error: tracesError } = await supabase
+          .from('generation_trace')
+          .select('*')
+          .eq('lesson_id', lessonUuid)
+          .eq('stage', 'stage_6')
+          .order('created_at', { ascending: true })
+
+        if (tracesError) throw tracesError
+
+        // Skip if a newer fetch was started
+        if (fetchId !== fetchIdRef.current) return
+
+        const traces = tracesData || []
+
+        // Build pipeline state
+        const {
+          pipelineNodes,
+          currentNode,
+          totalTokensUsed,
+          totalCostUsd,
+          totalDurationMs,
+          retryCount,
+        } = buildPipelineState(traces)
+
+        // Parse content if available
+        const content = contentData ? parseLessonContent(contentData) : null
+
+        // Extract rawMarkdown - priority: metadata.markdownContent > build from content
+        let rawMarkdown: string | null = null
+        if (contentData?.metadata && typeof contentData.metadata === 'object') {
+          const metadata = contentData.metadata as Record<string, unknown>
+          if (metadata.markdownContent && typeof metadata.markdownContent === 'string') {
+            rawMarkdown = metadata.markdownContent
+          }
+        }
+        // Fallback: build from content structure
+        if (!rawMarkdown && contentData?.content && typeof contentData.content === 'object') {
+          const contentObj = contentData.content as Record<string, unknown>
+          // Check for nested content structure: {status, content: {...}, metadata: {...}}
+          if (contentObj.content && typeof contentObj.content === 'object') {
+            rawMarkdown = buildMarkdownFromContent(contentObj.content as Record<string, unknown>)
+          } else {
+            rawMarkdown = buildMarkdownFromContent(contentObj)
+          }
+        }
+
+        // Parse judge result
+        const judgeResult = contentData ? parseJudgeResult(contentData, traces) : null
+
+        // Build logs
+        const logs = buildLogEntries(traces)
+
+        // Determine overall status
+        let status: 'pending' | 'active' | 'completed' | 'error' = 'pending'
+        if (pipelineNodes.length > 0) {
+          // Determine from pipeline nodes if available
+          if (pipelineNodes.some((n) => n.status === 'error')) {
+            status = 'error'
+          } else if (pipelineNodes.some((n) => n.status === 'active')) {
+            status = 'active'
+          } else if (pipelineNodes.every((n) => n.status === 'completed')) {
+            status = 'completed'
+          }
+        } else if (rawMarkdown || content) {
+          // No pipeline nodes but content exists - check traces for completion
+          const hasFinishTrace = traces.some(
+            (t) => t.step_name === 'finish' && t.phase === 'complete'
+          )
+          const hasErrorTrace = traces.some((t) => t.error_data != null)
+          if (hasErrorTrace) {
+            status = 'error'
+          } else if (hasFinishTrace) {
+            status = 'completed'
+          } else if (traces.length > 0) {
+            status = 'active'
+          }
+        }
+
+        // Calculate refinement iterations (judge node retries)
+        const judgeNode = pipelineNodes.find((n) => n.node === 'judge')
+        const refinementIterations = judgeNode?.retryAttempt || 0
+
+        // Extract generation input parameters from generator traces
+        // The generator_start trace stores style and language in input_data
+        const generatorStartTrace = traces.find(
+          (t) => t.phase === 'generator' && t.step_name === 'generator_start'
+        )
+        const generatorInputData = generatorStartTrace?.input_data as Record<string, unknown> | null
+        const traceStyle =
+          typeof generatorInputData?.style === 'string' ? generatorInputData.style : null
+        const traceLanguage =
+          typeof generatorInputData?.language === 'string' ? generatorInputData.language : null
+        const traceLessonSpec =
+          (generatorInputData?.lessonSpec as Record<string, unknown>) ?? null
+
+        // Construct final data
+        const inspectorData: LessonInspectorData = {
+          lessonId,
+          lessonUuid,
+          lessonNumber,
+          moduleId,
+          title: lessonTitle,
+          status,
+          pipelineNodes,
+          currentNode,
+          content,
+          rawMarkdown,
+          sourceDocuments: sourceDocuments.length > 0 ? sourceDocuments : undefined,
+          lessonSpec: traceLessonSpec,
+          style: traceStyle,
+          language: traceLanguage,
+          judgeResult,
+          totalTokensUsed,
+          totalCostUsd,
+          totalDurationMs,
+          retryCount,
+          refinementIterations,
+          logs,
+          canRegenerate: status === 'error' || status === 'completed',
+          canApprove: status === 'completed' && judgeResult !== null,
+          canEdit: status === 'completed',
+          tier,
+        }
+
+        setData(inspectorData)
+        setError(null)
+
+        logger.debug('Lesson inspector data fetched', {
+          lessonId,
+          status,
+          pipelineNodesCount: pipelineNodes.length,
+          logsCount: logs.length,
+          hasContent: !!content,
+          sourceDocumentsCount: sourceDocuments.length,
+        })
+      } catch (err) {
+        // Skip if a newer fetch was started
+        if (fetchId !== fetchIdRef.current) return
+
+        const fetchError = err instanceof Error ? err : new Error('Failed to fetch lesson data')
+        setError(fetchError)
+        setData(null)
+
+        logger.error('Failed to fetch lesson inspector data', {
+          lessonId,
+          error: fetchError.message,
+        })
+      } finally {
+        // Skip if a newer fetch was started
+        if (fetchId === fetchIdRef.current) {
+          setIsLoading(false)
         }
       }
-
-      // Parse content if available
-      const content = contentData ? parseLessonContent(contentData) : null;
-
-      // Extract rawMarkdown - priority: metadata.markdownContent > build from content
-      let rawMarkdown: string | null = null;
-      if (contentData?.metadata && typeof contentData.metadata === 'object') {
-        const metadata = contentData.metadata as Record<string, unknown>;
-        if (metadata.markdownContent && typeof metadata.markdownContent === 'string') {
-          rawMarkdown = metadata.markdownContent;
-        }
-      }
-      // Fallback: build from content structure
-      if (!rawMarkdown && contentData?.content && typeof contentData.content === 'object') {
-        const contentObj = contentData.content as Record<string, unknown>;
-        // Check for nested content structure: {status, content: {...}, metadata: {...}}
-        if (contentObj.content && typeof contentObj.content === 'object') {
-          rawMarkdown = buildMarkdownFromContent(contentObj.content as Record<string, unknown>);
-        } else {
-          rawMarkdown = buildMarkdownFromContent(contentObj);
-        }
-      }
-
-      // Parse judge result
-      const judgeResult = contentData ? parseJudgeResult(contentData, traces) : null;
-
-      // Build logs
-      const logs = buildLogEntries(traces);
-
-      // Determine overall status
-      let status: 'pending' | 'active' | 'completed' | 'error' = 'pending';
-      if (pipelineNodes.length > 0) {
-        // Determine from pipeline nodes if available
-        if (pipelineNodes.some((n) => n.status === 'error')) {
-          status = 'error';
-        } else if (pipelineNodes.some((n) => n.status === 'active')) {
-          status = 'active';
-        } else if (pipelineNodes.every((n) => n.status === 'completed')) {
-          status = 'completed';
-        }
-      } else if (rawMarkdown || content) {
-        // No pipeline nodes but content exists - check traces for completion
-        const hasFinishTrace = traces.some(t => t.step_name === 'finish' && t.phase === 'complete');
-        const hasErrorTrace = traces.some(t => t.error_data != null);
-        if (hasErrorTrace) {
-          status = 'error';
-        } else if (hasFinishTrace) {
-          status = 'completed';
-        } else if (traces.length > 0) {
-          status = 'active';
-        }
-      }
-
-      // Calculate refinement iterations (judge node retries)
-      const judgeNode = pipelineNodes.find((n) => n.node === 'judge');
-      const refinementIterations = judgeNode?.retryAttempt || 0;
-
-      // Construct final data
-      const inspectorData: LessonInspectorData = {
-        lessonId,
-        lessonUuid,
-        lessonNumber,
-        moduleId,
-        title: lessonTitle,
-        status,
-        pipelineNodes,
-        currentNode,
-        content,
-        rawMarkdown,
-        sourceDocuments: sourceDocuments.length > 0 ? sourceDocuments : undefined,
-        judgeResult,
-        totalTokensUsed,
-        totalCostUsd,
-        totalDurationMs,
-        retryCount,
-        refinementIterations,
-        logs,
-        canRegenerate: status === 'error' || status === 'completed',
-        canApprove: status === 'completed' && judgeResult !== null,
-        canEdit: status === 'completed',
-        tier,
-      };
-
-      setData(inspectorData);
-      setError(null);
-
-      logger.debug('Lesson inspector data fetched', {
-        lessonId,
-        status,
-        pipelineNodesCount: pipelineNodes.length,
-        logsCount: logs.length,
-        hasContent: !!content,
-        sourceDocumentsCount: sourceDocuments.length,
-      });
-    } catch (err) {
-      // Skip if a newer fetch was started
-      if (fetchId !== fetchIdRef.current) return;
-
-      const fetchError = err instanceof Error ? err : new Error('Failed to fetch lesson data');
-      setError(fetchError);
-      setData(null);
-
-      logger.error('Failed to fetch lesson inspector data', {
-        lessonId,
-        error: fetchError.message,
-      });
-    } finally {
-      // Skip if a newer fetch was started
-      if (fetchId === fetchIdRef.current) {
-        setIsLoading(false);
-      }
-    }
-  // Note: session/authLoading removed from deps - we use refs to avoid re-creating on token refresh
-  }, [enabled, lessonId, courseId, supabase]);
+      // Note: session/authLoading removed from deps - we use refs to avoid re-creating on token refresh
+    },
+    [enabled, lessonId, courseId, supabase]
+  )
 
   /**
    * Debounced fetch for realtime updates
@@ -1097,40 +1090,40 @@ export function useLessonInspectorData({
   const debouncedFetch = useCallback(() => {
     // Clear existing timer
     if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+      clearTimeout(debounceTimerRef.current)
     }
 
     // Set new timer - use silent mode to avoid loading spinner flicker
     debounceTimerRef.current = setTimeout(() => {
-      fetchLessonData({ silent: true });
-      debounceTimerRef.current = null;
-    }, 500); // 500ms debounce
-  }, [fetchLessonData]);
+      fetchLessonData({ silent: true })
+      debounceTimerRef.current = null
+    }, 500) // 500ms debounce
+  }, [fetchLessonData])
 
   // Initial fetch - trigger once when authenticated
   // Uses a stable boolean to avoid re-triggering on session object changes
-  const isAuthenticated = !!session && !authLoading;
+  const isAuthenticated = !!session && !authLoading
   useEffect(() => {
     if (isAuthenticated) {
-      fetchLessonData();
+      fetchLessonData()
     }
-  }, [fetchLessonData, isAuthenticated]);
+  }, [fetchLessonData, isAuthenticated])
 
   // Store debouncedFetch in a ref to avoid re-subscribing on every callback recreation
-  const debouncedFetchRef = useRef(debouncedFetch);
-  debouncedFetchRef.current = debouncedFetch;
+  const debouncedFetchRef = useRef(debouncedFetch)
+  debouncedFetchRef.current = debouncedFetch
 
   // Realtime subscription for live updates (uses UUID, not label)
   useEffect(() => {
     // Wait for lesson UUID to be resolved from initial fetch
-    if (!lessonUuidForRealtime || !isAuthenticated) return;
+    if (!lessonUuidForRealtime || !isAuthenticated) return
 
-    logger.debug('Setting up realtime subscription for lesson', { lessonId, lessonUuidForRealtime });
+    logger.debug('Setting up realtime subscription for lesson', { lessonId, lessonUuidForRealtime })
 
     // Cleanup previous subscription
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
     }
 
     // Create channel for this lesson using UUID
@@ -1145,8 +1138,8 @@ export function useLessonInspectorData({
           filter: `lesson_id=eq.${lessonUuidForRealtime}`,
         },
         () => {
-          logger.debug('New trace received for lesson', { lessonId, lessonUuidForRealtime });
-          debouncedFetchRef.current(); // Use ref to get latest callback
+          logger.debug('New trace received for lesson', { lessonId, lessonUuidForRealtime })
+          debouncedFetchRef.current() // Use ref to get latest callback
         }
       )
       .on(
@@ -1158,8 +1151,8 @@ export function useLessonInspectorData({
           filter: `lesson_id=eq.${lessonUuidForRealtime}`,
         },
         () => {
-          logger.debug('Lesson content updated', { lessonId, lessonUuidForRealtime });
-          debouncedFetchRef.current(); // Use ref to get latest callback
+          logger.debug('Lesson content updated', { lessonId, lessonUuidForRealtime })
+          debouncedFetchRef.current() // Use ref to get latest callback
         }
       )
       .on(
@@ -1171,42 +1164,41 @@ export function useLessonInspectorData({
           filter: `lesson_id=eq.${lessonUuidForRealtime}`,
         },
         () => {
-          logger.debug('Lesson enrichment changed', { lessonId, lessonUuidForRealtime });
-          debouncedFetchRef.current(); // Use ref to get latest callback
+          logger.debug('Lesson enrichment changed', { lessonId, lessonUuidForRealtime })
+          debouncedFetchRef.current() // Use ref to get latest callback
         }
       )
       .subscribe((status) => {
-        logger.debug('Realtime subscription status', { lessonId, lessonUuidForRealtime, status });
-      });
+        logger.debug('Realtime subscription status', { lessonId, lessonUuidForRealtime, status })
+      })
 
-    channelRef.current = channel;
+    channelRef.current = channel
 
     return () => {
       // Clear debounce timer
       if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
       }
 
       // Cleanup channel
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
       }
-    };
-  // Note: debouncedFetch removed from deps - we use ref to avoid re-subscribing
-  }, [lessonId, lessonUuidForRealtime, supabase, isAuthenticated]);
+    }
+    // Note: debouncedFetch removed from deps - we use ref to avoid re-subscribing
+  }, [lessonId, lessonUuidForRealtime, supabase, isAuthenticated])
 
   // Manual refetch function
   const refetch = useCallback(() => {
-    fetchLessonData();
-  }, [fetchLessonData]);
+    fetchLessonData()
+  }, [fetchLessonData])
 
   return {
     data,
     isLoading,
     error,
     refetch,
-  };
+  }
 }
-

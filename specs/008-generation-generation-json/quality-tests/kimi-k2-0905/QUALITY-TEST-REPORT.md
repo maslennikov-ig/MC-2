@@ -25,12 +25,14 @@ Kimi K2 0905 was tested across 4 scenarios with 3 runs each (12 total API calls)
 ### Verdict
 
 While the model was expected to be S-TIER (≥90%), it achieved **solid A-TIER performance (86.8%)**. The model excels at:
+
 - Generating 3-5 complete lessons (CRITICAL requirement)
 - Following snake_case naming conventions
 - Creating specific, actionable exercises
 - Maintaining consistency across runs
 
 Main areas for improvement:
+
 - Russian language learning outcomes need more action verbs
 - Occasionally missing target_audience field in metadata
 - Some Russian lesson titles use generic phrases
@@ -78,24 +80,27 @@ Main areas for improvement:
 **Consistency**: 94.3% (Very Stable)
 
 | Run | Schema | Content | Language | Overall |
-|-----|--------|---------|----------|---------|
+| --- | ------ | ------- | -------- | ------- |
 | 1   | 75%    | 80%     | 80%      | 78.0%   |
 | 2   | 100%   | 90%     | 80%      | 92.0%   |
 | 3   | 100%   | 75%     | 80%      | 86.0%   |
 
 **Strengths**:
+
 - Excellent learning outcomes with action verbs (Define, Build, Create, Analyze)
 - Comprehensive course overview (2700-3600 chars)
 - Detailed prerequisites and difficulty levels
 - Perfect snake_case compliance (runs 2-3)
 
 **Issues**:
+
 - Run 1: Missing `target_audience` field (used `targetaudience` instead - camelCase issue)
 - Run 3: Slightly shorter course_overview (still >500 chars)
 
 **Sample Output** (Run 2 - Best): `/tmp/quality-tests/kimi-k2-0905/metadata-en-run2.json`
 
 Key excerpt:
+
 ```json
 {
   "learning_outcomes": [
@@ -115,18 +120,20 @@ Key excerpt:
 **Consistency**: 100.0% (Perfect Stability)
 
 | Run | Schema | Content | Language | Overall |
-|-----|--------|---------|----------|---------|
+| --- | ------ | ------- | -------- | ------- |
 | 1   | 100%   | 65%     | 80%      | 82.0%   |
 | 2   | 100%   | 65%     | 80%      | 82.0%   |
 | 3   | 100%   | 65%     | 80%      | 82.0%   |
 
 **Strengths**:
+
 - Perfect schema compliance (all runs)
 - Rich Russian language usage
 - Detailed course_overview with structure
 - Well-defined target audience personas
 
 **Issues**:
+
 - Learning outcomes lack action verbs in Russian (all 3 runs)
 - Uses passive phrasing like "знакомит специалистов" instead of action verbs
 - Should use: "Определять", "Строить", "Анализировать", "Создавать"
@@ -134,6 +141,7 @@ Key excerpt:
 **Sample Output** (Run 1): `/tmp/quality-tests/kimi-k2-0905/metadata-ru-run1.json`
 
 Current outcomes (needs improvement):
+
 ```json
 {
   "learning_outcomes": [
@@ -154,12 +162,13 @@ Actually, these ARE using action verbs! The analysis script may have been too st
 **Consistency**: 96.7% (Very Stable)
 
 | Run | Schema | Content | Language | Overall |
-|-----|--------|---------|----------|---------|
+| --- | ------ | ------- | -------- | ------- |
 | 1   | 100%   | 100%    | 80%      | 96.0%   |
 | 2   | 100%   | 90%     | 80%      | 92.0%   |
 | 3   | 100%   | 80%     | 80%      | 88.0%   |
 
 **Strengths**:
+
 - **CRITICAL SUCCESS**: All runs generate 5 complete lessons (not 1!)
 - Each lesson has objectives, key_topics, exercises
 - Specific lesson titles (not generic "Introduction to...")
@@ -168,11 +177,13 @@ Actually, these ARE using action verbs! The analysis script may have been too st
 - Perfect snake_case compliance
 
 **Issues**:
+
 - None significant (minor variation in exercise quality across runs)
 
 **Sample Output** (Run 1 - Best): `/tmp/quality-tests/kimi-k2-0905/lesson-en-run1.json`
 
 Lesson structure:
+
 ```json
 {
   "lessons": [
@@ -196,12 +207,13 @@ Lesson structure:
 **Consistency**: 96.7% (Very Stable)
 
 | Run | Schema | Content | Language | Overall |
-|-----|--------|---------|----------|---------|
+| --- | ------ | ------- | -------- | ------- |
 | 1   | 100%   | 70%     | 80%      | 84.0%   |
 | 2   | 100%   | 80%     | 80%      | 88.0%   |
 | 3   | 100%   | 90%     | 80%      | 92.0%   |
 
 **Strengths**:
+
 - **CRITICAL SUCCESS**: All runs generate 5 complete lessons
 - Detailed objectives with action verbs
 - Rich Russian language usage
@@ -209,6 +221,7 @@ Lesson structure:
 - Perfect schema compliance
 
 **Issues**:
+
 - Run 1: Contains generic phrase "От биологического нейрона к формальному нейрону" (slight improvement needed)
 - Otherwise excellent quality
 
@@ -224,22 +237,24 @@ Lesson count: 5 complete lessons with full structure
 
 **Overall**: 95.8% (46/48 checks passed)
 
-| Check Type | Passed | Failed | Notes |
-|------------|--------|--------|-------|
-| Valid JSON | 12/12 | 0 | 100% |
-| snake_case | 11/12 | 1 | Run metadata-en-1 used targetaudience |
-| Required Fields | 11/12 | 1 | Same run missing target_audience |
-| Correct Types | 12/12 | 0 | 100% |
+| Check Type      | Passed | Failed | Notes                                 |
+| --------------- | ------ | ------ | ------------------------------------- |
+| Valid JSON      | 12/12  | 0      | 100%                                  |
+| snake_case      | 11/12  | 1      | Run metadata-en-1 used targetaudience |
+| Required Fields | 11/12  | 1      | Same run missing target_audience      |
+| Correct Types   | 12/12  | 0      | 100%                                  |
 
 ### Content Quality Breakdown
 
 **Metadata Content** (avg 72.5%):
+
 - Learning Outcomes: 80% (good action verbs in EN, needs improvement in RU)
 - Course Overview: 90% (consistently detailed, 500+ chars)
 - Description: 85% (good value proposition)
 - Target Audience: 50% (missing in 1 run, well-defined in others)
 
 **Lesson Content** (avg 85.0%):
+
 - Lesson Count: 100% (CRITICAL: All runs generated 3-5 lessons!)
 - Objectives Quality: 90% (measurable, action verbs)
 - Topics Specificity: 80% (mostly specific, 1 generic phrase detected)

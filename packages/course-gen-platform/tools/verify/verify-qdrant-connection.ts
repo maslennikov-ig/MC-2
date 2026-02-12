@@ -104,7 +104,7 @@ async function verifyQdrantConnection() {
 
     if (result.collections.length > 0) {
       console.log('\nExisting collections:');
-      result.collections.forEach((collection) => {
+      result.collections.forEach(collection => {
         console.log(`  - ${collection.name}`);
       });
     }
@@ -112,7 +112,9 @@ async function verifyQdrantConnection() {
     logError('Failed to connect to Qdrant Cloud');
 
     if (error && typeof error === 'object' && 'getActualType' in error) {
-      const actualError = (error as { getActualType: () => { status: number; data: unknown } }).getActualType();
+      const actualError = (
+        error as { getActualType: () => { status: number; data: unknown } }
+      ).getActualType();
       logError(`Status: ${actualError.status}`);
       logError(`Details: ${JSON.stringify(actualError.data, null, 2)}`);
     } else {
@@ -132,9 +134,7 @@ async function verifyQdrantConnection() {
   try {
     // Check if test collection already exists
     const collections = await client.getCollections();
-    const existingCollection = collections.collections.find(
-      (c) => c.name === testCollectionName
-    );
+    const existingCollection = collections.collections.find(c => c.name === testCollectionName);
 
     if (!existingCollection) {
       logInfo('Creating temporary test collection...');
@@ -207,7 +207,7 @@ verifyQdrantConnection()
   .then(() => {
     process.exit(0);
   })
-  .catch((error) => {
+  .catch(error => {
     logError(`Unexpected error: ${error}`);
     process.exit(1);
   });

@@ -19,12 +19,14 @@ Two related enhancements to improve lesson quality in Stage 6 generation pipelin
 ### Problem Statement
 
 Currently, each lesson is generated in isolation. The LLM has no knowledge of:
+
 - What the student learned in previous lessons
 - Which concepts have already been explained
 - What topics will be covered next
 - How this lesson fits into the course narrative
 
 This leads to:
+
 - Redundant explanations of concepts already covered
 - Missing "bridge" content connecting lessons
 - No forward references ("in the next lesson, we'll...")
@@ -38,24 +40,28 @@ Add `lesson_context` field to `LessonSpecificationV2`:
 ```typescript
 lesson_context: z.object({
   // Previous lesson info
-  previous_lesson: z.object({
-    lesson_id: z.string(),           // "1.2"
-    title: z.string(),               // "Introduction to Hooks"
-    key_concepts: z.array(z.string()), // ["useState", "useEffect"]
-    summary: z.string().max(500),    // Brief summary for context
-  }).nullable(),
+  previous_lesson: z
+    .object({
+      lesson_id: z.string(), // "1.2"
+      title: z.string(), // "Introduction to Hooks"
+      key_concepts: z.array(z.string()), // ["useState", "useEffect"]
+      summary: z.string().max(500), // Brief summary for context
+    })
+    .nullable(),
 
   // Next lesson preview
-  next_lesson: z.object({
-    lesson_id: z.string(),
-    title: z.string(),
-    preview: z.string().max(300),    // Teaser for next lesson
-  }).nullable(),
+  next_lesson: z
+    .object({
+      lesson_id: z.string(),
+      title: z.string(),
+      preview: z.string().max(300), // Teaser for next lesson
+    })
+    .nullable(),
 
   // Cumulative course knowledge
   concepts_already_covered: z.array(z.string()), // All concepts from lessons 1.1 to current-1
-  terms_already_defined: z.array(z.string()),    // Terms that don't need re-explanation
-})
+  terms_already_defined: z.array(z.string()), // Terms that don't need re-explanation
+});
 ```
 
 ### Implementation Options
@@ -63,16 +69,19 @@ lesson_context: z.object({
 #### Option A: Generate Context Post-Lesson (Recommended)
 
 After each lesson is generated, extract:
+
 1. Key concepts covered
 2. New terms introduced
 3. Summary for next lesson's context
 
 **Pros**:
+
 - Context is accurate to actual generated content
 - Same model that wrote lesson extracts context
 - Can be done as part of Smoother or new "Contextualizer" node
 
 **Cons**:
+
 - Requires sequential lesson generation (can't parallelize)
 - Adds latency per lesson
 
@@ -83,14 +92,17 @@ Lesson N Generated → Extract Context → Store → Use in Lesson N+1
 #### Option B: Pre-Generate Context from Specifications
 
 Use Stage 5 lesson specifications to pre-compute:
+
 1. What each lesson will cover (from learning objectives)
 2. Dependencies between lessons
 
 **Pros**:
+
 - Can parallelize lesson generation
 - Faster overall
 
 **Cons**:
+
 - Context is based on spec, not actual content
 - May be less accurate
 
@@ -101,14 +113,14 @@ Use Stage 5 lesson specifications to pre-compute:
 
 ### Affected Components
 
-| Component | Changes Needed |
-|-----------|----------------|
-| `LessonSpecificationV2` | Add `lesson_context` field |
-| Stage 5 Generator | Generate context for each lesson |
-| Stage 6 Planner | Use context in intro planning |
-| Stage 6 Assembler | Add previous/next references |
-| `stage6_planner` prompt | Add `<lesson_context>` section |
-| `stage6_assembler` prompt | Add instructions for bridges |
+| Component                 | Changes Needed                   |
+| ------------------------- | -------------------------------- |
+| `LessonSpecificationV2`   | Add `lesson_context` field       |
+| Stage 5 Generator         | Generate context for each lesson |
+| Stage 6 Planner           | Use context in intro planning    |
+| Stage 6 Assembler         | Add previous/next references     |
+| `stage6_planner` prompt   | Add `<lesson_context>` section   |
+| `stage6_assembler` prompt | Add instructions for bridges     |
 
 ### Prompt Additions (Draft)
 
@@ -156,6 +168,7 @@ Planner → Expander → Assembler → Smoother → Judge (CLEV voting)
 ```
 
 The Judge phase catches issues but:
+
 - Uses separate LLM calls (expensive)
 - Happens after full content is generated
 - May require multiple refinement iterations
@@ -210,10 +223,12 @@ For each issue found, provide:
 ```
 
 **Pros**:
+
 - Fast (single model call)
 - Model has context from generation
 
 **Cons**:
+
 - Model may have blind spots to own errors
 
 #### Option B: Different-Temperature Self-Check
@@ -225,24 +240,29 @@ As a fact-checker, review this educational content...
 ```
 
 **Pros**:
+
 - More critical perspective
 - Still efficient
 
 **Cons**:
+
 - May not catch all issues
 
 #### Option C: Cross-Reference with RAG
 
 For each factual claim in the content:
+
 1. Extract claim
 2. Search RAG for supporting evidence
 3. Flag unsupported claims
 
 **Pros**:
+
 - Grounded verification
 - High accuracy
 
 **Cons**:
+
 - More complex
 - Additional RAG calls
 
@@ -300,6 +320,7 @@ The self-verification results can be passed to Judge:
 ```
 
 Judge can then:
+
 - Focus on flagged areas
 - Skip re-checking verified content
 - Faster evaluation

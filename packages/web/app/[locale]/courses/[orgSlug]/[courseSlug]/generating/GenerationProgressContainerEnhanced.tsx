@@ -21,7 +21,7 @@ import { useTranslations } from 'next-intl'
 import { Link } from '@/src/i18n/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import confetti from 'canvas-confetti'
+// canvas-confetti is lazy-loaded on demand (only needed on completion)
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
@@ -33,7 +33,8 @@ import {
   ProgressState,
   ProgressAction,
 } from '@/types/course-generation'
-import { GraphViewWrapper } from '@/components/generation-graph'
+import { GraphViewWrapper } from '@/components/generation-graph/GraphViewWrapper'
+import type { Stage1CourseData } from '@/components/generation-graph/GraphViewWrapper'
 import {
   cancelGeneration,
   pauseGeneration,
@@ -41,7 +42,6 @@ import {
   switchToManualMode,
   startGeneration,
 } from '@/app/actions/admin-generation'
-import type { Stage1CourseData } from '@/components/generation-graph'
 // GlobalCourseChat removed - now using RefinementChat in NodeDetailsDrawer for Stages 4, 5, 6
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
@@ -448,7 +448,7 @@ export default function GenerationProgressContainerEnhanced({
           if (!hasTriggeredConfetti.current) {
             hasTriggeredConfetti.current = true
             setShowSuccess(true)
-            triggerConfetti()
+            void triggerConfetti()
             toast.success('Course generated successfully!')
           }
           onComplete?.(courseId)
@@ -521,7 +521,7 @@ export default function GenerationProgressContainerEnhanced({
     if (!supabase) return
     let channel: ReturnType<typeof supabase.channel> | null = null
     let reconnectTimeout: NodeJS.Timeout | undefined
-    const setupSubscription = async () => {
+    const setupSubscription = () => {
       try {
         channel = supabase
           .channel(`course-progress-${courseId}`)
@@ -541,7 +541,7 @@ export default function GenerationProgressContainerEnhanced({
               dispatch({ type: 'SET_CONNECTED', payload: false })
               startPolling()
               reconnectTimeout = setTimeout(() => {
-                if (channel && supabase) supabase.removeChannel(channel)
+                if (channel && supabase) void supabase.removeChannel(channel)
                 void setupSubscription()
               }, 5000)
             }
@@ -554,8 +554,8 @@ export default function GenerationProgressContainerEnhanced({
     void setupSubscription()
     return () => {
       if (channel && supabase) {
-        channel.unsubscribe()
-        supabase.removeChannel(channel)
+        void channel.unsubscribe()
+        void supabase.removeChannel(channel)
       }
       stopPolling()
       if (redirectTimeout.current) clearTimeout(redirectTimeout.current)
@@ -597,7 +597,9 @@ export default function GenerationProgressContainerEnhanced({
     }
   }, [])
 
-  const triggerConfetti = () => {
+  const triggerConfetti = async () => {
+    // Lazy-load canvas-confetti (~25KB) only when generation completes
+    const { default: confetti } = await import('canvas-confetti')
     const duration = 3000
     const animationEnd = Date.now() + duration
     const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 }
@@ -611,13 +613,13 @@ export default function GenerationProgressContainerEnhanced({
         return
       }
       const particleCount = 25 * (timeLeft / duration)
-      confetti({
+      void confetti({
         ...defaults,
         particleCount,
         origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
         colors: ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981'],
       })
-      confetti({
+      void confetti({
         ...defaults,
         particleCount,
         origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },

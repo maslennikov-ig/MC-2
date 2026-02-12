@@ -75,17 +75,8 @@ const FIELD_MAPPING: Record<string, string> = {
   lessonObjectives: 'lesson_objectives',
   keyTopics: 'key_topics',
 
-  // Stage 5 Generation - Exercise fields
-  exerciseType: 'exercise_type',
-  exerciseTitle: 'exercise_title',
-  exerciseDescription: 'exercise_description',
-  practicalExercises: 'practical_exercises',
-
-  // Stage 5 Generation - Assessment strategy fields
-  quizPerSection: 'quiz_per_section',
-  finalExam: 'final_exam',
-  practicalProjects: 'practical_projects',
-  assessmentDescription: 'assessment_description',
+  // Stage 5 Generation - Exercise fields REMOVED (practical_exercises no longer generated)
+  // Stage 5 Generation - Assessment strategy fields REMOVED (assessment_strategy no longer generated)
 
   // ========================================
   // Stage 4 Analysis - Course categorization (Phase 1)
@@ -132,13 +123,6 @@ const FIELD_MAPPING: Record<string, string> = {
   assessmentApproach: 'assessment_approach',
   progressionLogic: 'progression_logic',
 
-  // Stage 4 Analysis - Pedagogical patterns (Phase 1 enhancement)
-  pedagogicalPatterns: 'pedagogical_patterns',
-  primaryStrategy: 'primary_strategy',
-  theoryPracticeRatio: 'theory_practice_ratio',
-  assessmentTypes: 'assessment_types',
-  keyPatterns: 'key_patterns',
-
   // Stage 4 Analysis - Generation guidance (Phase 4 enhancement)
   generationGuidance: 'generation_guidance',
   useAnalogies: 'use_analogies',
@@ -151,9 +135,6 @@ const FIELD_MAPPING: Record<string, string> = {
 
   // Stage 4 Analysis - Scope instructions (Phase 5)
   scopeInstructions: 'scope_instructions',
-
-  // Stage 4 Analysis - Content strategy (Phase 5)
-  contentStrategy: 'content_strategy',
 
   // Stage 4 Analysis - Document relevance mapping (Phase 6 enhancement)
   documentRelevanceMapping: 'document_relevance_mapping',

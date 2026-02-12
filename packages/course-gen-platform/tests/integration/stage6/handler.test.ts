@@ -150,7 +150,7 @@ async function collectProgressUpdates(
 ): Promise<ProgressUpdate[]> {
   const updates: ProgressUpdate[] = [];
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const timer = setTimeout(() => {
       resolve(updates);
     }, timeout);
@@ -202,7 +202,8 @@ describe('Stage 6 BullMQ Handler Integration', () => {
   let queue: Queue<Stage6JobInput, Stage6JobResult>;
   let worker: Worker<Stage6JobInput, Stage6JobResult>;
   let queueEvents: QueueEvents;
-  let redisVersionInfo: { version: string; major: number; minor: number; patch: number } | null = null;
+  let redisVersionInfo: { version: string; major: number; minor: number; patch: number } | null =
+    null;
   let shouldSkipTests = false;
   let testCourseIds: string[] = [];
 
@@ -211,7 +212,9 @@ describe('Stage 6 BullMQ Handler Integration', () => {
     redisVersionInfo = await getRedisVersion();
 
     if (!redisVersionInfo) {
-      console.warn('[Stage 6 Handler Tests] Could not determine Redis version - tests will be skipped');
+      console.warn(
+        '[Stage 6 Handler Tests] Could not determine Redis version - tests will be skipped'
+      );
       shouldSkipTests = true;
       return;
     }
@@ -392,9 +395,7 @@ describe('Stage 6 BullMQ Handler Integration', () => {
       });
 
       // Then: Job should fail with error
-      await expect(
-        waitForJobCompletion(job, queueEvents, 30000)
-      ).rejects.toThrow();
+      await expect(waitForJobCompletion(job, queueEvents, 30000)).rejects.toThrow();
     });
   });
 
@@ -449,7 +450,9 @@ describe('Stage 6 BullMQ Handler Integration', () => {
 
       // Verify all phases are valid
       expectedPhases.forEach(phase => {
-        expect(['planner', 'expander', 'assembler', 'smoother', 'judge', 'complete']).toContain(phase);
+        expect(['planner', 'expander', 'assembler', 'smoother', 'judge', 'complete']).toContain(
+          phase
+        );
       });
     });
   });
@@ -522,7 +525,10 @@ describe('Stage 6 BullMQ Handler Integration', () => {
   describe('Partial Success Handling', () => {
     it.skipIf(shouldSkipTests)('should define partial success handling functions', () => {
       // Verify partial success handling is exported
-      const { handlePartialSuccess, markForReview } = require('../../../src/stages/stage6-lesson-content/handler');
+      const {
+        handlePartialSuccess,
+        markForReview,
+      } = require('../../../src/stages/stage6-lesson-content/handler');
 
       expect(handlePartialSuccess).toBeDefined();
       expect(typeof handlePartialSuccess).toBe('function');
@@ -641,32 +647,35 @@ describe('Stage 6 BullMQ Handler Integration', () => {
   // ==========================================================================
 
   describe('Generation Lock Integration', () => {
-    it.skipIf(shouldSkipTests)('should acquire and release lock during job processing', async () => {
-      // Given: A course ID
-      const courseId = generateUniqueCourseId();
-      testCourseIds.push(courseId);
+    it.skipIf(shouldSkipTests)(
+      'should acquire and release lock during job processing',
+      async () => {
+        // Given: A course ID
+        const courseId = generateUniqueCourseId();
+        testCourseIds.push(courseId);
 
-      // Initially, course should not be locked
-      const initialLocked = await generationLockService.isLocked(courseId);
-      expect(initialLocked).toBe(false);
+        // Initially, course should not be locked
+        const initialLocked = await generationLockService.isLocked(courseId);
+        expect(initialLocked).toBe(false);
 
-      // Manual lock acquisition test
-      const lockResult = await generationLockService.acquireLock(courseId, 'test-worker');
-      expect(lockResult.acquired).toBe(true);
-      expect(lockResult.lock?.courseId).toBe(courseId);
+        // Manual lock acquisition test
+        const lockResult = await generationLockService.acquireLock(courseId, 'test-worker');
+        expect(lockResult.acquired).toBe(true);
+        expect(lockResult.lock?.courseId).toBe(courseId);
 
-      // Course should now be locked
-      const afterAcquire = await generationLockService.isLocked(courseId);
-      expect(afterAcquire).toBe(true);
+        // Course should now be locked
+        const afterAcquire = await generationLockService.isLocked(courseId);
+        expect(afterAcquire).toBe(true);
 
-      // Release lock
-      const released = await generationLockService.releaseLock(courseId, 'test-worker');
-      expect(released).toBe(true);
+        // Release lock
+        const released = await generationLockService.releaseLock(courseId, 'test-worker');
+        expect(released).toBe(true);
 
-      // Course should no longer be locked
-      const afterRelease = await generationLockService.isLocked(courseId);
-      expect(afterRelease).toBe(false);
-    });
+        // Course should no longer be locked
+        const afterRelease = await generationLockService.isLocked(courseId);
+        expect(afterRelease).toBe(false);
+      }
+    );
 
     it.skipIf(shouldSkipTests)('should prevent concurrent generation for same course', async () => {
       // Given: A course ID with existing lock
@@ -687,39 +696,42 @@ describe('Stage 6 BullMQ Handler Integration', () => {
       await generationLockService.releaseLock(courseId, 'worker-1');
     });
 
-    it.skipIf(shouldSkipTests)('should return lock held error when course is being processed', async () => {
-      // Given: A locked course
-      const courseId = generateUniqueCourseId();
-      testCourseIds.push(courseId);
+    it.skipIf(shouldSkipTests)(
+      'should return lock held error when course is being processed',
+      async () => {
+        // Given: A locked course
+        const courseId = generateUniqueCourseId();
+        testCourseIds.push(courseId);
 
-      await generationLockService.acquireLock(courseId, 'existing-job');
+        await generationLockService.acquireLock(courseId, 'existing-job');
 
-      // When: A new job tries to start for the same course
-      const jobInput = mockStage6JobInput({
-        lessonSpec: createTestLessonSpec({ lesson_id: 'lock-test.1' }),
-        courseId,
-        ragChunks: createTestRAGChunks(2),
-      });
+        // When: A new job tries to start for the same course
+        const jobInput = mockStage6JobInput({
+          lessonSpec: createTestLessonSpec({ lesson_id: 'lock-test.1' }),
+          courseId,
+          ragChunks: createTestRAGChunks(2),
+        });
 
-      const job = await queue.add('lock-blocked-job', jobInput, {
-        jobId: generateUniqueJobId(),
-      });
+        const job = await queue.add('lock-blocked-job', jobInput, {
+          jobId: generateUniqueJobId(),
+        });
 
-      // Then: Job should return error about course already being processed
-      // Note: The actual behavior depends on handler implementation
-      // The job may complete with success=false and an error message
-      try {
-        const result = await waitForJobCompletion(job, queueEvents, 30000);
-        expect(result.success).toBe(false);
-        expect(result.errors.length).toBeGreaterThan(0);
-        expect(result.errors[0]).toContain('already being processed');
-      } catch {
-        // Job may have failed - that's also acceptable
+        // Then: Job should return error about course already being processed
+        // Note: The actual behavior depends on handler implementation
+        // The job may complete with success=false and an error message
+        try {
+          const result = await waitForJobCompletion(job, queueEvents, 30000);
+          expect(result.success).toBe(false);
+          expect(result.errors.length).toBeGreaterThan(0);
+          expect(result.errors[0]).toContain('already being processed');
+        } catch {
+          // Job may have failed - that's also acceptable
+        }
+
+        // Cleanup
+        await generationLockService.forceRelease(courseId);
       }
-
-      // Cleanup
-      await generationLockService.forceRelease(courseId);
-    });
+    );
 
     it.skipIf(shouldSkipTests)('should release lock after job completion', async () => {
       // This test verifies that locks are released in the finally block

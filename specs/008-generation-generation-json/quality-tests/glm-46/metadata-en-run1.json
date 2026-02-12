@@ -1,4 +1,3 @@
-
 {
   "course_title": "Introduction to Python Programming",
   "course_description": "A comprehensive beginner-level technical programming course designed to introduce students to Python programming fundamentals. This course covers essential concepts including variables, data types, control structures, functions, and basic object-oriented programming. Students will gain hands-on experience through practical exercises and real-world projects, building a solid foundation for further programming studies. The curriculum emphasizes problem-solving skills and coding best practices, preparing learners for entry-level programming roles or advanced Python courses.",
@@ -6,7 +5,12 @@
   "target_audience": "This course is designed for absolute beginners with no prior programming experience, including career changers transitioning into tech roles, college students exploring computer science, professionals seeking to add programming skills to their toolkit, entrepreneurs wanting to understand technical aspects of their businesses, and hobbyists interested in learning programming for personal projects. The course is particularly suitable for those who learn best through hands-on practice and real-world applications rather than theoretical lectures alone.",
   "estimated_duration_hours": 40,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy", "Familiarity with using a web browser", "Ability to install software on personal computer", "Logical thinking and problem-solving aptitude"],
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a web browser",
+    "Ability to install software on personal computer",
+    "Logical thinking and problem-solving aptitude"
+  ],
   "learning_outcomes": [
     "Define and implement Python variables, data types, and operators to solve basic computational problems",
     "Build functional programs using control structures including conditional statements and loops to control program flow",
@@ -16,5 +20,14 @@
     "Apply fundamental object-oriented programming concepts to structure code logically and efficiently",
     "Construct a complete Python project from requirements gathering through to implementation and testing"
   ],
-  "course_tags": ["Python", "Programming Fundamentals", "Beginner Programming", "Computer Science", "Software Development", "Coding Basics", "Technical Skills", "Programming Languages"]
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Programming",
+    "Computer Science",
+    "Software Development",
+    "Coding Basics",
+    "Technical Skills",
+    "Programming Languages"
+  ]
 }

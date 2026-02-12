@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { Link, useRouter } from '@/src/i18n/navigation';
-import { User, Moon, Sun, LogOut, Settings } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { useThemeSync } from '@/lib/hooks/use-theme-sync';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react'
+import { Link, useRouter } from '@/src/i18n/navigation'
+import { User, Moon, Sun, LogOut, Settings } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useThemeSync } from '@/lib/hooks/use-theme-sync'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,23 +13,23 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/components/ui/dropdown-menu'
 
 interface AdminUserMenuProps {
-  userEmail: string;
+  userEmail: string
 }
 
 export function AdminUserMenu({ userEmail }: AdminUserMenuProps) {
-  const router = useRouter();
-  const { theme, setTheme, mounted } = useThemeSync();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const router = useRouter()
+  const { theme, setTheme, mounted } = useThemeSync()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const handleSignOut = async () => {
-    setIsLoggingOut(true);
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/');
-  };
+    setIsLoggingOut(true)
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/')
+  }
 
   return (
     <DropdownMenu>
@@ -42,11 +42,14 @@ export function AdminUserMenu({ userEmail }: AdminUserMenuProps) {
           <User className="h-4 w-4 text-gray-700 dark:text-zinc-300" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-700">
+      <DropdownMenuContent
+        align="end"
+        className="w-56 border-gray-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+      >
         <DropdownMenuLabel className="text-gray-900 dark:text-zinc-300">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium">Admin Account</p>
-            <p className="text-xs text-gray-500 dark:text-zinc-500 truncate">{userEmail}</p>
+            <p className="truncate text-xs text-gray-500 dark:text-zinc-500">{userEmail}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-gray-200 dark:bg-zinc-700" />
@@ -72,7 +75,10 @@ export function AdminUserMenu({ userEmail }: AdminUserMenuProps) {
         <DropdownMenuSeparator className="bg-gray-200 dark:bg-zinc-700" />
 
         {/* Profile Link */}
-        <DropdownMenuItem asChild className="cursor-pointer text-gray-700 hover:bg-gray-100 focus:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:bg-zinc-800">
+        <DropdownMenuItem
+          asChild
+          className="cursor-pointer text-gray-700 hover:bg-gray-100 focus:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:bg-zinc-800"
+        >
           <Link href="/profile">
             <Settings className="mr-2 h-4 w-4" />
             Профиль
@@ -83,7 +89,7 @@ export function AdminUserMenu({ userEmail }: AdminUserMenuProps) {
 
         {/* Sign Out */}
         <DropdownMenuItem
-          className="cursor-pointer text-red-600 hover:bg-gray-100 focus:bg-gray-100 hover:text-red-700 dark:text-red-400 dark:hover:bg-zinc-800 dark:focus:bg-zinc-800 dark:hover:text-red-300"
+          className="cursor-pointer text-red-600 hover:bg-gray-100 hover:text-red-700 focus:bg-gray-100 dark:text-red-400 dark:hover:bg-zinc-800 dark:hover:text-red-300 dark:focus:bg-zinc-800"
           onClick={handleSignOut}
           disabled={isLoggingOut}
         >
@@ -92,5 +98,5 @@ export function AdminUserMenu({ userEmail }: AdminUserMenuProps) {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
+  )
 }

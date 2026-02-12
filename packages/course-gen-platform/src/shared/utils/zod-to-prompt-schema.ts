@@ -68,17 +68,14 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
   let isOptional = false;
   let isNullable = false;
 
-  while (
-    currentSchema instanceof z.ZodOptional ||
-    currentSchema instanceof z.ZodNullable
-  ) {
+  while (currentSchema instanceof z.ZodOptional || currentSchema instanceof z.ZodNullable) {
     if (currentSchema instanceof z.ZodOptional) {
       isOptional = true;
-      currentSchema = (currentSchema)._def.innerType as z.ZodType;
+      currentSchema = currentSchema._def.innerType as z.ZodType;
     }
     if (currentSchema instanceof z.ZodNullable) {
       isNullable = true;
-      currentSchema = (currentSchema)._def.innerType as z.ZodType;
+      currentSchema = currentSchema._def.innerType as z.ZodType;
     }
   }
 
@@ -86,7 +83,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
   // ZodEffects wraps the actual schema, we need to access the underlying type
   // See: INV-2025-11-19-001 - zodToPromptSchema missing ZodEffects handler
   if (currentSchema instanceof z.ZodEffects) {
-    currentSchema = (currentSchema)._def.schema as z.ZodType;
+    currentSchema = currentSchema._def.schema as z.ZodType;
   }
 
   const optionalSuffix = isOptional ? ' (optional)' : '';
@@ -115,9 +112,9 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
     const elementDesc = zodToPromptSchema(element as z.ZodType, depth);
 
     // Extract array constraints
-    const checks = ((currentSchema as unknown as { _def: ZodDefWithChecks })._def.checks) || [];
-    const minCheck = checks.find((c) => c.kind === 'min');
-    const maxCheck = checks.find((c) => c.kind === 'max');
+    const checks = (currentSchema as unknown as { _def: ZodDefWithChecks })._def.checks || [];
+    const minCheck = checks.find(c => c.kind === 'min');
+    const maxCheck = checks.find(c => c.kind === 'max');
 
     let constraints = '';
     if (minCheck || maxCheck) {
@@ -132,7 +129,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
 
   // Handle ZodString
   if (currentSchema instanceof z.ZodString) {
-    const checks = ((currentSchema as unknown as { _def: ZodDefWithChecks })._def.checks) || [];
+    const checks = (currentSchema as unknown as { _def: ZodDefWithChecks })._def.checks || [];
     const constraints: string[] = [];
 
     for (const check of checks) {
@@ -155,7 +152,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
 
   // Handle ZodNumber
   if (currentSchema instanceof z.ZodNumber) {
-    const checks = ((currentSchema as unknown as { _def: ZodDefWithChecks })._def.checks) || [];
+    const checks = (currentSchema as unknown as { _def: ZodDefWithChecks })._def.checks || [];
     const constraints: string[] = [];
 
     let isInteger = false;
@@ -195,9 +192,7 @@ export function zodToPromptSchema(schema: z.ZodType, depth: number = 0): string 
   // Handle ZodUnion
   if (currentSchema instanceof z.ZodUnion) {
     const options = (currentSchema as unknown as { _def: ZodDefWithOptions })._def.options;
-    const optionDescriptions = options.map((opt: z.ZodType) =>
-      zodToPromptSchema(opt, depth)
-    );
+    const optionDescriptions = options.map((opt: z.ZodType) => zodToPromptSchema(opt, depth));
     return `${optionDescriptions.join(' | ')}${optionalSuffix}${nullableSuffix}`;
   }
 
@@ -227,7 +222,7 @@ export function estimateSchemaTokens(schemaText: string): number {
     const tokens = encoding.encode(schemaText);
     encoding.free(); // Clean up encoding resources
     return tokens.length;
-  } catch (_) {
+  } catch {
     // Fallback to character-based estimation (4 chars ≈ 1 token)
     console.warn('[estimateSchemaTokens] Tiktoken encoding failed, using fallback estimation');
     return Math.ceil(schemaText.length / 4);
@@ -251,14 +246,9 @@ export function estimateSchemaTokens(schemaText: string): number {
  * const prompt = `Generate JSON matching this schema:\n\n${formatted}`;
  * ```
  */
-export function formatSchemaForPrompt(
-  schema: z.ZodType,
-  additionalInstructions?: string
-): string {
+export function formatSchemaForPrompt(schema: z.ZodType, additionalInstructions?: string): string {
   const schemaDescription = zodToPromptSchema(schema);
-  const instructions = additionalInstructions
-    ? `\n\n${additionalInstructions}`
-    : '';
+  const instructions = additionalInstructions ? `\n\n${additionalInstructions}` : '';
 
   return `You MUST respond with valid JSON matching this EXACT schema:
 

@@ -96,9 +96,7 @@
         "details": {
           "lessonCount": 4
         },
-        "issues": [
-          "Some lesson objectives not measurable"
-        ]
+        "issues": ["Some lesson objectives not measurable"]
       },
       "languageQuality": {
         "score": 1,
@@ -128,9 +126,7 @@
         "details": {
           "lessonCount": 4
         },
-        "issues": [
-          "Some lesson objectives not measurable"
-        ]
+        "issues": ["Some lesson objectives not measurable"]
       },
       "languageQuality": {
         "score": 1,
@@ -160,9 +156,7 @@
         "details": {
           "lessonCount": 4
         },
-        "issues": [
-          "Some lesson objectives not measurable"
-        ]
+        "issues": ["Some lesson objectives not measurable"]
       },
       "languageQuality": {
         "score": 1,
@@ -192,9 +186,7 @@
         "details": {
           "lessonCount": 4
         },
-        "issues": [
-          "Some lesson objectives not measurable"
-        ]
+        "issues": ["Some lesson objectives not measurable"]
       },
       "languageQuality": {
         "score": 1,
@@ -224,9 +216,7 @@
         "details": {
           "lessonCount": 4
         },
-        "issues": [
-          "Some lesson objectives not measurable"
-        ]
+        "issues": ["Some lesson objectives not measurable"]
       },
       "languageQuality": {
         "score": 1,
@@ -256,9 +246,7 @@
         "details": {
           "lessonCount": 4
         },
-        "issues": [
-          "Some lesson objectives not measurable"
-        ]
+        "issues": ["Some lesson objectives not measurable"]
       },
       "languageQuality": {
         "score": 1,
@@ -402,9 +390,7 @@
         "details": {
           "language": "ru"
         },
-        "issues": [
-          "Possible translation artifacts detected"
-        ]
+        "issues": ["Possible translation artifacts detected"]
       },
       "overallScore": 0.7400000000000001
     },
@@ -442,9 +428,7 @@
         "details": {
           "language": "ru"
         },
-        "issues": [
-          "Possible translation artifacts detected"
-        ]
+        "issues": ["Possible translation artifacts detected"]
       },
       "overallScore": 0.7400000000000001
     },
@@ -482,9 +466,7 @@
         "details": {
           "language": "ru"
         },
-        "issues": [
-          "Possible translation artifacts detected"
-        ]
+        "issues": ["Possible translation artifacts detected"]
       },
       "overallScore": 0.7400000000000001
     }

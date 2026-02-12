@@ -185,10 +185,7 @@ function detectImages(content: string): boolean {
  * @param docling_json - DoclingDocument JSON (optional)
  * @returns Array of image references
  */
-function extractImageReferences(
-  content: string,
-  docling_json?: DoclingDocument
-): ImageReference[] {
+function extractImageReferences(content: string, docling_json?: DoclingDocument): ImageReference[] {
   const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
   const references: ImageReference[] = [];
 
@@ -238,10 +235,7 @@ function extractImageReferences(
  * @param docling_json - DoclingDocument JSON (optional)
  * @returns Array of table references
  */
-function extractTableReferences(
-  content: string,
-  docling_json?: DoclingDocument
-): TableReference[] {
+function extractTableReferences(content: string, docling_json?: DoclingDocument): TableReference[] {
   const references: TableReference[] = [];
 
   // Simple markdown table detection
@@ -327,10 +321,7 @@ function determinePageRange(
  * @param options - Enrichment options
  * @returns Enriched chunk with metadata
  */
-export function enrichChunk(
-  chunk: TextChunk,
-  options: EnrichmentOptions
-): EnrichedChunk {
+export function enrichChunk(chunk: TextChunk, options: EnrichmentOptions): EnrichedChunk {
   const now = new Date().toISOString();
 
   // Detect content features
@@ -390,10 +381,7 @@ export function enrichChunk(
  * @param options - Enrichment options
  * @returns Array of enriched chunks
  */
-export function enrichChunks(
-  chunks: TextChunk[],
-  options: EnrichmentOptions
-): EnrichedChunk[] {
+export function enrichChunks(chunks: TextChunk[], options: EnrichmentOptions): EnrichedChunk[] {
   return chunks.map(chunk => enrichChunk(chunk, options));
 }
 
@@ -483,7 +471,8 @@ export function filterChunks(
   return chunks.filter(chunk => {
     if (filter.level && chunk.level !== filter.level) return false;
     if (filter.has_code !== undefined && chunk.has_code !== filter.has_code) return false;
-    if (filter.has_formulas !== undefined && chunk.has_formulas !== filter.has_formulas) return false;
+    if (filter.has_formulas !== undefined && chunk.has_formulas !== filter.has_formulas)
+      return false;
     if (filter.has_tables !== undefined && chunk.has_tables !== filter.has_tables) return false;
     if (filter.has_images !== undefined && chunk.has_images !== filter.has_images) return false;
     if (filter.min_tokens && chunk.token_count < filter.min_tokens) return false;

@@ -8,6 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { authenticateRequest, type AuthUser } from '@/lib/auth'
 import { nanoid } from 'nanoid'
 import { logger } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 
 /**
  * Test authentication flow
@@ -25,7 +26,7 @@ export async function testAuthToken(request?: NextRequest): Promise<{
   try {
     if (!request) {
       // Create a mock request if none provided
-      request = new NextRequest(new URL('http://localhost:3000/debug'))
+      request = new NextRequest(new URL(`${ENV.NEXT_PUBLIC_APP_URL}/debug`))
     }
 
     const user = await authenticateRequest(request)
@@ -34,7 +35,7 @@ export async function testAuthToken(request?: NextRequest): Promise<{
       logger.info(`[Debug ${debugId}] Authentication successful`, {
         userId: user.id,
         email: user.email,
-        role: user.role
+        role: user.role,
       })
 
       return {
@@ -45,8 +46,8 @@ export async function testAuthToken(request?: NextRequest): Promise<{
           userId: user.id,
           email: user.email,
           role: user.role,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       }
     }
 
@@ -58,8 +59,8 @@ export async function testAuthToken(request?: NextRequest): Promise<{
       details: {
         hasAuthHeader: request.headers.has('Authorization'),
         hasCookieHeader: request.headers.has('Cookie'),
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     }
   } catch (error) {
     logger.error(`[Debug ${debugId}] Authentication error`, { error })
@@ -70,8 +71,8 @@ export async function testAuthToken(request?: NextRequest): Promise<{
       details: {
         errorType: error instanceof Error ? error.name : typeof error,
         stack: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     }
   }
 }
@@ -98,10 +99,7 @@ export async function testSupabaseConnection(): Promise<{
   try {
     // Test regular client
     const client = await createClient()
-    const { error: pingError } = await client
-      .from('courses')
-      .select('id')
-      .limit(1)
+    const { error: pingError } = await client.from('courses').select('id').limit(1)
 
     if (!pingError || pingError.code === 'PGRST116') {
       regularClient = true
@@ -114,16 +112,15 @@ export async function testSupabaseConnection(): Promise<{
     // Test admin client
     try {
       const admin = await createAdminClient()
-      const { error: adminPingError } = await admin
-        .from('courses')
-        .select('id')
-        .limit(1)
+      const { error: adminPingError } = await admin.from('courses').select('id').limit(1)
 
       if (!adminPingError || adminPingError.code === 'PGRST116') {
         adminClient = true
         logger.info(`[Debug ${debugId}] Admin client connected successfully`)
       } else {
-        error = error ? `${error}; Admin client error: ${adminPingError.message}` : `Admin client error: ${adminPingError.message}`
+        error = error
+          ? `${error}; Admin client error: ${adminPingError.message}`
+          : `Admin client error: ${adminPingError.message}`
         logger.error(`[Debug ${debugId}] Admin client error`, { error: adminPingError })
       }
     } catch (adminError) {
@@ -140,7 +137,7 @@ export async function testSupabaseConnection(): Promise<{
     regularClient,
     adminClient,
     error,
-    responseTime
+    responseTime,
   }
 }
 
@@ -182,13 +179,13 @@ export async function testCoursePermissions(
         isAdmin: false,
         canShare: false,
         error: courseError?.message || 'Course not found',
-        details: { slug, error: courseError }
+        details: { slug, error: courseError },
       }
     }
 
     // If no userId provided, try to get from auth
     if (!userId) {
-      const mockRequest = new NextRequest(new URL('http://localhost:3000/debug'))
+      const mockRequest = new NextRequest(new URL(`${ENV.NEXT_PUBLIC_APP_URL}/debug`))
       const user = await authenticateRequest(mockRequest)
       userId = user?.id
     }
@@ -201,7 +198,7 @@ export async function testCoursePermissions(
         isAdmin: false,
         canShare: false,
         error: 'No user ID available',
-        details: { course: { id: course.id, title: course.title } }
+        details: { course: { id: course.id, title: course.title } },
       }
     }
 
@@ -212,13 +209,19 @@ export async function testCoursePermissions(
     let userRole = 'student'
     try {
       // SECURITY: First validate user authenticity with getUser()
-      const { data: { user: validatedUser } } = await supabase.auth.getUser()
+      const {
+        data: { user: validatedUser },
+      } = await supabase.auth.getUser()
 
       if (validatedUser) {
         // Now get session to access JWT custom claims (user is already validated)
-        const { data: { session } } = await supabase.auth.getSession()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
         if (session?.access_token) {
-          const payload = JSON.parse(Buffer.from(session.access_token.split('.')[1], 'base64').toString())
+          const payload = JSON.parse(
+            Buffer.from(session.access_token.split('.')[1], 'base64').toString()
+          )
           userRole = payload.role || 'student'
         }
       }
@@ -235,7 +238,7 @@ export async function testCoursePermissions(
       isOwner,
       isAdmin,
       canShare,
-      hasShareToken: !!course.share_token
+      hasShareToken: !!course.share_token,
     })
 
     return {
@@ -250,13 +253,13 @@ export async function testCoursePermissions(
           id: course.id,
           title: course.title,
           owner_id: course.user_id,
-          has_share_token: !!course.share_token
+          has_share_token: !!course.share_token,
         },
         user: {
           id: userId,
-          role: userRole || 'student'
-        }
-      }
+          role: userRole || 'student',
+        },
+      },
     }
   } catch (error) {
     logger.error(`[Debug ${debugId}] Permission check error`, { error })
@@ -267,7 +270,7 @@ export async function testCoursePermissions(
       isAdmin: false,
       canShare: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-      details: { error }
+      details: { error },
     }
   }
 }
@@ -282,16 +285,13 @@ export function validateEnvironment(): {
   warnings: string[]
   details: Record<string, boolean>
 } {
-  const required = [
-    'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY'
-  ]
+  const required = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY']
 
   const recommended = [
     'SUPABASE_SERVICE_ROLE_KEY',
     'NEXT_PUBLIC_SITE_URL',
     'NEXT_PUBLIC_APP_URL',
-    'N8N_WEBHOOK_URL'
+    'COURSEGEN_BACKEND_URL',
   ]
 
   const missing: string[] = []
@@ -319,14 +319,14 @@ export function validateEnvironment(): {
   logger.info('[Debug] Environment validation', {
     valid: missing.length === 0,
     missing,
-    warnings
+    warnings,
   })
 
   return {
     valid: missing.length === 0,
     missing,
     warnings,
-    details
+    details,
   }
 }
 
@@ -388,7 +388,7 @@ export function testSupabaseConfig(): {
     anonKeyValid,
     serviceKeyValid,
     projectRef,
-    errors
+    errors,
   }
 }
 
@@ -408,9 +408,9 @@ export function logRequestDetails(request: NextRequest, context?: string): void 
       userAgent: request.headers.get('user-agent'),
       contentType: request.headers.get('content-type'),
       authorization: request.headers.has('Authorization') ? 'present' : 'missing',
-      cookie: request.headers.has('cookie') ? 'present' : 'missing'
+      cookie: request.headers.has('cookie') ? 'present' : 'missing',
     },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   }
 
   logger.info(`[Debug ${debugId}] Request details`, details)
@@ -432,27 +432,27 @@ export function testShareTokenGeneration(): {
     if (isValid) {
       logger.info('[Debug] Share token generation successful', {
         tokenLength: token.length,
-        sample: `${token.substring(0, 8)}...`
+        sample: `${token.substring(0, 8)}...`,
       })
 
       return {
         success: true,
         token,
-        error: null
+        error: null,
       }
     }
 
     return {
       success: false,
       token: null,
-      error: 'Generated token is invalid'
+      error: 'Generated token is invalid',
     }
   } catch (error) {
     logger.error('[Debug] Share token generation failed', { error })
     return {
       success: false,
       token: null,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     }
   }
 }
@@ -483,11 +483,7 @@ export async function testCourseQuery(slug: string): Promise<{
 
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('slug', slug)
-      .single()
+    const { data, error } = await supabase.from('courses').select('*').eq('slug', slug).single()
 
     const queryTime = Date.now() - startTime
 
@@ -497,7 +493,7 @@ export async function testCourseQuery(slug: string): Promise<{
         success: false,
         course: null,
         error: error.message,
-        queryTime
+        queryTime,
       }
     }
 
@@ -506,7 +502,7 @@ export async function testCourseQuery(slug: string): Promise<{
       success: true,
       course: data,
       error: null,
-      queryTime
+      queryTime,
     }
   } catch (error) {
     const queryTime = Date.now() - startTime
@@ -515,7 +511,7 @@ export async function testCourseQuery(slug: string): Promise<{
       success: false,
       course: null,
       error: error instanceof Error ? error.message : 'Unknown error',
-      queryTime
+      queryTime,
     }
   }
 }
@@ -550,7 +546,7 @@ export async function testShareTokenUpdate(
       return {
         success: false,
         error: error.message,
-        updateTime
+        updateTime,
       }
     }
 
@@ -558,7 +554,7 @@ export async function testShareTokenUpdate(
     return {
       success: true,
       error: null,
-      updateTime
+      updateTime,
     }
   } catch (error) {
     const updateTime = Date.now() - startTime
@@ -566,7 +562,7 @@ export async function testShareTokenUpdate(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-      updateTime
+      updateTime,
     }
   }
 }
@@ -581,7 +577,7 @@ export async function testFetchRequest(
 ): Promise<{
   success: boolean
   status: number | null
-  data: unknown | null
+  data: unknown
   error: string | null
   responseTime: number
 }> {
@@ -595,8 +591,8 @@ export async function testFetchRequest(
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers
-      }
+        ...options.headers,
+      },
     })
 
     const responseTime = Date.now() - startTime
@@ -612,7 +608,7 @@ export async function testFetchRequest(
     logger.info(`[Debug ${debugId}] Fetch complete`, {
       status: response.status,
       ok: response.ok,
-      responseTime
+      responseTime,
     })
 
     return {
@@ -620,7 +616,7 @@ export async function testFetchRequest(
       status: response.status,
       data,
       error: response.ok ? null : data?.error || data?.message || 'Request failed',
-      responseTime
+      responseTime,
     }
   } catch (error) {
     const responseTime = Date.now() - startTime
@@ -630,7 +626,7 @@ export async function testFetchRequest(
       status: null,
       data: null,
       error: error instanceof Error ? error.message : 'Unknown error',
-      responseTime
+      responseTime,
     }
   }
 }
@@ -664,16 +660,21 @@ export async function runDebugSuite(slug?: string): Promise<{
     summary: {
       passed: 0,
       failed: 0,
-      warnings: 0
-    }
+      warnings: 0,
+    },
   }
 
   // Calculate summary
-  if (results.environment.valid) results.summary.passed++; else results.summary.failed++
-  if (results.supabase.success) results.summary.passed++; else results.summary.failed++
-  if (results.authentication.success) results.summary.passed++; else results.summary.failed++
-  if (results.shareToken.success) results.summary.passed++; else results.summary.failed++
-  if (results.course?.success) results.summary.passed++; else if (results.course) results.summary.failed++
+  if (results.environment.valid) results.summary.passed++
+  else results.summary.failed++
+  if (results.supabase.success) results.summary.passed++
+  else results.summary.failed++
+  if (results.authentication.success) results.summary.passed++
+  else results.summary.failed++
+  if (results.shareToken.success) results.summary.passed++
+  else results.summary.failed++
+  if (results.course?.success) results.summary.passed++
+  else if (results.course) results.summary.failed++
 
   results.summary.warnings = results.environment.warnings.length
 

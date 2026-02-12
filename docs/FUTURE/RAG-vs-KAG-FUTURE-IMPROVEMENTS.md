@@ -3,10 +3,11 @@
 **Purpose**: Detailed instructions for future refinement and validation of the RAG vs KAG comparative analysis
 **Target Audience**: Future AI assistant or team member tasked with improving this research
 **Context Documents**:
+
 - `RAG-vs-KAG-ANALYSIS.md` - Initial comprehensive analysis
 - `RAG-vs-KAG-ADDENDUM.md` - Critical corrections and revised recommendations
-**Status**: Phase 0 (Validation PoC) not yet started
-**Last Updated**: 2025-01-25
+  **Status**: Phase 0 (Validation PoC) not yet started
+  **Last Updated**: 2025-01-25
 
 ---
 
@@ -15,6 +16,7 @@
 You are tasked with refining and validating the RAG (Retrieval Augmented Generation) vs KAG (Knowledge Augmented Generation) comparative analysis for MegaCampus2, a Russian-language educational content platform. The current analysis has identified KAG as potentially superior for course generation use cases but requires empirical validation.
 
 **Current State**:
+
 - Initial analysis recommended RAG-only (cost concerns)
 - Revised analysis (addendum) recommends Hybrid RAG+KAG architecture
 - Key assumption: KAG provides 20-30% improvement for course generation
@@ -34,6 +36,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 **Steps**:
 
 1. **Prepare Gold Standard Dataset**:
+
    ```
    - Source: 100 Russian educational documents (ML/AI domain)
    - Format: PDF, DOCX, or Markdown
@@ -64,6 +67,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    | Llama 3.1 | 8B, 70B | Multilingual fine-tuned |
 
 3. **Measure Metrics**:
+
    ```python
    metrics = {
        "entity_extraction": {
@@ -94,6 +98,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 4. **Decision Criteria**:
+
    ```
    F1 >= 0.85: ✅ PASS - Proceed with KAG
    0.75 <= F1 < 0.85: ⚠️ CONDITIONAL - Hybrid approach (validated entities only)
@@ -118,6 +123,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 **Steps**:
 
 1. **Generate Test Queries**:
+
    ```python
    # 100 realistic course generation queries across categories:
 
@@ -147,6 +153,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 2. **Run A/B Comparison**:
+
    ```python
    for query in test_queries:
        # Get responses from both systems
@@ -167,6 +174,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 3. **Human Evaluation**:
+
    ```
    For each query, rate both responses on 5-point scale:
 
@@ -184,6 +192,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 4. **Statistical Analysis**:
+
    ```python
    import scipy.stats as stats
 
@@ -207,6 +216,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 5. **Decision Criteria**:
+
    ```
    KAG improvement >= 20% AND p < 0.05: ✅ STRONGLY RECOMMEND KAG
    KAG improvement >= 10% AND p < 0.05: ✅ RECOMMEND KAG
@@ -233,6 +243,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 **Steps**:
 
 1. **Hardware Benchmarking**:
+
    ```python
    # Test on different GPU configurations
    hardware_configs = [
@@ -263,6 +274,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 2. **Compare with Cloud LLM APIs**:
+
    ```python
    cloud_providers = {
        "OpenAI GPT-4": {"cost_per_1m_tokens": 10.0},
@@ -282,6 +294,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 3. **Total Cost of Ownership Analysis**:
+
    ```python
    def calculate_tco(scenario, years=3):
        """
@@ -336,6 +349,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 **Steps**:
 
 1. **Latency Benchmarking**:
+
    ```python
    import asyncio
    import time
@@ -368,6 +382,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 2. **Concurrent User Testing**:
+
    ```python
    async def load_test(system, concurrent_users, duration_seconds):
        """
@@ -411,6 +426,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 3. **Database Scaling**:
+
    ```python
    # Test KG performance with varying graph sizes
    graph_sizes = [
@@ -439,6 +455,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 4. **Decision Criteria**:
+
    ```
    Target Requirements:
    - RAG latency P95: <500ms ✅
@@ -466,6 +483,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 **Steps**:
 
 1. **Literature Search**:
+
    ```
    Search queries:
    - "Knowledge Augmented Generation 2025"
@@ -516,6 +534,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 4. **Russian EdTech**: Skyeng, Stepik, Skillbox - any public info on tech stack?
 
 **Key Questions**:
+
 - Do they use RAG/KAG or different approaches?
 - How do they handle prerequisite chains?
 - How do they generate course content?
@@ -534,6 +553,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 **Steps**:
 
 1. **Interview Course Authors** (5-10 interviews):
+
    ```
    Questions:
    - What's hardest about creating course content?
@@ -544,6 +564,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 2. **Analyze Existing Courses**:
+
    ```python
    # Sample 50 high-quality Russian ML/AI courses
    for course in sample_courses:
@@ -559,6 +580,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 3. **Survey Course Consumers** (100+ students):
+
    ```
    Questions:
    - How important are clear prerequisites? (1-5)
@@ -587,6 +609,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 **Approach**:
 
 1. **Systematic Prompt Tuning**:
+
    ```python
    prompt_variants = {
        "v1_basic": "Извлеки сущности из текста...",
@@ -608,6 +631,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    Test best prompts across Qwen 7B/14B/32B, DeepSeek, Mistral
 
 3. **Temperature/Parameter Tuning**:
+
    ```python
    hyperparams = {
        "temperature": [0.0, 0.3, 0.7, 1.0],
@@ -630,6 +654,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 **Steps**:
 
 1. **Entity Type Coverage Analysis**:
+
    ```python
    # Analyze what entity types appear in sample docs
    from collections import Counter
@@ -646,6 +671,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 2. **Relationship Type Discovery**:
+
    ```python
    # Extract common relationship patterns
    relationship_patterns = []
@@ -662,6 +688,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
    ```
 
 3. **Schema Validation**:
+
    ```python
    # Test schema coverage
    schema_coverage = 0
@@ -694,6 +721,7 @@ Validate assumptions, fill knowledge gaps, and provide data-driven recommendatio
 4. **Contextual Routing** (query-dependent weights)
 
 **Evaluation**:
+
 ```python
 for fusion_method in [RRF, weighted_linear, l2r, contextual]:
     # Test on query dataset
@@ -741,7 +769,7 @@ for fusion_method in [RRF, weighted_linear, l2r, contextual]:
 - queries_per_second
 - rag_queries_per_second
 - kag_queries_per_second
-- routing_accuracy  # Did router choose correct path?
+- routing_accuracy # Did router choose correct path?
 
 # Latency
 - p50_latency_ms
@@ -751,22 +779,22 @@ for fusion_method in [RRF, weighted_linear, l2r, contextual]:
 - kag_p95_latency_ms
 
 # Quality
-- user_satisfaction_score  # 1-5 rating
+- user_satisfaction_score # 1-5 rating
 - thumbs_up_rate
 - result_click_through_rate
-- follow_up_query_rate  # If high, initial answer was poor
+- follow_up_query_rate # If high, initial answer was poor
 
 # Graph Metrics
 - graph_node_count
 - graph_edge_count
 - graph_query_count
-- graph_query_complexity_avg  # Hops traversed
+- graph_query_complexity_avg # Hops traversed
 - graph_query_cache_hit_rate
 
 # Errors
 - error_rate
 - timeout_rate
-- fallback_rate  # KAG → RAG fallback frequency
+- fallback_rate # KAG → RAG fallback frequency
 
 # Costs
 - gpu_hours_used
@@ -775,6 +803,7 @@ for fusion_method in [RRF, weighted_linear, l2r, contextual]:
 ```
 
 **Alerting Rules**:
+
 ```yaml
 alerts:
   - name: HighRAGLatency
@@ -842,6 +871,7 @@ alerts:
 **Objective**: Design safe rollback strategy if KAG underperforms.
 
 **Rollback Triggers**:
+
 ```
 Automatic rollback if:
 - Error rate > 5% for 15 minutes
@@ -856,6 +886,7 @@ Manual rollback if:
 ```
 
 **Rollback Procedure**:
+
 ```bash
 # 1. Disable KAG routing (force all to RAG)
 kubectl set env deployment/api ENABLE_KAG=false
@@ -889,44 +920,54 @@ pg_dump knowledge_graph > rollback_$(date +%Y%m%d).sql
 **Objective**: Document all major architectural decisions with rationale.
 
 **Template**:
+
 ```markdown
 # ADR-001: Use Qwen 14B for Entity Extraction
 
 ## Status
+
 Accepted
 
 ## Context
+
 Need to extract entities from Russian educational text for knowledge graph construction.
 
 ## Decision
+
 Use Qwen 2.5 14B (4-bit quantized) running locally via Ollama.
 
 ## Rationale
+
 - Russian F1 score: 0.83 (vs 0.78 for Qwen 7B, 0.81 for Mistral 7B)
 - Cost: $0 (local inference) vs $0.50-1.00 per 1M tokens (API)
 - Latency: 450ms avg (vs 800ms for API)
 - VRAM: 10GB (fits on RTX 3080/4090)
 
 ## Alternatives Considered
+
 1. Qwen 7B: Lower cost but worse F1 (0.78)
 2. Qwen 32B: Better F1 (0.86) but requires 20GB VRAM
 3. DeepSeek-V3 API: Good F1 (0.84) but $0.14/1M tokens
 
 ## Consequences
+
 - Positive: Zero ongoing cost, fast inference, good quality
 - Negative: Requires GPU investment ($1,600 for RTX 4090)
 - Risk: Model updates require re-validation
 
 ## Validation
+
 - Tested on 100 Russian docs
 - F1 score: 0.83 (meets threshold of 0.80)
 - Cost savings: ~$1,500/year vs API
 
 ## Review Date
+
 2025-06-01
 ```
 
 **ADRs to Create**:
+
 1. ADR-001: Model Selection (Entity Extraction)
 2. ADR-002: Model Selection (Embeddings)
 3. ADR-003: Graph Database Choice (Neo4j vs alternatives)
@@ -1052,23 +1093,28 @@ Use Qwen 2.5 14B (4-bit quantized) running locally via Ollama.
 At the end of this research, you should be able to answer:
 
 ✅ **What is the empirically measured performance of KAG vs RAG for course generation?**
+
 - Expected: KAG is 20-30% better (human eval scores)
 - If true: Proceed with KAG
 - If false (improvement < 10%): Stick with RAG
 
 ✅ **What is the actual cost of running KAG with local models?**
+
 - Expected: $40-50K initial, $150-300/mo ongoing
 - Validate against real hardware/cloud costs
 
 ✅ **Can we achieve F1 > 0.80 for Russian entity extraction?**
+
 - Expected: Yes with Qwen 14B + tuned prompts
 - If no: Fall back to RAG or hybrid approach
 
 ✅ **What are the performance characteristics (latency, throughput)?**
+
 - Expected: P95 latency <1.5s, support 50+ concurrent users
 - If worse: Identify bottlenecks, optimize
 
 ✅ **Is the hybrid architecture production-ready?**
+
 - Expected: Yes with proper monitoring, fallbacks, runbooks
 - Document any remaining gaps
 
@@ -1077,6 +1123,7 @@ At the end of this research, you should be able to answer:
 ## Deliverables Checklist
 
 ### Research Reports
+
 - [ ] `russian-ner-benchmark-results.md`
 - [ ] `course-generation-ab-test-results.md`
 - [ ] `cost-validation-report.md`
@@ -1086,6 +1133,7 @@ At the end of this research, you should be able to answer:
 - [ ] `user-research-report.md`
 
 ### Technical Guides
+
 - [ ] `prompt-engineering-guide.md`
 - [ ] `optimized-graph-schema.json`
 - [ ] `hybrid-retrieval-optimization.md`
@@ -1094,11 +1142,13 @@ At the end of this research, you should be able to answer:
 - [ ] `rollback-runbook.md`
 
 ### Documentation
+
 - [ ] 8+ Architecture Decision Records
 - [ ] 4+ Operational Runbooks
 - [ ] Training materials (slides, exercises, videos)
 
 ### Code/Artifacts
+
 - [ ] `optimal-prompts.yaml`
 - [ ] Test suite for entity extraction
 - [ ] A/B testing framework
@@ -1109,14 +1159,14 @@ At the end of this research, you should be able to answer:
 
 ## Timeline Estimate
 
-| Phase | Tasks | Duration | Cost |
-|-------|-------|----------|------|
-| **Phase A: Empirical Validation** | Tasks 1.1-1.4 | 6-8 weeks | $2,500-4,500 |
-| **Phase B: Research Gap Filling** | Tasks 2.1-2.3 | 4-5 weeks | $500-1,000 |
-| **Phase C: Technical Deep Dives** | Tasks 3.1-3.3 | 4-6 weeks | $500-1,000 |
-| **Phase D: Production Readiness** | Tasks 4.1-4.3 | 2-3 weeks | $0-500 |
-| **Phase E: Documentation** | Tasks 5.1-5.3 | 3-4 weeks | $0-500 |
-| **TOTAL** | All tasks | **19-26 weeks** | **$3,500-7,500** |
+| Phase                             | Tasks         | Duration        | Cost             |
+| --------------------------------- | ------------- | --------------- | ---------------- |
+| **Phase A: Empirical Validation** | Tasks 1.1-1.4 | 6-8 weeks       | $2,500-4,500     |
+| **Phase B: Research Gap Filling** | Tasks 2.1-2.3 | 4-5 weeks       | $500-1,000       |
+| **Phase C: Technical Deep Dives** | Tasks 3.1-3.3 | 4-6 weeks       | $500-1,000       |
+| **Phase D: Production Readiness** | Tasks 4.1-4.3 | 2-3 weeks       | $0-500           |
+| **Phase E: Documentation**        | Tasks 5.1-5.3 | 3-4 weeks       | $0-500           |
+| **TOTAL**                         | All tasks     | **19-26 weeks** | **$3,500-7,500** |
 
 **Note**: Timeline assumes 1 FTE (full-time equivalent) working on this. With 2 people, can parallelize and reduce to 12-16 weeks.
 
@@ -1129,28 +1179,35 @@ After completing all tasks, create:
 **`RAG-vs-KAG-FINAL-RECOMMENDATION.md`**
 
 Structure:
+
 ```markdown
 # RAG vs KAG: Final Evidence-Based Recommendation
 
 ## Executive Summary
+
 [Data-driven recommendation based on empirical results]
 
 ## Empirical Results
+
 - Russian NER F1: X.XX (target: >0.80)
 - Course gen improvement: XX% (target: >20%)
 - Actual costs: $XX,XXX (projected: $40-50K)
 - Performance: P95 latency XXXms (target: <1500ms)
 
 ## Decision
+
 [RECOMMEND KAG | RECOMMEND RAG | CONDITIONAL]
 
 ## Implementation Plan
+
 [Detailed roadmap based on actual findings]
 
 ## Risk Assessment
+
 [Updated risks based on real testing]
 
 ## Appendices
+
 [Link to all research reports]
 ```
 
@@ -1190,6 +1247,7 @@ As you work through these tasks, continuously ask:
 ## Meta: How to Use This Prompt
 
 **If you are a future AI assistant**:
+
 1. Read the entire prompt carefully
 2. Ask clarifying questions about priorities
 3. Execute tasks systematically, documenting as you go
@@ -1197,6 +1255,7 @@ As you work through these tasks, continuously ask:
 5. Create final recommendation based on evidence
 
 **If you are a human team member**:
+
 1. Use this as a research roadmap
 2. Divide tasks among team members
 3. Schedule regular checkpoints to review progress
@@ -1204,6 +1263,7 @@ As you work through these tasks, continuously ask:
 5. Document learnings for future projects
 
 **If you are a project manager**:
+
 1. Use task estimates for project planning
 2. Allocate budget based on cost estimates
 3. Set up governance for decision points

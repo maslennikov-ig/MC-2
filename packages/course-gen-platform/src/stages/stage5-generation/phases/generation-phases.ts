@@ -54,6 +54,15 @@ import {
 import { logTrace } from '../../../shared/trace-logger';
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Calculate exponential backoff delay: baseMs * 2^(attempt-1) */
+function exponentialBackoff(attempt: number, baseMs: number): number {
+  return baseMs * Math.pow(2, attempt - 1);
+}
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -77,7 +86,9 @@ const RETRY_CONFIG = {
  */
 const PARALLEL_CONFIG = {
   /** Maximum concurrent section generations (respects OpenRouter rate limits) */
-  MAX_CONCURRENT_SECTIONS: 4,
+  MAX_CONCURRENT_SECTIONS: process.env.STAGE5_MAX_CONCURRENT_SECTIONS
+    ? parseInt(process.env.STAGE5_MAX_CONCURRENT_SECTIONS, 10)
+    : 4,
   /** Base retry delay in milliseconds */
   RETRY_DELAY_MS: 2000,
   /** Delay between parallel batches for rate limiting */
@@ -331,7 +342,7 @@ export class GenerationPhases {
 
         return {
           ...state,
-          metadata: result.metadata as any, // MetadataGenerator returns Partial<CourseStructure>
+          metadata: result.metadata as import('@megacampus/shared-types').CourseMetadata,
           tokenUsage: {
             ...state.tokenUsage,
             metadata: result.tokensUsed,
@@ -377,7 +388,7 @@ export class GenerationPhases {
         }
 
         // RT-004: Exponential backoff
-        const delay = RETRY_CONFIG.BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        const delay = exponentialBackoff(attempt, RETRY_CONFIG.BASE_DELAY_MS);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -436,8 +447,23 @@ export class GenerationPhases {
 
       // Use user-edited total_sections from Stage 4, fallback to sections_breakdown.length
       const recommendedStructure = state.input.analysis_result.recommended_structure;
-      const totalSections =
+      const requestedSections =
         recommendedStructure.total_sections ?? recommendedStructure.sections_breakdown.length;
+      const availableSections = recommendedStructure.sections_breakdown.length;
+
+      if (requestedSections > availableSections) {
+        this.logger.warn(
+          {
+            courseId,
+            requestedSections,
+            availableSections,
+            discrepancy: requestedSections - availableSections,
+          },
+          'total_sections exceeds sections_breakdown length, capping to available sections'
+        );
+      }
+
+      const totalSections = Math.min(requestedSections, availableSections);
 
       await logTrace({
         courseId,
@@ -453,8 +479,8 @@ export class GenerationPhases {
 
       try {
         const modelConfigService = createModelConfigService();
-        // Use stage 5 config for section generation retry attempts
-        const phaseConfig = await modelConfigService.getModelForPhase('stage_5_sections');
+        // Use stage 5 normal tier config for section generation retry attempts
+        const phaseConfig = await modelConfigService.getModelForPhase('stage_5_normal');
         const effectiveConfig = getEffectiveStageConfig(phaseConfig);
         retryAttemptsPerSection = effectiveConfig.maxRetries;
 
@@ -724,10 +750,17 @@ export class GenerationPhases {
   }
 
   /**
-   * Retry failed sections with exponential backoff
+   * Retry failed sections with exponential backoff (parallel via pLimit(2))
    *
    * Attempts to regenerate sections that failed in the initial parallel batch.
    * Uses exponential backoff between retries to handle rate limiting.
+   *
+   * NOTE: This is an OUTER retry layer. Each call to generateSingleSectionWithRetry()
+   * invokes generateBatch() → generateWithRetry() which has its own INNER retry (2 attempts
+   * with model escalation simple→complex). This is intentional:
+   * - Inner retry: handles model-level failures with tier escalation
+   * - Outer retry: handles section-level failures with exponential backoff
+   * Total worst case per section: maxRetries × 2 inner attempts.
    *
    * @param failedResults - Array of failed section results
    * @param input - Generation job input
@@ -757,80 +790,31 @@ export class GenerationPhases {
         failedCount: failedResults.length,
         maxRetries,
       },
-      `Retrying ${failedResults.length} failed sections`
+      `Retrying ${failedResults.length} failed sections (parallel, max 2 concurrent)`
     );
 
-    for (const failed of failedResults) {
-      let lastError = failed.error;
-      let retrySuccess = false;
+    // Use pLimit(2) for retry — lower concurrency than initial generation
+    // because failures often indicate rate limiting
+    const retryLimit = pLimit(2);
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        // Exponential backoff delay
-        const delay = PARALLEL_CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+    const retryPromises = failedResults.map(failed =>
+      retryLimit(() => this.retrySingleSection(failed, input, qdrantClient, maxRetries))
+    );
 
-        this.logger.info(
-          {
-            phase: 'generate_sections',
-            sectionIndex: failed.index + 1,
-            attempt,
-            maxAttempts: maxRetries,
-            delayMs: delay,
-          },
-          `Retry attempt ${attempt}/${maxRetries} for section ${failed.index + 1} after ${delay}ms delay`
-        );
+    const results = await Promise.allSettled(retryPromises);
 
-        await new Promise(resolve => setTimeout(resolve, delay));
-
-        try {
-          const result = await this.generateSingleSectionWithRetry(
-            failed.index,
-            input,
-            qdrantClient
-          );
-
-          successes.push({ index: failed.index, result });
-          retrySuccess = true;
-
-          this.logger.info(
-            {
-              phase: 'generate_sections',
-              sectionIndex: failed.index + 1,
-              attempt,
-            },
-            `Section ${failed.index + 1} succeeded on retry attempt ${attempt}`
-          );
-
-          break;
-        } catch (error) {
-          lastError = error instanceof Error ? error.message : String(error);
-
-          this.logger.warn(
-            {
-              phase: 'generate_sections',
-              sectionIndex: failed.index + 1,
-              attempt,
-              error: lastError,
-            },
-            `Section ${failed.index + 1} retry attempt ${attempt} failed`
-          );
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        if (result.value.success) {
+          successes.push({ index: result.value.index, result: result.value.result });
+        } else {
+          failures.push({ index: result.value.index, error: result.value.error });
         }
-      }
-
-      if (!retrySuccess) {
-        failures.push({
-          index: failed.index,
-          error: lastError,
-        });
-
-        this.logger.error(
-          {
-            phase: 'generate_sections',
-            sectionIndex: failed.index + 1,
-            maxAttempts: maxRetries,
-            error: lastError,
-          },
-          `Section ${failed.index + 1} failed after all ${maxRetries} retry attempts`
-        );
+      } else {
+        // Promise rejected (shouldn't happen since retrySingleSection catches errors)
+        const errorMessage =
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
+        failures.push({ index: -1, error: errorMessage });
       }
     }
 
@@ -844,6 +828,77 @@ export class GenerationPhases {
     );
 
     return { successes, failures };
+  }
+
+  /**
+   * Retry a single failed section with exponential backoff
+   */
+  private async retrySingleSection(
+    failed: { index: number; error: string },
+    input: GenerationJobInput,
+    qdrantClient: QdrantClient | undefined,
+    maxRetries: number
+  ): Promise<
+    | { success: true; index: number; result: SectionBatchResult }
+    | { success: false; index: number; error: string }
+  > {
+    let lastError = failed.error;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const delay = exponentialBackoff(attempt, PARALLEL_CONFIG.RETRY_DELAY_MS);
+
+      this.logger.info(
+        {
+          phase: 'generate_sections',
+          sectionIndex: failed.index + 1,
+          attempt,
+          maxAttempts: maxRetries,
+          delayMs: delay,
+        },
+        `Retry attempt ${attempt}/${maxRetries} for section ${failed.index + 1} after ${delay}ms delay`
+      );
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      try {
+        const result = await this.generateSingleSectionWithRetry(failed.index, input, qdrantClient);
+
+        this.logger.info(
+          {
+            phase: 'generate_sections',
+            sectionIndex: failed.index + 1,
+            attempt,
+          },
+          `Section ${failed.index + 1} succeeded on retry attempt ${attempt}`
+        );
+
+        return { success: true, index: failed.index, result };
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+
+        this.logger.warn(
+          {
+            phase: 'generate_sections',
+            sectionIndex: failed.index + 1,
+            attempt,
+            error: lastError,
+          },
+          `Section ${failed.index + 1} retry attempt ${attempt} failed`
+        );
+      }
+    }
+
+    this.logger.error(
+      {
+        phase: 'generate_sections',
+        sectionIndex: failed.index + 1,
+        maxAttempts: maxRetries,
+        error: lastError,
+      },
+      `Section ${failed.index + 1} failed after all ${maxRetries} retry attempts`
+    );
+
+    return { success: false, index: failed.index, error: lastError };
   }
 
   // ==========================================================================
@@ -917,7 +972,7 @@ export class GenerationPhases {
 
         const metadataResult = await this.qualityValidator.validateMetadata(
           inputRequirements,
-          state.metadata as any,
+          state.metadata,
           language
         );
 
@@ -1090,7 +1145,7 @@ export class GenerationPhases {
    * }
    * ```
    */
-  async generateV2Specs(state: GenerationState): Promise<LessonSpecificationV2[]> {
+  generateV2Specs(state: GenerationState): LessonSpecificationV2[] {
     const startTime = Date.now();
 
     try {
@@ -1106,8 +1161,8 @@ export class GenerationPhases {
         );
       }
 
-      // Generate V2 specs using the dedicated generator
-      const v2Specs = await this.v2SpecGenerator.generateV2Specs(state);
+      // Generate V2 specs using the dedicated generator (synchronous method)
+      const v2Specs = this.v2SpecGenerator.generateV2Specs(state);
 
       const duration = Date.now() - startTime;
       const totalSections =

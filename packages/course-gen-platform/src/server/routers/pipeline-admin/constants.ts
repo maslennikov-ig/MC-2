@@ -10,6 +10,10 @@ import {
   DEFAULT_MODEL_ID,
   DEFAULT_FALLBACK_MODEL_ID,
   MODEL_DEFAULTS,
+  CHAT_PRIMARY_MODEL_ID,
+  CHAT_FALLBACK_MODEL_ID,
+  CHAT_STAGE6_PRIMARY_MODEL_ID,
+  CHAT_STAGE6_FALLBACK_MODEL_ID,
 } from '@megacampus/shared-types';
 
 // =============================================================================
@@ -70,11 +74,13 @@ export const PIPELINE_STAGES = [
     handlerPath: 'stages/stage5-course-structure',
     linkedPhases: [
       'stage_5_metadata',
+      'stage_5_simple',
+      'stage_5_normal',
+      'stage_5_complex',
+      // Legacy phases kept for backward compatibility until PhaseName type is updated (task #4)
       'stage_5_sections',
       'stage_5_tier1',
       'stage_5_escalation',
-      // NOTE: stage_6_rag_planning was incorrectly placed here (it belonged to Stage 4 Phase 6)
-      // Removed in mc2-u9fb - vector search with priority boosting used instead
     ] as PhaseName[],
     linkedPrompts: ['stage_5_metadata', 'stage_5_sections'],
   },
@@ -289,17 +295,6 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   // Stage 6: Lesson Content
-  /**
-   * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
-   * Vector search with priority boosting (mc2-zac) replaces this.
-   * Kept for backward compatibility with database records.
-   */
-  stage_6_rag_planning: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.7,
-    maxTokens: 4096,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
-  },
   stage_6_judge: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.3,
@@ -417,5 +412,49 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     temperature: 0.3,
     maxTokens: 16000,
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  // Chat phases (model IDs from @megacampus/shared-types)
+  chat_node_refinement: {
+    modelId: CHAT_PRIMARY_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8192,
+    fallbackModelId: CHAT_FALLBACK_MODEL_ID,
+  },
+  chat_global_guidance: {
+    modelId: CHAT_PRIMARY_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8192,
+    fallbackModelId: CHAT_FALLBACK_MODEL_ID,
+  },
+  chat_full_regeneration: {
+    modelId: CHAT_PRIMARY_MODEL_ID,
+    temperature: 0.6,
+    maxTokens: 8192,
+    fallbackModelId: CHAT_FALLBACK_MODEL_ID,
+  },
+  chat_stage_5_refinement: {
+    modelId: CHAT_PRIMARY_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8192,
+    fallbackModelId: CHAT_FALLBACK_MODEL_ID,
+  },
+  chat_stage_6_refinement: {
+    modelId: CHAT_STAGE6_PRIMARY_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8192,
+    fallbackModelId: CHAT_STAGE6_FALLBACK_MODEL_ID,
+  },
+  // Inline operations
+  inline_block_regeneration: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 2000,
+    fallbackModelId: 'qwen/qwen3-235b-a22b-2507',
+  },
+  inline_element_crud: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 4000,
+    fallbackModelId: 'qwen/qwen3-235b-a22b-2507',
   },
 };

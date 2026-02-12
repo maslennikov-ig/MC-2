@@ -16,6 +16,7 @@
 **Solution**: Remove unused duplicate folder and create architecture documentation.
 
 **Impact**:
+
 - ✅ Eliminates future confusion
 - ✅ Prevents duplicate work
 - ✅ Improves code discoverability
@@ -26,9 +27,11 @@
 ## Duplicate Folder Analysis
 
 ### Active Folder (KEEP)
+
 **Path**: `/packages/course-gen-platform/src/services/stage5/`
 
 **Files** (15 total):
+
 ```
 generation-orchestrator.ts     ← LangGraph StateGraph orchestrator
 generation-phases.ts           ← 5-phase implementation (validate, generate, validate)
@@ -50,6 +53,7 @@ section-regeneration-service.ts ← Section retry logic
 ```
 
 **Imported By**:
+
 - `src/orchestrator/handlers/stage5-generation.ts` (line 28)
 - All Stage 5 handler logic flows through this folder
 
@@ -58,9 +62,11 @@ section-regeneration-service.ts ← Section retry logic
 ---
 
 ### Duplicate Folder (DELETE)
+
 **Path**: `/packages/course-gen-platform/src/orchestrator/services/generation/`
 
 **Files** (3 total):
+
 ```
 generation-orchestrator.ts     ← Duplicate of stage5 version
 generation-phases.ts           ← Duplicate of stage5 version
@@ -68,6 +74,7 @@ generation-state.ts            ← Duplicate of stage5 version
 ```
 
 **Key Differences**:
+
 - Missing all utility services (generators, validators, utilities)
 - Never imported by any production code
 - Parallel processing fix was mistakenly implemented here first
@@ -82,12 +89,14 @@ generation-state.ts            ← Duplicate of stage5 version
 ## Verification Results
 
 ### Production Code
+
 ```bash
 grep -r "from.*orchestrator/services/generation" src --include="*.ts" | grep -v "\.test\.ts"
 # Result: 0 matches
 ```
 
 ### Test Code
+
 ```bash
 grep -r "orchestrator/services/generation" tests --include="*.ts"
 # Result: 0 matches
@@ -140,6 +149,7 @@ pnpm test
 ### Phase 3: Documentation
 
 Create **`STAGE5-ARCHITECTURE.md`** documenting:
+
 - Official folder structure
 - File responsibilities
 - Import patterns
@@ -153,6 +163,7 @@ Create **`STAGE5-ARCHITECTURE.md`** documenting:
 **KEEP**: `/services/stage5/`
 
 **Reasons**:
+
 1. ✅ Contains complete implementation (15 files vs 3)
 2. ✅ All utilities are co-located (generators, validators, utilities)
 3. ✅ Used by production handler
@@ -162,6 +173,7 @@ Create **`STAGE5-ARCHITECTURE.md`** documenting:
 **Alternative Considered**: Move to `/orchestrator/services/generation/`
 
 **Rejected Because**:
+
 - Would require moving 15 files
 - Would require updating all imports in handler
 - No clear benefit over current structure
@@ -183,12 +195,14 @@ Create **`STAGE5-ARCHITECTURE.md`** documenting:
 **Risk Level**: 🟢 LOW
 
 **Why Safe**:
+
 - ✅ Duplicate is completely unused (verified with grep)
 - ✅ Type-check will catch any missed imports
 - ✅ Tests will catch any runtime issues
 - ✅ Only deleting files, not modifying active code
 
 **Rollback Plan**:
+
 ```bash
 git checkout HEAD -- src/orchestrator/services/generation/
 ```

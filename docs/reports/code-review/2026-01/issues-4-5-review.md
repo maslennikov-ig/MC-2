@@ -610,7 +610,7 @@ const safeCourseName = (course?.title || 'export')
 **Problem**:
 
 - Replaces spaces, hyphens, dots with underscores
-- "Advanced React - Hooks & Patterns" → "Advanced_React**_Hooks_**Patterns"
+- "Advanced React - Hooks & Patterns" → "Advanced*React\*\*\_Hooks*\*\*Patterns"
 - Multiple consecutive underscores look ugly
 
 **Fix**:

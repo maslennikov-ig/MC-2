@@ -41,14 +41,12 @@ interface UseWorkerReadinessOptions {
  * return <SubmitButton />
  * ```
  */
-export function useWorkerReadiness(options: UseWorkerReadinessOptions = {}): WorkerReadinessState & {
+export function useWorkerReadiness(
+  options: UseWorkerReadinessOptions = {}
+): WorkerReadinessState & {
   refetch: () => Promise<void>
 } {
-  const {
-    enabled = true,
-    pollInterval = 10000,
-    pollWhenReady = false,
-  } = options
+  const { enabled = true, pollInterval = 10000, pollWhenReady = false } = options
 
   const [state, setState] = useState<WorkerReadinessState>({
     ready: false,
@@ -106,7 +104,7 @@ export function useWorkerReadiness(options: UseWorkerReadinessOptions = {}): Wor
   // Initial check and polling
   useEffect(() => {
     if (!enabled) {
-      setState(prev => ({ ...prev, loading: false }))
+      setState((prev) => ({ ...prev, loading: false }))
       return
     }
 

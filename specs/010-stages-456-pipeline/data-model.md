@@ -71,20 +71,20 @@
 
 ```typescript
 interface DocumentPriority {
-  file_id: string;                    // FK to uploaded_documents
-  priority: 'HIGH' | 'LOW';           // Classification result
-  importance_score: number;           // 0.0-1.0 (HIGH threshold: >= 0.7)
-  order: number;                      // Processing order (1-N)
-  category: DocumentCategory;         // See enum below
-  classification_rationale: string;   // LLM reasoning
+  file_id: string; // FK to uploaded_documents
+  priority: 'HIGH' | 'LOW'; // Classification result
+  importance_score: number; // 0.0-1.0 (HIGH threshold: >= 0.7)
+  order: number; // Processing order (1-N)
+  category: DocumentCategory; // See enum below
+  classification_rationale: string; // LLM reasoning
   classified_at: Date;
 }
 
 type DocumentCategory =
-  | 'course_core'      // Lectures, textbooks, syllabi
-  | 'supplementary'    // Presentations, notes
-  | 'reference'        // Standards, technical docs
-  | 'regulatory';      // Laws, compliance docs
+  | 'course_core' // Lectures, textbooks, syllabi
+  | 'supplementary' // Presentations, notes
+  | 'reference' // Standards, technical docs
+  | 'regulatory'; // Laws, compliance docs
 
 // Validation Rules
 // - importance_score must be in [0.0, 1.0]
@@ -102,16 +102,16 @@ type DocumentCategory =
 ```typescript
 interface BudgetAllocation {
   course_id: string;
-  total_high_priority_tokens: number;  // Sum of HIGH priority docs
-  total_low_priority_tokens: number;   // Sum of LOW priority docs
-  selected_model: AnalysisModel;       // Based on 80K threshold
-  high_budget: number;                 // Allocated to HIGH docs
-  low_budget: number;                  // Allocated to LOW docs
+  total_high_priority_tokens: number; // Sum of HIGH priority docs
+  total_low_priority_tokens: number; // Sum of LOW priority docs
+  selected_model: AnalysisModel; // Based on 80K threshold
+  high_budget: number; // Allocated to HIGH docs
+  low_budget: number; // Allocated to LOW docs
   allocated_at: Date;
 }
 
 type AnalysisModel =
-  | 'oss-120b'      // If HIGH_total <= 80K (128K context)
+  | 'oss-120b' // If HIGH_total <= 80K (128K context)
   | 'gemini-flash'; // If HIGH_total > 80K (1M context)
 
 // Decision Logic
@@ -142,7 +142,7 @@ interface ProcessedDocument {
 
   // Processing result
   processing_mode: 'full_text' | 'summary';
-  content_for_analysis: string;        // Full text OR summary
+  content_for_analysis: string; // Full text OR summary
   content_token_count: number;
 
   // Original preserved for vectorization
@@ -171,11 +171,11 @@ interface DocumentRelevanceMapping {
 }
 
 interface SectionRAGPlan {
-  primary_documents: string[];         // file_ids ranked by relevance
-  search_queries: string[];            // Queries for RAG retrieval
-  expected_topics: string[];           // Topics to find in chunks
-  confidence: 'high' | 'medium';       // Based on processing_mode
-  note?: string;                       // Guidance for Generation
+  primary_documents: string[]; // file_ids ranked by relevance
+  search_queries: string[]; // Queries for RAG retrieval
+  expected_topics: string[]; // Topics to find in chunks
+  confidence: 'high' | 'medium'; // Based on processing_mode
+  note?: string; // Guidance for Generation
 }
 
 // Confidence Rules
@@ -193,12 +193,12 @@ interface SectionRAGPlan {
 interface GenerationGuidance {
   tone: ToneType;
   use_analogies: boolean;
-  specific_analogies?: string[];       // Optional suggested analogies
-  avoid_jargon: string[];              // Terms to avoid
+  specific_analogies?: string[]; // Optional suggested analogies
+  avoid_jargon: string[]; // Terms to avoid
   include_visuals: VisualType[];
   exercise_types: ExerciseType[];
-  contextual_language_hints: string;   // Language-specific guidance
-  real_world_examples?: string[];      // Suggested example domains
+  contextual_language_hints: string; // Language-specific guidance
+  real_world_examples?: string[]; // Suggested example domains
 }
 
 type ToneType =
@@ -219,7 +219,7 @@ type ExerciseType = 'coding' | 'conceptual' | 'case_study' | 'debugging' | 'desi
 
 ```typescript
 interface LessonSpecificationV2 {
-  lesson_id: string;                   // e.g., "1.1"
+  lesson_id: string; // e.g., "1.1"
   title: string;
   description: string;
 
@@ -238,54 +238,54 @@ interface LessonMetadata {
   target_audience: 'executive' | 'practitioner' | 'novice';
   tone: 'formal' | 'conversational-professional';
   compliance_level: 'strict' | 'standard';
-  content_archetype: ContentArchetype;  // For temperature routing
+  content_archetype: ContentArchetype; // For temperature routing
 }
 
 type ContentArchetype =
-  | 'code_tutorial'      // temp 0.2-0.3
-  | 'concept_explainer'  // temp 0.6-0.7
-  | 'case_study'         // temp 0.5-0.6
-  | 'legal_warning';     // temp 0.0-0.1
+  | 'code_tutorial' // temp 0.2-0.3
+  | 'concept_explainer' // temp 0.6-0.7
+  | 'case_study' // temp 0.5-0.6
+  | 'legal_warning'; // temp 0.0-0.1
 
 interface IntroBlueprint {
   hook_strategy: 'analogy' | 'statistic' | 'challenge' | 'question';
-  hook_topic: string;                  // e.g., "The cost of downtime"
-  key_learning_objectives: string;     // Summary of LOs
+  hook_topic: string; // e.g., "The cost of downtime"
+  key_learning_objectives: string; // Summary of LOs
 }
 
 interface SectionSpecV2 {
   title: string;
   content_archetype: ContentArchetype; // Per-section archetype
-  rag_context_id: string;              // ID of pre-retrieved context
+  rag_context_id: string; // ID of pre-retrieved context
 
   constraints: SectionConstraints;
-  key_points_to_cover: string[];       // The "skeleton"
-  analogies_to_use?: string;           // Optional: specific analogy
+  key_points_to_cover: string[]; // The "skeleton"
+  analogies_to_use?: string; // Optional: specific analogy
 }
 
 interface SectionConstraints {
   depth: 'summary' | 'detailed_analysis' | 'comprehensive';
-  required_keywords: string[];         // SEO + learning alignment
-  prohibited_terms: string[];          // Compliance terms to avoid
+  required_keywords: string[]; // SEO + learning alignment
+  prohibited_terms: string[]; // Compliance terms to avoid
 }
 
 interface ExerciseSpecV2 {
   type: ExerciseType;
   difficulty: 'easy' | 'medium' | 'hard';
-  learning_objective_id: string;       // Links to specific LO
-  structure_template: string;          // e.g., 'scenario_problem_solution'
+  learning_objective_id: string; // Links to specific LO
+  structure_template: string; // e.g., 'scenario_problem_solution'
   rubric_criteria: RubricCriterion[];
 }
 
 interface RubricCriterion {
   criteria: string[];
-  weight: number;                      // 0-100, sum to 100
+  weight: number; // 0-100, sum to 100
 }
 
 interface LessonRAGContext {
-  primary_documents: string[];         // file_ids
-  search_queries: string[];            // Lesson-specific queries
-  expected_chunks: number;             // 5-10 typical
+  primary_documents: string[]; // file_ids
+  search_queries: string[]; // Lesson-specific queries
+  expected_chunks: number; // 5-10 typical
 }
 ```
 
@@ -297,15 +297,15 @@ interface LessonRAGContext {
 
 ```typescript
 interface RAGContextCache {
-  context_id: string;                  // UUID
+  context_id: string; // UUID
   course_id: string;
   lesson_id: string;
 
   chunks: RAGChunk[];
-  query_params: RAGQueryParams;        // Persisted long-term
+  query_params: RAGQueryParams; // Persisted long-term
 
   created_at: Date;
-  expires_at: Date;                    // course_completed_at + 1 hour
+  expires_at: Date; // course_completed_at + 1 hour
 }
 
 interface RAGChunk {
@@ -357,7 +357,7 @@ interface LessonContent {
 }
 
 interface LessonContentBody {
-  intro: string;                       // Markdown
+  intro: string; // Markdown
 
   sections: ContentSection[];
   examples: ContentExample[];
@@ -368,26 +368,26 @@ interface LessonContentBody {
 
 interface ContentSection {
   title: string;
-  content: string;                     // Markdown (3-5K words total)
+  content: string; // Markdown (3-5K words total)
   citations?: Citation[];
 }
 
 interface Citation {
-  document: string;                    // document name
-  page_or_section: string;             // e.g., "page 12" or "Section 3.2"
+  document: string; // document name
+  page_or_section: string; // e.g., "page 12" or "Section 3.2"
 }
 
 interface ContentExample {
   title: string;
-  content: string;                     // Markdown
-  code?: string;                       // If code example
-  citations?: string[];                // Document references
+  content: string; // Markdown
+  code?: string; // If code example
+  citations?: string[]; // Document references
 }
 
 interface ContentExercise {
-  question: string;                    // Markdown
+  question: string; // Markdown
   hints?: string[];
-  solution: string;                    // Markdown (hidden by default)
+  solution: string; // Markdown (hidden by default)
   grading_rubric?: GradingRubric;
 }
 
@@ -400,7 +400,7 @@ interface LessonContentMetadata {
   total_words: number;
   total_tokens: number;
   cost_usd: number;
-  quality_score: number;               // 0.0-1.0
+  quality_score: number; // 0.0-1.0
   rag_chunks_used: number;
   generation_duration_ms: number;
   model_used: string;
@@ -409,11 +409,11 @@ interface LessonContentMetadata {
 }
 
 type LessonStatus =
-  | 'pending'           // Queued for generation
-  | 'generating'        // In progress
-  | 'completed'         // Successfully generated
-  | 'failed'            // All retries exhausted
-  | 'review_required';  // Partial success, manual review needed
+  | 'pending' // Queued for generation
+  | 'generating' // In progress
+  | 'completed' // Successfully generated
+  | 'failed' // All retries exhausted
+  | 'review_required'; // Partial success, manual review needed
 ```
 
 ### 9. Stage6Job (NEW - BullMQ Job Type)
@@ -431,21 +431,21 @@ interface Stage6Job {
   input: Stage6JobInput;
 
   retry_count: number;
-  max_retries: number;                 // Default: 3
-  model_fallback_index: number;        // 0=primary, 1=fallback
+  max_retries: number; // Default: 3
+  model_fallback_index: number; // 0=primary, 1=fallback
 }
 
 interface Stage6JobInput {
   lesson_spec: LessonSpecificationV2;
   course_context: CourseContext;
-  rag_context_id: string;              // Pre-retrieved context
+  rag_context_id: string; // Pre-retrieved context
 }
 
 interface CourseContext {
   title: string;
   difficulty_level: DifficultyLevel;
   generation_guidance: GenerationGuidance;
-  language: 'en' | 'ru';               // For model routing
+  language: 'en' | 'ru'; // For model routing
 }
 
 // Retry Strategy
@@ -491,16 +491,16 @@ interface CourseContext {
 
 ## Validation Rules Summary
 
-| Entity | Field | Rule |
-|--------|-------|------|
-| DocumentPriority | importance_score | 0.0-1.0, HIGH if >= 0.7 |
-| DocumentPriority | order | Unique within course |
-| BudgetAllocation | selected_model | Based on 80K threshold |
-| LessonSpecificationV2 | sections | Min 1, typical 3-5 |
-| LessonSpecificationV2 | exercises | Min 1 per lesson |
-| LessonContent | quality_score | Must be >= 0.75 |
-| RAGContextCache | expires_at | course_completed_at + 1h |
-| Stage6Job | max_retries | Default 3, max 5 |
+| Entity                | Field            | Rule                     |
+| --------------------- | ---------------- | ------------------------ |
+| DocumentPriority      | importance_score | 0.0-1.0, HIGH if >= 0.7  |
+| DocumentPriority      | order            | Unique within course     |
+| BudgetAllocation      | selected_model   | Based on 80K threshold   |
+| LessonSpecificationV2 | sections         | Min 1, typical 3-5       |
+| LessonSpecificationV2 | exercises        | Min 1 per lesson         |
+| LessonContent         | quality_score    | Must be >= 0.75          |
+| RAGContextCache       | expires_at       | course_completed_at + 1h |
+| Stage6Job             | max_retries      | Default 3, max 5         |
 
 ---
 
@@ -539,16 +539,16 @@ Based on Anthropic/Claude research, use XML tags for semantic boundaries:
 
 ```typescript
 interface Stage6PromptStructure {
-  system_role: string;      // Expert B2B Instructional Designer
+  system_role: string; // Expert B2B Instructional Designer
   critical_instructions: {
     grounding: 'Use ONLY <rag_context>. No hallucinations.';
-    tone: string;           // From LessonMetadata
+    tone: string; // From LessonMetadata
     format: 'Markdown (## sections, ### subsections)';
     refusal: 'If RAG insufficient, output "INSUFFICIENT_CONTEXT"';
   };
-  lesson_blueprint: LessonSpecificationV2;  // JSON from Stage 5
-  rag_context: RAGChunk[];                  // Retrieved docs
-  generation_steps: string[];               // ANALYZE → OUTLINE → DRAFT → REVIEW
+  lesson_blueprint: LessonSpecificationV2; // JSON from Stage 5
+  rag_context: RAGChunk[]; // Retrieved docs
+  generation_steps: string[]; // ANALYZE → OUTLINE → DRAFT → REVIEW
   output_format: 'Markdown only. No JSON wrapper.';
 }
 ```
@@ -560,7 +560,7 @@ interface RefusalResult {
   status: 'INSUFFICIENT_CONTEXT';
   missing_topics: string[];
   suggested_queries: string[];
-  partial_content?: string;  // If any sections could be generated
+  partial_content?: string; // If any sections could be generated
 }
 
 // Triggered when:
@@ -575,19 +575,19 @@ interface RefusalResult {
 
 ### Success Rate by Architecture
 
-| Approach | Success Rate | Source |
-|----------|--------------|--------|
-| Single-stage | 29.2% | Perplexity research |
-| LLM-only multi-stage | 66.2% | Perplexity research |
-| **Hybrid (our approach)** | **78.5%** | Perplexity research |
+| Approach                  | Success Rate | Source              |
+| ------------------------- | ------------ | ------------------- |
+| Single-stage              | 29.2%        | Perplexity research |
+| LLM-only multi-stage      | 66.2%        | Perplexity research |
+| **Hybrid (our approach)** | **78.5%**    | Perplexity research |
 
 ### Quality Improvement from Semantic Scaffolding
 
-| Approach | Quality Score | Retries | Cost/Lesson |
-|----------|---------------|---------|-------------|
-| Over-Specified (Mad Libs) | 3.2/5.0 | 1.8x | $0.45 |
-| **Optimal (Semantic Scaffolding)** | **3.8/5.0** | 1.2x | $0.32 |
-| Under-Specified (High-level) | 2.9/5.0 | 2.4x | $0.52 |
+| Approach                           | Quality Score | Retries | Cost/Lesson |
+| ---------------------------------- | ------------- | ------- | ----------- |
+| Over-Specified (Mad Libs)          | 3.2/5.0       | 1.8x    | $0.45       |
+| **Optimal (Semantic Scaffolding)** | **3.8/5.0**   | 1.2x    | $0.32       |
+| Under-Specified (High-level)       | 2.9/5.0       | 2.4x    | $0.52       |
 
 **ROI per 50 lessons**: $6.50 + 65 hours saved (29% efficiency gain)
 

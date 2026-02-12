@@ -31,12 +31,7 @@ export {
 } from './generator-helpers';
 
 // Content Generation (Intro/Summary)
-export {
-  generateIntroduction,
-  generateSummary,
-} from './generator-content';
+export { generateIntroduction, generateSummary } from './generator-content';
 
 // Section Generation
-export {
-  generateSection,
-} from './generator-section';
+export { generateSection } from './generator-section';

@@ -39,10 +39,7 @@ These fixtures can be used to:
 import { generateOlxCourse } from '@/integrations/lms/openedx/olx/generator';
 import { readFileSync } from 'fs';
 
-const expectedCourseXml = readFileSync(
-  'tests/fixtures/expected-olx/course.xml',
-  'utf-8'
-);
+const expectedCourseXml = readFileSync('tests/fixtures/expected-olx/course.xml', 'utf-8');
 
 const result = generateOlxCourse(courseInput);
 expect(result.files['course.xml']).toBe(expectedCourseXml);

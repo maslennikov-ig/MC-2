@@ -5,7 +5,10 @@
   "target_audience": "High school students or recent graduates exploring computer science majors, with backgrounds in math or science but no coding experience; career changers from non-technical fields such as teaching, marketing, or administration, seeking to transition into entry-level tech roles like junior developer or data analyst; and hobbyists or self-learners, including writers or small business owners, who want to automate repetitive tasks like data entry or content generation using scripts.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": ["Basic computer literacy and familiarity with using a web browser", "No prior programming experience required"],
+  "prerequisites": [
+    "Basic computer literacy and familiarity with using a web browser",
+    "No prior programming experience required"
+  ],
   "learning_outcomes": [
     "Write and execute basic Python scripts using variables, data types, and operators to perform simple calculations.",
     "Implement control structures including conditionals and loops to solve algorithmic problems, such as iterating through sequences to find patterns.",
@@ -14,5 +17,12 @@
     "Handle file input/output operations and basic exceptions to create scripts that interact with external data sources.",
     "Import and utilize standard Python modules to extend program functionality, such as generating random numbers or performing mathematical computations."
   ],
-  "course_tags": ["Python", "Programming", "Beginner", "Coding Fundamentals", "Software Development", "Data Structures"]
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding Fundamentals",
+    "Software Development",
+    "Data Structures"
+  ]
 }

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { ENV } from '@/lib/env'
 import { withDevBypass, withAuth, AuthUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
 
 interface RouteContext {
   params: Promise<{ orgSlug: string; courseSlug: string }>
+}
+
+/** Response shape from the delete_course_cascade RPC function */
+interface DeleteCourseResult {
+  success: boolean
+  error?: string
+  deleted_course_id?: string
+  deleted_course_title?: string
+  lesson_progress_deleted?: number
 }
 
 /**
@@ -22,7 +32,7 @@ async function cleanupCourseResources(
   filesDeleted?: number
   errors?: string[]
 }> {
-  const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+  const backendUrl = ENV.COURSEGEN_BACKEND_URL
   const tRPCUrl = `${backendUrl}/trpc`
 
   try {
@@ -144,6 +154,19 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           courseId: id,
           errors: cleanupResult.errors,
         })
+        // Audit trail for admin follow-up on orphaned resources
+        logPermanentFailure({
+          user_id: user.id,
+          error_message: `Course cleanup partially failed: ${cleanupResult.errors?.join(', ')}`,
+          severity: 'WARNING',
+          job_type: 'COURSE_CLEANUP',
+          metadata: {
+            courseId: id,
+            vectorsDeleted: cleanupResult.vectorsDeleted,
+            filesDeleted: cleanupResult.filesDeleted,
+            errors: cleanupResult.errors,
+          },
+        }).catch((e) => console.error('Log write failed:', e.message))
       } else {
         logger.info('Course cleanup completed successfully', {
           courseId: id,
@@ -157,6 +180,13 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseId: id,
         error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
       })
+      logPermanentFailure({
+        user_id: user.id,
+        error_message: `Course cleanup exception: ${cleanupError instanceof Error ? cleanupError.message : 'Unknown'}`,
+        severity: 'WARNING',
+        job_type: 'COURSE_CLEANUP',
+        metadata: { courseId: id },
+      }).catch((e) => console.error('Log write failed:', e.message))
     }
   } else {
     logger.warn('No access token available for cleanup, skipping external resource cleanup', {
@@ -164,41 +194,23 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
     })
   }
 
-  // Step 2: Delete database records
+  // Step 2: Atomic database deletion via RPC
+  // All deletions happen in a single transaction — if any step fails, everything rolls back.
+  // The RPC function handles: lesson_progress cleanup (NO ACTION FK), then course deletion
+  // with ON DELETE CASCADE handling all other child tables automatically.
   try {
-    // Delete in correct order to avoid foreign key constraint violations
-    // Note: Tests/questions tables will be added in future database schema updates
-    // Currently these tables don't exist: tests, questions, documents, document_chunks, sources, user_favorites
+    const { data: rpcData, error: rpcError } = await supabase.rpc('delete_course_cascade', {
+      p_course_id: id,
+    })
+    const result = rpcData as unknown as DeleteCourseResult | null
 
-    // 1. Delete assets
-    await supabase.from('assets').delete().eq('course_id', id)
-
-    // 3. Delete lessons (must be before sections)
-    const { data: sectionsData } = await supabase.from('sections').select('id').eq('course_id', id)
-
-    if (sectionsData && sectionsData.length > 0) {
-      const sectionIds = sectionsData.map((s) => s.id)
-      await supabase.from('lessons').delete().in('section_id', sectionIds)
-    }
-
-    // 4. Delete sections
-    await supabase.from('sections').delete().eq('course_id', id)
-
-    // 5. Finally, delete the course
-    const { error: courseError, data: deletedCourse } = await supabase
-      .from('courses')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (courseError) {
-      logger.error('Error deleting course:', courseError)
+    if (rpcError) {
+      logger.error('Atomic course deletion failed:', rpcError)
 
       // Log to error_logs for admin visibility
       logPermanentFailure({
         user_id: user.id,
-        error_message: `Failed to delete course: ${courseError.message}`,
+        error_message: `Failed to delete course: ${rpcError.message}`,
         severity: 'ERROR',
         job_type: 'COURSE_DELETE',
         metadata: {
@@ -206,30 +218,33 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           orgSlug,
           courseSlug,
           courseId: id,
-          errorCode: courseError.code,
+          errorCode: rpcError.code,
         },
-      }).catch(() => {})
+      }).catch((e) => console.error('Log write failed:', e.message))
 
       return NextResponse.json(
         {
           error: 'Failed to delete course',
-          details: courseError.message,
-          code: courseError.code,
+          details: rpcError.message,
+          code: rpcError.code,
         },
         { status: 500 }
       )
     }
 
-    if (!deletedCourse) {
-      return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+    if (!result?.success) {
+      return NextResponse.json(
+        { error: result?.error || 'Deletion failed' },
+        { status: 404 }
+      )
     }
 
-    logger.devLog('Successfully deleted course:', deletedCourse.title)
+    logger.devLog('Successfully deleted course:', result.deleted_course_title)
 
     return NextResponse.json(
       {
         message: 'Course deleted successfully',
-        deletedCourse: { id: deletedCourse.id, title: deletedCourse.title },
+        deletedCourse: { id: result.deleted_course_id, title: result.deleted_course_title },
       },
       { status: 200 }
     )
@@ -250,7 +265,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseId: id,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch(() => {})
+    }).catch((e) => console.error('Log write failed:', e.message))
 
     return NextResponse.json(
       {

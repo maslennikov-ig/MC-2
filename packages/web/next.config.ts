@@ -2,7 +2,11 @@ import type { NextConfig } from 'next'
 import webpack from 'webpack'
 import createNextIntlPlugin from 'next-intl/plugin'
 import withPWAInit from '@ducanh2912/next-pwa'
+import withBundleAnalyzer from '@next/bundle-analyzer'
 import packageJson from './package.json'
+
+// Validate env vars early — fails fast before expensive Next.js compilation
+import './lib/env-schema'
 
 // Read version from package.json for cache invalidation
 const APP_VERSION = packageJson.version
@@ -188,7 +192,7 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60,
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    deviceSizes: [640, 828, 1080, 1200, 1440, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     qualities: [75, 90, 100], // Added qualities configuration for Next.js 16 compatibility
     dangerouslyAllowSVG: false,
@@ -227,7 +231,37 @@ const nextConfig: NextConfig = {
     unoptimized: false,
   },
   experimental: {
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: [
+      // Icons & utilities
+      'lucide-react',
+      'date-fns',
+      // Radix UI primitives
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-avatar',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-collapsible',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-hover-card',
+      '@radix-ui/react-icons',
+      '@radix-ui/react-label',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-progress',
+      '@radix-ui/react-radio-group',
+      '@radix-ui/react-scroll-area',
+      '@radix-ui/react-select',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-slider',
+      '@radix-ui/react-slot',
+      '@radix-ui/react-switch',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-toggle',
+      '@radix-ui/react-toggle-group',
+      '@radix-ui/react-tooltip',
+      // Animations
+      'framer-motion',
+    ],
   },
   // Suppress Edge Runtime warnings for Supabase client
   // These warnings occur because Supabase uses Node.js APIs like process.versions
@@ -302,6 +336,7 @@ const nextConfig: NextConfig = {
     return config
   },
   // Rewrites for local development - proxy enrichments to staging server
+  // eslint-disable-next-line @typescript-eslint/require-await -- NextConfig requires Promise return type
   async rewrites() {
     // Only proxy in development - in production nginx serves these files
     if (process.env.NODE_ENV === 'development') {
@@ -314,6 +349,7 @@ const nextConfig: NextConfig = {
     }
     return []
   },
+  // eslint-disable-next-line @typescript-eslint/require-await -- NextConfig requires Promise return type
   async headers() {
     return [
       // Security headers for all pages
@@ -356,13 +392,13 @@ const nextConfig: NextConfig = {
               process.env.NODE_ENV === 'development'
                 ? `
                 default-src 'self';
-                script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com;
-                style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-                font-src 'self' https://fonts.gstatic.com;
+                script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://static.userback.io;
+                style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://static.userback.io;
+                font-src 'self' https://fonts.gstatic.com https://static.userback.io;
                 img-src 'self' data: https: blob:;
                 media-src 'self' https://drive.google.com https://*.googleusercontent.com https://*.supabase.co blob: data:;
-                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* ws://*.local:* http://10.* http://192.168.* http://172.16.* http://172.17.* http://172.18.* http://172.19.* http://172.20.* http://172.21.* http://172.22.* http://172.23.* http://172.24.* http://172.25.* http://172.26.* http://172.27.* http://172.28.* http://172.29.* http://172.30.* http://172.31.* https://flow8n.ru https://drive.google.com https://www.react-grab.com;
-                frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com;
+                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* ws://*.local:* http://10.* http://192.168.* http://172.16.* http://172.17.* http://172.18.* http://172.19.* http://172.20.* http://172.21.* http://172.22.* http://172.23.* http://172.24.* http://172.25.* http://172.26.* http://172.27.* http://172.28.* http://172.29.* http://172.30.* http://172.31.* https://flow8n.ru https://drive.google.com https://www.react-grab.com https://static.userback.io https://api.userback.io wss://api.userback.io;
+                frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com https://*.userback.io;
                 frame-ancestors 'none';
                 base-uri 'self';
                 form-action 'self';
@@ -372,13 +408,13 @@ const nextConfig: NextConfig = {
                     .trim()
                 : `
                 default-src 'self';
-                script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net;
-                style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-                font-src 'self' https://fonts.gstatic.com;
+                script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://static.userback.io;
+                style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://static.userback.io;
+                font-src 'self' https://fonts.gstatic.com https://static.userback.io;
                 img-src 'self' data: https: blob:;
                 media-src 'self' https://drive.google.com https://*.googleusercontent.com https://*.supabase.co blob: data:;
-                connect-src 'self' https://*.supabase.co wss://*.supabase.co https://flow8n.ru https://drive.google.com;
-                frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com;
+                connect-src 'self' https://*.supabase.co wss://*.supabase.co https://flow8n.ru https://drive.google.com https://static.userback.io https://api.userback.io wss://api.userback.io;
+                frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com https://*.userback.io;
                 frame-ancestors 'none';
                 base-uri 'self';
                 form-action 'self';
@@ -395,10 +431,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value:
-              process.env.NODE_ENV === 'development'
-                ? '*'
-                : 'https://ai.megacampus.ru',
+            value: process.env.NODE_ENV === 'development' ? '*' : 'https://ai.megacampus.ru',
           },
           {
             key: 'Access-Control-Allow-Methods',
@@ -424,10 +457,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value:
-              process.env.NODE_ENV === 'development'
-                ? '*'
-                : 'https://ai.megacampus.ru',
+            value: process.env.NODE_ENV === 'development' ? '*' : 'https://ai.megacampus.ru',
           },
           {
             key: 'Access-Control-Allow-Methods',
@@ -453,4 +483,8 @@ const nextConfig: NextConfig = {
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
-module.exports = withNextIntl(withPWA(nextConfig))
+const withAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+module.exports = withAnalyzer(withNextIntl(withPWA(nextConfig)))

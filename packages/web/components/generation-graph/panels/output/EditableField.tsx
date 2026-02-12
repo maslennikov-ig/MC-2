@@ -20,11 +20,8 @@ import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { InlineRegenerateChat, type RegenerationResult } from './InlineRegenerateChat'
 import { SemanticDiffViewer } from './SemanticDiff'
 import { ImpactAnalysisModal, type CascadeAction } from './ImpactAnalysisModal'
-import {
-  getBlockDependenciesAction,
-  updateFieldAction,
-  cascadeUpdateAction,
-} from '@/app/actions/admin-generation'
+import { updateFieldAction, cascadeUpdateAction } from '@/app/actions/admin-generation'
+import { trpc } from '@/lib/trpc/react'
 import { Wand2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
@@ -76,9 +73,10 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   isLearningObjective = false,
   onCascadeChange,
 }) => {
+  const utils = trpc.useUtils()
   const { label, type, placeholder, helpText, min, max, options } = config
   const [localValue, setLocalValue] = useState<string>(
-    value !== null && value !== undefined ? String(value) : ''
+    value !== null && value !== undefined ? String(value as string | number | boolean) : ''
   )
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -104,7 +102,8 @@ export const EditableField: React.FC<EditableFieldProps> = ({
 
   // Sync local value when external value changes
   useEffect(() => {
-    const newValue = value !== null && value !== undefined ? String(value) : ''
+    const newValue =
+      value !== null && value !== undefined ? String(value as string | number | boolean) : ''
     setLocalValue(newValue)
     // Update previous value ref when external value changes
     previousValueRef.current = value
@@ -151,7 +150,10 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       setPendingValue(newValue)
 
       try {
-        const result = await getBlockDependenciesAction(courseId, config.path)
+        const result = await utils.generation.getBlockDependencies.fetch({
+          courseId,
+          blockPath: config.path,
+        })
         setAffectedCount(result.downstream?.length || 0)
         setShowImpactModal(true)
       } catch (error) {
@@ -167,7 +169,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const newValue = e.target.value
     setLocalValue(newValue)
-    handleChange(newValue)
+    void handleChange(newValue)
   }
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,17 +177,17 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     setLocalValue(newValue)
     const numValue = parseFloat(newValue)
     if (!isNaN(numValue)) {
-      handleChange(numValue)
+      void handleChange(numValue)
     }
   }
 
   const handleToggleChange = (checked: boolean) => {
-    handleChange(checked)
+    void handleChange(checked)
   }
 
   const handleSelectChange = (newValue: string) => {
     setLocalValue(newValue)
-    handleChange(newValue)
+    void handleChange(newValue)
   }
 
   const handleBlur = () => {

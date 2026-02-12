@@ -82,15 +82,6 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   const { id, data, selected } = props
   const { zoom } = useViewport()
   const { selectNode } = useNodeSelection()
-  // DISABLED: Enrichments now created via Course Viewer, not Workflow
-  // const [showToolbar, setShowToolbar] = useState(false);
-  // const { setPendingCreate, openCreate } = useEnrichmentInspectorStore(
-  //   useShallow((s) => ({
-  //     setPendingCreate: s.setPendingCreate,
-  //     openCreate: s.openCreate,
-  //   }))
-  // );
-  // const { selectedNodeId } = useNodeSelection();
 
   // Subscribe to realtime status updates - MUST be called before any conditional returns (Rules of Hooks)
   const statusEntry = useNodeStatus(id)
@@ -99,16 +90,6 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   // Partial generation context (optional - may not be in provider)
   const contextValue = useOptionalPartialGenerationContext()
 
-  // DISABLED: Quick add handler - Enrichments now created via Course Viewer, not Workflow
-  // const handleQuickAdd = (type: CreateEnrichmentType) => {
-  //   if (selectedNodeId === id) {
-  //     openCreate(type);
-  //   } else {
-  //     setPendingCreate(type);
-  //     selectNode(id);
-  //   }
-  //   setShowToolbar(false);
-  // };
   const {
     generateLesson,
     isLessonGenerating = () => false,

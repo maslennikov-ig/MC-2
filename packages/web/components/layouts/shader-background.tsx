@@ -1,44 +1,47 @@
-"use client"
+'use client'
 
-import type React from "react"
-import { useEffect, useRef, useState } from "react"
-import dynamic from "next/dynamic"
-import WebGLErrorBoundary from "./webgl-error-boundary"
-import { getOptimizedShaderSettings, shouldDisableWebGLShaders } from "@/lib/device-detection"
+import type React from 'react'
+import { useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
+import WebGLErrorBoundary from './webgl-error-boundary'
+import { getOptimizedShaderSettings, shouldDisableWebGLShaders } from '@/lib/device-detection'
 
 // Dynamically import with SSR disabled
 const MeshGradient = dynamic(
-  () => import("@paper-design/shaders-react").then(mod => {
-    // Create wrapper component to filter props
-    interface ShaderProps {
-      className?: string
-      colors?: string[]
-      speed?: number
-      bgColor?: string
-      useWireframe?: boolean
-    }
-    
-    const Component = ({ className, colors, speed, bgColor, useWireframe }: ShaderProps) => {
-      const MeshGradientComponent = mod.MeshGradient
-      
-      // Create props object with only valid props
-      const props: Record<string, unknown> = {
-        className,
-        colors,
-        speed
+  () =>
+    import('@paper-design/shaders-react').then((mod) => {
+      // Create wrapper component to filter props
+      interface ShaderProps {
+        className?: string
+        colors?: string[]
+        speed?: number
+        bgColor?: string
+        useWireframe?: boolean
       }
-      
-      // Add optional props if they exist
-      if (bgColor) props.backgroundcolor = bgColor
-      if (useWireframe) props.wireframe = "true"
-      
-      return <MeshGradientComponent {...props} />
-    }
-    return Component
-  }),
-  { 
+
+      const Component = ({ className, colors, speed, bgColor, useWireframe }: ShaderProps) => {
+        const MeshGradientComponent = mod.MeshGradient
+
+        // Create props object with only valid props
+        const props: Record<string, unknown> = {
+          className,
+          colors,
+          speed,
+        }
+
+        // Add optional props if they exist
+        if (bgColor) props.backgroundcolor = bgColor
+        if (useWireframe) props.wireframe = 'true'
+
+        return <MeshGradientComponent {...props} />
+      }
+      return Component
+    }),
+  {
     ssr: false,
-    loading: () => <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-black via-purple-900 to-black" />
+    loading: () => (
+      <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-black via-purple-900 to-black" />
+    ),
   }
 )
 
@@ -56,15 +59,15 @@ export default function ShaderBackground({ children }: ShaderBackgroundProps) {
   useEffect(() => {
     // Set client flag when component mounts
     setIsClient(true)
-    
+
     // Check if we should disable shaders for performance
     const shouldDisable = shouldDisableWebGLShaders()
     setDisableShaders(shouldDisable)
-    
+
     // Get optimized settings
     const settings = getOptimizedShaderSettings()
     setShaderSettings(settings)
-    
+
     // Debounced resize handler to reduce WebGL checks
     let resizeTimeout: NodeJS.Timeout
     const handleResize = () => {
@@ -77,7 +80,7 @@ export default function ShaderBackground({ children }: ShaderBackgroundProps) {
         }
       }, 250) // Debounce by 250ms
     }
-    
+
     window.addEventListener('resize', handleResize)
     return () => {
       mountedRef.current = false
@@ -89,9 +92,9 @@ export default function ShaderBackground({ children }: ShaderBackgroundProps) {
   }, [])
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-black relative overflow-hidden">
+    <div ref={containerRef} className="relative min-h-screen overflow-hidden bg-black">
       {/* SVG Filters */}
-      <svg className="absolute inset-0 w-0 h-0">
+      <svg className="absolute inset-0 h-0 w-0">
         <defs>
           <filter id="glass-effect" x="-50%" y="-50%" width="200%" height="200%">
             <feTurbulence baseFrequency="0.005" numOctaves="1" result="noise" />
@@ -122,22 +125,22 @@ export default function ShaderBackground({ children }: ShaderBackgroundProps) {
       {isClient && !disableShaders ? (
         <WebGLErrorBoundary
           fallback={
-            <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-black via-purple-900 to-black" />
+            <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-black via-purple-900 to-black" />
           }
         >
           <MeshGradient
-            className="absolute inset-0 w-full h-full"
-            colors={["#000000", "#8b5cf6", "#ffffff", "#1e1b4b", "#4c1d95"]}
+            className="absolute inset-0 h-full w-full"
+            colors={['#000000', '#8b5cf6', '#ffffff', '#1e1b4b', '#4c1d95']}
             speed={shaderSettings.speed}
             bgColor="#000000"
           />
         </WebGLErrorBoundary>
       ) : (
         // CSS Gradient Fallback for mobile/low-end devices
-        <div className="absolute inset-0 w-full h-full">
+        <div className="absolute inset-0 h-full w-full">
           <div className="absolute inset-0 bg-gradient-to-br from-black via-purple-900 to-black" />
           <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/20 via-transparent to-purple-600/10" />
-          <div className="absolute inset-0 animate-pulse-slow bg-gradient-to-bl from-violet-900/10 via-transparent to-purple-800/10" />
+          <div className="animate-pulse-slow absolute inset-0 bg-gradient-to-bl from-violet-900/10 via-transparent to-purple-800/10" />
         </div>
       )}
 

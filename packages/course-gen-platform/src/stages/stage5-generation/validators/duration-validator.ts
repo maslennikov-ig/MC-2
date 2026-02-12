@@ -24,11 +24,11 @@ import { ValidationSeverity, type ValidationResult } from '@megacampus/shared-ty
 /**
  * RT-006 P1: Duration proportionality constants
  */
-export const MIN_TOPIC_DURATION = 2;        // minutes per topic
-export const MAX_TOPIC_DURATION = 5;        // minutes per topic
-export const MIN_OBJECTIVE_DURATION = 5;    // minutes per objective
-export const MAX_OBJECTIVE_DURATION = 15;   // minutes per objective
-export const ENGAGEMENT_CAP = 6;            // minutes max (attention span guideline)
+export const MIN_TOPIC_DURATION = 2; // minutes per topic
+export const MAX_TOPIC_DURATION = 5; // minutes per topic
+export const MIN_OBJECTIVE_DURATION = 5; // minutes per objective
+export const MAX_OBJECTIVE_DURATION = 15; // minutes per objective
+export const ENGAGEMENT_CAP = 6; // minutes max (attention span guideline)
 
 /**
  * RT-007 P1: Difficulty level multiplier
@@ -39,9 +39,9 @@ export const ENGAGEMENT_CAP = 6;            // minutes max (attention span guide
  * - Advanced: +100% time (2.0x) - complex topics requiring deeper understanding
  */
 export const DIFFICULTY_MULTIPLIER = {
-  beginner: 1.0,      // base formula
-  intermediate: 1.5,  // +50% time
-  advanced: 2.0,      // +100% time
+  beginner: 1.0, // base formula
+  intermediate: 1.5, // +50% time
+  advanced: 2.0, // +100% time
 } as const;
 
 /**
@@ -61,7 +61,7 @@ export function calculateExpectedDuration(
 
   return {
     min: Math.ceil(baseMin * multiplier),
-    max: Math.ceil(baseMax * multiplier)
+    max: Math.ceil(baseMax * multiplier),
   };
 }
 
@@ -77,24 +77,18 @@ export function calculateExpectedDuration(
  *
  * @returns Validation result with severity-based issues
  */
-export function validateDurationProportionality(
-  lesson: {
-    key_topics: string[];
-    lesson_objectives: unknown[];
-    estimated_duration_minutes: number;
-    difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
-  }
-): ValidationResult {
+export function validateDurationProportionality(lesson: {
+  key_topics: string[];
+  lesson_objectives: unknown[];
+  estimated_duration_minutes: number;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
+}): ValidationResult {
   const topicCount = lesson.key_topics.length;
   const objectiveCount = lesson.lesson_objectives.length;
   const actualDuration = lesson.estimated_duration_minutes;
   const difficultyLevel = lesson.difficulty_level || 'intermediate';
 
-  const expected = calculateExpectedDuration(
-    topicCount,
-    objectiveCount,
-    difficultyLevel
-  );
+  const expected = calculateExpectedDuration(topicCount, objectiveCount, difficultyLevel);
 
   // MIN check (ERROR - blocks if too short)
   if (actualDuration < expected.min) {
@@ -102,13 +96,15 @@ export function validateDurationProportionality(
       passed: false,
       severity: ValidationSeverity.ERROR,
       score: actualDuration / expected.min, // Proportional score
-      issues: [`Duration too short: ${actualDuration} min (expected ${expected.min}-${expected.max} min for ${difficultyLevel} level)`],
+      issues: [
+        `Duration too short: ${actualDuration} min (expected ${expected.min}-${expected.max} min for ${difficultyLevel} level)`,
+      ],
       suggestion: `Increase duration to at least ${expected.min} minutes to prevent cognitive overload`,
       metadata: {
         rule: 'duration_min',
         expected: { min: expected.min, max: expected.max },
         actual: actualDuration,
-      }
+      },
     };
   }
 
@@ -119,13 +115,15 @@ export function validateDurationProportionality(
       passed: true, // ✅ Passed despite warning
       severity: ValidationSeverity.WARNING,
       score: 0.9, // Slightly lower score, but still valid
-      warnings: [`Duration exceeds max: ${actualDuration} min (expected ${expected.min}-${expected.max} min). This is OK for complex topics.`],
+      warnings: [
+        `Duration exceeds max: ${actualDuration} min (expected ${expected.min}-${expected.max} min). This is OK for complex topics.`,
+      ],
       suggestion: `Consider splitting into multiple lessons if content is not complex`,
       metadata: {
         rule: 'duration_max',
         expected: { min: expected.min, max: expected.max },
         actual: actualDuration,
-      }
+      },
     };
   }
 
@@ -136,12 +134,14 @@ export function validateDurationProportionality(
       passed: true,
       severity: ValidationSeverity.INFO,
       score: 1.0,
-      info: [`Duration ${actualDuration} min exceeds engagement cap (${ENGAGEMENT_CAP} min). Consider adding breaks or splitting into shorter segments for better learner engagement.`],
+      info: [
+        `Duration ${actualDuration} min exceeds engagement cap (${ENGAGEMENT_CAP} min). Consider adding breaks or splitting into shorter segments for better learner engagement.`,
+      ],
       metadata: {
         rule: 'duration_engagement_cap',
         expected: { min: 0, max: ENGAGEMENT_CAP },
         actual: actualDuration,
-      }
+      },
     };
   }
 
@@ -150,11 +150,13 @@ export function validateDurationProportionality(
     passed: true,
     severity: ValidationSeverity.INFO,
     score: 1.0,
-    info: [`Duration ${actualDuration} min is within expected range (${expected.min}-${expected.max} min)`],
+    info: [
+      `Duration ${actualDuration} min is within expected range (${expected.min}-${expected.max} min)`,
+    ],
     metadata: {
       rule: 'duration_proportionality',
       expected: { min: expected.min, max: expected.max },
       actual: actualDuration,
-    }
+    },
   };
 }

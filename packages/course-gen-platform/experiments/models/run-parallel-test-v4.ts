@@ -36,7 +36,8 @@ if (!OPENROUTER_API_KEY) {
   process.exit(1);
 }
 
-const OUTPUT_DIR = '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-4';
+const OUTPUT_DIR =
+  '/home/me/code/megacampus2-worktrees/generation-json/docs/llm-testing/test-run-4';
 
 const MODELS = [
   { slug: 'kimi-k2-0905', apiName: 'moonshotai/kimi-k2-0905', name: 'Kimi K2 0905' },
@@ -47,10 +48,18 @@ const MODELS = [
   { slug: 'glm-46', apiName: 'z-ai/glm-4.6', name: 'GLM 4.6' },
   { slug: 'minimax-m2.1', apiName: 'minimax/minimax-m2.1', name: 'MiniMax M2.1' },
   { slug: 'qwen3-32b', apiName: 'qwen/qwen3-32b', name: 'Qwen3 32B' },
-  { slug: 'qwen3-235b-thinking', apiName: 'qwen/qwen3-235b-a22b-thinking-2507', name: 'Qwen3 235B Thinking' },
-  { slug: 'qwen3-235b-a22b-2507', apiName: 'qwen/qwen3-235b-a22b-2507', name: 'Qwen3 235B A22B Instruct 2507' },
+  {
+    slug: 'qwen3-235b-thinking',
+    apiName: 'qwen/qwen3-235b-a22b-thinking-2507',
+    name: 'Qwen3 235B Thinking',
+  },
+  {
+    slug: 'qwen3-235b-a22b-2507',
+    apiName: 'qwen/qwen3-235b-a22b-2507',
+    name: 'Qwen3 235B A22B Instruct 2507',
+  },
   { slug: 'oss-120b', apiName: 'openai/gpt-oss-120b', name: 'OSS 120B' },
-  { slug: 'qwen3-235b-a22b', apiName: 'qwen/qwen3-235b-a22b', name: 'Qwen3 235B A22B' }
+  { slug: 'qwen3-235b-a22b', apiName: 'qwen/qwen3-235b-a22b', name: 'Qwen3 235B A22B' },
 ];
 
 const SCENARIOS = [
@@ -74,7 +83,7 @@ Generate a JSON object with the following fields:
 - learning_outcomes: string[] (3-8 measurable outcomes using Bloom's taxonomy verbs)
 - course_tags: string[] (3-10 relevant tags)
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`,
   },
   {
     id: 'metadata-ru',
@@ -96,7 +105,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
 - learning_outcomes: string[] (3-8 измеримых результатов обучения с глаголами таксономии Блума)
 - course_tags: string[] (3-10 релевантных тегов)
 
-КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`
+КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`,
   },
   {
     id: 'lesson-en',
@@ -121,7 +130,7 @@ Generate a JSON object with:
     - exercise_title: string
     - exercise_instructions: string (clear, actionable steps)
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`,
   },
   {
     id: 'lesson-ru',
@@ -146,8 +155,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations.`
     - exercise_title: string
     - exercise_instructions: string (чёткие, выполнимые шаги)
 
-КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`
-  }
+КРИТИЧЕСКИ ВАЖНО: Верните ТОЛЬКО валидный JSON. Без markdown, без блоков кода, без объяснений.`,
+  },
 ];
 
 // ============================================================================
@@ -206,8 +215,8 @@ function cleanJsonResponse(text: string): string {
 }
 
 async function testModelScenario(
-  model: typeof MODELS[0],
-  scenario: typeof SCENARIOS[0],
+  model: (typeof MODELS)[0],
+  scenario: (typeof SCENARIOS)[0],
   runNumber: number
 ): Promise<TestResult> {
   const startTime = Date.now();
@@ -262,7 +271,7 @@ async function testModelScenario(
       runNumber,
       success: true,
       duration,
-      contentLength: cleanedContent.length
+      contentLength: cleanedContent.length,
     };
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -291,12 +300,12 @@ async function testModelScenario(
       runNumber,
       success: false,
       duration,
-      error: errorMessage
+      error: errorMessage,
     };
   }
 }
 
-async function testModel(model: typeof MODELS[0]): Promise<TestSummary> {
+async function testModel(model: (typeof MODELS)[0]): Promise<TestSummary> {
   console.log(`\n${'='.repeat(80)}`);
   console.log(`📊 Testing model: ${model.name} (${model.apiName})`);
   console.log(`${'='.repeat(80)}\n`);
@@ -337,7 +346,7 @@ async function testModel(model: typeof MODELS[0]): Promise<TestSummary> {
     failedTests,
     successRate,
     avgTestDuration: avgDuration,
-    results
+    results,
   };
 
   // Save summary
@@ -381,9 +390,7 @@ async function main() {
 
   // Run all models in parallel
   console.log('🔥 Starting all 12 models in parallel...\n');
-  const modelSummaries = await Promise.all(
-    MODELS.map(model => testModel(model))
-  );
+  const modelSummaries = await Promise.all(MODELS.map(model => testModel(model)));
 
   const overallDuration = Date.now() - overallStartTime;
 
@@ -402,8 +409,8 @@ async function main() {
       modelSlug: s.modelSlug,
       successRate: s.successRate,
       avgTestDuration: s.avgTestDuration,
-      duration: s.duration
-    }))
+      duration: s.duration,
+    })),
   };
 
   writeFileSync(
@@ -426,9 +433,11 @@ async function main() {
   modelSummaries
     .sort((a, b) => parseFloat(b.successRate) - parseFloat(a.successRate))
     .forEach(s => {
-      const icon = parseFloat(s.successRate) === 100 ? '✅' :
-                   parseFloat(s.successRate) >= 90 ? '⚠️' : '❌';
-      console.log(`   ${icon} ${s.model.padEnd(35)} ${s.successRate}% (${s.avgTestDuration}ms avg)`);
+      const icon =
+        parseFloat(s.successRate) === 100 ? '✅' : parseFloat(s.successRate) >= 90 ? '⚠️' : '❌';
+      console.log(
+        `   ${icon} ${s.model.padEnd(35)} ${s.successRate}% (${s.avgTestDuration}ms avg)`
+      );
     });
 
   console.log('\n✨ Test run 4 complete!\n');

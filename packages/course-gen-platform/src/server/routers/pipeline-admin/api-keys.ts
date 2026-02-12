@@ -11,17 +11,23 @@
  * - updateApiKeyConfig: Update API key configuration (source, value)
  * - testApiKey: Test if an API key is valid
  * - invalidateCache: Manually invalidate API key cache
- * - getApiKeysHealth: Public endpoint to check if API keys are configured
+ * - getApiKeysHealth: Admin endpoint to check if API keys are configured
  */
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure } from '../../trpc';
-import { superadminProcedure } from '../../procedures';
+import { router } from '../../trpc';
+import { superadminProcedure, adminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
-import { invalidateApiKeyCache, encryptApiKey, decryptApiKey, isEncrypted, isApiKeyConfigured } from '../../../shared/services/api-key-service';
+import {
+  invalidateApiKeyCache,
+  encryptApiKey,
+  decryptApiKey,
+  isEncrypted,
+  isApiKeyConfigured,
+} from '../../../shared/services/api-key-service';
 import type { Database } from '@megacampus/shared-types';
 
 // Type aliases for Database tables
@@ -57,7 +63,7 @@ function validateApiKeyFormat(keyType: 'jina' | 'openrouter', value: string): bo
  * - updateApiKeyConfig: Update API key source and value
  * - testApiKey: Test API key connectivity
  * - invalidateCache: Manually invalidate API key cache
- * - getApiKeysHealth: Public health check endpoint
+ * - getApiKeysHealth: Admin health check endpoint
  */
 export const apiKeysRouter = router({
   /**
@@ -97,21 +103,31 @@ export const apiKeysRouter = router({
       const openRouterEnvSet = !!process.env.OPENROUTER_API_KEY;
 
       // Parse settings with defaults
-      const jinaConfig = (settingsMap.jina_api_key as { source?: string; env_var?: string; is_configured?: boolean }) || {
+      const jinaConfig = (settingsMap.jina_api_key as {
+        source?: string;
+        env_var?: string;
+        is_configured?: boolean;
+      }) || {
         source: 'env',
         env_var: 'JINA_API_KEY',
         is_configured: false,
       };
 
-      const openRouterConfig = (settingsMap.openrouter_api_key as { source?: string; env_var?: string; is_configured?: boolean }) || {
+      const openRouterConfig = (settingsMap.openrouter_api_key as {
+        source?: string;
+        env_var?: string;
+        is_configured?: boolean;
+      }) || {
         source: 'env',
         env_var: 'OPENROUTER_API_KEY',
         is_configured: false,
       };
 
       // Determine if configured based on source
-      const jinaIsConfigured = jinaConfig.source === 'env' ? jinaEnvSet : !!jinaConfig.is_configured;
-      const openRouterIsConfigured = openRouterConfig.source === 'env' ? openRouterEnvSet : !!openRouterConfig.is_configured;
+      const jinaIsConfigured =
+        jinaConfig.source === 'env' ? jinaEnvSet : !!jinaConfig.is_configured;
+      const openRouterIsConfigured =
+        openRouterConfig.source === 'env' ? openRouterEnvSet : !!openRouterConfig.is_configured;
 
       return {
         jina: {
@@ -158,20 +174,25 @@ export const apiKeysRouter = router({
    */
   updateApiKeyConfig: superadminProcedure
     .input(
-      z.object({
-        keyType: z.enum(['jina', 'openrouter']),
-        source: z.enum(['env', 'database']),
-        value: z.string().optional(),
-      }).refine((data) => {
-        // Only validate format when source is 'database' and value is provided
-        if (data.source === 'database' && data.value) {
-          return validateApiKeyFormat(data.keyType, data.value);
-        }
-        return true;
-      }, (data) => ({
-        message: `Invalid ${data.keyType} API key format. ${API_KEY_FORMAT_HINTS[data.keyType]}`,
-        path: ['value'],
-      }))
+      z
+        .object({
+          keyType: z.enum(['jina', 'openrouter']),
+          source: z.enum(['env', 'database']),
+          value: z.string().optional(),
+        })
+        .refine(
+          data => {
+            // Only validate format when source is 'database' and value is provided
+            if (data.source === 'database' && data.value) {
+              return validateApiKeyFormat(data.keyType, data.value);
+            }
+            return true;
+          },
+          data => ({
+            message: `Invalid ${data.keyType} API key format. ${API_KEY_FORMAT_HINTS[data.keyType]}`,
+            path: ['value'],
+          })
+        )
     )
     .mutation(async ({ ctx, input }) => {
       try {
@@ -225,10 +246,17 @@ export const apiKeysRouter = router({
         invalidateApiKeyCache(input.keyType);
 
         // Audit log
-        await logPipelineAction(ctx.user.id, 'update_api_key', 'api_key_config', settingKey, {
-          keyType: input.keyType,
-          source: input.source,
-        }, { failOnError: true });
+        await logPipelineAction(
+          ctx.user.id,
+          'update_api_key',
+          'api_key_config',
+          settingKey,
+          {
+            keyType: input.keyType,
+            source: input.source,
+          },
+          { failOnError: true }
+        );
 
         logger.info(
           { userId: ctx.user.id, keyType: input.keyType, source: input.source },
@@ -242,7 +270,10 @@ export const apiKeysRouter = router({
         }
 
         logger.error(
-          { err: error instanceof Error ? error.message : String(error), input: { keyType: input.keyType, source: input.source } },
+          {
+            err: error instanceof Error ? error.message : String(error),
+            input: { keyType: input.keyType, source: input.source },
+          },
           'Unexpected error in updateApiKeyConfig'
         );
         throw new TRPCError({
@@ -286,7 +317,9 @@ export const apiKeysRouter = router({
           .eq('setting_key', settingKey)
           .single();
 
-        const config = (setting?.setting_value as { source?: string; value?: string }) || { source: 'env' };
+        const config = (setting?.setting_value as { source?: string; value?: string }) || {
+          source: 'env',
+        };
 
         // Get API key based on source
         let apiKey: string | undefined;
@@ -307,9 +340,8 @@ export const apiKeysRouter = router({
             apiKey = config.value;
           }
         } else {
-          apiKey = input.keyType === 'jina'
-            ? process.env.JINA_API_KEY
-            : process.env.OPENROUTER_API_KEY;
+          apiKey =
+            input.keyType === 'jina' ? process.env.JINA_API_KEY : process.env.OPENROUTER_API_KEY;
         }
 
         if (!apiKey) {
@@ -322,7 +354,7 @@ export const apiKeysRouter = router({
           const response = await fetch('https://api.jina.ai/v1/embeddings', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${apiKey}`,
+              Authorization: `Bearer ${apiKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -356,13 +388,16 @@ export const apiKeysRouter = router({
           const response = await fetch('https://openrouter.ai/api/v1/models', {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${apiKey}`,
+              Authorization: `Bearer ${apiKey}`,
             },
           });
 
           if (!response.ok) {
             const errorText = await response.text();
-            return { success: false, error: `OpenRouter API error: ${response.status} - ${errorText}` };
+            return {
+              success: false,
+              error: `OpenRouter API error: ${response.status} - ${errorText}`,
+            };
           }
 
           // Update test status in DB
@@ -402,9 +437,11 @@ export const apiKeysRouter = router({
    */
   invalidateCache: superadminProcedure
     .input(
-      z.object({
-        keyType: z.enum(['jina', 'openrouter']).optional(),
-      }).optional()
+      z
+        .object({
+          keyType: z.enum(['jina', 'openrouter']).optional(),
+        })
+        .optional()
     )
     .mutation(({ input }) => {
       invalidateApiKeyCache(input?.keyType);
@@ -415,15 +452,15 @@ export const apiKeysRouter = router({
   /**
    * Get API Keys Health Status
    *
-   * Purpose: Public endpoint to check if API keys are configured.
+   * Purpose: Check if API keys are configured.
    * Returns only whether keys are configured, not the actual values.
-   * Useful for monitoring and health checks.
+   * Useful for admin dashboard health indicators.
    *
-   * Authorization: Public (no auth required)
+   * Authorization: Admin or superadmin (reveals API key configuration state)
    *
    * Output: { jina: { configured: boolean }, openRouter: { configured: boolean }, timestamp: string }
    */
-  getApiKeysHealth: publicProcedure.query(async () => {
+  getApiKeysHealth: adminProcedure.query(async () => {
     const jinaConfigured = await isApiKeyConfigured('jina');
     const openRouterConfigured = await isApiKeyConfigured('openrouter');
 

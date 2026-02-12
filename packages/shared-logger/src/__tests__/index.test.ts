@@ -69,7 +69,7 @@ describe('shared-logger', () => {
     it('creates child logger with module context', async () => {
       vi.resetModules();
       const { createModuleLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const moduleLogger = createModuleLogger('test-module');
 
@@ -80,7 +80,7 @@ describe('shared-logger', () => {
     it('creates unique loggers for different modules', async () => {
       vi.resetModules();
       const { createModuleLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       createModuleLogger('auth');
       createModuleLogger('payments');
@@ -94,7 +94,7 @@ describe('shared-logger', () => {
     it('creates child logger with requestId only', async () => {
       vi.resetModules();
       const { createRequestLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const reqLogger = createRequestLogger('req-123');
 
@@ -108,7 +108,7 @@ describe('shared-logger', () => {
     it('creates child logger with requestId and userId', async () => {
       vi.resetModules();
       const { createRequestLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const reqLogger = createRequestLogger('req-456', 'user-789');
 
@@ -124,7 +124,7 @@ describe('shared-logger', () => {
     it('creates child logger with custom context', async () => {
       vi.resetModules();
       const { createChildLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const context = {
         jobId: 'job-123',
@@ -141,7 +141,7 @@ describe('shared-logger', () => {
     it('creates child logger with minimal context', async () => {
       vi.resetModules();
       const { createChildLogger } = await import('../index');
-      const { __mockChild } = await import('pino') as any;
+      const { __mockChild } = (await import('pino')) as any;
 
       const childLogger = createChildLogger({ module: 'test' });
 
@@ -205,6 +205,82 @@ describe('shared-logger', () => {
         type: 'Error',
         message: 'ENOENT',
         code: 'ENOENT',
+      });
+    });
+  });
+
+  describe('error key serializer (same as err)', () => {
+    it('registers error serializer alongside err', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(pinoCall.serializers).toHaveProperty('error');
+      expect(pinoCall.serializers.error).toBe(pinoCall.serializers.err);
+    });
+
+    it('error serializer handles standard Error', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const errorSerializer = pinoCall.serializers.error;
+
+      const error = new Error('DB sync failed');
+      const serialized = errorSerializer(error);
+
+      expect(serialized).toMatchObject({
+        type: 'Error',
+        message: 'DB sync failed',
+        stack: expect.any(String),
+      });
+    });
+
+    it('error serializer handles plain object (fetch/Supabase errors)', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const errorSerializer = pinoCall.serializers.error;
+
+      // Supabase errors are often plain objects without Error prototype
+      const plainError = { message: 'connect timeout', code: 'UND_ERR_CONNECT_TIMEOUT' };
+      const serialized = errorSerializer(plainError);
+
+      expect(serialized).toMatchObject({
+        message: 'connect timeout',
+        code: 'UND_ERR_CONNECT_TIMEOUT',
+      });
+    });
+
+    it('error serializer handles null/undefined gracefully', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const errorSerializer = pinoCall.serializers.error;
+
+      expect(errorSerializer(null)).toBe(null);
+      expect(errorSerializer(undefined)).toBe(undefined);
+      expect(errorSerializer('string error')).toBe('string error');
+    });
+
+    it('error serializer handles ENOENT errno errors', async () => {
+      vi.resetModules();
+      await import('../index');
+
+      const pinoCall = (pino as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const errorSerializer = pinoCall.serializers.error;
+
+      const error = new Error('ENOENT: no such file or directory') as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      const serialized = errorSerializer(error);
+
+      expect(serialized).toMatchObject({
+        type: 'Error',
+        message: 'ENOENT: no such file or directory',
+        code: 'ENOENT',
+        stack: expect.any(String),
       });
     });
   });

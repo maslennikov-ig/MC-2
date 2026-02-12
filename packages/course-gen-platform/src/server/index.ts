@@ -58,6 +58,8 @@
  */
 
 import 'dotenv/config';
+import { initSentry } from '../shared/sentry/init.js';
+initSentry();
 import { setMaxListeners } from 'events';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
@@ -115,29 +117,14 @@ async function initializeServices() {
         'reflection',
       ],
 
-      // primary_strategy
-      primary_strategy: [
-        'problem-based learning',
-        'lecture-based',
-        'inquiry-based',
-        'project-based',
-        'mixed',
-      ],
-
       // target_audience
       target_audience: ['beginner', 'intermediate', 'advanced', 'mixed'],
 
       // difficulty_level
       difficulty_level: ['beginner', 'intermediate', 'advanced'],
 
-      // cognitiveLevel (Bloom's taxonomy)
-      cognitiveLevel: ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'],
-
       // importance
-      importance: ['core', 'important', 'supplementary', 'optional'],
-
-      // difficulty_progression
-      difficulty_progression: ['gradual', 'steep', 'mixed'],
+      importance: ['simple', 'normal', 'complex'],
     });
 
     logger.info('[Startup] Embedding cache ready');

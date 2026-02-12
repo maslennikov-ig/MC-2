@@ -32,7 +32,7 @@ export const STAGE6_LAYOUT_CONFIG = {
   LESSON_GAP: 10,
   /** Internal padding inside module container */
   MODULE_PADDING: 15,
-} as const;
+} as const
 
 /**
  * Layout Configuration for Stage 2 Document Processing Container.
@@ -59,8 +59,8 @@ export const STAGE2_LAYOUT_CONFIG = {
   DOCUMENT_GAP: 8,
   /** Internal padding inside container */
   CONTAINER_PADDING: 12,
-} as const;
+} as const
 
 // Export type for external use
-export type Stage6LayoutConfig = typeof STAGE6_LAYOUT_CONFIG;
-export type Stage2LayoutConfig = typeof STAGE2_LAYOUT_CONFIG;
+export type Stage6LayoutConfig = typeof STAGE6_LAYOUT_CONFIG
+export type Stage2LayoutConfig = typeof STAGE2_LAYOUT_CONFIG

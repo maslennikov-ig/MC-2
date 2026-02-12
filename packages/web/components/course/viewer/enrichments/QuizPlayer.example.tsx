@@ -5,48 +5,48 @@
  * with different quiz configurations.
  */
 
-import { QuizPlayer } from "./QuizPlayer";
-import type { QuizEnrichmentContent } from "@megacampus/shared-types";
+import { QuizPlayer } from './QuizPlayer'
+import type { QuizEnrichmentContent } from '@megacampus/shared-types'
 
 /**
  * Example 1: Basic Multiple Choice Quiz
  */
 export function BasicQuizExample() {
   const quizContent: QuizEnrichmentContent = {
-    type: "quiz",
-    quiz_title: "JavaScript Основы",
-    instructions: "Ответьте на вопросы, чтобы проверить свои знания JavaScript",
+    type: 'quiz',
+    quiz_title: 'JavaScript Основы',
+    instructions: 'Ответьте на вопросы, чтобы проверить свои знания JavaScript',
     questions: [
       {
-        id: "q1",
-        type: "multiple_choice",
-        bloom_level: "remember",
-        difficulty: "easy",
-        question: "Какой оператор используется для объявления переменной в JavaScript?",
+        id: 'q1',
+        type: 'multiple_choice',
+        bloom_level: 'remember',
+        difficulty: 'easy',
+        question: 'Какой оператор используется для объявления переменной в JavaScript?',
         options: [
-          { id: "a", text: "var" },
-          { id: "b", text: "let" },
-          { id: "c", text: "const" },
-          { id: "d", text: "Все вышеперечисленное" },
+          { id: 'a', text: 'var' },
+          { id: 'b', text: 'let' },
+          { id: 'c', text: 'const' },
+          { id: 'd', text: 'Все вышеперечисленное' },
         ],
-        correct_answer: "d",
+        correct_answer: 'd',
         explanation:
-          "В JavaScript можно использовать var, let и const для объявления переменных. let и const появились в ES6 и являются более современными.",
+          'В JavaScript можно использовать var, let и const для объявления переменных. let и const появились в ES6 и являются более современными.',
         points: 1,
       },
       {
-        id: "q2",
-        type: "multiple_choice",
-        bloom_level: "understand",
-        difficulty: "medium",
-        question: "Что выведет console.log(typeof null)?",
+        id: 'q2',
+        type: 'multiple_choice',
+        bloom_level: 'understand',
+        difficulty: 'medium',
+        question: 'Что выведет console.log(typeof null)?',
         options: [
-          { id: "a", text: "null" },
-          { id: "b", text: "object" },
-          { id: "c", text: "undefined" },
-          { id: "d", text: "number" },
+          { id: 'a', text: 'null' },
+          { id: 'b', text: 'object' },
+          { id: 'c', text: 'undefined' },
+          { id: 'd', text: 'number' },
         ],
-        correct_answer: "b",
+        correct_answer: 'b',
         explanation:
           "typeof null возвращает 'object' - это известная особенность JavaScript, которая существует с первых версий языка.",
         points: 2,
@@ -65,14 +65,20 @@ export function BasicQuizExample() {
         analyze: 0,
       },
     },
-  };
+  }
 
   const handleComplete = (score: number, totalPoints: number, passed: boolean) => {
-    console.log("Quiz completed!", { score, totalPoints, passed });
+    console.log('Quiz completed!', { score, totalPoints, passed })
     // Save progress to backend or localStorage
-  };
+  }
 
-  return <QuizPlayer content={quizContent} enrichmentId="example-basic-quiz" onComplete={handleComplete} />;
+  return (
+    <QuizPlayer
+      content={quizContent}
+      enrichmentId="example-basic-quiz"
+      onComplete={handleComplete}
+    />
+  )
 }
 
 /**
@@ -80,30 +86,30 @@ export function BasicQuizExample() {
  */
 export function TrueFalseQuizExample() {
   const quizContent: QuizEnrichmentContent = {
-    type: "quiz",
-    quiz_title: "React Правда или Ложь",
-    instructions: "Определите, верны ли следующие утверждения о React",
+    type: 'quiz',
+    quiz_title: 'React Правда или Ложь',
+    instructions: 'Определите, верны ли следующие утверждения о React',
     questions: [
       {
-        id: "q1",
-        type: "true_false",
-        bloom_level: "understand",
-        difficulty: "easy",
-        question: "React - это фреймворк для создания пользовательских интерфейсов",
+        id: 'q1',
+        type: 'true_false',
+        bloom_level: 'understand',
+        difficulty: 'easy',
+        question: 'React - это фреймворк для создания пользовательских интерфейсов',
         correct_answer: false,
         explanation:
-          "React - это библиотека, а не фреймворк. Фреймворки, такие как Next.js, построены на основе React.",
+          'React - это библиотека, а не фреймворк. Фреймворки, такие как Next.js, построены на основе React.',
         points: 1,
       },
       {
-        id: "q2",
-        type: "true_false",
-        bloom_level: "remember",
-        difficulty: "easy",
-        question: "JSX является обязательным для работы с React",
+        id: 'q2',
+        type: 'true_false',
+        bloom_level: 'remember',
+        difficulty: 'easy',
+        question: 'JSX является обязательным для работы с React',
         correct_answer: false,
         explanation:
-          "JSX не является обязательным, но он делает код более читаемым. Можно использовать React.createElement() напрямую.",
+          'JSX не является обязательным, но он делает код более читаемым. Можно использовать React.createElement() напрямую.',
         points: 1,
       },
     ],
@@ -121,9 +127,9 @@ export function TrueFalseQuizExample() {
         analyze: 0,
       },
     },
-  };
+  }
 
-  return <QuizPlayer content={quizContent} enrichmentId="example-true-false-quiz" />;
+  return <QuizPlayer content={quizContent} enrichmentId="example-true-false-quiz" />
 }
 
 /**
@@ -131,29 +137,28 @@ export function TrueFalseQuizExample() {
  */
 export function ShortAnswerQuizExample() {
   const quizContent: QuizEnrichmentContent = {
-    type: "quiz",
-    quiz_title: "TypeScript Терминология",
-    instructions: "Введите краткие ответы на следующие вопросы",
+    type: 'quiz',
+    quiz_title: 'TypeScript Терминология',
+    instructions: 'Введите краткие ответы на следующие вопросы',
     questions: [
       {
-        id: "q1",
-        type: "short_answer",
-        bloom_level: "remember",
-        difficulty: "easy",
-        question: "Какое расширение файла используется для TypeScript?",
-        correct_answer: ".ts",
+        id: 'q1',
+        type: 'short_answer',
+        bloom_level: 'remember',
+        difficulty: 'easy',
+        question: 'Какое расширение файла используется для TypeScript?',
+        correct_answer: '.ts',
         explanation:
-          "TypeScript файлы используют расширение .ts для обычных файлов и .tsx для файлов с JSX.",
+          'TypeScript файлы используют расширение .ts для обычных файлов и .tsx для файлов с JSX.',
         points: 1,
       },
       {
-        id: "q2",
-        type: "short_answer",
-        bloom_level: "apply",
-        difficulty: "medium",
-        question:
-          "Какой ключевое слово используется для определения типа в TypeScript?",
-        correct_answer: "type",
+        id: 'q2',
+        type: 'short_answer',
+        bloom_level: 'apply',
+        difficulty: 'medium',
+        question: 'Какой ключевое слово используется для определения типа в TypeScript?',
+        correct_answer: 'type',
         explanation:
           "Ключевое слово 'type' используется для создания алиасов типов. Также можно использовать 'interface' для объектных типов.",
         points: 2,
@@ -172,9 +177,9 @@ export function ShortAnswerQuizExample() {
         analyze: 0,
       },
     },
-  };
+  }
 
-  return <QuizPlayer content={quizContent} enrichmentId="example-short-answer-quiz" />;
+  return <QuizPlayer content={quizContent} enrichmentId="example-short-answer-quiz" />
 }
 
 /**
@@ -182,47 +187,46 @@ export function ShortAnswerQuizExample() {
  */
 export function MixedQuizExample() {
   const quizContent: QuizEnrichmentContent = {
-    type: "quiz",
-    quiz_title: "Комплексный тест по веб-разработке",
-    instructions:
-      "Этот тест содержит различные типы вопросов для проверки ваших знаний",
+    type: 'quiz',
+    quiz_title: 'Комплексный тест по веб-разработке',
+    instructions: 'Этот тест содержит различные типы вопросов для проверки ваших знаний',
     questions: [
       {
-        id: "q1",
-        type: "multiple_choice",
-        bloom_level: "understand",
-        difficulty: "medium",
-        question: "Какой HTTP метод используется для обновления ресурса?",
+        id: 'q1',
+        type: 'multiple_choice',
+        bloom_level: 'understand',
+        difficulty: 'medium',
+        question: 'Какой HTTP метод используется для обновления ресурса?',
         options: [
-          { id: "a", text: "GET" },
-          { id: "b", text: "POST" },
-          { id: "c", text: "PUT" },
-          { id: "d", text: "DELETE" },
+          { id: 'a', text: 'GET' },
+          { id: 'b', text: 'POST' },
+          { id: 'c', text: 'PUT' },
+          { id: 'd', text: 'DELETE' },
         ],
-        correct_answer: "c",
+        correct_answer: 'c',
         explanation:
-          "PUT используется для полного обновления ресурса. PATCH используется для частичного обновления.",
+          'PUT используется для полного обновления ресурса. PATCH используется для частичного обновления.',
         points: 2,
       },
       {
-        id: "q2",
-        type: "true_false",
-        bloom_level: "remember",
-        difficulty: "easy",
-        question: "CSS означает Cascading Style Sheets",
+        id: 'q2',
+        type: 'true_false',
+        bloom_level: 'remember',
+        difficulty: 'easy',
+        question: 'CSS означает Cascading Style Sheets',
         correct_answer: true,
-        explanation: "CSS действительно расшифровывается как Cascading Style Sheets.",
+        explanation: 'CSS действительно расшифровывается как Cascading Style Sheets.',
         points: 1,
       },
       {
-        id: "q3",
-        type: "short_answer",
-        bloom_level: "apply",
-        difficulty: "hard",
-        question: "Какой метод массива используется для преобразования каждого элемента?",
-        correct_answer: "map",
+        id: 'q3',
+        type: 'short_answer',
+        bloom_level: 'apply',
+        difficulty: 'hard',
+        question: 'Какой метод массива используется для преобразования каждого элемента?',
+        correct_answer: 'map',
         explanation:
-          "Метод map() создает новый массив с результатами вызова функции для каждого элемента.",
+          'Метод map() создает новый массив с результатами вызова функции для каждого элемента.',
         points: 3,
       },
     ],
@@ -240,9 +244,9 @@ export function MixedQuizExample() {
         analyze: 0,
       },
     },
-  };
+  }
 
-  return <QuizPlayer content={quizContent} enrichmentId="example-mixed-quiz" />;
+  return <QuizPlayer content={quizContent} enrichmentId="example-mixed-quiz" />
 }
 
 /**
@@ -253,15 +257,15 @@ export function MixedQuizExample() {
 export function LessonEnrichmentIntegration() {
   // This would typically come from the database via props
   const enrichmentRow = {
-    id: "123e4567-e89b-12d3-a456-426614174000",
-    lesson_id: "1.2",
-    enrichment_type: "quiz" as const,
-    status: "completed" as const,
-    title: "Тест по основам программирования",
+    id: '123e4567-e89b-12d3-a456-426614174000',
+    lesson_id: '1.2',
+    enrichment_type: 'quiz' as const,
+    status: 'completed' as const,
+    title: 'Тест по основам программирования',
     content: {
-      type: "quiz" as const,
-      quiz_title: "Тест по основам программирования",
-      instructions: "Проверьте свои знания основ программирования",
+      type: 'quiz' as const,
+      quiz_title: 'Тест по основам программирования',
+      instructions: 'Проверьте свои знания основ программирования',
       questions: [
         // ... questions array
       ],
@@ -279,10 +283,10 @@ export function LessonEnrichmentIntegration() {
         },
       },
     },
-  };
+  }
 
   // Type guard to ensure content is QuizEnrichmentContent
-  if (enrichmentRow.content.type === "quiz") {
+  if (enrichmentRow.content.type === 'quiz') {
     return (
       <div className="p-6">
         <QuizPlayer
@@ -290,19 +294,19 @@ export function LessonEnrichmentIntegration() {
           enrichmentId={enrichmentRow.id}
           onComplete={(score, totalPoints, passed) => {
             // Save quiz results to backend
-            console.log("Saving quiz results:", {
+            console.log('Saving quiz results:', {
               enrichmentId: enrichmentRow.id,
               lessonId: enrichmentRow.lesson_id,
               score,
               totalPoints,
               passed,
               completedAt: new Date().toISOString(),
-            });
+            })
           }}
         />
       </div>
-    );
+    )
   }
 
-  return null;
+  return null
 }

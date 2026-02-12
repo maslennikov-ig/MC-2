@@ -23,16 +23,18 @@ interface AuthButtonProps {
   forceWhiteDropdown?: boolean
 }
 
-export default function AuthButton({ darkMode = false, forceWhiteDropdown = false }: AuthButtonProps) {
+export default function AuthButton({
+  darkMode = false,
+  forceWhiteDropdown = false,
+}: AuthButtonProps) {
   const [user, setUser] = useState<User | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const { open } = useAuthModal()
   const router = useRouter()
   const pathname = usePathname()
-  
+
   // Use the single source of truth from SupabaseProvider
   const { supabase, session, isLoading } = useSupabase()
-
 
   useEffect(() => {
     let mounted = true
@@ -60,7 +62,7 @@ export default function AuthButton({ darkMode = false, forceWhiteDropdown = fals
             id: session.user.id,
             email: session.user.email,
             name: fullName,
-            role: userProfile?.role || 'student'
+            role: userProfile?.role || 'student',
           })
         }
       } catch {
@@ -70,7 +72,7 @@ export default function AuthButton({ darkMode = false, forceWhiteDropdown = fals
             id: session.user.id,
             email: session.user.email,
             name: session.user.email?.split('@')[0],
-            role: 'student'
+            role: 'student',
           })
         }
       } finally {
@@ -112,28 +114,43 @@ export default function AuthButton({ darkMode = false, forceWhiteDropdown = fals
     return (
       <>
         <GooeyFilter />
-        <div id="gooey-btn" className="relative flex items-center group" style={{ filter: "url(#gooey-filter)" }}>
+        <div
+          id="gooey-btn"
+          className="group relative flex items-center"
+          style={{ filter: 'url(#gooey-filter)' }}
+        >
           <button
             onClick={() => open('login', { returnTo: pathname })}
-            className={`absolute right-0 px-3 py-3 rounded-full bg-gradient-to-r text-white font-medium text-sm transition-all duration-300 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center -translate-x-12 group-hover:-translate-x-20 z-0 shadow-md ${
+            className={`absolute right-0 z-0 flex min-h-[44px] min-w-[44px] -translate-x-12 cursor-pointer items-center justify-center rounded-full bg-gradient-to-r px-3 py-3 text-sm font-medium text-white shadow-md transition-all duration-300 group-hover:-translate-x-20 ${
               darkMode
                 ? 'from-purple-700 to-purple-800 hover:from-purple-800 hover:to-purple-900'
-                : 'from-purple-600 to-purple-700 dark:from-purple-700 dark:to-purple-800 hover:from-purple-700 hover:to-purple-800 dark:hover:from-purple-800 dark:hover:to-purple-900'
+                : 'from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 dark:from-purple-700 dark:to-purple-800 dark:hover:from-purple-800 dark:hover:to-purple-900'
             }`}
             aria-label="Открыть меню входа"
             aria-hidden="true"
             tabIndex={-1}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M17 7H7M17 7V17" />
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 17L17 7M17 7H7M17 7V17"
+              />
             </svg>
           </button>
-          <button 
+          <button
             onClick={() => open('login', { returnTo: pathname })}
-            className={`px-8 py-3 rounded-full bg-gradient-to-r text-white font-medium text-sm transition-all duration-300 cursor-pointer min-h-[44px] flex items-center z-10 shadow-lg ${
+            className={`z-10 flex min-h-[44px] cursor-pointer items-center rounded-full bg-gradient-to-r px-8 py-3 text-sm font-medium text-white shadow-lg transition-all duration-300 ${
               darkMode
                 ? 'from-purple-700 to-purple-800 hover:from-purple-800 hover:to-purple-900'
-                : 'from-purple-600 to-purple-700 dark:from-purple-700 dark:to-purple-800 hover:from-purple-700 hover:to-purple-800 dark:hover:from-purple-800 dark:hover:to-purple-900'
+                : 'from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 dark:from-purple-700 dark:to-purple-800 dark:hover:from-purple-800 dark:hover:to-purple-900'
             }`}
             aria-label="Войти в аккаунт"
           >
@@ -153,7 +170,7 @@ export default function AuthButton({ darkMode = false, forceWhiteDropdown = fals
           email: user.email || '',
           name: user.name,
           image: user.image,
-          role: user.role
+          role: user.role,
         }}
         onSignOut={handleSignOut}
         darkMode={darkMode}

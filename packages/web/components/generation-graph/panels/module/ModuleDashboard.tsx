@@ -149,7 +149,7 @@ export function ModuleDashboard({
 
   // Map ModuleDashboardData.aggregates to Stage6ControlTower stats format
   const controlTowerStats = {
-    totalTokens: undefined, // Not available yet - TODO: aggregate from lessons
+    totalTokens: data.aggregates.totalTokens,
     avgQuality: (data.aggregates.avgQualityScore ?? 0) * 100, // Convert 0-1 to 0-100
     statusCounts: {
       completed: data.aggregates.completedLessons,
@@ -163,9 +163,8 @@ export function ModuleDashboard({
   }
 
   // Handlers for Control Tower actions
-  const handleRegenerateAll = () => {
-    // TODO: Implement via tRPC mutation
-    logger.debug('Regenerate all lessons requested', { moduleId: data.moduleId })
+  const handleRetryFailed = () => {
+    logger.debug('Retry failed lessons requested', { moduleId: data.moduleId })
     onRegenerateFailed?.()
   }
 
@@ -182,7 +181,7 @@ export function ModuleDashboard({
           moduleId={data.moduleId}
           stats={controlTowerStats}
           modelTier="standard" // TODO: Get from course settings or user subscription
-          onRegenerateAll={handleRegenerateAll}
+          onRegenerateAll={handleRetryFailed}
           onExportAll={handleExportAll}
         />
 

@@ -11,12 +11,14 @@ This module implements reference counting for vector lifecycle management, preve
 ## Problem Statement
 
 **Before Implementation:**
+
 - ❌ Same file uploaded twice = 2× Docling processing
 - ❌ Same file uploaded twice = 2× Jina embedding costs (~$0.02/M tokens each)
 - ❌ Same file uploaded twice = 2× Qdrant storage
 - ❌ Same file uploaded twice = 2× processing time
 
 **Example Scenario:**
+
 1. Professor uploads "Introduction to Machine Learning.pdf" to Course A
 2. Same professor uploads same PDF to Course B
 3. Different professor at different organization uploads same PDF to Course C
@@ -26,12 +28,14 @@ All 3 uploads process the same content independently, wasting time and money.
 ## Solution: Reference Counting
 
 **After Implementation:**
+
 - ✅ Same file uploaded twice = 1× Docling processing (second upload skipped)
 - ✅ Same file uploaded twice = 1× Jina embedding cost (vectors reused)
 - ✅ Same file uploaded twice = 1.1× Qdrant storage (only duplicate points, not embeddings)
 - ✅ Second upload completes instantly (no processing queue)
 
 **How It Works:**
+
 1. Calculate SHA-256 hash on upload
 2. Check if file with same hash exists and is indexed
 3. If exists: Create reference record, duplicate vectors with new metadata, skip processing
@@ -99,6 +103,7 @@ supabase/migrations/
 Handles file upload with automatic deduplication.
 
 **Parameters:**
+
 - `fileBuffer: Buffer` - File content
 - `metadata: FileUploadMetadata` - Upload metadata
   - `filename: string` - Original filename
@@ -108,6 +113,7 @@ Handles file upload with automatic deduplication.
   - `user_id?: string` - Optional user UUID
 
 **Returns:**
+
 ```typescript
 {
   file_id: string;              // Created file_catalog record ID
@@ -119,6 +125,7 @@ Handles file upload with automatic deduplication.
 ```
 
 **Example:**
+
 ```typescript
 import { handleFileUpload } from './shared/qdrant/lifecycle';
 
@@ -141,19 +148,22 @@ if (result.deduplicated) {
 Handles file deletion with reference counting.
 
 **Parameters:**
+
 - `fileId: string` - File UUID to delete
 
 **Returns:**
+
 ```typescript
 {
-  physical_file_deleted: boolean;   // Whether physical file was deleted
-  remaining_references: number;      // Remaining reference count
-  vectors_deleted: number;           // Count of vectors deleted
-  storage_freed_bytes: number;       // Storage freed
+  physical_file_deleted: boolean; // Whether physical file was deleted
+  remaining_references: number; // Remaining reference count
+  vectors_deleted: number; // Count of vectors deleted
+  storage_freed_bytes: number; // Storage freed
 }
 ```
 
 **Example:**
+
 ```typescript
 import { handleFileDelete } from './shared/qdrant/lifecycle';
 
@@ -171,6 +181,7 @@ if (result.physical_file_deleted) {
 Duplicates vectors for a new course (internal function, called by `handleFileUpload`).
 
 **Parameters:**
+
 - `originalFileId: string` - Original file with existing vectors
 - `newFileId: string` - New file reference
 - `newCourseId: string` - New course UUID
@@ -179,6 +190,7 @@ Duplicates vectors for a new course (internal function, called by `handleFileUpl
 **Returns:** Number of vectors duplicated
 
 **Process:**
+
 1. Query Qdrant for all vectors with `document_id = originalFileId`
 2. Create new points with:
    - **Same embeddings** (dense + sparse)
@@ -190,6 +202,7 @@ Duplicates vectors for a new course (internal function, called by `handleFileUpl
 Calculates SHA-256 hash of file buffer.
 
 **Parameters:**
+
 - `buffer: Buffer` - File content
 
 **Returns:** Hex-encoded SHA-256 hash
@@ -199,6 +212,7 @@ Calculates SHA-256 hash of file buffer.
 Updates storage quota for an organization.
 
 **Parameters:**
+
 - `organizationId: string` - Organization UUID
 - `fileSize: number` - File size in bytes
 - `operation: 'increment' | 'decrement'` - Operation type
@@ -210,15 +224,17 @@ Updates storage quota for an organization.
 Gets deduplication statistics for an organization.
 
 **Parameters:**
+
 - `organizationId: string` - Organization UUID
 
 **Returns:**
+
 ```typescript
 {
-  original_files: number;        // Count of original files
-  reference_files: number;        // Count of reference files
-  storage_saved_bytes: number;    // Estimated storage savings
-  total_storage_bytes: number;    // Total storage used
+  original_files: number; // Count of original files
+  reference_files: number; // Count of reference files
+  storage_saved_bytes: number; // Estimated storage savings
+  total_storage_bytes: number; // Total storage used
 }
 ```
 
@@ -238,6 +254,7 @@ psql $DATABASE_URL < supabase/migrations/20251015_add_content_deduplication.sql
 ### 2. Update Upload Endpoint
 
 **Before:**
+
 ```typescript
 app.post('/api/files/upload', async (req, res) => {
   const file = req.file;
@@ -256,6 +273,7 @@ app.post('/api/files/upload', async (req, res) => {
 ```
 
 **After:**
+
 ```typescript
 import { handleFileUpload } from './shared/qdrant/lifecycle';
 
@@ -293,6 +311,7 @@ app.post('/api/files/upload', async (req, res) => {
 ### 3. Update Delete Endpoint
 
 **Before:**
+
 ```typescript
 app.delete('/api/files/:fileId', async (req, res) => {
   const fileId = req.params.fileId;
@@ -314,6 +333,7 @@ app.delete('/api/files/:fileId', async (req, res) => {
 ```
 
 **After:**
+
 ```typescript
 import { handleFileDelete } from './shared/qdrant/lifecycle';
 
@@ -418,18 +438,21 @@ Org 2 storage: 2458624 bytes
 **Scenario:** Same file uploaded 5 times (2 courses in Org A, 2 courses in Org B, 1 course in Org C)
 
 **Before (No Deduplication):**
+
 - Docling processing: 5× ~20 seconds = 100 seconds
 - Jina embeddings: 5× ~$0.02 = $0.10
 - Qdrant storage: 5× 1000 vectors × 768D × 4 bytes = 15.36 MB
 - Processing time: 5× processing jobs
 
 **After (With Deduplication):**
+
 - Docling processing: 1× ~20 seconds = 20 seconds (80% savings)
 - Jina embeddings: 1× ~$0.02 = $0.02 (80% savings)
 - Qdrant storage: ~1.5× original (5× points with same embeddings) = ~4.6 MB (70% savings)
 - Processing time: 1× processing job + 4× instant responses
 
 **Savings:**
+
 - ⏱️ Time: 80 seconds saved
 - 💰 Cost: $0.08 saved per 5 uploads
 - 💾 Storage: 10.76 MB saved
@@ -540,6 +563,7 @@ Search queries filter by `course_id` and `organization_id`, ensuring complete is
 **Symptoms:** All uploads create new files, no deduplication
 
 **Diagnosis:**
+
 ```sql
 -- Check if hash index exists
 SELECT * FROM pg_indexes WHERE indexname = 'idx_file_catalog_hash';
@@ -552,6 +576,7 @@ SELECT vector_status, COUNT(*) FROM file_catalog GROUP BY vector_status;
 ```
 
 **Solution:**
+
 - Ensure migration ran successfully
 - Verify hash is calculated on upload
 - Check that files reach `vector_status = 'indexed'` before deduplication
@@ -561,6 +586,7 @@ SELECT vector_status, COUNT(*) FROM file_catalog GROUP BY vector_status;
 **Symptoms:** Reference count doesn't match actual references
 
 **Diagnosis:**
+
 ```sql
 -- Count actual references vs reference_count
 SELECT
@@ -574,6 +600,7 @@ HAVING COUNT(*) != MAX(reference_count);
 ```
 
 **Solution:**
+
 ```sql
 -- Recalculate reference counts
 UPDATE file_catalog f1
@@ -598,6 +625,7 @@ This implementation provides robust content deduplication with:
 - ✅ **Multi-tenancy isolation** via filtered vector search
 
 **Files Created:**
+
 1. `supabase/migrations/20251015_add_content_deduplication.sql`
 2. `supabase/migrations/20251015_add_storage_quota_functions.sql`
 3. `src/shared/qdrant/lifecycle.ts`
@@ -606,6 +634,7 @@ This implementation provides robust content deduplication with:
 6. `src/shared/qdrant/LIFECYCLE-README.md` (this file)
 
 **Next Steps:**
+
 1. Run migrations in production
 2. Update upload/delete endpoints
 3. Monitor deduplication metrics

@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect } from 'react'
+import { usePrevious } from '@/lib/hooks/use-previous'
 import { motion } from 'framer-motion'
 import Header from '@/components/layouts/header'
 import ContentGenerationPanel from '@/components/common/content-generation-panel'
@@ -98,28 +99,21 @@ export default function CourseViewerEnhanced({
   }, [currentLessonId, course.id, refetchEnrichments, localEnrichments])
 
   // Track previous lesson to detect lesson changes (SPA navigation)
-  const prevLessonIdRef = useRef<string | null>(null)
+  const prevLessonId = usePrevious(currentLessonId)
 
   // Auto-refresh enrichments when switching lessons via SPA navigation
   // This ensures fresh data instead of stale SSR cache
   useEffect(() => {
-    // Skip on initial mount (we have SSR data)
-    if (prevLessonIdRef.current === null) {
-      prevLessonIdRef.current = currentLessonId
-      return undefined
-    }
+    if (prevLessonId === undefined) return undefined
 
-    // Only refetch when lesson actually changed
-    if (prevLessonIdRef.current !== currentLessonId && currentLessonId) {
-      prevLessonIdRef.current = currentLessonId
-      // Small delay to debounce rapid navigation
+    if (prevLessonId !== currentLessonId && currentLessonId) {
       const timeoutId = setTimeout(() => {
         void refreshEnrichments()
       }, 150)
       return () => clearTimeout(timeoutId)
     }
     return undefined
-  }, [currentLessonId, refreshEnrichments])
+  }, [currentLessonId, prevLessonId, refreshEnrichments])
 
   // Swipe logic for mobile navigation
   const swipeHandlers = useSwipe(

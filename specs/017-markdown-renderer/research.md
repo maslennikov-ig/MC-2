@@ -10,6 +10,7 @@
 **Decision**: Use `shiki@1.24+` with `rehype-pretty-code@0.14+` for server-side syntax highlighting.
 
 **Rationale**:
+
 - Zero client-side JavaScript for syntax highlighting (SSR only)
 - VS Code-quality highlighting using TextMate grammars
 - Supports 200+ programming languages out of the box
@@ -24,6 +25,7 @@
 | `prism.js` | Client-side JS, smaller grammar coverage |
 
 **Integration Pattern** (from Context7):
+
 ```typescript
 // Next.js RSC integration
 import { codeToHtml } from 'shiki'
@@ -42,6 +44,7 @@ async function CodeBlock({ code, lang }: { code: string; lang: string }) {
 **Decision**: Use `streamdown@latest` (Vercel) for AI streaming content.
 
 **Rationale**:
+
 - Drop-in replacement for react-markdown
 - Handles incomplete markdown gracefully during streaming
 - Uses `remend` library internally to auto-complete partial syntax
@@ -55,10 +58,11 @@ async function CodeBlock({ code, lang }: { code: string; lang: string }) {
 | Custom streaming parser | Maintenance burden, reinventing wheel |
 
 **Key Feature** (from Context7):
+
 ```tsx
 // Handles incomplete markdown during streaming
 <Streamdown parseIncompleteMarkdown={true}>
-  {streamingContent}  // "**bold text that hasn't closed yet" → auto-completed
+  {streamingContent} // "**bold text that hasn't closed yet" → auto-completed
 </Streamdown>
 ```
 
@@ -67,14 +71,16 @@ async function CodeBlock({ code, lang }: { code: string; lang: string }) {
 **Decision**: Use `next-mdx-remote@5.x` for RSC static content.
 
 **Rationale**:
+
 - Official MDX solution for Next.js RSC
 - Server-side compilation, zero client bundle for MDX processing
 - Supports custom components and remark/rehype plugins
 - Already proven in production (HashiCorp, High reputation)
 
 **Integration Pattern**:
+
 ```typescript
-import { compileMDX } from 'next-mdx-remote/rsc'
+import { compileMDX } from 'next-mdx-remote/rsc';
 
 export async function MarkdownRenderer({ content }: { content: string }) {
   const { content: compiledContent } = await compileMDX({
@@ -86,8 +92,8 @@ export async function MarkdownRenderer({ content }: { content: string }) {
       },
     },
     components: customComponents,
-  })
-  return compiledContent
+  });
+  return compiledContent;
 }
 ```
 
@@ -96,6 +102,7 @@ export async function MarkdownRenderer({ content }: { content: string }) {
 **Decision**: Use `katex@0.16+` with `remark-math@6.x` and `rehype-katex@7.x`.
 
 **Rationale**:
+
 - Server-side rendering (CSS-only on client)
 - Fastest LaTeX renderer available
 - MathML output for accessibility (`output: 'htmlAndMathml'`)
@@ -107,10 +114,17 @@ export async function MarkdownRenderer({ content }: { content: string }) {
 | MathJax | Larger bundle, client-side rendering |
 
 **Dark Mode Fix** (from requirements):
+
 ```css
 /* katex-overrides.css */
-.dark .katex { color: var(--foreground); }
-.dark .katex .mord, .dark .katex .mbin, .dark .katex .mrel { color: inherit; }
+.dark .katex {
+  color: var(--foreground);
+}
+.dark .katex .mord,
+.dark .katex .mbin,
+.dark .katex .mrel {
+  color: inherit;
+}
 ```
 
 ### 1.5 Diagrams: Mermaid in Sandboxed Iframe
@@ -118,12 +132,14 @@ export async function MarkdownRenderer({ content }: { content: string }) {
 **Decision**: Use `mermaid@11.4+` rendered inside a sandboxed `<iframe>` with separate CSP.
 
 **Rationale**:
+
 - Mermaid requires `unsafe-eval` for diagram parsing
 - Sandboxed iframe isolates security risk from main application
 - Main app CSP stays strict (no `unsafe-eval`)
 - Spec requirement FR-028 explicitly requires this approach
 
 **Implementation Pattern**:
+
 ```tsx
 // MermaidIframe.tsx
 export function MermaidIframe({ chart }: { chart: string }) {
@@ -142,7 +158,7 @@ export function MermaidIframe({ chart }: { chart: string }) {
     </head>
     <body><div class="mermaid">${escapeHtml(chart)}</div></body>
     </html>
-  `
+  `;
   return (
     <iframe
       sandbox="allow-scripts"
@@ -150,29 +166,30 @@ export function MermaidIframe({ chart }: { chart: string }) {
       className="w-full border-0"
       title="Mermaid diagram"
     />
-  )
+  );
 }
 ```
 
 **Security Levels** (from Context7):
+
 - `strict`: Safe for untrusted content (recommended)
 - `antiscript`: Blocks inline script execution in labels
 - `loose`: Allows click events and some HTML (not for UGC)
 
 ### 1.6 Existing Dependencies to Keep
 
-| Dependency | Version | Reason |
-|------------|---------|--------|
-| `remark-gfm` | 4.x | GFM support (tables, strikethrough, autolinks) |
-| `remark-emoji` | 5.x | Emoji shortcodes |
-| `rehype-sanitize` | 6.x | UGC sanitization |
-| `isomorphic-dompurify` | 2.x | Client-side sanitization backup |
-| `@tailwindcss/typography` | 0.5.x | Prose styling |
+| Dependency                | Version | Reason                                         |
+| ------------------------- | ------- | ---------------------------------------------- |
+| `remark-gfm`              | 4.x     | GFM support (tables, strikethrough, autolinks) |
+| `remark-emoji`            | 5.x     | Emoji shortcodes                               |
+| `rehype-sanitize`         | 6.x     | UGC sanitization                               |
+| `isomorphic-dompurify`    | 2.x     | Client-side sanitization backup                |
+| `@tailwindcss/typography` | 0.5.x   | Prose styling                                  |
 
 ### 1.7 Dependencies to Remove
 
-| Dependency | Reason |
-|------------|--------|
+| Dependency         | Reason                               |
+| ------------------ | ------------------------------------ |
 | `rehype-highlight` | Replaced by Shiki/rehype-pretty-code |
 
 ## 2. Architecture Decisions
@@ -181,10 +198,10 @@ export function MermaidIframe({ chart }: { chart: string }) {
 
 **Decision**: Two separate renderers for different use cases.
 
-| Renderer | Type | Use Case | Client JS |
-|----------|------|----------|-----------|
-| `MarkdownRenderer` | RSC (Server) | Lessons, previews, static content | 0 KB (highlight) |
-| `MarkdownRendererClient` | Client | Streaming AI chat | ~5-10 KB (Streamdown) |
+| Renderer                 | Type         | Use Case                          | Client JS             |
+| ------------------------ | ------------ | --------------------------------- | --------------------- |
+| `MarkdownRenderer`       | RSC (Server) | Lessons, previews, static content | 0 KB (highlight)      |
+| `MarkdownRendererClient` | Client       | Streaming AI chat                 | ~5-10 KB (Streamdown) |
 
 **Justification**: Server components cannot handle streaming token-by-token updates. Client components add unnecessary JS for static content. Dual approach optimizes both scenarios.
 
@@ -195,22 +212,38 @@ export function MermaidIframe({ chart }: { chart: string }) {
 ```typescript
 export const presets = {
   lesson: {
-    math: true, mermaid: true, codeHighlight: true,
-    copyButton: true, anchorLinks: true, callouts: true
+    math: true,
+    mermaid: true,
+    codeHighlight: true,
+    copyButton: true,
+    anchorLinks: true,
+    callouts: true,
   },
   chat: {
-    math: false, mermaid: false, codeHighlight: true,
-    copyButton: false, anchorLinks: false, callouts: false
+    math: false,
+    mermaid: false,
+    codeHighlight: true,
+    copyButton: false,
+    anchorLinks: false,
+    callouts: false,
   },
   preview: {
-    math: true, mermaid: false, codeHighlight: true,
-    copyButton: true, anchorLinks: false, callouts: true
+    math: true,
+    mermaid: false,
+    codeHighlight: true,
+    copyButton: true,
+    anchorLinks: false,
+    callouts: true,
   },
   minimal: {
-    math: false, mermaid: false, codeHighlight: false,
-    copyButton: false, anchorLinks: false, callouts: false
-  }
-}
+    math: false,
+    mermaid: false,
+    codeHighlight: false,
+    copyButton: false,
+    anchorLinks: false,
+    callouts: false,
+  },
+};
 ```
 
 **Justification**: Avoids per-component configuration duplication. Easy to extend with new presets.
@@ -219,10 +252,10 @@ export const presets = {
 
 **Decision**: Different sanitization pipelines for trusted vs untrusted content.
 
-| Content Source | Trust Level | Sanitization |
-|----------------|-------------|--------------|
-| AI-generated lessons | Trusted | None (performance) |
-| User comments/input | Untrusted | rehype-sanitize FIRST |
+| Content Source       | Trust Level | Sanitization          |
+| -------------------- | ----------- | --------------------- |
+| AI-generated lessons | Trusted     | None (performance)    |
+| User comments/input  | Untrusted   | rehype-sanitize FIRST |
 
 **Justification**: Spec requirement FR-026. Trusted content (CMS, AI) doesn't need sanitization overhead. UGC must be sanitized before any processing.
 
@@ -230,13 +263,13 @@ export const presets = {
 
 **Decision**: Enforce accessibility-compliant typography values.
 
-| Property | Value | Standard |
-|----------|-------|----------|
-| Body font size | 16px (base) | WCAG minimum |
-| Line height | 1.625 | WCAG 1.5× minimum |
-| Line length | max 65ch | Readability studies |
-| Paragraph spacing | 1.25em | Visual breathing room |
-| Heading letter-spacing | -0.025em | Display text optimization |
+| Property               | Value       | Standard                  |
+| ---------------------- | ----------- | ------------------------- |
+| Body font size         | 16px (base) | WCAG minimum              |
+| Line height            | 1.625       | WCAG 1.5× minimum         |
+| Line length            | max 65ch    | Readability studies       |
+| Paragraph spacing      | 1.25em      | Visual breathing room     |
+| Heading letter-spacing | -0.025em    | Display text optimization |
 
 ## 4. Component Reuse from Existing Code
 
@@ -245,6 +278,7 @@ export const presets = {
 **Source**: Existing `trace-viewer.tsx` has a CodeBlock component.
 
 **Decision**: Extract and enhance pattern for markdown system.
+
 - Add copy button with clipboard API
 - Add language badge
 - Add line numbers (CSS counters)
@@ -279,29 +313,29 @@ Parse with custom remark plugin or regex in component.
 
 ### 6.1 Lazy Loading
 
-| Component | Strategy |
-|-----------|----------|
-| MermaidDiagram | `next/dynamic` with loading skeleton |
-| CodeBlock copy button | Inline, minimal (~2KB) |
-| KaTeX CSS | Single load in layout, cached |
+| Component             | Strategy                             |
+| --------------------- | ------------------------------------ |
+| MermaidDiagram        | `next/dynamic` with loading skeleton |
+| CodeBlock copy button | Inline, minimal (~2KB)               |
+| KaTeX CSS             | Single load in layout, cached        |
 
 ### 6.2 Caching
 
 ```typescript
-import { cache } from 'react'
+import { cache } from 'react';
 
 // Request-level cache for MDX compilation
 export const getCompiledMDX = cache(async (content: string, preset: string) => {
-  return compileMDX({ source: content, options: getPresetOptions(preset) })
-})
+  return compileMDX({ source: content, options: getPresetOptions(preset) });
+});
 ```
 
 ## 7. Research Questions Resolved
 
-| Question | Resolution |
-|----------|------------|
-| How to achieve 0 KB client JS for highlighting? | Shiki SSR via next-mdx-remote RSC |
-| How to handle streaming markdown? | Streamdown library with `parseIncompleteMarkdown` |
-| How to avoid unsafe-eval for Mermaid? | Sandboxed iframe with isolated CSP |
-| Which typography values are WCAG-compliant? | 16px font, 1.625 line-height, 65ch max-width |
-| How to support dual themes (light/dark)? | Shiki dual themes + CSS variables |
+| Question                                        | Resolution                                        |
+| ----------------------------------------------- | ------------------------------------------------- |
+| How to achieve 0 KB client JS for highlighting? | Shiki SSR via next-mdx-remote RSC                 |
+| How to handle streaming markdown?               | Streamdown library with `parseIncompleteMarkdown` |
+| How to avoid unsafe-eval for Mermaid?           | Sandboxed iframe with isolated CSP                |
+| Which typography values are WCAG-compliant?     | 16px font, 1.625 line-height, 65ch max-width      |
+| How to support dual themes (light/dark)?        | Shiki dual themes + CSS variables                 |

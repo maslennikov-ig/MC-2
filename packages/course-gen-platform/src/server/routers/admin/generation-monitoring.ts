@@ -75,9 +75,22 @@ export const generationMonitoringRouter = router({
         // Parallel queries for better performance
         const [courseRes, historyRes, lessonsRes, tracesRes] = await Promise.all([
           supabase.from('courses').select('*').eq('id', input.courseId).single(),
-          supabase.from('generation_status_history').select('*').eq('course_id', input.courseId).order('changed_at', { ascending: false }),
-          supabase.from('lessons').select('*, lesson_contents(*)').eq('course_id', input.courseId).order('order_index', { ascending: true }),
-          supabase.from('generation_trace').select('*').eq('course_id', input.courseId).order('created_at', { ascending: false }).limit(20),
+          supabase
+            .from('generation_status_history')
+            .select('*')
+            .eq('course_id', input.courseId)
+            .order('changed_at', { ascending: false }),
+          supabase
+            .from('lessons')
+            .select('*, lesson_contents(*)')
+            .eq('course_id', input.courseId)
+            .order('order_index', { ascending: true }),
+          supabase
+            .from('generation_trace')
+            .select('*')
+            .eq('course_id', input.courseId)
+            .order('created_at', { ascending: false })
+            .limit(20),
         ]);
 
         if (courseRes.error) throw courseRes.error;
@@ -126,12 +139,20 @@ export const generationMonitoringRouter = router({
         };
 
         const courseStructure = courses.course_structure;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let lessonSpec: any = null;
+        interface LessonSpec {
+          lesson_id: string;
+          title: string;
+          lesson_objectives?: string[];
+          key_topics?: string[];
+          sections: Array<{ title: string } & Record<string, unknown>>;
+          metadata: Record<string, unknown>;
+          [key: string]: unknown;
+        }
+        let lessonSpec: LessonSpec | null = null;
 
         if (courseStructure && courseStructure.sections) {
           for (const section of courseStructure.sections) {
-            const found = section.lessons.find((l) => l.lesson_title === lesson.title);
+            const found = section.lessons.find(l => l.lesson_title === lesson.title);
             if (found) {
               lessonSpec = {
                 lesson_id: lesson.id,
@@ -157,12 +178,15 @@ export const generationMonitoringRouter = router({
 
         const language = (courses.language || 'en') as Language;
 
-        logger.info({
-          lessonId: input.lessonId,
-          courseId: courses.id,
-          language,
-          triggeredBy: 'admin',
-        }, 'Admin triggered Stage 6 generation');
+        logger.info(
+          {
+            lessonId: input.lessonId,
+            courseId: courses.id,
+            language,
+            triggeredBy: 'admin',
+          },
+          'Admin triggered Stage 6 generation'
+        );
 
         await addJob(JobType.LESSON_CONTENT, {
           jobType: JobType.LESSON_CONTENT,
@@ -219,7 +243,7 @@ export const generationMonitoringRouter = router({
             generation_attempt: nextAttempt,
             user_refinement_prompt: input.userInstructions,
             parent_content_id: currentContent?.id,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('lesson_id', input.lessonId);
 
@@ -232,16 +256,24 @@ export const generationMonitoringRouter = router({
           .single();
 
         if (lesson && lesson.courses) {
-          const courses = lesson.courses as unknown as { id: string; organization_id: string; user_id: string; language: string | null };
+          const courses = lesson.courses as unknown as {
+            id: string;
+            organization_id: string;
+            user_id: string;
+            language: string | null;
+          };
           const language = (courses.language || 'en') as Language;
 
-          logger.info({
-            lessonId: input.lessonId,
-            courseId: courses.id,
-            language,
-            refinementType: input.refinementType,
-            triggeredBy: 'admin',
-          }, 'Admin triggered lesson regeneration with refinement');
+          logger.info(
+            {
+              lessonId: input.lessonId,
+              courseId: courses.id,
+              language,
+              refinementType: input.refinementType,
+              triggeredBy: 'admin',
+            },
+            'Admin triggered lesson regeneration with refinement'
+          );
 
           await addJob(JobType.LESSON_CONTENT, {
             jobType: JobType.LESSON_CONTENT,
@@ -281,29 +313,31 @@ export const generationMonitoringRouter = router({
     .input(
       z.object({
         organizationId: z.string().uuid().optional(),
-        status: z.enum([
-          'pending',
-          'stage_2_init',
-          'stage_2_processing',
-          'stage_2_complete',
-          'stage_2_awaiting_approval',
-          'stage_3_init',
-          'stage_3_summarizing',
-          'stage_3_complete',
-          'stage_3_awaiting_approval',
-          'stage_4_init',
-          'stage_4_analyzing',
-          'stage_4_complete',
-          'stage_4_awaiting_approval',
-          'stage_5_init',
-          'stage_5_generating',
-          'stage_5_complete',
-          'stage_5_awaiting_approval',
-          'finalizing',
-          'completed',
-          'failed',
-          'cancelled',
-        ]).optional(),
+        status: z
+          .enum([
+            'pending',
+            'stage_2_init',
+            'stage_2_processing',
+            'stage_2_complete',
+            'stage_2_awaiting_approval',
+            'stage_3_init',
+            'stage_3_summarizing',
+            'stage_3_complete',
+            'stage_3_awaiting_approval',
+            'stage_4_init',
+            'stage_4_analyzing',
+            'stage_4_complete',
+            'stage_4_awaiting_approval',
+            'stage_5_init',
+            'stage_5_generating',
+            'stage_5_complete',
+            'stage_5_awaiting_approval',
+            'finalizing',
+            'completed',
+            'failed',
+            'cancelled',
+          ])
+          .optional(),
         language: z.enum(['ru', 'en']).optional(),
         search: z.string().optional(),
         limit: z.number().min(1).max(100).default(20),
@@ -317,7 +351,8 @@ export const generationMonitoringRouter = router({
         // Build query with specific columns, user join and organization
         let query = supabase
           .from('courses')
-          .select(`
+          .select(
+            `
             id,
             slug,
             generation_code,
@@ -331,7 +366,9 @@ export const generationMonitoringRouter = router({
             error_message,
             user_id,
             organizations!inner(slug)
-          `, { count: 'exact' })
+          `,
+            { count: 'exact' }
+          )
           .not('generation_status', 'is', null)
           .order('created_at', { ascending: false });
 
@@ -353,9 +390,7 @@ export const generationMonitoringRouter = router({
         // Fetch user emails for all courses
         const { data: users } = await supabase.auth.admin.listUsers();
 
-        const userEmailMap = new Map(
-          users?.users.map(u => [u.id, u.email || 'Unknown']) || []
-        );
+        const userEmailMap = new Map(users?.users.map(u => [u.id, u.email || 'Unknown']) || []);
 
         // Combine course data with user emails and org_slug
         const coursesWithUsers = (data || []).map(course => {
@@ -407,7 +442,7 @@ export const generationMonitoringRouter = router({
 
         return {
           data,
-          filename: `traces-${input.courseId}.${input.format}`
+          filename: `traces-${input.courseId}.${input.format}`,
         };
       } catch (error) {
         logger.error({ error, input }, 'Failed to export traces');
@@ -440,7 +475,7 @@ export const generationMonitoringRouter = router({
           .from('courses')
           .update({
             generation_status: 'completed',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', input.courseId);
 

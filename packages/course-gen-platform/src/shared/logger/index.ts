@@ -15,6 +15,7 @@ import {
 } from '@megacampus/shared-logger';
 import type { Logger } from 'pino';
 import { getSupabaseAdmin } from '../supabase/admin';
+import type { Json } from '@megacampus/shared-types';
 import { detectEnvironment } from './utils';
 import { applyAutoMuteStatus } from './auto-mute-service';
 
@@ -27,10 +28,18 @@ export * from './error-service.js';
 // Re-export unchanged functions
 export { createModuleLogger, createRequestLogger };
 
-/**
- * Safely extract error details from unknown error object
- * Handles Error instances, plain objects, and primitives
- */
+/** Safely convert unknown value to string, handling circular references */
+function safeStringify(obj: unknown): string {
+  if (typeof obj === 'string') return obj;
+  if (obj instanceof Error) return obj.message;
+  try {
+    return JSON.stringify(obj);
+  } catch {
+    return '[unstringifiable object]';
+  }
+}
+
+/** Extract error details from unknown error object (Error instances, plain objects, primitives) */
 function extractErrorDetails(errorObj: unknown): { errorDetails: Record<string, unknown> } | null {
   if (!errorObj) return null;
 
@@ -38,14 +47,16 @@ function extractErrorDetails(errorObj: unknown): { errorDetails: Record<string, 
     const errAny = errorObj as Record<string, unknown>;
     return {
       errorDetails: {
-        message: errAny.message || String(errorObj),
+        message: errAny.message || safeStringify(errorObj),
         code: errAny.code,
         name: errAny.name,
       },
     };
   }
 
-  return { errorDetails: { message: String(errorObj) } };
+  return {
+    errorDetails: { message: safeStringify(errorObj) },
+  };
 }
 
 /**
@@ -65,34 +76,62 @@ async function writeToErrorLogs(
     const environment = detectEnvironment();
 
     // Extract known fields from context (support both camelCase and snake_case)
+    const ctxAny = context;
+    const organizationId = ctxAny.organizationId;
+    const organization_id = ctxAny.organization_id;
+    const userId = ctxAny.userId;
+    const user_id = ctxAny.user_id;
+    const jobId = ctxAny.jobId;
+    const job_id = ctxAny.job_id;
+    const jobType = ctxAny.jobType;
+    const job_type = ctxAny.job_type;
+    const courseId = ctxAny.courseId;
+    const course_id = ctxAny.course_id;
+    const lessonId = ctxAny.lessonId;
+    const lesson_id = ctxAny.lesson_id;
+    const requestId = ctxAny.requestId;
+    const request_id = ctxAny.request_id;
+    const trpcPath = ctxAny.trpcPath;
+    const trpc_path = ctxAny.trpc_path;
+    const trpcInput = ctxAny.trpcInput;
+    const trpc_input = ctxAny.trpc_input;
+    const attemptedValue = ctxAny.attemptedValue;
+    const attempted_value = ctxAny.attempted_value;
+    const currentValue = ctxAny.currentValue;
+    const current_value = ctxAny.current_value;
+    const err = ctxAny.err;
+    const error = ctxAny.error;
+    const stack = ctxAny.stack;
+
+    // Remaining context for metadata
     const {
-      organizationId,
-      organization_id,
-      userId,
-      user_id,
-      jobId,
-      job_id,
-      jobType,
-      job_type,
-      courseId,
-      course_id,
-      lessonId,
-      lesson_id,
-      requestId,
-      request_id,
-      trpcPath,
-      trpc_path,
-      trpcInput,
-      trpc_input,
-      attemptedValue,
-      attempted_value,
-      currentValue,
-      current_value,
-      err,
-      error,
-      stack,
+      organizationId: _1,
+      organization_id: _2,
+      userId: _3,
+      user_id: _4,
+      jobId: _5,
+      job_id: _6,
+      jobType: _7,
+      job_type: _8,
+      courseId: _9,
+      course_id: _10,
+      lessonId: _11,
+      lesson_id: _12,
+      requestId: _13,
+      request_id: _14,
+      trpcPath: _15,
+      trpc_path: _16,
+      trpcInput: _17,
+      trpc_input: _18,
+      attemptedValue: _19,
+      attempted_value: _20,
+      currentValue: _21,
+      current_value: _22,
+      err: _23,
+      error: _24,
+      stack: _25,
       ...restMetadata
-    } = context;
+    } = ctxAny;
 
     // Build metadata with remaining context
     const metadata: Record<string, unknown> = { ...restMetadata };
@@ -114,38 +153,40 @@ async function writeToErrorLogs(
     if (inputData && typeof inputData === 'object') {
       try {
         // Sanitize and limit size
-        sanitizedInput = JSON.parse(JSON.stringify(inputData));
+        sanitizedInput = JSON.parse(JSON.stringify(inputData)) as Record<string, unknown>;
       } catch {
         sanitizedInput = { _error: 'Failed to serialize input' };
       }
     }
 
-    const { data: insertedLog } = await supabase
-      .from('error_logs' as any)
+    const result = (await supabase
+      .from('error_logs')
       .insert({
         error_message: message,
         severity: level,
         environment: environment,
-        organization_id: (organizationId || organization_id || null) as string | null,
-        user_id: (userId || user_id || null) as string | null,
-        job_id: (jobId || job_id || null) as string | null,
-        job_type: (jobType || job_type || null) as string | null,
-        course_id: (courseId || course_id || null) as string | null,
-        lesson_id: (lessonId || lesson_id || null) as string | null,
-        request_id: (requestId || request_id || null) as string | null,
-        trpc_path: (trpcPath || trpc_path || null) as string | null,
-        trpc_input: sanitizedInput,
-        attempted_value: (attemptedValue || attempted_value || null) as string | null,
-        stack_trace: (stack || null) as string | null,
-        metadata: Object.keys(metadata).length > 0 ? metadata : null,
+        organization_id: (organizationId || organization_id || null) as unknown as string,
+        user_id: (userId || user_id || null) as unknown as string,
+        job_id: (jobId || job_id || null) as unknown as string,
+        job_type: (jobType || job_type || null) as unknown as string,
+        course_id: (courseId || course_id || null) as unknown as string,
+        lesson_id: (lessonId || lesson_id || null) as unknown as string,
+        request_id: (requestId || request_id || null) as unknown as string,
+        trpc_path: (trpcPath || trpc_path || null) as unknown as string,
+        trpc_input: sanitizedInput as unknown as Json,
+        attempted_value: (attemptedValue || attempted_value || null) as unknown as string,
+        stack_trace: (stack || null) as unknown as string,
+        metadata: (Object.keys(metadata).length > 0 ? metadata : null) as unknown as Json,
       })
       .select('id')
-      .single();
+      .single()) as unknown as { data: { id: string } | null; error: unknown };
+
+    const insertedLog = result.data;
 
     // Check if this error should be auto-muted
     // SAFETY: applyAutoMuteStatus uses baseLogger internally to prevent recursion.
     // DO NOT await - fire-and-forget to prevent blocking main log flow.
-    const logId = (insertedLog as unknown as { id: string } | null)?.id;
+    const logId = insertedLog?.id;
     if (logId) {
       applyAutoMuteStatus(logId, message).catch(() => {
         // Silently ignore auto-mute failures to prevent cascading errors
@@ -170,17 +211,18 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
   // Create proxy that intercepts warn/error calls
   return new Proxy(pinoLogger, {
     get(target, prop, receiver) {
-      const original = Reflect.get(target, prop, receiver);
+      const original = Reflect.get(target, prop, receiver) as unknown;
 
       // Intercept warn method
       if (prop === 'warn' && typeof original === 'function') {
+        const originalWarn = original as (objOrMsg: unknown, msg?: string) => void;
         return function (objOrMsg: unknown, msg?: string) {
           // Call original warn
           if (typeof objOrMsg === 'string') {
-            original.call(target, objOrMsg);
+            originalWarn.call(target, objOrMsg);
             writeToErrorLogs('WARNING', objOrMsg, {}).catch(() => {});
           } else {
-            original.call(target, objOrMsg, msg);
+            originalWarn.call(target, objOrMsg, msg);
             writeToErrorLogs(
               'WARNING',
               msg || 'Warning',
@@ -192,13 +234,14 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
 
       // Intercept error method
       if (prop === 'error' && typeof original === 'function') {
+        const originalError = original as (objOrMsg: unknown, msg?: string) => void;
         return function (objOrMsg: unknown, msg?: string) {
           // Call original error
           if (typeof objOrMsg === 'string') {
-            original.call(target, objOrMsg);
+            originalError.call(target, objOrMsg);
             writeToErrorLogs('ERROR', objOrMsg, {}).catch(() => {});
           } else {
-            original.call(target, objOrMsg, msg);
+            originalError.call(target, objOrMsg, msg);
             writeToErrorLogs('ERROR', msg || 'Error', objOrMsg as Record<string, unknown>).catch(
               () => {}
             );
@@ -208,13 +251,14 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
 
       // Intercept fatal method (map to CRITICAL)
       if (prop === 'fatal' && typeof original === 'function') {
+        const originalFatal = original as (objOrMsg: unknown, msg?: string) => void;
         return function (objOrMsg: unknown, msg?: string) {
           // Call original fatal
           if (typeof objOrMsg === 'string') {
-            original.call(target, objOrMsg);
+            originalFatal.call(target, objOrMsg);
             writeToErrorLogs('CRITICAL', objOrMsg, {}).catch(() => {});
           } else {
-            original.call(target, objOrMsg, msg);
+            originalFatal.call(target, objOrMsg, msg);
             writeToErrorLogs(
               'CRITICAL',
               msg || 'Fatal error',
@@ -226,13 +270,14 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
 
       // For child() method, wrap the returned child logger too
       if (prop === 'child' && typeof original === 'function') {
+        const originalChild = original as (bindings: Record<string, unknown>) => Logger;
         return function (bindings: Record<string, unknown>) {
-          const childLogger = original.call(target, bindings);
+          const childLogger = originalChild.call(target, bindings);
           return createEnhancedLogger(childLogger);
         };
       }
 
-      return original;
+      return original as Logger[keyof Logger];
     },
   });
 }

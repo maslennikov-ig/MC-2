@@ -8,7 +8,6 @@
  * 1. Minimal requirements (no `answers` field): Verify basic analysis works
  * 2. Detailed English requirements: Verify requirements incorporated into:
  *    - topic_analysis.key_concepts
- *    - expansion_areas (if needed)
  *    - scope_instructions
  * 3. Russian requirements: Verify translation to English and incorporation
  *
@@ -31,7 +30,7 @@ import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
 import { getRedisClient } from '../../src/shared/cache/redis';
 import { JobType } from '@megacampus/shared-types';
 import type { StructureAnalysisJob } from '@megacampus/shared-types';
-import { AnalysisResultSchema } from '../../src/types/analysis-result';
+import { AnalysisResultSchema } from '@megacampus/shared-types';
 import {
   setupTestFixtures,
   cleanupTestFixtures,
@@ -61,10 +60,7 @@ function generateCorrelationId(): string {
  * @param timeout - Maximum wait time in milliseconds (default: 600000 = 10 minutes)
  * @returns Course record with analysis_result
  */
-async function waitForAnalysisResult(
-  courseId: string,
-  timeout: number = 600000
-): Promise<any> {
+async function waitForAnalysisResult(courseId: string, timeout: number = 600000): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -115,6 +111,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
 
     // Setup test fixtures with unique fixtures for this test file
     await setupTestFixtures({
+      skipAuthUsers: true,
       customFixtures: { TEST_USERS, TEST_ORGS },
     });
 
@@ -299,7 +296,6 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
           target_audience: 'intermediate',
           difficulty: 'intermediate',
           lesson_duration_minutes: 5,
-          answers: detailedRequirements, // DETAILED requirements
         },
         priority: 5,
         attempt_count: 0,
@@ -335,8 +331,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
       expect(hasUseEffectOrCleanup).toBe(true);
 
       // Check for custom hooks
-      const hasCustomHooks =
-        conceptsStr.includes('custom') && conceptsStr.includes('hook');
+      const hasCustomHooks = conceptsStr.includes('custom') && conceptsStr.includes('hook');
       expect(hasCustomHooks).toBe(true);
 
       // Check for performance optimization (useMemo/useCallback)
@@ -373,27 +368,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
       console.log('✓ Scope instructions reference user requirements');
 
       // =====================================================================
-      // STEP 6: Verify expansion_areas address specific topics (if present)
-      // =====================================================================
-      if (validated.expansion_areas && validated.expansion_areas.length > 0) {
-        const expansionAreasStr = validated.expansion_areas
-          .map(area => `${area.topic} ${area.reasoning}`)
-          .join(' ')
-          .toLowerCase();
-
-        console.log(`   Expansion areas: ${validated.expansion_areas.length} areas identified`);
-        console.log(
-          `   Topics: ${validated.expansion_areas.map(a => a.topic).join(', ')}`
-        );
-
-        // Expansion areas should align with requirements
-        // (This is optional - may not always have expansion areas)
-      } else {
-        console.log('   No expansion areas needed (information complete)');
-      }
-
-      // =====================================================================
-      // STEP 7: Summary
+      // STEP 6: Summary
       // =====================================================================
       console.log('\n📊 Detailed Requirements Test Summary:');
       console.log(`   ✓ Key concepts include user-specified topics`);
@@ -457,7 +432,6 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
           target_audience: 'beginner',
           difficulty: 'beginner',
           lesson_duration_minutes: 10,
-          answers: russianRequirements, // RUSSIAN requirements
         },
         priority: 5,
         attempt_count: 0,
@@ -501,7 +475,10 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
       // Should NOT contain Cyrillic characters
       const cyrillicMatch = allTextFields.match(/[а-яА-ЯёЁ]/g);
       if (cyrillicMatch) {
-        console.error('❌ Found Cyrillic characters in output:', cyrillicMatch.slice(0, 20).join(''));
+        console.error(
+          '❌ Found Cyrillic characters in output:',
+          cyrillicMatch.slice(0, 20).join('')
+        );
       }
       expect(cyrillicMatch).toBeNull();
 
@@ -527,13 +504,9 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
         combinedStr.includes('purchasing') ||
         combinedStr.includes('acquisition');
 
-      const hasPlanning =
-        combinedStr.includes('planning') ||
-        combinedStr.includes('plan');
+      const hasPlanning = combinedStr.includes('planning') || combinedStr.includes('plan');
 
-      const hasContract =
-        combinedStr.includes('contract') ||
-        combinedStr.includes('contracting');
+      const hasContract = combinedStr.includes('contract') || combinedStr.includes('contracting');
 
       // At least 2 out of 3 topics should be present
       const matchCount = [hasProcurement, hasPlanning, hasContract].filter(Boolean).length;

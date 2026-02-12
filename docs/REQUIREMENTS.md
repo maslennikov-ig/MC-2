@@ -99,8 +99,8 @@
 
 ```typescript
 {
-  summary_text: string;                // Aggregated document summaries
-  vectorized: boolean;                 // Whether RAG is available
+  summary_text: string; // Aggregated document summaries
+  vectorized: boolean; // Whether RAG is available
 }
 ```
 
@@ -212,7 +212,7 @@
 ### 4.1 LangGraph StateGraph (2 Major Nodes)
 
 ```typescript
-import { StateGraph, START, END, Annotation } from "@langchain/langgraph";
+import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
 
 // Workflow State
 const GenerationState = Annotation.Root({
@@ -236,16 +236,20 @@ const GenerationState = Annotation.Root({
 
 // 2-Node Graph
 const workflow = new StateGraph(GenerationState)
-  .addNode("generateMetadata", metadataGenerationNode)   // Phase 1
-  .addNode("generateSections", batchSectionGenerationNode) // Phase 2
-  .addEdge(START, "generateMetadata")
-  .addConditionalEdges("generateMetadata",
-    (state) => state.metadata ? "continue" : "retry",
-    { continue: "generateSections", retry: "generateMetadata" }
-  )
-  .addConditionalEdges("generateSections",
-    (state) => state.sections.length >= analysis_result.recommended_structure.total_sections ? "success" : "retry",
-    { success: END, retry: "generateSections" }
+  .addNode('generateMetadata', metadataGenerationNode) // Phase 1
+  .addNode('generateSections', batchSectionGenerationNode) // Phase 2
+  .addEdge(START, 'generateMetadata')
+  .addConditionalEdges('generateMetadata', state => (state.metadata ? 'continue' : 'retry'), {
+    continue: 'generateSections',
+    retry: 'generateMetadata',
+  })
+  .addConditionalEdges(
+    'generateSections',
+    state =>
+      state.sections.length >= analysis_result.recommended_structure.total_sections
+        ? 'success'
+        : 'retry',
+    { success: END, retry: 'generateSections' }
   );
 ```
 
@@ -258,6 +262,7 @@ const workflow = new StateGraph(GenerationState)
 **Strategy**: Single LLM call with retry (max 2 attempts, like MVP)
 
 **Input**:
+
 - `analysis_result.topic_analysis.determined_topic`
 - `analysis_result.recommended_structure` (total_lessons, total_sections, estimated_hours)
 - `analysis_result.pedagogical_strategy`
@@ -266,16 +271,19 @@ const workflow = new StateGraph(GenerationState)
 **Output**: CourseMetadata (title, description, overview, outcomes, etc.)
 
 **Retry Logic**:
+
 - **Attempt 1**: Detailed prompt with examples
 - **Attempt 2**: Stricter prompt with minimal instructions
 - **Fallback**: Use template with placeholders if both fail
 
 **Quality Validation**:
+
 - Semantic similarity check vs input topic (threshold: 0.70)
 - Field completeness check (all required fields populated)
 - Length validation (chars within bounds)
 
 **Prompt Template**:
+
 ```
 LANGUAGE: {language}
 Generate course metadata in {language}.
@@ -324,11 +332,13 @@ Return JSON:
 **Strategy**: Batch processing (1 section per batch, configurable parallelism)
 
 **Batch Configuration** (from MVP proven values):
+
 - `SECTIONS_PER_BATCH = 1` (prevents truncation, ensures complete schema)
 - `PARALLEL_BATCH_SIZE = 2` (process 2 batches in parallel)
 - `MAX_ATTEMPTS_PER_BATCH = 2` (retry with stricter prompt)
 
 **Batching Logic**:
+
 ```typescript
 async function generateSections(state) {
   const totalSections = state.analysis_result.recommended_structure.total_sections;
@@ -342,9 +352,7 @@ async function generateSections(state) {
 
     // Launch parallel batches
     for (let i = groupIdx; i < groupEnd; i++) {
-      parallelPromises.push(
-        generateBatch(llm, i + 1, i + 1, i + 1, sectionsInfo)
-      );
+      parallelPromises.push(generateBatch(llm, i + 1, i + 1, i + 1, sectionsInfo));
     }
 
     // Wait for group completion
@@ -362,6 +370,7 @@ async function generateSections(state) {
 ```
 
 **Retry Strategy (Progressive Prompts)**:
+
 ```typescript
 // Attempt 1: Normal prompt with strict example
 const attempt1Prompt = `
@@ -433,7 +442,7 @@ CRITICAL RULES:
    - Warn if trailing content found (but don't fail)
 
 2. **Sanitize**:
-   - Remove comments (// and /* */)
+   - Remove comments (// and /\* \*/)
    - Remove trailing commas before } or ]
    - Fix property name quotes
 
@@ -447,11 +456,13 @@ CRITICAL RULES:
    ```typescript
    // Auto-fix camelCase → snake_case
    fixed.section_title = section.section_title || section.sectionTitle || section.title;
-   fixed.lesson_objectives = lesson.lesson_objectives || lesson.lessonObjectives || lesson.objectives;
+   fixed.lesson_objectives =
+     lesson.lesson_objectives || lesson.lessonObjectives || lesson.objectives;
    // ... etc for all fields
    ```
 
 **Quality Validation**:
+
 - **Structure check**: sections array exists, not empty
 - **Completeness**: Each section has all required fields + lessons
 - **Lesson validation**: Each lesson has title, objectives, topics, exercises
@@ -465,28 +476,31 @@ CRITICAL RULES:
 ### 5.1 Quality Validation Strategy
 
 **Metadata Quality**:
+
 - Semantic similarity vs `analysis_result.topic_analysis.determined_topic` (threshold: 0.70)
 - Field completeness: All required fields populated, non-empty
 - Length validation: Each field within min/max bounds
 
 **Section Quality**:
+
 - Structural completeness: All sections have required fields + lessons
 - Content relevance: Section topics align with `sections_breakdown[i].area`
 - Exercise diversity: Mix of exercise types (not all same type)
 
 **Overall Quality Score**:
+
 ```typescript
-quality_score = (
+quality_score =
   metadata_similarity * 0.3 +
   section_completeness * 0.4 +
   exercise_diversity * 0.2 +
-  validation_passed * 0.1
-);
+  validation_passed * 0.1;
 ```
 
 ### 5.2 Cost Tracking
 
 **Per-Phase Tracking**:
+
 ```typescript
 {
   phase: 'metadata' | 'sections',
@@ -503,6 +517,7 @@ quality_score = (
 ```
 
 **Total Cost Calculation**:
+
 - Metadata: ~5K-10K tokens (~$0.001-0.002)
 - Sections (8 sections × 2 attempts avg): ~80K-150K tokens (~$0.016-0.030)
 - **Estimated total**: $0.017-0.032 per course
@@ -510,11 +525,13 @@ quality_score = (
 ### 5.3 Progress Tracking
 
 **Update courses.generation_status**:
+
 - `analyzing_structure` → `generating_structure` (Phase 1 start)
 - `generating_structure` (Phase 1 complete, Phase 2 in progress)
 - `structure_ready` (Phase 2 complete)
 
 **Update courses.generation_progress** (JSONB):
+
 ```typescript
 {
   current_step: 5,  // Stage 5
@@ -534,6 +551,7 @@ quality_score = (
 ```
 
 **BullMQ Job Progress**:
+
 ```typescript
 await job.updateProgress({
   stage: 5,
@@ -551,17 +569,20 @@ await job.updateProgress({
 ### 6.1 Retry Strategy
 
 **Metadata Generation**:
+
 - Max 2 attempts (like MVP)
 - Exponential backoff: 1s, 2s
 - Fallback: Use template with placeholders if both fail (graceful degradation)
 
 **Section Generation (per batch)**:
+
 - Max 2 attempts per batch
 - Exponential backoff: 1s, 3s
 - Progressive prompts: Detailed → Minimal
 - **NO partial results**: All batches must succeed or entire phase fails
 
 **Quality-Based Retry**:
+
 - If semantic similarity < 0.70 → retry with adjusted prompt
 - If validation fails → retry with stricter schema emphasis
 - If field names wrong → auto-fix, log warning, continue
@@ -569,22 +590,26 @@ await job.updateProgress({
 ### 6.2 Error Classification
 
 **Recoverable Errors** (retry):
+
 - `JSON_PARSE_ERROR`: Malformed JSON (repair logic should handle)
 - `INCOMPLETE_STRUCTURE`: Missing fields (retry with stricter prompt)
 - `QUALITY_TOO_LOW`: Semantic similarity < 0.70 (retry)
 
 **Permanent Errors** (fail immediately):
+
 - `MODEL_TIMEOUT`: OpenRouter API timeout (30s+)
 - `RATE_LIMIT`: OpenRouter rate limit exceeded
 - `INVALID_INPUT`: analysis_result missing required fields
 
 **Fallback Strategy**:
+
 - If Phase 1 (metadata) fails after 2 attempts → use template
 - If Phase 2 (sections) fails → fail entire generation, mark as failed, notify user
 
 ### 6.3 Error Reporting
 
 **Store in courses.error_details**:
+
 ```typescript
 {
   stage: 5,
@@ -604,6 +629,7 @@ await job.updateProgress({
 ### 7.1 Update Sequence
 
 1. **Phase 1 Complete**:
+
    ```sql
    UPDATE courses
    SET
@@ -617,6 +643,7 @@ await job.updateProgress({
    ```
 
 2. **Phase 2 Progress** (per batch):
+
    ```sql
    UPDATE courses
    SET generation_progress = jsonb_set(
@@ -663,17 +690,15 @@ for (const section of course_structure.sections) {
 
   // Insert lessons for this section
   for (const lesson of section.lessons) {
-    await supabase
-      .from('lessons')
-      .insert({
-        section_id: sectionData.id,
-        lesson_number: lesson.lesson_number,
-        title: lesson.lesson_title,
-        objectives: lesson.lesson_objectives,
-        key_topics: lesson.key_topics,
-        duration_minutes: lesson.estimated_duration_minutes,
-        activities: lesson.practical_exercises,
-      });
+    await supabase.from('lessons').insert({
+      section_id: sectionData.id,
+      lesson_number: lesson.lesson_number,
+      title: lesson.lesson_title,
+      objectives: lesson.lesson_objectives,
+      key_topics: lesson.key_topics,
+      duration_minutes: lesson.estimated_duration_minutes,
+      activities: lesson.practical_exercises,
+    });
   }
 }
 ```
@@ -762,6 +787,7 @@ Test tRPC endpoints (similar to Stage 4):
 ## 10. Performance Requirements
 
 **Target Metrics**:
+
 - Metadata generation: <10s (single LLM call, 5-10K tokens)
 - Section generation (8 sections): <120s (2 parallel batches, ~15s per batch)
 - Total pipeline: <150s (2.5 minutes)
@@ -769,6 +795,7 @@ Test tRPC endpoints (similar to Stage 4):
 - Cost per course: $0.017-0.032
 
 **Optimization Strategies**:
+
 - Parallel batch processing (2 batches at a time)
 - Minimize retry attempts (max 2)
 - Reuse parsed analysis_result (no re-fetching)
@@ -779,6 +806,7 @@ Test tRPC endpoints (similar to Stage 4):
 ## 11. Success Criteria
 
 **Functional**:
+
 - ✅ Generate complete course structure from analysis_result
 - ✅ All sections match recommended_structure.total_sections
 - ✅ All lessons have 3+ exercises
@@ -786,17 +814,20 @@ Test tRPC endpoints (similar to Stage 4):
 - ✅ Database inserts successful (sections, lessons)
 
 **Quality**:
+
 - ✅ Metadata semantic similarity ≥0.70
 - ✅ Overall quality score ≥0.80
 - ✅ <5% retry rate (batches succeed on attempt 1)
 - ✅ Zero validation errors in production
 
 **Performance**:
+
 - ✅ <150s total pipeline duration (8 sections)
 - ✅ Token usage <200K (within budget)
 - ✅ Cost per course <$0.035
 
 **Reliability**:
+
 - ✅ 99% success rate (with retry logic)
 - ✅ Graceful degradation (fallback templates)
 - ✅ Error reporting (user-friendly messages)
@@ -806,6 +837,7 @@ Test tRPC endpoints (similar to Stage 4):
 ## 12. Migration Notes from MVP
 
 **What to Keep**:
+
 - ✅ Batch processing strategy (1 section per batch, 2 parallel)
 - ✅ Retry logic (2 attempts, progressive prompts)
 - ✅ JSON extraction & repair (proven reliable)
@@ -813,6 +845,7 @@ Test tRPC endpoints (similar to Stage 4):
 - ✅ Zod validation schema (comprehensive)
 
 **What to Improve**:
+
 - ❌ Replace n8n Code node → TypeScript service
 - ❌ Replace manual state management → LangGraph StateGraph
 - ❌ Add quality validation (semantic similarity, Stage 4 pattern)
@@ -821,6 +854,7 @@ Test tRPC endpoints (similar to Stage 4):
 - ❌ Use tRPC for API (type-safe, Stage 1 pattern)
 
 **What to Remove**:
+
 - ❌ n8n-specific logic (Structured Output Parser node)
 - ❌ Telegram error notifications (use Supabase logging instead)
 - ❌ Legacy RPC calls (use Supabase realtime or polling)
@@ -830,17 +864,20 @@ Test tRPC endpoints (similar to Stage 4):
 ## 13. Implementation Phases
 
 **Phase 0: Preparation** (1-2 days)
+
 - Database migrations (course_structure JSONB column verified)
 - Shared-types: CourseStructure, Section, Lesson, Exercise interfaces
 - Zod schemas (port from MVP)
 
 **Phase 1: Metadata Service** (2-3 days)
+
 - Implement metadataGenerationNode
 - Add retry logic (2 attempts, progressive prompts)
 - Add semantic similarity validation
 - Unit tests (10+ tests)
 
 **Phase 2: Batch Section Service** (3-4 days)
+
 - Implement batchSectionGenerationNode
 - Add parallel batch processing (2 at a time)
 - Add JSON extraction & repair logic
@@ -848,18 +885,21 @@ Test tRPC endpoints (similar to Stage 4):
 - Unit tests (15+ tests)
 
 **Phase 3: LangGraph Orchestrator** (2-3 days)
+
 - Build StateGraph (2 nodes: metadata → sections)
 - Add conditional edges (retry logic)
 - Add progress tracking (BullMQ + Supabase)
 - Integration tests (5+ tests)
 
 **Phase 4: tRPC Integration** (1-2 days)
+
 - generation.startStructureGeneration endpoint
 - generation.getStructureProgress endpoint
 - generation.getStructure endpoint
 - Contract tests (10+ tests)
 
 **Phase 5: Testing & Validation** (2-3 days)
+
 - T056 E2E test (full pipeline)
 - Quality validation tests
 - Cost tracking tests

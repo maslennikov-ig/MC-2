@@ -401,7 +401,12 @@ class MetricsStore {
    * @param {number} duration - Batch processing duration in milliseconds
    * @param {number} queueDepth - Current queue depth
    */
-  recordOutboxBatch(jobsCreated: number, jobsFailed: number, duration: number, queueDepth: number): void {
+  recordOutboxBatch(
+    jobsCreated: number,
+    jobsFailed: number,
+    duration: number,
+    queueDepth: number
+  ): void {
     this.outboxMetrics.batchesProcessed++;
     this.outboxMetrics.jobsCreated += jobsCreated;
     this.outboxMetrics.jobsFailed += jobsFailed;
@@ -483,13 +488,11 @@ class MetricsStore {
    * @returns {object} FSM metrics with calculated rates
    */
   getFSMMetrics(): FSMInitMetrics & { successRate: number; cacheHitRate: number } {
-    const successRate = this.fsmMetrics.total > 0
-      ? (this.fsmMetrics.success / this.fsmMetrics.total) * 100
-      : 0;
+    const successRate =
+      this.fsmMetrics.total > 0 ? (this.fsmMetrics.success / this.fsmMetrics.total) * 100 : 0;
 
-    const cacheHitRate = this.fsmMetrics.total > 0
-      ? (this.fsmMetrics.cacheHits / this.fsmMetrics.total) * 100
-      : 0;
+    const cacheHitRate =
+      this.fsmMetrics.total > 0 ? (this.fsmMetrics.cacheHits / this.fsmMetrics.total) * 100 : 0;
 
     return {
       ...this.fsmMetrics,
@@ -506,13 +509,13 @@ class MetricsStore {
    */
   getOutboxMetrics(): OutboxProcessorMetrics & { successRate: number; avgQueueDepth: number } {
     const totalJobs = this.outboxMetrics.jobsCreated + this.outboxMetrics.jobsFailed;
-    const successRate = totalJobs > 0
-      ? (this.outboxMetrics.jobsCreated / totalJobs) * 100
-      : 100; // Default to 100% if no jobs yet
+    const successRate = totalJobs > 0 ? (this.outboxMetrics.jobsCreated / totalJobs) * 100 : 100; // Default to 100% if no jobs yet
 
-    const avgQueueDepth = this.outboxMetrics.queueDepthHistory.length > 0
-      ? this.outboxMetrics.queueDepthHistory.reduce((sum, val) => sum + val, 0) / this.outboxMetrics.queueDepthHistory.length
-      : 0;
+    const avgQueueDepth =
+      this.outboxMetrics.queueDepthHistory.length > 0
+        ? this.outboxMetrics.queueDepthHistory.reduce((sum, val) => sum + val, 0) /
+          this.outboxMetrics.queueDepthHistory.length
+        : 0;
 
     return {
       ...this.outboxMetrics,
@@ -589,9 +592,10 @@ class MetricsStore {
     recentActivations: number;
     topReasons: Array<{ reason: string; count: number }>;
   } {
-    const successRate = this.modelFallbackMetrics.total > 0
-      ? (this.modelFallbackMetrics.successes / this.modelFallbackMetrics.total) * 100
-      : 100;
+    const successRate =
+      this.modelFallbackMetrics.total > 0
+        ? (this.modelFallbackMetrics.successes / this.modelFallbackMetrics.total) * 100
+        : 100;
 
     // Count activations in last 5 minutes
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -619,7 +623,11 @@ class MetricsStore {
   /**
    * Ensure enrichment type metrics exist
    */
-  private ensureEnrichmentTypeMetrics(type: EnrichmentMetricType): { total: number; success: number; failed: number } {
+  private ensureEnrichmentTypeMetrics(type: EnrichmentMetricType): {
+    total: number;
+    success: number;
+    failed: number;
+  } {
     if (!this.enrichmentMetrics.byType.has(type)) {
       this.enrichmentMetrics.byType.set(type, { total: 0, success: 0, failed: 0 });
     }
@@ -711,15 +719,24 @@ class MetricsStore {
     successRate: number;
     avgDurationMs: number;
     recentOperations: number;
-    byTypeStats: Array<{ type: EnrichmentMetricType; total: number; success: number; failed: number; successRate: number }>;
+    byTypeStats: Array<{
+      type: EnrichmentMetricType;
+      total: number;
+      success: number;
+      failed: number;
+      successRate: number;
+    }>;
   } {
-    const successRate = this.enrichmentMetrics.total > 0
-      ? (this.enrichmentMetrics.successes / this.enrichmentMetrics.total) * 100
-      : 100;
+    const successRate =
+      this.enrichmentMetrics.total > 0
+        ? (this.enrichmentMetrics.successes / this.enrichmentMetrics.total) * 100
+        : 100;
 
-    const avgDurationMs = this.enrichmentMetrics.durations.length > 0
-      ? this.enrichmentMetrics.durations.reduce((sum, d) => sum + d, 0) / this.enrichmentMetrics.durations.length
-      : 0;
+    const avgDurationMs =
+      this.enrichmentMetrics.durations.length > 0
+        ? this.enrichmentMetrics.durations.reduce((sum, d) => sum + d, 0) /
+          this.enrichmentMetrics.durations.length
+        : 0;
 
     // Count operations in last 5 minutes
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);

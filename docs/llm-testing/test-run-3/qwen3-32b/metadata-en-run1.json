@@ -5,10 +5,7 @@
   "target_audience": "Individuals with no prior programming experience seeking to learn Python basics for software development, data analysis, or automation.",
   "estimated_duration_hours": 20,
   "difficulty_level": "beginner",
-  "prerequisites": [
-    "Basic computer literacy",
-    "Internet access for online coding environments"
-  ],
+  "prerequisites": ["Basic computer literacy", "Internet access for online coding environments"],
   "learning_outcomes": [
     "Write simple Python programs using basic syntax and data structures",
     "Debug common errors in Python code using debugging tools and techniques",

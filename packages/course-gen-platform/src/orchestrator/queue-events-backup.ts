@@ -40,6 +40,11 @@ const commandHandler = new InitializeFSMCommandHandler();
 const supabase = getSupabaseAdmin();
 
 /**
+ * QueueEvents instance for graceful shutdown
+ */
+let queueEvents: QueueEvents | null = null;
+
+/**
  * Job types that require FSM initialization
  * These are the entry points for course generation workflows
  */
@@ -91,7 +96,7 @@ function getInitialStateForJobType(jobType: JobType): string {
 export function initializeQueueEventsBackup(): void {
   try {
     const redisClient = getRedisClient();
-    const queueEvents = new QueueEvents(QUEUE_NAME, {
+    queueEvents = new QueueEvents(QUEUE_NAME, {
       connection: redisClient,
     });
 
@@ -271,6 +276,21 @@ export function initializeQueueEventsBackup(): void {
       },
       'Failed to initialize QueueEvents backup layer (non-fatal, Layers 1 and 3 still active)'
     );
+  }
+}
+
+/**
+ * Close QueueEvents backup layer (for graceful shutdown)
+ */
+export async function closeQueueEventsBackup(): Promise<void> {
+  if (queueEvents) {
+    try {
+      await queueEvents.close();
+      queueEvents = null;
+      logger.info('QueueEvents backup layer closed');
+    } catch (error) {
+      logger.error({ error }, 'Failed to close QueueEvents backup layer');
+    }
   }
 }
 

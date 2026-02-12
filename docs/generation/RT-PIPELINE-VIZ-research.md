@@ -10,6 +10,7 @@
 **Recommendation**: Use **custom component with shadcn/ui Card components** instead of @xyflow/react.
 
 **Key Findings**:
+
 - @xyflow/react is powerful but **significantly overkill** for a static, linear 6-stage pipeline
 - Your project **already uses @xyflow/react** extensively in generation-graph (26 files), but that's for complex interactive graph visualization
 - For a simple linear pipeline display (FR-4, FR-5), a custom component provides:
@@ -20,6 +21,7 @@
   - **Flexibility**: Easy to customize without library constraints
 
 **Cost-Benefit Analysis**:
+
 - Quality: Custom component = 100% (meets all requirements)
 - Bundle size impact: 0 bytes (no new dependencies)
 - Development time: ~2-3 hours (simple implementation)
@@ -42,6 +44,7 @@
 ```
 
 **Analysis**:
+
 - GraphView.tsx: 400+ lines, complex real-time graph with drag/drop, zoom, pan
 - Use case: Visualizing course generation workflow with multiple stages, documents, lessons
 - Perfect use case for React Flow: **Interactive, dynamic, user-manipulated graph**
@@ -62,6 +65,7 @@
 ### Area 2: React Flow Capabilities vs Requirements
 
 **React Flow Features**:
+
 - Drag-and-drop node positioning ❌ Not needed
 - Panning and zooming ❌ Not needed (6 stages fit on screen)
 - Auto-layout algorithms ❌ Not needed (simple left-to-right)
@@ -71,6 +75,7 @@
 - Performance optimization for 100+ nodes ❌ Not needed (6 nodes)
 
 **Your Requirements (FR-4, FR-5)**:
+
 - Display 6 stages in visual timeline/flowchart ✅ Simple CSS flexbox
 - Show stage metadata (number, name, description) ✅ Card component
 - Show status indicators ✅ Badge component
@@ -85,22 +90,26 @@
 ### Area 3: Bundle Size Impact
 
 **@xyflow/react Bundle Size** (from [Bundlephobia](https://bundlephobia.com/package/@xyflow/react)):
+
 - Minified: ~200KB
 - Minified + Gzipped: ~60KB
 - Dependencies: 6 (including d3-zoom, d3-drag)
 
 **Custom Component Estimate**:
+
 - Code: ~50-100 lines (simple flexbox layout)
 - Dependencies: 0 (uses existing shadcn/ui)
 - Bundle impact: 0 bytes
 
 **Context**:
+
 - Your project already includes @xyflow/react for generation-graph
 - However, admin dashboard is a separate route (`/admin/pipeline`)
 - **Code splitting**: Admin route bundle doesn't need to share graph visualization code
 - Adding React Flow to admin bundle = unnecessary duplication
 
 **Performance Impact**:
+
 - Custom component: First paint <50ms
 - React Flow: First paint ~200ms (library initialization)
 - SC-001 requirement: Page load within 2 seconds ✅ Both pass, but custom is 4x faster
@@ -110,18 +119,21 @@
 ### Area 4: Accessibility Comparison
 
 **React Flow Accessibility**:
+
 - Keyboard navigation: Built-in (arrow keys, tab)
 - Screen reader: Limited support
 - Focus management: Library-controlled
 - Custom keyboard shortcuts: Requires configuration
 
 **Custom Component Accessibility**:
+
 - Keyboard navigation: Full control (implement exactly what's needed)
 - Screen reader: Perfect semantic HTML (nav, ol/li, heading hierarchy)
 - Focus management: Standard React patterns
 - ARIA attributes: Easy to add
 
 **Example accessible custom component**:
+
 ```tsx
 <nav aria-label="Pipeline stages">
   <ol className="flex gap-4">
@@ -131,7 +143,7 @@
           tabIndex={0}
           role="button"
           aria-label={`Stage ${stage.number}: ${stage.name}`}
-          onKeyDown={(e) => e.key === 'Enter' && handleStageClick(stage)}
+          onKeyDown={e => e.key === 'Enter' && handleStageClick(stage)}
         >
           <Badge>{stage.status}</Badge>
           <h3>{stage.name}</h3>
@@ -151,22 +163,26 @@
 ### Area 5: Customization and Maintenance
 
 **React Flow Customization**:
+
 - Learning curve: Medium (must understand React Flow API)
 - Custom styling: Requires understanding library CSS classes
 - Updates: Must track library changes (breaking changes in v11→v12)
 - Edge cases: Must work around library limitations
 
 **Custom Component**:
+
 - Learning curve: None (standard React + CSS)
 - Custom styling: Full control with Tailwind/shadcn
 - Updates: No external dependency updates
 - Edge cases: Complete control to handle any requirement
 
 **Example: Adding animation to stage transitions**:
+
 - React Flow: Configure `animated` prop on edges, limited to library animations
 - Custom: Use framer-motion (already in project) for any animation
 
 **Maintenance Cost Over 2 Years**:
+
 - React Flow: ~4-8 hours (version updates, bug fixes, workarounds)
 - Custom: ~1-2 hours (minor styling tweaks)
 
@@ -205,7 +221,7 @@ interface PipelineStage {
 
 export function PipelineStagesView({
   stages,
-  onStageClick
+  onStageClick,
 }: {
   stages: PipelineStage[];
   onStageClick: (stageNumber: number) => void;
@@ -215,16 +231,10 @@ export function PipelineStagesView({
       <ol className="flex gap-4 overflow-x-auto pb-4">
         {stages.map((stage, index) => (
           <li key={stage.number} className="flex items-center">
-            <PipelineStageCard
-              stage={stage}
-              onClick={() => onStageClick(stage.number)}
-            />
+            <PipelineStageCard stage={stage} onClick={() => onStageClick(stage.number)} />
 
             {index < stages.length - 1 && (
-              <ArrowRight
-                className="mx-2 text-muted-foreground flex-shrink-0"
-                aria-hidden="true"
-              />
+              <ArrowRight className="mx-2 text-muted-foreground flex-shrink-0" aria-hidden="true" />
             )}
           </li>
         ))}
@@ -233,13 +243,7 @@ export function PipelineStagesView({
   );
 }
 
-function PipelineStageCard({
-  stage,
-  onClick
-}: {
-  stage: PipelineStage;
-  onClick: () => void;
-}) {
+function PipelineStageCard({ stage, onClick }: { stage: PipelineStage; onClick: () => void }) {
   const statusColors = {
     active: 'bg-green-500',
     inactive: 'bg-gray-400',
@@ -253,7 +257,7 @@ function PipelineStageCard({
       role="button"
       aria-label={`Stage ${stage.number}: ${stage.name}. Click to view details.`}
       onClick={onClick}
-      onKeyDown={(e) => {
+      onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onClick();
@@ -276,15 +280,11 @@ function PipelineStageCard({
         <div className="space-y-2 text-sm">
           <div>
             <span className="font-medium">Models:</span>{' '}
-            <span className="text-muted-foreground">
-              {stage.linkedModels.length} configured
-            </span>
+            <span className="text-muted-foreground">{stage.linkedModels.length} configured</span>
           </div>
           <div>
             <span className="font-medium">Prompts:</span>{' '}
-            <span className="text-muted-foreground">
-              {stage.linkedPrompts.length} templates
-            </span>
+            <span className="text-muted-foreground">{stage.linkedPrompts.length} templates</span>
           </div>
 
           {stage.avgExecutionTime !== null && (
@@ -299,9 +299,7 @@ function PipelineStageCard({
           {stage.avgCost !== null && (
             <div>
               <span className="font-medium">Avg Cost:</span>{' '}
-              <span className="text-muted-foreground">
-                ${stage.avgCost.toFixed(4)}
-              </span>
+              <span className="text-muted-foreground">${stage.avgCost.toFixed(4)}</span>
             </div>
           )}
         </div>
@@ -328,13 +326,12 @@ return (
     {stages.map((stage, index) => (
       <div key={stage.number}>
         <PipelineStageCard stage={stage} onClick={onStageClick} />
-        {index < stages.length - 1 && (
-          isMobile ? (
+        {index < stages.length - 1 &&
+          (isMobile ? (
             <ArrowDown className="mx-auto my-2" aria-hidden="true" />
           ) : (
             <ArrowRight className="mx-2" aria-hidden="true" />
-          )
-        )}
+          ))}
       </div>
     ))}
   </div>
@@ -347,13 +344,16 @@ return (
 // tRPC endpoint (already following project patterns)
 export const pipelineAdminRouter = router({
   getPipelineStages: superadminProcedure
-    .input(z.object({
-      periodStart: z.string().datetime(),
-      periodEnd: z.string().datetime(),
-    }))
+    .input(
+      z.object({
+        periodStart: z.string().datetime(),
+        periodEnd: z.string().datetime(),
+      })
+    )
     .query(async ({ input }) => {
       // Aggregate statistics from generation_trace table
-      const stages = await db.query(`
+      const stages = await db.query(
+        `
         SELECT
           s.stage_number,
           s.stage_name,
@@ -369,7 +369,9 @@ export const pipelineAdminRouter = router({
           AND gt.created_at BETWEEN $1 AND $2
         GROUP BY s.stage_number, s.stage_name, s.stage_description
         ORDER BY s.stage_number
-      `, [input.periodStart, input.periodEnd]);
+      `,
+        [input.periodStart, input.periodEnd]
+      );
 
       return stages;
     }),
@@ -396,6 +398,7 @@ export const pipelineAdminRouter = router({
 ## Alternative Considered: React Flow
 
 **When to use React Flow**:
+
 - 20+ nodes with complex relationships
 - User needs to rearrange nodes
 - Dynamic graph structure (nodes added/removed at runtime)
@@ -403,6 +406,7 @@ export const pipelineAdminRouter = router({
 - Non-linear flow (branches, merges, cycles)
 
 **Your pipeline**:
+
 - 6 fixed stages ✅
 - Linear flow (1→2→3→4→5→6) ✅
 - Static structure ✅
@@ -415,16 +419,16 @@ export const pipelineAdminRouter = router({
 
 ## Success Criteria Validation
 
-| Criterion | Custom Component | React Flow |
-|-----------|------------------|------------|
-| SC-001: Load <2s | ✅ ~50ms render | ✅ ~200ms render |
-| FR-004: Visual timeline | ✅ Flexbox layout | ✅ Graph layout |
-| FR-005: Stage metadata | ✅ Card content | ✅ Custom node |
-| Accessibility | ✅ Full control | ⚠️ Limited |
-| Maintainability | ✅ No dependencies | ⚠️ Library updates |
-| Customization | ✅ Full freedom | ⚠️ Library constraints |
-| Bundle size | ✅ 0 bytes | ❌ +60KB gzipped |
-| Development time | ✅ 2-3 hours | ⚠️ 4-6 hours |
+| Criterion               | Custom Component   | React Flow             |
+| ----------------------- | ------------------ | ---------------------- |
+| SC-001: Load <2s        | ✅ ~50ms render    | ✅ ~200ms render       |
+| FR-004: Visual timeline | ✅ Flexbox layout  | ✅ Graph layout        |
+| FR-005: Stage metadata  | ✅ Card content    | ✅ Custom node         |
+| Accessibility           | ✅ Full control    | ⚠️ Limited             |
+| Maintainability         | ✅ No dependencies | ⚠️ Library updates     |
+| Customization           | ✅ Full freedom    | ⚠️ Library constraints |
+| Bundle size             | ✅ 0 bytes         | ❌ +60KB gzipped       |
+| Development time        | ✅ 2-3 hours       | ⚠️ 4-6 hours           |
 
 **All success criteria met with custom component approach.**
 
@@ -432,12 +436,12 @@ export const pipelineAdminRouter = router({
 
 ## Risk Assessment
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Complex layout changes | Low | Medium | Use CSS Grid for flexibility |
-| Mobile responsiveness | Low | Low | Test early, use breakpoints |
-| Accessibility issues | Low | Medium | Follow ARIA best practices |
-| Performance on slow devices | Very Low | Low | Simple DOM, no heavy JS |
+| Risk                        | Likelihood | Impact | Mitigation                   |
+| --------------------------- | ---------- | ------ | ---------------------------- |
+| Complex layout changes      | Low        | Medium | Use CSS Grid for flexibility |
+| Mobile responsiveness       | Low        | Low    | Test early, use breakpoints  |
+| Accessibility issues        | Low        | Medium | Follow ARIA best practices   |
+| Performance on slow devices | Very Low   | Low    | Simple DOM, no heavy JS      |
 
 ---
 
@@ -459,6 +463,7 @@ export const pipelineAdminRouter = router({
 For the Admin Pipeline Dashboard's static, linear 6-stage pipeline visualization (FR-4, FR-5), a **custom component using shadcn/ui Card components** is the optimal solution.
 
 **Key Advantages**:
+
 1. **Zero bundle size impact** (no new dependencies)
 2. **Perfect semantic HTML** (better accessibility)
 3. **Full design control** (matches existing shadcn/ui system)
@@ -467,6 +472,7 @@ For the Admin Pipeline Dashboard's static, linear 6-stage pipeline visualization
 6. **Better performance** (50ms vs 200ms first paint)
 
 **When to reconsider**:
+
 - If pipeline grows to 20+ stages
 - If users need to rearrange stages
 - If non-linear flow is introduced (branches, parallel stages)

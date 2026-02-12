@@ -17,90 +17,94 @@ if (!OPENROUTER_API_KEY) {
 const MODEL = {
   slug: 'nemotron-nano-9b-v2',
   apiName: 'nvidia/nemotron-nano-9b-v2',
-  name: 'Nemotron Nano 9B V2'
+  name: 'Nemotron Nano 9B V2',
 };
 
 const LESSONS = {
-  '1.1': {
-    id: '1.1', language: 'ru',
+  1.1: {
+    id: '1.1',
+    language: 'ru',
     title: 'Что такое нематериальный продукт: билет как товар',
     section_title: 'Основы продаж билетов как нематериального продукта',
     learning_objectives: [
       'Распознать отличие билета от физического товара по пяти критериям',
       'Описать три ключевые особенности нематериального продукта в собственных словах',
-      'Применить аналогию «навигатора» для объяснения роли CRM при продаже билетов'
+      'Применить аналогию «навигатора» для объяснения роли CRM при продаже билетов',
     ],
     key_topics: [
       'Определение нематериального продукта',
       'Билет как право на участие, а не на владение',
       'Сравнение: билет vs физический товар',
       'Особенности потребления — немедленное и невозвратное',
-      'CRM как навигатор клиента'
+      'CRM как навигатор клиента',
     ],
     difficulty_level: 'beginner',
     estimated_duration_minutes: 5,
-    target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия'
+    target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия',
   },
-  '1.2': {
-    id: '1.2', language: 'ru',
+  1.2: {
+    id: '1.2',
+    language: 'ru',
     title: 'Ценообразование на билеты: как работают скидки и тарифы',
     section_title: 'Основы продаж билетов как нематериального продукта',
     learning_objectives: [
       'Применить early-bird скидку в коммуникации с клиентом',
       'Рассчитать разницу между базовым и VIP-тарифом для конкретного мероприятия',
-      'Объяснить клиенту выгоду скидки с акцентом на ограниченности'
+      'Объяснить клиенту выгоду скидки с акцентом на ограниченности',
     ],
     key_topics: [
       'Эффект дефицита через early-bird',
       'VIP-тарифы и дополнительные опции',
       'Групповые скидки: условия и ограничения',
       'Календарь цен: когда и как менять',
-      'Объяснение цены через ценность, а не стоимость'
+      'Объяснение цены через ценность, а не стоимость',
     ],
     difficulty_level: 'beginner',
     estimated_duration_minutes: 5,
-    target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия'
+    target_audience: 'Менеджеры отдела продаж, работающие с продажей билетов на мероприятия',
   },
   '1.1-en': {
-    id: '1.1-en', language: 'en',
+    id: '1.1-en',
+    language: 'en',
     title: 'What is an Intangible Product: Ticket as a Product',
     section_title: 'Fundamentals of Selling Tickets as Intangible Products',
     learning_objectives: [
       'Identify five key differences between tickets and physical products',
       'Describe three key characteristics of intangible products in your own words',
-      'Apply the "navigator" analogy to explain the role of CRM in ticket sales'
+      'Apply the "navigator" analogy to explain the role of CRM in ticket sales',
     ],
     key_topics: [
       'Definition of intangible products',
       'Ticket as a right to participate, not ownership',
       'Comparison: ticket vs physical product',
       'Consumption characteristics — immediate and non-refundable',
-      'CRM as a customer navigator'
+      'CRM as a customer navigator',
     ],
     difficulty_level: 'beginner',
     estimated_duration_minutes: 5,
-    target_audience: 'Sales managers working with event ticket sales'
+    target_audience: 'Sales managers working with event ticket sales',
   },
   '1.2-en': {
-    id: '1.2-en', language: 'en',
+    id: '1.2-en',
+    language: 'en',
     title: 'Ticket Pricing: How Discounts and Tiers Work',
     section_title: 'Fundamentals of Selling Tickets as Intangible Products',
     learning_objectives: [
       'Apply early-bird discounts in customer communication',
       'Calculate the difference between basic and VIP tiers for a specific event',
-      'Explain discount benefits to customers with emphasis on scarcity'
+      'Explain discount benefits to customers with emphasis on scarcity',
     ],
     key_topics: [
       'Scarcity effect through early-bird pricing',
       'VIP tiers and additional options',
       'Group discounts: conditions and limitations',
       'Price calendar: when and how to adjust',
-      'Explaining price through value, not cost'
+      'Explaining price through value, not cost',
     ],
     difficulty_level: 'beginner',
     estimated_duration_minutes: 5,
-    target_audience: 'Sales managers working with event ticket sales'
-  }
+    target_audience: 'Sales managers working with event ticket sales',
+  },
 };
 
 const ALL_LESSONS = ['1.1', '1.2', '1.1-en', '1.2-en'];
@@ -139,22 +143,31 @@ CRITICAL: Return ONLY valid JSON. No code blocks, no explanations. Use standard 
 }
 
 function cleanJson(text) {
-  let c = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  let c = text
+    .replace(/```json\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
   c = c.replace(/[""]/g, '"').replace(/['']/g, "'");
-  const f = c.indexOf('{'), l = c.lastIndexOf('}');
-  return (f !== -1 && l !== -1) ? c.substring(f, l + 1) : c;
+  const f = c.indexOf('{'),
+    l = c.lastIndexOf('}');
+  return f !== -1 && l !== -1 ? c.substring(f, l + 1) : c;
 }
 
 async function callAPI(model, prompt) {
   const res = await fetch(OPENROUTER_BASE_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://megacampus.ai',
-      'X-Title': 'MegaCampus Test'
+      'X-Title': 'MegaCampus Test',
     },
-    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 8000 })
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 8000,
+    }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   const data = await res.json();
@@ -173,11 +186,25 @@ function evalQuality(content, lesson) {
   score += Math.min(content.examples?.length || 0, 3) * 5;
   score += Math.min(content.exercises?.length || 0, 3) * 5;
   const text = JSON.stringify(content).toLowerCase();
-  const objCov = lesson.learning_objectives.filter(o => o.toLowerCase().split(/\s+/).filter(w => w.length > 4).some(k => text.includes(k))).length;
-  const topCov = lesson.key_topics.filter(t => t.toLowerCase().split(/\s+/).filter(w => w.length > 4).some(k => text.includes(k))).length;
+  const objCov = lesson.learning_objectives.filter(o =>
+    o
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 4)
+      .some(k => text.includes(k))
+  ).length;
+  const topCov = lesson.key_topics.filter(t =>
+    t
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 4)
+      .some(k => text.includes(k))
+  ).length;
   score += (objCov / lesson.learning_objectives.length) * 10;
   score += (topCov / lesson.key_topics.length) * 10;
-  const wc = (content.intro || '').split(/\s+/).length + (content.sections || []).reduce((s, sec) => s + (sec.content || '').split(/\s+/).length, 0);
+  const wc =
+    (content.intro || '').split(/\s+/).length +
+    (content.sections || []).reduce((s, sec) => s + (sec.content || '').split(/\s+/).length, 0);
   if (wc > 500) score += 5;
   if (wc > 1000) score += 5;
   return { qualityScore: Math.min(Math.round(score), 100) };
@@ -194,20 +221,46 @@ async function runTest(lessonId) {
     const cleaned = cleanJson(content);
 
     let parsed, parseError;
-    try { parsed = JSON.parse(cleaned); } catch (e) { parseError = e.message; }
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      parseError = e.message;
+    }
 
     const quality = parsed ? evalQuality(parsed, lesson) : null;
     const dir = join(OUTPUT_DIR, MODEL.slug);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
     writeFileSync(join(dir, `lesson-${lesson.id}.raw`), content);
-    writeFileSync(join(dir, `lesson-${lesson.id}.json`), JSON.stringify(parsed || { error: 'Parse error', parseError, raw: cleaned.substring(0, 1000) }, null, 2));
-    writeFileSync(join(dir, `lesson-${lesson.id}-metrics.json`), JSON.stringify({
-      model: MODEL.name, lessonId: lesson.id, language: lesson.language, duration: dur,
-      parseSuccess: !!parsed, parseError, usage, quality
-    }, null, 2));
+    writeFileSync(
+      join(dir, `lesson-${lesson.id}.json`),
+      JSON.stringify(
+        parsed || { error: 'Parse error', parseError, raw: cleaned.substring(0, 1000) },
+        null,
+        2
+      )
+    );
+    writeFileSync(
+      join(dir, `lesson-${lesson.id}-metrics.json`),
+      JSON.stringify(
+        {
+          model: MODEL.name,
+          lessonId: lesson.id,
+          language: lesson.language,
+          duration: dur,
+          parseSuccess: !!parsed,
+          parseError,
+          usage,
+          quality,
+        },
+        null,
+        2
+      )
+    );
 
-    console.log(`  [${MODEL.slug}] ${lessonId} - ${parsed ? `Score: ${quality.qualityScore}/100` : 'Parse error'} (${(dur/1000).toFixed(1)}s)`);
+    console.log(
+      `  [${MODEL.slug}] ${lessonId} - ${parsed ? `Score: ${quality.qualityScore}/100` : 'Parse error'} (${(dur / 1000).toFixed(1)}s)`
+    );
     return { parseSuccess: !!parsed, quality };
   } catch (e) {
     console.log(`  [${MODEL.slug}] ${lessonId} - Error: ${e.message.substring(0, 60)}`);
@@ -227,8 +280,13 @@ async function main() {
   }
 
   const ok = results.filter(r => r.parseSuccess);
-  const avg = ok.length ? ok.reduce((s, r) => s + (r.quality?.qualityScore || 0), 0) / ok.length : 0;
+  const avg = ok.length
+    ? ok.reduce((s, r) => s + (r.quality?.qualityScore || 0), 0) / ok.length
+    : 0;
   console.log(`\n  Summary: ${ok.length}/4 success, avg score: ${avg.toFixed(0)}/100\n`);
 }
 
-main().catch(e => { console.error('Fatal:', e); process.exit(1); });
+main().catch(e => {
+  console.error('Fatal:', e);
+  process.exit(1);
+});

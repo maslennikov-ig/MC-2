@@ -16,6 +16,7 @@ related_files:
 ## Executive Summary
 
 **Problem**: Stage 6 judge is executing correctly (cascade evaluation, retries work), but the UI doesn't show critical information:
+
 1. Which judges voted
 2. Why the verdict was "REGENERATE"
 3. Heuristic failure reasons (e.g., "Examples count (0) below minimum (1)")
@@ -27,6 +28,7 @@ related_files:
 **Recommended Solution**: Enrich the `judge_complete` trace output with full cascade evaluation details from `CascadeResult` and decision context.
 
 **Key Findings**:
+
 - Database currently stores only high-level judge decision (see database query results below)
 - UI parsing code expects rich `JudgeVerdictDisplay` structure with votes, heuristics, highlighted sections
 - Gap exists between what cascade evaluator produces and what gets saved to database
@@ -39,12 +41,14 @@ related_files:
 ### Observed Behavior
 
 The Stage 6 judge runs successfully:
+
 - Heuristic filters execute and detect failures (e.g., missing examples)
 - Cascade evaluation stops at heuristic stage when failures detected
 - Judge recommendation is correctly set to "REGENERATE"
 - Retry mechanism triggers regeneration
 
 However, the UI shows no information about:
+
 - **Why regeneration was recommended** (which heuristics failed)
 - **Which judges voted** (if cascade proceeded to single_judge or CLEV)
 - **Individual judge scores and reasoning**
@@ -54,6 +58,7 @@ However, the UI shows no information about:
 ### Expected Behavior
 
 The UI should display:
+
 1. **Heuristic failure reasons** in an alert box (e.g., "Examples count (0) below minimum (1)")
 2. **Individual judge cards** showing model, score, verdict, criteria breakdown (if judges ran)
 3. **Consensus method** (unanimous, majority, tie-breaker) and final verdict badge
@@ -133,6 +138,7 @@ The UI should display:
 ### Commands Executed
 
 **Database query to inspect judge_complete traces**:
+
 ```sql
 SELECT
   id, lesson_id, step_name, phase,
@@ -147,6 +153,7 @@ LIMIT 5;
 ```
 
 **Result** (truncated):
+
 ```json
 {
   "id": "120f071b-72ae-4776-af81-eb5b3ca88bd9",
@@ -164,6 +171,7 @@ LIMIT 5;
 ```
 
 **Missing from output_data**:
+
 - `heuristicResults.failureReasons` (e.g., "Examples count (0) below minimum (1)")
 - `votes` array (individual judge verdicts)
 - `consensus_method` (unanimous, majority, tie_breaker)
@@ -181,6 +189,7 @@ LIMIT 5;
 **Mechanism of Failure**:
 
 The judge node receives complete `CascadeResult` from `executeCascadeEvaluation()`, which contains:
+
 - `heuristicResults.failureReasons` (array of human-readable failure messages)
 - `singleJudgeVerdict` (if cascade reached single judge stage)
 - `clevResult.verdicts` (array of individual judge votes if CLEV ran)
@@ -192,11 +201,11 @@ However, when logging the completion trace (lines 467-485), the orchestrator onl
 await logTrace({
   // ... other fields
   outputData: {
-    finalRecommendation,           // ✅ Saved
-    qualityScore: finalScore,      // ✅ Saved
-    needsRegeneration,             // ✅ Saved
-    needsHumanReview,              // ✅ Saved
-    cascadeStage: cascadeResult.stage,  // ✅ Saved (but not enough detail)
+    finalRecommendation, // ✅ Saved
+    qualityScore: finalScore, // ✅ Saved
+    needsRegeneration, // ✅ Saved
+    needsHumanReview, // ✅ Saved
+    cascadeStage: cascadeResult.stage, // ✅ Saved (but not enough detail)
     // ❌ MISSING: cascadeResult.heuristicResults
     // ❌ MISSING: cascadeResult.singleJudgeVerdict
     // ❌ MISSING: cascadeResult.clevResult
@@ -223,7 +232,7 @@ interface ExpectedOutputData {
   consensus_method?: ConsensusMethod;
   final_verdict?: JudgeVerdictType;
   heuristics_passed?: boolean;
-  heuristics_issues?: string[];  // ← UI expects this!
+  heuristics_issues?: string[]; // ← UI expects this!
   highlighted_sections?: Array<{
     section_index: number;
     section_title: string;
@@ -234,6 +243,7 @@ interface ExpectedOutputData {
 ```
 
 Currently, **none of these fields are saved**, so the UI cannot display:
+
 1. Heuristic failure reasons (no `heuristics_issues` array)
 2. Individual judge votes (no `votes` array)
 3. Consensus method (no `consensus_method` field)
@@ -248,14 +258,13 @@ Currently, **none of these fields are saved**, so the UI cannot display:
 ### Evidence Supporting Root Cause
 
 **Evidence 1**: Cascade evaluator produces `failureReasons`
+
 ```typescript
 // cascade-evaluator.ts, lines 457-524
 const failureReasons: string[] = [];
 
 if (wordCount < thresholds.minWordCount) {
-  failureReasons.push(
-    `Word count (${wordCount}) below minimum (${thresholds.minWordCount})`
-  );
+  failureReasons.push(`Word count (${wordCount}) below minimum (${thresholds.minWordCount})`);
 }
 
 if (examplesCount < thresholds.minExamples) {
@@ -271,11 +280,12 @@ return {
   wordCount,
   fleschKincaid,
   // ...
-  failureReasons,  // ← This array is created but never saved to trace
+  failureReasons, // ← This array is created but never saved to trace
 };
 ```
 
 **Evidence 2**: UI expects `heuristics_issues`
+
 ```typescript
 // useLessonInspectorData.ts, lines 408-411
 const heuristicsPassed = (judgeOutput.heuristics_passed as boolean) ?? true;
@@ -289,6 +299,7 @@ return {
 ```
 
 **Evidence 3**: JudgeVotingPanel renders heuristics warning
+
 ```typescript
 // JudgeVotingPanel.tsx, lines 294-310
 {!heuristicsPassed && result.heuristicsIssues && result.heuristicsIssues.length > 0 && (
@@ -304,10 +315,11 @@ return {
 ```
 
 **Evidence 4**: Database query confirms minimal data
+
 ```json
 {
   "output_data": {
-    "cascadeStage": "heuristic",  // ← Only tells us it stopped at heuristics
+    "cascadeStage": "heuristic", // ← Only tells us it stopped at heuristics
     "qualityScore": 0,
     "needsHumanReview": false,
     "needsRegeneration": true,
@@ -328,6 +340,7 @@ return {
 **Implementation Steps**:
 
 1. **Create transformation function** in `orchestrator.ts`:
+
    ```typescript
    function transformCascadeResultForUI(
      cascadeResult: CascadeResult,
@@ -352,19 +365,21 @@ return {
 
      // Add single judge verdict if ran
      if (cascadeResult.singleJudgeVerdict) {
-       output.votes = [{
-         judge_id: 'single_judge',
-         model_id: cascadeResult.singleJudgeVerdict.judgeModel,
-         model_display_name: cascadeResult.singleJudgeVerdict.judgeModel,
-         verdict: cascadeResult.singleJudgeVerdict.recommendation,
-         score: cascadeResult.singleJudgeVerdict.overallScore,
-         coherence: cascadeResult.singleJudgeVerdict.criteriaScores.learning_objective_alignment,
-         accuracy: cascadeResult.singleJudgeVerdict.criteriaScores.factual_accuracy,
-         completeness: cascadeResult.singleJudgeVerdict.criteriaScores.completeness,
-         readability: cascadeResult.singleJudgeVerdict.criteriaScores.clarity_readability,
-         reasoning: cascadeResult.singleJudgeVerdict.strengths.join('; '),
-         evaluated_at: new Date().toISOString(),
-       }];
+       output.votes = [
+         {
+           judge_id: 'single_judge',
+           model_id: cascadeResult.singleJudgeVerdict.judgeModel,
+           model_display_name: cascadeResult.singleJudgeVerdict.judgeModel,
+           verdict: cascadeResult.singleJudgeVerdict.recommendation,
+           score: cascadeResult.singleJudgeVerdict.overallScore,
+           coherence: cascadeResult.singleJudgeVerdict.criteriaScores.learning_objective_alignment,
+           accuracy: cascadeResult.singleJudgeVerdict.criteriaScores.factual_accuracy,
+           completeness: cascadeResult.singleJudgeVerdict.criteriaScores.completeness,
+           readability: cascadeResult.singleJudgeVerdict.criteriaScores.clarity_readability,
+           reasoning: cascadeResult.singleJudgeVerdict.strengths.join('; '),
+           evaluated_at: new Date().toISOString(),
+         },
+       ];
        output.consensus_method = 'single_judge';
      }
 
@@ -393,8 +408,8 @@ return {
          section_index: idx,
          section_title: issue.location,
          issue: issue.description,
-         severity: issue.severity === 'critical' ? 'high' :
-                   issue.severity === 'major' ? 'medium' : 'low',
+         severity:
+           issue.severity === 'critical' ? 'high' : issue.severity === 'major' ? 'medium' : 'low',
        }));
      }
 
@@ -403,6 +418,7 @@ return {
    ```
 
 2. **Update trace logging** in judge node (line 467):
+
    ```typescript
    const uiCompatibleOutput = transformCascadeResultForUI(cascadeResult, verdict);
 
@@ -416,7 +432,7 @@ return {
        lessonLabel: state.lessonSpec.lesson_id,
      },
      outputData: {
-       ...uiCompatibleOutput,  // ← Use enriched output
+       ...uiCompatibleOutput, // ← Use enriched output
        needsRegeneration,
        needsHumanReview,
        hasLessonContent: finalContent !== null,
@@ -431,12 +447,14 @@ return {
    - Pass `state.retryCount` to `logTrace` call
 
 **Pros**:
+
 - ✅ Single source of truth (trace log)
 - ✅ No UI changes needed (parsing already expects this format)
 - ✅ Backward compatible (adds new fields, doesn't break existing)
 - ✅ Complete transparency into judge decision process
 
 **Cons**:
+
 - Increases `output_data` JSONB size (~2-5KB per trace)
 - Requires transformation logic maintenance
 
@@ -459,10 +477,12 @@ return {
 3. Parse cascade result directly without transformation
 
 **Pros**:
+
 - ✅ Keeps trace logs lean
 - ✅ Full cascade data available for analysis
 
 **Cons**:
+
 - ❌ Two sources of truth (trace + lesson metadata)
 - ❌ UI must fetch two resources
 - ❌ Breaks existing trace-based inspection pattern
@@ -480,6 +500,7 @@ return {
 **Approach**: New `judge_evaluations` table with foreign key to `lesson_contents`
 
 **Schema**:
+
 ```sql
 CREATE TABLE judge_evaluations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -496,11 +517,13 @@ CREATE TABLE judge_evaluations (
 ```
 
 **Pros**:
+
 - ✅ Proper relational structure
 - ✅ Easy to query judge history
 - ✅ Supports analytics
 
 **Cons**:
+
 - ❌ Requires migration
 - ❌ Changes architecture
 - ❌ More complex implementation
@@ -518,6 +541,7 @@ CREATE TABLE judge_evaluations (
 ### Recommended Priority: HIGH
 
 **Justification**:
+
 - Critical UI feature non-functional
 - Blocks user understanding of quality evaluation
 - Required for Stage 6 production readiness
@@ -525,6 +549,7 @@ CREATE TABLE judge_evaluations (
 ### Recommended Solution: **Solution 1** (Enrich Trace Output)
 
 **Rationale**:
+
 1. Fastest to implement (2-3 hours)
 2. Lowest risk (additive, backward compatible)
 3. Uses existing architecture (trace logging)
@@ -567,6 +592,7 @@ CREATE TABLE judge_evaluations (
 ### Testing Requirements
 
 **Unit Tests**:
+
 ```typescript
 describe('transformCascadeResultForUI', () => {
   it('should include heuristic failures when heuristics fail', () => {
@@ -598,11 +624,13 @@ describe('transformCascadeResultForUI', () => {
 ```
 
 **Integration Tests**:
+
 1. Run full Stage 6 pipeline with failing heuristics
 2. Query `generation_trace` for `judge_complete`
 3. Verify `output_data` contains `heuristics_issues` array
 
 **UI Tests** (manual or E2E):
+
 1. Open LessonInspector for lesson with failed heuristics
 2. Verify JudgeVotingPanel shows amber warning box
 3. Verify heuristic failure reasons listed as bullet points
@@ -614,16 +642,19 @@ describe('transformCascadeResultForUI', () => {
 ### Implementation Risks
 
 **Risk 1: JSONB Size Increase**
+
 - **Impact**: Medium
 - **Mitigation**: Monitor `generation_trace` table size, add index on `phase = 'judge'`
 - **Threshold**: If `output_data` exceeds 10KB consistently, revisit Solution 3 (dedicated table)
 
 **Risk 2: Transformation Logic Drift**
+
 - **Impact**: Low-Medium
 - **Mitigation**: Add TypeScript types for UI-expected structure, validate in tests
 - **Prevention**: Create shared type definition between backend and frontend
 
 **Risk 3: Backward Compatibility**
+
 - **Impact**: Low
 - **Mitigation**: Additive changes only (new fields, no deletions)
 - **Verification**: Existing lessons without new fields should still render (UI has fallbacks)
@@ -631,16 +662,19 @@ describe('transformCascadeResultForUI', () => {
 ### Performance Impact
 
 **Database**:
+
 - Minimal impact (JSONB writes are fast in Postgres)
 - Trace table already has JSONB column with GIN index
 
 **UI**:
+
 - No additional network requests (data already fetched)
 - Slightly larger JSON payload (~2-5KB per lesson)
 
 ### Breaking Changes
 
 **None expected** - This is an additive change:
+
 - New fields added to `output_data`
 - UI already has defensive parsing (uses `?? []` and `?? true` fallbacks)
 - Old traces without new fields will continue to work (UI shows empty state)
@@ -648,11 +682,13 @@ describe('transformCascadeResultForUI', () => {
 ### Side Effects
 
 **Positive**:
+
 - Enables future judge analytics (query by heuristic failure type)
 - Improves debugging (full judge context in one place)
 - Supports audit trails (complete evaluation history)
 
 **Negative**:
+
 - Slightly larger database footprint
 - More data to maintain consistency across versions
 
@@ -663,16 +699,19 @@ describe('transformCascadeResultForUI', () => {
 ### Tier 0: Project Internal Documentation
 
 **File**: `packages/course-gen-platform/src/stages/stage6-lesson-content/judge/cascade-evaluator.ts`
+
 - Lines 100-119: `HeuristicResults` interface definition
 - Lines 138-157: `CascadeResult` interface definition
 - Lines 457-550: `runHeuristicFilters()` implementation showing `failureReasons` construction
 
 **File**: `packages/web/components/generation-graph/hooks/useLessonInspectorData.ts`
+
 - Lines 383-427: `parseJudgeResult()` function showing expected data structure
 - Lines 408-411: Parsing of `heuristics_passed` and `heuristics_issues`
 - Lines 432-464: Parsing of `votes`, `consensus_method`, `final_verdict`
 
 **File**: `packages/course-gen-platform/src/stages/stage6-lesson-content/orchestrator.ts`
+
 - Lines 224-500: Judge node implementation
 - Lines 467-485: Current trace logging (missing cascade details)
 - Lines 280-334: Cascade result handling (data available but not saved)
@@ -680,6 +719,7 @@ describe('transformCascadeResultForUI', () => {
 **Previous Investigation**: None found for this specific issue
 
 **Git History**:
+
 ```bash
 git log --all --grep="judge.*trace" --oneline
 git log -p -- packages/course-gen-platform/src/stages/stage6-lesson-content/orchestrator.ts | head -100
@@ -698,6 +738,7 @@ No external dependencies involved - this is internal data transformation.
 ## MCP Server Usage
 
 **Tools Used**:
+
 1. **Project Internal Search** (Tier 0 - MANDATORY FIRST):
    - ✅ Read orchestrator.ts (judge node implementation)
    - ✅ Read useLessonInspectorData.ts (UI parsing logic)
@@ -731,6 +772,7 @@ No external dependencies involved - this is internal data transformation.
 **Task**: Implement Solution 1 - Enrich judge_complete trace output
 
 **Deliverables**:
+
 1. Add `transformCascadeResultForUI()` function to orchestrator.ts
 2. Update `judge_complete` trace logging to use enriched output
 3. Add unit tests for transformation function
@@ -738,6 +780,7 @@ No external dependencies involved - this is internal data transformation.
 5. Manual UI verification (checklist provided in Validation Criteria)
 
 **Acceptance Criteria**:
+
 - [ ] Heuristic failures visible in UI amber warning box
 - [ ] Individual judge votes render when cascade reaches single_judge
 - [ ] CLEV voting panel shows 2-3 judges when cascade reaches CLEV
@@ -829,11 +872,13 @@ No external dependencies involved - this is internal data transformation.
 **Total Duration**: ~2 hours
 
 **Findings Confidence**: High (95%)
+
 - Clear data flow gap identified
 - Root cause confirmed with code evidence
 - Solution validated against UI expectations
 
 **MCP Calls Made**: 15
+
 - 10x Read (code files, types, implementations)
 - 3x Grep (search for field names, patterns)
 - 1x execute_sql (database verification)

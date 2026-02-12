@@ -369,7 +369,7 @@ export const CONTENT_LABELS: Record<
  */
 export function getContentLabels(code: string): typeof CONTENT_LABELS.en {
   const labels = CONTENT_LABELS[code as Language];
-  if (!labels) {
+  if (!labels && process.env.NODE_ENV === 'development') {
     console.warn(`[getContentLabels] Unknown language code: "${code}", falling back to English`);
   }
   return labels || CONTENT_LABELS.en;

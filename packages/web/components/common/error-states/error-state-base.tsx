@@ -42,7 +42,7 @@ export function ErrorStateBase({
 
   const containerClasses = cn(
     'flex items-center justify-center',
-    isFullpage && 'min-h-screen bg-gradient-to-br from-background via-primary/10 to-background p-4',
+    isFullpage && 'from-background via-primary/10 to-background min-h-screen bg-gradient-to-br p-4',
     isCard && 'w-full',
     isInline && 'w-full py-8',
     className
@@ -50,26 +50,25 @@ export function ErrorStateBase({
 
   const cardClasses = cn(
     'text-center',
-    isFullpage && 'bg-card/80 dark:bg-card/50 backdrop-blur-xl border border-border rounded-2xl p-8 shadow-2xl max-w-lg w-full',
-    isCard && 'bg-card/80 dark:bg-card/50 backdrop-blur-xl border border-border rounded-2xl p-8 shadow-xl',
+    isFullpage &&
+      'bg-card/80 dark:bg-card/50 border-border w-full max-w-lg rounded-2xl border p-8 shadow-2xl backdrop-blur-xl',
+    isCard &&
+      'bg-card/80 dark:bg-card/50 border-border rounded-2xl border p-8 shadow-xl backdrop-blur-xl',
     isInline && 'px-4'
   )
 
   const iconContainerClasses = cn(
-    'rounded-full flex items-center justify-center mx-auto mb-6',
-    isFullpage ? 'w-20 h-20' : 'w-16 h-16',
+    'mx-auto mb-6 flex items-center justify-center rounded-full',
+    isFullpage ? 'h-20 w-20' : 'h-16 w-16',
     iconBg
   )
 
   const iconSize = isFullpage ? 'w-10 h-10' : 'w-8 h-8'
 
-  const titleClasses = cn(
-    'font-bold text-foreground mb-4',
-    isFullpage ? 'text-3xl' : 'text-2xl'
-  )
+  const titleClasses = cn('text-foreground mb-4 font-bold', isFullpage ? 'text-3xl' : 'text-2xl')
 
   const messageClasses = cn(
-    'text-muted-foreground mb-6 max-w-lg mx-auto',
+    'text-muted-foreground mx-auto mb-6 max-w-lg',
     isFullpage ? 'text-lg' : 'text-base'
   )
 
@@ -84,13 +83,13 @@ export function ErrorStateBase({
         <p className={messageClasses}>{message}</p>
 
         {hint && (
-          <div className="mt-6 pt-6 border-t border-border">
+          <div className="border-border mt-6 border-t pt-6">
             <p className="text-muted-foreground/70 text-sm">{hint}</p>
           </div>
         )}
 
         {actions && (
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-6">
+          <div className="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row">
             {actions}
           </div>
         )}

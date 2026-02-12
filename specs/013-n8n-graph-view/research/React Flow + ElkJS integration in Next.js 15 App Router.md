@@ -22,7 +22,7 @@ const nextConfig = {
         contextRegExp: /elkjs\/lib$/,
       })
     );
-    
+
     // Client-side only: prevent fs resolution attempts
     if (!isServer) {
       config.resolve.fallback = {
@@ -30,7 +30,7 @@ const nextConfig = {
         fs: false,
       };
     }
-    
+
     return config;
   },
 };
@@ -79,11 +79,11 @@ import dynamic from 'next/dynamic';
 const FlowCanvas = dynamic(() => import('./FlowCanvas'), {
   ssr: false,
   loading: () => (
-    <div style={{ 
-      height: '100%', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center' 
+    <div style={{
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
       Loading flow editor...
     </div>
@@ -229,10 +229,10 @@ let elk: InstanceType<typeof ELK> | null = null;
 
 export function getElk() {
   if (typeof window === 'undefined') return null;
-  
+
   if (!elk) {
     elk = new ELK({
-      workerUrl: '/elk-worker.min.js'
+      workerUrl: '/elk-worker.min.js',
     });
   }
   return elk;
@@ -266,9 +266,9 @@ self.onmessage = async (event: MessageEvent) => {
     const result = await elk.layout(graph, options);
     self.postMessage({ success: true, result });
   } catch (error) {
-    self.postMessage({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Layout failed' 
+    self.postMessage({
+      success: false,
+      error: error instanceof Error ? error.message : 'Layout failed',
     });
   }
 };
@@ -285,10 +285,8 @@ export function useElkWorker() {
 
   useEffect(() => {
     // Webpack 5 native worker syntax - URL must be inline
-    workerRef.current = new Worker(
-      new URL('../workers/elk-layout.worker.ts', import.meta.url)
-    );
-    
+    workerRef.current = new Worker(new URL('../workers/elk-layout.worker.ts', import.meta.url));
+
     return () => {
       workerRef.current?.terminate();
     };
@@ -300,12 +298,12 @@ export function useElkWorker() {
         reject(new Error('Worker not initialized'));
         return;
       }
-      
-      workerRef.current.onmessage = (e) => {
+
+      workerRef.current.onmessage = e => {
         if (e.data.success) resolve(e.data.result);
         else reject(new Error(e.data.error));
       };
-      
+
       workerRef.current.postMessage({ graph });
     });
   }, []);
@@ -348,69 +346,67 @@ interface LayoutOptions {
 export function useElkLayout() {
   const { setNodes, setEdges, fitView, getNodes, getEdges } = useReactFlow();
 
-  const applyLayout = useCallback(async (options: LayoutOptions = {}) => {
-    const { 
-      direction = 'DOWN', 
-      spacing = 50, 
-      layerSpacing = 100 
-    } = options;
-    
-    const nodes = getNodes();
-    const edges = getEdges();
-    
-    if (nodes.length === 0) return;
+  const applyLayout = useCallback(
+    async (options: LayoutOptions = {}) => {
+      const { direction = 'DOWN', spacing = 50, layerSpacing = 100 } = options;
 
-    const isHorizontal = direction === 'RIGHT' || direction === 'LEFT';
+      const nodes = getNodes();
+      const edges = getEdges();
 
-    // Build ELK graph using measured dimensions (v12 requirement)
-    const graph = {
-      id: 'root',
-      layoutOptions: {
-        'elk.algorithm': 'layered',
-        'elk.direction': direction,
-        'elk.spacing.nodeNode': String(spacing),
-        'elk.layered.spacing.nodeNodeBetweenLayers': String(layerSpacing),
-        'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-      },
-      children: nodes.map((node) => ({
-        id: node.id,
-        // v12: Use node.measured for actual dimensions
-        width: node.measured?.width ?? node.width ?? DEFAULT_WIDTH,
-        height: node.measured?.height ?? node.height ?? DEFAULT_HEIGHT,
-      })),
-      edges: edges.map((edge) => ({
-        id: edge.id,
-        sources: [edge.source],
-        targets: [edge.target],
-      })),
-    };
+      if (nodes.length === 0) return;
 
-    try {
-      const layoutedGraph = await elk.layout(graph);
-      
-      const layoutedNodes = nodes.map((node) => {
-        const elkNode = layoutedGraph.children?.find((n) => n.id === node.id);
-        if (!elkNode) return node;
-        
-        return {
-          ...node,
-          position: { x: elkNode.x ?? 0, y: elkNode.y ?? 0 },
-          targetPosition: isHorizontal ? 'left' : 'top',
-          sourcePosition: isHorizontal ? 'right' : 'bottom',
-        } as Node;
-      });
+      const isHorizontal = direction === 'RIGHT' || direction === 'LEFT';
 
-      setNodes(layoutedNodes);
-      
-      // Allow DOM to update before fitting view
-      requestAnimationFrame(() => {
-        fitView({ padding: 0.1, duration: 200 });
-      });
-      
-    } catch (error) {
-      console.error('ELK layout failed:', error);
-    }
-  }, [getNodes, getEdges, setNodes, fitView]);
+      // Build ELK graph using measured dimensions (v12 requirement)
+      const graph = {
+        id: 'root',
+        layoutOptions: {
+          'elk.algorithm': 'layered',
+          'elk.direction': direction,
+          'elk.spacing.nodeNode': String(spacing),
+          'elk.layered.spacing.nodeNodeBetweenLayers': String(layerSpacing),
+          'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+        },
+        children: nodes.map(node => ({
+          id: node.id,
+          // v12: Use node.measured for actual dimensions
+          width: node.measured?.width ?? node.width ?? DEFAULT_WIDTH,
+          height: node.measured?.height ?? node.height ?? DEFAULT_HEIGHT,
+        })),
+        edges: edges.map(edge => ({
+          id: edge.id,
+          sources: [edge.source],
+          targets: [edge.target],
+        })),
+      };
+
+      try {
+        const layoutedGraph = await elk.layout(graph);
+
+        const layoutedNodes = nodes.map(node => {
+          const elkNode = layoutedGraph.children?.find(n => n.id === node.id);
+          if (!elkNode) return node;
+
+          return {
+            ...node,
+            position: { x: elkNode.x ?? 0, y: elkNode.y ?? 0 },
+            targetPosition: isHorizontal ? 'left' : 'top',
+            sourcePosition: isHorizontal ? 'right' : 'bottom',
+          } as Node;
+        });
+
+        setNodes(layoutedNodes);
+
+        // Allow DOM to update before fitting view
+        requestAnimationFrame(() => {
+          fitView({ padding: 0.1, duration: 200 });
+        });
+      } catch (error) {
+        console.error('ELK layout failed:', error);
+      }
+    },
+    [getNodes, getEdges, setNodes, fitView]
+  );
 
   return { applyLayout };
 }
@@ -534,7 +530,7 @@ export function useElkLayoutWithCleanup() {
   useEffect(() => {
     // Initialize with Web Worker
     elkRef.current = new ELK({
-      workerUrl: '/elk-worker.min.js'
+      workerUrl: '/elk-worker.min.js',
     });
 
     return () => {
@@ -559,11 +555,10 @@ export function useElkLayoutWithCleanup() {
 ```typescript
 useEffect(() => {
   let mounted = true;
-  
+
   const runLayout = async () => {
-    const { nodes: layoutedNodes, edges: layoutedEdges } = 
-      await getLayoutedGraph(nodes, edges);
-    
+    const { nodes: layoutedNodes, edges: layoutedEdges } = await getLayoutedGraph(nodes, edges);
+
     if (mounted) {
       setNodes(layoutedNodes);
       // Delay edge setting to next tick
@@ -572,9 +567,11 @@ useEffect(() => {
       }, 0);
     }
   };
-  
+
   runLayout();
-  return () => { mounted = false; };
+  return () => {
+    mounted = false;
+  };
 }, []);
 ```
 
@@ -747,7 +744,7 @@ function ElkFlow() {
       <Background />
       <Controls />
       <Panel position="top-right">
-        <button 
+        <button
           onClick={() => {
             const newDir = direction === 'DOWN' ? 'RIGHT' : 'DOWN';
             setDirection(newDir);
@@ -775,7 +772,7 @@ export default function ElkFlowEditor() {
 
 ## Conclusion
 
-Successfully integrating React Flow with ElkJS in Next.js 15 requires addressing three core challenges: preventing server-side rendering of browser-dependent components, handling ElkJS's optional `web-worker` dependency, and adapting to React Flow v12's new dimension measurement API. 
+Successfully integrating React Flow with ElkJS in Next.js 15 requires addressing three core challenges: preventing server-side rendering of browser-dependent components, handling ElkJS's optional `web-worker` dependency, and adapting to React Flow v12's new dimension measurement API.
 
 The recommended approach uses `elkjs/lib/elk.bundled.js` for simplicity unless you have 500+ nodes requiring Web Worker offloading. Always wrap React Flow in a Client Component using `next/dynamic` with `ssr: false`, and ensure the dynamic import itself lives inside a `'use client'` component—not a Server Component. For Turbopack compatibility during development, either use the bundled ElkJS version or fall back to webpack with `next dev --webpack`.
 

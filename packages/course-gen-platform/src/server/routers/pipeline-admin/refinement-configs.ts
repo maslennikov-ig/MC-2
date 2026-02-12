@@ -18,7 +18,11 @@ import { TRPCError } from '@trpc/server';
 import { router } from '../../trpc';
 import { superadminProcedure } from '../../procedures';
 import type { RefinementConfigDb, OperationMode, Json } from '@megacampus/shared-types';
-import { operationModeSchema, refinementConfigUpdateSchema, REFINEMENT_CONFIG } from '@megacampus/shared-types';
+import {
+  operationModeSchema,
+  refinementConfigUpdateSchema,
+  REFINEMENT_CONFIG,
+} from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
@@ -133,7 +137,6 @@ export const refinementConfigsRouter = router({
     try {
       const supabase = getSupabaseAdmin();
 
-      
       const { data, error } = await supabase
         .from(REFINEMENT_CONFIG_TABLE)
         .select('*, users:created_by(email)')
@@ -197,7 +200,10 @@ export const refinementConfigsRouter = router({
         }
 
         // 2. Optimistic locking: check version
-        if (input.expectedVersion !== undefined && currentConfig.version !== input.expectedVersion) {
+        if (
+          input.expectedVersion !== undefined &&
+          currentConfig.version !== input.expectedVersion
+        ) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: `Configuration was modified by another user. Expected version ${input.expectedVersion}, but current version is ${currentConfig.version}. Please refresh and try again.`,
@@ -235,15 +241,20 @@ export const refinementConfigsRouter = router({
           timeout_ms: input.timeoutMs ?? currentConfig.timeout_ms,
 
           regression_tolerance: input.regressionTolerance ?? currentConfig.regression_tolerance,
-          section_lock_after_edits: input.sectionLockAfterEdits ?? currentConfig.section_lock_after_edits,
+          section_lock_after_edits:
+            input.sectionLockAfterEdits ?? currentConfig.section_lock_after_edits,
           convergence_threshold: input.convergenceThreshold ?? currentConfig.convergence_threshold,
 
-          max_concurrent_patchers: input.maxConcurrentPatchers ?? currentConfig.max_concurrent_patchers,
+          max_concurrent_patchers:
+            input.maxConcurrentPatchers ?? currentConfig.max_concurrent_patchers,
           adjacent_section_gap: input.adjacentSectionGap ?? currentConfig.adjacent_section_gap,
-          sequential_for_regenerations: input.sequentialForRegenerations ?? currentConfig.sequential_for_regenerations,
+          sequential_for_regenerations:
+            input.sequentialForRegenerations ?? currentConfig.sequential_for_regenerations,
 
-          krippendorff_high_agreement: input.krippendorffHighAgreement ?? currentConfig.krippendorff_high_agreement,
-          krippendorff_moderate_agreement: input.krippendorffModerateAgreement ?? currentConfig.krippendorff_moderate_agreement,
+          krippendorff_high_agreement:
+            input.krippendorffHighAgreement ?? currentConfig.krippendorff_high_agreement,
+          krippendorff_moderate_agreement:
+            input.krippendorffModerateAgreement ?? currentConfig.krippendorff_moderate_agreement,
 
           token_costs: currentConfig.token_costs,
           readability: currentConfig.readability,
@@ -276,7 +287,7 @@ export const refinementConfigsRouter = router({
             operationMode: currentConfig.operation_mode,
             oldVersion: currentConfig.version,
             newVersion,
-            changes: Object.keys(input).filter((k) => k !== 'id' && k !== 'expectedVersion'),
+            changes: Object.keys(input).filter(k => k !== 'id' && k !== 'expectedVersion'),
           },
           { failOnError: true }
         );
@@ -331,7 +342,9 @@ export const refinementConfigsRouter = router({
         // Type cast needed until migration is applied and types regenerated
         let query = supabase
           .from(REFINEMENT_CONFIG_TABLE)
-          .select('id, version, accept_threshold, good_enough_threshold, max_iterations, created_at, created_by, users:created_by(email)')
+          .select(
+            'id, version, accept_threshold, good_enough_threshold, max_iterations, created_at, created_by, users:created_by(email)'
+          )
           .eq('operation_mode', input.operationMode)
           .eq('config_type', input.configType)
           .order('version', { ascending: false });
@@ -342,7 +355,21 @@ export const refinementConfigsRouter = router({
           query = query.is('course_id', null);
         }
 
-        const { data, error } = await query as { data: any[] | null; error: any };
+        interface ConfigHistoryItem {
+          id: string;
+          version: number;
+          accept_threshold: number;
+          good_enough_threshold: number;
+          max_iterations: number;
+          created_at: string;
+          created_by: string | null;
+          users: { email: string } | { email: string }[] | null;
+        }
+
+        const { data, error } = (await query) as {
+          data: ConfigHistoryItem[] | null;
+          error: { message: string } | null;
+        };
 
         if (error) {
           throw new TRPCError({
@@ -351,7 +378,7 @@ export const refinementConfigsRouter = router({
           });
         }
 
-        return (data || []).map((item) => ({
+        return (data || []).map(item => ({
           id: item.id,
           version: item.version,
           acceptThreshold: Number(item.accept_threshold),
@@ -359,7 +386,9 @@ export const refinementConfigsRouter = router({
           maxIterations: item.max_iterations,
           createdAt: item.created_at,
           createdBy: item.created_by,
-          createdByEmail: (item.users as { email: string } | null)?.email || null,
+          createdByEmail: Array.isArray(item.users)
+            ? item.users[0]?.email
+            : item.users?.email || null,
         }));
       } catch (error: unknown) {
         if (error instanceof TRPCError) {
@@ -434,7 +463,10 @@ export const refinementConfigsRouter = router({
         }
 
         // 3. Optimistic locking
-        if (input.expectedCurrentVersion !== undefined && currentActive.version !== input.expectedCurrentVersion) {
+        if (
+          input.expectedCurrentVersion !== undefined &&
+          currentActive.version !== input.expectedCurrentVersion
+        ) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: `Configuration was modified. Expected version ${input.expectedCurrentVersion}, but current is ${currentActive.version}.`,
@@ -449,7 +481,13 @@ export const refinementConfigsRouter = router({
 
         // 5. Insert copy of target as new version
         const newVersion = currentActive.version + 1;
-        const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, ...targetFields } = targetConfig;
+        const {
+          id: _id,
+          created_at: _ca,
+          updated_at: _ua,
+          created_by: _cb,
+          ...targetFields
+        } = targetConfig;
 
         const { data: insertedConfig, error: insertError } = await supabase
           .from(REFINEMENT_CONFIG_TABLE)
@@ -469,12 +507,19 @@ export const refinementConfigsRouter = router({
           });
         }
 
-        await logPipelineAction(ctx.user.id, 'update_refinement_config', 'refinement_config', insertedConfig.id, {
-          action: 'revert',
-          operationMode: input.operationMode,
-          targetVersion: input.targetVersion,
-          newVersion,
-        }, { failOnError: true });
+        await logPipelineAction(
+          ctx.user.id,
+          'update_refinement_config',
+          'refinement_config',
+          insertedConfig.id,
+          {
+            action: 'revert',
+            operationMode: input.operationMode,
+            targetVersion: input.targetVersion,
+            newVersion,
+          },
+          { failOnError: true }
+        );
 
         logger.info(
           {
@@ -538,7 +583,11 @@ export const refinementConfigsRouter = router({
           .maybeSingle();
 
         // Optimistic locking
-        if (input.expectedCurrentVersion !== undefined && currentActive && currentActive.version !== input.expectedCurrentVersion) {
+        if (
+          input.expectedCurrentVersion !== undefined &&
+          currentActive &&
+          currentActive.version !== input.expectedCurrentVersion
+        ) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: `Configuration was modified. Expected version ${input.expectedCurrentVersion}, but current is ${currentActive.version}.`,
@@ -595,11 +644,18 @@ export const refinementConfigsRouter = router({
           });
         }
 
-        await logPipelineAction(ctx.user.id, 'update_refinement_config', 'refinement_config', insertedConfig.id, {
-          action: 'reset_to_default',
-          operationMode: input.operationMode,
-          newVersion: nextVersion,
-        }, { failOnError: true });
+        await logPipelineAction(
+          ctx.user.id,
+          'update_refinement_config',
+          'refinement_config',
+          insertedConfig.id,
+          {
+            action: 'reset_to_default',
+            operationMode: input.operationMode,
+            newVersion: nextVersion,
+          },
+          { failOnError: true }
+        );
 
         logger.info(
           {

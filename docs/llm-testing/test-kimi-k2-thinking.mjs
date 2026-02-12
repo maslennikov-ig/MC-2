@@ -345,7 +345,11 @@ function assessContentQuality(output, type, language) {
     }
 
     const allText = JSON.stringify(output).toLowerCase();
-    if (allText.includes('lorem ipsum') || allText.includes('todo') || allText.includes('[insert]')) {
+    if (
+      allText.includes('lorem ipsum') ||
+      allText.includes('todo') ||
+      allText.includes('[insert]')
+    ) {
       score -= 0.15;
     }
   } else {
@@ -363,7 +367,11 @@ function assessContentQuality(output, type, language) {
     }
 
     const allText = JSON.stringify(output).toLowerCase();
-    if (allText.includes('lorem ipsum') || allText.includes('todo') || allText.includes('[insert]')) {
+    if (
+      allText.includes('lorem ipsum') ||
+      allText.includes('todo') ||
+      allText.includes('[insert]')
+    ) {
       score -= 0.15;
     }
   }
@@ -389,7 +397,7 @@ async function callOpenRouter(prompt, maxTokens = 8000) {
   const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -503,11 +511,7 @@ async function runTests() {
         result.schemaCompliance = validateLessonSchema(result.output);
       }
 
-      result.contentQuality = assessContentQuality(
-        result.output,
-        testCase.type,
-        testCase.language
-      );
+      result.contentQuality = assessContentQuality(result.output, testCase.type, testCase.language);
 
       const detectedLanguage = detectLanguage(outputContent);
       result.language_consistency = detectedLanguage === testCase.language;
@@ -515,7 +519,9 @@ async function runTests() {
       result.status = result.schemaCompliance ? 'success' : 'failed';
 
       console.log(`  ✓ Success`);
-      console.log(`    - Tokens: ${result.totalTokens} (input: ${result.inputTokens}, output: ${result.outputTokens})`);
+      console.log(
+        `    - Tokens: ${result.totalTokens} (input: ${result.inputTokens}, output: ${result.outputTokens})`
+      );
       console.log(`    - Cost: $${result.costUSD.toFixed(6)}`);
       console.log(`    - Duration: ${result.durationMs}ms`);
       console.log(`    - Schema Compliant: ${result.schemaCompliance}`);
@@ -556,8 +562,8 @@ function generateMarkdownReport(results) {
 | **Failed** | ${results.filter(r => r.status === 'failed').length} |
 | **Errors** | ${results.filter(r => r.status === 'error').length} |
 | **Total Cost** | $${results.reduce((sum, r) => sum + r.costUSD, 0).toFixed(4)} |
-| **Average Quality Score** | ${(results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length * 100).toFixed(1)}% |
-| **Schema Compliance Rate** | ${(results.filter(r => r.schemaCompliance).length / results.length * 100).toFixed(1)}% |
+| **Average Quality Score** | ${((results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length) * 100).toFixed(1)}% |
+| **Schema Compliance Rate** | ${((results.filter(r => r.schemaCompliance).length / results.length) * 100).toFixed(1)}% |
 | **Total Duration** | ${results.reduce((sum, r) => sum + r.durationMs, 0)}ms |
 | **Avg Duration per Test** | ${(results.reduce((sum, r) => sum + r.durationMs, 0) / results.length).toFixed(0)}ms |
 
@@ -594,9 +600,7 @@ function generateMarkdownReport(results) {
       const outputPreview = JSON.stringify(result.output, null, 2);
       md += `**Output Preview**:
 \`\`\`json
-${outputPreview.substring(0, 1000)}${
-        outputPreview.length > 1000 ? '\n... (truncated)' : ''
-      }
+${outputPreview.substring(0, 1000)}${outputPreview.length > 1000 ? '\n... (truncated)' : ''}
 \`\`\`
 
 `;
@@ -665,8 +669,8 @@ Actual pricing should be verified from OpenRouter API documentation.
 | Metric | Target | Actual | Status |
 |--------|--------|--------|--------|
 | Average Quality | ≥ 0.75 | ${(results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length).toFixed(3)} | ${results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length >= 0.75 ? '✓' : '✗'} |
-| Schema Compliance | ≥ 95% | ${(results.filter(r => r.schemaCompliance).length / results.length * 100).toFixed(1)}% | ${results.filter(r => r.schemaCompliance).length / results.length >= 0.95 ? '✓' : '✗'} |
-| Success Rate | 100% | ${(results.filter(r => r.status === 'success').length / results.length * 100).toFixed(1)}% | ${results.filter(r => r.status === 'success').length === results.length ? '✓' : '✗'} |
+| Schema Compliance | ≥ 95% | ${((results.filter(r => r.schemaCompliance).length / results.length) * 100).toFixed(1)}% | ${results.filter(r => r.schemaCompliance).length / results.length >= 0.95 ? '✓' : '✗'} |
+| Success Rate | 100% | ${((results.filter(r => r.status === 'success').length / results.length) * 100).toFixed(1)}% | ${results.filter(r => r.status === 'success').length === results.length ? '✓' : '✗'} |
 
 ---
 
@@ -680,8 +684,8 @@ ${
 
 **Strengths**:
 - All tests passed successfully (${results.filter(r => r.status === 'success').length}/${results.length})
-- Average quality score: ${(results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length * 100).toFixed(1)}% (≥75% required)
-- Schema compliance rate: ${(results.filter(r => r.schemaCompliance).length / results.length * 100).toFixed(1)}% (≥95% required)
+- Average quality score: ${((results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length) * 100).toFixed(1)}% (≥75% required)
+- Schema compliance rate: ${((results.filter(r => r.schemaCompliance).length / results.length) * 100).toFixed(1)}% (≥95% required)
 - Average cost per test: $${(totalCost / results.length).toFixed(6)}
 
 **Next Steps**:
@@ -694,8 +698,8 @@ ${
 
 **Issues Detected**:
 ${results.filter(r => r.status !== 'success').length > 0 ? `- ${results.filter(r => r.status !== 'success').length} test(s) failed or errored` : ''}
-${results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length < 0.75 ? `- Average quality (${(results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length * 100).toFixed(1)}%) below 75% threshold` : ''}
-${results.filter(r => r.schemaCompliance).length / results.length < 0.95 ? `- Schema compliance (${(results.filter(r => r.schemaCompliance).length / results.length * 100).toFixed(1)}%) below 95% threshold` : ''}
+${results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length < 0.75 ? `- Average quality (${((results.reduce((sum, r) => sum + r.contentQuality, 0) / results.length) * 100).toFixed(1)}%) below 75% threshold` : ''}
+${results.filter(r => r.schemaCompliance).length / results.length < 0.95 ? `- Schema compliance (${((results.filter(r => r.schemaCompliance).length / results.length) * 100).toFixed(1)}%) below 95% threshold` : ''}
 
 **Recommendations**:
 1. Adjust prompts for better schema adherence

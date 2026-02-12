@@ -19,6 +19,7 @@
 **Position**: Always the first phase in tasks.md execution
 
 **Responsibilities**:
+
 1. **Task Analysis**:
    - Review all tasks from tasks.md
    - Classify each as PARALLEL or SEQUENTIAL execution
@@ -43,6 +44,7 @@
    - Sequential tasks: 1 agent run, wait for completion, then next agent run
 
 **Output**: Updated tasks.md with:
+
 - `[EXECUTOR: name]` annotations
 - `[SEQUENTIAL]` or `[PARALLEL-GROUP-X]` markers
 - Meta-agent creation tasks if needed
@@ -54,10 +56,12 @@
 **When**: Planning phase, after subagent assignment
 
 **Classification**:
+
 - **Simple Research**: Questions with clear answer path, solvable with agent + existing tools
 - **Complex Research**: Questions without obvious answers, require deep investigation
 
 **Simple Research Workflow**:
+
 1. Agent identifies question
 2. Agent uses available tools (Grep, Read, WebSearch, Context7, Supabase docs)
 3. Agent formulates answer
@@ -65,6 +69,7 @@
 5. Continue to next task
 
 **Complex Research Workflow**:
+
 1. Agent identifies complex question without clear answer
 2. Agent creates detailed English prompt for deepresearch:
    - **File**: `{FEATURE_DIR}/research/{topic-slug}.md`
@@ -78,6 +83,7 @@
 8. Continue to next task
 
 **Output**:
+
 - Research findings documented
 - Complex research prompts in `{FEATURE_DIR}/research/` if needed
 - Updated tasks.md with research-informed decisions
@@ -87,12 +93,14 @@
 ### C. ORCHESTRATION RULES (Enhanced)
 
 **Main Agent Role**: Orchestrator ONLY
+
 - Execute trivial tasks directly (1-2 line fixes, imports, single npm install)
 - Delegate ALL complex tasks to subagents
 - NEVER implement multi-file changes directly
 - NEVER implement logic changes directly
 
 **Before Delegation**:
+
 1. **Gather Full Context** (MANDATORY):
    - Read existing code in target files
    - Search codebase for similar patterns (Grep, Glob)
@@ -107,6 +115,7 @@
    - Patterns to follow (examples from codebase)
 
 **After Delegation**:
+
 1. **Detailed Verification**:
    - Read ALL modified files
    - Run `pnpm type-check` (or relevant validation)
@@ -121,6 +130,7 @@
    - Loop until accepted (no limit, quality over speed)
 
 **Commit Strategy** (DECISION: Per-Task Commits):
+
 - **When**: After EACH task marked completed
 - **Command**: `/push patch`
 - **Before commit**:
@@ -139,11 +149,13 @@
 ### D. IMPLEMENT COMMAND EXECUTION MODEL (Enhanced)
 
 **Task Discovery**:
+
 - Find FIRST incomplete task in tasks.md (not last)
 - Respect phase order: Setup → Tests → Core → Integration → Polish
 - Within phase: respect dependencies and sequential markers
 
 **Execution Loop** (Per Task):
+
 ```
 1. UPDATE TODO: Mark task `in_progress` in TodoWrite
 2. CHECK EXECUTOR:
@@ -164,6 +176,7 @@
 ```
 
 **Critical Rules**:
+
 - NEVER skip verification
 - NEVER proceed if task failed
 - NEVER batch commits (1 task = 1 commit)
@@ -178,6 +191,7 @@
 #### A. `speckit.implement.md`
 
 **Changes**:
+
 1. Add orchestration reminder blockquote (already done in generation-json)
 2. Update step 3 (Load context) to include research/ directory:
    ```markdown
@@ -188,15 +202,15 @@
    4. **PLANNING PHASE** (Execute Before Implementation):
       - Review all tasks and classify execution model (parallel vs sequential)
       - **Subagent Assignment** (Phase 0):
-        * [EXECUTOR: MAIN] - ONLY for trivial tasks (1-2 line fixes, simple imports, single dependency install)
-        * For complex tasks: thoroughly examine existing subagents, assign only if 100% match
-        * If no 100% match: assign FUTURE agent name (to be created) - `[EXECUTOR: future-agent-name]`
-        * After all assignments: if FUTURE agents exist, launch N meta-agent-v3 calls in single message
-        * After agent creation: ask user to restart claude-code
+        - [EXECUTOR: MAIN] - ONLY for trivial tasks (1-2 line fixes, simple imports, single dependency install)
+        - For complex tasks: thoroughly examine existing subagents, assign only if 100% match
+        - If no 100% match: assign FUTURE agent name (to be created) - `[EXECUTOR: future-agent-name]`
+        - After all assignments: if FUTURE agents exist, launch N meta-agent-v3 calls in single message
+        - After agent creation: ask user to restart claude-code
       - Annotate tasks with `[EXECUTOR: name]` and `[SEQUENTIAL]`/`[PARALLEL-GROUP-X]`
       - Handle research tasks:
-        * Simple: solve with agent tools
-        * Complex: create research prompt in research/, wait for user deepresearch
+        - Simple: solve with agent tools
+        - Complex: create research prompt in research/, wait for user deepresearch
       - Output: Updated tasks.md with executor annotations
    ```
 4. Update step 6 (Execution Strategy) to clarify task discovery:
@@ -217,11 +231,12 @@
 #### B. `speckit.tasks.md`
 
 **Changes**:
+
 1. Add research task classification in outline:
    ```markdown
    - **Research Tasks**: Questions without obvious answers
-     * Simple: Agent solves with available tools
-     * Complex: Create research prompt → wait for deepresearch → incorporate
+     - Simple: Agent solves with available tools
+     - Complex: Create research prompt → wait for deepresearch → incorporate
    ```
 2. Add planning phase instructions:
    ```markdown
@@ -232,6 +247,7 @@
 #### C. `speckit.plan.md`
 
 **Changes**:
+
 1. Add research considerations to tech stack analysis:
    ```markdown
    - If tech decisions unclear, classify as research task
@@ -241,6 +257,7 @@
 #### D. `speckit.specify.md` & `speckit.clarify.md`
 
 **Changes**:
+
 1. Add note about research questions:
    ```markdown
    - If clarifications reveal complex unknowns, flag for research phase
@@ -253,29 +270,35 @@
 #### A. `tasks.md` Template
 
 **Add Planning Phase Template**:
+
 ```markdown
 ## Phase 0: Planning
 
 ### P001: Task Analysis & Executor Assignment
+
 **Description**: Analyze all tasks, assign executors (MAIN for trivial, existing if 100% match, FUTURE otherwise)
 **Executor**: MAIN
 **Dependencies**: None
 **Output**:
+
 - All tasks annotated with [EXECUTOR: name] or [EXECUTOR: future-agent-name]
 - All tasks marked [SEQUENTIAL] or [PARALLEL-GROUP-X]
 - List of FUTURE agents to create (if any)
-**Artifacts**: Updated tasks.md
+  **Artifacts**: Updated tasks.md
 
 ### P002: Research Task Resolution
+
 **Description**: Identify and resolve research questions (simple: solve now, complex: create prompts)
 **Executor**: MAIN
 **Dependencies**: P001
 **Output**:
+
 - Simple research: documented findings
 - Complex research: prompts in research/ directory
-**Artifacts**: research/*.md (if complex research needed)
+  **Artifacts**: research/\*.md (if complex research needed)
 
 ### P003: Meta-Agent Subagent Creation (if needed)
+
 **Description**: Create FUTURE agents using meta-agent-v3, then ask user to restart claude-code
 **Executor**: meta-agent-v3
 **Dependencies**: P001
@@ -294,6 +317,7 @@
 #### A. `check-prerequisites.sh`
 
 **Changes**:
+
 1. Add research directory check:
    ```bash
    # Check for research directory
@@ -314,9 +338,12 @@
 #### A. `CLAUDE.md`
 
 **Changes**:
+
 1. Update "Main Pattern: You Are The Orchestrator" section, step 6 (Execution Pattern):
+
    ```markdown
    FOR EACH TASK:
+
    1. Read task description
    2. GATHER FULL CONTEXT (code + docs + patterns + history + research)
    3. Delegate to subagent OR execute directly (trivial only)
@@ -329,10 +356,12 @@
    ```
 
 2. Add new section after "Main Pattern":
+
    ```markdown
    ### Planning Phase (ALWAYS First)
 
    Before implementing any tasks:
+
    - Analyze task execution model (parallel/sequential)
    - Assign executors: MAIN for trivial only, existing subagents if 100% match, FUTURE agents otherwise
    - Create FUTURE agents: launch N meta-agent-v3 calls in single message, then ask restart
@@ -344,10 +373,12 @@
    ```
 
 3. Update "COMMIT STRATEGY" section:
+
    ```markdown
    **5. COMMIT STRATEGY**
 
    Run `/push patch` after EACH completed task (not batched):
+
    - Mark task [X] in tasks.md
    - Add artifacts to task description
    - Update TodoWrite to completed
@@ -359,6 +390,7 @@
 #### B. `docs/Agents Ecosystem/AGENT-ORCHESTRATION.md`
 
 **Changes**:
+
 1. Add "Planning Phase" section before "Orchestration Patterns"
 2. Add "Research Task Workflow" section
 3. Update orchestration patterns with atomicity rule
@@ -369,6 +401,7 @@
 ## Implementation Steps (How to Apply)
 
 ### Step 1: Update speckit.implement.md
+
 1. Open `.claude/commands/speckit.implement.md`
 2. Add orchestration blockquote after frontmatter (if not present)
 3. Add research/ to step 3 context loading
@@ -379,6 +412,7 @@
 8. Save file
 
 ### Step 2: Update CLAUDE.md
+
 1. Open `CLAUDE.md`
 2. Update step 6 in "Execution Pattern"
 3. Add "Planning Phase" section (with FUTURE agents logic)
@@ -386,29 +420,34 @@
 5. Save file
 
 ### Step 3: Update tasks.md Template
+
 1. Open `.specify/templates/tasks.md`
 2. Add "Phase 0: Planning" section at top
 3. Add P001 (with FUTURE agents logic), P002, P003 (with restart prompt) tasks
 4. Save file
 
 ### Step 4: Update Other Commands
+
 1. Update `speckit.tasks.md` - add research classification
 2. Update `speckit.plan.md` - add research considerations
 3. Update `speckit.specify.md` and `speckit.clarify.md` - add research notes
 4. Save all files
 
 ### Step 5: Update Scripts
+
 1. Open `.specify/scripts/bash/check-prerequisites.sh`
 2. Add research directory check
 3. Add research files to JSON output
 4. Save file
 
 ### Step 6: Update Documentation
+
 1. Update `docs/Agents Ecosystem/AGENT-ORCHESTRATION.md`
 2. Add planning phase, research workflow, atomicity examples
 3. Save file
 
 ### Step 7: Test Workflow
+
 1. Create test feature in specs/
 2. Run `/speckit.specify` - verify research question handling
 3. Run `/speckit.tasks` - verify planning phase in tasks.md
@@ -452,16 +491,19 @@ After applying all updates:
 ## Recent Updates
 
 **Change 1**: Enhanced subagent assignment with FUTURE agents logic
+
 - Strict rules: MAIN for trivial, existing if 100% match, FUTURE otherwise
 - FUTURE agents: launch N meta-agent-v3 calls in single message, ask restart
 - Updated: speckit.implement.md, speckit.tasks.md, tasks-template.md, CLAUDE.md
 
 **Change 2**: Clarified "single message" rule for ALL parallel tasks
+
 - Parallel execution applies to all agents, not just meta-agent
 - Updated atomicity rule: launch N agent calls in single message
 - Updated: speckit.implement.md, tasks-template.md, CLAUDE.md, this document
 
 **Change 3**: Optimized CLAUDE.md and all templates for token efficiency
+
 - CLAUDE.md: Added CRITICAL verification rule, removed duplicates (net -18 lines, -12%)
 - tasks-template.md: Removed emojis (5 instances)
 - checklist-template.md: Condensed comments (40 → 27 lines, -33%)

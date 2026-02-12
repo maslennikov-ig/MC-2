@@ -6,7 +6,7 @@
  * Test Coverage:
  * - generation.generate: Course structure generation initiation with validation
  * - generation.getStatus: Progress tracking and organization isolation
- * - generation.regenerateSection: Section regeneration with ownership validation
+ * - regeneration.regenerateSection: Section regeneration with ownership validation
  * - Input validation: Invalid UUIDs, missing fields, schema violations
  * - RLS enforcement: FORBIDDEN/NOT_FOUND errors for wrong organization
  * - Error handling: Already generating, concurrency limits, ownership violations
@@ -39,8 +39,8 @@ import { appRouter } from '../../src/server/app-router';
 import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
-import { getWorker, stopWorker } from '../../src/orchestrator/worker';
 import { closeQueue } from '../../src/orchestrator/queue';
+import { getAuthToken, clearTokenCache } from '../helpers/auth-token';
 
 // ============================================================================
 // Type Definitions
@@ -183,118 +183,16 @@ function createTestClient(port: number, token?: string) {
   });
 }
 
-// Token cache: key = email, value = { token, expiresAt }
-// Tokens are cached for 50 minutes (Supabase default TTL is 1 hour)
-const TOKEN_CACHE = new Map<string, { token: string; expiresAt: number }>();
-const TOKEN_CACHE_TTL_MS = 50 * 60 * 1000; // 50 minutes
-
-/**
- * Sign in with Supabase and get JWT token
- *
- * Features:
- * - Token caching to avoid rate limiting (reuses tokens for 50 min)
- * - Exponential backoff with jitter (1s, 2s, 4s, 8s, 16s max)
- * - Rate limit detection (429, "rate limit" in error message)
- * - Transient error handling (database errors, connection issues)
- *
- * @param email - User email
- * @param password - User password
- * @param retries - Max retry attempts (default: 5)
- * @returns JWT access token
- */
-async function getAuthToken(email: string, password: string, retries = 5): Promise<string> {
-  // Check cache first
-  const cached = TOKEN_CACHE.get(email);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.token;
-  }
-
-  const { createClient } = await import('@supabase/supabase-js');
-  const authClient = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
-    auth: { persistSession: false }, // Don't persist in tests
-  });
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const { data, error } = await authClient.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (!error && data.session?.access_token) {
-        // Cache the token
-        const token = data.session.access_token;
-        TOKEN_CACHE.set(email, {
-          token,
-          expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
-        });
-        return token;
-      }
-
-      // Determine if error is retryable
-      const errorMessage = error?.message || '';
-      const errorStatus = (error as any)?.status;
-      const isRateLimit =
-        errorStatus === 429 ||
-        errorMessage.toLowerCase().includes('rate limit') ||
-        errorMessage.toLowerCase().includes('too many requests');
-      const isTransient =
-        isRateLimit ||
-        errorMessage.toLowerCase().includes('database error') ||
-        errorMessage.toLowerCase().includes('connection') ||
-        errorMessage.toLowerCase().includes('timeout');
-
-      if (!isTransient || attempt === retries) {
-        throw new Error(
-          `Failed to authenticate user ${email} after ${attempt} attempts: ${errorMessage || 'No session returned'}`
-        );
-      }
-
-      // Exponential backoff with jitter: base * 2^(attempt-1) + random jitter
-      // Results in: ~1s, ~2s, ~4s, ~8s, ~16s (capped at 16s)
-      const baseDelay = 1000;
-      const exponentialDelay = Math.min(baseDelay * Math.pow(2, attempt - 1), 16000);
-      const jitter = Math.random() * 500; // 0-500ms jitter
-      const delay = exponentialDelay + jitter;
-
-      console.log(
-        `Auth attempt ${attempt}/${retries} failed for ${email} (${isRateLimit ? 'rate limited' : 'transient error'}), ` +
-          `retrying in ${Math.round(delay)}ms...`
-      );
-      await new Promise(resolve => setTimeout(resolve, delay));
-    } catch (e) {
-      // Re-throw if it's our own error or last attempt
-      if (e instanceof Error && e.message.includes('Failed to authenticate')) {
-        throw e;
-      }
-      if (attempt === retries) {
-        throw new Error(`Failed to authenticate user ${email} after ${retries} attempts: ${e}`);
-      }
-
-      // Exponential backoff for unexpected errors
-      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 16000);
-      console.log(`Auth attempt ${attempt}/${retries} threw unexpected error, retrying in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-
-  throw new Error(`Failed to authenticate user ${email}: unexpected error`);
-}
-
 /**
  * Create test course with specific generation status
  *
- * Valid generation_status enum values:
- * - 'pending' (queued, waiting to start)
- * - 'initializing' (Step 1: Initialization)
- * - 'processing_documents' (Step 2: Processing uploaded files)
- * - 'analyzing_task' (Step 2: Analyzing task, no files)
- * - 'generating_structure' (Step 3: Creating course structure)
- * - 'generating_content' (Step 4: Generating lessons)
- * - 'finalizing' (Step 5: Finalizing course)
- * - 'completed' (Generation finished successfully)
- * - 'failed' (Generation failed with error)
- * - 'cancelled' (User cancelled generation)
+ * Valid generation_status enum values (stage-based):
+ * - 'pending', 'cancelled', 'completed', 'failed', 'finalizing'
+ * - 'stage_2_init', 'stage_2_processing', 'stage_2_complete', 'stage_2_awaiting_approval'
+ * - 'stage_3_init', 'stage_3_summarizing', 'stage_3_complete', 'stage_3_awaiting_approval'
+ * - 'stage_4_init', 'stage_4_analyzing', 'stage_4_clarifying', 'stage_4_complete', 'stage_4_awaiting_approval'
+ * - 'stage_5_init', 'stage_5_generating', 'stage_5_complete', 'stage_5_awaiting_approval'
+ * - 'stage_6_init', 'stage_6_generating', 'stage_6_complete'
  *
  * @param title - Course title
  * @param generationStatus - Generation status to set
@@ -394,7 +292,6 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 describe('Contract: Generation Router', () => {
   let testServer: TestServer;
   let serverPort: number;
-  let worker: any;
   let testCourseIds: string[] = [];
 
   beforeAll(async () => {
@@ -410,9 +307,11 @@ describe('Contract: Generation Router', () => {
     testServer = await startTestServer();
     serverPort = testServer.port;
 
-    // Start BullMQ worker for job processing
-    worker = getWorker(1);
-    console.log('BullMQ worker started for test job processing');
+    // NOTE: BullMQ worker is NOT started for contract tests.
+    // Contract tests verify API contracts (input validation, error codes, response shapes)
+    // and do not require actual job processing. Jobs added to the queue will remain queued.
+    // Starting a worker with useWorkerThreads:true causes ESM resolution errors in vitest
+    // (BullMQ's main-worker.js imports './main-base' without .js extension).
 
     console.log(`Test server ready on port ${serverPort}`);
   }, 30000);
@@ -436,12 +335,8 @@ describe('Contract: Generation Router', () => {
   afterAll(async () => {
     console.log('Tearing down generation contract tests...');
 
-    // Stop worker BEFORE server
-    if (worker) {
-      console.log('Stopping BullMQ worker...');
-      await stopWorker(false);
-      await closeQueue();
-    }
+    // Close BullMQ queue (no worker to stop — contract tests don't start one)
+    await closeQueue();
 
     // Stop server
     if (testServer) {
@@ -450,6 +345,9 @@ describe('Contract: Generation Router', () => {
 
     // Cleanup test fixtures
     await cleanupTestFixtures();
+
+    // Clear cached auth tokens (singleton cleanup)
+    clearTokenCache();
 
     // Cleanup auth users
     const supabase = getSupabaseAdmin();
@@ -597,8 +495,11 @@ describe('Contract: Generation Router', () => {
       const token = await getAuthToken(TEST_USERS.instructor1.email, 'test-password-123');
       const client = createTestClient(serverPort, token);
 
-      // And: A course with generation in progress (using 'generating_structure' status)
-      const courseId = await createTestCourse('Test Course - Already Generating', 'generating_structure');
+      // And: A course with generation in progress (using 'stage_5_generating' status)
+      const courseId = await createTestCourse(
+        'Test Course - Already Generating',
+        'stage_5_generating'
+      );
       testCourseIds.push(courseId);
 
       // When: Attempting to start generation again
@@ -697,8 +598,8 @@ describe('Contract: Generation Router', () => {
       const token = await getAuthToken(TEST_USERS.instructor1.email, 'test-password-123');
       const client = createTestClient(serverPort, token);
 
-      // And: A course with known status (using 'generating_structure')
-      const courseId = await createTestCourse('Test Course - Get Status', 'generating_structure');
+      // And: A course with known status (using 'stage_5_generating')
+      const courseId = await createTestCourse('Test Course - Get Status', 'stage_5_generating');
       testCourseIds.push(courseId);
 
       // When: Getting generation status
@@ -829,10 +730,10 @@ describe('Contract: Generation Router', () => {
   });
 
   // ==========================================================================
-  // Test Suite 3: generation.regenerateSection
+  // Test Suite 3: regeneration.regenerateSection
   // ==========================================================================
 
-  describe('generation.regenerateSection', () => {
+  describe('regeneration.regenerateSection', () => {
     // ==========================================================================
     // Test 1: Valid Request
     // ==========================================================================
@@ -853,7 +754,7 @@ describe('Contract: Generation Router', () => {
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          result = await client.generation.regenerateSection.mutate({
+          result = await client.regeneration.regenerateSection.mutate({
             courseId,
             sectionNumber: 1,
           });
@@ -900,7 +801,7 @@ describe('Contract: Generation Router', () => {
       // When: Attempting to regenerate section 0 (invalid)
       // Then: Should throw BAD_REQUEST error
       try {
-        await client.generation.regenerateSection.mutate({
+        await client.regeneration.regenerateSection.mutate({
           courseId,
           sectionNumber: 0,
         });
@@ -927,7 +828,7 @@ describe('Contract: Generation Router', () => {
 
       // Then: Should throw NOT_FOUND error
       try {
-        await client.generation.regenerateSection.mutate({
+        await client.regeneration.regenerateSection.mutate({
           courseId: nonExistentCourseId,
           sectionNumber: 1,
         });
@@ -953,7 +854,7 @@ describe('Contract: Generation Router', () => {
 
       // Then: Should throw UNAUTHORIZED error
       try {
-        await client.generation.regenerateSection.mutate({
+        await client.regeneration.regenerateSection.mutate({
           courseId,
           sectionNumber: 1,
         });
@@ -1009,7 +910,7 @@ describe('Contract: Generation Router', () => {
       // When: Attempting to regenerate section for course owned by different user
       // Then: Should throw FORBIDDEN error
       try {
-        await client.generation.regenerateSection.mutate({
+        await client.regeneration.regenerateSection.mutate({
           courseId: course.id,
           sectionNumber: 1,
         });

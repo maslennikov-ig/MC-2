@@ -97,7 +97,7 @@ export const generateOnDemand = protectedProcedure
       if (!isOnDemandType(enrichmentType)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Enrichment type '${enrichmentType}' cannot be generated on-demand.`,
+          message: `Enrichment type '${String(enrichmentType)}' cannot be generated on-demand.`,
         });
       }
 
@@ -234,7 +234,6 @@ export const generateOnDemand = protectedProcedure
         userId: currentUser.id,
         organizationId: currentUser.organizationId,
         settings: settings || {},
-        retryAttempt: 0,
         isDraftPhase: isTwoStageType(enrichmentType),
       };
 

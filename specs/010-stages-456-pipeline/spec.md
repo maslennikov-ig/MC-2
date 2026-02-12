@@ -23,13 +23,14 @@
 
 ### Research References
 
-| Topic | Status | Document |
-|-------|--------|----------|
-| Stage 6 Generation Strategy | ✅ Completed | [Optimal Strategy Report](../docs/research/010-stage6-generation-strategy/Optimal%20Strategy%20for%20Educational%20Lesson%20Content%20Generation%20Research%20Report.md) |
-| LLM Content Generation Architecture | ✅ Completed | [LLM Content Generation Strategy](../docs/research/010-stage6-generation-strategy/LLM%20Content%20Generation%20Strategy%20Research.md) |
-| Model Selection Decisions | ✅ Documented | [MODEL-SELECTION-DECISIONS.md](../docs/MODEL-SELECTION-DECISIONS.md) |
+| Topic                               | Status        | Document                                                                                                                                                                 |
+| ----------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Stage 6 Generation Strategy         | ✅ Completed  | [Optimal Strategy Report](../docs/research/010-stage6-generation-strategy/Optimal%20Strategy%20for%20Educational%20Lesson%20Content%20Generation%20Research%20Report.md) |
+| LLM Content Generation Architecture | ✅ Completed  | [LLM Content Generation Strategy](../docs/research/010-stage6-generation-strategy/LLM%20Content%20Generation%20Strategy%20Research.md)                                   |
+| Model Selection Decisions           | ✅ Documented | [MODEL-SELECTION-DECISIONS.md](../docs/MODEL-SELECTION-DECISIONS.md)                                                                                                     |
 
 **Key Research Findings**:
+
 - **Skeleton-of-Thought**: НЕ рекомендован для образовательного контента (40% деградация coherence)
 - **Выбранный подход**: **Hybrid Map-Reduce-Refine через LangGraph** (production-grade)
   - Planner → Parallel Expanders → Assembler → Smoother

@@ -214,12 +214,14 @@ export function getLLMFixerMetrics(): {
 } {
   return {
     ...llmFixerMetrics,
-    successRate: llmFixerMetrics.totalAttempts > 0
-      ? llmFixerMetrics.successfulFixes / llmFixerMetrics.totalAttempts
-      : 0,
-    avgTokensPerFix: llmFixerMetrics.successfulFixes > 0
-      ? llmFixerMetrics.totalTokensUsed / llmFixerMetrics.successfulFixes
-      : 0,
+    successRate:
+      llmFixerMetrics.totalAttempts > 0
+        ? llmFixerMetrics.successfulFixes / llmFixerMetrics.totalAttempts
+        : 0,
+    avgTokensPerFix:
+      llmFixerMetrics.successfulFixes > 0
+        ? llmFixerMetrics.totalTokensUsed / llmFixerMetrics.successfulFixes
+        : 0,
   };
 }
 
@@ -354,11 +356,7 @@ export async function fixMermaidWithLLM(
     const systemPrompt = buildSystemPrompt(diagramType);
 
     // Create LLM instance
-    const model = createOpenRouterModel(
-      LLM_MODEL_ID,
-      LLM_TEMPERATURE,
-      LLM_MAX_TOKENS
-    );
+    const model = createOpenRouterModel(LLM_MODEL_ID, LLM_TEMPERATURE, LLM_MAX_TOKENS);
 
     // Configure timeout
     model.timeout = LLM_TIMEOUT;

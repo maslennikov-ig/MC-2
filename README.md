@@ -21,6 +21,7 @@ MegaCampusAI provides robust infrastructure for building AI-powered educational 
 **What the Platform Provides:**
 
 **Core Infrastructure (Stage 0):**
+
 - Multi-tenant database schema with RLS policies
 - Organization and subscription tier management
 - User authentication and role-based authorization
@@ -33,6 +34,7 @@ MegaCampusAI provides robust infrastructure for building AI-powered educational 
 - CI/CD pipeline with automated testing
 
 **Course Generation (Stage 5 - Complete):**
+
 - LangGraph-powered course structure generation
 - Multi-model AI routing (qwen3-max, OSS 120B, Gemini)
 - Title-only generation with model knowledge synthesis
@@ -80,13 +82,13 @@ MegaCampusAI provides robust infrastructure for building AI-powered educational 
 
 ### Version Requirements
 
-| Dependency | Minimum Version | Recommended |
-|------------|----------------|-------------|
-| Node.js | 20.0.0 | 20.11+ (LTS) |
-| pnpm | 8.0.0 | 8.15+ |
-| TypeScript | 5.3.3 | 5.3+ |
-| PostgreSQL | 15.0 | 15.6+ (via Supabase) |
-| Redis | 7.0 | 7.2+ |
+| Dependency | Minimum Version | Recommended          |
+| ---------- | --------------- | -------------------- |
+| Node.js    | 20.0.0          | 20.11+ (LTS)         |
+| pnpm       | 8.0.0           | 8.15+                |
+| TypeScript | 5.3.3           | 5.3+                 |
+| PostgreSQL | 15.0            | 15.6+ (via Supabase) |
+| Redis      | 7.0             | 7.2+                 |
 
 ## Monorepo Structure
 
@@ -144,6 +146,7 @@ megacampus2/
 **`packages/course-gen-platform/`**
 
 Main application server providing:
+
 - tRPC API endpoints with authentication
 - BullMQ job orchestration and handlers
 - Document processing pipeline (Docling integration)
@@ -156,6 +159,7 @@ Main application server providing:
 **`packages/shared-types/`**
 
 Centralized type definitions:
+
 - Auto-generated database types (Supabase schema)
 - Zod schemas for API input/output validation
 - BullMQ job data types
@@ -164,6 +168,7 @@ Centralized type definitions:
 **`packages/trpc-client-sdk/`** (Planned)
 
 External client library for consuming the tRPC API:
+
 - Type-safe API client factory
 - Authentication helpers
 - Error handling utilities
@@ -283,13 +288,13 @@ For complete API documentation, see [packages/course-gen-platform/README.md](pac
 
 ### Error Codes
 
-| Code | Description | Response |
-|------|-------------|----------|
-| 401 | Unauthorized | Missing or invalid JWT token |
-| 403 | Forbidden | Insufficient role permissions |
-| 422 | Validation Error | Invalid input (Zod schema failure) |
-| 413 | Payload Too Large | File exceeds 100MB limit |
-| 507 | Storage Quota Exceeded | Organization storage quota exceeded |
+| Code | Description            | Response                            |
+| ---- | ---------------------- | ----------------------------------- |
+| 401  | Unauthorized           | Missing or invalid JWT token        |
+| 403  | Forbidden              | Insufficient role permissions       |
+| 422  | Validation Error       | Invalid input (Zod schema failure)  |
+| 413  | Payload Too Large      | File exceeds 100MB limit            |
+| 507  | Storage Quota Exceeded | Organization storage quota exceeded |
 
 ## Features
 
@@ -408,12 +413,12 @@ For complete API documentation, see [packages/course-gen-platform/README.md](pac
 
 MegaCampusAI supports four subscription tiers with graduated feature access:
 
-| Tier | File Uploads | Allowed Formats | Storage Quota | File Count/Course |
-|------|-------------|-----------------|---------------|-------------------|
-| **FREE** | Prohibited | None | 10 MB | 0 |
-| **BASIC** | Allowed | TXT, MD | 100 MB | 1 |
-| **STANDARD** | Allowed | PDF, DOCX, PPTX, HTML, TXT, MD | 1 GB | 3 |
-| **PREMIUM** | Allowed | All formats + images (PNG, JPG, GIF, SVG, WebP) | 10 GB | 10 |
+| Tier         | File Uploads | Allowed Formats                                 | Storage Quota | File Count/Course |
+| ------------ | ------------ | ----------------------------------------------- | ------------- | ----------------- |
+| **FREE**     | Prohibited   | None                                            | 10 MB         | 0                 |
+| **BASIC**    | Allowed      | TXT, MD                                         | 100 MB        | 1                 |
+| **STANDARD** | Allowed      | PDF, DOCX, PPTX, HTML, TXT, MD                  | 1 GB          | 3                 |
+| **PREMIUM**  | Allowed      | All formats + images (PNG, JPG, GIF, SVG, WebP) | 10 GB         | 10                |
 
 **Additional Constraints:**
 
@@ -433,11 +438,11 @@ MegaCampusAI supports four subscription tiers with graduated feature access:
 
 ### Role-based Access Control
 
-| Role | Permissions |
-|------|-------------|
-| **Admin** | Full organization access, user management, tier configuration |
+| Role           | Permissions                                                        |
+| -------------- | ------------------------------------------------------------------ |
+| **Admin**      | Full organization access, user management, tier configuration      |
 | **Instructor** | Create/update/delete own courses, upload files, manage enrollments |
-| **Student** | Read-only access to enrolled courses, no file uploads |
+| **Student**    | Read-only access to enrolled courses, no file uploads              |
 
 ### Authentication
 
@@ -522,6 +527,7 @@ type(scope): subject
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -531,6 +537,7 @@ type(scope): subject
 - `chore`: Maintenance tasks
 
 **Example:**
+
 ```
 feat(api): add semantic search endpoint
 
@@ -591,6 +598,7 @@ See [docs/release-process.md](docs/release-process.md) for details.
 **Current Release**: v0.16.28 - Course Structure Generation
 
 **Latest Feature**: Stage 5 Course Structure Generation (Complete)
+
 - LangGraph 5-phase orchestration (validate → metadata → sections → quality → assembly)
 - Multi-model AI routing (qwen3-max, OSS 120B, Gemini)
 - Quality validation with Jina-v3 semantic similarity (≥0.75 threshold)
@@ -599,6 +607,7 @@ See [docs/release-process.md](docs/release-process.md) for details.
 - 9 services (~4500 lines) + 5 utilities (~2000 lines)
 
 **Completed Stages**:
+
 - ✅ Stage 0: Foundation Infrastructure
 - ✅ Stage 1: Document Upload and Processing
 - ✅ Stage 2: Vector Database Integration
@@ -607,6 +616,7 @@ See [docs/release-process.md](docs/release-process.md) for details.
 - ✅ Stage 5: Course Structure Generation
 
 **Next Steps**:
+
 - Stage 6: Multi-format lesson content generation
 - Stage 7: Interactive course player UI
 - Enhanced analytics dashboard

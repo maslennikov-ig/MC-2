@@ -8,12 +8,15 @@
 
 import { logger } from '@/shared/logger';
 import type { EnrichmentType } from '@megacampus/shared-types';
-import type {
-  EnrichmentHandlerInput,
-  DraftResult,
-  GenerateResult,
-} from '../types';
-import { quizHandler, videoHandler, audioHandler, presentationHandler, coverHandler, cardHandler } from '../handlers';
+import type { EnrichmentHandlerInput, DraftResult, GenerateResult } from '../types';
+import {
+  quizHandler,
+  videoHandler,
+  audioHandler,
+  presentationHandler,
+  coverHandler,
+  cardHandler,
+} from '../handlers';
 
 /**
  * Enrichment handler interface
@@ -33,6 +36,8 @@ export interface EnrichmentHandler {
    * Generate final content
    * For single-stage: generates complete content
    * For two-stage: generates final content from approved draft
+   *
+   * Sync handlers must wrap result in Promise.resolve() for interface compatibility.
    */
   generate: (input: EnrichmentHandlerInput) => Promise<GenerateResult>;
 
@@ -40,10 +45,7 @@ export interface EnrichmentHandler {
    * Generate final content from draft
    * Only required for two-stage flow
    */
-  generateFinal?: (
-    input: EnrichmentHandlerInput,
-    draft: DraftResult
-  ) => Promise<GenerateResult>;
+  generateFinal?: (input: EnrichmentHandlerInput, draft: DraftResult) => Promise<GenerateResult>;
 }
 
 // Quiz, audio, presentation, and video handlers imported from handlers/
@@ -57,7 +59,7 @@ export interface EnrichmentHandler {
 const documentHandler: EnrichmentHandler = {
   generationFlow: 'single-stage',
 
-  async generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
+  generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
     const { enrichmentContext } = input;
 
     logger.info(
@@ -80,7 +82,7 @@ const documentHandler: EnrichmentHandler = {
 
     const durationMs = Date.now() - startTime;
 
-    return {
+    return Promise.resolve({
       content,
       metadata: {
         generated_at: new Date().toISOString(),
@@ -90,7 +92,7 @@ const documentHandler: EnrichmentHandler = {
         quality_score: 1.0,
         retry_attempts: 0,
       },
-    };
+    });
   },
 };
 

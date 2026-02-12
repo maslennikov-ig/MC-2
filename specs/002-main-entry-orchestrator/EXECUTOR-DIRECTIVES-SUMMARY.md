@@ -5,17 +5,20 @@
 **Status**: Complete annotation for all 31 tasks
 
 ## Phase 1: Setup
+
 - **T001** [EXECUTOR: MAIN] [SEQUENTIAL] ✅ DONE - Pino installed
 - **T002** [EXECUTOR: MAIN] [SEQUENTIAL] ✅ DONE - Infrastructure verified
 
 ## Phase 2: Foundational
 
 ### Database Migrations (database-architect)
+
 - **T003** [EXECUTOR: database-architect] [SEQUENTIAL] [BLOCKING] ✅ DONE
 - **T004** [EXECUTOR: database-architect] [SEQUENTIAL] [BLOCKING] ✅ DONE
 - **T005** [EXECUTOR: database-architect] [SEQUENTIAL] [BLOCKING] ✅ DONE
 
 ### Core Utilities (MAIN + infrastructure-specialist)
+
 - **T006** [EXECUTOR: MAIN] [PARALLEL-GROUP-A: with T007,T008] - Pino logger
 - **T007** [EXECUTOR: MAIN] [PARALLEL-GROUP-A: with T006,T008] - System metrics types
 - **T008** [EXECUTOR: MAIN] [PARALLEL-GROUP-A: with T006,T007] - Concurrency types
@@ -90,7 +93,9 @@
 ## Parallel Groups Execution
 
 ### PARALLEL-GROUP-A (3 tasks in 1 message)
+
 Launch T006+T007+T008 simultaneously via MAIN:
+
 ```
 Message with 3 tool uses:
 1. Edit(logger/index.ts) - Pino replacement
@@ -99,7 +104,9 @@ Message with 3 tool uses:
 ```
 
 ### PARALLEL-GROUP-B (2 tasks in 1 message)
+
 Launch T023+T024 simultaneously via MAIN:
+
 ```
 Message with 2 tool uses:
 1. Read(course-viewer-enhanced.tsx) - Verify JSONB
@@ -107,7 +114,9 @@ Message with 2 tool uses:
 ```
 
 ### PARALLEL-GROUP-C (4 tasks in 1 message)
+
 Launch T027+T028+T030+T031 simultaneously via MAIN:
+
 ```
 Message with 4 tool uses:
 1. Grep/Read - Error handling review

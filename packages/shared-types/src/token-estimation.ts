@@ -25,35 +25,35 @@
  */
 export const CHARS_PER_TOKEN_BY_LANGUAGE: Record<string, number> = {
   // Latin scripts (~4 chars/token)
-  en: 4,    // English
-  es: 4,    // Spanish
-  fr: 4,    // French
-  de: 4,    // German
-  pt: 4,    // Portuguese
-  it: 4,    // Italian
-  pl: 3.5,  // Polish (some diacritics)
-  tr: 4,    // Turkish (Latin)
-  id: 4,    // Indonesian (Latin)
-  ms: 4,    // Malay (Latin)
+  en: 4, // English
+  es: 4, // Spanish
+  fr: 4, // French
+  de: 4, // German
+  pt: 4, // Portuguese
+  it: 4, // Italian
+  pl: 3.5, // Polish (some diacritics)
+  tr: 4, // Turkish (Latin)
+  id: 4, // Indonesian (Latin)
+  ms: 4, // Malay (Latin)
 
   // Cyrillic (~3 chars/token)
-  ru: 3,    // Russian
+  ru: 3, // Russian
 
   // CJK scripts (~1.5-2 chars/token) - most expensive
-  zh: 1.5,  // Chinese (each character often = 1+ token)
-  ja: 2,    // Japanese (mix of kanji, hiragana, katakana)
-  ko: 2,    // Korean (Hangul syllable blocks)
+  zh: 1.5, // Chinese (each character often = 1+ token)
+  ja: 2, // Japanese (mix of kanji, hiragana, katakana)
+  ko: 2, // Korean (Hangul syllable blocks)
 
   // Arabic script (~2.5 chars/token)
-  ar: 2.5,  // Arabic
+  ar: 2.5, // Arabic
 
   // Indic scripts (~2.5 chars/token)
-  hi: 2.5,  // Hindi (Devanagari)
-  bn: 2.5,  // Bengali
+  hi: 2.5, // Hindi (Devanagari)
+  bn: 2.5, // Bengali
 
   // Southeast Asian
-  th: 2,    // Thai (no spaces, complex script)
-  vi: 3.5,  // Vietnamese (Latin with many diacritics)
+  th: 2, // Thai (no spaces, complex script)
+  vi: 3.5, // Vietnamese (Latin with many diacritics)
 };
 
 /** Default chars per token for unknown languages */
@@ -68,25 +68,25 @@ const DEFAULT_CHARS_PER_TOKEN = 4;
  * Formula: englishCharsPerToken / languageCharsPerToken
  */
 export const TOKEN_MULTIPLIER_BY_LANGUAGE: Record<string, number> = {
-  en: 1.0,    // baseline
+  en: 1.0, // baseline
   es: 1.0,
   fr: 1.0,
   de: 1.0,
   pt: 1.0,
   it: 1.0,
-  pl: 1.14,   // 4/3.5
+  pl: 1.14, // 4/3.5
   tr: 1.0,
   id: 1.0,
   ms: 1.0,
-  ru: 1.33,   // 4/3 - Russian needs 33% more tokens
-  zh: 2.67,   // 4/1.5 - Chinese needs 167% more tokens
-  ja: 2.0,    // 4/2 - Japanese needs 100% more tokens
-  ko: 2.0,    // 4/2 - Korean needs 100% more tokens
-  ar: 1.6,    // 4/2.5 - Arabic needs 60% more tokens
-  hi: 1.6,    // 4/2.5
-  bn: 1.6,    // 4/2.5
-  th: 2.0,    // 4/2 - Thai needs 100% more tokens
-  vi: 1.14,   // 4/3.5
+  ru: 1.33, // 4/3 - Russian needs 33% more tokens
+  zh: 2.67, // 4/1.5 - Chinese needs 167% more tokens
+  ja: 2.0, // 4/2 - Japanese needs 100% more tokens
+  ko: 2.0, // 4/2 - Korean needs 100% more tokens
+  ar: 1.6, // 4/2.5 - Arabic needs 60% more tokens
+  hi: 1.6, // 4/2.5
+  bn: 1.6, // 4/2.5
+  th: 2.0, // 4/2 - Thai needs 100% more tokens
+  vi: 1.14, // 4/3.5
 };
 
 /**
@@ -108,10 +108,7 @@ export const TOKEN_MULTIPLIER_BY_LANGUAGE: Record<string, number> = {
  * // Chinese text - more tokens per character
  * const zhTokens = estimateTokenCount('你好世界', 'zh'); // ~3 tokens (4 chars / 1.5)
  */
-export function estimateTokenCount(
-  text: string | string[],
-  language: string = 'en'
-): number {
+export function estimateTokenCount(text: string | string[], language: string = 'en'): number {
   const charsPerToken = getCharsPerToken(language);
 
   if (Array.isArray(text)) {

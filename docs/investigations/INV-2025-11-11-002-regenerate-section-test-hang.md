@@ -4,7 +4,7 @@ status: completed
 timestamp: 2025-11-11T00:00:00Z
 investigator: Claude Code (Investigation Agent)
 test_file: tests/contract/generation.test.ts
-affected_test: "should regenerate section successfully (lines 855-900)"
+affected_test: 'should regenerate section successfully (lines 855-900)'
 priority: high
 test_status: 16/17 passing (last failing test)
 ---
@@ -20,11 +20,13 @@ test_status: 16/17 passing (last failing test)
 **Recommended Solution**: Add `timeout: 60000` (60 seconds) to ChatOpenAI initialization in production code. For contract tests, implement LLM mocking strategy since contract tests should validate API contracts, not LLM quality.
 
 **Impact**:
+
 - Production: Users experience indefinite waits during section regeneration if API is slow
 - Tests: Test suite hangs for >3 minutes, blocking CI/CD pipeline
 - Cost: Wasted API credits if requests eventually time out at system level
 
 **Key Findings**:
+
 1. LangChain ChatOpenAI supports `timeout` parameter (confirmed via Context7 documentation)
 2. Test has 3-layer retry logic (test: 3 retries, generator: 2 retries, critique-revise: 2 retries) = max 12 LLM calls
 3. WITHOUT timeout, a SINGLE hung LLM call blocks entire test indefinitely
@@ -37,12 +39,14 @@ test_status: 16/17 passing (last failing test)
 ### Observed Behavior
 
 **Test Execution Flow**:
+
 1. Test calls `client.generation.regenerateSection.mutate({ courseId, sectionNumber: 1 })`
 2. Test has built-in retry logic (3 attempts with 2-second delays)
 3. Test hangs for >3 minutes (exceeds test framework timeout)
 4. Test fails with timeout error
 
 **Console Output** (from earlier investigation):
+
 ```
 Layer 2: Model instance required
 UnifiedRegenerator: All layers exhausted
@@ -50,6 +54,7 @@ Failed to generate section batch 1 (section 0) after 2 attempts
 ```
 
 **Current Status**:
+
 - Previous investigation (INV-2025-11-11-001) identified "Layer 2: Model instance required"
 - Fix WAS applied: `model: model` added at line 454 in section-batch-generator.ts
 - 2 of 3 originally failing tests NOW PASS
@@ -77,9 +82,11 @@ Failed to generate section batch 1 (section 0) after 2 attempts
 ### Hypotheses Tested
 
 #### Hypothesis 1: Test hangs in retry loop logic
+
 **Status**: ❌ REJECTED
 
 **Evidence**:
+
 - Test retry loop (lines 869-886): maxRetries=3, 2-second delays
 - generateWithRetry() loop (lines 435-584): maxAttempts=2, exponential backoff
 - critiqueAndRevise() loop (lines 116-162): maxRetries=2
@@ -89,9 +96,11 @@ Failed to generate section batch 1 (section 0) after 2 attempts
 **Conclusion**: Retry logic is bounded, cannot cause infinite hang.
 
 #### Hypothesis 2: Database query hangs
+
 **Status**: ❌ REJECTED
 
 **Evidence**:
+
 - Database queries in section-regeneration-service.ts (lines 133, 350, 411)
 - Queries have RLS filters and organization_id checks
 - Other tests pass with same database setup
@@ -100,6 +109,7 @@ Failed to generate section batch 1 (section 0) after 2 attempts
 **Conclusion**: Database not the hang point.
 
 #### Hypothesis 3: LLM API call hangs due to missing timeout
+
 **Status**: ✅ CONFIRMED (ROOT CAUSE)
 
 **Evidence**:
@@ -107,6 +117,7 @@ Failed to generate section batch 1 (section 0) after 2 attempts
 **File**: `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
 
 **Code Analysis** (lines 825-843):
+
 ```typescript
 private createModel(modelId: string): ChatOpenAI {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -131,14 +142,16 @@ private createModel(modelId: string): ChatOpenAI {
 ```
 
 **Context7 Documentation Evidence** (from /langchain-ai/langchainjs):
+
 ```typescript
 const primaryModel = new ChatOpenAI({
-  model: "gpt-4o",
-  timeout: 5000,  // ← TIMEOUT PARAMETER SUPPORTED
+  model: 'gpt-4o',
+  timeout: 5000, // ← TIMEOUT PARAMETER SUPPORTED
 });
 ```
 
 **Execution Flow**:
+
 1. Test → regenerateSection endpoint (generation.ts:1310)
 2. Endpoint → SectionRegenerationService.regenerateSection() (line 273)
 3. Service → sectionBatchGenerator.generateBatch()
@@ -151,20 +164,22 @@ const primaryModel = new ChatOpenAI({
 **Conclusion**: Missing timeout configuration is the root cause.
 
 #### Hypothesis 4: Minimal test data causes LLM quality issues
+
 **Status**: ✅ CONFIRMED (CONTRIBUTING FACTOR)
 
 **Evidence**:
 
 **Test Fixture** (lines 356-403):
+
 ```typescript
 async function createTestCourseWithStructure(title: string): Promise<string> {
   const mockStructure = {
     course_title: title,
-    course_description: 'Test course description',  // Generic
+    course_description: 'Test course description', // Generic
     sections: [
       {
-        section_title: 'Section 1',  // Minimal title
-        section_description: 'First section',  // Minimal description
+        section_title: 'Section 1', // Minimal title
+        section_description: 'First section', // Minimal description
         lessons: [
           { lesson_title: 'Lesson 1.1', lesson_objective: 'Learn basics' },
           { lesson_title: 'Lesson 1.2', lesson_objective: 'Practice basics' },
@@ -178,12 +193,14 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ```
 
 **Analysis**:
+
 - Course title: "Test Course - Regenerate Section" (no domain context)
 - Section titles: Generic ("Section 1", "First section")
 - Lesson objectives: Minimal ("Learn basics")
 - No rich educational content for LLM context
 
 **Impact**:
+
 - LLM struggles to generate quality educational content from minimal context
 - More likely to produce invalid JSON structure
 - Quality validation may fail more frequently
@@ -195,17 +212,21 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ### Files Examined
 
 **Service Implementation** (3 files):
+
 - `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts` (lines 422-587, 825-843)
 - `packages/course-gen-platform/src/services/stage5/section-regeneration-service.ts` (lines 108-452)
 - `packages/course-gen-platform/src/shared/regeneration/unified-regenerator.ts` (lines 176-385)
 
 **Regeneration Layers** (1 file):
+
 - `packages/course-gen-platform/src/shared/regeneration/layers/layer-2-critique-revise.ts` (lines 98-166)
 
 **Test Files** (1 file):
+
 - `packages/course-gen-platform/tests/contract/generation.test.ts` (lines 855-900, 356-403)
 
 **tRPC Endpoint** (1 file):
+
 - `packages/course-gen-platform/src/server/routers/generation.ts` (lines 1310-1448)
 
 ### Commands Executed
@@ -224,6 +245,7 @@ grep -rn "OPENAI_TIMEOUT|LLM.*timeout|model.*timeout" src/
 ### MCP Server Usage
 
 **Context7 MCP** (Tier 1 - MANDATORY):
+
 - Library: `/langchain-ai/langchainjs`
 - Topic: "ChatOpenAI timeout configuration"
 - Finding: **ChatOpenAI supports `timeout` parameter (in milliseconds)**
@@ -231,12 +253,13 @@ grep -rn "OPENAI_TIMEOUT|LLM.*timeout|model.*timeout" src/
 - Key Quote:
   ```typescript
   const primaryModel = new ChatOpenAI({
-    model: "gpt-4o",
-    timeout: 5000,  // 5 seconds
+    model: 'gpt-4o',
+    timeout: 5000, // 5 seconds
   });
   ```
 
 **Sequential Thinking MCP**:
+
 - Used for multi-step reasoning through execution flow
 - 8 thoughts total to trace hang location and validate hypothesis
 - Identified: Missing timeout → LLM call hangs → test hangs forever
@@ -254,6 +277,7 @@ grep -rn "OPENAI_TIMEOUT|LLM.*timeout|model.*timeout" src/
 **Mechanism of Failure**:
 
 1. **Model Creation** (line 834-842):
+
    ```typescript
    return new ChatOpenAI({
      modelName: modelId,
@@ -266,6 +290,7 @@ grep -rn "OPENAI_TIMEOUT|LLM.*timeout|model.*timeout" src/
    ```
 
 2. **LLM Invocation** (line 447):
+
    ```typescript
    const response = await model.invoke(prompt);
    ```
@@ -284,22 +309,23 @@ grep -rn "OPENAI_TIMEOUT|LLM.*timeout|model.*timeout" src/
 **Supporting Evidence**:
 
 From Context7 LangChain documentation:
+
 ```typescript
 // Example showing timeout usage in fallback scenarios
 const primaryModel = new ChatOpenAI({
-  model: "gpt-4o",
-  timeout: 5000,  // Timeout after 5 seconds
+  model: 'gpt-4o',
+  timeout: 5000, // Timeout after 5 seconds
 });
 
 const fallbackModel = new ChatAnthropic({
-  model: "claude-3-5-sonnet-20241022",
+  model: 'claude-3-5-sonnet-20241022',
 });
 
-const modelWithFallbacks = primaryModel
-  .withFallbacks([fallbackModel]);
+const modelWithFallbacks = primaryModel.withFallbacks([fallbackModel]);
 ```
 
 **Why This Matters**:
+
 - LangChain DOES support timeout configuration
 - Timeout prevents indefinite waits
 - Allows proper error handling and retry logic to function
@@ -312,34 +338,40 @@ const modelWithFallbacks = primaryModel
 **Location**: `tests/contract/generation.test.ts:356-403`
 
 **Issue**: Test fixture provides minimal educational context:
+
 - Generic course title
 - Minimal section descriptions
 - Basic lesson objectives
 - No domain-specific content
 
 **Impact**:
+
 - LLM struggles to generate quality content
 - Higher likelihood of invalid JSON
 - More retry attempts needed
 - Compounds timeout problem (more chances to hang)
 
 **Not Root Cause Because**:
+
 - Even with perfect test data, missing timeout would still cause hangs if API is slow
 - Other tests with similar data structures pass (they don't trigger section regeneration)
 
 #### Factor 2: Multiple Retry Layers
 
 **Locations**:
+
 - Test retry: lines 869-886 (3 attempts)
 - Generator retry: lines 435-584 (2 attempts)
 - Critique-revise retry: lines 116-162 in layer-2-critique-revise.ts (2 attempts)
 
 **Issue**: 3 nested retry layers create complex interaction:
+
 - Total possible LLM calls: 3 × 2 × 2 = 12
 - Each call could potentially hang
 - More opportunities for timeout issue to manifest
 
 **Not Root Cause Because**:
+
 - Retry logic is BOUNDED (not infinite)
 - Retries are GOOD practice for LLM non-determinism
 - Problem is that individual calls hang, not that retries exist
@@ -361,6 +393,7 @@ const modelWithFallbacks = primaryModel
 **Location**: Lines 834-842 (createModel method)
 
 **Change**:
+
 ```typescript
 return new ChatOpenAI({
   modelName: modelId,
@@ -375,18 +408,21 @@ return new ChatOpenAI({
 ```
 
 **Rationale**:
+
 - 60 seconds is reasonable for complex educational content generation
 - Prevents indefinite hangs
 - Allows retry logic to function properly
 - Consistent with OpenRouter API SLA (typically 30-60 second responses)
 
 **Validation Criteria**:
+
 - Test completes within 2 minutes (allows for retries)
 - If LLM times out, test fails with clear timeout error (not hang)
 - Timeout error triggers test retry logic
 - Production section regeneration fails fast (not hang indefinitely)
 
 **Pros**:
+
 - ✅ Simple one-line fix
 - ✅ Addresses root cause directly
 - ✅ Benefits both tests and production
@@ -394,6 +430,7 @@ return new ChatOpenAI({
 - ✅ Aligns with LangChain best practices
 
 **Cons**:
+
 - ⚠️ May cause legitimate long-running requests to fail (mitigated by 60s being generous)
 - ⚠️ Requires testing to find optimal timeout value
 
@@ -418,6 +455,7 @@ return new ChatOpenAI({
 **Location**: Lines 834-842
 
 **Change**:
+
 ```typescript
 return new ChatOpenAI({
   modelName: modelId,
@@ -433,16 +471,19 @@ return new ChatOpenAI({
 ```
 
 **Validation Criteria**:
+
 - Tests use 30-second timeout
 - Production uses 60-second timeout
 - Both environments fail fast on slow APIs
 
 **Pros**:
+
 - ✅ Faster test execution
 - ✅ More production tolerance for complex generation
 - ✅ Clear separation of concerns
 
 **Cons**:
+
 - ⚠️ More complex (environment-dependent behavior)
 - ⚠️ Tests may not catch production timeout issues
 
@@ -467,6 +508,7 @@ return new ChatOpenAI({
 Create test utility to mock LLM responses:
 
 **New File**: `tests/contract/mocks/llm-mock.ts`
+
 ```typescript
 import { ChatOpenAI } from '@langchain/openai';
 
@@ -491,12 +533,12 @@ export function createMockChatOpenAI(): ChatOpenAI {
               lesson_objective: 'Valid learning objective at Remember level',
               blooms_level: 'Remember',
               content: 'Lesson content',
-              exercises: []
-            }
-          ]
-        }
-      ]
-    })
+              exercises: [],
+            },
+          ],
+        },
+      ],
+    }),
   });
 
   return mockModel;
@@ -508,6 +550,7 @@ export function createMockChatOpenAI(): ChatOpenAI {
 Mock the entire generator to return pre-defined valid sections:
 
 **Test File**: `tests/contract/generation.test.ts`
+
 ```typescript
 import { vi } from 'vitest';
 import { SectionBatchGenerator } from '@/services/stage5/section-batch-generator';
@@ -516,25 +559,29 @@ import { SectionBatchGenerator } from '@/services/stage5/section-batch-generator
 vi.mock('@/services/stage5/section-batch-generator', () => ({
   SectionBatchGenerator: vi.fn().mockImplementation(() => ({
     generateBatch: vi.fn().mockResolvedValue({
-      sections: [/* valid mock section */],
+      sections: [
+        /* valid mock section */
+      ],
       modelUsed: 'mock-model',
       tier: 'tier1_oss120b',
       tokensUsed: 1000,
       retryCount: 0,
       complexityScore: 0.5,
       criticalityScore: 0.5,
-    })
-  }))
+    }),
+  })),
 }));
 ```
 
 **Validation Criteria**:
+
 - Contract tests run in <10 seconds (no real LLM calls)
 - Tests validate tRPC endpoint behavior (auth, RLS, input validation)
 - Tests do NOT validate LLM response quality (separate integration tests for that)
 - Tests are deterministic (no LLM non-determinism)
 
 **Pros**:
+
 - ✅ Fast, deterministic tests
 - ✅ No API costs during testing
 - ✅ Tests focus on contract validation (auth, RLS, error handling)
@@ -542,6 +589,7 @@ vi.mock('@/services/stage5/section-batch-generator', () => ({
 - ✅ Follows testing best practices
 
 **Cons**:
+
 - ⚠️ Doesn't test real LLM integration (need separate integration tests)
 - ⚠️ Mock data must match real LLM output schema (maintenance burden)
 
@@ -566,23 +614,27 @@ vi.mock('@/services/stage5/section-batch-generator', () => ({
 **Location**: Lines 356-403 (createTestCourseWithStructure)
 
 **Change**:
+
 ```typescript
 async function createTestCourseWithStructure(title: string): Promise<string> {
   const mockStructure = {
-    course_title: 'Introduction to Software Testing',  // Specific domain
-    course_description: 'Learn the fundamentals of software testing, including unit testing, integration testing, and test-driven development. Understand testing frameworks, best practices, and how to write effective test cases.',
+    course_title: 'Introduction to Software Testing', // Specific domain
+    course_description:
+      'Learn the fundamentals of software testing, including unit testing, integration testing, and test-driven development. Understand testing frameworks, best practices, and how to write effective test cases.',
     sections: [
       {
-        section_title: 'Testing Fundamentals',  // Clear topic
-        section_description: 'Introduction to software testing concepts, types of testing, and the testing lifecycle. Understand why testing is critical for software quality.',
+        section_title: 'Testing Fundamentals', // Clear topic
+        section_description:
+          'Introduction to software testing concepts, types of testing, and the testing lifecycle. Understand why testing is critical for software quality.',
         lessons: [
           {
             lesson_title: 'Introduction to Software Testing',
-            lesson_objective: 'Define software testing and identify three main types of testing'
+            lesson_objective: 'Define software testing and identify three main types of testing',
           },
           {
             lesson_title: 'Testing Lifecycle and Best Practices',
-            lesson_objective: 'Explain the software testing lifecycle phases and apply best practices'
+            lesson_objective:
+              'Explain the software testing lifecycle phases and apply best practices',
           },
         ],
       },
@@ -594,16 +646,19 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ```
 
 **Validation Criteria**:
+
 - LLM produces valid JSON more frequently
 - Fewer retry attempts needed
 - Test execution time reduced
 
 **Pros**:
+
 - ✅ More realistic test data
 - ✅ Better LLM success rate
 - ✅ Faster test execution (fewer retries)
 
 **Cons**:
+
 - ⚠️ Doesn't address root cause (timeout still needed)
 - ⚠️ More maintenance burden for test fixtures
 - ⚠️ LLM quality still non-deterministic
@@ -644,31 +699,34 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ### Files to Modify
 
 **Required Changes**:
+
 1. `packages/course-gen-platform/src/services/stage5/section-batch-generator.ts`
    - Line 834-842: Add `timeout: 60000` to ChatOpenAI config
    - Validation: Run contract test, verify no hang
 
-**Recommended Changes**:
-2. `packages/course-gen-platform/tests/contract/generation.test.ts`
-   - Mock SectionBatchGenerator for contract test
-   - Validation: Test runs in <10 seconds
+**Recommended Changes**: 2. `packages/course-gen-platform/tests/contract/generation.test.ts`
 
-**Optional Changes**:
-3. `packages/course-gen-platform/tests/contract/generation.test.ts`
-   - Lines 356-403: Improve test fixture data
-   - Validation: Fewer LLM failures in integration tests
+- Mock SectionBatchGenerator for contract test
+- Validation: Test runs in <10 seconds
+
+**Optional Changes**: 3. `packages/course-gen-platform/tests/contract/generation.test.ts`
+
+- Lines 356-403: Improve test fixture data
+- Validation: Fewer LLM failures in integration tests
 
 ### Testing Strategy
 
 **Unit Tests**: Not applicable (no new logic, just configuration)
 
 **Contract Tests**:
+
 - Run `pnpm test tests/contract/generation.test.ts`
 - Expected: "should regenerate section successfully" test completes in <30 seconds
 - If timeout occurs: Clear timeout error (not hang)
 - If mocking implemented: Test completes in <10 seconds
 
 **Integration Tests** (if created):
+
 - Separate integration test suite for real LLM quality validation
 - Use Solution 4 (improved fixtures) for better LLM success rate
 - Accept longer execution time (30-60 seconds per test)
@@ -677,17 +735,20 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ### Validation Criteria
 
 **Must Have** (Phase 1):
+
 - ✅ Test completes within 2 minutes (with timeout, allows retries)
 - ✅ No indefinite hangs
 - ✅ Clear timeout error if LLM slow
 - ✅ 17/17 tests passing (100% pass rate)
 
 **Should Have** (Phase 2):
+
 - ✅ Contract test runs in <10 seconds (mocked)
 - ✅ Deterministic test results
 - ✅ No API costs during contract testing
 
 **Nice to Have** (Phase 3-4):
+
 - ✅ Rich test fixture data
 - ✅ Environment-based timeout configuration
 - ✅ Documented timeout strategy
@@ -699,6 +760,7 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ### Implementation Risks
 
 **Risk 1: Timeout Too Short**
+
 - **Description**: 60-second timeout may be too short for complex course generation
 - **Likelihood**: Low (typical LLM responses: 10-30 seconds)
 - **Impact**: Medium (legitimate requests fail)
@@ -706,6 +768,7 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 - **Monitoring**: Track timeout errors in logs, adjust based on P95/P99 latency
 
 **Risk 2: Over-Mocking Hides Integration Issues**
+
 - **Description**: Mocking LLM in contract tests doesn't catch real integration bugs
 - **Likelihood**: Medium (common testing anti-pattern)
 - **Impact**: Medium (bugs reach production)
@@ -715,6 +778,7 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
   - Use Solution 1 (timeout) in integration tests
 
 **Risk 3: Test Fixture Changes Break Other Tests**
+
 - **Description**: Improving test fixtures might cause unexpected failures in other tests
 - **Likelihood**: Low (isolated test utility function)
 - **Impact**: Low (test failures, not production)
@@ -723,16 +787,19 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ### Performance Impact
 
 **Before Fix**:
+
 - Test hangs for >3 minutes
 - Test suite blocked until framework timeout
 - CI/CD pipeline delayed
 
 **After Fix (Phase 1 only)**:
+
 - Test completes in 30-120 seconds (depends on LLM performance + retries)
 - Faster failure feedback (timeout after 60s per attempt)
 - CI/CD pipeline less delayed
 
 **After Fix (Phase 2 - Mocking)**:
+
 - Test completes in <10 seconds
 - Deterministic, no API dependency
 - No CI/CD delays
@@ -740,28 +807,34 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ### Side Effects
 
 **Positive**:
+
 - ✅ Faster test feedback
 - ✅ More reliable CI/CD pipeline
 - ✅ Better production resilience (fails fast, not hangs)
 - ✅ Clear error messages for debugging
 
 **Negative**:
+
 - ⚠️ Legitimate long-running requests may timeout (mitigated by 60s being generous)
 - ⚠️ Mocking adds test maintenance burden
 
 ### Migration Requirements
 
 **Configuration**:
+
 - No environment variables needed (hardcoded timeout)
 - Optional: Add LLM_TIMEOUT env var for configurable timeout
 
 **Database**:
+
 - No database changes
 
 **Dependencies**:
+
 - No new dependencies (LangChain already supports timeout)
 
 **Deployment**:
+
 - No deployment changes (code change only)
 - Deploy with next release
 
@@ -772,12 +845,14 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
 ### Tier 0: Project Internal Documentation
 
 **Previous Investigation**:
+
 - File: `docs/investigations/INV-2025-11-11-001-generation-test-failures.md`
 - Finding: Layer 2 model instance issue identified and fixed
 - Relevance: Related issue in same test, but different root cause
 - Resolution: Fix applied (model: model at line 454), 2/3 tests now pass
 
 **Git History**:
+
 ```bash
 a511797 test: fix all 22 unit test failures and improve contract tests
 7fdef35 fix: parallel test failure fixes across unit, contract, and schema layers
@@ -786,6 +861,7 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
 ```
 
 **Project Code**:
+
 - `section-batch-generator.ts:825-843` - createModel() WITHOUT timeout
 - `layer-2-critique-revise.ts:98-166` - critiqueAndRevise retry logic
 - `unified-regenerator.ts:176-385` - Multi-layer regeneration system
@@ -798,30 +874,32 @@ c745bf7 test(stage5): add integration and contract tests for generation workflow
 **Key Finding**: ChatOpenAI DOES support timeout parameter
 
 **Direct Quote**:
+
 ```typescript
 // Example from Context7 documentation
 const primaryModel = new ChatOpenAI({
-  model: "gpt-4o",
-  timeout: 5000,  // Timeout in milliseconds
+  model: 'gpt-4o',
+  timeout: 5000, // Timeout in milliseconds
 });
 
 const fallbackModel = new ChatAnthropic({
-  model: "claude-3-5-sonnet-20241022",
+  model: 'claude-3-5-sonnet-20241022',
 });
 
-const modelWithFallbacks = primaryModel
-  .withFallbacks([fallbackModel]);
+const modelWithFallbacks = primaryModel.withFallbacks([fallbackModel]);
 ```
 
 **Documentation URL**: https://github.com/langchain-ai/langchainjs/blob/main/libs/langchain-mcp-adapters/README.md
 
 **What Context7 Provided**:
+
 - ✅ Confirmation that `timeout` parameter exists
 - ✅ Example usage in milliseconds
 - ✅ Fallback pattern for resilience
 - ✅ Best practice for production LLM applications
 
 **What Was Missing**:
+
 - ⚠️ Recommended timeout values for different use cases
 - ⚠️ Default timeout behavior if not specified
 - ⚠️ OpenRouter-specific timeout considerations
@@ -866,16 +944,19 @@ Not needed - root cause identified through Context7 and code analysis.
 ### Follow-up Recommendations
 
 **Test Strategy**:
+
 - Separate contract tests (mocked, fast) from integration tests (real LLM, slower)
 - Contract tests: Validate API behavior (auth, RLS, input validation, error handling)
 - Integration tests: Validate LLM quality, regeneration layers, end-to-end flow
 
 **Monitoring**:
+
 - Add metrics for LLM timeout errors
 - Track P95/P99 LLM response times
 - Alert if timeout rate >5%
 
 **Documentation**:
+
 - Document timeout configuration in architecture docs
 - Add comments explaining why timeout is needed
 - Update testing strategy documentation
@@ -887,6 +968,7 @@ Not needed - root cause identified through Context7 and code analysis.
 ### Timeline
 
 **00:00 - Phase 1: Problem Analysis**
+
 - Read test file (lines 855-900)
 - Read test fixture (lines 356-403)
 - Read tRPC endpoint (lines 1310-1448)
@@ -894,6 +976,7 @@ Not needed - root cause identified through Context7 and code analysis.
 - Hypothesis formed: Hang occurs in LLM call or database query
 
 **00:15 - Phase 2: Evidence Collection**
+
 - Read SectionRegenerationService (full file, 452 lines)
 - Read SectionBatchGenerator (lines 422-587, createModel at 825-843)
 - Read UnifiedRegenerator (lines 176-385)
@@ -902,6 +985,7 @@ Not needed - root cause identified through Context7 and code analysis.
 - Hypothesis refined: Individual LLM call hangs, not retry logic
 
 **00:30 - Phase 3: Root Cause Identification**
+
 - Used Sequential Thinking MCP (8 thoughts)
 - Analyzed: createModel() does NOT set timeout parameter
 - Searched: Context7 for LangChain timeout documentation
@@ -909,12 +993,14 @@ Not needed - root cause identified through Context7 and code analysis.
 - **ROOT CAUSE IDENTIFIED**: Missing timeout → indefinite LLM hang
 
 **00:45 - Phase 4: Solution Recommendations**
+
 - Formulated 4 solution approaches
 - Prioritized: Solution 1 (timeout) as primary fix
 - Recommended: Solution 3 (mocking) for contract tests
 - Evaluated: Complexity, risk, effort for each solution
 
 **01:00 - Phase 5: Report Generation**
+
 - Structured investigation report per template
 - Documented execution flow, evidence, recommendations
 - Included Context7 documentation quotes

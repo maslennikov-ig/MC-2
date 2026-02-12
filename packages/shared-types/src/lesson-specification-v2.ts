@@ -102,9 +102,6 @@ export const ExerciseDifficultyV2Schema = z.enum(['easy', 'medium', 'hard']);
 /**
  * Learning objective with Bloom's Taxonomy classification for V2.
  * Each objective must be measurable and aligned to a cognitive level.
- *
- * This is distinct from LearningObjective in generation-result.ts which includes
- * additional fields like estimatedDuration and targetAudienceLevel.
  */
 export const LearningObjectiveV2Schema = z.object({
   /** Unique identifier for cross-referencing with exercises (e.g., "LO-1.1.1") */
@@ -462,7 +459,9 @@ export const LessonSpecificationV2Schema = z.object({
    * Learning objectives aligned to Bloom's Taxonomy.
    * Each objective must be measurable and assessable.
    */
-  learning_objectives: z.array(LearningObjectiveV2Schema).min(1, 'Must have at least 1 learning objective'),
+  learning_objectives: z
+    .array(LearningObjectiveV2Schema)
+    .min(1, 'Must have at least 1 learning objective'),
 
   /** Blueprint for lesson introduction generation */
   intro_blueprint: IntroBlueprintV2Schema,
@@ -630,10 +629,9 @@ export const CONTENT_ARCHETYPE_TEMPERATURES_V2: Record<
  * @param archetype - The content archetype
  * @returns Middle value of the temperature range (default: 0.5 for unknown archetypes)
  */
-export function getRecommendedTemperatureV2(
-  archetype: string
-): number {
-  const range = CONTENT_ARCHETYPE_TEMPERATURES_V2[archetype as keyof typeof CONTENT_ARCHETYPE_TEMPERATURES_V2];
+export function getRecommendedTemperatureV2(archetype: string): number {
+  const range =
+    CONTENT_ARCHETYPE_TEMPERATURES_V2[archetype as keyof typeof CONTENT_ARCHETYPE_TEMPERATURES_V2];
   if (!range) {
     // Default temperature for unknown archetypes
     return 0.5;

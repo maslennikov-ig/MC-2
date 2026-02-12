@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import * as React from 'react';
-import dynamic from 'next/dynamic';
-import { cn } from '@/lib/utils';
-import type { MermaidDiagramProps } from '../types';
+import * as React from 'react'
+import dynamic from 'next/dynamic'
+import { cn } from '@/lib/utils'
+import type { MermaidDiagramProps } from '../types'
 
 /**
  * Lazy-loaded MermaidDirect component
@@ -18,7 +18,7 @@ const MermaidDirect = dynamic(
     ssr: false, // Mermaid requires client-side execution
     loading: () => <MermaidSkeleton />,
   }
-);
+)
 
 /**
  * Loading skeleton displayed while MermaidIframe component is being loaded
@@ -27,10 +27,10 @@ const MermaidDirect = dynamic(
  */
 function MermaidSkeleton() {
   return (
-    <div className="mermaid-skeleton flex items-center justify-center min-h-[200px] bg-muted/50 rounded-lg animate-pulse">
+    <div className="mermaid-skeleton bg-muted/50 flex min-h-[200px] animate-pulse items-center justify-center rounded-lg">
       <div className="text-muted-foreground text-sm">Loading diagram...</div>
     </div>
-  );
+  )
 }
 
 /**
@@ -43,16 +43,14 @@ function MermaidSkeleton() {
  */
 function MermaidError({ chart }: { chart: string }) {
   return (
-    <div className="mermaid-error border border-destructive/50 bg-destructive/10 rounded-lg p-4">
-      <div className="text-destructive font-medium mb-2">Diagram Error</div>
-      <div className="text-muted-foreground text-sm mb-2">
+    <div className="mermaid-error border-destructive/50 bg-destructive/10 rounded-lg border p-4">
+      <div className="text-destructive mb-2 font-medium">Diagram Error</div>
+      <div className="text-muted-foreground mb-2 text-sm">
         Failed to render Mermaid diagram. Check the syntax.
       </div>
-      <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
-        {chart}
-      </pre>
+      <pre className="bg-muted overflow-x-auto rounded p-2 text-xs">{chart}</pre>
     </div>
-  );
+  )
 }
 
 /**
@@ -66,24 +64,24 @@ class MermaidErrorBoundary extends React.Component<
   { hasError: boolean }
 > {
   constructor(props: { children: React.ReactNode; chart: string }) {
-    super(props);
-    this.state = { hasError: false };
+    super(props)
+    this.state = { hasError: false }
   }
 
   static getDerivedStateFromError() {
-    return { hasError: true };
+    return { hasError: true }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log error for debugging purposes
-    console.error('Mermaid diagram rendering error:', error, errorInfo);
+    console.error('Mermaid diagram rendering error:', error, errorInfo)
   }
 
   render() {
     if (this.state.hasError) {
-      return <MermaidError chart={this.props.chart} />;
+      return <MermaidError chart={this.props.chart} />
     }
-    return this.props.children;
+    return this.props.children
   }
 }
 
@@ -114,7 +112,7 @@ class MermaidErrorBoundary extends React.Component<
 export function MermaidDiagram({ chart, className, ariaLabel }: MermaidDiagramProps) {
   // Basic validation - return null for empty/invalid input
   if (!chart || chart.trim() === '') {
-    return null;
+    return null
   }
 
   return (
@@ -123,5 +121,5 @@ export function MermaidDiagram({ chart, className, ariaLabel }: MermaidDiagramPr
         <MermaidDirect chart={chart} className={className} ariaLabel={ariaLabel} />
       </div>
     </MermaidErrorBoundary>
-  );
+  )
 }

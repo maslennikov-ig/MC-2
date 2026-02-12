@@ -10,15 +10,7 @@ import confetti from 'canvas-confetti'
 import { ErrorBoundary } from 'react-error-boundary'
 import { QuestionCard } from './QuestionCard'
 import { WizardProgress, WizardSidebar, WizardNavigation } from './wizard'
-import {
-  useClarifyingQuestions,
-  useClarifyingProgress,
-  useSubmitAnswer,
-  useSubmitMultipleAnswers,
-  useSkipQuestion,
-  useApproveAndProceed,
-  useInvalidateClarifying,
-} from '@/lib/trpc/client'
+import { trpc } from '@/lib/trpc/react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -31,11 +23,6 @@ interface SuggestedAnswer {
   is_recommended?: boolean
 }
 
-interface UserAnswerValue {
-  value?: string
-  values?: string[]
-}
-
 interface Question {
   id: string
   text: string
@@ -44,6 +31,7 @@ interface Question {
   suggestedAnswers: SuggestedAnswer[]
   currentAnswer?: string
   currentAnswers?: string[] // For multi_choice
+  category?: string
   isAnswered: boolean
 }
 
@@ -122,91 +110,117 @@ function ClarifyingErrorFallback({ courseId: _courseId }: { courseId: string }) 
 }
 
 export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: ClarifyingPanelProps) {
-  // TanStack Query hooks for data fetching
+  // tRPC utils for cache invalidation
+  const utils = trpc.useUtils()
+
+  // TanStack Query hooks for data fetching via native tRPC
   // Uses refetchInterval to poll for questions until they appear (race condition protection)
   const {
     data: questionsData,
     isLoading,
     refetch: refetchQuestions,
-  } = useClarifyingQuestions(courseId, {
-    staleTime: Infinity, // Questions never change after generation, only answers do
-    refetchOnWindowFocus: false, // Prevents rate limit spam when switching windows
-    // Poll every 2s when no questions exist yet, stop when questions arrive
-    refetchInterval: (query) => (query.state.data?.questions?.length ? false : 2000),
-    refetchIntervalInBackground: false, // Pause polling when window is hidden
-  })
+  } = trpc.clarifying.getQuestions.useQuery(
+    { courseId },
+    {
+      staleTime: Infinity, // Questions never change after generation, only answers do
+      refetchOnWindowFocus: false, // Prevents rate limit spam when switching windows
+      // Poll every 2s when no questions exist yet, stop when questions arrive
+      refetchInterval: (query) => (query.state.data?.questions?.length ? false : 2000),
+      refetchIntervalInBackground: false, // Pause polling when window is hidden
+    }
+  )
 
-  // Cache invalidation hook for TanStack Query
-  const invalidateClarifying = useInvalidateClarifying(courseId)
-
-  // Progress hook for explicit refetch (ensures GraphView node updates immediately)
-  const { refetch: refetchProgress } = useClarifyingProgress(courseId, {
-    enabled: false, // Don't auto-fetch, only used for manual refetch
-  })
+  // Progress query for explicit refetch (ensures GraphView node updates immediately)
+  const { refetch: refetchProgress } = trpc.clarifying.getProgress.useQuery(
+    { courseId },
+    {
+      enabled: false, // Don't auto-fetch, only used for manual refetch
+    }
+  )
 
   // Mutations with automatic cache invalidation (notifies GraphView automatically)
-  const submitAnswerMutation = useSubmitAnswer(courseId)
-  const submitMultipleAnswersMutation = useSubmitMultipleAnswers(courseId)
-  const skipQuestionMutation = useSkipQuestion(courseId)
-  const approveAndProceedMutation = useApproveAndProceed()
+  const submitAnswerMutation = trpc.clarifying.submitAnswer.useMutation({
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    onSuccess: async () => {
+      try {
+        await Promise.all([
+          utils.clarifying.getQuestions.invalidate({ courseId }),
+          utils.clarifying.getProgress.invalidate({ courseId }),
+        ])
+      } catch (error) {
+        console.error('[submitAnswer] Cache invalidation failed:', error)
+      }
+    },
+  })
+
+  const submitMultipleAnswersMutation = trpc.clarifying.submitMultipleAnswers.useMutation({
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    onSuccess: async () => {
+      try {
+        await Promise.all([
+          utils.clarifying.getQuestions.invalidate({ courseId }),
+          utils.clarifying.getProgress.invalidate({ courseId }),
+        ])
+      } catch (error) {
+        console.error('[submitMultipleAnswers] Cache invalidation failed:', error)
+      }
+    },
+  })
+
+  const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation({
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    onSuccess: async () => {
+      try {
+        await Promise.all([
+          utils.clarifying.getQuestions.invalidate({ courseId }),
+          utils.clarifying.getProgress.invalidate({ courseId }),
+        ])
+      } catch (error) {
+        console.error('[skipQuestion] Cache invalidation failed:', error)
+      }
+    },
+  })
+
+  const approveAndProceedMutation = trpc.clarifying.approveAndProceed.useMutation()
 
   // Invalidate cache and refetch both questions AND progress after any mutation
   // This ensures GraphView node counter updates immediately without page refresh
   const invalidateAndRefetch = useCallback(async () => {
-    // TanStack Query invalidation notifies ALL subscribers (including GraphView)
-    await invalidateClarifying()
+    // tRPC invalidation notifies ALL subscribers (including GraphView)
+    await Promise.all([
+      utils.clarifying.getQuestions.invalidate({ courseId }),
+      utils.clarifying.getProgress.invalidate({ courseId }),
+    ])
     // Explicitly refetch both queries to guarantee immediate UI update
     await Promise.all([refetchQuestions(), refetchProgress()])
-  }, [invalidateClarifying, refetchQuestions, refetchProgress])
+  }, [utils, courseId, refetchQuestions, refetchProgress])
 
   // Transform API response to Question format
   // XSS Protection: Sanitize all user-submitted and AI-generated text
-  // Extended type for new fields not yet in generated types
-  interface ExtendedQuestionFromAPI {
-    id: string
-    course_id: string
-    question_text: string
-    question_type?: QuestionType
-    question_priority: string
-    question_category: string | null
-    suggested_answers: Array<
-      string | { text: string; rationale?: string; is_recommended?: boolean }
-    > | null
-    user_answer: UserAnswerValue | string | null
-    answer_source: string | null
-    selected_suggestion_index: number | null
-    user_modification: string | null
-    iteration_round: number
-    status: string
-    order_index: number
-    created_at: string | null
-    answered_at: string | null
-    metadata: Record<string, unknown> | null
-  }
-
+  // tRPC infers ClarifyingQuestionRow from backend (shared-types) — no manual cast needed
   const questions: Question[] = (questionsData?.questions || []).map((rawQ) => {
-    const q = rawQ as unknown as ExtendedQuestionFromAPI
-
     // HIGH-004 fix: Use Zod-validated parser instead of inline logic
-    const { currentAnswer, currentAnswers } = parseUserAnswer(q.user_answer)
+    const { currentAnswer, currentAnswers } = parseUserAnswer(rawQ.user_answer)
 
     return {
-      id: q.id,
-      text: DOMPurify.sanitize(q.question_text),
-      type: (q.question_type as QuestionType) || 'open',
-      priority: q.question_priority as QuestionPriority,
-      suggestedAnswers: Array.isArray(q.suggested_answers)
-        ? q.suggested_answers.map(
-            (item: string | { text: string; rationale?: string; is_recommended?: boolean }) => ({
-              text: DOMPurify.sanitize(typeof item === 'string' ? item : item.text),
-              rationale: typeof item === 'string' ? undefined : item.rationale,
-              is_recommended: typeof item === 'string' ? undefined : item.is_recommended,
-            })
-          )
+      id: rawQ.id,
+      text: DOMPurify.sanitize(rawQ.question_text),
+      type: rawQ.question_type || 'open',
+      priority: rawQ.question_priority as QuestionPriority,
+      suggestedAnswers: Array.isArray(rawQ.suggested_answers)
+        ? rawQ.suggested_answers.map((item) => ({
+            text: DOMPurify.sanitize(item.text),
+            rationale: item.rationale,
+            is_recommended: item.is_recommended,
+          }))
         : [],
       currentAnswer,
       currentAnswers,
-      isAnswered: q.status === 'answered',
+      category: rawQ.question_category || undefined,
+      isAnswered: rawQ.status === 'answered',
     }
   })
 
@@ -302,7 +316,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
     if (isComplete && !hasShownConfetti && wasAlreadyCompleteOnMount.current === false) {
       setHasShownConfetti(true)
       // Persist to localStorage so confetti never shows again for this course
-      localStorage.setItem(`clarifying_confetti_shown_${courseId}`, 'true')
+      localStorage.setItem(confettiStorageKey, 'true')
       void confetti({
         particleCount: 100,
         spread: 70,
@@ -354,8 +368,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
     setProcessingQuestionId(questionId)
 
     void submitAnswerMutation
-      // Cast needed: backend accepts both single answer and multi_choice arrays, but SubmitAnswerInput only types single
-      .mutateAsync(payload as Parameters<typeof submitAnswerMutation.mutateAsync>[0])
+      .mutateAsync(payload)
       .then(async () => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
 

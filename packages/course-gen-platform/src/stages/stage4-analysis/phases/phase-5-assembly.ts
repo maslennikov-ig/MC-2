@@ -1,7 +1,7 @@
 /**
  * Phase 5: Final Assembly Service
  *
- * Pure data assembly logic (NO LLM calls) that combines outputs from Phases 1-4, 6
+ * Pure data assembly logic (NO LLM calls) that combines outputs from Phases 1-4
  * into a single validated AnalysisResult structure for storage in courses.analysis_result.
  *
  * Critical Requirements:
@@ -21,11 +21,6 @@
  * - This prevents XSS attacks when displaying content to users
  * - Sanitization applied to: contextual_language, scope_instructions
  *
- * Phase 6 (RAG Planning) DEPRECATED (mc2-u9fb):
- * - Phase 6 has been removed in favor of vector search with priority boosting
- * - document_relevance_mapping is now always an empty object {}
- * - Backward compatibility maintained for existing course data
- *
  * @module phase-5-assembly
  */
 
@@ -36,7 +31,18 @@ import type {
   Phase4Output,
   AnalysisResult,
 } from '@megacampus/shared-types/analysis-result';
-import type { Phase6Output } from './phase-6-rag-planning';
+
+/** @deprecated Kept for backward compatibility with existing course data */
+interface Phase6Output {
+  document_relevance_mapping: Record<string, unknown>;
+  phase_metadata: {
+    duration_ms: number;
+    model_used: string;
+    tokens: { input: number; output: number; total: number };
+    quality_score: number;
+    retry_count: number;
+  };
+}
 import { sanitizeLLMOutput } from '../../../shared/utils/sanitize-llm-output';
 import { logger } from '../../../shared/logger';
 
@@ -77,7 +83,7 @@ export interface Phase5Input {
   /** Phase 4 output: Document synthesis */
   phase4_output: Phase4Output;
 
-  /** Phase 6 output: RAG planning (optional - only if documents exist) */
+  /** Phase 6 output: deprecated, always null for new courses */
   phase6_output?: Phase6Output | null;
 
   /** Minimum lessons constraint from course_size preset (default 10 for AUTO mode) */
@@ -109,7 +115,7 @@ export interface Phase5Input {
  * @throws Error if any required phase output is missing
  * @throws Error if total_lessons < 10 (defensive validation)
  */
-export async function assembleAnalysisResult(input: Phase5Input): Promise<AnalysisResult> {
+export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
   const startTime = Date.now();
 
   // Defensive validation: Ensure all phase outputs present
@@ -142,7 +148,6 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
   const phase2Meta = input.phase2_output.phase_metadata;
   const phase3Meta = input.phase3_output.phase_metadata;
   const phase4Meta = input.phase4_output.phase_metadata;
-  const phase6Meta = input.phase6_output?.phase_metadata;
 
   // Calculate phase-specific durations
   const phaseDurationsMs: Record<string, number> = {
@@ -153,10 +158,6 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     phase_5: 0, // Will be calculated at end
   };
 
-  if (phase6Meta) {
-    phaseDurationsMs.phase_6 = phase6Meta.duration_ms;
-  }
-
   // Track model usage per phase
   const modelUsage: Record<string, string> = {
     phase_1: phase1Meta.model_used,
@@ -165,17 +166,12 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     phase_4: phase4Meta.model_used,
   };
 
-  if (phase6Meta) {
-    modelUsage.phase_6 = phase6Meta.model_used;
-  }
-
   // Calculate total retry count
   const totalRetryCount =
     phase1Meta.retry_count +
     phase2Meta.retry_count +
     phase3Meta.retry_count +
-    phase4Meta.retry_count +
-    (phase6Meta?.retry_count || 0);
+    phase4Meta.retry_count;
 
   // Collect quality scores per phase
   const qualityScores: Record<string, number> = {
@@ -184,10 +180,6 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     phase_3: phase3Meta.quality_score,
     phase_4: phase4Meta.quality_score,
   };
-
-  if (phase6Meta) {
-    qualityScores.phase_6 = phase6Meta.quality_score;
-  }
 
   // Sanitize LLM-generated text fields to prevent XSS attacks
   // Apply DOMPurify sanitization to all user-facing text that came from LLM outputs
@@ -243,22 +235,21 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     // contextual_language is now optional (DEPRECATED - only for legacy data)
     ...(sanitizedContextualLanguage && { contextual_language: sanitizedContextualLanguage }),
     topic_analysis: input.phase1_output.topic_analysis,
-    pedagogical_patterns: input.phase1_output.pedagogical_patterns, // Optional - from Analyze Enhancement
 
     // From Phase 2: Scope and structure
     recommended_structure: input.phase2_output.recommended_structure,
 
     // From Phase 3: Pedagogical strategy and analysis
     pedagogical_strategy: pedagogicalStrategy, // Only assessment_approach and progression_logic
-    expansion_areas: input.phase3_output.expansion_areas ?? null, // Fallback to null if undefined
     research_flags: input.phase3_output.research_flags,
 
     // From Phase 4: Document synthesis
     generation_guidance: sanitizedGenerationGuidance, // REQUIRED - SANITIZED for XSS protection
-    content_strategy: input.phase4_output.content_strategy,
 
-    // From Phase 6: RAG planning (defaults to empty object if no documents)
-    document_relevance_mapping: input.phase6_output?.document_relevance_mapping || {},
+    // Deprecated: always empty object for new courses, kept for backward compat
+    document_relevance_mapping:
+      (input.phase6_output?.document_relevance_mapping as AnalysisResult['document_relevance_mapping']) ||
+      {},
 
     // Metadata: Cumulative execution metrics
     metadata: {
@@ -301,7 +292,6 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
  * slip through TypeScript type checking (e.g., from dynamic data).
  *
  * Enhanced in Analyze Enhancement to support new optional fields:
- * - pedagogical_patterns (optional)
  * - generation_guidance (optional, but required if scope_instructions missing)
  * - document_relevance_mapping (optional)
  *
@@ -325,10 +315,6 @@ function validateAnalysisResult(result: AnalysisResult): void {
   if (!result.pedagogical_strategy) {
     throw new Error('Validation error: pedagogical_strategy is missing');
   }
-  if (!result.content_strategy) {
-    throw new Error('Validation error: content_strategy is missing');
-  }
-
   // generation_guidance is now REQUIRED
   if (!result.generation_guidance) {
     throw new Error('Validation error: generation_guidance is missing');
@@ -337,11 +323,6 @@ function validateAnalysisResult(result: AnalysisResult): void {
   // research_flags can be empty array but must be defined
   if (!Array.isArray(result.research_flags)) {
     throw new Error('Validation error: research_flags must be an array');
-  }
-
-  // expansion_areas can be null but must be defined
-  if (result.expansion_areas !== null && !Array.isArray(result.expansion_areas)) {
-    throw new Error('Validation error: expansion_areas must be null or an array');
   }
 
   // Validate metadata structure
@@ -373,80 +354,9 @@ function validateAnalysisResult(result: AnalysisResult): void {
   // Note: Minimum lessons validation is done in assembleAnalysisResult
   // using dynamic min_lessons from course_size preset (not hardcoded 10)
 
-  // Validate optional pedagogical_patterns field (when present)
-  if (result.pedagogical_patterns) {
-    validatePedagogicalPatterns(result.pedagogical_patterns);
-  }
-
   // Validate optional generation_guidance field (when present)
   if (result.generation_guidance) {
     validateGenerationGuidance(result.generation_guidance);
-  }
-
-  // Validate optional document_relevance_mapping field (when present)
-  if (result.document_relevance_mapping) {
-    validateDocumentRelevanceMapping(result.document_relevance_mapping);
-  }
-
-  // Validate prerequisites chain for circular dependencies
-  validatePrerequisitesChain(result.recommended_structure.sections_breakdown);
-}
-
-/**
- * Validate pedagogical_patterns structure (optional field)
- *
- * Checks:
- * - primary_strategy is present
- * - theory_practice_ratio format: "XX:YY" where XX + YY = 100
- * - assessment_types is non-empty array
- * - key_patterns has 2-5 items
- *
- * @param patterns - PedagogicalPatterns to validate
- * @throws Error if structure is invalid
- */
-function validatePedagogicalPatterns(
-  patterns: NonNullable<AnalysisResult['pedagogical_patterns']>
-): void {
-  if (!patterns.primary_strategy) {
-    throw new Error('Validation error: pedagogical_patterns.primary_strategy is missing');
-  }
-
-  // Validate theory_practice_ratio format: "XX:YY" where XX + YY = 100
-  const ratio = patterns.theory_practice_ratio;
-  const match = ratio.match(/^(\d+):(\d+)$/);
-  if (!match) {
-    throw new Error(
-      `Validation error: Invalid theory_practice_ratio format: "${ratio}". Expected format: "XX:YY" (e.g., "30:70")`
-    );
-  }
-
-  const theory = parseInt(match[1], 10);
-  const practice = parseInt(match[2], 10);
-  if (theory + practice !== 100) {
-    throw new Error(
-      `Validation error: theory_practice_ratio must sum to 100, got ${theory + practice} (theory=${theory}, practice=${practice})`
-    );
-  }
-
-  // Validate assessment_types is non-empty array
-  if (!Array.isArray(patterns.assessment_types) || patterns.assessment_types.length === 0) {
-    throw new Error(
-      'Validation error: pedagogical_patterns.assessment_types must be a non-empty array'
-    );
-  }
-
-  // Validate key_patterns has 2-10 items (gracefully truncate if more)
-  if (!Array.isArray(patterns.key_patterns)) {
-    throw new Error('Validation error: pedagogical_patterns.key_patterns must be an array');
-  }
-  if (patterns.key_patterns.length < 2) {
-    throw new Error(
-      `Validation error: pedagogical_patterns.key_patterns must have at least 2 items, got ${patterns.key_patterns.length}`
-    );
-  }
-  // Gracefully truncate to 10 items if LLM returned more (avoid hard failure)
-  if (patterns.key_patterns.length > 10) {
-    patterns.key_patterns = patterns.key_patterns.slice(0, 10);
   }
 }
 
@@ -507,177 +417,5 @@ function validateGenerationGuidance(
   // Validate avoid_jargon is array (can be empty)
   if (!Array.isArray(guidance.avoid_jargon)) {
     throw new Error('Validation error: generation_guidance.avoid_jargon must be an array');
-  }
-}
-
-/**
- * Validate document_relevance_mapping structure (optional field)
- *
- * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
- * This function is now only used for backward compatibility with existing course data.
- * New courses will always have document_relevance_mapping = {}.
- *
- * Checks:
- * - Is an object (not null, not undefined)
- * - Each section mapping has valid structure:
- *   - primary_documents is array (can be empty)
- *   - key_search_terms is array with 3-10 items
- *   - expected_topics is array with 2-8 items
- *   - document_processing_methods is object
- *
- * @param mapping - DocumentRelevanceMapping to validate
- * @throws Error if structure is invalid
- */
-function validateDocumentRelevanceMapping(
-  mapping: NonNullable<AnalysisResult['document_relevance_mapping']>
-): void {
-  if (typeof mapping !== 'object' || mapping === null) {
-    throw new Error('Validation error: document_relevance_mapping must be an object');
-  }
-
-  // Empty mapping is valid (Phase 6 deprecated - this is now the default)
-  if (Object.keys(mapping).length === 0) {
-    return;
-  }
-
-  // Validate each section mapping (backward compatibility for existing data)
-  for (const [sectionId, sectionMapping] of Object.entries(mapping)) {
-    // Type guard: ensure sectionMapping has expected structure
-    if (!sectionMapping || typeof sectionMapping !== 'object') {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId} must be an object`
-      );
-    }
-
-    // Validate primary_documents is array
-    if (
-      !('primary_documents' in sectionMapping) ||
-      !Array.isArray(sectionMapping.primary_documents)
-    ) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.primary_documents must be an array`
-      );
-    }
-
-    // Validate search_queries (new) or key_search_terms (legacy) is array with 3-10 items
-    // Cast to any to handle both new and legacy field names at runtime
-    const mappingAny = sectionMapping as Record<string, unknown>;
-    const searchQueries = mappingAny.search_queries ?? mappingAny.key_search_terms ?? null;
-
-    if (!Array.isArray(searchQueries)) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.search_queries must be an array`
-      );
-    }
-    const searchTermsCount = searchQueries.length;
-    if (searchTermsCount < 3 || searchTermsCount > 10) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.search_queries must have 3-10 items, got ${searchTermsCount}`
-      );
-    }
-
-    // Validate expected_topics is array with 2-8 items
-    if (!('expected_topics' in sectionMapping) || !Array.isArray(sectionMapping.expected_topics)) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.expected_topics must be an array`
-      );
-    }
-    const topicsCount = sectionMapping.expected_topics.length;
-    if (topicsCount < 2 || topicsCount > 8) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.expected_topics must have 2-8 items, got ${topicsCount}`
-      );
-    }
-
-    // Validate confidence (required in v0.20.0+)
-    const confidence = mappingAny.confidence;
-    if (!confidence || !['high', 'medium'].includes(confidence as string)) {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.confidence must be 'high' or 'medium'`
-      );
-    }
-
-    // Validate note if present (optional)
-    const note = mappingAny.note;
-    if (note !== undefined && typeof note !== 'string') {
-      throw new Error(
-        `Validation error: document_relevance_mapping.${sectionId}.note must be a string`
-      );
-    }
-
-    // Legacy validation: document_processing_methods is optional in v0.20.0+
-    const docProcessingMethods = mappingAny.document_processing_methods;
-    if (docProcessingMethods !== undefined) {
-      if (typeof docProcessingMethods !== 'object' || docProcessingMethods === null) {
-        throw new Error(
-          `Validation error: document_relevance_mapping.${sectionId}.document_processing_methods must be an object`
-        );
-      }
-    }
-  }
-}
-
-/**
- * Validate prerequisites chain for circular dependencies
- *
- * Uses depth-first search (DFS) with recursion stack tracking to detect cycles
- * in the section prerequisites graph.
- *
- * @param sections - Array of SectionBreakdown to validate
- * @throws Error if circular dependency detected
- */
-function validatePrerequisitesChain(
-  sections: AnalysisResult['recommended_structure']['sections_breakdown']
-): void {
-  // Build adjacency list: section_id -> prerequisites[]
-  const graph = new Map<string, string[]>();
-
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i];
-    // Use section_id if available, otherwise use index + 1 as fallback
-    const sectionId = section.section_id || String(i + 1);
-    const prerequisites = section.prerequisites || [];
-    graph.set(sectionId, prerequisites);
-  }
-
-  // DFS cycle detection using recursion stack
-  const visited = new Set<string>();
-  const recStack = new Set<string>();
-
-  /**
-   * Recursive DFS helper to detect cycles
-   * @param node - Current section_id being visited
-   * @returns true if cycle detected, false otherwise
-   */
-  function hasCycle(node: string): boolean {
-    visited.add(node);
-    recStack.add(node);
-
-    const neighbors = graph.get(node) || [];
-    for (const neighbor of neighbors) {
-      // If neighbor not visited, recurse
-      if (!visited.has(neighbor)) {
-        if (hasCycle(neighbor)) {
-          return true;
-        }
-      }
-      // If neighbor in recursion stack, cycle detected
-      else if (recStack.has(neighbor)) {
-        throw new Error(
-          `Validation error: Circular dependency detected in prerequisites. Section "${node}" depends on "${neighbor}", which creates a cycle.`
-        );
-      }
-    }
-
-    // Remove from recursion stack on backtrack
-    recStack.delete(node);
-    return false;
-  }
-
-  // Check all nodes for cycles
-  for (const sectionId of Array.from(graph.keys())) {
-    if (!visited.has(sectionId)) {
-      hasCycle(sectionId);
-    }
   }
 }

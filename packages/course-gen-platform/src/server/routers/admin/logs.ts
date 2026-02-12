@@ -11,7 +11,6 @@
  * - log_issue_status: Admin review status for logs
  */
 
-import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router } from '../../trpc';
 import { adminProcedure } from '../../procedures';
@@ -19,303 +18,39 @@ import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
 
-// ============================================================================
-// Retry Utilities
-// ============================================================================
+// Re-export schemas and types so external consumers don't break
+export * from './logs-schemas';
 
-/**
- * Retry wrapper for transient database errors
- * Implements exponential backoff for network/timeout issues
- */
-async function withRetry<T>(
-  operation: () => Promise<T>,
-  options: { maxRetries?: number; baseDelayMs?: number; operationName: string }
-): Promise<T> {
-  const { maxRetries = 3, baseDelayMs = 100, operationName } = options;
-  let lastError: unknown;
+import type { LogListResponse, LogDetails, GroupedLogListResponse } from './logs-schemas';
+import {
+  listLogsInputSchema,
+  getLogByIdInputSchema,
+  updateStatusInputSchema,
+  bulkUpdateStatusInputSchema,
+  listGroupedInputSchema,
+  getGroupLogsInputSchema,
+  updateGroupStatusInputSchema,
+} from './logs-schemas';
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      const isRetryable = isTransientError(error);
+// Re-export helpers that were previously exported from this file
+export { fetchAllLogStatuses } from './logs-helpers';
 
-      if (!isRetryable || attempt === maxRetries) {
-        throw error;
-      }
+import {
+  buildErrorLogsQuery,
+  buildGenerationTraceQuery,
+  buildGroupedErrorLogsQuery,
+} from './logs-query-builders';
 
-      const delayMs = baseDelayMs * Math.pow(2, attempt - 1);
-      logger.warn(
-        {
-          attempt,
-          maxRetries,
-          delayMs,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        `${operationName}: Retrying after transient error`
-      );
+import {
+  fetchErrorLogById,
+  fetchGenerationTraceById,
+  fetchLogStatuses,
+  verifyLogExists,
+  validateStatusTransition,
+  fetchCurrentLogStatus,
+} from './logs-helpers';
 
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-
-  throw lastError;
-}
-
-/**
- * Determines if an error is transient and worth retrying
- */
-function isTransientError(error: unknown): boolean {
-  if (!(error && typeof error === 'object')) return false;
-
-  const errorObj = error as { code?: string; message?: string };
-  const transientCodes = ['PGRST', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'];
-  const transientPatterns = [
-    /timeout/i,
-    /connection.*reset/i,
-    /network/i,
-    /truncated/i,
-    /malformed/i,
-  ];
-
-  // Check error code
-  if (errorObj.code && transientCodes.some(code => errorObj.code?.includes(code))) {
-    return true;
-  }
-
-  // Check error message patterns
-  const message = errorObj.message || '';
-  return transientPatterns.some(pattern => pattern.test(message));
-}
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/** MD5 fingerprint length (32 hex characters) */
-const FINGERPRINT_LENGTH = 32;
-
-// ============================================================================
-// Zod Schemas
-// ============================================================================
-
-/**
- * Log type enum for polymorphic references
- */
-export const logTypeSchema = z.enum(['error_log', 'generation_trace']);
-export type LogType = z.infer<typeof logTypeSchema>;
-
-/**
- * Log issue status enum
- */
-export const logStatusSchema = z.enum([
-  'new',
-  'in_progress',
-  'to_verify',
-  'resolved',
-  'ignored',
-  'auto_muted',
-]);
-export type LogStatus = z.infer<typeof logStatusSchema>;
-
-/**
- * Log severity/level filter
- */
-export const logLevelSchema = z.enum(['WARNING', 'ERROR', 'CRITICAL']);
-
-/**
- * Sort direction
- */
-export const sortDirectionSchema = z.enum(['asc', 'desc']);
-
-/**
- * Input schema for list procedure filters
- */
-export const logFiltersSchema = z.object({
-  level: logLevelSchema.optional(),
-  source: logTypeSchema.optional(),
-  status: logStatusSchema.optional(),
-  search: z.string().min(2).max(200).trim().optional(),
-  dateFrom: z.string().datetime().optional(),
-  dateTo: z.string().datetime().optional(),
-  courseId: z.string().uuid().optional(),
-  environment: z.enum(['dev', 'stage']).optional(),
-});
-
-/**
- * Input schema for list procedure
- */
-export const listLogsInputSchema = z.object({
-  page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().max(100).default(20),
-  filters: logFiltersSchema.optional(),
-  sort: z
-    .object({
-      field: z.enum(['created_at', 'severity']).default('created_at'),
-      direction: sortDirectionSchema.default('desc'),
-    })
-    .optional(),
-});
-
-/**
- * Input schema for getById procedure
- */
-export const getLogByIdInputSchema = z.object({
-  logType: logTypeSchema,
-  logId: z.string().uuid(),
-});
-
-/**
- * Input schema for updateStatus procedure
- */
-export const updateStatusInputSchema = z.object({
-  logType: logTypeSchema,
-  logId: z.string().uuid(),
-  status: logStatusSchema,
-  notes: z.string().max(2000).optional(),
-});
-
-/**
- * Input schema for bulkUpdateStatus procedure
- */
-export const bulkUpdateStatusInputSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        logType: logTypeSchema,
-        logId: z.string().uuid(),
-      })
-    )
-    .min(1)
-    .max(100),
-  status: logStatusSchema,
-});
-
-/**
- * Input schema for listGrouped procedure - list errors grouped by fingerprint
- */
-export const listGroupedInputSchema = z.object({
-  page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().max(100).default(20),
-  filters: logFiltersSchema.optional(),
-});
-
-/**
- * Input schema for getGroupLogs procedure - get individual logs within a fingerprint group
- */
-export const getGroupLogsInputSchema = z.object({
-  fingerprint: z.string().length(FINGERPRINT_LENGTH), // MD5 hash
-  page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().max(50).default(10),
-});
-
-/**
- * Input schema for updateGroupStatus procedure - update status for all logs in a fingerprint group
- */
-export const updateGroupStatusInputSchema = z.object({
-  fingerprint: z.string().length(FINGERPRINT_LENGTH), // MD5 hash
-  status: logStatusSchema,
-  notes: z.string().max(2000).optional(),
-});
-
-// ============================================================================
-// Response Types
-// ============================================================================
-
-/**
- * Unified log item shape for list response
- */
-export type UnifiedLogItem = {
-  id: string;
-  logType: LogType;
-  createdAt: string;
-  severity: string;
-  message: string;
-  source: string | null;
-  courseId: string | null;
-  lessonId: string | null;
-  stage: string | null;
-  phase: string | null;
-  status: LogStatus;
-  metadata: Record<string, unknown> | null;
-  problemId: string | null;
-  environment: string | null;
-  courseName: string | null;
-};
-
-/**
- * Full log details for getById response
- */
-export type LogDetails = UnifiedLogItem & {
-  stackTrace: string | null;
-  errorData: Record<string, unknown> | null;
-  inputData: Record<string, unknown> | null;
-  outputData: Record<string, unknown> | null;
-  modelUsed: string | null;
-  tokensUsed: number | null;
-  costUsd: number | null;
-  durationMs: number | null;
-  statusNotes: string | null;
-  statusUpdatedBy: string | null;
-  statusUpdatedAt: string | null;
-  // Enhanced context fields
-  requestId: string | null;
-  trpcPath: string | null;
-  trpcInput: Record<string, unknown> | null;
-  attemptedValue: string | null;
-};
-
-/**
- * List response shape
- */
-export type LogListResponse = {
-  items: UnifiedLogItem[];
-  total: number;
-  page: number;
-};
-
-/**
- * Grouped error item for listGrouped response
- * Represents a single fingerprint group with aggregated data
- */
-export type ErrorGroupItem = {
-  fingerprint: string;
-  count: number;
-  firstSeen: string;
-  lastSeen: string;
-  severity: string;
-  message: string;
-  source: string | null; // 'error_log' | 'generation_trace' - job_type for error_logs
-  status: LogStatus; // from log_issue_status by fingerprint
-  environments: string[]; // unique environments in group
-  latestLogId: string;
-  latestProblemId: string | null;
-  jobType: string | null;
-  courseId: string | null; // course_id from latest log
-  courseName: string | null; // course name (fetched separately)
-};
-
-/**
- * List grouped response shape
- */
-export type GroupedLogListResponse = {
-  items: ErrorGroupItem[];
-  total: number;
-  page: number;
-};
-
-// ============================================================================
-// Security Helpers
-// ============================================================================
-
-/**
- * Sanitize search input to prevent SQL injection via LIKE pattern characters.
- * Escapes %, _, and \ which have special meaning in LIKE patterns.
- */
-function sanitizeSearchInput(input: string): string {
-  return input.replace(/[%_\\]/g, '\\$&');
-}
+import type { UnifiedLogItem, LogType } from './logs-schemas';
 
 // ============================================================================
 // Router Implementation
@@ -339,53 +74,20 @@ export const logsRouter = router({
         const offset = (page - 1) * limit;
 
         // Build separate queries for each table and combine results
-        const errorLogsPromise = buildErrorLogsQuery(supabase, filters, sort, limit, offset);
-        const generationTracePromise = buildGenerationTraceQuery(
-          supabase,
-          filters,
-          sort,
-          limit,
-          offset
-        );
-
-        // Execute both queries in parallel
         const [errorLogsResult, generationTraceResult] = await Promise.all([
-          errorLogsPromise,
-          generationTracePromise,
+          buildErrorLogsQuery(supabase, filters, sort, limit, offset),
+          buildGenerationTraceQuery(supabase, filters, sort, limit, offset),
         ]);
 
-        // Combine and deduplicate results
-        let allItems: UnifiedLogItem[] = [];
-
-        if (!filters?.source || filters.source === 'error_log') {
-          allItems = allItems.concat(errorLogsResult.items);
-        }
-
-        if (!filters?.source || filters.source === 'generation_trace') {
-          allItems = allItems.concat(generationTraceResult.items);
-        }
-
-        // Sort combined results
-        const sortField = sort?.field || 'created_at';
-        const sortDir = sort?.direction || 'desc';
-
-        allItems.sort((a, b) => {
-          if (sortField === 'created_at') {
-            const dateA = new Date(a.createdAt).getTime();
-            const dateB = new Date(b.createdAt).getTime();
-            return sortDir === 'desc' ? dateB - dateA : dateA - dateB;
-          }
-          // severity sort
-          const severityOrder = { CRITICAL: 3, ERROR: 2, WARNING: 1 };
-          const sevA = severityOrder[a.severity as keyof typeof severityOrder] || 0;
-          const sevB = severityOrder[b.severity as keyof typeof severityOrder] || 0;
-          return sortDir === 'desc' ? sevB - sevA : sevA - sevB;
-        });
+        // Combine results based on source filter
+        const allItems = combineLogResults(
+          errorLogsResult.items,
+          generationTraceResult.items,
+          filters?.source,
+          sort
+        );
 
         // Apply pagination to combined results
-        // Note: Since each table is already paginated, we take the combined items
-        // and slice to limit. For proper cross-table pagination, consider using
-        // a database view with UNION or fetching more data initially.
         const paginatedItems = allItems.slice(0, limit);
 
         // Calculate total count from both sources
@@ -393,11 +95,7 @@ export const logsRouter = router({
           (filters?.source === 'generation_trace' ? 0 : errorLogsResult.total) +
           (filters?.source === 'error_log' ? 0 : generationTraceResult.total);
 
-        return {
-          items: paginatedItems,
-          total: totalCount,
-          page,
-        };
+        return { items: paginatedItems, total: totalCount, page };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
@@ -432,118 +130,10 @@ export const logsRouter = router({
     .query(async ({ input }): Promise<LogDetails> => {
       try {
         const supabase = getSupabaseAdmin();
-        const { logType, logId } = input;
-
-        // Fetch log based on type
-        if (logType === 'error_log') {
-          const { data: log, error } = await supabase
-            .from('error_logs')
-            .select('*')
-            .eq('id', logId)
-            .single();
-
-          if (error || !log) {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: ErrorMessages.notFound('Error log', logId),
-            });
-          }
-
-          // Fetch status
-          const status = await fetchLogStatus(supabase, logType, logId);
-
-          return {
-            id: log.id,
-            logType: 'error_log',
-            createdAt: log.created_at,
-            severity: log.severity,
-            message: log.error_message,
-            source: log.job_type || null,
-            courseId: log.course_id || null,
-            lessonId: log.lesson_id || null,
-            stage: null,
-            phase: null,
-            status: status?.status || 'new',
-            metadata: log.metadata as Record<string, unknown> | null,
-            problemId: log.problem_id || null,
-            environment: log.environment || null,
-            courseName: null,
-            stackTrace: log.stack_trace,
-            errorData: null,
-            inputData: null,
-            outputData: null,
-            modelUsed: null,
-            tokensUsed: null,
-            costUsd: null,
-            durationMs: null,
-            statusNotes: status?.notes || null,
-            statusUpdatedBy: status?.updatedByEmail || null,
-            statusUpdatedAt: status?.updated_at || null,
-            // Enhanced context fields
-            requestId: log.request_id || null,
-            trpcPath: log.trpc_path || null,
-            trpcInput: log.trpc_input as Record<string, unknown> | null,
-            attemptedValue: log.attempted_value || null,
-          };
-        } else {
-          // generation_trace
-          const { data: log, error } = await supabase
-            .from('generation_trace')
-            .select('*, courses(title)')
-            .eq('id', logId)
-            .single();
-
-          if (error || !log) {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: ErrorMessages.notFound('Generation trace', logId),
-            });
-          }
-
-          // Fetch status
-          const status = await fetchLogStatus(supabase, logType, logId);
-
-          // Determine severity from error_data
-          const errorData = log.error_data as Record<string, unknown> | null;
-          const severity = errorData ? 'ERROR' : 'WARNING';
-
-          // Get course name from JOIN
-          const courseData = log.courses as { title: string } | null;
-
-          return {
-            id: log.id,
-            logType: 'generation_trace',
-            createdAt: log.created_at,
-            severity,
-            message: (errorData?.message as string) || log.step_name || 'Unknown',
-            source: `${log.stage}/${log.phase}`,
-            courseId: log.course_id,
-            lessonId: log.lesson_id || null,
-            stage: log.stage,
-            phase: log.phase,
-            status: status?.status || 'new',
-            metadata: null,
-            problemId: null,
-            environment: null,
-            courseName: courseData?.title || null,
-            stackTrace: (errorData?.stack as string) || null,
-            errorData,
-            inputData: log.input_data as Record<string, unknown> | null,
-            outputData: log.output_data as Record<string, unknown> | null,
-            modelUsed: log.model_used,
-            tokensUsed: log.tokens_used,
-            costUsd: log.cost_usd ? Number(log.cost_usd) : null,
-            durationMs: log.duration_ms,
-            statusNotes: status?.notes || null,
-            statusUpdatedBy: status?.updatedByEmail || null,
-            statusUpdatedAt: status?.updated_at || null,
-            // Enhanced context fields (not applicable for generation_trace)
-            requestId: null,
-            trpcPath: null,
-            trpcInput: null,
-            attemptedValue: null,
-          };
+        if (input.logType === 'error_log') {
+          return fetchErrorLogById(supabase, input.logId);
         }
+        return fetchGenerationTraceById(supabase, input.logId);
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
@@ -623,9 +213,7 @@ export const logsRouter = router({
           updated_by: userId,
           updated_at: new Date().toISOString(),
         },
-        {
-          onConflict: 'log_type,log_id',
-        }
+        { onConflict: 'log_type,log_id' }
       );
 
       if (error) {
@@ -712,19 +300,9 @@ export const logsRouter = router({
           });
         }
 
-        logger.info(
-          {
-            count: items.length,
-            status,
-            updatedBy: userId,
-          },
-          'Bulk log status updated'
-        );
+        logger.info({ count: items.length, status, updatedBy: userId }, 'Bulk log status updated');
 
-        return {
-          success: true,
-          updatedCount: items.length,
-        };
+        return { success: true, updatedCount: items.length };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
@@ -762,14 +340,9 @@ export const logsRouter = router({
         const { page, limit, filters } = input;
         const offset = (page - 1) * limit;
 
-        // Build and execute the grouped query
         const result = await buildGroupedErrorLogsQuery(supabase, filters, limit, offset);
 
-        return {
-          items: result.items,
-          total: result.total,
-          page,
-        };
+        return { items: result.items, total: result.total, page };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
@@ -851,11 +424,7 @@ export const logsRouter = router({
           courseName: null,
         }));
 
-        return {
-          items,
-          total: count || 0,
-          page,
-        };
+        return { items, total: count || 0, page };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
@@ -925,20 +494,17 @@ export const logsRouter = router({
           .single();
 
         // Upsert status using fingerprint as the key
-        // We use log_type='error_log' and set fingerprint for group-level status
         const { error } = await supabase.from('log_issue_status').upsert(
           {
             log_type: 'error_log',
-            log_id: latestLog?.id || fingerprint, // Use latest log ID if available
+            log_id: latestLog?.id || fingerprint,
             fingerprint,
             status,
             notes: notes || null,
             updated_by: userId,
             updated_at: new Date().toISOString(),
           },
-          {
-            onConflict: 'fingerprint',
-          }
+          { onConflict: 'fingerprint' }
         );
 
         if (error) {
@@ -949,19 +515,11 @@ export const logsRouter = router({
         }
 
         logger.info(
-          {
-            fingerprint,
-            status,
-            logsCount: count,
-            updatedBy: userId,
-          },
+          { fingerprint, status, logsCount: count, updatedBy: userId },
           'Group log status updated'
         );
 
-        return {
-          success: true,
-          updatedCount: count,
-        };
+        return { success: true, updatedCount: count };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
@@ -989,782 +547,43 @@ export const logsRouter = router({
 // ============================================================================
 
 /**
- * Build and execute query for error_logs table
+ * Combine and sort log results from both tables.
+ * Applies source filter and sorts by the specified field/direction.
  */
-async function buildErrorLogsQuery(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  filters: z.infer<typeof logFiltersSchema> | undefined,
-  sort: { field: string; direction: string } | undefined,
-  limit: number,
-  offset: number
-): Promise<{ items: UnifiedLogItem[]; total: number }> {
-  // Status filter: pre-fetch log IDs with matching status
-  // IMPORTANT: Filter BEFORE pagination for correct results
-  let statusFilteredIds: string[] | null = null;
+function combineLogResults(
+  errorItems: UnifiedLogItem[],
+  traceItems: UnifiedLogItem[],
+  sourceFilter: string | undefined,
+  sort: { field: string; direction: string } | undefined
+): UnifiedLogItem[] {
+  let allItems: UnifiedLogItem[] = [];
 
-  if (filters?.status) {
-    if (filters.status === 'new') {
-      // "new" means:
-      // 1. Logs WITHOUT any status record for their fingerprint
-      // 2. Logs WITH explicit status='new' in log_issue_status
-      // Use RPC function to avoid Supabase 1000 row limit (mc2-ud16)
-      const { data: newLogIds, error: rpcError } = await supabase.rpc(
-        'get_new_error_log_ids' as any
-      );
+  if (!sourceFilter || sourceFilter === 'error_log') {
+    allItems = allItems.concat(errorItems);
+  }
 
-      if (rpcError) {
-        logger.error({ error: rpcError }, 'RPC get_new_error_log_ids failed');
-        // Return empty on error rather than showing wrong data
-        return { items: [], total: 0 };
-      }
+  if (!sourceFilter || sourceFilter === 'generation_trace') {
+    allItems = allItems.concat(traceItems);
+  }
 
-      statusFilteredIds = (newLogIds || []).map((row: { id: string }) => row.id);
+  // Sort combined results
+  const sortField = sort?.field || 'created_at';
+  const sortDir = sort?.direction || 'desc';
 
-      // If no logs match, return empty
-      if (!statusFilteredIds || statusFilteredIds.length === 0) {
-        return { items: [], total: 0 };
-      }
-    } else {
-      // Get IDs with specific status (via individual log_id OR fingerprint)
-      const { data: statusData, error: statusError } = await supabase.rpc(
-        'get_error_logs_by_status' as any,
-        { p_status: filters.status }
-      );
-
-      if (statusError) {
-        // Fallback: query with fingerprint support
-        logger.warn(
-          { error: statusError },
-          'RPC get_error_logs_by_status not available, falling back to complex query'
-        );
-
-        // Get fingerprints with this status
-        const { data: fingerprintsWithStatus } = await supabase
-          .from('log_issue_status')
-          .select('fingerprint')
-          .eq('log_type', 'error_log')
-          .eq('status', filters.status)
-          .not('fingerprint', 'is', null);
-
-        const fingerprints = (fingerprintsWithStatus || [])
-          .map(r => r.fingerprint)
-          .filter(Boolean) as string[];
-
-        // Get log_ids with this status (individual)
-        const { data: logIdsWithStatus } = await supabase
-          .from('log_issue_status')
-          .select('log_id')
-          .eq('log_type', 'error_log')
-          .eq('status', filters.status);
-
-        const logIds = (logIdsWithStatus || []).map(r => r.log_id);
-
-        // Get logs by fingerprint
-        let fingerprintLogIds: string[] = [];
-        if (fingerprints.length > 0) {
-          const { data: logsByFingerprint } = await supabase
-            .from('error_logs')
-            .select('id')
-            .in('fingerprint', fingerprints);
-          fingerprintLogIds = (logsByFingerprint || []).map(r => r.id);
-        }
-
-        // Combine both sets
-        statusFilteredIds = [...new Set([...logIds, ...fingerprintLogIds])];
-      } else {
-        statusFilteredIds = (statusData || []).map((row: { id: string }) => row.id);
-      }
-
-      if (!statusFilteredIds || statusFilteredIds.length === 0) {
-        return { items: [], total: 0 };
-      }
+  allItems.sort((a, b) => {
+    if (sortField === 'created_at') {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return sortDir === 'desc' ? dateB - dateA : dateA - dateB;
     }
-  }
-
-  let query = supabase
-    .from('error_logs')
-    .select(
-      'id, created_at, severity, error_message, job_type, metadata, problem_id, environment, fingerprint',
-      { count: 'exact' }
-    );
-
-  // Apply status filter if we have specific IDs (now includes 'new' status too)
-  if (statusFilteredIds !== null) {
-    query = query.in('id', statusFilteredIds);
-  }
-
-  // Apply filters
-  if (filters?.level) {
-    query = query.eq('severity', filters.level);
-  }
-
-  if (filters?.search && filters.search.length >= 2) {
-    const sanitized = sanitizeSearchInput(filters.search);
-    query = query.ilike('error_message', `%${sanitized}%`);
-  }
-
-  if (filters?.dateFrom) {
-    query = query.gte('created_at', filters.dateFrom);
-  }
-
-  if (filters?.dateTo) {
-    query = query.lte('created_at', filters.dateTo);
-  }
-
-  if (filters?.environment) {
-    query = query.eq('environment', filters.environment);
-  }
-
-  // Note: error_logs doesn't have course_id, so skip that filter
-  // Note: source filter is handled at combine level
-
-  // Apply sorting
-  const sortField = sort?.field === 'severity' ? 'severity' : 'created_at';
-  const ascending = sort?.direction === 'asc';
-  query = query.order(sortField, { ascending });
-
-  // Apply pagination
-  query = query.range(offset, offset + limit - 1);
-
-  // Execute query with retry for transient errors
-  type QueryData = {
-    id: string;
-    created_at: string;
-    severity: string;
-    error_message: string;
-    job_type: string | null;
-    metadata: unknown;
-    problem_id: string | null;
-    environment: string | null;
-    fingerprint?: string;
-  };
-  let data: QueryData[] | null = null;
-  let count: number | null = null;
-  let queryError: unknown = null;
-
-  try {
-    const result = await withRetry(
-      async () => {
-        const response = await query;
-        if (response.error) {
-          // Check if error is truncated/malformed (transient)
-          const isTruncated =
-            response.error.message?.startsWith('{') && !response.error.message?.endsWith('}');
-          if (isTruncated) {
-            throw new Error(`Truncated response: ${response.error.message}`);
-          }
-          throw response.error;
-        }
-        return response;
-      },
-      { operationName: 'buildErrorLogsQuery' }
-    );
-    data = result.data as QueryData[] | null;
-    count = result.count;
-  } catch (error) {
-    queryError = error;
-  }
-
-  if (queryError) {
-    const errorDetails = {
-      message: queryError instanceof Error ? queryError.message : 'Unknown error',
-      code: (queryError as { code?: string }).code || null,
-      details: (queryError as { details?: string }).details || null,
-      hint: (queryError as { hint?: string }).hint || null,
-    };
-    logger.error({ errorDetails }, 'Error querying error_logs after retries');
-    return { items: [], total: 0 };
-  }
-
-  // All filtering now happens BEFORE pagination, so no post-filter needed
-  const filteredData = data || [];
-
-  // Fetch statuses for these logs (individual status by log_id)
-  const logIds = filteredData.map(log => log.id);
-  const statuses = await fetchLogStatuses(supabase, 'error_log', logIds);
-
-  // Fetch fingerprint-based statuses as fallback
-  const fingerprints = filteredData
-    .map(log => (log as { fingerprint?: string }).fingerprint)
-    .filter((fp): fp is string => !!fp);
-  const fingerprintStatuses = await fetchGroupStatuses(supabase, fingerprints);
-
-  const items: UnifiedLogItem[] = filteredData.map(log => {
-    const fp = (log as { fingerprint?: string }).fingerprint;
-    // Priority: individual status > fingerprint status > 'new'
-    const status = statuses.get(log.id) || (fp ? fingerprintStatuses.get(fp) : undefined) || 'new';
-    return {
-      id: log.id,
-      logType: 'error_log' as LogType,
-      createdAt: log.created_at,
-      severity: log.severity,
-      message: log.error_message,
-      source: log.job_type || null,
-      courseId: null,
-      lessonId: null,
-      stage: null,
-      phase: null,
-      status,
-      metadata: log.metadata as Record<string, unknown> | null,
-      problemId: log.problem_id || null,
-      environment: log.environment || null,
-      courseName: null,
-    };
+    // severity sort
+    const severityOrder = { CRITICAL: 3, ERROR: 2, WARNING: 1 };
+    const sevA = severityOrder[a.severity as keyof typeof severityOrder] || 0;
+    const sevB = severityOrder[b.severity as keyof typeof severityOrder] || 0;
+    return sortDir === 'desc' ? sevB - sevA : sevA - sevB;
   });
 
-  return { items, total: count || 0 };
-}
-
-/**
- * Build and execute query for generation_trace table (with error_data)
- */
-async function buildGenerationTraceQuery(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  filters: z.infer<typeof logFiltersSchema> | undefined,
-  sort: { field: string; direction: string } | undefined,
-  limit: number,
-  offset: number
-): Promise<{ items: UnifiedLogItem[]; total: number }> {
-  // generation_trace with error_data are always ERROR severity
-  // Skip query entirely if filtering for WARNING or CRITICAL
-  if (filters?.level && filters.level !== 'ERROR') {
-    return { items: [], total: 0 };
-  }
-
-  // Status filter: pre-fetch log IDs with matching status
-  // IMPORTANT: Filter BEFORE pagination for correct results
-  let statusFilteredIds: string[] | null = null;
-
-  if (filters?.status) {
-    if (filters.status === 'new') {
-      // "new" means:
-      // 1. Logs WITHOUT any status record
-      // 2. Logs WITH explicit status='new' in log_issue_status
-      // This matches the grouped view logic
-
-      // Get log_ids with explicit 'new' status
-      const { data: logsWithNewStatus } = await supabase
-        .from('log_issue_status')
-        .select('log_id')
-        .eq('log_type', 'generation_trace')
-        .eq('status', 'new');
-
-      const newStatusLogIds = new Set((logsWithNewStatus || []).map(r => r.log_id));
-
-      // Get log_ids with non-new status (to exclude)
-      const { data: logsWithOtherStatus } = await supabase
-        .from('log_issue_status')
-        .select('log_id')
-        .eq('log_type', 'generation_trace')
-        .neq('status', 'new');
-
-      const otherStatusLogIds = new Set((logsWithOtherStatus || []).map(r => r.log_id));
-
-      // Get all generation_trace with error_data
-      const { data: allTraces } = await supabase
-        .from('generation_trace')
-        .select('id')
-        .not('error_data', 'is', null);
-
-      statusFilteredIds = (allTraces || [])
-        .filter(trace => {
-          // Include if has explicit 'new' status
-          if (newStatusLogIds.has(trace.id)) return true;
-          // Exclude if has non-new status
-          if (otherStatusLogIds.has(trace.id)) return false;
-          // Include if no status record at all (truly new)
-          return true;
-        })
-        .map(trace => trace.id);
-
-      if (statusFilteredIds.length === 0) {
-        return { items: [], total: 0 };
-      }
-    } else {
-      // Get IDs with specific status
-      const statusQuery = await supabase
-        .from('log_issue_status')
-        .select('log_id')
-        .eq('log_type', 'generation_trace')
-        .eq('status', filters.status);
-
-      if (statusQuery.error) {
-        logger.error({ error: statusQuery.error }, 'Error fetching status-filtered IDs');
-        return { items: [], total: 0 };
-      }
-
-      statusFilteredIds = (statusQuery.data || []).map(row => row.log_id);
-      if (statusFilteredIds.length === 0) {
-        return { items: [], total: 0 };
-      }
-    }
-  }
-
-  let query = supabase
-    .from('generation_trace')
-    .select(
-      'id, created_at, stage, phase, step_name, course_id, lesson_id, error_data, courses(title)',
-      {
-        count: 'exact',
-      }
-    )
-    .not('error_data', 'is', null); // Only traces with errors
-
-  // Apply status filter (now includes 'new' status too - all filtering before pagination)
-  if (statusFilteredIds !== null) {
-    query = query.in('id', statusFilteredIds);
-  }
-
-  // Apply filters
-  if (filters?.search && filters.search.length >= 2) {
-    const sanitized = sanitizeSearchInput(filters.search);
-    query = query.ilike('step_name', `%${sanitized}%`);
-  }
-
-  if (filters?.dateFrom) {
-    query = query.gte('created_at', filters.dateFrom);
-  }
-
-  if (filters?.dateTo) {
-    query = query.lte('created_at', filters.dateTo);
-  }
-
-  if (filters?.courseId) {
-    query = query.eq('course_id', filters.courseId);
-  }
-
-  // Apply sorting
-  const ascending = sort?.direction === 'asc';
-  query = query.order('created_at', { ascending });
-
-  // Apply pagination
-  query = query.range(offset, offset + limit - 1);
-
-  // Execute query with retry for transient errors
-  type TraceQueryData = {
-    id: string;
-    created_at: string;
-    stage: string;
-    phase: string;
-    step_name: string;
-    course_id: string;
-    lesson_id: string | null;
-    error_data: unknown;
-    courses: { title: string } | null;
-  };
-  let data: TraceQueryData[] | null = null;
-  let count: number | null = null;
-  let queryError: unknown = null;
-
-  try {
-    const result = await withRetry(
-      async () => {
-        const response = await query;
-        if (response.error) {
-          // Check if error is truncated/malformed (transient)
-          const isTruncated =
-            response.error.message?.startsWith('{') && !response.error.message?.endsWith('}');
-          if (isTruncated) {
-            throw new Error(`Truncated response: ${response.error.message}`);
-          }
-          throw response.error;
-        }
-        return response;
-      },
-      { operationName: 'buildGenerationTraceQuery' }
-    );
-    data = result.data as TraceQueryData[] | null;
-    count = result.count;
-  } catch (error) {
-    queryError = error;
-  }
-
-  if (queryError) {
-    const errorDetails = {
-      message: queryError instanceof Error ? queryError.message : 'Unknown error',
-      code: (queryError as { code?: string }).code || null,
-      details: (queryError as { details?: string }).details || null,
-      hint: (queryError as { hint?: string }).hint || null,
-    };
-    logger.error({ errorDetails }, 'Error querying generation_trace after retries');
-    return { items: [], total: 0 };
-  }
-
-  // All filtering now happens BEFORE pagination, so no post-filter needed
-  const filteredData = data || [];
-
-  // Fetch statuses for these logs
-  const logIds = filteredData.map(log => log.id);
-  const statuses = await fetchLogStatuses(supabase, 'generation_trace', logIds);
-
-  const items: UnifiedLogItem[] = filteredData.map(log => {
-    const errorData = log.error_data as Record<string, unknown> | null;
-    // Get course name from JOIN
-    const courseData = log.courses as { title: string } | null;
-    return {
-      id: log.id,
-      logType: 'generation_trace' as LogType,
-      createdAt: log.created_at,
-      severity: 'ERROR', // Traces with error_data are errors
-      message: (errorData?.message as string) || log.step_name || 'Unknown error',
-      source: `${log.stage}/${log.phase}`,
-      courseId: log.course_id,
-      lessonId: log.lesson_id || null,
-      stage: log.stage,
-      phase: log.phase,
-      status: statuses.get(log.id) || 'new',
-      metadata: null,
-      problemId: null,
-      environment: null,
-      courseName: courseData?.title || null,
-    };
-  });
-
-  return { items, total: count || 0 };
-}
-
-/**
- * Build and execute grouped query for error_logs by fingerprint
- *
- * Groups error_logs by fingerprint, returning aggregated data for each group.
- * Uses PostgreSQL RPC function for efficient server-side grouping.
- */
-async function buildGroupedErrorLogsQuery(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  filters: z.infer<typeof logFiltersSchema> | undefined,
-  limit: number,
-  offset: number
-): Promise<{ items: ErrorGroupItem[]; total: number }> {
-  // Type for RPC function result
-  type GroupedErrorLogRow = {
-    fingerprint: string;
-    count: number;
-    first_seen: string;
-    last_seen: string;
-    severity: string;
-    message: string;
-    environments: string[] | null;
-    latest_log_id: string;
-    latest_problem_id: string | null;
-    job_type: string | null;
-    issue_status: string | null; // Status returned from RPC (matches filter)
-    latest_course_id: string | null; // Course ID from latest log
-  };
-
-  // Prepare filter parameters (use undefined for omitted values, as Supabase types expect)
-  const searchParam = filters?.search ? sanitizeSearchInput(filters.search) : undefined;
-
-  // Call RPC function for grouped data
-  const { data: groupedData, error } = (await supabase.rpc('get_grouped_error_logs', {
-    p_limit: limit,
-    p_offset: offset,
-    p_severity: filters?.level ?? undefined,
-    p_environment: filters?.environment ?? undefined,
-    p_search: searchParam,
-    p_date_from: filters?.dateFrom ?? undefined,
-    p_date_to: filters?.dateTo ?? undefined,
-    p_status: filters?.status ?? undefined,
-  })) as { data: GroupedErrorLogRow[] | null; error: Error | null };
-
-  if (error) {
-    logger.error({ error }, 'Error calling get_grouped_error_logs RPC');
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: ErrorMessages.databaseError('Grouped logs query', error.message),
-    });
-  }
-
-  // Get total count for pagination
-  const { data: countData, error: countError } = (await supabase.rpc(
-    'get_grouped_error_logs_count',
-    {
-      p_severity: filters?.level ?? undefined,
-      p_environment: filters?.environment ?? undefined,
-      p_search: searchParam,
-      p_date_from: filters?.dateFrom ?? undefined,
-      p_date_to: filters?.dateTo ?? undefined,
-      p_status: filters?.status ?? undefined,
-    }
-  )) as { data: number | null; error: Error | null };
-
-  if (countError) {
-    logger.error({ error: countError }, 'Error calling get_grouped_error_logs_count RPC');
-  }
-
-  const total = countData ?? 0;
-
-  if (!groupedData || groupedData.length === 0) {
-    return { items: [], total: 0 };
-  }
-
-  // Fetch course names for all unique course IDs
-  const courseIds = [
-    ...new Set(groupedData.map(g => g.latest_course_id).filter(Boolean) as string[]),
-  ];
-
-  const courseNameMap = new Map<string, string>();
-  if (courseIds.length > 0) {
-    const { data: courses } = await supabase
-      .from('courses')
-      .select('id, title')
-      .in('id', courseIds);
-
-    (courses || []).forEach(c => {
-      courseNameMap.set(c.id, c.title);
-    });
-  }
-
-  // Map RPC result to ErrorGroupItem
-  // NOTE: Use issue_status from RPC directly to ensure consistency with filtering
-  // Previously we fetched statuses separately which caused mismatch when status changed
-  const items: ErrorGroupItem[] = groupedData.map(g => ({
-    fingerprint: g.fingerprint,
-    count: g.count,
-    firstSeen: g.first_seen,
-    lastSeen: g.last_seen,
-    severity: g.severity,
-    message: g.message,
-    source: 'error_log',
-    status: (g.issue_status as LogStatus) || 'new', // Use status from RPC
-    environments: g.environments || [],
-    latestLogId: g.latest_log_id,
-    latestProblemId: g.latest_problem_id,
-    jobType: g.job_type,
-    courseId: g.latest_course_id,
-    courseName: g.latest_course_id ? (courseNameMap.get(g.latest_course_id) ?? null) : null,
-  }));
-
-  return { items, total };
-}
-
-/**
- * Fetch statuses for fingerprint groups
- * Note: fingerprint column added by migration, using type assertion until types regenerated
- */
-async function fetchGroupStatuses(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  fingerprints: string[]
-): Promise<Map<string, LogStatus>> {
-  if (fingerprints.length === 0) return new Map();
-
-  // Type for status with fingerprint column (added by migration)
-  // TODO: Remove after regenerating database types
-  type StatusWithFingerprint = {
-    fingerprint: string | null;
-    status: string;
-  };
-
-  const result = await supabase
-    .from('log_issue_status')
-    .select('fingerprint, status')
-    .in('fingerprint', fingerprints);
-
-  // Cast to expected type since fingerprint column exists but types not regenerated
-  const { data } = result as unknown as { data: StatusWithFingerprint[] | null };
-
-  const statusMap = new Map<string, LogStatus>();
-  (data || []).forEach(row => {
-    if (row.fingerprint) {
-      statusMap.set(row.fingerprint, row.status as LogStatus);
-    }
-  });
-
-  return statusMap;
-}
-
-/**
- * Fetch statuses for multiple logs of different types in a single query.
- * Optimized to avoid N+1 queries when fetching from both error_logs and generation_trace.
- * @internal Exported for potential future optimization of list procedure
- */
-export async function fetchAllLogStatuses(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  errorLogIds: string[],
-  traceLogIds: string[]
-): Promise<{ errorLogs: Map<string, LogStatus>; traces: Map<string, LogStatus> }> {
-  const allIds = [...errorLogIds, ...traceLogIds];
-  if (allIds.length === 0) {
-    return { errorLogs: new Map(), traces: new Map() };
-  }
-
-  const { data } = await supabase
-    .from('log_issue_status')
-    .select('log_id, log_type, status')
-    .in('log_id', allIds);
-
-  const errorLogs = new Map<string, LogStatus>();
-  const traces = new Map<string, LogStatus>();
-
-  (data || []).forEach(row => {
-    if (row.log_type === 'error_log') {
-      errorLogs.set(row.log_id, row.status as LogStatus);
-    } else {
-      traces.set(row.log_id, row.status as LogStatus);
-    }
-  });
-
-  return { errorLogs, traces };
-}
-
-/**
- * Fetch statuses for multiple logs (single type)
- * @deprecated Use fetchAllLogStatuses for batch operations
- */
-async function fetchLogStatuses(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  logType: LogType,
-  logIds: string[]
-): Promise<Map<string, LogStatus>> {
-  if (logIds.length === 0) return new Map();
-
-  const { data } = await supabase
-    .from('log_issue_status')
-    .select('log_id, status')
-    .eq('log_type', logType)
-    .in('log_id', logIds);
-
-  const statusMap = new Map<string, LogStatus>();
-  (data || []).forEach(row => {
-    statusMap.set(row.log_id, row.status as LogStatus);
-  });
-
-  return statusMap;
-}
-
-/**
- * Fetch single log status with user info
- */
-async function fetchLogStatus(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  logType: LogType,
-  logId: string
-): Promise<{
-  status: LogStatus;
-  notes: string | null;
-  updated_at: string | null;
-  updatedByEmail: string | null;
-} | null> {
-  // Query status without join first (to avoid relationship ambiguity)
-  const { data } = await supabase
-    .from('log_issue_status')
-    .select('status, notes, updated_at, updated_by')
-    .eq('log_type', logType)
-    .eq('log_id', logId)
-    .single();
-
-  if (!data) return null;
-
-  // Fetch user email separately if updated_by exists
-  let updatedByEmail: string | null = null;
-  if (data.updated_by) {
-    const { data: userData } = await supabase
-      .from('users')
-      .select('email')
-      .eq('id', data.updated_by)
-      .single();
-    updatedByEmail = userData?.email || null;
-  }
-
-  return {
-    status: data.status as LogStatus,
-    notes: data.notes,
-    updated_at: data.updated_at,
-    updatedByEmail,
-  };
-}
-
-/**
- * Verify that a log exists in the appropriate table
- */
-async function verifyLogExists(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  logType: LogType,
-  logId: string
-): Promise<boolean> {
-  const table = logType === 'error_log' ? 'error_logs' : 'generation_trace';
-
-  const { data } = await supabase.from(table).select('id').eq('id', logId).single();
-
-  return !!data;
-}
-
-/**
- * Terminal statuses - considered "closed" issues
- */
-const TERMINAL_STATUSES: LogStatus[] = ['resolved', 'ignored', 'auto_muted'];
-
-/**
- * Active statuses - issues being worked on
- */
-const ACTIVE_STATUSES: LogStatus[] = ['new', 'in_progress', 'to_verify'];
-
-/**
- * Validate status transition and return warning if reopening
- *
- * Transitioning from terminal states (resolved, ignored, auto_muted)
- * back to active states (new, in_progress, to_verify) is a "reopening"
- * and should require notes to explain why.
- *
- * @param fromStatus - Current status (or null if no status set)
- * @param toStatus - Target status
- * @param hasNotes - Whether notes are provided
- * @returns Object with isValid flag and optional warning message
- */
-function validateStatusTransition(
-  fromStatus: LogStatus | null,
-  toStatus: LogStatus,
-  hasNotes: boolean
-): { isValid: boolean; warning?: string; requiresNotes: boolean } {
-  // No current status - any transition is valid (initial assignment)
-  if (!fromStatus || fromStatus === 'new') {
-    return { isValid: true, requiresNotes: false };
-  }
-
-  // Same status - valid but pointless
-  if (fromStatus === toStatus) {
-    return { isValid: true, requiresNotes: false };
-  }
-
-  // Check if this is a "reopening" transition
-  const isFromTerminal = TERMINAL_STATUSES.includes(fromStatus);
-  const isToActive = ACTIVE_STATUSES.includes(toStatus);
-
-  if (isFromTerminal && isToActive) {
-    // Reopening requires notes to explain why
-    if (!hasNotes) {
-      return {
-        isValid: true, // Allow but warn
-        warning: `Reopening issue from '${fromStatus}' to '${toStatus}' without notes. Consider adding explanation.`,
-        requiresNotes: true,
-      };
-    }
-    return {
-      isValid: true,
-      warning: `Issue reopened from '${fromStatus}' to '${toStatus}'`,
-      requiresNotes: false,
-    };
-  }
-
-  // All other transitions are valid
-  return { isValid: true, requiresNotes: false };
-}
-
-/**
- * Fetch current status for a log
- */
-async function fetchCurrentLogStatus(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  logType: LogType,
-  logId: string
-): Promise<LogStatus | null> {
-  const { data } = await supabase
-    .from('log_issue_status')
-    .select('status')
-    .eq('log_type', logType)
-    .eq('log_id', logId)
-    .single();
-
-  return data?.status as LogStatus | null;
+  return allItems;
 }
 
 export type LogsRouter = typeof logsRouter;

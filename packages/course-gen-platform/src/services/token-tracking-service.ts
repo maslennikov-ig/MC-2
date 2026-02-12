@@ -63,24 +63,22 @@ export async function recordTrace(entry: TraceEntry): Promise<void> {
   try {
     const supabase = getSupabaseAdmin();
 
-    const { error } = await supabase
-      .from('generation_trace')
-      .insert({
-        course_id: entry.courseId,
-        stage: `stage_${entry.stageNumber}`,
-        phase: entry.phaseName,
-        step_name: 'llm_call',
-        model_used: entry.modelId,
-        tokens_used: entry.inputTokens + entry.outputTokens,
-        cost_usd: entry.costUsd,
-        duration_ms: entry.durationMs,
-        input_data: {
-          inputTokens: entry.inputTokens,
-          outputTokens: entry.outputTokens,
-          ...(entry.metadata || {}),
-        },
-        created_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.from('generation_trace').insert({
+      course_id: entry.courseId,
+      stage: `stage_${entry.stageNumber}`,
+      phase: entry.phaseName,
+      step_name: 'llm_call',
+      model_used: entry.modelId,
+      tokens_used: entry.inputTokens + entry.outputTokens,
+      cost_usd: entry.costUsd,
+      duration_ms: entry.durationMs,
+      input_data: {
+        inputTokens: entry.inputTokens,
+        outputTokens: entry.outputTokens,
+        ...(entry.metadata || {}),
+      },
+      created_at: new Date().toISOString(),
+    });
 
     if (error) {
       logger.warn({ error, entry }, 'Failed to record trace to database');

@@ -48,13 +48,13 @@ Analysis of **10 major AI writing platforms** reveals consistent patterns for ha
 
 The universal UI pattern across platforms involves **selection-based triggers** (highlight text → AI menu appears), **2-3 output variations** to choose from, clear **Accept/Replace/Discard** buttons, and tone modifiers (formal/casual dropdowns). The most useful innovation for educational contexts is **Canva's voice analysis feature**, which extracts tone characteristics from sample text to create reusable voice profiles.
 
-| Platform | Context Approach | Key Limitation |
-|----------|-----------------|----------------|
-| Notion AI | Page content + @-mentions | Cannot select multiple pages at once |
-| Jasper | 3K chars + Knowledge Base | No internet access in editor |
-| Copy.ai | Workflow-chained context | Requires workflow setup |
-| MS Copilot | File references (up to 20) | Requires continuous connectivity |
-| Google Docs | Selected text + prompt only | Limited document awareness |
+| Platform    | Context Approach            | Key Limitation                       |
+| ----------- | --------------------------- | ------------------------------------ |
+| Notion AI   | Page content + @-mentions   | Cannot select multiple pages at once |
+| Jasper      | 3K chars + Knowledge Base   | No internet access in editor         |
+| Copy.ai     | Workflow-chained context    | Requires workflow setup              |
+| MS Copilot  | File references (up to 20)  | Requires continuous connectivity     |
+| Google Docs | Selected text + prompt only | Limited document awareness           |
 
 ## Educational content demands explicit dependency tracking
 
@@ -89,12 +89,12 @@ Research demonstrates that **less context often produces better results**. The "
 
 **Recommended context sizes by task type**:
 
-| Regeneration Task | Optimal Context | Rationale |
-|-------------------|-----------------|-----------|
-| Single field (title, objective) | 2K-4K tokens | Minimal context for local coherence |
-| Paragraph regeneration | 4K-8K tokens | Include surrounding paragraphs + constraints |
-| Full lesson regeneration | 8K-16K tokens | Section structure + key dependencies |
-| Module-aware regeneration | 16K-32K tokens | Summary + targeted sections, not full content |
+| Regeneration Task               | Optimal Context | Rationale                                     |
+| ------------------------------- | --------------- | --------------------------------------------- |
+| Single field (title, objective) | 2K-4K tokens    | Minimal context for local coherence           |
+| Paragraph regeneration          | 4K-8K tokens    | Include surrounding paragraphs + constraints  |
+| Full lesson regeneration        | 8K-16K tokens   | Section structure + key dependencies          |
+| Module-aware regeneration       | 16K-32K tokens  | Summary + targeted sections, not full content |
 
 The **token budget allocation framework** for an 8K context window:
 

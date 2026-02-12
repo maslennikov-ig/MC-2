@@ -1,43 +1,49 @@
-import React, { useState } from 'react';
-import { useLocale } from 'next-intl';
-import { Loader2, AlertCircle, X } from 'lucide-react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useEnrichmentInspectorStore } from '../../../stores/enrichment-inspector-store';
-import { useStaticGraph } from '../../../contexts/StaticGraphContext';
-import { createEnrichment } from '@/app/actions/enrichment-actions';
-import { cn } from '@/lib/utils';
-import { getErrorMessage } from '@/lib/utils/sanitize-error';
-import { DiscardChangesDialog, useDiscardDialog } from '../components/DiscardChangesDialog';
+import React, { useState } from 'react'
+import { useLocale } from 'next-intl'
+import { Loader2, AlertCircle, X } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { useEnrichmentInspectorStore } from '../../../stores/enrichment-inspector-store'
+import { useStaticGraph } from '../../../contexts/StaticGraphContext'
+import { createEnrichment } from '@/app/actions/enrichment-actions'
+import { cn } from '@/lib/utils'
+import { getErrorMessage } from '@/lib/utils/sanitize-error'
+import { DiscardChangesDialog, useDiscardDialog } from '../components/DiscardChangesDialog'
 
 export interface CreateViewProps {
-  type: 'quiz' | 'video' | 'audio' | 'presentation' | 'cover';
-  lessonId: string;
-  className?: string;
+  type: 'quiz' | 'video' | 'audio' | 'presentation' | 'cover'
+  lessonId: string
+  className?: string
 }
 
 interface FormProps {
-  onSubmit: (settings: Record<string, unknown>) => void;
-  onCancel: () => void;
-  onDirtyChange: (dirty: boolean) => void;
-  isSubmitting: boolean;
+  onSubmit: (settings: Record<string, unknown>) => void
+  onCancel: () => void
+  onDirtyChange: (dirty: boolean) => void
+  isSubmitting: boolean
 }
 
 // Quiz Form Component
 function QuizCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: FormProps) {
-  const locale = useLocale();
-  const [questionCount, setQuestionCount] = useState(5);
-  const [difficulty, setDifficulty] = useState<'easy' | 'balanced' | 'hard'>('balanced');
+  const locale = useLocale()
+  const [questionCount, setQuestionCount] = useState(5)
+  const [difficulty, setDifficulty] = useState<'easy' | 'balanced' | 'hard'>('balanced')
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({ questionCount, difficultyBias: difficulty });
-  };
+    e.preventDefault()
+    onSubmit({ questionCount, difficultyBias: difficulty })
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -46,13 +52,16 @@ function QuizCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: For
           <Label>{locale === 'ru' ? 'Количество вопросов' : 'Question Count'}</Label>
           <Slider
             value={[questionCount]}
-            onValueChange={([v]) => { setQuestionCount(v); onDirtyChange(true); }}
+            onValueChange={([v]) => {
+              setQuestionCount(v)
+              onDirtyChange(true)
+            }}
             min={3}
             max={10}
             step={1}
             className="mt-2"
           />
-          <span className="text-sm text-muted-foreground mt-1 block">{questionCount}</span>
+          <span className="text-muted-foreground mt-1 block text-sm">{questionCount}</span>
         </div>
 
         <div>
@@ -60,8 +69,8 @@ function QuizCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: For
           <Select
             value={difficulty}
             onValueChange={(v) => {
-              setDifficulty(v as 'easy' | 'balanced' | 'hard');
-              onDirtyChange(true);
+              setDifficulty(v as 'easy' | 'balanced' | 'hard')
+              onDirtyChange(true)
             }}
           >
             <SelectTrigger className="mt-2">
@@ -69,37 +78,39 @@ function QuizCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: For
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="easy">{locale === 'ru' ? 'Легкий' : 'Easy'}</SelectItem>
-              <SelectItem value="balanced">{locale === 'ru' ? 'Сбалансированный' : 'Balanced'}</SelectItem>
+              <SelectItem value="balanced">
+                {locale === 'ru' ? 'Сбалансированный' : 'Balanced'}
+              </SelectItem>
               <SelectItem value="hard">{locale === 'ru' ? 'Сложный' : 'Hard'}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t">
+      <div className="flex gap-3 border-t pt-4">
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
           {locale === 'ru' ? 'Отмена' : 'Cancel'}
         </Button>
         <Button type="submit" disabled={isSubmitting} className="flex-1">
-          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {locale === 'ru' ? 'Создать' : 'Create'}
         </Button>
       </div>
     </form>
-  );
+  )
 }
 
 // Video Form Component
 function VideoCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: FormProps) {
-  const locale = useLocale();
-  const [voice, setVoice] = useState('alloy');
-  const [speed, setSpeed] = useState(1.0);
-  const [format, setFormat] = useState<'mp4' | 'webm'>('mp4');
+  const locale = useLocale()
+  const [voice, setVoice] = useState('alloy')
+  const [speed, setSpeed] = useState(1.0)
+  const [format, setFormat] = useState<'mp4' | 'webm'>('mp4')
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({ voice, speed, format });
-  };
+    e.preventDefault()
+    onSubmit({ voice, speed, format })
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -109,8 +120,8 @@ function VideoCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: Fo
           <Select
             value={voice}
             onValueChange={(v) => {
-              setVoice(v);
-              onDirtyChange(true);
+              setVoice(v)
+              onDirtyChange(true)
             }}
           >
             <SelectTrigger className="mt-2">
@@ -131,13 +142,16 @@ function VideoCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: Fo
           <Label>{locale === 'ru' ? 'Скорость' : 'Speed'}</Label>
           <Slider
             value={[speed]}
-            onValueChange={([v]) => { setSpeed(v); onDirtyChange(true); }}
+            onValueChange={([v]) => {
+              setSpeed(v)
+              onDirtyChange(true)
+            }}
             min={0.5}
             max={2.0}
             step={0.1}
             className="mt-2"
           />
-          <span className="text-sm text-muted-foreground mt-1 block">{speed.toFixed(1)}x</span>
+          <span className="text-muted-foreground mt-1 block text-sm">{speed.toFixed(1)}x</span>
         </div>
 
         <div>
@@ -145,8 +159,8 @@ function VideoCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: Fo
           <Select
             value={format}
             onValueChange={(v) => {
-              setFormat(v as 'mp4' | 'webm');
-              onDirtyChange(true);
+              setFormat(v as 'mp4' | 'webm')
+              onDirtyChange(true)
             }}
           >
             <SelectTrigger className="mt-2">
@@ -160,30 +174,30 @@ function VideoCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: Fo
         </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t">
+      <div className="flex gap-3 border-t pt-4">
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
           {locale === 'ru' ? 'Отмена' : 'Cancel'}
         </Button>
         <Button type="submit" disabled={isSubmitting} className="flex-1">
-          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {locale === 'ru' ? 'Создать' : 'Create'}
         </Button>
       </div>
     </form>
-  );
+  )
 }
 
 // Audio Form Component
 function AudioCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: FormProps) {
-  const locale = useLocale();
-  const [voice, setVoice] = useState('alloy');
-  const [speed, setSpeed] = useState(1.0);
-  const [format, setFormat] = useState<'mp3' | 'opus' | 'aac'>('mp3');
+  const locale = useLocale()
+  const [voice, setVoice] = useState('alloy')
+  const [speed, setSpeed] = useState(1.0)
+  const [format, setFormat] = useState<'mp3' | 'opus' | 'aac'>('mp3')
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({ voice, speed, format });
-  };
+    e.preventDefault()
+    onSubmit({ voice, speed, format })
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -193,8 +207,8 @@ function AudioCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: Fo
           <Select
             value={voice}
             onValueChange={(v) => {
-              setVoice(v);
-              onDirtyChange(true);
+              setVoice(v)
+              onDirtyChange(true)
             }}
           >
             <SelectTrigger className="mt-2">
@@ -215,13 +229,16 @@ function AudioCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: Fo
           <Label>{locale === 'ru' ? 'Скорость' : 'Speed'}</Label>
           <Slider
             value={[speed]}
-            onValueChange={([v]) => { setSpeed(v); onDirtyChange(true); }}
+            onValueChange={([v]) => {
+              setSpeed(v)
+              onDirtyChange(true)
+            }}
             min={0.5}
             max={2.0}
             step={0.1}
             className="mt-2"
           />
-          <span className="text-sm text-muted-foreground mt-1 block">{speed.toFixed(1)}x</span>
+          <span className="text-muted-foreground mt-1 block text-sm">{speed.toFixed(1)}x</span>
         </div>
 
         <div>
@@ -229,8 +246,8 @@ function AudioCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: Fo
           <Select
             value={format}
             onValueChange={(v) => {
-              setFormat(v as 'mp3' | 'opus' | 'aac');
-              onDirtyChange(true);
+              setFormat(v as 'mp3' | 'opus' | 'aac')
+              onDirtyChange(true)
             }}
           >
             <SelectTrigger className="mt-2">
@@ -245,30 +262,30 @@ function AudioCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: Fo
         </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t">
+      <div className="flex gap-3 border-t pt-4">
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
           {locale === 'ru' ? 'Отмена' : 'Cancel'}
         </Button>
         <Button type="submit" disabled={isSubmitting} className="flex-1">
-          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {locale === 'ru' ? 'Создать' : 'Create'}
         </Button>
       </div>
     </form>
-  );
+  )
 }
 
 // Presentation Form Component
 function PresentationCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmitting }: FormProps) {
-  const locale = useLocale();
-  const [theme, setTheme] = useState<'light' | 'dark' | 'colorful'>('light');
-  const [maxSlides, setMaxSlides] = useState(10);
-  const [includeNotes, setIncludeNotes] = useState(true);
+  const locale = useLocale()
+  const [theme, setTheme] = useState<'light' | 'dark' | 'colorful'>('light')
+  const [maxSlides, setMaxSlides] = useState(10)
+  const [includeNotes, setIncludeNotes] = useState(true)
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({ theme, maxSlides, includeNotes });
-  };
+    e.preventDefault()
+    onSubmit({ theme, maxSlides, includeNotes })
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -278,8 +295,8 @@ function PresentationCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmittin
           <Select
             value={theme}
             onValueChange={(v) => {
-              setTheme(v as 'light' | 'dark' | 'colorful');
-              onDirtyChange(true);
+              setTheme(v as 'light' | 'dark' | 'colorful')
+              onDirtyChange(true)
             }}
           >
             <SelectTrigger className="mt-2">
@@ -297,13 +314,16 @@ function PresentationCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmittin
           <Label>{locale === 'ru' ? 'Максимум слайдов' : 'Maximum Slides'}</Label>
           <Slider
             value={[maxSlides]}
-            onValueChange={([v]) => { setMaxSlides(v); onDirtyChange(true); }}
+            onValueChange={([v]) => {
+              setMaxSlides(v)
+              onDirtyChange(true)
+            }}
             min={5}
             max={20}
             step={1}
             className="mt-2"
           />
-          <span className="text-sm text-muted-foreground mt-1 block">{maxSlides}</span>
+          <span className="text-muted-foreground mt-1 block text-sm">{maxSlides}</span>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -312,10 +332,10 @@ function PresentationCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmittin
             id="includeNotes"
             checked={includeNotes}
             onChange={(e) => {
-              setIncludeNotes(e.target.checked);
-              onDirtyChange(true);
+              setIncludeNotes(e.target.checked)
+              onDirtyChange(true)
             }}
-            className="w-4 h-4 rounded border-gray-300"
+            className="h-4 w-4 rounded border-gray-300"
           />
           <Label htmlFor="includeNotes" className="cursor-pointer">
             {locale === 'ru' ? 'Включить заметки докладчика' : 'Include Speaker Notes'}
@@ -323,56 +343,56 @@ function PresentationCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmittin
         </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t">
+      <div className="flex gap-3 border-t pt-4">
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
           {locale === 'ru' ? 'Отмена' : 'Cancel'}
         </Button>
         <Button type="submit" disabled={isSubmitting} className="flex-1">
-          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {locale === 'ru' ? 'Создать' : 'Create'}
         </Button>
       </div>
     </form>
-  );
+  )
 }
 
 // Cover Form Component - Simple form with no settings (auto-generated from lesson content)
 function CoverCreateForm({ onSubmit, onCancel, isSubmitting }: Omit<FormProps, 'onDirtyChange'>) {
-  const locale = useLocale();
+  const locale = useLocale()
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({}); // No settings needed - cover is auto-generated from lesson content
-  };
+    e.preventDefault()
+    onSubmit({}) // No settings needed - cover is auto-generated from lesson content
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="text-sm text-muted-foreground">
+      <div className="text-muted-foreground text-sm">
         {locale === 'ru'
           ? 'Обложка будет автоматически сгенерирована на основе контента урока.'
           : 'Cover image will be automatically generated based on lesson content.'}
       </div>
 
-      <div className="flex gap-3 pt-4 border-t">
+      <div className="flex gap-3 border-t pt-4">
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
           {locale === 'ru' ? 'Отмена' : 'Cancel'}
         </Button>
         <Button type="submit" disabled={isSubmitting} className="flex-1">
-          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {locale === 'ru' ? 'Создать' : 'Create'}
         </Button>
       </div>
     </form>
-  );
+  )
 }
 
 // Main CreateView Component
 export function CreateView({ type, lessonId, className }: CreateViewProps) {
-  const locale = useLocale();
-  const { goBack, setDirty, dirty: isDirty } = useEnrichmentInspectorStore();
-  const { courseInfo } = useStaticGraph();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const locale = useLocale()
+  const { goBack, setDirty, dirty: isDirty } = useEnrichmentInspectorStore()
+  const { courseInfo } = useStaticGraph()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Discard dialog for unsaved changes
   const {
@@ -380,56 +400,59 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
     handleNavigation,
     handleConfirm,
     handleCancel: handleDialogCancel,
-  } = useDiscardDialog(isDirty, () => setDirty(false));
+  } = useDiscardDialog(isDirty, () => setDirty(false))
 
   // Handle form submission
   const handleSubmit = async (settings: Record<string, unknown>) => {
     if (!courseInfo?.id) {
-      setError(locale === 'ru' ? 'Курс не найден' : 'Course not found');
-      return;
+      setError(locale === 'ru' ? 'Курс не найден' : 'Course not found')
+      return
     }
 
-    setIsSubmitting(true);
-    setError(null); // Clear previous errors
+    setIsSubmitting(true)
+    setError(null) // Clear previous errors
 
     try {
       // Map form type to enrichmentType
-      const typeMap: Record<string, 'quiz' | 'video' | 'audio' | 'presentation' | 'document' | 'cover'> = {
+      const typeMap: Record<
+        string,
+        'quiz' | 'video' | 'audio' | 'presentation' | 'document' | 'cover'
+      > = {
         quiz: 'quiz',
         video: 'video',
         audio: 'audio',
         presentation: 'presentation',
         cover: 'cover',
-      };
+      }
 
       const result = await createEnrichment({
         lessonId,
         courseId: courseInfo.id,
         enrichmentType: typeMap[type],
         settings,
-      });
+      })
 
       if (result.success) {
-        toast.success(locale === 'ru' ? 'Активность создана' : 'Activity created');
-        goBack();
+        toast.success(locale === 'ru' ? 'Активность создана' : 'Activity created')
+        goBack()
       } else {
-        setError(result.error || (locale === 'ru' ? 'Ошибка создания' : 'Creation failed'));
+        setError(result.error || (locale === 'ru' ? 'Ошибка создания' : 'Creation failed'))
       }
     } catch (err) {
-      console.error('Failed to create enrichment:', err);
-      setError(getErrorMessage(err, { locale }));
+      console.error('Failed to create enrichment:', err)
+      setError(getErrorMessage(err, { locale }))
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   // Handle cancel (with dirty form check)
   const handleCancel = () => {
-    handleNavigation(goBack);
-  };
+    handleNavigation(goBack)
+  }
 
   // Dismiss error alert
-  const dismissError = () => setError(null);
+  const dismissError = () => setError(null)
 
   // Render form based on type
   const renderForm = () => {
@@ -442,7 +465,7 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
             onDirtyChange={setDirty}
             isSubmitting={isSubmitting}
           />
-        );
+        )
       case 'video':
         return (
           <VideoCreateForm
@@ -451,7 +474,7 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
             onDirtyChange={setDirty}
             isSubmitting={isSubmitting}
           />
-        );
+        )
       case 'audio':
         return (
           <AudioCreateForm
@@ -460,7 +483,7 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
             onDirtyChange={setDirty}
             isSubmitting={isSubmitting}
           />
-        );
+        )
       case 'presentation':
         return (
           <PresentationCreateForm
@@ -469,7 +492,7 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
             onDirtyChange={setDirty}
             isSubmitting={isSubmitting}
           />
-        );
+        )
       case 'cover':
         return (
           <CoverCreateForm
@@ -477,28 +500,26 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
             onCancel={handleCancel}
             isSubmitting={isSubmitting}
           />
-        );
+        )
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   return (
     <>
-      <ScrollArea className={cn('flex-1 h-full', className)} data-testid="create-view">
-        <div className="p-4 space-y-4">
+      <ScrollArea className={cn('h-full flex-1', className)} data-testid="create-view">
+        <div className="space-y-4 p-4">
           {/* Error Alert */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>
-                {locale === 'ru' ? 'Ошибка' : 'Error'}
-              </AlertTitle>
+              <AlertTitle>{locale === 'ru' ? 'Ошибка' : 'Error'}</AlertTitle>
               <AlertDescription className="flex items-start justify-between gap-2">
                 <span>{error}</span>
                 <button
                   onClick={dismissError}
-                  className="shrink-0 text-destructive-foreground/70 hover:text-destructive-foreground"
+                  className="text-destructive-foreground/70 hover:text-destructive-foreground shrink-0"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -515,11 +536,11 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
         open={showDialog}
         onOpenChange={(open) => !open && handleDialogCancel()}
         onConfirm={() => {
-          handleConfirm();
-          goBack();
+          handleConfirm()
+          goBack()
         }}
         onCancel={handleDialogCancel}
       />
     </>
-  );
+  )
 }

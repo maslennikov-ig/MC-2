@@ -1,4 +1,5 @@
-import React, { memo, useState, useEffect, useRef } from 'react'
+import React, { memo, useState, useEffect } from 'react'
+import { usePrevious } from '@/lib/hooks/use-previous'
 import { Handle, Position, NodeProps, useViewport, useUpdateNodeInternals } from '@xyflow/react'
 import { useParams } from 'next/navigation'
 import { RFStageNode } from '../types'
@@ -13,6 +14,7 @@ import { useTranslations } from 'next-intl'
 import { RestartConfirmDialog } from '../controls/RestartConfirmDialog'
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext'
 import { useGenerationStore, type StageId } from '@/stores/useGenerationStore'
+import { formatDuration } from '@megacampus/shared-utils'
 import { NodeErrorTooltip, NodeErrorPanel, RetryBadge, NodeProgressBar } from '../components/shared'
 
 const StageNode = (props: NodeProps<RFStageNode>) => {
@@ -28,16 +30,15 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
 
   // Track zoom mode for semantic zoom - notify React Flow when node dimensions change
   // This ensures edges are recalculated when crossing zoom thresholds
-  const prevZoomModeRef = useRef<'minimal' | 'medium' | 'full'>('full')
   const currentZoomMode = zoom < 0.3 ? 'minimal' : zoom < 0.5 ? 'medium' : 'full'
+  const prevZoomMode = usePrevious(currentZoomMode)
 
   useEffect(() => {
-    if (prevZoomModeRef.current !== currentZoomMode) {
-      prevZoomModeRef.current = currentZoomMode
-      // Notify React Flow to recalculate node dimensions and edge positions
+    if (prevZoomMode === undefined) return
+    if (prevZoomMode !== currentZoomMode) {
       updateNodeInternals(id)
     }
-  }, [currentZoomMode, id, updateNodeInternals])
+  }, [currentZoomMode, prevZoomMode, id, updateNodeInternals])
 
   // Get partial generation context for Stage 6 active state detection (optional - may not be in provider)
   const partialGenContext = useOptionalPartialGenerationContext()
@@ -197,8 +198,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
         {(selected || currentStatus === 'completed') && (
           <div className="mt-2 grid grid-cols-2 gap-1 border-t border-dashed border-slate-200 pt-2 text-[10px] text-slate-400 dark:border-slate-600 dark:text-slate-500">
             <div>
-              {t('metrics.duration')}:{' '}
-              {data.duration ? `${Math.round(data.duration / 1000)}с` : '-'}
+              {t('metrics.duration')}: {data.duration ? formatDuration(data.duration) : '-'}
             </div>
             <div>
               {t('metrics.tokens')}: {data.tokens?.toLocaleString('ru-RU') || '-'}

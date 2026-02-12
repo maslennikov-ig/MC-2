@@ -35,17 +35,11 @@ export { OpenEdXClient } from './client';
 export type { OpenEdXClientConfig } from './client';
 
 // Status Polling
-export {
-  pollImportStatus,
-  estimateRemainingTime,
-  formatDuration,
-} from './poller';
+export { pollImportStatus, estimateRemainingTime, formatDuration } from './poller';
 export type { PollOptions } from './poller';
 
 // Types
-export {
-  OpenEdXApiError,
-} from './types';
+export { OpenEdXApiError } from './types';
 export type {
   ImportStatus,
   ImportResult,

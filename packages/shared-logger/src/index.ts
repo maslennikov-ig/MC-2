@@ -48,6 +48,28 @@ function createLoggerDestination(): DestinationStream | undefined {
   });
 }
 
+/**
+ * Serializes error objects for structured logging.
+ * Handles both standard Error instances and plain objects (e.g., fetch errors, Supabase errors)
+ * that may have non-enumerable properties invisible to JSON.stringify().
+ */
+function serializeError(err: unknown): unknown {
+  if (!err || typeof err !== 'object') return err;
+  const e = err as Record<string, unknown>;
+  return {
+    type: (err as Error).constructor?.name,
+    message: e.message || (e.name ? `${e.name as string}` : 'Unknown error'),
+    stack: e.stack,
+    code: e.code,
+    cause: (err as Error).cause
+      ? {
+          message: ((err as Error).cause as Error).message,
+          stack: ((err as Error).cause as Error).stack,
+        }
+      : undefined,
+  };
+}
+
 const loggerOptions: LoggerOptions = {
   level: process.env.LOG_LEVEL || 'info',
   base: {
@@ -78,16 +100,8 @@ const loggerOptions: LoggerOptions = {
     remove: true,
   },
   serializers: {
-    err: (err: Error) => ({
-      type: err.constructor.name,
-      message: err.message,
-      stack: err.stack,
-      code: (err as NodeJS.ErrnoException).code,
-      cause: err.cause ? {
-        message: (err.cause as Error).message,
-        stack: (err.cause as Error).stack,
-      } : undefined,
-    }),
+    err: serializeError,
+    error: serializeError,
   },
 };
 
@@ -99,9 +113,7 @@ if (transportConfig) {
 
 // Create logger with appropriate destination
 const destination = createLoggerDestination();
-const logger = destination
-  ? pino(loggerOptions, destination)
-  : pino(loggerOptions);
+const logger = destination ? pino(loggerOptions, destination) : pino(loggerOptions);
 
 /**
  * Creates a child logger with custom context fields

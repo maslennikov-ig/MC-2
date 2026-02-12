@@ -29,6 +29,18 @@ import { logger } from '@/shared/logger';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { createStage7Queue, addEnrichmentJob } from '../factory';
 import type { Stage7JobInput, Stage7JobResult } from '../types';
+import {
+  fetchCourseMetadata,
+  fetchCourseSections,
+  fetchFirstLesson,
+  checkExistingCourseCard,
+  createCourseCardEnrichment,
+  queueCourseCardJob,
+  logCardGenerationFailure,
+  fetchSectionsForBatch,
+  fetchLessonsForBatch,
+  fetchExistingEnrichments,
+} from './auto-card-trigger-helpers';
 
 // ============================================================================
 // CONFIGURATION
@@ -113,71 +125,11 @@ let shutdownHandlersRegistered = false;
 let isShuttingDown = false;
 
 /**
- * Log structured enrichment generation failure for tracking and monitoring
- *
- * Provides structured error logging with consistent fields for:
- * - Monitoring dashboards (filtering by event type)
- * - Alert triggers (severity-based routing)
- * - Debugging (full context with stack traces)
- *
- * @param params - Failure context parameters
- */
-function logCardGenerationFailure(params: {
-  enrichmentType: 'card' | 'cover';
-  scope: 'lesson' | 'course';
-  courseId: string;
-  lessonId?: string;
-  error: unknown;
-  phase: 'trigger' | 'queue' | 'enrichment-creation';
-  context?: Record<string, unknown>;
-}): void {
-  const { enrichmentType, scope, courseId, lessonId, error, phase, context } = params;
-
-  // Handle different error types: Error instances, Supabase errors (plain objects), or primitives
-  let errorMessage: string;
-  let errorStack: string | undefined;
-
-  if (error instanceof Error) {
-    errorMessage = error.message;
-    errorStack = error.stack;
-  } else if (error && typeof error === 'object' && 'message' in error) {
-    // Supabase PostgrestError or similar object with message property
-    errorMessage = String((error as { message: unknown }).message);
-  } else if (error && typeof error === 'object') {
-    // Plain object - try to JSON stringify
-    try {
-      errorMessage = JSON.stringify(error);
-    } catch {
-      errorMessage = String(error);
-    }
-  } else {
-    errorMessage = String(error);
-  }
-
-  // Structured error log for monitoring/alerting systems
-  logger.error(
-    {
-      event: 'enrichment_generation_failure',
-      enrichmentType,
-      scope,
-      courseId,
-      lessonId,
-      phase,
-      error: errorMessage,
-      errorStack,
-      timestamp: new Date().toISOString(),
-      ...context,
-    },
-    `Enrichment generation failure: ${scope} ${enrichmentType} failed during ${phase} phase`
-  );
-}
-
-/**
  * Get or create the Stage7 queue singleton instance
  *
  * @returns Queue instance or null if shutting down
  */
-async function getQueue(): Promise<Queue<Stage7JobInput, Stage7JobResult> | null> {
+function getQueue(): Queue<Stage7JobInput, Stage7JobResult> | null {
   if (isShuttingDown) {
     logger.warn('Queue requested during shutdown, returning null');
     return null;
@@ -391,10 +343,9 @@ async function triggerLessonEnrichment(
       courseId,
       userId: userId,
       organizationId: organizationId,
-      retryAttempt: 0,
     };
 
-    const queue = await getQueue();
+    const queue = getQueue();
     if (!queue) {
       logCardGenerationFailure({
         enrichmentType,
@@ -502,14 +453,13 @@ export async function triggerCourseCard(params: {
   const { courseId } = params;
   let { userId, organizationId } = params;
 
-  // Input validation
   if (!courseId) {
-    logger.error({ courseId }, 'Missing required courseId for course card trigger');
+    logger.error({ courseId }, 'Missing required courseId');
     return null;
   }
 
   if (!AUTO_CARD_ENABLED) {
-    logger.debug({ courseId }, 'Auto-card generation disabled, skipping course card trigger');
+    logger.debug({ courseId }, 'Auto-card generation disabled');
     return null;
   }
 
@@ -518,166 +468,60 @@ export async function triggerCourseCard(params: {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Fetch userId and organizationId from course if not provided
+    // Fetch metadata if not provided
     if (!userId || !organizationId) {
-      const { data: course, error: courseError } = await supabase
-        .from('courses')
-        .select('user_id, organization_id')
-        .eq('id', courseId)
-        .single();
-
-      if (courseError || !course) {
-        logCardGenerationFailure({
-          enrichmentType: 'card',
-          scope: 'course',
-          courseId,
-          error: courseError || new Error('Course not found'),
-          phase: 'trigger',
-          context: { errorCode: courseError?.code },
-        });
-        return null;
-      }
-
-      // Null safety check for required fields from database
-      if (!course.user_id || !course.organization_id) {
-        logger.error(
-          { courseId, user_id: course.user_id, organization_id: course.organization_id },
-          'Course missing required user_id or organization_id'
-        );
-        return null;
-      }
-
-      userId = userId || course.user_id;
-      organizationId = organizationId || course.organization_id;
+      const metadata = await fetchCourseMetadata(courseId, supabase);
+      if (!metadata) return null;
+      userId = userId || metadata.userId;
+      organizationId = organizationId || metadata.organizationId;
     }
 
-    // Get the first lesson of the course to attach the course card to
-    // Note: lessons are linked via sections (lessons.section_id -> sections.course_id)
-    // We use two-step query because PostgREST nested filter syntax can be unreliable
+    // Get first lesson
+    const sections = await fetchCourseSections(courseId, supabase);
+    if (!sections) return null;
 
-    // Step 1: Get all section IDs for this course
-    const { data: sections, error: sectionsError } = await supabase
-      .from('sections')
-      .select('id, order_index')
-      .eq('course_id', courseId)
-      .order('order_index', { ascending: true });
+    const firstLesson = await fetchFirstLesson(sections[0].id, courseId, supabase);
+    if (!firstLesson) return null;
 
-    if (sectionsError || !sections || sections.length === 0) {
-      logger.warn(
-        { courseId, error: sectionsError?.message },
-        'No sections found for course, cannot create course card'
-      );
-      return null;
-    }
+    // Check existing card
+    const existingCardId = await checkExistingCourseCard(courseId, supabase);
+    if (existingCardId) return existingCardId;
 
-    // Step 2: Get lessons from first section (sorted by order)
-    const firstSection = sections[0];
-    const { data: allLessons, error: lessonError } = await supabase
-      .from('lessons')
-      .select('id, order_index')
-      .eq('section_id', firstSection.id)
-      .order('order_index', { ascending: true })
-      .limit(1);
-
-    if (lessonError || !allLessons || allLessons.length === 0) {
-      logger.warn(
-        { courseId, sectionId: firstSection.id, error: lessonError?.message },
-        'No lessons found in first section, cannot create course card'
-      );
-      return null;
-    }
-
-    const firstLesson = allLessons[0];
-
-    // Check if course card already exists (marked by title or settings)
-    const { data: existingCard } = await supabase
-      .from('lesson_enrichments')
-      .select('id')
-      .eq('course_id', courseId)
-      .eq('enrichment_type', 'card')
-      .eq('title', 'course-card')
-      .maybeSingle();
-
-    if (existingCard) {
-      logger.debug(
-        { courseId, existingCardId: existingCard.id },
-        'Course card already exists, skipping'
-      );
-      return existingCard.id;
-    }
-
-    // Create enrichment record for course card
-    // Mark it with title='course-card' to identify it as a course-level card
-    // Note: Unique constraint lesson_enrichments_course_card_unique ensures one per course
-    const enrichmentId = randomUUID();
-    const { error: insertError } = await supabase.from('lesson_enrichments').insert({
-      id: enrichmentId,
-      lesson_id: firstLesson.id,
-      course_id: courseId,
-      enrichment_type: 'card',
-      status: 'pending',
-      order_index: CARD_ORDER_INDEX,
-      title: 'course-card', // Marker for course-level card
-      metadata: { isCourseCard: true }, // Additional marker in metadata
-      generation_attempt: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-
-    if (insertError) {
-      // 23505 means unique constraint violation (race condition - another process inserted first)
-      if (insertError.code === '23505') {
-        logger.debug(
-          { courseId },
-          'Course card already exists (race condition handled), skipping job queue'
-        );
-        return null;
-      }
-      logCardGenerationFailure({
-        enrichmentType: 'card',
-        scope: 'course',
-        courseId,
-        error: insertError,
-        phase: 'enrichment-creation',
-        context: { errorCode: insertError.code },
-      });
-      return null;
-    }
-
-    // Queue Stage7 job with deterministic jobId for deduplication
-    // userId and organizationId are guaranteed to be set at this point (either from params or fetched from course)
-    const jobInput: Stage7JobInput = {
-      enrichmentId,
-      enrichmentType: 'card',
-      lessonId: firstLesson.id,
+    // Create enrichment
+    const { enrichmentId, isRaceCondition } = await createCourseCardEnrichment(
       courseId,
-      userId: userId,
-      organizationId: organizationId,
-      settings: { isCourseCard: true },
-      retryAttempt: 0,
-    };
+      firstLesson.id,
+      supabase
+    );
 
-    const queue = await getQueue();
+    if (isRaceCondition) return null;
+
+    // Queue job
+    const queue = getQueue();
     if (!queue) {
       logCardGenerationFailure({
         enrichmentType: 'card',
         scope: 'course',
         courseId,
-        error: new Error('Queue unavailable (shutdown in progress)'),
+        error: new Error('Queue unavailable'),
         phase: 'queue',
       });
       return null;
     }
 
-    await addEnrichmentJob(queue, jobInput, {
-      priority: CARD_JOB_PRIORITY,
-      jobId: `card-course-${courseId}`,
-    });
-
-    const durationMs = Date.now() - startTime;
+    await queueCourseCardJob(
+      {
+        enrichmentId,
+        lessonId: firstLesson.id,
+        courseId,
+        userId,
+        organizationId,
+      },
+      queue
+    );
 
     logger.info(
-      { courseId, enrichmentId, lessonId: firstLesson.id, durationMs },
+      { courseId, enrichmentId, lessonId: firstLesson.id, durationMs: Date.now() - startTime },
       'Course card generation triggered'
     );
 
@@ -750,50 +594,18 @@ export async function triggerAllLessonCards(params: {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Two-step query: get sections first, then lessons
-    // This is more reliable than PostgREST nested filter syntax
+    // Get sections
+    const sectionIds = await fetchSectionsForBatch(courseId, supabase);
+    if (!sectionIds) return result;
 
-    // Step 1: Get all section IDs for this course
-    const { data: sections, error: sectionsError } = await supabase
-      .from('sections')
-      .select('id')
-      .eq('course_id', courseId);
+    // Get lessons
+    const lessons = await fetchLessonsForBatch(sectionIds, courseId, supabase);
+    if (!lessons) return result;
 
-    if (sectionsError || !sections || sections.length === 0) {
-      logger.warn(
-        { courseId, error: sectionsError?.message },
-        'No sections found for batch card trigger'
-      );
-      return result;
-    }
+    // Get existing enrichments
+    const existingLessonIds = await fetchExistingEnrichments(courseId, 'card', true, supabase);
 
-    const sectionIds = sections.map(s => s.id);
-
-    // Step 2: Get all lessons from these sections
-    const { data: lessons, error: lessonsError } = await supabase
-      .from('lessons')
-      .select('id')
-      .in('section_id', sectionIds);
-
-    if (lessonsError || !lessons || lessons.length === 0) {
-      logger.warn(
-        { courseId, error: lessonsError?.message },
-        'No lessons found for batch card trigger'
-      );
-      return result;
-    }
-
-    // Get existing card enrichments
-    const { data: existingCards } = await supabase
-      .from('lesson_enrichments')
-      .select('lesson_id')
-      .eq('course_id', courseId)
-      .eq('enrichment_type', 'card')
-      .not('title', 'eq', 'course-card'); // Exclude course card
-
-    const existingLessonIds = new Set(existingCards?.map(c => c.lesson_id) || []);
-
-    // Trigger cards for lessons that don't have them
+    // Trigger cards
     for (const lesson of lessons) {
       if (existingLessonIds.has(lesson.id)) {
         result.skipped.push(lesson.id);
@@ -811,10 +623,9 @@ export async function triggerAllLessonCards(params: {
         if (enrichmentId) {
           result.succeeded.push(enrichmentId);
         } else {
-          // triggerLessonCard returned null without throwing
           result.failed.push({
             lessonId: lesson.id,
-            error: 'Trigger returned null (check logs for details)',
+            error: 'Trigger returned null',
           });
         }
       } catch (error) {
@@ -893,49 +704,18 @@ export async function triggerAllLessonCovers(params: {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Two-step query: get sections first, then lessons
-    // This is more reliable than PostgREST nested filter syntax
+    // Get sections
+    const sectionIds = await fetchSectionsForBatch(courseId, supabase);
+    if (!sectionIds) return result;
 
-    // Step 1: Get all section IDs for this course
-    const { data: sections, error: sectionsError } = await supabase
-      .from('sections')
-      .select('id')
-      .eq('course_id', courseId);
+    // Get lessons
+    const lessons = await fetchLessonsForBatch(sectionIds, courseId, supabase);
+    if (!lessons) return result;
 
-    if (sectionsError || !sections || sections.length === 0) {
-      logger.warn(
-        { courseId, error: sectionsError?.message },
-        'No sections found for batch cover trigger'
-      );
-      return result;
-    }
+    // Get existing enrichments
+    const existingLessonIds = await fetchExistingEnrichments(courseId, 'cover', false, supabase);
 
-    const sectionIds = sections.map(s => s.id);
-
-    // Step 2: Get all lessons from these sections
-    const { data: lessons, error: lessonsError } = await supabase
-      .from('lessons')
-      .select('id')
-      .in('section_id', sectionIds);
-
-    if (lessonsError || !lessons || lessons.length === 0) {
-      logger.warn(
-        { courseId, error: lessonsError?.message },
-        'No lessons found for batch cover trigger'
-      );
-      return result;
-    }
-
-    // Get existing cover enrichments
-    const { data: existingCovers } = await supabase
-      .from('lesson_enrichments')
-      .select('lesson_id')
-      .eq('course_id', courseId)
-      .eq('enrichment_type', 'cover');
-
-    const existingLessonIds = new Set(existingCovers?.map(c => c.lesson_id) || []);
-
-    // Trigger covers for lessons that don't have them
+    // Trigger covers
     for (const lesson of lessons) {
       if (existingLessonIds.has(lesson.id)) {
         result.skipped.push(lesson.id);
@@ -953,10 +733,9 @@ export async function triggerAllLessonCovers(params: {
         if (enrichmentId) {
           result.succeeded.push(enrichmentId);
         } else {
-          // triggerLessonCover returned null without throwing
           result.failed.push({
             lessonId: lesson.id,
-            error: 'Trigger returned null (check logs for details)',
+            error: 'Trigger returned null',
           });
         }
       } catch (error) {

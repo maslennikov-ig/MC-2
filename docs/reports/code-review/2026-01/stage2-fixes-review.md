@@ -1077,6 +1077,7 @@ const pdfData = await pdfParse(buffer);
 - ❌ **Return -1 to Stop Retrying**: Not implemented for non-retryable errors
   - Issue: Non-retryable errors (FILE_NOT_FOUND, UNSUPPORTED_FORMAT) still go through retry loop
   - Context7 Pattern:
+
   ```typescript
   if (attemptsMade > 3 && err?.message.includes('fatal')) {
     return -1; // Stop retrying

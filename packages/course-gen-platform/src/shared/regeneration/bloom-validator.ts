@@ -16,13 +16,7 @@
 /**
  * Bloom's Taxonomy cognitive levels
  */
-export type BloomLevel =
-  | 'remember'
-  | 'understand'
-  | 'apply'
-  | 'analyze'
-  | 'evaluate'
-  | 'create';
+export type BloomLevel = 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
 
 /**
  * Result of Bloom's level validation
@@ -338,9 +332,7 @@ export function detectBloomLevel(text: string): BloomDetectionResult {
   }
 
   // Find top two levels
-  const sortedLevels = (Object.keys(scores) as BloomLevel[]).sort(
-    (a, b) => scores[b] - scores[a]
-  );
+  const sortedLevels = (Object.keys(scores) as BloomLevel[]).sort((a, b) => scores[b] - scores[a]);
 
   const topLevel = sortedLevels[0];
   const topScore = scores[topLevel];
@@ -353,8 +345,7 @@ export function detectBloomLevel(text: string): BloomDetectionResult {
 
   // Calculate confidence as separation between top and second
   // Higher separation = higher confidence
-  const confidence =
-    secondScore === 0 ? 1.0 : Math.min(1.0, (topScore - secondScore) / topScore);
+  const confidence = secondScore === 0 ? 1.0 : Math.min(1.0, (topScore - secondScore) / topScore);
 
   return {
     level: topLevel,
@@ -404,18 +395,15 @@ export function validateBloomPreservation(
       confidence: Math.min(originalDetection.confidence, newDetection.confidence),
       message:
         originalDetection.level === null && newDetection.level === null
-          ? 'Could not detect Bloom\'s level in either original or regenerated content'
+          ? "Could not detect Bloom's level in either original or regenerated content"
           : originalDetection.level === null
-            ? 'Could not detect Bloom\'s level in original content'
-            : 'Could not detect Bloom\'s level in regenerated content',
+            ? "Could not detect Bloom's level in original content"
+            : "Could not detect Bloom's level in regenerated content",
     };
   }
 
   // Check confidence threshold
-  const minDetectionConfidence = Math.min(
-    originalDetection.confidence,
-    newDetection.confidence
-  );
+  const minDetectionConfidence = Math.min(originalDetection.confidence, newDetection.confidence);
 
   if (minDetectionConfidence < minConfidence) {
     return {

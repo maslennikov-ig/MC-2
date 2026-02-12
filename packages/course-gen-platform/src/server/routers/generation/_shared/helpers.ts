@@ -3,55 +3,14 @@
  */
 
 import type { Database, CourseStructure, Section, Lesson } from '@megacampus/shared-types';
-import { FORBIDDEN_PATH_KEYS } from './constants';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { TRPCError } from '@trpc/server';
+import { ConcurrencyTracker } from '../../../../shared/concurrency/tracker';
+import { logger } from '../../../../shared/logger/index.js';
+import type { ConcurrencyCheckResult, NormalizedTier } from './types';
 
-/**
- * Helper function to set a nested value in an object using a path string
- * @param obj - The object to modify
- * @param path - The path string (e.g., "topic_analysis.key_concepts")
- * @param value - The value to set
- * @throws Error if path is invalid, contains forbidden keys, or cannot be traversed
- */
-export function setNestedValue(obj: unknown, path: string, value: unknown): void {
-  if (!obj || typeof obj !== 'object') {
-    throw new Error('Invalid object: must be a non-null object');
-  }
-
-  const keys = path.split('.');
-  if (keys.length === 0 || keys.some(k => k.trim() === '')) {
-    throw new Error('Invalid path: path cannot be empty or contain empty segments');
-  }
-
-  // Security: Check for prototype pollution attempts
-  for (const key of keys) {
-    if (FORBIDDEN_PATH_KEYS.includes(key)) {
-      throw new Error(`Security violation: "${key}" is a forbidden path segment`);
-    }
-  }
-
-  let current = obj as Record<string, unknown>;
-
-  // Traverse to the parent of the target field
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
-
-    // If the key doesn't exist, create an empty object
-    if (!(key in current)) {
-      current[key] = {};
-    }
-
-    // Ensure the current value is an object we can traverse
-    if (typeof current[key] !== 'object' || current[key] === null) {
-      throw new Error(`Cannot traverse path: "${key}" is not an object`);
-    }
-
-    current = current[key] as Record<string, unknown>;
-  }
-
-  // Set the final value
-  const finalKey = keys[keys.length - 1];
-  current[finalKey] = value;
-}
+// Re-export from shared utility (single source of truth)
+export { setNestedValue } from '../../../../shared/utils/nested-value';
 
 /**
  * Normalize field path for validation against whitelist
@@ -144,4 +103,139 @@ export function canUserEditCourse(
   // if (user.role === 'admin' && course.organization_id && user.organizationId === course.organization_id) return true;
 
   return false;
+}
+
+// Re-export for backward compatibility
+export type { NormalizedTier } from './types';
+
+const TIER_MAP: Record<string, NormalizedTier> = {
+  trial: 'TRIAL',
+  free: 'FREE',
+  basic: 'BASIC',
+  standard: 'STANDARD',
+  premium: 'PREMIUM',
+};
+
+/**
+ * Extract and normalize tier from course with organization join.
+ *
+ * @param course - Course object with `organization` relation containing `tier`
+ * @returns Normalized uppercase tier string
+ */
+export function extractTierFromOrg(course: {
+  organization?: { tier?: string | null } | null;
+}): NormalizedTier {
+  const dbTier = course.organization?.tier || 'free';
+  return TIER_MAP[dbTier] || 'FREE';
+}
+
+/**
+ * Check concurrency limits and throw if exceeded.
+ * Also logs metrics event to system_metrics on limit hit.
+ */
+export async function checkConcurrencyLimits(params: {
+  userId: string;
+  tier: NormalizedTier;
+  courseId: string;
+  requestId: string;
+  supabase: SupabaseClient<Database>;
+}): Promise<void> {
+  const { userId, tier, courseId, requestId, supabase } = params;
+  const concurrencyTracker = new ConcurrencyTracker();
+  let concurrencyCheck: ConcurrencyCheckResult;
+
+  try {
+    concurrencyCheck = await concurrencyTracker.checkAndReserve(userId, tier);
+  } catch (concurrencyError) {
+    logger.error({ requestId, userId, tier, error: concurrencyError }, 'Concurrency check failed');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to check concurrency limits',
+    });
+  }
+
+  if (!concurrencyCheck.allowed) {
+    logger.warn({ requestId, userId, tier, concurrencyCheck }, 'Concurrency limit hit');
+
+    await supabase.from('system_metrics').insert({
+      event_type: 'concurrency_limit_hit',
+      severity: 'warn',
+      user_id: userId,
+      metadata: {
+        tier,
+        ...concurrencyCheck,
+        rejected_course_id: courseId,
+        request_id: requestId,
+      },
+    });
+
+    const errorMessage =
+      concurrencyCheck?.reason === 'user_limit'
+        ? `Too many concurrent jobs. ${tier} tier allows ${concurrencyCheck.user_limit} concurrent course generation.`
+        : 'System at capacity. Please try again in a few minutes.';
+
+    throw new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: errorMessage,
+    });
+  }
+}
+
+/** Document summary item for Stage 5 job input */
+export interface DocumentSummary {
+  file_id: string;
+  file_name: string;
+  summary: string;
+  key_topics: string[];
+}
+
+/**
+ * Query file_catalog for indexed documents and build summaries for Stage 5.
+ */
+export async function buildDocumentSummaries(
+  supabase: SupabaseClient<Database>,
+  courseId: string,
+  requestId?: string
+): Promise<{ hasVectorizedDocs: boolean; documentSummaries: DocumentSummary[] }> {
+  const { data: vectorizedFiles, error: filesError } = await supabase
+    .from('file_catalog')
+    .select('id, filename, processed_content, mime_type')
+    .eq('course_id', courseId)
+    .eq('vector_status', 'indexed' as unknown as Database['public']['Enums']['vector_status']);
+
+  if (filesError) {
+    // Differentiate expected vs unexpected errors
+    const isTableNotFound = filesError.code === '42P01'; // relation does not exist
+    if (isTableNotFound) {
+      logger.debug(
+        { requestId, courseId },
+        'file_catalog table not available, assuming no documents'
+      );
+    } else {
+      logger.warn(
+        { requestId, courseId, error: filesError, code: filesError.code },
+        'Failed to query vectorized files, assuming no documents'
+      );
+    }
+  }
+
+  const hasVectorizedDocs = !filesError && vectorizedFiles && vectorizedFiles.length > 0;
+
+  const documentSummaries: DocumentSummary[] = hasVectorizedDocs
+    ? (
+        vectorizedFiles as Array<{
+          id: string;
+          filename: string;
+          processed_content: string | null;
+          mime_type: string;
+        }>
+      ).map(file => ({
+        file_id: file.id,
+        file_name: file.filename,
+        summary: file.processed_content || '',
+        key_topics: [],
+      }))
+    : [];
+
+  return { hasVectorizedDocs, documentSummaries };
 }

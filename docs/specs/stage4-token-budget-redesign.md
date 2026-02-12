@@ -9,6 +9,7 @@
 ## Цель
 
 Создать интеллектуальную систему распределения токенов, которая:
+
 1. Максимально сохраняет CORE документ целиком
 2. Адаптивно выбирает модель под размер контекста
 3. Использует cache-read для экономии на дорогих моделях
@@ -18,37 +19,41 @@
 ## Ключевое архитектурное изменение: Новый порядок Pipeline
 
 ### Было (текущий порядок Stage 2):
+
 ```
 Parse (Docling) → Classify (приоритизация) → Chunk → Embed → Summarize
 ```
 
 ### Стало (новый порядок):
+
 ```
 Parse (Docling) → Chunk → Embed → Summarize → Classify (приоритизация)
 ```
 
 ### Почему меняем:
+
 1. **Summary нужен ДО приоритизации** для расчёта бюджета
 2. После summary знаем точные размеры всех документов
 3. Приоритизация может учитывать размеры при принятии решений
 
 ### Источники контента для Stage 4 Analysis:
 
-| Приоритет | Источник контента | Поле в file_catalog |
-|-----------|-------------------|---------------------|
-| **CORE** | Полный текст из Docling | `markdown_content` |
-| **IMPORTANT** (если влезает) | Полный текст из Docling | `markdown_content` |
-| **IMPORTANT** (если не влезает) | Summary | `processed_content` |
-| **SUPPLEMENTARY** | Summary (всегда) | `processed_content` |
+| Приоритет                       | Источник контента       | Поле в file_catalog |
+| ------------------------------- | ----------------------- | ------------------- |
+| **CORE**                        | Полный текст из Docling | `markdown_content`  |
+| **IMPORTANT** (если влезает)    | Полный текст из Docling | `markdown_content`  |
+| **IMPORTANT** (если не влезает) | Summary                 | `processed_content` |
+| **SUPPLEMENTARY**               | Summary (всегда)        | `processed_content` |
 
 ### Новая структура данных в file_catalog:
+
 ```typescript
 {
-  markdown_content: string;      // Полный текст из Docling (для full_text mode)
-  processed_content: string;     // Summary (создаётся для ВСЕХ документов)
-  token_count: number;           // Токены полного текста
+  markdown_content: string; // Полный текст из Docling (для full_text mode)
+  processed_content: string; // Summary (создаётся для ВСЕХ документов)
+  token_count: number; // Токены полного текста
   summary_metadata: {
-    summary_tokens: number;      // Токены summary
+    summary_tokens: number; // Токены summary
     // ... остальные поля
   }
 }
@@ -60,47 +65,47 @@ Parse (Docling) → Chunk → Embed → Summarize → Classify (приорити
 
 ### Русский язык (RU)
 
-| Контекст | Primary Model | Fallback Model | Cache |
-|----------|---------------|----------------|-------|
-| ≤260K токенов | `qwen/qwen3-235b-a22b-2507` | `moonshotai/kimi-k2-0905` | — |
+| Контекст      | Primary Model                             | Fallback Model              | Cache                        |
+| ------------- | ----------------------------------------- | --------------------------- | ---------------------------- |
+| ≤260K токенов | `qwen/qwen3-235b-a22b-2507`               | `moonshotai/kimi-k2-0905`   | —                            |
 | >260K токенов | `google/gemini-2.5-flash-preview-09-2025` | `qwen/qwen-plus-2025-07-28` | ✅ cache-read (10x экономия) |
 
 **Примечание:** Fallback `qwen/qwen-plus-2025-07-28` НЕ поддерживает cache-read/write.
 
 ### Другие языки (EN, etc.)
 
-| Контекст | Primary Model | Fallback Model | Cache |
-|----------|---------------|----------------|-------|
-| ≤260K токенов | `x-ai/grok-4.1-fast:free` | `moonshotai/kimi-k2-0905` | — |
-| >260K токенов | `x-ai/grok-4.1-fast:free` | `moonshotai/kimi-linear-48b-a3b-instruct` | — |
+| Контекст      | Primary Model             | Fallback Model                            | Cache |
+| ------------- | ------------------------- | ----------------------------------------- | ----- |
+| ≤260K токенов | `x-ai/grok-4.1-fast:free` | `moonshotai/kimi-k2-0905`                 | —     |
+| >260K токенов | `x-ai/grok-4.1-fast:free` | `moonshotai/kimi-linear-48b-a3b-instruct` | —     |
 
 ### Полная таблица моделей
 
-| Model ID | Max Context | Язык | Tier | Cache |
-|----------|-------------|------|------|-------|
-| `qwen/qwen3-235b-a22b-2507` | 260K | RU | Primary (≤260K) | — |
-| `moonshotai/kimi-k2-0905` | 128K | RU/EN | Fallback (≤260K) | — |
-| `google/gemini-2.5-flash-preview-09-2025` | 1M | RU | Primary (>260K) | ✅ cache-read |
-| `qwen/qwen-plus-2025-07-28` | 1M | RU | Fallback (>260K) | ❌ |
-| `x-ai/grok-4.1-fast:free` | 260K+ | EN | Primary (all) | — |
-| `moonshotai/kimi-linear-48b-a3b-instruct` | 1M+ | EN | Fallback (>260K) | — |
+| Model ID                                  | Max Context | Язык  | Tier             | Cache         |
+| ----------------------------------------- | ----------- | ----- | ---------------- | ------------- |
+| `qwen/qwen3-235b-a22b-2507`               | 260K        | RU    | Primary (≤260K)  | —             |
+| `moonshotai/kimi-k2-0905`                 | 128K        | RU/EN | Fallback (≤260K) | —             |
+| `google/gemini-2.5-flash-preview-09-2025` | 1M          | RU    | Primary (>260K)  | ✅ cache-read |
+| `qwen/qwen-plus-2025-07-28`               | 1M          | RU    | Fallback (>260K) | ❌            |
+| `x-ai/grok-4.1-fast:free`                 | 260K+       | EN    | Primary (all)    | —             |
+| `moonshotai/kimi-linear-48b-a3b-instruct` | 1M+         | EN    | Fallback (>260K) | —             |
 
 ### Лимиты
 
-| Параметр | Значение |
-|----------|----------|
-| Порог перехода на модель 1M | 260 000 токенов |
+| Параметр                       | Значение        |
+| ------------------------------ | --------------- |
+| Порог перехода на модель 1M    | 260 000 токенов |
 | ЖЁСТКИЙ МАКСИМУМ (даже для 1M) | 700 000 токенов |
 
 ---
 
 ## Приоритеты документов (упрощённая система)
 
-| Приоритет | Правило | Контент в Analysis |
-|-----------|---------|-------------------|
-| **CORE** | Единственный ключевой документ | **Всегда целиком** |
-| **IMPORTANT** | Важные вспомогательные | Целиком если влезаем, иначе summary |
-| **SUPPLEMENTARY** | Дополнительные материалы | **Всегда summary** |
+| Приоритет         | Правило                        | Контент в Analysis                  |
+| ----------------- | ------------------------------ | ----------------------------------- |
+| **CORE**          | Единственный ключевой документ | **Всегда целиком**                  |
+| **IMPORTANT**     | Важные вспомогательные         | Целиком если влезаем, иначе summary |
+| **SUPPLEMENTARY** | Дополнительные материалы       | **Всегда summary**                  |
 
 ---
 
@@ -108,13 +113,14 @@ Parse (Docling) → Chunk → Embed → Summarize → Classify (приорити
 
 ### Терминология приоритетов
 
-| Код | Название | Описание |
-|-----|----------|----------|
-| **CORE** | Ключевой документ | Единственный главный документ курса |
-| **IMPORTANT** | Важные документы | Средний приоритет, вспомогательные ключевые |
-| **SUPPLEMENTARY** | Вспомогательные | Низкий приоритет, дополнительные материалы |
+| Код               | Название          | Описание                                    |
+| ----------------- | ----------------- | ------------------------------------------- |
+| **CORE**          | Ключевой документ | Единственный главный документ курса         |
+| **IMPORTANT**     | Важные документы  | Средний приоритет, вспомогательные ключевые |
+| **SUPPLEMENTARY** | Вспомогательные   | Низкий приоритет, дополнительные материалы  |
 
 ### Этап 1: Подготовка (в Stage 2, после Summarization)
+
 ```
 ДЛЯ КАЖДОГО документа:
   1. Создать summary (независимо от приоритета)
@@ -122,6 +128,7 @@ Parse (Docling) → Chunk → Embed → Summarize → Classify (приорити
 ```
 
 ### Этап 2: Расчёт минимального бюджета
+
 ```
 CORE_full = размер CORE документа (полный) — ОБЯЗАТЕЛЬНО целиком
 IMPORTANT_summary = сумма(summary_tokens всех IMPORTANT)
@@ -131,6 +138,7 @@ SUPPLEMENTARY_summary = сумма(summary_tokens всех SUPPLEMENTARY)
 ```
 
 ### Этап 3: Выбор модели
+
 ```
 ЕСЛИ МИНИМУМ ≤ 260K:
   → Используем модель 260K
@@ -143,6 +151,7 @@ SUPPLEMENTARY_summary = сумма(summary_tokens всех SUPPLEMENTARY)
 ```
 
 ### Этап 4: Оптимизация IMPORTANT (жадный алгоритм)
+
 ```
 available_budget = MAX_CONTEXT - CORE_full - SUPPLEMENTARY_summary
   где MAX_CONTEXT = 260K или 700K в зависимости от модели
@@ -165,6 +174,7 @@ remaining = available_budget
 ```
 
 ### Итоговое правило (простыми словами)
+
 ```
 1. CORE — ВСЕГДА целиком (это главный документ)
 2. SUPPLEMENTARY — ВСЕГДА только summary (низкий приоритет)
@@ -181,6 +191,7 @@ remaining = available_budget
 **Статус:** 🔧 Implementation (КРИТИЧНО - делать первым)
 
 **Текущий порядок фаз Stage 2:**
+
 1. Phase 1: Parse (Docling)
 2. Phase 2: Validate
 3. Phase 3: Classify (приоритизация) ← сейчас здесь
@@ -188,6 +199,7 @@ remaining = available_budget
 5. Phase 5: Embedding
 
 **Новый порядок:**
+
 1. Phase 1: Parse (Docling)
 2. Phase 2: Validate
 3. Phase 3: Chunking (бывший Phase 4)
@@ -196,11 +208,13 @@ remaining = available_budget
 6. Phase 6: Classify (приоритизация) ← теперь в конце
 
 **Ключевые изменения:**
+
 - Summarization перемещается из Stage 3 в конец Stage 2
 - Classify перемещается в конец (после summary)
 - Stage 3 становится пустым или удаляется
 
 **Файлы для изменения:**
+
 - `packages/course-gen-platform/src/stages/stage2-document-processing/orchestrator.ts`
 - `packages/course-gen-platform/src/stages/stage2-document-processing/phases/` - переименование фаз
 - `packages/course-gen-platform/src/stages/stage3-summarization/` - перенос в Stage 2
@@ -212,17 +226,20 @@ remaining = available_budget
 **Статус:** 🔬 Research
 
 **Вопросы для исследования:**
+
 1. Как гарантировать, что summary будет нужного размера? (target ~10K для IMPORTANT, ~5K для SUPPLEMENTARY)
 2. Нужно ли делать summary ДО расчёта бюджета или можно по требованию?
 3. Как обработать edge case: CORE документ > 260K токенов?
 4. Стоит ли кэшировать summary между фазами Stage 4?
 
 **Рекомендуемый подход:**
+
 - Summary делается в Stage 3 для ВСЕХ документов
 - Размеры сохраняются в `file_catalog.summary_metadata`
 - Stage 4 читает размеры и принимает решение
 
 **Артефакты:**
+
 - [ ] Анализ текущего flow Stage 3 → Stage 4
 - [ ] Определение точных формул расчёта
 
@@ -233,11 +250,13 @@ remaining = available_budget
 **Статус:** 🔧 Implementation
 
 **Файлы для изменения:**
+
 - `packages/shared-types/src/document-prioritization.ts` - убрать DocumentCategorySchema
 - `packages/course-gen-platform/src/stages/stage2-document-processing/phases/phase-classification.ts` - убрать category из output
 - Все места использования category (grep показал 3 файла)
 
 **Изменения:**
+
 1. Удалить `DocumentCategorySchema` и `DocumentCategory`
 2. Заменить `priority: HIGH | LOW` на `priority: CORE | IMPORTANT | SUPPLEMENTARY`
 3. Обновить LLM промпт для классификации
@@ -250,6 +269,7 @@ remaining = available_budget
 **Статус:** 🔧 Implementation
 
 **Новая структура:**
+
 ```typescript
 export const STAGE4_MODELS = {
   ru: {
@@ -291,6 +311,7 @@ export const HARD_TOKEN_LIMIT = 700_000; // Даже для 1M моделей
 **Новый модуль:** `stage4-budget-allocator.ts`
 
 **Функции:**
+
 ```typescript
 interface DocumentBudgetInfo {
   file_id: string;
@@ -324,11 +345,13 @@ function allocateStage4Budget(
 **Статус:** 🔧 Implementation
 
 **Требования:**
+
 - Gemini cache-read экономит 10x на входящих токенах
 - Stage 4 делает несколько вызовов (Phase 1-6) с одинаковым контекстом документов
 - Нужно кэшировать document context между фазами
 
 **Исследовать:**
+
 - Как работает cache-read в OpenRouter API
 - Можно ли переиспользовать cache между Phase 1-6
 - Нужен ли cache-write или только read
@@ -340,6 +363,7 @@ function allocateStage4Budget(
 **Статус:** 🔧 Implementation
 
 **Изменения в `stage4-analysis/orchestrator.ts`:**
+
 1. Перед Phase 1: вызвать `allocateStage4Budget()`
 2. Выбрать модель на основе результата
 3. Подготовить document context (full_text или summary для каждого)
@@ -352,6 +376,7 @@ function allocateStage4Budget(
 **Статус:** 🔧 Implementation
 
 **Изменения:**
+
 1. `NodeDetailsModal` - убрать показ category
 2. Показывать priority (CORE/IMPORTANT/SUPPLEMENTARY) из output модели
 3. Синхронизировать значение в UI с данными classification
