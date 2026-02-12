@@ -122,13 +122,13 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       courseId: body.courseId,
       filename: body.filename,
-      fileId: (result as any).fileId,
+      fileId: result.fileId,
     })
 
     return NextResponse.json({
-      fileId: (result as any).fileId,
-      storagePath: (result as any).storagePath,
-      message: (result as any).message || 'Файл успешно загружен',
+      fileId: result.fileId,
+      storagePath: result.storagePath,
+      message: result.message || 'Файл успешно загружен',
     })
   } catch (error) {
     // Handle tRPC errors with proper HTTP status codes

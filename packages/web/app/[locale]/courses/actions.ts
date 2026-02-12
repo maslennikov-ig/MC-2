@@ -167,7 +167,7 @@ export async function getCourses({
       }
     }
 
-    const userFavorites = getUserFavorites(user.id)
+    const userFavorites = await getUserFavorites(user.id)
     if (userFavorites.length === 0) {
       return {
         courses: [],
@@ -315,7 +315,7 @@ export async function getCourses({
   const user = await getCurrentUser()
   let userFavorites: string[] = []
   if (user?.id) {
-    userFavorites = getUserFavorites(user.id)
+    userFavorites = await getUserFavorites(user.id)
   }
 
   // Add favorite status to courses
@@ -489,7 +489,8 @@ export async function togglePublishCourse(courseSlug: string, isPublished: boole
  * Get user favorites - returns empty array as user_favorites table doesn't exist
  * Note: User favorites functionality will be implemented when table is added to database schema
  */
-export function getUserFavorites(_userId: string) {
+// eslint-disable-next-line @typescript-eslint/require-await -- must be async for 'use server' file
+export async function getUserFavorites(_userId: string) {
   // user_favorites table doesn't exist in database
   // Return empty array to maintain compatibility
   return []
