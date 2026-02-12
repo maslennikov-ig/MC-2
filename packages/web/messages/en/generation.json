@@ -132,6 +132,11 @@
       "chatFailed": "Chat Failed",
       "chatFailedDesc": "Could not send message. Please try again.",
       "emptyResponseFallback": "See suggested changes below."
+    },
+    "stage6Cta": {
+      "description": "Course content has already been generated. Would you like to generate content for newly added lessons?",
+      "button": "Generate content",
+      "message": "Generate content for new lessons"
     }
   },
   "errors": {

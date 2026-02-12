@@ -35,6 +35,7 @@ export const useRefinement = (courseId: string) => {
   const [isApplying, setIsApplying] = useState(false)
   const [proposalError, setProposalError] = useState<string | null>(null)
   const [acceptedProposal, setAcceptedProposal] = useState<Proposal | null>(null)
+  const [stage6ContentReady, setStage6ContentReady] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const isMountedRef = useRef(true)
 
@@ -63,6 +64,7 @@ export const useRefinement = (courseId: string) => {
     setChatHistory([])
     setLatestProposal(null)
     setAcceptedProposal(null)
+    setStage6ContentReady(false)
   }, [])
 
   const acceptProposal = useCallback(async () => {
@@ -217,6 +219,11 @@ export const useRefinement = (courseId: string) => {
           setAcceptedProposal(null)
         }
 
+        // Track Stage 6 content readiness for CTA
+        if (response.metadata?.stage6ContentReady) {
+          setStage6ContentReady(true)
+        }
+
         // Show toast only for regenerate (long async operation); refine response is shown in chat
         if (response.intent === 'regenerate') {
           toast.success(t('refinementChat.proposal.regenerationStarted'), {
@@ -264,5 +271,6 @@ export const useRefinement = (courseId: string) => {
     retryProposal,
     rejectProposal,
     acceptedProposal,
+    stage6ContentReady,
   }
 }

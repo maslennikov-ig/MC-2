@@ -92,6 +92,7 @@ interface StageContentProps {
   onAcceptProposal: () => void
   onRetryProposal: () => void
   onRejectProposal: () => void
+  stage6ContentReady: boolean
 
   // Handlers
   onStageApproved: () => void
@@ -135,6 +136,7 @@ export const StageContent = memo(function StageContent({
   onAcceptProposal,
   onRetryProposal,
   onRejectProposal,
+  stage6ContentReady,
   onStageApproved,
   onDeselectNode,
 }: StageContentProps) {
@@ -427,6 +429,7 @@ export const StageContent = memo(function StageContent({
             proposalError={proposalError}
             onRetryProposal={() => void onRetryProposal()}
             onRejectProposal={() => onRejectProposal()}
+            stage6ContentReady={stage6ContentReady}
             isGenerating={isGenerationActive}
             blockedMessage={t('refinementChat.generationInProgress')}
           />
