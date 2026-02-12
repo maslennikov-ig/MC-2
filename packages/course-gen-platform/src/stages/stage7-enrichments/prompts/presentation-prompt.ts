@@ -16,6 +16,46 @@
  */
 
 import { z } from 'zod';
+import { createLLMEnumSchema } from '@megacampus/shared-types';
+
+// Reusable LLM-tolerant enums for presentation schemas
+const llmSlideLayout = createLLMEnumSchema(
+  ['title', 'content', 'two-column', 'image'] as const,
+  {
+    heading: 'title',
+    cover: 'title',
+    header: 'title',
+    intro: 'title',
+    body: 'content',
+    text: 'content',
+    'single-column': 'content',
+    main: 'content',
+    split: 'two-column',
+    dual: 'two-column',
+    'side-by-side': 'two-column',
+    visual: 'image',
+    picture: 'image',
+    illustration: 'image',
+    photo: 'image',
+  },
+  'slideLayout'
+);
+const llmPresentationTheme = createLLMEnumSchema(
+  ['default', 'dark', 'academic'] as const,
+  {
+    light: 'default',
+    standard: 'default',
+    normal: 'default',
+    basic: 'default',
+    night: 'dark',
+    black: 'dark',
+    dim: 'dark',
+    scholarly: 'academic',
+    formal: 'academic',
+    professional: 'academic',
+  },
+  'presentationTheme'
+);
 
 /**
  * Language-specific token multipliers
@@ -92,7 +132,7 @@ const presentationDraftOutlineItemSchema = z.object({
   key_points: z.array(z.string().min(3)).min(1).max(6),
 
   /** Suggested layout type */
-  layout: z.enum(['title', 'content', 'two-column', 'image']),
+  layout: llmSlideLayout,
 });
 
 export type PresentationDraftOutlineItem = z.infer<typeof presentationDraftOutlineItemSchema>;
@@ -112,7 +152,7 @@ export const presentationDraftSchema = z.object({
     estimated_slides: z.number().int().positive(),
 
     /** Selected theme */
-    theme: z.enum(['default', 'dark', 'academic']),
+    theme: llmPresentationTheme,
   }),
 });
 
@@ -132,7 +172,7 @@ const presentationSlideSchema = z.object({
   content: z.string().min(1),
 
   /** Slide layout type */
-  layout: z.enum(['title', 'content', 'two-column', 'image']),
+  layout: llmSlideLayout,
 
   /** Optional speaker notes for presenter */
   speaker_notes: z.string().optional(),
@@ -150,7 +190,7 @@ export type PresentationSlide = z.infer<typeof presentationSlideSchema>;
  */
 export const presentationOutputSchema = z.object({
   /** Presentation theme */
-  theme: z.enum(['default', 'dark', 'academic']),
+  theme: llmPresentationTheme,
 
   /** Complete slides array */
   slides: z.array(presentationSlideSchema).min(1).max(100),

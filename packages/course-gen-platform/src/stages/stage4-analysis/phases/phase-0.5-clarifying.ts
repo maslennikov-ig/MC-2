@@ -26,6 +26,7 @@ import { logTrace } from '@/shared/trace-logger';
 import logger from '@/shared/logger';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
+import { createLLMEnumSchema } from '@megacampus/shared-types';
 import type { ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
 import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
 
@@ -108,17 +109,73 @@ function normalizeSuggestedAnswer(val: unknown): unknown {
 export const ClarifyingQuestionSchema = z.object({
   question_text: z.string().min(10).max(500),
   question_type: QuestionTypeSchema.default('open'),
-  question_priority: z.enum(['critical', 'important', 'nice_to_have']),
-  question_category: z.enum([
-    'company_context',
-    'audience',
-    'expected_outcomes',
-    'content_structure',
-    'focus_priorities',
-    'business_goals',
-    'practical_application',
-    'constraints',
-  ]),
+  question_priority: createLLMEnumSchema(
+    ['critical', 'important', 'nice_to_have'] as const,
+    {
+      essential: 'critical',
+      'must-have': 'critical',
+      urgent: 'critical',
+      high: 'critical',
+      mandatory: 'critical',
+      significant: 'important',
+      needed: 'important',
+      medium: 'important',
+      useful: 'important',
+      optional: 'nice_to_have',
+      low: 'nice_to_have',
+      bonus: 'nice_to_have',
+      supplementary: 'nice_to_have',
+      extra: 'nice_to_have',
+    },
+    'questionPriority'
+  ),
+  question_category: createLLMEnumSchema(
+    [
+      'company_context',
+      'audience',
+      'expected_outcomes',
+      'content_structure',
+      'focus_priorities',
+      'business_goals',
+      'practical_application',
+      'constraints',
+    ] as const,
+    {
+      company: 'company_context',
+      organization: 'company_context',
+      corporate: 'company_context',
+      employer: 'company_context',
+      learners: 'audience',
+      students: 'audience',
+      users: 'audience',
+      target: 'audience',
+      outcomes: 'expected_outcomes',
+      results: 'expected_outcomes',
+      goals: 'expected_outcomes',
+      objectives: 'expected_outcomes',
+      structure: 'content_structure',
+      format: 'content_structure',
+      layout: 'content_structure',
+      arrangement: 'content_structure',
+      focus: 'focus_priorities',
+      priorities: 'focus_priorities',
+      emphasis: 'focus_priorities',
+      key_areas: 'focus_priorities',
+      business: 'business_goals',
+      commercial: 'business_goals',
+      revenue: 'business_goals',
+      roi: 'business_goals',
+      practical: 'practical_application',
+      'hands-on': 'practical_application',
+      'real-world': 'practical_application',
+      applied: 'practical_application',
+      limits: 'constraints',
+      restrictions: 'constraints',
+      requirements: 'constraints',
+      boundaries: 'constraints',
+    },
+    'questionCategory'
+  ),
   suggested_answers: z.preprocess(val => {
     if (!Array.isArray(val)) return val;
     return val
