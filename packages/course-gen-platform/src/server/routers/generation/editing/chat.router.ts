@@ -52,7 +52,7 @@ import {
   persistUserMessage,
   executeLegacyLLMFlow,
 } from './chat-mutation-helpers';
-import { executeIntentClassificationFlow } from './chat-intent-flow';
+import { executeIntentClassificationFlow, executeFullRegenerate } from './chat-intent-flow';
 
 // ============================================================================
 // Rate Limiting Configuration
@@ -299,22 +299,20 @@ async function executeChatMutation(
 
   // --- Intent Routing (Phase 1: auto-intent classification) ---
 
-  // Explicit 'regenerate' from legacy clients → skip classification, go directly to legacy flow
+  // Explicit 'regenerate' → skip classification, enqueue async regeneration job directly
   if (intent === 'regenerate') {
-    logger.info({ requestId, courseId }, 'Chat: Explicit regenerate intent, using legacy flow');
-    return executeLegacyLLMFlow({
+    logger.info(
+      { requestId, courseId },
+      'Chat: Explicit regenerate intent, enqueuing regeneration job'
+    );
+    return executeFullRegenerate({
       courseId,
-      course,
-      userMessage,
+      userId,
+      convId,
       chatType,
       nodeContext,
-      previousOutput,
-      intent: 'regenerate',
-      convId,
-      history,
       requestId,
       supabaseAdmin,
-      fallbackConfig: CHAT_FALLBACK_CONFIG,
     });
   }
 

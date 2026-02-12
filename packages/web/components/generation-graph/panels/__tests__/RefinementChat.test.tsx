@@ -48,6 +48,11 @@ vi.mock('next-intl', () => ({
       'refinementChat.proposal.retry': 'Повторить',
       'refinementChat.proposal.changesApplied': 'Изменения применены',
       'refinementChat.proposal.emptyResponseFallback': 'Ответ обрабатывается...',
+      // Stage 6 CTA translations
+      'refinementChat.stage6Cta.description':
+        'Course content has already been generated. Would you like to generate content for newly added lessons?',
+      'refinementChat.stage6Cta.button': 'Generate content',
+      'refinementChat.stage6Cta.message': 'Generate content for new lessons',
     }
     return translations[key] || key
   },
@@ -149,6 +154,23 @@ const createMockProposal = (): Proposal => ({
     },
   ],
   summary: 'Updated course title',
+})
+
+const createStructuralProposal = (): Proposal => ({
+  type: 'structural_operation',
+  operations: [
+    {
+      type: 'add_lesson',
+      reasoning: 'Add new lesson to section',
+      tempId: '__new_1__',
+      parentSectionId: 'sec_001',
+      afterLessonId: null,
+      title: 'New Lesson',
+      objectives: ['Learn new content'],
+      keyTopics: ['Concept 1'],
+    },
+  ],
+  summary: 'Added new lessons to section',
 })
 
 // =============================================================================
@@ -555,6 +577,136 @@ describe('RefinementChat', () => {
         const hasPending = messages.some((el) => el.parentElement?.className.includes('opacity-60'))
         expect(hasPending).toBe(false)
       })
+    })
+  })
+
+  // ===========================================================================
+  // Stage 6 CTA Tests
+  // ===========================================================================
+
+  describe('Stage 6 CTA', () => {
+    it('should render Stage 6 CTA when stage6ContentReady=true and acceptedProposal present', () => {
+      const acceptedProposal = createStructuralProposal()
+
+      render(
+        <RefinementChat
+          {...defaultProps}
+          stage6ContentReady={true}
+          acceptedProposal={acceptedProposal}
+          latestProposal={null}
+        />
+      )
+
+      const ctaButton = screen.getByTestId('stage6-generate-cta')
+      expect(ctaButton).toBeDefined()
+      expect(screen.getByText('Generate content')).toBeDefined()
+      expect(
+        screen.getByText(
+          'Course content has already been generated. Would you like to generate content for newly added lessons?'
+        )
+      ).toBeDefined()
+    })
+
+    it('should NOT render Stage 6 CTA when stage6ContentReady=false', () => {
+      const acceptedProposal = createStructuralProposal()
+
+      render(
+        <RefinementChat
+          {...defaultProps}
+          stage6ContentReady={false}
+          acceptedProposal={acceptedProposal}
+          latestProposal={null}
+        />
+      )
+
+      const ctaButton = screen.queryByTestId('stage6-generate-cta')
+      expect(ctaButton).toBeNull()
+    })
+
+    it('should NOT render Stage 6 CTA when acceptedProposal is missing', () => {
+      render(
+        <RefinementChat
+          {...defaultProps}
+          stage6ContentReady={true}
+          acceptedProposal={null}
+          latestProposal={null}
+        />
+      )
+
+      const ctaButton = screen.queryByTestId('stage6-generate-cta')
+      expect(ctaButton).toBeNull()
+    })
+
+    it('should NOT render Stage 6 CTA when latestProposal is present', () => {
+      const acceptedProposal = createStructuralProposal()
+      const latestProposal = createMockProposal()
+
+      render(
+        <RefinementChat
+          {...defaultProps}
+          stage6ContentReady={true}
+          acceptedProposal={acceptedProposal}
+          latestProposal={latestProposal}
+        />
+      )
+
+      const ctaButton = screen.queryByTestId('stage6-generate-cta')
+      expect(ctaButton).toBeNull()
+    })
+
+    it('should call onRefine with regenerate intent when CTA clicked', async () => {
+      const user = userEvent.setup()
+      const onRefine = vi.fn().mockResolvedValue(undefined)
+      const acceptedProposal = createStructuralProposal()
+
+      render(
+        <RefinementChat
+          {...defaultProps}
+          onRefine={onRefine}
+          stage6ContentReady={true}
+          acceptedProposal={acceptedProposal}
+          latestProposal={null}
+        />
+      )
+
+      const ctaButton = screen.getByTestId('stage6-generate-cta')
+      await user.click(ctaButton)
+
+      expect(onRefine).toHaveBeenCalledWith('Generate content for new lessons', 'regenerate')
+    })
+
+    it('should disable CTA button when isGenerating=true', () => {
+      const acceptedProposal = createStructuralProposal()
+
+      render(
+        <RefinementChat
+          {...defaultProps}
+          stage6ContentReady={true}
+          acceptedProposal={acceptedProposal}
+          latestProposal={null}
+          isGenerating={true}
+        />
+      )
+
+      const ctaButton = screen.getByTestId('stage6-generate-cta')
+      expect(ctaButton).toHaveProperty('disabled', true)
+    })
+
+    it('should disable CTA button when isProcessing=true', () => {
+      const acceptedProposal = createStructuralProposal()
+
+      render(
+        <RefinementChat
+          {...defaultProps}
+          stage6ContentReady={true}
+          acceptedProposal={acceptedProposal}
+          latestProposal={null}
+          isProcessing={true}
+        />
+      )
+
+      const ctaButton = screen.getByTestId('stage6-generate-cta')
+      expect(ctaButton).toHaveProperty('disabled', true)
     })
   })
 })

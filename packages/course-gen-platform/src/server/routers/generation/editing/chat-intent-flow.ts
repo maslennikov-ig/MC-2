@@ -65,6 +65,123 @@ interface IntentRouteMsgParams {
 }
 
 // ============================================================================
+// Full Regeneration Handler (shared between explicit intent and classified)
+// ============================================================================
+
+/** Parameters for the full regeneration handler */
+export interface FullRegenerateParams {
+  courseId: string;
+  userId: string;
+  convId: string;
+  chatType: 'node' | 'global';
+  nodeContext?: { stageId: string; nodeId?: string; blockPath?: string } | null;
+  requestId: string;
+  supabaseAdmin: SupabaseClient<Database>;
+}
+
+/**
+ * Execute a full course regeneration: restart_from_stage + enqueue Stage 5 job.
+ * Shared between explicit `intent='regenerate'` and classified FULL_REGENERATE.
+ */
+export async function executeFullRegenerate(params: FullRegenerateParams): Promise<ChatResponse> {
+  const { courseId, userId, convId, chatType, nodeContext, requestId, supabaseAdmin } = params;
+
+  try {
+    // Reset course status via RPC
+    const { error: rpcError } = await supabaseAdmin.rpc(
+      'restart_from_stage' as unknown as never,
+      {
+        p_course_id: courseId,
+        p_stage_number: 5,
+        p_user_id: userId,
+      } as unknown as never
+    );
+
+    if (rpcError) {
+      logger.error(
+        { requestId, courseId, error: rpcError },
+        'FULL_REGENERATE: RPC restart_from_stage failed'
+      );
+      throw new Error('Failed to reset course status');
+    }
+
+    // Clean up existing jobs
+    try {
+      await removeJobsByCourseId(courseId);
+    } catch (cleanupError) {
+      logger.warn(
+        { requestId, courseId, error: cleanupError },
+        'FULL_REGENERATE: Failed to clean up jobs'
+      );
+    }
+
+    // Build and enqueue Stage 5 job
+    const { jobInput } = await buildStage5JobInput(supabaseAdmin, courseId, userId, requestId);
+    const job = await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData);
+
+    const regenMessage = 'Запускаю полную перегенерацию курса. Это может занять некоторое время.';
+
+    await persistAssistantMessage(supabaseAdmin, {
+      courseId,
+      convId,
+      content: regenMessage,
+      chatType,
+      nodeContext: nodeContext || null,
+      intent: 'regenerate',
+      modelUsed: 'system',
+      inputTokens: 0,
+      outputTokens: 0,
+      requestId,
+    });
+
+    logger.info({ requestId, courseId, jobId: job.id }, 'Chat: FULL_REGENERATE — job enqueued');
+
+    return {
+      conversationId: convId,
+      assistantMessage: regenMessage,
+      intent: 'regenerate',
+      jobId: job.id,
+      modelUsed: 'system',
+      inputTokens: 0,
+      outputTokens: 0,
+    };
+  } catch (error) {
+    logger.error(
+      {
+        requestId,
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Chat: FULL_REGENERATE failed'
+    );
+
+    const errorMessage = 'Не удалось запустить перегенерацию. Попробуйте ещё раз.';
+
+    await persistAssistantMessage(supabaseAdmin, {
+      courseId,
+      convId,
+      content: errorMessage,
+      chatType,
+      nodeContext: nodeContext || null,
+      intent: 'regenerate',
+      modelUsed: 'system',
+      inputTokens: 0,
+      outputTokens: 0,
+      requestId,
+    });
+
+    return {
+      conversationId: convId,
+      assistantMessage: errorMessage,
+      intent: 'regenerate',
+      modelUsed: 'system',
+      inputTokens: 0,
+      outputTokens: 0,
+    };
+  }
+}
+
+// ============================================================================
 // Intent Route Handlers
 // ============================================================================
 
@@ -673,102 +790,15 @@ export async function executeIntentClassificationFlow(
 
   // Step 2: FULL_REGENERATE → enqueue async regeneration job
   if (classifiedIntent.intent === 'FULL_REGENERATE') {
-    try {
-      // Reset course status via RPC
-      const { error: rpcError } = await supabaseAdmin.rpc(
-        'restart_from_stage' as unknown as never,
-        {
-          p_course_id: courseId,
-          p_stage_number: 5,
-          p_user_id: userId,
-        } as unknown as never
-      );
-
-      if (rpcError) {
-        logger.error(
-          { requestId, courseId, error: rpcError },
-          'FULL_REGENERATE: RPC restart_from_stage failed'
-        );
-        throw new Error('Failed to reset course status');
-      }
-
-      // Clean up existing jobs
-      try {
-        await removeJobsByCourseId(courseId);
-      } catch (cleanupError) {
-        logger.warn(
-          { requestId, courseId, error: cleanupError },
-          'FULL_REGENERATE: Failed to clean up jobs'
-        );
-      }
-
-      // Build and enqueue Stage 5 job
-      const { jobInput } = await buildStage5JobInput(supabaseAdmin, courseId, userId, requestId);
-      const job = await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData);
-
-      const regenMessage = 'Запускаю полную перегенерацию курса. Это может занять некоторое время.';
-
-      await persistAssistantMessage(supabaseAdmin, {
-        courseId,
-        convId,
-        content: regenMessage,
-        chatType,
-        nodeContext: nodeContext || null,
-        intent: 'regenerate',
-        modelUsed: 'heuristic_classifier',
-        inputTokens: 0,
-        outputTokens: 0,
-        requestId,
-      });
-
-      logger.info(
-        { requestId, courseId, jobId: job.id, confidence: classifiedIntent.confidence },
-        'Chat: FULL_REGENERATE — job enqueued'
-      );
-
-      return {
-        conversationId: convId,
-        assistantMessage: regenMessage,
-        intent: 'regenerate',
-        jobId: job.id,
-        modelUsed: 'heuristic_classifier',
-        inputTokens: 0,
-        outputTokens: 0,
-      };
-    } catch (error) {
-      logger.error(
-        {
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        'Chat: FULL_REGENERATE failed'
-      );
-
-      const errorMessage = 'Не удалось запустить перегенерацию. Попробуйте ещё раз.';
-
-      await persistAssistantMessage(supabaseAdmin, {
-        courseId,
-        convId,
-        content: errorMessage,
-        chatType,
-        nodeContext: nodeContext || null,
-        intent: 'regenerate',
-        modelUsed: 'heuristic_classifier',
-        inputTokens: 0,
-        outputTokens: 0,
-        requestId,
-      });
-
-      return {
-        conversationId: convId,
-        assistantMessage: errorMessage,
-        intent: 'regenerate',
-        modelUsed: 'heuristic_classifier',
-        inputTokens: 0,
-        outputTokens: 0,
-      };
-    }
+    return executeFullRegenerate({
+      courseId,
+      userId,
+      convId,
+      chatType,
+      nodeContext,
+      requestId,
+      supabaseAdmin,
+    });
   }
 
   // Step 3: Handle direct execution intents (DELETE, MOVE) - 0 tokens
