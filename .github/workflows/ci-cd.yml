@@ -38,7 +38,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   PNPM_VERSION: '8.15.0'
   DEPLOY_HOST: '95.81.98.230'
   DEPLOY_USER: 'claude-deploy'
@@ -559,7 +559,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           build-args: |
-            NODE_VERSION=20
+            NODE_VERSION=22
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
             ${{ matrix.image == 'web' && format('NEXT_PUBLIC_SUPABASE_URL={0}', secrets.SUPABASE_URL) || '' }}

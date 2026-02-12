@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.4
 
 # Build arguments
-ARG NODE_VERSION=20
+ARG NODE_VERSION=22
 ARG BUILD_DATE
 ARG VCS_REF
 
