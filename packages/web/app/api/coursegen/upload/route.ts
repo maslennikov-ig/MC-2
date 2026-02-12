@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
       })
       return NextResponse.json(
-        { error: 'Требуется авторизация', code: 'UNAUTHORIZED' },
+        { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         error: parseError instanceof Error ? parseError.message : 'Unknown error',
       })
       return NextResponse.json(
-        { error: 'Некорректный формат запроса', code: 'INVALID_REQUEST' },
+        { error: 'Invalid request format', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     // Basic input validation
     if (!body.courseId || !body.filename || !body.fileContent) {
       return NextResponse.json(
-        { error: 'Отсутствуют обязательные поля', code: 'INVALID_REQUEST' },
+        { error: 'Missing required fields', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     // Validate courseId format (UUID)
     if (!isValidUUID(body.courseId)) {
       return NextResponse.json(
-        { error: 'Некорректный формат ID курса', code: 'INVALID_REQUEST' },
+        { error: 'Invalid course ID format', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       fileId: result.fileId,
       storagePath: result.storagePath,
-      message: result.message || 'Файл успешно загружен',
+      message: result.message || 'File uploaded successfully',
     })
   } catch (error) {
     // Handle tRPC errors with proper HTTP status codes

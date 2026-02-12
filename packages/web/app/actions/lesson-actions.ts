@@ -1,7 +1,7 @@
 'use server'
 
-import { TRPCClientError } from '@trpc/client'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
+import { toActionError } from '@/lib/trpc/action-error'
 
 /**
  * Approve a lesson after review
@@ -179,17 +179,4 @@ export async function retryMultipleLessons(
   } catch (error) {
     throw toActionError(error, 'Failed to retry lessons')
   }
-}
-
-/**
- * Convert tRPC or unknown errors to a plain Error for server action boundaries
- */
-function toActionError(error: unknown, fallback: string): Error {
-  if (error instanceof TRPCClientError) {
-    return new Error(error.message)
-  }
-  if (error instanceof Error) {
-    return error
-  }
-  return new Error(fallback)
 }

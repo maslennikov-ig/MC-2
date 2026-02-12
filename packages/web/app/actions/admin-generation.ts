@@ -1,19 +1,10 @@
 'use server'
 
-import { TRPCClientError } from '@trpc/client'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
+import { toActionError } from '@/lib/trpc/action-error'
 import { ENV } from '@/lib/env'
-
-/**
- * Convert tRPC or unknown errors to a plain Error for server action boundaries
- */
-function toActionError(error: unknown, fallback: string): Error {
-  if (error instanceof TRPCClientError) return new Error(error.message)
-  if (error instanceof Error) return error
-  return new Error(fallback)
-}
 
 export async function triggerStage6ForLesson(lessonId: string) {
   try {
