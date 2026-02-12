@@ -4,10 +4,11 @@
  *
  * Coverage:
  * - GenerationGuidanceSchema (T010 equivalent)
+ * - SectionBreakdownSchema.importance field transformation
  */
 
 import { describe, it, expect } from 'vitest';
-import { GenerationGuidanceSchema } from '../src/analysis-schemas';
+import { GenerationGuidanceSchema, SectionBreakdownSchema } from '../src/analysis-schemas';
 
 // ==================== Helper Functions (Data Fixtures) ====================
 
@@ -382,6 +383,562 @@ describe('GenerationGuidanceSchema', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.include_visuals).toEqual([]);
+      }
+    });
+  });
+});
+
+// ==================== Helper Functions (Section Breakdown Fixtures) ====================
+
+/**
+ * Creates valid SectionBreakdown object for testing
+ */
+function createValidSectionBreakdown() {
+  return {
+    area: 'Introduction to Programming',
+    estimated_lessons: 5,
+    importance: 'normal' as const,
+    learning_objectives: ['Understand basic programming concepts', 'Write simple programs'],
+    key_topics: ['Variables', 'Control flow', 'Functions'],
+    pedagogical_approach:
+      'Hands-on coding exercises with immediate feedback and visual debugging tools',
+  };
+}
+
+// ==================== SectionBreakdownSchema.importance Tests ====================
+
+describe('SectionBreakdownSchema.importance field transformation', () => {
+  describe('Canonical values (pass through unchanged)', () => {
+    it('should accept "simple" as-is', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'simple',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+
+    it('should accept "normal" as-is', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'normal',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('normal');
+      }
+    });
+
+    it('should accept "complex" as-is', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'complex',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+  });
+
+  describe('Old enum values (backward compatibility)', () => {
+    it('should transform "core" → "complex"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'core',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "important" → "normal"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'important',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('normal');
+      }
+    });
+
+    it('should transform "optional" → "simple"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'optional',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+  });
+
+  describe('LLM synonyms - simple mappings', () => {
+    it('should transform "easy" → "simple"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'easy',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+
+    it('should transform "beginner" → "simple"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'beginner',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+
+    it('should transform "low" → "simple"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'low',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+
+    it('should transform "supplementary" → "simple"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'supplementary',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+
+    it('should transform "extra" → "simple"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'extra',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+
+    it('should transform "bonus" → "simple"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'bonus',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+  });
+
+  describe('LLM synonyms - normal mappings', () => {
+    it('should transform "medium" → "normal"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'medium',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('normal');
+      }
+    });
+
+    it('should transform "intermediate" → "normal"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'intermediate',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('normal');
+      }
+    });
+
+    it('should transform "secondary" → "normal"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'secondary',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('normal');
+      }
+    });
+  });
+
+  describe('LLM synonyms - complex mappings', () => {
+    it('should transform "hard" → "complex"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'hard',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "advanced" → "complex"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'advanced',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "high" → "complex"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'high',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "critical" → "complex"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'critical',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "essential" → "complex"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'essential',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "main" → "complex"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'main',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "primary" → "complex"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'primary',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+  });
+
+  describe('Case-insensitive matching', () => {
+    it('should transform "Core" → "complex" (capital first letter)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'Core',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "IMPORTANT" → "normal" (all caps)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'IMPORTANT',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('normal');
+      }
+    });
+
+    it('should transform "OpTiOnAl" → "simple" (mixed case)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'OpTiOnAl',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+
+    it('should transform "aDvAnCeD" → "complex" (mixed case)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'aDvAnCeD',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+  });
+
+  describe('Whitespace trimming', () => {
+    it('should transform "  core  " → "complex" (leading/trailing spaces)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '  core  ',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "\\timportant\\t" → "normal" (tabs)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '\timportant\t',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('normal');
+      }
+    });
+
+    it('should transform "\\n  optional  \\n" → "simple" (newlines + spaces)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '\n  optional  \n',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+  });
+
+  describe('Unknown values rejection', () => {
+    it('should reject "super-critical" (unknown value)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'super-critical',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        // Verify error is from the enum pipe, not the transform
+        expect(result.error.issues[0].path).toContain('importance');
+        expect(result.error.issues[0].code).toBe('invalid_enum_value');
+      }
+    });
+
+    it('should reject "moderate" (unknown value)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'moderate',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toContain('importance');
+        expect(result.error.issues[0].code).toBe('invalid_enum_value');
+      }
+    });
+
+    it('should reject "very-important" (unknown value)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'very-important',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toContain('importance');
+        expect(result.error.issues[0].code).toBe('invalid_enum_value');
+      }
+    });
+
+    it('should reject "foundational" (unknown value)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: 'foundational',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toContain('importance');
+        expect(result.error.issues[0].code).toBe('invalid_enum_value');
+      }
+    });
+  });
+
+  describe('Empty string and special cases', () => {
+    it('should reject empty string ""', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toContain('importance');
+        expect(result.error.issues[0].code).toBe('invalid_enum_value');
+      }
+    });
+
+    it('should reject whitespace-only string "   "', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '   ',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toContain('importance');
+        expect(result.error.issues[0].code).toBe('invalid_enum_value');
+      }
+    });
+
+    it('should reject numeric string "1"', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '1',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toContain('importance');
+        expect(result.error.issues[0].code).toBe('invalid_enum_value');
+      }
+    });
+  });
+
+  describe('Combined transformations (case + whitespace)', () => {
+    it('should transform "  CORE  " → "complex" (all caps + whitespace)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '  CORE  ',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('complex');
+      }
+    });
+
+    it('should transform "\\tEaSy\\n" → "simple" (mixed case + mixed whitespace)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '\tEaSy\n',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('simple');
+      }
+    });
+
+    it('should transform "  Medium  " → "normal" (capital first + whitespace)', () => {
+      const section = {
+        ...createValidSectionBreakdown(),
+        importance: '  Medium  ',
+      };
+      const result = SectionBreakdownSchema.safeParse(section);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.importance).toBe('normal');
       }
     });
   });
