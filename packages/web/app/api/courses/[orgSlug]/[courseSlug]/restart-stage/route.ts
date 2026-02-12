@@ -2,15 +2,16 @@
  * POST /api/courses/[orgSlug]/[courseSlug]/restart-stage
  *
  * Restarts course generation from a specific stage.
- * Proxies to tRPC generation.restartStage endpoint.
+ * Calls tRPC generation.restartStage via type-safe server caller.
  *
  * @module api/courses/[orgSlug]/[courseSlug]/restart-stage
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { TRPCClientError } from '@trpc/client'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { ENV } from '@/lib/env'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
 
 interface RestartStageInput {
@@ -102,79 +103,61 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    logger.info('Proxying restart-stage request to tRPC', {
+    logger.info('Calling generation.restartStage via tRPC client', {
       userId: user.id,
       courseId: courseData.id,
       stageNumber,
     })
 
-    // Get auth token for tRPC request
-    const { data: sessionData } = await supabase.auth.getSession()
-    const accessToken = sessionData.session?.access_token
-
-    if (!accessToken) {
-      return NextResponse.json({ error: 'No valid session', code: 'UNAUTHORIZED' }, { status: 401 })
-    }
-
-    // Call tRPC endpoint
-    const backendUrl = ENV.COURSEGEN_BACKEND_URL
-    const tRPCUrl = `${backendUrl}/trpc`
-
-    const tRPCResponse = await fetch(`${tRPCUrl}/generation.restartStage`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        courseId: courseData.id,
-        stageNumber,
-      }),
+    // Call tRPC via type-safe server caller (uses httpBatchLink with correct wire format)
+    const client = await getServerTrpcClient()
+    const result = await client.generation.restartStage.mutate({
+      courseId: courseData.id,
+      stageNumber,
     })
-
-    const data = await tRPCResponse.json()
-
-    if (!tRPCResponse.ok) {
-      logger.error('tRPC generation.restartStage failed', {
-        userId: user.id,
-        courseId: courseData.id,
-        stageNumber,
-        status: tRPCResponse.status,
-        error: data,
-      })
-
-      // Map tRPC error codes to HTTP status codes
-      const statusMap: Record<string, number> = {
-        NOT_FOUND: 404,
-        FORBIDDEN: 403,
-        BAD_REQUEST: 400,
-        TOO_MANY_REQUESTS: 429,
-      }
-
-      const httpStatus = statusMap[data.error?.data?.code] || tRPCResponse.status
-      return NextResponse.json(
-        {
-          error: data.error?.message || 'Failed to restart stage',
-          code: data.error?.data?.code || 'INTERNAL_ERROR',
-        },
-        { status: httpStatus }
-      )
-    }
 
     logger.info('Stage restart initiated successfully', {
       userId: user.id,
       courseId: courseData.id,
       stageNumber,
-      previousStatus: data.result?.data?.previousStatus,
-      newStatus: data.result?.data?.newStatus,
+      previousStatus: result?.previousStatus,
+      newStatus: result?.newStatus,
     })
 
-    // Return tRPC result data
+    // Return tRPC result data (spread first, then override success to ensure it's true)
     return NextResponse.json({
+      ...result,
       success: true,
-      ...data.result?.data,
     })
   } catch (error) {
+    // Handle tRPC errors with proper HTTP status codes
+    if (error instanceof TRPCClientError) {
+      const statusMap: Record<string, number> = {
+        UNAUTHORIZED: 401,
+        FORBIDDEN: 403,
+        NOT_FOUND: 404,
+        TOO_MANY_REQUESTS: 429,
+        BAD_REQUEST: 400,
+        INTERNAL_SERVER_ERROR: 500,
+      }
+      const httpStatus = error.data?.httpStatus || statusMap[error.data?.code] || 500
+
+      logger.error('tRPC generation.restartStage failed', {
+        userId,
+        code: error.data?.code,
+        message: error.message,
+        httpStatus,
+      })
+
+      return NextResponse.json(
+        {
+          error: error.message || 'Failed to restart stage',
+          code: error.data?.code || 'INTERNAL_ERROR',
+        },
+        { status: httpStatus }
+      )
+    }
+
     logger.error('Unexpected error in restart-stage', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,

@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { logger } from '@/lib/logger'
-import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import type { Database } from '@/types/database.generated'
 
 // ============================================================================
@@ -143,47 +143,29 @@ export async function createEnrichment(
     }
 
     // Call tRPC API to create enrichment
-    const headers = await getBackendAuthHeaders()
-    const response = await fetch(`${TRPC_URL}/enrichment.create`, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        lessonId: lesson.id,
-        enrichmentType: input.enrichmentType,
-        settings: input.settings || {},
-      }),
-    })
+    const client = await getServerTrpcClient()
+    const result = await client.enrichment.create.mutate({
+      lessonId: lesson.id,
+      enrichmentType: input.enrichmentType,
+      settings: input.settings || {},
+    } as any)
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      logger.error('[createEnrichment] tRPC call failed', {
-        status: response.status,
-        error: errorText,
-      })
-      return { success: false, error: `Failed to create enrichment: ${response.status}` }
-    }
-
-    const result = await response.json()
-
-    if (!result.result?.data?.success) {
+    if (!result?.success) {
       return {
         success: false,
-        error: result.result?.data?.error || 'Unknown error',
+        error: (result as any)?.error || 'Unknown error',
       }
     }
 
     logger.info('[createEnrichment] Enrichment created', {
-      enrichmentId: result.result.data.enrichmentId,
+      enrichmentId: (result as any).enrichmentId,
       lessonId: input.lessonId,
       type: input.enrichmentType,
     })
 
     return {
       success: true,
-      enrichmentId: result.result.data.enrichmentId,
+      enrichmentId: (result as any).enrichmentId,
     }
   } catch (error) {
     logger.error('[createEnrichment] Unexpected error', {
@@ -406,33 +388,15 @@ export async function deleteEnrichment(
     }
 
     // Call tRPC API to delete enrichment
-    const headers = await getBackendAuthHeaders()
-    const response = await fetch(`${TRPC_URL}/enrichment.delete`, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        enrichmentId: input.enrichmentId,
-      }),
+    const client = await getServerTrpcClient()
+    const result = await client.enrichment.delete.mutate({
+      enrichmentId: input.enrichmentId,
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      logger.error('[deleteEnrichment] tRPC call failed', {
-        status: response.status,
-        error: errorText,
-      })
-      return { success: false, error: `Failed to delete enrichment: ${response.status}` }
-    }
-
-    const result = await response.json()
-
-    if (!result.result?.data?.success) {
+    if (!(result as any)?.success) {
       return {
         success: false,
-        error: result.result?.data?.error || 'Unknown error',
+        error: (result as any)?.error || 'Unknown error',
       }
     }
 
@@ -519,44 +483,26 @@ export async function regenerateEnrichment(
     }
 
     // Call tRPC API to regenerate enrichment
-    const headers = await getBackendAuthHeaders()
-    const response = await fetch(`${TRPC_URL}/enrichment.regenerate`, {
-      method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        enrichmentId: input.enrichmentId,
-      }),
+    const client = await getServerTrpcClient()
+    const result = await client.enrichment.regenerate.mutate({
+      enrichmentId: input.enrichmentId,
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      logger.error('[regenerateEnrichment] tRPC call failed', {
-        status: response.status,
-        error: errorText,
-      })
-      return { success: false, error: `Failed to regenerate enrichment: ${response.status}` }
-    }
-
-    const result = await response.json()
-
-    if (!result.result?.data?.success) {
+    if (!(result as any)?.success) {
       return {
         success: false,
-        error: result.result?.data?.error || 'Unknown error',
+        error: (result as any)?.error || 'Unknown error',
       }
     }
 
     logger.info('[regenerateEnrichment] Enrichment regeneration started', {
       enrichmentId: input.enrichmentId,
-      newJobId: result.result.data.newJobId,
+      newJobId: (result as any).newJobId,
     })
 
     return {
       success: true,
-      newJobId: result.result.data.newJobId,
+      newJobId: (result as any).newJobId,
     }
   } catch (error) {
     logger.error('[regenerateEnrichment] Unexpected error', {

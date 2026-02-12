@@ -7,8 +7,9 @@ import { DocumentPriorityLevelSchema, courseSizeSchema } from '@megacampus/share
 import { extractDocumentUUID } from '@/lib/generation-graph/utils'
 import crypto from 'crypto'
 import { CreateCourseResponse, CreateCourseError, GenerationStep } from '@/types/course-generation'
+import { TRPCClientError } from '@trpc/client'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { ENV } from '@/lib/env'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import type { Json } from '@/types/database.generated'
 import { generateSlug } from '@/lib/utils/slug'
 
@@ -78,50 +79,30 @@ function createInitialProgress(): GenerationStep[] {
 }
 
 /**
- * Trigger course generation via new backend endpoint
+ * Trigger course generation via tRPC backend
  * Stage 1 - Main Entry Orchestrator
  * Exported for potential direct use (e.g., retry scenarios)
+ *
+ * @deprecated Parameters userId/accessToken are no longer needed — auth handled by getServerTrpcClient()
  */
 export async function triggerCourseGeneration(
   courseId: string,
-  userId: string,
-  accessToken: string
+  _userId?: string,
+  _accessToken?: string
 ): Promise<{ success: boolean; error?: string; errorCode?: string }> {
   try {
-    // Call tRPC endpoint directly on the backend server
-    const backendUrl = ENV.COURSEGEN_BACKEND_URL
-    const endpoint = `${backendUrl}/trpc/generation.initiate`
+    logger.info('Triggering course generation via tRPC client', { courseId })
 
-    logger.info('Triggering course generation via tRPC backend', {
-      courseId,
-      userId,
-      endpoint: endpoint.substring(0, 50) + '...',
-      hasAccessToken: !!accessToken,
-    })
+    const client = await getServerTrpcClient()
+    await client.generation.initiate.mutate({ courseId, webhookUrl: null })
 
-    // tRPC v11 expects plain input data for mutations
-    const payload = {
-      courseId,
-      webhookUrl: null,
-    }
-
-    // Call tRPC backend with JWT authentication
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10000), // 10 second timeout
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-
-      // Handle concurrency limit (429)
-      if (response.status === 429) {
-        logger.warn('Concurrency limit reached', { courseId, userId })
+    logger.info('Course generation triggered successfully', { courseId })
+    return { success: true }
+  } catch (error) {
+    // Handle concurrency limit (429 / TOO_MANY_REQUESTS)
+    if (error instanceof TRPCClientError) {
+      if (error.data?.code === 'TOO_MANY_REQUESTS') {
+        logger.warn('Concurrency limit reached', { courseId })
         return {
           success: false,
           error:
@@ -130,43 +111,23 @@ export async function triggerCourseGeneration(
         }
       }
 
-      // Extract error message from tRPC error format
-      const errorMessage =
-        errorData?.error?.message ||
-        errorData?.message ||
-        errorData?.error ||
-        `Backend failed with status ${response.status}`
-      const errorCode = errorData?.error?.data?.code || errorData?.code || 'BACKEND_ERROR'
-
       logger.error('tRPC generation.initiate failed', {
-        status: response.status,
-        error: errorData,
+        code: error.data?.code,
+        message: error.message,
         courseId,
       })
 
       return {
         success: false,
-        error: errorMessage,
-        errorCode: errorCode,
+        error: error.message,
+        errorCode: error.data?.code || 'BACKEND_ERROR',
       }
     }
 
-    // tRPC returns data in { result: { data: ... } } format
-    const responseData = await response.json()
-    const result = responseData?.result?.data || responseData
-
-    logger.info('Course generation triggered successfully', {
-      courseId,
-      result,
-    })
-
-    return { success: true }
-  } catch (error) {
     logger.error('Failed to trigger course generation', {
       error: error instanceof Error ? error.message : 'Unknown error',
       errorStack: error instanceof Error ? error.stack : undefined,
       courseId,
-      userId,
     })
     return {
       success: false,
