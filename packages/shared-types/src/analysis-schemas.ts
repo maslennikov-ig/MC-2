@@ -109,7 +109,45 @@ function createSoftEnumArraySchema<T extends string>(
 export const SectionBreakdownSchema = z.object({
   area: z.string().min(1), // Removed .max(200) - allow detailed section names
   estimated_lessons: z.number().int().min(1, 'Section must have at least 1 lesson'),
-  importance: z.enum(['simple', 'normal', 'complex']),
+  importance: z
+    .string()
+    .transform(val => {
+      // Normalize to lowercase for case-insensitive matching
+      const normalized = val.toLowerCase().trim();
+
+      // Map old enum values and LLM-generated synonyms to new canonical values
+      const importanceMap: Record<string, 'simple' | 'normal' | 'complex'> = {
+        // Canonical values (pass through)
+        simple: 'simple',
+        normal: 'normal',
+        complex: 'complex',
+        // Backward compatibility: old enum values
+        core: 'complex',
+        important: 'normal',
+        optional: 'simple',
+        // LLM synonym mappings
+        easy: 'simple',
+        medium: 'normal',
+        hard: 'complex',
+        advanced: 'complex',
+        intermediate: 'normal',
+        beginner: 'simple',
+        high: 'complex',
+        low: 'simple',
+        critical: 'complex',
+        essential: 'complex',
+        main: 'complex',
+        primary: 'complex',
+        secondary: 'normal',
+        supplementary: 'simple',
+        extra: 'simple',
+        bonus: 'simple',
+      };
+
+      // Return mapped value or original if not found
+      return importanceMap[normalized] || (val as 'simple' | 'normal' | 'complex');
+    })
+    .pipe(z.enum(['simple', 'normal', 'complex'])),
   learning_objectives: z
     .array(z.string().min(1))
     .min(2, 'Must have at least 2 learning objectives'), // Removed .max(5) - encourage comprehensive objectives
