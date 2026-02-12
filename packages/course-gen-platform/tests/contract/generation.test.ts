@@ -758,7 +758,7 @@ describe('Contract: Generation Router', () => {
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          result = await client.reregeneration.regenerateSection.mutate({
+          result = await client.regeneration.regenerateSection.mutate({
             courseId,
             sectionNumber: 1,
           });
@@ -805,7 +805,7 @@ describe('Contract: Generation Router', () => {
       // When: Attempting to regenerate section 0 (invalid)
       // Then: Should throw BAD_REQUEST error
       try {
-        await client.reregeneration.regenerateSection.mutate({
+        await client.regeneration.regenerateSection.mutate({
           courseId,
           sectionNumber: 0,
         });
@@ -832,7 +832,7 @@ describe('Contract: Generation Router', () => {
 
       // Then: Should throw NOT_FOUND error
       try {
-        await client.reregeneration.regenerateSection.mutate({
+        await client.regeneration.regenerateSection.mutate({
           courseId: nonExistentCourseId,
           sectionNumber: 1,
         });
@@ -858,7 +858,7 @@ describe('Contract: Generation Router', () => {
 
       // Then: Should throw UNAUTHORIZED error
       try {
-        await client.reregeneration.regenerateSection.mutate({
+        await client.regeneration.regenerateSection.mutate({
           courseId,
           sectionNumber: 1,
         });
@@ -914,7 +914,7 @@ describe('Contract: Generation Router', () => {
       // When: Attempting to regenerate section for course owned by different user
       // Then: Should throw FORBIDDEN error
       try {
-        await client.reregeneration.regenerateSection.mutate({
+        await client.regeneration.regenerateSection.mutate({
           courseId: course.id,
           sectionNumber: 1,
         });
