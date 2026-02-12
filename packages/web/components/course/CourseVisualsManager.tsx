@@ -9,8 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { useSupabase } from '@/lib/supabase/browser-client'
-import { BACKEND_URL } from '@/lib/env-client'
+import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 import { Link } from '@/src/i18n/navigation'
 
 interface Lesson {
@@ -53,8 +52,6 @@ export function CourseVisualsManager({
   const t = useTranslations('enrichments')
   const tCourse = useTranslations('course')
   const router = useRouter()
-  const { session } = useSupabase()
-
   const [isGeneratingCovers, setIsGeneratingCovers] = useState(false)
   const [isGeneratingCards, setIsGeneratingCards] = useState(false)
 
@@ -86,14 +83,6 @@ export function CourseVisualsManager({
   const cardPercentage =
     totalLessons > 0 ? Math.round(((totalLessons - missingCards) / totalLessons) * 100) : 0
 
-  const getAuthHeaders = useCallback(
-    () => ({
-      'Content-Type': 'application/json',
-      Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
-    }),
-    [session?.access_token]
-  )
-
   /**
    * Poll generation status for enrichment IDs
    * Checks every 3 seconds until all complete
@@ -106,15 +95,12 @@ export function CourseVisualsManager({
       }
 
       const checkStatus = async () => {
+        const client = getBrowserTrpcClient()
         let completed = 0
         for (const id of ids) {
           try {
-            const res = await fetch(
-              `${BACKEND_URL}/trpc/enrichment.getGenerationStatus?input=${encodeURIComponent(JSON.stringify({ enrichmentId: id }))}`,
-              { headers: getAuthHeaders() }
-            )
-            const data = await res.json()
-            if (data.result?.data?.status === 'completed') {
+            const data = await client.enrichment.getGenerationStatus.query({ enrichmentId: id })
+            if (data.status === 'completed') {
               completed++
             }
           } catch {
@@ -142,7 +128,7 @@ export function CourseVisualsManager({
       // Then poll every 3 seconds
       pollingIntervalRef.current = setInterval(() => void checkStatus(), 3000)
     },
-    [getAuthHeaders, router, t]
+    [router, t]
   )
 
   /**
@@ -151,7 +137,6 @@ export function CourseVisualsManager({
   const handleBatchGeneration = useCallback(
     async (
       type: GenerationType,
-      endpoint: string,
       missingCount: number,
       setIsGenerating: (value: boolean) => void,
       abortRef: React.MutableRefObject<AbortController | null>
@@ -161,38 +146,21 @@ export function CourseVisualsManager({
         return
       }
 
-      // Abort previous request if any
+      // Abort previous polling if any
       abortRef.current?.abort()
       abortRef.current = new AbortController()
 
       setIsGenerating(true)
 
       try {
-        const response = await fetch(`${BACKEND_URL}/trpc/${endpoint}`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          signal: abortRef.current.signal,
-          body: JSON.stringify({
-            courseId,
-            skipExisting: true,
-          }),
-        })
+        const client = getBrowserTrpcClient()
+        const input = { courseId, skipExisting: true }
 
-        if (!response.ok) {
-          // Try to extract error details from response
-          const errorData = await response.json().catch(() => ({}))
-          const errorMessage =
-            errorData?.error?.message ||
-            (response.status === 429
-              ? t('errors.rateLimitExceeded')
-              : response.status >= 500
-                ? t('errors.serverError')
-                : `Batch ${type} generation failed`)
-          throw new Error(errorMessage)
-        }
+        const data =
+          type === 'covers'
+            ? await client.enrichment.generateBatchCovers.mutate(input)
+            : await client.enrichment.generateBatchCards.mutate(input)
 
-        const result = await response.json()
-        const data = result.result?.data
         const enrichmentIds: string[] = data?.details?.succeededIds || []
 
         if (enrichmentIds.length > 0) {
@@ -219,30 +187,16 @@ export function CourseVisualsManager({
         abortRef.current = null
       }
     },
-    [courseId, getAuthHeaders, router, startPolling, t]
+    [courseId, router, startPolling, t]
   )
 
   const handleGenerateMissingCovers = useCallback(
-    () =>
-      handleBatchGeneration(
-        'covers',
-        'enrichment.generateBatchCovers',
-        missingCovers,
-        setIsGeneratingCovers,
-        coversAbortRef
-      ),
+    () => handleBatchGeneration('covers', missingCovers, setIsGeneratingCovers, coversAbortRef),
     [handleBatchGeneration, missingCovers]
   )
 
   const handleGenerateMissingCards = useCallback(
-    () =>
-      handleBatchGeneration(
-        'cards',
-        'enrichment.generateBatchCards',
-        missingCards,
-        setIsGeneratingCards,
-        cardsAbortRef
-      ),
+    () => handleBatchGeneration('cards', missingCards, setIsGeneratingCards, cardsAbortRef),
     [handleBatchGeneration, missingCards]
   )
 
