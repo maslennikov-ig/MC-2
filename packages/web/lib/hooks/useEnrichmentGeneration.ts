@@ -276,7 +276,7 @@ export function useEnrichmentGeneration({
               : 'Lost connection to server. Please refresh and try again.'
             onError?.(errorMessage)
           } else {
-            // Exponential backoff
+            // Multiplicative backoff (1.5x per failure, capped at MAX_BACKOFF_INTERVAL)
             currentInterval = Math.min(currentInterval * 1.5, MAX_BACKOFF_INTERVAL)
           }
         }
