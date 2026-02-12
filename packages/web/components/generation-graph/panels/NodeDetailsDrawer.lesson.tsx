@@ -90,6 +90,8 @@ interface NodeDetailsDrawerLessonProps {
   onRetryProposal: () => void
   /** Reject proposal handler */
   onRejectProposal: () => void
+  /** Stage 6 content ready for CTA */
+  stage6ContentReady: boolean
 }
 
 /**
@@ -139,6 +141,7 @@ export const NodeDetailsDrawerLesson = memo(function NodeDetailsDrawerLesson({
   onAcceptProposal,
   onRetryProposal,
   onRejectProposal,
+  stage6ContentReady,
 }: NodeDetailsDrawerLessonProps) {
   return (
     <div className="flex h-full flex-col">
@@ -192,6 +195,7 @@ export const NodeDetailsDrawerLesson = memo(function NodeDetailsDrawerLesson({
           proposalError={proposalError}
           onRetryProposal={onRetryProposal}
           onRejectProposal={onRejectProposal}
+          stage6ContentReady={stage6ContentReady}
           isGenerating={isGenerating}
           blockedMessage={blockedMessage}
         />

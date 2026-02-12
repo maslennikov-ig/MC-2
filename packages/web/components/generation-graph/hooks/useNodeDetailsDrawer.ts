@@ -104,6 +104,7 @@ export function useNodeDetailsDrawer() {
     retryProposal,
     rejectProposal,
     acceptedProposal,
+    stage6ContentReady,
   } = useRefinement(courseInfo.id)
 
   // Check if there's a pending enrichment create from toolbar
@@ -797,6 +798,7 @@ export function useNodeDetailsDrawer() {
       isApplying,
       acceptedProposal,
       proposalError,
+      stage6ContentReady,
     },
     // Handlers
     handlers: {

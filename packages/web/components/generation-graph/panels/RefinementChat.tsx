@@ -13,6 +13,7 @@ import {
   RefreshCcw,
   Check,
   X,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
@@ -36,6 +37,8 @@ interface RefinementChatProps {
   onRetryProposal?: () => void
   onRejectProposal?: () => void
   acceptedProposal?: Proposal | null
+  /** Whether Stage 6 content is ready for new lessons (show generate CTA) */
+  stage6ContentReady?: boolean
   /** Whether course generation is currently active (blocks chat interaction) */
   isGenerating?: boolean
   /** Message to display when chat is blocked due to generation */
@@ -65,6 +68,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   onRetryProposal,
   onRejectProposal,
   acceptedProposal,
+  stage6ContentReady = false,
   isGenerating = false,
   blockedMessage,
 }) => {
@@ -523,6 +527,24 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                     ))}
                   </ul>
                 )}
+              </div>
+            )}
+
+            {/* Stage 6 CTA: generate content for newly added lessons */}
+            {stage6ContentReady && !latestProposal && acceptedProposal && (
+              <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-900/20">
+                <p className="mb-3 text-sm text-purple-800 dark:text-purple-200">
+                  {t('refinementChat.stage6Cta.description')}
+                </p>
+                <Button
+                  onClick={() => void onRefine(t('refinementChat.stage6Cta.message'), 'regenerate')}
+                  disabled={isBlocked}
+                  className="bg-purple-600 hover:bg-purple-700"
+                  data-testid="stage6-generate-cta"
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {t('refinementChat.stage6Cta.button')}
+                </Button>
               </div>
             )}
 
