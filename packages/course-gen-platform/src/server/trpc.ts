@@ -9,6 +9,7 @@
 
 import { initTRPC } from '@trpc/server';
 import type { FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
+import { createHmac } from 'crypto';
 import { getSupabaseAdmin } from '../shared/supabase/admin';
 import type { Database } from '@megacampus/shared-types';
 import { logger } from '../shared/logger/index.js';
@@ -56,13 +57,48 @@ function extractToken(req: Request): string | null {
 }
 
 /**
+ * Verify JWT signature locally using HMAC-SHA256.
+ * Used as a fallback in test environments when supabase.auth.getUser() fails
+ * (e.g., mock JWTs without real sessions in auth.sessions).
+ *
+ * @returns Decoded payload if signature is valid and token is not expired, null otherwise
+ */
+function verifyJWTLocally(token: string, secret: string): { sub: string; email?: string } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    const [header, payload, signature] = parts;
+    const expectedSig = createHmac('sha256', secret)
+      .update(`${header}.${payload}`)
+      .digest('base64url');
+
+    if (expectedSig !== signature) return null;
+
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+
+    // Check expiration
+    if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) return null;
+
+    // Must have sub claim
+    if (!decoded.sub) return null;
+
+    return { sub: decoded.sub, email: decoded.email };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Create tRPC context from incoming request
  *
  * This function:
  * 1. Extracts JWT from Authorization header
- * 2. Validates JWT using Supabase admin client
- * 3. Extracts custom claims (user_id, role, organization_id) from JWT
- * 4. Returns context with user information or null if unauthenticated
+ * 2. Validates JWT using Supabase admin client (getUser API call)
+ * 3. Falls back to local JWT signature verification in test environments
+ *    (GoTrue rejects mock JWTs that lack real sessions in auth.sessions)
+ * 4. Loads user data from database for current role and organization
+ * 5. Returns context with user information or null if unauthenticated
  *
  * @param opts - Context options containing request
  * @returns Context object with user or null
@@ -79,26 +115,37 @@ export async function createContext(opts: FetchCreateContextFnOptions): Promise<
   }
 
   try {
-    // Validate JWT using Supabase admin client
     const supabase = getSupabaseAdmin();
+
+    // Primary path: validate JWT using Supabase Auth API (checks signature + session)
     const { data, error } = await supabase.auth.getUser(token);
 
-    // Return unauthenticated context if validation fails
-    if (error || !data.user) {
-      return { user: null, req };
+    let userId: string | undefined;
+
+    if (!error && data.user) {
+      userId = data.user.id;
+    } else if (process.env.NODE_ENV === 'test') {
+      // Fallback for test environments: verify JWT signature locally.
+      // GoTrue rejects mock JWTs without real sessions in auth.sessions,
+      // but locally-signed JWTs with valid signatures are safe for testing.
+      const jwtSecret = process.env.SUPABASE_JWT_SECRET?.trim();
+      if (jwtSecret) {
+        const claims = verifyJWTLocally(token, jwtSecret);
+        if (claims) {
+          userId = claims.sub;
+        }
+      }
     }
 
-    // Extract custom claims from JWT
-    // These claims are added by the custom_access_token_hook function (T047)
-    // Note: getUser() doesn't return JWT payload directly, so we need to decode it
-    // However, for security, we should get claims from the database instead
-    // to ensure they're current (in case user role changed after JWT issued)
+    if (!userId) {
+      return { user: null, req };
+    }
 
     // Query user data from database to get current role and organization
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, email, role, organization_id')
-      .eq('id', data.user.id)
+      .eq('id', userId)
       .single();
 
     // Return unauthenticated context if user not found in database
