@@ -1,19 +1,17 @@
 /**
  * POST /api/coursegen/partial-generate
  *
- * Thin proxy to tRPC lessonContent.partialGenerate endpoint.
+ * Calls tRPC lessonContent.partialGenerate via type-safe server caller.
  * Enables partial generation of specific lessons or sections.
- *
- * This endpoint serves as a compatibility layer for existing API consumers.
- * New integrations should use the tRPC endpoint directly for type safety.
  *
  * @module api/coursegen/partial-generate
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { TRPCClientError } from '@trpc/client'
 import { logger, logPermanentFailure } from '@/lib/logger'
-import { ENV } from '@/lib/env'
+import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 
 interface PartialGenerateRequest {
   courseId: string // Course UUID
@@ -25,10 +23,9 @@ interface PartialGenerateRequest {
 /**
  * POST handler for partial course generation
  *
- * This is a thin proxy that:
- * 1. Validates authentication
- * 2. Validates required parameters (courseId + lessonIds/sectionIds)
- * 3. Proxies request to tRPC lessonContent.partialGenerate
+ * 1. Validates authentication (friendly error messages)
+ * 2. Validates required parameters
+ * 3. Calls tRPC via type-safe getServerTrpcClient()
  * 4. Returns formatted response
  */
 export async function POST(request: NextRequest) {
@@ -55,18 +52,6 @@ export async function POST(request: NextRequest) {
 
     userId = user.id
 
-    // Get session for access token (needed for tRPC call)
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    if (!session?.access_token) {
-      return NextResponse.json(
-        { error: 'Session expired', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      )
-    }
-    const accessToken = session.access_token
-
     let body: PartialGenerateRequest
     try {
       body = await request.json()
@@ -83,7 +68,6 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!body.courseId) {
-      logger.warn('Missing courseId in partial-generate request', { userId: user.id })
       return NextResponse.json(
         { error: 'courseId обязателен', code: 'INVALID_REQUEST' },
         { status: 400 }
@@ -91,17 +75,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!body.lessonIds?.length && !body.sectionIds?.length) {
-      logger.warn('Missing lessonIds and sectionIds in partial-generate request', {
-        userId: user.id,
-        courseId: body.courseId,
-      })
       return NextResponse.json(
         { error: 'Укажите lessonIds или sectionIds', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
-    logger.info('Proxying partial generation request to tRPC', {
+    logger.info('Calling lessonContent.partialGenerate via tRPC client', {
       userId: user.id,
       courseId: body.courseId,
       lessonIds: body.lessonIds,
@@ -109,52 +89,54 @@ export async function POST(request: NextRequest) {
       priority: body.priority,
     })
 
-    // Call tRPC endpoint
-    // Use COURSEGEN_BACKEND_URL as single source of truth for backend URL
-    const backendUrl = ENV.COURSEGEN_BACKEND_URL
-    const tRPCUrl = `${backendUrl}/trpc`
-    const response = await fetch(`${tRPCUrl}/lessonContent.partialGenerate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        courseId: body.courseId,
-        lessonIds: body.lessonIds,
-        sectionIds: body.sectionIds,
-        priority: body.priority ?? 5,
-      }),
+    // Call tRPC via type-safe server caller (uses httpBatchLink with correct wire format)
+    const client = await getServerTrpcClient()
+    const result = await client.lessonContent.partialGenerate.mutate({
+      courseId: body.courseId,
+      lessonIds: body.lessonIds,
+      sectionIds: body.sectionIds,
+      priority: body.priority ?? 5,
     })
 
-    const data = await response.json()
+    logger.info('Partial generation initiated successfully', {
+      userId: user.id,
+      courseId: body.courseId,
+      jobCount: result.jobCount,
+    })
 
-    // Log tRPC errors
-    if (!response.ok) {
+    // Wrap in tRPC-compatible response shape for frontend compatibility
+    return NextResponse.json({ result: { data: result } })
+  } catch (error) {
+    // Handle tRPC errors with proper HTTP status codes
+    if (error instanceof TRPCClientError) {
+      const statusMap: Record<string, number> = {
+        UNAUTHORIZED: 401,
+        FORBIDDEN: 403,
+        NOT_FOUND: 404,
+        TOO_MANY_REQUESTS: 429,
+        BAD_REQUEST: 400,
+        INTERNAL_SERVER_ERROR: 500,
+      }
+      const httpStatus = error.data?.httpStatus || statusMap[error.data?.code] || 500
+
       logger.error('tRPC lessonContent.partialGenerate failed', {
-        userId: user.id,
-        courseId: body.courseId,
-        lessonIds: body.lessonIds,
-        sectionIds: body.sectionIds,
-        status: response.status,
-        error: data,
+        userId,
+        code: error.data?.code,
+        message: error.message,
+        httpStatus,
       })
-    } else {
-      logger.info('Partial generation initiated successfully', {
-        userId: user.id,
-        courseId: body.courseId,
-        jobCount: data.result?.data?.jobCount,
-      })
+
+      return NextResponse.json(
+        { error: error.message, code: error.data?.code || 'BAD_REQUEST' },
+        { status: httpStatus }
+      )
     }
 
-    return NextResponse.json(data, { status: response.status })
-  } catch (error) {
     logger.error('Unexpected error in /api/coursegen/partial-generate', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
     })
 
-    // Log to error_logs for admin visibility
     logPermanentFailure({
       user_id: userId,
       error_message: error instanceof Error ? error.message : 'Unknown error',
