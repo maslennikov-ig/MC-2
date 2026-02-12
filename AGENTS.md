@@ -50,3 +50,11 @@ Never commit `.env` files; instead copy `packages/course-gen-platform/.env.examp
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
+
+## Codex Skills (Token-Efficient)
+
+- Superpowers are installed globally; do not vendor them into this repository.
+- Preferred skills path for Codex: `~/.codex/skills/superpowers` (symlink is acceptable).
+- If a dedicated `Skill` tool is unavailable in the current runtime, load the needed `SKILL.md` directly and follow it.
+- Keep instructions short and action-focused; avoid re-reading large docs unless required.
+- Do not modify Claude Code-specific setup while configuring Codex skills.
