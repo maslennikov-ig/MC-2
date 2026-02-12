@@ -293,16 +293,30 @@ async function executeChatMutation(
     'Chat: Processing message'
   );
 
-  // Try intent classification flow (if enabled)
-  const enableIntentClassification = process.env.ENABLE_INTENT_CLASSIFICATION === 'true';
+  // --- Intent Routing (Phase 1: auto-intent classification) ---
 
-  if (
-    enableIntentClassification &&
-    intent === 'refine' &&
-    chatType === 'node' &&
-    nodeContext?.stageId === 'stage_5' &&
-    course.course_structure
-  ) {
+  // Explicit 'regenerate' from legacy clients → skip classification, go directly to legacy flow
+  if (intent === 'regenerate') {
+    logger.info({ requestId, courseId }, 'Chat: Explicit regenerate intent, using legacy flow');
+    return executeLegacyLLMFlow({
+      courseId,
+      course,
+      userMessage,
+      chatType,
+      nodeContext,
+      previousOutput,
+      intent: 'regenerate',
+      convId,
+      history,
+      requestId,
+      supabaseAdmin,
+      fallbackConfig: CHAT_FALLBACK_CONFIG,
+    });
+  }
+
+  // Auto-intent classification pipeline (Tier 0 regex + Tier 1 LLM)
+  // Enabled by default; disable with CHAT_INTENT_ROUTING_ENABLED=false
+  if (process.env.CHAT_INTENT_ROUTING_ENABLED !== 'false' && course.course_structure) {
     // Inject stable IDs in-memory for legacy structures without IDs
     const courseStructureWithIds = ensureStableIdsInMemory(
       course.course_structure as CourseStructure
@@ -326,10 +340,10 @@ async function executeChatMutation(
     if (classificationResult) {
       return classificationResult;
     }
-    // Fallback to legacy flow if classification returned null
+    // Fallback to legacy flow if classification returned null (UNKNOWN/low confidence)
   }
 
-  // Legacy LLM flow
+  // Legacy LLM flow (fallback for unclassified intents or no course_structure)
   return executeLegacyLLMFlow({
     courseId,
     course,

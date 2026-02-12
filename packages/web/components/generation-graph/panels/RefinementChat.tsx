@@ -4,15 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   MessageSquare,
   ChevronDown,
   ChevronUp,
   Send,
   Loader2,
-  Wand2,
   RefreshCcw,
   Check,
   X,
@@ -21,7 +18,6 @@ import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
 import { QuickActions, type ChatIntent } from './QuickActions'
 import { MarkdownRendererClient } from '@/components/markdown'
-import { toast } from '@/lib/toast'
 import { Proposal } from '@megacampus/shared-types/chat-types'
 import { type ChatMessage } from '../hooks/useRefinement'
 
@@ -30,7 +26,7 @@ interface RefinementChatProps {
   stageId: string
   nodeId?: string
   attemptNumber: number
-  onRefine: (message: string, intent: 'refine' | 'regenerate') => Promise<void> | void
+  onRefine: (message: string, intent?: 'refine' | 'regenerate') => Promise<void> | void
   history?: ChatMessage[]
   isProcessing?: boolean
   latestProposal?: Proposal | null
@@ -40,7 +36,6 @@ interface RefinementChatProps {
   onRetryProposal?: () => void
   onRejectProposal?: () => void
   acceptedProposal?: Proposal | null
-  selectedIntent?: ChatIntent | null
   /** Whether course generation is currently active (blocks chat interaction) */
   isGenerating?: boolean
   /** Message to display when chat is blocked due to generation */
@@ -70,7 +65,6 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   onRetryProposal,
   onRejectProposal,
   acceptedProposal,
-  selectedIntent: externalSelectedIntent,
   isGenerating = false,
   blockedMessage,
 }) => {
@@ -87,7 +81,6 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
     }
   })
   const [message, setMessage] = useState('')
-  const [selectedIntent, setSelectedIntent] = useState<ChatIntent | null>('refine')
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -145,12 +138,6 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
       e?.preventDefault()
       if (!message.trim() || isBlocked) return
 
-      // Validate intent is selected
-      if (!selectedIntent) {
-        toast.warning(t('refinementChat.modes.selectModeRequired'))
-        return
-      }
-
       const pendingMsg: ChatMessage = {
         role: 'user',
         content: message,
@@ -164,19 +151,19 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
       setMessage('')
 
       try {
-        await onRefine(messageToSend, selectedIntent)
+        // No explicit intent — backend auto-classifies
+        await onRefine(messageToSend)
       } catch {
         // Remove pending message on error
         setPendingMessages((prev) => prev.filter((m) => m !== pendingMsg))
         // Error toast is shown by useRefinement hook
       }
     },
-    [message, isBlocked, selectedIntent, onRefine, t]
+    [message, isBlocked, onRefine]
   )
 
   const handleQuickAction = useCallback(
     async (actionText: string, intent: ChatIntent) => {
-      setSelectedIntent(intent)
       setMessage(actionText)
 
       const pendingMsg: ChatMessage = {
@@ -186,7 +173,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
         pending: true,
       }
 
-      // Send immediately
+      // Send immediately with explicit intent from quick action
       // Add to pending for optimistic update
       setPendingMessages((prev) => [...prev, pendingMsg])
 
@@ -218,13 +205,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
       if (!isOpen) return
 
       // Ctrl/Cmd + Enter to submit
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        e.key === 'Enter' &&
-        !isBlocked &&
-        message.trim() &&
-        selectedIntent
-      ) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isBlocked && message.trim()) {
         e.preventDefault()
         void handleSubmit()
       }
@@ -232,7 +213,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, isBlocked, message, selectedIntent, handleSubmit])
+  }, [isOpen, isBlocked, message, handleSubmit])
 
   return (
     <div className="bg-card mt-6 rounded-md border" data-testid="refinement-chat">
@@ -322,79 +303,26 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
           )}
 
           <div className="space-y-3">
-            <div className="mb-3 flex items-center gap-2">
-              <TooltipProvider delayDuration={300}>
-                <ToggleGroup
-                  type="single"
-                  value={selectedIntent ?? ''}
-                  onValueChange={(value) => {
-                    if (value === 'refine' || value === 'regenerate') {
-                      setSelectedIntent(value)
-                    }
-                  }}
-                  aria-label={t('refinementChat.modes.modeSelectionLabel')}
-                  className="justify-start"
-                  disabled={isBlocked}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem
-                        value="refine"
-                        aria-label={t('refinementChat.modes.refineAriaLabel')}
-                        className="h-8 text-xs"
-                      >
-                        <Wand2 className="mr-1 h-3 w-3" />
-                        {t('refinementChat.modes.refine')} (~2K)
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p className="max-w-[200px] text-xs">
-                        {t('refinementChat.modes.refineTooltip')}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem
-                        value="regenerate"
-                        aria-label={t('refinementChat.modes.regenerateAriaLabel')}
-                        className="h-8 text-xs"
-                      >
-                        <RefreshCcw className="mr-1 h-3 w-3" />
-                        {t('refinementChat.modes.regenerate')} (~20K)
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <p className="max-w-[200px] text-xs">
-                        {t('refinementChat.modes.regenerateTooltip')}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </ToggleGroup>
-              </TooltipProvider>
-            </div>
             <QuickActions
               onSelect={(text, intent) => void handleQuickAction(text, intent)}
               disabled={isBlocked}
             />
 
             {/* Loading skeleton while waiting for proposal */}
-            {isProcessing &&
-              (selectedIntent === 'refine' || externalSelectedIntent === 'refine') && (
-                <div className="mt-4 animate-pulse rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
-                  <div className="h-4 w-48 rounded bg-gray-300 dark:bg-gray-600" />
-                  <div className="mt-3 space-y-2">
-                    <div className="h-3 w-full rounded bg-gray-200 dark:bg-gray-700" />
-                    <div className="h-3 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <div className="h-9 w-24 rounded bg-gray-300 dark:bg-gray-600" />
-                    <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
-                    <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
-                  </div>
+            {isProcessing && (
+              <div className="mt-4 animate-pulse rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+                <div className="h-4 w-48 rounded bg-gray-300 dark:bg-gray-600" />
+                <div className="mt-3 space-y-2">
+                  <div className="h-3 w-full rounded bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-3 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
                 </div>
-              )}
+                <div className="mt-4 flex gap-2">
+                  <div className="h-9 w-24 rounded bg-gray-300 dark:bg-gray-600" />
+                  <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+                </div>
+              </div>
+            )}
 
             {latestProposal && (
               <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
@@ -577,7 +505,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                 type="submit"
                 size="icon"
                 className="h-[80px] w-[50px]"
-                disabled={!message.trim() || isBlocked || !selectedIntent}
+                disabled={!message.trim() || isBlocked}
                 data-testid="refinement-submit"
                 title={t('refinementChat.send')}
               >

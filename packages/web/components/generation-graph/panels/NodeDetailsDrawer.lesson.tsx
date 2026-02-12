@@ -83,7 +83,7 @@ interface NodeDetailsDrawerLessonProps {
   /** Cancel edit handler */
   onCancelEdit: () => void
   /** Refine for lesson handler */
-  onRefineForLesson: (message: string, intent: 'refine' | 'regenerate') => void
+  onRefineForLesson: (message: string, intent?: 'refine' | 'regenerate') => void
   /** Accept proposal handler */
   onAcceptProposal: () => void
   /** Retry proposal handler */

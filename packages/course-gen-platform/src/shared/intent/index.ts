@@ -20,6 +20,9 @@ export {
   type NodeContextForClassification,
 } from './classifier';
 
+// Heuristics exports (Tier 0: regex-based, zero-cost)
+export { classifyWithHeuristics } from './heuristics';
+
 // Target resolver exports
 export {
   resolveTargetPath,

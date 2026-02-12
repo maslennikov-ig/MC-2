@@ -128,8 +128,8 @@ export const chatRequestSchema = z.object({
   /** Previous output content for context */
   previousOutput: z.string().optional(),
 
-  /** Explicit user intent: refine (inline edit) or regenerate (full regen) */
-  intent: z.enum(['refine', 'regenerate']),
+  /** Explicit user intent (optional — auto-classified if omitted) */
+  intent: z.enum(['refine', 'regenerate']).optional(),
 });
 
 /**

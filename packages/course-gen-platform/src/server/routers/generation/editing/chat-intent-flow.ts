@@ -16,6 +16,7 @@ import type { CourseStructure, Database } from '@megacampus/shared-types';
 import { CHAT_PRIMARY_MODEL_ID, CHAT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
 import {
   classifyIntent,
+  classifyWithHeuristics,
   isDirectExecutionIntent,
   isLLMRequiredIntent,
 } from '../../../../shared/intent';
@@ -43,7 +44,8 @@ interface IntentRouteMsgParams {
   convId: string;
   chatType: 'node' | 'global';
   nodeContext?: { stageId: string; nodeId?: string; blockPath?: string } | null;
-  intent: 'refine' | 'regenerate';
+  /** Derived response intent based on classification result */
+  responseIntent: 'refine' | 'regenerate';
 }
 
 // ============================================================================
@@ -72,7 +74,7 @@ async function handleDirectExecutionRoute(
     content: directResult.message,
     chat_type: params.chatType,
     node_context: params.nodeContext || null,
-    intent: params.intent,
+    intent: params.responseIntent,
     model_used: 'intent_classifier',
     input_tokens: 200, // Approximate classification tokens
     output_tokens: 50,
@@ -81,7 +83,7 @@ async function handleDirectExecutionRoute(
   return {
     conversationId: params.convId,
     assistantMessage: directResult.message,
-    intent: params.intent,
+    intent: params.responseIntent,
     proposal: directResult.proposal as Proposal | undefined,
     modelUsed: 'intent_classifier',
     inputTokens: 200,
@@ -109,7 +111,7 @@ async function handleInfoQueryRoute(
     content: infoResult.message,
     chat_type: params.chatType,
     node_context: params.nodeContext || null,
-    intent: params.intent,
+    intent: params.responseIntent,
     model_used: 'info_query',
     input_tokens: 0,
     output_tokens: 0,
@@ -118,7 +120,7 @@ async function handleInfoQueryRoute(
   return {
     conversationId: params.convId,
     assistantMessage: infoResult.message,
-    intent: params.intent,
+    intent: params.responseIntent,
     modelUsed: 'info_query',
     inputTokens: 0,
     outputTokens: 0,
@@ -155,7 +157,11 @@ async function handleLLMRequiredRoute(
     targetPath
   );
 
-  // Get model config from database (intent classification is only used for stage 5)
+  // Stage-aware model selection: stage_6 → chat_stage_6_refinement, else → chat_stage_5_refinement
+  const phaseKey =
+    params.nodeContext?.stageId === 'stage_6'
+      ? 'chat_stage_6_refinement'
+      : 'chat_stage_5_refinement';
   const modelConfigService = createModelConfigService();
   let targetedModelId = CHAT_PRIMARY_MODEL_ID; // Hardcoded fallback primary
   let targetedFallbackModelId = CHAT_FALLBACK_MODEL_ID; // Hardcoded fallback secondary
@@ -164,7 +170,7 @@ async function handleLLMRequiredRoute(
 
   try {
     const config = await modelConfigService.getModelForPhase(
-      'chat_stage_5_refinement',
+      phaseKey,
       courseId,
       undefined,
       (courseLanguage as 'ru' | 'en') || 'ru'
@@ -290,7 +296,7 @@ async function handleLLMRequiredRoute(
     content: targetedMessage,
     chatType: params.chatType,
     nodeContext: params.nodeContext,
-    intent: params.intent,
+    intent: params.responseIntent,
     modelUsed,
     inputTokens: targetedLLMResponse.inputTokens,
     outputTokens: targetedLLMResponse.outputTokens,
@@ -314,7 +320,7 @@ async function handleLLMRequiredRoute(
   return {
     conversationId: params.convId,
     assistantMessage: targetedMessage,
-    intent: params.intent,
+    intent: params.responseIntent,
     proposal: targetedProposal || undefined,
     modelUsed,
     inputTokens: targetedLLMResponse.inputTokens || 0,
@@ -335,7 +341,8 @@ export interface IntentClassificationParams {
   nodeContext?: { stageId: string; nodeId?: string; blockPath?: string };
   convId: string;
   chatType: 'node' | 'global';
-  intent: 'refine' | 'regenerate';
+  /** User-provided intent. Optional — when omitted, auto-classified by backend. */
+  intent?: 'refine' | 'regenerate';
   requestId: string;
   supabaseAdmin: SupabaseClient<Database>;
   fallbackConfig: ChatFallbackConfig;
@@ -358,43 +365,96 @@ export async function executeIntentClassificationFlow(
     nodeContext,
     convId,
     chatType,
-    intent,
     requestId,
     supabaseAdmin,
     fallbackConfig,
     thresholds,
   } = params;
 
-  // Step 1: Classify intent using cheap model (~200 tokens)
-  const classifiedIntent = await classifyIntent(
-    userMessage,
-    nodeContext
-      ? {
-          stageId: nodeContext.stageId,
-          path: nodeContext.blockPath,
-          elementType: nodeContext.nodeId?.includes('lesson') ? 'lesson' : 'section',
-        }
-      : undefined
-  );
+  // Step 1a: Tier 0 — Regex heuristics (0ms, $0, covers ~40-50% of messages)
+  const heuristicResult = classifyWithHeuristics(userMessage);
 
-  logger.info(
-    {
-      requestId,
-      classifiedIntent: classifiedIntent.intent,
-      confidence: classifiedIntent.confidence,
-      target: classifiedIntent.target,
-    },
-    'Chat: Intent classified'
-  );
+  let classifiedIntent;
+  if (heuristicResult) {
+    classifiedIntent = heuristicResult;
+    logger.info(
+      {
+        requestId,
+        classifiedIntent: classifiedIntent.intent,
+        confidence: classifiedIntent.confidence,
+        tier: 0,
+      },
+      'Chat: Intent classified via Tier 0 heuristics'
+    );
+  } else {
+    // Step 1b: Tier 1 — Cheap LLM classification (~200 tokens, ~$0.00005)
+    classifiedIntent = await classifyIntent(
+      userMessage,
+      nodeContext
+        ? {
+            stageId: nodeContext.stageId,
+            path: nodeContext.blockPath,
+            elementType: nodeContext.nodeId?.includes('lesson') ? 'lesson' : 'section',
+          }
+        : undefined
+    );
+
+    logger.info(
+      {
+        requestId,
+        classifiedIntent: classifiedIntent.intent,
+        confidence: classifiedIntent.confidence,
+        target: classifiedIntent.target,
+        tier: 1,
+      },
+      'Chat: Intent classified via Tier 1 LLM'
+    );
+  }
+
+  // Derive response intent from classification
+  const responseIntent: 'refine' | 'regenerate' =
+    classifiedIntent.intent === 'FULL_REGENERATE' ? 'regenerate' : 'refine';
 
   const msgParams: IntentRouteMsgParams = {
     convId,
     chatType,
     nodeContext: nodeContext || null,
-    intent,
+    responseIntent,
   };
 
-  // Step 2: Handle direct execution intents (DELETE, MOVE) - 0 tokens
+  // Step 2: FULL_REGENERATE → return regeneration response (no LLM needed)
+  if (classifiedIntent.intent === 'FULL_REGENERATE') {
+    const regenMessage = 'Запускаю полную перегенерацию курса. Это может занять некоторое время.';
+
+    await persistAssistantMessage(supabaseAdmin, {
+      courseId,
+      convId,
+      content: regenMessage,
+      chatType,
+      nodeContext: nodeContext || null,
+      intent: 'regenerate',
+      modelUsed: 'heuristic_classifier',
+      inputTokens: 0,
+      outputTokens: 0,
+      requestId,
+    });
+
+    logger.info(
+      { requestId, courseId, confidence: classifiedIntent.confidence },
+      'Chat: FULL_REGENERATE detected, returning regeneration response'
+    );
+
+    return {
+      conversationId: convId,
+      assistantMessage: regenMessage,
+      intent: 'regenerate',
+      modelUsed: 'heuristic_classifier',
+      inputTokens: 0,
+      outputTokens: 0,
+    };
+  }
+
+  // Step 3: Handle direct execution intents (DELETE, MOVE) - 0 tokens
   if (
     isDirectExecutionIntent(classifiedIntent.intent) &&
     classifiedIntent.confidence >= thresholds.DIRECT_EXECUTION
@@ -409,7 +469,7 @@ export async function executeIntentClassificationFlow(
     );
   }
 
-  // Step 3: Handle GET_INFO queries - no LLM needed
+  // Step 4: Handle GET_INFO queries - no LLM needed
   if (
     classifiedIntent.intent === 'GET_INFO' &&
     classifiedIntent.confidence >= thresholds.GET_INFO
@@ -417,7 +477,7 @@ export async function executeIntentClassificationFlow(
     return handleInfoQueryRoute(userMessage, courseStructure, supabaseAdmin, courseId, msgParams);
   }
 
-  // Step 4: LLM-required intents with TARGETED context
+  // Step 5: LLM-required intents with TARGETED context
   if (
     isLLMRequiredIntent(classifiedIntent.intent) &&
     classifiedIntent.confidence >= thresholds.LLM_REQUIRED

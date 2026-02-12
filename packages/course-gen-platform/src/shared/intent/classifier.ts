@@ -43,6 +43,7 @@ export const IntentSchema = z.object({
     'ADD_LESSON',
     'ADD_SECTION',
     'GET_INFO',
+    'FULL_REGENERATE',
     'UNKNOWN',
   ]),
   confidence: z.number().min(0).max(1),

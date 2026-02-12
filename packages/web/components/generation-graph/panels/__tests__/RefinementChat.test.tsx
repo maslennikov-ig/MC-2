@@ -39,6 +39,15 @@ vi.mock('next-intl', () => ({
       'generation.refinementChat.modes.regenerateAriaLabel': 'Regenerate mode',
       'generation.refinementChat.modes.regenerate': 'Regenerate',
       'generation.refinementChat.modes.regenerateTooltip': 'Regenerate from scratch',
+      // Proposal-related translations
+      'refinementChat.proposal.suggestedChanges': 'Предложенные изменения',
+      'refinementChat.proposal.accept': 'Принять',
+      'refinementChat.proposal.applying': 'Применяю...',
+      'refinementChat.proposal.supplement': 'Дополнить',
+      'refinementChat.proposal.reject': 'Отклонить',
+      'refinementChat.proposal.retry': 'Повторить',
+      'refinementChat.proposal.changesApplied': 'Изменения применены',
+      'refinementChat.proposal.emptyResponseFallback': 'Ответ обрабатывается...',
     }
     return translations[key] || key
   },
