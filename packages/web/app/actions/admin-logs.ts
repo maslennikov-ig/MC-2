@@ -207,7 +207,7 @@ export async function listLogsAction(params: ListLogsParams): Promise<LogListRes
 
   try {
     const client = await getServerTrpcClient()
-    const result = await (client.admin.logs.list as any).query(queryInput)
+    const result = await client.admin.logs.list.query(queryInput)
     return result as LogListResponse
   } catch (error) {
     console.error('List Logs Server Action Error:', error)
@@ -224,7 +224,7 @@ export async function getLogByIdAction(params: {
 }): Promise<LogDetails> {
   try {
     const client = await getServerTrpcClient()
-    const result = await (client.admin.logs.getById as any).query(params)
+    const result = await client.admin.logs.getById.query(params)
     return result as LogDetails
   } catch (error) {
     console.error('Get Log By ID Server Action Error:', error)
@@ -240,7 +240,7 @@ export async function updateLogStatusAction(
 ): Promise<{ success: boolean }> {
   try {
     const client = await getServerTrpcClient()
-    const result = await (client.admin.logs.updateStatus as any).mutate(params)
+    const result = await client.admin.logs.updateStatus.mutate(params)
     return result as { success: boolean }
   } catch (error) {
     console.error('Update Log Status Server Action Error:', error)
@@ -256,7 +256,7 @@ export async function bulkUpdateLogStatusAction(
 ): Promise<{ success: boolean; updatedCount: number }> {
   try {
     const client = await getServerTrpcClient()
-    const result = await (client.admin.logs.bulkUpdateStatus as any).mutate(params)
+    const result = await client.admin.logs.bulkUpdateStatus.mutate(params)
     return result as { success: boolean; updatedCount: number }
   } catch (error) {
     console.error('Bulk Update Log Status Server Action Error:', error)
@@ -285,7 +285,7 @@ export async function listGroupedLogsAction(
 
   try {
     const client = await getServerTrpcClient()
-    const result = await (client.admin.logs.listGrouped as any).query(queryInput)
+    const result = await client.admin.logs.listGrouped.query(queryInput)
     return result as GroupedLogListResponse
   } catch (error) {
     console.error('List Grouped Logs Server Action Error:', error)
@@ -305,7 +305,7 @@ export async function getGroupLogsAction(params: GetGroupLogsParams): Promise<Lo
 
   try {
     const client = await getServerTrpcClient()
-    const result = await (client.admin.logs.getGroupLogs as any).query(queryInput)
+    const result = await client.admin.logs.getGroupLogs.query(queryInput)
     return result as LogListResponse
   } catch (error) {
     console.error('Get Group Logs Server Action Error:', error)
@@ -321,7 +321,7 @@ export async function updateGroupStatusAction(
 ): Promise<{ success: boolean; updatedCount: number }> {
   try {
     const client = await getServerTrpcClient()
-    const result = await (client.admin.logs.updateGroupStatus as any).mutate(params)
+    const result = await client.admin.logs.updateGroupStatus.mutate(params)
     return result as { success: boolean; updatedCount: number }
   } catch (error) {
     console.error('Update Group Status Server Action Error:', error)

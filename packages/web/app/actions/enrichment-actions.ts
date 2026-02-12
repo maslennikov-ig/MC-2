@@ -143,29 +143,23 @@ export async function createEnrichment(
     }
 
     // Call tRPC API to create enrichment
+    // tRPC throws TRPCClientError on failure — result is always the success type
     const client = await getServerTrpcClient()
     const result = await client.enrichment.create.mutate({
       lessonId: lesson.id,
       enrichmentType: input.enrichmentType,
       settings: input.settings || {},
-    } as any)
-
-    if (!result?.success) {
-      return {
-        success: false,
-        error: (result as any)?.error || 'Unknown error',
-      }
-    }
+    })
 
     logger.info('[createEnrichment] Enrichment created', {
-      enrichmentId: (result as any).enrichmentId,
+      enrichmentId: result.enrichmentId,
       lessonId: input.lessonId,
       type: input.enrichmentType,
     })
 
     return {
       success: true,
-      enrichmentId: (result as any).enrichmentId,
+      enrichmentId: result.enrichmentId,
     }
   } catch (error) {
     logger.error('[createEnrichment] Unexpected error', {
@@ -388,17 +382,11 @@ export async function deleteEnrichment(
     }
 
     // Call tRPC API to delete enrichment
+    // tRPC throws TRPCClientError on failure — result is always the success type
     const client = await getServerTrpcClient()
-    const result = await client.enrichment.delete.mutate({
+    await client.enrichment.delete.mutate({
       enrichmentId: input.enrichmentId,
     })
-
-    if (!(result as any)?.success) {
-      return {
-        success: false,
-        error: (result as any)?.error || 'Unknown error',
-      }
-    }
 
     logger.info('[deleteEnrichment] Enrichment deleted', {
       enrichmentId: input.enrichmentId,
@@ -483,26 +471,20 @@ export async function regenerateEnrichment(
     }
 
     // Call tRPC API to regenerate enrichment
+    // tRPC throws TRPCClientError on failure — result is always the success type
     const client = await getServerTrpcClient()
     const result = await client.enrichment.regenerate.mutate({
       enrichmentId: input.enrichmentId,
     })
 
-    if (!(result as any)?.success) {
-      return {
-        success: false,
-        error: (result as any)?.error || 'Unknown error',
-      }
-    }
-
     logger.info('[regenerateEnrichment] Enrichment regeneration started', {
       enrichmentId: input.enrichmentId,
-      newJobId: (result as any).newJobId,
+      newJobId: result.newJobId,
     })
 
     return {
       success: true,
-      newJobId: (result as any).newJobId,
+      newJobId: result.newJobId,
     }
   } catch (error) {
     logger.error('[regenerateEnrichment] Unexpected error', {

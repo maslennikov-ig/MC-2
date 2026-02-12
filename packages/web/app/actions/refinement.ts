@@ -83,7 +83,7 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
   try {
     const client = await getServerTrpcClient()
     const result = await client.generation.getChatTokenEstimates.query({ courseId })
-    return (result as TokenEstimates) ?? null
+    return (result ?? null) as TokenEstimates | null
   } catch (error) {
     console.warn('[getChatTokenEstimates] Failed to fetch:', error)
     return null
@@ -107,7 +107,7 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
     const client = await getServerTrpcClient()
     // NOTE: AbortSignal cannot be passed to server actions (not serializable).
     // Abort handling is done client-side by checking controller.signal.aborted after response.
-    const result = await client.generation.chat.mutate(request as any)
+    const result = await client.generation.chat.mutate(request)
 
     // Validate response structure with Zod
     const parseResult = chatResponseSchema.safeParse(result)
@@ -153,8 +153,8 @@ export async function applyProposal(
       courseId,
       conversationId,
       proposal,
-    } as any)
-    return { success: (result as any)?.success ?? false }
+    })
+    return { success: result?.success ?? false }
   } catch (error) {
     if (error instanceof TRPCClientError) {
       const httpCode = error.data?.httpStatus
