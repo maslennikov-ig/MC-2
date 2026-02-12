@@ -2,6 +2,24 @@
 
 _Released on 2025-12-26_
 
+## v0.29.11
+
+_Released on 2026-02-12_
+
+### 🔧 Improvements
+
+- **web**: Remove 25 as-any casts from tRPC-migrated server actions
+
+### 🐛 Bug Fixes
+
+- **web**: Fix build blocker, remove upload as-any casts, rewrite enrichment tests
+- **web**: Migrate client-side hooks from raw fetch to tRPC client (Phase 4)
+- **web**: Migrate raw fetch() calls to tRPC client (Phases 1-3)
+
+---
+
+_This release was automatically generated from 17 commits._
+
 ## v0.29.10
 
 _Released on 2026-02-12_
