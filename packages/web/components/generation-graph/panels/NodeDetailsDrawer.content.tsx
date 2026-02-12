@@ -82,7 +82,7 @@ interface StageContentProps {
   // Refinement chat
   isAIStage: boolean
   refinementChatRef: React.RefObject<HTMLDivElement | null>
-  onRefine: (message: string, intent: 'refine' | 'regenerate') => void
+  onRefine: (message: string, intent?: 'refine' | 'regenerate') => void
   chatHistory: ChatMessage[]
   isRefining: boolean
   latestProposal: RefinementProposal | null

@@ -155,7 +155,7 @@ export const useRefinement = (courseId: string) => {
       nodeId: string | undefined,
       userMessage: string,
       previousOutput: string,
-      intent: 'refine' | 'regenerate' = 'refine'
+      intent?: 'refine' | 'regenerate'
     ): Promise<ChatResponse | undefined> => {
       // Cancel any existing request
       if (abortControllerRef.current) {
@@ -179,7 +179,8 @@ export const useRefinement = (courseId: string) => {
             blockPath: undefined,
           },
           previousOutput,
-          intent,
+          // Only send intent when explicitly provided (e.g., from quick actions)
+          ...(intent && { intent }),
         }
 
         // NOTE: AbortSignal cannot be passed to server actions (not serializable).
