@@ -39,6 +39,87 @@ import { normalizePathForValidation } from '../_shared/helpers';
 const FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.7;
 
 // ============================================================================
+// Course Skeleton Builder (Context Optimization)
+// ============================================================================
+
+/**
+ * Build a compact text skeleton of the course structure for LLM context.
+ * Uses tree notation (~300-500 tokens for 8 sections, 24 lessons).
+ * Optionally expands a target section while collapsing others.
+ *
+ * Example output:
+ * ```
+ * COURSE: "How to be happy" (8 sections, 24 lessons, 4.5h)
+ * +-- sec_1: "Introduction" (3 lessons)
+ * |   +-- lsn_1: "What is happiness" [10 min]
+ * |   +-- lsn_2: "Myths about happiness" [15 min]  <-- [TARGET]
+ * |   +-- lsn_3: "Scientific approach" [12 min]
+ * +-- sec_2: "Fundamentals" (4 lessons) -- collapsed
+ * +-- sec_3: "Practices" (5 lessons) -- collapsed
+ * ```
+ */
+export function buildCourseSkeleton(
+  structure: CourseStructure,
+  targetElementId?: string | null
+): string {
+  const totalLessons = structure.sections.reduce((sum, s) => sum + s.lessons.length, 0);
+  const lines: string[] = [
+    `COURSE: "${structure.course_title}" (${structure.sections.length} sections, ${totalLessons} lessons, ${structure.estimated_duration_hours}h)`,
+  ];
+
+  // Find which section contains the target
+  let targetSectionIdx = -1;
+  if (targetElementId) {
+    for (let si = 0; si < structure.sections.length; si++) {
+      const section = structure.sections[si];
+      if (section.id === targetElementId) {
+        targetSectionIdx = si;
+        break;
+      }
+      for (const lesson of section.lessons) {
+        if (lesson.id === targetElementId) {
+          targetSectionIdx = si;
+          break;
+        }
+      }
+      if (targetSectionIdx >= 0) break;
+    }
+  }
+
+  for (let si = 0; si < structure.sections.length; si++) {
+    const section = structure.sections[si];
+    const sectionId = section.id || `sec_${si + 1}`;
+    const isTargetSection = si === targetSectionIdx || !targetElementId;
+    const isLastSection = si === structure.sections.length - 1;
+    const prefix = isLastSection ? '\\-- ' : '+-- ';
+    const childPrefix = isLastSection ? '    ' : '|   ';
+
+    if (isTargetSection) {
+      // Expand this section
+      lines.push(
+        `${prefix}${sectionId}: "${section.section_title}" (${section.lessons.length} lessons)`
+      );
+      for (let li = 0; li < section.lessons.length; li++) {
+        const lesson = section.lessons[li];
+        const lessonId = lesson.id || `lsn_${li + 1}`;
+        const isTarget = lesson.id === targetElementId || section.id === targetElementId;
+        const marker = isTarget ? '  <-- [TARGET]' : '';
+        lines.push(
+          `${childPrefix}+-- ${lessonId}: "${lesson.lesson_title}" [${lesson.estimated_duration_minutes} min]${marker}`
+        );
+      }
+    } else {
+      // Collapse this section
+      lines.push(
+        `${prefix}${sectionId}: "${section.section_title}" (${section.lessons.length} lessons) -- collapsed`
+      );
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ============================================================================
 // Prompt Building
 // ============================================================================
 
@@ -88,13 +169,19 @@ Rules:
 
 /**
  * Build prompt with targeted context (NOT full course_structure).
- * This is the key optimization: ~500 tokens instead of 42K.
+ * Uses compact skeleton (~300-500 tokens) + focused element JSON.
+ *
+ * Context budget:
+ * - Skeleton: ~300-500 tokens (compact tree)
+ * - Target element: ~200-500 tokens (JSON of single element)
+ * - Total: ~500-1000 tokens vs ~42K for full course_structure
  */
 export function buildTargetedRefinementPrompt(
   intentType: string,
   targetedContext: unknown,
   allowedFields: readonly string[],
-  targetPath?: string | null
+  targetPath?: string | null,
+  courseSkeleton?: string
 ): string {
   const intentInstructions: Record<string, string> = {
     REWRITE_CONTENT: 'Rewrite the content to be clearer and more engaging.',
@@ -104,12 +191,14 @@ export function buildTargetedRefinementPrompt(
     ADD_SECTION: 'Generate a new section based on the user request.',
   };
 
+  const skeletonBlock = courseSkeleton ? `\nCourse overview:\n${courseSkeleton}\n` : '';
+
   return `You are an instructional designer assistant.
 ${intentInstructions[intentType] || 'Help the user modify the content.'}
-
+${skeletonBlock}
 ${targetPath ? `Target element path: ${targetPath}` : 'Working at course level.'}
 
-Current content (ONLY the relevant element, not the full course):
+Target content:
 ${JSON.stringify(targetedContext, null, 2)}
 
 Editable fields:
@@ -131,7 +220,7 @@ Rules:
 3. Preserve existing structure
 4. For Stage 5 array paths, use exact indices like "sections[0].lessons[1].lesson_title"
 5. The "message" field MUST contain a clear, helpful explanation in Russian (2-3 sentences) of what you're proposing and why. NEVER leave it empty.
-6. If the user asks to ADD a new lesson, section, or other structural element — return empty updates and explain in "message" that structural changes require using the "Перегенерировать" mode instead of "Уточнить". Do NOT make unrelated edits to approximate the request.`;
+6. If the user asks to ADD a new lesson, section, or other structural element — return empty updates and explain in "message" that structural changes are now supported. Suggest rephrasing with "добавь урок" or "добавь секцию".`;
 }
 
 // ============================================================================
@@ -547,6 +636,8 @@ export interface TargetedContextResult {
   targetedContext: unknown;
   allowedFieldsForTarget: readonly string[];
   targetPath: string | null;
+  /** Compact course skeleton for LLM context (~300-500 tokens) */
+  courseSkeleton: string;
 }
 
 /**
@@ -564,21 +655,30 @@ export function resolveTargetedContext(params: TargetedContextParams): TargetedC
   );
 
   if (targetPath) {
-    // Send only the selected element (~500 tokens)
+    // Send only the selected element (~200-500 tokens) + skeleton (~300-500 tokens)
     const targetedContext = getElementAtPath(courseStructure, targetPath);
     const isLesson = isLessonPath(targetPath);
     const allowedFieldsForTarget = isLesson
       ? ['lesson_title', 'lesson_objectives', 'key_topics', 'estimated_duration_minutes']
       : ['section_title', 'section_description', 'learning_objectives'];
 
-    return { targetedContext, allowedFieldsForTarget, targetPath };
+    // Extract target element's stable ID for skeleton highlighting
+    let targetElementId: string | undefined;
+    if (targetedContext && typeof targetedContext === 'object' && 'id' in targetedContext) {
+      targetElementId = (targetedContext as { id?: string }).id ?? undefined;
+    }
+
+    const courseSkeleton = buildCourseSkeleton(courseStructure, targetElementId);
+    return { targetedContext, allowedFieldsForTarget, targetPath, courseSkeleton };
   }
 
-  // No specific element - use lightweight outline
+  // No specific element - use skeleton + lightweight outline
   const targetedContext = generateCourseOutline(courseStructure);
+  const courseSkeleton = buildCourseSkeleton(courseStructure);
   return {
     targetedContext,
     allowedFieldsForTarget: STAGE5_EDITABLE_FIELDS,
     targetPath: null,
+    courseSkeleton,
   };
 }
