@@ -93,6 +93,8 @@ interface StageContentProps {
   onRetryProposal: () => void
   onRejectProposal: () => void
   stage6ContentReady: boolean
+  /** Callback to generate content for new lessons (server action passed as prop) */
+  onGenerateContent?: (courseId: string) => Promise<unknown>
 
   // Handlers
   onStageApproved: () => void
@@ -137,6 +139,7 @@ export const StageContent = memo(function StageContent({
   onRetryProposal,
   onRejectProposal,
   stage6ContentReady,
+  onGenerateContent,
   onStageApproved,
   onDeselectNode,
 }: StageContentProps) {
@@ -430,6 +433,7 @@ export const StageContent = memo(function StageContent({
             onRetryProposal={() => void onRetryProposal()}
             onRejectProposal={() => onRejectProposal()}
             stage6ContentReady={stage6ContentReady}
+            onGenerateContent={onGenerateContent}
             isGenerating={isGenerationActive}
             blockedMessage={t('refinementChat.generationInProgress')}
           />

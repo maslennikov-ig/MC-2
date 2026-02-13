@@ -209,6 +209,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               onRetryProposal={() => void handlers.retryProposal()}
               onRejectProposal={handlers.rejectProposal}
               stage6ContentReady={refinement.stage6ContentReady}
+              onGenerateContent={generateContentForNewLessons}
               onStageApproved={handlers.handleStageApproved}
               onDeselectNode={handlers.deselectNode}
             />
