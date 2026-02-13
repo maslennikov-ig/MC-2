@@ -13,8 +13,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, CourseStructure } from '@megacampus/shared-types';
 import type { Logger } from 'pino';
-import { nestedJsonToCourseNodes } from './converters.js';
+import { nestedJsonToCourseNodes, courseNodesToNestedJson } from './converters.js';
 import { isDualWriteEnabled } from './feature-flags.js';
+import { checkStructureParity } from './parity-checker.js';
+import type { CourseNodeRow } from './types.js';
 
 /**
  * Write course structure to the course_nodes table (dual-write).
@@ -88,4 +90,53 @@ export async function writeCourseNodes(
 
   const elapsed = Date.now() - startTime;
   log.info({ courseId, nodeCount: nodes.length, elapsed }, 'course_nodes dual-write: success');
+
+  // Optional parity check: read back and compare (non-fatal, gated by env flag)
+  if (process.env.COURSE_NODES_PARITY_CHECK_ENABLED === 'true') {
+    try {
+      const { data: writtenNodes } = await supabase
+        .from('course_nodes')
+        .select('*')
+        .eq('course_id', courseId);
+
+      if (writtenNodes && writtenNodes.length > 0) {
+        const meta = {
+          course_title: structure.course_title,
+          course_description: structure.course_description,
+          course_overview: structure.course_overview,
+          target_audience: structure.target_audience,
+          estimated_duration_hours: structure.estimated_duration_hours,
+          difficulty_level: structure.difficulty_level,
+          prerequisites: structure.prerequisites ?? [],
+          learning_outcomes: structure.learning_outcomes ?? [],
+          course_tags: structure.course_tags ?? [],
+        };
+        const reconstructed = courseNodesToNestedJson(writtenNodes as CourseNodeRow[], meta);
+        const parity = checkStructureParity(structure, reconstructed);
+
+        if (!parity.isEqual) {
+          log.warn(
+            {
+              courseId,
+              differenceCount: parity.differences.length,
+              differences: parity.differences.slice(0, 5),
+              sectionCount: parity.sectionCount,
+              lessonCount: parity.lessonCount,
+            },
+            'course_nodes parity check FAILED — structure mismatch after dual-write'
+          );
+        } else {
+          log.debug({ courseId }, 'course_nodes parity check passed');
+        }
+      }
+    } catch (parityError) {
+      log.debug(
+        {
+          courseId,
+          error: parityError instanceof Error ? parityError.message : String(parityError),
+        },
+        'course_nodes parity check skipped (error)'
+      );
+    }
+  }
 }
