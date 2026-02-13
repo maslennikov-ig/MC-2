@@ -25,8 +25,12 @@ import {
   blockPathToNodeId,
   getNodeLabel,
 } from '../../../shared/regeneration/dependency-graph-builder';
-import { applyFieldUpdate } from '../../../stages/stage5-generation/utils/course-structure-editor';
+import {
+  applyFieldUpdate,
+  ensureStableIdsInMemory,
+} from '../../../stages/stage5-generation/utils/course-structure-editor';
 import { resolveStructure } from '../../../shared/course-nodes/structure-resolver';
+import { writeCourseNodes } from '../../../shared/course-nodes/writer';
 
 export const dependenciesRouter = router({
   /**
@@ -407,6 +411,15 @@ export const dependenciesRouter = router({
             message: 'Failed to save changes',
           });
         }
+
+        // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+        const structureForNodes = ensureStableIdsInMemory(courseStructure);
+        await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+          logger.warn(
+            { courseId, error: err instanceof Error ? err.message : String(err) },
+            'course_nodes dual-write failed (non-fatal)'
+          )
+        );
 
         logger.info(
           {

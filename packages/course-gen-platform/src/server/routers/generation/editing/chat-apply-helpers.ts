@@ -30,6 +30,7 @@ import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolv
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { applySurgicalOperations } from './surgical-operations';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 
 // ============================================================================
 // Types
@@ -170,6 +171,13 @@ export async function applyFieldUpdatesProposal(
   // Deep clone and apply updates
   const clonedData = deepCloneData(currentData, requestId, courseId);
   const updatedData = applyFieldUpdatesToData(clonedData, proposal, requestId, courseId);
+
+  // Guard: block writes without stable IDs when flag is on (plan:433)
+  if (stageId === 'stage_5') {
+    assertStableIds(
+      updatedData as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+    );
+  }
 
   // Save updated data to database
   const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
@@ -380,6 +388,9 @@ export async function applyStructuralOperationProposal(
 
   // Apply operations atomically
   const result = applySurgicalOperations(operations, structureWithIds);
+
+  // Guard: block writes without stable IDs when COURSE_STABLE_IDS_REQUIRED=true (plan:433)
+  assertStableIds(result.updatedStructure);
 
   // Save updated structure to database
   const now = new Date().toISOString();

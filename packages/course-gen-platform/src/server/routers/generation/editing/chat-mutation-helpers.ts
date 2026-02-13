@@ -353,15 +353,36 @@ async function resolveModelConfig(
       phaseName,
     };
   } catch (configError) {
-    // Plan requirement: chat phases must fail-fast (503) when config is unavailable
-    logger.error(
+    // Distinguish missing config (permanent) from transient errors (DB down)
+    const errMsg = configError instanceof Error ? configError.message : '';
+    const isMissingConfig = errMsg.includes('has no config') || errMsg.includes('no active config');
+
+    if (isMissingConfig) {
+      // Plan requirement: chat phases must fail-fast (503) when config is missing
+      logger.error(
+        { requestId, phaseName, stageId, chatType, error: configError },
+        'Chat phase model config missing — returning 503 per plan requirement'
+      );
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: `Model configuration unavailable for chat phase "${phaseName}". Please try again later.`,
+      });
+    }
+
+    // Transient error (DB down, timeout) — fall back to stage-specific hardcoded models
+    const hardcoded = CHAT_STAGE_FALLBACK_MODELS[stageId || ''] || DEFAULT_CHAT_FALLBACK_MODELS;
+    logger.warn(
       { requestId, phaseName, stageId, chatType, error: configError },
-      'Chat phase model config unavailable — returning 503 per plan requirement'
+      'Failed to get model config from database, using hardcoded fallback'
     );
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: `Model configuration unavailable for chat phase "${phaseName}". Please try again later.`,
-    });
+
+    return {
+      modelId: hardcoded.primary,
+      fallbackModelId: hardcoded.fallback,
+      temperature: fallbackConfig.temperature ?? 0.7,
+      maxTokens: fallbackConfig.maxTokens ?? 2000,
+      phaseName,
+    };
   }
 }
 

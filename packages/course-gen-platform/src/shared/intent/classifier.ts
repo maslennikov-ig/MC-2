@@ -141,6 +141,9 @@ CONTENT MODIFICATION (requires LLM generation):
 - ADD_LESSON: Create new lesson (e.g., "добавь урок про X", "add lesson about")
 - ADD_SECTION: Create new section (e.g., "добавь секцию", "create section")
 
+FULL COURSE ACTIONS:
+- FULL_REGENERATE: Regenerate entire course structure from scratch (e.g., "перегенерируй курс", "regenerate everything", "начни заново", "start over")
+
 QUERY:
 - GET_INFO: Request information (e.g., "сколько уроков?", "what's the duration?")
 
