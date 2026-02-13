@@ -13,6 +13,7 @@ import type { CourseStructure } from '@megacampus/shared-types';
 import { applyFieldUpdate } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { isDualWriteEnabled } from '../../../../shared/course-nodes/feature-flags';
 
 // Schema for checking downstream stages
 const checkDownstreamStagesInputSchema = z.object({
@@ -457,6 +458,22 @@ export const fieldUpdateRouter = {
           }
 
           deletedStructure = true;
+
+          // Phase 4: Clean up course_nodes when structure is cleared (non-blocking, non-fatal)
+          if (isDualWriteEnabled()) {
+            await supabase
+              .from('course_nodes')
+              .delete()
+              .eq('course_id', courseId)
+              .then(({ error: nodesError }) => {
+                if (nodesError) {
+                  logger.warn(
+                    { courseId, error: nodesError.message },
+                    'course_nodes cleanup failed (non-fatal)'
+                  );
+                }
+              });
+          }
         }
 
         logger.info(

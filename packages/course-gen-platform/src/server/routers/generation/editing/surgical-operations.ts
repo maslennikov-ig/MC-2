@@ -220,7 +220,7 @@ function recalculateCourseDuration(structure: CourseStructure): number {
 /**
  * Renumber all section numbers and lesson numbers in-place.
  * Section numbers: 1, 2, 3, ...
- * Lesson numbers: 1.1, 1.2, 2.1, 2.2, ...
+ * Lesson numbers: 1, 2, 3, ... (sequential integers within each section)
  */
 function renumberAll(structure: CourseStructure): void {
   for (let si = 0; si < structure.sections.length; si++) {
@@ -228,7 +228,7 @@ function renumberAll(structure: CourseStructure): void {
     section.section_number = si + 1;
 
     for (let li = 0; li < section.lessons.length; li++) {
-      section.lessons[li].lesson_number = parseFloat(`${si + 1}.${li + 1}`);
+      section.lessons[li].lesson_number = li + 1;
     }
   }
 }

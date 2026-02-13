@@ -342,7 +342,7 @@ async function handleLLMRequiredRoute(
       'Chat phase model config unavailable — returning 503 per plan requirement'
     );
     throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'SERVICE_UNAVAILABLE',
       message: `Model configuration unavailable for chat phase "${phaseKey}". Please try again later.`,
     });
   }
@@ -580,7 +580,7 @@ Respond ONLY with valid JSON, no markdown fences.`;
       'Chat phase model config unavailable — returning 503 per plan requirement'
     );
     throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'SERVICE_UNAVAILABLE',
       message: `Model configuration unavailable for chat phase "${phaseKey}". Please try again later.`,
     });
   }

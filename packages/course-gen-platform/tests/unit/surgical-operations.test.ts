@@ -593,9 +593,9 @@ describe('applySurgicalOperations - renumbering and duration recalculation', () 
 
     const result = applySurgicalOperations(operations, structure);
 
-    expect(result.updatedStructure.sections[0].lessons[0].lesson_number).toBe(1.1);
-    expect(result.updatedStructure.sections[0].lessons[1].lesson_number).toBe(1.2);
-    expect(result.updatedStructure.sections[0].lessons[2].lesson_number).toBe(1.3);
+    expect(result.updatedStructure.sections[0].lessons[0].lesson_number).toBe(1);
+    expect(result.updatedStructure.sections[0].lessons[1].lesson_number).toBe(2);
+    expect(result.updatedStructure.sections[0].lessons[2].lesson_number).toBe(3);
   });
 
   it('should renumber sections after add operation', () => {
