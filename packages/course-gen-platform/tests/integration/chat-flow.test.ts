@@ -22,6 +22,34 @@ import {
 } from '../../src/server/routers/generation/editing/surgical-operations';
 import type { CourseStructure } from '@megacampus/shared-types';
 import type { CourseOperation } from '@megacampus/shared-types/course-operations';
+import { ensureStableIdsInMemory } from '../../src/stages/stage5-generation/utils/course-structure-editor';
+import {
+  buildIdRemapContext,
+  remapStructureToSimplified,
+  remapOperationsToReal,
+} from '../../src/server/routers/generation/editing/surgical-id-remap';
+import { executeFullRegenerate } from '../../src/server/routers/generation/editing/chat-intent-flow';
+
+// ============================================================================
+// Mocks for Scenario 2 (executeFullRegenerate)
+// ============================================================================
+
+// Mock orchestrator queue functions
+vi.mock('../../src/orchestrator/queue', () => ({
+  removeJobsByCourseId: vi.fn().mockResolvedValue(undefined),
+  addJob: vi.fn().mockResolvedValue({ id: 'test-job-id-12345' }),
+}));
+
+// Mock buildStage5JobInput helper
+vi.mock('../../src/server/routers/generation/_shared/helpers', () => ({
+  buildStage5JobInput: vi.fn().mockResolvedValue({
+    jobInput: {
+      courseId: 'test-course',
+      userId: 'test-user',
+      requestId: 'test-request',
+    },
+  }),
+}));
 
 // ============================================================================
 // Shared Test Fixtures
@@ -248,25 +276,284 @@ describe('Scenario 1: generation.chat without explicit intent (auto-classificati
 // ============================================================================
 
 describe('Scenario 2: legacy intent="regenerate" (backward compatibility)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it.todo('should bypass auto-classification when intent="regenerate" is explicitly provided');
 
-  it.todo('should call executeFullRegenerate handler when legacy intent="regenerate" is sent');
+  it('should call executeFullRegenerate handler when legacy intent="regenerate" is sent', async () => {
+    // Mock Supabase admin client
+    const mockSupabaseAdmin = {
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+      from: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
 
-  it.todo('should call restart_from_stage RPC with stage=5 and courseId');
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'test-course-123',
+      userId: 'test-user-456',
+      convId: 'test-conv-789',
+      chatType: 'global',
+      nodeContext: null,
+      requestId: 'test-request-abc',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
 
-  it.todo('should remove existing jobs for the course via removeJobsByCourseId');
+    const result = await executeFullRegenerate(params);
 
-  it.todo('should enqueue new STRUCTURE_GENERATION job via addJob');
+    // Verify executeFullRegenerate returns correct ChatResponse
+    expect(result).toBeDefined();
+    expect(result.conversationId).toBe('test-conv-789');
+    expect(result.intent).toBe('regenerate');
+    expect(result.jobId).toBe('test-job-id-12345');
+    expect(result.modelUsed).toBe('system');
+  });
 
-  it.todo('should return ChatResponse with jobId and modelUsed="system"');
+  it('should call restart_from_stage RPC with stage=5 and courseId', async () => {
+    const mockRpc = vi.fn().mockResolvedValue({ error: null });
+    const mockSupabaseAdmin = {
+      rpc: mockRpc,
+      from: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
 
-  it.todo('should persist assistant message with intent="regenerate" and zero tokens');
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'course-xyz',
+      userId: 'user-abc',
+      convId: 'conv-123',
+      chatType: 'global',
+      nodeContext: null,
+      requestId: 'req-456',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
 
-  it.todo('should handle RPC failure gracefully without throwing (return error message)');
+    await executeFullRegenerate(params);
 
-  it.todo('should continue when removeJobsByCourseId fails (non-blocking cleanup)');
+    // Verify supabase.rpc called with correct params
+    expect(mockRpc).toHaveBeenCalledWith('restart_from_stage', {
+      p_course_id: 'course-xyz',
+      p_stage_number: 5,
+      p_user_id: 'user-abc',
+    });
+  });
 
-  it.todo('should preserve nodeContext in persisted message for traceability');
+  it('should remove existing jobs for the course via removeJobsByCourseId', async () => {
+    const { removeJobsByCourseId } = await import('../../src/orchestrator/queue');
+
+    const mockSupabaseAdmin = {
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+      from: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
+
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'course-cleanup-test',
+      userId: 'user-test',
+      convId: 'conv-test',
+      chatType: 'global',
+      nodeContext: null,
+      requestId: 'req-test',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
+
+    await executeFullRegenerate(params);
+
+    // Verify removeJobsByCourseId called
+    expect(removeJobsByCourseId).toHaveBeenCalledWith('course-cleanup-test');
+  });
+
+  it('should enqueue new STRUCTURE_GENERATION job via addJob', async () => {
+    const { addJob } = await import('../../src/orchestrator/queue');
+
+    const mockSupabaseAdmin = {
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+      from: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
+
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'course-job-test',
+      userId: 'user-job',
+      convId: 'conv-job',
+      chatType: 'global',
+      nodeContext: null,
+      requestId: 'req-job',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
+
+    await executeFullRegenerate(params);
+
+    // Verify addJob called with STRUCTURE_GENERATION type
+    expect(addJob).toHaveBeenCalledWith('structure_generation', expect.any(Object));
+  });
+
+  it('should return ChatResponse with jobId and modelUsed="system"', async () => {
+    const mockSupabaseAdmin = {
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+      from: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
+
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'course-response-test',
+      userId: 'user-response',
+      convId: 'conv-response',
+      chatType: 'global',
+      nodeContext: null,
+      requestId: 'req-response',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
+
+    const result = await executeFullRegenerate(params);
+
+    // Verify response has jobId and modelUsed="system"
+    expect(result.jobId).toBe('test-job-id-12345');
+    expect(result.modelUsed).toBe('system');
+    expect(result.inputTokens).toBe(0);
+    expect(result.outputTokens).toBe(0);
+  });
+
+  it('should persist assistant message with intent="regenerate" and zero tokens', async () => {
+    const mockInsert = vi.fn().mockResolvedValue({ error: null });
+    const mockFrom = vi.fn().mockReturnValue({
+      insert: mockInsert,
+    });
+    const mockSupabaseAdmin = {
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+      from: mockFrom,
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
+
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'course-persist-test',
+      userId: 'user-persist',
+      convId: 'conv-persist',
+      chatType: 'global',
+      nodeContext: null,
+      requestId: 'req-persist',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
+
+    await executeFullRegenerate(params);
+
+    // Verify persistAssistantMessage called with correct parameters
+    expect(mockFrom).toHaveBeenCalledWith('course_chat_messages');
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        course_id: 'course-persist-test',
+        conversation_id: 'conv-persist',
+        role: 'assistant',
+        intent: 'regenerate',
+        model_used: 'system',
+        input_tokens: 0,
+        output_tokens: 0,
+      })
+    );
+  });
+
+  it('should handle RPC failure gracefully without throwing (return error message)', async () => {
+    const mockInsert = vi.fn().mockResolvedValue({ error: null });
+    const mockFrom = vi.fn().mockReturnValue({
+      insert: mockInsert,
+    });
+    const mockSupabaseAdmin = {
+      rpc: vi.fn().mockResolvedValue({ error: { message: 'RPC failed' } }),
+      from: mockFrom,
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
+
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'course-rpc-fail',
+      userId: 'user-rpc-fail',
+      convId: 'conv-rpc-fail',
+      chatType: 'global',
+      nodeContext: null,
+      requestId: 'req-rpc-fail',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
+
+    // Verify function returns error response instead of throwing
+    const result = await executeFullRegenerate(params);
+
+    expect(result).toBeDefined();
+    expect(result.conversationId).toBe('conv-rpc-fail');
+    expect(result.intent).toBe('regenerate');
+    expect(result.assistantMessage).toContain('перегенерацию');
+    expect(result.modelUsed).toBe('system');
+
+    // Verify error message was persisted
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.stringContaining('перегенерацию'),
+        intent: 'regenerate',
+      })
+    );
+  });
+
+  it('should continue when removeJobsByCourseId fails (non-blocking cleanup)', async () => {
+    // Mock removeJobsByCourseId to throw
+    const { removeJobsByCourseId } = await import('../../src/orchestrator/queue');
+    (removeJobsByCourseId as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('Queue cleanup failed')
+    );
+
+    const mockSupabaseAdmin = {
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+      from: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
+
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'course-cleanup-fail',
+      userId: 'user-cleanup-fail',
+      convId: 'conv-cleanup-fail',
+      chatType: 'global',
+      nodeContext: null,
+      requestId: 'req-cleanup-fail',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
+
+    // Verify function still succeeds even when removeJobsByCourseId fails
+    const result = await executeFullRegenerate(params);
+    expect(result).toBeDefined();
+    expect(result.jobId).toBe('test-job-id-12345');
+  });
+
+  it('should preserve nodeContext in persisted message for traceability', async () => {
+    const mockInsert = vi.fn().mockResolvedValue({ error: null });
+    const mockFrom = vi.fn().mockReturnValue({
+      insert: mockInsert,
+    });
+    const mockSupabaseAdmin = {
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+      from: mockFrom,
+    } as unknown as Parameters<typeof executeFullRegenerate>[0]['supabaseAdmin'];
+
+    const nodeContext = {
+      stageId: 'stage_5',
+      nodeId: 'node_123',
+      blockPath: 'sections[0].lessons[1]',
+    };
+
+    const params: Parameters<typeof executeFullRegenerate>[0] = {
+      courseId: 'course-node-context',
+      userId: 'user-node',
+      convId: 'conv-node',
+      chatType: 'node',
+      nodeContext,
+      requestId: 'req-node',
+      supabaseAdmin: mockSupabaseAdmin,
+    };
+
+    await executeFullRegenerate(params);
+
+    // Verify nodeContext preserved in message
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        node_context: nodeContext,
+        chat_type: 'node',
+      })
+    );
+  });
 });
 
 // ============================================================================
@@ -588,9 +875,82 @@ describe('Scenario 3: structural proposal -> applyProposal atomic apply', () => 
 
   // --- Remaining stubs requiring full tRPC/DB context ---
 
-  it.todo('should remap stable IDs to simplified IDs (sec_hY7a3fRx -> sec_1) in LLM context');
+  it('should remap stable IDs to simplified IDs (sec_hY7a3fRx -> sec_1) in LLM context', () => {
+    const structure = createTestStructure();
 
-  it.todo('should remap simplified IDs back to stable IDs (sec_1 -> sec_hY7a3fRx) in LLM response');
+    // Build ID remap context
+    const ctx = buildIdRemapContext(structure);
+
+    // Verify context was built correctly
+    expect(ctx.toSimplified.size).toBeGreaterThan(0);
+    expect(ctx.toReal.size).toBeGreaterThan(0);
+
+    // Remap structure to simplified IDs
+    const simplified = remapStructureToSimplified(structure, ctx);
+
+    // Verify sections get sec_1, sec_2
+    expect(simplified.sections[0].id).toBe('sec_1');
+    expect(simplified.sections[1].id).toBe('sec_2');
+
+    // Verify lessons get lsn_1, lsn_2, lsn_3 (sequential across entire course)
+    expect(simplified.sections[0].lessons[0].id).toBe('lsn_1');
+    expect(simplified.sections[0].lessons[1].id).toBe('lsn_2');
+    expect(simplified.sections[1].lessons[0].id).toBe('lsn_3');
+
+    // Verify original structure unchanged (immutability)
+    expect(structure.sections[0].id).toBe('sec_aaaaaaaa');
+    expect(structure.sections[0].lessons[0].id).toBe('lsn_bbbbbbbb');
+  });
+
+  it('should remap simplified IDs back to stable IDs (sec_1 -> sec_hY7a3fRx) in LLM response', () => {
+    const structure = createTestStructure();
+
+    // Build ID remap context
+    const ctx = buildIdRemapContext(structure);
+
+    // Create operations with simplified IDs (as LLM would return)
+    const simplifiedOps: CourseOperation[] = [
+      {
+        type: 'update_field',
+        targetId: 'sec_1', // Simplified ID
+        field: 'section_title',
+        newValue: 'Updated Title',
+      },
+      {
+        type: 'delete_element',
+        targetId: 'lsn_2', // Simplified ID
+      },
+      {
+        type: 'add_lesson',
+        reasoning: 'Add new lesson',
+        tempId: '__new_lesson__', // tempId should NOT be remapped
+        parentSectionId: 'sec_1', // Simplified ID
+        afterLessonId: 'lsn_1', // Simplified ID
+        title: 'New Lesson',
+      },
+    ];
+
+    // Remap operations back to real IDs
+    const realOps = remapOperationsToReal(simplifiedOps, ctx);
+
+    // Verify operations now have real IDs
+    expect(realOps[0].type).toBe('update_field');
+    if (realOps[0].type === 'update_field') {
+      expect(realOps[0].targetId).toBe('sec_aaaaaaaa');
+    }
+
+    expect(realOps[1].type).toBe('delete_element');
+    if (realOps[1].type === 'delete_element') {
+      expect(realOps[1].targetId).toBe('lsn_cccccccc');
+    }
+
+    expect(realOps[2].type).toBe('add_lesson');
+    if (realOps[2].type === 'add_lesson') {
+      expect(realOps[2].parentSectionId).toBe('sec_aaaaaaaa');
+      expect(realOps[2].afterLessonId).toBe('lsn_bbbbbbbb');
+      expect(realOps[2].tempId).toBe('__new_lesson__'); // tempId unchanged
+    }
+  });
 
   it.todo('should persist updated course_structure to database after successful apply');
 
@@ -639,7 +999,7 @@ describe('Scenario 4: add lesson + Stage 6 CTA condition', () => {
     ];
 
     const result = applySurgicalOperations(ops, structure);
-    expect(result.tempIdMap['__tmp__']).toMatch(/^lsn_[A-Za-z0-9]+$/);
+    expect(result.tempIdMap['__tmp__']).toMatch(/^lsn_[A-Za-z0-9_-]+$/);
   });
 
   it('should renumber lesson_number for all lessons in section after insertion', () => {
@@ -819,11 +1179,128 @@ describe('Stable IDs and backfill integration', () => {
     expect(result.updatedStructure.sections[0].lessons[0].id).toBe('lsn_bbbbbbbb');
   });
 
-  it.todo('should call ensureStableIdsInMemory for legacy structures without stable IDs');
+  it('should call ensureStableIdsInMemory for legacy structures without stable IDs', () => {
+    // Create legacy structure WITHOUT id fields on sections/lessons
+    const legacyStructure: CourseStructure = {
+      title: 'Legacy Course',
+      description: 'Course without IDs',
+      tags: [],
+      target_audience: 'everyone',
+      language: 'ru',
+      estimated_duration_hours: 2,
+      sections: [
+        {
+          // No id field
+          section_number: 1,
+          section_title: 'Section 1',
+          section_description: 'First',
+          estimated_duration_minutes: 30,
+          learning_objectives: [],
+          lessons: [
+            {
+              // No id field
+              lesson_number: 1,
+              lesson_title: 'Lesson 1.1',
+              lesson_objectives: [],
+              key_topics: [],
+              estimated_duration_minutes: 15,
+              difficulty_level: 'beginner',
+            },
+          ],
+        } as CourseStructure['sections'][0],
+      ],
+    };
+
+    const result = ensureStableIdsInMemory(legacyStructure);
+
+    // Verify all sections got sec_ prefix IDs
+    expect(result.sections[0].id).toBeDefined();
+    expect(result.sections[0].id).toMatch(/^sec_[A-Za-z0-9_-]{8}$/);
+
+    // Verify all lessons got lsn_ prefix IDs
+    expect(result.sections[0].lessons[0].id).toBeDefined();
+    expect(result.sections[0].lessons[0].id).toMatch(/^lsn_[A-Za-z0-9_-]{8}$/);
+  });
 
   it.todo('should NOT write-on-read to database (backfill is in-memory only for request)');
 
-  it.todo('should apply operations correctly even when structure has mixed stable/missing IDs');
+  it('should apply operations correctly even when structure has mixed stable/missing IDs', () => {
+    // Create structure with SOME IDs missing
+    const mixedStructure: CourseStructure = {
+      title: 'Mixed Course',
+      description: 'Some IDs present, some missing',
+      tags: [],
+      target_audience: 'everyone',
+      language: 'ru',
+      estimated_duration_hours: 2,
+      sections: [
+        {
+          id: 'sec_existing1', // Has ID
+          section_number: 1,
+          section_title: 'Section 1',
+          section_description: 'First',
+          estimated_duration_minutes: 30,
+          learning_objectives: [],
+          lessons: [
+            {
+              id: 'lsn_existing1', // Has ID
+              lesson_number: 1,
+              lesson_title: 'Lesson 1.1',
+              lesson_objectives: [],
+              key_topics: [],
+              estimated_duration_minutes: 15,
+              difficulty_level: 'beginner',
+            },
+          ],
+        },
+        {
+          // No id field on section 2
+          section_number: 2,
+          section_title: 'Section 2',
+          section_description: 'Second',
+          estimated_duration_minutes: 20,
+          learning_objectives: [],
+          lessons: [
+            {
+              // No id field on lesson
+              lesson_number: 1,
+              lesson_title: 'Lesson 2.1',
+              lesson_objectives: [],
+              key_topics: [],
+              estimated_duration_minutes: 20,
+              difficulty_level: 'intermediate',
+            },
+          ],
+        } as CourseStructure['sections'][0],
+      ],
+    };
+
+    // First ensure all IDs are present
+    const backfilledStructure = ensureStableIdsInMemory(mixedStructure);
+
+    // Verify existing IDs preserved
+    expect(backfilledStructure.sections[0].id).toBe('sec_existing1');
+    expect(backfilledStructure.sections[0].lessons[0].id).toBe('lsn_existing1');
+
+    // Verify missing IDs added
+    expect(backfilledStructure.sections[1].id).toBeDefined();
+    expect(backfilledStructure.sections[1].id).toMatch(/^sec_/);
+    expect(backfilledStructure.sections[1].lessons[0].id).toBeDefined();
+    expect(backfilledStructure.sections[1].lessons[0].id).toMatch(/^lsn_/);
+
+    // Now apply operations using the backfilled structure
+    const ops: CourseOperation[] = [
+      {
+        type: 'update_field',
+        targetId: 'sec_existing1',
+        field: 'section_title',
+        newValue: 'Updated Section 1',
+      },
+    ];
+
+    const result = applySurgicalOperations(ops, backfilledStructure);
+    expect(result.updatedStructure.sections[0].section_title).toBe('Updated Section 1');
+  });
 
   it.todo('should handle schema_version marker in course_structure (v1=no IDs, v2=with IDs)');
 });
