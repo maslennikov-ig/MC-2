@@ -863,47 +863,9 @@ export async function executeIntentClassificationFlow(
     return handleInfoQueryRoute(userMessage, courseStructure, supabaseAdmin, courseId, msgParams);
   }
 
-  // Step 5: Structural intents (ADD_LESSON, ADD_SECTION) - LLM with ID remapping
-  // Also gated by CHAT_STRUCTURAL_PROPOSALS_ENABLED
-  if (
-    structuralProposalsEnabled &&
-    isStructuralIntent(classifiedIntent.intent) &&
-    classifiedIntent.confidence >= thresholds.LLM_REQUIRED
-  ) {
-    return handleStructuralIntentRoute(
-      classifiedIntent,
-      userMessage,
-      courseStructure,
-      courseLanguage,
-      courseId,
-      supabaseAdmin,
-      fallbackConfig,
-      requestId,
-      msgParams,
-      generationStatus
-    );
-  }
-
-  // Step 6: Other LLM-required intents with TARGETED context
-  if (
-    isLLMRequiredIntent(classifiedIntent.intent) &&
-    classifiedIntent.confidence >= thresholds.LLM_REQUIRED
-  ) {
-    return handleLLMRequiredRoute(
-      classifiedIntent,
-      userMessage,
-      courseStructure,
-      courseLanguage,
-      courseId,
-      nodeContext?.blockPath,
-      supabaseAdmin,
-      fallbackConfig,
-      requestId,
-      msgParams
-    );
-  }
-
-  // Plan requirement (plan:208): confidence < 0.6 => clarification response
+  // Step 5: Plan requirement (plan:208): confidence < 0.6 => clarification response
+  // MUST be checked BEFORE LLM routing to prevent low-confidence intents
+  // (0.5-0.6) from bypassing clarification and going straight to LLM.
   if (
     classifiedIntent.intent !== 'UNKNOWN' &&
     classifiedIntent.confidence < thresholds.CLARIFICATION
@@ -915,7 +877,7 @@ export async function executeIntentClassificationFlow(
         confidence: classifiedIntent.confidence,
         threshold: thresholds.CLARIFICATION,
       },
-      'Chat: Low confidence — returning clarification instead of legacy fallback'
+      'Chat: Low confidence — returning clarification instead of LLM routing'
     );
 
     const clarificationMessage =
@@ -943,6 +905,46 @@ export async function executeIntentClassificationFlow(
       inputTokens: 200,
       outputTokens: 30,
     };
+  }
+
+  // Step 6: Structural intents (ADD_LESSON, ADD_SECTION) - LLM with ID remapping
+  // Also gated by CHAT_STRUCTURAL_PROPOSALS_ENABLED
+  if (
+    structuralProposalsEnabled &&
+    isStructuralIntent(classifiedIntent.intent) &&
+    classifiedIntent.confidence >= thresholds.LLM_REQUIRED
+  ) {
+    return handleStructuralIntentRoute(
+      classifiedIntent,
+      userMessage,
+      courseStructure,
+      courseLanguage,
+      courseId,
+      supabaseAdmin,
+      fallbackConfig,
+      requestId,
+      msgParams,
+      generationStatus
+    );
+  }
+
+  // Step 7: Other LLM-required intents with TARGETED context
+  if (
+    isLLMRequiredIntent(classifiedIntent.intent) &&
+    classifiedIntent.confidence >= thresholds.LLM_REQUIRED
+  ) {
+    return handleLLMRequiredRoute(
+      classifiedIntent,
+      userMessage,
+      courseStructure,
+      courseLanguage,
+      courseId,
+      nodeContext?.blockPath,
+      supabaseAdmin,
+      fallbackConfig,
+      requestId,
+      msgParams
+    );
   }
 
   // Fallback: UNKNOWN intent - return null to use legacy flow

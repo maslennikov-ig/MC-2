@@ -187,7 +187,7 @@ export function courseNodesToNestedJson(
 
       return {
         id: lNode.id,
-        lesson_number: parseFloat(`${sIdx + 1}.${lIdx + 1}`),
+        lesson_number: lIdx + 1,
         lesson_title: lNode.title,
         lesson_objectives: lData.lesson_objectives ?? [],
         key_topics: lData.key_topics ?? [],
