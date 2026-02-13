@@ -8,6 +8,7 @@ import type {
 import {
   deleteElement as deleteStructureElement,
   addElement as addStructureElement,
+  ensureStableIdsInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
@@ -167,7 +168,8 @@ export async function handleDeleteElement(
   }
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-  await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },
       'course_nodes dual-write failed (non-fatal)'
@@ -574,7 +576,8 @@ export async function handleAddElement(
   }
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-  await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },
       'course_nodes dual-write failed (non-fatal)'

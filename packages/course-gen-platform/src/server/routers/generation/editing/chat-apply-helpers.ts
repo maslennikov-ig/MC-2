@@ -196,7 +196,8 @@ export async function applyFieldUpdatesProposal(
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
   if (stageId === 'stage_5') {
-    await writeCourseNodes(courseId, updatedData as CourseStructure, supabase, logger).catch(err =>
+    const structureForNodes = ensureStableIdsInMemory(updatedData as CourseStructure);
+    await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
       logger.warn(
         { courseId, error: err instanceof Error ? err.message : String(err) },
         'course_nodes dual-write failed (non-fatal)'
@@ -402,7 +403,8 @@ export async function applyStructuralOperationProposal(
   }
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-  await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },
       'course_nodes dual-write failed (non-fatal)'
