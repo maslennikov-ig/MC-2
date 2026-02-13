@@ -1,50 +1,168 @@
 /**
- * Chat Flow Integration Test Stubs
+ * Chat Flow Integration Tests
  * @module tests/integration/chat-flow
  *
  * Integration test scenarios for the surgical course editing chat flow.
  * Based on plan section 10.2 from docs/plans/2026-02-12-surgical-course-editing-v2-1.md
  *
  * Test scenarios:
- * 1. generation.chat without intent (auto classification)
+ * 1. generation.chat without intent (auto classification) — heuristics tested, rest todo
  * 2. legacy intent='regenerate'
  * 3. structural proposal -> applyProposal
  * 4. add lesson + Stage 6 CTA condition
  *
- * IMPORTANT: These are test stubs (it.todo) documenting the integration test scenarios
- * that should be implemented once the surgical course editing flow is fully developed.
+ * Scenario 1 heuristic tests are fully executable. Remaining stubs (it.todo)
+ * document integration scenarios requiring DB/tRPC setup.
  */
 
-import { describe, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import { classifyWithHeuristics } from '../../src/shared/intent/heuristics';
 
 // ============================================================================
 // Scenario 1: Auto-classification Flow (No Explicit Intent)
 // ============================================================================
 
 describe('Scenario 1: generation.chat without explicit intent (auto-classification)', () => {
-  it.todo(
-    'should auto-classify "Добавь урок про X" as ADD_LESSON intent and return structural_operation proposal'
-  );
+  // --- Tier 0 heuristic classification (real executable tests) ---
 
-  it.todo(
-    'should auto-classify "Удали секцию Y" as DELETE_SECTION intent and return structural_operation proposal'
-  );
+  describe('Tier 0 heuristics — ADD_LESSON', () => {
+    it('should classify "Добавь урок про X" as ADD_LESSON', () => {
+      const result = classifyWithHeuristics('Добавь урок про Machine Learning');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('ADD_LESSON');
+      expect(result!.confidence).toBe(0.9);
+    });
 
-  it.todo(
-    'should auto-classify "Измени название курса на Z" as UPDATE_FIELD intent and return field_updates proposal'
-  );
+    it('should classify "Добавить новый урок" as ADD_LESSON', () => {
+      const result = classifyWithHeuristics('Добавить новый урок по Python');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('ADD_LESSON');
+    });
 
-  it.todo(
-    'should auto-classify "Полностью переделай курс" as FULL_REGENERATE intent and enqueue job'
-  );
+    it('should classify "add lesson" as ADD_LESSON', () => {
+      const result = classifyWithHeuristics('add lesson about arrays');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('ADD_LESSON');
+    });
+  });
 
-  it.todo(
-    'should auto-classify "Сколько уроков?" as GET_INFO intent and return info without LLM call'
-  );
+  describe('Tier 0 heuristics — DELETE', () => {
+    it('should classify "Удали урок 3" as DELETE_LESSON', () => {
+      const result = classifyWithHeuristics('Удали урок 3');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('DELETE_LESSON');
+      expect(result!.confidence).toBe(0.9);
+    });
+
+    it('should classify "Удали последнюю секцию" as DELETE_SECTION', () => {
+      const result = classifyWithHeuristics('Удали последнюю секцию');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('DELETE_SECTION');
+    });
+
+    it('should classify "remove last section" as DELETE_SECTION', () => {
+      const result = classifyWithHeuristics('remove last section');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('DELETE_SECTION');
+    });
+  });
+
+  describe('Tier 0 heuristics — UPDATE_FIELD', () => {
+    it('should classify "Измени название курса на Z" as UPDATE_FIELD', () => {
+      const result = classifyWithHeuristics('Измени название курса на "Advanced Python"');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('UPDATE_FIELD');
+      expect(result!.confidence).toBe(0.9);
+    });
+
+    it('should classify "rename title course" as UPDATE_FIELD', () => {
+      const result = classifyWithHeuristics('rename title course to something');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('UPDATE_FIELD');
+    });
+  });
+
+  describe('Tier 0 heuristics — FULL_REGENERATE', () => {
+    it('should classify "Полностью переделай курс" as FULL_REGENERATE', () => {
+      const result = classifyWithHeuristics('Полностью переделай курс');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('FULL_REGENERATE');
+      expect(result!.confidence).toBe(0.95);
+    });
+
+    it('should classify "Перегенерируй всё" as FULL_REGENERATE', () => {
+      const result = classifyWithHeuristics('Перегенерируй всё');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('FULL_REGENERATE');
+    });
+
+    it('should classify "start over" as FULL_REGENERATE', () => {
+      const result = classifyWithHeuristics('start over please');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('FULL_REGENERATE');
+    });
+  });
+
+  describe('Tier 0 heuristics — GET_INFO', () => {
+    it('should classify "Сколько уроков?" as GET_INFO', () => {
+      const result = classifyWithHeuristics('Сколько уроков?');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('GET_INFO');
+      expect(result!.confidence).toBe(0.95);
+    });
+
+    it('should classify "Покажи все секции" as GET_INFO', () => {
+      const result = classifyWithHeuristics('Покажи все секции');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('GET_INFO');
+      expect(result!.confidence).toBe(0.85);
+    });
+
+    it('should classify "how many lessons" as GET_INFO', () => {
+      const result = classifyWithHeuristics('how many lessons are there?');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('GET_INFO');
+    });
+  });
+
+  describe('Tier 0 heuristics — MOVE_ELEMENT', () => {
+    it('should classify "Перемести урок 3 в секцию 2" as MOVE_ELEMENT', () => {
+      const result = classifyWithHeuristics('Перемести урок 3 в секцию 2');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('MOVE_ELEMENT');
+      expect(result!.confidence).toBe(0.85);
+    });
+  });
+
+  describe('Tier 0 heuristics — ADD_SECTION', () => {
+    it('should classify "Добавь новую секцию" as ADD_SECTION', () => {
+      const result = classifyWithHeuristics('Добавь новую секцию про базы данных');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('ADD_SECTION');
+      expect(result!.confidence).toBe(0.9);
+    });
+  });
+
+  describe('Tier 0 heuristics — fallback to null', () => {
+    it('should return null for ambiguous messages that need LLM', () => {
+      const result = classifyWithHeuristics('Сделай курс более интересным');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for empty messages', () => {
+      const result = classifyWithHeuristics('');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for generic questions', () => {
+      const result = classifyWithHeuristics('Что ты думаешь про этот курс?');
+      expect(result).toBeNull();
+    });
+  });
+
+  // --- Remaining integration stubs (require DB/tRPC setup) ---
 
   it.todo('should return clarification response when intent confidence is below 0.6 threshold');
-
-  it.todo('should use heuristics.ts (Tier 0) before classifier.ts (Tier 1) for known patterns');
 
   it.todo('should handle fallback to LLM when both heuristics and classifier fail');
 

@@ -1,11 +1,11 @@
 -- ============================================================================
 -- course_nodes Table Test Suite
 -- Tests constraints, triggers, RLS policies, and cascading behavior
--- Test Count: 24 scenarios
+-- Test Count: 25 scenarios
 -- ============================================================================
 
 BEGIN;
-SELECT plan(24);
+SELECT plan(25);
 
 -- ============================================================================
 -- HELPER: Disable circular-dependency RLS on helper tables
@@ -178,7 +178,7 @@ SELECT throws_ok(
   INSERT INTO course_nodes (id, course_id, parent_id, node_type, order_key, title)
   VALUES ('lsn_trg00002', '33333333-3333-3333-3333-333333333333', 'sec_test0010', 'lesson', 'z4', 'Cross-course Lesson')
   $$,
-  'P0001', -- raise_exception
+  '23514', -- check_violation (ERRCODE set by trigger)
   NULL,
   'Trigger 2.2: Lesson referencing parent from different course is rejected'
 );
@@ -189,7 +189,7 @@ SELECT throws_ok(
   INSERT INTO course_nodes (id, course_id, parent_id, node_type, order_key, title)
   VALUES ('lsn_trg00003', '33333333-3333-3333-3333-333333333333', 'lsn_test0001', 'lesson', 'z5', 'Nested Lesson')
   $$,
-  'P0001', -- raise_exception
+  '23514', -- check_violation (ERRCODE set by trigger)
   NULL,
   'Trigger 2.3: Lesson under another lesson (deep nesting) is rejected'
 );
@@ -201,7 +201,7 @@ SELECT throws_ok(
   SET parent_id = 'sec_test0010'
   WHERE id = 'lsn_test0001'
   $$,
-  'P0001', -- raise_exception
+  '23514', -- check_violation (ERRCODE set by trigger)
   NULL,
   'Trigger 2.4: UPDATE parent_id to cross-course section is rejected'
 );
@@ -274,8 +274,7 @@ SELECT results_eq(
   'Cascade 4.1: Deleting section cascades to child lessons'
 );
 
--- Test 4.2: Delete course cascades to all course_nodes (via courses FK)
--- Count nodes for course2 before delete
+-- Test 4.2: Verify course2 has nodes before course delete (pre-check)
 SELECT results_eq(
   $$
   SELECT COUNT(*)::int FROM course_nodes WHERE course_id = '44444444-4444-4444-4444-444444444444'
@@ -283,6 +282,32 @@ SELECT results_eq(
   ARRAY[2],
   'Cascade 4.2: Course2 has 2 nodes before course delete'
 );
+
+-- Test 4.3: Delete course cascades to all its course_nodes
+DELETE FROM courses WHERE id = '44444444-4444-4444-4444-444444444444';
+
+SELECT results_eq(
+  $$
+  SELECT COUNT(*)::int FROM course_nodes WHERE course_id = '44444444-4444-4444-4444-444444444444'
+  $$,
+  ARRAY[0],
+  'Cascade 4.3: Deleting course cascades to all its course_nodes (0 remaining)'
+);
+
+-- Re-insert course2 and its nodes for subsequent RLS tests
+INSERT INTO courses (id, title, slug, user_id, organization_id, status)
+VALUES (
+  '44444444-4444-4444-4444-444444444444'::uuid,
+  'Course 2 by Instructor2',
+  'course-2-inst2',
+  'cccccccc-cccc-cccc-cccc-cccccccccccc'::uuid,
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  'published'
+);
+INSERT INTO course_nodes (id, course_id, parent_id, node_type, order_key, title, data)
+VALUES
+  ('sec_test0010', '44444444-4444-4444-4444-444444444444', NULL, 'section', 'a0', 'Section A', '{}'),
+  ('lsn_test0010', '44444444-4444-4444-4444-444444444444', 'sec_test0010', 'lesson', 'a0', 'Lesson A.1', '{}');
 
 -- ============================================================================
 -- SCENARIO 5: RLS — Admin Access (2 tests)

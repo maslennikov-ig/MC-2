@@ -44,7 +44,8 @@ async function main(): Promise<void> {
     errors: 0,
   };
 
-  const failedCourseIds: string[] = [];
+  const errorCourseIds: string[] = []; // actual DB/exception errors
+  const conflictCourseIds: string[] = []; // optimistic concurrency conflicts
 
   console.log('=== Backfill Stable IDs ===');
   console.log(`Batch size: ${BATCH_SIZE}`);
@@ -111,7 +112,7 @@ async function main(): Promise<void> {
         if (updateError) {
           console.error(`  Error updating course ${course.id}:`, updateError.message);
           metrics.errors++;
-          failedCourseIds.push(course.id);
+          errorCourseIds.push(course.id);
           continue;
         }
 
@@ -119,7 +120,7 @@ async function main(): Promise<void> {
         if (!updateResult || updateResult.length === 0) {
           console.log(`  Conflict on course ${course.id} (updated_at changed). Skipping.`);
           metrics.id_conflicts++;
-          failedCourseIds.push(course.id);
+          conflictCourseIds.push(course.id);
           continue;
         }
 
@@ -141,11 +142,15 @@ async function main(): Promise<void> {
   }
 
   // Retry pass for failed/conflicted courses (plan:132)
-  if (failedCourseIds.length > 0) {
+  const allFailedIds = [...errorCourseIds, ...conflictCourseIds];
+  const errorIdSet = new Set(errorCourseIds);
+  if (allFailedIds.length > 0) {
     console.log('');
-    console.log(`=== Retry pass for ${failedCourseIds.length} failed courses ===`);
+    console.log(
+      `=== Retry pass for ${allFailedIds.length} failed courses (${errorCourseIds.length} errors, ${conflictCourseIds.length} conflicts) ===`
+    );
 
-    for (const courseId of failedCourseIds) {
+    for (const courseId of allFailedIds) {
       metrics.retry_count++;
 
       try {
@@ -185,6 +190,9 @@ async function main(): Promise<void> {
         }
 
         metrics.courses_updated++;
+        if (errorIdSet.has(courseId)) {
+          metrics.errors--;
+        }
         console.log(`  Retry: Updated course ${courseId}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
