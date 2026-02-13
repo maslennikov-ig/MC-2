@@ -21,6 +21,7 @@ import { QuickActions, type ChatIntent } from './QuickActions'
 import { MarkdownRendererClient } from '@/components/markdown'
 import { Proposal } from '@megacampus/shared-types/chat-types'
 import { type ChatMessage } from '../hooks/useRefinement'
+import { generateContentForNewLessons } from '@/app/actions/lesson-actions'
 
 interface RefinementChatProps {
   courseId: string
@@ -58,6 +59,7 @@ function isJSONContent(content: string): boolean {
 }
 
 export const RefinementChat: React.FC<RefinementChatProps> = ({
+  courseId,
   onRefine,
   history = [],
   isProcessing = false,
@@ -537,7 +539,11 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                   {t('refinementChat.stage6Cta.description')}
                 </p>
                 <Button
-                  onClick={() => void onRefine(t('refinementChat.stage6Cta.message'), 'regenerate')}
+                  onClick={() => {
+                    void generateContentForNewLessons(courseId).catch((error: unknown) => {
+                      console.error('Failed to generate content for new lessons:', error)
+                    })
+                  }}
                   disabled={isBlocked}
                   className="bg-purple-600 hover:bg-purple-700"
                   data-testid="stage6-generate-cta"
