@@ -92,6 +92,8 @@ interface NodeDetailsDrawerLessonProps {
   onRejectProposal: () => void
   /** Stage 6 content ready for CTA */
   stage6ContentReady: boolean
+  /** Callback to generate content for new lessons (server action passed as prop) */
+  onGenerateContent?: (courseId: string) => Promise<unknown>
 }
 
 /**
@@ -142,6 +144,7 @@ export const NodeDetailsDrawerLesson = memo(function NodeDetailsDrawerLesson({
   onRetryProposal,
   onRejectProposal,
   stage6ContentReady,
+  onGenerateContent,
 }: NodeDetailsDrawerLessonProps) {
   return (
     <div className="flex h-full flex-col">
@@ -198,6 +201,7 @@ export const NodeDetailsDrawerLesson = memo(function NodeDetailsDrawerLesson({
           stage6ContentReady={stage6ContentReady}
           isGenerating={isGenerating}
           blockedMessage={blockedMessage}
+          onGenerateContent={onGenerateContent}
         />
       </div>
     </div>

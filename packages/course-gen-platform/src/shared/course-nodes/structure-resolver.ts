@@ -33,6 +33,7 @@ function extractCourseMeta(structure: CourseStructure): CourseMetaFields {
     prerequisites: structure.prerequisites ?? [],
     learning_outcomes: structure.learning_outcomes ?? [],
     course_tags: structure.course_tags ?? [],
+    schema_version: (structure as Record<string, unknown>).schema_version as number | undefined,
   };
 }
 

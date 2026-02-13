@@ -652,15 +652,25 @@ Respond ONLY with valid JSON, no markdown fences.`;
       realOperations.some(op => op.type === 'add_lesson');
 
     if (statusMatch) {
-      // Consistency check: verify lesson_contents actually have completed content
+      // Consistency check (plan:318): verify ratio of lesson_contents with
+      // completed/review_required status. A majority (>50%) indicates
+      // Stage 6 content has actually been generated, not just status set.
       try {
-        const { count: completedCount } = await supabaseAdmin
-          .from('lesson_contents')
-          .select('id', { count: 'exact', head: true })
-          .eq('course_id', courseId)
-          .in('status', ['completed', 'review_required']);
+        const [{ count: totalCount }, { count: completedCount }] = await Promise.all([
+          supabaseAdmin
+            .from('lesson_contents')
+            .select('id', { count: 'exact', head: true })
+            .eq('course_id', courseId),
+          supabaseAdmin
+            .from('lesson_contents')
+            .select('id', { count: 'exact', head: true })
+            .eq('course_id', courseId)
+            .in('status', ['completed', 'review_required']),
+        ]);
 
-        stage6ContentReady = (completedCount ?? 0) > 0;
+        const total = totalCount ?? 0;
+        const completed = completedCount ?? 0;
+        stage6ContentReady = total > 0 && completed / total > 0.5;
       } catch {
         // Non-fatal: fall back to status-only check
         stage6ContentReady = true;

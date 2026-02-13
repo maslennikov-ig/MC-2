@@ -416,6 +416,32 @@ export function validateOperations(
           const afterElement = findElementById(structure, op.afterId, {});
           if (!afterElement) {
             addError(`move_element: afterId "${op.afterId}" not found in structure`);
+          } else if (moveTarget) {
+            // Validate type match: moving a lesson requires afterId to be a lesson,
+            // moving a section requires afterId to be a section
+            if (moveTarget.type === 'lesson' && afterElement.type !== 'lesson') {
+              addError(
+                `move_element: afterId "${op.afterId}" is a ${afterElement.type}, expected a lesson (target is a lesson)`
+              );
+            }
+            if (moveTarget.type === 'section' && afterElement.type !== 'section') {
+              addError(
+                `move_element: afterId "${op.afterId}" is a ${afterElement.type}, expected a section (target is a section)`
+              );
+            }
+            // Validate context: when moving a lesson, afterId must be in the target section
+            if (moveTarget.type === 'lesson' && afterElement.type === 'lesson') {
+              const targetParentId =
+                op.newParentId || structure.sections[moveTarget.sectionIndex]?.id;
+              if (targetParentId && !knownTempIds.has(targetParentId)) {
+                const targetParent = findSectionById(structure, targetParentId, {});
+                if (targetParent && afterElement.sectionIndex !== targetParent.sectionIndex) {
+                  addError(
+                    `move_element: afterId "${op.afterId}" is not in the target section "${targetParentId}"`
+                  );
+                }
+              }
+            }
           }
         }
         break;

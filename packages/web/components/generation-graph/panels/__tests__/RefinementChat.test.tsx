@@ -654,25 +654,25 @@ describe('RefinementChat', () => {
       expect(ctaButton).toBeNull()
     })
 
-    it('should call onRefine with regenerate intent when CTA clicked', async () => {
+    it('should call onGenerateContent when CTA clicked', async () => {
       const user = userEvent.setup()
-      const onRefine = vi.fn().mockResolvedValue(undefined)
+      const onGenerateContent = vi.fn().mockResolvedValue(undefined)
       const acceptedProposal = createStructuralProposal()
 
       render(
         <RefinementChat
           {...defaultProps}
-          onRefine={onRefine}
           stage6ContentReady={true}
           acceptedProposal={acceptedProposal}
           latestProposal={null}
+          onGenerateContent={onGenerateContent}
         />
       )
 
       const ctaButton = screen.getByTestId('stage6-generate-cta')
       await user.click(ctaButton)
 
-      expect(onRefine).toHaveBeenCalledWith('Generate content for new lessons', 'regenerate')
+      expect(onGenerateContent).toHaveBeenCalledWith(defaultProps.courseId)
     })
 
     it('should disable CTA button when isGenerating=true', () => {
