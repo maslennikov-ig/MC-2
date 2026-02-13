@@ -338,7 +338,7 @@ describe('handleDirectIntent - MOVE_ELEMENT', () => {
 // ============================================================================
 
 describe('handleDirectIntent - UPDATE_FIELD', () => {
-  it('should return clarification message without proposal', () => {
+  it('should return field_updates proposal when fieldName and newValue are present', () => {
     const structure = createSampleStructure();
     const intent = createIntent('UPDATE_FIELD', 'урок 1', 'sections[0].lessons[0]');
     // Add fieldName and newValue to intent
@@ -350,8 +350,60 @@ describe('handleDirectIntent - UPDATE_FIELD', () => {
     expect(result.message).toContain('Изменить');
     expect(result.message).toContain('title');
     expect(result.message).toContain('New Title');
-    // UPDATE_FIELD should not produce a proposal in handleDirectIntent
-    expect(result.proposal).toBeUndefined();
+    expect(result.proposal).toBeDefined();
+    expect(result.proposal?.type).toBe('field_updates');
+    if (result.proposal?.type === 'field_updates') {
+      expect(result.proposal.stageId).toBe('stage_5');
+      expect(result.proposal.updates).toHaveLength(1);
+      expect(result.proposal.updates[0]).toMatchObject({
+        path: 'title',
+        newValue: 'New Title',
+      });
+      expect(result.proposal.summary).toContain('title');
+    }
+  });
+
+  it('should use stage_4 when stageId is explicitly stage_4', () => {
+    const structure = createSampleStructure();
+    const intent = createIntent('UPDATE_FIELD', 'урок 1', 'sections[0].lessons[0]');
+    intent.fieldName = 'course_title';
+    intent.newValue = 'Updated Course';
+
+    const result = handleDirectIntent(intent, structure, undefined, 'stage_4');
+
+    expect(result.proposal).toBeDefined();
+    if (result.proposal?.type === 'field_updates') {
+      expect(result.proposal.stageId).toBe('stage_4');
+    }
+  });
+
+  it('should default to stage_5 when no stageId is provided', () => {
+    const structure = createSampleStructure();
+    const intent = createIntent('UPDATE_FIELD', 'урок 1', 'sections[0].lessons[0]');
+    intent.fieldName = 'lesson_title';
+    intent.newValue = 'Updated Lesson';
+
+    const result = handleDirectIntent(intent, structure);
+
+    expect(result.proposal).toBeDefined();
+    if (result.proposal?.type === 'field_updates') {
+      expect(result.proposal.stageId).toBe('stage_5');
+    }
+  });
+
+  it('should handle non-string newValue in proposal', () => {
+    const structure = createSampleStructure();
+    const intent = createIntent('UPDATE_FIELD', 'урок 1', 'sections[0].lessons[0]');
+    intent.fieldName = 'estimated_duration_minutes';
+    intent.newValue = 45;
+
+    const result = handleDirectIntent(intent, structure);
+
+    expect(result.message).toContain('45');
+    expect(result.proposal).toBeDefined();
+    if (result.proposal?.type === 'field_updates') {
+      expect(result.proposal.updates[0].newValue).toBe(45);
+    }
   });
 
   it('should require clarification when field or value is missing', () => {

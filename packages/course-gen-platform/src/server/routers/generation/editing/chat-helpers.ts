@@ -503,10 +503,12 @@ function handleMoveIntent(
 
 /**
  * Handle UPDATE_FIELD intents.
- * Returns a clarification or confirmation without a proposal
- * (UPDATE_FIELD uses field_updates via the normal LLM flow).
+ * Returns a field_updates proposal for deterministic apply when both fieldName and newValue are present.
  */
-function handleUpdateFieldIntent(intent: ClassifiedIntent): DirectIntentResult {
+function handleUpdateFieldIntent(
+  intent: ClassifiedIntent,
+  stageId: 'stage_4' | 'stage_5'
+): DirectIntentResult {
   if (!intent.fieldName || intent.newValue === undefined) {
     return {
       message: 'Уточните, какое поле и на какое значение изменить.',
@@ -514,10 +516,25 @@ function handleUpdateFieldIntent(intent: ClassifiedIntent): DirectIntentResult {
     };
   }
 
-  // P2-3: Return without proposal - UPDATE_FIELD should use field_updates
-  // via the normal LLM flow or be handled by a separate handler
+  const fieldName = String(intent.fieldName);
+  const displayValue =
+    typeof intent.newValue === 'string' ? intent.newValue : JSON.stringify(intent.newValue);
+
+  // Return field_updates proposal for deterministic apply
   return {
-    message: `Изменить ${String(intent.fieldName)} на "${typeof intent.newValue === 'string' ? intent.newValue : JSON.stringify(intent.newValue)}"?`,
+    message: `Изменить ${fieldName} на "${displayValue}"?`,
+    proposal: {
+      type: 'field_updates' as const,
+      stageId,
+      updates: [
+        {
+          path: fieldName,
+          oldValue: null,
+          newValue: intent.newValue,
+        },
+      ],
+      summary: `Обновление поля ${fieldName}`,
+    },
   };
 }
 
@@ -591,7 +608,8 @@ function resolveDirectIntentTarget(
 export function handleDirectIntent(
   intent: ClassifiedIntent,
   courseStructure: CourseStructure,
-  nodeContextPath?: string
+  nodeContextPath?: string,
+  stageId?: string
 ): DirectIntentResult {
   const resolved = resolveDirectIntentTarget(intent, courseStructure, nodeContextPath);
 
@@ -609,8 +627,11 @@ export function handleDirectIntent(
     case 'MOVE_ELEMENT':
       return handleMoveIntent(intent, courseStructure, targetPath);
 
-    case 'UPDATE_FIELD':
-      return handleUpdateFieldIntent(intent);
+    case 'UPDATE_FIELD': {
+      // Default to stage_5 (course_structure) unless explicitly stage_4 (analysis)
+      const resolvedStageId: 'stage_4' | 'stage_5' = stageId === 'stage_4' ? 'stage_4' : 'stage_5';
+      return handleUpdateFieldIntent(intent, resolvedStageId);
+    }
 
     default:
       return { message: 'Операция не поддерживается.' };

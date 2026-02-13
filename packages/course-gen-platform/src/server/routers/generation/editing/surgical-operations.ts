@@ -394,6 +394,30 @@ export function validateOperations(
         requireId(op.targetId, 'targetId');
         requireOptionalId(op.newParentId, 'newParentId');
         requireOptionalId(op.afterId, 'afterId');
+
+        // Preflight structural checks (beyond basic ID existence)
+        const moveTarget = findElementById(structure, op.targetId, {});
+        if (!moveTarget && !knownTempIds.has(op.targetId)) {
+          addError(`move_element: targetId "${op.targetId}" not found in structure`);
+        }
+        if (op.newParentId && !knownTempIds.has(op.newParentId)) {
+          const parent = findSectionById(structure, op.newParentId, {});
+          if (!parent) {
+            addError(`move_element: newParentId "${op.newParentId}" is not a valid section`);
+          }
+          // Circular check: can't move a section into itself
+          if (moveTarget?.type === 'section' && op.newParentId === op.targetId) {
+            addError(
+              `move_element: circular relation — cannot move section "${op.targetId}" into itself`
+            );
+          }
+        }
+        if (op.afterId && !knownTempIds.has(op.afterId)) {
+          const afterElement = findElementById(structure, op.afterId, {});
+          if (!afterElement) {
+            addError(`move_element: afterId "${op.afterId}" not found in structure`);
+          }
+        }
         break;
       }
 

@@ -100,6 +100,8 @@ const INTENT_CONFIDENCE_THRESHOLDS = {
   GET_INFO: 0.7,
   /** Minimum confidence for LLM-required intents (REWRITE, EXPAND, etc.) */
   LLM_REQUIRED: 0.5,
+  /** Below this threshold → clarification response instead of legacy fallback (plan:208) */
+  CLARIFICATION: 0.6,
 } as const;
 
 // ============================================================================

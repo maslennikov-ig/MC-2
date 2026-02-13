@@ -375,7 +375,11 @@ class Stage5GenerationHandler {
     );
 
     // Inject stable IDs (sec_ + lsn_ + nanoid(8)) before persisting
-    const structureWithIds = ensureStableIdsInMemory(sanitizedStructure);
+    const structureWithIds = {
+      ...ensureStableIdsInMemory(sanitizedStructure),
+      // Set schema_version to 2 (plan:105) — indicates stable IDs present
+      schema_version: 2 as const,
+    };
 
     // Save structure
     const { error: structureError } = await supabaseAdmin

@@ -17,3 +17,11 @@ export function isDualWriteEnabled(): boolean {
 export function isReadFromNodesEnabled(): boolean {
   return process.env.COURSE_NODES_READ_ENABLED === 'true';
 }
+
+/**
+ * When true, reject course_structure writes that lack stable IDs (plan:433).
+ * Enable after backfill is complete and all structures have sec_/lsn_ IDs.
+ */
+export function isStableIdsRequired(): boolean {
+  return process.env.COURSE_STABLE_IDS_REQUIRED === 'true';
+}
