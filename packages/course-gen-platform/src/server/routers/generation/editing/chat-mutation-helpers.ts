@@ -69,6 +69,8 @@ export interface IntentConfidenceThresholds {
   DIRECT_EXECUTION: number;
   GET_INFO: number;
   LLM_REQUIRED: number;
+  /** Below this threshold → clarification response (plan:208) */
+  CLARIFICATION: number;
 }
 
 // ============================================================================
@@ -351,19 +353,15 @@ async function resolveModelConfig(
       phaseName,
     };
   } catch (configError) {
-    logger.warn(
-      { requestId, phaseName, stageId, chatType, error: configError, fallback: fallbackConfig },
-      'Failed to get model config from database, using hardcoded fallback'
+    // Plan requirement: chat phases must fail-fast (503) when config is unavailable
+    logger.error(
+      { requestId, phaseName, stageId, chatType, error: configError },
+      'Chat phase model config unavailable — returning 503 per plan requirement'
     );
-    // Use stage-specific hardcoded models when DB is unavailable
-    const stageFallback = CHAT_STAGE_FALLBACK_MODELS[stageId || ''] || DEFAULT_CHAT_FALLBACK_MODELS;
-    return {
-      modelId: stageFallback.primary,
-      fallbackModelId: stageFallback.fallback,
-      temperature: fallbackConfig.temperature,
-      maxTokens: fallbackConfig.maxTokens,
-      phaseName,
-    };
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Model configuration unavailable for chat phase "${phaseName}". Please try again later.`,
+    });
   }
 }
 

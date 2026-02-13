@@ -514,6 +514,11 @@ export type DifficultyLevel = CourseLevel;
  */
 export const CourseStructureSchema = z
   .object({
+    // ========== SCHEMA VERSION ==========
+
+    /** Structure schema version (plan:105). Version 2 = stable IDs required. */
+    schema_version: z.number().int().min(1).max(10).optional().describe('Structure schema version'),
+
     // ========== METADATA ==========
 
     course_title: z

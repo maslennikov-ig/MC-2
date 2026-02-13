@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { TRPCError } from '@trpc/server';
 import { JobType } from '@megacampus/shared-types';
 import type { JobData } from '@megacampus/shared-types';
 import { addJob, removeJobsByCourseId } from '../../../../orchestrator/queue';
@@ -197,7 +198,12 @@ async function handleDirectExecutionRoute(
   courseId: string,
   params: IntentRouteMsgParams
 ): Promise<ChatResponse> {
-  const directResult = handleDirectIntent(classifiedIntent, courseStructure, nodeContextBlockPath);
+  const directResult = handleDirectIntent(
+    classifiedIntent,
+    courseStructure,
+    nodeContextBlockPath,
+    params.nodeContext?.stageId
+  );
 
   // Save assistant message
   await supabaseAdmin.from('course_chat_messages').insert({
@@ -325,16 +331,20 @@ async function handleLLMRequiredRoute(
       'Resolved model config for intent flow from database'
     );
   } catch (configError) {
-    logger.warn(
+    // Plan requirement: chat phases must fail-fast (503) when config is unavailable
+    logger.error(
       {
         requestId,
         courseId,
+        phaseKey,
         error: configError,
-        fallbackPrimary: targetedModelId,
-        fallbackSecondary: targetedFallbackModelId,
       },
-      'Failed to get model config for intent flow, using hardcoded fallback'
+      'Chat phase model config unavailable — returning 503 per plan requirement'
     );
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Model configuration unavailable for chat phase "${phaseKey}". Please try again later.`,
+    });
   }
 
   let modelUsed = targetedModelId;
@@ -563,8 +573,16 @@ Respond ONLY with valid JSON, no markdown fences.`;
     modelId = config.modelId || modelId;
     fallbackModelId = config.fallbackModelId || fallbackModelId;
     temperature = config.temperature;
-  } catch {
-    logger.warn({ requestId, courseId }, 'Failed to get model config for structural intent');
+  } catch (configError) {
+    // Plan requirement: chat phases must fail-fast (503) when config is unavailable
+    logger.error(
+      { requestId, courseId, phaseKey, error: configError },
+      'Chat phase model config unavailable — returning 503 per plan requirement'
+    );
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Model configuration unavailable for chat phase "${phaseKey}". Please try again later.`,
+    });
   }
 
   // Call LLM with primary/fallback
@@ -626,11 +644,28 @@ Respond ONLY with valid JSON, no markdown fences.`;
     assistantMessage = proposal.summary;
 
     // Stage 6 CTA: explicit action prompt when content already generated
+    // Plan:316-318: additional consistency check via lesson_contents status
     const STAGE6_COMPLETE_STATUSES = ['stage_6_complete', 'finalizing', 'completed'];
-    stage6ContentReady =
+    const statusMatch =
       !!generationStatus &&
       STAGE6_COMPLETE_STATUSES.includes(generationStatus) &&
       realOperations.some(op => op.type === 'add_lesson');
+
+    if (statusMatch) {
+      // Consistency check: verify lesson_contents actually have completed content
+      try {
+        const { count: completedCount } = await supabaseAdmin
+          .from('lesson_contents')
+          .select('id', { count: 'exact', head: true })
+          .eq('course_id', courseId)
+          .in('status', ['completed', 'review_required']);
+
+        stage6ContentReady = (completedCount ?? 0) > 0;
+      } catch {
+        // Non-fatal: fall back to status-only check
+        stage6ContentReady = true;
+      }
+    }
 
     if (stage6ContentReady) {
       assistantMessage +=
@@ -868,14 +903,56 @@ export async function executeIntentClassificationFlow(
     );
   }
 
-  // Fallback: UNKNOWN intent with low confidence - return null to use legacy flow
+  // Plan requirement (plan:208): confidence < 0.6 => clarification response
+  if (
+    classifiedIntent.intent !== 'UNKNOWN' &&
+    classifiedIntent.confidence < thresholds.CLARIFICATION
+  ) {
+    logger.info(
+      {
+        requestId,
+        classifiedIntent: classifiedIntent.intent,
+        confidence: classifiedIntent.confidence,
+        threshold: thresholds.CLARIFICATION,
+      },
+      'Chat: Low confidence — returning clarification instead of legacy fallback'
+    );
+
+    const clarificationMessage =
+      'Не совсем понял ваш запрос. Уточните, пожалуйста, что именно вы хотите сделать: ' +
+      'изменить структуру курса, переписать содержимое, добавить/удалить элемент или что-то другое?';
+
+    await supabaseAdmin.from('course_chat_messages').insert({
+      course_id: courseId,
+      conversation_id: convId,
+      role: 'assistant',
+      content: clarificationMessage,
+      chat_type: chatType,
+      node_context: nodeContext || null,
+      intent: 'refine',
+      model_used: 'intent_classifier',
+      input_tokens: 200,
+      output_tokens: 30,
+    });
+
+    return {
+      conversationId: convId,
+      assistantMessage: clarificationMessage,
+      intent: 'refine' as const,
+      modelUsed: 'intent_classifier',
+      inputTokens: 200,
+      outputTokens: 30,
+    };
+  }
+
+  // Fallback: UNKNOWN intent - return null to use legacy flow
   logger.info(
     {
       requestId,
       classifiedIntent: classifiedIntent.intent,
       confidence: classifiedIntent.confidence,
     },
-    'Chat: Low confidence or UNKNOWN, falling back to legacy flow'
+    'Chat: UNKNOWN intent, falling back to legacy flow'
   );
 
   return null;

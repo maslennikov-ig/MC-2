@@ -5,7 +5,11 @@
  * and flat course_nodes table rows, with feature flags for gradual rollout.
  */
 
-export { isDualWriteEnabled, isReadFromNodesEnabled } from './feature-flags.js';
+export {
+  isDualWriteEnabled,
+  isReadFromNodesEnabled,
+  isStableIdsRequired,
+} from './feature-flags.js';
 export { generateInitialOrderKeys, generateOrderKeyBetween } from './order-keys.js';
 export { nestedJsonToCourseNodes, courseNodesToNestedJson } from './converters.js';
 export { checkStructureParity } from './parity-checker.js';

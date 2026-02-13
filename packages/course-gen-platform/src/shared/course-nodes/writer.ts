@@ -14,7 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, CourseStructure } from '@megacampus/shared-types';
 import type { Logger } from 'pino';
 import { nestedJsonToCourseNodes, courseNodesToNestedJson } from './converters.js';
-import { isDualWriteEnabled } from './feature-flags.js';
+import { isDualWriteEnabled, isStableIdsRequired } from './feature-flags.js';
 import { checkStructureParity } from './parity-checker.js';
 import type { CourseNodeRow } from './types.js';
 
@@ -42,6 +42,19 @@ export async function writeCourseNodes(
   if (!isDualWriteEnabled()) return;
 
   const startTime = Date.now();
+
+  // Guard: when COURSE_STABLE_IDS_REQUIRED=true, reject structures without IDs (plan:433)
+  if (isStableIdsRequired()) {
+    const hasAllIds = structure.sections?.every(
+      s => s.id?.startsWith('sec_') && s.lessons?.every(l => l.id?.startsWith('lsn_'))
+    );
+    if (!hasAllIds) {
+      const err =
+        'course_nodes dual-write: structure missing stable IDs (COURSE_STABLE_IDS_REQUIRED=true)';
+      log.error({ courseId }, err);
+      throw new Error(err);
+    }
+  }
 
   // Convert nested JSON to flat rows
   let nodes;
