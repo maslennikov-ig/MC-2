@@ -57,6 +57,7 @@ import {
   resolveStructure,
   hasResolvedStructure,
 } from '../../../../shared/course-nodes/structure-resolver';
+import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 
 // ============================================================================
 // Rate Limiting Configuration
@@ -560,6 +561,9 @@ async function executeApplyDirectAction(
     } else {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid action' });
     }
+
+    // Guard: block writes without stable IDs when flag is on (plan:433)
+    assertStableIds(result.updatedStructure);
 
     // Save updated structure
     const now = new Date().toISOString();

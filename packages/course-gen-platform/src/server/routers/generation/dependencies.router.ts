@@ -31,6 +31,7 @@ import {
 } from '../../../stages/stage5-generation/utils/course-structure-editor';
 import { resolveStructure } from '../../../shared/course-nodes/structure-resolver';
 import { writeCourseNodes } from '../../../shared/course-nodes/writer';
+import { assertStableIds } from '../../../shared/course-nodes/feature-flags';
 
 export const dependenciesRouter = router({
   /**
@@ -387,6 +388,9 @@ export const dependenciesRouter = router({
             'CascadeUpdate: Returning affected paths for review'
           );
         }
+
+        // Guard: block writes without stable IDs when flag is on (plan:433)
+        assertStableIds(courseStructure);
 
         // Step 6: Update course structure in database
         const { error: updateError } = await supabase

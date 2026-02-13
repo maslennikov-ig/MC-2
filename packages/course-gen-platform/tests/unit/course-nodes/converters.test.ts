@@ -340,22 +340,22 @@ describe('course-nodes/converters', () => {
       expect(result.sections[2].section_number).toBe(3);
     });
 
-    it('assigns lesson_number as section.lesson format', () => {
+    it('assigns lesson_number as section-local integer', () => {
       const structure = createStructureWithIds();
       const nodes = nestedJsonToCourseNodes(TEST_COURSE_ID, structure);
       const rows = nodes.map(toRow);
       const meta = createCourseMeta();
       const result = courseNodesToNestedJson(rows, meta);
 
-      // Section 1 lessons
-      expect(result.sections[0].lessons[0].lesson_number).toBe(1.1);
-      expect(result.sections[0].lessons[1].lesson_number).toBe(1.2);
-      // Section 2 lessons
-      expect(result.sections[1].lessons[0].lesson_number).toBe(2.1);
-      expect(result.sections[1].lessons[1].lesson_number).toBe(2.2);
-      expect(result.sections[1].lessons[2].lesson_number).toBe(2.3);
-      // Section 3 lessons
-      expect(result.sections[2].lessons[0].lesson_number).toBe(3.1);
+      // Section 1 lessons (1, 2)
+      expect(result.sections[0].lessons[0].lesson_number).toBe(1);
+      expect(result.sections[0].lessons[1].lesson_number).toBe(2);
+      // Section 2 lessons (1, 2, 3)
+      expect(result.sections[1].lessons[0].lesson_number).toBe(1);
+      expect(result.sections[1].lessons[1].lesson_number).toBe(2);
+      expect(result.sections[1].lessons[2].lesson_number).toBe(3);
+      // Section 3 lessons (1)
+      expect(result.sections[2].lessons[0].lesson_number).toBe(1);
     });
 
     it('sorts nodes by order_key even when input is shuffled', () => {

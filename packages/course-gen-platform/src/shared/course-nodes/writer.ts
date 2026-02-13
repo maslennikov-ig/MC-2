@@ -71,12 +71,7 @@ export async function writeCourseNodes(
     return;
   }
 
-  if (nodes.length === 0) {
-    log.debug({ courseId }, 'course_nodes dual-write: no nodes to write (empty structure)');
-    return;
-  }
-
-  // Delete existing nodes for this course
+  // Delete existing nodes for this course (always, even if new structure is empty)
   const { error: deleteError } = await supabase
     .from('course_nodes')
     .delete()
@@ -86,6 +81,14 @@ export async function writeCourseNodes(
     log.warn(
       { courseId, error: deleteError.message },
       'course_nodes dual-write: failed to delete existing nodes'
+    );
+    return;
+  }
+
+  if (nodes.length === 0) {
+    log.debug(
+      { courseId },
+      'course_nodes dual-write: no nodes to write (empty structure), stale rows cleared'
     );
     return;
   }
