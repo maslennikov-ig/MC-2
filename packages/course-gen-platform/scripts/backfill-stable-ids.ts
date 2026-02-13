@@ -171,6 +171,10 @@ async function main(): Promise<void> {
         const updatedStructure = ensureStableIdsInMemory(originalStructure);
         if (JSON.stringify(originalStructure) === JSON.stringify(updatedStructure)) {
           metrics.courses_skipped++;
+          // If this was an error course, the data is already correct (transient error resolved)
+          if (errorIdSet.has(courseId)) {
+            metrics.errors--;
+          }
           continue;
         }
 
