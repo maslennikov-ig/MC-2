@@ -130,6 +130,7 @@ async function main(): Promise<void> {
         const message = err instanceof Error ? err.message : String(err);
         console.error(`  Exception processing course ${course.id}: ${message}`);
         metrics.errors++;
+        errorCourseIds.push(course.id);
       }
     }
 
