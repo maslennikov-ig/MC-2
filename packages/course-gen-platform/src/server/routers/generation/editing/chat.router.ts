@@ -38,7 +38,6 @@ import {
   moveElement as moveStructureElement,
   ensureStableIdsInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
-import type { CourseStructure } from '@megacampus/shared-types';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import {
   applyFieldUpdatesProposal,
