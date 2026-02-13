@@ -183,6 +183,24 @@ describe('validateOperations', () => {
     expect(errors2.some(e => e.message.includes('50%'))).toBe(true);
   });
 
+  it('should count section deletion as section + all its lessons for ratio check', () => {
+    const structure = createSampleStructure();
+    // Total: 2 sections + 4 lessons = 6 elements
+    // Deleting sec_test01 removes 1 section + 2 lessons = 3 elements = 50% (boundary, passes)
+    const ops1: CourseOperation[] = [{ type: 'delete_element', targetId: 'sec_test01' }];
+    const errors1 = validateOperations(ops1, structure);
+    expect(errors1).toHaveLength(0); // 3/6 = 50%, exactly at boundary
+
+    // Deleting both sections removes all 6 elements = 100% > 50%
+    const ops2: CourseOperation[] = [
+      { type: 'delete_element', targetId: 'sec_test01' },
+      { type: 'delete_element', targetId: 'sec_test02' },
+    ];
+    const errors2 = validateOperations(ops2, structure);
+    expect(errors2.length).toBeGreaterThan(0);
+    expect(errors2.some(e => e.message.includes('50%'))).toBe(true);
+  });
+
   it('should fail validation when referencing non-existent ID', () => {
     const structure = createSampleStructure();
     const operations: CourseOperation[] = [{ type: 'delete_element', targetId: 'nonexistent_id' }];
