@@ -310,14 +310,27 @@ export function validateOperations(
     });
   }
 
-  // Check delete ratio: count elements that would be deleted vs total
+  // Check delete ratio: count actual elements that would be removed vs total
+  // Deleting a section also removes all its lessons, so count those too
   if (deleteOps.length > 0) {
     const totalElements = countElements(structure);
-    if (totalElements > 0 && deleteOps.length / totalElements > MAX_DELETE_CONTENT_RATIO) {
+    let affectedElements = 0;
+    for (const op of deleteOps) {
+      if (op.type !== 'delete_element') continue;
+      const element = findElementById(structure, op.targetId, {});
+      if (element?.type === 'section') {
+        // Section deletion removes the section + all its lessons
+        const section = structure.sections[element.sectionIndex];
+        affectedElements += 1 + section.lessons.length;
+      } else {
+        affectedElements += 1;
+      }
+    }
+    if (totalElements > 0 && affectedElements / totalElements > MAX_DELETE_CONTENT_RATIO) {
       errors.push({
         operationIndex: -1,
         operationType: 'batch',
-        message: `Delete operations would remove >${Math.round(MAX_DELETE_CONTENT_RATIO * 100)}% of content (${deleteOps.length} deletes out of ${totalElements} elements)`,
+        message: `Delete operations would remove >${Math.round(MAX_DELETE_CONTENT_RATIO * 100)}% of content (${affectedElements} elements affected out of ${totalElements} total)`,
       });
     }
   }
@@ -436,12 +449,15 @@ function applyAddLesson(
   // Generate real ID
   const realId = `${LESSON_ID_PREFIX}${nanoid(STABLE_ID_LENGTH)}`;
 
-  // Build lesson object
+  // Build lesson object with sensible defaults that satisfy Zod schema minimums
+  // (lesson_objectives >= 1, key_topics >= 2)
   const newLesson: Lesson = {
     id: realId,
     lesson_title: op.title,
-    lesson_objectives: op.objectives ?? [],
-    key_topics: op.keyTopics ?? [],
+    lesson_objectives:
+      op.objectives && op.objectives.length > 0 ? op.objectives : [`Изучить основы: ${op.title}`],
+    key_topics:
+      op.keyTopics && op.keyTopics.length >= 2 ? op.keyTopics : [op.title, `Основы ${op.title}`],
     estimated_duration_minutes: op.estimatedDuration ?? defaultLessonDuration,
   };
 
@@ -478,6 +494,9 @@ function applyAddSection(
   const realId = `${SECTION_ID_PREFIX}${nanoid(STABLE_ID_LENGTH)}`;
 
   // Build section object
+  // Note: lessons=[] intentionally violates Zod min(1) — new sections start
+  // empty and the user adds lessons separately. Schema validation only runs
+  // during Stage 5 initial generation, not during chat-based edits.
   const newSection: Section = {
     id: realId,
     section_title: op.title,
