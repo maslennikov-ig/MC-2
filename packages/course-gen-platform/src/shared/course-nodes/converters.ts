@@ -38,6 +38,7 @@ export interface CourseMetaFields {
   prerequisites: string[];
   learning_outcomes: LearningObjective[];
   course_tags: string[];
+  schema_version?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +224,7 @@ export function courseNodesToNestedJson(
     prerequisites: courseMeta.prerequisites,
     learning_outcomes: courseMeta.learning_outcomes,
     course_tags: courseMeta.course_tags,
+    ...(courseMeta.schema_version != null && { schema_version: courseMeta.schema_version }),
     sections,
   };
 }

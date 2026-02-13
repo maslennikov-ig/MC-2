@@ -12,6 +12,7 @@ import { useNodeDetailsDrawer } from '../hooks/useNodeDetailsDrawer'
 import { NodeDetailsDrawerHeader } from './NodeDetailsDrawer.header'
 import { NodeDetailsDrawerLesson } from './NodeDetailsDrawer.lesson'
 import { StageContent } from './NodeDetailsDrawer.content'
+import { generateContentForNewLessons } from '@/app/actions/lesson-actions'
 
 export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const { portalContainerRef } = useFullscreenContext()
@@ -166,6 +167,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               onRetryProposal={() => void handlers.retryProposal()}
               onRejectProposal={() => handlers.rejectProposal()}
               stage6ContentReady={refinement.stage6ContentReady}
+              onGenerateContent={generateContentForNewLessons}
             />
           ) : (
             <StageContent

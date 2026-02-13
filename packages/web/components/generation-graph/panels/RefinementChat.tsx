@@ -21,7 +21,6 @@ import { QuickActions, type ChatIntent } from './QuickActions'
 import { MarkdownRendererClient } from '@/components/markdown'
 import { Proposal } from '@megacampus/shared-types/chat-types'
 import { type ChatMessage } from '../hooks/useRefinement'
-import { generateContentForNewLessons } from '@/app/actions/lesson-actions'
 
 interface RefinementChatProps {
   courseId: string
@@ -44,6 +43,8 @@ interface RefinementChatProps {
   isGenerating?: boolean
   /** Message to display when chat is blocked due to generation */
   blockedMessage?: string
+  /** Callback to generate content for new lessons (server action passed as prop) */
+  onGenerateContent?: (courseId: string) => Promise<unknown>
 }
 
 // Helper to safely format timestamp
@@ -73,6 +74,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   stage6ContentReady = false,
   isGenerating = false,
   blockedMessage,
+  onGenerateContent,
 }) => {
   const t = useTranslations('generation')
   // Expanded by default (FR-022), with localStorage persistence
@@ -540,7 +542,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                 </p>
                 <Button
                   onClick={() => {
-                    void generateContentForNewLessons(courseId).catch((error: unknown) => {
+                    void onGenerateContent?.(courseId)?.catch?.((error: unknown) => {
                       console.error('Failed to generate content for new lessons:', error)
                     })
                   }}

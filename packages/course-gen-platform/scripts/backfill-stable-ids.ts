@@ -166,7 +166,6 @@ async function main(): Promise<void> {
         const updatedStructure = ensureStableIdsInMemory(originalStructure);
         if (JSON.stringify(originalStructure) === JSON.stringify(updatedStructure)) {
           metrics.courses_skipped++;
-          metrics.errors--; // Was counted as error, now skipped
           continue;
         }
 
@@ -186,7 +185,6 @@ async function main(): Promise<void> {
         }
 
         metrics.courses_updated++;
-        metrics.errors--; // Was counted as error, now succeeded
         console.log(`  Retry: Updated course ${courseId}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
