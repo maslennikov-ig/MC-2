@@ -224,6 +224,26 @@ describe('Scenario 1: generation.chat without explicit intent (auto-classificati
       const result = classifyWithHeuristics('переделай заголовок урока 2');
       expect(result === null || result.intent !== 'FULL_REGENERATE').toBe(true);
     });
+
+    it('should NOT classify "перепиши весь урок" as FULL_REGENERATE (scope + element type)', () => {
+      const result = classifyWithHeuristics('перепиши весь урок');
+      expect(result === null || result.intent !== 'FULL_REGENERATE').toBe(true);
+    });
+
+    it('should NOT classify "regenerate all lessons" as FULL_REGENERATE (scope + element type)', () => {
+      const result = classifyWithHeuristics('regenerate all lessons');
+      expect(result === null || result.intent !== 'FULL_REGENERATE').toBe(true);
+    });
+
+    it('should NOT classify "переделай все секции" as FULL_REGENERATE (scope + element type)', () => {
+      const result = classifyWithHeuristics('переделай все секции');
+      expect(result === null || result.intent !== 'FULL_REGENERATE').toBe(true);
+    });
+
+    it('should NOT classify "redo the whole section" as FULL_REGENERATE (scope + element type)', () => {
+      const result = classifyWithHeuristics('redo the whole section');
+      expect(result === null || result.intent !== 'FULL_REGENERATE').toBe(true);
+    });
   });
 
   describe('Tier 0 heuristics — GET_INFO', () => {
@@ -684,6 +704,31 @@ describe('Scenario 3: structural proposal -> applyProposal atomic apply', () => 
       const errors = validateOperations(ops, structure);
       // Should NOT have error about __new_sec__ not found (tempId cross-reference)
       expect(errors.filter(e => e.message.includes('__new_sec__'))).toHaveLength(0);
+    });
+
+    it('should reject duplicate tempId in batch operations', () => {
+      const ops: CourseOperation[] = [
+        {
+          type: 'add_lesson',
+          reasoning: 'First',
+          tempId: '__dup__',
+          parentSectionId: 'sec_aaaaaaaa',
+          afterLessonId: null,
+          title: 'Lesson A',
+        },
+        {
+          type: 'add_lesson',
+          reasoning: 'Second with same tempId',
+          tempId: '__dup__',
+          parentSectionId: 'sec_aaaaaaaa',
+          afterLessonId: null,
+          title: 'Lesson B',
+        },
+      ];
+
+      const errors = validateOperations(ops, structure);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some(e => e.message.includes('Duplicate tempId'))).toBe(true);
     });
 
     it('should validate operations pass for valid single operation', () => {
