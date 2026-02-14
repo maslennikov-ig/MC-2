@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.15] - 2026-02-14
+
+### Added
+
+- **course-gen-platform**: replace section-by-section with single-call lesson generation (1fc3eb1d)
+
+### Fixed
+
+- **course-gen-platform**: refactor chat editing system + code review fixes (52de40d6)
+- **course-gen-platform**: fix chat config duplicates + Phase 0.5 Zod validation + auto-mute rules (5e5d1950)
+
+### Other
+
+- bd daemon export: 2026-02-14 22:06:55 (4f0ac1e9)
+- bd daemon export: 2026-02-14 21:37:39 (a8c57b33)
+- bd daemon export: 2026-02-14 21:37:34 (99418aa9)
+- bd daemon export: 2026-02-14 20:50:10 (17584cef)
+- bd daemon export: 2026-02-14 20:50:09 (63945abd)
+- bd daemon export: 2026-02-14 20:42:41 (077647d3)
+- bd daemon export: 2026-02-14 20:42:36 (b98a47a5)
+- bd daemon export: 2026-02-14 20:42:35 (d78abdac)
+- bd daemon export: 2026-02-14 20:32:25 (443fa13a)
+- bd daemon export: 2026-02-14 20:32:24 (33532dda)
+- bd daemon export: 2026-02-14 20:32:23 (9e3bbaaa)
+- bd daemon export: 2026-02-14 20:23:02 (cd543475)
+- bd daemon export: 2026-02-14 20:23:00 (01ec7943)
+- bd daemon export: 2026-02-14 20:22:46 (f32305e6)
+
 ## [0.29.14] - 2026-02-14
 
 ### Fixed

@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.29.15
+
+_Released on 2026-02-14_
+
+### ✨ New Features
+
+- **course-gen-platform**: Replace section-by-section with single-call lesson generation
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Refactor chat editing system + code review fixes
+- **course-gen-platform**: Fix chat config duplicates + Phase 0.5 Zod validation + auto-mute rules
+
+---
+
+_This release was automatically generated from 17 commits._
+
 ## v0.29.14
 
 _Released on 2026-02-14_
