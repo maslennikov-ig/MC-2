@@ -165,18 +165,15 @@ describe('Scenario 1: generation.chat without explicit intent (auto-classificati
     });
   });
 
-  describe('Tier 0 heuristics — UPDATE_FIELD', () => {
-    it('should classify "Измени название курса на Z" as UPDATE_FIELD', () => {
+  describe('Tier 0 heuristics — UPDATE_FIELD (deferred to Tier 1)', () => {
+    it('should NOT classify UPDATE_FIELD at Tier 0 (needs fieldName+newValue from LLM)', () => {
       const result = classifyWithHeuristics('Измени название курса на "Advanced Python"');
-      expect(result).not.toBeNull();
-      expect(result!.intent).toBe('UPDATE_FIELD');
-      expect(result!.confidence).toBe(0.9);
+      expect(result).toBeNull();
     });
 
-    it('should classify "rename title course" as UPDATE_FIELD', () => {
+    it('should NOT classify "rename title course" at Tier 0', () => {
       const result = classifyWithHeuristics('rename title course to something');
-      expect(result).not.toBeNull();
-      expect(result!.intent).toBe('UPDATE_FIELD');
+      expect(result).toBeNull();
     });
   });
 
@@ -223,12 +220,10 @@ describe('Scenario 1: generation.chat without explicit intent (auto-classificati
     });
   });
 
-  describe('Tier 0 heuristics — MOVE_ELEMENT', () => {
-    it('should classify "Перемести урок 3 в секцию 2" as MOVE_ELEMENT', () => {
+  describe('Tier 0 heuristics — MOVE_ELEMENT (deferred to Tier 1)', () => {
+    it('should NOT classify MOVE_ELEMENT at Tier 0 (needs destination from LLM)', () => {
       const result = classifyWithHeuristics('Перемести урок 3 в секцию 2');
-      expect(result).not.toBeNull();
-      expect(result!.intent).toBe('MOVE_ELEMENT');
-      expect(result!.confidence).toBe(0.85);
+      expect(result).toBeNull();
     });
   });
 
