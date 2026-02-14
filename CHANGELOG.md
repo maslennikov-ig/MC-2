@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.13] - 2026-02-14
+
+### Fixed
+
+- **course-gen-platform**: update 15 source file(s), update docs (1676f109)
+
 ## [0.29.12] - 2026-02-14
 
 ### Added
