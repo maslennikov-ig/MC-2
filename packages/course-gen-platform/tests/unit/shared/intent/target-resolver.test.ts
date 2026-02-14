@@ -637,4 +637,89 @@ describe('resolveTargetPathWithMatches', () => {
       expect(matches[0].elementType).toBe('section');
     });
   });
+
+  describe('positional references (first/last)', () => {
+    it('should resolve "Удали последнюю секцию" to last section', () => {
+      const matches = resolveTargetPathWithMatches(
+        'Удали последнюю секцию',
+        undefined,
+        courseStructure
+      );
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0].path).toBe('sections[1]');
+      expect(matches[0].title).toBe('Advanced React');
+      expect(matches[0].confidence).toBe(1.0);
+      expect(matches[0].elementType).toBe('section');
+    });
+
+    it('should resolve "remove last section" to last section', () => {
+      const matches = resolveTargetPathWithMatches(
+        'remove last section',
+        undefined,
+        courseStructure
+      );
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0].path).toBe('sections[1]');
+    });
+
+    it('should resolve "Удали первую секцию" to first section', () => {
+      const matches = resolveTargetPathWithMatches(
+        'Удали первую секцию',
+        undefined,
+        courseStructure
+      );
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0].path).toBe('sections[0]');
+      expect(matches[0].title).toBe('React Fundamentals');
+    });
+
+    it('should resolve "delete first lesson" to first lesson', () => {
+      const matches = resolveTargetPathWithMatches(
+        'delete first lesson',
+        undefined,
+        courseStructure
+      );
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0].path).toBe('sections[0].lessons[0]');
+      expect(matches[0].elementType).toBe('lesson');
+    });
+
+    it('should resolve "удали последний урок" to last lesson of last section', () => {
+      const matches = resolveTargetPathWithMatches(
+        'удали последний урок',
+        undefined,
+        courseStructure
+      );
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0].path).toBe('sections[1].lessons[2]');
+      expect(matches[0].title).toBe('React Testing');
+    });
+  });
+});
+
+describe('resolveTargetPath — positional references', () => {
+  const courseStructure = createTestCourseWithSimilarLessons();
+
+  it('should resolve "Удали последнюю секцию" to last section path', () => {
+    const path = resolveTargetPath('Удали последнюю секцию', undefined, courseStructure);
+
+    expect(path).toBe('sections[1]');
+  });
+
+  it('should resolve "remove first section" to first section path', () => {
+    const path = resolveTargetPath('remove first section', undefined, courseStructure);
+
+    expect(path).toBe('sections[0]');
+  });
+
+  it('should resolve "последний урок" to last lesson of last section', () => {
+    const path = resolveTargetPath('удали последний урок', undefined, courseStructure);
+
+    expect(path).toBe('sections[1].lessons[2]');
+  });
 });
