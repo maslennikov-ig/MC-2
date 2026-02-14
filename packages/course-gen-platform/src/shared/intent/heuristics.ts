@@ -33,9 +33,12 @@ interface HeuristicRule {
  */
 const HEURISTIC_RULES: HeuristicRule[] = [
   // --- FULL_REGENERATE ---
+  // Only match phrases that clearly indicate regenerating the WHOLE course.
+  // Bare "regenerate" / "перегенерируй" without scope modifiers must fall through
+  // to Tier 1 LLM to distinguish "regenerate everything" from "regenerate this field".
   {
     pattern:
-      /(?:полностью\s+)?(?:перегенерир|переделай|перепиши\s+(?:весь|всё|все)|сгенерируй\s+заново|regenerate|redo\s+(?:the\s+)?(?:whole|entire)|start\s+over)/i,
+      /(?:полностью\s+(?:перегенерир[а-яё]*|переделай)|(?:перегенерир[а-яё]*|переделай)\s+(?:весь|всю|всё|все|целиком)(?:\s|$)|(?:перегенерир[а-яё]*|переделай)\s+курс|перепиши\s+(?:весь|всё|все)|сгенерируй\s+заново|regenerate\s+(?:the\s+)?(?:whole|entire|full|everything|all|course)(?:\s|$)|redo\s+(?:the\s+)?(?:whole|entire)|start\s+over)/i,
     intent: 'FULL_REGENERATE',
     confidence: 0.95,
   },

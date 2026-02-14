@@ -196,6 +196,34 @@ describe('Scenario 1: generation.chat without explicit intent (auto-classificati
       expect(result).not.toBeNull();
       expect(result!.intent).toBe('FULL_REGENERATE');
     });
+
+    it('should classify "перегенерируй курс" as FULL_REGENERATE', () => {
+      const result = classifyWithHeuristics('перегенерируй курс');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('FULL_REGENERATE');
+    });
+
+    it('should classify "regenerate everything" as FULL_REGENERATE', () => {
+      const result = classifyWithHeuristics('regenerate everything');
+      expect(result).not.toBeNull();
+      expect(result!.intent).toBe('FULL_REGENERATE');
+    });
+
+    it('should NOT classify bare "regenerate typo in lesson 1" as FULL_REGENERATE', () => {
+      const result = classifyWithHeuristics('Regenerate typo in lesson 1');
+      // Should fall through to Tier 1 LLM, not trigger full regeneration
+      expect(result === null || result.intent !== 'FULL_REGENERATE').toBe(true);
+    });
+
+    it('should NOT classify "Перегенерируй опечатку в уроке 1" as FULL_REGENERATE', () => {
+      const result = classifyWithHeuristics('Перегенерируй опечатку в уроке 1');
+      expect(result === null || result.intent !== 'FULL_REGENERATE').toBe(true);
+    });
+
+    it('should NOT classify "переделай заголовок" as FULL_REGENERATE', () => {
+      const result = classifyWithHeuristics('переделай заголовок урока 2');
+      expect(result === null || result.intent !== 'FULL_REGENERATE').toBe(true);
+    });
   });
 
   describe('Tier 0 heuristics — GET_INFO', () => {
@@ -704,10 +732,10 @@ describe('Scenario 3: structural proposal -> applyProposal atomic apply', () => 
       // Check lesson has the real ID
       expect(section.lessons[1].id).toBe(result.tempIdMap['__new_1__']);
 
-      // Check renumbering
-      expect(section.lessons[0].lesson_number).toBe(1);
-      expect(section.lessons[1].lesson_number).toBe(2);
-      expect(section.lessons[2].lesson_number).toBe(3);
+      // Check renumbering (dotted format matching legacy editor: section.lesson)
+      expect(section.lessons[0].lesson_number).toBe(1.1);
+      expect(section.lessons[1].lesson_number).toBe(1.2);
+      expect(section.lessons[2].lesson_number).toBe(1.3);
     });
 
     it('should add section and insert at correct position', () => {
@@ -744,7 +772,7 @@ describe('Scenario 3: structural proposal -> applyProposal atomic apply', () => 
 
       expect(section.lessons).toHaveLength(1);
       expect(section.lessons[0].lesson_title).toBe('Lesson 1.2');
-      expect(section.lessons[0].lesson_number).toBe(1);
+      expect(section.lessons[0].lesson_number).toBe(1.1);
     });
   });
 
@@ -1013,9 +1041,9 @@ describe('Scenario 4: add lesson + Stage 6 CTA condition', () => {
     const section = result.updatedStructure.sections[0];
 
     expect(section.lessons).toHaveLength(3);
-    expect(section.lessons[0].lesson_number).toBe(1);
-    expect(section.lessons[1].lesson_number).toBe(2);
-    expect(section.lessons[2].lesson_number).toBe(3);
+    expect(section.lessons[0].lesson_number).toBe(1.1);
+    expect(section.lessons[1].lesson_number).toBe(1.2);
+    expect(section.lessons[2].lesson_number).toBe(1.3);
     expect(section.lessons[0].lesson_title).toBe('New First Lesson');
   });
 
