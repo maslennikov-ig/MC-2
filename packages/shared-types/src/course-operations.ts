@@ -30,13 +30,13 @@ export const addLessonOperationSchema = z.object({
   /** Insert after this lesson ID, or null for first position */
   afterLessonId: z.string().nullable(),
   /** Lesson title */
-  title: z.string(),
+  title: z.string().min(5).max(500),
   /** Learning objectives for the new lesson */
-  objectives: z.array(z.string()).optional(),
+  objectives: z.array(z.string().min(10).max(600)).max(20).optional(),
   /** Key topics for the new lesson */
-  keyTopics: z.array(z.string()).optional(),
+  keyTopics: z.array(z.string().min(5).max(300)).max(30).optional(),
   /** Estimated duration in minutes */
-  estimatedDuration: z.number().int().min(3).max(45).optional(),
+  estimatedDuration: z.number().int().min(3).max(600).optional(),
 });
 
 /**
@@ -51,9 +51,9 @@ export const addSectionOperationSchema = z.object({
   /** Insert after this section ID, or null for first position */
   afterSectionId: z.string().nullable(),
   /** Section title */
-  title: z.string(),
+  title: z.string().min(10).max(600),
   /** Section description */
-  description: z.string().optional(),
+  description: z.string().max(2000).optional(),
 });
 
 /**

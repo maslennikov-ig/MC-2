@@ -253,6 +253,17 @@ describe('handleDirectIntent - DELETE_SECTION', () => {
 // ============================================================================
 
 describe('handleDirectIntent - MOVE_ELEMENT', () => {
+  it('should require clarification when moving a section to a lesson destination', () => {
+    const structure = createSampleStructure();
+    const intent = createIntent('MOVE_ELEMENT', 'секция 1', 'sections[0]', 'урок 2.1');
+
+    const result = handleDirectIntent(intent, structure);
+
+    expect(result.requiresClarification).toBe(true);
+    expect(result.message).toContain('Секцию можно перемещать только');
+    expect(result.proposal).toBeUndefined();
+  });
+
   it('should require clarification when destination is not precisely specified', () => {
     const structure = createSampleStructure();
     const intent = createIntent(
@@ -338,6 +349,25 @@ describe('handleDirectIntent - MOVE_ELEMENT', () => {
 // ============================================================================
 
 describe('handleDirectIntent - UPDATE_FIELD', () => {
+  it('should handle UPDATE_FIELD without resolving a target element', () => {
+    const structure = createSampleStructure();
+    const intent = createIntent('UPDATE_FIELD');
+    intent.fieldName = 'course_title';
+    intent.newValue = 'Updated Course Title';
+
+    const result = handleDirectIntent(intent, structure);
+
+    expect(result.requiresClarification).toBeUndefined();
+    expect(result.proposal).toBeDefined();
+    if (result.proposal?.type === 'field_updates') {
+      expect(result.proposal.stageId).toBe('stage_5');
+      expect(result.proposal.updates[0]).toMatchObject({
+        path: 'course_title',
+        newValue: 'Updated Course Title',
+      });
+    }
+  });
+
   it('should return field_updates proposal when fieldName and newValue are present', () => {
     const structure = createSampleStructure();
     const intent = createIntent('UPDATE_FIELD', 'урок 1', 'sections[0].lessons[0]');
@@ -348,7 +378,7 @@ describe('handleDirectIntent - UPDATE_FIELD', () => {
     const result = handleDirectIntent(intent, structure);
 
     expect(result.message).toContain('Изменить');
-    expect(result.message).toContain('title');
+    expect(result.message).toContain('sections[0].lessons[0].lesson_title');
     expect(result.message).toContain('New Title');
     expect(result.proposal).toBeDefined();
     expect(result.proposal?.type).toBe('field_updates');
@@ -356,10 +386,10 @@ describe('handleDirectIntent - UPDATE_FIELD', () => {
       expect(result.proposal.stageId).toBe('stage_5');
       expect(result.proposal.updates).toHaveLength(1);
       expect(result.proposal.updates[0]).toMatchObject({
-        path: 'title',
+        path: 'sections[0].lessons[0].lesson_title',
         newValue: 'New Title',
       });
-      expect(result.proposal.summary).toContain('title');
+      expect(result.proposal.summary).toContain('sections[0].lessons[0].lesson_title');
     }
   });
 
@@ -388,6 +418,7 @@ describe('handleDirectIntent - UPDATE_FIELD', () => {
     expect(result.proposal).toBeDefined();
     if (result.proposal?.type === 'field_updates') {
       expect(result.proposal.stageId).toBe('stage_5');
+      expect(result.proposal.updates[0].path).toBe('sections[0].lessons[0].lesson_title');
     }
   });
 
@@ -402,8 +433,24 @@ describe('handleDirectIntent - UPDATE_FIELD', () => {
     expect(result.message).toContain('45');
     expect(result.proposal).toBeDefined();
     if (result.proposal?.type === 'field_updates') {
+      expect(result.proposal.updates[0].path).toBe(
+        'sections[0].lessons[0].estimated_duration_minutes'
+      );
       expect(result.proposal.updates[0].newValue).toBe(45);
     }
+  });
+
+  it('should require clarification for element-scoped fields when target is missing', () => {
+    const structure = createSampleStructure();
+    const intent = createIntent('UPDATE_FIELD');
+    intent.fieldName = 'lesson_title';
+    intent.newValue = 'Updated Lesson';
+
+    const result = handleDirectIntent(intent, structure);
+
+    expect(result.requiresClarification).toBe(true);
+    expect(result.message).toContain('Уточните');
+    expect(result.proposal).toBeUndefined();
   });
 
   it('should require clarification when field or value is missing', () => {

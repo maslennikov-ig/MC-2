@@ -24,6 +24,12 @@ import type { CourseStructure, Json } from '@megacampus/shared-types';
 
 const BATCH_SIZE = 50;
 
+interface CourseRow {
+  id: string;
+  course_structure: unknown;
+  updated_at: string | null;
+}
+
 interface Metrics {
   courses_scanned: number;
   courses_updated: number;
@@ -31,6 +37,98 @@ interface Metrics {
   id_conflicts: number;
   errors: number;
   retry_count: number;
+}
+
+async function updateCourseWithOptimisticLock(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  courseId: string,
+  updatedStructure: CourseStructure,
+  expectedUpdatedAt: string | null
+): Promise<{ updated: boolean; errorMessage?: string }> {
+  const updateBaseQuery = supabase
+    .from('courses')
+    .update({
+      course_structure: updatedStructure as unknown as Json,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', courseId);
+
+  const updateQuery =
+    expectedUpdatedAt === null
+      ? updateBaseQuery.is('updated_at', null)
+      : updateBaseQuery.eq('updated_at', expectedUpdatedAt);
+
+  const { data: updateResult, error: updateError } = await updateQuery.select('id');
+
+  if (updateError) {
+    return { updated: false, errorMessage: updateError.message };
+  }
+
+  return { updated: !!updateResult && updateResult.length > 0 };
+}
+
+async function runRetryPass(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  allFailedIds: string[],
+  errorIdSet: Set<string>,
+  metrics: Metrics
+): Promise<void> {
+  if (allFailedIds.length === 0) return;
+
+  console.log('');
+  console.log(
+    `=== Retry pass for ${allFailedIds.length} failed courses (${errorIdSet.size} errors, ${allFailedIds.length - errorIdSet.size} conflicts) ===`
+  );
+
+  for (const courseId of allFailedIds) {
+    metrics.retry_count++;
+
+    try {
+      const { data: course, error: fetchError } = await supabase
+        .from('courses')
+        .select('id, course_structure, updated_at')
+        .eq('id', courseId)
+        .single();
+
+      if (fetchError || !course) {
+        console.error(`  Retry: Failed to fetch course ${courseId}`);
+        continue;
+      }
+
+      const originalStructure = course.course_structure as CourseStructure;
+      if (!originalStructure?.sections) continue;
+
+      const updatedStructure = ensureStableIdsAndSchemaVersionInMemory(originalStructure);
+      if (JSON.stringify(originalStructure) === JSON.stringify(updatedStructure)) {
+        metrics.courses_skipped++;
+        if (errorIdSet.has(courseId)) {
+          metrics.errors--;
+        }
+        continue;
+      }
+
+      const updateResult = await updateCourseWithOptimisticLock(
+        supabase,
+        courseId,
+        updatedStructure,
+        course.updated_at
+      );
+
+      if (!updateResult.updated) {
+        console.error(`  Retry: Still failed for course ${courseId}`);
+        continue;
+      }
+
+      metrics.courses_updated++;
+      if (errorIdSet.has(courseId)) {
+        metrics.errors--;
+      }
+      console.log(`  Retry: Updated course ${courseId}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`  Retry exception for course ${courseId}: ${message}`);
+    }
+  }
 }
 
 async function main(): Promise<void> {
@@ -77,11 +175,11 @@ async function main(): Promise<void> {
 
     console.log(`Processing batch: offset=${offset}, count=${courses.length}`);
 
-    for (const course of courses) {
+    for (const course of courses as CourseRow[]) {
       metrics.courses_scanned++;
 
       try {
-        const originalStructure = course.course_structure as unknown as CourseStructure;
+        const originalStructure = course.course_structure as CourseStructure;
 
         if (!originalStructure || !originalStructure.sections) {
           metrics.courses_skipped++;
@@ -99,26 +197,22 @@ async function main(): Promise<void> {
           continue;
         }
 
-        // Update with optimistic concurrency: only succeed if updated_at has not changed
-        const { data: updateResult, error: updateError } = await supabase
-          .from('courses')
-          .update({
-            course_structure: updatedStructure as unknown as Json,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', course.id)
-          .eq('updated_at', course.updated_at ?? '')
-          .select('id');
+        const updateResult = await updateCourseWithOptimisticLock(
+          supabase,
+          course.id,
+          updatedStructure,
+          course.updated_at
+        );
 
-        if (updateError) {
-          console.error(`  Error updating course ${course.id}:`, updateError.message);
+        if (updateResult.errorMessage) {
+          console.error(`  Error updating course ${course.id}:`, updateResult.errorMessage);
           metrics.errors++;
           errorCourseIds.push(course.id);
           continue;
         }
 
         // Check if the update actually affected a row (optimistic concurrency)
-        if (!updateResult || updateResult.length === 0) {
+        if (!updateResult.updated) {
           console.log(`  Conflict on course ${course.id} (updated_at changed). Skipping.`);
           metrics.id_conflicts++;
           conflictCourseIds.push(course.id);
@@ -146,66 +240,7 @@ async function main(): Promise<void> {
   // Retry pass for failed/conflicted courses (plan:132)
   const allFailedIds = [...errorCourseIds, ...conflictCourseIds];
   const errorIdSet = new Set(errorCourseIds);
-  if (allFailedIds.length > 0) {
-    console.log('');
-    console.log(
-      `=== Retry pass for ${allFailedIds.length} failed courses (${errorCourseIds.length} errors, ${conflictCourseIds.length} conflicts) ===`
-    );
-
-    for (const courseId of allFailedIds) {
-      metrics.retry_count++;
-
-      try {
-        const { data: course, error: fetchError } = await supabase
-          .from('courses')
-          .select('id, course_structure, updated_at')
-          .eq('id', courseId)
-          .single();
-
-        if (fetchError || !course) {
-          console.error(`  Retry: Failed to fetch course ${courseId}`);
-          continue;
-        }
-
-        const originalStructure = course.course_structure as unknown as CourseStructure;
-        if (!originalStructure?.sections) continue;
-
-        const updatedStructure = ensureStableIdsAndSchemaVersionInMemory(originalStructure);
-        if (JSON.stringify(originalStructure) === JSON.stringify(updatedStructure)) {
-          metrics.courses_skipped++;
-          // If this was an error course, the data is already correct (transient error resolved)
-          if (errorIdSet.has(courseId)) {
-            metrics.errors--;
-          }
-          continue;
-        }
-
-        const { data: updateResult, error: updateError } = await supabase
-          .from('courses')
-          .update({
-            course_structure: updatedStructure as unknown as Json,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', courseId)
-          .eq('updated_at', course.updated_at ?? '')
-          .select('id');
-
-        if (updateError || !updateResult || updateResult.length === 0) {
-          console.error(`  Retry: Still failed for course ${courseId}`);
-          continue;
-        }
-
-        metrics.courses_updated++;
-        if (errorIdSet.has(courseId)) {
-          metrics.errors--;
-        }
-        console.log(`  Retry: Updated course ${courseId}`);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`  Retry exception for course ${courseId}: ${message}`);
-      }
-    }
-  }
+  await runRetryPass(supabase, allFailedIds, errorIdSet, metrics);
 
   // Print summary
   console.log('');

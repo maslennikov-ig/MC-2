@@ -14,13 +14,12 @@
 
 import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
 import type { CourseOperation } from '@megacampus/shared-types/course-operations';
-import {
-  MAX_OPERATIONS_PER_BATCH,
-  MAX_DELETES_PER_BATCH,
-  MAX_DELETE_CONTENT_RATIO,
-} from '@megacampus/shared-types/course-operations';
 import { nanoid } from 'nanoid';
 import { logger } from '../../../../shared/logger/index.js';
+import {
+  validateOperations as validateOperationsImpl,
+  type PreflightError,
+} from './surgical-preflight';
 
 // ============================================================================
 // Constants
@@ -46,12 +45,7 @@ export interface SurgicalResult {
   operationSummary: string[];
 }
 
-/** Validation error from pre-flight check */
-export interface PreflightError {
-  operationIndex: number;
-  operationType: string;
-  message: string;
-}
+export type { PreflightError } from './surgical-preflight';
 
 // ============================================================================
 // Internal Lookup Types
@@ -156,8 +150,27 @@ function findElementById(
 function deepClone<T>(value: T): T {
   try {
     return structuredClone(value);
-  } catch {
-    return JSON.parse(JSON.stringify(value)) as T;
+  } catch (structuredCloneError) {
+    logger.warn(
+      {
+        error:
+          structuredCloneError instanceof Error
+            ? structuredCloneError.message
+            : String(structuredCloneError),
+      },
+      'structuredClone failed, trying JSON fallback'
+    );
+    try {
+      return JSON.parse(JSON.stringify(value)) as T;
+    } catch (jsonError) {
+      logger.error(
+        {
+          error: jsonError instanceof Error ? jsonError.message : String(jsonError),
+        },
+        'Both structuredClone and JSON fallback failed'
+      );
+      throw new Error('Cannot clone course structure: data contains non-serializable values');
+    }
   }
 }
 
@@ -245,226 +258,11 @@ function recalculateAllDurations(structure: CourseStructure): void {
   structure.estimated_duration_hours = recalculateCourseDuration(structure);
 }
 
-// ============================================================================
-// Internal Helpers — ID Existence Check (for validation)
-// ============================================================================
-
-/**
- * Check whether a given ID exists in the structure.
- * Only checks real IDs — tempIds are not checked here (they are validated
- * by ensuring they reference an earlier add operation in the batch).
- */
-function idExistsInStructure(structure: CourseStructure, id: string): boolean {
-  return findElementById(structure, id, {}) !== null;
-}
-
-/**
- * Count total content elements (sections + lessons) in the structure.
- */
-function countElements(structure: CourseStructure): number {
-  let count = structure.sections.length;
-  for (const section of structure.sections) {
-    count += section.lessons.length;
-  }
-  return count;
-}
-
-// ============================================================================
-// Pre-flight Validation
-// ============================================================================
-
-/**
- * Pre-flight validation for a batch of operations.
- *
- * Checks:
- * - Max 15 operations per batch
- * - Max 3 delete operations per batch
- * - Delete operations don't remove >50% of content
- * - All referenced IDs exist in the structure (or are tempIds from earlier ops)
- * - Move targets are valid (no section-as-lesson or lesson-as-section)
- *
- * @param operations - Array of course operations to validate
- * @param structure - Current course structure to validate against
- * @returns List of errors (empty array means valid)
- */
 export function validateOperations(
   operations: CourseOperation[],
   structure: CourseStructure
 ): PreflightError[] {
-  const errors: PreflightError[] = [];
-
-  // --- Batch-level constraints ---
-
-  if (operations.length > MAX_OPERATIONS_PER_BATCH) {
-    errors.push({
-      operationIndex: -1,
-      operationType: 'batch',
-      message: `Batch exceeds maximum of ${MAX_OPERATIONS_PER_BATCH} operations (got ${operations.length})`,
-    });
-  }
-
-  const deleteOps = operations.filter(op => op.type === 'delete_element');
-  if (deleteOps.length > MAX_DELETES_PER_BATCH) {
-    errors.push({
-      operationIndex: -1,
-      operationType: 'batch',
-      message: `Batch exceeds maximum of ${MAX_DELETES_PER_BATCH} delete operations (got ${deleteOps.length})`,
-    });
-  }
-
-  // Check delete ratio: count actual elements that would be removed vs total
-  // Deleting a section also removes all its lessons, so count those too
-  if (deleteOps.length > 0) {
-    const totalElements = countElements(structure);
-    let affectedElements = 0;
-    for (const op of deleteOps) {
-      if (op.type !== 'delete_element') continue;
-      const element = findElementById(structure, op.targetId, {});
-      if (element?.type === 'section') {
-        // Section deletion removes the section + all its lessons
-        const section = structure.sections[element.sectionIndex];
-        affectedElements += 1 + section.lessons.length;
-      } else {
-        affectedElements += 1;
-      }
-    }
-    if (totalElements > 0 && affectedElements / totalElements > MAX_DELETE_CONTENT_RATIO) {
-      errors.push({
-        operationIndex: -1,
-        operationType: 'batch',
-        message: `Delete operations would remove >${Math.round(MAX_DELETE_CONTENT_RATIO * 100)}% of content (${affectedElements} elements affected out of ${totalElements} total)`,
-      });
-    }
-  }
-
-  // --- Per-operation validation ---
-  // Track tempIds introduced by earlier add operations so later ops can reference them
-  const knownTempIds = new Set<string>();
-
-  for (let i = 0; i < operations.length; i++) {
-    const op = operations[i];
-    const addError = (message: string) => {
-      errors.push({ operationIndex: i, operationType: op.type, message });
-    };
-
-    /**
-     * Check that an ID exists in the structure or was introduced by an
-     * earlier add operation in this batch.
-     */
-    const requireId = (id: string, fieldName: string) => {
-      if (!idExistsInStructure(structure, id) && !knownTempIds.has(id)) {
-        addError(`${fieldName} "${id}" not found in course structure`);
-      }
-    };
-
-    /**
-     * Check an optional/nullable ID (skip null/undefined).
-     */
-    const requireOptionalId = (id: string | null | undefined, fieldName: string) => {
-      if (id !== null && id !== undefined) {
-        requireId(id, fieldName);
-      }
-    };
-
-    switch (op.type) {
-      case 'add_lesson': {
-        requireId(op.parentSectionId, 'parentSectionId');
-        requireOptionalId(op.afterLessonId, 'afterLessonId');
-        if (knownTempIds.has(op.tempId)) {
-          addError(
-            `Duplicate tempId "${op.tempId}" — each add operation must have a unique tempId`
-          );
-        }
-        knownTempIds.add(op.tempId);
-        break;
-      }
-
-      case 'add_section': {
-        requireOptionalId(op.afterSectionId, 'afterSectionId');
-        if (knownTempIds.has(op.tempId)) {
-          addError(
-            `Duplicate tempId "${op.tempId}" — each add operation must have a unique tempId`
-          );
-        }
-        knownTempIds.add(op.tempId);
-        break;
-      }
-
-      case 'update_field': {
-        requireId(op.targetId, 'targetId');
-        break;
-      }
-
-      case 'delete_element': {
-        requireId(op.targetId, 'targetId');
-        break;
-      }
-
-      case 'move_element': {
-        requireId(op.targetId, 'targetId');
-        requireOptionalId(op.newParentId, 'newParentId');
-        requireOptionalId(op.afterId, 'afterId');
-
-        // Preflight structural checks (beyond basic ID existence)
-        const moveTarget = findElementById(structure, op.targetId, {});
-        if (!moveTarget && !knownTempIds.has(op.targetId)) {
-          addError(`move_element: targetId "${op.targetId}" not found in structure`);
-        }
-        if (op.newParentId && !knownTempIds.has(op.newParentId)) {
-          const parent = findSectionById(structure, op.newParentId, {});
-          if (!parent) {
-            addError(`move_element: newParentId "${op.newParentId}" is not a valid section`);
-          }
-          // Circular check: can't move a section into itself
-          if (moveTarget?.type === 'section' && op.newParentId === op.targetId) {
-            addError(
-              `move_element: circular relation — cannot move section "${op.targetId}" into itself`
-            );
-          }
-        }
-        if (op.afterId && !knownTempIds.has(op.afterId)) {
-          const afterElement = findElementById(structure, op.afterId, {});
-          if (!afterElement) {
-            addError(`move_element: afterId "${op.afterId}" not found in structure`);
-          } else if (moveTarget) {
-            // Validate type match: moving a lesson requires afterId to be a lesson,
-            // moving a section requires afterId to be a section
-            if (moveTarget.type === 'lesson' && afterElement.type !== 'lesson') {
-              addError(
-                `move_element: afterId "${op.afterId}" is a ${afterElement.type}, expected a lesson (target is a lesson)`
-              );
-            }
-            if (moveTarget.type === 'section' && afterElement.type !== 'section') {
-              addError(
-                `move_element: afterId "${op.afterId}" is a ${afterElement.type}, expected a section (target is a section)`
-              );
-            }
-            // Validate context: when moving a lesson, afterId must be in the target section
-            if (moveTarget.type === 'lesson' && afterElement.type === 'lesson') {
-              const targetParentId =
-                op.newParentId || structure.sections[moveTarget.sectionIndex]?.id;
-              if (targetParentId && !knownTempIds.has(targetParentId)) {
-                const targetParent = findSectionById(structure, targetParentId, {});
-                if (targetParent && afterElement.sectionIndex !== targetParent.sectionIndex) {
-                  addError(
-                    `move_element: afterId "${op.afterId}" is not in the target section "${targetParentId}"`
-                  );
-                }
-              }
-            }
-          }
-        }
-        break;
-      }
-
-      default: {
-        const _exhaustive: never = op;
-        addError(`Unknown operation type: ${(_exhaustive as { type: string }).type}`);
-      }
-    }
-  }
-
-  return errors;
+  return validateOperationsImpl(operations, structure);
 }
 
 // ============================================================================
@@ -536,7 +334,9 @@ function applyAddLesson(
 function applyAddSection(
   structure: CourseStructure,
   op: Extract<CourseOperation, { type: 'add_section' }>,
-  tempIdMap: Record<string, string>
+  tempIdMap: Record<string, string>,
+  defaultLessonDuration: number,
+  insertStarterLesson: boolean
 ): string {
   // Determine insertion index
   let insertIndex: number;
@@ -553,17 +353,27 @@ function applyAddSection(
   // Generate real ID
   const realId = `${SECTION_ID_PREFIX}${nanoid(STABLE_ID_LENGTH)}`;
 
-  // Build section object
-  // Note: lessons=[] intentionally violates Zod min(1) — new sections start
-  // empty and the user adds lessons separately. Schema validation only runs
-  // during Stage 5 initial generation, not during chat-based edits.
+  const normalizedDescription = op.description?.trim() || `Раздел посвящен теме: ${op.title}.`;
+
+  const starterLesson: Lesson | null = insertStarterLesson
+    ? {
+        id: `${LESSON_ID_PREFIX}${nanoid(STABLE_ID_LENGTH)}`,
+        lesson_title: `Введение в ${op.title}`,
+        lesson_objectives: ['Понять ключевые идеи нового раздела'],
+        key_topics: ['Ключевые идеи', 'Практический фокус'],
+        estimated_duration_minutes: defaultLessonDuration,
+      }
+    : null;
+
+  // Build section object. Keep it schema-compatible by providing non-empty
+  // learning objectives and (when needed) a starter lesson.
   const newSection: Section = {
     id: realId,
     section_title: op.title,
-    section_description: op.description ?? '',
-    learning_objectives: [],
-    lessons: [],
-    estimated_duration_minutes: 0,
+    section_description: normalizedDescription,
+    learning_objectives: [`Освоить базовые принципы раздела: ${op.title}`],
+    lessons: starterLesson ? [starterLesson] : [],
+    estimated_duration_minutes: starterLesson ? defaultLessonDuration : 0,
   };
 
   structure.sections.splice(insertIndex, 0, newSection);
@@ -757,6 +567,17 @@ export function applySurgicalOperations(
   const working = deepClone(structure);
   const tempIdMap: Record<string, string> = {};
   const operationSummary: string[] = [];
+  const addedSectionTempIds = new Set(
+    operations.filter(op => op.type === 'add_section').map(op => op.tempId)
+  );
+  const sectionTempIdsWithExplicitLessonAdds = new Set(
+    operations
+      .filter(
+        (op): op is Extract<CourseOperation, { type: 'add_lesson' }> => op.type === 'add_lesson'
+      )
+      .filter(op => addedSectionTempIds.has(op.parentSectionId))
+      .map(op => op.parentSectionId)
+  );
 
   // Apply each operation sequentially
   for (let i = 0; i < operations.length; i++) {
@@ -771,7 +592,13 @@ export function applySurgicalOperations(
           break;
 
         case 'add_section':
-          summary = applyAddSection(working, op, tempIdMap);
+          summary = applyAddSection(
+            working,
+            op,
+            tempIdMap,
+            defaultLessonDuration,
+            !sectionTempIdsWithExplicitLessonAdds.has(op.tempId)
+          );
           break;
 
         case 'update_field':
