@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 50 (no optimization needed)
+ * Current rule count: 52 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -373,6 +373,22 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'expected_behavior',
     description:
       'Content sanity check warning (e.g. NO_HEADINGS) - non-blocking, content still accepted',
+  },
+
+  // === Worker Redis Connection Refused ===
+  {
+    pattern: /Worker error.*ECONNREFUSED|ECONNREFUSED.*6379/i,
+    reason: 'external_service',
+    description:
+      'Worker failed to connect to Redis - transient connection issue during restart, will retry',
+  },
+
+  // === Stage 4 Fallback Initialization ===
+  {
+    pattern: /Worker validation.*Stage 4 not initialized.*initializing as fallback/i,
+    reason: 'graceful_fallback',
+    description:
+      'Stage 4 not initialized when worker started, initializing as fallback - expected during recovery',
   },
 ];
 
