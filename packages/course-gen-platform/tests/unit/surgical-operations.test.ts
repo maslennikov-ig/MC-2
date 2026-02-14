@@ -234,6 +234,19 @@ describe('validateOperations', () => {
 
     expect(errors).toHaveLength(0);
   });
+
+  it('should fail validation when a later operation targets an element deleted earlier in batch', () => {
+    const structure = createSampleStructure();
+    const operations: CourseOperation[] = [
+      { type: 'delete_element', targetId: 'lsn_test01' },
+      { type: 'update_field', targetId: 'lsn_test01', field: 'lesson_title', newValue: 'Renamed' },
+    ];
+
+    const errors = validateOperations(operations, structure);
+
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(e => e.operationIndex === 1 && e.message.includes('not found'))).toBe(true);
+  });
 });
 
 // ============================================================================
@@ -503,6 +516,103 @@ describe('applySurgicalOperations - update_field', () => {
       'Updated via friendly name'
     );
   });
+
+  it('should reject update_field with invalid type (number for string field)', () => {
+    const structure = createSampleStructure();
+    const operations: CourseOperation[] = [
+      {
+        type: 'update_field',
+        targetId: 'lsn_test01',
+        field: 'lesson_title',
+        newValue: 123, // Invalid: should be string
+      },
+    ];
+
+    expect(() => applySurgicalOperations(operations, structure)).toThrow(
+      'Pre-flight validation failed'
+    );
+  });
+
+  it('should reject update_field with value exceeding size limits (title too long)', () => {
+    const structure = createSampleStructure();
+    const operations: CourseOperation[] = [
+      {
+        type: 'update_field',
+        targetId: 'lsn_test01',
+        field: 'lesson_title',
+        newValue: 'x'.repeat(501), // Exceeds max 500 chars
+      },
+    ];
+
+    expect(() => applySurgicalOperations(operations, structure)).toThrow(
+      'Pre-flight validation failed'
+    );
+  });
+
+  it('should reject update_field with invalid array items (objectives too short)', () => {
+    const structure = createSampleStructure();
+    const operations: CourseOperation[] = [
+      {
+        type: 'update_field',
+        targetId: 'lsn_test01',
+        field: 'lesson_objectives',
+        newValue: ['Too short'], // Items must be >= 10 chars
+      },
+    ];
+
+    expect(() => applySurgicalOperations(operations, structure)).toThrow(
+      'Pre-flight validation failed'
+    );
+  });
+
+  it('should reject update_field with invalid difficulty_level value', () => {
+    const structure = createSampleStructure();
+    const operations: CourseOperation[] = [
+      {
+        type: 'update_field',
+        targetId: 'lsn_test01',
+        field: 'difficulty_level',
+        newValue: 'expert', // Not in allowed enum
+      },
+    ];
+
+    expect(() => applySurgicalOperations(operations, structure)).toThrow(
+      'Pre-flight validation failed'
+    );
+  });
+
+  it('should accept valid update_field with proper types and sizes', () => {
+    const structure = createSampleStructure();
+    const operations: CourseOperation[] = [
+      {
+        type: 'update_field',
+        targetId: 'lsn_test01',
+        field: 'lesson_title',
+        newValue: 'Valid Title',
+      },
+      {
+        type: 'update_field',
+        targetId: 'lsn_test01',
+        field: 'estimated_duration_minutes',
+        newValue: 30,
+      },
+      {
+        type: 'update_field',
+        targetId: 'lsn_test01',
+        field: 'lesson_objectives',
+        newValue: ['Learn basic concepts of TypeScript', 'Understand type inference'],
+      },
+    ];
+
+    const result = applySurgicalOperations(operations, structure);
+
+    expect(result.updatedStructure.sections[0].lessons[0].lesson_title).toBe('Valid Title');
+    expect(result.updatedStructure.sections[0].lessons[0].estimated_duration_minutes).toBe(30);
+    expect(result.updatedStructure.sections[0].lessons[0].lesson_objectives).toEqual([
+      'Learn basic concepts of TypeScript',
+      'Understand type inference',
+    ]);
+  });
 });
 
 // ============================================================================
@@ -593,9 +703,9 @@ describe('applySurgicalOperations - renumbering and duration recalculation', () 
 
     const result = applySurgicalOperations(operations, structure);
 
-    expect(result.updatedStructure.sections[0].lessons[0].lesson_number).toBe(1);
-    expect(result.updatedStructure.sections[0].lessons[1].lesson_number).toBe(2);
-    expect(result.updatedStructure.sections[0].lessons[2].lesson_number).toBe(3);
+    expect(result.updatedStructure.sections[0].lessons[0].lesson_number).toBe(1.1);
+    expect(result.updatedStructure.sections[0].lessons[1].lesson_number).toBe(1.2);
+    expect(result.updatedStructure.sections[0].lessons[2].lesson_number).toBe(1.3);
   });
 
   it('should renumber sections after add operation', () => {

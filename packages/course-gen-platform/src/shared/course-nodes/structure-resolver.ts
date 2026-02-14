@@ -4,9 +4,9 @@
  * When COURSE_NODES_READ_ENABLED=true, reads from course_nodes table
  * and reconstructs CourseStructure. Otherwise falls back to JSONB.
  *
- * Course-level metadata (title, description, tags, etc.) is always
- * extracted from the JSONB, since it lives on the `courses` row and
- * not inside course_nodes.
+ * Course-level metadata (title, description, tags, etc.) is primarily
+ * extracted from JSONB; when JSONB is absent but nodes exist, a safe
+ * fallback metadata envelope is synthesized.
  *
  * @module course-nodes/structure-resolver
  */
@@ -17,6 +17,8 @@ import type { CourseNodeRow } from './types';
 import type { CourseMetaFields } from './converters';
 import { courseNodesToNestedJson } from './converters';
 import { isReadFromNodesEnabled } from './feature-flags';
+import { checkStructureParity } from './parity-checker';
+import { logger } from '../logger/index.js';
 
 /**
  * Extract CourseMetaFields from a CourseStructure JSONB.
@@ -37,12 +39,28 @@ function extractCourseMeta(structure: CourseStructure): CourseMetaFields {
   };
 }
 
+function buildFallbackMetaFromNodes(nodes: CourseNodeRow[]): CourseMetaFields {
+  const sectionCount = nodes.filter(node => node.node_type === 'section').length;
+  return {
+    course_title: sectionCount > 0 ? `Курс (${sectionCount} секций)` : 'Курс',
+    course_description: 'Структура курса восстановлена из course_nodes.',
+    course_overview: undefined,
+    target_audience: undefined,
+    estimated_duration_hours: 0,
+    difficulty_level: 'beginner',
+    prerequisites: [],
+    learning_outcomes: [],
+    course_tags: [],
+    schema_version: 2,
+  };
+}
+
 /**
  * Resolve course structure from the active source.
  *
  * - If COURSE_NODES_READ_ENABLED=true AND course_nodes rows exist, reads
  *   sections/lessons from course_nodes and merges with course-level meta
- *   from JSONB.
+ *   from JSONB when available, otherwise uses synthesized fallback meta.
  * - Otherwise, returns the JSONB course_structure as-is.
  *
  * @param courseId            UUID of the course
@@ -62,11 +80,6 @@ export async function resolveStructure(
     return jsonStructure ?? null;
   }
 
-  // Need JSONB for course-level meta even when reading nodes
-  if (!jsonStructure) {
-    return null;
-  }
-
   // Try reading from course_nodes
   const { data: nodes, error } = await supabase
     .from('course_nodes')
@@ -74,24 +87,51 @@ export async function resolveStructure(
     .eq('course_id', courseId);
 
   if (error || !nodes || nodes.length === 0) {
-    // Graceful fallback: no nodes yet → use JSONB
-    return jsonStructure;
+    // Graceful fallback: no nodes yet → use JSONB if present
+    return jsonStructure ?? null;
   }
 
-  const meta = extractCourseMeta(jsonStructure);
-  return courseNodesToNestedJson(nodes as CourseNodeRow[], meta);
+  const meta = jsonStructure ? extractCourseMeta(jsonStructure) : buildFallbackMetaFromNodes(nodes);
+  const reconstructed = courseNodesToNestedJson(nodes as CourseNodeRow[], meta);
+
+  if (jsonStructure) {
+    const parity = checkStructureParity(jsonStructure, reconstructed);
+    if (!parity.isEqual) {
+      logger.warn(
+        {
+          courseId,
+          differenceCount: parity.differences.length,
+          differences: parity.differences.slice(0, 5),
+          sectionCount: parity.sectionCount,
+          lessonCount: parity.lessonCount,
+        },
+        'course_nodes read parity mismatch, falling back to JSONB course_structure'
+      );
+      return jsonStructure;
+    }
+  } else {
+    logger.warn(
+      {
+        courseId,
+        nodeCount: nodes.length,
+      },
+      'course_nodes read path used without JSONB fallback metadata'
+    );
+  }
+
+  return reconstructed;
 }
 
 /**
  * Check whether a resolved course structure is available.
  *
- * Lightweight sync check — does NOT query DB. Just verifies that JSONB
- * exists (which is always needed, even when nodes are the primary source,
- * because course-level meta comes from JSONB).
+ * Lightweight sync check — does NOT query DB. When read-from-nodes is
+ * enabled, this returns true even if JSONB is absent because structure
+ * may still be recoverable from course_nodes.
  *
  * @param courseStructureJson The JSONB column value
  * @returns true if course_structure data is available
  */
 export function hasResolvedStructure(courseStructureJson: unknown): boolean {
-  return courseStructureJson != null;
+  return courseStructureJson != null || isReadFromNodesEnabled();
 }

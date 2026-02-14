@@ -32,13 +32,10 @@ import {
   chatRequestSchema,
   proposalSchema,
   type ChatResponse,
+  type StructuralOperationProposal,
 } from '@megacampus/shared-types/chat-types';
-import {
-  deleteElement as deleteStructureElement,
-  moveElement as moveStructureElement,
-  ensureStableIdsAndSchemaVersionInMemory,
-  ensureStableIdsInMemory,
-} from '../../../../stages/stage5-generation/utils/course-structure-editor';
+import type { CourseStructure } from '@megacampus/shared-types';
+import { ensureStableIdsInMemory } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import {
   applyFieldUpdatesProposal,
@@ -53,12 +50,8 @@ import {
   executeLegacyLLMFlow,
 } from './chat-mutation-helpers';
 import { executeIntentClassificationFlow, executeFullRegenerate } from './chat-intent-flow';
-import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
-import {
-  resolveStructure,
-  hasResolvedStructure,
-} from '../../../../shared/course-nodes/structure-resolver';
-import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
+import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
+import { getElementAtPath, isLessonPath } from '../../../../shared/intent';
 
 // ============================================================================
 // Rate Limiting Configuration
@@ -75,6 +68,16 @@ const chatRateLimiter = createRateLimiter({
   requests: 20,
   window: 60, // 1 minute
   keyPrefix: 'chat-rate-limit',
+});
+
+/**
+ * Rate limiter for applyProposal endpoint.
+ * Structural operations are expensive (JSONB + dual-write to course_nodes).
+ */
+const applyProposalRateLimiter = createRateLimiter({
+  requests: 15,
+  window: 60, // 1 minute
+  keyPrefix: 'apply-proposal-rate-limit',
 });
 
 /**
@@ -105,6 +108,10 @@ const INTENT_CONFIDENCE_THRESHOLDS = {
   /** Below this threshold → clarification response instead of legacy fallback (plan:208) */
   CLARIFICATION: 0.6,
 } as const;
+
+function isFeatureFlagEnabled(flagValue: string | undefined): boolean {
+  return flagValue === 'true';
+}
 
 // ============================================================================
 // Fallback Configuration
@@ -180,8 +187,10 @@ export const chatRouter = {
    * - direct_action: Apply structural changes (handled by applyDirectAction)
    *
    * Authorization: Requires course ownership or org admin access.
+   * Rate limited: 15 req/min (structural operations are expensive).
    */
   applyProposal: instructorProcedure
+    .use(applyProposalRateLimiter)
     .input(applyProposalInputSchema)
     .mutation(async ({ ctx, input }) => {
       return executeApplyProposal(ctx, input);
@@ -325,37 +334,42 @@ async function executeChatMutation(
   }
 
   // Auto-intent classification pipeline (Tier 0 regex + Tier 1 LLM)
-  // Enabled by default; disable with CHAT_INTENT_ROUTING_ENABLED=false
-  if (
-    process.env.CHAT_INTENT_ROUTING_ENABLED !== 'false' &&
-    hasResolvedStructure(course.course_structure)
-  ) {
+  // Phased rollout: enabled only when CHAT_INTENT_ROUTING_ENABLED=true
+  if (isFeatureFlagEnabled(process.env.CHAT_INTENT_ROUTING_ENABLED)) {
     // Phase 4: resolve from course_nodes if enabled, fallback to JSONB
     const resolved = await resolveStructure(courseId, course.course_structure, supabaseAdmin);
-    // Inject stable IDs in-memory for legacy structures without IDs
-    const courseStructureWithIds = ensureStableIdsInMemory(resolved!);
 
-    const classificationResult = await executeIntentClassificationFlow({
-      userMessage,
-      courseStructure: courseStructureWithIds,
-      courseLanguage: course.language,
-      courseId,
-      nodeContext,
-      convId,
-      chatType,
-      intent,
-      requestId,
-      supabaseAdmin,
-      userId: userId,
-      fallbackConfig: CHAT_FALLBACK_CONFIG,
-      thresholds: INTENT_CONFIDENCE_THRESHOLDS,
-      generationStatus: course.generation_status,
-    });
+    if (resolved) {
+      // Inject stable IDs in-memory for legacy structures without IDs
+      const courseStructureWithIds = ensureStableIdsInMemory(resolved);
 
-    if (classificationResult) {
-      return classificationResult;
+      const classificationResult = await executeIntentClassificationFlow({
+        userMessage,
+        courseStructure: courseStructureWithIds,
+        courseLanguage: course.language,
+        courseId,
+        nodeContext,
+        convId,
+        chatType,
+        intent,
+        requestId,
+        supabaseAdmin,
+        userId: userId,
+        fallbackConfig: CHAT_FALLBACK_CONFIG,
+        thresholds: INTENT_CONFIDENCE_THRESHOLDS,
+        generationStatus: course.generation_status,
+      });
+
+      if (classificationResult) {
+        return classificationResult;
+      }
+      // Fallback to legacy flow if classification returned null (UNKNOWN/low confidence)
+    } else {
+      logger.info(
+        { requestId, courseId },
+        'Chat: Intent routing skipped because course structure is unavailable'
+      );
     }
-    // Fallback to legacy flow if classification returned null (UNKNOWN/low confidence)
   }
 
   // Legacy LLM flow (fallback for unclassified intents or no course_structure)
@@ -407,7 +421,7 @@ async function executeApplyProposal(
   // Fetch course for authorization and data
   const { data: course, error: courseError } = await supabase
     .from('courses')
-    .select('id, user_id, organization_id, analysis_result, course_structure')
+    .select('id, user_id, organization_id, analysis_result, course_structure, updated_at')
     .eq('id', courseId)
     .single();
 
@@ -461,7 +475,8 @@ async function executeApplyProposal(
           courseId,
           currentStructure,
           proposal,
-          requestId
+          requestId,
+          course.updated_at
         );
       }
 
@@ -489,6 +504,139 @@ async function executeApplyProposal(
 // ============================================================================
 // Apply Direct Action Implementation
 // ============================================================================
+
+function getSectionIndexFromPath(path: string): number | null {
+  const sectionMatch = path.match(/sections\[(\d+)\]/);
+  return sectionMatch ? parseInt(sectionMatch[1], 10) : null;
+}
+
+function buildMoveProposal(
+  structureWithIds: CourseStructure,
+  targetPath: string,
+  destinationPath: string
+): StructuralOperationProposal {
+  const targetElement = getElementAtPath(structureWithIds, targetPath);
+  const targetId = targetElement?.id;
+  if (!targetId) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Target element not found or missing stable ID',
+    });
+  }
+
+  const destinationElement = getElementAtPath(structureWithIds, destinationPath);
+  const destinationId = destinationElement?.id;
+  if (!destinationId) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Destination element not found or missing stable ID',
+    });
+  }
+  if (destinationId === targetId) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Cannot move an element relative to itself',
+    });
+  }
+
+  const targetIsLesson = isLessonPath(targetPath);
+  const destinationIsLesson = isLessonPath(destinationPath);
+
+  if (!targetIsLesson && destinationIsLesson) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Sections can only be moved relative to other sections',
+    });
+  }
+
+  let newParentId: string | undefined;
+  let afterId: string | null = destinationId;
+
+  if (targetIsLesson) {
+    if (!destinationIsLesson) {
+      newParentId = destinationId;
+      const sourceSectionIndex = getSectionIndexFromPath(targetPath);
+      const destinationSectionIndex = getSectionIndexFromPath(destinationPath);
+      if (destinationSectionIndex === null) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot resolve destination section for lesson move',
+        });
+      }
+      const targetSection = structureWithIds.sections[destinationSectionIndex];
+      if (!targetSection) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Destination section not found',
+        });
+      }
+      const lastNonTargetLesson = [...targetSection.lessons]
+        .reverse()
+        .find(lesson => lesson.id !== targetId);
+      afterId = lastNonTargetLesson?.id ?? null;
+
+      if (sourceSectionIndex === destinationSectionIndex && afterId === null) {
+        // Section has only the moved lesson -> moving to section end is a no-op.
+        afterId = null;
+      }
+    } else {
+      const sectionIndex = getSectionIndexFromPath(destinationPath);
+      if (sectionIndex === null) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot resolve destination section for lesson move',
+        });
+      }
+      newParentId = structureWithIds.sections[sectionIndex]?.id;
+      if (!newParentId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Destination section missing stable ID',
+        });
+      }
+    }
+  }
+
+  return {
+    type: 'structural_operation',
+    operations: [{ type: 'move_element', targetId, newParentId, afterId }],
+    summary: `Перемещение элемента ${targetPath}`,
+  };
+}
+
+function buildDirectActionProposal(
+  structureWithIds: CourseStructure,
+  action: 'DELETE' | 'MOVE',
+  targetPath: string,
+  destinationPath?: string
+): StructuralOperationProposal {
+  const targetElement = getElementAtPath(structureWithIds, targetPath);
+  const targetId = targetElement?.id;
+
+  if (!targetId) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Target element not found or missing stable ID',
+    });
+  }
+
+  if (action === 'DELETE') {
+    return {
+      type: 'structural_operation',
+      operations: [{ type: 'delete_element', targetId }],
+      summary: `Удаление элемента ${targetPath}`,
+    };
+  }
+
+  if (!destinationPath) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Destination path required for MOVE action',
+    });
+  }
+
+  return buildMoveProposal(structureWithIds, targetPath, destinationPath);
+}
 
 /**
  * Execute the applyDirectAction mutation.
@@ -519,7 +667,7 @@ async function executeApplyDirectAction(
   // Fetch course
   const { data: course, error: courseError } = await supabase
     .from('courses')
-    .select('id, user_id, organization_id, course_structure')
+    .select('id, user_id, organization_id, course_structure, updated_at')
     .eq('id', courseId)
     .single();
 
@@ -547,56 +695,29 @@ async function executeApplyDirectAction(
   );
 
   try {
-    let result;
+    const structureWithIds = ensureStableIdsInMemory(courseStructure);
+    const proposal = buildDirectActionProposal(
+      structureWithIds,
+      action,
+      targetPath,
+      destinationPath
+    );
 
-    if (action === 'DELETE') {
-      result = deleteStructureElement(courseStructure, targetPath);
-    } else if (action === 'MOVE') {
-      if (!destinationPath) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Destination path required for MOVE action',
-        });
-      }
-      result = moveStructureElement(courseStructure, targetPath, destinationPath);
-    } else {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid action' });
-    }
-
-    const structureToPersist = ensureStableIdsAndSchemaVersionInMemory(result.updatedStructure);
-
-    // Guard: block writes without stable IDs when flag is on (plan:433)
-    assertStableIds(structureToPersist);
-
-    // Save updated structure
-    const now = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from('courses')
-      .update({ course_structure: structureToPersist, updated_at: now })
-      .eq('id', courseId);
-
-    if (updateError) {
-      logger.error(
-        { requestId, courseId, action, error: updateError },
-        'applyDirectAction: Database update failed'
-      );
-      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to apply action' });
-    }
-
-    // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-    await writeCourseNodes(courseId, structureToPersist, supabase, logger).catch(err =>
-      logger.warn(
-        { courseId, error: err instanceof Error ? err.message : String(err) },
-        'course_nodes dual-write failed (non-fatal)'
-      )
+    const result = await applyStructuralOperationProposal(
+      supabase,
+      courseId,
+      structureWithIds,
+      proposal,
+      requestId,
+      course.updated_at
     );
 
     logger.info(
-      { requestId, courseId, action, targetPath, recalculated: result.recalculated },
-      'applyDirectAction: Applied successfully'
+      { requestId, courseId, action, targetPath, appliedUpdates: result.appliedUpdates ?? 0 },
+      'applyDirectAction: Applied successfully via structural_operation'
     );
 
-    return { success: true, recalculated: result.recalculated, updatedAt: now };
+    return { success: true, updatedAt: result.updatedAt };
   } catch (error) {
     if (error instanceof TRPCError) throw error;
 

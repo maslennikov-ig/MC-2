@@ -24,14 +24,16 @@ import {
   CHAT_STAGE6_FALLBACK_MODEL_ID,
 } from '@megacampus/shared-types';
 import type { ChatResponse, Proposal } from '@megacampus/shared-types/chat-types';
-import {
-  STAGE4_EDITABLE_FIELDS,
-  STAGE5_EDITABLE_FIELDS,
-} from '@megacampus/shared-types/regeneration-types';
 import type { Database } from '@megacampus/shared-types';
 import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
-import { buildRefinementPrompt, parseProposalFromLLMResponse } from './chat-helpers';
+import { parseProposalFromLLMResponse } from './chat-helpers';
+import {
+  buildLegacySystemPrompt,
+  buildLLMMessages,
+  resolveProposalContext,
+  type ProposalContext,
+} from './chat-legacy-prompt-helpers';
 
 /**
  * Fallback chat model configuration per stage (used when ModelConfigService unavailable)
@@ -271,14 +273,6 @@ interface ResolvedModelConfig {
   phaseName: string;
 }
 
-/** Resolved proposal context for field update proposals */
-interface ProposalContext {
-  shouldGenerateProposal: boolean;
-  stageId: 'stage_4' | 'stage_5' | null;
-  allowedFields: readonly string[];
-  currentData: unknown;
-}
-
 /**
  * Resolve the model configuration for the chat LLM call.
  * Tries ModelConfigService first, falls back to hardcoded constants.
@@ -384,107 +378,6 @@ async function resolveModelConfig(
       phaseName,
     };
   }
-}
-
-/**
- * Resolve proposal context: whether to generate a proposal and which fields/data to use.
- */
-function resolveProposalContext(params: LegacyLLMFlowParams): ProposalContext {
-  const { intent, chatType, nodeContext, course } = params;
-
-  // When intent is omitted (auto-classified), treat as potential refine for proposal generation
-  const shouldGenerateProposal =
-    intent !== 'regenerate' &&
-    chatType === 'node' &&
-    !!nodeContext &&
-    (nodeContext.stageId === 'stage_4' || nodeContext.stageId === 'stage_5');
-
-  if (!shouldGenerateProposal || !nodeContext) {
-    return { shouldGenerateProposal: false, stageId: null, allowedFields: [], currentData: null };
-  }
-
-  const stageId = nodeContext.stageId as 'stage_4' | 'stage_5';
-  const allowedFields = stageId === 'stage_4' ? STAGE4_EDITABLE_FIELDS : STAGE5_EDITABLE_FIELDS;
-  const currentData = stageId === 'stage_4' ? course.analysis_result : course.course_structure;
-
-  return { shouldGenerateProposal, stageId, allowedFields, currentData };
-}
-
-/**
- * Build the system prompt for the legacy LLM flow.
- * Returns either a refinement prompt (for proposals) or a standard prompt.
- */
-function buildLegacySystemPrompt(
-  params: LegacyLLMFlowParams,
-  proposalCtx: ProposalContext
-): string {
-  if (proposalCtx.shouldGenerateProposal && proposalCtx.stageId && proposalCtx.currentData) {
-    return buildRefinementPrompt(
-      proposalCtx.stageId,
-      proposalCtx.currentData,
-      proposalCtx.allowedFields
-    );
-  }
-
-  const courseContext = `
-<course_context>
-  Title: ${params.course.title || 'Untitled Course'}
-  Language: ${params.course.language || 'ru'}
-  Style: ${params.course.style || 'formal'}
-</course_context>`;
-
-  let contentContext = '';
-  if (params.chatType === 'node' && params.nodeContext && params.previousOutput) {
-    contentContext = `
-<current_content>
-${params.previousOutput}
-</current_content>
-
-<target_location>
-  Stage: ${params.nodeContext.stageId}
-  ${params.nodeContext.nodeId ? `Node ID: ${params.nodeContext.nodeId}` : ''}
-  ${params.nodeContext.blockPath ? `Block Path: ${params.nodeContext.blockPath}` : ''}
-</target_location>`;
-  }
-
-  return `You are an expert instructional designer helping refine course content.
-${courseContext}
-${contentContext}
-
-<instructions>
-- Respond in the user's language (detect from their message)
-- If the user wants to REFINE content: provide specific improvements, suggestions, or refined content
-- If the user wants to REGENERATE: acknowledge their request and explain what will be regenerated
-- Be concise but helpful
-- If returning content, format appropriately for the content type
-- For JSON content, return valid JSON without markdown code blocks
-- Focus on pedagogical quality and alignment with course goals
-</instructions>`;
-}
-
-/**
- * Build the messages array for LLM multi-turn conversation.
- */
-function buildLLMMessages(
-  systemPrompt: string,
-  history: Array<{ role: string; content: string }> | null,
-  userMessage: string
-): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
-  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: systemPrompt },
-  ];
-
-  if (history && history.length > 0) {
-    for (const msg of history) {
-      messages.push({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-      });
-    }
-  }
-
-  messages.push({ role: 'user', content: userMessage });
-  return messages;
 }
 
 /**

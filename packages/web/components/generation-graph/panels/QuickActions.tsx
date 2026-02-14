@@ -1,6 +1,6 @@
 import React from 'react'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Wand2, ShieldCheck, Scale, LucideIcon } from 'lucide-react'
+import { Sparkles, Wand2, ShieldCheck, Scale, RefreshCcw, LucideIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 export type ChatIntent = 'refine' | 'regenerate'
@@ -44,6 +44,12 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onSelect, disabled }
       icon: Sparkles,
       text: 'Please simplify the language and explanation.',
       intent: 'refine',
+    },
+    {
+      label: t('refinementChat.quickActions.regenerateCourse'),
+      icon: RefreshCcw,
+      text: 'Regenerate the entire course from scratch.',
+      intent: 'regenerate',
     },
   ]
 
