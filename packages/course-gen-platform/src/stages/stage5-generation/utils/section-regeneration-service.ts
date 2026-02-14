@@ -27,6 +27,7 @@ import type { QdrantClient } from '@qdrant/js-client-rest';
 import logger from '@/shared/logger';
 import { ensureStableIdsInMemory } from './course-structure-editor';
 import { writeCourseNodes } from '@/shared/course-nodes/writer';
+import { assertStableIds } from '@/shared/course-nodes/feature-flags';
 
 // ============================================================================
 // TYPES
@@ -365,6 +366,10 @@ export class SectionRegenerationService {
     // ========================================================================
     // STEP 8: Atomic JSONB Update
     // ========================================================================
+
+    assertStableIds(
+      updatedStructure as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+    );
 
     const { error: updateError } = await supabase
       .from('courses')

@@ -95,11 +95,12 @@ function applyFieldUpdatesToData(
   proposal: FieldUpdatesProposal,
   requestId: string,
   courseId: string
-): unknown {
+): { data: unknown; appliedCount: number } {
   const { stageId, updates } = proposal;
   const allowedFields = stageId === 'stage_4' ? STAGE4_EDITABLE_FIELDS : STAGE5_EDITABLE_FIELDS;
 
   let result = updatedData;
+  let appliedCount = 0;
 
   for (const update of updates) {
     const normalizedPath =
@@ -126,6 +127,7 @@ function applyFieldUpdatesToData(
         setNestedValue(result, update.path, update.newValue);
       }
 
+      appliedCount++;
       logger.info(
         { requestId, courseId, path: update.path },
         'applyProposal: Applied field update'
@@ -143,7 +145,7 @@ function applyFieldUpdatesToData(
     }
   }
 
-  return result;
+  return { data: result, appliedCount };
 }
 
 /**
@@ -170,7 +172,12 @@ export async function applyFieldUpdatesProposal(
 
   // Deep clone and apply updates
   const clonedData = deepCloneData(currentData, requestId, courseId);
-  const updatedData = applyFieldUpdatesToData(clonedData, proposal, requestId, courseId);
+  const { data: updatedData, appliedCount } = applyFieldUpdatesToData(
+    clonedData,
+    proposal,
+    requestId,
+    courseId
+  );
 
   // Guard: block writes without stable IDs when flag is on (plan:433)
   if (stageId === 'stage_5') {
@@ -214,13 +221,13 @@ export async function applyFieldUpdatesProposal(
   }
 
   logger.info(
-    { requestId, courseId, stageId, updateCount: updates.length },
+    { requestId, courseId, stageId, updateCount: appliedCount, totalRequested: updates.length },
     'applyProposal: Field updates applied successfully'
   );
 
   return {
     success: true,
-    appliedUpdates: updates.length,
+    appliedUpdates: appliedCount,
     updatedAt: now,
   };
 }

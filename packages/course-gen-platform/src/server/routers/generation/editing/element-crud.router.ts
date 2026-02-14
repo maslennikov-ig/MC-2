@@ -13,6 +13,7 @@ import type {
   AddElementResponse,
 } from '@megacampus/shared-types/regeneration-types';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
 import {
   handleDeleteElement,
   handleAddElement,
@@ -44,7 +45,7 @@ export const elementCrudRouter = {
         // Check authorization: superadmin/admin/owner can delete
         assertCourseAccess(buildAuthContext(ctx.user), course, 'delete element');
 
-        const courseStructure = course.course_structure as CourseStructure | null;
+        const courseStructure = await resolveStructure(courseId, course.course_structure, supabase);
         if (!courseStructure) {
           logger.warn({ requestId, courseId }, 'Course structure is null');
           throw new TRPCError({
@@ -106,7 +107,7 @@ export const elementCrudRouter = {
         // Check authorization: superadmin/admin/owner can add
         assertCourseAccess(buildAuthContext(ctx.user), course, 'add element');
 
-        const courseStructure = course.course_structure as CourseStructure | null;
+        const courseStructure = await resolveStructure(courseId, course.course_structure, supabase);
         if (!courseStructure) {
           logger.warn({ requestId, courseId }, 'Course structure is null');
           throw new TRPCError({

@@ -24,6 +24,8 @@ import {
 import { contextCacheManager } from '../../../../shared/regeneration/context-cache-manager';
 import { setNestedValue } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
+import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
 
 export const regenerationRouter = {
   regenerateBlock: instructorProcedure
@@ -63,7 +65,11 @@ export const regenerationRouter = {
         const currentData =
           stageId === 'stage_4'
             ? (course.analysis_result as unknown as AnalysisResult)
-            : (course.course_structure as unknown as CourseStructure);
+            : ((await resolveStructure(
+                courseId,
+                course.course_structure,
+                supabase
+              )) as unknown as CourseStructure);
 
         if (!currentData) {
           logger.warn({ requestId, courseId, stageId }, 'Target data is null or undefined');
@@ -115,7 +121,9 @@ export const regenerationRouter = {
             blockPath,
             tier,
             analysisResult: course.analysis_result as unknown as AnalysisResult,
-            courseStructure: course.course_structure as unknown as CourseStructure,
+            courseStructure: (stageId === 'stage_5'
+              ? currentData
+              : course.course_structure) as unknown as CourseStructure,
           });
 
           staticContextContent = staticContext.content;
@@ -141,7 +149,9 @@ export const regenerationRouter = {
           blockPath,
           tier,
           analysisResult: course.analysis_result as unknown as AnalysisResult,
-          courseStructure: course.course_structure as unknown as CourseStructure,
+          courseStructure: (stageId === 'stage_5'
+            ? currentData
+            : course.course_structure) as unknown as CourseStructure,
         });
 
         const dynamicContextContent = dynamicContext.content;
@@ -317,6 +327,12 @@ ${dynamicContextContent}
 
         const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
         const now = new Date().toISOString();
+
+        if (stageId === 'stage_5') {
+          assertStableIds(
+            updatedData as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+          );
+        }
 
         const { error: updateError } = await supabase
           .from('courses')

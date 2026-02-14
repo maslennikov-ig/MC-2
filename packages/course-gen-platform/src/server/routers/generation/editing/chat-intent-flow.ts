@@ -799,16 +799,29 @@ export async function executeIntentClassificationFlow(
     );
   } else {
     // Step 1b: Tier 1 — Cheap LLM classification (~200 tokens, ~$0.00005)
-    classifiedIntent = await classifyIntent(
-      userMessage,
-      nodeContext
-        ? {
-            stageId: nodeContext.stageId,
-            path: nodeContext.blockPath,
-            elementType: nodeContext.nodeId?.includes('lesson') ? 'lesson' : 'section',
-          }
-        : undefined
-    );
+    try {
+      classifiedIntent = await classifyIntent(
+        userMessage,
+        nodeContext
+          ? {
+              stageId: nodeContext.stageId,
+              path: nodeContext.blockPath,
+              elementType: nodeContext.nodeId?.includes('lesson') ? 'lesson' : 'section',
+            }
+          : undefined
+      );
+    } catch (classifyError) {
+      // Plan requirement: chat phase misconfig → explicit 503 (not masked as 500)
+      const errMsg = classifyError instanceof Error ? classifyError.message : '';
+      if (errMsg.includes('Chat phase') && errMsg.includes('has no config')) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: errMsg,
+          cause: classifyError,
+        });
+      }
+      throw classifyError;
+    }
 
     logger.info(
       {

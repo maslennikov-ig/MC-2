@@ -16,6 +16,7 @@ import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { getElementAtPath } from '../_shared/helpers';
 import { logger } from '../../../../shared/logger/index.js';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 
 /**
  * Fetch course and validate authorization
@@ -141,6 +142,7 @@ export async function handleDeleteElement(
   }
 
   const result = deleteStructureElement(courseStructure, elementPath);
+  assertStableIds(result.updatedStructure);
   const now = new Date().toISOString();
 
   const { error: updateError } = await supabase
@@ -550,6 +552,7 @@ export async function handleAddElement(
     result.updatedStructure
   );
 
+  assertStableIds(result.updatedStructure);
   const now = new Date().toISOString();
   const { error: updateError } = await supabase
     .from('courses')

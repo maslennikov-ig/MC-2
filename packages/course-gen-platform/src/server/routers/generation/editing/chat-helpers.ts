@@ -468,18 +468,25 @@ function handleMoveIntent(
 
   // Resolve the element after which to place
   const destElement = getElementAtPath(courseStructure, destPath);
-  const afterId = destElement ? destElement.id || null : null;
+  const destIsSection = destPath && !destPath.includes('.lessons[');
+  let afterId = destElement ? destElement.id || null : null;
 
   // For lesson moves, determine the parent section
   let newParentId: string | undefined;
   if (!isSection && destPath) {
-    // Extract section from destination path (e.g., "sections[1].lessons[2]" -> section at index 1)
-    const sectionMatch = destPath.match(/sections\[(\d+)\]/);
-    if (sectionMatch) {
-      const sectionIndex = parseInt(sectionMatch[1], 10);
-      const parentSection = courseStructure.sections[sectionIndex];
-      if (parentSection?.id) {
-        newParentId = parentSection.id;
+    if (destIsSection && destElement?.id) {
+      // Destination is a section — move lesson to end of that section (afterId=null)
+      newParentId = destElement.id;
+      afterId = null;
+    } else {
+      // Destination is a lesson — extract parent section from path
+      const sectionMatch = destPath.match(/sections\[(\d+)\]/);
+      if (sectionMatch) {
+        const sectionIndex = parseInt(sectionMatch[1], 10);
+        const parentSection = courseStructure.sections[sectionIndex];
+        if (parentSection?.id) {
+          newParentId = parentSection.id;
+        }
       }
     }
   }
