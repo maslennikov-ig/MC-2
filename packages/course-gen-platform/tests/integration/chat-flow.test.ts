@@ -477,13 +477,13 @@ describe('Scenario 2: legacy intent="regenerate" (backward compatibility)', () =
     expect(result).toBeDefined();
     expect(result.conversationId).toBe('conv-rpc-fail');
     expect(result.intent).toBe('regenerate');
-    expect(result.assistantMessage).toContain('перегенерацию');
+    expect(result.assistantMessage).toContain('Не удалось');
     expect(result.modelUsed).toBe('system');
 
-    // Verify error message was persisted
+    // Verify error message was persisted (must match error-specific text, not success)
     expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: expect.stringContaining('перегенерацию'),
+        content: expect.stringContaining('Не удалось'),
         intent: 'regenerate',
       })
     );
@@ -1134,7 +1134,7 @@ describe('Stable IDs and backfill integration', () => {
 
     const result = applySurgicalOperations(ops, structure);
     const newId = result.tempIdMap['__new__'];
-    expect(newId).toMatch(/^lsn_[A-Za-z0-9]{8}$/);
+    expect(newId).toMatch(/^lsn_[A-Za-z0-9_-]{8}$/);
   });
 
   it('should generate new stable IDs with nanoid (sec_ prefix for sections, lsn_ for lessons)', () => {
@@ -1222,7 +1222,49 @@ describe('Stable IDs and backfill integration', () => {
     expect(result.sections[0].lessons[0].id).toMatch(/^lsn_[A-Za-z0-9_-]{8}$/);
   });
 
-  it.todo('should NOT write-on-read to database (backfill is in-memory only for request)');
+  it('should NOT write-on-read to database (backfill is in-memory only for request)', () => {
+    // ensureStableIdsInMemory is synchronous (no async, no DB client param)
+    // — proving it cannot perform DB writes by design
+    const legacyStructure: CourseStructure = {
+      title: 'Legacy',
+      description: 'No IDs',
+      tags: [],
+      target_audience: 'everyone',
+      language: 'ru',
+      estimated_duration_hours: 1,
+      sections: [
+        {
+          section_number: 1,
+          section_title: 'S1',
+          section_description: 'D1',
+          estimated_duration_minutes: 30,
+          learning_objectives: [],
+          lessons: [
+            {
+              lesson_number: 1,
+              lesson_title: 'L1',
+              lesson_objectives: [],
+              key_topics: [],
+              estimated_duration_minutes: 30,
+              difficulty_level: 'beginner',
+            },
+          ],
+        } as CourseStructure['sections'][0],
+      ],
+    };
+
+    // Call is synchronous — returns value directly, not a Promise
+    const result = ensureStableIdsInMemory(legacyStructure);
+    expect(result).not.toBeInstanceOf(Promise);
+
+    // Original structure is not mutated (pure function)
+    expect((legacyStructure.sections[0] as Record<string, unknown>).id).toBeUndefined();
+    expect((legacyStructure.sections[0].lessons[0] as Record<string, unknown>).id).toBeUndefined();
+
+    // Result has IDs assigned
+    expect(result.sections[0].id).toMatch(/^sec_/);
+    expect(result.sections[0].lessons[0].id).toMatch(/^lsn_/);
+  });
 
   it('should apply operations correctly even when structure has mixed stable/missing IDs', () => {
     // Create structure with SOME IDs missing
