@@ -167,10 +167,20 @@ export const LessonGraphState = Annotation.Root({
   // ============================================================================
 
   /**
-   * Generated lesson content from serial generator node
-   * Complete markdown with intro, all sections, and summary
+   * Generated lesson content from generator node
+   * Complete markdown with intro, all sections, summary, and exercises
    */
   generatedContent: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Lesson digest — factual 3-5 sentence summary of generated content.
+   * Used as summary_preview in inter-lesson context for next lesson generation.
+   * Generated as part of single-call output, extracted post-generation.
+   */
+  lessonDigest: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),

@@ -109,6 +109,7 @@ export const CONTENT_LABELS: Record<
     hint: string;
     hints: string;
     sampleAnswer: string;
+    lessonDigest: string;
   }
 > = {
   ru: {
@@ -123,6 +124,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Подсказка',
     hints: 'Подсказки',
     sampleAnswer: 'Образец ответа',
+    lessonDigest: 'Краткое содержание урока',
   },
   en: {
     introduction: 'Introduction',
@@ -136,6 +138,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Hint',
     hints: 'Hints',
     sampleAnswer: 'Sample Answer',
+    lessonDigest: 'Lesson Digest',
   },
   zh: {
     introduction: '引言',
@@ -149,6 +152,7 @@ export const CONTENT_LABELS: Record<
     hint: '提示',
     hints: '提示',
     sampleAnswer: '参考答案',
+    lessonDigest: '课程摘要',
   },
   es: {
     introduction: 'Introducción',
@@ -162,6 +166,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Pista',
     hints: 'Pistas',
     sampleAnswer: 'Respuesta de ejemplo',
+    lessonDigest: 'Resumen de la lección',
   },
   fr: {
     introduction: 'Introduction',
@@ -175,6 +180,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Indice',
     hints: 'Indices',
     sampleAnswer: 'Exemple de réponse',
+    lessonDigest: 'Résumé de la leçon',
   },
   de: {
     introduction: 'Einführung',
@@ -188,6 +194,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Hinweis',
     hints: 'Hinweise',
     sampleAnswer: 'Musterantwort',
+    lessonDigest: 'Lektionszusammenfassung',
   },
   ja: {
     introduction: 'はじめに',
@@ -201,6 +208,7 @@ export const CONTENT_LABELS: Record<
     hint: 'ヒント',
     hints: 'ヒント',
     sampleAnswer: '解答例',
+    lessonDigest: 'レッスンの要約',
   },
   ko: {
     introduction: '소개',
@@ -214,6 +222,7 @@ export const CONTENT_LABELS: Record<
     hint: '힌트',
     hints: '힌트',
     sampleAnswer: '모범 답안',
+    lessonDigest: '수업 요약',
   },
   ar: {
     introduction: 'مقدمة',
@@ -227,6 +236,7 @@ export const CONTENT_LABELS: Record<
     hint: 'تلميح',
     hints: 'تلميحات',
     sampleAnswer: 'نموذج الإجابة',
+    lessonDigest: 'ملخص الدرس',
   },
   pt: {
     introduction: 'Introdução',
@@ -240,6 +250,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Dica',
     hints: 'Dicas',
     sampleAnswer: 'Resposta modelo',
+    lessonDigest: 'Resumo da lição',
   },
   it: {
     introduction: 'Introduzione',
@@ -253,6 +264,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Suggerimento',
     hints: 'Suggerimenti',
     sampleAnswer: 'Risposta di esempio',
+    lessonDigest: 'Riepilogo della lezione',
   },
   tr: {
     introduction: 'Giriş',
@@ -266,6 +278,7 @@ export const CONTENT_LABELS: Record<
     hint: 'İpucu',
     hints: 'İpuçları',
     sampleAnswer: 'Örnek Cevap',
+    lessonDigest: 'Ders Özeti',
   },
   vi: {
     introduction: 'Giới thiệu',
@@ -279,6 +292,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Gợi ý',
     hints: 'Gợi ý',
     sampleAnswer: 'Đáp án mẫu',
+    lessonDigest: 'Tóm tắt bài học',
   },
   th: {
     introduction: 'บทนำ',
@@ -292,6 +306,7 @@ export const CONTENT_LABELS: Record<
     hint: 'คำใบ้',
     hints: 'คำใบ้',
     sampleAnswer: 'ตัวอย่างคำตอบ',
+    lessonDigest: 'สรุปบทเรียน',
   },
   id: {
     introduction: 'Pendahuluan',
@@ -305,6 +320,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Petunjuk',
     hints: 'Petunjuk',
     sampleAnswer: 'Contoh Jawaban',
+    lessonDigest: 'Ringkasan Pelajaran',
   },
   ms: {
     introduction: 'Pengenalan',
@@ -318,6 +334,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Petunjuk',
     hints: 'Petunjuk',
     sampleAnswer: 'Contoh Jawapan',
+    lessonDigest: 'Ringkasan Pelajaran',
   },
   hi: {
     introduction: 'परिचय',
@@ -331,6 +348,7 @@ export const CONTENT_LABELS: Record<
     hint: 'संकेत',
     hints: 'संकेत',
     sampleAnswer: 'नमूना उत्तर',
+    lessonDigest: 'पाठ सारांश',
   },
   bn: {
     introduction: 'ভূমিকা',
@@ -344,6 +362,7 @@ export const CONTENT_LABELS: Record<
     hint: 'ইঙ্গিত',
     hints: 'ইঙ্গিত',
     sampleAnswer: 'নমুনা উত্তর',
+    lessonDigest: 'পাঠ সারাংশ',
   },
   pl: {
     introduction: 'Wprowadzenie',
@@ -357,6 +376,7 @@ export const CONTENT_LABELS: Record<
     hint: 'Wskazówka',
     hints: 'Wskazówki',
     sampleAnswer: 'Przykładowa odpowiedź',
+    lessonDigest: 'Podsumowanie lekcji',
   },
 };
 
