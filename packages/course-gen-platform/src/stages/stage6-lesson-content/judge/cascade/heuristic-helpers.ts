@@ -26,13 +26,13 @@ function extractTextContent(content: LessonContentBody): string {
   }
 
   // Add all sections
-  for (const section of content.sections) {
+  for (const section of content.sections ?? []) {
     parts.push(section.title);
     parts.push(section.content);
   }
 
   // Add examples
-  for (const example of content.examples) {
+  for (const example of content.examples ?? []) {
     parts.push(example.title);
     parts.push(example.content);
     if (example.code) {
@@ -41,7 +41,7 @@ function extractTextContent(content: LessonContentBody): string {
   }
 
   // Add exercises
-  for (const exercise of content.exercises) {
+  for (const exercise of content.exercises ?? []) {
     parts.push(exercise.question);
     if (exercise.hints) {
       parts.push(...exercise.hints);
