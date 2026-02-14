@@ -243,10 +243,26 @@ export async function fetchPhaseConfigFromDb(
     Promise.all(globalConfigQueries),
   ]);
 
+  // Track whether at least one query succeeded (no error).
+  // If ALL queries had errors → throw (transient DB failure).
+  // If at least one succeeded but no data → return null (genuine missing config).
+  let queriesSucceeded = 0;
+  let lastDbError: string | null = null;
+
   // Priority 1: Process course override results in language priority order
   for (let i = 0; i < courseOverrideResults.length; i++) {
-    const { data: courseOverride } = courseOverrideResults[i];
+    const { data: courseOverride, error } = courseOverrideResults[i];
     const langToTry = languagesToTry[i];
+
+    if (error) {
+      lastDbError = error.message;
+      logger.warn(
+        { phaseName, courseId, language: langToTry, tier, error: error.message },
+        'Error fetching course override config from DB'
+      );
+      continue;
+    }
+    queriesSucceeded++;
 
     if (courseOverride) {
       if (langToTry === 'any') {
@@ -277,12 +293,14 @@ export async function fetchPhaseConfigFromDb(
     const langToTry = languagesToTry[i];
 
     if (error) {
+      lastDbError = error.message;
       logger.warn(
         { phaseName, language: langToTry, tier, error: error.message },
         'Error fetching phase config from DB'
       );
       continue;
     }
+    queriesSucceeded++;
 
     if (globalConfig) {
       if (langToTry === 'any') {
@@ -312,6 +330,15 @@ export async function fetchPhaseConfigFromDb(
     }
   }
 
+  // If ALL queries had errors (none succeeded), throw to signal transient DB failure.
+  // This lets callers (model-config-service) distinguish "no config rows" from "DB unreachable".
+  if (queriesSucceeded === 0) {
+    throw new Error(
+      `All DB queries failed for phase "${phaseName}" — possible transient DB issue: ${lastDbError}`
+    );
+  }
+
+  // At least one query succeeded but returned no matching config row
   return null;
 }
 
