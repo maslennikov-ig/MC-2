@@ -4,10 +4,11 @@
  * @module scripts/backfill-stable-ids
  *
  * One-time migration script that ensures all sections and lessons
- * in existing course_structure JSON have stable IDs (sec_* / lsn_*).
+ * in existing course_structure JSON have stable IDs (sec_* / lsn_*)
+ * and schema_version=2.
  *
  * - Reads courses in batches of 50
- * - Applies ensureStableIdsInMemory() to each course_structure
+ * - Applies ensureStableIdsAndSchemaVersionInMemory() to each course_structure
  * - Skips courses where all IDs are already present
  * - Uses optimistic concurrency (updated_at check) to avoid overwriting
  *   concurrent modifications
@@ -18,7 +19,7 @@
 
 import 'dotenv/config';
 import { getSupabaseAdmin } from '../src/shared/supabase/admin';
-import { ensureStableIdsInMemory } from '../src/stages/stage5-generation/utils/course-structure-editor';
+import { ensureStableIdsAndSchemaVersionInMemory } from '../src/stages/stage5-generation/utils/course-structure-editor';
 import type { CourseStructure, Json } from '@megacampus/shared-types';
 
 const BATCH_SIZE = 50;
@@ -87,7 +88,7 @@ async function main(): Promise<void> {
           continue;
         }
 
-        const updatedStructure = ensureStableIdsInMemory(originalStructure);
+        const updatedStructure = ensureStableIdsAndSchemaVersionInMemory(originalStructure);
 
         // Deep equality check via JSON.stringify
         const originalJson = JSON.stringify(originalStructure);
@@ -169,7 +170,7 @@ async function main(): Promise<void> {
         const originalStructure = course.course_structure as unknown as CourseStructure;
         if (!originalStructure?.sections) continue;
 
-        const updatedStructure = ensureStableIdsInMemory(originalStructure);
+        const updatedStructure = ensureStableIdsAndSchemaVersionInMemory(originalStructure);
         if (JSON.stringify(originalStructure) === JSON.stringify(updatedStructure)) {
           metrics.courses_skipped++;
           // If this was an error course, the data is already correct (transient error resolved)

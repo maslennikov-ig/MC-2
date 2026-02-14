@@ -18,6 +18,49 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 import { logger } from '../../../../shared/logger/index.js';
 import { validateLocale } from '@/shared/validation';
 
+type LessonFromStructure = {
+  lesson_number: number;
+  lesson_title: string;
+  lesson_objectives?: string[];
+  key_topics?: string[];
+  estimated_duration_minutes?: number;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
+};
+
+type SectionFromStructure = {
+  section_number?: number;
+  section_title: string;
+  lessons: LessonFromStructure[];
+};
+
+function buildLessonId(sectionNumber: number, lessonOrder: number): string {
+  return `${sectionNumber}.${lessonOrder}`;
+}
+
+function resolveSectionNumber(section: SectionFromStructure, sectionIndex: number): number {
+  return section.section_number ?? sectionIndex + 1;
+}
+
+function parseLessonId(lessonId: string): { sectionNum: number; lessonOrder: number } | null {
+  const match = lessonId.match(/^(\d+)\.(\d+)$/);
+  if (!match) return null;
+
+  const sectionNum = parseInt(match[1], 10);
+  const lessonOrder = parseInt(match[2], 10);
+
+  if (sectionNum <= 0 || lessonOrder <= 0) return null;
+
+  return { sectionNum, lessonOrder };
+}
+
+function findLessonByOrder(
+  section: SectionFromStructure,
+  lessonOrder: number
+): LessonFromStructure | null {
+  const lesson = section.lessons[lessonOrder - 1];
+  return lesson ?? null;
+}
+
 /**
  * Partial Stage 6 generation for selected lessons
  *
@@ -124,18 +167,7 @@ export const partialGenerate = protectedProcedure
 
       // Step 3: Validate course_structure exists
       const courseStructure = course.course_structure as {
-        sections: Array<{
-          section_number: number;
-          section_title: string;
-          lessons: Array<{
-            lesson_number: number;
-            lesson_title: string;
-            lesson_objectives?: string[];
-            key_topics?: string[];
-            estimated_duration_minutes?: number;
-            difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
-          }>;
-        }>;
+        sections: SectionFromStructure[];
       } | null;
 
       if (!courseStructure || !courseStructure.sections) {
@@ -291,13 +323,15 @@ export const partialGenerate = protectedProcedure
         );
 
         // Create sections
-        for (const section of courseStructure.sections) {
+        for (let sectionIndex = 0; sectionIndex < courseStructure.sections.length; sectionIndex++) {
+          const section = courseStructure.sections[sectionIndex];
+          const sectionNumber = resolveSectionNumber(section, sectionIndex);
           const { data: newSection, error: sectionError } = await supabase
             .from('sections')
             .insert({
               course_id: courseId,
               title: section.section_title,
-              order_index: section.section_number,
+              order_index: sectionNumber,
             })
             .select('id')
             .single();
@@ -307,7 +341,7 @@ export const partialGenerate = protectedProcedure
               {
                 requestId,
                 courseId,
-                sectionNumber: section.section_number,
+                sectionNumber,
                 error: sectionError,
               },
               'Failed to create section'
@@ -316,11 +350,12 @@ export const partialGenerate = protectedProcedure
           }
 
           // Create lessons for this section
-          for (const lesson of section.lessons) {
+          for (let lessonIndex = 0; lessonIndex < section.lessons.length; lessonIndex++) {
+            const lesson = section.lessons[lessonIndex];
             const { error: lessonError } = await supabase.from('lessons').insert({
               section_id: newSection.id,
               title: lesson.lesson_title,
-              order_index: lesson.lesson_number,
+              order_index: lessonIndex + 1,
               lesson_type: 'text',
               duration_minutes: lesson.estimated_duration_minutes || 15,
               objectives: lesson.lesson_objectives || [],
@@ -331,7 +366,7 @@ export const partialGenerate = protectedProcedure
                 {
                   requestId,
                   courseId,
-                  lessonId: `${section.section_number}.${lesson.lesson_number}`,
+                  lessonId: buildLessonId(sectionNumber, lessonIndex + 1),
                   error: lessonError,
                 },
                 'Failed to create lesson'
@@ -359,10 +394,13 @@ export const partialGenerate = protectedProcedure
       } else if (sectionIds && sectionIds.length > 0) {
         // Build lesson IDs from section IDs
         for (const sectionId of sectionIds) {
-          const section = courseStructure.sections.find(s => s.section_number === sectionId);
-          if (section) {
-            for (const lesson of section.lessons) {
-              lessonIdsToGenerate.push(`${sectionId}.${lesson.lesson_number}`);
+          const sectionIndex = courseStructure.sections.findIndex(
+            (s, idx) => resolveSectionNumber(s, idx) === sectionId
+          );
+          if (sectionIndex !== -1) {
+            const section = courseStructure.sections[sectionIndex];
+            for (let lessonIndex = 0; lessonIndex < section.lessons.length; lessonIndex++) {
+              lessonIdsToGenerate.push(buildLessonId(sectionId, lessonIndex + 1));
             }
           }
         }
@@ -389,11 +427,17 @@ export const partialGenerate = protectedProcedure
       const lessonSpecs: LessonSpecificationV2[] = [];
 
       for (const lessonId of lessonIdsToGenerate) {
-        const [sectionNumStr, lessonNumStr] = lessonId.split('.');
-        const sectionNum = parseInt(sectionNumStr, 10);
-        const lessonNum = parseInt(lessonNumStr, 10);
+        const parsedLessonId = parseLessonId(lessonId);
+        if (!parsedLessonId) {
+          logger.warn({ requestId, lessonId }, 'Invalid lesson ID format');
+          continue;
+        }
 
-        const section = courseStructure.sections.find(s => s.section_number === sectionNum);
+        const { sectionNum, lessonOrder } = parsedLessonId;
+
+        const section = courseStructure.sections.find(
+          (s, sectionIndex) => resolveSectionNumber(s, sectionIndex) === sectionNum
+        );
         if (!section) {
           logger.warn(
             {
@@ -406,14 +450,14 @@ export const partialGenerate = protectedProcedure
           continue;
         }
 
-        const lesson = section.lessons.find(l => l.lesson_number === lessonNum);
+        const lesson = findLessonByOrder(section, lessonOrder);
         if (!lesson) {
           logger.warn(
             {
               requestId,
               lessonId,
               sectionNum,
-              lessonNum,
+              lessonOrder,
             },
             'Lesson not found in course_structure'
           );
@@ -451,9 +495,16 @@ export const partialGenerate = protectedProcedure
       // Step 5.5: Ensure all lessons exist in database (recreate if deleted)
       // This handles the case where a lesson was deleted but user wants to regenerate it
       for (const spec of lessonSpecs) {
-        const [sectionNumStr, lessonNumStr] = spec.lesson_id.split('.');
-        const sectionNum = parseInt(sectionNumStr, 10);
-        const lessonNum = parseInt(lessonNumStr, 10);
+        const parsedLessonId = parseLessonId(spec.lesson_id);
+        if (!parsedLessonId) {
+          logger.warn(
+            { requestId, courseId, lessonId: spec.lesson_id },
+            'Invalid lesson ID format while recreating lessons'
+          );
+          continue;
+        }
+
+        const { sectionNum, lessonOrder } = parsedLessonId;
 
         // Find section ID
         const { data: sectionData } = await supabase
@@ -481,19 +532,21 @@ export const partialGenerate = protectedProcedure
           .from('lessons')
           .select('id')
           .eq('section_id', sectionData.id)
-          .eq('order_index', lessonNum)
+          .eq('order_index', lessonOrder)
           .single();
 
         if (!existingLesson) {
           // Lesson was deleted - recreate it from course_structure
-          const section = courseStructure.sections.find(s => s.section_number === sectionNum);
-          const lesson = section?.lessons.find(l => l.lesson_number === lessonNum);
+          const section = courseStructure.sections.find(
+            (s, sectionIndex) => resolveSectionNumber(s, sectionIndex) === sectionNum
+          );
+          const lesson = section ? findLessonByOrder(section, lessonOrder) : null;
 
           if (lesson) {
             const { error: createError } = await supabase.from('lessons').insert({
               section_id: sectionData.id,
               title: lesson.lesson_title,
-              order_index: lessonNum,
+              order_index: lessonOrder,
               lesson_type: 'text',
               duration_minutes: lesson.estimated_duration_minutes || 15,
               objectives: lesson.lesson_objectives || [],

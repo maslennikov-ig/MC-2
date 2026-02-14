@@ -27,7 +27,7 @@ import {
 } from '../../../shared/regeneration/dependency-graph-builder';
 import {
   applyFieldUpdate,
-  ensureStableIdsInMemory,
+  ensureStableIdsAndSchemaVersionInMemory,
 } from '../../../stages/stage5-generation/utils/course-structure-editor';
 import { resolveStructure } from '../../../shared/course-nodes/structure-resolver';
 import { writeCourseNodes } from '../../../shared/course-nodes/writer';
@@ -389,14 +389,16 @@ export const dependenciesRouter = router({
           );
         }
 
+        const structureToPersist = ensureStableIdsAndSchemaVersionInMemory(courseStructure);
+
         // Guard: block writes without stable IDs when flag is on (plan:433)
-        assertStableIds(courseStructure);
+        assertStableIds(structureToPersist);
 
         // Step 6: Update course structure in database
         const { error: updateError } = await supabase
           .from('courses')
           .update({
-            course_structure: courseStructure,
+            course_structure: structureToPersist,
             updated_at: new Date().toISOString(),
           })
           .eq('id', courseId);
@@ -417,7 +419,7 @@ export const dependenciesRouter = router({
         }
 
         // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-        const structureForNodes = ensureStableIdsInMemory(courseStructure);
+        const structureForNodes = structureToPersist;
         await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
           logger.warn(
             { courseId, error: err instanceof Error ? err.message : String(err) },

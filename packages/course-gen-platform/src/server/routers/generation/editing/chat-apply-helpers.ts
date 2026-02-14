@@ -22,6 +22,7 @@ import {
 } from '@megacampus/shared-types/regeneration-types';
 import {
   applyFieldUpdate,
+  ensureStableIdsAndSchemaVersionInMemory,
   ensureStableIdsInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import type { CourseStructure, Json, Database } from '@megacampus/shared-types';
@@ -179,11 +180,14 @@ export async function applyFieldUpdatesProposal(
     courseId
   );
 
-  // Guard: block writes without stable IDs when flag is on (plan:433)
+  let dataToPersist: unknown = updatedData;
   if (stageId === 'stage_5') {
-    assertStableIds(
-      updatedData as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+    const normalizedStructure = ensureStableIdsAndSchemaVersionInMemory(
+      updatedData as CourseStructure
     );
+    // Guard: block writes without stable IDs when flag is on (plan:433)
+    assertStableIds(normalizedStructure);
+    dataToPersist = normalizedStructure;
   }
 
   // Save updated data to database
@@ -193,7 +197,7 @@ export async function applyFieldUpdatesProposal(
   const { error: updateError } = await supabase
     .from('courses')
     .update({
-      [updateColumn]: updatedData,
+      [updateColumn]: dataToPersist,
       updated_at: now,
     })
     .eq('id', courseId);
@@ -211,7 +215,7 @@ export async function applyFieldUpdatesProposal(
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
   if (stageId === 'stage_5') {
-    const structureForNodes = ensureStableIdsInMemory(updatedData as CourseStructure);
+    const structureForNodes = dataToPersist as CourseStructure;
     await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
       logger.warn(
         { courseId, error: err instanceof Error ? err.message : String(err) },
@@ -396,15 +400,17 @@ export async function applyStructuralOperationProposal(
   // Apply operations atomically
   const result = applySurgicalOperations(operations, structureWithIds);
 
+  const structureToPersist = ensureStableIdsAndSchemaVersionInMemory(result.updatedStructure);
+
   // Guard: block writes without stable IDs when COURSE_STABLE_IDS_REQUIRED=true (plan:433)
-  assertStableIds(result.updatedStructure);
+  assertStableIds(structureToPersist);
 
   // Save updated structure to database
   const now = new Date().toISOString();
   const { error: updateError } = await supabase
     .from('courses')
     .update({
-      course_structure: result.updatedStructure as unknown as Json,
+      course_structure: structureToPersist as unknown as Json,
       updated_at: now,
     })
     .eq('id', courseId);
@@ -421,7 +427,7 @@ export async function applyStructuralOperationProposal(
   }
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  const structureForNodes = structureToPersist;
   await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },

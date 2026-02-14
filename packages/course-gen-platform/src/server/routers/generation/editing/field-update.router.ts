@@ -12,7 +12,7 @@ import {
 import type { CourseStructure } from '@megacampus/shared-types';
 import {
   applyFieldUpdate,
-  ensureStableIdsInMemory,
+  ensureStableIdsAndSchemaVersionInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
@@ -131,11 +131,14 @@ export const fieldUpdateRouter = {
           });
         }
 
-        // Phase 4: Guard — block writes without stable IDs
+        let dataToPersist: unknown = updatedData;
         if (stageId === 'stage_5') {
-          assertStableIds(
-            updatedData as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+          const normalizedStructure = ensureStableIdsAndSchemaVersionInMemory(
+            updatedData as CourseStructure
           );
+          // Phase 4: Guard — block writes without stable IDs
+          assertStableIds(normalizedStructure);
+          dataToPersist = normalizedStructure;
         }
 
         const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
@@ -144,7 +147,7 @@ export const fieldUpdateRouter = {
         const { error: updateError } = await supabase
           .from('courses')
           .update({
-            [updateColumn]: updatedData,
+            [updateColumn]: dataToPersist,
             updated_at: now,
           })
           .eq('id', courseId);
@@ -168,7 +171,7 @@ export const fieldUpdateRouter = {
 
         // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
         if (stageId === 'stage_5') {
-          const structureForNodes = ensureStableIdsInMemory(updatedData as CourseStructure);
+          const structureForNodes = dataToPersist as CourseStructure;
           await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
             logger.warn(
               { courseId, error: err instanceof Error ? err.message : String(err) },

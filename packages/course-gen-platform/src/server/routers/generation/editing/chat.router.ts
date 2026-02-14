@@ -36,6 +36,7 @@ import {
 import {
   deleteElement as deleteStructureElement,
   moveElement as moveStructureElement,
+  ensureStableIdsAndSchemaVersionInMemory,
   ensureStableIdsInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
@@ -562,14 +563,16 @@ async function executeApplyDirectAction(
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid action' });
     }
 
+    const structureToPersist = ensureStableIdsAndSchemaVersionInMemory(result.updatedStructure);
+
     // Guard: block writes without stable IDs when flag is on (plan:433)
-    assertStableIds(result.updatedStructure);
+    assertStableIds(structureToPersist);
 
     // Save updated structure
     const now = new Date().toISOString();
     const { error: updateError } = await supabase
       .from('courses')
-      .update({ course_structure: result.updatedStructure, updated_at: now })
+      .update({ course_structure: structureToPersist, updated_at: now })
       .eq('id', courseId);
 
     if (updateError) {
@@ -581,7 +584,7 @@ async function executeApplyDirectAction(
     }
 
     // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-    await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+    await writeCourseNodes(courseId, structureToPersist, supabase, logger).catch(err =>
       logger.warn(
         { courseId, error: err instanceof Error ? err.message : String(err) },
         'course_nodes dual-write failed (non-fatal)'
