@@ -1,16 +1,12 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+/* eslint-disable max-lines */
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: '13.0.5'
   }
   public: {
     Tables: {
@@ -44,11 +40,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "admin_audit_logs_admin_id_fkey"
-            columns: ["admin_id"]
+            foreignKeyName: 'admin_audit_logs_admin_id_fkey'
+            columns: ['admin_id']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -88,25 +84,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "api_keys_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: 'api_keys_created_by_fkey'
+            columns: ['created_by']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "api_keys_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'api_keys_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "api_keys_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'api_keys_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -167,25 +163,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "assets_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'assets_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "assets_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'assets_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons"
-            referencedColumns: ["id"]
+            referencedRelation: 'lessons'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "assets_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'assets_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons_with_latest_content"
-            referencedColumns: ["lesson_id"]
+            referencedRelation: 'lessons_with_latest_content'
+            referencedColumns: ['lesson_id']
           },
         ]
       }
@@ -234,18 +230,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "audit_log_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'audit_log_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "audit_log_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'audit_log_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -309,11 +305,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "clarifying_questions_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'clarifying_questions_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -347,11 +343,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "config_backups_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: 'config_backups_created_by_fkey'
+            columns: ['created_by']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -427,11 +423,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "course_chat_messages_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'course_chat_messages_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -474,11 +470,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "course_edits_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'course_edits_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -489,7 +485,7 @@ export type Database = {
           enrolled_at: string | null
           id: string
           progress: Json | null
-          status: Database["public"]["Enums"]["enrollment_status"]
+          status: Database['public']['Enums']['enrollment_status']
           user_id: string
         }
         Insert: {
@@ -498,7 +494,7 @@ export type Database = {
           enrolled_at?: string | null
           id?: string
           progress?: Json | null
-          status?: Database["public"]["Enums"]["enrollment_status"]
+          status?: Database['public']['Enums']['enrollment_status']
           user_id: string
         }
         Update: {
@@ -507,23 +503,74 @@ export type Database = {
           enrolled_at?: string | null
           id?: string
           progress?: Json | null
-          status?: Database["public"]["Enums"]["enrollment_status"]
+          status?: Database['public']['Enums']['enrollment_status']
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "course_enrollments_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'course_enrollments_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "course_enrollments_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: 'course_enrollments_user_id_fkey'
+            columns: ['user_id']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      course_nodes: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          data: Json
+          id: string
+          node_type: string
+          order_key: string
+          parent_id: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          data?: Json
+          id: string
+          node_type: string
+          order_key: string
+          parent_id?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          data?: Json
+          id?: string
+          node_type?: string
+          order_key?: string
+          parent_id?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'course_nodes_course_id_fkey'
+            columns: ['course_id']
+            isOneToOne: false
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'course_nodes_parent_id_fkey'
+            columns: ['parent_id']
+            isOneToOne: false
+            referencedRelation: 'course_nodes'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -540,7 +587,7 @@ export type Database = {
           created_at: string | null
           difficulty: string | null
           email: string | null
-          error_code: Database["public"]["Enums"]["stage_error_code"] | null
+          error_code: Database['public']['Enums']['stage_error_code'] | null
           error_details: Json | null
           error_message: string | null
           estimated_completion_minutes: number | null
@@ -556,9 +603,7 @@ export type Database = {
           generation_paused_by: string | null
           generation_progress: Json | null
           generation_started_at: string | null
-          generation_status:
-            | Database["public"]["Enums"]["generation_status"]
-            | null
+          generation_status: Database['public']['Enums']['generation_status'] | null
           has_files: boolean | null
           id: string
           is_published: boolean | null
@@ -576,7 +621,7 @@ export type Database = {
           settings: Json | null
           share_token: string | null
           slug: string
-          status: Database["public"]["Enums"]["course_status"]
+          status: Database['public']['Enums']['course_status']
           style: string | null
           target_audience: string | null
           title: string
@@ -585,7 +630,7 @@ export type Database = {
           updated_at: string | null
           user_agent: string | null
           user_id: string
-          visibility: Database["public"]["Enums"]["course_visibility"]
+          visibility: Database['public']['Enums']['course_visibility']
           visual_style: Json | null
           webhook_url: string | null
         }
@@ -601,7 +646,7 @@ export type Database = {
           created_at?: string | null
           difficulty?: string | null
           email?: string | null
-          error_code?: Database["public"]["Enums"]["stage_error_code"] | null
+          error_code?: Database['public']['Enums']['stage_error_code'] | null
           error_details?: Json | null
           error_message?: string | null
           estimated_completion_minutes?: number | null
@@ -617,9 +662,7 @@ export type Database = {
           generation_paused_by?: string | null
           generation_progress?: Json | null
           generation_started_at?: string | null
-          generation_status?:
-            | Database["public"]["Enums"]["generation_status"]
-            | null
+          generation_status?: Database['public']['Enums']['generation_status'] | null
           has_files?: boolean | null
           id?: string
           is_published?: boolean | null
@@ -637,7 +680,7 @@ export type Database = {
           settings?: Json | null
           share_token?: string | null
           slug: string
-          status?: Database["public"]["Enums"]["course_status"]
+          status?: Database['public']['Enums']['course_status']
           style?: string | null
           target_audience?: string | null
           title: string
@@ -646,7 +689,7 @@ export type Database = {
           updated_at?: string | null
           user_agent?: string | null
           user_id: string
-          visibility?: Database["public"]["Enums"]["course_visibility"]
+          visibility?: Database['public']['Enums']['course_visibility']
           visual_style?: Json | null
           webhook_url?: string | null
         }
@@ -662,7 +705,7 @@ export type Database = {
           created_at?: string | null
           difficulty?: string | null
           email?: string | null
-          error_code?: Database["public"]["Enums"]["stage_error_code"] | null
+          error_code?: Database['public']['Enums']['stage_error_code'] | null
           error_details?: Json | null
           error_message?: string | null
           estimated_completion_minutes?: number | null
@@ -678,9 +721,7 @@ export type Database = {
           generation_paused_by?: string | null
           generation_progress?: Json | null
           generation_started_at?: string | null
-          generation_status?:
-            | Database["public"]["Enums"]["generation_status"]
-            | null
+          generation_status?: Database['public']['Enums']['generation_status'] | null
           has_files?: boolean | null
           id?: string
           is_published?: boolean | null
@@ -698,7 +739,7 @@ export type Database = {
           settings?: Json | null
           share_token?: string | null
           slug?: string
-          status?: Database["public"]["Enums"]["course_status"]
+          status?: Database['public']['Enums']['course_status']
           style?: string | null
           target_audience?: string | null
           title?: string
@@ -707,37 +748,37 @@ export type Database = {
           updated_at?: string | null
           user_agent?: string | null
           user_id?: string
-          visibility?: Database["public"]["Enums"]["course_visibility"]
+          visibility?: Database['public']['Enums']['course_visibility']
           visual_style?: Json | null
           webhook_url?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "courses_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'courses_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "courses_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'courses_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "courses_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: 'courses_user_id_fkey'
+            columns: ['user_id']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
         ]
       }
       document_priorities: {
         Row: {
-          category: Database["public"]["Enums"]["document_category"]
+          category: Database['public']['Enums']['document_category']
           classification_rationale: string
           classified_at: string
           course_id: string
@@ -751,7 +792,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          category: Database["public"]["Enums"]["document_category"]
+          category: Database['public']['Enums']['document_category']
           classification_rationale: string
           classified_at?: string
           course_id: string
@@ -765,7 +806,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          category?: Database["public"]["Enums"]["document_category"]
+          category?: Database['public']['Enums']['document_category']
           classification_rationale?: string
           classified_at?: string
           course_id?: string
@@ -780,46 +821,46 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "document_priorities_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'document_priorities_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "document_priorities_file_id_fkey"
-            columns: ["file_id"]
+            foreignKeyName: 'document_priorities_file_id_fkey'
+            columns: ['file_id']
             isOneToOne: true
-            referencedRelation: "file_catalog"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "document_priorities_file_id_fkey"
-            columns: ["file_id"]
+            foreignKeyName: 'document_priorities_file_id_fkey'
+            columns: ['file_id']
             isOneToOne: true
-            referencedRelation: "file_catalog_deduplication_stats"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog_deduplication_stats'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "document_priorities_file_id_fkey"
-            columns: ["file_id"]
+            foreignKeyName: 'document_priorities_file_id_fkey'
+            columns: ['file_id']
             isOneToOne: true
-            referencedRelation: "file_catalog_processing_status"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog_processing_status'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "document_priorities_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'document_priorities_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "document_priorities_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'document_priorities_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -898,25 +939,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "error_logs_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'error_logs_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "error_logs_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'error_logs_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "error_logs_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'error_logs_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -945,7 +986,7 @@ export type Database = {
           storage_path: string
           summary_metadata: Json | null
           updated_at: string | null
-          vector_status: Database["public"]["Enums"]["vector_status"]
+          vector_status: Database['public']['Enums']['vector_status']
         }
         Insert: {
           chunk_count?: number | null
@@ -971,7 +1012,7 @@ export type Database = {
           storage_path: string
           summary_metadata?: Json | null
           updated_at?: string | null
-          vector_status?: Database["public"]["Enums"]["vector_status"]
+          vector_status?: Database['public']['Enums']['vector_status']
         }
         Update: {
           chunk_count?: number | null
@@ -997,50 +1038,50 @@ export type Database = {
           storage_path?: string
           summary_metadata?: Json | null
           updated_at?: string | null
-          vector_status?: Database["public"]["Enums"]["vector_status"]
+          vector_status?: Database['public']['Enums']['vector_status']
         }
         Relationships: [
           {
-            foreignKeyName: "file_catalog_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'file_catalog_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "file_catalog_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'file_catalog_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "file_catalog_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'file_catalog_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "file_catalog_original_file_id_fkey"
-            columns: ["original_file_id"]
+            foreignKeyName: 'file_catalog_original_file_id_fkey'
+            columns: ['original_file_id']
             isOneToOne: false
-            referencedRelation: "file_catalog"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "file_catalog_original_file_id_fkey"
-            columns: ["original_file_id"]
+            foreignKeyName: 'file_catalog_original_file_id_fkey'
+            columns: ['original_file_id']
             isOneToOne: false
-            referencedRelation: "file_catalog_deduplication_stats"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog_deduplication_stats'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "file_catalog_original_file_id_fkey"
-            columns: ["original_file_id"]
+            foreignKeyName: 'file_catalog_original_file_id_fkey'
+            columns: ['original_file_id']
             isOneToOne: false
-            referencedRelation: "file_catalog_processing_status"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog_processing_status'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1074,11 +1115,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fsm_events_entity_id_fkey"
-            columns: ["entity_id"]
+            foreignKeyName: 'fsm_events_entity_id_fkey'
+            columns: ['entity_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1089,8 +1130,8 @@ export type Database = {
           course_id: string
           id: string
           metadata: Json | null
-          new_status: Database["public"]["Enums"]["generation_status"]
-          old_status: Database["public"]["Enums"]["generation_status"] | null
+          new_status: Database['public']['Enums']['generation_status']
+          old_status: Database['public']['Enums']['generation_status'] | null
           trigger_source: string | null
         }
         Insert: {
@@ -1099,8 +1140,8 @@ export type Database = {
           course_id: string
           id?: string
           metadata?: Json | null
-          new_status: Database["public"]["Enums"]["generation_status"]
-          old_status?: Database["public"]["Enums"]["generation_status"] | null
+          new_status: Database['public']['Enums']['generation_status']
+          old_status?: Database['public']['Enums']['generation_status'] | null
           trigger_source?: string | null
         }
         Update: {
@@ -1109,17 +1150,17 @@ export type Database = {
           course_id?: string
           id?: string
           metadata?: Json | null
-          new_status?: Database["public"]["Enums"]["generation_status"]
-          old_status?: Database["public"]["Enums"]["generation_status"] | null
+          new_status?: Database['public']['Enums']['generation_status']
+          old_status?: Database['public']['Enums']['generation_status'] | null
           trigger_source?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "generation_status_history_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'generation_status_history_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1192,25 +1233,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "generation_trace_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'generation_trace_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "generation_trace_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'generation_trace_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons"
-            referencedColumns: ["id"]
+            referencedRelation: 'lessons'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "generation_trace_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'generation_trace_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons_with_latest_content"
-            referencedColumns: ["lesson_id"]
+            referencedRelation: 'lessons_with_latest_content'
+            referencedColumns: ['lesson_id']
           },
         ]
       }
@@ -1238,11 +1279,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "idempotency_keys_entity_id_fkey"
-            columns: ["entity_id"]
+            foreignKeyName: 'idempotency_keys_entity_id_fkey'
+            columns: ['entity_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1288,11 +1329,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "job_outbox_entity_id_fkey"
-            columns: ["entity_id"]
+            foreignKeyName: 'job_outbox_entity_id_fkey'
+            columns: ['entity_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1315,7 +1356,7 @@ export type Database = {
           organization_id: string
           progress: Json | null
           started_at: string | null
-          status: Database["public"]["Enums"]["job_status_enum"]
+          status: Database['public']['Enums']['job_status_enum']
           updated_at: string | null
           user_id: string | null
         }
@@ -1337,7 +1378,7 @@ export type Database = {
           organization_id: string
           progress?: Json | null
           started_at?: string | null
-          status?: Database["public"]["Enums"]["job_status_enum"]
+          status?: Database['public']['Enums']['job_status_enum']
           updated_at?: string | null
           user_id?: string | null
         }
@@ -1359,45 +1400,45 @@ export type Database = {
           organization_id?: string
           progress?: Json | null
           started_at?: string | null
-          status?: Database["public"]["Enums"]["job_status_enum"]
+          status?: Database['public']['Enums']['job_status_enum']
           updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "job_status_cancelled_by_fkey"
-            columns: ["cancelled_by"]
+            foreignKeyName: 'job_status_cancelled_by_fkey'
+            columns: ['cancelled_by']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "job_status_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'job_status_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "job_status_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'job_status_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "job_status_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'job_status_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "job_status_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: 'job_status_user_id_fkey'
+            columns: ['user_id']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1443,32 +1484,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "lesson_contents_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'lesson_contents_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "lesson_contents_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'lesson_contents_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons"
-            referencedColumns: ["id"]
+            referencedRelation: 'lessons'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "lesson_contents_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'lesson_contents_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons_with_latest_content"
-            referencedColumns: ["lesson_id"]
+            referencedRelation: 'lessons_with_latest_content'
+            referencedColumns: ['lesson_id']
           },
           {
-            foreignKeyName: "lesson_contents_parent_content_id_fkey"
-            columns: ["parent_content_id"]
+            foreignKeyName: 'lesson_contents_parent_content_id_fkey'
+            columns: ['parent_content_id']
             isOneToOne: false
-            referencedRelation: "lesson_contents"
-            referencedColumns: ["id"]
+            referencedRelation: 'lesson_contents'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1478,7 +1519,7 @@ export type Database = {
           content: Json | null
           course_id: string
           created_at: string | null
-          enrichment_type: Database["public"]["Enums"]["enrichment_type"]
+          enrichment_type: Database['public']['Enums']['enrichment_type']
           error_details: Json | null
           error_message: string | null
           generated_at: string | null
@@ -1487,7 +1528,7 @@ export type Database = {
           lesson_id: string
           metadata: Json | null
           order_index: number
-          status: Database["public"]["Enums"]["enrichment_status"]
+          status: Database['public']['Enums']['enrichment_status']
           title: string | null
           updated_at: string | null
         }
@@ -1496,7 +1537,7 @@ export type Database = {
           content?: Json | null
           course_id: string
           created_at?: string | null
-          enrichment_type: Database["public"]["Enums"]["enrichment_type"]
+          enrichment_type: Database['public']['Enums']['enrichment_type']
           error_details?: Json | null
           error_message?: string | null
           generated_at?: string | null
@@ -1505,7 +1546,7 @@ export type Database = {
           lesson_id: string
           metadata?: Json | null
           order_index?: number
-          status?: Database["public"]["Enums"]["enrichment_status"]
+          status?: Database['public']['Enums']['enrichment_status']
           title?: string | null
           updated_at?: string | null
         }
@@ -1514,7 +1555,7 @@ export type Database = {
           content?: Json | null
           course_id?: string
           created_at?: string | null
-          enrichment_type?: Database["public"]["Enums"]["enrichment_type"]
+          enrichment_type?: Database['public']['Enums']['enrichment_type']
           error_details?: Json | null
           error_message?: string | null
           generated_at?: string | null
@@ -1523,38 +1564,38 @@ export type Database = {
           lesson_id?: string
           metadata?: Json | null
           order_index?: number
-          status?: Database["public"]["Enums"]["enrichment_status"]
+          status?: Database['public']['Enums']['enrichment_status']
           title?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "lesson_enrichments_asset_id_fkey"
-            columns: ["asset_id"]
+            foreignKeyName: 'lesson_enrichments_asset_id_fkey'
+            columns: ['asset_id']
             isOneToOne: false
-            referencedRelation: "assets"
-            referencedColumns: ["id"]
+            referencedRelation: 'assets'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "lesson_enrichments_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'lesson_enrichments_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "lesson_enrichments_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'lesson_enrichments_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons"
-            referencedColumns: ["id"]
+            referencedRelation: 'lessons'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "lesson_enrichments_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'lesson_enrichments_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons_with_latest_content"
-            referencedColumns: ["lesson_id"]
+            referencedRelation: 'lessons_with_latest_content'
+            referencedColumns: ['lesson_id']
           },
         ]
       }
@@ -1603,25 +1644,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "lesson_progress_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'lesson_progress_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "lesson_progress_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'lesson_progress_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons"
-            referencedColumns: ["id"]
+            referencedRelation: 'lessons'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "lesson_progress_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'lesson_progress_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons_with_latest_content"
-            referencedColumns: ["lesson_id"]
+            referencedRelation: 'lessons_with_latest_content'
+            referencedColumns: ['lesson_id']
           },
         ]
       }
@@ -1630,13 +1671,13 @@ export type Database = {
           created_at: string | null
           duration_minutes: number | null
           id: string
-          lesson_type: Database["public"]["Enums"]["lesson_type"]
+          lesson_type: Database['public']['Enums']['lesson_type']
           metadata: Json | null
           objectives: string[] | null
           order_index: number
           section_id: string
           source_documents: Json | null
-          status: Database["public"]["Enums"]["lesson_status"]
+          status: Database['public']['Enums']['lesson_status']
           title: string
           updated_at: string | null
         }
@@ -1644,13 +1685,13 @@ export type Database = {
           created_at?: string | null
           duration_minutes?: number | null
           id?: string
-          lesson_type: Database["public"]["Enums"]["lesson_type"]
+          lesson_type: Database['public']['Enums']['lesson_type']
           metadata?: Json | null
           objectives?: string[] | null
           order_index: number
           section_id: string
           source_documents?: Json | null
-          status?: Database["public"]["Enums"]["lesson_status"]
+          status?: Database['public']['Enums']['lesson_status']
           title: string
           updated_at?: string | null
         }
@@ -1658,245 +1699,25 @@ export type Database = {
           created_at?: string | null
           duration_minutes?: number | null
           id?: string
-          lesson_type?: Database["public"]["Enums"]["lesson_type"]
+          lesson_type?: Database['public']['Enums']['lesson_type']
           metadata?: Json | null
           objectives?: string[] | null
           order_index?: number
           section_id?: string
           source_documents?: Json | null
-          status?: Database["public"]["Enums"]["lesson_status"]
+          status?: Database['public']['Enums']['lesson_status']
           title?: string
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "lessons_section_id_fkey"
-            columns: ["section_id"]
+            foreignKeyName: 'lessons_section_id_fkey'
+            columns: ['section_id']
             isOneToOne: false
-            referencedRelation: "sections"
-            referencedColumns: ["id"]
+            referencedRelation: 'sections'
+            referencedColumns: ['id']
           },
         ]
-      }
-      llm_benchmark_runs: {
-        Row: {
-          benchmark_id: string
-          content_score: number
-          created_at: string | null
-          error_message: string | null
-          heuristic_result: Json | null
-          id: string
-          is_error: boolean | null
-          issues: Json | null
-          language: string
-          language_score: number
-          overall_score: number
-          run_number: number
-          scenario: string
-          schema_score: number
-        }
-        Insert: {
-          benchmark_id: string
-          content_score: number
-          created_at?: string | null
-          error_message?: string | null
-          heuristic_result?: Json | null
-          id?: string
-          is_error?: boolean | null
-          issues?: Json | null
-          language: string
-          language_score: number
-          overall_score: number
-          run_number: number
-          scenario: string
-          schema_score: number
-        }
-        Update: {
-          benchmark_id?: string
-          content_score?: number
-          created_at?: string | null
-          error_message?: string | null
-          heuristic_result?: Json | null
-          id?: string
-          is_error?: boolean | null
-          issues?: Json | null
-          language?: string
-          language_score?: number
-          overall_score?: number
-          run_number?: number
-          scenario?: string
-          schema_score?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "llm_benchmark_runs_benchmark_id_fkey"
-            columns: ["benchmark_id"]
-            isOneToOne: false
-            referencedRelation: "llm_model_benchmarks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      llm_benchmark_samples: {
-        Row: {
-          benchmark_id: string | null
-          created_at: string | null
-          final_score: number | null
-          generation_time_ms: number | null
-          id: string
-          input_prompt: string | null
-          judge_scores: Json | null
-          language: string
-          model_slug: string
-          output_content: string
-          output_preview: string | null
-          scenario: string
-          score_breakdown: Json | null
-          test_session_id: string
-          tier: string | null
-          token_count: number | null
-          word_count: number | null
-        }
-        Insert: {
-          benchmark_id?: string | null
-          created_at?: string | null
-          final_score?: number | null
-          generation_time_ms?: number | null
-          id?: string
-          input_prompt?: string | null
-          judge_scores?: Json | null
-          language: string
-          model_slug: string
-          output_content: string
-          output_preview?: string | null
-          scenario: string
-          score_breakdown?: Json | null
-          test_session_id: string
-          tier?: string | null
-          token_count?: number | null
-          word_count?: number | null
-        }
-        Update: {
-          benchmark_id?: string | null
-          created_at?: string | null
-          final_score?: number | null
-          generation_time_ms?: number | null
-          id?: string
-          input_prompt?: string | null
-          judge_scores?: Json | null
-          language?: string
-          model_slug?: string
-          output_content?: string
-          output_preview?: string | null
-          scenario?: string
-          score_breakdown?: Json | null
-          test_session_id?: string
-          tier?: string | null
-          token_count?: number | null
-          word_count?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "llm_benchmark_samples_benchmark_id_fkey"
-            columns: ["benchmark_id"]
-            isOneToOne: false
-            referencedRelation: "llm_model_benchmarks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      llm_model_benchmarks: {
-        Row: {
-          content_quality_score: number
-          created_at: string | null
-          critical_issues: number | null
-          error_rate: number | null
-          heuristic_scores: Json
-          id: string
-          language_quality_score: number
-          model_name: string
-          model_slug: string
-          overall_quality_score: number
-          provider: string
-          quality_tier: string
-          raw_results_path: string | null
-          schema_compliance_score: number
-          score_bonuses: number | null
-          score_no_hallucinations: number | null
-          score_penalties: number | null
-          score_practical_value: number | null
-          score_semantic_quality: number | null
-          score_structure: number | null
-          score_task_compliance: number | null
-          score_visualization: number | null
-          test_date: string
-          test_session_id: string | null
-          test_version: string
-          total_issues: number | null
-          total_points: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          content_quality_score: number
-          created_at?: string | null
-          critical_issues?: number | null
-          error_rate?: number | null
-          heuristic_scores?: Json
-          id?: string
-          language_quality_score: number
-          model_name: string
-          model_slug: string
-          overall_quality_score: number
-          provider: string
-          quality_tier: string
-          raw_results_path?: string | null
-          schema_compliance_score: number
-          score_bonuses?: number | null
-          score_no_hallucinations?: number | null
-          score_penalties?: number | null
-          score_practical_value?: number | null
-          score_semantic_quality?: number | null
-          score_structure?: number | null
-          score_task_compliance?: number | null
-          score_visualization?: number | null
-          test_date?: string
-          test_session_id?: string | null
-          test_version: string
-          total_issues?: number | null
-          total_points?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          content_quality_score?: number
-          created_at?: string | null
-          critical_issues?: number | null
-          error_rate?: number | null
-          heuristic_scores?: Json
-          id?: string
-          language_quality_score?: number
-          model_name?: string
-          model_slug?: string
-          overall_quality_score?: number
-          provider?: string
-          quality_tier?: string
-          raw_results_path?: string | null
-          schema_compliance_score?: number
-          score_bonuses?: number | null
-          score_no_hallucinations?: number | null
-          score_penalties?: number | null
-          score_practical_value?: number | null
-          score_semantic_quality?: number | null
-          score_structure?: number | null
-          score_task_compliance?: number | null
-          score_visualization?: number | null
-          test_date?: string
-          test_session_id?: string | null
-          test_version?: string
-          total_issues?: number | null
-          total_points?: number | null
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       llm_model_config: {
         Row: {
@@ -1985,18 +1806,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "llm_model_config_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'llm_model_config_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "llm_model_config_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: 'llm_model_config_created_by_fkey'
+            columns: ['created_by']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2054,18 +1875,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "lms_configurations_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'lms_configurations_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "lms_configurations_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'lms_configurations_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2129,18 +1950,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "lms_import_jobs_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'lms_import_jobs_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "lms_import_jobs_lms_config_id_fkey"
-            columns: ["lms_config_id"]
+            foreignKeyName: 'lms_import_jobs_lms_config_id_fkey'
+            columns: ['lms_config_id']
             isOneToOne: false
-            referencedRelation: "lms_configurations"
-            referencedColumns: ["id"]
+            referencedRelation: 'lms_configurations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2183,18 +2004,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "log_issue_status_assigned_to_fkey"
-            columns: ["assigned_to"]
+            foreignKeyName: 'log_issue_status_assigned_to_fkey'
+            columns: ['assigned_to']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "log_issue_status_updated_by_fkey"
-            columns: ["updated_by"]
+            foreignKeyName: 'log_issue_status_updated_by_fkey'
+            columns: ['updated_by']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2209,11 +2030,11 @@ export type Database = {
           email: string | null
           expires_at: string
           id: string
-          invitation_type: Database["public"]["Enums"]["invitation_type"]
+          invitation_type: Database['public']['Enums']['invitation_type']
           max_uses: number | null
           organization_id: string
-          role: Database["public"]["Enums"]["org_role"]
-          status: Database["public"]["Enums"]["invitation_status"]
+          role: Database['public']['Enums']['org_role']
+          status: Database['public']['Enums']['invitation_status']
           token: string | null
         }
         Insert: {
@@ -2226,11 +2047,11 @@ export type Database = {
           email?: string | null
           expires_at: string
           id?: string
-          invitation_type: Database["public"]["Enums"]["invitation_type"]
+          invitation_type: Database['public']['Enums']['invitation_type']
           max_uses?: number | null
           organization_id: string
-          role?: Database["public"]["Enums"]["org_role"]
-          status?: Database["public"]["Enums"]["invitation_status"]
+          role?: Database['public']['Enums']['org_role']
+          status?: Database['public']['Enums']['invitation_status']
           token?: string | null
         }
         Update: {
@@ -2243,27 +2064,27 @@ export type Database = {
           email?: string | null
           expires_at?: string
           id?: string
-          invitation_type?: Database["public"]["Enums"]["invitation_type"]
+          invitation_type?: Database['public']['Enums']['invitation_type']
           max_uses?: number | null
           organization_id?: string
-          role?: Database["public"]["Enums"]["org_role"]
-          status?: Database["public"]["Enums"]["invitation_status"]
+          role?: Database['public']['Enums']['org_role']
+          status?: Database['public']['Enums']['invitation_status']
           token?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "organization_invitations_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'organization_invitations_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "organization_invitations_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'organization_invitations_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2273,7 +2094,7 @@ export type Database = {
           invited_by: string | null
           joined_at: string
           organization_id: string
-          role: Database["public"]["Enums"]["org_role"]
+          role: Database['public']['Enums']['org_role']
           user_id: string
         }
         Insert: {
@@ -2281,7 +2102,7 @@ export type Database = {
           invited_by?: string | null
           joined_at?: string
           organization_id: string
-          role?: Database["public"]["Enums"]["org_role"]
+          role?: Database['public']['Enums']['org_role']
           user_id: string
         }
         Update: {
@@ -2289,23 +2110,23 @@ export type Database = {
           invited_by?: string | null
           joined_at?: string
           organization_id?: string
-          role?: Database["public"]["Enums"]["org_role"]
+          role?: Database['public']['Enums']['org_role']
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "organization_members_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'organization_members_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "organization_members_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'organization_members_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2321,7 +2142,7 @@ export type Database = {
           slug: string
           storage_quota_bytes: number
           storage_used_bytes: number
-          tier: Database["public"]["Enums"]["tier"] | null
+          tier: Database['public']['Enums']['tier'] | null
           updated_at: string | null
         }
         Insert: {
@@ -2335,7 +2156,7 @@ export type Database = {
           slug: string
           storage_quota_bytes?: number
           storage_used_bytes?: number
-          tier?: Database["public"]["Enums"]["tier"] | null
+          tier?: Database['public']['Enums']['tier'] | null
           updated_at?: string | null
         }
         Update: {
@@ -2349,7 +2170,7 @@ export type Database = {
           slug?: string
           storage_quota_bytes?: number
           storage_used_bytes?: number
-          tier?: Database["public"]["Enums"]["tier"] | null
+          tier?: Database['public']['Enums']['tier'] | null
           updated_at?: string | null
         }
         Relationships: []
@@ -2384,11 +2205,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "pipeline_global_settings_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: 'pipeline_global_settings_created_by_fkey'
+            columns: ['created_by']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2455,11 +2276,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "prompt_templates_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: 'prompt_templates_created_by_fkey'
+            columns: ['created_by']
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: 'users'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2553,25 +2374,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "rag_context_cache_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'rag_context_cache_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "rag_context_cache_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'rag_context_cache_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons"
-            referencedColumns: ["id"]
+            referencedRelation: 'lessons'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "rag_context_cache_lesson_id_fkey"
-            columns: ["lesson_id"]
+            foreignKeyName: 'rag_context_cache_lesson_id_fkey'
+            columns: ['lesson_id']
             isOneToOne: false
-            referencedRelation: "lessons_with_latest_content"
-            referencedColumns: ["lesson_id"]
+            referencedRelation: 'lessons_with_latest_content'
+            referencedColumns: ['lesson_id']
           },
         ]
       }
@@ -2662,11 +2483,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "refinement_config_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'refinement_config_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2703,55 +2524,55 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "sections_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'sections_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
       system_metrics: {
         Row: {
           course_id: string | null
-          event_type: Database["public"]["Enums"]["metric_event_type"]
+          event_type: Database['public']['Enums']['metric_event_type']
           id: string
           job_id: string | null
           message: string | null
           metadata: Json | null
-          severity: Database["public"]["Enums"]["metric_severity"]
+          severity: Database['public']['Enums']['metric_severity']
           timestamp: string
           user_id: string | null
         }
         Insert: {
           course_id?: string | null
-          event_type: Database["public"]["Enums"]["metric_event_type"]
+          event_type: Database['public']['Enums']['metric_event_type']
           id?: string
           job_id?: string | null
           message?: string | null
           metadata?: Json | null
-          severity: Database["public"]["Enums"]["metric_severity"]
+          severity: Database['public']['Enums']['metric_severity']
           timestamp?: string
           user_id?: string | null
         }
         Update: {
           course_id?: string | null
-          event_type?: Database["public"]["Enums"]["metric_event_type"]
+          event_type?: Database['public']['Enums']['metric_event_type']
           id?: string
           job_id?: string | null
           message?: string | null
           metadata?: Json | null
-          severity?: Database["public"]["Enums"]["metric_severity"]
+          severity?: Database['public']['Enums']['metric_severity']
           timestamp?: string
           user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "system_metrics_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'system_metrics_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2840,7 +2661,7 @@ export type Database = {
           id: string
           is_active: boolean
           organization_id: string
-          role: Database["public"]["Enums"]["role"]
+          role: Database['public']['Enums']['role']
           telegram_chat_id: string | null
           telegram_notifications_enabled: boolean | null
           updated_at: string | null
@@ -2854,7 +2675,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           organization_id: string
-          role?: Database["public"]["Enums"]["role"]
+          role?: Database['public']['Enums']['role']
           telegram_chat_id?: string | null
           telegram_notifications_enabled?: boolean | null
           updated_at?: string | null
@@ -2868,25 +2689,25 @@ export type Database = {
           id?: string
           is_active?: boolean
           organization_id?: string
-          role?: Database["public"]["Enums"]["role"]
+          role?: Database['public']['Enums']['role']
           telegram_chat_id?: string | null
           telegram_notifications_enabled?: boolean | null
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "users_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'users_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "users_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'users_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2896,9 +2717,7 @@ export type Database = {
         Row: {
           avg_duration_seconds: number | null
           course_count: number | null
-          generation_status:
-            | Database["public"]["Enums"]["generation_status"]
-            | null
+          generation_status: Database['public']['Enums']['generation_status'] | null
           most_recent_update: string | null
           stuck_count: number | null
         }
@@ -2932,7 +2751,7 @@ export type Database = {
           reference_copies: number | null
           reference_count: number | null
           storage_saved_bytes: number | null
-          vector_status: Database["public"]["Enums"]["vector_status"] | null
+          vector_status: Database['public']['Enums']['vector_status'] | null
         }
         Insert: {
           course_id?: string | null
@@ -2947,7 +2766,7 @@ export type Database = {
           reference_copies?: never
           reference_count?: number | null
           storage_saved_bytes?: never
-          vector_status?: Database["public"]["Enums"]["vector_status"] | null
+          vector_status?: Database['public']['Enums']['vector_status'] | null
         }
         Update: {
           course_id?: string | null
@@ -2962,50 +2781,50 @@ export type Database = {
           reference_copies?: never
           reference_count?: number | null
           storage_saved_bytes?: never
-          vector_status?: Database["public"]["Enums"]["vector_status"] | null
+          vector_status?: Database['public']['Enums']['vector_status'] | null
         }
         Relationships: [
           {
-            foreignKeyName: "file_catalog_course_id_fkey"
-            columns: ["course_id"]
+            foreignKeyName: 'file_catalog_course_id_fkey'
+            columns: ['course_id']
             isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
+            referencedRelation: 'courses'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "file_catalog_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'file_catalog_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organization_deduplication_stats"
-            referencedColumns: ["organization_id"]
+            referencedRelation: 'organization_deduplication_stats'
+            referencedColumns: ['organization_id']
           },
           {
-            foreignKeyName: "file_catalog_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'file_catalog_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "file_catalog_original_file_id_fkey"
-            columns: ["original_file_id"]
+            foreignKeyName: 'file_catalog_original_file_id_fkey'
+            columns: ['original_file_id']
             isOneToOne: false
-            referencedRelation: "file_catalog"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "file_catalog_original_file_id_fkey"
-            columns: ["original_file_id"]
+            foreignKeyName: 'file_catalog_original_file_id_fkey'
+            columns: ['original_file_id']
             isOneToOne: false
-            referencedRelation: "file_catalog_deduplication_stats"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog_deduplication_stats'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "file_catalog_original_file_id_fkey"
-            columns: ["original_file_id"]
+            foreignKeyName: 'file_catalog_original_file_id_fkey'
+            columns: ['original_file_id']
             isOneToOne: false
-            referencedRelation: "file_catalog_processing_status"
-            referencedColumns: ["id"]
+            referencedRelation: 'file_catalog_processing_status'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -3022,7 +2841,7 @@ export type Database = {
           table_count: number | null
           text_elements: number | null
           updated_at: string | null
-          vector_status: Database["public"]["Enums"]["vector_status"] | null
+          vector_status: Database['public']['Enums']['vector_status'] | null
         }
         Insert: {
           created_at?: string | null
@@ -3036,7 +2855,7 @@ export type Database = {
           table_count?: never
           text_elements?: never
           updated_at?: string | null
-          vector_status?: Database["public"]["Enums"]["vector_status"] | null
+          vector_status?: Database['public']['Enums']['vector_status'] | null
         }
         Update: {
           created_at?: string | null
@@ -3050,7 +2869,7 @@ export type Database = {
           table_count?: never
           text_elements?: never
           updated_at?: string | null
-          vector_status?: Database["public"]["Enums"]["vector_status"] | null
+          vector_status?: Database['public']['Enums']['vector_status'] | null
         }
         Relationships: []
       }
@@ -3066,112 +2885,13 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "lessons_section_id_fkey"
-            columns: ["section_id"]
+            foreignKeyName: 'lessons_section_id_fkey'
+            columns: ['section_id']
             isOneToOne: false
-            referencedRelation: "sections"
-            referencedColumns: ["id"]
+            referencedRelation: 'sections'
+            referencedColumns: ['id']
           },
         ]
-      }
-      llm_benchmark_comparison: {
-        Row: {
-          generation_time_ms: number | null
-          model_name: string | null
-          model_slug: string | null
-          output_preview: string | null
-          points: number | null
-          provider: string | null
-          quality_tier: string | null
-          score_no_hallucinations: number | null
-          score_practical_value: number | null
-          score_semantic_quality: number | null
-          score_structure: number | null
-          score_task_compliance: number | null
-          score_visualization: number | null
-          test_date: string | null
-          test_session_id: string | null
-          word_count: number | null
-        }
-        Relationships: []
-      }
-      llm_model_leaderboard: {
-        Row: {
-          content_quality_score: number | null
-          critical_issues: number | null
-          error_rate: number | null
-          language_quality_score: number | null
-          model_name: string | null
-          model_slug: string | null
-          overall_quality_score: number | null
-          provider: string | null
-          quality_tier: string | null
-          schema_compliance_score: number | null
-          score_bonuses: number | null
-          score_no_hallucinations: number | null
-          score_penalties: number | null
-          score_practical_value: number | null
-          score_semantic_quality: number | null
-          score_structure: number | null
-          score_task_compliance: number | null
-          score_visualization: number | null
-          test_date: string | null
-          test_session_id: string | null
-          test_version: string | null
-          total_issues: number | null
-          total_points: number | null
-        }
-        Insert: {
-          content_quality_score?: number | null
-          critical_issues?: number | null
-          error_rate?: number | null
-          language_quality_score?: number | null
-          model_name?: string | null
-          model_slug?: string | null
-          overall_quality_score?: number | null
-          provider?: string | null
-          quality_tier?: string | null
-          schema_compliance_score?: number | null
-          score_bonuses?: number | null
-          score_no_hallucinations?: number | null
-          score_penalties?: number | null
-          score_practical_value?: number | null
-          score_semantic_quality?: number | null
-          score_structure?: number | null
-          score_task_compliance?: number | null
-          score_visualization?: number | null
-          test_date?: string | null
-          test_session_id?: string | null
-          test_version?: string | null
-          total_issues?: number | null
-          total_points?: number | null
-        }
-        Update: {
-          content_quality_score?: number | null
-          critical_issues?: number | null
-          error_rate?: number | null
-          language_quality_score?: number | null
-          model_name?: string | null
-          model_slug?: string | null
-          overall_quality_score?: number | null
-          provider?: string | null
-          quality_tier?: string | null
-          schema_compliance_score?: number | null
-          score_bonuses?: number | null
-          score_no_hallucinations?: number | null
-          score_penalties?: number | null
-          score_practical_value?: number | null
-          score_semantic_quality?: number | null
-          score_structure?: number | null
-          score_task_compliance?: number | null
-          score_visualization?: number | null
-          test_date?: string | null
-          test_session_id?: string | null
-          test_version?: string | null
-          total_issues?: number | null
-          total_points?: number | null
-        }
-        Relationships: []
       }
       organization_deduplication_stats: {
         Row: {
@@ -3205,7 +2925,7 @@ export type Database = {
       acquire_generation_lock: {
         Args: {
           p_course_id: string
-          p_stage: Database["public"]["Enums"]["generation_stage"]
+          p_stage: Database['public']['Enums']['generation_stage']
           p_ttl_minutes?: number
           p_worker_id: string
         }
@@ -3244,12 +2964,10 @@ export type Database = {
           total_lessons: number
         }[]
       }
-      calculate_quality_tier: { Args: { score: number }; Returns: string }
-      calculate_tier_from_points: { Args: { points: number }; Returns: string }
       check_generation_lock: {
         Args: {
           p_course_id: string
-          p_stage: Database["public"]["Enums"]["generation_stage"]
+          p_stage: Database['public']['Enums']['generation_stage']
         }
         Returns: {
           expires_at: string
@@ -3337,10 +3055,7 @@ export type Database = {
           success: boolean
         }[]
       }
-      delete_course_cascade: {
-        Args: { p_course_id: string }
-        Returns: Json
-      }
+      delete_course_cascade: { Args: { p_course_id: string }; Returns: Json }
       expire_old_invitations: { Args: never; Returns: number }
       export_archive_to_json: {
         Args: { p_age_days?: number }
@@ -3404,8 +3119,8 @@ export type Database = {
           video_watched_percent: number | null
         }[]
         SetofOptions: {
-          from: "*"
-          to: "lesson_progress"
+          from: '*'
+          to: 'lesson_progress'
           isOneToOne: false
           isSetofReturn: true
         }
@@ -3524,8 +3239,8 @@ export type Database = {
           updated_at: string | null
         }
         SetofOptions: {
-          from: "*"
-          to: "tier_settings"
+          from: '*'
+          to: 'tier_settings'
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3635,12 +3350,16 @@ export type Database = {
       release_generation_lock: {
         Args: {
           p_course_id: string
-          p_stage: Database["public"]["Enums"]["generation_stage"]
+          p_stage: Database['public']['Enums']['generation_stage']
           p_worker_id?: string
         }
         Returns: boolean
       }
       reset_storage_quota: { Args: { org_id: string }; Returns: boolean }
+      resolve_inactive_to_verify: {
+        Args: { p_inactive_days?: number }
+        Returns: Json
+      }
       restart_from_stage: {
         Args: { p_course_id: string; p_stage_number: number; p_user_id: string }
         Returns: Json
@@ -3668,7 +3387,7 @@ export type Database = {
         Returns: boolean
       }
       show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
+      show_trgm: { Args: { '': string }; Returns: string[] }
       soft_delete_organization: { Args: { org_id: string }; Returns: boolean }
       test_set_jwt: { Args: { user_id: string }; Returns: undefined }
       transfer_organization_ownership: {
@@ -3755,8 +3474,8 @@ export type Database = {
           video_watched_percent: number | null
         }
         SetofOptions: {
-          from: "*"
-          to: "lesson_progress"
+          from: '*'
+          to: 'lesson_progress'
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3771,98 +3490,83 @@ export type Database = {
       }
     }
     Enums: {
-      course_status: "draft" | "published" | "archived"
-      course_visibility: "private" | "organization" | "public"
-      document_category:
-        | "course_core"
-        | "supplementary"
-        | "reference"
-        | "regulatory"
+      course_status: 'draft' | 'published' | 'archived'
+      course_visibility: 'private' | 'organization' | 'public'
+      document_category: 'course_core' | 'supplementary' | 'reference' | 'regulatory'
       enrichment_status:
-        | "pending"
-        | "draft_generating"
-        | "draft_ready"
-        | "generating"
-        | "completed"
-        | "failed"
-        | "cancelled"
+        | 'pending'
+        | 'draft_generating'
+        | 'draft_ready'
+        | 'generating'
+        | 'completed'
+        | 'failed'
+        | 'cancelled'
       enrichment_type:
-        | "video"
-        | "audio"
-        | "presentation"
-        | "quiz"
-        | "document"
-        | "cover"
-        | "card"
-        | "banner"
-      enrollment_status: "active" | "completed" | "dropped" | "expired"
-      generation_stage: "stage4" | "stage5" | "stage6"
+        | 'video'
+        | 'audio'
+        | 'presentation'
+        | 'quiz'
+        | 'document'
+        | 'cover'
+        | 'card'
+        | 'banner'
+      enrollment_status: 'active' | 'completed' | 'dropped' | 'expired'
+      generation_stage: 'stage4' | 'stage5' | 'stage6'
       generation_status:
-        | "pending"
-        | "stage_2_init"
-        | "stage_2_processing"
-        | "stage_2_complete"
-        | "stage_2_awaiting_approval"
-        | "stage_3_init"
-        | "stage_3_summarizing"
-        | "stage_3_complete"
-        | "stage_3_awaiting_approval"
-        | "stage_4_init"
-        | "stage_4_clarifying"
-        | "stage_4_analyzing"
-        | "stage_4_complete"
-        | "stage_4_awaiting_approval"
-        | "stage_5_init"
-        | "stage_5_generating"
-        | "stage_5_complete"
-        | "stage_5_awaiting_approval"
-        | "stage_6_init"
-        | "stage_6_generating"
-        | "stage_6_complete"
-        | "finalizing"
-        | "completed"
-        | "failed"
-        | "cancelled"
-      invitation_status: "pending" | "accepted" | "expired" | "revoked"
-      invitation_type: "email" | "link" | "code"
-      job_status_enum:
-        | "pending"
-        | "waiting"
-        | "active"
-        | "completed"
-        | "failed"
-        | "delayed"
-      lesson_content_status:
-        | "pending"
-        | "generating"
-        | "completed"
-        | "failed"
-        | "review_required"
-      lesson_status: "draft" | "published" | "archived"
-      lesson_type: "video" | "text" | "quiz" | "interactive" | "assignment"
+        | 'pending'
+        | 'stage_2_init'
+        | 'stage_2_processing'
+        | 'stage_2_complete'
+        | 'stage_2_awaiting_approval'
+        | 'stage_3_init'
+        | 'stage_3_summarizing'
+        | 'stage_3_complete'
+        | 'stage_3_awaiting_approval'
+        | 'stage_4_init'
+        | 'stage_4_clarifying'
+        | 'stage_4_analyzing'
+        | 'stage_4_complete'
+        | 'stage_4_awaiting_approval'
+        | 'stage_5_init'
+        | 'stage_5_generating'
+        | 'stage_5_complete'
+        | 'stage_5_awaiting_approval'
+        | 'stage_6_init'
+        | 'stage_6_generating'
+        | 'stage_6_complete'
+        | 'finalizing'
+        | 'completed'
+        | 'failed'
+        | 'cancelled'
+      invitation_status: 'pending' | 'accepted' | 'expired' | 'revoked'
+      invitation_type: 'email' | 'link' | 'code'
+      job_status_enum: 'pending' | 'waiting' | 'active' | 'completed' | 'failed' | 'delayed'
+      lesson_content_status: 'pending' | 'generating' | 'completed' | 'failed' | 'review_required'
+      lesson_status: 'draft' | 'published' | 'archived'
+      lesson_type: 'video' | 'text' | 'quiz' | 'interactive' | 'assignment'
       metric_event_type:
-        | "job_rollback"
-        | "orphaned_job_recovery"
-        | "concurrency_limit_hit"
-        | "worker_timeout"
-        | "rpc_retry_exhausted"
-        | "duplicate_job_detected"
-        | "llm_phase_execution"
-        | "json_repair_execution"
-      metric_severity: "info" | "warn" | "error" | "fatal"
-      org_role: "owner" | "admin" | "instructor" | "student" | "manager"
-      role: "admin" | "superadmin" | "instructor" | "student"
+        | 'job_rollback'
+        | 'orphaned_job_recovery'
+        | 'concurrency_limit_hit'
+        | 'worker_timeout'
+        | 'rpc_retry_exhausted'
+        | 'duplicate_job_detected'
+        | 'llm_phase_execution'
+        | 'json_repair_execution'
+      metric_severity: 'info' | 'warn' | 'error' | 'fatal'
+      org_role: 'owner' | 'admin' | 'instructor' | 'student' | 'manager'
+      role: 'admin' | 'superadmin' | 'instructor' | 'student'
       stage_error_code:
-        | "LOCK_ACQUISITION_FAILED"
-        | "ORCHESTRATION_FAILED"
-        | "VALIDATION_FAILED"
-        | "QUALITY_THRESHOLD_NOT_MET"
-        | "DATABASE_ERROR"
-        | "TIMEOUT"
-        | "UNKNOWN"
-        | "BARRIER_FAILED"
-      tier: "trial" | "free" | "basic" | "standard" | "premium"
-      vector_status: "pending" | "indexing" | "indexed" | "failed"
+        | 'LOCK_ACQUISITION_FAILED'
+        | 'ORCHESTRATION_FAILED'
+        | 'VALIDATION_FAILED'
+        | 'QUALITY_THRESHOLD_NOT_MET'
+        | 'DATABASE_ERROR'
+        | 'TIMEOUT'
+        | 'UNKNOWN'
+        | 'BARRIER_FAILED'
+      tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium'
+      vector_status: 'pending' | 'indexing' | 'indexed' | 'failed'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3870,33 +3574,31 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -3905,23 +3607,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -3930,23 +3632,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -3955,141 +3657,123 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
+    | keyof DefaultSchema['Enums']
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
+    | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
     Enums: {
-      course_status: ["draft", "published", "archived"],
-      course_visibility: ["private", "organization", "public"],
-      document_category: [
-        "course_core",
-        "supplementary",
-        "reference",
-        "regulatory",
-      ],
+      course_status: ['draft', 'published', 'archived'],
+      course_visibility: ['private', 'organization', 'public'],
+      document_category: ['course_core', 'supplementary', 'reference', 'regulatory'],
       enrichment_status: [
-        "pending",
-        "draft_generating",
-        "draft_ready",
-        "generating",
-        "completed",
-        "failed",
-        "cancelled",
+        'pending',
+        'draft_generating',
+        'draft_ready',
+        'generating',
+        'completed',
+        'failed',
+        'cancelled',
       ],
       enrichment_type: [
-        "video",
-        "audio",
-        "presentation",
-        "quiz",
-        "document",
-        "cover",
-        "card",
-        "banner",
+        'video',
+        'audio',
+        'presentation',
+        'quiz',
+        'document',
+        'cover',
+        'card',
+        'banner',
       ],
-      enrollment_status: ["active", "completed", "dropped", "expired"],
-      generation_stage: ["stage4", "stage5", "stage6"],
+      enrollment_status: ['active', 'completed', 'dropped', 'expired'],
+      generation_stage: ['stage4', 'stage5', 'stage6'],
       generation_status: [
-        "pending",
-        "stage_2_init",
-        "stage_2_processing",
-        "stage_2_complete",
-        "stage_2_awaiting_approval",
-        "stage_3_init",
-        "stage_3_summarizing",
-        "stage_3_complete",
-        "stage_3_awaiting_approval",
-        "stage_4_init",
-        "stage_4_clarifying",
-        "stage_4_analyzing",
-        "stage_4_complete",
-        "stage_4_awaiting_approval",
-        "stage_5_init",
-        "stage_5_generating",
-        "stage_5_complete",
-        "stage_5_awaiting_approval",
-        "stage_6_init",
-        "stage_6_generating",
-        "stage_6_complete",
-        "finalizing",
-        "completed",
-        "failed",
-        "cancelled",
+        'pending',
+        'stage_2_init',
+        'stage_2_processing',
+        'stage_2_complete',
+        'stage_2_awaiting_approval',
+        'stage_3_init',
+        'stage_3_summarizing',
+        'stage_3_complete',
+        'stage_3_awaiting_approval',
+        'stage_4_init',
+        'stage_4_clarifying',
+        'stage_4_analyzing',
+        'stage_4_complete',
+        'stage_4_awaiting_approval',
+        'stage_5_init',
+        'stage_5_generating',
+        'stage_5_complete',
+        'stage_5_awaiting_approval',
+        'stage_6_init',
+        'stage_6_generating',
+        'stage_6_complete',
+        'finalizing',
+        'completed',
+        'failed',
+        'cancelled',
       ],
-      invitation_status: ["pending", "accepted", "expired", "revoked"],
-      invitation_type: ["email", "link", "code"],
-      job_status_enum: [
-        "pending",
-        "waiting",
-        "active",
-        "completed",
-        "failed",
-        "delayed",
-      ],
-      lesson_content_status: [
-        "pending",
-        "generating",
-        "completed",
-        "failed",
-        "review_required",
-      ],
-      lesson_status: ["draft", "published", "archived"],
-      lesson_type: ["video", "text", "quiz", "interactive", "assignment"],
+      invitation_status: ['pending', 'accepted', 'expired', 'revoked'],
+      invitation_type: ['email', 'link', 'code'],
+      job_status_enum: ['pending', 'waiting', 'active', 'completed', 'failed', 'delayed'],
+      lesson_content_status: ['pending', 'generating', 'completed', 'failed', 'review_required'],
+      lesson_status: ['draft', 'published', 'archived'],
+      lesson_type: ['video', 'text', 'quiz', 'interactive', 'assignment'],
       metric_event_type: [
-        "job_rollback",
-        "orphaned_job_recovery",
-        "concurrency_limit_hit",
-        "worker_timeout",
-        "rpc_retry_exhausted",
-        "duplicate_job_detected",
-        "llm_phase_execution",
-        "json_repair_execution",
+        'job_rollback',
+        'orphaned_job_recovery',
+        'concurrency_limit_hit',
+        'worker_timeout',
+        'rpc_retry_exhausted',
+        'duplicate_job_detected',
+        'llm_phase_execution',
+        'json_repair_execution',
       ],
-      metric_severity: ["info", "warn", "error", "fatal"],
-      org_role: ["owner", "admin", "instructor", "student", "manager"],
-      role: ["admin", "superadmin", "instructor", "student"],
+      metric_severity: ['info', 'warn', 'error', 'fatal'],
+      org_role: ['owner', 'admin', 'instructor', 'student', 'manager'],
+      role: ['admin', 'superadmin', 'instructor', 'student'],
       stage_error_code: [
-        "LOCK_ACQUISITION_FAILED",
-        "ORCHESTRATION_FAILED",
-        "VALIDATION_FAILED",
-        "QUALITY_THRESHOLD_NOT_MET",
-        "DATABASE_ERROR",
-        "TIMEOUT",
-        "UNKNOWN",
-        "BARRIER_FAILED",
+        'LOCK_ACQUISITION_FAILED',
+        'ORCHESTRATION_FAILED',
+        'VALIDATION_FAILED',
+        'QUALITY_THRESHOLD_NOT_MET',
+        'DATABASE_ERROR',
+        'TIMEOUT',
+        'UNKNOWN',
+        'BARRIER_FAILED',
       ],
-      tier: ["trial", "free", "basic", "standard", "premium"],
-      vector_status: ["pending", "indexing", "indexed", "failed"],
+      tier: ['trial', 'free', 'basic', 'standard', 'premium'],
+      vector_status: ['pending', 'indexing', 'indexed', 'failed'],
     },
   },
 } as const
