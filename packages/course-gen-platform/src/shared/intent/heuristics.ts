@@ -14,6 +14,8 @@ interface HeuristicRule {
   pattern: RegExp;
   intent: ClassifiedIntent['intent'];
   confidence: number;
+  /** If true, the rule needs target resolution — pass user message as identifier */
+  needsTarget?: boolean;
 }
 
 /**
@@ -35,12 +37,14 @@ const HEURISTIC_RULES: HeuristicRule[] = [
       /(?:удали|убери|убрать|удалить|delete|remove)\s+(?:урок|lesson|секци[юя]|section|раздел)/i,
     intent: 'DELETE_LESSON',
     confidence: 0.9,
+    needsTarget: true,
   },
   {
     pattern:
       /(?:удали|убери|убрать|удалить|delete|remove)\s+(?:последн(?:ий|юю)|первую|первый|last|first)\s+(?:секци[юя]|section|раздел)/i,
     intent: 'DELETE_SECTION',
     confidence: 0.9,
+    needsTarget: true,
   },
 
   // --- GET_INFO ---
@@ -63,6 +67,7 @@ const HEURISTIC_RULES: HeuristicRule[] = [
       /(?:измени|изменить|переименуй|rename|change)\s+(?:название|имя|заголовок|title|name)\s+(?:курса|course)/i,
     intent: 'UPDATE_FIELD',
     confidence: 0.9,
+    needsTarget: true,
   },
 
   // --- ADD ---
@@ -82,6 +87,7 @@ const HEURISTIC_RULES: HeuristicRule[] = [
     pattern: /(?:перемести|передвинь|move|перенеси)\s+(?:урок|lesson|секци[юя]|section|раздел)/i,
     intent: 'MOVE_ELEMENT',
     confidence: 0.85,
+    needsTarget: true,
   },
 ];
 
@@ -99,6 +105,9 @@ export function classifyWithHeuristics(userMessage: string): ClassifiedIntent | 
       return {
         intent: rule.intent,
         confidence: rule.confidence,
+        // For target-dependent intents, pass the full message as identifier
+        // so downstream resolvers can extract "урок 2.3", titles, etc.
+        ...(rule.needsTarget ? { target: { identifier: trimmed } } : {}),
       };
     }
   }
