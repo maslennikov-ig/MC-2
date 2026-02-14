@@ -88,7 +88,8 @@ export function buildCompletionRequest(
  * @param messages - Array of chat messages
  * @param maxTokens - Maximum output tokens to generate
  * @param temperature - Sampling temperature
- * @param enableCaching - Whether to enable Anthropic cache_control
+ * @param enableCaching - Whether to enable prompt caching (Anthropic: cache_control header;
+ *   DeepSeek: auto-caches repeated prefixes server-side; other providers: no-op)
  * @returns Tuple of [messagesWithCacheControl, requestOptions]
  */
 export function buildChatCompletionRequest(

@@ -13,7 +13,7 @@ import { logger } from '../../../../shared/logger/index.js';
 import {
   type FieldUpdatesProposal,
   type FieldUpdateItem,
-  type DirectActionProposal,
+  type Proposal,
 } from '@megacampus/shared-types/chat-types';
 import { STAGE5_EDITABLE_FIELDS } from '@megacampus/shared-types/regeneration-types';
 import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
@@ -37,6 +37,87 @@ import { normalizePathForValidation } from '../_shared/helpers';
  * Matches below this threshold or multiple matches above it require user clarification.
  */
 const FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.7;
+
+// ============================================================================
+// Course Skeleton Builder (Context Optimization)
+// ============================================================================
+
+/**
+ * Build a compact text skeleton of the course structure for LLM context.
+ * Uses tree notation (~300-500 tokens for 8 sections, 24 lessons).
+ * Optionally expands a target section while collapsing others.
+ *
+ * Example output:
+ * ```
+ * COURSE: "How to be happy" (8 sections, 24 lessons, 4.5h)
+ * +-- sec_1: "Introduction" (3 lessons)
+ * |   +-- lsn_1: "What is happiness" [10 min]
+ * |   +-- lsn_2: "Myths about happiness" [15 min]  <-- [TARGET]
+ * |   +-- lsn_3: "Scientific approach" [12 min]
+ * +-- sec_2: "Fundamentals" (4 lessons) -- collapsed
+ * +-- sec_3: "Practices" (5 lessons) -- collapsed
+ * ```
+ */
+export function buildCourseSkeleton(
+  structure: CourseStructure,
+  targetElementId?: string | null
+): string {
+  const totalLessons = structure.sections.reduce((sum, s) => sum + s.lessons.length, 0);
+  const lines: string[] = [
+    `COURSE: "${structure.course_title}" (${structure.sections.length} sections, ${totalLessons} lessons, ${structure.estimated_duration_hours}h)`,
+  ];
+
+  // Find which section contains the target
+  let targetSectionIdx = -1;
+  if (targetElementId) {
+    for (let si = 0; si < structure.sections.length; si++) {
+      const section = structure.sections[si];
+      if (section.id === targetElementId) {
+        targetSectionIdx = si;
+        break;
+      }
+      for (const lesson of section.lessons) {
+        if (lesson.id === targetElementId) {
+          targetSectionIdx = si;
+          break;
+        }
+      }
+      if (targetSectionIdx >= 0) break;
+    }
+  }
+
+  for (let si = 0; si < structure.sections.length; si++) {
+    const section = structure.sections[si];
+    const sectionId = section.id || `sec_${si + 1}`;
+    const isTargetSection = si === targetSectionIdx || !targetElementId;
+    const isLastSection = si === structure.sections.length - 1;
+    const prefix = isLastSection ? '\\-- ' : '+-- ';
+    const childPrefix = isLastSection ? '    ' : '|   ';
+
+    if (isTargetSection) {
+      // Expand this section
+      lines.push(
+        `${prefix}${sectionId}: "${section.section_title}" (${section.lessons.length} lessons)`
+      );
+      for (let li = 0; li < section.lessons.length; li++) {
+        const lesson = section.lessons[li];
+        const lessonId = lesson.id || `lsn_${li + 1}`;
+        const isTarget = lesson.id === targetElementId || section.id === targetElementId;
+        const marker = isTarget ? '  <-- [TARGET]' : '';
+        lines.push(
+          `${childPrefix}+-- ${lessonId}: "${lesson.lesson_title}" [${lesson.estimated_duration_minutes} min]${marker}`
+        );
+      }
+    } else {
+      // Collapse this section
+      lines.push(
+        `${prefix}${sectionId}: "${section.section_title}" (${section.lessons.length} lessons) -- collapsed`
+      );
+    }
+  }
+
+  return lines.join('\n');
+}
 
 // ============================================================================
 // Prompt Building
@@ -88,13 +169,19 @@ Rules:
 
 /**
  * Build prompt with targeted context (NOT full course_structure).
- * This is the key optimization: ~500 tokens instead of 42K.
+ * Uses compact skeleton (~300-500 tokens) + focused element JSON.
+ *
+ * Context budget:
+ * - Skeleton: ~300-500 tokens (compact tree)
+ * - Target element: ~200-500 tokens (JSON of single element)
+ * - Total: ~500-1000 tokens vs ~42K for full course_structure
  */
 export function buildTargetedRefinementPrompt(
   intentType: string,
   targetedContext: unknown,
   allowedFields: readonly string[],
-  targetPath?: string | null
+  targetPath?: string | null,
+  courseSkeleton?: string
 ): string {
   const intentInstructions: Record<string, string> = {
     REWRITE_CONTENT: 'Rewrite the content to be clearer and more engaging.',
@@ -104,12 +191,14 @@ export function buildTargetedRefinementPrompt(
     ADD_SECTION: 'Generate a new section based on the user request.',
   };
 
+  const skeletonBlock = courseSkeleton ? `\nCourse overview:\n${courseSkeleton}\n` : '';
+
   return `You are an instructional designer assistant.
 ${intentInstructions[intentType] || 'Help the user modify the content.'}
-
+${skeletonBlock}
 ${targetPath ? `Target element path: ${targetPath}` : 'Working at course level.'}
 
-Current content (ONLY the relevant element, not the full course):
+Target content:
 ${JSON.stringify(targetedContext, null, 2)}
 
 Editable fields:
@@ -131,7 +220,7 @@ Rules:
 3. Preserve existing structure
 4. For Stage 5 array paths, use exact indices like "sections[0].lessons[1].lesson_title"
 5. The "message" field MUST contain a clear, helpful explanation in Russian (2-3 sentences) of what you're proposing and why. NEVER leave it empty.
-6. If the user asks to ADD a new lesson, section, or other structural element — return empty updates and explain in "message" that structural changes require using the "Перегенерировать" mode instead of "Уточнить". Do NOT make unrelated edits to approximate the request.`;
+6. If the user asks to ADD a new lesson, section, or other structural element — return empty updates and explain in "message" that structural changes are now supported. Suggest rephrasing with "добавь урок" or "добавь секцию".`;
 }
 
 // ============================================================================
@@ -288,13 +377,13 @@ export function formatMultipleMatchesMessage(matches: TargetMatch[]): string {
 /** Result type for handleDirectIntent */
 export interface DirectIntentResult {
   message: string;
-  proposal?: DirectActionProposal;
+  proposal?: Proposal;
   requiresClarification?: boolean;
 }
 
 /**
  * Handle DELETE_LESSON / DELETE_SECTION intents.
- * Creates a DirectActionProposal for user confirmation.
+ * Creates a structural_operation proposal with delete_element for user confirmation.
  */
 function handleDeleteIntent(
   courseStructure: CourseStructure,
@@ -307,27 +396,37 @@ function handleDeleteIntent(
 
   const isSection = !isLessonPath(targetPath);
   const title = isSection ? (element as Section).section_title : (element as Lesson).lesson_title;
+  const stableId = element.id;
+
+  if (!stableId) {
+    // Fallback for structures without IDs (shouldn't happen after ensureStableIdsInMemory)
+    return {
+      message: 'Элемент не имеет стабильного идентификатора. Попробуйте обновить страницу.',
+    };
+  }
 
   const lessonCount = isSection ? (element as Section).lessons.length : 0;
 
   return {
     message: `Удалить "${title}"?`,
     proposal: {
-      type: 'direct_action',
-      action: 'DELETE',
-      targetPath,
-      elementType: isSection ? 'section' : 'lesson',
-      title,
-      impactSummary: isSection
-        ? `Удаление секции удалит ${lessonCount} ${lessonCount === 1 ? 'урок' : 'уроков'}.`
-        : 'Нумерация уроков будет пересчитана.',
+      type: 'structural_operation',
+      operations: [
+        {
+          type: 'delete_element',
+          targetId: stableId,
+        },
+      ],
+      summary: isSection
+        ? `Удаление секции "${title}" (${lessonCount} ${lessonCount === 1 ? 'урок' : 'уроков'})`
+        : `Удаление урока "${title}"`,
     },
   };
 }
 
 /**
  * Handle MOVE_ELEMENT intents.
- * Resolves both source and destination paths.
+ * Resolves both source and destination paths, produces structural_operation with move_element.
  */
 function handleMoveIntent(
   intent: ClassifiedIntent,
@@ -336,47 +435,96 @@ function handleMoveIntent(
 ): DirectIntentResult {
   if (!intent.destination) {
     return {
-      message: 'Куда переместить элемент?',
+      message: 'Укажите, куда переместить элемент. Например: "Перемести после урока 3".',
       requiresClarification: true,
     };
   }
 
-  // Use resolveTargetPath for destination (typically explicit, no ambiguity)
-  const destinationPath = resolveTargetPath(intent.destination, undefined, courseStructure);
+  const sourceElement = getElementAtPath(courseStructure, targetPath);
+  if (!sourceElement) {
+    return { message: 'Исходный элемент не найден.' };
+  }
 
-  if (!destinationPath) {
+  const sourceId = sourceElement.id;
+  if (!sourceId) {
+    return {
+      message: 'Элемент не имеет стабильного идентификатора. Попробуйте обновить страницу.',
+    };
+  }
+
+  const isSection = !isLessonPath(targetPath);
+  const title = isSection
+    ? (sourceElement as Section).section_title
+    : (sourceElement as Lesson).lesson_title;
+
+  // Resolve destination path
+  const destPath = resolveTargetPath(intent.destination, undefined, courseStructure);
+  if (!destPath) {
     return {
       message: 'Не удалось определить место назначения.',
       requiresClarification: true,
     };
   }
 
-  const element = getElementAtPath(courseStructure, targetPath);
-  const title = element
-    ? isLessonPath(targetPath)
-      ? (element as Lesson).lesson_title
-      : (element as Section).section_title
-    : 'Элемент';
+  // Resolve the element after which to place
+  const destElement = getElementAtPath(courseStructure, destPath);
+  const destIsSection = destPath && !destPath.includes('.lessons[');
+  let afterId = destElement ? destElement.id || null : null;
+
+  // For lesson moves, determine the parent section
+  let newParentId: string | undefined;
+  if (!isSection && destPath) {
+    if (destIsSection && destElement?.id) {
+      // Destination is a section — move lesson to end of that section.
+      // Set afterId to last lesson's ID so surgical-ops inserts after it.
+      // (afterId=null means index 0 in surgical-ops, i.e. beginning, not end)
+      newParentId = destElement.id;
+      const sectionIdxMatch = destPath.match(/sections\[(\d+)\]/);
+      if (sectionIdxMatch) {
+        const targetSection = courseStructure.sections[parseInt(sectionIdxMatch[1], 10)];
+        const lastLesson = targetSection?.lessons?.at(-1);
+        afterId = lastLesson?.id ?? null;
+      } else {
+        afterId = null;
+      }
+    } else {
+      // Destination is a lesson — extract parent section from path
+      const sectionMatch = destPath.match(/sections\[(\d+)\]/);
+      if (sectionMatch) {
+        const sectionIndex = parseInt(sectionMatch[1], 10);
+        const parentSection = courseStructure.sections[sectionIndex];
+        if (parentSection?.id) {
+          newParentId = parentSection.id;
+        }
+      }
+    }
+  }
 
   return {
-    message: `Переместить "${title}" в ${intent.destination}?`,
+    message: `Переместить "${title}"?`,
     proposal: {
-      type: 'direct_action',
-      action: 'MOVE',
-      targetPath,
-      destinationPath,
-      elementType: isLessonPath(targetPath) ? 'lesson' : 'section',
-      title,
+      type: 'structural_operation',
+      operations: [
+        {
+          type: 'move_element',
+          targetId: sourceId,
+          newParentId,
+          afterId,
+        },
+      ],
+      summary: `Перемещение "${title}"`,
     },
   };
 }
 
 /**
  * Handle UPDATE_FIELD intents.
- * Returns a clarification or confirmation without a proposal
- * (UPDATE_FIELD uses field_updates via the normal LLM flow).
+ * Returns a field_updates proposal for deterministic apply when both fieldName and newValue are present.
  */
-function handleUpdateFieldIntent(intent: ClassifiedIntent): DirectIntentResult {
+function handleUpdateFieldIntent(
+  intent: ClassifiedIntent,
+  stageId: 'stage_4' | 'stage_5'
+): DirectIntentResult {
   if (!intent.fieldName || intent.newValue === undefined) {
     return {
       message: 'Уточните, какое поле и на какое значение изменить.',
@@ -384,10 +532,25 @@ function handleUpdateFieldIntent(intent: ClassifiedIntent): DirectIntentResult {
     };
   }
 
-  // P2-3: Return without proposal - UPDATE_FIELD should use field_updates
-  // via the normal LLM flow or be handled by a separate handler
+  const fieldName = String(intent.fieldName);
+  const displayValue =
+    typeof intent.newValue === 'string' ? intent.newValue : JSON.stringify(intent.newValue);
+
+  // Return field_updates proposal for deterministic apply
   return {
-    message: `Изменить ${String(intent.fieldName)} на "${typeof intent.newValue === 'string' ? intent.newValue : JSON.stringify(intent.newValue)}"?`,
+    message: `Изменить ${fieldName} на "${displayValue}"?`,
+    proposal: {
+      type: 'field_updates' as const,
+      stageId,
+      updates: [
+        {
+          path: fieldName,
+          oldValue: null,
+          newValue: intent.newValue,
+        },
+      ],
+      summary: `Обновление поля ${fieldName}`,
+    },
   };
 }
 
@@ -451,7 +614,7 @@ function resolveDirectIntentTarget(
 
 /**
  * Handle direct execution intents (DELETE, MOVE) - no LLM generation needed.
- * Returns a DirectActionProposal for user confirmation.
+ * Returns a structural_operation proposal for user confirmation.
  *
  * Uses confidence-scored fuzzy matching to handle ambiguous cases:
  * - Single match with confidence >= 0.7: execute directly
@@ -461,7 +624,8 @@ function resolveDirectIntentTarget(
 export function handleDirectIntent(
   intent: ClassifiedIntent,
   courseStructure: CourseStructure,
-  nodeContextPath?: string
+  nodeContextPath?: string,
+  stageId?: string
 ): DirectIntentResult {
   const resolved = resolveDirectIntentTarget(intent, courseStructure, nodeContextPath);
 
@@ -479,8 +643,11 @@ export function handleDirectIntent(
     case 'MOVE_ELEMENT':
       return handleMoveIntent(intent, courseStructure, targetPath);
 
-    case 'UPDATE_FIELD':
-      return handleUpdateFieldIntent(intent);
+    case 'UPDATE_FIELD': {
+      // Default to stage_5 (course_structure) unless explicitly stage_4 (analysis)
+      const resolvedStageId: 'stage_4' | 'stage_5' = stageId === 'stage_4' ? 'stage_4' : 'stage_5';
+      return handleUpdateFieldIntent(intent, resolvedStageId);
+    }
 
     default:
       return { message: 'Операция не поддерживается.' };
@@ -547,6 +714,8 @@ export interface TargetedContextResult {
   targetedContext: unknown;
   allowedFieldsForTarget: readonly string[];
   targetPath: string | null;
+  /** Compact course skeleton for LLM context (~300-500 tokens) */
+  courseSkeleton: string;
 }
 
 /**
@@ -564,21 +733,30 @@ export function resolveTargetedContext(params: TargetedContextParams): TargetedC
   );
 
   if (targetPath) {
-    // Send only the selected element (~500 tokens)
+    // Send only the selected element (~200-500 tokens) + skeleton (~300-500 tokens)
     const targetedContext = getElementAtPath(courseStructure, targetPath);
     const isLesson = isLessonPath(targetPath);
     const allowedFieldsForTarget = isLesson
       ? ['lesson_title', 'lesson_objectives', 'key_topics', 'estimated_duration_minutes']
       : ['section_title', 'section_description', 'learning_objectives'];
 
-    return { targetedContext, allowedFieldsForTarget, targetPath };
+    // Extract target element's stable ID for skeleton highlighting
+    let targetElementId: string | undefined;
+    if (targetedContext && typeof targetedContext === 'object' && 'id' in targetedContext) {
+      targetElementId = (targetedContext as { id?: string }).id ?? undefined;
+    }
+
+    const courseSkeleton = buildCourseSkeleton(courseStructure, targetElementId);
+    return { targetedContext, allowedFieldsForTarget, targetPath, courseSkeleton };
   }
 
-  // No specific element - use lightweight outline
+  // No specific element - use skeleton + lightweight outline
   const targetedContext = generateCourseOutline(courseStructure);
+  const courseSkeleton = buildCourseSkeleton(courseStructure);
   return {
     targetedContext,
     allowedFieldsForTarget: STAGE5_EDITABLE_FIELDS,
     targetPath: null,
+    courseSkeleton,
   };
 }

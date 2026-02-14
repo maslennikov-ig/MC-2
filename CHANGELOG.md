@@ -7,6 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.12] - 2026-02-14
+
+### Added
+
+- Phase 4 course_nodes flat relational migration with dual-write (c19f7493)
+- **web**: add Stage 6 content generation CTA for newly added lessons (605ef19f)
+- protect 23 LLM-facing z.enum() with createLLMEnumSchema helper (8832032a)
+- **chat**: Phase 3 — context optimization with course skeleton (7ebf2f25)
+- **chat**: Phase 2 — surgical operations with stable IDs (b06e0907)
+- **chat**: Phase 1 — remove toggle, auto-intent classification (abc08ece)
+- **chat**: Phase 0 — stable IDs + chat model config foundation (5a812b65)
+
+### Changed
+
+- **web**: extract shared toActionError, replace Russian strings, use client-logger (4f5ee892)
+
+### Fixed
+
+- **course-gen-platform**: update 3 source file(s), update 1 test(s), +2 more (948f6167)
+- distinguish transient DB failure from missing config in fetchPhaseConfigFromDb (870c2fd8)
+- address round 16 code review findings (fail-fast + clarification cards) (7a439a3b)
+- address round 15 code review findings (4 fixes) (bc8107aa)
+- address round 14 code review findings (FULL_REGENERATE regex + lesson_number format) (fc14c264)
+- resolve positional reference ambiguity when both element types present (66d84db0)
+- add positional reference resolution (first/last) to target-resolver (34381819)
+- address round 11 code review findings (Phase 4 alignment + heuristics) (71ad9044)
+- add chat phase hardcoded fallbacks + guard content.sections iteration (7e2bbc1f)
+- address 7 code review findings (round 10) (16abf3cc)
+- address round 9 code review findings (flaky regex + false-green + stubs) (d729f69c)
+- address round 8 code review findings (integration tests + backfill retry) (d030449c)
+- address round 7 code review findings (backfill retry + integration tests) (f33a9454)
+- address 5 code review findings (round 6) (18ca5223)
+- address 8 code review findings (round 5) (7dc211f4)
+- address 6 code review findings (round 4) + parent integrity trigger (6b940537)
+- address 6 code review findings (round 3) (be776de3)
+- align implementation with plan requirements (9 findings) (90ef4914)
+- targeted Stage 6 content generation for new lessons + parity monitoring (b653146c)
+- count actual affected elements in delete ratio validation (48b70569)
+- ensure stable IDs before course_nodes dual-write (f79ada3c)
+- **chat**: route explicit intent=regenerate to actual job queue instead of legacy LLM flow (102df930)
+- **web**: add NextIntlClientProvider wrapper to useRefinement tests (e5bd9384)
+- **chat**: complete Phase 2-3 audit — prompt caching, structural flag, token benchmark, Stage 6 CTA (86f9faae)
+- **chat**: audit fixes — FULL_REGENERATE job, stable ID proposals, ensureStableIds in apply, Stage 6 CTA (6b39e6e0)
+- resolve generation.initiate failure, Stage 5 enum mismatch, CSP blocking (4c20b638)
+- **web**: correct misleading "exponential backoff" comment (0ba464ad)
+
+### Other
+
+- remove LLM benchmarks (migrated to aidevteam) (f4aea6f6)
+- bd daemon export: 2026-02-14 12:29:29 (2ae61e53)
+- bd daemon export: 2026-02-14 12:29:28 (70107b1f)
+- bd daemon export: 2026-02-14 12:26:25 (e6f0314b)
+- bd daemon export: 2026-02-14 12:26:21 (6476bdfc)
+- bd daemon export: 2026-02-14 12:25:12 (41bfc6b7)
+- bd daemon export: 2026-02-14 12:25:11 (8ef4fd54)
+- bd daemon sync: 2026-02-13 08:02:14 (ed0ed0fc)
+- **chat**: add unit tests for executeFullRegenerate function (9d51b43d)
+- code review improvements — tests, clarity, body parser guard (abd4868b)
+- bd daemon export: 2026-02-12 17:33:30 (906c17d5)
+- bd daemon export: 2026-02-12 17:33:29 (9170ede9)
+- bd daemon export: 2026-02-12 17:26:06 (47f0a555)
+- bd daemon export: 2026-02-12 17:26:04 (255485b0)
+- bd daemon export: 2026-02-12 17:26:03 (433cb654)
+- bd daemon export: 2026-02-12 17:18:47 (759d6fc4)
+- bd daemon export: 2026-02-12 17:18:43 (6345df32)
+- bd daemon export: 2026-02-12 17:18:35 (979a891a)
+- bd daemon export: 2026-02-12 17:12:53 (72ea70ca)
+- bd daemon export: 2026-02-12 17:03:09 (672231e9)
+- bd daemon export: 2026-02-12 17:02:57 (c72ab05e)
+- bd daemon export: 2026-02-12 17:02:39 (e5ca197e)
+- bd daemon export: 2026-02-12 17:00:35 (48b72c77)
+- bd daemon export: 2026-02-12 17:00:26 (66f37c22)
+- bd daemon export: 2026-02-12 16:11:59 (5ffaa301)
+- bd daemon export: 2026-02-12 16:11:52 (8584e2c6)
+- bd daemon export: 2026-02-12 16:10:53 (cb5278e6)
+- bd daemon export: 2026-02-12 16:10:33 (1c100a45)
+- bd daemon export: 2026-02-12 16:10:24 (57b98c9c)
+- bd daemon export: 2026-02-12 16:10:17 (74e5b233)
+- bd daemon export: 2026-02-12 16:10:08 (37dc98e0)
+- bd daemon export: 2026-02-12 16:10:03 (bf2e3325)
+- bd daemon export: 2026-02-12 16:09:54 (4fdd29eb)
+- bd daemon export: 2026-02-12 16:09:47 (5dff7ab5)
+- bd daemon export: 2026-02-12 16:09:41 (a82dcdf9)
+- bd daemon export: 2026-02-12 15:58:15 (bde62498)
+- bd daemon export: 2026-02-12 15:53:33 (8b40a6c4)
+- bd daemon export: 2026-02-12 15:53:25 (6485c521)
+- bd daemon export: 2026-02-12 15:53:17 (b48db32f)
+- bd daemon export: 2026-02-12 15:53:16 (58f93277)
+- bd daemon export: 2026-02-12 15:53:14 (0a6d1e62)
+
 ## [0.29.11] - 2026-02-12
 
 ### Changed

@@ -8,12 +8,15 @@ import type {
 import {
   deleteElement as deleteStructureElement,
   addElement as addStructureElement,
+  ensureStableIdsInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { getElementAtPath } from '../_shared/helpers';
 import { logger } from '../../../../shared/logger/index.js';
+import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 
 /**
  * Fetch course and validate authorization
@@ -139,6 +142,7 @@ export async function handleDeleteElement(
   }
 
   const result = deleteStructureElement(courseStructure, elementPath);
+  assertStableIds(result.updatedStructure);
   const now = new Date().toISOString();
 
   const { error: updateError } = await supabase
@@ -164,6 +168,15 @@ export async function handleDeleteElement(
       message: 'Failed to delete element',
     });
   }
+
+  // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'course_nodes dual-write failed (non-fatal)'
+    )
+  );
 
   const isSection = !elementPath.includes('.lessons[');
   logger.info(
@@ -539,6 +552,7 @@ export async function handleAddElement(
     result.updatedStructure
   );
 
+  assertStableIds(result.updatedStructure);
   const now = new Date().toISOString();
   const { error: updateError } = await supabase
     .from('courses')
@@ -563,6 +577,15 @@ export async function handleAddElement(
       message: 'Failed to add element',
     });
   }
+
+  // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'course_nodes dual-write failed (non-fatal)'
+    )
+  );
 
   logger.info(
     {

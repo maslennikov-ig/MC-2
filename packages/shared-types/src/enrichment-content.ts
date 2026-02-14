@@ -14,6 +14,7 @@
  */
 
 import { z } from 'zod';
+import { createLLMEnumSchema } from './analysis-schemas';
 
 // ============================================================================
 // BLOOM'S TAXONOMY LEVELS
@@ -28,7 +29,29 @@ import { z } from 'zod';
  * - apply: Use information in new situations
  * - analyze: Draw connections among ideas
  */
-export const bloomLevelSchema = z.enum(['remember', 'understand', 'apply', 'analyze']);
+export const bloomLevelSchema = createLLMEnumSchema(
+  ['remember', 'understand', 'apply', 'analyze'] as const,
+  {
+    recall: 'remember',
+    memorize: 'remember',
+    recognize: 'remember',
+    knowledge: 'remember',
+    comprehend: 'understand',
+    explain: 'understand',
+    describe: 'understand',
+    comprehension: 'understand',
+    use: 'apply',
+    implement: 'apply',
+    execute: 'apply',
+    application: 'apply',
+    examine: 'analyze',
+    compare: 'analyze',
+    contrast: 'analyze',
+    analysis: 'analyze',
+    evaluation: 'analyze',
+  },
+  'bloomLevel'
+);
 
 export type BloomLevel = z.infer<typeof bloomLevelSchema>;
 
@@ -42,7 +65,22 @@ export type BloomLevel = z.infer<typeof bloomLevelSchema>;
  * Note: This is distinct from course-level difficulty (beginner/intermediate/advanced)
  * defined in common-enums.ts. This is specifically for individual quiz questions.
  */
-export const questionDifficultySchema = z.enum(['easy', 'medium', 'hard']);
+export const questionDifficultySchema = createLLMEnumSchema(
+  ['easy', 'medium', 'hard'] as const,
+  {
+    simple: 'easy',
+    basic: 'easy',
+    beginner: 'easy',
+    moderate: 'medium',
+    intermediate: 'medium',
+    standard: 'medium',
+    difficult: 'hard',
+    complex: 'hard',
+    advanced: 'hard',
+    challenging: 'hard',
+  },
+  'questionDifficulty'
+);
 
 export type QuestionDifficulty = z.infer<typeof questionDifficultySchema>;
 
@@ -53,7 +91,23 @@ export type QuestionDifficulty = z.infer<typeof questionDifficultySchema>;
 /**
  * Question types supported in quiz enrichments
  */
-export const quizQuestionTypeSchema = z.enum(['multiple_choice', 'true_false', 'short_answer']);
+export const quizQuestionTypeSchema = createLLMEnumSchema(
+  ['multiple_choice', 'true_false', 'short_answer'] as const,
+  {
+    mc: 'multiple_choice',
+    'multi-choice': 'multiple_choice',
+    'select-one': 'multiple_choice',
+    tf: 'true_false',
+    yes_no: 'true_false',
+    boolean: 'true_false',
+    'yes-no': 'true_false',
+    open: 'short_answer',
+    free_text: 'short_answer',
+    open_ended: 'short_answer',
+    essay: 'short_answer',
+  },
+  'quizQuestionType'
+);
 
 export type QuizQuestionType = z.infer<typeof quizQuestionTypeSchema>;
 
@@ -164,14 +218,49 @@ export type QuizEnrichmentContent = z.infer<typeof quizEnrichmentContentSchema>;
 /**
  * Presentation theme options
  */
-export const presentationThemeSchema = z.enum(['default', 'dark', 'academic']);
+export const presentationThemeSchema = createLLMEnumSchema(
+  ['default', 'dark', 'academic'] as const,
+  {
+    light: 'default',
+    standard: 'default',
+    normal: 'default',
+    basic: 'default',
+    night: 'dark',
+    black: 'dark',
+    dim: 'dark',
+    scholarly: 'academic',
+    formal: 'academic',
+    professional: 'academic',
+  },
+  'presentationTheme'
+);
 
 export type PresentationTheme = z.infer<typeof presentationThemeSchema>;
 
 /**
  * Slide layout types
  */
-export const slideLayoutSchema = z.enum(['title', 'content', 'two-column', 'image']);
+export const slideLayoutSchema = createLLMEnumSchema(
+  ['title', 'content', 'two-column', 'image'] as const,
+  {
+    heading: 'title',
+    cover: 'title',
+    header: 'title',
+    intro: 'title',
+    body: 'content',
+    text: 'content',
+    'single-column': 'content',
+    main: 'content',
+    split: 'two-column',
+    dual: 'two-column',
+    'side-by-side': 'two-column',
+    visual: 'image',
+    picture: 'image',
+    illustration: 'image',
+    photo: 'image',
+  },
+  'slideLayout'
+);
 
 export type SlideLayout = z.infer<typeof slideLayoutSchema>;
 

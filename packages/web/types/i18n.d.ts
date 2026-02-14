@@ -17,7 +17,6 @@ type AuthMessages = typeof import('../messages/ru/auth.json')
 type EnrichmentsMessages = typeof import('../messages/ru/enrichments.json')
 type CourseMessages = typeof import('../messages/ru/course.json')
 type OrganizationsMessages = typeof import('../messages/ru/organizations.json')
-type BenchmarksMessages = typeof import('../messages/ru/benchmarks.json')
 type ProfileMessages = typeof import('../messages/ru/profile.json')
 
 // Combined messages type matching the structure returned by request.ts
@@ -29,7 +28,6 @@ type Messages = {
   enrichments: EnrichmentsMessages
   course: CourseMessages
   organizations: OrganizationsMessages
-  benchmarks: BenchmarksMessages
   profile: ProfileMessages
 }
 

@@ -43,6 +43,22 @@ import { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS } from './model-config-db';
 
 export { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS };
 
+/**
+ * Detect missing chat phase configuration errors from model config service.
+ * Supports both legacy ("has no config") and current ("has no active config") messages.
+ */
+export function isMissingChatPhaseConfigError(error: unknown): error is Error {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message;
+  return (
+    message.includes('Chat phase') &&
+    (message.includes('has no config') || message.includes('no active config'))
+  );
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -423,6 +439,7 @@ class ModelConfigServiceImpl {
     }
 
     // Step 2: Try database lookup
+    let dbReturnedNull = false;
     try {
       const dbConfig = await ModelConfigDB.fetchPhaseConfigFromDb(
         phaseName,
@@ -438,8 +455,18 @@ class ModelConfigServiceImpl {
         this.phaseCache.set(cacheKey, dbConfig);
         return dbConfig;
       }
+      // DB was reachable but no config row found
+      dbReturnedNull = true;
     } catch (err) {
       logger.error({ phaseName, courseId, tier, error: err }, 'Database phase lookup failed');
+    }
+
+    // Step 2b: Chat phases require DB config — fail-fast if DB is up but config row missing
+    // Plan requirement (section 4.3): "при missing/invalid phase config — 503 (явно)"
+    if (dbReturnedNull && phaseName.startsWith('chat_')) {
+      const msg = `Chat phase "${phaseName}" has no active config in database. Seed the config before using chat.`;
+      logger.error({ phaseName, courseId, tier }, msg);
+      throw new Error(msg);
     }
 
     // Step 3: Use stale cache if available
@@ -464,7 +491,13 @@ class ModelConfigServiceImpl {
       return hardcodedConfig;
     }
 
-    // Step 5: Try global_default as last resort
+    // Step 5: Try global_default as last resort (NOT for chat phases — explicit failure)
+    if (phaseName.startsWith('chat_')) {
+      const chatErrorMsg = `Chat phase "${phaseName}" has no config: database unavailable, no cache, and no hardcoded fallback. Do NOT use global_default for chat phases.`;
+      logger.fatal({ phaseName, courseId, tier }, chatErrorMsg);
+      throw new Error(chatErrorMsg);
+    }
+
     const globalDefault = DEFAULT_PHASE_CONFIGS['global_default'];
     if (globalDefault) {
       logger.warn(

@@ -152,6 +152,32 @@ export async function exportModuleLessons(
 }
 
 /**
+ * Generate Stage 6 content only for lessons that don't have content yet.
+ * Used after structure refinement adds new lessons, to avoid regenerating
+ * all existing content.
+ *
+ * @param courseId - Course UUID
+ */
+export async function generateContentForNewLessons(
+  courseId: string
+): Promise<{ success: boolean; jobCount?: number; message?: string }> {
+  try {
+    const client = await getServerTrpcClient()
+    const result = await client.lessonContent.generateMissingContent.mutate({
+      courseId,
+      priority: 7,
+    })
+    return {
+      success: result?.success ?? false,
+      jobCount: result?.jobCount,
+      message: result?.message,
+    }
+  } catch (error) {
+    throw toActionError(error, 'Failed to generate content for new lessons')
+  }
+}
+
+/**
  * Retry generation of multiple failed lessons (batch)
  * Uses partialGenerate which supports multiple lessonIds
  *

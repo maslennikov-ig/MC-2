@@ -36,6 +36,7 @@ import { approveLessons } from './procedures/approve-lessons';
 import { updateLessonContent } from './procedures/update-content';
 import { deleteLesson } from './procedures/delete-lesson';
 import { exportLessons } from './procedures/export-lessons';
+import { generateMissingContent } from './procedures/generate-missing';
 
 /**
  * Lesson content router
@@ -52,6 +53,7 @@ import { exportLessons } from './procedures/export-lessons';
  * - updateLessonContent: Update lesson content with manual edits
  * - deleteLesson: Delete a lesson and all related data (cascading)
  * - exportLessons: Export lessons in a module as Markdown
+ * - generateMissingContent: Generate content only for lessons without existing content
  */
 export const lessonContentRouter = router({
   startStage6,
@@ -65,6 +67,7 @@ export const lessonContentRouter = router({
   updateLessonContent,
   deleteLesson,
   exportLessons,
+  generateMissingContent,
 });
 
 /**

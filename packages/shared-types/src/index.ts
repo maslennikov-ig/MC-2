@@ -14,6 +14,7 @@ export * from './model-config';
 export * from './model-defaults';
 export * from './analysis-job';
 export * from './analysis-schemas'; // Includes enhanced Analyze types
+export { createLLMEnumSchema } from './analysis-schemas'; // Export LLM-tolerant enum helper
 export * from './generation-result';
 export * from './style-prompts';
 export * from './generation-job';
@@ -50,6 +51,9 @@ export * from './dependency-graph';
 
 // Chat Types for Course Refinement/Regeneration
 export * from './chat-types';
+
+// Course Operations for Surgical Editing
+export * from './course-operations';
 
 // Stage 6 UI Types (Glass Factory Dashboard)
 export * from './stage6-ui.types';

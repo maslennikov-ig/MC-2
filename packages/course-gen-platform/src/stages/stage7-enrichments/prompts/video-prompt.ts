@@ -15,6 +15,40 @@
  */
 
 import { z } from 'zod';
+import { createLLMEnumSchema } from '@megacampus/shared-types';
+
+// LLM-tolerant enums for video script metadata
+const llmVideoTone = createLLMEnumSchema(
+  ['professional', 'conversational', 'energetic'] as const,
+  {
+    formal: 'professional',
+    business: 'professional',
+    corporate: 'professional',
+    casual: 'conversational',
+    friendly: 'conversational',
+    relaxed: 'conversational',
+    dynamic: 'energetic',
+    enthusiastic: 'energetic',
+    upbeat: 'energetic',
+    lively: 'energetic',
+  },
+  'videoTone'
+);
+const llmVideoPacing = createLLMEnumSchema(
+  ['slow', 'moderate', 'fast'] as const,
+  {
+    deliberate: 'slow',
+    careful: 'slow',
+    measured: 'slow',
+    standard: 'moderate',
+    normal: 'moderate',
+    medium: 'moderate',
+    quick: 'fast',
+    rapid: 'fast',
+    brisk: 'fast',
+  },
+  'videoPacing'
+);
 
 /**
  * Language-specific token multipliers
@@ -134,10 +168,10 @@ export const videoScriptOutputSchema = z.object({
     total_duration_seconds: z.number().int().positive(),
 
     /** Tone used in the script */
-    tone: z.enum(['professional', 'conversational', 'energetic']),
+    tone: llmVideoTone,
 
     /** Pacing of the narration */
-    pacing: z.enum(['slow', 'moderate', 'fast']),
+    pacing: llmVideoPacing,
 
     /** Total word count */
     word_count: z.number().int().nonnegative(),

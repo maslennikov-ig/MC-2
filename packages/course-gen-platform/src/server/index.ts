@@ -244,13 +244,32 @@ app.use(
   })
 );
 
-// Parse JSON request bodies (for file upload metadata, etc.)
-// Limit set to 100MB to support premium tier (max file size)
-// Tier-based validation happens in frontend (FileUpload) and backend (tRPC)
-app.use(express.json({ limit: '100mb' }));
+// NOTE: express.json() and express.urlencoded() are intentionally NOT applied globally.
+// tRPC's createExpressMiddleware handles its own body parsing internally.
+// Applying express.json() before the tRPC middleware causes "Unexpected end of JSON input"
+// errors because Express consumes the request body stream before tRPC can read it.
+// See: https://trpc.io/docs/server/non-json-content-types
+//
+// All non-tRPC routes in this server (/, /admin/queues, /metrics, /health) are
+// GET-only endpoints that do not accept request bodies, so no body parser is needed.
+// If a future non-tRPC route requires body parsing, scope it to that route's path:
+//   app.use('/my-route', express.json({ limit: '100mb' }));
 
-// Parse URL-encoded request bodies
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+// Guard: warn if a non-tRPC route receives a request body without a body parser
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  if (
+    !req.path.startsWith('/trpc') &&
+    req.method !== 'GET' &&
+    req.method !== 'HEAD' &&
+    req.headers['content-type']
+  ) {
+    logger.warn(
+      { method: req.method, path: req.path, contentType: req.headers['content-type'] },
+      'Non-tRPC route received request body but no body parser is configured'
+    );
+  }
+  next();
+});
 
 /**
  * Request Logging Middleware

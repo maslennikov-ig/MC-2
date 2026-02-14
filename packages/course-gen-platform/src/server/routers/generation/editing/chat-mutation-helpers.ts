@@ -69,6 +69,8 @@ export interface IntentConfidenceThresholds {
   DIRECT_EXECUTION: number;
   GET_INFO: number;
   LLM_REQUIRED: number;
+  /** Below this threshold → clarification response (plan:208) */
+  CLARIFICATION: number;
 }
 
 // ============================================================================
@@ -169,7 +171,7 @@ export async function persistUserMessage(
     userMessage: string;
     chatType: 'node' | 'global';
     nodeContext?: { stageId: string; nodeId?: string; blockPath?: string } | null;
-    intent: 'refine' | 'regenerate';
+    intent?: 'refine' | 'regenerate';
     requestId: string;
   }
 ): Promise<void> {
@@ -203,7 +205,7 @@ export async function persistAssistantMessage(
     content: string;
     chatType: 'node' | 'global';
     nodeContext?: { stageId: string; nodeId?: string; blockPath?: string } | null;
-    intent: 'refine' | 'regenerate';
+    intent?: 'refine' | 'regenerate';
     modelUsed: string;
     inputTokens?: number;
     outputTokens?: number;
@@ -251,7 +253,8 @@ export interface LegacyLLMFlowParams {
   chatType: 'node' | 'global';
   nodeContext?: { stageId: string; nodeId?: string; blockPath?: string };
   previousOutput?: string;
-  intent: 'refine' | 'regenerate';
+  /** User-provided intent. Optional — when omitted, auto-classified by backend. */
+  intent?: 'refine' | 'regenerate';
   convId: string;
   history: Array<{ role: string; content: string }> | null;
   requestId: string;
@@ -350,17 +353,34 @@ async function resolveModelConfig(
       phaseName,
     };
   } catch (configError) {
+    // Distinguish missing config (permanent) from transient errors (DB down)
+    const errMsg = configError instanceof Error ? configError.message : '';
+    const isMissingConfig = errMsg.includes('has no config') || errMsg.includes('no active config');
+
+    if (isMissingConfig) {
+      // Plan requirement: chat phases must fail-fast (503) when config is missing
+      logger.error(
+        { requestId, phaseName, stageId, chatType, error: configError },
+        'Chat phase model config missing — returning 503 per plan requirement'
+      );
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: `Model configuration unavailable for chat phase "${phaseName}". Please try again later.`,
+      });
+    }
+
+    // Transient error (DB down, timeout) — fall back to stage-specific hardcoded models
+    const hardcoded = CHAT_STAGE_FALLBACK_MODELS[stageId || ''] || DEFAULT_CHAT_FALLBACK_MODELS;
     logger.warn(
-      { requestId, phaseName, stageId, chatType, error: configError, fallback: fallbackConfig },
+      { requestId, phaseName, stageId, chatType, error: configError },
       'Failed to get model config from database, using hardcoded fallback'
     );
-    // Use stage-specific hardcoded models when DB is unavailable
-    const stageFallback = CHAT_STAGE_FALLBACK_MODELS[stageId || ''] || DEFAULT_CHAT_FALLBACK_MODELS;
+
     return {
-      modelId: stageFallback.primary,
-      fallbackModelId: stageFallback.fallback,
-      temperature: fallbackConfig.temperature,
-      maxTokens: fallbackConfig.maxTokens,
+      modelId: hardcoded.primary,
+      fallbackModelId: hardcoded.fallback,
+      temperature: fallbackConfig.temperature ?? 0.7,
+      maxTokens: fallbackConfig.maxTokens ?? 2000,
       phaseName,
     };
   }
@@ -372,8 +392,9 @@ async function resolveModelConfig(
 function resolveProposalContext(params: LegacyLLMFlowParams): ProposalContext {
   const { intent, chatType, nodeContext, course } = params;
 
+  // When intent is omitted (auto-classified), treat as potential refine for proposal generation
   const shouldGenerateProposal =
-    intent === 'refine' &&
+    intent !== 'regenerate' &&
     chatType === 'node' &&
     !!nodeContext &&
     (nodeContext.stageId === 'stage_4' || nodeContext.stageId === 'stage_5');
@@ -682,10 +703,13 @@ export async function executeLegacyLLMFlow(params: LegacyLLMFlowParams): Promise
     'Chat: Response generated'
   );
 
+  // Derive response intent: explicit 'regenerate' stays, otherwise 'refine'
+  const responseIntent = intent === 'regenerate' ? 'regenerate' : 'refine';
+
   return {
     conversationId: convId,
     assistantMessage,
-    intent,
+    intent: responseIntent,
     proposal,
     modelUsed,
     inputTokens: llmResponse.inputTokens || 0,

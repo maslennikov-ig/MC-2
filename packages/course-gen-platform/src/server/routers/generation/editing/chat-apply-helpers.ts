@@ -6,21 +6,31 @@
  * to reduce file size and cyclomatic complexity. Handles:
  * - Applying field_updates proposals (Stage 4/5)
  * - Applying lesson_patch proposals (Stage 6)
+ * - Applying structural_operation proposals (surgical editing)
  */
 
 import { TRPCError } from '@trpc/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../../../../shared/logger/index.js';
-import type { FieldUpdatesProposal } from '@megacampus/shared-types/chat-types';
+import type {
+  FieldUpdatesProposal,
+  StructuralOperationProposal,
+} from '@megacampus/shared-types/chat-types';
 import {
   STAGE4_EDITABLE_FIELDS,
   STAGE5_EDITABLE_FIELDS,
 } from '@megacampus/shared-types/regeneration-types';
-import { applyFieldUpdate } from '../../../../stages/stage5-generation/utils/course-structure-editor';
+import {
+  applyFieldUpdate,
+  ensureStableIdsInMemory,
+} from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import type { CourseStructure, Json, Database } from '@megacampus/shared-types';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolver';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { applySurgicalOperations } from './surgical-operations';
+import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 
 // ============================================================================
 // Types
@@ -85,11 +95,12 @@ function applyFieldUpdatesToData(
   proposal: FieldUpdatesProposal,
   requestId: string,
   courseId: string
-): unknown {
+): { data: unknown; appliedCount: number } {
   const { stageId, updates } = proposal;
   const allowedFields = stageId === 'stage_4' ? STAGE4_EDITABLE_FIELDS : STAGE5_EDITABLE_FIELDS;
 
   let result = updatedData;
+  let appliedCount = 0;
 
   for (const update of updates) {
     const normalizedPath =
@@ -116,6 +127,7 @@ function applyFieldUpdatesToData(
         setNestedValue(result, update.path, update.newValue);
       }
 
+      appliedCount++;
       logger.info(
         { requestId, courseId, path: update.path },
         'applyProposal: Applied field update'
@@ -133,7 +145,7 @@ function applyFieldUpdatesToData(
     }
   }
 
-  return result;
+  return { data: result, appliedCount };
 }
 
 /**
@@ -160,7 +172,19 @@ export async function applyFieldUpdatesProposal(
 
   // Deep clone and apply updates
   const clonedData = deepCloneData(currentData, requestId, courseId);
-  const updatedData = applyFieldUpdatesToData(clonedData, proposal, requestId, courseId);
+  const { data: updatedData, appliedCount } = applyFieldUpdatesToData(
+    clonedData,
+    proposal,
+    requestId,
+    courseId
+  );
+
+  // Guard: block writes without stable IDs when flag is on (plan:433)
+  if (stageId === 'stage_5') {
+    assertStableIds(
+      updatedData as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+    );
+  }
 
   // Save updated data to database
   const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
@@ -185,14 +209,25 @@ export async function applyFieldUpdatesProposal(
     });
   }
 
+  // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+  if (stageId === 'stage_5') {
+    const structureForNodes = ensureStableIdsInMemory(updatedData as CourseStructure);
+    await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+      logger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal)'
+      )
+    );
+  }
+
   logger.info(
-    { requestId, courseId, stageId, updateCount: updates.length },
+    { requestId, courseId, stageId, updateCount: appliedCount, totalRequested: updates.length },
     'applyProposal: Field updates applied successfully'
   );
 
   return {
     success: true,
-    appliedUpdates: updates.length,
+    appliedUpdates: appliedCount,
     updatedAt: now,
   };
 }
@@ -327,6 +362,88 @@ export async function applyLessonPatchProposal(
     success: true,
     lessonId,
     sectionId,
+    updatedAt: now,
+  };
+}
+
+// ============================================================================
+// Structural Operation (Surgical Editing)
+// ============================================================================
+
+/**
+ * Apply structural_operation proposal to course structure.
+ * Uses the surgical operations sequencer for atomic batch application.
+ */
+export async function applyStructuralOperationProposal(
+  supabase: SupabaseClient<Database>,
+  courseId: string,
+  courseStructure: CourseStructure,
+  proposal: StructuralOperationProposal,
+  requestId: string
+): Promise<ApplyProposalResult & { tempIdMap?: Record<string, string> }> {
+  const { operations, summary } = proposal;
+
+  if (!operations || operations.length === 0) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Structural operation proposal has no operations',
+    });
+  }
+
+  // Ensure stable IDs exist for legacy structures without them
+  const structureWithIds = ensureStableIdsInMemory(courseStructure);
+
+  // Apply operations atomically
+  const result = applySurgicalOperations(operations, structureWithIds);
+
+  // Guard: block writes without stable IDs when COURSE_STABLE_IDS_REQUIRED=true (plan:433)
+  assertStableIds(result.updatedStructure);
+
+  // Save updated structure to database
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from('courses')
+    .update({
+      course_structure: result.updatedStructure as unknown as Json,
+      updated_at: now,
+    })
+    .eq('id', courseId);
+
+  if (updateError) {
+    logger.error(
+      { requestId, courseId, error: updateError },
+      'applyProposal: Failed to save structural operation result'
+    );
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to apply structural operation',
+    });
+  }
+
+  // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'course_nodes dual-write failed (non-fatal)'
+    )
+  );
+
+  logger.info(
+    {
+      requestId,
+      courseId,
+      appliedCount: result.appliedCount,
+      tempIdMappings: Object.keys(result.tempIdMap).length,
+      summary,
+    },
+    'applyProposal: Structural operation applied successfully'
+  );
+
+  return {
+    success: true,
+    appliedUpdates: result.appliedCount,
+    tempIdMap: result.tempIdMap,
     updatedAt: now,
   };
 }

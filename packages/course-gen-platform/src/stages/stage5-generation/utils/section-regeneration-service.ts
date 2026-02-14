@@ -25,6 +25,9 @@ import { SectionBatchGenerator } from './section-batch-generator';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import logger from '@/shared/logger';
+import { ensureStableIdsInMemory } from './course-structure-editor';
+import { writeCourseNodes } from '@/shared/course-nodes/writer';
+import { assertStableIds } from '@/shared/course-nodes/feature-flags';
 
 // ============================================================================
 // TYPES
@@ -364,6 +367,10 @@ export class SectionRegenerationService {
     // STEP 8: Atomic JSONB Update
     // ========================================================================
 
+    assertStableIds(
+      updatedStructure as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+    );
+
     const { error: updateError } = await supabase
       .from('courses')
       .update({
@@ -392,6 +399,15 @@ export class SectionRegenerationService {
         sectionNumber,
       },
       'Course structure updated atomically'
+    );
+
+    // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+    const structureForNodes = ensureStableIdsInMemory(updatedStructure);
+    await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+      logger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal)'
+      )
     );
 
     // ========================================================================

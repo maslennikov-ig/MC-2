@@ -25,7 +25,13 @@ import {
   blockPathToNodeId,
   getNodeLabel,
 } from '../../../shared/regeneration/dependency-graph-builder';
-import { applyFieldUpdate } from '../../../stages/stage5-generation/utils/course-structure-editor';
+import {
+  applyFieldUpdate,
+  ensureStableIdsInMemory,
+} from '../../../stages/stage5-generation/utils/course-structure-editor';
+import { resolveStructure } from '../../../shared/course-nodes/structure-resolver';
+import { writeCourseNodes } from '../../../shared/course-nodes/writer';
+import { assertStableIds } from '../../../shared/course-nodes/feature-flags';
 
 export const dependenciesRouter = router({
   /**
@@ -93,8 +99,13 @@ export const dependenciesRouter = router({
           });
         }
 
-        // Step 3: Validate that course_structure exists
-        if (!course.course_structure) {
+        // Step 3: Resolve course structure (Phase 4: from course_nodes if enabled)
+        const resolvedStructure = await resolveStructure(
+          courseId,
+          course.course_structure,
+          supabase
+        );
+        if (!resolvedStructure) {
           logger.warn({ userId, courseId }, 'Course structure is null in getBlockDependencies');
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -103,7 +114,7 @@ export const dependenciesRouter = router({
         }
 
         // Step 4: Build dependency graph
-        const graph = buildDependencyGraph(course.course_structure as CourseStructure);
+        const graph = buildDependencyGraph(resolvedStructure);
 
         // Step 5: Convert blockPath to nodeId
         let nodeId: string;
@@ -378,6 +389,9 @@ export const dependenciesRouter = router({
           );
         }
 
+        // Guard: block writes without stable IDs when flag is on (plan:433)
+        assertStableIds(courseStructure);
+
         // Step 6: Update course structure in database
         const { error: updateError } = await supabase
           .from('courses')
@@ -401,6 +415,15 @@ export const dependenciesRouter = router({
             message: 'Failed to save changes',
           });
         }
+
+        // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+        const structureForNodes = ensureStableIdsInMemory(courseStructure);
+        await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+          logger.warn(
+            { courseId, error: err instanceof Error ? err.message : String(err) },
+            'course_nodes dual-write failed (non-fatal)'
+          )
+        );
 
         logger.info(
           {

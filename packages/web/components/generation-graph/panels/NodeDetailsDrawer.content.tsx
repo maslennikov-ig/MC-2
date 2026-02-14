@@ -82,7 +82,7 @@ interface StageContentProps {
   // Refinement chat
   isAIStage: boolean
   refinementChatRef: React.RefObject<HTMLDivElement | null>
-  onRefine: (message: string, intent: 'refine' | 'regenerate') => void
+  onRefine: (message: string, intent?: 'refine' | 'regenerate') => void
   chatHistory: ChatMessage[]
   isRefining: boolean
   latestProposal: RefinementProposal | null
@@ -92,6 +92,9 @@ interface StageContentProps {
   onAcceptProposal: () => void
   onRetryProposal: () => void
   onRejectProposal: () => void
+  stage6ContentReady: boolean
+  /** Callback to generate content for new lessons (server action passed as prop) */
+  onGenerateContent?: (courseId: string) => Promise<unknown>
 
   // Handlers
   onStageApproved: () => void
@@ -135,6 +138,8 @@ export const StageContent = memo(function StageContent({
   onAcceptProposal,
   onRetryProposal,
   onRejectProposal,
+  stage6ContentReady,
+  onGenerateContent,
   onStageApproved,
   onDeselectNode,
 }: StageContentProps) {
@@ -427,6 +432,8 @@ export const StageContent = memo(function StageContent({
             proposalError={proposalError}
             onRetryProposal={() => void onRetryProposal()}
             onRejectProposal={() => onRejectProposal()}
+            stage6ContentReady={stage6ContentReady}
+            onGenerateContent={onGenerateContent}
             isGenerating={isGenerationActive}
             blockedMessage={t('refinementChat.generationInProgress')}
           />

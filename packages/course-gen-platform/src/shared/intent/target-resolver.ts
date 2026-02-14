@@ -6,6 +6,8 @@
  * - "урок 2.3" → "sections[1].lessons[2]"
  * - "секция Введение" → "sections[0]"
  * - "section 2" → "sections[1]"
+ * - "последнюю секцию" → last section
+ * - "first lesson" → first lesson
  *
  * @module intent/target-resolver
  */
@@ -30,6 +32,82 @@ export interface TargetMatch {
   confidence: number;
   /** Human-readable identifier (e.g., "Урок 1.2" or "Секция 1") */
   displayLabel: string;
+}
+
+// ============================================================================
+// Positional Reference Resolution (first/last)
+// ============================================================================
+
+/** Position extracted from natural language */
+type PositionalRef = { position: 'first' | 'last'; elementType: 'section' | 'lesson' };
+
+/**
+ * Detect positional references like "последнюю секцию", "first lesson", etc.
+ * Handles all Russian grammatical cases and English equivalents.
+ */
+function detectPositionalReference(identifier: string): PositionalRef | null {
+  const lower = identifier.toLowerCase();
+
+  // Detect position: last / first
+  // Note: \b doesn't work with Cyrillic in JS regex, so we use (?=\s|$) or omit boundaries
+  const lastMatch = lower.match(/(?:последн(?:ий|юю|яя|ее|ую|ей|ем|его)|last(?:\s|$))/);
+  const firstMatch = lower.match(/(?:перв(?:ый|ую|ая|ое|ой|ого|ому|ом)|first(?:\s|$))/);
+  if (!lastMatch && !firstMatch) return null;
+
+  const positionalIdx = (lastMatch?.index ?? firstMatch?.index) as number;
+
+  // Detect element type: section / lesson
+  const sectionMatch = lower.match(/(?:секци[юяие]|section|раздел[аеуом]?)(?:\s|$)/);
+  const lessonMatch = lower.match(/(?:урок[аеуом]?|lesson)(?:\s|$)/);
+  if (!sectionMatch && !lessonMatch) return null;
+
+  // When both types present (e.g. "удали последний урок в секции 2"),
+  // pick the one closest to the positional keyword — the adjective modifies
+  // the nearest noun.
+  let elementType: 'section' | 'lesson';
+  if (sectionMatch && lessonMatch) {
+    const sectionDist = Math.abs((sectionMatch.index as number) - positionalIdx);
+    const lessonDist = Math.abs((lessonMatch.index as number) - positionalIdx);
+    elementType = lessonDist <= sectionDist ? 'lesson' : 'section';
+  } else {
+    elementType = sectionMatch ? 'section' : 'lesson';
+  }
+
+  return {
+    position: lastMatch ? 'last' : 'first',
+    elementType,
+  };
+}
+
+/**
+ * Resolve a positional reference to a concrete path.
+ * "last section" → last section, "first lesson" → first lesson of first section.
+ */
+function resolvePositionalPath(
+  ref: PositionalRef,
+  courseStructure: CourseStructure
+): string | null {
+  const sections = courseStructure.sections;
+  if (sections.length === 0) return null;
+
+  if (ref.elementType === 'section') {
+    const idx = ref.position === 'last' ? sections.length - 1 : 0;
+    return `sections[${idx}]`;
+  }
+
+  // For lessons: "last lesson" = last lesson of last section,
+  // "first lesson" = first lesson of first section
+  if (ref.position === 'last') {
+    const lastSectionIdx = sections.length - 1;
+    const lastSection = sections[lastSectionIdx];
+    if (lastSection.lessons.length === 0) return null;
+    const lastLessonIdx = lastSection.lessons.length - 1;
+    return `sections[${lastSectionIdx}].lessons[${lastLessonIdx}]`;
+  } else {
+    const firstSection = sections[0];
+    if (firstSection.lessons.length === 0) return null;
+    return `sections[0].lessons[0]`;
+  }
 }
 
 // ============================================================================
@@ -76,6 +154,12 @@ export function resolveTargetPath(
   const MAX_IDENTIFIER_LENGTH = 200;
   if (identifier.length > MAX_IDENTIFIER_LENGTH) {
     return null;
+  }
+
+  // Positional references: "последнюю секцию", "first lesson", etc.
+  const positionalRef = detectPositionalReference(identifier);
+  if (positionalRef) {
+    return resolvePositionalPath(positionalRef, courseStructure);
   }
 
   // Match patterns like "урок 2.3", "lesson 2.3", "урок 1.2"
@@ -267,7 +351,36 @@ export function resolveTargetPathWithMatches(
 
   const matches: TargetMatch[] = [];
 
-  // 5. Check for explicit numeric patterns (exact match, confidence 1.0)
+  // 5a. Check for positional references ("последнюю секцию", "first lesson")
+  const positionalRef = detectPositionalReference(identifier);
+  if (positionalRef) {
+    const posPath = resolvePositionalPath(positionalRef, courseStructure);
+    if (posPath) {
+      const element = getElementAtPath(courseStructure, posPath);
+      if (element) {
+        const isLesson = isLessonPath(posPath);
+        const title = isLesson
+          ? (element as Lesson).lesson_title
+          : (element as Section).section_title;
+        const indices = parsePathIndices(posPath);
+        const displayLabel = isLesson
+          ? `Урок ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}.${indices?.lessonIndex !== undefined ? indices.lessonIndex + 1 : '?'}`
+          : `Секция ${indices?.sectionIndex !== undefined ? indices.sectionIndex + 1 : '?'}`;
+
+        return [
+          {
+            path: posPath,
+            title,
+            elementType: isLesson ? 'lesson' : 'section',
+            confidence: CONFIDENCE_SCORES.EXACT,
+            displayLabel,
+          },
+        ];
+      }
+    }
+  }
+
+  // 5b. Check for explicit numeric patterns (exact match, confidence 1.0)
   // Match patterns like "урок 2.3", "lesson 2.3"
   const lessonMatch = identifier.match(/(?:урок|lesson)\s*(\d+)\.(\d+)/i);
   if (lessonMatch) {

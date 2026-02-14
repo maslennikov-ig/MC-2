@@ -10,9 +10,15 @@ import {
   STAGE5_EDITABLE_FIELDS,
 } from '@megacampus/shared-types/regeneration-types';
 import type { CourseStructure } from '@megacampus/shared-types';
-import { applyFieldUpdate } from '../../../../stages/stage5-generation/utils/course-structure-editor';
+import {
+  applyFieldUpdate,
+  ensureStableIdsInMemory,
+} from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { assertStableIds, isDualWriteEnabled } from '../../../../shared/course-nodes/feature-flags';
+import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
+import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 
 // Schema for checking downstream stages
 const checkDownstreamStagesInputSchema = z.object({
@@ -85,7 +91,9 @@ export const fieldUpdateRouter = {
         }
 
         const currentData =
-          stageId === 'stage_4' ? course.analysis_result : course.course_structure;
+          stageId === 'stage_4'
+            ? course.analysis_result
+            : await resolveStructure(courseId, course.course_structure, supabase);
 
         if (!currentData) {
           logger.warn({ requestId, courseId, stageId }, 'Target data is null or undefined');
@@ -123,6 +131,13 @@ export const fieldUpdateRouter = {
           });
         }
 
+        // Phase 4: Guard — block writes without stable IDs
+        if (stageId === 'stage_5') {
+          assertStableIds(
+            updatedData as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+          );
+        }
+
         const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
         const now = new Date().toISOString();
 
@@ -149,6 +164,17 @@ export const fieldUpdateRouter = {
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to update field',
           });
+        }
+
+        // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+        if (stageId === 'stage_5') {
+          const structureForNodes = ensureStableIdsInMemory(updatedData as CourseStructure);
+          await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+            logger.warn(
+              { courseId, error: err instanceof Error ? err.message : String(err) },
+              'course_nodes dual-write failed (non-fatal)'
+            )
+          );
         }
 
         logger.info(
@@ -457,6 +483,22 @@ export const fieldUpdateRouter = {
           }
 
           deletedStructure = true;
+
+          // Phase 4: Clean up course_nodes when structure is cleared (non-blocking, non-fatal)
+          if (isDualWriteEnabled()) {
+            await supabase
+              .from('course_nodes')
+              .delete()
+              .eq('course_id', courseId)
+              .then(({ error: nodesError }) => {
+                if (nodesError) {
+                  logger.warn(
+                    { courseId, error: nodesError.message },
+                    'course_nodes cleanup failed (non-fatal)'
+                  );
+                }
+              });
+          }
         }
 
         logger.info(

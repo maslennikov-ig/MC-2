@@ -46,8 +46,13 @@ vi.mock('openai/helpers/zod', () => ({
 }));
 
 // Import after mocks are defined
-import { classifyIntent, isDirectExecutionIntent, isLLMRequiredIntent } from '@/shared/intent/classifier';
+import {
+  classifyIntent,
+  isDirectExecutionIntent,
+  isLLMRequiredIntent,
+} from '@/shared/intent/classifier';
 import { logger } from '@/shared/logger/index.js';
+import * as ModelConfigService from '@/shared/llm/model-config-service';
 import OpenAI from 'openai';
 
 describe('classifyIntent', () => {
@@ -355,6 +360,25 @@ describe('classifyIntent', () => {
       }),
       'Intent classification failed'
     );
+  });
+
+  it('should rethrow chat missing-config error for "has no active config" message', async () => {
+    const missingConfigError = new Error(
+      'Chat phase "chat_intent_classification" has no active config in database. Seed the config before using chat.'
+    );
+
+    const createServiceSpy = vi
+      .spyOn(ModelConfigService, 'createModelConfigService')
+      .mockReturnValue({
+        getModelForPhase: vi.fn().mockRejectedValue(missingConfigError),
+      } as any);
+
+    await expect(classifyIntent('test message', undefined, mockOpenAIClient)).rejects.toThrow(
+      'has no active config'
+    );
+    expect(mockOpenAIClient.chat.completions.create).not.toHaveBeenCalled();
+
+    createServiceSpy.mockRestore();
   });
 
   it('should handle length truncation (finish_reason: length)', async () => {

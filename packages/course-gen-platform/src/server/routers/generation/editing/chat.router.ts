@@ -36,10 +36,14 @@ import {
 import {
   deleteElement as deleteStructureElement,
   moveElement as moveStructureElement,
+  ensureStableIdsInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
-import type { CourseStructure } from '@megacampus/shared-types';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
-import { applyFieldUpdatesProposal, applyLessonPatchProposal } from './chat-apply-helpers';
+import {
+  applyFieldUpdatesProposal,
+  applyLessonPatchProposal,
+  applyStructuralOperationProposal,
+} from './chat-apply-helpers';
 import {
   validateConversationOwnership,
   assertGenerationNotActive,
@@ -47,7 +51,13 @@ import {
   persistUserMessage,
   executeLegacyLLMFlow,
 } from './chat-mutation-helpers';
-import { executeIntentClassificationFlow } from './chat-intent-flow';
+import { executeIntentClassificationFlow, executeFullRegenerate } from './chat-intent-flow';
+import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import {
+  resolveStructure,
+  hasResolvedStructure,
+} from '../../../../shared/course-nodes/structure-resolver';
+import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 
 // ============================================================================
 // Rate Limiting Configuration
@@ -91,6 +101,8 @@ const INTENT_CONFIDENCE_THRESHOLDS = {
   GET_INFO: 0.7,
   /** Minimum confidence for LLM-required intents (REWRITE, EXPAND, etc.) */
   LLM_REQUIRED: 0.5,
+  /** Below this threshold → clarification response instead of legacy fallback (plan:208) */
+  CLARIFICATION: 0.6,
 } as const;
 
 // ============================================================================
@@ -292,19 +304,39 @@ async function executeChatMutation(
     'Chat: Processing message'
   );
 
-  // Try intent classification flow (if enabled)
-  const enableIntentClassification = process.env.ENABLE_INTENT_CLASSIFICATION === 'true';
+  // --- Intent Routing (Phase 1: auto-intent classification) ---
 
+  // Explicit 'regenerate' → skip classification, enqueue async regeneration job directly
+  if (intent === 'regenerate') {
+    logger.info(
+      { requestId, courseId },
+      'Chat: Explicit regenerate intent, enqueuing regeneration job'
+    );
+    return executeFullRegenerate({
+      courseId,
+      userId,
+      convId,
+      chatType,
+      nodeContext,
+      requestId,
+      supabaseAdmin,
+    });
+  }
+
+  // Auto-intent classification pipeline (Tier 0 regex + Tier 1 LLM)
+  // Enabled by default; disable with CHAT_INTENT_ROUTING_ENABLED=false
   if (
-    enableIntentClassification &&
-    intent === 'refine' &&
-    chatType === 'node' &&
-    nodeContext?.stageId === 'stage_5' &&
-    course.course_structure
+    process.env.CHAT_INTENT_ROUTING_ENABLED !== 'false' &&
+    hasResolvedStructure(course.course_structure)
   ) {
+    // Phase 4: resolve from course_nodes if enabled, fallback to JSONB
+    const resolved = await resolveStructure(courseId, course.course_structure, supabaseAdmin);
+    // Inject stable IDs in-memory for legacy structures without IDs
+    const courseStructureWithIds = ensureStableIdsInMemory(resolved!);
+
     const classificationResult = await executeIntentClassificationFlow({
       userMessage,
-      courseStructure: course.course_structure as CourseStructure,
+      courseStructure: courseStructureWithIds,
       courseLanguage: course.language,
       courseId,
       nodeContext,
@@ -313,17 +345,19 @@ async function executeChatMutation(
       intent,
       requestId,
       supabaseAdmin,
+      userId: userId,
       fallbackConfig: CHAT_FALLBACK_CONFIG,
       thresholds: INTENT_CONFIDENCE_THRESHOLDS,
+      generationStatus: course.generation_status,
     });
 
     if (classificationResult) {
       return classificationResult;
     }
-    // Fallback to legacy flow if classification returned null
+    // Fallback to legacy flow if classification returned null (UNKNOWN/low confidence)
   }
 
-  // Legacy LLM flow
+  // Legacy LLM flow (fallback for unclassified intents or no course_structure)
   return executeLegacyLLMFlow({
     courseId,
     course,
@@ -408,6 +442,28 @@ async function executeApplyProposal(
           ctx.user as Parameters<typeof buildAuthContext>[0]
         );
 
+      case 'structural_operation': {
+        // Phase 4: resolve from course_nodes if enabled, fallback to JSONB
+        const currentStructure = await resolveStructure(
+          courseId,
+          course.course_structure,
+          supabase
+        );
+        if (!currentStructure) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot apply structural operation: course_structure is empty',
+          });
+        }
+        return await applyStructuralOperationProposal(
+          supabase,
+          courseId,
+          currentStructure,
+          proposal,
+          requestId
+        );
+      }
+
       case 'direct_action':
         // Direct actions should use the applyDirectAction endpoint instead
         throw new TRPCError({
@@ -478,11 +534,11 @@ async function executeApplyDirectAction(
     'apply direct action'
   );
 
-  if (!course.course_structure) {
+  // Phase 4: resolve from course_nodes if enabled, fallback to JSONB
+  const courseStructure = await resolveStructure(courseId, course.course_structure, supabase);
+  if (!courseStructure) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Course structure is empty' });
   }
-
-  const courseStructure = course.course_structure as CourseStructure;
 
   logger.info(
     { requestId, courseId, action, targetPath, destinationPath },
@@ -506,6 +562,9 @@ async function executeApplyDirectAction(
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid action' });
     }
 
+    // Guard: block writes without stable IDs when flag is on (plan:433)
+    assertStableIds(result.updatedStructure);
+
     // Save updated structure
     const now = new Date().toISOString();
     const { error: updateError } = await supabase
@@ -520,6 +579,14 @@ async function executeApplyDirectAction(
       );
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to apply action' });
     }
+
+    // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+    await writeCourseNodes(courseId, result.updatedStructure, supabase, logger).catch(err =>
+      logger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal)'
+      )
+    );
 
     logger.info(
       { requestId, courseId, action, targetPath, recalculated: result.recalculated },

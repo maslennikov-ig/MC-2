@@ -103,25 +103,243 @@ function createSoftEnumArraySchema<T extends string>(
 }
 
 /**
+ * Helper to create an LLM-tolerant enum schema using .transform().pipe().
+ * Maps LLM-generated synonyms to canonical values before strict validation.
+ *
+ * @param canonicalValues - The strict enum values (output type)
+ * @param synonymMap - Maps lowercase synonyms to canonical values
+ * @param fieldName - For dev logging of unknown values
+ */
+export function createLLMEnumSchema<const T extends readonly [string, ...string[]]>(
+  canonicalValues: T,
+  synonymMap: Record<string, T[number]>,
+  fieldName?: string
+) {
+  const allMappings: Record<string, T[number]> = { ...synonymMap };
+  for (const val of canonicalValues) {
+    allMappings[val] = val;
+  }
+
+  return z
+    .string()
+    .transform(val => {
+      const normalized = val.toLowerCase().trim();
+      const mapped = allMappings[normalized];
+      if (!mapped && fieldName) {
+        console.warn(
+          `[LLMEnum] Unknown ${fieldName} value: "${val}". ` +
+            `Expected: ${canonicalValues.join(', ')} or synonyms.`
+        );
+      }
+      return mapped ?? val;
+    })
+    .pipe(z.enum(canonicalValues));
+}
+
+/**
+ * Reusable LLM-tolerant enum schemas for cross-schema consistency
+ */
+
+// course_category enum (used in Phase1, Phase2Input, AnalysisResult)
+const llmCourseCategoryEnum = createLLMEnumSchema(
+  ['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'] as const,
+  {
+    career: 'professional',
+    work: 'professional',
+    business: 'professional',
+    corporate: 'professional',
+    'self-help': 'personal',
+    'self-development': 'personal',
+    lifestyle: 'personal',
+    growth: 'personal',
+    art: 'creative',
+    artistic: 'creative',
+    design: 'creative',
+    arts: 'creative',
+    leisure: 'hobby',
+    fun: 'hobby',
+    entertainment: 'hobby',
+    recreation: 'hobby',
+    religious: 'spiritual',
+    faith: 'spiritual',
+    meditation: 'spiritual',
+    mindfulness: 'spiritual',
+    educational: 'academic',
+    scholarly: 'academic',
+    scientific: 'academic',
+    research: 'academic',
+  },
+  'course_category'
+);
+
+// complexity enum (used in Phase1, Phase2Input, AnalysisResult)
+const llmComplexityEnum = createLLMEnumSchema(
+  ['narrow', 'medium', 'broad'] as const,
+  {
+    small: 'narrow',
+    limited: 'narrow',
+    specific: 'narrow',
+    focused: 'narrow',
+    simple: 'narrow',
+    moderate: 'medium',
+    average: 'medium',
+    standard: 'medium',
+    wide: 'broad',
+    large: 'broad',
+    extensive: 'broad',
+    comprehensive: 'broad',
+  },
+  'complexity'
+);
+
+// target_audience enum (used in Phase1, Phase2Input, AnalysisResult)
+const llmTargetAudienceEnum = createLLMEnumSchema(
+  ['beginner', 'intermediate', 'advanced', 'mixed'] as const,
+  {
+    novice: 'beginner',
+    newcomer: 'beginner',
+    starter: 'beginner',
+    entry: 'beginner',
+    middle: 'intermediate',
+    moderate: 'intermediate',
+    expert: 'advanced',
+    professional: 'advanced',
+    senior: 'advanced',
+    general: 'mixed',
+    various: 'mixed',
+    diverse: 'mixed',
+    all: 'mixed',
+    universal: 'mixed',
+  },
+  'target_audience'
+);
+
+// difficulty_progression enum (used in SectionBreakdown)
+const llmDifficultyProgressionEnum = createLLMEnumSchema(
+  ['flat', 'gradual', 'steep'] as const,
+  {
+    constant: 'flat',
+    uniform: 'flat',
+    even: 'flat',
+    linear: 'flat',
+    smooth: 'gradual',
+    progressive: 'gradual',
+    moderate: 'gradual',
+    rapid: 'steep',
+    sharp: 'steep',
+    accelerating: 'steep',
+    aggressive: 'steep',
+  },
+  'difficulty_progression'
+);
+
+// difficulty enum (used in SectionBreakdown)
+const llmDifficultyEnum = createLLMEnumSchema(
+  ['beginner', 'intermediate', 'advanced'] as const,
+  {
+    easy: 'beginner',
+    simple: 'beginner',
+    basic: 'beginner',
+    novice: 'beginner',
+    entry: 'beginner',
+    medium: 'intermediate',
+    moderate: 'intermediate',
+    middle: 'intermediate',
+    hard: 'advanced',
+    complex: 'advanced',
+    expert: 'advanced',
+    challenging: 'advanced',
+  },
+  'difficulty'
+);
+
+// tone enum (used in GenerationGuidance)
+const llmToneEnum = createLLMEnumSchema(
+  [
+    'conversational but precise',
+    'formal academic',
+    'casual friendly',
+    'technical professional',
+  ] as const,
+  {
+    casual: 'casual friendly',
+    relaxed: 'casual friendly',
+    informal: 'casual friendly',
+    friendly: 'casual friendly',
+    academic: 'formal academic',
+    formal: 'formal academic',
+    scientific: 'formal academic',
+    scholarly: 'formal academic',
+    technical: 'technical professional',
+    professional: 'technical professional',
+    expert: 'technical professional',
+    conversational: 'conversational but precise',
+    precise: 'conversational but precise',
+    balanced: 'conversational but precise',
+  },
+  'tone'
+);
+
+// confidence enum (used in SectionRAGPlan)
+const llmConfidenceEnum = createLLMEnumSchema(
+  ['high', 'medium'] as const,
+  {
+    excellent: 'high',
+    strong: 'high',
+    certain: 'high',
+    moderate: 'medium',
+    acceptable: 'medium',
+    ok: 'medium',
+  },
+  'confidence'
+);
+
+/**
  * Section breakdown schema (Phase 2)
  * Architectural principle: .min() is critical (blocks), .max() is recommendation (non-blocking)
  */
 export const SectionBreakdownSchema = z.object({
   area: z.string().min(1), // Removed .max(200) - allow detailed section names
   estimated_lessons: z.number().int().min(1, 'Section must have at least 1 lesson'),
-  importance: z.enum(['simple', 'normal', 'complex']),
+  importance: createLLMEnumSchema(
+    ['simple', 'normal', 'complex'] as const,
+    {
+      // Backward compatibility: old enum values
+      core: 'complex',
+      important: 'normal',
+      optional: 'simple',
+      // LLM synonym mappings
+      easy: 'simple',
+      beginner: 'simple',
+      low: 'simple',
+      supplementary: 'simple',
+      extra: 'simple',
+      bonus: 'simple',
+      medium: 'normal',
+      intermediate: 'normal',
+      secondary: 'normal',
+      hard: 'complex',
+      advanced: 'complex',
+      high: 'complex',
+      critical: 'complex',
+      essential: 'complex',
+      main: 'complex',
+      primary: 'complex',
+    },
+    'importance'
+  ),
   learning_objectives: z
     .array(z.string().min(1))
     .min(2, 'Must have at least 2 learning objectives'), // Removed .max(5) - encourage comprehensive objectives
   key_topics: z.array(z.string().min(1)).min(3, 'Must have at least 3 key topics'), // Removed .max(8) - allow extensive topic coverage
   pedagogical_approach: z.string().min(20, 'Pedagogical approach must be at least 20 characters'), // Removed .max(200) - encourage detailed approaches
   // Deprecated: kept optional for backward compat with stored analysis data
-  difficulty_progression: z.enum(['flat', 'gradual', 'steep']).optional(),
+  difficulty_progression: llmDifficultyProgressionEnum.optional(),
 
   // NEW: Analyze Enhancement fields (optional for backward compatibility)
   section_id: z.string().optional(), // Unique identifier (e.g., "1", "2", "3")
   estimated_duration_hours: z.number().min(0.5).max(20).optional(), // Time to complete section
-  difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(), // Difficulty level
+  difficulty: llmDifficultyEnum.optional(), // Difficulty level
   // Deprecated: kept optional for backward compat with stored analysis data
   prerequisites: z.array(z.string()).optional(), // section_ids that must be completed first
 });
@@ -268,13 +486,10 @@ export const Phase2InputSchema = z.object({
   document_summaries: z.array(z.string()).nullable().optional(),
   phase1_output: z.object({
     course_category: z.object({
-      primary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']),
+      primary: llmCourseCategoryEnum,
       confidence: z.number().min(0).max(1),
       reasoning: z.string().min(1),
-      secondary: z
-        .enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'])
-        .nullable()
-        .optional(),
+      secondary: llmCourseCategoryEnum.nullable().optional(),
     }),
     contextual_language: z
       .object({
@@ -289,9 +504,9 @@ export const Phase2InputSchema = z.object({
     topic_analysis: z.object({
       determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
       information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
-      complexity: z.enum(['narrow', 'medium', 'broad']),
+      complexity: llmComplexityEnum,
       reasoning: z.string().min(50),
-      target_audience: z.enum(['beginner', 'intermediate', 'advanced', 'mixed']),
+      target_audience: llmTargetAudienceEnum,
       missing_elements: z.array(z.string()).nullable(),
       key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
       domain_keywords: z.array(z.string()).min(5), // Removed .max(15) - allow extensive keyword coverage
@@ -343,13 +558,10 @@ export const Phase2InputSchema = z.object({
  */
 export const Phase1OutputSchema = z.object({
   course_category: z.object({
-    primary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']),
+    primary: llmCourseCategoryEnum,
     confidence: z.number().min(0).max(1),
     reasoning: z.string().min(1),
-    secondary: z
-      .enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'])
-      .nullable()
-      .optional(),
+    secondary: llmCourseCategoryEnum.nullable().optional(),
   }),
   contextual_language: z
     .object({
@@ -364,9 +576,9 @@ export const Phase1OutputSchema = z.object({
   topic_analysis: z.object({
     determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
     information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
-    complexity: z.enum(['narrow', 'medium', 'broad']),
+    complexity: llmComplexityEnum,
     reasoning: z.string().min(50),
-    target_audience: z.enum(['beginner', 'intermediate', 'advanced', 'mixed']),
+    target_audience: llmTargetAudienceEnum,
     missing_elements: z.array(z.string()).nullable(),
     key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
     domain_keywords: z.array(z.string()).min(5), // Removed .max(15) - allow extensive keyword coverage
@@ -392,12 +604,7 @@ export const Phase1OutputSchema = z.object({
  * - Allows LLM flexibility while maintaining type safety
  */
 export const GenerationGuidanceSchema = z.object({
-  tone: z.enum([
-    'conversational but precise',
-    'formal academic',
-    'casual friendly',
-    'technical professional',
-  ]),
+  tone: llmToneEnum,
   use_analogies: z.boolean(),
   specific_analogies: z.array(z.string()).optional(),
   avoid_jargon: z.array(z.string()),
@@ -473,7 +680,7 @@ export const SectionRAGPlanSchema = z.object({
   primary_documents: z.array(z.string()), // file_catalog IDs ranked by relevance
   search_queries: z.array(z.string()), // Queries for RAG retrieval
   expected_topics: z.array(z.string()), // Topics to find in chunks
-  confidence: z.enum(['high', 'medium']), // Based on processing_mode
+  confidence: llmConfidenceEnum, // Based on processing_mode
   note: z.string().optional(), // Guidance for Generation
   // Legacy field for backward compatibility (deprecated, use search_queries)
   key_search_terms: z.array(z.string()).optional(),
@@ -500,13 +707,10 @@ export const DocumentRelevanceMappingSchema = z.record(
  */
 export const AnalysisResultSchema = z.object({
   course_category: z.object({
-    primary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']),
+    primary: llmCourseCategoryEnum,
     confidence: z.number().min(0).max(1), // Keep .max(1) - technical constraint (probability)
     reasoning: z.string().min(50), // Removed .max(200) - encourage detailed reasoning
-    secondary: z
-      .enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'])
-      .optional()
-      .nullable(),
+    secondary: llmCourseCategoryEnum.optional().nullable(),
   }),
 
   contextual_language: z
@@ -523,9 +727,9 @@ export const AnalysisResultSchema = z.object({
   topic_analysis: z.object({
     determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
     information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
-    complexity: z.enum(['narrow', 'medium', 'broad']),
+    complexity: llmComplexityEnum,
     reasoning: z.string().min(50),
-    target_audience: z.enum(['beginner', 'intermediate', 'advanced', 'mixed']),
+    target_audience: llmTargetAudienceEnum,
     missing_elements: z.array(z.string()).nullable(),
     key_concepts: z.array(z.string()).min(3), // Removed .max(10) - encourage comprehensive concept lists
     domain_keywords: z.array(z.string()).min(5), // Removed .max(15) - allow extensive keyword coverage

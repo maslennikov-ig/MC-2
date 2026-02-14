@@ -11,6 +11,7 @@
  */
 
 import type { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
+import { nanoid } from 'nanoid';
 
 // ============================================================================
 // TYPES
@@ -759,5 +760,49 @@ export function addElement(
   return {
     updatedStructure,
     recalculated,
+  };
+}
+
+// ============================================================================
+// STABLE IDS
+// ============================================================================
+
+const SECTION_ID_PREFIX = 'sec_';
+const LESSON_ID_PREFIX = 'lsn_';
+const STABLE_ID_LENGTH = 8;
+
+/**
+ * Ensure all sections and lessons in a course structure have stable IDs.
+ *
+ * - Injects `sec_` + nanoid(8) for sections without `id`
+ * - Injects `lsn_` + nanoid(8) for lessons without `id`
+ * - Idempotent: elements with existing IDs are left unchanged
+ * - Pure function: returns a new structure, does NOT mutate input or write to DB
+ *
+ * @param structure - Course structure (may have missing IDs in legacy data)
+ * @returns New structure with all IDs populated
+ */
+export function ensureStableIdsInMemory(structure: CourseStructure): CourseStructure {
+  const sections = structure.sections?.map((section: Section) => {
+    const lessons = section.lessons?.map((lesson: Lesson) => {
+      if (lesson.id) return lesson;
+      return { ...lesson, id: `${LESSON_ID_PREFIX}${nanoid(STABLE_ID_LENGTH)}` };
+    });
+
+    const updatedSection: Section = {
+      ...section,
+      ...(lessons ? { lessons } : {}),
+    };
+
+    if (!updatedSection.id) {
+      updatedSection.id = `${SECTION_ID_PREFIX}${nanoid(STABLE_ID_LENGTH)}`;
+    }
+
+    return updatedSection;
+  });
+
+  return {
+    ...structure,
+    ...(sections ? { sections } : {}),
   };
 }

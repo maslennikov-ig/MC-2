@@ -37,6 +37,7 @@ import { MetadataGenerator } from './utils/metadata-generator';
 import { SectionBatchGenerator } from './utils/section-batch-generator';
 import { QualityValidator } from '../../shared/validation/quality-validator';
 import { sanitizeCourseStructure } from './utils/sanitize';
+import { ensureStableIdsInMemory } from './utils/course-structure-editor';
 import { qdrantClient } from '@/shared/qdrant/client';
 import { acquireGenerationLock } from '@/shared/locks';
 import {
@@ -44,6 +45,7 @@ import {
   // DISABLED: triggerAllLessonCovers - lesson covers now manual via UI
 } from '../stage7-enrichments/services/auto-card-trigger';
 import { handleStageCompletion } from '@/shared/auto-approval';
+import { writeCourseNodes } from '@/shared/course-nodes/writer';
 import { checkPauseAndDelay } from '../../shared/pause-check';
 import { isPipelineInterrupt } from '@/shared/errors';
 import { z } from 'zod';
@@ -372,11 +374,18 @@ class Stage5GenerationHandler {
       'Committing course structure to database (atomic commit)'
     );
 
+    // Inject stable IDs (sec_ + lsn_ + nanoid(8)) before persisting
+    const structureWithIds = {
+      ...ensureStableIdsInMemory(sanitizedStructure),
+      // Set schema_version to 2 (plan:105) — indicates stable IDs present
+      schema_version: 2 as const,
+    };
+
     // Save structure
     const { error: structureError } = await supabaseAdmin
       .from('courses')
       .update({
-        course_structure: sanitizedStructure,
+        course_structure: structureWithIds,
         generation_metadata: result.generation_metadata,
         updated_at: new Date().toISOString(),
       })
@@ -389,7 +398,7 @@ class Stage5GenerationHandler {
     // Materialize sections and lessons to DB tables (non-fatal on failure)
     jobLogger.info('Materializing sections and lessons to database tables');
     try {
-      await materializeSectionsAndLessons(courseId, sanitizedStructure, jobLogger);
+      await materializeSectionsAndLessons(courseId, structureWithIds, jobLogger);
     } catch (materializeError) {
       jobLogger.warn(
         {
@@ -400,6 +409,14 @@ class Stage5GenerationHandler {
         'Failed to materialize sections/lessons (non-fatal, Stage 6 will use JSONB)'
       );
     }
+
+    // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+    await writeCourseNodes(courseId, structureWithIds, supabaseAdmin, jobLogger).catch(err =>
+      jobLogger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal)'
+      )
+    );
 
     // Clear heartbeat - lock will be released in finally block
     clearInterval(lockGuard.heartbeatInterval);

@@ -295,6 +295,12 @@ export type LearningObjectiveWithoutInjectedFields = z.infer<
  * - LessonSchema (for final validation after field injection)
  */
 const LessonBaseSchema = z.object({
+  // Stable ID for surgical editing (Phase 0: optional for backward compat with legacy structures)
+  id: z
+    .string()
+    .optional()
+    .describe('Stable lesson ID (lsn_ + nanoid(8)), injected post-generation'),
+
   // Identification
   lesson_number: z
     .number()
@@ -355,6 +361,7 @@ const LessonBaseSchema = z.object({
  * Reference: INV-2025-11-19-001-duration-fields-architecture.md
  */
 export const LessonWithoutInjectedFieldsSchema = LessonBaseSchema.omit({
+  id: true,
   estimated_duration_minutes: true,
 });
 
@@ -382,6 +389,12 @@ export type Lesson = z.infer<typeof LessonSchema>;
  * Base section schema for LLM generation (without estimated_duration_minutes)
  */
 const SectionBaseSchemaForGeneration = z.object({
+  // Stable ID for surgical editing (Phase 0: optional for backward compat with legacy structures)
+  id: z
+    .string()
+    .optional()
+    .describe('Stable section ID (sec_ + nanoid(8)), injected post-generation'),
+
   // Identification
   section_number: z
     .number()
@@ -423,7 +436,9 @@ const SectionBaseSchemaForGeneration = z.object({
  *
  * Reference: INV-2025-11-19-001-duration-fields-architecture.md
  */
-export const SectionWithoutInjectedFieldsSchema = SectionBaseSchemaForGeneration;
+export const SectionWithoutInjectedFieldsSchema = SectionBaseSchemaForGeneration.omit({
+  id: true,
+});
 
 export type SectionWithoutInjectedFields = z.infer<typeof SectionWithoutInjectedFieldsSchema>;
 
@@ -437,6 +452,7 @@ export type SectionWithoutInjectedFields = z.infer<typeof SectionWithoutInjected
  */
 export const SectionSchema = z
   .object({
+    id: z.string().optional(),
     section_number: z.number().int().positive().optional(),
     section_title: z
       .string()
@@ -498,6 +514,11 @@ export type DifficultyLevel = CourseLevel;
  */
 export const CourseStructureSchema = z
   .object({
+    // ========== SCHEMA VERSION ==========
+
+    /** Structure schema version (plan:105). Version 2 = stable IDs required. */
+    schema_version: z.number().int().min(1).max(10).optional().describe('Structure schema version'),
+
     // ========== METADATA ==========
 
     course_title: z

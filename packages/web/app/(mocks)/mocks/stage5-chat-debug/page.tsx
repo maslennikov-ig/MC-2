@@ -258,13 +258,13 @@ function ChatDebugContent() {
 
   // Handle refine wrapper — logs and captures response
   const handleRefine = useCallback(
-    async (message: string, intent: 'refine' | 'regenerate') => {
+    async (message: string, intent?: 'refine' | 'regenerate') => {
       const now = new Date().toLocaleTimeString()
       addLog({
         timestamp: now,
         type: 'request',
-        label: `Sending: "${message}" [${intent}]`,
-        data: { message, intent, courseId: activeCourseId },
+        label: `Sending: "${message}" [${intent || 'auto'}]`,
+        data: { message, intent: intent || 'auto', courseId: activeCourseId },
       })
 
       try {
@@ -317,7 +317,7 @@ function ChatDebugContent() {
   }, [acceptProposalHook, latestProposal, addLog, refreshAfter])
 
   const handleTestScenarioSend = useCallback(
-    (message: string, intent: 'refine' | 'regenerate') => {
+    (message: string, intent?: 'refine' | 'regenerate') => {
       void handleRefine(message, intent)
     },
     [handleRefine]

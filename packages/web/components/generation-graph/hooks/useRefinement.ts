@@ -14,6 +14,8 @@ function getUpdatedFieldsForProposal(proposal: Proposal): string[] {
       return ['course_structure']
     case 'direct_action':
       return ['analysis_result', 'course_structure']
+    case 'structural_operation':
+      return ['course_structure']
   }
 }
 
@@ -22,6 +24,9 @@ export interface ChatMessage {
   content: string
   timestamp: string
   pending?: boolean
+  metadata?: {
+    clarificationType?: 'ambiguous_intent'
+  }
 }
 
 export const useRefinement = (courseId: string) => {
@@ -33,6 +38,7 @@ export const useRefinement = (courseId: string) => {
   const [isApplying, setIsApplying] = useState(false)
   const [proposalError, setProposalError] = useState<string | null>(null)
   const [acceptedProposal, setAcceptedProposal] = useState<Proposal | null>(null)
+  const [stage6ContentReady, setStage6ContentReady] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const isMountedRef = useRef(true)
 
@@ -61,6 +67,7 @@ export const useRefinement = (courseId: string) => {
     setChatHistory([])
     setLatestProposal(null)
     setAcceptedProposal(null)
+    setStage6ContentReady(false)
   }, [])
 
   const acceptProposal = useCallback(async () => {
@@ -155,7 +162,7 @@ export const useRefinement = (courseId: string) => {
       nodeId: string | undefined,
       userMessage: string,
       previousOutput: string,
-      intent: 'refine' | 'regenerate' = 'refine'
+      intent?: 'refine' | 'regenerate'
     ): Promise<ChatResponse | undefined> => {
       // Cancel any existing request
       if (abortControllerRef.current) {
@@ -179,7 +186,8 @@ export const useRefinement = (courseId: string) => {
             blockPath: undefined,
           },
           previousOutput,
-          intent,
+          // Only send intent when explicitly provided (e.g., from quick actions)
+          ...(intent && { intent }),
         }
 
         // NOTE: AbortSignal cannot be passed to server actions (not serializable).
@@ -204,6 +212,9 @@ export const useRefinement = (courseId: string) => {
               response.assistantMessage?.trim() ||
               t('refinementChat.proposal.emptyResponseFallback'),
             timestamp: new Date().toISOString(),
+            ...(response.metadata?.clarificationType
+              ? { metadata: { clarificationType: response.metadata.clarificationType } }
+              : {}),
           },
         ])
 
@@ -212,6 +223,11 @@ export const useRefinement = (courseId: string) => {
           setLatestProposal(response.proposal)
           setProposalError(null) // Clear any previous error
           setAcceptedProposal(null)
+        }
+
+        // Track Stage 6 content readiness for CTA
+        if (response.metadata?.stage6ContentReady) {
+          setStage6ContentReady(true)
         }
 
         // Show toast only for regenerate (long async operation); refine response is shown in chat
@@ -261,5 +277,6 @@ export const useRefinement = (courseId: string) => {
     retryProposal,
     rejectProposal,
     acceptedProposal,
+    stage6ContentReady,
   }
 }

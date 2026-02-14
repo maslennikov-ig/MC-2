@@ -83,13 +83,17 @@ interface NodeDetailsDrawerLessonProps {
   /** Cancel edit handler */
   onCancelEdit: () => void
   /** Refine for lesson handler */
-  onRefineForLesson: (message: string, intent: 'refine' | 'regenerate') => void
+  onRefineForLesson: (message: string, intent?: 'refine' | 'regenerate') => void
   /** Accept proposal handler */
   onAcceptProposal: () => void
   /** Retry proposal handler */
   onRetryProposal: () => void
   /** Reject proposal handler */
   onRejectProposal: () => void
+  /** Stage 6 content ready for CTA */
+  stage6ContentReady: boolean
+  /** Callback to generate content for new lessons (server action passed as prop) */
+  onGenerateContent?: (courseId: string) => Promise<unknown>
 }
 
 /**
@@ -139,6 +143,8 @@ export const NodeDetailsDrawerLesson = memo(function NodeDetailsDrawerLesson({
   onAcceptProposal,
   onRetryProposal,
   onRejectProposal,
+  stage6ContentReady,
+  onGenerateContent,
 }: NodeDetailsDrawerLessonProps) {
   return (
     <div className="flex h-full flex-col">
@@ -192,8 +198,10 @@ export const NodeDetailsDrawerLesson = memo(function NodeDetailsDrawerLesson({
           proposalError={proposalError}
           onRetryProposal={onRetryProposal}
           onRejectProposal={onRejectProposal}
+          stage6ContentReady={stage6ContentReady}
           isGenerating={isGenerating}
           blockedMessage={blockedMessage}
+          onGenerateContent={onGenerateContent}
         />
       </div>
     </div>

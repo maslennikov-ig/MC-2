@@ -18,6 +18,8 @@
  *                         regenerateLessonWithRefinement, getGenerationHistory, exportTraceData, finalizeCourse
  * - tiers: listTiers, getTier, updateTier, resetTierToDefaults
  * - logs: list, getById, updateStatus, bulkUpdateStatus (error logs and generation traces)
+ *
+ * Note: Benchmarks router was removed (migrated to aidevteam project, 2026-02-14)
  */
 
 import { router } from '../../trpc';
@@ -31,7 +33,6 @@ import { auditLogsRouter } from './audit-logs';
 import { generationMonitoringRouter } from './generation-monitoring';
 import { tiersRouter } from './tiers';
 import { logsRouter } from './logs';
-import { benchmarksRouter } from './benchmarks';
 
 // Re-export shared types for external consumers
 export * from './shared/types';
@@ -69,9 +70,6 @@ export const adminRouter = router({
 
   // Logs (4 procedures: list, getById, updateStatus, bulkUpdateStatus)
   logs: logsRouter,
-
-  // Benchmarks (4 procedures: listBenchmarks, getBenchmark, getBenchmarkRuns, compareBenchmarks)
-  benchmarks: benchmarksRouter,
 });
 
 /**

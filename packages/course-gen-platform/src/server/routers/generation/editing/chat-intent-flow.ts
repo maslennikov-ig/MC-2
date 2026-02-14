@@ -10,21 +10,36 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { TRPCError } from '@trpc/server';
+import { JobType } from '@megacampus/shared-types';
+import type { JobData } from '@megacampus/shared-types';
+import { addJob, removeJobsByCourseId } from '../../../../orchestrator/queue';
+import { buildStage5JobInput } from '../_shared/helpers';
 import { logger } from '../../../../shared/logger/index.js';
-import type { ChatResponse, Proposal } from '@megacampus/shared-types/chat-types';
+import type {
+  ChatResponse,
+  StructuralOperationProposal,
+} from '@megacampus/shared-types/chat-types';
 import type { CourseStructure, Database } from '@megacampus/shared-types';
 import { CHAT_PRIMARY_MODEL_ID, CHAT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
+import { courseOperationSchema } from '@megacampus/shared-types/course-operations';
+import { z } from 'zod';
 import {
   classifyIntent,
+  classifyWithHeuristics,
   isDirectExecutionIntent,
   isLLMRequiredIntent,
 } from '../../../../shared/intent';
 import { llmClient } from '../../../../shared/llm/client';
-import { createModelConfigService } from '../../../../shared/llm/model-config-service';
+import {
+  createModelConfigService,
+  isMissingChatPhaseConfigError,
+} from '../../../../shared/llm/model-config-service';
 import {
   handleDirectIntent,
   handleInfoQuery,
   buildTargetedRefinementPrompt,
+  buildCourseSkeleton,
   parseProposalFromLLMResponse,
   resolveTargetedContext,
 } from './chat-helpers';
@@ -33,6 +48,12 @@ import {
   type ChatFallbackConfig,
   type IntentConfidenceThresholds,
 } from './chat-mutation-helpers';
+import {
+  buildIdRemapContext,
+  remapStructureToSimplified,
+  remapOperationsToReal,
+} from './surgical-id-remap';
+import { validateOperations } from './surgical-operations';
 
 // ============================================================================
 // Types
@@ -43,7 +64,125 @@ interface IntentRouteMsgParams {
   convId: string;
   chatType: 'node' | 'global';
   nodeContext?: { stageId: string; nodeId?: string; blockPath?: string } | null;
-  intent: 'refine' | 'regenerate';
+  /** Derived response intent based on classification result */
+  responseIntent: 'refine' | 'regenerate';
+}
+
+// ============================================================================
+// Full Regeneration Handler (shared between explicit intent and classified)
+// ============================================================================
+
+/** Parameters for the full regeneration handler */
+export interface FullRegenerateParams {
+  courseId: string;
+  userId: string;
+  convId: string;
+  chatType: 'node' | 'global';
+  nodeContext?: { stageId: string; nodeId?: string; blockPath?: string } | null;
+  requestId: string;
+  supabaseAdmin: SupabaseClient<Database>;
+}
+
+/**
+ * Execute a full course regeneration: restart_from_stage + enqueue Stage 5 job.
+ * Shared between explicit `intent='regenerate'` and classified FULL_REGENERATE.
+ */
+export async function executeFullRegenerate(params: FullRegenerateParams): Promise<ChatResponse> {
+  const { courseId, userId, convId, chatType, nodeContext, requestId, supabaseAdmin } = params;
+
+  try {
+    // Reset course status via RPC
+    const { error: rpcError } = await supabaseAdmin.rpc(
+      'restart_from_stage' as unknown as never,
+      {
+        p_course_id: courseId,
+        p_stage_number: 5,
+        p_user_id: userId,
+      } as unknown as never
+    );
+
+    if (rpcError) {
+      logger.error(
+        { requestId, courseId, error: rpcError },
+        'FULL_REGENERATE: RPC restart_from_stage failed'
+      );
+      throw new Error('Failed to reset course status');
+    }
+
+    // Clean up existing jobs
+    try {
+      await removeJobsByCourseId(courseId);
+    } catch (cleanupError) {
+      logger.warn(
+        { requestId, courseId, error: cleanupError },
+        'FULL_REGENERATE: Failed to clean up jobs'
+      );
+    }
+
+    // Build and enqueue Stage 5 job
+    const { jobInput } = await buildStage5JobInput(supabaseAdmin, courseId, userId, requestId);
+    const job = await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData);
+
+    const regenMessage = 'Запускаю полную перегенерацию курса. Это может занять некоторое время.';
+
+    await persistAssistantMessage(supabaseAdmin, {
+      courseId,
+      convId,
+      content: regenMessage,
+      chatType,
+      nodeContext: nodeContext || null,
+      intent: 'regenerate',
+      modelUsed: 'system',
+      inputTokens: 0,
+      outputTokens: 0,
+      requestId,
+    });
+
+    logger.info({ requestId, courseId, jobId: job.id }, 'Chat: FULL_REGENERATE — job enqueued');
+
+    return {
+      conversationId: convId,
+      assistantMessage: regenMessage,
+      intent: 'regenerate',
+      jobId: job.id,
+      modelUsed: 'system',
+      inputTokens: 0,
+      outputTokens: 0,
+    };
+  } catch (error) {
+    logger.error(
+      {
+        requestId,
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Chat: FULL_REGENERATE failed'
+    );
+
+    const errorMessage = 'Не удалось запустить перегенерацию. Попробуйте ещё раз.';
+
+    await persistAssistantMessage(supabaseAdmin, {
+      courseId,
+      convId,
+      content: errorMessage,
+      chatType,
+      nodeContext: nodeContext || null,
+      intent: 'regenerate',
+      modelUsed: 'system',
+      inputTokens: 0,
+      outputTokens: 0,
+      requestId,
+    });
+
+    return {
+      conversationId: convId,
+      assistantMessage: errorMessage,
+      intent: 'regenerate',
+      modelUsed: 'system',
+      inputTokens: 0,
+      outputTokens: 0,
+    };
+  }
 }
 
 // ============================================================================
@@ -62,7 +201,12 @@ async function handleDirectExecutionRoute(
   courseId: string,
   params: IntentRouteMsgParams
 ): Promise<ChatResponse> {
-  const directResult = handleDirectIntent(classifiedIntent, courseStructure, nodeContextBlockPath);
+  const directResult = handleDirectIntent(
+    classifiedIntent,
+    courseStructure,
+    nodeContextBlockPath,
+    params.nodeContext?.stageId
+  );
 
   // Save assistant message
   await supabaseAdmin.from('course_chat_messages').insert({
@@ -72,7 +216,7 @@ async function handleDirectExecutionRoute(
     content: directResult.message,
     chat_type: params.chatType,
     node_context: params.nodeContext || null,
-    intent: params.intent,
+    intent: params.responseIntent,
     model_used: 'intent_classifier',
     input_tokens: 200, // Approximate classification tokens
     output_tokens: 50,
@@ -81,8 +225,8 @@ async function handleDirectExecutionRoute(
   return {
     conversationId: params.convId,
     assistantMessage: directResult.message,
-    intent: params.intent,
-    proposal: directResult.proposal as Proposal | undefined,
+    intent: params.responseIntent,
+    proposal: directResult.proposal,
     modelUsed: 'intent_classifier',
     inputTokens: 200,
     outputTokens: 50,
@@ -109,7 +253,7 @@ async function handleInfoQueryRoute(
     content: infoResult.message,
     chat_type: params.chatType,
     node_context: params.nodeContext || null,
-    intent: params.intent,
+    intent: params.responseIntent,
     model_used: 'info_query',
     input_tokens: 0,
     output_tokens: 0,
@@ -118,7 +262,7 @@ async function handleInfoQueryRoute(
   return {
     conversationId: params.convId,
     assistantMessage: infoResult.message,
-    intent: params.intent,
+    intent: params.responseIntent,
     modelUsed: 'info_query',
     inputTokens: 0,
     outputTokens: 0,
@@ -141,21 +285,27 @@ async function handleLLMRequiredRoute(
   requestId: string,
   params: IntentRouteMsgParams
 ): Promise<ChatResponse> {
-  const { targetedContext, allowedFieldsForTarget, targetPath } = resolveTargetedContext({
-    classifiedIntent,
-    courseStructure,
-    nodeContextBlockPath,
-  });
+  const { targetedContext, allowedFieldsForTarget, targetPath, courseSkeleton } =
+    resolveTargetedContext({
+      classifiedIntent,
+      courseStructure,
+      nodeContextBlockPath,
+    });
 
-  // Build targeted prompt
+  // Build targeted prompt with skeleton context
   const targetedSystemPrompt = buildTargetedRefinementPrompt(
     classifiedIntent.intent,
     targetedContext,
     allowedFieldsForTarget,
-    targetPath
+    targetPath,
+    courseSkeleton
   );
 
-  // Get model config from database (intent classification is only used for stage 5)
+  // Stage-aware model selection: stage_6 → chat_stage_6_refinement, else → chat_stage_5_refinement
+  const phaseKey =
+    params.nodeContext?.stageId === 'stage_6'
+      ? 'chat_stage_6_refinement'
+      : 'chat_stage_5_refinement';
   const modelConfigService = createModelConfigService();
   let targetedModelId = CHAT_PRIMARY_MODEL_ID; // Hardcoded fallback primary
   let targetedFallbackModelId = CHAT_FALLBACK_MODEL_ID; // Hardcoded fallback secondary
@@ -164,7 +314,7 @@ async function handleLLMRequiredRoute(
 
   try {
     const config = await modelConfigService.getModelForPhase(
-      'chat_stage_5_refinement',
+      phaseKey,
       courseId,
       undefined,
       (courseLanguage as 'ru' | 'en') || 'ru'
@@ -184,16 +334,20 @@ async function handleLLMRequiredRoute(
       'Resolved model config for intent flow from database'
     );
   } catch (configError) {
-    logger.warn(
+    // Plan requirement: chat phases must fail-fast (503) when config is unavailable
+    logger.error(
       {
         requestId,
         courseId,
+        phaseKey,
         error: configError,
-        fallbackPrimary: targetedModelId,
-        fallbackSecondary: targetedFallbackModelId,
       },
-      'Failed to get model config for intent flow, using hardcoded fallback'
+      'Chat phase model config unavailable — returning 503 per plan requirement'
     );
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: `Model configuration unavailable for chat phase "${phaseKey}". Please try again later.`,
+    });
   }
 
   let modelUsed = targetedModelId;
@@ -210,6 +364,7 @@ async function handleLLMRequiredRoute(
         model: targetedModelId,
         temperature: targetedTemperature,
         maxTokens: targetedMaxTokens,
+        enableCaching: true,
       }
     );
   } catch (primaryError) {
@@ -235,6 +390,7 @@ async function handleLLMRequiredRoute(
           model: targetedFallbackModelId,
           temperature: targetedTemperature,
           maxTokens: targetedMaxTokens,
+          enableCaching: true,
         }
       );
     } catch (fallbackError) {
@@ -290,7 +446,7 @@ async function handleLLMRequiredRoute(
     content: targetedMessage,
     chatType: params.chatType,
     nodeContext: params.nodeContext,
-    intent: params.intent,
+    intent: params.responseIntent,
     modelUsed,
     inputTokens: targetedLLMResponse.inputTokens,
     outputTokens: targetedLLMResponse.outputTokens,
@@ -314,11 +470,269 @@ async function handleLLMRequiredRoute(
   return {
     conversationId: params.convId,
     assistantMessage: targetedMessage,
-    intent: params.intent,
+    intent: params.responseIntent,
     proposal: targetedProposal || undefined,
     modelUsed,
     inputTokens: targetedLLMResponse.inputTokens || 0,
     outputTokens: targetedLLMResponse.outputTokens || 0,
+  };
+}
+
+// ============================================================================
+// Structural Intent Detection
+// ============================================================================
+
+/** Intents that produce structural_operation proposals */
+const STRUCTURAL_INTENTS = ['ADD_LESSON', 'ADD_SECTION'] as const;
+
+function isStructuralIntent(intent: string): boolean {
+  return (STRUCTURAL_INTENTS as readonly string[]).includes(intent);
+}
+
+// ============================================================================
+// Structural Intent Handler (ADD_LESSON, ADD_SECTION)
+// ============================================================================
+
+/**
+ * Handle structural intents (ADD_LESSON, ADD_SECTION) via LLM with ID remapping.
+ * Returns a structural_operation proposal with CourseOperation[] batch.
+ */
+async function handleStructuralIntentRoute(
+  classifiedIntent: Awaited<ReturnType<typeof classifyIntent>>,
+  userMessage: string,
+  courseStructure: CourseStructure,
+  courseLanguage: string | null,
+  courseId: string,
+  supabaseAdmin: SupabaseClient<Database>,
+  fallbackConfig: ChatFallbackConfig,
+  requestId: string,
+  params: IntentRouteMsgParams,
+  generationStatus?: string | null
+): Promise<ChatResponse> {
+  // Build ID remap context for LLM-friendly IDs
+  const remapCtx = buildIdRemapContext(courseStructure);
+  const simplifiedStructure = remapStructureToSimplified(courseStructure, remapCtx);
+
+  // Build compact skeleton with simplified IDs
+  const structureSummary = buildCourseSkeleton(simplifiedStructure);
+
+  const isAddLesson = classifiedIntent.intent === 'ADD_LESSON';
+  const operationType = isAddLesson ? 'add_lesson' : 'add_section';
+
+  const systemPrompt = `You are a course structure editor. The user wants to ${isAddLesson ? 'add a lesson' : 'add a section'} to their course.
+
+Course: "${simplifiedStructure.course_title}"
+Structure:
+${structureSummary}
+
+Respond with a JSON object containing:
+- "operations": array with one ${operationType} operation
+- "summary": human-readable summary in ${courseLanguage === 'en' ? 'English' : 'Russian'}
+
+${
+  isAddLesson
+    ? `Operation format:
+{
+  "type": "add_lesson",
+  "reasoning": "why this lesson",
+  "tempId": "__new_1__",
+  "parentSectionId": "sec_N",
+  "afterLessonId": "lsn_N" or null,
+  "title": "lesson title",
+  "objectives": ["objective 1", "objective 2"],
+  "keyTopics": ["topic 1", "topic 2"]
+}`
+    : `Operation format:
+{
+  "type": "add_section",
+  "reasoning": "why this section",
+  "tempId": "__new_1__",
+  "afterSectionId": "sec_N" or null,
+  "title": "section title",
+  "description": "section description"
+}`
+}
+
+Use the simplified IDs (sec_1, lsn_1, etc.) from the structure above.
+Respond ONLY with valid JSON, no markdown fences.`;
+
+  // Stage-aware model selection
+  const phaseKey =
+    params.nodeContext?.stageId === 'stage_6'
+      ? 'chat_stage_6_refinement'
+      : 'chat_stage_5_refinement';
+  const modelConfigService = createModelConfigService();
+  let modelId = CHAT_PRIMARY_MODEL_ID;
+  let fallbackModelId = CHAT_FALLBACK_MODEL_ID;
+  let temperature = fallbackConfig.temperature;
+
+  try {
+    const config = await modelConfigService.getModelForPhase(
+      phaseKey,
+      courseId,
+      undefined,
+      (courseLanguage as 'ru' | 'en') || 'ru'
+    );
+    modelId = config.modelId || modelId;
+    fallbackModelId = config.fallbackModelId || fallbackModelId;
+    temperature = config.temperature;
+  } catch (configError) {
+    // Plan requirement: chat phases must fail-fast (503) when config is unavailable
+    logger.error(
+      { requestId, courseId, phaseKey, error: configError },
+      'Chat phase model config unavailable — returning 503 per plan requirement'
+    );
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: `Model configuration unavailable for chat phase "${phaseKey}". Please try again later.`,
+    });
+  }
+
+  // Call LLM with primary/fallback
+  let modelUsed = modelId;
+  let llmResponse;
+
+  try {
+    llmResponse = await llmClient.generateChatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      { model: modelId, temperature, maxTokens: 2048, enableCaching: true }
+    );
+  } catch {
+    modelUsed = fallbackModelId;
+    llmResponse = await llmClient.generateChatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      { model: fallbackModelId, temperature, maxTokens: 2048, enableCaching: true }
+    );
+  }
+
+  // Parse LLM response into operations
+  let proposal: StructuralOperationProposal | undefined;
+  let assistantMessage: string;
+  let stage6ContentReady = false;
+
+  try {
+    // Strip markdown fences if present
+    const raw = llmResponse.content
+      .replace(/^```(?:json)?\s*/m, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const parsed = JSON.parse(raw) as { operations?: unknown[]; summary?: string };
+
+    const operationsResult = z.array(courseOperationSchema).safeParse(parsed.operations);
+    if (!operationsResult.success) {
+      throw new Error(`Invalid operations: ${operationsResult.error.message}`);
+    }
+
+    // Remap simplified IDs back to real
+    const realOperations = remapOperationsToReal(operationsResult.data, remapCtx);
+
+    // Pre-flight validation
+    const errors = validateOperations(realOperations, courseStructure);
+    if (errors.length > 0) {
+      throw new Error(`Validation failed: ${errors.map(e => e.message).join('; ')}`);
+    }
+
+    proposal = {
+      type: 'structural_operation' as const,
+      operations: realOperations,
+      summary: parsed.summary || `Добавление ${isAddLesson ? 'урока' : 'секции'}`,
+    };
+
+    assistantMessage = proposal.summary;
+
+    // Stage 6 CTA: explicit action prompt when content already generated
+    // Plan:316-318: additional consistency check via lesson_contents status
+    const STAGE6_COMPLETE_STATUSES = ['stage_6_complete', 'finalizing', 'completed'];
+    const statusMatch =
+      !!generationStatus &&
+      STAGE6_COMPLETE_STATUSES.includes(generationStatus) &&
+      realOperations.some(op => op.type === 'add_lesson');
+
+    if (statusMatch) {
+      // Consistency check (plan:318): verify ratio of lesson_contents with
+      // completed/review_required status. A majority (>50%) indicates
+      // Stage 6 content has actually been generated, not just status set.
+      try {
+        const [{ count: totalCount }, { count: completedCount }] = await Promise.all([
+          supabaseAdmin
+            .from('lesson_contents')
+            .select('id', { count: 'exact', head: true })
+            .eq('course_id', courseId),
+          supabaseAdmin
+            .from('lesson_contents')
+            .select('id', { count: 'exact', head: true })
+            .eq('course_id', courseId)
+            .in('status', ['completed', 'review_required']),
+        ]);
+
+        const total = totalCount ?? 0;
+        const completed = completedCount ?? 0;
+        stage6ContentReady = total > 0 && completed / total > 0.5;
+      } catch {
+        // Non-fatal: fall back to status-only check
+        stage6ContentReady = true;
+      }
+    }
+
+    if (stage6ContentReady) {
+      assistantMessage +=
+        '\n\nКонтент курса уже сгенерирован. Сгенерировать контент для новых уроков после применения изменений?';
+    }
+  } catch (parseError) {
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        llmPreview: llmResponse.content.slice(0, 300),
+      },
+      'Chat: Failed to parse structural operation from LLM, returning text response'
+    );
+    // Fallback: return LLM text without proposal
+    assistantMessage =
+      llmResponse.content || 'Не удалось создать операцию. Попробуйте уточнить запрос.';
+  }
+
+  await persistAssistantMessage(supabaseAdmin, {
+    courseId,
+    convId: params.convId,
+    content: assistantMessage,
+    chatType: params.chatType,
+    nodeContext: params.nodeContext,
+    intent: params.responseIntent,
+    modelUsed,
+    inputTokens: llmResponse.inputTokens,
+    outputTokens: llmResponse.outputTokens,
+    requestId,
+  });
+
+  logger.info(
+    {
+      requestId,
+      courseId,
+      intent: classifiedIntent.intent,
+      modelUsed,
+      hasProposal: !!proposal,
+      operationCount: proposal?.operations?.length ?? 0,
+    },
+    'Chat: Structural intent response generated'
+  );
+
+  return {
+    conversationId: params.convId,
+    assistantMessage,
+    intent: params.responseIntent,
+    proposal: proposal || undefined,
+    modelUsed,
+    inputTokens: llmResponse.inputTokens || 0,
+    outputTokens: llmResponse.outputTokens || 0,
+    ...(stage6ContentReady ? { metadata: { stage6ContentReady: true } } : {}),
   };
 }
 
@@ -335,11 +749,16 @@ export interface IntentClassificationParams {
   nodeContext?: { stageId: string; nodeId?: string; blockPath?: string };
   convId: string;
   chatType: 'node' | 'global';
-  intent: 'refine' | 'regenerate';
+  /** User-provided intent. Optional — when omitted, auto-classified by backend. */
+  intent?: 'refine' | 'regenerate';
   requestId: string;
   supabaseAdmin: SupabaseClient<Database>;
+  /** Authenticated user ID, required for FULL_REGENERATE to enqueue jobs */
+  userId: string;
   fallbackConfig: ChatFallbackConfig;
   thresholds: IntentConfidenceThresholds;
+  /** Course generation status for Stage 6 CTA */
+  generationStatus?: string | null;
 }
 
 /**
@@ -358,44 +777,96 @@ export async function executeIntentClassificationFlow(
     nodeContext,
     convId,
     chatType,
-    intent,
     requestId,
     supabaseAdmin,
+    userId,
     fallbackConfig,
     thresholds,
+    generationStatus,
   } = params;
 
-  // Step 1: Classify intent using cheap model (~200 tokens)
-  const classifiedIntent = await classifyIntent(
-    userMessage,
-    nodeContext
-      ? {
-          stageId: nodeContext.stageId,
-          path: nodeContext.blockPath,
-          elementType: nodeContext.nodeId?.includes('lesson') ? 'lesson' : 'section',
-        }
-      : undefined
-  );
+  // Step 1a: Tier 0 — Regex heuristics (0ms, $0, covers ~40-50% of messages)
+  const heuristicResult = classifyWithHeuristics(userMessage);
 
-  logger.info(
-    {
-      requestId,
-      classifiedIntent: classifiedIntent.intent,
-      confidence: classifiedIntent.confidence,
-      target: classifiedIntent.target,
-    },
-    'Chat: Intent classified'
-  );
+  let classifiedIntent;
+  if (heuristicResult) {
+    classifiedIntent = heuristicResult;
+    logger.info(
+      {
+        requestId,
+        classifiedIntent: classifiedIntent.intent,
+        confidence: classifiedIntent.confidence,
+        tier: 0,
+      },
+      'Chat: Intent classified via Tier 0 heuristics'
+    );
+  } else {
+    // Step 1b: Tier 1 — Cheap LLM classification (~200 tokens, ~$0.00005)
+    try {
+      classifiedIntent = await classifyIntent(
+        userMessage,
+        nodeContext
+          ? {
+              stageId: nodeContext.stageId,
+              path: nodeContext.blockPath,
+              elementType: nodeContext.nodeId?.includes('lesson') ? 'lesson' : 'section',
+            }
+          : undefined
+      );
+    } catch (classifyError) {
+      // Plan requirement: chat phase misconfig → explicit 503 (not masked as 500)
+      if (isMissingChatPhaseConfigError(classifyError)) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: classifyError.message,
+          cause: classifyError,
+        });
+      }
+      throw classifyError;
+    }
+
+    logger.info(
+      {
+        requestId,
+        classifiedIntent: classifiedIntent.intent,
+        confidence: classifiedIntent.confidence,
+        target: classifiedIntent.target,
+        tier: 1,
+      },
+      'Chat: Intent classified via Tier 1 LLM'
+    );
+  }
+
+  // Derive response intent from classification
+  const responseIntent: 'refine' | 'regenerate' =
+    classifiedIntent.intent === 'FULL_REGENERATE' ? 'regenerate' : 'refine';
 
   const msgParams: IntentRouteMsgParams = {
     convId,
     chatType,
     nodeContext: nodeContext || null,
-    intent,
+    responseIntent,
   };
 
-  // Step 2: Handle direct execution intents (DELETE, MOVE) - 0 tokens
+  // Step 2: FULL_REGENERATE → enqueue async regeneration job
+  if (classifiedIntent.intent === 'FULL_REGENERATE') {
+    return executeFullRegenerate({
+      courseId,
+      userId,
+      convId,
+      chatType,
+      nodeContext,
+      requestId,
+      supabaseAdmin,
+    });
+  }
+
+  // Step 3: Handle direct execution intents (DELETE, MOVE) - 0 tokens
+  // Gated by CHAT_STRUCTURAL_PROPOSALS_ENABLED for phased rollout
+  const structuralProposalsEnabled = process.env.CHAT_STRUCTURAL_PROPOSALS_ENABLED !== 'false';
+
   if (
+    structuralProposalsEnabled &&
     isDirectExecutionIntent(classifiedIntent.intent) &&
     classifiedIntent.confidence >= thresholds.DIRECT_EXECUTION
   ) {
@@ -409,7 +880,7 @@ export async function executeIntentClassificationFlow(
     );
   }
 
-  // Step 3: Handle GET_INFO queries - no LLM needed
+  // Step 4: Handle GET_INFO queries - no LLM needed
   if (
     classifiedIntent.intent === 'GET_INFO' &&
     classifiedIntent.confidence >= thresholds.GET_INFO
@@ -417,7 +888,73 @@ export async function executeIntentClassificationFlow(
     return handleInfoQueryRoute(userMessage, courseStructure, supabaseAdmin, courseId, msgParams);
   }
 
-  // Step 4: LLM-required intents with TARGETED context
+  // Step 5: Plan requirement (plan:208): confidence < 0.6 => clarification response
+  // MUST be checked BEFORE LLM routing to prevent low-confidence intents
+  // (0.5-0.6) from bypassing clarification and going straight to LLM.
+  if (
+    classifiedIntent.intent !== 'UNKNOWN' &&
+    classifiedIntent.confidence < thresholds.CLARIFICATION
+  ) {
+    logger.info(
+      {
+        requestId,
+        classifiedIntent: classifiedIntent.intent,
+        confidence: classifiedIntent.confidence,
+        threshold: thresholds.CLARIFICATION,
+      },
+      'Chat: Low confidence — returning clarification instead of LLM routing'
+    );
+
+    const clarificationMessage =
+      'Не совсем понял ваш запрос. Уточните, пожалуйста, что именно вы хотите сделать: ' +
+      'изменить структуру курса, переписать содержимое, добавить/удалить элемент или что-то другое?';
+
+    await supabaseAdmin.from('course_chat_messages').insert({
+      course_id: courseId,
+      conversation_id: convId,
+      role: 'assistant',
+      content: clarificationMessage,
+      chat_type: chatType,
+      node_context: nodeContext || null,
+      intent: 'refine',
+      model_used: 'intent_classifier',
+      input_tokens: 200,
+      output_tokens: 30,
+    });
+
+    return {
+      conversationId: convId,
+      assistantMessage: clarificationMessage,
+      intent: 'refine' as const,
+      modelUsed: 'intent_classifier',
+      inputTokens: 200,
+      outputTokens: 30,
+      metadata: { clarificationType: 'ambiguous_intent' as const },
+    };
+  }
+
+  // Step 6: Structural intents (ADD_LESSON, ADD_SECTION) - LLM with ID remapping
+  // Also gated by CHAT_STRUCTURAL_PROPOSALS_ENABLED
+  if (
+    structuralProposalsEnabled &&
+    isStructuralIntent(classifiedIntent.intent) &&
+    classifiedIntent.confidence >= thresholds.LLM_REQUIRED
+  ) {
+    return handleStructuralIntentRoute(
+      classifiedIntent,
+      userMessage,
+      courseStructure,
+      courseLanguage,
+      courseId,
+      supabaseAdmin,
+      fallbackConfig,
+      requestId,
+      msgParams,
+      generationStatus
+    );
+  }
+
+  // Step 7: Other LLM-required intents with TARGETED context
   if (
     isLLMRequiredIntent(classifiedIntent.intent) &&
     classifiedIntent.confidence >= thresholds.LLM_REQUIRED
@@ -436,14 +973,14 @@ export async function executeIntentClassificationFlow(
     );
   }
 
-  // Fallback: UNKNOWN intent with low confidence - return null to use legacy flow
+  // Fallback: UNKNOWN intent - return null to use legacy flow
   logger.info(
     {
       requestId,
       classifiedIntent: classifiedIntent.intent,
       confidence: classifiedIntent.confidence,
     },
-    'Chat: Low confidence or UNKNOWN, falling back to legacy flow'
+    'Chat: UNKNOWN intent, falling back to legacy flow'
   );
 
   return null;

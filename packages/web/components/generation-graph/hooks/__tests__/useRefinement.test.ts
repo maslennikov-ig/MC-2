@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
+import React from 'react'
+import { NextIntlClientProvider } from 'next-intl'
 import { useRefinement } from '../useRefinement'
 import { Proposal } from '@megacampus/shared-types/chat-types'
 import { isCourseDataUpdatedEvent } from '@megacampus/shared-types'
@@ -36,6 +38,32 @@ vi.mock('sonner', () => ({
     error: vi.fn(),
   },
 }))
+
+// Minimal messages for next-intl provider (only keys used by useRefinement)
+const messages = {
+  generation: {
+    refinementChat: {
+      proposal: {
+        appliedMessage: 'Changes applied ({count} updates).',
+        applyError: 'Error applying changes',
+        errorMessage: 'Error: {error}',
+        rejectedMessage: '❌ Изменения отклонены. Напишите уточнение или новый запрос.',
+        regenerationStarted: 'Regeneration started',
+        regenerationStartedDesc: 'AI is regenerating the content.',
+        chatFailed: 'Chat Failed',
+        chatFailedDesc: 'Could not send message.',
+        emptyResponseFallback: 'See suggested changes below.',
+      },
+    },
+  },
+}
+
+/** Wrapper providing NextIntlClientProvider for hooks that use useTranslations */
+function createIntlWrapper() {
+  return function IntlWrapper({ children }: { children: React.ReactNode }) {
+    return React.createElement(NextIntlClientProvider, { locale: 'en', messages }, children)
+  }
+}
 
 // =============================================================================
 // Test Utilities
@@ -109,7 +137,9 @@ describe('useRefinement', () => {
       }
       window.addEventListener('course-data-updated', eventListener)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Set proposal and accept
       await act(async () => {
@@ -239,7 +269,9 @@ describe('useRefinement', () => {
       }
       window.addEventListener('course-data-updated', eventListener)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Trigger refine to get proposal
       await act(async () => {
@@ -284,7 +316,9 @@ describe('useRefinement', () => {
       }
       window.addEventListener('course-data-updated', eventListener)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Trigger refine to get proposal
       await act(async () => {
@@ -329,7 +363,9 @@ describe('useRefinement', () => {
       }
       window.addEventListener('course-data-updated', eventListener)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Trigger refine to get proposal
       await act(async () => {
@@ -373,7 +409,9 @@ describe('useRefinement', () => {
       }
       window.addEventListener('course-data-updated', eventListener)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Trigger refine to get proposal
       await act(async () => {
@@ -417,7 +455,9 @@ describe('useRefinement', () => {
       }
       window.addEventListener('course-data-updated', eventListener)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Trigger refine to get proposal
       await act(async () => {
@@ -468,7 +508,9 @@ describe('useRefinement', () => {
       }
       window.addEventListener('course-data-updated', eventListener)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Trigger refine to get proposal
       await act(async () => {
@@ -509,7 +551,9 @@ describe('useRefinement', () => {
 
       vi.mocked(sendChatMessage).mockResolvedValue(mockChatResponse)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Trigger refine to get proposal
       await act(async () => {
@@ -550,7 +594,9 @@ describe('useRefinement', () => {
       vi.mocked(sendChatMessage).mockResolvedValue(mockChatResponse)
       vi.mocked(applyProposal).mockResolvedValue(undefined)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // First proposal: accept it
       await act(async () => {
@@ -592,7 +638,9 @@ describe('useRefinement', () => {
     })
 
     it('should do nothing when no latestProposal exists', () => {
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // No proposal exists
       expect(result.current.latestProposal).toBeNull()
@@ -630,7 +678,9 @@ describe('useRefinement', () => {
       vi.mocked(sendChatMessage).mockResolvedValue(mockChatResponse)
       vi.mocked(applyProposal).mockResolvedValue(undefined)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Trigger refine to get proposal
       await act(async () => {
@@ -670,7 +720,9 @@ describe('useRefinement', () => {
       vi.mocked(sendChatMessage).mockResolvedValue(mockChatResponse1)
       vi.mocked(applyProposal).mockResolvedValue(undefined)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // First proposal: accept it
       await act(async () => {
@@ -724,7 +776,9 @@ describe('useRefinement', () => {
       vi.mocked(sendChatMessage).mockResolvedValue(mockChatResponse)
       vi.mocked(applyProposal).mockResolvedValue(undefined)
 
-      const { result, unmount } = renderHook(() => useRefinement(courseId))
+      const { result, unmount } = renderHook(() => useRefinement(courseId), {
+        wrapper: createIntlWrapper(),
+      })
 
       // Create some state
       await act(async () => {

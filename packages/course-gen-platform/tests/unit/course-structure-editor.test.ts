@@ -6,7 +6,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { applyFieldUpdate } from '../../src/stages/stage5-generation/utils/course-structure-editor';
+import {
+  applyFieldUpdate,
+  ensureStableIdsInMemory,
+} from '../../src/stages/stage5-generation/utils/course-structure-editor';
 import type { CourseStructure } from '@megacampus/shared-types';
 
 // Minimal valid CourseStructure for testing
@@ -161,6 +164,92 @@ describe('course-structure-editor', () => {
       expect(() =>
         applyFieldUpdate(invalidStructure, 'sections[0].section_title', 'value')
       ).toThrow('Expected array at "sections"');
+    });
+  });
+
+  describe('ensureStableIdsInMemory', () => {
+    it('should inject sec_ and lsn_ IDs where missing', () => {
+      const structure = createMinimalStructure();
+      // Verify no IDs exist initially
+      expect(structure.sections[0].id).toBeUndefined();
+      expect(structure.sections[0].lessons[0].id).toBeUndefined();
+
+      const result = ensureStableIdsInMemory(structure);
+
+      // All sections should have sec_ IDs
+      for (const section of result.sections) {
+        expect(section.id).toBeDefined();
+        expect(section.id).toMatch(/^sec_[a-zA-Z0-9_-]{8}$/);
+        // All lessons should have lsn_ IDs
+        for (const lesson of section.lessons) {
+          expect(lesson.id).toBeDefined();
+          expect(lesson.id).toMatch(/^lsn_[a-zA-Z0-9_-]{8}$/);
+        }
+      }
+    });
+
+    it('should be idempotent (preserve existing IDs)', () => {
+      const structure = createMinimalStructure();
+      const first = ensureStableIdsInMemory(structure);
+      const second = ensureStableIdsInMemory(first);
+
+      // Same IDs should be preserved
+      expect(second.sections[0].id).toBe(first.sections[0].id);
+      expect(second.sections[1].id).toBe(first.sections[1].id);
+      expect(second.sections[0].lessons[0].id).toBe(first.sections[0].lessons[0].id);
+      expect(second.sections[0].lessons[1].id).toBe(first.sections[0].lessons[1].id);
+      expect(second.sections[1].lessons[0].id).toBe(first.sections[1].lessons[0].id);
+    });
+
+    it('should not mutate the original structure (pure function)', () => {
+      const structure = createMinimalStructure();
+      const original = JSON.parse(JSON.stringify(structure));
+
+      ensureStableIdsInMemory(structure);
+
+      // Original structure should be unchanged
+      expect(structure).toEqual(original);
+    });
+
+    it('should only inject missing IDs (mixed structure)', () => {
+      const structure = createMinimalStructure();
+      // Pre-set some IDs
+      structure.sections[0].id = 'sec_existing';
+      structure.sections[0].lessons[0].id = 'lsn_existing';
+
+      const result = ensureStableIdsInMemory(structure);
+
+      // Pre-existing IDs preserved
+      expect(result.sections[0].id).toBe('sec_existing');
+      expect(result.sections[0].lessons[0].id).toBe('lsn_existing');
+      // Missing IDs injected
+      expect(result.sections[0].lessons[1].id).toMatch(/^lsn_/);
+      expect(result.sections[1].id).toMatch(/^sec_/);
+      expect(result.sections[1].lessons[0].id).toMatch(/^lsn_/);
+    });
+
+    it('should handle structure with no sections', () => {
+      const structure = {
+        ...createMinimalStructure(),
+        sections: undefined,
+      } as unknown as CourseStructure;
+
+      const result = ensureStableIdsInMemory(structure);
+
+      expect(result.sections).toBeUndefined();
+    });
+
+    it('should generate unique IDs for each element', () => {
+      const structure = createMinimalStructure();
+      const result = ensureStableIdsInMemory(structure);
+
+      const allIds = [
+        ...result.sections.map(s => s.id),
+        ...result.sections.flatMap(s => s.lessons.map(l => l.id)),
+      ];
+
+      const uniqueIds = new Set(allIds);
+      expect(uniqueIds.size).toBe(allIds.length);
     });
   });
 });

@@ -288,6 +288,11 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   // Chat phases (model IDs from @megacampus/shared-types)
+  chat_intent_classification: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.1,
+    maxTokens: 200,
+  },
   chat_node_refinement: {
     modelId: CHAT_PRIMARY_MODEL_ID,
     temperature: 0.7,

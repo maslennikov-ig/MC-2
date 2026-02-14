@@ -104,6 +104,7 @@ export function useNodeDetailsDrawer() {
     retryProposal,
     rejectProposal,
     acceptedProposal,
+    stage6ContentReady,
   } = useRefinement(courseInfo.id)
 
   // Check if there's a pending enrichment create from toolbar
@@ -624,7 +625,7 @@ export function useNodeDetailsDrawer() {
 
   // Callbacks: Refinement
   const handleRefine = useCallback(
-    async (message: string, intent: 'refine' | 'regenerate' = 'refine') => {
+    async (message: string, intent?: 'refine' | 'regenerate') => {
       if (!data) return
 
       const currentOutput = JSON.stringify(displayData?.outputData || {})
@@ -641,7 +642,7 @@ export function useNodeDetailsDrawer() {
   )
 
   const handleRefineForLesson = useCallback(
-    async (message: string, intent: 'refine' | 'regenerate' = 'refine') => {
+    async (message: string, intent?: 'refine' | 'regenerate') => {
       if (!lessonInspectorData) return
       const currentOutput = JSON.stringify({
         lessonId: lessonInfoForInspector?.lessonId,
@@ -797,6 +798,7 @@ export function useNodeDetailsDrawer() {
       isApplying,
       acceptedProposal,
       proposalError,
+      stage6ContentReady,
     },
     // Handlers
     handlers: {
