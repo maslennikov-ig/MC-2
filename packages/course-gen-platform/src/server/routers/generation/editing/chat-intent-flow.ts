@@ -31,7 +31,10 @@ import {
   isLLMRequiredIntent,
 } from '../../../../shared/intent';
 import { llmClient } from '../../../../shared/llm/client';
-import { createModelConfigService } from '../../../../shared/llm/model-config-service';
+import {
+  createModelConfigService,
+  isMissingChatPhaseConfigError,
+} from '../../../../shared/llm/model-config-service';
 import {
   handleDirectIntent,
   handleInfoQuery,
@@ -812,11 +815,10 @@ export async function executeIntentClassificationFlow(
       );
     } catch (classifyError) {
       // Plan requirement: chat phase misconfig → explicit 503 (not masked as 500)
-      const errMsg = classifyError instanceof Error ? classifyError.message : '';
-      if (errMsg.includes('Chat phase') && errMsg.includes('has no config')) {
+      if (isMissingChatPhaseConfigError(classifyError)) {
         throw new TRPCError({
           code: 'SERVICE_UNAVAILABLE',
-          message: errMsg,
+          message: classifyError.message,
           cause: classifyError,
         });
       }

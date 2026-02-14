@@ -43,6 +43,22 @@ import { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS } from './model-config-db';
 
 export { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS };
 
+/**
+ * Detect missing chat phase configuration errors from model config service.
+ * Supports both legacy ("has no config") and current ("has no active config") messages.
+ */
+export function isMissingChatPhaseConfigError(error: unknown): error is Error {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message;
+  return (
+    message.includes('Chat phase') &&
+    (message.includes('has no config') || message.includes('no active config'))
+  );
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
