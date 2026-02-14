@@ -423,6 +423,7 @@ class ModelConfigServiceImpl {
     }
 
     // Step 2: Try database lookup
+    let dbReturnedNull = false;
     try {
       const dbConfig = await ModelConfigDB.fetchPhaseConfigFromDb(
         phaseName,
@@ -438,8 +439,18 @@ class ModelConfigServiceImpl {
         this.phaseCache.set(cacheKey, dbConfig);
         return dbConfig;
       }
+      // DB was reachable but no config row found
+      dbReturnedNull = true;
     } catch (err) {
       logger.error({ phaseName, courseId, tier, error: err }, 'Database phase lookup failed');
+    }
+
+    // Step 2b: Chat phases require DB config — fail-fast if DB is up but config row missing
+    // Plan requirement (section 4.3): "при missing/invalid phase config — 503 (явно)"
+    if (dbReturnedNull && phaseName.startsWith('chat_')) {
+      const msg = `Chat phase "${phaseName}" has no active config in database. Seed the config before using chat.`;
+      logger.error({ phaseName, courseId, tier }, msg);
+      throw new Error(msg);
     }
 
     // Step 3: Use stale cache if available

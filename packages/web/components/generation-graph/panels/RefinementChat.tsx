@@ -267,20 +267,30 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                           'max-w-[90%] rounded-lg px-3 py-2',
                           msg.role === 'user'
                             ? 'bg-blue-500 text-white'
-                            : 'border-border border bg-gray-100 dark:bg-gray-800',
+                            : msg.metadata?.clarificationType
+                              ? 'border-2 border-amber-300 bg-amber-50 dark:border-amber-600 dark:bg-amber-900/20'
+                              : 'border-border border bg-gray-100 dark:bg-gray-800',
                           msg.pending && 'opacity-60'
                         )}
                       >
                         {msg.role === 'assistant' ? (
-                          <MarkdownRendererClient
-                            content={
-                              msg.content?.trim() && !isJSONContent(msg.content)
-                                ? msg.content
-                                : t('refinementChat.proposal.emptyResponseFallback')
-                            }
-                            preset="chat"
-                            isStreaming={msg.pending || false}
-                          />
+                          <>
+                            {msg.metadata?.clarificationType && (
+                              <div className="mb-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                                <Sparkles className="h-3 w-3" />
+                                <span>Уточнение</span>
+                              </div>
+                            )}
+                            <MarkdownRendererClient
+                              content={
+                                msg.content?.trim() && !isJSONContent(msg.content)
+                                  ? msg.content
+                                  : t('refinementChat.proposal.emptyResponseFallback')
+                              }
+                              preset="chat"
+                              isStreaming={msg.pending || false}
+                            />
+                          </>
                         ) : (
                           <span className="whitespace-pre-wrap">{msg.content}</span>
                         )}

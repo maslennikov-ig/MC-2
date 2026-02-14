@@ -190,6 +190,8 @@ export const chatResponseSchema = z.object({
     .object({
       /** Stage 6 content already generated — frontend can show "Generate content for new lesson?" CTA */
       stage6ContentReady: z.boolean().optional(),
+      /** Clarification card type — frontend renders as a distinct card instead of plain text */
+      clarificationType: z.enum(['ambiguous_intent']).optional(),
     })
     .optional(),
 });
