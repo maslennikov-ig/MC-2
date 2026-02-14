@@ -25,9 +25,13 @@ import { SectionBatchGenerator } from './section-batch-generator';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import logger from '@/shared/logger';
-import { ensureStableIdsInMemory } from './course-structure-editor';
+import {
+  ensureStableIdsAndSchemaVersionInMemory,
+  ensureStableIdsInMemory,
+} from './course-structure-editor';
 import { writeCourseNodes } from '@/shared/course-nodes/writer';
 import { assertStableIds } from '@/shared/course-nodes/feature-flags';
+import { resolveStructure } from '@/shared/course-nodes/structure-resolver';
 
 // ============================================================================
 // TYPES
@@ -163,13 +167,14 @@ export class SectionRegenerationService {
       throw new Error(errorMessage);
     }
 
-    if (!course.course_structure) {
+    const structure = await resolveStructure(courseId, course.course_structure, supabase);
+
+    if (!structure) {
       const errorMessage = `Course structure not found for course: ${courseId}`;
       logger.error({ courseId }, errorMessage);
       throw new Error(errorMessage);
     }
 
-    const structure = course.course_structure;
     const analysisResult = course.analysis_result;
     const existingMetadata = course.generation_metadata;
 
@@ -367,14 +372,15 @@ export class SectionRegenerationService {
     // STEP 8: Atomic JSONB Update
     // ========================================================================
 
+    const structureToPersist = ensureStableIdsAndSchemaVersionInMemory(updatedStructure);
     assertStableIds(
-      updatedStructure as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+      structureToPersist as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
     );
 
     const { error: updateError } = await supabase
       .from('courses')
       .update({
-        course_structure: updatedStructure as unknown as Json, // Type assertion for JSONB
+        course_structure: structureToPersist as unknown as Json, // Type assertion for JSONB
         updated_at: new Date().toISOString(),
       })
       .eq('id', courseId)
@@ -402,7 +408,7 @@ export class SectionRegenerationService {
     );
 
     // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-    const structureForNodes = ensureStableIdsInMemory(updatedStructure);
+    const structureForNodes = ensureStableIdsInMemory(structureToPersist);
     await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
       logger.warn(
         { courseId, error: err instanceof Error ? err.message : String(err) },
@@ -481,6 +487,6 @@ export class SectionRegenerationService {
       'Section regeneration completed successfully'
     );
 
-    return updatedStructure;
+    return structureToPersist;
   }
 }
