@@ -26,6 +26,8 @@ import { setNestedValue } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
+import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
+import { ensureStableIdsInMemory } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 
 export const regenerationRouter = {
   regenerateBlock: instructorProcedure
@@ -381,6 +383,17 @@ ${dynamicContextContent}
               error: editHistoryError,
             },
             'Failed to save edit history (non-blocking)'
+          );
+        }
+
+        // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+        if (stageId === 'stage_5') {
+          const structureForNodes = ensureStableIdsInMemory(updatedData as CourseStructure);
+          await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+            logger.warn(
+              { courseId, error: err instanceof Error ? err.message : String(err) },
+              'course_nodes dual-write failed (non-fatal)'
+            )
           );
         }
 

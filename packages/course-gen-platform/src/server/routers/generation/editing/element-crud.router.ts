@@ -128,7 +128,7 @@ export const elementCrudRouter = {
           userInstruction,
           userId,
           requestId,
-          course
+          { ...course, course_structure: courseStructure }
         );
       } catch (error) {
         if (error instanceof TRPCError) throw error;

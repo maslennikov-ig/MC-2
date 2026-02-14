@@ -5,6 +5,11 @@
  * Covers ~40-50% of common user messages in both Russian and English.
  * Returns null if no pattern matches (falls through to Tier 1 LLM).
  *
+ * Important: Only intents that DON'T require structured slots (target, destination,
+ * fieldName, newValue) can be handled here. MOVE_ELEMENT and UPDATE_FIELD need
+ * Tier 1 LLM to extract all required slots. DELETE_* needs target.identifier
+ * which we provide from the full user message.
+ *
  * @module intent/heuristics
  */
 
@@ -14,13 +19,17 @@ interface HeuristicRule {
   pattern: RegExp;
   intent: ClassifiedIntent['intent'];
   confidence: number;
-  /** If true, the rule needs target resolution — pass user message as identifier */
+  /** If true, pass user message as target.identifier for downstream resolution */
   needsTarget?: boolean;
 }
 
 /**
  * Ordered list of heuristic rules.
  * More specific patterns come first to avoid false positives.
+ *
+ * NOT included (require Tier 1 LLM for slot extraction):
+ * - MOVE_ELEMENT: needs `destination` slot
+ * - UPDATE_FIELD: needs `fieldName` + `newValue` slots
  */
 const HEURISTIC_RULES: HeuristicRule[] = [
   // --- FULL_REGENERATE ---
@@ -61,15 +70,6 @@ const HEURISTIC_RULES: HeuristicRule[] = [
     confidence: 0.85,
   },
 
-  // --- UPDATE_FIELD (rename) ---
-  {
-    pattern:
-      /(?:измени|изменить|переименуй|rename|change)\s+(?:название|имя|заголовок|title|name)\s+(?:курса|course)/i,
-    intent: 'UPDATE_FIELD',
-    confidence: 0.9,
-    needsTarget: true,
-  },
-
   // --- ADD ---
   {
     pattern: /(?:добавь|добавить|add)\s+(?:новый\s+)?(?:урок|lesson)/i,
@@ -80,14 +80,6 @@ const HEURISTIC_RULES: HeuristicRule[] = [
     pattern: /(?:добавь|добавить|add)\s+(?:нов(?:ую|ый)\s+)?(?:секци[юя]|section|раздел)/i,
     intent: 'ADD_SECTION',
     confidence: 0.9,
-  },
-
-  // --- MOVE ---
-  {
-    pattern: /(?:перемести|передвинь|move|перенеси)\s+(?:урок|lesson|секци[юя]|section|раздел)/i,
-    intent: 'MOVE_ELEMENT',
-    confidence: 0.85,
-    needsTarget: true,
   },
 ];
 
