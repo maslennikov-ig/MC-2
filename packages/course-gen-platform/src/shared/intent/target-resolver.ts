@@ -50,18 +50,32 @@ function detectPositionalReference(identifier: string): PositionalRef | null {
 
   // Detect position: last / first
   // Note: \b doesn't work with Cyrillic in JS regex, so we use (?=\s|$) or omit boundaries
-  const isLast = /(?:последн(?:ий|юю|яя|ее|ую|ей|ем|его)|last(?:\s|$))/.test(lower);
-  const isFirst = /(?:перв(?:ый|ую|ая|ое|ой|ого|ому|ом)|first(?:\s|$))/.test(lower);
-  if (!isLast && !isFirst) return null;
+  const lastMatch = lower.match(/(?:последн(?:ий|юю|яя|ее|ую|ей|ем|его)|last(?:\s|$))/);
+  const firstMatch = lower.match(/(?:перв(?:ый|ую|ая|ое|ой|ого|ому|ом)|first(?:\s|$))/);
+  if (!lastMatch && !firstMatch) return null;
+
+  const positionalIdx = (lastMatch?.index ?? firstMatch?.index) as number;
 
   // Detect element type: section / lesson
-  const isSection = /(?:секци[юяие]|section|раздел[аеуом]?)(?:\s|$)/.test(lower);
-  const isLesson = /(?:урок[аеуом]?|lesson)(?:\s|$)/.test(lower);
-  if (!isSection && !isLesson) return null;
+  const sectionMatch = lower.match(/(?:секци[юяие]|section|раздел[аеуом]?)(?:\s|$)/);
+  const lessonMatch = lower.match(/(?:урок[аеуом]?|lesson)(?:\s|$)/);
+  if (!sectionMatch && !lessonMatch) return null;
+
+  // When both types present (e.g. "удали последний урок в секции 2"),
+  // pick the one closest to the positional keyword — the adjective modifies
+  // the nearest noun.
+  let elementType: 'section' | 'lesson';
+  if (sectionMatch && lessonMatch) {
+    const sectionDist = Math.abs((sectionMatch.index as number) - positionalIdx);
+    const lessonDist = Math.abs((lessonMatch.index as number) - positionalIdx);
+    elementType = lessonDist <= sectionDist ? 'lesson' : 'section';
+  } else {
+    elementType = sectionMatch ? 'section' : 'lesson';
+  }
 
   return {
-    position: isLast ? 'last' : 'first',
-    elementType: isSection ? 'section' : 'lesson',
+    position: lastMatch ? 'last' : 'first',
+    elementType,
   };
 }
 

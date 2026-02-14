@@ -699,6 +699,30 @@ describe('resolveTargetPathWithMatches', () => {
       expect(matches[0].path).toBe('sections[1].lessons[2]');
       expect(matches[0].title).toBe('React Testing');
     });
+
+    it('should resolve "удали последний урок в секции 2" as lesson, not section', () => {
+      const matches = resolveTargetPathWithMatches(
+        'удали последний урок в секции 2',
+        undefined,
+        courseStructure
+      );
+
+      expect(matches).toHaveLength(1);
+      // "последний" is closer to "урок" than "секции" → lesson
+      expect(matches[0].elementType).toBe('lesson');
+    });
+
+    it('should resolve "remove last section with lesson" as section (closer to positional)', () => {
+      const matches = resolveTargetPathWithMatches(
+        'remove last section with lesson content',
+        undefined,
+        courseStructure
+      );
+
+      expect(matches).toHaveLength(1);
+      // "last" is closer to "section" than "lesson" → section
+      expect(matches[0].elementType).toBe('section');
+    });
   });
 });
 
