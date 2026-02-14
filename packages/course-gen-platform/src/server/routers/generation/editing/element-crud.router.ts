@@ -3,7 +3,6 @@ import { instructorProcedure } from '../../../procedures';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
-import type { CourseStructure } from '@megacampus/shared-types';
 import {
   deleteElementInputSchema,
   addElementInputSchema,
