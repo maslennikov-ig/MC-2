@@ -87,6 +87,13 @@ const HEURISTIC_RULES: HeuristicRule[] = [
 ];
 
 /**
+ * Detects element-type words (урок, секция, lesson, section, etc.) in the message.
+ * Used to guard FULL_REGENERATE: "перепиши весь урок" is NOT a full course regen,
+ * it's a qualified scope (весь + урок). Fall through to Tier 1 LLM for precision.
+ */
+const ELEMENT_TYPE_PATTERN = /(?:урок[а-яё]*|секци[а-яё]*|раздел[а-яё]*|lessons?|sections?)/i;
+
+/**
  * Classify user intent using regex heuristics (Tier 0).
  *
  * @param userMessage - User's chat message
@@ -97,6 +104,12 @@ export function classifyWithHeuristics(userMessage: string): ClassifiedIntent | 
 
   for (const rule of HEURISTIC_RULES) {
     if (rule.pattern.test(trimmed)) {
+      // Guard: scope words + element type ≠ full course regeneration.
+      // "перепиши весь урок" / "regenerate all lessons" → Tier 1 LLM decides.
+      if (rule.intent === 'FULL_REGENERATE' && ELEMENT_TYPE_PATTERN.test(trimmed)) {
+        continue;
+      }
+
       return {
         intent: rule.intent,
         confidence: rule.confidence,

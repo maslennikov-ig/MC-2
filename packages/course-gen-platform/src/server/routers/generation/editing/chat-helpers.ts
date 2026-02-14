@@ -475,9 +475,18 @@ function handleMoveIntent(
   let newParentId: string | undefined;
   if (!isSection && destPath) {
     if (destIsSection && destElement?.id) {
-      // Destination is a section — move lesson to end of that section (afterId=null)
+      // Destination is a section — move lesson to end of that section.
+      // Set afterId to last lesson's ID so surgical-ops inserts after it.
+      // (afterId=null means index 0 in surgical-ops, i.e. beginning, not end)
       newParentId = destElement.id;
-      afterId = null;
+      const sectionIdxMatch = destPath.match(/sections\[(\d+)\]/);
+      if (sectionIdxMatch) {
+        const targetSection = courseStructure.sections[parseInt(sectionIdxMatch[1], 10)];
+        const lastLesson = targetSection?.lessons?.at(-1);
+        afterId = lastLesson?.id ?? null;
+      } else {
+        afterId = null;
+      }
     } else {
       // Destination is a lesson — extract parent section from path
       const sectionMatch = destPath.match(/sections\[(\d+)\]/);

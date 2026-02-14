@@ -370,14 +370,22 @@ export function validateOperations(
       case 'add_lesson': {
         requireId(op.parentSectionId, 'parentSectionId');
         requireOptionalId(op.afterLessonId, 'afterLessonId');
-        // Register tempId for later operations
+        if (knownTempIds.has(op.tempId)) {
+          addError(
+            `Duplicate tempId "${op.tempId}" — each add operation must have a unique tempId`
+          );
+        }
         knownTempIds.add(op.tempId);
         break;
       }
 
       case 'add_section': {
         requireOptionalId(op.afterSectionId, 'afterSectionId');
-        // Register tempId for later operations
+        if (knownTempIds.has(op.tempId)) {
+          addError(
+            `Duplicate tempId "${op.tempId}" — each add operation must have a unique tempId`
+          );
+        }
         knownTempIds.add(op.tempId);
         break;
       }

@@ -131,7 +131,9 @@ export const generateMissingContent = protectedProcedure
       const allLessonIds: string[] = [];
       for (const section of courseStructure.sections) {
         for (const lesson of section.lessons) {
-          allLessonIds.push(`${section.section_number}.${lesson.lesson_number}`);
+          // lesson_number is already in dotted format (e.g. 1.1, 2.3) from renumberAll,
+          // so use it directly as the lessonId — no need to prepend section_number again.
+          allLessonIds.push(String(lesson.lesson_number));
         }
       }
 
@@ -366,9 +368,10 @@ export const generateMissingContent = protectedProcedure
       const lessonSpecs: LessonSpecificationV2[] = [];
 
       for (const lessonId of missingLessonIds) {
-        const [sectionNumStr, lessonNumStr] = lessonId.split('.');
-        const sectionNum = parseInt(sectionNumStr, 10);
-        const lessonNum = parseInt(lessonNumStr, 10);
+        // lessonId is dotted lesson_number (e.g. "1.1", "2.3").
+        // Integer part = section_number, full float = lesson_number.
+        const sectionNum = parseInt(lessonId, 10);
+        const lessonNumFloat = parseFloat(lessonId);
 
         const section = courseStructure.sections.find(s => s.section_number === sectionNum);
         if (!section) {
@@ -376,10 +379,10 @@ export const generateMissingContent = protectedProcedure
           continue;
         }
 
-        const lesson = section.lessons.find(l => l.lesson_number === lessonNum);
+        const lesson = section.lessons.find(l => l.lesson_number === lessonNumFloat);
         if (!lesson) {
           logger.warn(
-            { requestId, lessonId, sectionNum, lessonNum },
+            { requestId, lessonId, sectionNum, lessonNumFloat },
             'Lesson not found in course_structure'
           );
           continue;
