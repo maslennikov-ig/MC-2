@@ -435,3 +435,124 @@ describe('context window integration behavior', () => {
     expect(contextWindow.length).toBeLessThanOrEqual(5003);
   });
 });
+
+// ============================================================================
+// TESTS: extractLessonDigest
+// ============================================================================
+
+import { extractLessonDigest } from '@/stages/stage6-lesson-content/nodes/generator/generator-single-call';
+
+describe('extractLessonDigest', () => {
+  it('should extract English digest section', () => {
+    const markdown = `## Introduction
+
+Some intro content.
+
+## Section 1
+
+Content here.
+
+## Exercises
+
+Exercise content.
+
+## Lesson Digest
+
+This lesson covered topic A and topic B. Key takeaways include X and Y.`;
+
+    const result = extractLessonDigest(markdown, 'Lesson Digest');
+
+    expect(result.digest).toContain('topic A and topic B');
+    expect(result.content).not.toContain('Lesson Digest');
+    expect(result.content).toContain('Exercise content');
+  });
+
+  it('should extract Russian digest section', () => {
+    const markdown = `## Введение
+
+Контент введения.
+
+## Упражнения
+
+Упражнение 1.
+
+## Краткое содержание урока
+
+Урок рассмотрел тему A и тему B. Ключевые выводы: X и Y.`;
+
+    const result = extractLessonDigest(markdown, 'Краткое содержание урока');
+
+    expect(result.digest).toContain('тему A и тему B');
+    expect(result.content).not.toContain('Краткое содержание урока');
+    expect(result.content).toContain('Упражнение 1');
+  });
+
+  it('should return empty digest when no digest section found', () => {
+    const markdown = `## Introduction
+
+Content without digest.
+
+## Exercises
+
+Exercise content.`;
+
+    const result = extractLessonDigest(markdown);
+
+    expect(result.digest).toBe('');
+    expect(result.content).toContain('Content without digest');
+  });
+
+  it('should handle digest with trailing separator', () => {
+    const markdown = `## Summary
+
+Summary content.
+
+## Lesson Digest
+
+This is the digest.
+
+---`;
+
+    const result = extractLessonDigest(markdown, 'Lesson Digest');
+
+    expect(result.digest).toBe('This is the digest.');
+    expect(result.content).toContain('Summary content');
+  });
+
+  it('should handle "Дайджест урока" header variant via fallback', () => {
+    const markdown = `## Введение
+
+Контент.
+
+## Дайджест урока
+
+Краткое содержание.`;
+
+    // Model deviated from expected header — fallback should catch it
+    const result = extractLessonDigest(markdown, 'Краткое содержание урока');
+
+    expect(result.digest).toContain('Краткое содержание');
+    expect(result.content).not.toContain('Дайджест урока');
+  });
+
+  it('should extract localized digest header (e.g., Chinese)', () => {
+    const markdown = `## 引言
+
+内容。
+
+## 课程摘要
+
+本课介绍了主题A和主题B。`;
+
+    const result = extractLessonDigest(markdown, '课程摘要');
+
+    expect(result.digest).toContain('主题A');
+    expect(result.content).not.toContain('课程摘要');
+  });
+
+  it('should handle empty markdown', () => {
+    const result = extractLessonDigest('');
+    expect(result.digest).toBe('');
+    expect(result.content).toBe('');
+  });
+});

@@ -53,6 +53,41 @@ export const VALID_DEPTHS: readonly SectionDepthV2[] = [
 ];
 
 // ============================================================================
+// SINGLE-CALL GENERATION CONSTANTS
+// ============================================================================
+
+/**
+ * Words per minute for educational content reading speed.
+ * Used to calculate target word count: durationMinutes × WORDS_PER_MINUTE
+ */
+export const WORDS_PER_MINUTE = 150;
+
+/**
+ * Token-to-word ratio for LLM output estimation.
+ * Russian/Cyrillic text typically needs ~1.8 tokens per word.
+ */
+export const TOKENS_PER_WORD_RATIO = 1.8;
+
+/**
+ * Minimum maxTokens for single-call generation.
+ * Floor value to ensure short lessons still get enough generation space.
+ */
+export const SINGLE_CALL_MIN_TOKENS = 2048;
+
+/**
+ * Maximum maxTokens for single-call generation.
+ * Cap to prevent excessive token usage on very long lessons.
+ */
+export const SINGLE_CALL_MAX_TOKENS = 16384;
+
+/**
+ * Character budget for RAG context in single-call generation.
+ * All RAG chunks are deduplicated and included up to this limit.
+ * Higher than per-section (15000) since single-call sees all sections.
+ */
+export const SINGLE_CALL_RAG_BUDGET_CHARS = 20000;
+
+// ============================================================================
 // CONTEXT WINDOW CONFIGURATION
 // ============================================================================
 

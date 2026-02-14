@@ -1,23 +1,24 @@
 /**
- * Stage 6 Hardcoded Prompts - Lesson Content Generation (6 prompts)
+ * Stage 6 Hardcoded Prompts - Lesson Content Generation (7 prompts)
  * @module shared/prompts/stage6-prompts
  *
  * Stage 6: Lesson Content Generation
- * - Serial Generator: Section-by-section content with context window (ACTIVE)
+ * - Serial Generator: Section-by-section content with context window (ACTIVE - used by section-regenerator)
+ * - Single-Call Generator: Complete lesson in one call with duration-aware word budget (ACTIVE - primary method)
  * - Planner: Lesson outline generation (DEPRECATED)
  * - Expander: Section expansion (DEPRECATED)
  * - Assembler: Content assembly (DEPRECATED)
  * - Smoother: Transition refinement (DEPRECATED)
  * - Judge: Quality validation (ACTIVE)
  *
- * Note: Stage 6 refactored from 6-node to 3-node pipeline.
+ * Note: Stage 6 refactored from 6-node to 3-node pipeline, then to single-call approach.
  * Deprecated prompts kept for historical reference.
  */
 
 import type { HardcodedPrompt } from './types.js';
 
 // ============================================================================
-// STAGE 6 PROMPTS (6 total)
+// STAGE 6 PROMPTS (7 total)
 // ============================================================================
 
 export const stage6Prompts: HardcodedPrompt[] = [
@@ -263,6 +264,205 @@ Output markdown content for this section only (no header needed).
         name: 'stylePrompt',
         description: 'Course content style prompt text',
         required: false,
+      },
+    ],
+  },
+  {
+    stage: 'stage_6',
+    promptKey: 'stage6_single_call_generator',
+    promptName: 'Stage 6 - Single-Call Generator: Complete Lesson in One Call',
+    promptDescription:
+      'Generates complete lesson content in a single LLM call with duration-aware word budget. Replaces section-by-section approach for better coherence and accurate word counts.',
+    promptTemplate: `<lesson_specification>
+  <title>{{lessonTitle}}</title>
+  <description>{{lessonDescription}}</description>
+  <duration_minutes>{{durationMinutes}}</duration_minutes>
+  <target_word_count>{{targetWordCount}}</target_word_count>
+  <target_audience>{{targetAudience}}</target_audience>
+  <tone>{{tone}}</tone>
+  <difficulty>{{difficulty}}</difficulty>
+
+  <learning_objectives>
+{{learningObjectives}}
+  </learning_objectives>
+
+  <sections_to_cover>
+{{sectionsList}}
+  </sections_to_cover>
+
+  <intro_blueprint>
+    <hook_strategy>{{hookStrategy}}</hook_strategy>
+    <hook_topic>{{hookTopic}}</hook_topic>
+  </intro_blueprint>
+</lesson_specification>
+
+<reference_material>
+{{ragContext}}
+</reference_material>
+
+{{interLessonContext}}
+
+{{generationGuidance}}
+
+<content_style>
+{{stylePrompt}}
+</content_style>
+
+<rag_validation>
+**CRITICAL: Reference Material Relevance Check**
+
+Before using ANY content from <reference_material>, you MUST verify its relevance:
+
+1. **Topic Match Test**: Does the chunk discuss the SAME topic as the lesson "{{lessonTitle}}"?
+   - If chunk discusses unrelated products, scenarios, or domains → IGNORE IT COMPLETELY
+
+2. **Key Points Alignment**: Does the chunk support the learning objectives listed above?
+   - Only use chunks that directly help explain the specified topics
+   - Generic or tangential information should be ignored
+
+3. **When to IGNORE reference material**:
+   - Chunk topic doesn't match lesson focus
+   - Chunk discusses different industry/product than lesson context
+   - Using the chunk would confuse or mislead the reader
+
+4. **When in doubt**: Generate accurate content from your knowledge rather than forcing irrelevant reference material.
+
+**Quality over quantity**: It's better to write accurate content without references than to include misleading information from unrelated chunks.
+</rag_validation>
+
+<visual_toolkit>
+Use actively to create engaging content:
+1. **Mermaid Diagrams** — flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
+   CRITICAL: NEVER use escaped quotes in node labels. Keep labels simple.
+2. **Math Formulas** (LaTeX): inline \`$E=mc^2$\` or block \`$$\\sum_{i=1}^{n} x_i$$\`
+3. **Callouts**: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO]
+4. **Tables** for comparisons
+5. **Code blocks** with filenames when relevant
+*Syntax keywords stay in English regardless of output language.*
+</visual_toolkit>
+
+<output_language>
+MANDATORY: Write ALL content in {{outputLanguage}}.
+Every word, header, example must be in {{outputLanguage}}.
+DO NOT mix languages (except code/syntax keywords).
+</output_language>
+
+<task>
+Write a COMPLETE lesson for a {{durationMinutes}}-minute reading session.
+Target: approximately {{targetWordCount}} words total (excluding exercises and digest).
+
+STRUCTURE (use ## headers for each section):
+1. ## {{introductionHeader}} — Hook ({{hookStrategy}}) + preview of learning objectives (100-150 words)
+2. Content sections (one ## header per topic from sections_to_cover).
+   All sections combined should be approximately {{contentWordBudget}} words.
+   Each section should be focused and proportional.
+3. ## {{summaryHeader}} — Brief recap + next steps (80-120 words)
+4. ## {{exercisesHeader}} — Exactly 2 practical exercises
+
+Exercise format (use {{outputLanguage}} labels):
+### {{exerciseLabel}} 1: [Title]
+**{{taskLabel}}:** [Description]
+**{{scenarioLabel}}:** [If applicable]
+**{{yourAnswerLabel}}:**
+> **{{hintLabel}}:** [Hint]
+> **{{sampleAnswerLabel}}:** [Model answer]
+
+---
+
+### {{exerciseLabel}} 2: [Title]
+[Same format]
+
+5. ## {{digestHeader}} — 3-5 sentence factual summary of the lesson content for cross-lesson context.
+
+CRITICAL RULES:
+- This is a {{durationMinutes}}-minute lesson. Be concise and focused.
+- DO NOT repeat or re-explain topics between sections. Each section covers its own unique content.
+- Transitions between sections: 1 sentence max. NO recaps of previous sections.
+- Cover ALL topics from sections_to_cover, but keep each proportional to the total word budget.
+- Include at least 1 visual element (diagram, table, or callout) in the lesson.
+- DO NOT start sections with "As we discussed..." or "In the previous section..." patterns.
+- VALIDATE reference material relevance BEFORE using (see rag_validation).
+- INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
+  - Reference previous lesson naturally if context is given
+  - Do NOT re-explain terms from terms_already_defined
+  - In summary, tease next lesson if next_lesson info is provided
+</task>`,
+    variables: [
+      { name: 'lessonTitle', description: 'Lesson title', required: true },
+      { name: 'lessonDescription', description: 'Lesson description', required: true },
+      { name: 'durationMinutes', description: 'Estimated duration in minutes', required: true },
+      {
+        name: 'targetWordCount',
+        description: 'Target word count (durationMinutes × 150)',
+        required: true,
+      },
+      { name: 'targetAudience', description: 'Target audience', required: true },
+      { name: 'tone', description: 'Content tone', required: true },
+      { name: 'difficulty', description: 'Difficulty level', required: true },
+      {
+        name: 'learningObjectives',
+        description: 'Formatted learning objectives list',
+        required: true,
+      },
+      {
+        name: 'sectionsList',
+        description: 'Numbered list of section titles to cover',
+        required: true,
+      },
+      {
+        name: 'hookStrategy',
+        description: 'Hook strategy (analogy, statistic, challenge, question)',
+        required: true,
+      },
+      { name: 'hookTopic', description: 'Topic for the hook', required: true },
+      {
+        name: 'ragContext',
+        description: 'XML-formatted RAG context (all chunks deduplicated)',
+        required: false,
+      },
+      {
+        name: 'interLessonContext',
+        description: 'Inter-lesson context XML (previous/next lesson info, pre-rendered)',
+        required: false,
+      },
+      {
+        name: 'generationGuidance',
+        description: 'Generation guidance XML from Stage 4 analysis (pre-rendered)',
+        required: false,
+      },
+      { name: 'stylePrompt', description: 'Course content style prompt text', required: false },
+      {
+        name: 'outputLanguage',
+        description: 'Target language for all output (e.g., "Russian", "English")',
+        required: true,
+        example: 'Russian',
+      },
+      {
+        name: 'introductionHeader',
+        description: 'Localized "Introduction" header',
+        required: true,
+      },
+      {
+        name: 'summaryHeader',
+        description: 'Localized "Summary/Conclusion" header',
+        required: true,
+      },
+      { name: 'exercisesHeader', description: 'Localized "Exercises" header', required: true },
+      { name: 'exerciseLabel', description: 'Localized "Exercise" label', required: true },
+      { name: 'taskLabel', description: 'Localized "Task" label', required: true },
+      { name: 'scenarioLabel', description: 'Localized "Scenario" label', required: true },
+      { name: 'yourAnswerLabel', description: 'Localized "Your Answer" label', required: true },
+      { name: 'hintLabel', description: 'Localized "Hint" label', required: true },
+      { name: 'sampleAnswerLabel', description: 'Localized "Sample Answer" label', required: true },
+      {
+        name: 'digestHeader',
+        description: 'Localized "Lesson Digest" / "Краткое содержание урока" header',
+        required: true,
+      },
+      {
+        name: 'contentWordBudget',
+        description: 'Word budget for content sections only (targetWordCount - 300)',
+        required: true,
       },
     ],
   },

@@ -1,76 +1,56 @@
 /**
- * Generator Node - Serial section-by-section content generation
+ * Generator Node - Single-call lesson content generation
  * @module stages/stage6-lesson-content/nodes/generator
  *
- * Replaces the Planner + Expander + Assembler + Smoother pipeline with a
- * single serial loop that generates content section-by-section with context window.
+ * Generates complete lesson content in a single LLM call with
+ * duration-aware word budget. Produces intro, sections, summary,
+ * exercises, and lesson digest in one pass.
  *
  * Flow:
- * 1. Generate Introduction (using intro_blueprint)
- * 2. Loop through sections sequentially, accumulating context
- * 3. Generate Summary at the end
- * 4. Return full markdown content
+ * 1. Call generateLessonSingleCall() with all context
+ * 2. Run Mermaid fix pipeline on full content
+ * 3. Validate for prompt leakage
+ * 4. Return generatedContent + lessonDigest
  *
- * Context Window Strategy:
- * - Keep last ~5000 characters of generated content
- * - Include in prompt as <previous_context> section
- * - Enables natural transitions without separate Smoother node
- *
- * Input: lessonSpec, ragChunks, language
- * Output: generatedContent (full markdown), tokensUsed, durationMs
+ * Input: lessonSpec, ragChunks, language, style, analysisResult
+ * Output: generatedContent, lessonDigest, tokensUsed, durationMs
  */
 
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
-import { createOpenRouterModel } from '@/shared/llm/langchain-models';
-import { createModelConfigService } from '@/shared/llm/model-config-service';
-import { getRecommendedTemperatureV2 } from '@megacampus/shared-types/lesson-specification-v2';
-import { getContentLabels } from '@megacampus/shared-types';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 
 // Import from extracted modules
 import { calculateDynamicContextWindow } from './generator/generator-constants';
-import {
-  generateIntroduction,
-  generateSummary,
-  generateExercises,
-  validateGeneratedContent,
-} from './generator/generator-content';
+import { validateGeneratedContent } from './generator/generator-content';
 import { generateSection } from './generator/generator-section';
+import { generateLessonSingleCall } from './generator/generator-single-call';
 
-// Re-export for backward compatibility
+// Re-export for backward compatibility (used by section-regenerator)
 export { calculateDynamicContextWindow, generateSection };
 
 /**
- * Generator Node - Serial section-by-section content generation
+ * Generator Node - Single-call lesson content generation
  *
- * Replaces the Planner + Expander + Assembler + Smoother pipeline with a
- * single serial loop. Generates content sequentially with context accumulation.
- *
- * Flow:
- * 1. Generate Introduction (using intro_blueprint)
- * 2. Loop through sections, accumulating context window
- * 3. Generate Summary
- * 4. Return full markdown
+ * Generates complete lesson content in one LLM call with duration-aware
+ * word budget. Replaces the previous N+3 serial loop approach.
  *
  * @param state - Current graph state with lessonSpec and ragChunks
- * @returns Updated state with generatedContent and metrics
+ * @returns Updated state with generatedContent, lessonDigest, and metrics
  */
 export async function generatorNode(state: LessonGraphStateType): Promise<LessonGraphStateUpdate> {
   const startTime = performance.now();
   const { lessonSpec, ragChunks, courseId, lessonUuid, language, style, analysisResult } = state;
-
-  // Get localized section headers (supports all 19 languages via shared-types)
-  const headers = getContentLabels(language);
 
   logger.info(
     {
       lessonId: lessonSpec.lesson_id,
       sectionCount: lessonSpec.sections.length,
       ragChunksCount: ragChunks.length,
+      durationMinutes: lessonSpec.estimated_duration_minutes,
     },
-    'Generator node: Starting serial content generation'
+    'Generator node: Starting single-call content generation'
   );
 
   // Log trace at start
@@ -88,221 +68,87 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       ragChunksCount: ragChunks.length,
       language,
       style: style ?? 'default',
-      lessonSpec,
+      generationMethod: 'single-call',
     },
     durationMs: 0,
   });
 
   try {
-    // Get temperature based on content archetype
-    const temperature = getRecommendedTemperatureV2(lessonSpec.metadata.content_archetype);
-
-    // Get model from ModelConfigService (database-driven, throws on failure)
-    const modelConfigService = createModelConfigService();
-    const modelId =
-      state.modelOverride ??
-      (await modelConfigService.getModelForPhase('stage_6_refinement')).modelId;
-
-    logger.info(
-      {
-        lessonId: lessonSpec.lesson_id,
-        modelId,
-        source: state.modelOverride ? 'override' : 'database',
-      },
-      'Using model config for generator'
+    // ========================================================================
+    // 1. GENERATE FULL LESSON IN SINGLE CALL
+    // ========================================================================
+    const result = await generateLessonSingleCall(
+      lessonSpec,
+      ragChunks,
+      language,
+      state.modelOverride,
+      style,
+      analysisResult
     );
 
-    // Create LLM instance for intro and summary generation
-    const model = createOpenRouterModel(modelId, temperature, 4096);
-
-    let totalTokens = 0;
-    const contentParts: string[] = [];
+    let generatedContent = result.content;
+    const totalTokens = result.tokensUsed;
 
     // ========================================================================
-    // 1. GENERATE INTRODUCTION
+    // 2. MERMAID FIX PIPELINE (on full content, single pass)
     // ========================================================================
-    logger.debug({ lessonId: lessonSpec.lesson_id }, 'Generating introduction');
-    const introResult = await generateIntroduction(lessonSpec, language, model);
-    totalTokens += introResult.tokensUsed;
-
-    // Start building full content
-    contentParts.push(`# ${lessonSpec.title}`);
-    contentParts.push('');
-    contentParts.push(`## ${headers.introduction}`);
-    contentParts.push('');
-    contentParts.push(introResult.content);
-    contentParts.push('');
-
-    // Track accumulated content for context window
-    let accumulatedContent = contentParts.join('\n');
-
-    // ========================================================================
-    // 2. GENERATE SECTIONS SEQUENTIALLY
-    // ========================================================================
-    const sectionTitles: string[] = [];
-
-    for (const section of lessonSpec.sections) {
-      logger.debug(
-        { lessonId: lessonSpec.lesson_id, sectionTitle: section.title },
-        'Generating section'
-      );
-
-      const sectionResult = await generateSection(
-        section,
-        lessonSpec,
-        ragChunks,
-        accumulatedContent, // Pass context window
-        language,
-        state.modelOverride,
-        style, // Pass course content style for style-specific prompts
-        analysisResult // Pass analysis result for generation guidance
-      );
-
-      totalTokens += sectionResult.tokensUsed;
-      sectionTitles.push(section.title);
-
-      // =========================================================================
-      // MERMAID FIX PIPELINE
-      // =========================================================================
-      // Run 5-stage cascading fix pipeline:
-      // 1. Regex Sanitization - Fast fixes for common LLM issues (escaped quotes, arrows)
-      // 2. Validation - Official mermaid.parse() syntax check
-      // 3. LLM Fix - Use cheap LLM to fix complex issues (max 5 per lesson)
-      // 4. Re-validation - Verify LLM fix worked
-      // 5. Fallback - Replace with HTML comment for manual review
-      //
-      // DEFENSIVE STRATEGY:
-      // - Pipeline errors should NOT block lesson generation
-      // - If pipeline crashes, use original content (self-reviewer will catch issues)
-      // - Trade-off: Some broken diagrams might slip through, but lessons still generate
-      // - Rationale: Better to have a lesson with broken diagram than no lesson at all
-      // =========================================================================
-      let finalContent = sectionResult.content;
-      try {
-        const pipelineResult = await runMermaidFixPipeline(sectionResult.content);
-        if (pipelineResult.modified) {
-          logger.debug(
-            {
-              sectionTitle: section.title,
-              metrics: pipelineResult.metrics,
-            },
-            'Mermaid fix pipeline applied to section'
-          );
-        }
-        finalContent = pipelineResult.content;
-      } catch (error) {
-        logger.warn(
-          {
-            sectionTitle: section.title,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          'Mermaid fix pipeline failed, using original content'
-        );
-        // Keep original content - self-reviewer will catch issues later
-      }
-
-      // Validate for prompt template markers
-      const validation = validateGeneratedContent(finalContent);
-      if (!validation.isValid) {
-        logger.error(
-          {
-            sectionTitle: section.title,
-            detectedMarkers: validation.detectedMarkers,
-          },
-          'Generated content contains prompt template markers - indicates model reproducing training data'
-        );
-
-        // For now, log and continue - in future could trigger regeneration
-        // throw new Error(`Content generation failed: prompt template leak detected in section "${section.title}"`);
-      }
-
-      // Add section to content
-      contentParts.push(`## ${section.title}`);
-      contentParts.push('');
-      contentParts.push(finalContent);
-      contentParts.push('');
-
-      // Update accumulated content for next section's context
-      accumulatedContent = contentParts.join('\n');
-
-      // Warn if accumulated content is getting very large (>100K chars)
-      if (accumulatedContent.length > 100_000) {
-        logger.warn(
+    try {
+      const pipelineResult = await runMermaidFixPipeline(generatedContent);
+      if (pipelineResult.modified) {
+        logger.debug(
           {
             lessonId: lessonSpec.lesson_id,
-            sectionTitle: section.title,
-            accumulatedLength: accumulatedContent.length,
+            metrics: pipelineResult.metrics,
           },
-          'Accumulated content exceeds 100K characters - consider breaking into smaller lessons'
+          'Mermaid fix pipeline applied to generated content'
         );
+        generatedContent = pipelineResult.content;
       }
-
-      // Log section completion
-      await logTrace({
-        courseId,
-        lessonId: lessonUuid || undefined,
-        stage: 'stage_6',
-        phase: 'generator',
-        stepName: 'generator_section_complete',
-        inputData: {
-          lessonLabel: lessonSpec.lesson_id,
-          sectionTitle: section.title,
-          sectionIndex: lessonSpec.sections.indexOf(section) + 1,
-          totalSections: lessonSpec.sections.length,
+    } catch (error) {
+      logger.warn(
+        {
+          lessonId: lessonSpec.lesson_id,
+          error: error instanceof Error ? error.message : String(error),
         },
-        outputData: {
-          contentLength: sectionResult.content.length,
-          wordCount: sectionResult.content.split(/\s+/).filter(Boolean).length,
-        },
-        tokensUsed: sectionResult.tokensUsed,
-        durationMs: 0,
-      });
+        'Mermaid fix pipeline failed, using original content'
+      );
+      // Keep original content - self-reviewer will catch issues later
     }
 
     // ========================================================================
-    // 3. GENERATE SUMMARY
+    // 3. VALIDATE FOR PROMPT TEMPLATE LEAKAGE
     // ========================================================================
-    logger.debug({ lessonId: lessonSpec.lesson_id }, 'Generating summary');
-    const summaryResult = await generateSummary(lessonSpec, sectionTitles, language, model);
-    totalTokens += summaryResult.tokensUsed;
-
-    contentParts.push(`## ${headers.summary}`);
-    contentParts.push('');
-    contentParts.push(summaryResult.content);
-    contentParts.push('');
-
-    // ========================================================================
-    // 4. GENERATE EXERCISES
-    // ========================================================================
-    logger.debug({ lessonId: lessonSpec.lesson_id }, 'Generating exercises');
-    const exercisesResult = await generateExercises(lessonSpec, sectionTitles, language, model);
-    totalTokens += exercisesResult.tokensUsed;
-
-    contentParts.push(`## ${headers.exercises}`);
-    contentParts.push('');
-    contentParts.push(exercisesResult.content);
-    contentParts.push('');
+    const validation = validateGeneratedContent(generatedContent);
+    if (!validation.isValid) {
+      logger.error(
+        {
+          lessonId: lessonSpec.lesson_id,
+          detectedMarkers: validation.detectedMarkers,
+        },
+        'Generated content contains prompt template markers'
+      );
+    }
 
     // ========================================================================
-    // 5. ASSEMBLE FINAL CONTENT
+    // 4. CALCULATE METRICS AND RETURN
     // ========================================================================
-    const generatedContent = contentParts.join('\n');
     const durationMs = Math.round(performance.now() - startTime);
-
-    // Calculate metrics
     const wordCount = generatedContent.split(/\s+/).filter(Boolean).length;
-    const avgSectionLength = Math.round(generatedContent.length / lessonSpec.sections.length);
+
+    // Count H2 sections for metrics
+    const h2Count = (generatedContent.match(/^## /gm) || []).length;
 
     logger.info(
       {
         lessonId: lessonSpec.lesson_id,
         contentLength: generatedContent.length,
         wordCount,
-        sectionsGenerated: sectionTitles.length,
+        h2Count,
+        hasDigest: result.lessonDigest.length > 0,
         totalTokens,
         durationMs,
       },
-      'Generator node: Serial content generation complete'
+      'Generator node: Single-call content generation complete'
     );
 
     // Log trace at completion
@@ -321,13 +167,11 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       outputData: {
         contentLength: generatedContent.length,
         wordCount,
-        sectionsGenerated: sectionTitles.length,
-        totalSections: lessonSpec.sections.length,
-        avgSectionLength,
-        hasIntro: true,
-        hasSummary: true,
-        hasExercises: true,
-        modelUsed: modelId,
+        h2Count,
+        hasDigest: result.lessonDigest.length > 0,
+        digestLength: result.lessonDigest.length,
+        generationMethod: 'single-call',
+        targetWordCount: (lessonSpec.estimated_duration_minutes || 15) * 150,
       },
       tokensUsed: totalTokens,
       durationMs,
@@ -335,6 +179,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
 
     return {
       generatedContent,
+      lessonDigest: result.lessonDigest,
       tokensUsed: totalTokens,
       durationMs,
       currentNode: 'selfReviewer',
@@ -348,7 +193,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         lessonId: lessonSpec.lesson_id,
         error: errorMessage,
       },
-      'Generator node: Serial content generation failed'
+      'Generator node: Single-call content generation failed'
     );
 
     // Log trace on error
