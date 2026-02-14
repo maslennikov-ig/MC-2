@@ -24,6 +24,9 @@ export interface ChatMessage {
   content: string
   timestamp: string
   pending?: boolean
+  metadata?: {
+    clarificationType?: 'ambiguous_intent'
+  }
 }
 
 export const useRefinement = (courseId: string) => {
@@ -209,6 +212,9 @@ export const useRefinement = (courseId: string) => {
               response.assistantMessage?.trim() ||
               t('refinementChat.proposal.emptyResponseFallback'),
             timestamp: new Date().toISOString(),
+            ...(response.metadata?.clarificationType
+              ? { metadata: { clarificationType: response.metadata.clarificationType } }
+              : {}),
           },
         ])
 

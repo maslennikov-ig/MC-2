@@ -927,6 +927,7 @@ export async function executeIntentClassificationFlow(
       modelUsed: 'intent_classifier',
       inputTokens: 200,
       outputTokens: 30,
+      metadata: { clarificationType: 'ambiguous_intent' as const },
     };
   }
 
