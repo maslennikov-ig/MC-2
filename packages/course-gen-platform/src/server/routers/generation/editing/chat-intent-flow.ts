@@ -888,21 +888,22 @@ export async function executeIntentClassificationFlow(
     return handleInfoQueryRoute(userMessage, courseStructure, supabaseAdmin, courseId, msgParams);
   }
 
-  // Step 5: Plan requirement (plan:208): confidence < 0.6 => clarification response
-  // MUST be checked BEFORE LLM routing to prevent low-confidence intents
-  // (0.5-0.6) from bypassing clarification and going straight to LLM.
-  if (
-    classifiedIntent.intent !== 'UNKNOWN' &&
-    classifiedIntent.confidence < thresholds.CLARIFICATION
-  ) {
+  // Step 5: Clarification for ambiguous intent.
+  // Plan requirement (plan:208): confidence < 0.6 => clarification response.
+  // Also clarify UNKNOWN intent instead of falling back to legacy flow.
+  const needsClarification =
+    classifiedIntent.intent === 'UNKNOWN' || classifiedIntent.confidence < thresholds.CLARIFICATION;
+
+  if (needsClarification) {
     logger.info(
       {
         requestId,
         classifiedIntent: classifiedIntent.intent,
         confidence: classifiedIntent.confidence,
         threshold: thresholds.CLARIFICATION,
+        reason: classifiedIntent.intent === 'UNKNOWN' ? 'unknown_intent' : 'low_confidence_intent',
       },
-      'Chat: Low confidence — returning clarification instead of LLM routing'
+      'Chat: Returning clarification instead of legacy/LLM routing'
     );
 
     const clarificationMessage =
@@ -973,14 +974,14 @@ export async function executeIntentClassificationFlow(
     );
   }
 
-  // Fallback: UNKNOWN intent - return null to use legacy flow
+  // Fallback: unhandled classification path - use legacy flow
   logger.info(
     {
       requestId,
       classifiedIntent: classifiedIntent.intent,
       confidence: classifiedIntent.confidence,
     },
-    'Chat: UNKNOWN intent, falling back to legacy flow'
+    'Chat: Unhandled classification route, falling back to legacy flow'
   );
 
   return null;
