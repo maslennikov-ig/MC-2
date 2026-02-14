@@ -2,6 +2,58 @@
 
 _Released on 2025-12-26_
 
+## v0.29.12
+
+_Released on 2026-02-14_
+
+### ✨ New Features
+
+- Phase 4 course_nodes flat relational migration with dual-write
+- **web**: Add Stage 6 content generation CTA for newly added lessons
+- Protect 23 LLM-facing z.enum() with createLLMEnumSchema helper
+- **chat**: Phase 3 — context optimization with course skeleton
+- **chat**: Phase 2 — surgical operations with stable IDs
+- **chat**: Phase 1 — remove toggle, auto-intent classification
+- **chat**: Phase 0 — stable IDs + chat model config foundation
+
+### 🔧 Improvements
+
+- **web**: Extract shared toActionError, replace Russian strings, use client-logger
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 3 source file(s), update 1 test(s), +2 more
+- Distinguish transient DB failure from missing config in fetchPhaseConfigFromDb
+- Address round 16 code review findings (fail-fast + clarification cards)
+- Address round 15 code review findings (4 fixes)
+- Address round 14 code review findings (FULL_REGENERATE regex + lesson_number format)
+- Resolve positional reference ambiguity when both element types present
+- Add positional reference resolution (first/last) to target-resolver
+- Address round 11 code review findings (Phase 4 alignment + heuristics)
+- Add chat phase hardcoded fallbacks + guard content.sections iteration
+- Address 7 code review findings (round 10)
+- Address round 9 code review findings (flaky regex + false-green + stubs)
+- Address round 8 code review findings (integration tests + backfill retry)
+- Address round 7 code review findings (backfill retry + integration tests)
+- Address 5 code review findings (round 6)
+- Address 8 code review findings (round 5)
+- Address 6 code review findings (round 4) + parent integrity trigger
+- Address 6 code review findings (round 3)
+- Align implementation with plan requirements (9 findings)
+- Targeted Stage 6 content generation for new lessons + parity monitoring
+- Count actual affected elements in delete ratio validation
+- Ensure stable IDs before course_nodes dual-write
+- **chat**: Route explicit intent=regenerate to actual job queue instead of legacy LLM flow
+- **web**: Add NextIntlClientProvider wrapper to useRefinement tests
+- **chat**: Complete Phase 2-3 audit — prompt caching, structural flag, token benchmark, Stage 6 CTA
+- **chat**: Audit fixes — FULL_REGENERATE job, stable ID proposals, ensureStableIds in apply, Stage 6 CTA
+- Resolve generation.initiate failure, Stage 5 enum mismatch, CSP blocking
+- **web**: Correct misleading "exponential backoff" comment
+
+---
+
+_This release was automatically generated from 76 commits._
+
 ## v0.29.11
 
 _Released on 2026-02-12_
