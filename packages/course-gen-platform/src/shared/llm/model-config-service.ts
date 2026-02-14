@@ -461,7 +461,14 @@ class ModelConfigServiceImpl {
       logger.error({ phaseName, courseId, tier, error: err }, 'Database phase lookup failed');
     }
 
-    // Step 3: Use stale cache if available
+    // Step 3: Chat phases with missing DB config must fail explicitly (no stale/hardcoded fallback)
+    if (phaseName.startsWith('chat_') && dbReturnedNull) {
+      const chatErrorMsg = `Chat phase "${phaseName}" has no active config in database. Seed the config before using chat.`;
+      logger.error({ phaseName, courseId, tier, dbReturnedNull }, chatErrorMsg);
+      throw new Error(chatErrorMsg);
+    }
+
+    // Step 4: Use stale cache if available
     if (cached) {
       const ageMinutes = Math.round(cached.age / 60000);
       logger.warn(
@@ -471,16 +478,14 @@ class ModelConfigServiceImpl {
       return cached.data;
     }
 
-    // Step 4: Chat phases must NEVER use hardcoded/global fallback (plan:4.3)
+    // Step 5: Chat phases must NEVER use hardcoded/global fallback (plan:4.3)
     if (phaseName.startsWith('chat_')) {
-      const chatErrorMsg = dbReturnedNull
-        ? `Chat phase "${phaseName}" has no active config in database. Seed the config before using chat.`
-        : `Chat phase "${phaseName}" has no config: database unavailable and no cached config. Do NOT use hardcoded/global fallback for chat phases.`;
+      const chatErrorMsg = `Chat phase "${phaseName}" has no config: database unavailable and no cached config. Do NOT use hardcoded/global fallback for chat phases.`;
       logger.error({ phaseName, courseId, tier, dbReturnedNull }, chatErrorMsg);
       throw new Error(chatErrorMsg);
     }
 
-    // Step 5: No cache, no database - try hardcoded fallback for non-chat phases
+    // Step 6: No cache, no database - try hardcoded fallback for non-chat phases
     const hardcodedConfig = DEFAULT_PHASE_CONFIGS[phaseName];
     if (hardcodedConfig) {
       logger.warn(
@@ -492,7 +497,7 @@ class ModelConfigServiceImpl {
       return hardcodedConfig;
     }
 
-    // Step 6: Try global_default as last resort for non-chat phases
+    // Step 7: Try global_default as last resort for non-chat phases
     const globalDefault = DEFAULT_PHASE_CONFIGS['global_default'];
     if (globalDefault) {
       logger.warn(
@@ -503,7 +508,7 @@ class ModelConfigServiceImpl {
       return globalDefault;
     }
 
-    // Step 7: Unknown phase, no fallback - explicit failure (should never happen)
+    // Step 8: Unknown phase, no fallback - explicit failure (should never happen)
     const errorMsg = `Cannot get phase config for "${phaseName}"${courseId ? ` (course: ${courseId})` : ''} tier "${tier}": database unavailable and no cached data`;
     logger.fatal({ phaseName, courseId, tier }, errorMsg);
     throw new Error(errorMsg);

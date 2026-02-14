@@ -45,8 +45,7 @@ const HEURISTIC_RULES: HeuristicRule[] = [
 
   // --- DELETE ---
   {
-    pattern:
-      /(?:удали|убери|убрать|удалить|delete|remove)\s+(?:урок|lesson|секци[юя]|section|раздел)/i,
+    pattern: /(?:удали|убери|убрать|удалить|delete|remove)\s+(?:урок|lesson)/i,
     intent: 'DELETE_LESSON',
     confidence: 0.9,
     needsTarget: true,
@@ -54,6 +53,12 @@ const HEURISTIC_RULES: HeuristicRule[] = [
   {
     pattern:
       /(?:удали|убери|убрать|удалить|delete|remove)\s+(?:последн(?:ий|юю)|первую|первый|last|first)\s+(?:секци[юя]|section|раздел)/i,
+    intent: 'DELETE_SECTION',
+    confidence: 0.9,
+    needsTarget: true,
+  },
+  {
+    pattern: /(?:удали|убери|убрать|удалить|delete|remove)\s+(?:секци[юя]|section|раздел)/i,
     intent: 'DELETE_SECTION',
     confidence: 0.9,
     needsTarget: true,

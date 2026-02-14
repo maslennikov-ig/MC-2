@@ -33,6 +33,7 @@ import { getSupabaseAdmin } from '../../shared/supabase/admin.js';
 import { llmClient } from '../../shared/llm/client.js';
 import { captureError } from '../../shared/sentry/init.js';
 import { getModelConfigBunker } from '../../shared/llm/model-config-bunker.js';
+import logger from '../../shared/logger/index.js';
 import {
   detectContextTier,
   generateSemanticDiff,
@@ -41,6 +42,10 @@ import {
   getFieldValue,
 } from '../../shared/regeneration/index.js';
 import { setNestedValue } from '../../shared/utils/nested-value.js';
+import { resolveStructure } from '../../shared/course-nodes/structure-resolver.js';
+import { writeCourseNodes } from '../../shared/course-nodes/writer.js';
+import { assertStableIds } from '../../shared/course-nodes/feature-flags.js';
+import { ensureStableIdsAndSchemaVersionInMemory } from '../../stages/stage5-generation/utils/course-structure-editor.js';
 
 const PROGRESS = {
   FETCH_COURSE: 10,
@@ -137,7 +142,10 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
       };
     }
 
-    const currentData = stageId === 'stage_4' ? course.analysis_result : course.course_structure;
+    const currentData =
+      stageId === 'stage_4'
+        ? course.analysis_result
+        : await resolveStructure(courseId, course.course_structure, supabase);
 
     if (!currentData) {
       this.log(job, 'error', 'BlockRegeneration: Target data is null', {
@@ -172,7 +180,9 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
       blockPath,
       tier,
       analysisResult: course.analysis_result as unknown as AnalysisResult,
-      courseStructure: course.course_structure as unknown as CourseStructure,
+      courseStructure: (stageId === 'stage_5'
+        ? currentData
+        : course.course_structure) as unknown as CourseStructure,
     });
 
     // Step 5: Assemble dynamic context
@@ -182,7 +192,9 @@ export class BlockRegenerationHandler extends BaseJobHandler<BlockRegenerationJo
       blockPath,
       tier,
       analysisResult: course.analysis_result as unknown as AnalysisResult,
-      courseStructure: course.course_structure as unknown as CourseStructure,
+      courseStructure: (stageId === 'stage_5'
+        ? currentData
+        : course.course_structure) as unknown as CourseStructure,
     });
 
     this.log(job, 'info', 'BlockRegeneration: Context assembled', {
@@ -345,11 +357,20 @@ ${dynamicContext.content}
     // Include updated_at in WHERE clause to detect concurrent modifications
     const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
     const now = new Date().toISOString();
+    let dataToPersist: unknown = updatedData;
+
+    if (stageId === 'stage_5') {
+      const normalizedStructure = ensureStableIdsAndSchemaVersionInMemory(
+        updatedData as CourseStructure
+      );
+      assertStableIds(normalizedStructure);
+      dataToPersist = normalizedStructure;
+    }
 
     const { data: updateResult, error: updateError } = await supabase
       .from('courses')
       .update({
-        [updateColumn]: updatedData,
+        [updateColumn]: dataToPersist,
         updated_at: now,
       })
       .eq('id', courseId)
@@ -405,6 +426,17 @@ ${dynamicContext.content}
         blockPath,
         error: editHistoryError.message,
       });
+    }
+
+    // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
+    if (stageId === 'stage_5') {
+      const structureForNodes = dataToPersist as CourseStructure;
+      await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
+        this.log(job, 'warn', 'BlockRegeneration: course_nodes dual-write failed (non-fatal)', {
+          courseId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
     }
 
     this.log(job, 'info', 'BlockRegeneration: Completed successfully', {
