@@ -16,7 +16,10 @@ import { zodResponseFormat } from 'openai/helpers/zod';
 import { createHash } from 'crypto';
 import { logger } from '../logger/index.js';
 import { cache as redisCache } from '../cache/redis';
-import { createModelConfigService } from '../llm/model-config-service.js';
+import {
+  createModelConfigService,
+  isMissingChatPhaseConfigError,
+} from '../llm/model-config-service.js';
 
 // ============================================================================
 // Intent Schema (Zod + OpenRouter Structured Output)
@@ -232,8 +235,7 @@ export async function classifyIntent(
       maxTokens = phaseConfig.maxTokens;
     } catch (configErr) {
       // If this is a chat phase misconfiguration error, propagate it (don't mask)
-      const errMsg = configErr instanceof Error ? configErr.message : '';
-      if (errMsg.includes('Chat phase') && errMsg.includes('has no config')) {
+      if (isMissingChatPhaseConfigError(configErr)) {
         throw configErr;
       }
       // For transient errors (DB down, timeout), fallback to env var / hardcoded
@@ -297,8 +299,7 @@ export async function classifyIntent(
     return validated;
   } catch (error) {
     // Propagate chat phase misconfiguration errors — do NOT mask as UNKNOWN
-    const errMsg = error instanceof Error ? error.message : '';
-    if (errMsg.includes('Chat phase') && errMsg.includes('has no config')) {
+    if (isMissingChatPhaseConfigError(error)) {
       throw error;
     }
 
