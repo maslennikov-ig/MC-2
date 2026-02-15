@@ -14,6 +14,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isContextOverflowError,
   getContextOverflowFallback,
+  executeWithContextFallback,
 } from '../../src/shared/llm/context-overflow-handler';
 import type { Stage4TierConfig } from '../../src/stages/stage4-analysis/phases/stage4-budget-allocator';
 
@@ -249,6 +250,87 @@ describe('Context Overflow Handler', () => {
       const isOverflow = isContextOverflowError(error);
 
       expect(isOverflow).toBe(false);
+    });
+  });
+
+  describe('executeWithContextFallback - Circular Fallback Detection', () => {
+    it('should detect circular fallback and not retry already-tried models', async () => {
+      // Circular config: standard.fallback = extended.model, extended.fallback = standard.model
+      const circularTierConfig: Stage4TierConfig = {
+        standard: {
+          modelId: 'model-a',
+          fallbackModelId: 'model-b',
+          maxContext: 128_000,
+        },
+        extended: {
+          modelId: 'model-b',
+          fallbackModelId: 'model-a',
+          maxContext: 1_000_000,
+          cacheReadEnabled: false,
+        },
+      };
+
+      const calledModels: string[] = [];
+
+      // Operation always throws context overflow
+      const operation = async (modelId: string) => {
+        calledModels.push(modelId);
+        throw new Error('context_length_exceeded');
+      };
+
+      await expect(
+        executeWithContextFallback(operation, 'model-a', 'ru', 5, circularTierConfig)
+      ).rejects.toThrow();
+
+      // model-a fails → fallback to model-b (extended.modelId)
+      // model-b fails → fallback would be model-a (extended.fallbackModelId), but already tried
+      // So it should stop after 2 attempts, NOT loop through all 5 retries
+      expect(calledModels).toEqual(['model-a', 'model-b']);
+    });
+
+    it('should succeed on fallback model and report full chain', async () => {
+      const operation = async (modelId: string) => {
+        if (modelId === 'model-a') {
+          throw new Error('context_length_exceeded');
+        }
+        return 'success';
+      };
+
+      const circularTierConfig: Stage4TierConfig = {
+        standard: {
+          modelId: 'model-a',
+          fallbackModelId: 'model-b',
+          maxContext: 128_000,
+        },
+        extended: {
+          modelId: 'model-b',
+          fallbackModelId: 'model-a',
+          maxContext: 1_000_000,
+          cacheReadEnabled: false,
+        },
+      };
+
+      const result = await executeWithContextFallback(
+        operation,
+        'model-a',
+        'ru',
+        2,
+        circularTierConfig
+      );
+
+      expect(result.result).toBe('success');
+      expect(result.modelUsed).toBe('model-b');
+    });
+
+    it('should include initialModel and finalModel in exhaustion error', async () => {
+      // No tierConfig → generic fallback to gemini-2.5-flash, then no more options
+      const operation = async (_modelId: string) => {
+        throw new Error('context_length_exceeded');
+      };
+
+      await expect(
+        executeWithContextFallback(operation, 'some-model', 'ru', 5)
+      ).rejects.toThrow(/context_length_exceeded/);
     });
   });
 });

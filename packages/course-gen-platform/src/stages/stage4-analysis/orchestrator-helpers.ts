@@ -149,8 +149,27 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
     }
 
     const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(input.document_summaries);
-    budgetAllocation = allocateStage4Budget(documentInfos, validateLocale(input.language), tierConfig);
-    validateStage4Budget(budgetAllocation);
+
+    try {
+      budgetAllocation = allocateStage4Budget(documentInfos, validateLocale(input.language), tierConfig);
+      validateStage4Budget(budgetAllocation);
+    } catch (budgetError) {
+      orchestrationLogger.error(
+        {
+          error: budgetError instanceof Error ? budgetError.message : String(budgetError),
+          documentCount: documentInfos.length,
+          priorities: {
+            core: documentInfos.filter(d => d.priority === 'CORE').length,
+            important: documentInfos.filter(d => d.priority === 'IMPORTANT').length,
+            supplementary: documentInfos.filter(d => d.priority === 'SUPPLEMENTARY').length,
+          },
+          totalOriginalTokens: documentInfos.reduce((sum, d) => sum + d.original_tokens, 0),
+          totalSummaryTokens: documentInfos.reduce((sum, d) => sum + d.summary_tokens, 0),
+        },
+        'Budget allocation failed'
+      );
+      throw budgetError;
+    }
 
     orchestrationLogger.info(
       {
