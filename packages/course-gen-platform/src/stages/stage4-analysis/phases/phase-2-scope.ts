@@ -27,8 +27,6 @@ import {
   parseWithRepairCascade,
   postProcessAndValidate,
 } from './phase-2-scope-helpers';
-import { logger } from '@/shared/logger';
-
 /**
  * Main Phase 2 execution function: Scope Analysis
  *
@@ -106,13 +104,6 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         repairMetadata,
         validatedInput
       );
-
-      // Log duplicate key_topics across sections (observability)
-      logDuplicateKeyTopics(validated.recommended_structure.sections_breakdown, {
-        warn: (obj: Record<string, unknown>, msg: string) => {
-          logger.warn(obj, msg);
-        },
-      });
 
       return {
         result: validated,
@@ -458,33 +449,3 @@ ${sizeSpecificNotes}
 - difficulty should generally progress from beginner -> intermediate -> advanced through the course`;
 }
 
-/**
- * Log warnings for duplicate key_topics across sections (observability).
- * Non-blocking - only logs warnings for monitoring purposes.
- *
- * @param sections - Generated sections_breakdown from Phase 2
- * @param sectionLogger - Pino logger instance
- */
-export function logDuplicateKeyTopics(
-  sections: Array<{ key_topics?: string[]; area?: string }>,
-  sectionLogger: { warn: (obj: Record<string, unknown>, msg: string) => void }
-): void {
-  const topicToSections = new Map<string, number[]>();
-  for (let i = 0; i < sections.length; i++) {
-    for (const topic of sections[i].key_topics || []) {
-      const normalized = topic.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[-_]/g, ' ');
-      if (!topicToSections.has(normalized)) {
-        topicToSections.set(normalized, []);
-      }
-      topicToSections.get(normalized)!.push(i + 1);
-    }
-  }
-  for (const [topic, sectionIndices] of topicToSections) {
-    if (sectionIndices.length > 1) {
-      sectionLogger.warn(
-        { topic, sections: sectionIndices, phase: 'phase-2-scope' },
-        `Duplicate key_topic across sections: "${topic}" in sections ${sectionIndices.join(', ')}`
-      );
-    }
-  }
-}
