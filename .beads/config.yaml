@@ -40,7 +40,7 @@ daemon.auto-pull: true
 
 # Sync branch (optional) - use separate branch for beads commits
 # Recommended for team projects to isolate beads sync from main branch
-# sync-branch: "beads-sync"
+sync-branch: 'beads-sync'
 
 # =============================================================================
 # DIRECTORY LABELS (Auto-categorization)
