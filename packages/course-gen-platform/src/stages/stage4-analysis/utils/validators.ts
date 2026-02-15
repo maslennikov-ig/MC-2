@@ -28,25 +28,26 @@ import logger from '../../../shared/logger';
  * - Phase 4: Document synthesis (multi-source integration)
  * - Phase 5: Final assembly (validation, quality checks)
  *
- * These keys are translated on the frontend using next-intl.
+ * Human-readable messages stored directly in generation_progress.message.
+ * Frontend displays these as-is (with i18n key fallback for legacy data).
  */
 export const PROGRESS_MESSAGES = {
-  step_0_start: 'progress.step_0_start',
-  step_0_complete: 'progress.step_0_complete',
-  step_1_start: 'progress.step_1_start',
-  step_1_complete: 'progress.step_1_complete',
-  step_0_5_start: 'progress.step_0_5_start',
-  step_0_5_complete: 'progress.step_0_5_complete',
-  step_2_start: 'progress.step_2_start',
-  step_2_complete: 'progress.step_2_complete',
-  step_3_start: 'progress.step_3_start',
-  step_3_complete: 'progress.step_3_complete',
-  step_4_start: 'progress.step_4_start',
-  step_4_complete: 'progress.step_4_complete',
-  step_6_start: 'progress.step_6_start',
-  step_6_complete: 'progress.step_6_complete',
-  step_5_start: 'progress.step_5_start',
-  step_5_complete: 'progress.step_5_complete',
+  step_0_start: 'Валидация входных данных...',
+  step_0_complete: 'Валидация завершена',
+  step_1_start: 'Базовая классификация...',
+  step_1_complete: 'Классификация завершена',
+  step_0_5_start: 'Генерация уточняющих вопросов...',
+  step_0_5_complete: 'Уточняющие вопросы готовы',
+  step_2_start: 'Глубокий анализ материалов...',
+  step_2_complete: 'Анализ материалов завершён',
+  step_3_start: 'Синтез документов...',
+  step_3_complete: 'Синтез завершён',
+  step_4_start: 'Финальная сборка результатов...',
+  step_4_complete: 'Анализ завершён',
+  step_6_start: 'Подготовка бюджета контекста...',
+  step_6_complete: 'Бюджет подготовлен',
+  step_5_start: 'Итоговая валидация качества...',
+  step_5_complete: 'Анализ задачи завершён',
 } as const;
 
 /**
