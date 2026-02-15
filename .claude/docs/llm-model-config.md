@@ -79,28 +79,50 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 
 ## Stage 4: Analysis
 
-### Phase 0: Budget Allocation
+> **Конфигурация моделей полностью в БД** (`llm_model_config`). Менять через Admin UI: `/admin/pipeline` → Models.
+> Budget Allocator читает tier configs из БД, хардкод `STAGE4_MODELS` удалён.
 
-> Нет отдельной LLM конфигурации — использует документы из Stage 3
+### Порядок выполнения фаз
 
-### Phase 0.5: Clarifying Questions
+| # | Phase | DB key | Описание |
+|---|-------|--------|----------|
+| 0 | Budget Allocation | — | Нет LLM вызова. Распределяет токен-бюджет по документам. |
+| 1 | Classification | `stage_4_classification` | Классификация темы курса |
+| 1.5 | Clarifying Questions | `stage_4_clarifying` | Генерация уточняющих вопросов (после Phase 1, использует её output). В коде: `phase-0.5-clarifying.ts` |
+| 2 | Scope | `stage_4_scope` | Генерация структуры курса (секции, модули) |
+| 3 | Expert | `stage_4_expert` | Экспертный анализ с педагогическими рекомендациями |
+| 4 | Synthesis | `stage_4_synthesis` | Финальная компиляция метаданных и стиля |
 
-| Phase              | Tier     | Primary Model           | Fallback Model                | Temp | Tokens |
-| ------------------ | -------- | ----------------------- | ----------------------------- | ---- | ------ |
-| stage_4_clarifying | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 4000   |
+### Стратегия выбора моделей
 
-### Phase 1-4: Analysis
+- **Standard tier** (≤260K tokens): Быстрые дешёвые модели для основных фаз, думающие модели для аналитических
+- **Extended tier** (>260K tokens): Модели с большим контекстом (1M)
+- **Thinking phases** (clarifying, expert, synthesis): `moonshotai/kimi-k2-0905` — дорогая, но качественная reasoning-модель
+- **Bulk phases** (classification, scope): Быстрые модели — `xiaomi/mimo-v2-flash` (ru), `x-ai/grok-4.1-fast` (other)
+- **Порог 260K** — хардкод `STAGE4_CONTEXT_THRESHOLD`, не из БД
 
-| Phase                  | Tier     | Primary Model           | Fallback Model                | Temp | Tokens |
-| ---------------------- | -------- | ----------------------- | ----------------------------- | ---- | ------ |
-| stage_4_classification | standard | xiaomi/mimo-v2-flash    | google/gemini-2.5-flash       | 0.70 | 4096   |
-| stage_4_classification | extended | google/gemini-2.5-flash | xiaomi/mimo-v2-flash          | 0.70 | 4096   |
-| stage_4_scope          | standard | xiaomi/mimo-v2-flash    | google/gemini-2.5-flash       | 0.70 | 4096   |
-| stage_4_scope          | extended | google/gemini-2.5-flash | xiaomi/mimo-v2-flash          | 0.70 | 4096   |
-| stage_4_expert         | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 8000   |
-| stage_4_expert         | extended | google/gemini-2.5-flash | xiaomi/mimo-v2-flash          | 0.50 | 8000   |
-| stage_4_synthesis      | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.70 | 6000   |
-| stage_4_synthesis      | extended | google/gemini-2.5-flash | xiaomi/mimo-v2-flash          | 0.70 | 6000   |
+### Russian (ru)
+
+| Phase | Tier | Primary Model | Fallback Model | Temp | Tokens |
+| ----- | ---- | ------------- | -------------- | ---- | ------ |
+| stage_4_classification | standard | xiaomi/mimo-v2-flash | google/gemini-3-flash-preview | 0.70 | 4096 |
+| stage_4_classification | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash | 0.70 | 4096 |
+| stage_4_scope | standard | xiaomi/mimo-v2-flash | google/gemini-3-flash-preview | 0.70 | 4096 |
+| stage_4_scope | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash | 0.70 | 4096 |
+
+### Any language (fallback for non-Russian)
+
+| Phase | Tier | Primary Model | Fallback Model | Temp | Tokens |
+| ----- | ---- | ------------- | -------------- | ---- | ------ |
+| stage_4_clarifying | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 4000 |
+| stage_4_classification | standard | x-ai/grok-4.1-fast | google/gemini-3-flash-preview | 0.70 | 4096 |
+| stage_4_classification | extended | google/gemini-3-flash-preview | x-ai/grok-4.1-fast | 0.70 | 4096 |
+| stage_4_scope | standard | x-ai/grok-4.1-fast | google/gemini-3-flash-preview | 0.70 | 4096 |
+| stage_4_scope | extended | google/gemini-3-flash-preview | x-ai/grok-4.1-fast | 0.70 | 4096 |
+| stage_4_expert | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 8000 |
+| stage_4_expert | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-0905 | 0.50 | 8000 |
+| stage_4_synthesis | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.70 | 6000 |
+| stage_4_synthesis | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-0905 | 0.70 | 6000 |
 
 ---
 
@@ -245,6 +267,8 @@ Stage-specific models with automatic fallback:
 | ---------------------- | ------------------------------------ | -------- | ---------------------- |
 | MiMo V2 Flash          | xiaomi/mimo-v2-flash                 | Xiaomi   | Стабильная, русский    |
 | Gemini 2.5 Flash       | google/gemini-2.5-flash              | Google   | Большой контекст (1M)  |
+| Gemini 3 Flash Preview | google/gemini-3-flash-preview        | Google   | Большой контекст (1M), Stage 4 extended |
+| Grok 4.1 Fast          | x-ai/grok-4.1-fast                  | xAI      | Быстрая, Stage 4 non-Russian |
 | Gemini 2.0 Thinking    | google/gemini-2.0-flash-thinking-exp | Google   | Reasoning модель       |
 | DeepSeek V3.2          | deepseek/deepseek-v3.2               | DeepSeek | Лучшая для русского    |
 | Qwen3 235B             | qwen/qwen3-235b-a22b-2507            | Alibaba  | Лучшая для английского |
@@ -259,7 +283,7 @@ Stage-specific models with automatic fallback:
 
 ## Statistics
 
-- **Total configs**: 64
-- **Active configs**: 64
-- **Last updated**: 2026-02-11
-- **Last change**: Stage-specific chat models (kimi-k2/deepseek-v3.2), replaced gpt-4o-mini with mimo-v2-flash
+- **Total configs**: 68
+- **Active configs**: 68
+- **Last updated**: 2026-02-15
+- **Last change**: Stage 4 model unification — DB-driven tier configs, removed hardcoded STAGE4_MODELS, added ru-specific configs, switched extended tier to gemini-3-flash-preview
