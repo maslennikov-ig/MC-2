@@ -35,7 +35,10 @@ import {
   QUALITY_CONFIG,
   performPostGenerationQualityGate,
   assembleGenerationResult,
+  detectOverlap,
+  buildSectionOverlapFeedback,
 } from './orchestrator-helpers';
+import type { CrossSectionOverlapResult } from '../../shared/validation/quality-validator';
 
 // ============================================================================
 // LANGGRAPH STATE ANNOTATION
@@ -119,6 +122,9 @@ type GenerationStateType = typeof GenerationStateAnnotation.State;
  * Builds and executes LangGraph StateGraph workflow with dependency-injected services.
  * Coordinates MetadataGenerator, SectionBatchGenerator, and QualityValidator across 4 phases.
  */
+/** Maximum overlap retry attempts before proceeding with warning */
+const MAX_OVERLAP_RETRIES = 2;
+
 export class GenerationOrchestrator {
   private phases: GenerationPhases;
   private graph: { invoke: (state: GenerationStateType) => Promise<GenerationStateType> };
@@ -210,8 +216,132 @@ export class GenerationOrchestrator {
 
     this.logQualityGateResults(input, qualityGateResults);
 
-    // STEP 5: Assemble and return result
-    return this.assembleAndReturnResult(finalState, input, totalDuration);
+    // STEP 4.5: Overlap retry loop (non-blocking — never fails the pipeline)
+    const updatedSections = await this.retryOverlappingSections(
+      finalState.sections,
+      input,
+      qualityGateResults.overlapResult
+    );
+
+    // STEP 5: Assemble and return result (use updated sections if overlap was resolved)
+    const stateForAssembly = updatedSections !== finalState.sections
+      ? { ...finalState, sections: updatedSections }
+      : finalState;
+
+    return this.assembleAndReturnResult(stateForAssembly, input, totalDuration);
+  }
+
+  // ==========================================================================
+  // OVERLAP RETRY LOGIC
+  // ==========================================================================
+
+  /**
+   * Retry overlapping sections after post-generation quality gate.
+   *
+   * Non-blocking: if overlap persists after MAX_OVERLAP_RETRIES, proceeds with warning.
+   * For each overlapping pair, regenerates both sections with specific feedback
+   * about what the other section already covers.
+   *
+   * @param sections - Original generated sections
+   * @param input - Generation job input
+   * @param initialOverlapResult - Overlap result from quality gate
+   * @returns Updated sections array (same reference if no overlap detected)
+   */
+  private async retryOverlappingSections(
+    sections: Section[],
+    input: GenerationJobInput,
+    initialOverlapResult: CrossSectionOverlapResult | null
+  ): Promise<Section[]> {
+    if (!initialOverlapResult?.hasOverlap) {
+      return sections;
+    }
+
+    let updatedSections = [...sections];
+    let currentOverlapResult = initialOverlapResult;
+
+    for (let attempt = 0; attempt < MAX_OVERLAP_RETRIES; attempt++) {
+      if (!currentOverlapResult.hasOverlap) break;
+
+      this.logger.info(
+        {
+          courseId: input.course_id,
+          attempt: attempt + 1,
+          maxAttempts: MAX_OVERLAP_RETRIES,
+          overlapCount: currentOverlapResult.overlapCount,
+          pairs: currentOverlapResult.overlappingPairs.map(
+            p => `S${p.sectionA}<>S${p.sectionB} (${p.similarity.toFixed(2)})`
+          ),
+        },
+        `Overlap detected, regenerating overlapping sections (attempt ${attempt + 1}/${MAX_OVERLAP_RETRIES})`
+      );
+
+      // Build per-section overlap feedback
+      const feedbackMap = buildSectionOverlapFeedback(currentOverlapResult, updatedSections);
+
+      // Regenerate each overlapping section sequentially
+      // (sequential so later sections benefit from earlier regenerations)
+      for (const [sectionIdx, feedback] of feedbackMap) {
+        try {
+          const regenerated = await this.phases.regenerateSingleSection(
+            sectionIdx,
+            input,
+            feedback
+          );
+          if (regenerated.length > 0) {
+            updatedSections[sectionIdx] = regenerated[0];
+          }
+        } catch (error) {
+          this.logger.warn(
+            {
+              courseId: input.course_id,
+              sectionIndex: sectionIdx + 1,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            `Failed to regenerate overlapping section ${sectionIdx + 1}, keeping original`
+          );
+        }
+      }
+
+      // Re-run overlap detection on updated sections
+      currentOverlapResult = await detectOverlap(updatedSections, input, this.logger) || {
+        hasOverlap: false,
+        overlapCount: 0,
+        overlapThreshold: 0,
+        overlappingPairs: [],
+      };
+    }
+
+    if (currentOverlapResult.hasOverlap) {
+      this.logger.warn(
+        {
+          courseId: input.course_id,
+          overlapCount: currentOverlapResult.overlapCount,
+          pairs: currentOverlapResult.overlappingPairs
+            .map(p => `S${p.sectionA}<>S${p.sectionB} (${p.similarity.toFixed(2)})`)
+            .join(', '),
+        },
+        'Overlap persists after max retries, proceeding with warning (non-blocking)'
+      );
+
+      await logTrace({
+        courseId: input.course_id,
+        stage: 'stage_5',
+        phase: 'overlap_retry',
+        stepName: 'exhausted',
+        outputData: {
+          overlapCount: currentOverlapResult.overlapCount,
+          pairs: currentOverlapResult.overlappingPairs,
+        },
+        durationMs: 0,
+      });
+    } else if (updatedSections !== sections) {
+      this.logger.info(
+        { courseId: input.course_id },
+        'Overlap resolved after regeneration'
+      );
+    }
+
+    return updatedSections;
   }
 
   // ==========================================================================

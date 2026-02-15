@@ -66,7 +66,8 @@ export function buildBatchPrompt(
   sectionIndex: number,
   qdrantClient: QdrantClient | undefined,
   attemptNumber: number,
-  constraints?: CourseConstraints
+  constraints?: CourseConstraints,
+  overlapFeedback?: string
 ): string {
   const language = input.frontend_parameters.language || 'en';
   const style = input.frontend_parameters.style || DEFAULT_COURSE_STYLE;
@@ -120,6 +121,11 @@ ${courseStructureMap}
 6. SELF-CHECK BEFORE OUTPUT: For EACH lesson you generate, verify its title and content do NOT match topics from other sections. If they do — REJECT and create a different lesson.
 ${antiOverlapLang}
 `;
+
+    // Inject overlap feedback from post-generation overlap detection retry
+    if (overlapFeedback) {
+      prompt += `\n${overlapFeedback}\n`;
+    }
   }
 
   prompt += `
