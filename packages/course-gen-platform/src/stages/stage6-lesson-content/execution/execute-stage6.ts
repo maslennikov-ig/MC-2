@@ -89,6 +89,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       },
       // Include review info for UI warnings (undefined if not set)
       reviewInfo: result.reviewInfo ?? undefined,
+      lessonDigest: result.lessonDigest || undefined,
     };
   } catch (error) {
     const durationMs = Date.now() - startTime;

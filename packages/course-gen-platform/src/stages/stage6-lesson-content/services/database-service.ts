@@ -198,6 +198,7 @@ export async function saveLessonContent(
             : undefined,
           // Human review info for UI warnings (only present if review needed)
           reviewInfo: result.reviewInfo ?? undefined,
+          lessonDigest: result.lessonDigest ?? undefined,
         })
       ) as Json,
       status: 'completed',
