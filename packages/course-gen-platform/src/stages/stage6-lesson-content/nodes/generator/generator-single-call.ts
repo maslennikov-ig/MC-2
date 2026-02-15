@@ -81,8 +81,8 @@ export async function generateLessonSingleCall(
     'Starting single-call lesson generation'
   );
 
-  // Step 1: Calculate word budget
-  const durationMinutes = lessonSpec.estimated_duration_minutes || 15;
+  // Step 1: Calculate word budget (min 5 min to prevent 0/negative budgets)
+  const durationMinutes = Math.max(5, lessonSpec.estimated_duration_minutes || 15);
   const targetWordCount = Math.round(durationMinutes * WORDS_PER_MINUTE);
   const contentWordBudget = Math.round(targetWordCount - 300); // Subtract intro/summary overhead
 
@@ -98,6 +98,18 @@ export async function generateLessonSingleCall(
   // Sort by relevance_score descending
   deduplicatedChunks.sort((a, b) => b.relevance_score - a.relevance_score);
 
+  if (ragChunks.length > 0) {
+    logger.debug(
+      {
+        lessonId: lessonSpec.lesson_id,
+        totalChunks: ragChunks.length,
+        uniqueChunks: deduplicatedChunks.length,
+        duplicatesRemoved: ragChunks.length - deduplicatedChunks.length,
+      },
+      'RAG chunks deduplicated for single-call generation'
+    );
+  }
+
   // Format with budget
   const ragContextXML = formatRAGContextXML(deduplicatedChunks, SINGLE_CALL_RAG_BUDGET_CHARS);
 
@@ -107,11 +119,20 @@ export async function generateLessonSingleCall(
   // Step 4: Prepare generation guidance
   const generationGuidanceXML = formatGenerationGuidanceXML(analysisResult);
 
-  // Step 5: Get style prompt with try/catch fallback
+  // Step 5: Get style prompt with fallback
   let stylePrompt: string;
   try {
     stylePrompt = getStylePrompt(style);
-  } catch {
+  } catch (error) {
+    logger.warn(
+      {
+        lessonId: lessonSpec.lesson_id,
+        requestedStyle: style,
+        fallbackStyle: DEFAULT_COURSE_STYLE,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to get style prompt, using default'
+    );
     stylePrompt = getStylePrompt(DEFAULT_COURSE_STYLE);
   }
 
@@ -119,7 +140,8 @@ export async function generateLessonSingleCall(
   const labels = getContentLabels(language);
   const digestHeader = labels.lessonDigest;
 
-  // Step 7: Build sections list (filter out "Conclusion")
+  // Step 7: Build sections list
+  // Filter out "Conclusion" — it's generated as the summary section in the prompt
   const contentSections = lessonSpec.sections.filter(
     s =>
       !s.title.toLowerCase().includes('conclusion') && !s.title.toLowerCase().includes('заключение')

@@ -81,9 +81,10 @@ export const SINGLE_CALL_MIN_TOKENS = 2048;
 export const SINGLE_CALL_MAX_TOKENS = 16384;
 
 /**
- * Character budget for RAG context in single-call generation.
+ * Total character budget for RAG context in single-call generation.
  * All RAG chunks are deduplicated and included up to this limit.
- * Higher than per-section (15000) since single-call sees all sections.
+ * In serial mode each section got up to 15K chars; single-call sees
+ * all sections at once, so we provide 20K total for the entire lesson.
  */
 export const SINGLE_CALL_RAG_BUDGET_CHARS = 20000;
 
