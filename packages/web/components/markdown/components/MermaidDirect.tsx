@@ -470,13 +470,17 @@ const lightThemeVariables = {
 export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isDark, setIsDark] = useState(false)
+  const [isDark, setIsDark] = useState(() =>
+    typeof document !== 'undefined'
+      ? document.documentElement.classList.contains('dark')
+      : false
+  )
   const uniqueId = useId().replace(/:/g, '-') // React's useId returns colons which aren't valid in IDs
+  const renderCountRef = useRef(0) // Prevents race conditions between concurrent renders
 
-  // Detect dark mode
+  // Detect dark mode changes (not initial value — that's handled by useState initializer)
   useEffect(() => {
     const checkDark = () => document.documentElement.classList.contains('dark')
-    setIsDark(checkDark())
 
     const observer = new MutationObserver(() => {
       setIsDark(checkDark())
@@ -493,6 +497,11 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
   // Render diagram
   useEffect(() => {
     if (!containerRef.current || !chart?.trim()) return
+
+    // Increment render counter to track the current render.
+    // If a new render starts before this one completes, the stale render
+    // will see its counter doesn't match and skip writing to the DOM.
+    const currentRender = ++renderCountRef.current
 
     const renderDiagram = async () => {
       try {
@@ -513,8 +522,12 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
           },
         })
 
-        // Render the diagram
-        const { svg, bindFunctions } = await mermaid.render(`mermaid-${uniqueId}`, chart.trim())
+        // Use render-unique ID to prevent mermaid ID conflicts between concurrent calls
+        const renderId = `mermaid-${uniqueId}-${currentRender}`
+        const { svg, bindFunctions } = await mermaid.render(renderId, chart.trim())
+
+        // Skip if a newer render has started while we were awaiting
+        if (currentRender !== renderCountRef.current) return
 
         if (containerRef.current) {
           // SECURITY: innerHTML is safe here — Mermaid's securityLevel: 'strict' sanitizes
@@ -534,6 +547,8 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
 
         setError(null)
       } catch (err) {
+        // Skip error handling if a newer render has started
+        if (currentRender !== renderCountRef.current) return
         console.error('Mermaid rendering error:', err)
         setError(err instanceof Error ? err.message : 'Failed to render diagram')
       }
