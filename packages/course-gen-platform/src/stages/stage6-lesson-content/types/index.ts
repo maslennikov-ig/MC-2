@@ -185,4 +185,6 @@ export interface Stage6Output {
     /** Number of unverified claims */
     unverifiedClaims?: number;
   };
+  /** Lesson digest — 3-5 sentence factual summary for inter-lesson context */
+  lessonDigest?: string;
 }
