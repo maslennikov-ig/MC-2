@@ -354,7 +354,7 @@ Target: approximately {{targetWordCount}} words total (excluding exercises and d
 STRUCTURE (use ## headers for each section):
 1. ## {{introductionHeader}} — Hook ({{hookStrategy}}) + preview of learning objectives (100-150 words)
 2. Content sections (one ## header per topic from sections_to_cover).
-   All sections combined should be approximately {{contentWordBudget}} words.
+   All sections combined should be approximately {{sectionsWordBudget}} words.
    Each section should be focused and proportional.
 3. ## {{summaryHeader}} — Brief recap + next steps (80-120 words)
 4. ## {{exercisesHeader}} — Exactly 2 practical exercises
@@ -463,8 +463,9 @@ CRITICAL RULES:
         required: true,
       },
       {
-        name: 'contentWordBudget',
-        description: 'Word budget for content sections only (targetWordCount - 300)',
+        name: 'sectionsWordBudget',
+        description:
+          'Word budget for main content sections (excludes intro, summary, exercises, digest)',
         required: true,
       },
     ],

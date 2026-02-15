@@ -84,7 +84,7 @@ export async function generateLessonSingleCall(
   // Step 1: Calculate word budget (min 5 min to prevent 0/negative budgets)
   const durationMinutes = Math.max(5, lessonSpec.estimated_duration_minutes || 15);
   const targetWordCount = Math.round(durationMinutes * WORDS_PER_MINUTE);
-  const contentWordBudget = Math.round(targetWordCount - 300); // Subtract intro/summary overhead
+  const sectionsWordBudget = Math.round(targetWordCount - 300); // Subtract intro/summary overhead
 
   // Step 2: Prepare RAG context (CRITICAL - user requirement)
   // Deduplicate chunks by chunk_id
@@ -186,7 +186,7 @@ export async function generateLessonSingleCall(
     hintLabel: labels.hint,
     sampleAnswerLabel: labels.sampleAnswer,
     digestHeader,
-    contentWordBudget: String(contentWordBudget),
+    sectionsWordBudget: String(sectionsWordBudget),
   });
 
   // Step 11: Calculate maxTokens
