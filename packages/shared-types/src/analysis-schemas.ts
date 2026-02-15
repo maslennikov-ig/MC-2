@@ -539,6 +539,9 @@ export const Phase2InputSchema = z.object({
   /** Learning outcomes (user-specified goals) */
   learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
 
+  /** Overlap detection feedback from previous attempt (for retry) */
+  overlap_feedback: z.string().optional(),
+
   /** Clarifying answers from Phase 0.5 */
   clarifying_answers: z
     .array(
