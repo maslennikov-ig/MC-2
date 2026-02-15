@@ -345,6 +345,25 @@ export const AdjacentLessonContextSchema = z.object({
 
 export type AdjacentLessonContext = z.infer<typeof AdjacentLessonContextSchema>;
 
+export const CoursePositionSchema = z.object({
+  /** Lesson position within current module (1-based) */
+  lesson_index_in_module: z.number().int().min(1),
+  /** Total lessons in current module */
+  total_lessons_in_module: z.number().int().min(1),
+  /** Module position in course (1-based) */
+  module_index: z.number().int().min(1),
+  /** Total modules in course */
+  total_modules: z.number().int().min(1),
+  /** Global lesson position in course (1-based) */
+  lesson_index_in_course: z.number().int().min(1),
+  /** Total lessons in entire course */
+  total_lessons_in_course: z.number().int().min(1),
+  /** Title of the current module */
+  module_title: z.string(),
+});
+
+export type CoursePosition = z.infer<typeof CoursePositionSchema>;
+
 /**
  * Inter-lesson context for content generation
  * Provides information about surrounding lessons to improve coherence
@@ -360,6 +379,8 @@ export const LessonContextSchema = z.object({
   concepts_already_covered: z.array(z.string()),
   /** Terms already defined in previous lessons */
   terms_already_defined: z.array(z.string()),
+  /** Course position info for the current lesson */
+  course_position: CoursePositionSchema.optional(),
 });
 
 export type LessonContext = z.infer<typeof LessonContextSchema>;

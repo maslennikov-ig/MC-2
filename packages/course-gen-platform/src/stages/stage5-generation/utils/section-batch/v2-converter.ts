@@ -158,16 +158,20 @@ function buildLessonContext(
     termsAlreadyDefined.push(...(prev.key_topics || []).slice(0, 10));
   }
 
-  // Only return context if there's something useful
-  if (!previousLesson && !nextLesson && conceptsAlreadyCovered.length === 0) {
-    return undefined;
-  }
-
   return {
     previous_lesson: previousLesson,
     next_lesson: nextLesson,
     concepts_already_covered: conceptsAlreadyCovered,
     terms_already_defined: termsAlreadyDefined,
+    course_position: {
+      lesson_index_in_module: lessonIndex + 1,
+      total_lessons_in_module: (allSections[sectionIndex].lessons || []).length,
+      module_index: sectionIndex + 1,
+      total_modules: allSections.length,
+      lesson_index_in_course: currentFlatIndex + 1,
+      total_lessons_in_course: allLessons.length,
+      module_title: allSections[sectionIndex].section_title,
+    },
   };
 }
 
