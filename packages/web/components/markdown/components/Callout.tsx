@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getContentLabels } from '@megacampus/shared-types'
 import type { CalloutProps, CalloutType } from '../types'
 
 /**
@@ -40,8 +41,7 @@ const calloutStyles: Record<CalloutType, { icon: LucideIcon; colors: string }> =
 }
 
 /**
- * Default titles for each callout type
- * Used when no custom title is provided
+ * Default English titles for each callout type (fallback)
  */
 const defaultTitles: Record<CalloutType, string> = {
   note: 'Note',
@@ -49,6 +49,24 @@ const defaultTitles: Record<CalloutType, string> = {
   warning: 'Warning',
   danger: 'Danger',
   info: 'Info',
+}
+
+/**
+ * Get localized title for a callout type based on content language.
+ * Falls back to English defaults if language is not provided.
+ */
+function getLocalizedTitle(type: CalloutType, language?: string): string {
+  if (!language) return defaultTitles[type]
+
+  const labels = getContentLabels(language)
+  const labelMap: Record<CalloutType, string> = {
+    note: labels.calloutNote,
+    tip: labels.calloutTip,
+    warning: labels.calloutWarning,
+    danger: labels.calloutDanger,
+    info: labels.calloutInfo,
+  }
+  return labelMap[type]
 }
 
 /**
@@ -70,10 +88,10 @@ const defaultTitles: Record<CalloutType, string> = {
  * > This is a warning message
  * ```
  */
-export function Callout({ type, title, children, className }: CalloutProps) {
+export function Callout({ type, title, children, className, language }: CalloutProps) {
   const style = calloutStyles[type]
   const Icon = style.icon
-  const displayTitle = title || defaultTitles[type]
+  const displayTitle = title || getLocalizedTitle(type, language)
 
   return (
     <aside

@@ -66,6 +66,8 @@ export interface MarkdownRendererFullProps {
   className?: string
   /** Override specific features from preset */
   features?: Partial<FeatureFlags>
+  /** Content language for localized callout titles (ISO 639-1) */
+  language?: string
 }
 
 /**
@@ -217,7 +219,7 @@ function formatLanguage(lang: string): string {
  * Try to detect GitHub-style callout syntax in blockquote children.
  * Returns a Callout element if detected, null otherwise.
  */
-function tryParseCallout(children: React.ReactNode): React.JSX.Element | null {
+function tryParseCallout(children: React.ReactNode, language?: string): React.JSX.Element | null {
   const firstChild = React.Children.toArray(children)[0]
 
   if (React.isValidElement(firstChild) && firstChild.type === 'p') {
@@ -234,16 +236,16 @@ function tryParseCallout(children: React.ReactNode): React.JSX.Element | null {
       }
     }
 
-    const match = textContent.match(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i)
+    const match = textContent.match(/^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i)
 
     if (match) {
       const type = match[1].toLowerCase() as CalloutType
-      const remainingText = textContent.replace(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]\s*/i, '')
+      const remainingText = textContent.replace(/^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]["'«»\u201C\u201D]*\s*/i, '')
       const newFirstParagraph = remainingText ? <p>{remainingText}</p> : null
       const restChildren = React.Children.toArray(children).slice(1)
 
       return (
-        <Callout type={type}>
+        <Callout type={type} language={language}>
           {newFirstParagraph}
           {restChildren}
         </Callout>
@@ -272,6 +274,7 @@ export function MarkdownRendererFull({
   preset = 'lesson',
   className,
   features,
+  language,
 }: MarkdownRendererFullProps): React.JSX.Element {
   // Get merged preset configuration with feature overrides
   const config = getPresetConfig(preset, features)
@@ -422,7 +425,7 @@ export function MarkdownRendererFull({
     // Blockquote styling with optional callout/admonition support
     blockquote: ({ children }) => {
       if (config.callouts) {
-        const callout = tryParseCallout(children)
+        const callout = tryParseCallout(children, language)
         if (callout) return callout
       }
       return (

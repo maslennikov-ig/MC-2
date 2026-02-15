@@ -36,6 +36,8 @@ interface LessonContentProps {
   lessonContent?: LessonContentRow
   /** Enrichments for the current lesson (video, audio, quiz, presentation, document, cover) */
   enrichments?: Array<{ enrichment_type: string; content: unknown; status: string }>
+  /** Course content language for localized callout titles */
+  courseLanguage?: string
 }
 
 export default function LessonContent({
@@ -44,6 +46,7 @@ export default function LessonContent({
   assets,
   lessonContent,
   enrichments,
+  courseLanguage,
 }: LessonContentProps) {
   const [videoMode, setVideoMode] = useState<'hidden' | 'normal' | 'floating'>('hidden')
 
@@ -387,7 +390,7 @@ export default function LessonContent({
         <div className="mb-8">
           <div className="rounded-xl border border-blue-200/50 bg-gradient-to-br from-blue-50/50 via-indigo-50/30 to-purple-50/50 p-6 shadow-sm dark:border-blue-800/30 dark:from-blue-900/10 dark:via-indigo-900/10 dark:to-purple-900/10">
             <div className="prose prose-lg dark:prose-invert prose-purple max-w-none">
-              <MarkdownRendererFull content={introText} preset="lesson" />
+              <MarkdownRendererFull content={introText} preset="lesson" language={courseLanguage} />
             </div>
           </div>
         </div>
@@ -395,7 +398,7 @@ export default function LessonContent({
 
       {/* Main Content */}
       <div className="prose prose-lg dark:prose-invert prose-purple max-w-none">
-        <MarkdownRendererFull content={mainContent} preset="lesson" />
+        <MarkdownRendererFull content={mainContent} preset="lesson" language={courseLanguage} />
       </div>
     </motion.div>
   )
