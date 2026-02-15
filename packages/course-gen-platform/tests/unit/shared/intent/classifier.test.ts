@@ -10,13 +10,39 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { ClassifiedIntent, NodeContextForClassification } from '@/shared/intent/classifier';
 
 // Mock dependencies before imports
-vi.mock('@/shared/logger/index.js', () => ({
-  logger: {
+// vi.hoisted runs before vi.mock hoisting, so variables are available in mock factories
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock('@/shared/logger/index.js', () => ({
+  logger: mockLogger,
+  default: mockLogger,
+}));
+
+vi.mock('@/shared/cache/redis', () => ({
+  cache: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(true),
+  },
+}));
+
+vi.mock('@/shared/llm/model-config-service.js', () => ({
+  createModelConfigService: vi.fn(() => ({
+    getModelForPhase: vi.fn().mockResolvedValue({
+      modelId: 'test-model',
+      temperature: 0.1,
+      maxTokens: 256,
+    }),
+  })),
+  isMissingChatPhaseConfigError: vi.fn((error: unknown) => {
+    return error instanceof Error && error.message.includes('has no active config');
+  }),
 }));
 
 vi.mock('openai', () => {
@@ -52,7 +78,7 @@ import {
   isLLMRequiredIntent,
 } from '@/shared/intent/classifier';
 import { logger } from '@/shared/logger/index.js';
-import * as ModelConfigService from '@/shared/llm/model-config-service';
+import { createModelConfigService } from '@/shared/llm/model-config-service.js';
 import OpenAI from 'openai';
 
 describe('classifyIntent', () => {
@@ -245,11 +271,15 @@ describe('classifyIntent', () => {
     );
   });
 
-  it('should use classification model from env var or default', async () => {
-    const originalEnv = process.env.CHAT_CLASSIFICATION_MODEL;
-
-    // Test with env var
-    process.env.CHAT_CLASSIFICATION_MODEL = 'custom/model';
+  it('should use model from model-config-service', async () => {
+    // Override mock to return a custom model
+    vi.mocked(createModelConfigService).mockReturnValueOnce({
+      getModelForPhase: vi.fn().mockResolvedValue({
+        modelId: 'custom/model-from-config',
+        temperature: 0.2,
+        maxTokens: 512,
+      }),
+    } as any);
 
     const mockResponse = {
       choices: [
@@ -274,15 +304,8 @@ describe('classifyIntent', () => {
     await classifyIntent('сколько уроков?', undefined, mockOpenAIClient);
 
     expect(mockOpenAIClient.chat.completions.create).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'custom/model' })
+      expect.objectContaining({ model: 'custom/model-from-config' })
     );
-
-    // Reset env var
-    if (originalEnv) {
-      process.env.CHAT_CLASSIFICATION_MODEL = originalEnv;
-    } else {
-      delete process.env.CHAT_CLASSIFICATION_MODEL;
-    }
   });
 
   it('should classify UPDATE_FIELD with field name and value', async () => {
@@ -367,18 +390,14 @@ describe('classifyIntent', () => {
       'Chat phase "chat_intent_classification" has no active config in database. Seed the config before using chat.'
     );
 
-    const createServiceSpy = vi
-      .spyOn(ModelConfigService, 'createModelConfigService')
-      .mockReturnValue({
-        getModelForPhase: vi.fn().mockRejectedValue(missingConfigError),
-      } as any);
+    vi.mocked(createModelConfigService).mockReturnValueOnce({
+      getModelForPhase: vi.fn().mockRejectedValue(missingConfigError),
+    } as any);
 
     await expect(classifyIntent('test message', undefined, mockOpenAIClient)).rejects.toThrow(
       'has no active config'
     );
     expect(mockOpenAIClient.chat.completions.create).not.toHaveBeenCalled();
-
-    createServiceSpy.mockRestore();
   });
 
   it('should handle length truncation (finish_reason: length)', async () => {
