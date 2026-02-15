@@ -1194,6 +1194,60 @@ export class GenerationPhases {
   }
 
   // ==========================================================================
+  // OVERLAP RETRY: REGENERATE SINGLE SECTION
+  // ==========================================================================
+
+  /**
+   * Regenerate a single section with overlap feedback.
+   *
+   * Called by the orchestrator's overlap retry loop when post-generation
+   * overlap detection finds semantically similar sections.
+   * The overlapFeedback string is injected into the prompt to guide
+   * the LLM to generate non-overlapping content.
+   *
+   * @param sectionIndex - 0-based section index
+   * @param input - Generation job input
+   * @param overlapFeedback - Specific instructions about what other sections cover
+   * @returns Regenerated section(s)
+   */
+  async regenerateSingleSection(
+    sectionIndex: number,
+    input: GenerationJobInput,
+    overlapFeedback: string
+  ): Promise<Section[]> {
+    this.logger.info(
+      {
+        phase: 'overlap_retry',
+        sectionIndex: sectionIndex + 1,
+        courseId: input.course_id,
+      },
+      `Regenerating section ${sectionIndex + 1} due to overlap detection`
+    );
+
+    const result = await this.sectionBatchGenerator.generateBatch(
+      sectionIndex + 1, // batchNum (1-indexed)
+      sectionIndex, // startSection (0-indexed)
+      sectionIndex + 1, // endSection (exclusive)
+      input,
+      this.qdrantClient,
+      overlapFeedback
+    );
+
+    this.logger.info(
+      {
+        phase: 'overlap_retry',
+        sectionIndex: sectionIndex + 1,
+        lessonsGenerated: result.sections[0]?.lessons?.length || 0,
+        modelUsed: result.modelUsed,
+        courseId: input.course_id,
+      },
+      `Section ${sectionIndex + 1} regenerated successfully`
+    );
+
+    return result.sections;
+  }
+
+  // ==========================================================================
   // PRIVATE HELPER METHODS
   // ==========================================================================
 
