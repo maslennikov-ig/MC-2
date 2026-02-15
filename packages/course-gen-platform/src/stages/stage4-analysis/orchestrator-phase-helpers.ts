@@ -101,7 +101,7 @@ async function completePhaseWithTrace<
  * Phase 1: Basic Classification (12-25%)
  */
 export async function runClassificationPhase(context: AnalysisContext): Promise<void> {
-  const { courseId, input, supabase, orchestrationLogger } = context;
+  const { courseId, input, supabase, orchestrationLogger, originalDocumentSummaries } = context;
   const phase1CacheKey = `phase1_cache:${courseId}`;
   const redis = getRedisClient();
 
@@ -155,7 +155,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
           language: input.language,
           topic: input.topic,
           document_summaries:
-            input.document_summaries?.map(ds => ({
+            originalDocumentSummaries?.map(ds => ({
               document_id: ds.document_id,
               file_name: ds.file_name,
               processed_content: ds.processed_content,
@@ -211,8 +211,15 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
  * Phase 0.5: Clarifying Questions (25-28%)
  */
 export async function runClarifyingPhase(context: AnalysisContext): Promise<void> {
-  const { courseId, input, supabase, orchestrationLogger, budgetAllocation, phase1Output } =
-    context;
+  const {
+    courseId,
+    input,
+    supabase,
+    orchestrationLogger,
+    budgetAllocation,
+    phase1Output,
+    resolvedDocumentSummaries,
+  } = context;
 
   if (!phase1Output) {
     throw new Error('Phase 1 output required for clarifying phase');
@@ -254,7 +261,7 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
         target_audience: input.target_audience,
       },
       language: input.language,
-      document_summaries: input.document_summaries?.map(ds => ({
+      document_summaries: resolvedDocumentSummaries?.map(ds => ({
         file_name: ds.file_name,
         processed_content: ds.processed_content,
       })),
@@ -344,8 +351,15 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
  * Phase 2: Scope Analysis (28-45%)
  */
 export async function runScopePhase(context: AnalysisContext): Promise<void> {
-  const { courseId, input, supabase, orchestrationLogger, phase1Output, clarifyingAnswers } =
-    context;
+  const {
+    courseId,
+    input,
+    supabase,
+    orchestrationLogger,
+    phase1Output,
+    clarifyingAnswers,
+    resolvedDocumentSummaries,
+  } = context;
 
   if (!phase1Output) {
     throw new Error('Phase 1 output required for scope phase');
@@ -365,7 +379,7 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
           course_id: courseId,
           language: input.language,
           topic: input.topic,
-          document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
+          document_summaries: resolvedDocumentSummaries?.map(ds => ds.processed_content) || null,
           phase1_output: phase1Output,
           course_size: input.course_size,
           target_lessons: input.target_lessons,
@@ -471,6 +485,7 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
     phase1Output,
     phase2Output,
     clarifyingAnswers,
+    resolvedDocumentSummaries,
   } = context;
 
   if (!phase1Output || !phase2Output) {
@@ -479,7 +494,7 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
 
   await startPhase(3, courseId, supabase, orchestrationLogger);
 
-  const documentSummariesText = input.document_summaries?.map(ds => ds.processed_content) || null;
+  const documentSummariesText = resolvedDocumentSummaries?.map(ds => ds.processed_content) || null;
 
   const phase3Output: Phase3Output = await executePhaseWithRetry(
     'phase3_expert',
@@ -527,6 +542,7 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
     phase2Output,
     phase3Output,
     clarifyingAnswers,
+    resolvedDocumentSummaries,
   } = context;
 
   if (!phase1Output || !phase2Output || !phase3Output) {
@@ -542,7 +558,7 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
         course_id: courseId,
         language: input.language,
         topic: input.topic,
-        document_summaries: input.document_summaries || null,
+        document_summaries: resolvedDocumentSummaries || null,
         phase1_output: phase1Output,
         phase2_output: phase2Output,
         phase3_output: phase3Output,

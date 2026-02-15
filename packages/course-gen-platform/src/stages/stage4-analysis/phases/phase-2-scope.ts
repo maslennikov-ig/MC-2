@@ -187,9 +187,20 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
 
 /** Build documents context section */
 function buildDocumentsContext(documentSummaries: Phase2Input['document_summaries']): string {
-  return documentSummaries && documentSummaries.length > 0
-    ? `\n\nAvailable Documents: ${documentSummaries.length} documents with processed content`
-    : '';
+  if (!documentSummaries || documentSummaries.length === 0) return '';
+
+  const parts: string[] = [];
+  parts.push(`\n\nAVAILABLE DOCUMENTS (${documentSummaries.length}):`);
+  parts.push('Use these documents as PRIMARY source for course structure.');
+  parts.push('Each section MUST be grounded in document content where possible.\n');
+
+  for (let i = 0; i < documentSummaries.length; i++) {
+    parts.push(`[Document ${i + 1}]`);
+    parts.push(documentSummaries[i]);
+    parts.push('');
+  }
+
+  return parts.join('\n');
 }
 
 /** Build clarifying answers context section */

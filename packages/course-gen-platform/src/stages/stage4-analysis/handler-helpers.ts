@@ -29,6 +29,7 @@ import {
   PipelineError,
   classifyPipelineError,
 } from '@/shared/errors';
+import type { Stage4BudgetAllocation } from './phases/stage4-budget-allocator';
 
 // ============================================================================
 // TYPES
@@ -277,7 +278,7 @@ type SummaryMetadata = {
 };
 
 /** Document summary shape returned from buildAnalysisInput */
-type DocumentSummaryResult = {
+export type DocumentSummaryResult = {
   document_id: string;
   file_name: string;
   processed_content: string;
@@ -341,6 +342,53 @@ async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummary
         quality_score: metadata?.quality_score || 0.8,
       },
     };
+  });
+}
+
+/** Fetch full text (markdown_content) for documents that need full text mode */
+async function fetchFullTextDocuments(documentIds: string[]): Promise<Map<string, string>> {
+  if (documentIds.length === 0) return new Map();
+
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from('file_catalog')
+    .select('id, markdown_content')
+    .in('id', documentIds)
+    .not('markdown_content', 'is', null);
+
+  const map = new Map<string, string>();
+  for (const doc of data || []) {
+    if (doc.markdown_content) map.set(doc.id, doc.markdown_content);
+  }
+  return map;
+}
+
+/**
+ * Resolve document content based on budget allocation.
+ * Replaces processed_content with markdown_content for documents marked as mode: 'full_text'.
+ *
+ * @param allocation - Budget allocation result with mode decisions
+ * @param documents - Original document summaries
+ * @returns Document summaries with full text loaded for full_text mode documents
+ */
+export async function resolveDocumentContent(
+  allocation: Stage4BudgetAllocation,
+  documents: DocumentSummaryResult[]
+): Promise<DocumentSummaryResult[]> {
+  const fullTextIds = allocation.documents
+    .filter(d => d.mode === 'full_text')
+    .map(d => d.file_id);
+
+  if (fullTextIds.length === 0) return documents;
+
+  const fullTextMap = await fetchFullTextDocuments(fullTextIds);
+
+  return documents.map(doc => {
+    const fullText = fullTextMap.get(doc.document_id);
+    if (fullText) {
+      return { ...doc, processed_content: fullText };
+    }
+    return doc;
   });
 }
 

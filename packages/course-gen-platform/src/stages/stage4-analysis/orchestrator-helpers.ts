@@ -24,7 +24,9 @@ import {
   validateStage4Budget,
   type Stage4BudgetAllocation,
   type Stage4DocumentInfo,
+  type Stage4TierConfig,
 } from './phases/stage4-budget-allocator';
+import { createModelConfigService } from '../../shared/llm/model-config-service';
 import logger from '../../shared/logger';
 import { logTrace } from '../../shared/trace-logger';
 import type { StructureAnalysisJob, DocumentSummary } from '@megacampus/shared-types';
@@ -37,6 +39,7 @@ import type {
 } from '@megacampus/shared-types/analysis-result';
 import type pino from 'pino';
 import { validateLocale } from '@/shared/validation';
+import type { DocumentSummaryResult } from './handler-helpers';
 
 /**
  * Analysis orchestration context
@@ -51,6 +54,8 @@ export interface AnalysisContext {
   supabase: SupabaseClient<Database>;
   orchestrationLogger: pino.Logger;
   budgetAllocation: Stage4BudgetAllocation | null;
+  originalDocumentSummaries: DocumentSummaryResult[];
+  resolvedDocumentSummaries: DocumentSummaryResult[];
   phase1Output?: Phase1Output;
   phase2Output?: Phase2Output;
   phase3Output?: Phase3Output;
@@ -127,12 +132,24 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
 
   // Budget allocation
   let budgetAllocation: Stage4BudgetAllocation | null = null;
+  let tierConfig: Stage4TierConfig | undefined;
 
   if (input.document_summaries && input.document_summaries.length > 0) {
     orchestrationLogger.info('Starting budget allocation');
 
+    // Fetch tier configs from DB (single source of truth)
+    try {
+      const modelConfigService = createModelConfigService();
+      tierConfig = await modelConfigService.getStage4TierConfigs(validateLocale(input.language));
+    } catch (tierErr) {
+      orchestrationLogger.warn(
+        { error: tierErr instanceof Error ? tierErr.message : String(tierErr) },
+        'Failed to load tier configs from DB, Budget Allocator will use hardcoded fallback'
+      );
+    }
+
     const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(input.document_summaries);
-    budgetAllocation = allocateStage4Budget(documentInfos, validateLocale(input.language));
+    budgetAllocation = allocateStage4Budget(documentInfos, validateLocale(input.language), tierConfig);
     validateStage4Budget(budgetAllocation);
 
     orchestrationLogger.info(
@@ -160,6 +177,27 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
     });
   }
 
+  // Resolve document content: replace processed_content with markdown_content for full_text documents
+  const originalDocumentSummaries =
+    (input.document_summaries as unknown as import('./handler-helpers').DocumentSummaryResult[]) ||
+    [];
+  let resolvedDocumentSummaries = originalDocumentSummaries;
+
+  if (budgetAllocation) {
+    const { resolveDocumentContent } = await import('./handler-helpers');
+    resolvedDocumentSummaries = await resolveDocumentContent(
+      budgetAllocation,
+      originalDocumentSummaries
+    );
+    orchestrationLogger.info(
+      {
+        totalDocs: originalDocumentSummaries.length,
+        fullTextDocs: budgetAllocation.documents.filter(d => d.mode === 'full_text').length,
+      },
+      'Document content resolved with budget allocator decisions'
+    );
+  }
+
   return {
     courseId,
     organizationId: job.organization_id,
@@ -169,6 +207,8 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
     supabase,
     orchestrationLogger,
     budgetAllocation,
+    originalDocumentSummaries,
+    resolvedDocumentSummaries,
     clarifyingAnswers: [],
   };
 }

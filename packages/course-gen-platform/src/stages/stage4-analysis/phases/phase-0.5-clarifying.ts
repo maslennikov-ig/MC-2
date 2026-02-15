@@ -295,8 +295,8 @@ function truncateContent(content: string, maxTokens: number): string {
  * Build condensed context from budget allocation and document content.
  *
  * Creates a compact summary of document context for prompt injection.
- * Includes actual document text (truncated to ~4K total tokens) so the model
- * can avoid asking questions already answered in the documents.
+ * Includes actual document text (already budget-resolved by allocator) with safety truncation
+ * to prevent extreme cases from breaking the LLM context.
  *
  * @param budgetAllocation - Stage 4 budget allocation result (nullable when no documents)
  * @param documentSummaries - Document content from Stage 3 (reused from orchestrator)
@@ -325,13 +325,14 @@ function buildCondensedContext(
   );
   contextParts.push(`- SUPPLEMENTARY: ${breakdown.supplementary.count} documents (summaries only)`);
 
-  // Actual document content (truncated to ~4K total tokens)
+  // Actual document content (use per-document content as-is, already budget-resolved by allocator)
+  // Safety truncation only if single doc exceeds 100K tokens
   if (documentSummaries && documentSummaries.length > 0) {
-    const tokensPerDoc = Math.floor(4000 / documentSummaries.length);
+    const SAFETY_MAX_TOKENS_PER_DOC = 100_000;
     contextParts.push('\nDOCUMENT CONTENTS:');
     for (const doc of documentSummaries) {
       contextParts.push(
-        `\n[${doc.file_name}]\n${truncateContent(doc.processed_content, tokensPerDoc)}`
+        `\n[${doc.file_name}]\n${truncateContent(doc.processed_content, SAFETY_MAX_TOKENS_PER_DOC)}`
       );
     }
   }

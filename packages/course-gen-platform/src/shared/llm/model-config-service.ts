@@ -717,6 +717,92 @@ class ModelConfigServiceImpl {
   }
 
   /**
+   * Get Stage 4 tier configurations for Budget Allocator.
+   *
+   * Reads standard and extended tier configs from `llm_model_config` DB table
+   * using `stage_4_scope` as the representative phase. Budget Allocator uses
+   * these to determine context thresholds and model selection.
+   *
+   * Falls back to hardcoded STAGE4_CONTEXT_THRESHOLD / STAGE4_HARD_TOKEN_LIMIT
+   * if database is unavailable.
+   *
+   * @param language - Content language (LanguageCode)
+   * @returns Tier configurations with maxContext and cacheReadEnabled
+   */
+  async getStage4TierConfigs(language: LanguageCode): Promise<{
+    standard: { modelId: string; fallbackModelId: string; maxContext: number };
+    extended: { modelId: string; fallbackModelId: string; maxContext: number; cacheReadEnabled: boolean };
+  }> {
+    const representativePhase = 'stage_4_scope';
+
+    try {
+      const [standardConfig, extendedConfig] = await Promise.all([
+        ModelConfigDB.fetchPhaseConfigFromDb(representativePhase, undefined, 'standard', language),
+        ModelConfigDB.fetchPhaseConfigFromDb(representativePhase, undefined, 'extended', language),
+      ]);
+
+      const standard = standardConfig
+        ? {
+            modelId: standardConfig.modelId,
+            fallbackModelId: standardConfig.fallbackModelId || standardConfig.modelId,
+            maxContext: standardConfig.maxContextTokens || STAGE4_CONTEXT_THRESHOLD,
+          }
+        : {
+            modelId: 'unknown',
+            fallbackModelId: 'unknown',
+            maxContext: STAGE4_CONTEXT_THRESHOLD,
+          };
+
+      const extended = extendedConfig
+        ? {
+            modelId: extendedConfig.modelId,
+            fallbackModelId: extendedConfig.fallbackModelId || extendedConfig.modelId,
+            maxContext: extendedConfig.maxContextTokens || 1_000_000,
+            cacheReadEnabled: false, // Phase configs don't carry cacheRead; safe default
+          }
+        : {
+            modelId: 'unknown',
+            fallbackModelId: 'unknown',
+            maxContext: 1_000_000,
+            cacheReadEnabled: false,
+          };
+
+      logger.info(
+        {
+          language,
+          standardModel: standard.modelId,
+          standardMaxContext: standard.maxContext,
+          extendedModel: extended.modelId,
+          extendedMaxContext: extended.maxContext,
+          source: 'database',
+        },
+        'Stage 4 tier configs loaded from database'
+      );
+
+      return { standard, extended };
+    } catch (err) {
+      logger.warn(
+        { language, error: err instanceof Error ? err.message : String(err) },
+        'Failed to load Stage 4 tier configs from DB, using hardcoded fallback'
+      );
+
+      return {
+        standard: {
+          modelId: 'unknown',
+          fallbackModelId: 'unknown',
+          maxContext: STAGE4_CONTEXT_THRESHOLD,
+        },
+        extended: {
+          modelId: 'unknown',
+          fallbackModelId: 'unknown',
+          maxContext: 1_000_000,
+          cacheReadEnabled: false,
+        },
+      };
+    }
+  }
+
+  /**
    * Clear all caches (for testing/admin)
    */
   clearCache(): void {
