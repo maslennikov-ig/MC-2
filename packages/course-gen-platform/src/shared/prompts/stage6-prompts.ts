@@ -159,6 +159,13 @@ CRITICAL INSTRUCTIONS:
    - Reference previous lesson naturally: "As we explored in [previous_lesson.title]..." or "Building on [concept]..."
    - Do NOT re-explain terms from terms_already_defined — the reader already knows them
    - In conclusion sections, tease next lesson: "In the next lesson, we will explore [next_lesson.title]..."
+   - COURSE POSITION (from course_position if provided):
+     - Use position awareness to write appropriate introductions and conclusions
+     - If is_first_in_course: include course-level welcome and motivation, set expectations for the learning journey
+     - If is_first_in_module: briefly introduce the module theme and bridge from previous module
+     - If is_last_in_module but NOT is_last_in_course: write a MODULE summary and bridge to the next module. Do NOT write a course-level conclusion
+     - If is_last_in_course: write a comprehensive COURSE conclusion with reflection on the full learning journey
+     - For all other lessons: write a standard lesson conclusion that connects to the next lesson
    Example:
    ✓ GOOD: "Building on the React hooks concept from the previous lesson, let's explore..."
    ✗ BAD: "React hooks allow you to use state in functional components..." (re-explaining known term)
@@ -389,6 +396,13 @@ CRITICAL RULES:
   - Reference previous lesson naturally if context is given
   - Do NOT re-explain terms from terms_already_defined
   - In summary, tease next lesson if next_lesson info is provided
+  - COURSE POSITION (from course_position if provided):
+    - Use position awareness to write appropriate introductions and conclusions
+    - If is_first_in_course: include course-level welcome and motivation, set expectations for the learning journey
+    - If is_first_in_module: briefly introduce the module theme and bridge from previous module
+    - If is_last_in_module but NOT is_last_in_course: write a MODULE summary and bridge to the next module. Do NOT write a course-level conclusion
+    - If is_last_in_course: write a comprehensive COURSE conclusion with reflection on the full learning journey
+    - For all other lessons: write a standard lesson conclusion that connects to the next lesson
 </task>`,
     variables: [
       { name: 'lessonTitle', description: 'Lesson title', required: true },
