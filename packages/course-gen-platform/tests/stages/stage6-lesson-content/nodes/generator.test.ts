@@ -555,4 +555,52 @@ This is the digest.
     expect(result.digest).toBe('');
     expect(result.content).toBe('');
   });
+
+  it('should return empty digest when header is unknown and no fallback matches', () => {
+    const markdown = `## Введение
+
+Контент.
+
+## Неизвестный заголовок
+
+Текст после.`;
+
+    const result = extractLessonDigest(markdown, 'Краткое содержание урока');
+
+    expect(result.digest).toBe('');
+    expect(result.content).toContain('Неизвестный заголовок');
+  });
+
+  it('should handle digest header with no content after it', () => {
+    const markdown = `## Summary
+
+Summary content.
+
+## Lesson Digest`;
+
+    const result = extractLessonDigest(markdown, 'Lesson Digest');
+
+    expect(result.digest).toBe('');
+    expect(result.content).toContain('Summary content');
+  });
+
+  it('should extract first occurrence when multiple digest-like sections exist', () => {
+    const markdown = `## Content
+
+Some content.
+
+## Lesson Digest
+
+First digest text.
+
+## Lesson Digest
+
+Second digest text.`;
+
+    const result = extractLessonDigest(markdown, 'Lesson Digest');
+
+    // Should extract from the first match onward
+    expect(result.content).toContain('Some content');
+    expect(result.content).not.toContain('First digest');
+  });
 });

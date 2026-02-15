@@ -372,7 +372,10 @@ Exercise format (use {{outputLanguage}} labels):
 ### {{exerciseLabel}} 2: [Title]
 [Same format]
 
-5. ## {{digestHeader}} — 3-5 sentence factual summary of the lesson content for cross-lesson context.
+5. ## {{digestHeader}} — Write a 3-5 sentence factual summary of the lesson content.
+   - Use objective, encyclopedic tone (no "you will learn", "exciting", etc.)
+   - Focus on what topics were covered and key takeaways
+   - This will be used as context for the next lesson generation
 
 CRITICAL RULES:
 - This is a {{durationMinutes}}-minute lesson. Be concise and focused.
