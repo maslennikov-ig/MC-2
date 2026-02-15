@@ -97,8 +97,8 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 
 - **Standard tier** (≤260K tokens): Быстрые дешёвые модели для основных фаз, думающие модели для аналитических
 - **Extended tier** (>260K tokens): Модели с большим контекстом (1M)
-- **Thinking phases** (clarifying, expert, synthesis): `moonshotai/kimi-k2-0905` — дорогая, но качественная reasoning-модель
-- **Bulk phases** (classification, scope): Быстрые модели — `xiaomi/mimo-v2-flash` (ru), `x-ai/grok-4.1-fast` (other)
+- **Thinking phases** (clarifying, expert): `moonshotai/kimi-k2-0905` — дорогая reasoning-модель для фаз, требующих глубокого анализа
+- **Bulk phases** (classification, scope, synthesis): Быстрые модели — `xiaomi/mimo-v2-flash` (ru), `x-ai/grok-4.1-fast` (other)
 - **Порог 260K** — хардкод `STAGE4_CONTEXT_THRESHOLD`, не из БД
 
 ### Russian (ru)
@@ -109,6 +109,7 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 | stage_4_classification | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash | 0.70 | 4096 |
 | stage_4_scope | standard | xiaomi/mimo-v2-flash | google/gemini-3-flash-preview | 0.70 | 4096 |
 | stage_4_scope | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash | 0.70 | 4096 |
+| stage_4_synthesis | standard | xiaomi/mimo-v2-flash | google/gemini-3-flash-preview | 0.70 | 6000 |
 
 ### Any language (fallback for non-Russian)
 
@@ -121,7 +122,7 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 | stage_4_scope | extended | google/gemini-3-flash-preview | x-ai/grok-4.1-fast | 0.70 | 4096 |
 | stage_4_expert | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 8000 |
 | stage_4_expert | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-0905 | 0.50 | 8000 |
-| stage_4_synthesis | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.70 | 6000 |
+| stage_4_synthesis | standard | x-ai/grok-4.1-fast | google/gemini-3-flash-preview | 0.70 | 6000 |
 | stage_4_synthesis | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-0905 | 0.70 | 6000 |
 
 ---
@@ -286,4 +287,4 @@ Stage-specific models with automatic fallback:
 - **Total configs**: 68
 - **Active configs**: 68
 - **Last updated**: 2026-02-15
-- **Last change**: Stage 4 model unification — DB-driven tier configs, removed hardcoded STAGE4_MODELS, added ru-specific configs, switched extended tier to gemini-3-flash-preview
+- **Last change**: Stage 4 Synthesis switched from kimi-k2-0905 to cheap models (mimo-v2-flash/grok-4.1-fast) — structured extraction doesn't need reasoning
