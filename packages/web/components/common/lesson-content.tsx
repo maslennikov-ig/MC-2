@@ -196,9 +196,9 @@ export default function LessonContent({
   return (
     <motion.div
       key={lesson.id}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
       className="mx-auto max-w-7xl px-6 py-8 lg:px-10 xl:max-w-[90rem]"
     >
       {/* Cover Hero Image - Displayed at the top if exists, with overlay containing lesson info */}
