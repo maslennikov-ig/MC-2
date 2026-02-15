@@ -2,6 +2,7 @@ import type { LessonGraphStateType, LessonGraphStateUpdate, LessonGraphNode } fr
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { regenerateSections } from '../utils/section-regenerator';
+import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 
 /**
  * Section Regenerator Node - Regenerates specific sections identified by self-reviewer
@@ -87,6 +88,32 @@ export async function sectionRegeneratorNode(
       );
     }
 
+    // Run Mermaid fix pipeline on regenerated content (same as generator-node.ts)
+    // Section regenerator uses LLM to regenerate sections, which can introduce
+    // broken mermaid syntax (escaped quotes, bad arrows, etc.)
+    let finalContent = result.content;
+    try {
+      const pipelineResult = await runMermaidFixPipeline(finalContent);
+      if (pipelineResult.modified) {
+        logger.debug(
+          {
+            lessonId: state.lessonSpec.lesson_id,
+            metrics: pipelineResult.metrics,
+          },
+          'Section regenerator: Mermaid fix pipeline applied to regenerated content'
+        );
+        finalContent = pipelineResult.content;
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          lessonId: state.lessonSpec.lesson_id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Section regenerator: Mermaid fix pipeline failed, using original content'
+      );
+    }
+
     logger.info(
       {
         lessonId: state.lessonSpec.lesson_id,
@@ -99,7 +126,7 @@ export async function sectionRegeneratorNode(
 
     return {
       currentNode: 'sectionRegenerator' as LessonGraphNode,
-      generatedContent: result.content,
+      generatedContent: finalContent,
       tokensUsed: result.tokensUsed,
       durationMs,
       sectionRegenerationResult: {

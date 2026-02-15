@@ -15,6 +15,7 @@ import { verifyPatch } from '../verifier/delta-judge';
 import { executeExpansion } from '../section-expander';
 import { selectFixPromptTemplate } from '../fix-templates';
 import { processInlineFixes, INLINE_FIXER_ENABLED } from '../inline-fixer';
+import { sanitizeMermaidBlocks } from '../../utils/mermaid-sanitizer';
 
 import { emitEvent } from './events';
 import { extractSectionContent } from './content-utils';
@@ -188,6 +189,16 @@ export async function executePatcherTask(
       );
       patchedContent = standardResult.patchedContent;
       tokensUsed = standardResult.tokensUsed;
+    }
+
+    // Sanitize mermaid blocks in patched content (regex-only, no LLM)
+    const mermaidResult = sanitizeMermaidBlocks(patchedContent);
+    if (mermaidResult.modified) {
+      patchedContent = mermaidResult.content;
+      logger.debug(
+        { sectionId: task.sectionId, fixCount: mermaidResult.fixes.length },
+        'Patcher: Mermaid sanitization applied to patched content'
+      );
     }
 
     // Verify patch using Delta Judge
@@ -428,10 +439,21 @@ export async function executeExpanderTask(
     // Execute expansion
     const expandResult = await executeExpansion(expanderInput);
 
+    // Sanitize mermaid blocks in expanded content (regex-only, no LLM)
+    let expandedContent = expandResult.regeneratedContent;
+    const mermaidResult = sanitizeMermaidBlocks(expandedContent);
+    if (mermaidResult.modified) {
+      expandedContent = mermaidResult.content;
+      logger.debug(
+        { sectionId: task.sectionId, fixCount: mermaidResult.fixes.length },
+        'Expander: Mermaid sanitization applied to expanded content'
+      );
+    }
+
     emitEvent(onStreamEvent, {
       type: 'patch_applied',
       sectionId: task.sectionId,
-      content: expandResult.regeneratedContent,
+      content: expandedContent,
       diffSummary: `Regenerated section (${expandResult.wordCount} words)`,
     });
 
@@ -439,11 +461,11 @@ export async function executeExpanderTask(
     let verificationPassed = true;
     let deltaJudgeTokens = 0;
 
-    if (expandResult.regeneratedContent !== sectionContent && expandResult.success) {
+    if (expandedContent !== sectionContent && expandResult.success) {
       try {
         const result = await verifyPatchWithDeltaJudge(
           sectionContent,
-          expandResult.regeneratedContent,
+          expandedContent,
           task,
           onStreamEvent
         );
@@ -479,7 +501,7 @@ export async function executeExpanderTask(
     return {
       success: expandResult.success && verificationPassed,
       sectionId: task.sectionId,
-      regeneratedContent: verificationPassed ? expandResult.regeneratedContent : sectionContent,
+      regeneratedContent: verificationPassed ? expandedContent : sectionContent,
       tokensUsed: expandResult.tokensUsed + deltaJudgeTokens,
     };
   } catch (error) {
