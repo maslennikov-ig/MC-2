@@ -110,6 +110,11 @@ export const CONTENT_LABELS: Record<
     hints: string;
     sampleAnswer: string;
     lessonDigest: string;
+    calloutNote: string;
+    calloutTip: string;
+    calloutWarning: string;
+    calloutDanger: string;
+    calloutInfo: string;
   }
 > = {
   ru: {
@@ -125,6 +130,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Подсказки',
     sampleAnswer: 'Образец ответа',
     lessonDigest: 'Краткое содержание урока',
+    calloutNote: 'На заметку',
+    calloutTip: 'Совет',
+    calloutWarning: 'Внимание',
+    calloutDanger: 'Важно',
+    calloutInfo: 'Информация',
   },
   en: {
     introduction: 'Introduction',
@@ -139,6 +149,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Hints',
     sampleAnswer: 'Sample Answer',
     lessonDigest: 'Lesson Digest',
+    calloutNote: 'Note',
+    calloutTip: 'Tip',
+    calloutWarning: 'Warning',
+    calloutDanger: 'Danger',
+    calloutInfo: 'Info',
   },
   zh: {
     introduction: '引言',
@@ -153,6 +168,11 @@ export const CONTENT_LABELS: Record<
     hints: '提示',
     sampleAnswer: '参考答案',
     lessonDigest: '课程摘要',
+    calloutNote: '注意',
+    calloutTip: '提示',
+    calloutWarning: '警告',
+    calloutDanger: '危险',
+    calloutInfo: '信息',
   },
   es: {
     introduction: 'Introducción',
@@ -167,6 +187,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Pistas',
     sampleAnswer: 'Respuesta de ejemplo',
     lessonDigest: 'Resumen de la lección',
+    calloutNote: 'Nota',
+    calloutTip: 'Consejo',
+    calloutWarning: 'Advertencia',
+    calloutDanger: 'Peligro',
+    calloutInfo: 'Información',
   },
   fr: {
     introduction: 'Introduction',
@@ -181,6 +206,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Indices',
     sampleAnswer: 'Exemple de réponse',
     lessonDigest: 'Résumé de la leçon',
+    calloutNote: 'Remarque',
+    calloutTip: 'Conseil',
+    calloutWarning: 'Attention',
+    calloutDanger: 'Danger',
+    calloutInfo: 'Information',
   },
   de: {
     introduction: 'Einführung',
@@ -195,6 +225,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Hinweise',
     sampleAnswer: 'Musterantwort',
     lessonDigest: 'Lektionszusammenfassung',
+    calloutNote: 'Hinweis',
+    calloutTip: 'Tipp',
+    calloutWarning: 'Warnung',
+    calloutDanger: 'Gefahr',
+    calloutInfo: 'Information',
   },
   ja: {
     introduction: 'はじめに',
@@ -209,6 +244,11 @@ export const CONTENT_LABELS: Record<
     hints: 'ヒント',
     sampleAnswer: '解答例',
     lessonDigest: 'レッスンの要約',
+    calloutNote: '注記',
+    calloutTip: 'ヒント',
+    calloutWarning: '警告',
+    calloutDanger: '危険',
+    calloutInfo: '情報',
   },
   ko: {
     introduction: '소개',
@@ -223,6 +263,11 @@ export const CONTENT_LABELS: Record<
     hints: '힌트',
     sampleAnswer: '모범 답안',
     lessonDigest: '수업 요약',
+    calloutNote: '참고',
+    calloutTip: '팁',
+    calloutWarning: '주의',
+    calloutDanger: '위험',
+    calloutInfo: '정보',
   },
   ar: {
     introduction: 'مقدمة',
@@ -237,6 +282,11 @@ export const CONTENT_LABELS: Record<
     hints: 'تلميحات',
     sampleAnswer: 'نموذج الإجابة',
     lessonDigest: 'ملخص الدرس',
+    calloutNote: 'ملاحظة',
+    calloutTip: 'نصيحة',
+    calloutWarning: 'تحذير',
+    calloutDanger: 'خطر',
+    calloutInfo: 'معلومة',
   },
   pt: {
     introduction: 'Introdução',
@@ -251,6 +301,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Dicas',
     sampleAnswer: 'Resposta modelo',
     lessonDigest: 'Resumo da lição',
+    calloutNote: 'Nota',
+    calloutTip: 'Dica',
+    calloutWarning: 'Aviso',
+    calloutDanger: 'Perigo',
+    calloutInfo: 'Informação',
   },
   it: {
     introduction: 'Introduzione',
@@ -265,6 +320,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Suggerimenti',
     sampleAnswer: 'Risposta di esempio',
     lessonDigest: 'Riepilogo della lezione',
+    calloutNote: 'Nota',
+    calloutTip: 'Suggerimento',
+    calloutWarning: 'Attenzione',
+    calloutDanger: 'Pericolo',
+    calloutInfo: 'Informazione',
   },
   tr: {
     introduction: 'Giriş',
@@ -279,6 +339,11 @@ export const CONTENT_LABELS: Record<
     hints: 'İpuçları',
     sampleAnswer: 'Örnek Cevap',
     lessonDigest: 'Ders Özeti',
+    calloutNote: 'Not',
+    calloutTip: 'İpucu',
+    calloutWarning: 'Uyarı',
+    calloutDanger: 'Tehlike',
+    calloutInfo: 'Bilgi',
   },
   vi: {
     introduction: 'Giới thiệu',
@@ -293,6 +358,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Gợi ý',
     sampleAnswer: 'Đáp án mẫu',
     lessonDigest: 'Tóm tắt bài học',
+    calloutNote: 'Ghi chú',
+    calloutTip: 'Mẹo',
+    calloutWarning: 'Cảnh báo',
+    calloutDanger: 'Nguy hiểm',
+    calloutInfo: 'Thông tin',
   },
   th: {
     introduction: 'บทนำ',
@@ -307,6 +377,11 @@ export const CONTENT_LABELS: Record<
     hints: 'คำใบ้',
     sampleAnswer: 'ตัวอย่างคำตอบ',
     lessonDigest: 'สรุปบทเรียน',
+    calloutNote: 'หมายเหตุ',
+    calloutTip: 'เคล็ดลับ',
+    calloutWarning: 'คำเตือน',
+    calloutDanger: 'อันตราย',
+    calloutInfo: 'ข้อมูล',
   },
   id: {
     introduction: 'Pendahuluan',
@@ -321,6 +396,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Petunjuk',
     sampleAnswer: 'Contoh Jawaban',
     lessonDigest: 'Ringkasan Pelajaran',
+    calloutNote: 'Catatan',
+    calloutTip: 'Tips',
+    calloutWarning: 'Peringatan',
+    calloutDanger: 'Bahaya',
+    calloutInfo: 'Informasi',
   },
   ms: {
     introduction: 'Pengenalan',
@@ -335,6 +415,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Petunjuk',
     sampleAnswer: 'Contoh Jawapan',
     lessonDigest: 'Ringkasan Pelajaran',
+    calloutNote: 'Nota',
+    calloutTip: 'Petua',
+    calloutWarning: 'Amaran',
+    calloutDanger: 'Bahaya',
+    calloutInfo: 'Maklumat',
   },
   hi: {
     introduction: 'परिचय',
@@ -349,6 +434,11 @@ export const CONTENT_LABELS: Record<
     hints: 'संकेत',
     sampleAnswer: 'नमूना उत्तर',
     lessonDigest: 'पाठ सारांश',
+    calloutNote: 'टिप्पणी',
+    calloutTip: 'सुझाव',
+    calloutWarning: 'चेतावनी',
+    calloutDanger: 'खतरा',
+    calloutInfo: 'जानकारी',
   },
   bn: {
     introduction: 'ভূমিকা',
@@ -363,6 +453,11 @@ export const CONTENT_LABELS: Record<
     hints: 'ইঙ্গিত',
     sampleAnswer: 'নমুনা উত্তর',
     lessonDigest: 'পাঠ সারাংশ',
+    calloutNote: 'টীকা',
+    calloutTip: 'পরামর্শ',
+    calloutWarning: 'সতর্কতা',
+    calloutDanger: 'বিপদ',
+    calloutInfo: 'তথ্য',
   },
   pl: {
     introduction: 'Wprowadzenie',
@@ -377,6 +472,11 @@ export const CONTENT_LABELS: Record<
     hints: 'Wskazówki',
     sampleAnswer: 'Przykładowa odpowiedź',
     lessonDigest: 'Podsumowanie lekcji',
+    calloutNote: 'Uwaga',
+    calloutTip: 'Wskazówka',
+    calloutWarning: 'Ostrzeżenie',
+    calloutDanger: 'Niebezpieczeństwo',
+    calloutInfo: 'Informacja',
   },
 };
 

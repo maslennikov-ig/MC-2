@@ -276,6 +276,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
             content={rawMarkdown?.trim() ? rawMarkdown : ''}
             preset="preview"
             features={{ mermaid: true }}
+            language={generationLanguage ?? undefined}
           />
         </ErrorBoundary>
       )

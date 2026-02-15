@@ -56,6 +56,8 @@ export interface MarkdownRendererProps {
   features?: Partial<FeatureFlags>
   /** Trust level for content - affects sanitization */
   trusted?: boolean
+  /** Content language for localized callout titles (ISO 639-1) */
+  language?: string
 }
 
 /**
@@ -109,6 +111,8 @@ export interface CalloutProps {
   children: React.ReactNode
   /** Custom className */
   className?: string
+  /** Content language for localized default titles (ISO 639-1) */
+  language?: string
 }
 
 /**
