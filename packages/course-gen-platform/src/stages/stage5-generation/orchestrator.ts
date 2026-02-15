@@ -256,7 +256,7 @@ export class GenerationOrchestrator {
       return sections;
     }
 
-    let updatedSections = [...sections];
+    const updatedSections = [...sections];
     let currentOverlapResult = initialOverlapResult;
 
     for (let attempt = 0; attempt < MAX_OVERLAP_RETRIES; attempt++) {
