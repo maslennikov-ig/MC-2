@@ -511,7 +511,11 @@ class Stage5GenerationHandler {
         { courseId, errorCode, attemptsMade: job.attemptsMade, maxAttempts },
         'Last retry attempt - Updating generation_status to failed (FR-024)'
       );
-      await markCourseAsFailed(courseId, errorCode, jobLogger);
+      await markCourseAsFailed(courseId, errorCode, jobLogger, {
+        message: error instanceof Error ? error.message : String(error),
+        phase,
+        duration_ms: totalDurationMs,
+      });
     } else {
       jobLogger.info(
         {
@@ -529,7 +533,11 @@ class Stage5GenerationHandler {
       const errorMessage = error instanceof Error ? error.message : String(error);
       jobLogger.warn({ errorCode, phase, error: errorMessage }, 'Non-retryable error');
 
-      await markCourseAsFailed(courseId, errorCode, jobLogger);
+      await markCourseAsFailed(courseId, errorCode, jobLogger, {
+        message: errorMessage,
+        phase,
+        duration_ms: totalDurationMs,
+      });
 
       return buildNonRetryableResult(
         courseId,

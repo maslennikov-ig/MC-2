@@ -65,20 +65,27 @@ export interface JobResult {
 }
 
 /**
- * Job type to step ID mapping
+ * Job type to step ID mapping (matches RPC update_course_progress steps 2-6)
+ *
+ * RPC step mapping (migration 20251126093000):
+ *   step 2 → stage_2_* (Document Processing)
+ *   step 3 → stage_3_* (Summarization/Classification)
+ *   step 4 → stage_4_* (Structure Analysis)
+ *   step 5 → stage_5_* (Structure Generation)
+ *   step 6 → finalizing/completed
  */
 const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.TEST_JOB]: null,
-  [JobType.DOCUMENT_PROCESSING]: 2,
-  [JobType.SUMMARY_GENERATION]: 2, // Fallback - should not be used in step 1 recovery
-  [JobType.DOCUMENT_CLASSIFICATION]: 2, // Stage 3 classification
-  [JobType.STRUCTURE_ANALYSIS]: 2,
-  [JobType.STRUCTURE_GENERATION]: 3,
-  [JobType.TEXT_GENERATION]: 4,
-  [JobType.LESSON_CONTENT]: 4, // Stage 6 lesson content generation
+  [JobType.DOCUMENT_PROCESSING]: 2, // Stage 2 → RPC step 2
+  [JobType.SUMMARY_GENERATION]: 2, // Stage 2 fallback
+  [JobType.DOCUMENT_CLASSIFICATION]: 3, // Stage 3 → RPC step 3
+  [JobType.STRUCTURE_ANALYSIS]: 4, // Stage 4 → RPC step 4
+  [JobType.STRUCTURE_GENERATION]: 5, // Stage 5 → RPC step 5
+  [JobType.TEXT_GENERATION]: null, // Stage 6 — uses lesson-level progress tracking
+  [JobType.LESSON_CONTENT]: null, // Stage 6 — uses lesson-level progress tracking
   [JobType.ENRICHMENT_GENERATION]: null, // Stage 7 enrichments (no course progress step)
   [JobType.BLOCK_REGENERATION]: null, // Cascade regeneration (no course progress step)
-  [JobType.FINALIZATION]: 5,
+  [JobType.FINALIZATION]: 6, // Finalization → RPC step 6
 };
 
 /**
@@ -551,7 +558,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    * @private
    * @param {SupabaseClient<Database>} supabase - Supabase admin client
    * @param {string} courseId - Course UUID
-   * @param {number} stepId - Step ID (2-5)
+   * @param {number} stepId - Step ID (2-6, matching RPC update_course_progress)
    * @param {'in_progress' | 'completed' | 'failed'} status - Step status
    * @param {string} jobId - Job ID
    * @param {Logger} jobLogger - Logger instance with job context
