@@ -202,30 +202,59 @@ export async function executeWithContextFallback<T>(
 ): Promise<ExecuteWithContextFallbackResult<T>> {
   let currentModelId = initialModelId;
   let attempt = 0;
+  const attemptedModels = new Set<string>([initialModelId]);
 
   while (attempt <= maxRetries) {
     try {
       const result = await operation(currentModelId);
+
+      if (attempt > 0) {
+        logger.info(
+          {
+            initialModel: initialModelId,
+            finalModel: currentModelId,
+            fallbackChain: Array.from(attemptedModels),
+            attempts: attempt + 1,
+          },
+          '[ContextOverflow] Fallback succeeded'
+        );
+      }
+
       return { result, modelUsed: currentModelId };
     } catch (error) {
       if (isContextOverflowError(error)) {
         const fallback = getContextOverflowFallback(currentModelId, language, tierConfig, modelSelection);
 
-        if (fallback) {
+        if (fallback && !attemptedModels.has(fallback.modelId)) {
           logger.warn(
             {
               attempt: attempt + 1,
               currentModel: currentModelId,
               nextModel: fallback.modelId,
+              fallbackChain: Array.from(attemptedModels),
               error: error instanceof Error ? error.message : String(error),
             },
             '[ContextOverflow] Retrying with larger context model'
           );
 
+          attemptedModels.add(fallback.modelId);
           currentModelId = fallback.modelId;
           attempt++;
           continue;
         }
+
+        // Fallback unavailable or already tried — log and throw
+        logger.error(
+          {
+            initialModel: initialModelId,
+            finalModel: currentModelId,
+            fallbackChain: Array.from(attemptedModels),
+            skippedModel: fallback?.modelId ?? null,
+            reason: fallback ? 'circular_fallback_detected' : 'no_fallback_available',
+            error: error instanceof Error ? error.message : String(error),
+          },
+          '[ContextOverflow] All fallback options exhausted'
+        );
       }
 
       // Not a context overflow or no fallback available
@@ -233,5 +262,8 @@ export async function executeWithContextFallback<T>(
     }
   }
 
-  throw new Error(`Context overflow: exhausted all fallback models after ${maxRetries} retries`);
+  throw new Error(
+    `Context overflow: exhausted all fallback models after ${maxRetries} retries ` +
+    `(initial: ${initialModelId}, final: ${currentModelId})`
+  );
 }

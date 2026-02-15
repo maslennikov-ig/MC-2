@@ -128,6 +128,8 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
    > Key concept to remember
 
    Types: NOTE, TIP, WARNING, DANGER, INFO
+   CRITICAL: Callout marker must start immediately after >. NEVER wrap in quotes.
+   WRONG: > "[!TIP] text"    CORRECT: > [!TIP]
 
 4. **Rich Code Blocks**:
    \`\`\`typescript filename="example.ts" {2,4-6}
@@ -343,6 +345,7 @@ Use actively to create engaging content:
    CRITICAL: NEVER use escaped quotes in node labels. Keep labels simple.
 2. **Math Formulas** (LaTeX): inline \`$E=mc^2$\` or block \`$$\\sum_{i=1}^{n} x_i$$\`
 3. **Callouts**: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO]
+   CRITICAL: NEVER wrap callout markers in quotes. WRONG: > "[!TIP]"  CORRECT: > [!TIP]
 4. **Tables** for comparisons
 5. **Code blocks** with filenames when relevant
 *Syntax keywords stay in English regardless of output language.*
@@ -719,6 +722,8 @@ Format as markdown outline. Target total reading time: {{durationMinutes}} minut
    > Key concept to remember
 
    Types: NOTE, TIP, WARNING, DANGER, INFO
+   CRITICAL: Callout marker must start immediately after >. NEVER wrap in quotes.
+   WRONG: > "[!TIP] text"    CORRECT: > [!TIP]
 
 4. **Rich Code Blocks**:
    \`\`\`typescript filename="example.ts" {2,4-6}

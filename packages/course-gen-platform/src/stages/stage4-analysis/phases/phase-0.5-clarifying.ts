@@ -326,14 +326,27 @@ function buildCondensedContext(
   contextParts.push(`- SUPPLEMENTARY: ${breakdown.supplementary.count} documents (summaries only)`);
 
   // Actual document content (use per-document content as-is, already budget-resolved by allocator)
-  // Safety truncation only if single doc exceeds 100K tokens
+  // Safety truncation: per-doc limit + total limit across all documents
   if (documentSummaries && documentSummaries.length > 0) {
     const SAFETY_MAX_TOKENS_PER_DOC = 100_000;
+    const SAFETY_MAX_TOTAL_TOKENS = 500_000;
+    let totalTokensUsed = 0;
     contextParts.push('\nDOCUMENT CONTENTS:');
     for (const doc of documentSummaries) {
-      contextParts.push(
-        `\n[${doc.file_name}]\n${truncateContent(doc.processed_content, SAFETY_MAX_TOKENS_PER_DOC)}`
+      const availableTokens = Math.min(
+        SAFETY_MAX_TOKENS_PER_DOC,
+        SAFETY_MAX_TOTAL_TOKENS - totalTokensUsed
       );
+      if (availableTokens <= 0) {
+        contextParts.push(
+          `\n[TRUNCATED] Remaining documents omitted — total context limit (${SAFETY_MAX_TOTAL_TOKENS} tokens) reached.`
+        );
+        break;
+      }
+      const truncated = truncateContent(doc.processed_content, availableTokens);
+      contextParts.push(`\n[${doc.file_name}]\n${truncated}`);
+      // Estimate tokens used (same heuristic as truncateContent: 1 token ≈ 4 chars)
+      totalTokensUsed += Math.ceil(truncated.length / 4);
     }
   }
 

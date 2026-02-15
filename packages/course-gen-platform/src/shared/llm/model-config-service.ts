@@ -29,6 +29,9 @@ import logger from '../logger';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
 import { normalizeLanguageForReserve, type LanguageCode } from '@megacampus/shared-utils';
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
+
+/** Emergency universal fallback model when DB config is unavailable */
+const EMERGENCY_FALLBACK_MODEL = 'google/gemini-2.5-flash';
 import * as ModelConfigDB from './model-config-db';
 
 // Re-export types and constants from model-config-db for backward compatibility
@@ -747,11 +750,17 @@ class ModelConfigServiceImpl {
             fallbackModelId: standardConfig.fallbackModelId || standardConfig.modelId,
             maxContext: standardConfig.maxContextTokens || STAGE4_CONTEXT_THRESHOLD,
           }
-        : {
-            modelId: 'unknown',
-            fallbackModelId: 'unknown',
-            maxContext: STAGE4_CONTEXT_THRESHOLD,
-          };
+        : (() => {
+            logger.warn(
+              { language, tier: 'standard' },
+              `Stage 4 standard tier config is null, falling back to emergency model: ${EMERGENCY_FALLBACK_MODEL}`
+            );
+            return {
+              modelId: EMERGENCY_FALLBACK_MODEL,
+              fallbackModelId: EMERGENCY_FALLBACK_MODEL,
+              maxContext: STAGE4_CONTEXT_THRESHOLD,
+            };
+          })();
 
       const extended = extendedConfig
         ? {
@@ -760,12 +769,18 @@ class ModelConfigServiceImpl {
             maxContext: extendedConfig.maxContextTokens || 1_000_000,
             cacheReadEnabled: false, // Phase configs don't carry cacheRead; safe default
           }
-        : {
-            modelId: 'unknown',
-            fallbackModelId: 'unknown',
-            maxContext: 1_000_000,
-            cacheReadEnabled: false,
-          };
+        : (() => {
+            logger.warn(
+              { language, tier: 'extended' },
+              `Stage 4 extended tier config is null, falling back to emergency model: ${EMERGENCY_FALLBACK_MODEL}`
+            );
+            return {
+              modelId: EMERGENCY_FALLBACK_MODEL,
+              fallbackModelId: EMERGENCY_FALLBACK_MODEL,
+              maxContext: 1_000_000,
+              cacheReadEnabled: false,
+            };
+          })();
 
       logger.info(
         {
@@ -788,13 +803,13 @@ class ModelConfigServiceImpl {
 
       return {
         standard: {
-          modelId: 'unknown',
-          fallbackModelId: 'unknown',
+          modelId: EMERGENCY_FALLBACK_MODEL,
+          fallbackModelId: EMERGENCY_FALLBACK_MODEL,
           maxContext: STAGE4_CONTEXT_THRESHOLD,
         },
         extended: {
-          modelId: 'unknown',
-          fallbackModelId: 'unknown',
+          modelId: EMERGENCY_FALLBACK_MODEL,
+          fallbackModelId: EMERGENCY_FALLBACK_MODEL,
           maxContext: 1_000_000,
           cacheReadEnabled: false,
         },

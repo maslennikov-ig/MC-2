@@ -12,6 +12,10 @@
 
 import type { DocumentPriorityLevel } from '@megacampus/shared-types';
 import { STAGE4_HARD_TOKEN_LIMIT, STAGE4_CONTEXT_THRESHOLD } from '../../../shared/llm/model-selector';
+import logger from '../../../shared/logger';
+
+/** Emergency universal fallback model when DB config is unavailable */
+const EMERGENCY_FALLBACK_MODEL = 'google/gemini-2.5-flash';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -162,42 +166,46 @@ export function allocateStage4Budget(
   // Step 4: Determine effective max context (respect hard limit)
   const effectiveMaxContext = Math.min(modelSelection.maxContext, STAGE4_HARD_TOKEN_LIMIT);
 
-  // Step 5: Calculate available budget for IMPORTANT full-text upgrades
-  // available = max_context - CORE_full - SUPPLEMENTARY_summary
+  // Step 5: Calculate upgrade budget for IMPORTANT documents
+  // All IMPORTANT docs start as summaries (already reserved in minimumTokens).
+  // upgradeableBudget = extra space available for full_text upgrades (delta over summaries).
   const availableForImportant = effectiveMaxContext - coreFullTokens - supplementarySummaryTokens;
+  const upgradeableBudget = availableForImportant - importantSummaryTokens;
 
   // Step 6: Greedy allocation for IMPORTANT documents
-  // Sort by importance_score DESC
-  const sortedImportant = [...important].sort(
-    (a, b) => (b.importance_score || 0) - (a.importance_score || 0)
-  );
+  // Sort by importance_score DESC, break ties by file_id for deterministic results
+  const sortedImportant = [...important].sort((a, b) => {
+    const scoreDiff = (b.importance_score || 0) - (a.importance_score || 0);
+    if (scoreDiff !== 0) return scoreDiff;
+    return a.file_id.localeCompare(b.file_id);
+  });
 
   const importantAllocations: Stage4DocumentBudget[] = [];
-  let remainingBudget = availableForImportant;
+  let remainingUpgradeBudget = upgradeableBudget;
   let importantFullTextCount = 0;
   let importantTotalTokens = 0;
 
   for (const doc of sortedImportant) {
-    if (doc.original_tokens <= remainingBudget) {
-      // Document fits - use full text
+    const upgradeDelta = doc.original_tokens - doc.summary_tokens;
+    if (upgradeDelta <= remainingUpgradeBudget) {
+      // Full text upgrade fits within remaining budget
       importantAllocations.push({
         file_id: doc.file_id,
         mode: 'full_text',
         tokens: doc.original_tokens,
         priority: 'IMPORTANT',
       });
-      remainingBudget -= doc.original_tokens;
+      remainingUpgradeBudget -= upgradeDelta;
       importantFullTextCount++;
       importantTotalTokens += doc.original_tokens;
     } else {
-      // Document doesn't fit - use summary
+      // Use summary (already reserved in minimumTokens)
       importantAllocations.push({
         file_id: doc.file_id,
         mode: 'summary',
         tokens: doc.summary_tokens,
         priority: 'IMPORTANT',
       });
-      remainingBudget -= doc.summary_tokens;
       importantTotalTokens += doc.summary_tokens;
     }
   }
@@ -479,9 +487,13 @@ function selectModelFromTierConfig(
   }
 
   // Hardcoded fallback when no tier config available
+  logger.warn(
+    { minimumTokens, tier },
+    `No tier config available in selectModelFromTierConfig, falling back to emergency model: ${EMERGENCY_FALLBACK_MODEL}`
+  );
   return {
-    modelId: 'unknown',
-    fallbackModelId: 'unknown',
+    modelId: EMERGENCY_FALLBACK_MODEL,
+    fallbackModelId: EMERGENCY_FALLBACK_MODEL,
     tier,
     maxContext: tier === 'extended' ? 1_000_000 : STAGE4_CONTEXT_THRESHOLD,
     cacheReadEnabled: false,
