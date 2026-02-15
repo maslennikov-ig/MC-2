@@ -28,6 +28,10 @@ import {
   PROGRESS_MESSAGES,
 } from './utils/validators';
 import { getAndClearTraceData } from './utils/observability';
+import {
+  detectSectionBreakdownOverlap,
+  buildOverlapFeedback,
+} from './phases/phase-2-scope-helpers';
 import type {
   Phase1Output,
   Phase2Output,
@@ -349,45 +353,109 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
 
   await startPhase(2, courseId, supabase, orchestrationLogger);
 
-  const phase2Output: Phase2Output = await executePhaseWithRetry(
-    'phase2_scope',
-    () =>
-      runPhase2Scope({
-        course_id: courseId,
-        language: input.language,
-        topic: input.topic,
-        document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
-        phase1_output: phase1Output,
-        course_size: input.course_size,
-        target_lessons: input.target_lessons,
-        target_sections: input.target_sections,
-        size_guidance: input.size_guidance,
-        min_lessons: input.min_lessons,
-        max_lessons: input.max_lessons,
-        clarifying_answers: clarifyingAnswers,
-        course_description: input.course_description,
-        learning_outcomes: input.learning_outcomes,
-      }),
-    orchestrationLogger
-  );
+  const MAX_OVERLAP_RETRIES = 2;
+  let overlapFeedback: string | undefined;
+  let phase2Output: Phase2Output | undefined;
 
+  for (let overlapAttempt = 0; overlapAttempt <= MAX_OVERLAP_RETRIES; overlapAttempt++) {
+    phase2Output = await executePhaseWithRetry(
+      'phase2_scope',
+      () =>
+        runPhase2Scope({
+          course_id: courseId,
+          language: input.language,
+          topic: input.topic,
+          document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
+          phase1_output: phase1Output,
+          course_size: input.course_size,
+          target_lessons: input.target_lessons,
+          target_sections: input.target_sections,
+          size_guidance: input.size_guidance,
+          min_lessons: input.min_lessons,
+          max_lessons: input.max_lessons,
+          clarifying_answers: clarifyingAnswers,
+          course_description: input.course_description,
+          learning_outcomes: input.learning_outcomes,
+          overlap_feedback: overlapFeedback,
+        }),
+      orchestrationLogger
+    );
+
+    // Detect semantic overlap in generated sections
+    try {
+      const overlapResult = await detectSectionBreakdownOverlap(
+        phase2Output.recommended_structure.sections_breakdown,
+        input.language
+      );
+
+      if (overlapResult.hasOverlap) {
+        orchestrationLogger.warn(
+          {
+            phase: 'phase2_scope',
+            overlapAttempt,
+            overlappingPairs: overlapResult.overlappingPairs.map(p => ({
+              sections: [p.sectionIndexA, p.sectionIndexB],
+              areas: [p.areaA, p.areaB],
+              similarity: Math.round(p.similarity * 100) + '%',
+            })),
+          },
+          `Phase 2 overlap detected (attempt ${overlapAttempt + 1}/${MAX_OVERLAP_RETRIES + 1})`
+        );
+
+        if (overlapAttempt < MAX_OVERLAP_RETRIES) {
+          overlapFeedback = buildOverlapFeedback(overlapResult);
+          continue; // Retry with overlap feedback
+        }
+
+        // Final attempt still has overlap - log but proceed
+        orchestrationLogger.error(
+          {
+            phase: 'phase2_scope',
+            overlapPairs: overlapResult.overlappingPairs.length,
+            maxRetries: MAX_OVERLAP_RETRIES,
+          },
+          'Phase 2 overlap persists after all retries, proceeding with overlapping sections'
+        );
+      } else {
+        if (overlapAttempt > 0) {
+          orchestrationLogger.info(
+            { phase: 'phase2_scope', resolvedAfterAttempts: overlapAttempt + 1 },
+            'Phase 2 overlap resolved after retry'
+          );
+        }
+      }
+    } catch (overlapError) {
+      // Overlap detection failed (e.g., Jina API down) - non-blocking, proceed
+      orchestrationLogger.warn(
+        {
+          phase: 'phase2_scope',
+          error: overlapError instanceof Error ? overlapError.message : String(overlapError),
+        },
+        'Overlap detection failed, proceeding without overlap check'
+      );
+    }
+
+    break; // No overlap or detection failed - proceed
+  }
+
+  // phase2Output is guaranteed to be set here (at least one iteration runs)
   await completePhaseWithTrace(
     2,
     'stage_4_scope',
     'scope_analysis',
     context,
-    phase2Output,
+    phase2Output!,
     {
-      total_lessons: phase2Output.recommended_structure.total_lessons,
-      total_sections: phase2Output.recommended_structure.total_sections,
-      estimated_hours: phase2Output.recommended_structure.estimated_content_hours,
-      duration_ms: phase2Output.phase_metadata.duration_ms,
-      model_used: phase2Output.phase_metadata.model_used,
+      total_lessons: phase2Output!.recommended_structure.total_lessons,
+      total_sections: phase2Output!.recommended_structure.total_sections,
+      estimated_hours: phase2Output!.recommended_structure.estimated_content_hours,
+      duration_ms: phase2Output!.phase_metadata.duration_ms,
+      model_used: phase2Output!.phase_metadata.model_used,
     },
     { topic: input.topic }
   );
 
-  context.phase2Output = phase2Output;
+  context.phase2Output = phase2Output!;
 }
 
 /**

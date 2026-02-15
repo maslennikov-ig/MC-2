@@ -27,6 +27,7 @@ import {
   parseWithRepairCascade,
   postProcessAndValidate,
 } from './phase-2-scope-helpers';
+import { logger } from '@/shared/logger';
 
 /**
  * Main Phase 2 execution function: Scope Analysis
@@ -105,6 +106,13 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         repairMetadata,
         validatedInput
       );
+
+      // Log duplicate key_topics across sections (observability)
+      logDuplicateKeyTopics(validated.recommended_structure.sections_breakdown, {
+        warn: (obj: Record<string, unknown>, msg: string) => {
+          logger.warn(obj, msg);
+        },
+      });
 
       return {
         result: validated,
@@ -321,7 +329,10 @@ function buildUserPrompt(
 - For seemingly narrow topics, think broadly: add context, history, applications, best practices
 - Aim for comprehensive coverage that provides maximum value`;
 
-  return `Analyze this course and provide scope recommendations:
+  // Add overlap feedback from previous attempt (if retrying due to overlap)
+  const overlapFeedbackSection = input.overlap_feedback ? `\n\n${input.overlap_feedback}\n` : '';
+
+  return `Analyze this course and provide scope recommendations:${overlapFeedbackSection}
 
 **Course Topic**: ${topic}${courseDescriptionContext}${learningOutcomesContext}
 
