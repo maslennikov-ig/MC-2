@@ -105,17 +105,23 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 
 | Phase | Tier | Primary Model | Fallback Model | Temp | Tokens |
 | ----- | ---- | ------------- | -------------- | ---- | ------ |
+| stage_4_clarifying | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 4000 |
+| stage_4_clarifying | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-0905 | 0.50 | 4000 |
 | stage_4_classification | standard | xiaomi/mimo-v2-flash | google/gemini-3-flash-preview | 0.70 | 4096 |
 | stage_4_classification | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash | 0.70 | 4096 |
 | stage_4_scope | standard | xiaomi/mimo-v2-flash | google/gemini-3-flash-preview | 0.70 | 4096 |
 | stage_4_scope | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash | 0.70 | 4096 |
+| stage_4_expert | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 8000 |
+| stage_4_expert | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-0905 | 0.50 | 8000 |
 | stage_4_synthesis | standard | xiaomi/mimo-v2-flash | google/gemini-3-flash-preview | 0.70 | 6000 |
+| stage_4_synthesis | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash | 0.70 | 6000 |
 
 ### Any language (fallback for non-Russian)
 
 | Phase | Tier | Primary Model | Fallback Model | Temp | Tokens |
 | ----- | ---- | ------------- | -------------- | ---- | ------ |
 | stage_4_clarifying | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 4000 |
+| stage_4_clarifying | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-0905 | 0.50 | 4000 |
 | stage_4_classification | standard | x-ai/grok-4.1-fast | google/gemini-3-flash-preview | 0.70 | 4096 |
 | stage_4_classification | extended | google/gemini-3-flash-preview | x-ai/grok-4.1-fast | 0.70 | 4096 |
 | stage_4_scope | standard | x-ai/grok-4.1-fast | google/gemini-3-flash-preview | 0.70 | 4096 |
