@@ -276,6 +276,14 @@ export class MetadataGenerator {
         }));
       }
 
+      // Post-process course_tags: filter out tags shorter than 3 chars (Zod min(3) requirement)
+      // LLMs sometimes generate valid abbreviations like "AI", "ИИ" that fail validation
+      if (result.data.course_tags && Array.isArray(result.data.course_tags)) {
+        result.data.course_tags = result.data.course_tags.filter(
+          tag => typeof tag === 'string' && tag.length >= 3
+        );
+      }
+
       // RT-006: Validate with Bloom's Taxonomy validators before extracting fields
       // Note: We validate only the metadata subset (no sections field)
       // This triggers RT-006 validators for learning_outcomes which checks Bloom's taxonomy
