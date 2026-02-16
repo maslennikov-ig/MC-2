@@ -3,10 +3,10 @@
  * @module shared/prompts/stage4-prompts
  *
  * Stage 4: Educational Analysis - Multi-phase course analysis
- * - Phase 1: Classification (category, language, topics)
- * - Phase 2: Scope (hours, lessons, sections)
- * - Phase 3: Expert (pedagogical strategy, expansion areas)
- * - Phase 4: Synthesis (generation guidance)
+ * - Phase 1: Classification (category, language, topics) — NOT migrated to PromptService, prompt built inline
+ * - Phase 2: Scope (hours, lessons, sections) — migrated to PromptService (system + user prompts)
+ * - Phase 3: Expert (pedagogical strategy, expansion areas) — NOT migrated, prompt built inline
+ * - Phase 4: Synthesis (generation guidance) — NOT migrated, prompt built inline
  */
 
 import type { HardcodedPrompt } from './types.js';
