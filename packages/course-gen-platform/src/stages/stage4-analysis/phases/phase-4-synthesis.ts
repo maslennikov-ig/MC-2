@@ -4,6 +4,10 @@
  * Synthesizes document summaries and analysis outputs into clear generation instructions
  * for Stage 5 (Course Structure Generation). Model configured via database (llm_model_config table).
  *
+ * Document handling: receives full DocumentSummaryResult objects (budget-resolved by orchestrator).
+ * Uses hardcoded 25K token split — not budget-aware. Synthesis needs broad coverage of all
+ * documents rather than deep analysis, so equal split is acceptable.
+ *
  * @module phase-4-synthesis
  */
 
