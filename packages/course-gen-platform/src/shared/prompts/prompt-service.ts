@@ -156,7 +156,7 @@ class PromptServiceImpl {
     // Validate required variables
     const missingVars = prompt.variables
       .filter(v => v.required)
-      .filter(v => !variables[v.name])
+      .filter(v => !(v.name in variables) || variables[v.name] === undefined)
       .map(v => v.name);
 
     if (missingVars.length > 0) {

@@ -1,13 +1,11 @@
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import { SectionWithoutInjectedFieldsSchema } from '@megacampus/shared-types/generation-result';
-import { getStylePrompt, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
+import { DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import {
   getDifficultyFromAnalysis,
-  formatCourseCategoryForPrompt,
   formatPedagogicalStrategyForPrompt,
-  formatGenerationGuidanceForPrompt,
 } from '../analysis-formatters';
 import { extractSection } from './utils';
 import { buildUserContextSection } from '../prompt-helpers';
@@ -74,7 +72,8 @@ export async function buildBatchPrompt(
 ): Promise<string> {
   const language = input.frontend_parameters.language || 'en';
   const style = input.frontend_parameters.style || DEFAULT_COURSE_STYLE;
-  const stylePrompt = getStylePrompt(style);
+  // Keep Stage 5 style guidance intentionally short to reduce prompt noise.
+  const stylePrompt = `Style preference: ${style}. Prioritize structure over prose style.`;
 
   const section = extractSection(input, sectionIndex);
   const sectionTitle = section.area || 'Untitled Section';
@@ -135,21 +134,12 @@ ${previousSectionsDigest}
   let analysisContext = '';
   if (input.analysis_result) {
     const difficulty = getDifficultyFromAnalysis(input.analysis_result);
-    const category = formatCourseCategoryForPrompt(input.analysis_result.course_category);
     const strategy = formatPedagogicalStrategyForPrompt(input.analysis_result.pedagogical_strategy);
-    const guidance = formatGenerationGuidanceForPrompt(input.analysis_result.generation_guidance);
 
     analysisContext = `**Analysis Context** (from Stage 4):
-- Difficulty: ${difficulty}
-- Category: ${category}
 - Topic: ${input.analysis_result.topic_analysis.determined_topic}
-
-**Pedagogical Strategy**:
-${strategy}
-
-**Generation Guidance**:
-${guidance}
-
+- Difficulty: ${difficulty}
+- Progression: ${strategy.replace(/\n+/g, ' | ')}
 `;
   }
 
@@ -174,26 +164,18 @@ ${guidance}
   // RAG tool info
   let ragToolInfo = '';
   if (qdrantClient) {
-    ragToolInfo = `**RAG Search Tool Available**: You have access to search uploaded documents.
-- Use SPARINGLY - only for exact formulas, legal text, code examples, or domain-specific facts
-- Do NOT query for generic concepts or creative elaboration
-- Example queries: "Python asyncio syntax", "GDPR Article 6", "React useState hook"
-
-`;
+    ragToolInfo =
+      '**RAG Search Tool Available**: Use only for exact facts (formulas, legal clauses, API syntax).\n\n';
   }
 
   // Output format (attempt 1 vs retry)
   let outputFormat = '';
   if (attemptNumber === 1) {
-    outputFormat = `**Output Format**: Valid JSON matching the schema above (1 section with 3-5 lessons).
-
-**Field Type Requirements**:
-- learning_objectives: array of STRINGS, 1-5 items (each string, not object with id/text/language)
-- lesson_objectives: array of 1-5 STRINGS per lesson (each string 10-600 chars)
-- section_number: Integer (${sectionIndex + 1})
-- section_title: String ("${sectionTitle}")
-
-**Output**: Valid JSON only, no markdown, no code blocks, no explanations.
+    outputFormat = `**Output Format**:
+- Valid JSON only (no markdown, no prose)
+- One section object with lessons for Section ${sectionIndex + 1}
+- section_number must be ${sectionIndex + 1}
+- section_title must be "${sectionTitle}"
 `;
   } else {
     outputFormat = `**CRITICAL - RETRY ATTEMPT ${attemptNumber}**: Previous attempt failed. Follow these strict rules:
@@ -201,11 +183,10 @@ ${guidance}
 1. **JSON ONLY**: No markdown, no code blocks, no explanations
 2. **Valid Schema**: Match exact structure above
 3. **Section/Lesson Numbers**: Use sequential integers starting from 1
-4. **Enum Values**: Use exact cognitive levels (optional): remember, understand, apply, analyze, evaluate, create
-5. **Array Lengths**: 1-5 learning_objectives per section, 3-5 lessons, 1-5 lesson_objectives per lesson
-6. **String Lengths**: Respect min/max character limits
+4. **Array Lengths**: 1-5 learning_objectives per section, 3-5 lessons, 1-5 lesson_objectives per lesson
+5. **String Lengths**: Respect min/max character limits
 
-**Output Format**: Single JSON object starting with { and ending with }. No extra text.
+**Output Format**: Single JSON object from { ... } only.
 `;
   }
 
