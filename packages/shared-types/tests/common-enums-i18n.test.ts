@@ -168,17 +168,9 @@ describe('getContentLabels', () => {
       expect(labels).toEqual(CONTENT_LABELS.en);
     });
 
-    it('should log warning in development mode for unknown code', () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'development';
-      try {
-        getContentLabels('xx');
-        expect(console.warn).toHaveBeenCalledWith(
-          '[getContentLabels] Unknown language code: "xx", falling back to English'
-        );
-      } finally {
-        process.env.NODE_ENV = originalEnv;
-      }
+    it('should silently fall back to English for unknown code (no warning)', () => {
+      const labels = getContentLabels('xx');
+      expect(labels).toEqual(CONTENT_LABELS.en);
     });
   });
 });
