@@ -61,43 +61,42 @@ Generate:
     promptName: 'Stage 5 - Batch Section Generator (RT-002 Optimized)',
     promptDescription:
       'Generates detailed lesson breakdown for a single section. Uses RT-002 prompt engineering with course structure map, anti-overlap rules, and constraints from Stage 4 user edits.',
-    promptTemplate: `You are an expert course designer expanding section-level structure into detailed lessons.
+    promptTemplate: `You are an expert course designer expanding one section into lesson structure.
 
 **Course Context**:
 - Course Title: {{courseTitle}}
 - Target Language: {{language}}
-- Content Style: {{stylePrompt}}
+- Style Signal: {{stylePrompt}}
 {{targetAudienceLine}}
 {{userContext}}
 {{courseStructureMapSection}}
 {{previousSectionsDigestSection}}
+
 **Section to Expand** (Section {{sectionNumber}}):
 - Section Title: {{sectionTitle}}
-- Learning Objectives (section-level): {{learningObjectives}}
+- Section Objectives: {{learningObjectives}}
 - Key Topics: {{keyTopics}}
 - Estimated Lessons: {{estimatedLessons}}
 
 {{analysisContext}}
-{{constraintsSection}}**Your Task**: Expand this section into 3-5 detailed lessons.
-
-**CRITICAL: You MUST respond with valid JSON matching this EXACT schema**:
-
+{{constraintsSection}}
+**CRITICAL: Return valid JSON matching this EXACT schema**
 {{schemaDescription}}
 
-**Constraints**:
-1. **Lesson Breakdown**: {{lessonGuidance}}
-2. **Learning Objectives**: Each lesson must have 1-5 SMART objectives using Bloom's taxonomy action verbs
-   - Apply {{style}} style to objectives (e.g., storytelling: "explore", "discover"; academic: "analyze", "evaluate")
-3. **Key Topics**: Each lesson must have 2-10 specific key topics
-   - Frame topics in {{style}} style (e.g., conversational: "Let's learn about...", professional: "Core competency:")
-4. **Coherence**: Lessons must follow logical progression, build on prerequisites
-5. **Language**: All content in {{language}}
+**PEDAGOGICAL GUARDRAILS**:
+1. First lesson must be introductory and contextual for this section.
+2. Last lesson must provide synthesis, application, or transition.
+3. Keep lesson sequence logically progressive (foundational -> applied).
+4. Avoid overloading one lesson with all key topics.
 
-**Content Completeness**: Every field must contain real, finished content in {{language}}. Replace any placeholder text (e.g., [название], [insert X here], [TBD]) with actual content.
+**Generation Requirements**:
+- Lesson Breakdown: {{lessonGuidance}}
+- All text in {{language}}
+- Replace placeholders ([TBD], [insert X], [название]) with final text
+- Duration fields are system-managed (do not invent extra duration fields)
 
-**NOTE**: Duration fields are managed by the system and not part of the schema you need to generate.
-
-{{ragToolInfo}}{{outputFormat}}`,
+{{ragToolInfo}}
+{{outputFormat}}`,
     variables: [
       {
         name: 'courseTitle',
@@ -131,7 +130,8 @@ Generate:
       },
       {
         name: 'courseStructureMapSection',
-        description: 'Pre-assembled full course structure map block with focus rules, or empty string',
+        description:
+          'Pre-assembled full course structure map block with focus rules, or empty string',
         required: true,
       },
       {

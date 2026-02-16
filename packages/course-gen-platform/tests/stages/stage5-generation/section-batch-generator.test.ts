@@ -493,11 +493,11 @@ describe('SectionBatchGenerator', () => {
   });
 
   /**
-   * Test 4: buildBatchPrompt() includes style integration
-   * Requirement: T024.4 - Verify getStylePrompt called
+   * Test 4: buildBatchPrompt() keeps prompt lean (no style payload injection)
+   * Requirement: prevent oversized Stage 5 prompt from style micromanagement
    */
-  describe('buildBatchPrompt - style integration', () => {
-    it('should integrate style prompts via getStylePrompt (FR-028)', async () => {
+  describe('buildBatchPrompt - prompt minimalism', () => {
+    it('should avoid style prompt payload injection and keep only structural guidance', async () => {
       const mockSection: Section = {
         section_number: 1,
         section_title: 'Test Section',
@@ -559,16 +559,16 @@ describe('SectionBatchGenerator', () => {
       const generator = new SectionBatchGenerator();
       await generator.generateBatch(0, 0, 1, mockJobInput);
 
-      // Verify getStylePrompt was called with correct style
-      expect(stylePromptsModule.getStylePrompt).toHaveBeenCalledWith('storytelling');
+      // Stage 5 should not pull verbose style payloads for structure-only generation
+      expect(stylePromptsModule.getStylePrompt).not.toHaveBeenCalled();
 
-      // Verify style prompt is included in ChatOpenAI invocation
-      expect(mockInvoke).toHaveBeenCalledWith(
-        expect.stringContaining('Storytelling style: Use narrative structure')
-      );
+      const capturedPrompt = mockInvoke.mock.calls[0][0] as string;
+      expect(capturedPrompt).not.toContain('Storytelling style: Use narrative structure');
+      expect(capturedPrompt).not.toContain('Specific Analogies:');
+      expect(capturedPrompt).not.toContain('Real World Examples:');
     });
 
-    it('should use default style when not provided', async () => {
+    it('should avoid default style resolution when style is not provided', async () => {
       const mockSection: Section = {
         section_number: 1,
         section_title: 'Test Section',
@@ -626,8 +626,8 @@ describe('SectionBatchGenerator', () => {
       const generator = new SectionBatchGenerator();
       await generator.generateBatch(0, 0, 1, mockJobInput);
 
-      // Verify default style 'conversational' is used
-      expect(stylePromptsModule.getStylePrompt).toHaveBeenCalledWith('conversational');
+      // Stage 5 structure prompt should not resolve style prompts at all
+      expect(stylePromptsModule.getStylePrompt).not.toHaveBeenCalled();
     });
   });
 
@@ -1113,14 +1113,13 @@ describe('SectionBatchGenerator', () => {
       // Generate section 0 (first section, 0-based)
       await generator.generateBatch(0, 0, 1, mockJobInput);
 
-      // Verify prompt contains CRITICAL COURSE CONSTRAINTS block
-      expect(capturedPrompt).toContain('CRITICAL COURSE CONSTRAINTS');
-      expect(capturedPrompt).toContain('Total sections: 6 (user-specified)');
-      expect(capturedPrompt).toContain('Total lessons: 30 (user-specified)');
-      expect(capturedPrompt).toContain('Current section: 1 of 6');
+      // Verify prompt contains compact constraints block
+      expect(capturedPrompt).toContain('**Course Structure** (from Stage 4):');
+      expect(capturedPrompt).toContain('- Course: 6 sections, 30 total lessons');
+      expect(capturedPrompt).toContain('- This section: 1 of 6');
 
       // lessonsPerSectionBudget = Math.round(30 / 6) = 5
-      expect(capturedPrompt).toContain('**Target lesson count for THIS section**: 5');
+      expect(capturedPrompt).toContain('- Target: 5 lessons for this section');
     });
 
     it('should use dynamic lesson guidance with constraints', async () => {
@@ -1417,12 +1416,11 @@ describe('SectionBatchGenerator', () => {
       const generator = new SectionBatchGenerator();
       await generator.generateBatch(0, 0, 1, mockJobInput);
 
-      // Verify prompt contains constraint block with calculated values
-      expect(capturedPrompt).toContain('CRITICAL COURSE CONSTRAINTS');
-      expect(capturedPrompt).toContain('Total sections: 6 (user-specified)');
-      expect(capturedPrompt).toContain('Total lessons: 30 (user-specified)');
+      // Verify prompt contains compact constraints block with calculated values
+      expect(capturedPrompt).toContain('**Course Structure** (from Stage 4):');
+      expect(capturedPrompt).toContain('- Course: 6 sections, 30 total lessons');
       // Budget = Math.round(30 / 6) = 5
-      expect(capturedPrompt).toContain('**Target lesson count for THIS section**: 5');
+      expect(capturedPrompt).toContain('- Target: 5 lessons for this section');
     });
 
     it('should handle missing total_sections gracefully (fallback)', async () => {
