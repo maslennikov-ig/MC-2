@@ -507,6 +507,19 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
         phase1_output: phase1Output,
         phase2_output: phase2Output,
         clarifying_answers: clarifyingAnswers,
+        budget_context: context.budgetAllocation
+          ? {
+              documents: context.budgetAllocation.documents.map((d) => ({
+                file_name:
+                  resolvedDocumentSummaries.find((ds) => ds.document_id === d.file_id)?.file_name ||
+                  d.file_id,
+                mode: d.mode,
+                priority: d.priority,
+                tokens: d.tokens,
+              })),
+              totalTokens: context.budgetAllocation.totalTokens,
+            }
+          : undefined,
       }),
     orchestrationLogger
   );
