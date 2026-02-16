@@ -4,6 +4,9 @@
  * Estimates course scope and generates detailed structure recommendations.
  * Uses database-configured model (mathematical/logical task) with English-only output.
  *
+ * Document handling: uses summaries only (no full text, no Budget Allocator).
+ * Scope estimation doesn't need full document text — summaries are sufficient.
+ *
  * Key responsibilities:
  * - Estimate total content hours (0.5-200h)
  * - Calculate lesson count (15 min lessons, MINIMUM 10 enforced)

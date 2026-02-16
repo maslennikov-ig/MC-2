@@ -509,14 +509,23 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
         clarifying_answers: clarifyingAnswers,
         budget_context: context.budgetAllocation
           ? {
-              documents: context.budgetAllocation.documents.map((d) => ({
-                file_name:
-                  resolvedDocumentSummaries.find((ds) => ds.document_id === d.file_id)?.file_name ||
-                  d.file_id,
-                mode: d.mode,
-                priority: d.priority,
-                tokens: d.tokens,
-              })),
+              documents: context.budgetAllocation.documents.map((d) => {
+                const docSummary = resolvedDocumentSummaries?.find(
+                  (ds) => ds.document_id === d.file_id
+                );
+                if (!docSummary) {
+                  orchestrationLogger.warn(
+                    { file_id: d.file_id, priority: d.priority },
+                    'Budget document not found in resolvedDocumentSummaries, using file_id as name'
+                  );
+                }
+                return {
+                  file_name: docSummary?.file_name || d.file_id,
+                  mode: d.mode,
+                  priority: d.priority,
+                  tokens: d.tokens,
+                };
+              }),
               totalTokens: context.budgetAllocation.totalTokens,
             }
           : undefined,

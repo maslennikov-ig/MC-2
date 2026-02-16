@@ -116,6 +116,8 @@ function buildPhase3Prompt(input: Phase3Input): string {
   // Build document context with budget-aware truncation
   // Uses per-document token allocation from Budget Allocator when available
   // Falls back to equal 25K split when no budget context
+  // INVARIANT: budget_context.documents order MUST match document_summaries order
+  // Both are derived from resolvedDocumentSummaries in the orchestrator
   const documentCount = document_summaries?.length || 0;
   const budgetDocs = input.budget_context?.documents;
   const DEFAULT_TOTAL_DOC_TOKENS = 25_000;
