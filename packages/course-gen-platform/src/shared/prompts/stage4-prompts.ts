@@ -1,37 +1,41 @@
 /**
- * Stage 4 Hardcoded Prompts - Educational Analysis (4 prompts)
+ * Stage 4 Hardcoded Prompts - Educational Analysis (7 prompts)
  * @module shared/prompts/stage4-prompts
  *
  * Stage 4: Educational Analysis - Multi-phase course analysis
- * - Phase 1: Classification (category, language, topics) — NOT migrated to PromptService, prompt built inline
+ * - Phase 1: Classification (category, language, topics) — migrated to PromptService (system + user prompts)
  * - Phase 2: Scope (hours, lessons, sections) — migrated to PromptService (system + user prompts)
- * - Phase 3: Expert (pedagogical strategy, expansion areas) — NOT migrated, prompt built inline
- * - Phase 4: Synthesis (generation guidance) — NOT migrated, prompt built inline
+ * - Phase 3: Expert (pedagogical strategy, expansion areas) — migrated to PromptService (single user prompt)
+ * - Phase 4: Synthesis (generation guidance) — migrated to PromptService (system + user prompts)
  */
 
 import type { HardcodedPrompt } from './types.js';
 
 // ============================================================================
-// STAGE 4 PROMPTS (4 total)
+// STAGE 4 PROMPTS (7 total)
 // ============================================================================
 
 export const stage4Prompts: HardcodedPrompt[] = [
   {
     stage: 'stage_4',
-    promptKey: 'stage4_phase1_classification',
-    promptName: 'Stage 4 Phase 1 - Course Classification',
+    promptKey: 'stage4_phase1_classification_system',
+    promptName: 'Stage 4 Phase 1 - Classification (System)',
     promptDescription:
-      'Performs course categorization (6 categories), contextual language generation, and topic analysis. Always outputs in target course language.',
+      'System prompt for course classification: category detection, topic analysis, key concepts extraction.',
     promptTemplate: `You are an expert curriculum architect with 15+ years of experience in adult education (andragogy).
 
-Your task is to analyze course topics and classify them into one of 6 categories, generate contextual motivational language, and perform topic analysis.
+Your task is to analyze course topics and classify them into one of 6 categories, and perform topic analysis.
 
 CRITICAL RULES:
-1. ALL output MUST be in {{outputLanguage}} (the course target language is {{outputLanguage}})
-2. You MUST respond with valid JSON matching the Phase1Output schema
-3. Use category-specific templates for contextual language
-4. Ensure all character length constraints are met
-5. Extract 3-10 key concepts and 5-15 domain keywords
+1. ALL output MUST be in {{outputLanguageUpper}} (the course target language is {{outputLanguage}})
+2. You MUST respond with valid JSON matching this EXACT schema:
+
+{{schemaDescription}}
+
+3. Ensure all character length constraints are met
+4. Extract 3-10 key concepts and 5-15 domain keywords
+
+FIELD FORMATS:
 
 CATEGORIES (with examples):
 - professional: Business skills, technical training, certifications (e.g., "Project Management", "Python Programming")
@@ -39,13 +43,7 @@ CATEGORIES (with examples):
 - creative: Art, music, design, writing (e.g., "Digital Art", "Creative Writing")
 - hobby: Leisure activities, crafts, games (e.g., "Chess", "Photography")
 - spiritual: Meditation, mindfulness, philosophy (e.g., "Mindfulness", "Stoic Philosophy")
-- academic: Formal education subjects (e.g., "Calculus", "World History")
-
-TOPIC: {{topic}}
-TARGET LANGUAGE FOR COURSE: {{outputLanguage}} (ALL text content MUST be in {{outputLanguage}})
-{{userRequirements}}{{documentContext}}
-
-Analyze this topic and provide comprehensive classification and topic analysis.`,
+- academic: Formal education subjects (e.g., "Calculus", "World History")`,
     variables: [
       {
         name: 'outputLanguage',
@@ -54,21 +52,88 @@ Analyze this topic and provide comprehensive classification and topic analysis.`
         example: 'Russian',
       },
       {
+        name: 'outputLanguageUpper',
+        description: 'Target language in uppercase (e.g., ENGLISH, RUSSIAN)',
+        required: true,
+        example: 'RUSSIAN',
+      },
+      {
+        name: 'schemaDescription',
+        description: 'Zod schema description for Phase 1 output (from zodToPromptSchema)',
+        required: true,
+        example: 'Phase1Output schema...',
+      },
+    ],
+  },
+  {
+    stage: 'stage_4',
+    promptKey: 'stage4_phase1_classification_user',
+    promptName: 'Stage 4 Phase 1 - Classification (User)',
+    promptDescription:
+      'User prompt for course classification with topic, audience, and optional document/clarifying context.',
+    promptTemplate: `COURSE INFORMATION:
+Topic: {{topic}}
+Target Language: {{outputLanguage}} (ALL OUTPUT MUST BE IN {{outputLanguageUpper}})
+Target Audience: {{targetAudience}}
+Lesson Duration: {{lessonDurationMinutes}} minutes
+{{courseDescriptionContext}}{{documentContext}}{{clarifyingContext}}
+
+TASK:
+1. Classify this course into the most appropriate category
+2. Analyze topic complexity and identify key concepts
+3. Extract domain keywords relevant to this topic
+4. Assess information completeness and identify missing elements
+
+IMPORTANT: Generate ALL text content (topic_analysis descriptions, key_concepts, domain_keywords) in {{outputLanguageUpper}}.
+Output MUST be valid JSON with all text fields in {{outputLanguage}}.`,
+    variables: [
+      {
         name: 'topic',
         description: 'Course topic to analyze',
         required: true,
         example: 'React Hooks fundamentals',
       },
       {
-        name: 'userRequirements',
-        description: 'Optional user requirements (course description, learning outcomes, etc.)',
+        name: 'outputLanguage',
+        description: 'Target language for course content (English, Russian, etc.)',
+        required: true,
+        example: 'Russian',
+      },
+      {
+        name: 'outputLanguageUpper',
+        description: 'Target language in uppercase (e.g., ENGLISH, RUSSIAN)',
+        required: true,
+        example: 'RUSSIAN',
+      },
+      {
+        name: 'targetAudience',
+        description: 'Target audience for the course',
+        required: true,
+        example: 'Developers with React experience',
+      },
+      {
+        name: 'lessonDurationMinutes',
+        description: 'Lesson duration in minutes',
+        required: true,
+        example: '15',
+      },
+      {
+        name: 'courseDescriptionContext',
+        description: 'Optional user-provided course description',
         required: false,
+        example: '\n\n**User-Provided Course Description**...',
       },
       {
         name: 'documentContext',
         description: 'Optional document summaries context',
         required: false,
         example: '\n\nDOCUMENT SUMMARIES:\n[Document 1]\n...',
+      },
+      {
+        name: 'clarifyingContext',
+        description: 'Optional clarifying Q&A context',
+        required: false,
+        example: '\n\nUSER CLARIFICATIONS...',
       },
     ],
   },
@@ -134,8 +199,7 @@ CRITICAL RULES:
     stage: 'stage_4',
     promptKey: 'stage4_phase2_scope_user',
     promptName: 'Stage 4 Phase 2 - Scope Analysis (User)',
-    promptDescription:
-      'User prompt for scope estimation: course details, tasks, and constraints.',
+    promptDescription: 'User prompt for scope estimation: course details, tasks, and constraints.',
     promptTemplate: `Analyze this course and provide scope recommendations:{{overlapFeedbackSection}}
 
 **Course Topic**: {{topic}}{{courseDescriptionContext}}{{learningOutcomesContext}}
@@ -370,16 +434,19 @@ IMPORTANT:
     promptKey: 'stage4_phase3_expert',
     promptName: 'Stage 4 Phase 3 - Deep Expert Analysis',
     promptDescription:
-      'Designs pedagogical strategy (teaching style, assessment, progression), identifies expansion areas, detects research flags. Always uses 120B model.',
-    promptTemplate: `You are a senior curriculum architect with 20+ years of experience in adult education (andragogy) and instructional design.
+      'Designs pedagogical strategy (assessment approach, progression logic). Uses Phase 1 and Phase 2 outputs as context.',
+    promptTemplate: `You are a senior curriculum architect with 20+ years of experience in adult education (andragogy) and instructional design. Your expertise includes pedagogical strategy, learning progression design, and identifying content gaps.
 
 CRITICAL RULES:
-1. ALL your response MUST be in {{outputLanguage}}
-2. You MUST respond with valid JSON matching the Phase3Output schema
+1. ALL your response MUST be in {{outputLanguageUpper}} (the course target language is {{outputLanguage}})
+2. You MUST respond with valid JSON matching this EXACT schema:
 
-CONTEXT FROM PREVIOUS PHASES:
+{{schemaDescription}}
+
+===== CONTEXT FROM PREVIOUS PHASES =====
+
 TOPIC: {{topic}}
-TARGET LANGUAGE: {{outputLanguage}}
+TARGET LANGUAGE FOR COURSE: {{outputLanguage}} (ALL text content MUST be in {{outputLanguageUpper}})
 
 CATEGORY: {{category}} (confidence: {{categoryConfidence}})
 COMPLEXITY: {{complexity}}
@@ -390,31 +457,59 @@ SCOPE:
 - Total lessons: {{totalLessons}}
 - Estimated hours: {{estimatedHours}}h
 - Lesson duration: {{lessonDurationMinutes}} minutes
-- Total sections: {{totalSections}}
-
-{{userRequirements}}{{documentContext}}
+- Total sections: {{totalSections}}{{documentContext}}{{clarifyingContext}}
 
 ===== YOUR TASKS =====
 
 TASK 1: DESIGN PEDAGOGICAL STRATEGY
 
-Design a comprehensive pedagogical strategy:
-1. assessment_approach: Describe how learners demonstrate understanding (min 50 chars)
-2. progression_logic: Explain how difficulty increases across lessons (min 100 chars)
+Design a comprehensive pedagogical strategy for this course:
 
-TASK 2: IDENTIFY EXPANSION AREAS (if information_completeness < 80%)
+1. assessment_approach (min 50 chars): How learners demonstrate understanding
+   - Examples: "Progressive quizzes after each section", "Final capstone project", "Peer review exercises"
+   - Provide comprehensive detail - no upper limit
 
-If information is incomplete, identify areas that need expansion:
-- area: Topic area name
-- priority: critical, important, or nice-to-have
-- specific_requirements: List of specific requirements
-- estimated_lessons: Number of lessons needed`,
+2. progression_logic (min 100 chars): How difficulty increases across lessons
+   - Explain the learning arc from beginner to mastery
+   - Describe scaffolding strategy
+   - Provide comprehensive detail - no upper limit
+
+NOTE ON FIELD LENGTHS:
+- All string fields have minimum lengths to ensure quality
+- NO upper limits - provide comprehensive, detailed responses
+- Quality over brevity - thorough explanations are encouraged
+
+LANGUAGE REQUIREMENT:
+- ALL text content (assessment_approach, progression_logic) MUST be in {{outputLanguageUpper}}
+
+===== OUTPUT FORMAT =====
+
+Respond ONLY with valid JSON (no markdown, no code blocks, no explanations):
+
+{
+  "pedagogical_strategy": {
+    "assessment_approach": "string (min 50 chars, comprehensive detail encouraged)",
+    "progression_logic": "string (min 100 chars, comprehensive detail encouraged)"
+  }
+}`,
     variables: [
       {
         name: 'outputLanguage',
         description: 'Target language for course content',
         required: true,
         example: 'Russian',
+      },
+      {
+        name: 'outputLanguageUpper',
+        description: 'Target language in uppercase (e.g., ENGLISH, RUSSIAN)',
+        required: true,
+        example: 'RUSSIAN',
+      },
+      {
+        name: 'schemaDescription',
+        description: 'Zod schema description for Phase 3 output (from zodToPromptSchema)',
+        required: true,
+        example: 'Phase3Output schema...',
       },
       {
         name: 'topic',
@@ -467,43 +562,162 @@ If information is incomplete, identify areas that need expansion:
         required: true,
       },
       {
-        name: 'userRequirements',
-        description: 'Optional user requirements',
+        name: 'documentContext',
+        description: 'Optional document summaries',
         required: false,
       },
       {
-        name: 'documentContext',
-        description: 'Optional document summaries',
+        name: 'clarifyingContext',
+        description: 'Optional clarifying Q&A context',
         required: false,
       },
     ],
   },
   {
     stage: 'stage_4',
-    promptKey: 'stage4_phase4_synthesis',
-    promptName: 'Stage 4 Phase 4 - Document Synthesis',
+    promptKey: 'stage4_phase4_synthesis_system',
+    promptName: 'Stage 4 Phase 4 - Synthesis (System)',
     promptDescription:
-      'Synthesizes all analysis phases into clear generation instructions for Stage 5. Adaptive model: <3 docs → 20B, ≥3 docs → 120B.',
-    promptTemplate: `You are a curriculum synthesis expert. Your task is to combine all analysis phases and document summaries into clear generation instructions.
+      'System prompt for document synthesis: combines analysis phases into generation guidance.',
+    promptTemplate: `You are an expert curriculum architect specializing in synthesizing diverse information sources into structured course generation guidance.
+
+Your role:
+1. Analyze outputs from previous analysis phases (categorization, scope, expert analysis)
+2. Synthesize document summaries (if provided) into key insights
+3. Generate structured generation_guidance that specifies tone, pedagogy, and content approach
+
+Quality standards:
+- generation_guidance must be complete and well-reasoned based on course category and target audience
+- All output in English (internal processing language)
+- Preserve all critical insights from previous phases
+- Balance structured guidance with practical applicability
+
+You have 15+ years experience in curriculum design and instructional synthesis.`,
+    variables: [],
+  },
+  {
+    stage: 'stage_4',
+    promptKey: 'stage4_phase4_synthesis_user',
+    promptName: 'Stage 4 Phase 4 - Synthesis (User)',
+    promptDescription:
+      'User prompt for document synthesis with all phase outputs, document summaries, and generation guidance schema.',
+    promptTemplate: `You are synthesizing course analysis into clear generation instructions for Stage 5 Course Generation.
 
 CRITICAL RULES:
-1. ALL output MUST be in {{outputLanguage}}
-2. generation_guidance: Structured guidance for Stage 5 Generation (tone, analogies, exercises)
+1. ALL your response MUST be in {{outputLanguageUpper}} (the course target language is {{outputLanguage}})
+2. You MUST respond with valid JSON matching this EXACT schema:
 
-CONTEXT:
-Topic: {{topic}}
-Documents: {{documentCount}} documents
-{{phase1Summary}}
-{{phase2Summary}}
-{{phase3Summary}}
-{{documentSummaries}}
+{{schemaDescription}}
 
-Synthesize all information into generation_guidance: structured guidance for content generation (tone, analogies, exercises, visuals)`,
+---
+
+ANALYSIS SUMMARY:
+
+Course Topic: {{topic}}
+Target Language: {{language}} (for final course output)
+Category: {{category}}
+Scope: {{totalLessons}} lessons, {{totalSections}} sections
+Document Count: {{documentCount}}
+{{researchFlagsSection}}
+
+---
+
+PREVIOUS PHASE OUTPUTS:
+
+Phase 1 - Key Concepts:
+{{phase1KeyConcepts}}
+
+Phase 2 - Sections Breakdown:
+{{phase2SectionsBreakdown}}
+
+Phase 3 - Pedagogical Approach:
+{{phase3ProgressionLogic}}
+{{documentSummariesSection}}{{clarifyingContext}}
+
+---
+
+TASK: Generate synthesis output
+
+1. **generation_guidance** (structured object):
+   - **tone**: Select based on course category and target_audience
+     * "conversational but precise": Most programming/technical courses
+     * "formal academic": Academic subjects, research-based courses
+     * "casual friendly": Personal development, hobbies
+     * "technical professional": Professional certifications, business
+
+   - **use_analogies**: true if topic benefits from comparisons (abstract concepts, technical topics)
+
+   - **specific_analogies** (optional): List 1-3 specific analogies that fit this topic
+     * Example for programming: ["functions like recipes", "variables like labeled boxes"]
+     * Example for networking: ["packets like letters", "router like post office"]
+
+   - **avoid_jargon**: List technical terms that should be avoided or explained
+     * Based on target_audience level (beginners need more avoidance)
+     * Example: ["polymorphism", "encapsulation"] for beginner OOP course
+
+   - **include_visuals**: Recommend visual aids based on topic nature
+     * "diagrams": For system architecture, workflows, relationships
+     * "flowcharts": For processes, algorithms, decision trees
+     * "code examples": For programming courses
+     * "screenshots": For software tutorials
+     * "animations": For dynamic processes
+     * "plots": For data science, statistics
+
+   - **exercise_types**: Select appropriate assessment methods
+     * "coding": Programming, scripting courses
+     * "derivation": Math, physics, theoretical subjects
+     * "interpretation": Literature, philosophy, analysis
+     * "debugging": Software development
+     * "refactoring": Advanced programming
+     * "analysis": Critical thinking, research-based
+
+   - **contextual_language_hints**: Describe audience level and communication style
+     * Example: "Assume no prior programming experience, use simple metaphors"
+     * Example: "Target experienced developers, use industry terminology"
+     * If research flags exist, mention them briefly here
+
+   - **real_world_examples** (optional): List 1-3 practical applications to reference
+     * Example for web dev: ["e-commerce checkout", "social media feed", "real-time chat"]
+
+---
+
+OUTPUT FORMAT (JSON only, no markdown):
+
+{
+  "generation_guidance": {
+    "tone": "conversational but precise" | "formal academic" | "casual friendly" | "technical professional",
+    "use_analogies": true | false,
+    "specific_analogies": ["analogy1", "analogy2"],
+    "avoid_jargon": ["term1", "term2"],
+    "include_visuals": ["diagrams", "code examples"],
+    "exercise_types": ["coding", "debugging"],
+    "contextual_language_hints": "Audience assumptions and communication style",
+    "real_world_examples": ["example1", "example2"]
+  }
+}
+
+IMPORTANT:
+- generation_guidance fields MUST all be populated (only specific_analogies and real_world_examples are optional)
+- ALL text content (avoid_jargon, contextual_language_hints, specific_analogies, real_world_examples) MUST be in {{outputLanguageUpper}}
+- If research flags exist, mention them briefly in contextual_language_hints`,
     variables: [
       {
         name: 'outputLanguage',
         description: 'Target language for course content',
         required: true,
+        example: 'Russian',
+      },
+      {
+        name: 'outputLanguageUpper',
+        description: 'Target language in uppercase (e.g., ENGLISH, RUSSIAN)',
+        required: true,
+        example: 'RUSSIAN',
+      },
+      {
+        name: 'schemaDescription',
+        description: 'Zod schema description for Phase 4 output (from zodToPromptSchema)',
+        required: true,
+        example: 'Phase4Output schema...',
       },
       {
         name: 'topic',
@@ -511,29 +725,70 @@ Synthesize all information into generation_guidance: structured guidance for con
         required: true,
       },
       {
+        name: 'language',
+        description: 'Target language code (en, ru, etc.)',
+        required: true,
+        example: 'ru',
+      },
+      {
+        name: 'category',
+        description: 'Course category from Phase 1',
+        required: true,
+        example: 'professional',
+      },
+      {
+        name: 'totalLessons',
+        description: 'Total number of lessons from Phase 2',
+        required: true,
+        example: '15',
+      },
+      {
+        name: 'totalSections',
+        description: 'Total number of sections from Phase 2',
+        required: true,
+        example: '3',
+      },
+      {
         name: 'documentCount',
         description: 'Number of documents analyzed',
         required: true,
+        example: '2',
       },
       {
-        name: 'phase1Summary',
-        description: 'Summary of Phase 1 classification results',
-        required: true,
-      },
-      {
-        name: 'phase2Summary',
-        description: 'Summary of Phase 2 scope analysis',
-        required: true,
-      },
-      {
-        name: 'phase3Summary',
-        description: 'Summary of Phase 3 expert analysis',
-        required: true,
-      },
-      {
-        name: 'documentSummaries',
-        description: 'Formatted document summaries',
+        name: 'researchFlagsSection',
+        description: 'Optional research flags section',
         required: false,
+        example: '\nResearch Flags: [flag1, flag2]\n',
+      },
+      {
+        name: 'phase1KeyConcepts',
+        description: 'Comma-separated key concepts from Phase 1',
+        required: true,
+        example: 'useState, useEffect, custom hooks',
+      },
+      {
+        name: 'phase2SectionsBreakdown',
+        description: 'Formatted sections breakdown from Phase 2',
+        required: true,
+        example: '- Introduction: 2 lessons (normal)\n- Core Concepts: 8 lessons (complex)',
+      },
+      {
+        name: 'phase3ProgressionLogic',
+        description: 'Progression logic from Phase 3',
+        required: true,
+        example: 'The course starts with basic concepts...',
+      },
+      {
+        name: 'documentSummariesSection',
+        description: 'Optional formatted document summaries',
+        required: false,
+        example: '\n\nDOCUMENT SUMMARIES:\n[Doc 1]...',
+      },
+      {
+        name: 'clarifyingContext',
+        description: 'Optional clarifying Q&A context',
+        required: false,
+        example: '\n\nUSER CLARIFICATIONS...',
       },
     ],
   },

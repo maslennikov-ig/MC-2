@@ -87,7 +87,7 @@ function extractUnresolvedPlaceholders(rendered: string): string[] {
   // Filter out:
   // 1. Mustache control structures: {{#section}}, {{/section}}, {{^section}}, {{>partial}}
   // 2. Whitelisted technical templates (Helm, Go, Jinja2)
-  const nonControlMatches = allMatches.filter(match => !(/^\{\{[#/^>]/.test(match)));
+  const nonControlMatches = allMatches.filter(match => !/^\{\{[#/^>]/.test(match));
 
   // Apply whitelist filtering
   return filterWhitelistedTemplates(nonControlMatches);
@@ -162,8 +162,13 @@ describe('Prompt Contract Validation', () => {
     const promptVariableMapKeys: Array<keyof PromptVariableMap> = [
       'stage3_classification_comparative',
       'stage3_classification_independent',
+      'stage4_phase1_classification_system',
+      'stage4_phase1_classification_user',
       'stage4_phase2_scope_system',
       'stage4_phase2_scope_user',
+      'stage4_phase3_expert',
+      'stage4_phase4_synthesis_system',
+      'stage4_phase4_synthesis_user',
       'stage5_batch_section_generator',
       'stage6_serial_generator',
       'stage6_single_call_generator',
@@ -181,9 +186,9 @@ describe('Prompt Contract Validation', () => {
       });
     }
 
-    it('should have exactly 10 typed prompts in PromptVariableMap', () => {
+    it('should have exactly 15 typed prompts in PromptVariableMap', () => {
       // Ensure all typed prompts are accounted for
-      expect(promptVariableMapKeys).toHaveLength(10);
+      expect(promptVariableMapKeys).toHaveLength(15);
     });
   });
 
@@ -246,6 +251,31 @@ describe('Prompt Contract Validation', () => {
       validateRequiredVariables('stage3_classification_independent', interfaceKeys);
     });
 
+    it('stage4_phase1_classification_system variables match interface', () => {
+      const interfaceKeys = getInterfaceKeys(key => ({
+        outputLanguage: key,
+        outputLanguageUpper: key,
+        schemaDescription: key,
+      }));
+
+      validateRequiredVariables('stage4_phase1_classification_system', interfaceKeys);
+    });
+
+    it('stage4_phase1_classification_user variables match interface', () => {
+      const interfaceKeys = getInterfaceKeys(key => ({
+        topic: key,
+        outputLanguage: key,
+        outputLanguageUpper: key,
+        targetAudience: key,
+        lessonDurationMinutes: key,
+        courseDescriptionContext: key,
+        documentContext: key,
+        clarifyingContext: key,
+      }));
+
+      validateRequiredVariables('stage4_phase1_classification_user', interfaceKeys);
+    });
+
     it('stage4_phase2_scope_system variables match interface', () => {
       const interfaceKeys = getInterfaceKeys(key => ({
         outputLanguage: key,
@@ -279,6 +309,56 @@ describe('Prompt Contract Validation', () => {
       }));
 
       validateRequiredVariables('stage4_phase2_scope_user', interfaceKeys);
+    });
+
+    it('stage4_phase3_expert variables match interface', () => {
+      const interfaceKeys = getInterfaceKeys(key => ({
+        outputLanguage: key,
+        outputLanguageUpper: key,
+        schemaDescription: key,
+        topic: key,
+        category: key,
+        categoryConfidence: key,
+        complexity: key,
+        informationCompleteness: key,
+        targetAudience: key,
+        totalLessons: key,
+        estimatedHours: key,
+        lessonDurationMinutes: key,
+        totalSections: key,
+        documentContext: key,
+        clarifyingContext: key,
+      }));
+
+      validateRequiredVariables('stage4_phase3_expert', interfaceKeys);
+    });
+
+    it('stage4_phase4_synthesis_system variables match interface', () => {
+      const interfaceKeys = getInterfaceKeys(() => ({}));
+
+      validateRequiredVariables('stage4_phase4_synthesis_system', interfaceKeys);
+    });
+
+    it('stage4_phase4_synthesis_user variables match interface', () => {
+      const interfaceKeys = getInterfaceKeys(key => ({
+        outputLanguage: key,
+        outputLanguageUpper: key,
+        schemaDescription: key,
+        topic: key,
+        language: key,
+        category: key,
+        totalLessons: key,
+        totalSections: key,
+        documentCount: key,
+        researchFlagsSection: key,
+        phase1KeyConcepts: key,
+        phase2SectionsBreakdown: key,
+        phase3ProgressionLogic: key,
+        documentSummariesSection: key,
+        clarifyingContext: key,
+      }));
+
+      validateRequiredVariables('stage4_phase4_synthesis_user', interfaceKeys);
     });
 
     it('stage5_batch_section_generator variables match interface', () => {

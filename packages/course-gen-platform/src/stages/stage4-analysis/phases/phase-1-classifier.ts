@@ -27,6 +27,7 @@ import { preprocessObject } from '@/shared/validation/preprocessing';
 import { extractJSON } from '@/shared/utils/json-repair';
 import { normalizePhase1Output } from '@/shared/utils/structure-normalizer';
 import { logger } from '@/shared/logger';
+import { createPromptService } from '@/shared/prompts/prompt-service';
 
 /**
  * Input data for Phase 1 Classification
@@ -65,37 +66,15 @@ export interface Phase1Input {
  * @param input - Phase 1 input data
  * @returns Formatted prompt messages for LLM
  */
-function buildClassificationPrompt(input: Phase1Input): [SystemMessage, HumanMessage] {
+async function buildClassificationPrompt(
+  input: Phase1Input
+): Promise<[SystemMessage, HumanMessage]> {
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase1OutputSchema);
 
   // Determine output language based on course language
   const outputLanguage =
     input.language === 'en' ? 'English' : input.language === 'ru' ? 'Russian' : input.language;
-
-  const systemMessage =
-    new SystemMessage(`You are an expert curriculum architect with 15+ years of experience in adult education (andragogy).
-
-Your task is to analyze course topics and classify them into one of 6 categories, and perform topic analysis.
-
-CRITICAL RULES:
-1. ALL output MUST be in ${outputLanguage.toUpperCase()} (the course target language is ${outputLanguage})
-2. You MUST respond with valid JSON matching this EXACT schema:
-
-${schemaDescription}
-
-3. Ensure all character length constraints are met
-4. Extract 3-10 key concepts and 5-15 domain keywords
-
-FIELD FORMATS:
-
-CATEGORIES (with examples):
-- professional: Business skills, technical training, certifications (e.g., "Project Management", "Python Programming")
-- personal: Self-help, life skills, wellness (e.g., "Time Management", "Healthy Cooking")
-- creative: Art, music, design, writing (e.g., "Digital Art", "Creative Writing")
-- hobby: Leisure activities, crafts, games (e.g., "Chess", "Photography")
-- spiritual: Meditation, mindfulness, philosophy (e.g., "Mindfulness", "Stoic Philosophy")
-- academic: Formal education subjects (e.g., "Calculus", "World History")`);
 
   /**
    * Truncates document content to stay within token budget
@@ -149,21 +128,25 @@ CATEGORIES (with examples):
     courseDescriptionContext = `\n\n**User-Provided Course Description**:\n${input.course_description}`;
   }
 
-  const humanMessage = new HumanMessage(`COURSE INFORMATION:
-Topic: ${input.topic}
-Target Language: ${outputLanguage} (ALL OUTPUT MUST BE IN ${outputLanguage.toUpperCase()})
-Target Audience: ${input.target_audience || 'mixed'}
-Lesson Duration: ${input.lesson_duration_minutes || 15} minutes
-${courseDescriptionContext}${documentContext}${clarifyingContext}
+  const promptService = createPromptService();
+  const systemText = await promptService.renderPrompt('stage4_phase1_classification_system', {
+    outputLanguage,
+    outputLanguageUpper: outputLanguage.toUpperCase(),
+    schemaDescription,
+  });
+  const systemMessage = new SystemMessage(systemText);
 
-TASK:
-1. Classify this course into the most appropriate category
-2. Analyze topic complexity and identify key concepts
-3. Extract domain keywords relevant to this topic
-4. Assess information completeness and identify missing elements
-
-IMPORTANT: Generate ALL text content (topic_analysis descriptions, key_concepts, domain_keywords) in ${outputLanguage.toUpperCase()}.
-Output MUST be valid JSON with all text fields in ${outputLanguage}.`);
+  const userText = await promptService.renderPrompt('stage4_phase1_classification_user', {
+    topic: input.topic,
+    outputLanguage,
+    outputLanguageUpper: outputLanguage.toUpperCase(),
+    targetAudience: input.target_audience || 'mixed',
+    lessonDurationMinutes: String(input.lesson_duration_minutes || 15),
+    courseDescriptionContext,
+    documentContext,
+    clarifyingContext,
+  });
+  const humanMessage = new HumanMessage(userText);
 
   return [systemMessage, humanMessage];
 }
@@ -189,7 +172,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
   const modelId = model.model || 'unknown';
 
   // Build prompt
-  const [systemMsg, humanMsg] = buildClassificationPrompt(input);
+  const [systemMsg, humanMsg] = await buildClassificationPrompt(input);
   const promptMessages = [systemMsg, humanMsg];
 
   // Track execution with observability
