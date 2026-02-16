@@ -32,6 +32,7 @@ import { preprocessObject } from '@/shared/validation/preprocessing';
 import { extractJSON } from '@/shared/utils/json-repair';
 import type { AIMessage } from '@langchain/core/messages';
 import { logger } from '@/shared/logger';
+import { createPromptService } from '@/shared/prompts/prompt-service';
 
 /**
  * Input data for Phase 3 Expert Analysis
@@ -107,7 +108,7 @@ function truncateSummary(summary: string, maxTokens: number): string {
  * @param input - Phase 3 input data
  * @returns LLM prompt string with token-aware truncation
  */
-function buildPhase3Prompt(input: Phase3Input): string {
+async function buildPhase3Prompt(input: Phase3Input): Promise<string> {
   const { topic, language, document_summaries, phase1_output, phase2_output } = input;
 
   // Determine output language based on course language
@@ -129,13 +130,15 @@ function buildPhase3Prompt(input: Phase3Input): string {
 
   const documentContext =
     document_summaries && document_summaries.length > 0
-      ? `\n\nDOCUMENT CONTEXT (${documentCount} documents):\n${document_summaries.map((summary, idx) => {
-          const budget = getTokenBudget(idx);
-          const priorityLabel = budgetDocs?.[idx]
-            ? ` [${budgetDocs[idx].priority}, ${budgetDocs[idx].mode}]`
-            : '';
-          return `\n[Document ${idx + 1}${priorityLabel}]\n${truncateSummary(summary, budget)}`;
-        }).join('\n\n')}`
+      ? `\n\nDOCUMENT CONTEXT (${documentCount} documents):\n${document_summaries
+          .map((summary, idx) => {
+            const budget = getTokenBudget(idx);
+            const priorityLabel = budgetDocs?.[idx]
+              ? ` [${budgetDocs[idx].priority}, ${budgetDocs[idx].mode}]`
+              : '';
+            return `\n[Document ${idx + 1}${priorityLabel}]\n${truncateSummary(summary, budget)}`;
+          })
+          .join('\n\n')}`
       : '';
 
   // Build clarifying context from user answers
@@ -150,63 +153,24 @@ function buildPhase3Prompt(input: Phase3Input): string {
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase3OutputSchema);
 
-  return `You are a senior curriculum architect with 20+ years of experience in adult education (andragogy) and instructional design. Your expertise includes pedagogical strategy, learning progression design, and identifying content gaps.
-
-CRITICAL RULES:
-1. ALL your response MUST be in ${outputLanguage.toUpperCase()} (the course target language is ${outputLanguage})
-2. You MUST respond with valid JSON matching this EXACT schema:
-
-${schemaDescription}
-
-===== CONTEXT FROM PREVIOUS PHASES =====
-
-TOPIC: ${topic}
-TARGET LANGUAGE FOR COURSE: ${outputLanguage} (ALL text content MUST be in ${outputLanguage.toUpperCase()})
-
-CATEGORY: ${phase1_output.course_category.primary} (confidence: ${phase1_output.course_category.confidence})
-COMPLEXITY: ${phase1_output.topic_analysis.complexity}
-INFORMATION COMPLETENESS: ${phase1_output.topic_analysis.information_completeness}%
-TARGET AUDIENCE: ${phase1_output.topic_analysis.target_audience}
-
-SCOPE:
-- Total lessons: ${phase2_output.recommended_structure.total_lessons}
-- Estimated hours: ${phase2_output.recommended_structure.estimated_content_hours}h
-- Lesson duration: ${phase2_output.recommended_structure.lesson_duration_minutes} minutes
-- Total sections: ${phase2_output.recommended_structure.total_sections}${documentContext}${clarifyingContext}
-
-===== YOUR TASKS =====
-
-TASK 1: DESIGN PEDAGOGICAL STRATEGY
-
-Design a comprehensive pedagogical strategy for this course:
-
-1. assessment_approach (min 50 chars): How learners demonstrate understanding
-   - Examples: "Progressive quizzes after each section", "Final capstone project", "Peer review exercises"
-   - Provide comprehensive detail - no upper limit
-
-2. progression_logic (min 100 chars): How difficulty increases across lessons
-   - Explain the learning arc from beginner to mastery
-   - Describe scaffolding strategy
-   - Provide comprehensive detail - no upper limit
-
-NOTE ON FIELD LENGTHS:
-- All string fields have minimum lengths to ensure quality
-- NO upper limits - provide comprehensive, detailed responses
-- Quality over brevity - thorough explanations are encouraged
-
-LANGUAGE REQUIREMENT:
-- ALL text content (assessment_approach, progression_logic) MUST be in ${outputLanguage.toUpperCase()}
-
-===== OUTPUT FORMAT =====
-
-Respond ONLY with valid JSON (no markdown, no code blocks, no explanations):
-
-{
-  "pedagogical_strategy": {
-    "assessment_approach": "string (min 50 chars, comprehensive detail encouraged)",
-    "progression_logic": "string (min 100 chars, comprehensive detail encouraged)"
-  }
-}`;
+  const promptService = createPromptService();
+  return promptService.renderPrompt('stage4_phase3_expert', {
+    outputLanguage,
+    outputLanguageUpper: outputLanguage.toUpperCase(),
+    schemaDescription,
+    topic,
+    category: String(phase1_output.course_category.primary),
+    categoryConfidence: String(phase1_output.course_category.confidence),
+    complexity: String(phase1_output.topic_analysis.complexity),
+    informationCompleteness: String(phase1_output.topic_analysis.information_completeness),
+    targetAudience: String(phase1_output.topic_analysis.target_audience),
+    totalLessons: String(phase2_output.recommended_structure.total_lessons),
+    estimatedHours: String(phase2_output.recommended_structure.estimated_content_hours),
+    lessonDurationMinutes: String(phase2_output.recommended_structure.lesson_duration_minutes),
+    totalSections: String(phase2_output.recommended_structure.total_sections),
+    documentContext,
+    clarifyingContext,
+  });
 }
 
 export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output> {
@@ -224,7 +188,7 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
 
   const model = await getModelForPhase('stage_4_expert', course_id, estimatedTokenCount, language);
   const modelId = model.model || 'unknown';
-  const prompt = buildPhase3Prompt(input);
+  const prompt = await buildPhase3Prompt(input);
   const mainPhaseStartTime = Date.now();
   const mainPhaseOutput = await trackPhaseExecution(
     'stage_4_expert',
