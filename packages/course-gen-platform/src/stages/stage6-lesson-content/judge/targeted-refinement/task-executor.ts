@@ -192,12 +192,22 @@ export async function executePatcherTask(
     }
 
     // Run full mermaid fix pipeline on patched content (regex → validate → LLM fix → revalidate → fallback)
-    const mermaidResult = await runMermaidFixPipeline(patchedContent);
-    if (mermaidResult.modified) {
-      patchedContent = mermaidResult.content;
-      logger.debug(
-        { sectionId: task.sectionId, metrics: mermaidResult.metrics },
-        'Patcher: Mermaid fix pipeline applied to patched content'
+    try {
+      const mermaidResult = await runMermaidFixPipeline(patchedContent);
+      if (mermaidResult.modified) {
+        patchedContent = mermaidResult.content;
+        logger.debug(
+          { sectionId: task.sectionId, metrics: mermaidResult.metrics },
+          'Patcher: Mermaid fix pipeline applied to patched content'
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          sectionId: task.sectionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Patcher: Mermaid fix pipeline failed, using content as-is'
       );
     }
 
@@ -441,12 +451,22 @@ export async function executeExpanderTask(
 
     // Run full mermaid fix pipeline on expanded content (regex → validate → LLM fix → revalidate → fallback)
     let expandedContent = expandResult.regeneratedContent;
-    const mermaidResult = await runMermaidFixPipeline(expandedContent);
-    if (mermaidResult.modified) {
-      expandedContent = mermaidResult.content;
-      logger.debug(
-        { sectionId: task.sectionId, metrics: mermaidResult.metrics },
-        'Expander: Mermaid fix pipeline applied to expanded content'
+    try {
+      const mermaidResult = await runMermaidFixPipeline(expandedContent);
+      if (mermaidResult.modified) {
+        expandedContent = mermaidResult.content;
+        logger.debug(
+          { sectionId: task.sectionId, metrics: mermaidResult.metrics },
+          'Expander: Mermaid fix pipeline applied to expanded content'
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          sectionId: task.sectionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Expander: Mermaid fix pipeline failed, using content as-is'
       );
     }
 
