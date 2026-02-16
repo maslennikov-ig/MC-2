@@ -2,6 +2,60 @@
 
 _Released on 2025-12-26_
 
+## v0.30.0
+
+_Released on 2026-02-16_
+
+### ✨ New Features
+
+- Add 1 skill(s), update 5 agent(s), +2 more
+- **stage4**: Migrate phases 1, 3, 4 to PromptService with typed contracts
+- **prompts**: Add type-safe PromptVariableMap + contract validation tests
+- **stages 4-5**: Add pedagogical guidance, optimize prompts, migrate to PromptService
+- **stage6**: Coherence patcher rejection tests + mermaid pipeline admin monitoring
+- **stage5**: Sequential section generation with digest accumulation
+- **stage4**: Budget-aware Phase 3 truncation + system prompt reserve
+- **stage4**: Wire Budget Allocator to phases + DB-driven model config
+- **stage5**: Add overlap retry loop for cross-section deduplication
+- **stage4**: Add semantic overlap detection to Phase 2 sections_breakdown
+- **stage6**: Add course position awareness to lesson generation
+- **stage6**: Persist lessonDigest and enrich summary_preview from DB
+
+### 🔧 Improvements
+
+- **stage5**: Extract shared buildFallbackSearchQueries + add Stage 5→6 integration test
+- **stage4**: Remove dead logDuplicateKeyTopics function
+
+### 🐛 Bug Fixes
+
+- **health**: Return 503 when heap usage exceeds 90%
+- Health check — 18 bugs fixed (3 critical, 5 high, 7 medium, 3 low)
+- **web**: MermaidDirect error state recovery on chart prop change
+- **stage6**: Add try/catch to mermaid pipeline calls + update README
+- **stage6**: Upgrade targeted refinement to full mermaid fix pipeline
+- **stage6**: Add prompt template validation to section-regenerator and coherence patcher
+- **shared-types**: Fix LessonRAGContextV2 Zod schema rejecting empty primary_documents
+- **stage5**: Fix RAG sentinel bug, remove dead code, deprecate document_relevance_mapping
+- **stage5**: Code review fixes — sanitization, edge cases, dead code cleanup
+- **web**: Fix 40 failing tests across 17 test files
+- **stage4**: Code review fixes — warning logs, ordering invariant, doc headers
+- **web**: Thread courseLanguage to admin generation-graph panels
+- **web**: Parse and localize markdown callout blocks ([!TIP], [!WARNING], etc.)
+- **stage4**: Budget allocator overflow + context handler improvements
+- **web**: Remove y-axis animation to prevent scroll jump on lesson load
+- **tests**: Update lesson-context and classifier tests for new behavior
+- **stage5**: Use const for non-reassigned variable (lint)
+- **web**: Resolve empty mermaid SVG caused by render race condition
+- **stage6**: Add mermaid sanitization to all LLM content paths
+- **pipeline**: Correct JOB_TYPE_TO_STEP mapping, progress messages, and error metadata
+- **stage5**: Filter short course_tags before RT-006 validation
+- **course-gen-platform**: Complete code review fixes for single-call generation
+- **course-gen-platform**: Address code review findings for single-call generation
+
+---
+
+_This release was automatically generated from 61 commits._
+
 ## v0.29.15
 
 _Released on 2026-02-14_
