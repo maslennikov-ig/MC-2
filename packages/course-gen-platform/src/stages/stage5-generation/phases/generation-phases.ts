@@ -75,24 +75,13 @@ const RETRY_CONFIG = {
 } as const;
 
 /**
- * Retry configuration for section generation
- *
- * Note: Section generation is now SEQUENTIAL (one-by-one with digest accumulation).
- * This config is used ONLY for retrying failed sections:
- * - RETRY_DELAY_MS: 2000 (base delay for exponential backoff)
- * - Failed sections are retried in parallel with pLimit(2) for efficiency
- *
- * Note: RETRY_ATTEMPTS_PER_SECTION is now fetched from database via model-config-service
+ * Retry configuration for failed section re-generation.
+ * Primary generation is SEQUENTIAL; retries use pLimit(2) for parallel recovery.
+ * RETRY_ATTEMPTS_PER_SECTION is fetched from database via model-config-service.
  */
-const PARALLEL_CONFIG = {
-  /** Maximum concurrent section generations (DEPRECATED - sections now sequential, only used for retries) */
-  MAX_CONCURRENT_SECTIONS: process.env.STAGE5_MAX_CONCURRENT_SECTIONS
-    ? parseInt(process.env.STAGE5_MAX_CONCURRENT_SECTIONS, 10)
-    : 4,
-  /** Base retry delay in milliseconds */
+const SECTION_RETRY_CONFIG = {
+  /** Base retry delay in milliseconds (exponential backoff) */
   RETRY_DELAY_MS: 2000,
-  /** Delay between parallel batches for rate limiting (DEPRECATED - sections now sequential) */
-  RATE_LIMIT_DELAY_MS: 2000,
 } as const;
 
 /**
@@ -107,23 +96,38 @@ const QUALITY_CONFIG = {
 // HELPER FUNCTIONS
 // ============================================================================
 
+/** Sanitize text for safe prompt injection: strip newlines, limit length */
+const sanitizeDigest = (s: string, maxLen = 200): string =>
+  s.replace(/[\n\r]+/g, ' ').trim().slice(0, maxLen);
+
 /**
  * Build a text digest of a generated section for cross-section context.
  * Extracts lesson titles and key_topics from structured output.
  * Used to give subsequent sections awareness of previously generated content.
  *
+ * Returns empty string if section has no lessons (skipped in accumulation).
+ *
  * @param section - Generated section with lessons
  * @param sectionIndex - Section index (0-based)
- * @returns Formatted digest string with lesson titles and topics
+ * @returns Formatted digest string, or empty string if no lesson content
  */
 function buildSectionDigest(section: Section, sectionIndex: number): string {
-  const title = section.section_title || `Section ${sectionIndex + 1}`;
+  const title = sanitizeDigest(section.section_title || `Section ${sectionIndex + 1}`);
   const lessons = (section.lessons || [])
     .map(l => {
-      const topics = (l.key_topics || []).slice(0, 3).join(', ');
-      return `  - ${l.lesson_title}${topics ? ` (Topics: ${topics})` : ''}`;
+      const lessonTitle = sanitizeDigest(l.lesson_title || 'Untitled Lesson');
+      const topics = (l.key_topics || [])
+        .slice(0, 3)
+        .map(t => sanitizeDigest(t, 100))
+        .join(', ');
+      return `  - ${lessonTitle}${topics ? ` (Topics: ${topics})` : ''}`;
     })
     .join('\n');
+
+  if (!lessons.trim()) {
+    return '';
+  }
+
   return `Section ${sectionIndex + 1} "${title}":\n${lessons}\n`;
 }
 
@@ -495,7 +499,7 @@ export class GenerationPhases {
         stage: 'stage_5',
         phase: 'generate_sections',
         stepName: 'phase_start',
-        inputData: { totalSections, maxConcurrency: PARALLEL_CONFIG.MAX_CONCURRENT_SECTIONS },
+        inputData: { totalSections, generationMode: 'sequential' },
         durationMs: 0,
       });
 
@@ -568,9 +572,12 @@ export class GenerationPhases {
           );
           successfulResults.push({ index: sectionIndex, result });
 
-          // Accumulate digest for subsequent sections
+          // Accumulate digest for subsequent sections (skip empty digests)
           if (result.sections.length > 0) {
-            previousSectionsDigest += buildSectionDigest(result.sections[0], sectionIndex);
+            const digest = buildSectionDigest(result.sections[0], sectionIndex);
+            if (digest) {
+              previousSectionsDigest += digest;
+            }
           }
         } catch (error) {
           failedResults.push({
@@ -640,6 +647,7 @@ export class GenerationPhases {
           totalSections: allSections.length,
           successCount: successfulResults.length,
           failureCount: finalFailures.length,
+          digestChars: previousSectionsDigest.length,
         },
         tokensUsed: totalTokensUsed,
         durationMs: duration,
@@ -882,7 +890,7 @@ export class GenerationPhases {
     let lastError = failed.error;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const delay = exponentialBackoff(attempt, PARALLEL_CONFIG.RETRY_DELAY_MS);
+      const delay = exponentialBackoff(attempt, SECTION_RETRY_CONFIG.RETRY_DELAY_MS);
 
       this.logger.info(
         {
@@ -1247,6 +1255,11 @@ export class GenerationPhases {
    * overlap detection finds semantically similar sections.
    * The overlapFeedback string is injected into the prompt to guide
    * the LLM to generate non-overlapping content.
+   *
+   * NOTE: Does NOT use previousSectionsDigest because:
+   * 1. Called AFTER all sections are generated (digest would be stale context)
+   * 2. overlapFeedback provides more precise, targeted differentiation instructions
+   * 3. Overlap retry is a corrective mechanism, not preventive like digest
    *
    * @param sectionIndex - 0-based section index
    * @param input - Generation job input
