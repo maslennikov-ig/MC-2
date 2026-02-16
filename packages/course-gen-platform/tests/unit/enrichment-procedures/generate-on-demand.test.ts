@@ -19,15 +19,18 @@ vi.mock('nanoid', () => ({
   nanoid: vi.fn(() => 'test-request-id'),
 }));
 
-// Mock logger
-vi.mock('@/shared/logger/index.js', () => ({
-  logger: {
+// Mock logger (both named and default exports — rate-limit.ts uses default import)
+vi.mock('@/shared/logger/index.js', () => {
+  const mockLogger = {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
-  },
-}));
+    trace: vi.fn(),
+    child: vi.fn().mockReturnThis(),
+  };
+  return { default: mockLogger, logger: mockLogger };
+});
 
 // Mock Supabase admin
 vi.mock('@/shared/supabase/admin', () => ({
@@ -54,11 +57,13 @@ vi.mock('@/shared/supabase/admin', () => ({
   })),
 }));
 
-// Mock access control helpers
+// Mock access control helpers (include all functions used by generate-on-demand procedure)
 vi.mock('@/server/routers/enrichment/helpers', () => ({
   verifyLessonAccess: vi.fn(),
   getNextOrderIndex: vi.fn().mockResolvedValue(1),
   isTwoStageType: (type: string) => type === 'presentation' || type === 'video',
+  checkExistingEnrichment: vi.fn().mockResolvedValue({ exists: false }),
+  findReusableEnrichment: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock BullMQ queue
@@ -201,14 +206,45 @@ describe('generateOnDemand', () => {
       }
     });
 
-    // TODO: These tests require more sophisticated mock setup for vi.mock factory
-    // See follow-up task for comprehensive tRPC procedure testing
-    it.skip('should throw FORBIDDEN if user lacks access to lesson', async () => {
-      // Skipped: requires vi.mock factory refactoring
+    it('should throw FORBIDDEN if user lacks access to lesson', async () => {
+      mockVerifyLessonAccess.mockRejectedValueOnce(
+        new TRPCError({ code: 'FORBIDDEN', message: 'You do not have access to this lesson' })
+      );
+
+      const caller = testRouter.createCaller(createAuthenticatedContext());
+
+      try {
+        await caller.generateOnDemand({
+          lessonId: '550e8400-e29b-41d4-a716-446655440000',
+          enrichmentType: 'quiz',
+        });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(TRPCError);
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe('FORBIDDEN');
+        }
+      }
     });
 
-    it.skip('should call verifyLessonAccess with correct parameters', async () => {
-      // Skipped: requires vi.mock factory refactoring
+    it('should call verifyLessonAccess with correct parameters', async () => {
+      const caller = testRouter.createCaller(createAuthenticatedContext());
+
+      try {
+        await caller.generateOnDemand({
+          lessonId: '550e8400-e29b-41d4-a716-446655440000',
+          enrichmentType: 'quiz',
+        });
+      } catch {
+        // May throw due to downstream mocks — we only check verifyLessonAccess was called
+      }
+
+      expect(mockVerifyLessonAccess).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'user-123',
+        'org-123',
+        expect.any(String)
+      );
     });
   });
 
@@ -234,9 +270,25 @@ describe('generateOnDemand', () => {
   });
 
   describe('NOT_FOUND Handling', () => {
-    // TODO: Requires more sophisticated mock setup for vi.mock factory
-    it.skip('should throw NOT_FOUND if lesson does not exist', async () => {
-      // Skipped: requires vi.mock factory refactoring
+    it('should throw NOT_FOUND if lesson does not exist', async () => {
+      mockVerifyLessonAccess.mockRejectedValueOnce(
+        new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' })
+      );
+
+      const caller = testRouter.createCaller(createAuthenticatedContext());
+
+      try {
+        await caller.generateOnDemand({
+          lessonId: '550e8400-e29b-41d4-a716-446655440000',
+          enrichmentType: 'quiz',
+        });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(TRPCError);
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe('NOT_FOUND');
+        }
+      }
     });
   });
 });
