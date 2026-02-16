@@ -48,6 +48,12 @@ const TEST_CASES = [
     diagram: '```mermaid\ngraph TD\n  A[\\"test\\"]\n```',
     shouldSanitize: true,
   },
+  {
+    name: 'pipeline_full_flow',
+    diagram: '```mermaid\ngraph TD\n  A[\\"test\\"]\n```',
+    shouldRunPipeline: true,
+    expectedModified: true,
+  },
 ];
 
 /**
@@ -102,6 +108,21 @@ export async function healthCheckMermaidPipeline(): Promise<MermaidHealthCheckRe
           error: passed
             ? undefined
             : `Expected modified=${testCase.shouldSanitize}, got ${result.modified}`,
+          durationMs: Date.now() - checkStart,
+        });
+      }
+
+      if ('shouldRunPipeline' in testCase) {
+        const { runMermaidFixPipeline } = await import('./mermaid-fix-pipeline');
+        const result = await runMermaidFixPipeline(testCase.diagram, { skipLLM: true });
+        const passed = result.modified === testCase.expectedModified;
+
+        checks.push({
+          name: testCase.name,
+          passed,
+          error: passed
+            ? undefined
+            : `Expected modified=${testCase.expectedModified}, got ${result.modified}`,
           durationMs: Date.now() - checkStart,
         });
       }
