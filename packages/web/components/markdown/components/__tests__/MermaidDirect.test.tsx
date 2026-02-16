@@ -300,20 +300,18 @@ describe('MermaidDirect', () => {
       })
     })
 
-    it('should render successfully after a failed mount (fresh mount)', async () => {
-      // First mount with error
+    it('should recover from error when chart prop changes to valid syntax', async () => {
+      // First render with error
       mockRender.mockRejectedValueOnce(new Error('Syntax error'))
-      const { unmount } = render(<MermaidDirect chart="invalid syntax" />)
+      const { rerender } = render(<MermaidDirect chart="invalid syntax" />)
 
       await waitFor(() => {
         expect(screen.getByText('Diagram Error')).toBeInTheDocument()
       })
 
-      unmount()
-
-      // Fresh mount with valid chart — error state resets
+      // Rerender with valid chart — same component instance should recover
       mockRender.mockResolvedValue({ svg: MOCK_SVG_CLEAN, bindFunctions: undefined })
-      render(<MermaidDirect chart="graph TD\n  A-->B" />)
+      rerender(<MermaidDirect chart="graph TD\n  A-->B" />)
 
       await waitFor(() => {
         expect(screen.queryByText('Diagram Error')).not.toBeInTheDocument()

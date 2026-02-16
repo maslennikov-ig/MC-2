@@ -557,9 +557,17 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
     renderDiagram()
   }, [chart, isDark, uniqueId])
 
-  if (error) {
-    return (
-      <figure className={cn('mermaid-error not-prose my-6', className)}>
+  return (
+    <figure
+      className={cn(
+        error ? 'mermaid-error' : 'mermaid-container',
+        'not-prose my-6',
+        className
+      )}
+      role={error ? undefined : 'img'}
+      aria-label={error ? undefined : ariaLabel || 'Mermaid diagram'}
+    >
+      {error && (
         <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
           <div className="text-destructive mb-2 font-medium">Diagram Error</div>
           <div className="text-muted-foreground mb-2 text-sm">{error}</div>
@@ -567,19 +575,13 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
             {chart}
           </pre>
         </div>
-      </figure>
-    )
-  }
-
-  return (
-    <figure
-      className={cn('mermaid-container not-prose my-6', className)}
-      role="img"
-      aria-label={ariaLabel || 'Mermaid diagram'}
-    >
+      )}
       <div
         ref={containerRef}
-        className="mermaid-diagram bg-card border-border flex justify-center overflow-x-auto rounded-lg border p-4"
+        className={cn(
+          'mermaid-diagram bg-card border-border flex justify-center overflow-x-auto rounded-lg border p-4',
+          error && 'hidden'
+        )}
       />
     </figure>
   )
