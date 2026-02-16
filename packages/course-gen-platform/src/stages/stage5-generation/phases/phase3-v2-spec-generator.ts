@@ -38,6 +38,7 @@ import type {
 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { SectionBreakdown, AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import { inferSemanticScaffolding } from '../utils/semantic-scaffolding';
+import { buildFallbackSearchQueries } from '../utils/rag-fallback-queries';
 import logger from '@/shared/logger';
 
 // ============================================================================
@@ -474,9 +475,11 @@ export class V2LessonSpecGenerator {
     const sectionBreakdown = analysisResult.recommended_structure?.sections_breakdown?.find(
       s => s.section_id === sectionId
     );
-    const fallbackQueries = sectionBreakdown
-      ? [sectionBreakdown.area, ...sectionBreakdown.key_topics.slice(0, 3)]
-      : [`${analysisResult.topic_analysis.determined_topic} fundamentals`];
+    const fallbackQueries = buildFallbackSearchQueries(
+      sectionBreakdown,
+      analysisResult.topic_analysis.determined_topic,
+      sectionId,
+    );
 
     const finalSearchQueries =
       searchQueries.length > 0 && searchQueries[0].length >= 3
