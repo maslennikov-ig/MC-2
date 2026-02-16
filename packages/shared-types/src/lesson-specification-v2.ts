@@ -392,13 +392,20 @@ export type LessonContext = z.infer<typeof LessonContextSchema>;
 /**
  * RAG context specification for lesson generation.
  * Defines retrieval parameters and expected chunk counts.
+ *
+ * @property primary_documents - UUIDs of documents to prioritize in retrieval.
+ *   - Non-empty array: filter retrieval to these documents only
+ *   - Empty array `[]`: search ALL course documents (no filtering)
+ *   - NEVER use sentinel values like `['default']` — they break Qdrant filtering
+ * @property search_queries - queries for vector search (section topics, key concepts)
+ * @property expected_chunks - target chunk count (5-10 per lesson)
  */
 export const LessonRAGContextV2Schema = z.object({
   /**
    * Primary document IDs from file_catalog.
-   * These documents provide the authoritative source material.
+   * Empty array means "search all course documents" (no document filtering).
    */
-  primary_documents: z.array(z.string().min(1)).min(1, 'Must have at least 1 primary document'),
+  primary_documents: z.array(z.string().min(1)).default([]),
 
   /**
    * Search queries for vector retrieval.
@@ -414,8 +421,8 @@ export const LessonRAGContextV2Schema = z.object({
   expected_chunks: z
     .number()
     .int('Expected chunks must be an integer')
-    .min(5, 'Minimum 5 chunks expected')
-    .max(10, 'Maximum 10 chunks expected'),
+    .min(1, 'Minimum 1 chunk expected')
+    .max(15, 'Maximum 15 chunks expected'),
 });
 
 // ============================================================================
