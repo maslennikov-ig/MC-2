@@ -59,16 +59,22 @@ function buildRAGContext(
   const ragPlan = analysisResult?.document_relevance_mapping?.[String(sectionId)];
 
   if (!ragPlan) {
+    // Get section-specific data for meaningful search queries
+    const section = analysisResult?.recommended_structure?.sections_breakdown?.[sectionId - 1];
+    const searchQueries = section
+      ? [section.area, ...section.key_topics.slice(0, 3)]
+      : [`${analysisResult?.topic_analysis?.determined_topic ?? 'course'} section ${sectionId}`];
+
     return {
-      primary_documents: ['default'],
-      search_queries: ['course content'],
+      primary_documents: [],  // empty = search all course documents
+      search_queries: searchQueries,
       expected_chunks: 7,
     };
   }
 
   return {
     primary_documents:
-      ragPlan.primary_documents?.length > 0 ? ragPlan.primary_documents : ['default'],
+      ragPlan.primary_documents?.length > 0 ? ragPlan.primary_documents : [],  // empty = search all
     search_queries:
       ragPlan.search_queries?.length > 0
         ? ragPlan.search_queries

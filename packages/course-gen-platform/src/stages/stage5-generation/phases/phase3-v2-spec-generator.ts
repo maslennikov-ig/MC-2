@@ -466,15 +466,22 @@ export class V2LessonSpecGenerator {
     // Build primary documents list
     const primaryDocuments = ragPlan?.primary_documents || [];
 
-    // Ensure we have at least one primary document or fallback
+    // Empty array = search all course documents (do not use 'default' sentinel)
     const finalPrimaryDocs =
-      primaryDocuments.length > 0 ? primaryDocuments : ['default-course-document'];
+      primaryDocuments.length > 0 ? primaryDocuments : [];
 
-    // Ensure we have at least one search query
+    // Use section-specific topics for better search queries
+    const sectionBreakdown = analysisResult.recommended_structure?.sections_breakdown?.find(
+      s => s.section_id === sectionId
+    );
+    const fallbackQueries = sectionBreakdown
+      ? [sectionBreakdown.area, ...sectionBreakdown.key_topics.slice(0, 3)]
+      : [`${analysisResult.topic_analysis.determined_topic} fundamentals`];
+
     const finalSearchQueries =
       searchQueries.length > 0 && searchQueries[0].length >= 3
         ? searchQueries
-        : [`${analysisResult.topic_analysis.determined_topic} fundamentals`];
+        : fallbackQueries;
 
     return {
       primary_documents: finalPrimaryDocs,
