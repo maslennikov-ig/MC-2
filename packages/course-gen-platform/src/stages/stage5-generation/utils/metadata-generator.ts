@@ -257,17 +257,37 @@ export class MetadataGenerator {
       // Filter course_tags shorter than 3 chars BEFORE UnifiedRegenerator validation
       // LLMs sometimes generate valid abbreviations like "AI", "ИИ" that fail z.string().min(3)
       if (parsedRaw.course_tags && Array.isArray(parsedRaw.course_tags)) {
+        const originalTagCount = (parsedRaw.course_tags as unknown[]).length;
         parsedRaw.course_tags = (parsedRaw.course_tags as unknown[]).filter(
           (tag): tag is string => typeof tag === 'string' && tag.length >= 3
         );
+        const filteredCount = originalTagCount - (parsedRaw.course_tags as unknown[]).length;
+        if (filteredCount > 0) {
+          logger.warn({
+            msg: 'Filtered short course_tags in preprocessing',
+            courseId: input.course_id,
+            filtered: filteredCount,
+            remaining: (parsedRaw.course_tags as unknown[]).length,
+          });
+        }
       }
 
       // Filter prerequisites shorter than 10 chars BEFORE validation
       // z.string().min(10) for individual prerequisites
       if (parsedRaw.prerequisites && Array.isArray(parsedRaw.prerequisites)) {
+        const originalPrereqCount = (parsedRaw.prerequisites as unknown[]).length;
         parsedRaw.prerequisites = (parsedRaw.prerequisites as unknown[]).filter(
           (prereq): prereq is string => typeof prereq === 'string' && prereq.length >= 10
         );
+        const filteredCount = originalPrereqCount - (parsedRaw.prerequisites as unknown[]).length;
+        if (filteredCount > 0) {
+          logger.warn({
+            msg: 'Filtered short prerequisites in preprocessing',
+            courseId: input.course_id,
+            filtered: filteredCount,
+            remaining: (parsedRaw.prerequisites as unknown[]).length,
+          });
+        }
       }
 
       preprocessedContent = JSON.stringify(parsedRaw);
