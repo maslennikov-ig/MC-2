@@ -21,6 +21,7 @@ import {
   type HardcodedPrompt,
 } from './prompt-registry';
 import { filterWhitelistedTemplates } from '../validation/template-whitelist';
+import type { PromptKey, PromptVariableMap } from './prompt-contracts';
 
 // ============================================================================
 // TYPES
@@ -133,11 +134,19 @@ class PromptServiceImpl {
   /**
    * Render prompt template with variable substitution
    *
+   * Type-safe overload: when promptKey is a known PromptKey, TypeScript enforces
+   * the correct variables shape at compile time via PromptVariableMap.
+   *
    * @param promptKey - Unique prompt identifier
    * @param variables - Variables to substitute (key-value pairs)
    * @returns Rendered prompt string
    * @throws Error if prompt not found or required variables missing
    */
+  async renderPrompt<K extends PromptKey>(
+    promptKey: K,
+    variables: PromptVariableMap[K]
+  ): Promise<string>;
+  async renderPrompt(promptKey: string, variables: Record<string, string>): Promise<string>;
   async renderPrompt(promptKey: string, variables: Record<string, string>): Promise<string> {
     const prompt = await this.getPrompt(promptKey);
     if (!prompt) {
