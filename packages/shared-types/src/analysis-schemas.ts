@@ -762,7 +762,7 @@ export const AnalysisResultSchema = z.object({
     real_world_examples: z.array(z.string()), // REQUIRED
   }),
 
-  document_relevance_mapping: DocumentRelevanceMappingSchema.default({}),
+  document_relevance_mapping: DocumentRelevanceMappingSchema.optional().default({}),
 
   metadata: z.object({
     analysis_version: z.string(),
