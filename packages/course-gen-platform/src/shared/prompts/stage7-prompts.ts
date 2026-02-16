@@ -194,7 +194,13 @@ Key Topics: {{keywords}}
 Language Context: {{languageContext}}
 {{styleHint}}
 
-Create a prompt for a 16:9 hero banner image that visually represents this lesson topic.`,
+VISUAL STYLE (MUST FOLLOW for brand consistency):
+Color Scheme: {{colorScheme}}
+Aesthetic: {{aesthetic}}
+Visual Elements: {{visualElements}}
+Mood: {{mood}}
+
+Create a prompt for a 16:9 hero banner image that visually represents this lesson topic while matching the specified visual style.`,
     variables: [
       { name: 'lessonTitle', description: 'Lesson title', required: true },
       { name: 'courseSubject', description: 'Course subject area', required: true },
@@ -209,6 +215,10 @@ Create a prompt for a 16:9 hero banner image that visually represents this lesso
         description: 'Optional style preference line (e.g., "Style Preference: minimalist")',
         required: false,
       },
+      { name: 'colorScheme', description: 'Visual style color scheme', required: true },
+      { name: 'aesthetic', description: 'Visual style aesthetic', required: true },
+      { name: 'visualElements', description: 'Visual style elements', required: true },
+      { name: 'mood', description: 'Visual style mood', required: true },
     ],
   },
 ];

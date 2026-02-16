@@ -60,6 +60,11 @@ Analyze this topic and provide comprehensive classification and topic analysis.`
         example: 'React Hooks fundamentals',
       },
       {
+        name: 'userRequirements',
+        description: 'Optional user requirements (course description, learning outcomes, etc.)',
+        required: false,
+      },
+      {
         name: 'documentContext',
         description: 'Optional document summaries context',
         required: false,
