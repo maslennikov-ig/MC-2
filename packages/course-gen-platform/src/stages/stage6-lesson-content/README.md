@@ -152,20 +152,24 @@ Location: `src/shared/prompts/prompt-registry.ts`
 
 LLM prompts include explicit instructions to avoid escaped quotes in Mermaid diagrams.
 
-### Layer 2: Auto-Fix (Sanitizer)
+### Layer 2: Auto-Fix (5-Stage Pipeline)
 
-Location: `utils/mermaid-sanitizer.ts`
+Location: `utils/mermaid-fix-pipeline.ts`
 
-Automatically removes `\"` from Mermaid blocks after generation:
+Automatically fixes mermaid syntax through a 5-stage cascade (regex → validate → LLM fix → revalidate → fallback):
 
 ```typescript
-import { sanitizeMermaidBlocks } from './utils/mermaid-sanitizer';
+import { runMermaidFixPipeline } from './utils/mermaid-fix-pipeline';
 
-const result = sanitizeMermaidBlocks(content);
-// result.content - sanitized content
-// result.modified - whether changes were made
-// result.fixes - details of fixes applied
+const result = await runMermaidFixPipeline(content);
+// result.content - fixed content
+// result.modified - whether any changes were made
+// result.metrics.diagramsFixedRegex - diagrams fixed by regex
+// result.metrics.diagramsFixedLLM - diagrams fixed by LLM
+// result.metrics.diagramsFallback - diagrams that failed all fixes
 ```
+
+Note: `sanitizeMermaidBlocks()` from `utils/mermaid-sanitizer.ts` is now internal to the pipeline (Stage 1).
 
 ### Layer 3: Detection (Heuristic Filter)
 
