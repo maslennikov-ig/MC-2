@@ -390,6 +390,21 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description:
       'Stage 4 not initialized when worker started, initializing as fallback - expected during recovery',
   },
+
+  // === Stage 4 Cascade Retry Warnings ===
+  {
+    pattern: /Phase phase\d+_\w+ attempt \d+ failed/i,
+    reason: 'cascading_repair',
+    description:
+      'Intermediate retry warning from executePhaseWithRetry - expected during LLM retries',
+  },
+
+  // === Stage 6 Digest Section Fallback ===
+  {
+    pattern: /No digest section found/i,
+    reason: 'graceful_fallback',
+    description: 'Stage 6 returns empty digest when no digest section exists - non-blocking',
+  },
 ];
 
 export interface AutoMuteResult {
