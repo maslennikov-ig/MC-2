@@ -50,6 +50,16 @@ export interface Phase3Input {
     priority: string;
     category: string | null;
   }>;
+  /** Budget allocation context from Stage 4 Budget Allocator */
+  budget_context?: {
+    documents: Array<{
+      file_name: string;
+      mode: 'full_text' | 'summary';
+      priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+      tokens: number;
+    }>;
+    totalTokens: number;
+  };
 }
 
 interface RawPhase3Output {
@@ -103,15 +113,27 @@ function buildPhase3Prompt(input: Phase3Input): string {
   // Determine output language based on course language
   const outputLanguage = language === 'en' ? 'English' : language === 'ru' ? 'Russian' : language;
 
-  // Build document context with token-aware truncation
-  // Target: ~25K tokens total for documents (model context is limited)
-  // With 3 docs: ~8K tokens per document
+  // Build document context with budget-aware truncation
+  // Uses per-document token allocation from Budget Allocator when available
+  // Falls back to equal 25K split when no budget context
   const documentCount = document_summaries?.length || 0;
-  const tokensPerDocument = documentCount > 0 ? Math.floor(25000 / documentCount) : 0;
+  const budgetDocs = input.budget_context?.documents;
+  const DEFAULT_TOTAL_DOC_TOKENS = 25_000;
+
+  const getTokenBudget = (idx: number): number => {
+    if (budgetDocs?.[idx]) return budgetDocs[idx].tokens;
+    return documentCount > 0 ? Math.floor(DEFAULT_TOTAL_DOC_TOKENS / documentCount) : 0;
+  };
 
   const documentContext =
     document_summaries && document_summaries.length > 0
-      ? `\n\nDOCUMENT SUMMARIES (${documentCount} documents, truncated for context):\n${document_summaries.map((summary, idx) => `\n[Document ${idx + 1}]\n${truncateSummary(summary, tokensPerDocument)}`).join('\n\n')}`
+      ? `\n\nDOCUMENT CONTEXT (${documentCount} documents):\n${document_summaries.map((summary, idx) => {
+          const budget = getTokenBudget(idx);
+          const priorityLabel = budgetDocs?.[idx]
+            ? ` [${budgetDocs[idx].priority}, ${budgetDocs[idx].mode}]`
+            : '';
+          return `\n[Document ${idx + 1}${priorityLabel}]\n${truncateSummary(summary, budget)}`;
+        }).join('\n\n')}`
       : '';
 
   // Build clarifying context from user answers

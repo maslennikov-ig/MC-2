@@ -111,6 +111,12 @@ export interface Stage4BudgetAllocation {
   };
 }
 
+/**
+ * Token reserve for system prompt and phase-specific instructions.
+ * Subtracted from effective max context before document allocation.
+ */
+export const SYSTEM_PROMPT_RESERVE = 10_000;
+
 // ============================================================================
 // MAIN FUNCTION
 // ============================================================================
@@ -163,8 +169,8 @@ export function allocateStage4Budget(
   // Step 3: Select model based on minimum — use tier config from DB or hardcoded fallback
   const modelSelection = selectModelFromTierConfig(minimumTokens, language, tierConfig);
 
-  // Step 4: Determine effective max context (respect hard limit)
-  const effectiveMaxContext = Math.min(modelSelection.maxContext, STAGE4_HARD_TOKEN_LIMIT);
+  // Step 4: Determine effective max context (respect hard limit + system prompt reserve)
+  const effectiveMaxContext = Math.min(modelSelection.maxContext, STAGE4_HARD_TOKEN_LIMIT) - SYSTEM_PROMPT_RESERVE;
 
   // Step 5: Calculate upgrade budget for IMPORTANT documents
   // All IMPORTANT docs start as summaries (already reserved in minimumTokens).
