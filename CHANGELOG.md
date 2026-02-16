@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.2] - 2026-02-16
+
+### Fixed
+
+- **course-gen-platform**: route Zod validation through UnifiedRegenerator, fix metadata min-length, add auto-mute rules (f0fb8a8b)
+- **course-gen-platform**: sync thin stage5 prompt in db (12228ef2)
+
+### Other
+
+- update docs (cbbbbb60)
+
 ## [0.30.1] - 2026-02-16
 
 ### Fixed

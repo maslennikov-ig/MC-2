@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.30.2
+
+_Released on 2026-02-16_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Route Zod validation through UnifiedRegenerator, fix metadata min-length, add auto-mute rules
+- **course-gen-platform**: Sync thin stage5 prompt in db
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.30.1
 
 _Released on 2026-02-16_
