@@ -280,7 +280,7 @@ export async function generateWithRetry(
 
   while (retryCount < maxAttempts) {
     try {
-      const prompt = buildBatchPrompt(
+      const prompt = await buildBatchPrompt(
         input,
         sectionIndex,
         qdrantClient,

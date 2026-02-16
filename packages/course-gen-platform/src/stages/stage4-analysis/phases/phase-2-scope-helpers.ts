@@ -96,7 +96,7 @@ export async function parseWithRepairCascade(
   model: ChatOpenAI,
   modelId: string,
   validatedInput: Phase2Input,
-  buildPromptTextFn: (input: Phase2Input) => string
+  buildPromptTextFn: (input: Phase2Input) => Promise<string>
 ): Promise<{ parsedOutput: unknown; repairMetadata: RepairMetadata }> {
   const repairMetadata: RepairMetadata = {
     layer_used: 'none',
@@ -133,7 +133,7 @@ export async function parseWithRepairCascade(
 
     const result = await regenerator.regenerate({
       rawOutput: preprocessedOutput,
-      originalPrompt: buildPromptTextFn(validatedInput),
+      originalPrompt: await buildPromptTextFn(validatedInput),
       parseError: parseError instanceof Error ? parseError.message : String(parseError),
     });
 
