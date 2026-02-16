@@ -1,57 +1,35 @@
-# Plan: Bug Health Check (Inline Orchestration)
+# Диагностика: ERR_NAME_NOT_RESOLVED на dev.ai.megacampus.ru
 
-## Context
+## Ошибка
 
-Запуск полного Bug Health Check по workflow `/health-bugs`. Цель — обнаружить баги в кодовой базе, создать Beads-задачи, исправить по приоритетам, верифицировать.
+```
+GET https://dev.ai.megacampus.ru/api/courses/default-organization/kak-stat-schastlivym-884c3af5/traces net::ERR_NAME_NOT_RESOLVED
+[ERROR] [SW Manager] Fetch interceptor error {error: 'Failed to fetch'}
+```
 
-## Workflow
+## Результаты расследования
 
-### Phase 1: Pre-flight & Beads Init
+### Курс существует
 
-- `mkdir -p .tmp/current/{plans,changes,backups}`
-- Создать Beads wisp: `bd mol wisp healthcheck`
-- Инициализировать TodoWrite
+- ID: `2c921d06-4722-4b3b-8de1-97c24c37ebaa`
+- Slug: `kak-stat-schastlivym-884c3af5`
+- Status: `draft`
+- API endpoint `/api/courses/[orgSlug]/[courseSlug]/traces/route.ts` — существует
 
-### Phase 2: Detection
+### В error_logs ничего нет
 
-- Запустить `bug-hunter` subagent для полного сканирования
-- Прочитать `bug-hunting-report.md`, распарсить баги по приоритетам
-- Если 0 багов → Phase 7
+Ни одной записи с этой ошибкой в БД — запрос не дошёл до сервера.
 
-### Phase 2.5: History Enrichment (только CRITICAL/HIGH)
+### Диагноз: DNS-проблема на стороне клиента
 
-- Поиск в Beads по ключевым словам закрытых задач
-- Обогащение данных о багах историческим контекстом
+`ERR_NAME_NOT_RESOLVED` — браузер пользователя не смог разрешить домен `dev.ai.megacampus.ru` в IP-адрес. Это **не ошибка кода**.
 
-### Phase 3: Create Beads Issues
+Возможные причины:
 
-- `bd create` для каждого бага с приоритетом
-- Для CRITICAL/HIGH — с историческим контекстом
+1. Временный DNS-сбой
+2. Сеть пользователя (корпоративный DNS, VPN, нестабильный интернет)
+3. Деплой в момент запроса — мы пушили в develop (авто-деплой на dev), сервер перезагружался
 
-### Phase 4: Quality Gate (Pre-fix)
+Service Worker ошибка — вторичная: SW попытался fetch, получил ту же DNS-ошибку.
 
-- `pnpm type-check && pnpm build`
-
-### Phase 5: Fixing Loop (critical → high → medium → low)
-
-- Для каждого приоритета запустить `bug-fixer` subagent
-- Quality gate после каждого раунда
-- Закрыть исправленные Beads-задачи
-
-### Phase 6: Verification
-
-- Повторный `bug-hunter` для проверки
-- До 3 итераций если баги остаются
-
-### Phase 7: Final Summary & Beads Complete
-
-- `bd mol squash/burn` для wisp
-- Создать задачи для неисправленных багов
-- Git commit & push
-
-## Verification
-
-- `pnpm type-check` passes
-- `pnpm build` passes
-- bug-hunting-report.md создан
-- Beads wisp закрыт
+## Действия по коду: нет
