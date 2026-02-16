@@ -8,6 +8,7 @@ import type {
 } from '@megacampus/shared-types/lesson-specification-v2';
 import logger from '@/shared/logger';
 import { inferSemanticScaffolding } from '../semantic-scaffolding';
+import { buildFallbackSearchQueries } from '../rag-fallback-queries';
 
 const BLOOM_KEYWORDS: Record<BloomLevelV2, string[]> = {
   create: ['create', 'design', 'build', 'develop', 'construct', 'compose', 'invent', 'formulate'],
@@ -59,15 +60,12 @@ function buildRAGContext(
   const ragPlan = analysisResult?.document_relevance_mapping?.[String(sectionId)];
 
   if (!ragPlan) {
-    // Get section-specific data for meaningful search queries
     const section = analysisResult?.recommended_structure?.sections_breakdown?.[sectionId - 1];
-    const searchQueries = section
-      ? [section.area, ...section.key_topics.slice(0, 3)]
-      : [`${analysisResult?.topic_analysis?.determined_topic ?? 'course'} section ${sectionId}`];
+    const topic = analysisResult?.topic_analysis?.determined_topic ?? 'course';
 
     return {
       primary_documents: [],  // empty = search all course documents
-      search_queries: searchQueries,
+      search_queries: buildFallbackSearchQueries(section, topic, sectionId),
       expected_chunks: 7,
     };
   }
