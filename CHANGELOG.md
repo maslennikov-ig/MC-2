@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-02-16
+
+### Added
+
+- add 1 skill(s), update 5 agent(s), +2 more (b5c7ea70)
+- **stage4**: migrate phases 1, 3, 4 to PromptService with typed contracts (6be9a309)
+- **prompts**: add type-safe PromptVariableMap + contract validation tests (308e6e9f)
+- **stages 4-5**: add pedagogical guidance, optimize prompts, migrate to PromptService (99fb2260)
+- **stage6**: coherence patcher rejection tests + mermaid pipeline admin monitoring (ca6f625b)
+- **stage5**: sequential section generation with digest accumulation (dd770d06)
+- **stage4**: budget-aware Phase 3 truncation + system prompt reserve (9b3e5407)
+- **stage4**: wire Budget Allocator to phases + DB-driven model config (ac50c93e)
+- **stage5**: add overlap retry loop for cross-section deduplication (2d18962f)
+- **stage4**: add semantic overlap detection to Phase 2 sections_breakdown (44dbac89)
+- **stage6**: add course position awareness to lesson generation (61348bf6)
+- **stage6**: persist lessonDigest and enrich summary_preview from DB (f7f66473)
+
+### Changed
+
+- **stage5**: extract shared buildFallbackSearchQueries + add Stage 5→6 integration test (c85b11e2)
+- **stage4**: remove dead logDuplicateKeyTopics function (57007f63)
+
+### Fixed
+
+- **health**: return 503 when heap usage exceeds 90% (491f1098)
+- health check — 18 bugs fixed (3 critical, 5 high, 7 medium, 3 low) (69b00fbc)
+- **web**: MermaidDirect error state recovery on chart prop change (354d636f)
+- **stage6**: add try/catch to mermaid pipeline calls + update README (1023339b)
+- **stage6**: upgrade targeted refinement to full mermaid fix pipeline (d582272b)
+- **stage6**: add prompt template validation to section-regenerator and coherence patcher (38d926b6)
+- **shared-types**: fix LessonRAGContextV2 Zod schema rejecting empty primary_documents (520e9bdc)
+- **stage5**: fix RAG sentinel bug, remove dead code, deprecate document_relevance_mapping (478f5c20)
+- **stage5**: code review fixes — sanitization, edge cases, dead code cleanup (a5ff8242)
+- **web**: fix 40 failing tests across 17 test files (14ec3938)
+- **stage4**: code review fixes — warning logs, ordering invariant, doc headers (a641d4be)
+- **web**: thread courseLanguage to admin generation-graph panels (6cde4647)
+- **web**: parse and localize markdown callout blocks ([!TIP], [!WARNING], etc.) (abca7614)
+- **stage4**: budget allocator overflow + context handler improvements (41a50c79)
+- **web**: remove y-axis animation to prevent scroll jump on lesson load (b2a5c078)
+- **tests**: update lesson-context and classifier tests for new behavior (5611533b)
+- **stage5**: use const for non-reassigned variable (lint) (3cdaea5e)
+- **web**: resolve empty mermaid SVG caused by render race condition (0bda5335)
+- **stage6**: add mermaid sanitization to all LLM content paths (61526476)
+- **pipeline**: correct JOB_TYPE_TO_STEP mapping, progress messages, and error metadata (b83078c5)
+- **stage5**: filter short course_tags before RT-006 validation (10cc23e5)
+- **course-gen-platform**: complete code review fixes for single-call generation (ec9ebbae)
+- **course-gen-platform**: address code review findings for single-call generation (49927618)
+
+### Other
+
+- **web**: add 42 unit tests for MermaidDirect component (c40ef2a7)
+- **stage4**: clarify PromptService migration status for each phase (b529fcee)
+- **stage6**: clarify log-only vs reject validation pattern in section-regenerator (184b51b9)
+- **stage5**: remove dead enrichBatchContext tests from qdrant-search.test.ts (a7a0e720)
+- **stage5**: add unit tests for buildSectionDigest and sanitizeDigest (8fdbd909)
+- update i18n guide with current namespaces, content labels, and stage 7 migration status (0e804b61)
+- add missing Stage 4 DB records for ru + extended tiers (89ed4f56)
+- switch Stage 4 Synthesis from kimi-k2-0905 to cheap models (0d4ca72a)
+- **overlap**: add end-to-end overlap retry flow tests for Stage 4 and Stage 5 (95e0b53d)
+- **overlap**: add unit tests for Stage 4 and Stage 5 overlap detection (dfab0a52)
+- **beads**: migrate to Dolt backend with CGO support (1bfb8eb5)
+- **beads**: add bd hooks to husky and configure sync-branch (3a8a3a21)
+- **beads**: update gitignore for bd 0.50.3 patterns (2c5f91fd)
+- **beads**: fix doctor warnings — gitignore, stale molecules, role (4ccb4d24)
+- **beads**: sync issues — create tasks for stage6 audit findings (d92b0ad2)
+- bd daemon export: 2026-02-15 15:31:39 (149149f6)
+- bd daemon export: 2026-02-15 15:31:38 (98c3b100)
+- bd daemon export: 2026-02-15 15:31:37 (cd339768)
+- bd daemon export: 2026-02-15 15:31:36 (866c6147)
+- bd daemon export: 2026-02-15 10:59:58 (ce158b28)
+- bd daemon export: 2026-02-15 10:58:28 (678bb7c8)
+- bd daemon export: 2026-02-15 10:56:34 (599672a4)
+- bd daemon export: 2026-02-15 10:56:29 (99628273)
+- bd daemon export: 2026-02-15 10:56:27 (bfc24841)
+
 ## [0.29.15] - 2026-02-14
 
 ### Added
