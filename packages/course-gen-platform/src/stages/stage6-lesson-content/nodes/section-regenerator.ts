@@ -116,6 +116,8 @@ export async function sectionRegeneratorNode(
     }
 
     // Validate for prompt template markers (hallucination detection)
+    // Pattern: log-only — don't reject, let judge make final decision
+    // (matches generator-node.ts; refinement-level functions reject in patcher/expander)
     const validation = validateGeneratedContent(finalContent);
     if (!validation.isValid) {
       logger.warn(
