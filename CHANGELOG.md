@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.3] - 2026-02-16
+
+### Fixed
+
+- **course-gen-platform**: add warning logs when preprocessing filters short tags/prerequisites (63a3483c)
+
+### Other
+
+- **course-gen-platform**: update auto-mute rule count comment (52 → 54) (f3690a92)
+- **course-gen-platform**: add unit tests for Phase 3 Zod validation repair path (8a179117)
+
 ## [0.30.2] - 2026-02-16
 
 ### Fixed

@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.30.3
+
+_Released on 2026-02-16_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Add warning logs when preprocessing filters short tags/prerequisites
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.30.2
 
 _Released on 2026-02-16_
