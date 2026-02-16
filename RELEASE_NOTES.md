@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.30.1
+
+_Released on 2026-02-16_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 3 source file(s), update 1 test(s), +1 more
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.30.0
 
 _Released on 2026-02-16_
