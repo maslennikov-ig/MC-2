@@ -77,6 +77,9 @@ export interface PresentationPreviewProps {
 
   /** Optional className */
   className?: string
+
+  /** Course language for localized callout titles (ISO 639-1) */
+  language?: string
 }
 
 // ============================================================================
@@ -318,9 +321,11 @@ function SlidePreview({
 function SlideContent({
   slide,
   theme,
+  language,
 }: {
   slide: PresentationSlide
   theme: PresentationTheme
+  language?: string
 }): React.JSX.Element {
   const themeClasses = getThemeBackgroundClasses(theme)
 
@@ -332,7 +337,7 @@ function SlideContent({
 
         {/* Slide content */}
         <div className="prose prose-slate max-w-none">
-          <MarkdownRendererFull content={slide.content} preset="preview" />
+          <MarkdownRendererFull content={slide.content} preset="preview" language={language} />
         </div>
       </div>
     </div>
@@ -443,6 +448,7 @@ export function PresentationPreview({
   onApproveDraft,
   isRegenerating = false,
   className,
+  language,
 }: PresentationPreviewProps): React.JSX.Element {
   const locale = useLocale()
   const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru
@@ -703,7 +709,7 @@ export function PresentationPreview({
           </div>
 
           {/* Current slide preview */}
-          <SlideContent slide={currentSlideData} theme={presentationContent.theme} />
+          <SlideContent slide={currentSlideData} theme={presentationContent.theme} language={language} />
 
           {/* Slide details panel */}
           <SlideDetailsPanel

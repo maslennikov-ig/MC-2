@@ -733,6 +733,8 @@ export interface StaticGraphData {
     readOnly?: boolean;
     /** Analysis result from Stage 4 (persisted in courses.analysis_result) */
     analysisResult?: AnalysisResult | null;
+    /** Course generation language (ISO 639-1 code, e.g., 'en', 'ru') */
+    courseLanguage?: string | null;
   };
 }
 

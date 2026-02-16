@@ -293,7 +293,7 @@ function GraphViewInner({
     courseStatus: pipelineStatus ?? undefined,
   })
   // Course data sync (structure, visual_style, style, analysis_result)
-  const { visualStyle, courseStyle, analysisResult } = useCourseDataSync({
+  const { visualStyle, courseStyle, analysisResult, courseLanguage } = useCourseDataSync({
     courseId,
     initializeFromCourseStructure,
     isConnected,
@@ -408,9 +408,10 @@ function GraphViewInner({
         courseStyle,
         readOnly,
         analysisResult,
+        courseLanguage,
       },
     }
-  }, [courseId, courseTitle, tier, nodes, visualStyle, courseStyle, readOnly, analysisResult])
+  }, [courseId, courseTitle, tier, nodes, visualStyle, courseStyle, readOnly, analysisResult, courseLanguage])
 
   // Mobile view - show simplified graph (no separate list view)
   // Graph view works on mobile with touch gestures enabled

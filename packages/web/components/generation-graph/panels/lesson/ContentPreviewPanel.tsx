@@ -31,6 +31,8 @@ interface ContentPreviewPanelProps {
   isApproving?: boolean
   isRegenerating?: boolean
   className?: string
+  /** Course language for localized callout titles (ISO 639-1) */
+  language?: string
 }
 
 export function ContentPreviewPanel({
@@ -46,6 +48,7 @@ export function ContentPreviewPanel({
   isApproving = false,
   isRegenerating = false,
   className,
+  language,
 }: ContentPreviewPanelProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'markdown' | 'metadata'>('preview')
 
@@ -78,7 +81,7 @@ export function ContentPreviewPanel({
                   </div>
                 }
               >
-                <MarkdownRendererFull content={rawMarkdown} preset="preview" />
+                <MarkdownRendererFull content={rawMarkdown} preset="preview" language={language} />
               </ErrorBoundary>
             ) : (
               <p className="text-muted-foreground py-8 text-center text-sm">

@@ -344,16 +344,16 @@ interface CoverPreviewHandlers {
  * Renders the appropriate preview component based on enrichment type.
  * Uses discriminated union pattern for type-safe rendering.
  */
-function renderPreview(enrichment: EnrichmentData, coverHandlers?: CoverPreviewHandlers) {
+function renderPreview(enrichment: EnrichmentData, coverHandlers?: CoverPreviewHandlers, courseLanguage?: string | null) {
   switch (enrichment.type) {
     case 'quiz':
       return <QuizPreview enrichment={toQuizPreviewProps(enrichment)} />
     case 'video':
-      return <VideoScriptPanel enrichment={toVideoPreviewProps(enrichment)} />
+      return <VideoScriptPanel enrichment={toVideoPreviewProps(enrichment)} language={courseLanguage ?? undefined} />
     case 'audio':
       return <AudioPreview enrichment={toAudioPreviewProps(enrichment)} />
     case 'presentation':
-      return <PresentationPreview enrichment={toPresentationPreviewProps(enrichment)} />
+      return <PresentationPreview enrichment={toPresentationPreviewProps(enrichment)} language={courseLanguage ?? undefined} />
     case 'cover':
       return (
         <CoverPreview
@@ -485,7 +485,7 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
           <>
             {/* Preview component */}
             <div data-testid="preview-content" className="flex-1 overflow-hidden">
-              {renderPreview(enrichment, coverHandlers)}
+              {renderPreview(enrichment, coverHandlers, courseInfo?.courseLanguage)}
             </div>
 
             {/* Action bar - hidden for cover draft state */}
