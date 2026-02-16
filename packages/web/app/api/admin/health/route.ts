@@ -634,6 +634,61 @@ async function checkQdrant(): Promise<ServiceStatus> {
 }
 
 /**
+ * Check Mermaid Pipeline health via API Server
+ * Verifies the regex sanitizer, validator, and full pipeline orchestration
+ */
+async function checkMermaidPipeline(): Promise<ServiceStatus> {
+  const startTime = Date.now()
+  const lastCheck = new Date().toISOString()
+
+  const internalUrl = 'http://api:4000/health/mermaid'
+  const publicUrl = `${ENV.COURSEGEN_BACKEND_URL}/health/mermaid`
+
+  try {
+    let response: Response | null = null
+
+    try {
+      response = await fetchWithTimeout(internalUrl)
+    } catch {
+      response = await fetchWithTimeout(publicUrl)
+    }
+
+    const responseTime = Date.now() - startTime
+
+    if (response.ok) {
+      const data = await response.json()
+      const checksCount = data.data?.checks?.length ?? 0
+      const passedCount =
+        data.data?.checks?.filter((c: { passed: boolean }) => c.passed).length ?? 0
+
+      return {
+        name: 'Mermaid Pipeline',
+        status: data.data?.status === 'healthy' ? 'healthy' : 'degraded',
+        responseTime,
+        message: `${passedCount}/${checksCount} checks passed`,
+        lastCheck,
+      }
+    }
+
+    return {
+      name: 'Mermaid Pipeline',
+      status: 'degraded',
+      responseTime,
+      message: `HTTP ${response.status}: ${response.statusText}`,
+      lastCheck,
+    }
+  } catch (error) {
+    return {
+      name: 'Mermaid Pipeline',
+      status: 'error',
+      responseTime: Date.now() - startTime,
+      message: error instanceof Error ? error.message : 'Connection failed',
+      lastCheck,
+    }
+  }
+}
+
+/**
  * Admin Health Check API
  *
  * Checks the health of all system components:
@@ -642,6 +697,7 @@ async function checkQdrant(): Promise<ServiceStatus> {
  * - Redis (via API Server)
  * - Docling MCP (document processing)
  * - Qdrant (vector database)
+ * - Mermaid Pipeline (diagram syntax fixer)
  */
 export async function GET(
   request: NextRequest
@@ -686,6 +742,7 @@ export async function GET(
       workerStatus,
       workerStage7Status,
       telegramStatus,
+      mermaidPipelineStatus,
     ] = await Promise.allSettled([
       checkSupabase(),
       checkApiServer(),
@@ -695,6 +752,7 @@ export async function GET(
       checkWorkerReadiness(),
       checkWorkerStage7Readiness(),
       checkTelegramBot(),
+      checkMermaidPipeline(),
     ])
 
     // Extract results, handling rejected promises
@@ -766,6 +824,15 @@ export async function GET(
         ? telegramStatus.value
         : {
             name: 'Telegram Bot',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
+      mermaidPipelineStatus.status === 'fulfilled'
+        ? mermaidPipelineStatus.value
+        : {
+            name: 'Mermaid Pipeline',
             status: 'error' as const,
             responseTime: 0,
             message: 'Check failed',
