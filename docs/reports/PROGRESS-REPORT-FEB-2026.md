@@ -41,6 +41,16 @@
 | **Новых страниц**         | 12        |
 | **Среднее коммитов/день** | 37        |
 
+### Распределение коммитов по типу
+
+```mermaid
+pie title Распределение коммитов по типу
+    "Исправления (fix)" : 359
+    "Новые функции (feat)" : 117
+    "Рефакторинг (refactor)" : 49
+    "Прочее (chore, docs, test, ci)" : 396
+```
+
 ### Кодовая база на текущий момент
 
 | Метрика               | Значение |
@@ -51,32 +61,12 @@
 
 ### Динамика по дням
 
-```
-21 янв: █████████████████ 17
-22 янв: ██████████████████████████████████████████████████████████████████████████████████████████████████████ 102
-23 янв: ██████████████████████████████████████████████████████████████████████████████ 78
-24 янв: ███████████████████████████████████████████████████████████████████ 67
-25 янв: ██████████████████████████████████████████████████ 50
-26 янв: ██████████████████████████████████████ 38
-27 янв: █████████████████████████████████████████████████████████████████ 65
-28 янв: ███████████████████████████████████████████████████████████████ 63
-29 янв: █████████████████████ 21
-30 янв: █████████████████████████████████████████████████████████████ 61
-31 янв: █████████████ 13
-01 фев: █████████████████████████████████ 33
-02 фев: ██████████████████ 18
-03 фев: ████████████████ 16
-04 фев: █████████████████████ 21
-05 фев: █████ 5
-06 фев: ████████████████████████ 24
-07 фев: ███████████████████████████████████ 35
-08 фев: ███████████████████████████████ 31
-09 фев: ███████████████████████████████████████████████████████████ 59
-10 фев: ████████████████████████████████████ 36
-11 фев: ██████████ 10
-12 фев: ███████████████████████████████████ 35
-13 фев: ██████████ 10
-14 фев: █████████████ 13
+```mermaid
+xychart-beta
+    title "Коммиты по дням (921 за период)"
+    x-axis ["21/01", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "01/02", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14"]
+    y-axis "Коммиты" 0 --> 110
+    bar [17, 102, 78, 67, 50, 38, 65, 63, 21, 61, 13, 33, 18, 16, 21, 5, 24, 35, 31, 59, 36, 10, 35, 10, 13]
 ```
 
 ---
@@ -87,52 +77,54 @@
 
 ### Четырёхфазная архитектура
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  Phase 0: Фундамент                                                  │
-│  ├── Stable IDs для всех элементов курса                             │
-│  ├── Конфигурация моделей для чата в БД                              │
-│  └── Единая система идентификации секций/уроков/модулей              │
-│                                                                       │
-│  Phase 1: Классификация намерений                                    │
-│  ├── Автоматическое определение intent пользователя                  │
-│  ├── Удаление ручного переключателя — AI решает сам                 │
-│  └── Маршрутизация: edit / regenerate / question                     │
-│                                                                       │
-│  Phase 2: Хирургические операции                                     │
-│  ├── Точечное редактирование через stable IDs                       │
-│  ├── Добавление/удаление/перемещение секций и уроков                │
-│  └── Валидация целостности после каждой операции                     │
-│                                                                       │
-│  Phase 3: Оптимизация контекста                                      │
-│  ├── Course skeleton вместо полного дампа курса                      │
-│  ├── Экономия токенов при работе с большими курсами                  │
-│  └── Кэширование промптов для повторных обращений                   │
-└──────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    P0["<b>Phase 0: Фундамент</b><br/>Stable IDs · Model Config в БД<br/>Единая идентификация элементов"]
+    P1["<b>Phase 1: Классификация</b><br/>Auto Intent Detection<br/>edit / regenerate / question"]
+    P2["<b>Phase 2: Хирургические операции</b><br/>Точечное редактирование через Stable IDs<br/>Add / Delete / Move + Валидация"]
+    P3["<b>Phase 3: Оптимизация контекста</b><br/>Course Skeleton · Экономия токенов<br/>Кэширование промптов"]
+
+    P0 --> P1 --> P2 --> P3
+
+    style P0 fill:#e8f5e9,stroke:#2e7d32
+    style P1 fill:#e3f2fd,stroke:#1565c0
+    style P2 fill:#fff3e0,stroke:#ef6c00
+    style P3 fill:#f3e5f5,stroke:#7b1fa2
 ```
 
 ### Confirm-then-Apply
 
 Перед применением изменений система показывает пользователю предварительный просмотр — что будет изменено, добавлено или удалено. Пользователь подтверждает или отклоняет предложение.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Чат: "Добавь практическое задание в урок 3"                │
-│                                                              │
-│  ┌────────────────────────────────────────────────────┐     │
-│  │  AI предлагает:                                     │     │
-│  │                                                     │     │
-│  │  + Добавить секцию "Практическое задание"          │     │
-│  │    в урок "Введение в нейронные сети"              │     │
-│  │                                                     │     │
-│  │  Содержание:                                        │     │
-│  │  1. Загрузка датасета MNIST                        │     │
-│  │  2. Построение простой нейросети                    │     │
-│  │  3. Обучение и оценка                              │     │
-│  │                                                     │     │
-│  │  [Применить]  [Отклонить]  [Изменить]              │     │
-│  └────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    actor User as Пользователь
+    participant Chat as AI Chat
+    participant LLM as LLM
+    participant DB as Database
+
+    User->>Chat: "Добавь задание в урок 3"
+    Chat->>LLM: Intent Classification
+    LLM-->>Chat: intent: edit
+    Chat->>LLM: Generate Changes
+    LLM-->>Chat: Proposed Changes
+
+    Chat->>User: Preview: + Секция "Практическое задание"
+
+    alt Применить
+        User->>Chat: ✅ Confirm
+        Chat->>DB: Apply via Stable IDs
+        DB-->>Chat: Success
+        Chat->>User: Изменения применены
+    else Отклонить
+        User->>Chat: ❌ Reject
+        Chat->>User: Изменения отменены
+    else Изменить
+        User->>Chat: ✏️ Modify
+        Chat->>LLM: Refine Changes
+        LLM-->>Chat: Updated Proposal
+        Chat->>User: Обновлённый Preview
+    end
 ```
 
 ### Ключевые возможности
@@ -192,13 +184,19 @@
 
 ### Архитектура
 
-```
-Documents → Phase 1 (Analysis) → Phase 0.5 (Questions) → Phase 2+ (Planning)
-                                       │
-                                       ├── LLM генерирует вопросы
-                                       ├── UI показывает Wizard
-                                       ├── Ответы сохраняются в БД
-                                       └── Ответы передаются в промпты
+```mermaid
+flowchart LR
+    A["📄 Documents"] --> B["Phase 1<br/>Analysis"]
+    B --> C{"Phase 0.5<br/>Questions"}
+    C -->|"LLM генерирует"| D["🧙 Wizard UI"]
+    D -->|"Ответы"| E["💾 БД"]
+    E --> F["Phase 2+<br/>Planning"]
+    C -->|"Skip"| F
+
+    style A fill:#fff3e0,stroke:#ef6c00
+    style C fill:#e3f2fd,stroke:#1565c0
+    style D fill:#e8f5e9,stroke:#2e7d32
+    style F fill:#f3e5f5,stroke:#7b1fa2
 ```
 
 ---
@@ -328,35 +326,54 @@ const storageService = createStorageService({
 
 Секции курса теперь генерируются разными моделями в зависимости от их важности:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Tier 1 (Premium):  Введение, Заключение                │
-│  Модель: Claude 3.5 Sonnet                              │
-│  → Максимальное качество для ключевых секций            │
-│                                                          │
-│  Tier 2 (Standard): Основные модули                     │
-│  Модель: GPT-4o                                         │
-│  → Баланс качества и стоимости                          │
-│                                                          │
-│  Tier 3 (Economy):  Вспомогательные секции              │
-│  Модель: Gemini 2.0 Flash                               │
-│  → Экономия на менее критичных секциях                  │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["🎯 Секция курса"] --> B{"Оценка важности"}
+
+    B -->|"Введение, Заключение"| C["🥇 Tier 1: Premium<br/><b>Claude 3.5 Sonnet</b>"]
+    B -->|"Основные модули"| D["🥈 Tier 2: Standard<br/><b>GPT-4o</b>"]
+    B -->|"Вспомогательные"| E["🥉 Tier 3: Economy<br/><b>Gemini 2.0 Flash</b>"]
+
+    C --> F["Максимальное качество"]
+    D --> G["Баланс качество / цена"]
+    E --> H["Экономия"]
+
+    style C fill:#fff9c4,stroke:#f9a825
+    style D fill:#e0e0e0,stroke:#616161
+    style E fill:#ffccbc,stroke:#d84315
 ```
 
 ### Course Nodes — реляционная миграция
 
 Переход от JSON-массивов к плоской реляционной структуре для элементов курса:
 
-```
-Было:                              Стало:
-courses.sections (JSON[])    →     course_nodes (таблица)
-  └── lessons (JSON[])             ├── id (UUID)
-                                   ├── course_id (FK)
-                                   ├── parent_id (FK, nullable)
-                                   ├── node_type (section|lesson)
-                                   ├── stable_id (unique)
-                                   └── position (integer)
+```mermaid
+erDiagram
+    courses ||--o{ course_nodes : "contains"
+    course_nodes ||--o{ course_nodes : "parent_id"
+    courses ||--o{ sections : "has (legacy)"
+
+    courses {
+        uuid id PK
+        string title
+        string slug
+        jsonb sections "deprecated JSON[]"
+    }
+
+    course_nodes {
+        uuid id PK
+        uuid course_id FK
+        uuid parent_id FK "nullable"
+        enum node_type "section | lesson"
+        string stable_id UK
+        int position
+    }
+
+    sections {
+        uuid id PK
+        uuid course_id FK
+        string title
+    }
 ```
 
 **Dual-Write:** Параллельная запись в обе структуры для безопасной миграции.
@@ -413,13 +430,28 @@ Phase 4: Cleanup — удаление 25 as-any casts    ✅
 
 ### Новый пакет: shared-utils
 
-```
-packages/
-├── shared-types/       # TypeScript типы
-├── shared-logger/      # Pino логирование
-├── shared-utils/       # ← НОВЫЙ: общие утилиты
-├── course-gen-platform/ # Backend
-└── web/                # Frontend
+```mermaid
+graph TB
+    subgraph "packages/"
+        ST["📦 shared-types<br/><i>TypeScript типы</i>"]
+        SL["📦 shared-logger<br/><i>Pino логирование</i>"]
+        SU["📦 shared-utils<br/><i>Общие утилиты</i> ✨ NEW"]
+        CGP["📦 course-gen-platform<br/><i>Backend + Pipeline</i>"]
+        WEB["📦 web<br/><i>Next.js Frontend</i>"]
+    end
+
+    WEB --> ST
+    WEB --> SU
+    CGP --> ST
+    CGP --> SL
+    CGP --> SU
+
+    WEB -.->|"tRPC"| CGP
+    CGP -.->|"Supabase"| DB[("PostgreSQL")]
+    CGP -.->|"BullMQ"| Redis[("Redis")]
+    CGP -.->|"OpenRouter"| LLM["LLM APIs"]
+
+    style SU fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
 ```
 
 ### Валидация ENV-переменных
@@ -470,6 +502,19 @@ Full tests:     pnpm test:full      # Все, при PR/deploy
 ## 9. Безопасность и база данных
 
 ### 62 миграции за период
+
+```mermaid
+pie title Категории миграций БД (62 миграции)
+    "Прочее (FSM, хранение, триггеры)" : 25
+    "Конфигурация моделей" : 8
+    "Данные/Seeds" : 6
+    "RLS-оптимизация" : 5
+    "Новые таблицы" : 4
+    "Индексы" : 4
+    "RPC-функции" : 4
+    "Race Condition защита" : 3
+    "Очистка" : 3
+```
 
 | Категория                 | Миграций | Описание                                       |
 | ------------------------- | -------- | ---------------------------------------------- |
@@ -740,25 +785,17 @@ toast.success(t('course.created'));
 
 ### Release Timeline
 
-```
-v0.28.21 ─── 21 января (начало периода)
-
-v0.28.22-30 ─── 21-23 января (9 releases)
-  Enrichments, storage migration, covers
-
-v0.28.31-40 ─── 23-26 января (10 releases)
-  Clarifying Questions, Stage 4 UX
-
-v0.28.41-50 ─── 26 янв - 3 фев (10 releases)
-  Chat intent classification, model configs
-
-v0.28.51-62 ─── 3-7 февраля (12 releases)
-  Pipeline improvements, data-driven questions
-
-v0.29.0 ───── 8 февраля (minor: audit, i18n, testing)
-
-v0.29.1-12 ── 8-14 февраля (12 releases)
-  Chat Phases 0-3, tRPC migration, course_nodes
+```mermaid
+timeline
+    title Release Timeline · v0.28.21 → v0.29.12
+    section Январь
+        21-23 янв : v0.28.22–30 (9 releases) : Enrichments, Storage migration, Covers
+        23-26 янв : v0.28.31–40 (10 releases) : Clarifying Questions, Stage 4 UX
+        26 янв – 3 фев : v0.28.41–50 (10 releases) : Chat Intent Classification, Model Configs
+    section Февраль
+        3-7 фев : v0.28.51–62 (12 releases) : Pipeline improvements, Data-driven Questions
+        8 фев : v0.29.0 (minor) : Audit, i18n, Testing
+        8-14 фев : v0.29.1–12 (12 releases) : Chat Phases 0-3, tRPC migration, Course Nodes
 ```
 
 ### Основные версии
