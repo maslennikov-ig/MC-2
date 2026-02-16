@@ -85,9 +85,6 @@ export const LANGUAGE_NAMES: Record<Language, string> = {
  */
 export function getLanguageName(code: string): string {
   const name = LANGUAGE_NAMES[code as Language];
-  if (!name && process.env.NODE_ENV === 'development') {
-    console.warn(`[getLanguageName] Unknown language code: "${code}", falling back to English`);
-  }
   return name || LANGUAGE_NAMES.en;
 }
 
@@ -489,9 +486,6 @@ export const CONTENT_LABELS: Record<
  */
 export function getContentLabels(code: string): typeof CONTENT_LABELS.en {
   const labels = CONTENT_LABELS[code as Language];
-  if (!labels && process.env.NODE_ENV === 'development') {
-    console.warn(`[getContentLabels] Unknown language code: "${code}", falling back to English`);
-  }
   return labels || CONTENT_LABELS.en;
 }
 

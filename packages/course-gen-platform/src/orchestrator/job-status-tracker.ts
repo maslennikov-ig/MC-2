@@ -9,17 +9,44 @@
 
 /* eslint-disable max-lines-per-function */
 /* eslint-disable complexity */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 /* eslint-disable max-lines */
 
 import { Job } from 'bullmq';
 import { getSupabaseAdmin } from '../shared/supabase/admin';
 import logger from '../shared/logger';
 import { JobData, Database } from '@megacampus/shared-types';
+
+/**
+ * Legacy job data may contain snake_case keys from older job producers (e.g. Stage 3).
+ * This type represents the possible snake_case variants that can appear at the boundary.
+ */
+interface LegacyJobDataFields {
+  organization_id?: string;
+  course_id?: string;
+  user_id?: string;
+}
+
+/**
+ * Extract organization_id from job data, handling both camelCase (current) and
+ * snake_case (legacy Stage 3) property names at the boundary.
+ */
+function extractOrganizationId(data: JobData): string | undefined {
+  return data.organizationId || (data as unknown as LegacyJobDataFields).organization_id;
+}
+
+/**
+ * Extract course_id from job data, handling both camelCase and snake_case variants.
+ */
+function extractCourseId(data: JobData): string | null {
+  return data.courseId || (data as unknown as LegacyJobDataFields).course_id || null;
+}
+
+/**
+ * Extract user_id from job data, handling both camelCase and snake_case variants.
+ */
+function extractUserId(data: JobData): string | null {
+  return data.userId || (data as unknown as LegacyJobDataFields).user_id || null;
+}
 
 /**
  * Job status enum matching database enum
@@ -80,9 +107,20 @@ export async function createJobStatus(job: Job<JobData>): Promise<void> {
 
     const supabase = getSupabaseAdmin();
 
-    // Handle both camelCase and snake_case organization_id
-    // Stage 3 jobs use snake_case (organization_id) while other jobs use camelCase (organizationId)
-    const organizationId = job.data.organizationId || (job.data as any).organization_id;
+    // Handle both camelCase and snake_case field names at the boundary.
+    // Stage 3 jobs use snake_case (organization_id) while other jobs use camelCase (organizationId).
+    const organizationId = extractOrganizationId(job.data);
+
+    if (!organizationId) {
+      logger.warn(
+        {
+          jobId: job.id,
+          jobData: job.data,
+        },
+        'Skipping job status creation: organizationId is missing from job data'
+      );
+      return;
+    }
 
     // Use upsert to handle BullMQ job retries gracefully
     // When a job is retried, it keeps the same job_id, so we need to update existing record
@@ -94,8 +132,8 @@ export async function createJobStatus(job: Job<JobData>): Promise<void> {
           job_id: job.id!,
           job_type: job.name,
           organization_id: organizationId,
-          course_id: job.data.courseId || (job.data as any).course_id || null,
-          user_id: job.data.userId || (job.data as any).user_id || null,
+          course_id: extractCourseId(job.data),
+          user_id: extractUserId(job.data),
           status: JobStatus.PENDING,
           progress: {},
           attempts: 0,
@@ -776,8 +814,13 @@ export async function markJobFailed(job: Job<JobData>, error: Error): Promise<vo
     if (error && typeof error === 'object') {
       if (error.message) {
         errorMessage = error.message;
-      } else if (error.cause && typeof error.cause === 'object' && (error.cause as any).message) {
-        errorMessage = (error.cause as any).message;
+      } else if (
+        error.cause &&
+        typeof error.cause === 'object' &&
+        'message' in error.cause &&
+        typeof (error.cause as { message: unknown }).message === 'string'
+      ) {
+        errorMessage = (error.cause as { message: string }).message;
       } else if (error.toString && error.toString() !== '[object Object]') {
         errorMessage = error.toString();
       }
@@ -864,7 +907,7 @@ export async function markJobFailed(job: Job<JobData>, error: Error): Promise<vo
     }
 
     await updateJobStatus(job.id!, updates);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error(
       {
         jobId: job.id,
