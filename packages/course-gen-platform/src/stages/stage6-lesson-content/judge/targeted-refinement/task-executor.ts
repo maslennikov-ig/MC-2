@@ -15,7 +15,7 @@ import { verifyPatch } from '../verifier/delta-judge';
 import { executeExpansion } from '../section-expander';
 import { selectFixPromptTemplate } from '../fix-templates';
 import { processInlineFixes, INLINE_FIXER_ENABLED } from '../inline-fixer';
-import { sanitizeMermaidBlocks } from '../../utils/mermaid-sanitizer';
+import { runMermaidFixPipeline } from '../../utils/mermaid-fix-pipeline';
 
 import { emitEvent } from './events';
 import { extractSectionContent } from './content-utils';
@@ -191,13 +191,13 @@ export async function executePatcherTask(
       tokensUsed = standardResult.tokensUsed;
     }
 
-    // Sanitize mermaid blocks in patched content (regex-only, no LLM)
-    const mermaidResult = sanitizeMermaidBlocks(patchedContent);
+    // Run full mermaid fix pipeline on patched content (regex → validate → LLM fix → revalidate → fallback)
+    const mermaidResult = await runMermaidFixPipeline(patchedContent);
     if (mermaidResult.modified) {
       patchedContent = mermaidResult.content;
       logger.debug(
-        { sectionId: task.sectionId, fixCount: mermaidResult.fixes.length },
-        'Patcher: Mermaid sanitization applied to patched content'
+        { sectionId: task.sectionId, metrics: mermaidResult.metrics },
+        'Patcher: Mermaid fix pipeline applied to patched content'
       );
     }
 
@@ -439,14 +439,14 @@ export async function executeExpanderTask(
     // Execute expansion
     const expandResult = await executeExpansion(expanderInput);
 
-    // Sanitize mermaid blocks in expanded content (regex-only, no LLM)
+    // Run full mermaid fix pipeline on expanded content (regex → validate → LLM fix → revalidate → fallback)
     let expandedContent = expandResult.regeneratedContent;
-    const mermaidResult = sanitizeMermaidBlocks(expandedContent);
+    const mermaidResult = await runMermaidFixPipeline(expandedContent);
     if (mermaidResult.modified) {
       expandedContent = mermaidResult.content;
       logger.debug(
-        { sectionId: task.sectionId, fixCount: mermaidResult.fixes.length },
-        'Expander: Mermaid sanitization applied to expanded content'
+        { sectionId: task.sectionId, metrics: mermaidResult.metrics },
+        'Expander: Mermaid fix pipeline applied to expanded content'
       );
     }
 
