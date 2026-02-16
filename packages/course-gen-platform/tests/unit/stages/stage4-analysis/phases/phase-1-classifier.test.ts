@@ -122,14 +122,19 @@ vi.mock('@/shared/utils/structure-normalizer', () => ({
   normalizePhase1Output: vi.fn((data: any) => data),
 }));
 
-vi.mock('@/shared/logger', () => ({
-  logger: {
+vi.mock('@/shared/logger', () => {
+  const mockLogger = {
     info: vi.fn(),
     debug: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-  },
-}));
+    child: vi.fn().mockReturnThis(),
+  };
+  return {
+    default: mockLogger,
+    logger: mockLogger,
+  };
+});
 
 describe('Phase 1 Classification Service', () => {
   beforeEach(() => {
