@@ -17,73 +17,87 @@ vi.mock('nanoid', () => ({
   nanoid: vi.fn(() => 'test-session-id-' + Math.random().toString(36).substring(7)),
 }))
 
-// In-memory Redis mock for integration testing
-class InMemoryRedis {
-  private store: Map<string, { value: unknown; expiresAt: number | null }> = new Map()
+// Hoist InMemoryRedis class so it's available in vi.mock factory
+const { inMemoryRedis, InMemoryRedis } = vi.hoisted(() => {
+  class InMemoryRedis {
+    private store: Map<string, { value: unknown; expiresAt: number | null }> = new Map()
 
-  async get<T>(key: string): Promise<T | null> {
-    const entry = this.store.get(key)
-    if (!entry) return null
+    async get<T>(key: string): Promise<T | null> {
+      const entry = this.store.get(key)
+      if (!entry) return null
 
-    // Check if expired
-    if (entry.expiresAt && Date.now() > entry.expiresAt) {
-      this.store.delete(key)
-      return null
-    }
-
-    return entry.value as T
-  }
-
-  async set(key: string, value: unknown, options?: { ttl?: number }): Promise<boolean> {
-    const expiresAt = options?.ttl ? Date.now() + options.ttl * 1000 : null
-    this.store.set(key, { value, expiresAt })
-    return true
-  }
-
-  async delete(key: string): Promise<boolean> {
-    this.store.delete(key)
-    return true
-  }
-
-  async exists(key: string): Promise<boolean> {
-    const entry = this.store.get(key)
-    if (!entry) return false
-
-    // Check if expired
-    if (entry.expiresAt && Date.now() > entry.expiresAt) {
-      this.store.delete(key)
-      return false
-    }
-
-    return true
-  }
-
-  reset(): void {
-    this.store.clear()
-  }
-
-  // Helper for testing expiration
-  expireAll(): void {
-    this.store.forEach((entry, key) => {
-      if (entry.expiresAt) {
+      // Check if expired
+      if (entry.expiresAt && Date.now() > entry.expiresAt) {
         this.store.delete(key)
+        return null
       }
-    })
+
+      return entry.value as T
+    }
+
+    async set(key: string, value: unknown, options?: { ttl?: number }): Promise<boolean> {
+      const expiresAt = options?.ttl ? Date.now() + options.ttl * 1000 : null
+      this.store.set(key, { value, expiresAt })
+      return true
+    }
+
+    async delete(key: string): Promise<boolean> {
+      this.store.delete(key)
+      return true
+    }
+
+    async exists(key: string): Promise<boolean> {
+      const entry = this.store.get(key)
+      if (!entry) return false
+
+      // Check if expired
+      if (entry.expiresAt && Date.now() > entry.expiresAt) {
+        this.store.delete(key)
+        return false
+      }
+
+      return true
+    }
+
+    reset(): void {
+      this.store.clear()
+    }
+
+    // Helper for testing expiration
+    expireAll(): void {
+      this.store.forEach((entry, key) => {
+        if (entry.expiresAt) {
+          this.store.delete(key)
+        }
+      })
+    }
   }
-}
 
-const inMemoryRedis = new InMemoryRedis()
+  return { InMemoryRedis, inMemoryRedis: new InMemoryRedis() }
+})
 
-// Mock Redis client with in-memory implementation
-vi.mock('@/lib/redis-client', () => ({
-  RedisCache: vi.fn(() => ({
-    get: (key: string) => inMemoryRedis.get(key),
-    set: (key: string, value: unknown, options?: { ttl?: number }) =>
-      inMemoryRedis.set(key, value, options),
-    delete: (key: string) => inMemoryRedis.delete(key),
-    exists: (key: string) => inMemoryRedis.exists(key),
-  })),
-}))
+// Mock server-only module
+vi.mock('server-only', () => ({}))
+
+// Mock Redis client with in-memory implementation using class-based mock
+vi.mock('@/lib/redis-client', () => {
+  return {
+    RedisCache: class MockRedisCache {
+      get(key: string) {
+        return inMemoryRedis.get(key)
+      }
+      set(key: string, value: unknown, options?: { ttl?: number }) {
+        return inMemoryRedis.set(key, value, options)
+      }
+      delete(key: string) {
+        return inMemoryRedis.delete(key)
+      }
+      exists(key: string) {
+        return inMemoryRedis.exists(key)
+      }
+    },
+  }
+})
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({

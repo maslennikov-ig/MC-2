@@ -317,9 +317,8 @@ describe('MarkdownRendererClient - Contract Tests', () => {
       const whitespaceContent = '\n\n   \n\t\n   '
       const { container } = render(<MarkdownRendererClient content={whitespaceContent} />)
 
-      // Whitespace is truthy, so Streamdown should render
-      const streamdown = screen.getByTestId('streamdown')
-      expect(streamdown).toBeInTheDocument()
+      // Whitespace-only content is trimmed to empty, so no Streamdown renders
+      expect(screen.queryByTestId('streamdown')).not.toBeInTheDocument()
     })
   })
 
