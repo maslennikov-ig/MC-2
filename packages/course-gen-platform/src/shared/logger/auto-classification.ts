@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 52 (no optimization needed)
+ * Current rule count: 54 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
