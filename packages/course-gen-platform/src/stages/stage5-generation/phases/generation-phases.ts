@@ -75,23 +75,23 @@ const RETRY_CONFIG = {
 } as const;
 
 /**
- * Parallel section generation configuration
+ * Retry configuration for section generation
  *
- * Optimized for OpenRouter rate limits and performance:
- * - MAX_CONCURRENT_SECTIONS: 4 (respects API rate limits while maximizing throughput)
+ * Note: Section generation is now SEQUENTIAL (one-by-one with digest accumulation).
+ * This config is used ONLY for retrying failed sections:
  * - RETRY_DELAY_MS: 2000 (base delay for exponential backoff)
- * - RATE_LIMIT_DELAY_MS: 2000 (delay between batches for rate limiting)
+ * - Failed sections are retried in parallel with pLimit(2) for efficiency
  *
  * Note: RETRY_ATTEMPTS_PER_SECTION is now fetched from database via model-config-service
  */
 const PARALLEL_CONFIG = {
-  /** Maximum concurrent section generations (respects OpenRouter rate limits) */
+  /** Maximum concurrent section generations (DEPRECATED - sections now sequential, only used for retries) */
   MAX_CONCURRENT_SECTIONS: process.env.STAGE5_MAX_CONCURRENT_SECTIONS
     ? parseInt(process.env.STAGE5_MAX_CONCURRENT_SECTIONS, 10)
     : 4,
   /** Base retry delay in milliseconds */
   RETRY_DELAY_MS: 2000,
-  /** Delay between parallel batches for rate limiting */
+  /** Delay between parallel batches for rate limiting (DEPRECATED - sections now sequential) */
   RATE_LIMIT_DELAY_MS: 2000,
 } as const;
 
@@ -102,6 +102,30 @@ const QUALITY_CONFIG = {
   MIN_SIMILARITY: 0.75, // Overall quality threshold
   MIN_LESSONS: 10, // FR-015: Minimum 10 lessons total
 } as const;
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Build a text digest of a generated section for cross-section context.
+ * Extracts lesson titles and key_topics from structured output.
+ * Used to give subsequent sections awareness of previously generated content.
+ *
+ * @param section - Generated section with lessons
+ * @param sectionIndex - Section index (0-based)
+ * @returns Formatted digest string with lesson titles and topics
+ */
+function buildSectionDigest(section: Section, sectionIndex: number): string {
+  const title = section.section_title || `Section ${sectionIndex + 1}`;
+  const lessons = (section.lessons || [])
+    .map(l => {
+      const topics = (l.key_topics || []).slice(0, 3).join(', ');
+      return `  - ${l.lesson_title}${topics ? ` (Topics: ${topics})` : ''}`;
+    })
+    .join('\n');
+  return `Section ${sectionIndex + 1} "${title}":\n${lessons}\n`;
+}
 
 // ============================================================================
 // GENERATION PHASES CLASS
@@ -401,24 +425,25 @@ export class GenerationPhases {
   }
 
   // ==========================================================================
-  // PHASE 3: GENERATE SECTIONS (Parallel with Promise.allSettled)
+  // PHASE 3: GENERATE SECTIONS (Sequential with Digest Accumulation)
   // ==========================================================================
 
   /**
-   * Phase 3: Generate sections using SectionBatchGenerator with parallel processing
+   * Phase 3: Generate sections using SectionBatchGenerator with sequential processing
    *
-   * Optimized implementation using Promise.allSettled for graceful partial failure handling:
-   * - Uses p-limit for concurrency control (default: 4 concurrent sections)
-   * - Handles partial failures gracefully - if 1 section fails, others still complete
+   * Sequential generation with digest accumulation for concrete-level anti-duplication:
+   * - Generates sections one-by-one in order (not parallel)
+   * - Each section receives digest of previously generated lessons (titles + topics)
+   * - Prevents overlap at concrete lesson level (complements Stage 4 abstract-level anti-overlap)
    * - Implements retry logic for failed sections (max 3 attempts per section)
-   * - Maintains correct section_number ordering regardless of completion order
+   * - Maintains correct section_number ordering
    *
    * RT-001 tiered routing:
    * - Tier 1: OSS 120B (70-75% of sections)
    * - Tier 2: qwen3-max (20-25% escalation for complex/critical sections)
    * - Tier 3: Gemini 2.5 Flash (5% overflow for context >108K tokens)
    *
-   * Performance target: ~2-4 minutes for 6 sections (down from ~12 minutes sequential)
+   * Performance target: ~3-5 minutes for 6 sections (~5-7 minutes for 10 sections)
    *
    * @param state - Current generation state (must have metadata)
    * @returns Updated state with accumulated sections and tracking metrics
@@ -436,7 +461,7 @@ export class GenerationPhases {
     const courseId = state.input.course_id;
 
     try {
-      this.logger.info({ phase: 'generate_sections' }, 'Starting parallel section generation');
+      this.logger.info({ phase: 'generate_sections' }, 'Starting sequential section generation with digest accumulation');
 
       // Determine total sections from analysis_result
       if (!state.input.analysis_result) {
@@ -507,54 +532,50 @@ export class GenerationPhases {
         {
           phase: 'generate_sections',
           totalSections,
-          maxConcurrency: PARALLEL_CONFIG.MAX_CONCURRENT_SECTIONS,
           retryAttemptsPerSection,
         },
-        `Generating ${totalSections} sections in parallel (max ${PARALLEL_CONFIG.MAX_CONCURRENT_SECTIONS} concurrent)`
+        `Generating ${totalSections} sections sequentially with digest accumulation`
       );
-
-      // Create concurrency limiter using p-limit
-      const limit = pLimit(PARALLEL_CONFIG.MAX_CONCURRENT_SECTIONS);
 
       // Create array of section indices to process
       const sectionIndices = Array.from({ length: totalSections }, (_, i) => i);
 
-      // Launch all sections in parallel with concurrency control
-      const sectionPromises = sectionIndices.map(sectionIndex =>
-        limit(() =>
-          this.generateSingleSectionWithRetry(
+      // Generate sections SEQUENTIALLY with digest accumulation
+      // Each section receives a summary of previously generated sections' lessons
+      // to prevent concrete-level overlap (same lesson topics across related sections)
+      const successfulResults: Array<{ index: number; result: SectionBatchResult }> = [];
+      const failedResults: Array<{ index: number; error: string }> = [];
+      let previousSectionsDigest = '';
+
+      for (const sectionIndex of sectionIndices) {
+        try {
+          this.logger.info(
+            {
+              phase: 'generate_sections',
+              sectionIndex: sectionIndex + 1,
+              totalSections,
+              digestLength: previousSectionsDigest.length,
+            },
+            `Generating section ${sectionIndex + 1}/${totalSections} with digest from ${sectionIndex} previous sections`
+          );
+
+          const result = await this.generateSingleSectionWithRetry(
             sectionIndex,
             state.input,
             this.qdrantClient,
-            state.input.course_id
-          )
-        )
-      );
+            state.input.course_id,
+            previousSectionsDigest
+          );
+          successfulResults.push({ index: sectionIndex, result });
 
-      this.logger.info(
-        {
-          phase: 'generate_sections',
-          totalSections,
-          concurrencyLimit: PARALLEL_CONFIG.MAX_CONCURRENT_SECTIONS,
-        },
-        `Launched ${totalSections} section generation tasks with concurrency limit`
-      );
-
-      // Wait for all sections with Promise.allSettled for graceful partial failure handling
-      const results = await Promise.allSettled(sectionPromises);
-
-      // Process results and separate successes from failures
-      const successfulResults: Array<{ index: number; result: SectionBatchResult }> = [];
-      const failedResults: Array<{ index: number; error: string }> = [];
-
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        if (result.status === 'fulfilled') {
-          successfulResults.push({ index: i, result: result.value });
-        } else {
+          // Accumulate digest for subsequent sections
+          if (result.sections.length > 0) {
+            previousSectionsDigest += buildSectionDigest(result.sections[0], sectionIndex);
+          }
+        } catch (error) {
           failedResults.push({
-            index: i,
-            error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+            index: sectionIndex,
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
@@ -566,7 +587,7 @@ export class GenerationPhases {
           failureCount: failedResults.length,
           failedIndices: failedResults.map(f => f.index),
         },
-        `Initial parallel generation complete: ${successfulResults.length}/${totalSections} succeeded`
+        `Sequential generation complete: ${successfulResults.length}/${totalSections} succeeded`
       );
 
       // Retry failed sections with exponential backoff
@@ -574,7 +595,8 @@ export class GenerationPhases {
         failedResults,
         state.input,
         this.qdrantClient,
-        retryAttemptsPerSection
+        retryAttemptsPerSection,
+        previousSectionsDigest
       );
 
       // Merge retried successes
@@ -682,6 +704,7 @@ export class GenerationPhases {
    * @param input - Generation job input
    * @param qdrantClient - Optional RAG client
    * @param courseId - Course UUID for trace logging
+   * @param previousSectionsDigest - Digest of previously generated sections (for anti-duplication)
    * @returns Section batch result
    * @throws Error if all retry attempts fail
    */
@@ -689,7 +712,8 @@ export class GenerationPhases {
     sectionIndex: number,
     input: GenerationJobInput,
     qdrantClient?: QdrantClient,
-    courseId?: string
+    courseId?: string,
+    previousSectionsDigest?: string
   ): Promise<SectionBatchResult> {
     const sectionStartTime = Date.now();
 
@@ -717,7 +741,9 @@ export class GenerationPhases {
       sectionIndex, // startSection (0-indexed)
       sectionIndex + 1, // endSection (exclusive, 1 section per batch)
       input,
-      qdrantClient
+      qdrantClient,
+      undefined, // overlapFeedback (not used in initial generation)
+      previousSectionsDigest
     );
 
     const sectionDuration = Date.now() - sectionStartTime;
@@ -752,7 +778,7 @@ export class GenerationPhases {
   /**
    * Retry failed sections with exponential backoff (parallel via pLimit(2))
    *
-   * Attempts to regenerate sections that failed in the initial parallel batch.
+   * Attempts to regenerate sections that failed in the initial sequential batch.
    * Uses exponential backoff between retries to handle rate limiting.
    *
    * NOTE: This is an OUTER retry layer. Each call to generateSingleSectionWithRetry()
@@ -766,13 +792,15 @@ export class GenerationPhases {
    * @param input - Generation job input
    * @param qdrantClient - Optional RAG client
    * @param maxRetries - Maximum retry attempts per section (from database config)
+   * @param previousSectionsDigest - Digest of previously generated sections
    * @returns Object with successfully retried sections and final failures
    */
   private async retryFailedSections(
     failedResults: Array<{ index: number; error: string }>,
     input: GenerationJobInput,
     qdrantClient: QdrantClient | undefined,
-    maxRetries: number
+    maxRetries: number,
+    previousSectionsDigest: string
   ): Promise<{
     successes: Array<{ index: number; result: SectionBatchResult }>;
     failures: Array<{ index: number; error: string }>;
@@ -798,7 +826,9 @@ export class GenerationPhases {
     const retryLimit = pLimit(2);
 
     const retryPromises = failedResults.map(failed =>
-      retryLimit(() => this.retrySingleSection(failed, input, qdrantClient, maxRetries))
+      retryLimit(() =>
+        this.retrySingleSection(failed, input, qdrantClient, maxRetries, previousSectionsDigest)
+      )
     );
 
     const results = await Promise.allSettled(retryPromises);
@@ -832,12 +862,19 @@ export class GenerationPhases {
 
   /**
    * Retry a single failed section with exponential backoff
+   *
+   * @param failed - Failed section info
+   * @param input - Generation job input
+   * @param qdrantClient - Optional RAG client
+   * @param maxRetries - Maximum retry attempts
+   * @param previousSectionsDigest - Digest of previously generated sections
    */
   private async retrySingleSection(
     failed: { index: number; error: string },
     input: GenerationJobInput,
     qdrantClient: QdrantClient | undefined,
-    maxRetries: number
+    maxRetries: number,
+    previousSectionsDigest: string
   ): Promise<
     | { success: true; index: number; result: SectionBatchResult }
     | { success: false; index: number; error: string }
@@ -861,7 +898,13 @@ export class GenerationPhases {
       await new Promise(resolve => setTimeout(resolve, delay));
 
       try {
-        const result = await this.generateSingleSectionWithRetry(failed.index, input, qdrantClient);
+        const result = await this.generateSingleSectionWithRetry(
+          failed.index,
+          input,
+          qdrantClient,
+          input.course_id,
+          previousSectionsDigest
+        );
 
         this.logger.info(
           {

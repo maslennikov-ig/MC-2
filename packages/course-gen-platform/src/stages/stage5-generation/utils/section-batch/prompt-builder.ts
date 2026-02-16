@@ -67,7 +67,8 @@ export function buildBatchPrompt(
   qdrantClient: QdrantClient | undefined,
   attemptNumber: number,
   constraints?: CourseConstraints,
-  overlapFeedback?: string
+  overlapFeedback?: string,
+  previousSectionsDigest?: string
 ): string {
   const language = input.frontend_parameters.language || 'en';
   const style = input.frontend_parameters.style || DEFAULT_COURSE_STYLE;
@@ -126,6 +127,14 @@ ${antiOverlapLang}
     if (overlapFeedback) {
       prompt += `\n${overlapFeedback}\n`;
     }
+  }
+
+  // Inject digest of previously generated sections for concrete-level anti-duplication
+  if (previousSectionsDigest) {
+    prompt += `
+**PREVIOUSLY GENERATED SECTIONS** (DO NOT repeat these lesson topics):
+${previousSectionsDigest}
+`;
   }
 
   prompt += `

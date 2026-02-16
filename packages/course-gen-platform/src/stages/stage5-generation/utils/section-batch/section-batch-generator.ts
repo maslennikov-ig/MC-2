@@ -23,7 +23,8 @@ export class SectionBatchGenerator {
     endSection: number,
     input: GenerationJobInput,
     qdrantClient?: QdrantClient,
-    overlapFeedback?: string
+    overlapFeedback?: string,
+    previousSectionsDigest?: string
   ): Promise<SectionBatchResult> {
     if (endSection - startSection !== SECTIONS_PER_BATCH) {
       throw new Error(
@@ -105,7 +106,8 @@ export class SectionBatchGenerator {
       qdrantClient,
       language,
       constraints,
-      overlapFeedback
+      overlapFeedback,
+      previousSectionsDigest
     );
   }
 
