@@ -96,8 +96,8 @@ const QUALITY_CONFIG = {
 // HELPER FUNCTIONS
 // ============================================================================
 
-/** Sanitize text for safe prompt injection: strip newlines, limit length */
-const sanitizeDigest = (s: string, maxLen = 200): string =>
+/** Sanitize text for safe prompt injection: strip newlines, limit length @internal */
+export const sanitizeDigest = (s: string, maxLen = 200): string =>
   s.replace(/[\n\r]+/g, ' ').trim().slice(0, maxLen);
 
 /**
@@ -111,7 +111,7 @@ const sanitizeDigest = (s: string, maxLen = 200): string =>
  * @param sectionIndex - Section index (0-based)
  * @returns Formatted digest string, or empty string if no lesson content
  */
-function buildSectionDigest(section: Section, sectionIndex: number): string {
+export function buildSectionDigest(section: Section, sectionIndex: number): string {
   const title = sanitizeDigest(section.section_title || `Section ${sectionIndex + 1}`);
   const lessons = (section.lessons || [])
     .map(l => {
