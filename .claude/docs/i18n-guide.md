@@ -13,7 +13,7 @@
 | Messages   | `messages/{locale}/{namespace}.json`    |
 | Types      | `types/i18n.d.ts`                       |
 | Locales    | `ru` (default), `en`                    |
-| Namespaces | `common`, `admin`, `generation`, `auth` |
+| Namespaces | `common`, `admin`, `generation`, `auth`, `enrichments`, `course`, `organizations`, `profile` |
 
 ## Architecture
 
@@ -181,7 +181,7 @@ async function MyPage() {
 1. Add to `src/i18n/config.ts`:
 
 ```ts
-export const namespaces = ['common', 'admin', 'generation', 'auth', 'NEW_NS'] as const;
+export const namespaces = ['common', 'admin', 'generation', 'auth', 'enrichments', 'course', 'organizations', 'profile', 'NEW_NS'] as const;
 ```
 
 2. Create JSON files:
@@ -360,7 +360,8 @@ export const config = {
 
 ## Generation Graph i18n
 
-> **P3.3 Migration (2026-01-26)**: All generation-graph components migrated from legacy `GRAPH_TRANSLATIONS` to `next-intl`.
+> **P3.3 Migration (2026-01-26)**: Most generation-graph components migrated from legacy `GRAPH_TRANSLATIONS` to `next-intl`.
+> **Not yet migrated**: Stage 7 preview components (AudioPreview, CoverPreview, PresentationPreview, VideoScriptPanel, QuizPreview) and `step-translations.ts` still use inline `const TRANSLATIONS = { ru: {...}, en: {...} }` pattern.
 
 ### Quick Reference
 
@@ -599,9 +600,49 @@ await this.updateCourseProgressInDB(courseId, t('stage3.init'));
 
 ### Current Limitations
 
-- **Hardcoded locale**: Currently `locale: 'ru'` is hardcoded in job creation (TODO: derive from user session)
-- **Stage coverage**: Only Stage 2 has detailed progress keys; other stages use generic step messages
+- **Hardcoded locale**: `locale: 'ru'` used as default fallback in job data destructuring (e.g., `locale = 'ru'`). Locale is passed from frontend via `BaseJobDataSchema` but defaults to Russian.
+- **Stage coverage**: Stages 2-6 have progress keys in `messages.ts`; Stage 7 uses generic step messages.
 - **No pluralization**: Simple `{param}` interpolation only (backend uses same ICU format as frontend)
+
+---
+
+## Content Labels (Course Language i18n)
+
+> Localized labels for generated course content (callouts, section headers, etc.) in the language of the **course**, not the UI.
+
+This is a **third i18n system**, separate from frontend next-intl (UI language) and backend BullMQ i18n (progress messages).
+
+### Quick Reference
+
+| Item            | Location                                     |
+| --------------- | -------------------------------------------- |
+| Labels          | `packages/shared-types/src/common-enums.ts`  |
+| Languages       | 19 (en, ru, es, fr, de, zh, ja, ko, ar, pt, it, nl, sv, pl, tr, hi, th, vi, id) |
+| Accessor        | `getContentLabels(languageCode)`             |
+| Usage           | Markdown callout titles, content section labels |
+
+### How It Works
+
+```typescript
+import { getContentLabels } from '@megacampus/shared-types'
+
+const labels = getContentLabels('ru')
+// labels.calloutTip → 'Совет'
+// labels.calloutWarning → 'Внимание'
+// labels.sectionIntroduction → 'Введение'
+```
+
+### When to Use
+
+- **next-intl** (`useTranslations`): UI elements — buttons, menus, status badges, error messages. 2 locales (ru, en).
+- **CONTENT_LABELS** (`getContentLabels`): Generated course content display — callout titles, section headers. 19 languages, driven by `courses.language`.
+- **BACKEND_TRANSLATIONS** (`getTranslator`): Worker progress messages. 2 locales (ru, en).
+
+### Adding New Content Labels
+
+1. Add field to the type definition in `CONTENT_LABELS` (at the top of the object)
+2. Add the value to all 19 language entries
+3. Use via `getContentLabels(courseLanguage).newField`
 
 ---
 
