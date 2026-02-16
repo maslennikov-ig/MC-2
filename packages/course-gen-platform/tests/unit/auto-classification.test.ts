@@ -308,6 +308,34 @@ describe('shouldAutoMute', () => {
     });
   });
 
+  describe('stage4 cascade retry warning patterns', () => {
+    it('should auto-mute "Phase phase3_expert attempt 2 failed" warnings', () => {
+      const result = shouldAutoMute('Phase phase3_expert attempt 2 failed');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('cascading_repair');
+    });
+
+    it('should auto-mute "Phase phase1_classification attempt 3 failed" warnings', () => {
+      const result = shouldAutoMute('Phase phase1_classification attempt 3 failed');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('cascading_repair');
+    });
+  });
+
+  describe('stage6 digest section fallback patterns', () => {
+    it('should auto-mute "No digest section found" warnings', () => {
+      const result = shouldAutoMute('No digest section found');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+
+    it('should auto-mute "No digest section found" in longer messages', () => {
+      const result = shouldAutoMute('Warning: No digest section found for lesson 5');
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_fallback');
+    });
+  });
+
   describe('AUTO_MUTE_RULES configuration', () => {
     it('should have rules defined (auto-mute patterns)', () => {
       // At least 20 rules expected - exact count changes as rules are added

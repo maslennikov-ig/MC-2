@@ -261,9 +261,44 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
         validated = Phase3OutputSchema.parse(parsedOutput);
       } catch (validationError) {
         if (validationError instanceof z.ZodError) {
-          throw new Error(`Phase 3 validation failed: ${JSON.stringify(validationError.errors)}`);
+          // Route Zod validation failures through UnifiedRegenerator
+          logger.warn(
+            {
+              phase: 'phase-3-expert',
+              errors: validationError.errors,
+            },
+            'Zod validation failed, routing through UnifiedRegenerator'
+          );
+          const regenerator = new UnifiedRegenerator<z.infer<typeof Phase3OutputSchema>>({
+            enabledLayers: [
+              'auto-repair',
+              'critique-revise',
+              'partial-regen',
+              'model-escalation',
+              'emergency',
+            ],
+            maxRetries: 3,
+            schema: Phase3OutputSchema,
+            model: model,
+            metricsTracking: true,
+            stage: 'analyze',
+            courseId: input.course_id,
+            phaseId: 'stage_4_expert',
+            allowWarningFallback: true,
+          });
+          const result = await regenerator.regenerate({
+            rawOutput: preprocessedContent,
+            originalPrompt: prompt,
+            parseError: `Zod validation failed: ${JSON.stringify(validationError.errors)}`,
+          });
+          if (result.success && result.data) {
+            validated = Phase3OutputSchema.parse(result.data);
+          } else {
+            throw new Error(`Phase 3 validation failed after repair: ${result.error}`);
+          }
+        } else {
+          throw validationError;
         }
-        throw validationError;
       }
       const responseMetadata = (response as AIMessage).response_metadata as
         | { usage?: { input_tokens?: number; output_tokens?: number } }

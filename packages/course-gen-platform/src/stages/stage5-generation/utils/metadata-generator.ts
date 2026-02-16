@@ -253,6 +253,23 @@ export class MetadataGenerator {
           })
         );
       }
+
+      // Filter course_tags shorter than 3 chars BEFORE UnifiedRegenerator validation
+      // LLMs sometimes generate valid abbreviations like "AI", "ИИ" that fail z.string().min(3)
+      if (parsedRaw.course_tags && Array.isArray(parsedRaw.course_tags)) {
+        parsedRaw.course_tags = (parsedRaw.course_tags as unknown[]).filter(
+          (tag): tag is string => typeof tag === 'string' && tag.length >= 3
+        );
+      }
+
+      // Filter prerequisites shorter than 10 chars BEFORE validation
+      // z.string().min(10) for individual prerequisites
+      if (parsedRaw.prerequisites && Array.isArray(parsedRaw.prerequisites)) {
+        parsedRaw.prerequisites = (parsedRaw.prerequisites as unknown[]).filter(
+          (prereq): prereq is string => typeof prereq === 'string' && prereq.length >= 10
+        );
+      }
+
       preprocessedContent = JSON.stringify(parsedRaw);
     } catch (error) {
       // If preprocessing fails, continue with raw output
