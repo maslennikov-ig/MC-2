@@ -540,8 +540,8 @@ describe('course-data-utils', () => {
 
         const result = prepareLessonsForViewer(lessons as LessonRow[], courseId)
 
-        // Note: order_index of 0 is treated as falsy, so becomes ''
-        expect(result[0].lesson_number).toBe('')
+        // order_index: 0 is correctly preserved as '0'
+        expect(result[0].lesson_number).toBe('0')
         expect(result[1].lesson_number).toBe('100')
         expect(result[2].lesson_number).toBe('')
       })

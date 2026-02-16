@@ -27,14 +27,25 @@ vi.mock('@/lib/logger', () => ({
   },
 }))
 
-// Mock Redis client - create mock inside factory function
+// Mock server-only module
+vi.mock('server-only', () => ({}))
+
+// Hoisted shared mock instance for Redis (accessible in vi.mock factory and tests)
+const mockRedisInstance = vi.hoisted(() => ({
+  get: vi.fn(),
+  set: vi.fn(),
+  delete: vi.fn(),
+  exists: vi.fn(),
+}))
+
+// Mock Redis client - class mock delegates to shared instance
 vi.mock('@/lib/redis-client', () => ({
-  RedisCache: vi.fn().mockImplementation(() => ({
-    get: vi.fn(),
-    set: vi.fn(),
-    delete: vi.fn(),
-    exists: vi.fn(),
-  })),
+  RedisCache: class MockRedisCache {
+    get = mockRedisInstance.get
+    set = mockRedisInstance.set
+    delete = mockRedisInstance.delete
+    exists = mockRedisInstance.exists
+  },
 }))
 
 // Mock Supabase createDraftCourse action
@@ -43,21 +54,11 @@ vi.mock('@/app/actions/courses', () => ({
 }))
 
 // Import after mocking
-const { RedisCache } = await import('@/lib/redis-client')
 const { createDraftCourse: mockCreateDraftCourse } = await import('@/app/actions/courses')
-
-// Get mock instance for assertions
-const getMockRedisInstance = () => {
-  const instances = (RedisCache as Mock).mock.results
-  if (instances.length > 0) {
-    return instances[instances.length - 1].value
-  }
-  return null
-}
 
 describe('DraftSessionManager', () => {
   let manager: DraftSessionManager
-  let mockRedis: any
+  const mockRedis = mockRedisInstance
   const testUserId = 'test-user-123'
   const testOrgId = 'test-org-456'
   const DRAFT_TTL = 24 * 60 * 60 // 24 hours in seconds
@@ -65,7 +66,6 @@ describe('DraftSessionManager', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     manager = new DraftSessionManager()
-    mockRedis = getMockRedisInstance()
   })
 
   afterEach(() => {

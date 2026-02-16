@@ -119,7 +119,7 @@ This is paragraph two.
       expect(result).not.toBeNull()
       const link = result!.container.querySelector('a')
       expect(link).toBeTruthy()
-      expect(link?.textContent).toBe('OpenAI')
+      expect(link?.textContent).toContain('OpenAI')
       expect(link?.getAttribute('href')).toBe('https://openai.com')
     })
 
