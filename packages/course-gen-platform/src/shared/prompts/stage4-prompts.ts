@@ -69,51 +69,204 @@ Analyze this topic and provide comprehensive classification and topic analysis.`
   },
   {
     stage: 'stage_4',
-    promptKey: 'stage4_phase2_scope',
-    promptName: 'Stage 4 Phase 2 - Scope Analysis',
+    promptKey: 'stage4_phase2_scope_system',
+    promptName: 'Stage 4 Phase 2 - Scope Analysis (System)',
     promptDescription:
-      'Estimates course scope: total content hours (0.5-200h), lesson count (minimum 10), sections breakdown (1-30 sections).',
-    promptTemplate: `You are a curriculum scope analyst with expertise in estimating course structure.
+      'System prompt for scope estimation: course structure planning and section breakdown.',
+    promptTemplate: `You are an expert course designer specializing in scope estimation and structure planning.
 
-Your task is to analyze the course topic and classify output to estimate:
-1. Total content hours (0.5-200h)
-2. Lesson count (MINIMUM 10 lessons enforced)
-3. Sections breakdown (1-30 sections)
+Your task: Analyze the course topic and provide detailed scope recommendations.
+
+**Course Arc Guidance**:
+Structure the course as a learning journey with natural cognitive progression:
+
+1. **Opening section(s)**: Begin with context, motivation, and foundational vocabulary. Help learners understand WHY this topic matters and WHAT they will gain before introducing specialized concepts.
+2. **Core sections**: Progress from simple, concrete ideas toward complex, abstract ones. Each section should build on knowledge established in earlier sections.
+3. **Closing section(s)**: Conclude with synthesis, real-world application, or forward-looking perspectives that tie the course together.
+
+Recommended proportions: ~10-15% orientation, ~60-70% core progression, ~15-20% synthesis and application.
+
+When choosing Bloom's taxonomy verbs for learning_objectives, let them ascend naturally: early sections favor "identify", "describe", "explain"; later sections favor "analyze", "evaluate", "design".
 
 CRITICAL RULES:
-1. ALL output MUST be in {{outputLanguage}}
-2. You MUST respond with valid JSON matching the Phase2Output schema
-3. Ensure minimum 10 lessons constraint (FR-015)
-4. Each lesson is {{lessonDurationMinutes}} minutes
+1. ALL text output MUST be in {{outputLanguageUpper}} (the course target language is {{outputLanguage}})
+2. You MUST respond with valid JSON matching this EXACT schema:
 
-CONTEXT FROM PHASE 1:
-Topic: {{topic}}
-Category: {{category}}
-Complexity: {{complexity}}
-Target Audience: {{targetAudience}}
-Information Completeness: {{informationCompleteness}}%
+{{schemaDescription}}
 
-{{userRequirements}}{{documentContext}}
-
-Estimate the course scope and generate detailed structure recommendations.`,
+{{minLessonsRule}}
+4. Lesson duration: typically 15 minutes (can vary 3-45 min based on content type)
+5. Sections: 1-30 sections, each with 1+ lessons
+6. Provide detailed breakdown for each section (learning objectives, key topics, pedagogy)`,
     variables: [
       {
         name: 'outputLanguage',
-        description: 'Target language for course content',
+        description: 'Target language for course content (e.g., English, Russian)',
         required: true,
         example: 'Russian',
       },
       {
-        name: 'lessonDurationMinutes',
-        description: 'Duration of each lesson in minutes',
+        name: 'outputLanguageUpper',
+        description: 'Target language in uppercase (e.g., ENGLISH, RUSSIAN)',
         required: true,
-        example: '15',
+        example: 'RUSSIAN',
       },
+      {
+        name: 'schemaDescription',
+        description: 'Zod schema description for Phase 2 output (from zodToPromptSchema)',
+        required: true,
+        example: 'Phase2Output schema...',
+      },
+      {
+        name: 'minLessonsRule',
+        description: 'Rule about minimum lessons (dynamic based on size_guidance)',
+        required: true,
+        example: '3. Minimum 10 lessons REQUIRED (FR-015)...',
+      },
+    ],
+  },
+  {
+    stage: 'stage_4',
+    promptKey: 'stage4_phase2_scope_user',
+    promptName: 'Stage 4 Phase 2 - Scope Analysis (User)',
+    promptDescription:
+      'User prompt for scope estimation: course details, tasks, and constraints.',
+    promptTemplate: `Analyze this course and provide scope recommendations:{{overlapFeedbackSection}}
+
+**Course Topic**: {{topic}}{{courseDescriptionContext}}{{learningOutcomesContext}}
+
+**Category**: {{category}}
+**Complexity**: {{complexity}}
+**Target Audience**: {{targetAudience}}
+**Key Concepts**: {{keyConcepts}}{{documentsContext}}{{clarifyingContext}}{{sizeSection}}
+
+**Tasks**:
+1. **Estimate Total Content Hours** (0.5-200h):
+   - Consider topic breadth, depth, and target audience level
+   - Factor in available documents (if any)
+   - Provide reasoning for estimate
+
+2. **Calculate Lesson Count**:
+   - Determine appropriate lesson duration (3-45 min, typically 15 min)
+   - Formula: total_lessons = ceil((estimated_hours * 60) / lesson_duration_minutes)
+{{sizeConstraintNote}}
+
+3. **Generate Sections Breakdown** ({{sectionsRange}}):
+
+   **CRITICAL: Complete Section Fields**
+   EVERY section in sections_breakdown MUST include ALL required fields:
+   - area (string)
+   - estimated_lessons (number, min 1)
+   - importance (simple/normal/complex)
+   - learning_objectives (array, 2+ items)
+   - key_topics (array, 3+ items)
+   - pedagogical_approach (string, 50+ chars)
+   - section_id (string)
+   - estimated_duration_hours (number)
+   - difficulty (beginner/intermediate/advanced)
+
+   ALL sections MUST have ALL 9 fields above. {{sectionsSuffix}}
+
+   - Break course into logical sections
+   - For each section:
+     - Area name (topic focus)
+     - Estimated lessons (min 1)
+     - Importance: simple/normal/complex
+     - Learning objectives (2-5 items)
+     - Key topics (3-8 items)
+     - Pedagogical approach (50-200 chars)
+     - Section ID (sequential string: "1", "2", "3", ...)
+     - Estimated duration hours (calculate from estimated_lessons x lesson_duration_minutes / 60)
+     - Difficulty level: beginner/intermediate/advanced
+
+   **Importance levels** (model routing for generation quality):
+   - simple: Trivial overview, basic definitions, introductory material (use sparingly)
+   - normal: Standard course content - the MAJORITY of sections should be normal
+   - complex: Genuinely hard technical material requiring deep expertise (use RARELY - only 1-2 per course max)
+
+**CRITICAL: RESPECT USER-PROVIDED STRUCTURE**
+
+If the USER-PROVIDED COURSE DESCRIPTION above specifies an explicit course structure (modules, sections, topics, lesson plans):
+- You MUST use it as the PRIMARY blueprint for sections_breakdown
+- Each user-specified module/topic MUST become a separate section with matching area name
+- Preserve the user's ordering unless pedagogically impossible
+- You may add introductory/concluding sections ONLY if the user didn't specify a complete structure
+- Do NOT invent your own structure when the user has already defined one
+- Do NOT rename, merge, or reorder user-specified modules without strong pedagogical justification
+
+**CRITICAL: SECTION TOPIC DISTINCTNESS** (ZERO TOLERANCE FOR OVERLAP)
+
+Each section MUST cover a COMPLETELY DISTINCT topic area:
+1. **ONE concept -> ONE section**: Each user-mentioned concept goes to exactly ONE section. Other sections MUST NOT use it as a main topic. Distribute concepts EVENLY.
+2. **Boundary test**: For each section pair - "Could a lesson from A fit in B?" If yes -> MERGE or SHARPEN boundaries.
+3. **Key topics exclusivity**: Each key_topic MUST appear in EXACTLY ONE section. No duplicates or paraphrases across sections.
+4. **Deletion test**: If removing a section creates NO content gap -> MERGE it with the similar section.
+
+**CRITICAL CONSTRAINT - KEY TOPICS / LEARNING OBJECTIVES ALIGNMENT:**
+
+Each item in \`key_topics\` MUST directly correspond to a \`learning_objective\` in the same section.
+- The key_topic should be the noun/concept/technique from the objective
+- DO NOT generate key_topics that are not covered by learning_objectives
+- The LLM generating lesson content will use key_topics as section titles
+- The LLM validating lesson content will check against learning_objectives
+- If they don't match, the lesson will fail quality validation!
+
+**Correct Alignment Example:**
+- learning_objective: "Apply the 'Time Compression' technique to accelerate decisions"
+  -> key_topic: "Time Compression technique"
+- learning_objective: "Use 'Scarcity Principle' in event ticket context"
+  -> key_topic: "Scarcity Principle in sales"
+
+**Incorrect Example (CAUSES GENERATION FAILURE):**
+- learning_objective: "Apply Time Compression technique"
+  -> key_topic: "Anchoring technique" <- WRONG! Topic doesn't match objective!
+
+4. **Scope Warning** (if applicable):
+   - Warn if scope is very narrow or very broad
+
+**JSON Schema** (fields only, calculate values based on constraints above):
+{"recommended_structure":{"estimated_content_hours":<number>,"scope_reasoning":"<string>","lesson_duration_minutes":<number>,"calculation_explanation":"<string>","total_lessons":<number>,"total_sections":<number>,"scope_warning":<string|null>,"sections_breakdown":[{"area":"<string>","estimated_lessons":<number>,"importance":"<simple|normal|complex>","learning_objectives":["<string>"],"key_topics":["<string>"],"pedagogical_approach":"<string>","section_id":"<string>","estimated_duration_hours":<number>,"difficulty":"<beginner|intermediate|advanced>"}]},"phase_metadata":{"duration_ms":0,"model_used":"","tokens":{"input":0,"output":0,"total":0},"quality_score":0.0,"retry_count":0}}
+
+IMPORTANT:
+- Output ONLY valid JSON (no markdown, no comments)
+- ALL text fields (area, learning_objectives, key_topics, pedagogical_approach, scope_reasoning, calculation_explanation, scope_warning) MUST be in {{outputLanguageUpper}}
+{{sizeSpecificNotes}}
+- The ONLY hard constraint is lesson_duration_minutes - respect it strictly
+- sections_breakdown array MUST match total_sections count
+
+**New Fields in sections_breakdown (MANDATORY)**:
+1. **section_id**: MUST be sequential strings starting from "1" (not numbers)
+   - Format: "1", "2", "3", ..., "N" (where N = total_sections)
+   - Example: For {{targetSectionsHint}} sections, use "1" through "{{targetSectionsHint}}"
+
+2. **estimated_duration_hours**: Calculate for each section
+   - Formula: (estimated_lessons x lesson_duration_minutes) / 60
+   - Round to 1 decimal place (e.g., 1.3, 2.5, 4.0)
+   - Example: 5 lessons x 15 min / 60 = 1.25 hours
+   - Sum across all sections should approximately equal estimated_content_hours
+
+3. **difficulty**: Assess based on position in course and target_audience
+   - Values: "beginner" | "intermediate" | "advanced"
+   - Early sections typically "beginner", middle sections "intermediate", later sections "advanced"
+   - Consider target_audience level (novices need more beginner sections)
+   - Can have multiple sections at same difficulty level
+
+**Validation Rules**:
+- section_id values MUST be unique and sequential
+- estimated_duration_hours sum should be within +/-10% of estimated_content_hours
+- difficulty should generally progress from beginner -> intermediate -> advanced through the course`,
+    variables: [
       {
         name: 'topic',
         description: 'Course topic',
         required: true,
         example: 'React Hooks fundamentals',
+      },
+      {
+        name: 'outputLanguageUpper',
+        description: 'Target language in uppercase',
+        required: true,
+        example: 'RUSSIAN',
       },
       {
         name: 'category',
@@ -131,23 +284,79 @@ Estimate the course scope and generate detailed structure recommendations.`,
         name: 'targetAudience',
         description: 'Target audience from Phase 1',
         required: true,
-        example: 'intermediate',
+        example: 'Developers with React experience',
       },
       {
-        name: 'informationCompleteness',
-        description: 'Information completeness percentage from Phase 1',
+        name: 'keyConcepts',
+        description: 'Comma-separated key concepts from Phase 1',
         required: true,
-        example: '85',
+        example: 'useState, useEffect, custom hooks',
       },
       {
-        name: 'userRequirements',
-        description: 'Optional user requirements',
+        name: 'overlapFeedbackSection',
+        description: 'Optional overlap feedback from retry (includes newlines)',
         required: false,
+        example: '\n\nPrevious attempt had overlapping sections...\n',
       },
       {
-        name: 'documentContext',
-        description: 'Optional document summaries',
+        name: 'courseDescriptionContext',
+        description: 'Optional user-provided course description',
         required: false,
+        example: '\n\n**USER-PROVIDED COURSE DESCRIPTION**...',
+      },
+      {
+        name: 'learningOutcomesContext',
+        description: 'Optional required learning outcomes',
+        required: false,
+        example: '\n\n**REQUIRED LEARNING OUTCOMES**...',
+      },
+      {
+        name: 'documentsContext',
+        description: 'Optional document summaries context',
+        required: false,
+        example: '\n\nAVAILABLE DOCUMENTS (3):\n...',
+      },
+      {
+        name: 'clarifyingContext',
+        description: 'Optional clarifying Q&A context',
+        required: false,
+        example: '\n\nUSER CLARIFICATIONS...',
+      },
+      {
+        name: 'sizeSection',
+        description: 'Course size guidance or AUTO mode text',
+        required: true,
+        example: '\n\n## MANDATORY COURSE SIZE CONSTRAINT...',
+      },
+      {
+        name: 'sizeConstraintNote',
+        description: 'Size constraint note for Task 2',
+        required: true,
+        example: '   - FOR THIS MINI COURSE: Generate 3-5 lessons ONLY',
+      },
+      {
+        name: 'sectionsRange',
+        description: 'Expected sections range text',
+        required: true,
+        example: '1 section(s) for mini size',
+      },
+      {
+        name: 'sectionsSuffix',
+        description: 'Additional note about section count',
+        required: false,
+        example: 'For mini size: generate 1 section(s) only.',
+      },
+      {
+        name: 'sizeSpecificNotes',
+        description: 'Size-specific notes in IMPORTANT section',
+        required: true,
+        example: '- RESPECT THE SIZE PRESET: Generate 3-5 lessons in 1 section(s)...',
+      },
+      {
+        name: 'targetSectionsHint',
+        description: 'Target sections count as string',
+        required: true,
+        example: '3',
       },
     ],
   },
