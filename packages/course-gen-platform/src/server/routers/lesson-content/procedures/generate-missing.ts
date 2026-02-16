@@ -22,6 +22,55 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 import { logger } from '../../../../shared/logger/index.js';
 import { validateLocale } from '@/shared/validation';
 
+type LessonFromStructure = {
+  lesson_number: number;
+  lesson_title: string;
+  lesson_objectives?: string[];
+  key_topics?: string[];
+  estimated_duration_minutes?: number;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
+};
+
+type SectionFromStructure = {
+  section_number?: number;
+  section_title: string;
+  lessons: LessonFromStructure[];
+};
+
+type LessonWithContentRow = {
+  order_index: number;
+  lesson_contents: Array<{ id: string }> | null;
+  sections: { order_index: number } | Array<{ order_index: number }> | null;
+};
+
+function buildLessonId(sectionNumber: number, lessonOrder: number): string {
+  return `${sectionNumber}.${lessonOrder}`;
+}
+
+function resolveSectionNumber(section: SectionFromStructure, sectionIndex: number): number {
+  return section.section_number ?? sectionIndex + 1;
+}
+
+function parseLessonId(lessonId: string): { sectionNum: number; lessonOrder: number } | null {
+  const match = lessonId.match(/^(\d+)\.(\d+)$/);
+  if (!match) return null;
+
+  const sectionNum = parseInt(match[1], 10);
+  const lessonOrder = parseInt(match[2], 10);
+
+  if (sectionNum <= 0 || lessonOrder <= 0) return null;
+
+  return { sectionNum, lessonOrder };
+}
+
+function findLessonByOrder(
+  section: SectionFromStructure,
+  lessonOrder: number
+): LessonFromStructure | null {
+  const lesson = section.lessons[lessonOrder - 1];
+  return lesson ?? null;
+}
+
 const generateMissingInputSchema = z.object({
   courseId: z.string().uuid('Invalid course ID'),
   priority: z.number().int().min(1).max(10).default(7),
@@ -98,18 +147,7 @@ export const generateMissingContent = protectedProcedure
 
       // Step 3: Validate course_structure exists
       const courseStructure = course.course_structure as {
-        sections: Array<{
-          section_number: number;
-          section_title: string;
-          lessons: Array<{
-            lesson_number: number;
-            lesson_title: string;
-            lesson_objectives?: string[];
-            key_topics?: string[];
-            estimated_duration_minutes?: number;
-            difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
-          }>;
-        }>;
+        sections: SectionFromStructure[];
       } | null;
 
       if (!courseStructure || !courseStructure.sections) {
@@ -129,11 +167,11 @@ export const generateMissingContent = protectedProcedure
 
       // Step 4: Build list of ALL lesson IDs from course_structure
       const allLessonIds: string[] = [];
-      for (const section of courseStructure.sections) {
-        for (const lesson of section.lessons) {
-          // lesson_number is already in dotted format (e.g. 1.1, 2.3) from renumberAll,
-          // so use it directly as the lessonId — no need to prepend section_number again.
-          allLessonIds.push(String(lesson.lesson_number));
+      for (let sectionIndex = 0; sectionIndex < courseStructure.sections.length; sectionIndex++) {
+        const section = courseStructure.sections[sectionIndex];
+        const sectionNumber = resolveSectionNumber(section, sectionIndex);
+        for (let lessonIndex = 0; lessonIndex < section.lessons.length; lessonIndex++) {
+          allLessonIds.push(buildLessonId(sectionNumber, lessonIndex + 1));
         }
       }
 
@@ -173,20 +211,17 @@ export const generateMissingContent = protectedProcedure
 
       // Build a set of lesson IDs that already have content
       const lessonsWithContentSet = new Set<string>();
-      if (lessonsWithContent) {
-        for (const lesson of lessonsWithContent) {
-          // lesson_contents is an array; if non-empty, the lesson has content
-          const hasContent =
-            Array.isArray(lesson.lesson_contents) && lesson.lesson_contents.length > 0;
-          if (hasContent) {
-            // sections is an inner join result - can be object or array depending on Supabase client
-            const sectionData = Array.isArray(lesson.sections)
-              ? lesson.sections[0]
-              : lesson.sections;
-            if (sectionData) {
-              const lessonId = `${sectionData.order_index}.${lesson.order_index}`;
-              lessonsWithContentSet.add(lessonId);
-            }
+      const typedLessonsWithContent = (lessonsWithContent ?? []) as LessonWithContentRow[];
+      for (const lesson of typedLessonsWithContent) {
+        // lesson_contents is an array; if non-empty, the lesson has content
+        const hasContent =
+          Array.isArray(lesson.lesson_contents) && lesson.lesson_contents.length > 0;
+        if (hasContent) {
+          // sections is an inner join result - can be object or array depending on Supabase client
+          const sectionData = Array.isArray(lesson.sections) ? lesson.sections[0] : lesson.sections;
+          if (sectionData) {
+            const lessonId = `${sectionData.order_index}.${lesson.order_index}`;
+            lessonsWithContentSet.add(lessonId);
           }
         }
       }
@@ -320,30 +355,33 @@ export const generateMissingContent = protectedProcedure
           'Materializing sections and lessons from course_structure'
         );
 
-        for (const section of courseStructure.sections) {
+        for (let sectionIndex = 0; sectionIndex < courseStructure.sections.length; sectionIndex++) {
+          const section = courseStructure.sections[sectionIndex];
+          const sectionNumber = resolveSectionNumber(section, sectionIndex);
           const { data: newSection, error: sectionError } = await supabase
             .from('sections')
             .insert({
               course_id: courseId,
               title: section.section_title,
-              order_index: section.section_number,
+              order_index: sectionNumber,
             })
             .select('id')
             .single();
 
           if (sectionError || !newSection) {
             logger.error(
-              { requestId, courseId, sectionNumber: section.section_number, error: sectionError },
+              { requestId, courseId, sectionNumber, error: sectionError },
               'Failed to create section'
             );
             continue;
           }
 
-          for (const lesson of section.lessons) {
+          for (let lessonIndex = 0; lessonIndex < section.lessons.length; lessonIndex++) {
+            const lesson = section.lessons[lessonIndex];
             const { error: lessonError } = await supabase.from('lessons').insert({
               section_id: newSection.id,
               title: lesson.lesson_title,
-              order_index: lesson.lesson_number,
+              order_index: lessonIndex + 1,
               lesson_type: 'text',
               duration_minutes: lesson.estimated_duration_minutes || 15,
               objectives: lesson.lesson_objectives || [],
@@ -354,7 +392,7 @@ export const generateMissingContent = protectedProcedure
                 {
                   requestId,
                   courseId,
-                  lessonId: `${section.section_number}.${lesson.lesson_number}`,
+                  lessonId: buildLessonId(sectionNumber, lessonIndex + 1),
                   error: lessonError,
                 },
                 'Failed to create lesson'
@@ -368,21 +406,26 @@ export const generateMissingContent = protectedProcedure
       const lessonSpecs: LessonSpecificationV2[] = [];
 
       for (const lessonId of missingLessonIds) {
-        // lessonId is dotted lesson_number (e.g. "1.1", "2.3").
-        // Integer part = section_number, full float = lesson_number.
-        const sectionNum = parseInt(lessonId, 10);
-        const lessonNumFloat = parseFloat(lessonId);
+        const parsedLessonId = parseLessonId(lessonId);
+        if (!parsedLessonId) {
+          logger.warn({ requestId, lessonId }, 'Invalid lesson ID format in missing lessons list');
+          continue;
+        }
 
-        const section = courseStructure.sections.find(s => s.section_number === sectionNum);
+        const { sectionNum, lessonOrder } = parsedLessonId;
+
+        const section = courseStructure.sections.find(
+          (s, sectionIndex) => resolveSectionNumber(s, sectionIndex) === sectionNum
+        );
         if (!section) {
           logger.warn({ requestId, lessonId, sectionNum }, 'Section not found in course_structure');
           continue;
         }
 
-        const lesson = section.lessons.find(l => l.lesson_number === lessonNumFloat);
+        const lesson = findLessonByOrder(section, lessonOrder);
         if (!lesson) {
           logger.warn(
-            { requestId, lessonId, sectionNum, lessonNumFloat },
+            { requestId, lessonId, sectionNum, lessonOrder },
             'Lesson not found in course_structure'
           );
           continue;
@@ -416,9 +459,16 @@ export const generateMissingContent = protectedProcedure
 
       // Step 9.5: Ensure all missing lessons exist in database (recreate if deleted)
       for (const spec of lessonSpecs) {
-        const [sectionNumStr, lessonNumStr] = spec.lesson_id.split('.');
-        const sectionNum = parseInt(sectionNumStr, 10);
-        const lessonNum = parseInt(lessonNumStr, 10);
+        const parsedLessonId = parseLessonId(spec.lesson_id);
+        if (!parsedLessonId) {
+          logger.warn(
+            { requestId, courseId, lessonId: spec.lesson_id },
+            'Invalid lesson ID format while recreating lessons'
+          );
+          continue;
+        }
+
+        const { sectionNum, lessonOrder } = parsedLessonId;
 
         const { data: sectionData } = await supabase
           .from('sections')
@@ -439,18 +489,20 @@ export const generateMissingContent = protectedProcedure
           .from('lessons')
           .select('id')
           .eq('section_id', sectionData.id)
-          .eq('order_index', lessonNum)
+          .eq('order_index', lessonOrder)
           .single();
 
         if (!existingLesson) {
-          const section = courseStructure.sections.find(s => s.section_number === sectionNum);
-          const lesson = section?.lessons.find(l => l.lesson_number === lessonNum);
+          const section = courseStructure.sections.find(
+            (s, sectionIndex) => resolveSectionNumber(s, sectionIndex) === sectionNum
+          );
+          const lesson = section ? findLessonByOrder(section, lessonOrder) : null;
 
           if (lesson) {
             const { error: createError } = await supabase.from('lessons').insert({
               section_id: sectionData.id,
               title: lesson.lesson_title,
-              order_index: lessonNum,
+              order_index: lessonOrder,
               lesson_type: 'text',
               duration_minutes: lesson.estimated_duration_minutes || 15,
               objectives: lesson.lesson_objectives || [],

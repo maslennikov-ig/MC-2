@@ -8,6 +8,7 @@ import type {
 } from '@megacampus/shared-types/lesson-specification-v2';
 import logger from '@/shared/logger';
 import { inferSemanticScaffolding } from '../semantic-scaffolding';
+import { buildFallbackSearchQueries } from '../rag-fallback-queries';
 
 const BLOOM_KEYWORDS: Record<BloomLevelV2, string[]> = {
   create: ['create', 'design', 'build', 'develop', 'construct', 'compose', 'invent', 'formulate'],
@@ -59,16 +60,19 @@ function buildRAGContext(
   const ragPlan = analysisResult?.document_relevance_mapping?.[String(sectionId)];
 
   if (!ragPlan) {
+    const section = analysisResult?.recommended_structure?.sections_breakdown?.[sectionId - 1];
+    const topic = analysisResult?.topic_analysis?.determined_topic ?? 'course';
+
     return {
-      primary_documents: ['default'],
-      search_queries: ['course content'],
+      primary_documents: [],  // empty = search all course documents
+      search_queries: buildFallbackSearchQueries(section, topic, sectionId),
       expected_chunks: 7,
     };
   }
 
   return {
     primary_documents:
-      ragPlan.primary_documents?.length > 0 ? ragPlan.primary_documents : ['default'],
+      ragPlan.primary_documents?.length > 0 ? ragPlan.primary_documents : [],  // empty = search all
     search_queries:
       ragPlan.search_queries?.length > 0
         ? ragPlan.search_queries
@@ -158,16 +162,20 @@ function buildLessonContext(
     termsAlreadyDefined.push(...(prev.key_topics || []).slice(0, 10));
   }
 
-  // Only return context if there's something useful
-  if (!previousLesson && !nextLesson && conceptsAlreadyCovered.length === 0) {
-    return undefined;
-  }
-
   return {
     previous_lesson: previousLesson,
     next_lesson: nextLesson,
     concepts_already_covered: conceptsAlreadyCovered,
     terms_already_defined: termsAlreadyDefined,
+    course_position: {
+      lesson_index_in_module: lessonIndex + 1,
+      total_lessons_in_module: (allSections[sectionIndex].lessons || []).length,
+      module_index: sectionIndex + 1,
+      total_modules: allSections.length,
+      lesson_index_in_course: currentFlatIndex + 1,
+      total_lessons_in_course: allLessons.length,
+      module_title: allSections[sectionIndex].section_title,
+    },
   };
 }
 

@@ -17,7 +17,7 @@
  * @see packages/course-gen-platform/src/shared/embeddings/jina-client.ts
  */
 
-import { generateEmbedding } from '@/shared/embeddings/jina-client';
+import { generateEmbedding, generateEmbeddings } from '@/shared/embeddings/jina-client';
 import type { CourseMetadata, Section } from '@megacampus/shared-types';
 import type { Logger } from 'pino';
 import defaultLogger from '@/shared/logger';
@@ -121,10 +121,20 @@ const LANGUAGE_ADJUSTMENTS: Record<string, number> = {
 };
 
 /**
- * Default threshold for cross-section overlap detection.
- * Pairs with cosine similarity >= this value are flagged as overlapping.
+ * Default overlap thresholds by stage.
+ * Stage 4 sections are abstract (area + key_topics) → higher threshold to avoid false positives.
+ * Stage 5 sections are detailed (title + description + lessons) → lower threshold catches more.
  */
-const DEFAULT_OVERLAP_THRESHOLD = 0.85;
+export const OVERLAP_THRESHOLDS = {
+  /** Stage 4: Abstract section breakdown (area, key_topics, learning_objectives) */
+  stage4: 0.8,
+  /** Stage 5: Detailed sections with lessons */
+  stage5: 0.75,
+  /** Legacy default for backward compatibility */
+  default: 0.8,
+} as const;
+
+// Note: DEFAULT_OVERLAP_THRESHOLD removed — use OVERLAP_THRESHOLDS.stage4 or .stage5 directly
 
 // ============================================================================
 // QUALITY VALIDATOR CLASS
@@ -394,56 +404,108 @@ export class QualityValidator {
   }
 
   /**
-   * Detect content overlap between sections using pairwise cosine similarity.
+   * Detect content overlap between Stage 5 generated sections.
    *
-   * For each section, builds a text representation using titles and lesson titles,
-   * generates Jina-v3 embeddings, then computes pairwise cosine similarity.
+   * Thin wrapper over detectOverlapFromTexts() that extracts text from Section[].
+   * Uses OVERLAP_THRESHOLDS.stage5 (0.75) by default.
    *
    * @param generatedSections - Array of generated sections to check
-   * @param language - Language code for logging
-   * @param overlapThreshold - Similarity threshold above which overlap is flagged (default 0.85)
+   * @param language - Language code for threshold adjustment
+   * @param overlapThreshold - Override threshold (default: stage5 threshold 0.75)
    * @returns CrossSectionOverlapResult with detected overlapping pairs
    */
   async detectCrossSectionOverlap(
     generatedSections: Section[],
     language: string = 'en',
-    overlapThreshold: number = DEFAULT_OVERLAP_THRESHOLD
+    overlapThreshold: number = OVERLAP_THRESHOLDS.stage5
   ): Promise<CrossSectionOverlapResult> {
+    // Build text representations for each section
+    const texts = generatedSections.map(section => {
+      const text = this.concatenateSectionFields(section);
+      return text.trim().length > 0 ? text : `Section ${section.section_number ?? 'unknown'}`;
+    });
+
+    const labels = generatedSections.map(
+      section => section.section_title || `Section ${section.section_number ?? 'unknown'}`
+    );
+
+    // Delegate to unified core method
+    const result = await this.detectOverlapFromTexts(texts, labels, language, overlapThreshold);
+
+    // Remap indices to section_numbers for backward compatibility
+    result.overlappingPairs = result.overlappingPairs.map(pair => ({
+      ...pair,
+      sectionA: generatedSections[pair.sectionA - 1]?.section_number ?? pair.sectionA,
+      sectionB: generatedSections[pair.sectionB - 1]?.section_number ?? pair.sectionB,
+    }));
+
+    return result;
+  }
+
+  // ==========================================================================
+  // UNIFIED OVERLAP DETECTION (shared by Stage 4 and Stage 5)
+  // ==========================================================================
+
+  /**
+   * Core overlap detection from pre-built text representations.
+   *
+   * Unified method used by both Stage 4 (sections_breakdown) and Stage 5 (generated sections).
+   * Each caller prepares texts and labels; this method handles:
+   * - Batch embedding generation (1 API call via generateEmbeddings)
+   * - Pairwise cosine similarity computation
+   * - Language-adjusted threshold comparison
+   *
+   * Uses batch generateEmbeddings() for efficiency:
+   * - 10 texts → 1 API call (vs 10 individual calls with generateEmbedding)
+   * - Respects Jina distributed rate limits (100 RPM, 2 concurrent) automatically
+   *
+   * @param texts - Pre-concatenated text representations (one per item)
+   * @param labels - Human-readable labels for reporting (e.g., section titles)
+   * @param language - Language code for threshold adjustment (ru: -0.05)
+   * @param overlapThreshold - Base threshold (default: OVERLAP_THRESHOLDS.default)
+   * @returns CrossSectionOverlapResult with detected overlapping pairs
+   */
+  async detectOverlapFromTexts(
+    texts: string[],
+    labels: string[],
+    language: string = 'en',
+    overlapThreshold: number = OVERLAP_THRESHOLDS.default
+  ): Promise<CrossSectionOverlapResult> {
+    // Apply language adjustment
+    const langCode = language.toLowerCase().slice(0, 2);
+    const adjustment = LANGUAGE_ADJUSTMENTS[langCode] || 0.0;
+    const effectiveThreshold = overlapThreshold + adjustment;
+
     try {
       this.logger.info({
-        msg: 'Starting cross-section overlap detection',
-        sectionCount: generatedSections.length,
-        overlapThreshold,
+        msg: 'Starting overlap detection from texts',
+        itemCount: texts.length,
+        baseThreshold: overlapThreshold,
+        effectiveThreshold,
         language,
       });
 
-      // Need at least 2 sections for comparison
-      if (generatedSections.length < 2) {
+      // Need at least 2 items for comparison
+      if (texts.length < 2) {
         return {
           hasOverlap: false,
           overlapCount: 0,
-          overlapThreshold,
+          overlapThreshold: effectiveThreshold,
           overlappingPairs: [],
         };
       }
 
-      // Build text representations for each section, skip empty ones
-      const sectionTexts = generatedSections.map(section => {
-        const text = this.concatenateSectionFields(section);
-        if (text.trim().length === 0) {
-          this.logger.warn({
-            msg: 'Section has no content for overlap detection, using section number as fallback',
-            sectionNumber: section.section_number,
-          });
-          return `Section ${section.section_number ?? 'unknown'}`;
-        }
-        return text;
-      });
+      // Validate texts/labels alignment
+      if (texts.length !== labels.length) {
+        this.logger.warn({
+          msg: 'texts/labels length mismatch, using index as fallback labels',
+          textsLength: texts.length,
+          labelsLength: labels.length,
+        });
+      }
 
-      // Generate embeddings for all sections in parallel
-      const embeddings = await Promise.all(
-        sectionTexts.map(text => generateEmbedding(text, 'retrieval.passage'))
-      );
+      // Generate embeddings in batch (single API call — efficient)
+      const embeddings = await generateEmbeddings(texts, 'retrieval.passage');
 
       // Compute pairwise cosine similarity
       const overlappingPairs: CrossSectionOverlapResult['overlappingPairs'] = [];
@@ -452,23 +514,23 @@ export class QualityValidator {
         for (let j = i + 1; j < embeddings.length; j++) {
           const similarity = this.cosineSimilarity(embeddings[i], embeddings[j]);
 
-          if (similarity >= overlapThreshold) {
+          if (similarity >= effectiveThreshold) {
             overlappingPairs.push({
-              sectionA: generatedSections[i].section_number ?? i + 1,
-              sectionB: generatedSections[j].section_number ?? j + 1,
+              sectionA: i + 1,
+              sectionB: j + 1,
               similarity,
-              sectionATitle: generatedSections[i].section_title,
-              sectionBTitle: generatedSections[j].section_title,
+              sectionATitle: labels[i] || `Item ${i + 1}`,
+              sectionBTitle: labels[j] || `Item ${j + 1}`,
             });
 
             this.logger.warn({
-              msg: 'Cross-section overlap detected',
-              sectionA: generatedSections[i].section_number ?? i + 1,
-              sectionB: generatedSections[j].section_number ?? j + 1,
+              msg: 'Overlap detected',
+              indexA: i + 1,
+              indexB: j + 1,
               similarity: similarity.toFixed(4),
-              threshold: overlapThreshold,
-              sectionATitle: generatedSections[i].section_title,
-              sectionBTitle: generatedSections[j].section_title,
+              threshold: effectiveThreshold,
+              labelA: labels[i],
+              labelB: labels[j],
             });
           }
         }
@@ -477,22 +539,22 @@ export class QualityValidator {
       const result: CrossSectionOverlapResult = {
         hasOverlap: overlappingPairs.length > 0,
         overlapCount: overlappingPairs.length,
-        overlapThreshold,
+        overlapThreshold: effectiveThreshold,
         overlappingPairs,
       };
 
       this.logger.info({
-        msg: 'Cross-section overlap detection complete',
+        msg: 'Overlap detection complete',
         hasOverlap: result.hasOverlap,
         overlapCount: result.overlapCount,
-        totalPairsChecked: (generatedSections.length * (generatedSections.length - 1)) / 2,
+        totalPairsChecked: (texts.length * (texts.length - 1)) / 2,
         language,
       });
 
       return result;
     } catch (error) {
       this.logger.error({
-        msg: 'Cross-section overlap detection failed',
+        msg: 'Overlap detection from texts failed',
         error: error instanceof Error ? error.message : 'Unknown error',
       });
 
@@ -500,7 +562,7 @@ export class QualityValidator {
       return {
         hasOverlap: false,
         overlapCount: 0,
-        overlapThreshold,
+        overlapThreshold: effectiveThreshold,
         overlappingPairs: [],
       };
     }

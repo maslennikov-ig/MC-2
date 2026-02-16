@@ -103,7 +103,7 @@ export interface AnalysisResult {
    * Historical: RAG Planning for Generation - document-to-section mapping
    * Enhanced in v0.20.0 with confidence levels and search_queries
    */
-  document_relevance_mapping: {
+  document_relevance_mapping?: {
     [section_id: string]: {
       primary_documents: string[]; // file_catalog IDs ranked by relevance
       search_queries: string[]; // Queries for RAG retrieval

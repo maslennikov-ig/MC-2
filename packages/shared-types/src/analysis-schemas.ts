@@ -77,28 +77,11 @@ export type ExerciseType = (typeof KNOWN_EXERCISE_TYPES)[number];
  */
 function createSoftEnumArraySchema<T extends string>(
   knownValues: readonly T[],
-  fieldName: string
+  _fieldName: string
 ): z.ZodEffects<z.ZodArray<z.ZodString>, T[], string[]> {
   return z.array(z.string()).transform(arr => {
-    const known: T[] = [];
-    const unknown: string[] = [];
-
-    for (const value of arr) {
-      if (knownValues.includes(value as T)) {
-        known.push(value as T);
-      } else {
-        unknown.push(value);
-      }
-    }
-
-    if (unknown.length > 0 && process.env.NODE_ENV === 'development') {
-      console.warn(
-        `[GenerationGuidance] Unknown ${fieldName} values filtered: ${unknown.join(', ')}. ` +
-          `Known values: ${knownValues.join(', ')}`
-      );
-    }
-
-    return known;
+    // Filter to only known enum values — unknown LLM-generated values are silently dropped
+    return arr.filter((value): value is T => knownValues.includes(value as T));
   });
 }
 
@@ -113,7 +96,7 @@ function createSoftEnumArraySchema<T extends string>(
 export function createLLMEnumSchema<const T extends readonly [string, ...string[]]>(
   canonicalValues: T,
   synonymMap: Record<string, T[number]>,
-  fieldName?: string
+  _fieldName?: string
 ) {
   const allMappings: Record<string, T[number]> = { ...synonymMap };
   for (const val of canonicalValues) {
@@ -125,12 +108,7 @@ export function createLLMEnumSchema<const T extends readonly [string, ...string[
     .transform(val => {
       const normalized = val.toLowerCase().trim();
       const mapped = allMappings[normalized];
-      if (!mapped && fieldName) {
-        console.warn(
-          `[LLMEnum] Unknown ${fieldName} value: "${val}". ` +
-            `Expected: ${canonicalValues.join(', ')} or synonyms.`
-        );
-      }
+      // Unknown values pass through to the .pipe(z.enum()) which will reject them
       return mapped ?? val;
     })
     .pipe(z.enum(canonicalValues));
@@ -539,6 +517,9 @@ export const Phase2InputSchema = z.object({
   /** Learning outcomes (user-specified goals) */
   learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
 
+  /** Overlap detection feedback from previous attempt (for retry) */
+  overlap_feedback: z.string().optional(),
+
   /** Clarifying answers from Phase 0.5 */
   clarifying_answers: z
     .array(
@@ -759,7 +740,7 @@ export const AnalysisResultSchema = z.object({
     real_world_examples: z.array(z.string()), // REQUIRED
   }),
 
-  document_relevance_mapping: DocumentRelevanceMappingSchema.default({}),
+  document_relevance_mapping: DocumentRelevanceMappingSchema.optional().default({}),
 
   metadata: z.object({
     analysis_version: z.string(),

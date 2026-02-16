@@ -29,6 +29,9 @@ import logger from '../logger';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
 import { normalizeLanguageForReserve, type LanguageCode } from '@megacampus/shared-utils';
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
+
+/** Emergency universal fallback model when DB config is unavailable */
+const EMERGENCY_FALLBACK_MODEL = 'google/gemini-2.5-flash';
 import * as ModelConfigDB from './model-config-db';
 
 // Re-export types and constants from model-config-db for backward compatibility
@@ -461,15 +464,14 @@ class ModelConfigServiceImpl {
       logger.error({ phaseName, courseId, tier, error: err }, 'Database phase lookup failed');
     }
 
-    // Step 2b: Chat phases require DB config — fail-fast if DB is up but config row missing
-    // Plan requirement (section 4.3): "при missing/invalid phase config — 503 (явно)"
-    if (dbReturnedNull && phaseName.startsWith('chat_')) {
-      const msg = `Chat phase "${phaseName}" has no active config in database. Seed the config before using chat.`;
-      logger.error({ phaseName, courseId, tier }, msg);
-      throw new Error(msg);
+    // Step 3: Chat phases with missing DB config must fail explicitly (no stale/hardcoded fallback)
+    if (phaseName.startsWith('chat_') && dbReturnedNull) {
+      const chatErrorMsg = `Chat phase "${phaseName}" has no active config in database. Seed the config before using chat.`;
+      logger.error({ phaseName, courseId, tier, dbReturnedNull }, chatErrorMsg);
+      throw new Error(chatErrorMsg);
     }
 
-    // Step 3: Use stale cache if available
+    // Step 4: Use stale cache if available
     if (cached) {
       const ageMinutes = Math.round(cached.age / 60000);
       logger.warn(
@@ -479,7 +481,14 @@ class ModelConfigServiceImpl {
       return cached.data;
     }
 
-    // Step 4: No cache, no database - try hardcoded fallback
+    // Step 5: Chat phases must NEVER use hardcoded/global fallback (plan:4.3)
+    if (phaseName.startsWith('chat_')) {
+      const chatErrorMsg = `Chat phase "${phaseName}" has no config: database unavailable and no cached config. Do NOT use hardcoded/global fallback for chat phases.`;
+      logger.error({ phaseName, courseId, tier, dbReturnedNull }, chatErrorMsg);
+      throw new Error(chatErrorMsg);
+    }
+
+    // Step 6: No cache, no database - try hardcoded fallback for non-chat phases
     const hardcodedConfig = DEFAULT_PHASE_CONFIGS[phaseName];
     if (hardcodedConfig) {
       logger.warn(
@@ -491,13 +500,7 @@ class ModelConfigServiceImpl {
       return hardcodedConfig;
     }
 
-    // Step 5: Try global_default as last resort (NOT for chat phases — explicit failure)
-    if (phaseName.startsWith('chat_')) {
-      const chatErrorMsg = `Chat phase "${phaseName}" has no config: database unavailable, no cache, and no hardcoded fallback. Do NOT use global_default for chat phases.`;
-      logger.fatal({ phaseName, courseId, tier }, chatErrorMsg);
-      throw new Error(chatErrorMsg);
-    }
-
+    // Step 7: Try global_default as last resort for non-chat phases
     const globalDefault = DEFAULT_PHASE_CONFIGS['global_default'];
     if (globalDefault) {
       logger.warn(
@@ -508,7 +511,7 @@ class ModelConfigServiceImpl {
       return globalDefault;
     }
 
-    // Step 6: Unknown phase, no fallback - explicit failure (should never happen)
+    // Step 8: Unknown phase, no fallback - explicit failure (should never happen)
     const errorMsg = `Cannot get phase config for "${phaseName}"${courseId ? ` (course: ${courseId})` : ''} tier "${tier}": database unavailable and no cached data`;
     logger.fatal({ phaseName, courseId, tier }, errorMsg);
     throw new Error(errorMsg);
@@ -714,6 +717,104 @@ class ModelConfigServiceImpl {
     );
 
     return threshold;
+  }
+
+  /**
+   * Get Stage 4 tier configurations for Budget Allocator.
+   *
+   * Reads standard and extended tier configs from `llm_model_config` DB table
+   * using `stage_4_scope` as the representative phase. Budget Allocator uses
+   * these to determine context thresholds and model selection.
+   *
+   * Falls back to hardcoded STAGE4_CONTEXT_THRESHOLD / STAGE4_HARD_TOKEN_LIMIT
+   * if database is unavailable.
+   *
+   * @param language - Content language (LanguageCode)
+   * @returns Tier configurations with maxContext and cacheReadEnabled
+   */
+  async getStage4TierConfigs(language: LanguageCode): Promise<{
+    standard: { modelId: string; fallbackModelId: string; maxContext: number };
+    extended: { modelId: string; fallbackModelId: string; maxContext: number; cacheReadEnabled: boolean };
+  }> {
+    const representativePhase = 'stage_4_scope';
+
+    try {
+      const [standardConfig, extendedConfig] = await Promise.all([
+        ModelConfigDB.fetchPhaseConfigFromDb(representativePhase, undefined, 'standard', language),
+        ModelConfigDB.fetchPhaseConfigFromDb(representativePhase, undefined, 'extended', language),
+      ]);
+
+      const standard = standardConfig
+        ? {
+            modelId: standardConfig.modelId,
+            fallbackModelId: standardConfig.fallbackModelId || standardConfig.modelId,
+            maxContext: standardConfig.maxContextTokens || STAGE4_CONTEXT_THRESHOLD,
+          }
+        : (() => {
+            logger.warn(
+              { language, tier: 'standard' },
+              `Stage 4 standard tier config is null, falling back to emergency model: ${EMERGENCY_FALLBACK_MODEL}`
+            );
+            return {
+              modelId: EMERGENCY_FALLBACK_MODEL,
+              fallbackModelId: EMERGENCY_FALLBACK_MODEL,
+              maxContext: STAGE4_CONTEXT_THRESHOLD,
+            };
+          })();
+
+      const extended = extendedConfig
+        ? {
+            modelId: extendedConfig.modelId,
+            fallbackModelId: extendedConfig.fallbackModelId || extendedConfig.modelId,
+            maxContext: extendedConfig.maxContextTokens || 1_000_000,
+            cacheReadEnabled: false, // Phase configs don't carry cacheRead; safe default
+          }
+        : (() => {
+            logger.warn(
+              { language, tier: 'extended' },
+              `Stage 4 extended tier config is null, falling back to emergency model: ${EMERGENCY_FALLBACK_MODEL}`
+            );
+            return {
+              modelId: EMERGENCY_FALLBACK_MODEL,
+              fallbackModelId: EMERGENCY_FALLBACK_MODEL,
+              maxContext: 1_000_000,
+              cacheReadEnabled: false,
+            };
+          })();
+
+      logger.info(
+        {
+          language,
+          standardModel: standard.modelId,
+          standardMaxContext: standard.maxContext,
+          extendedModel: extended.modelId,
+          extendedMaxContext: extended.maxContext,
+          source: 'database',
+        },
+        'Stage 4 tier configs loaded from database'
+      );
+
+      return { standard, extended };
+    } catch (err) {
+      logger.warn(
+        { language, error: err instanceof Error ? err.message : String(err) },
+        'Failed to load Stage 4 tier configs from DB, using hardcoded fallback'
+      );
+
+      return {
+        standard: {
+          modelId: EMERGENCY_FALLBACK_MODEL,
+          fallbackModelId: EMERGENCY_FALLBACK_MODEL,
+          maxContext: STAGE4_CONTEXT_THRESHOLD,
+        },
+        extended: {
+          modelId: EMERGENCY_FALLBACK_MODEL,
+          fallbackModelId: EMERGENCY_FALLBACK_MODEL,
+          maxContext: 1_000_000,
+          cacheReadEnabled: false,
+        },
+      };
+    }
   }
 
   /**

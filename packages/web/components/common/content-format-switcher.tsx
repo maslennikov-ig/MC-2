@@ -68,6 +68,8 @@ interface ContentFormatSwitcherProps {
     presentation?: string
   }
   onFormatChange?: (format: string) => void
+  /** Course content language for localized callout titles */
+  courseLanguage?: string
 }
 
 export default function ContentFormatSwitcher({
@@ -78,6 +80,7 @@ export default function ContentFormatSwitcher({
   enrichments,
   availableFormats = {},
   onFormatChange,
+  courseLanguage,
 }: ContentFormatSwitcherProps) {
   const [currentFormat, setCurrentFormat] = useState<'text' | 'video' | 'audio' | 'presentation'>(
     'text'
@@ -205,6 +208,7 @@ export default function ContentFormatSwitcher({
         assets={assets}
         lessonContent={lessonContent}
         enrichments={enrichments}
+        courseLanguage={courseLanguage}
       />
     )
   }
@@ -296,6 +300,7 @@ export default function ContentFormatSwitcher({
               assets={assets}
               lessonContent={lessonContent}
               enrichments={enrichments}
+              courseLanguage={courseLanguage}
             />
           )}
 

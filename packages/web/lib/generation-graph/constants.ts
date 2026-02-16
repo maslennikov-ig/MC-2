@@ -1,16 +1,23 @@
-import { StageConfig, NodeStyles } from '@megacampus/shared-types'
-import { CourseStatus } from '@/types/course-generation'
+import { StageConfig, NodeStyles, Database } from '@megacampus/shared-types'
+
+type GenerationStatus = Database['public']['Enums']['generation_status']
 
 /**
- * Active Course Statuses
- * Statuses that indicate the generation is in progress
+ * Active Generation Statuses
+ * Statuses that indicate the generation pipeline is in progress
  */
-export const ACTIVE_STATUSES: CourseStatus[] = [
-  'initializing',
-  'processing_documents',
-  'analyzing_task',
-  'generating_structure',
-  'generating_content',
+export const ACTIVE_STATUSES: GenerationStatus[] = [
+  'stage_2_init',
+  'stage_2_processing',
+  'stage_3_init',
+  'stage_3_summarizing',
+  'stage_4_init',
+  'stage_4_clarifying',
+  'stage_4_analyzing',
+  'stage_5_init',
+  'stage_5_generating',
+  'stage_6_init',
+  'stage_6_generating',
   'finalizing',
 ]
 

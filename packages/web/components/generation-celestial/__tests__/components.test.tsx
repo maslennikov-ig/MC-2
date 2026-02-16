@@ -30,6 +30,31 @@ const messages = {
         description: 'Этап {stageName} завершен',
         hint: 'Нажмите для подтверждения',
       },
+      automatic: {
+        title: 'Автоматическая генерация',
+        titlePaused: 'Генерация приостановлена',
+        hint: 'Можно закрыть страницу — уведомим по готовности',
+        hintPaused: 'Нажмите «Продолжить» для возобновления',
+        pause: 'Пауза',
+        resume: 'Продолжить',
+        cancel: 'Отменить',
+        manualMode: 'Ручной режим',
+        manualModeHint: 'В ручном режиме вы сможете проверить и изменить результаты каждого этапа.',
+      },
+      clarifying: {
+        title: 'Уточняющие вопросы',
+        hint: 'Ответьте на вопросы для продолжения',
+        progress: '{answered} / {total}',
+        criticalRemaining: 'Обязательных: осталось {count}',
+        button: 'Продолжить генерацию',
+        buttonDisabled: 'Ответьте на все обязательные вопросы',
+      },
+      aria: {
+        expand: 'Развернуть панель управления',
+        collapse: 'Свернуть панель',
+        collapseHint: 'Свернуть (или смахните влево)',
+        swipeHint: 'Смахните влево, чтобы свернуть',
+      },
     },
   },
 }
@@ -180,7 +205,7 @@ describe('MissionControlBanner', () => {
     )
 
     // Find the edge tab expand button by aria-label
-    const expandButton = screen.getByLabelText('Развернуть панель подтверждения')
+    const expandButton = screen.getByLabelText('Развернуть панель управления')
     fireEvent.click(expandButton)
 
     // Should now show the full banner with "Ожидание" text

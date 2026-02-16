@@ -270,7 +270,9 @@ export async function generateWithRetry(
   modelTier: ModelTier,
   qdrantClient: QdrantClient | undefined,
   language: string,
-  constraints?: CourseConstraints
+  constraints?: CourseConstraints,
+  overlapFeedback?: string,
+  previousSectionsDigest?: string
 ): Promise<SectionBatchResult> {
   const maxAttempts = 2;
   let retryCount = 0;
@@ -278,12 +280,14 @@ export async function generateWithRetry(
 
   while (retryCount < maxAttempts) {
     try {
-      const prompt = buildBatchPrompt(
+      const prompt = await buildBatchPrompt(
         input,
         sectionIndex,
         qdrantClient,
         retryCount + 1,
-        constraints
+        constraints,
+        overlapFeedback,
+        previousSectionsDigest
       );
 
       const model = createModel(currentModelTier.model);

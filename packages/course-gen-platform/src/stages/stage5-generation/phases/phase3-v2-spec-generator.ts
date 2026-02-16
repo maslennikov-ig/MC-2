@@ -38,6 +38,7 @@ import type {
 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { SectionBreakdown, AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import { inferSemanticScaffolding } from '../utils/semantic-scaffolding';
+import { buildFallbackSearchQueries } from '../utils/rag-fallback-queries';
 import logger from '@/shared/logger';
 
 // ============================================================================
@@ -466,15 +467,24 @@ export class V2LessonSpecGenerator {
     // Build primary documents list
     const primaryDocuments = ragPlan?.primary_documents || [];
 
-    // Ensure we have at least one primary document or fallback
+    // Empty array = search all course documents (do not use 'default' sentinel)
     const finalPrimaryDocs =
-      primaryDocuments.length > 0 ? primaryDocuments : ['default-course-document'];
+      primaryDocuments.length > 0 ? primaryDocuments : [];
 
-    // Ensure we have at least one search query
+    // Use section-specific topics for better search queries
+    const sectionBreakdown = analysisResult.recommended_structure?.sections_breakdown?.find(
+      s => s.section_id === sectionId
+    );
+    const fallbackQueries = buildFallbackSearchQueries(
+      sectionBreakdown,
+      analysisResult.topic_analysis.determined_topic,
+      sectionId,
+    );
+
     const finalSearchQueries =
       searchQueries.length > 0 && searchQueries[0].length >= 3
         ? searchQueries
-        : [`${analysisResult.topic_analysis.determined_topic} fundamentals`];
+        : fallbackQueries;
 
     return {
       primary_documents: finalPrimaryDocs,

@@ -28,6 +28,10 @@ import {
   PROGRESS_MESSAGES,
 } from './utils/validators';
 import { getAndClearTraceData } from './utils/observability';
+import {
+  detectSectionBreakdownOverlap,
+  buildOverlapFeedback,
+} from './phases/phase-2-scope-helpers';
 import type {
   Phase1Output,
   Phase2Output,
@@ -97,7 +101,7 @@ async function completePhaseWithTrace<
  * Phase 1: Basic Classification (12-25%)
  */
 export async function runClassificationPhase(context: AnalysisContext): Promise<void> {
-  const { courseId, input, supabase, orchestrationLogger } = context;
+  const { courseId, input, supabase, orchestrationLogger, originalDocumentSummaries } = context;
   const phase1CacheKey = `phase1_cache:${courseId}`;
   const redis = getRedisClient();
 
@@ -151,7 +155,7 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
           language: input.language,
           topic: input.topic,
           document_summaries:
-            input.document_summaries?.map(ds => ({
+            originalDocumentSummaries?.map(ds => ({
               document_id: ds.document_id,
               file_name: ds.file_name,
               processed_content: ds.processed_content,
@@ -207,8 +211,15 @@ export async function runClassificationPhase(context: AnalysisContext): Promise<
  * Phase 0.5: Clarifying Questions (25-28%)
  */
 export async function runClarifyingPhase(context: AnalysisContext): Promise<void> {
-  const { courseId, input, supabase, orchestrationLogger, budgetAllocation, phase1Output } =
-    context;
+  const {
+    courseId,
+    input,
+    supabase,
+    orchestrationLogger,
+    budgetAllocation,
+    phase1Output,
+    resolvedDocumentSummaries,
+  } = context;
 
   if (!phase1Output) {
     throw new Error('Phase 1 output required for clarifying phase');
@@ -250,7 +261,7 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
         target_audience: input.target_audience,
       },
       language: input.language,
-      document_summaries: input.document_summaries?.map(ds => ({
+      document_summaries: resolvedDocumentSummaries?.map(ds => ({
         file_name: ds.file_name,
         processed_content: ds.processed_content,
       })),
@@ -340,8 +351,15 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
  * Phase 2: Scope Analysis (28-45%)
  */
 export async function runScopePhase(context: AnalysisContext): Promise<void> {
-  const { courseId, input, supabase, orchestrationLogger, phase1Output, clarifyingAnswers } =
-    context;
+  const {
+    courseId,
+    input,
+    supabase,
+    orchestrationLogger,
+    phase1Output,
+    clarifyingAnswers,
+    resolvedDocumentSummaries,
+  } = context;
 
   if (!phase1Output) {
     throw new Error('Phase 1 output required for scope phase');
@@ -349,45 +367,109 @@ export async function runScopePhase(context: AnalysisContext): Promise<void> {
 
   await startPhase(2, courseId, supabase, orchestrationLogger);
 
-  const phase2Output: Phase2Output = await executePhaseWithRetry(
-    'phase2_scope',
-    () =>
-      runPhase2Scope({
-        course_id: courseId,
-        language: input.language,
-        topic: input.topic,
-        document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
-        phase1_output: phase1Output,
-        course_size: input.course_size,
-        target_lessons: input.target_lessons,
-        target_sections: input.target_sections,
-        size_guidance: input.size_guidance,
-        min_lessons: input.min_lessons,
-        max_lessons: input.max_lessons,
-        clarifying_answers: clarifyingAnswers,
-        course_description: input.course_description,
-        learning_outcomes: input.learning_outcomes,
-      }),
-    orchestrationLogger
-  );
+  const MAX_OVERLAP_RETRIES = 2;
+  let overlapFeedback: string | undefined;
+  let phase2Output: Phase2Output | undefined;
 
+  for (let overlapAttempt = 0; overlapAttempt <= MAX_OVERLAP_RETRIES; overlapAttempt++) {
+    phase2Output = await executePhaseWithRetry(
+      'phase2_scope',
+      () =>
+        runPhase2Scope({
+          course_id: courseId,
+          language: input.language,
+          topic: input.topic,
+          document_summaries: resolvedDocumentSummaries?.map(ds => ds.processed_content) || null,
+          phase1_output: phase1Output,
+          course_size: input.course_size,
+          target_lessons: input.target_lessons,
+          target_sections: input.target_sections,
+          size_guidance: input.size_guidance,
+          min_lessons: input.min_lessons,
+          max_lessons: input.max_lessons,
+          clarifying_answers: clarifyingAnswers,
+          course_description: input.course_description,
+          learning_outcomes: input.learning_outcomes,
+          overlap_feedback: overlapFeedback,
+        }),
+      orchestrationLogger
+    );
+
+    // Detect semantic overlap in generated sections
+    try {
+      const overlapResult = await detectSectionBreakdownOverlap(
+        phase2Output.recommended_structure.sections_breakdown,
+        input.language
+      );
+
+      if (overlapResult.hasOverlap) {
+        orchestrationLogger.warn(
+          {
+            phase: 'phase2_scope',
+            overlapAttempt,
+            overlappingPairs: overlapResult.overlappingPairs.map(p => ({
+              sections: [p.sectionIndexA, p.sectionIndexB],
+              areas: [p.areaA, p.areaB],
+              similarity: Math.round(p.similarity * 100) + '%',
+            })),
+          },
+          `Phase 2 overlap detected (attempt ${overlapAttempt + 1}/${MAX_OVERLAP_RETRIES + 1})`
+        );
+
+        if (overlapAttempt < MAX_OVERLAP_RETRIES) {
+          overlapFeedback = buildOverlapFeedback(overlapResult);
+          continue; // Retry with overlap feedback
+        }
+
+        // Final attempt still has overlap - log but proceed
+        orchestrationLogger.error(
+          {
+            phase: 'phase2_scope',
+            overlapPairs: overlapResult.overlappingPairs.length,
+            maxRetries: MAX_OVERLAP_RETRIES,
+          },
+          'Phase 2 overlap persists after all retries, proceeding with overlapping sections'
+        );
+      } else {
+        if (overlapAttempt > 0) {
+          orchestrationLogger.info(
+            { phase: 'phase2_scope', resolvedAfterAttempts: overlapAttempt + 1 },
+            'Phase 2 overlap resolved after retry'
+          );
+        }
+      }
+    } catch (overlapError) {
+      // Overlap detection failed (e.g., Jina API down) - non-blocking, proceed
+      orchestrationLogger.warn(
+        {
+          phase: 'phase2_scope',
+          error: overlapError instanceof Error ? overlapError.message : String(overlapError),
+        },
+        'Overlap detection failed, proceeding without overlap check'
+      );
+    }
+
+    break; // No overlap or detection failed - proceed
+  }
+
+  // phase2Output is guaranteed to be set here (at least one iteration runs)
   await completePhaseWithTrace(
     2,
     'stage_4_scope',
     'scope_analysis',
     context,
-    phase2Output,
+    phase2Output!,
     {
-      total_lessons: phase2Output.recommended_structure.total_lessons,
-      total_sections: phase2Output.recommended_structure.total_sections,
-      estimated_hours: phase2Output.recommended_structure.estimated_content_hours,
-      duration_ms: phase2Output.phase_metadata.duration_ms,
-      model_used: phase2Output.phase_metadata.model_used,
+      total_lessons: phase2Output!.recommended_structure.total_lessons,
+      total_sections: phase2Output!.recommended_structure.total_sections,
+      estimated_hours: phase2Output!.recommended_structure.estimated_content_hours,
+      duration_ms: phase2Output!.phase_metadata.duration_ms,
+      model_used: phase2Output!.phase_metadata.model_used,
     },
     { topic: input.topic }
   );
 
-  context.phase2Output = phase2Output;
+  context.phase2Output = phase2Output!;
 }
 
 /**
@@ -403,6 +485,7 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
     phase1Output,
     phase2Output,
     clarifyingAnswers,
+    resolvedDocumentSummaries,
   } = context;
 
   if (!phase1Output || !phase2Output) {
@@ -411,7 +494,7 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
 
   await startPhase(3, courseId, supabase, orchestrationLogger);
 
-  const documentSummariesText = input.document_summaries?.map(ds => ds.processed_content) || null;
+  const documentSummariesText = resolvedDocumentSummaries?.map(ds => ds.processed_content) || null;
 
   const phase3Output: Phase3Output = await executePhaseWithRetry(
     'phase3_expert',
@@ -424,6 +507,28 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
         phase1_output: phase1Output,
         phase2_output: phase2Output,
         clarifying_answers: clarifyingAnswers,
+        budget_context: context.budgetAllocation
+          ? {
+              documents: context.budgetAllocation.documents.map((d) => {
+                const docSummary = resolvedDocumentSummaries?.find(
+                  (ds) => ds.document_id === d.file_id
+                );
+                if (!docSummary) {
+                  orchestrationLogger.warn(
+                    { file_id: d.file_id, priority: d.priority },
+                    'Budget document not found in resolvedDocumentSummaries, using file_id as name'
+                  );
+                }
+                return {
+                  file_name: docSummary?.file_name || d.file_id,
+                  mode: d.mode,
+                  priority: d.priority,
+                  tokens: d.tokens,
+                };
+              }),
+              totalTokens: context.budgetAllocation.totalTokens,
+            }
+          : undefined,
       }),
     orchestrationLogger
   );
@@ -459,6 +564,7 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
     phase2Output,
     phase3Output,
     clarifyingAnswers,
+    resolvedDocumentSummaries,
   } = context;
 
   if (!phase1Output || !phase2Output || !phase3Output) {
@@ -474,7 +580,7 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
         course_id: courseId,
         language: input.language,
         topic: input.topic,
-        document_summaries: input.document_summaries || null,
+        document_summaries: resolvedDocumentSummaries || null,
         phase1_output: phase1Output,
         phase2_output: phase2Output,
         phase3_output: phase3Output,

@@ -66,6 +66,7 @@ export async function MarkdownRenderer({
   className,
   features,
   trusted = true,
+  language,
 }: MarkdownRendererProps): Promise<React.JSX.Element | null> {
   // Handle empty content - return null to avoid rendering empty elements
   if (!content || content.trim() === '') {
@@ -241,20 +242,20 @@ export async function MarkdownRenderer({
         }
 
         // Match pattern like [!NOTE], [!TIP], [!WARNING], [!DANGER], [!INFO]
-        const match = textContent.match(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i)
+        const match = textContent.match(/^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i)
 
         if (match) {
           const type = match[1].toLowerCase() as CalloutType
 
-          // Remove the [!TYPE] marker from the text
-          const remainingText = textContent.replace(/^\[!(NOTE|TIP|WARNING|DANGER|INFO)\]\s*/i, '')
+          // Remove the [!TYPE] marker and surrounding quotes from the text
+          const remainingText = textContent.replace(/^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]["'«»\u201C\u201D]*\s*/i, '')
 
           // Reconstruct children without the marker
           const newFirstParagraph = remainingText ? <p>{remainingText}</p> : null
           const restChildren = React.Children.toArray(children).slice(1)
 
           return (
-            <Callout type={type}>
+            <Callout type={type} language={language}>
               {newFirstParagraph}
               {restChildren}
             </Callout>

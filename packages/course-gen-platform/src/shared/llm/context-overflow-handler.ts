@@ -22,7 +22,7 @@
  */
 
 import logger from '../logger';
-import { STAGE4_MODELS } from './model-selector';
+import type { Stage4TierConfig, Stage4ModelSelection } from '../../stages/stage4-analysis/phases/stage4-budget-allocator';
 
 // ============================================================================
 // ERROR DETECTION
@@ -41,17 +41,6 @@ import { STAGE4_MODELS } from './model-selector';
  *
  * @param error - Error object to check
  * @returns true if error indicates context overflow
- *
- * @example
- * ```typescript
- * try {
- *   await llm.invoke(largePrompt);
- * } catch (error) {
- *   if (isContextOverflowError(error)) {
- *     // Handle context overflow
- *   }
- * }
- * ```
  */
 export function isContextOverflowError(error: unknown): boolean {
   if (error instanceof Error) {
@@ -84,65 +73,80 @@ export interface ContextOverflowFallback {
 }
 
 /**
- * Get fallback model for context overflow.
+ * Get fallback model for context overflow using budget allocation's model selection.
  *
  * Escalation strategy:
- * 1. Standard tier (260K) → Extended tier primary (1M)
- * 2. Extended tier primary → Extended tier fallback (1M)
+ * 1. Standard tier → Extended tier primary (from tierConfig)
+ * 2. Extended tier primary → Extended tier fallback (from tierConfig)
  * 3. Extended tier fallback → No more options (null)
  *
  * @param currentModelId - Current model that failed
  * @param language - Content language ('ru' | 'en')
+ * @param tierConfig - Tier configuration from Budget Allocator (DB-driven)
+ * @param modelSelection - Current model selection from Budget Allocator
  * @returns Fallback model info or null if exhausted
- *
- * @example
- * ```typescript
- * // Escalate from standard to extended
- * const fallback = getContextOverflowFallback('qwen/qwen3-235b-a22b-2507', 'ru');
- * // fallback.modelId === 'google/gemini-2.5-flash-preview-09-2025'
- * // fallback.maxContext === 1_000_000
- * ```
  */
 export function getContextOverflowFallback(
   currentModelId: string,
-  language: 'ru' | 'en'
+  _language: 'ru' | 'en',
+  tierConfig?: Stage4TierConfig,
+  _modelSelection?: Stage4ModelSelection
 ): ContextOverflowFallback | null {
-  const langConfig = STAGE4_MODELS[language];
-
-  // If current model is standard tier, escalate to extended
-  if (
-    currentModelId === langConfig.standard.primary ||
-    currentModelId === langConfig.standard.fallback
-  ) {
-    logger.info(
-      {
-        currentModel: currentModelId,
-        fallbackModel: langConfig.extended.primary,
-        reason: 'context_overflow',
-      },
-      '[ContextOverflow] Escalating to extended context model'
-    );
-
-    return {
-      modelId: langConfig.extended.primary,
-      maxContext: langConfig.extended.maxContext,
-    };
+  if (!tierConfig) {
+    // Without tier config, use generic Gemini Flash as universal large-context fallback
+    if (currentModelId !== 'google/gemini-2.5-flash') {
+      logger.info(
+        {
+          currentModel: currentModelId,
+          fallbackModel: 'google/gemini-2.5-flash',
+          reason: 'context_overflow_no_tier_config',
+        },
+        '[ContextOverflow] Escalating to Gemini Flash (no tier config available)'
+      );
+      return {
+        modelId: 'google/gemini-2.5-flash',
+        maxContext: 1_000_000,
+      };
+    }
+    return null;
   }
 
-  // If already on extended primary, try extended fallback
-  if (currentModelId === langConfig.extended.primary) {
+  const { standard, extended } = tierConfig;
+
+  // Check extended FIRST — handles overlap where standard.fallbackModelId === extended.modelId
+  if (currentModelId === extended.modelId) {
     logger.info(
       {
         currentModel: currentModelId,
-        fallbackModel: langConfig.extended.fallback,
+        fallbackModel: extended.fallbackModelId,
         reason: 'context_overflow',
       },
       '[ContextOverflow] Trying extended fallback model'
     );
 
     return {
-      modelId: langConfig.extended.fallback,
-      maxContext: langConfig.extended.maxContext,
+      modelId: extended.fallbackModelId,
+      maxContext: extended.maxContext,
+    };
+  }
+
+  // If current model is standard tier, escalate to extended
+  if (
+    currentModelId === standard.modelId ||
+    currentModelId === standard.fallbackModelId
+  ) {
+    logger.info(
+      {
+        currentModel: currentModelId,
+        fallbackModel: extended.modelId,
+        reason: 'context_overflow',
+      },
+      '[ContextOverflow] Escalating to extended context model'
+    );
+
+    return {
+      modelId: extended.modelId,
+      maxContext: extended.maxContext,
     };
   }
 
@@ -183,57 +187,74 @@ export interface ExecuteWithContextFallbackResult<T> {
  * @param initialModelId - Initial model to try
  * @param language - Content language ('ru' | 'en')
  * @param maxRetries - Maximum fallback attempts (default: 2)
+ * @param tierConfig - Optional tier configuration from Budget Allocator
+ * @param modelSelection - Optional current model selection
  * @returns Promise with result and model used
  * @throws Error if operation fails or fallbacks exhausted
- *
- * @example
- * ```typescript
- * // Phase execution with automatic fallback
- * const { result, modelUsed } = await executeWithContextFallback(
- *   async (modelId) => {
- *     const model = getModelForPhase(modelId, 0.3);
- *     return await model.invoke(messages);
- *   },
- *   'qwen/qwen3-235b-a22b-2507',
- *   'ru'
- * );
- *
- * logger.info({ modelUsed }, 'Phase completed');
- * // modelUsed may be 'google/gemini-2.5-flash-preview-09-2025' if fallback occurred
- * ```
  */
 export async function executeWithContextFallback<T>(
   operation: (modelId: string) => Promise<T>,
   initialModelId: string,
   language: 'ru' | 'en',
-  maxRetries: number = 2
+  maxRetries: number = 2,
+  tierConfig?: Stage4TierConfig,
+  modelSelection?: Stage4ModelSelection
 ): Promise<ExecuteWithContextFallbackResult<T>> {
   let currentModelId = initialModelId;
   let attempt = 0;
+  const attemptedModels = new Set<string>([initialModelId]);
 
   while (attempt <= maxRetries) {
     try {
       const result = await operation(currentModelId);
+
+      if (attempt > 0) {
+        logger.info(
+          {
+            initialModel: initialModelId,
+            finalModel: currentModelId,
+            fallbackChain: Array.from(attemptedModels),
+            attempts: attempt + 1,
+          },
+          '[ContextOverflow] Fallback succeeded'
+        );
+      }
+
       return { result, modelUsed: currentModelId };
     } catch (error) {
       if (isContextOverflowError(error)) {
-        const fallback = getContextOverflowFallback(currentModelId, language);
+        const fallback = getContextOverflowFallback(currentModelId, language, tierConfig, modelSelection);
 
-        if (fallback) {
+        if (fallback && !attemptedModels.has(fallback.modelId)) {
           logger.warn(
             {
               attempt: attempt + 1,
               currentModel: currentModelId,
               nextModel: fallback.modelId,
+              fallbackChain: Array.from(attemptedModels),
               error: error instanceof Error ? error.message : String(error),
             },
             '[ContextOverflow] Retrying with larger context model'
           );
 
+          attemptedModels.add(fallback.modelId);
           currentModelId = fallback.modelId;
           attempt++;
           continue;
         }
+
+        // Fallback unavailable or already tried — log and throw
+        logger.error(
+          {
+            initialModel: initialModelId,
+            finalModel: currentModelId,
+            fallbackChain: Array.from(attemptedModels),
+            skippedModel: fallback?.modelId ?? null,
+            reason: fallback ? 'circular_fallback_detected' : 'no_fallback_available',
+            error: error instanceof Error ? error.message : String(error),
+          },
+          '[ContextOverflow] All fallback options exhausted'
+        );
       }
 
       // Not a context overflow or no fallback available
@@ -241,5 +262,8 @@ export async function executeWithContextFallback<T>(
     }
   }
 
-  throw new Error(`Context overflow: exhausted all fallback models after ${maxRetries} retries`);
+  throw new Error(
+    `Context overflow: exhausted all fallback models after ${maxRetries} retries ` +
+    `(initial: ${initialModelId}, final: ${currentModelId})`
+  );
 }

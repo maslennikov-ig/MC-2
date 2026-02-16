@@ -2,6 +2,8 @@ import type { LessonGraphStateType, LessonGraphStateUpdate, LessonGraphNode } fr
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { regenerateSections } from '../utils/section-regenerator';
+import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
+import { validateGeneratedContent } from './generator/generator-content';
 
 /**
  * Section Regenerator Node - Regenerates specific sections identified by self-reviewer
@@ -87,6 +89,49 @@ export async function sectionRegeneratorNode(
       );
     }
 
+    // Run Mermaid fix pipeline on regenerated content (same as generator-node.ts)
+    // Section regenerator uses LLM to regenerate sections, which can introduce
+    // broken mermaid syntax (escaped quotes, bad arrows, etc.)
+    let finalContent = result.content;
+    try {
+      const pipelineResult = await runMermaidFixPipeline(finalContent);
+      if (pipelineResult.modified) {
+        logger.debug(
+          {
+            lessonId: state.lessonSpec.lesson_id,
+            metrics: pipelineResult.metrics,
+          },
+          'Section regenerator: Mermaid fix pipeline applied to regenerated content'
+        );
+        finalContent = pipelineResult.content;
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          lessonId: state.lessonSpec.lesson_id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Section regenerator: Mermaid fix pipeline failed, using original content'
+      );
+    }
+
+    // Validate for prompt template markers (hallucination detection)
+    // Pattern: log-only — don't reject, let judge make final decision
+    // (matches generator-node.ts; refinement-level functions reject in patcher/expander)
+    const validation = validateGeneratedContent(finalContent);
+    if (!validation.isValid) {
+      logger.warn(
+        {
+          event: 'hallucination_detected',
+          component: 'section-regenerator',
+          lessonId: state.lessonSpec.lesson_id,
+          markersCount: validation.detectedMarkers.length,
+          detectedMarkers: validation.detectedMarkers,
+        },
+        'Section regenerator: Detected prompt template markers in regenerated content'
+      );
+    }
+
     logger.info(
       {
         lessonId: state.lessonSpec.lesson_id,
@@ -99,7 +144,7 @@ export async function sectionRegeneratorNode(
 
     return {
       currentNode: 'sectionRegenerator' as LessonGraphNode,
-      generatedContent: result.content,
+      generatedContent: finalContent,
       tokensUsed: result.tokensUsed,
       durationMs,
       sectionRegenerationResult: {

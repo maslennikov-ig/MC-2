@@ -22,6 +22,7 @@ import {
 } from '@megacampus/shared-types/regeneration-types';
 import {
   applyFieldUpdate,
+  ensureStableIdsAndSchemaVersionInMemory,
   ensureStableIdsInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import type { CourseStructure, Json, Database } from '@megacampus/shared-types';
@@ -50,6 +51,7 @@ interface CourseDataForFieldUpdates {
   id: string;
   analysis_result: Json | null;
   course_structure: Json | null;
+  updated_at: string | null;
 }
 
 /** User context for authorization */
@@ -57,6 +59,24 @@ interface UserCtx {
   id: string;
   role: Database['public']['Enums']['role'];
   organizationId: string;
+}
+
+/**
+ * Convert "0 rows updated" optimistic-lock miss into a typed conflict.
+ */
+function throwOptimisticLockConflict(
+  courseId: string,
+  requestId: string,
+  operation: string
+): never {
+  logger.warn(
+    { requestId, courseId, operation },
+    'Optimistic lock conflict: course updated concurrently'
+  );
+  throw new TRPCError({
+    code: 'CONFLICT',
+    message: 'Course was updated by another request. Refresh and try again.',
+  });
 }
 
 // ============================================================================
@@ -179,24 +199,40 @@ export async function applyFieldUpdatesProposal(
     courseId
   );
 
-  // Guard: block writes without stable IDs when flag is on (plan:433)
-  if (stageId === 'stage_5') {
-    assertStableIds(
-      updatedData as { sections?: Array<{ id?: string; lessons?: Array<{ id?: string }> }> }
+  if (appliedCount === 0) {
+    logger.warn(
+      { requestId, courseId, stageId, totalRequested: updates.length },
+      'applyProposal: No valid field updates to apply'
     );
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'No valid field updates to apply',
+    });
+  }
+
+  let dataToPersist: unknown = updatedData;
+  if (stageId === 'stage_5') {
+    const normalizedStructure = ensureStableIdsAndSchemaVersionInMemory(
+      updatedData as CourseStructure
+    );
+    // Guard: block writes without stable IDs when flag is on (plan:433)
+    assertStableIds(normalizedStructure);
+    dataToPersist = normalizedStructure;
   }
 
   // Save updated data to database
   const updateColumn = stageId === 'stage_4' ? 'analysis_result' : 'course_structure';
   const now = new Date().toISOString();
 
-  const { error: updateError } = await supabase
-    .from('courses')
-    .update({
-      [updateColumn]: updatedData,
-      updated_at: now,
-    })
-    .eq('id', courseId);
+  const updatePayload: Database['public']['Tables']['courses']['Update'] = {
+    [updateColumn]: dataToPersist as Json,
+    updated_at: now,
+  };
+  const updateBaseQuery = supabase.from('courses').update(updatePayload).eq('id', courseId);
+  const { data: updatedRows, error: updateError } =
+    course.updated_at === null
+      ? await updateBaseQuery.is('updated_at', null).select('id')
+      : await updateBaseQuery.eq('updated_at', course.updated_at).select('id');
 
   if (updateError) {
     logger.error(
@@ -208,14 +244,17 @@ export async function applyFieldUpdatesProposal(
       message: 'Failed to apply proposal',
     });
   }
+  if (!updatedRows || updatedRows.length === 0) {
+    throwOptimisticLockConflict(courseId, requestId, 'applyFieldUpdatesProposal');
+  }
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
   if (stageId === 'stage_5') {
-    const structureForNodes = ensureStableIdsInMemory(updatedData as CourseStructure);
+    const structureForNodes = dataToPersist as CourseStructure;
     await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
       logger.warn(
-        { courseId, error: err instanceof Error ? err.message : String(err) },
-        'course_nodes dual-write failed (non-fatal)'
+        { requestId, courseId, stageId, error: err instanceof Error ? err.message : String(err) },
+        'course_nodes dual-write failed (non-fatal) — JSONB may diverge from course_nodes'
       )
     );
   }
@@ -275,7 +314,7 @@ export async function applyLessonPatchProposal(
   // Fetch current lesson content
   const { data: currentLesson, error: fetchError } = await supabase
     .from('lesson_contents')
-    .select('content, metadata')
+    .select('id, content, metadata')
     .eq('course_id', courseId)
     .eq('lesson_id', lessonUuid)
     .order('created_at', { ascending: false })
@@ -287,6 +326,13 @@ export async function applyLessonPatchProposal(
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to fetch lesson content',
+    });
+  }
+
+  if (!currentLesson) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: `Lesson content for ${lessonId} not found`,
     });
   }
 
@@ -339,8 +385,7 @@ export async function applyLessonPatchProposal(
       updated_at: now,
       metadata: updatedMetadata as Json, // JSONB in database
     })
-    .eq('course_id', courseId)
-    .eq('lesson_id', lessonUuid);
+    .eq('id', currentLesson.id);
 
   if (updateError) {
     logger.error(
@@ -379,7 +424,8 @@ export async function applyStructuralOperationProposal(
   courseId: string,
   courseStructure: CourseStructure,
   proposal: StructuralOperationProposal,
-  requestId: string
+  requestId: string,
+  expectedUpdatedAt: string | null
 ): Promise<ApplyProposalResult & { tempIdMap?: Record<string, string> }> {
   const { operations, summary } = proposal;
 
@@ -394,20 +440,37 @@ export async function applyStructuralOperationProposal(
   const structureWithIds = ensureStableIdsInMemory(courseStructure);
 
   // Apply operations atomically
-  const result = applySurgicalOperations(operations, structureWithIds);
+  let result;
+  try {
+    result = applySurgicalOperations(operations, structureWithIds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Structural operation issues are user-fixable request errors, not server faults.
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        message.startsWith('Operation #') || message.startsWith('Pre-flight validation failed')
+          ? message
+          : `Structural operation failed: ${message}`,
+    });
+  }
+
+  const structureToPersist = ensureStableIdsAndSchemaVersionInMemory(result.updatedStructure);
 
   // Guard: block writes without stable IDs when COURSE_STABLE_IDS_REQUIRED=true (plan:433)
-  assertStableIds(result.updatedStructure);
+  assertStableIds(structureToPersist);
 
   // Save updated structure to database
   const now = new Date().toISOString();
-  const { error: updateError } = await supabase
-    .from('courses')
-    .update({
-      course_structure: result.updatedStructure as unknown as Json,
-      updated_at: now,
-    })
-    .eq('id', courseId);
+  const updatePayload: Database['public']['Tables']['courses']['Update'] = {
+    course_structure: structureToPersist as unknown as Json,
+    updated_at: now,
+  };
+  const updateBaseQuery = supabase.from('courses').update(updatePayload).eq('id', courseId);
+  const { data: updatedRows, error: updateError } =
+    expectedUpdatedAt === null
+      ? await updateBaseQuery.is('updated_at', null).select('id')
+      : await updateBaseQuery.eq('updated_at', expectedUpdatedAt).select('id');
 
   if (updateError) {
     logger.error(
@@ -419,13 +482,16 @@ export async function applyStructuralOperationProposal(
       message: 'Failed to apply structural operation',
     });
   }
+  if (!updatedRows || updatedRows.length === 0) {
+    throwOptimisticLockConflict(courseId, requestId, 'applyStructuralOperationProposal');
+  }
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  const structureForNodes = structureToPersist;
   await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
     logger.warn(
-      { courseId, error: err instanceof Error ? err.message : String(err) },
-      'course_nodes dual-write failed (non-fatal)'
+      { requestId, courseId, error: err instanceof Error ? err.message : String(err) },
+      'course_nodes dual-write failed (non-fatal) — JSONB may diverge from course_nodes'
     )
   );
 

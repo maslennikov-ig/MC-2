@@ -17,6 +17,8 @@ import type { Database, CourseStructure } from '@megacampus/shared-types';
 
 const mockCourseNodesToNestedJson = vi.hoisted(() => vi.fn());
 const mockIsReadFromNodesEnabled = vi.hoisted(() => vi.fn());
+const mockCheckStructureParity = vi.hoisted(() => vi.fn());
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/shared/course-nodes/converters', () => ({
   courseNodesToNestedJson: mockCourseNodesToNestedJson,
@@ -24,6 +26,19 @@ vi.mock('../../../src/shared/course-nodes/converters', () => ({
 
 vi.mock('../../../src/shared/course-nodes/feature-flags', () => ({
   isReadFromNodesEnabled: mockIsReadFromNodesEnabled,
+}));
+
+vi.mock('../../../src/shared/course-nodes/parity-checker', () => ({
+  checkStructureParity: mockCheckStructureParity,
+}));
+
+vi.mock('../../../src/shared/logger/index.js', () => ({
+  logger: {
+    warn: mockLoggerWarn,
+    info: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 // Import after mocks are registered
@@ -136,6 +151,12 @@ describe('course-nodes/structure-resolver', () => {
 
     // Default: read from nodes disabled
     mockIsReadFromNodesEnabled.mockReturnValue(false);
+    mockCheckStructureParity.mockReturnValue({
+      isEqual: true,
+      differences: [],
+      sectionCount: { original: 1, reconstructed: 1 },
+      lessonCount: { original: 1, reconstructed: 1 },
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -153,6 +174,11 @@ describe('course-nodes/structure-resolver', () => {
 
     it('returns false when course_structure JSONB is undefined', () => {
       expect(hasResolvedStructure(undefined)).toBe(false);
+    });
+
+    it('returns true when read-from-nodes is enabled (even with null JSONB)', () => {
+      mockIsReadFromNodesEnabled.mockReturnValue(true);
+      expect(hasResolvedStructure(null)).toBe(true);
     });
 
     it('returns true for empty object (edge case)', () => {
@@ -254,17 +280,54 @@ describe('course-nodes/structure-resolver', () => {
         learning_outcomes: jsonb.learning_outcomes,
         course_tags: jsonb.course_tags,
       });
+      expect(mockCheckStructureParity).toHaveBeenCalledWith(jsonb, reconstructedStructure);
 
       expect(result).toEqual(reconstructedStructure);
     });
 
-    it('returns null when JSONB is null (even when read-from-nodes enabled)', async () => {
-      const mockSupabase = createMockSupabase({ data: null });
+    it('falls back to JSONB when reconstructed structure fails parity check', async () => {
+      const jsonb = createJsonbStructure();
+      const nodes = createMockCourseNodes();
+      const mockSupabase = createMockSupabase({ data: nodes, error: null });
+
+      const reconstructedMismatch = {
+        ...jsonb,
+        sections: [],
+      } as CourseStructure;
+
+      mockCourseNodesToNestedJson.mockReturnValue(reconstructedMismatch);
+      mockCheckStructureParity.mockReturnValue({
+        isEqual: false,
+        differences: [
+          {
+            path: 'sections.length',
+            expected: 1,
+            actual: 0,
+          },
+        ],
+        sectionCount: { original: 1, reconstructed: 0 },
+        lessonCount: { original: 1, reconstructed: 0 },
+      });
+
+      const result = await resolveStructure(TEST_COURSE_ID, jsonb, mockSupabase);
+
+      expect(result).toEqual(jsonb);
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          courseId: TEST_COURSE_ID,
+          differenceCount: 1,
+        }),
+        'course_nodes read parity mismatch, falling back to JSONB course_structure'
+      );
+    });
+
+    it('returns null when JSONB is null and no course_nodes exist', async () => {
+      const mockSupabase = createMockSupabase({ data: null, error: null });
 
       const result = await resolveStructure(TEST_COURSE_ID, null, mockSupabase);
 
       expect(result).toBeNull();
-      expect(mockSupabase.from).not.toHaveBeenCalled(); // No DB query
+      expect(mockSupabase.from).toHaveBeenCalledWith('course_nodes');
     });
 
     it('falls back to JSONB when course_nodes query returns error', async () => {
@@ -290,6 +353,35 @@ describe('course-nodes/structure-resolver', () => {
       // Graceful fallback: returns JSONB structure
       expect(result).toEqual(jsonb);
       expect(mockCourseNodesToNestedJson).not.toHaveBeenCalled();
+    });
+
+    it('reconstructs from course_nodes when JSONB is null', async () => {
+      const nodes = createMockCourseNodes();
+      const mockSupabase = createMockSupabase({ data: nodes, error: null });
+      const reconstructed = {
+        course_title: 'Курс (1 секций)',
+        course_description: 'Структура курса восстановлена из course_nodes.',
+        estimated_duration_hours: 0.5,
+        difficulty_level: 'beginner',
+        prerequisites: [],
+        learning_outcomes: [],
+        course_tags: [],
+        sections: [],
+      } as CourseStructure;
+      mockCourseNodesToNestedJson.mockReturnValue(reconstructed);
+
+      const result = await resolveStructure(TEST_COURSE_ID, null, mockSupabase);
+
+      expect(result).toEqual(reconstructed);
+      expect(mockCourseNodesToNestedJson).toHaveBeenCalledWith(
+        nodes,
+        expect.objectContaining({
+          course_title: 'Курс (1 секций)',
+          course_description: 'Структура курса восстановлена из course_nodes.',
+          difficulty_level: 'beginner',
+        })
+      );
+      expect(mockCheckStructureParity).not.toHaveBeenCalled();
     });
 
     it('falls back to JSONB when course_nodes data is null', async () => {

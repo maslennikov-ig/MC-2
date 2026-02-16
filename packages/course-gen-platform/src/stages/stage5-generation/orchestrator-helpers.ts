@@ -275,9 +275,10 @@ export async function performPostGenerationQualityGate(
 }
 
 /**
- * Detect cross-section content overlap (non-blocking)
+ * Detect cross-section content overlap (non-blocking).
+ * Exported for use in orchestrator overlap retry loop.
  */
-async function detectOverlap(
+export async function detectOverlap(
   sections: Section[],
   input: GenerationJobInput,
   overlapLogger: pino.Logger
@@ -467,4 +468,59 @@ export function assembleGenerationResult(
   };
 
   return { courseStructure, generationMetadata };
+}
+
+// ============================================================================
+// OVERLAP RETRY FEEDBACK
+// ============================================================================
+
+/**
+ * Build per-section overlap feedback for regeneration.
+ *
+ * For each section involved in an overlapping pair, creates specific
+ * instructions about what the other section(s) already cover,
+ * so the LLM can generate differentiated content on retry.
+ *
+ * @param overlapResult - Overlap detection result with pairs
+ * @param sections - Current generated sections
+ * @returns Map of sectionIndex (0-based) → feedback string
+ */
+export function buildSectionOverlapFeedback(
+  overlapResult: CrossSectionOverlapResult,
+  sections: Section[]
+): Map<number, string> {
+  const feedbackMap = new Map<number, string>();
+
+  for (const pair of overlapResult.overlappingPairs) {
+    // Convert section numbers to 0-based indices
+    const idxA = pair.sectionA - 1;
+    const idxB = pair.sectionB - 1;
+
+    const addFeedback = (thisIdx: number, otherIdx: number) => {
+      const otherSection = sections[otherIdx];
+      if (!otherSection) return;
+
+      const otherLessons =
+        otherSection.lessons?.map(l => l.lesson_title).join(', ') || 'unknown topics';
+      const newLine = `- Section ${otherIdx + 1} ("${otherSection.section_title || 'Unknown'}") already covers: ${otherLessons}. Your section MUST NOT duplicate these topics.`;
+      const existing = feedbackMap.get(thisIdx) || '';
+      feedbackMap.set(thisIdx, existing ? `${existing}\n${newLine}` : newLine);
+    };
+
+    addFeedback(idxA, idxB);
+    addFeedback(idxB, idxA);
+  }
+
+  // Wrap each section's feedback with a header
+  for (const [idx, lines] of feedbackMap) {
+    feedbackMap.set(
+      idx,
+      `**OVERLAP CORRECTION** (CRITICAL — this section was REJECTED due to ${Math.round((overlapResult.overlappingPairs.find(p => p.sectionA - 1 === idx || p.sectionB - 1 === idx)?.similarity ?? 0) * 100)}% content overlap):
+${lines}
+
+You MUST regenerate this section with COMPLETELY DIFFERENT lesson topics from the sections listed above. Focus EXCLUSIVELY on the unique aspects defined by YOUR section's key topics from the course structure map.`
+    );
+  }
+
+  return feedbackMap;
 }

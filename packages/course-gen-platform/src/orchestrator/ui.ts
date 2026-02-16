@@ -380,6 +380,45 @@ export function createMetricsRouter(): Router {
     })
   );
 
+  /**
+   * GET /health/mermaid - Mermaid pipeline health check
+   *
+   * Tests the Mermaid fix pipeline components:
+   * - Validator recognizes valid/invalid diagrams
+   * - Sanitizer fixes known issues (escaped quotes, etc.)
+   * - Full pipeline orchestration works end-to-end
+   *
+   * Uses dynamic import to avoid loading stage6 code on server startup.
+   */
+  router.get(
+    '/health/mermaid',
+    healthLimiter,
+    asyncHandler(async (_req, res) => {
+      try {
+        const { healthCheckMermaidPipeline } = await import(
+          '../stages/stage6-lesson-content/utils/mermaid-health-check'
+        );
+        const result = await healthCheckMermaidPipeline();
+
+        res.json({
+          success: true,
+          data: {
+            status: result.healthy ? 'healthy' : 'degraded',
+            checks: result.checks,
+            totalDurationMs: result.totalDurationMs,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Mermaid health check failed');
+        res.status(503).json({
+          success: false,
+          error: 'Mermaid health check failed',
+        });
+      }
+    })
+  );
+
   // Add centralized error handler - must be last
   router.use(errorHandler);
 

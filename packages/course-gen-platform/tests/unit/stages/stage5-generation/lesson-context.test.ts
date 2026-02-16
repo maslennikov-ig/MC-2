@@ -145,7 +145,20 @@ describe('Inter-Lesson Context (buildLessonContext)', () => {
       const specs = convertSectionToV2Specs(sections[0], 0, input, sections);
 
       const firstLesson = specs[0];
-      expect(firstLesson.lesson_context).toBeUndefined(); // No context if first lesson with no next
+      // With course_position, context is always present even for the only lesson
+      expect(firstLesson.lesson_context).toBeDefined();
+      expect(firstLesson.lesson_context?.previous_lesson).toBeNull();
+      expect(firstLesson.lesson_context?.next_lesson).toBeNull();
+      expect(firstLesson.lesson_context?.concepts_already_covered).toEqual([]);
+      expect(firstLesson.lesson_context?.course_position).toEqual({
+        lesson_index_in_module: 1,
+        total_lessons_in_module: 1,
+        module_index: 1,
+        total_modules: 1,
+        lesson_index_in_course: 1,
+        total_lessons_in_course: 1,
+        module_title: 'Section 1',
+      });
     });
   });
 
@@ -507,8 +520,20 @@ describe('Inter-Lesson Context (buildLessonContext)', () => {
       const specs = convertSectionToV2Specs(sections[0], 0, input, sections);
 
       const onlyLesson = specs[0];
-      // Should be undefined because it's first lesson with no next lesson
-      expect(onlyLesson.lesson_context).toBeUndefined();
+      // With course_position, context is always present even for the only lesson
+      expect(onlyLesson.lesson_context).toBeDefined();
+      expect(onlyLesson.lesson_context?.previous_lesson).toBeNull();
+      expect(onlyLesson.lesson_context?.next_lesson).toBeNull();
+      expect(onlyLesson.lesson_context?.concepts_already_covered).toEqual([]);
+      expect(onlyLesson.lesson_context?.course_position).toEqual({
+        lesson_index_in_module: 1,
+        total_lessons_in_module: 1,
+        module_index: 1,
+        total_modules: 1,
+        lesson_index_in_course: 1,
+        total_lessons_in_course: 1,
+        module_title: 'Section 1',
+      });
     });
 
     it('should handle empty key_topics gracefully', () => {

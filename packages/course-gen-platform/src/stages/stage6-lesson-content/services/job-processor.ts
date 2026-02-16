@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
+import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { checkPauseAndDelay, isCoursePaused } from '@/shared/pause-check';
 import {
   executeStage6 as executeStage6Orchestrator,
@@ -230,6 +231,54 @@ export async function processWithFallback(
 }
 
 /**
+ * Enrich summary_preview with actual lesson digest from database.
+ *
+ * When a previous lesson has already been generated and its digest persisted,
+ * override the objectives-based summary_preview with the real digest.
+ * This improves inter-lesson coherence for retries, regenerations, and
+ * cases where the previous lesson completed before the current one started.
+ *
+ * Mutates lessonSpec.lesson_context.previous_lesson.summary_preview in place.
+ */
+async function enrichSummaryPreviewFromDB(
+  courseId: string,
+  lessonSpec: Stage6JobInput['lessonSpec']
+): Promise<void> {
+  const prevLessonId = lessonSpec.lesson_context?.previous_lesson?.lesson_id;
+  if (!prevLessonId) return;
+
+  try {
+    const prevUuid = await resolveLessonUuid(courseId, prevLessonId);
+    if (!prevUuid) return;
+
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from('lesson_contents')
+      .select('metadata')
+      .eq('lesson_id', prevUuid)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const digest = (data?.metadata as Record<string, unknown>)?.lessonDigest;
+    if (typeof digest === 'string' && digest.length > 0) {
+      lessonSpec.lesson_context!.previous_lesson!.summary_preview = digest;
+      logger.info(
+        { courseId, lessonId: lessonSpec.lesson_id, prevLessonId, digestLength: digest.length },
+        'Enriched summary_preview with previous lesson digest from DB'
+      );
+    }
+  } catch {
+    // Non-fatal: fall back to objectives-based summary_preview
+    logger.debug(
+      { courseId, lessonId: lessonSpec.lesson_id, prevLessonId },
+      'Could not enrich summary_preview from DB (non-fatal)'
+    );
+  }
+}
+
+/**
  * Process a single Stage 6 job
  * @param job - The BullMQ job to process
  * @param token - Job token for lock management (required for pause/delay, validated at runtime)
@@ -314,6 +363,9 @@ export async function processStage6Job(
       'RAG retrieval failed, continuing without context'
     );
   }
+
+  // Enrich summary_preview with actual digest from previous lesson (if available)
+  await enrichSummaryPreviewFromDB(courseId, lessonSpec);
 
   let lessonLabel: LessonLabel;
   try {

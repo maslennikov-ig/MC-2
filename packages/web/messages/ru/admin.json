@@ -296,7 +296,9 @@
       "qdrant": "Qdrant",
       "qdrantDesc": "Векторная база",
       "telegram": "Telegram бот",
-      "telegramDesc": "Уведомления"
+      "telegramDesc": "Уведомления",
+      "mermaid": "Mermaid Pipeline",
+      "mermaidDesc": "Исправление синтаксиса диаграмм"
     },
     "status": {
       "healthy": "Работает",

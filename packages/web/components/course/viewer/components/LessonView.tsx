@@ -57,6 +57,8 @@ interface LessonViewProps {
   onExitFocus: () => void
   /** Callback when enrichments should be refreshed (after generation completes) */
   onRefreshEnrichments?: () => void
+  /** Course content language for localized callout titles */
+  courseLanguage?: string
 }
 
 export function LessonView({
@@ -84,6 +86,7 @@ export function LessonView({
   onMarkComplete,
   onExitFocus,
   onRefreshEnrichments,
+  courseLanguage,
 }: LessonViewProps) {
   if (focusMode) {
     return (
@@ -178,6 +181,7 @@ export function LessonView({
               assets={assets}
               lessonContent={lessonContent}
               enrichments={enrichments}
+              courseLanguage={courseLanguage}
             />
           </div>
 
@@ -283,6 +287,7 @@ export function LessonView({
             presentation: currentLesson.presentation_asset?.url,
           }}
           onFormatChange={undefined}
+          courseLanguage={courseLanguage}
         />
       </TabsContent>
 

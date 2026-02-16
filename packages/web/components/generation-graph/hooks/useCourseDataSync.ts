@@ -29,6 +29,7 @@ interface UseCourseDataSyncReturn {
   visualStyle: VisualStyle | null
   courseStyle: string | null
   analysisResult: AnalysisResult | null
+  courseLanguage: string | null
 }
 
 /**
@@ -50,6 +51,7 @@ export function useCourseDataSync({
   const [visualStyle, setVisualStyle] = useState<VisualStyle | null>(null)
   const [courseStyle, setCourseStyle] = useState<string | null>(null)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+  const [courseLanguage, setCourseLanguage] = useState<string | null>(null)
 
   // Ref to prevent concurrent refetches (race condition protection)
   const refetchInProgressRef = useRef(false)
@@ -117,7 +119,7 @@ export function useCourseDataSync({
           const [courseResult, lessonsResult] = await Promise.all([
             supabase
               .from('courses')
-              .select('course_structure, visual_style, style, analysis_result')
+              .select('course_structure, visual_style, style, analysis_result, language')
               .eq('id', courseId)
               .single(),
             lessonsQuery,
@@ -139,6 +141,7 @@ export function useCourseDataSync({
           visualStyleData = courseResult.data?.visual_style
           styleData = courseResult.data?.style ?? null
           analysisResultData = courseResult.data?.analysis_result
+          const languageData = courseResult.data?.language ?? null
 
           // Update visual style
           if (visualStyleData && isVisualStyle(visualStyleData)) {
@@ -148,6 +151,11 @@ export function useCourseDataSync({
           // Update course style
           if (styleData) {
             setCourseStyle(styleData)
+          }
+
+          // Update course language
+          if (languageData) {
+            setCourseLanguage(languageData)
           }
 
           // Update analysis result
@@ -348,5 +356,5 @@ export function useCourseDataSync({
     }
   }, [pipelineStatus, prevPipelineStatus, courseId, fetchCourseData])
 
-  return { visualStyle, courseStyle, analysisResult }
+  return { visualStyle, courseStyle, analysisResult, courseLanguage }
 }

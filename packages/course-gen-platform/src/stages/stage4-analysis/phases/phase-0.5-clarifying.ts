@@ -108,75 +108,85 @@ function normalizeSuggestedAnswer(val: unknown): unknown {
  */
 export const ClarifyingQuestionSchema = z.object({
   question_text: z.string().min(10).max(500),
-  question_type: QuestionTypeSchema.default('open'),
-  question_priority: createLLMEnumSchema(
-    ['critical', 'important', 'nice_to_have'] as const,
-    {
-      essential: 'critical',
-      'must-have': 'critical',
-      urgent: 'critical',
-      high: 'critical',
-      mandatory: 'critical',
-      significant: 'important',
-      needed: 'important',
-      medium: 'important',
-      useful: 'important',
-      optional: 'nice_to_have',
-      low: 'nice_to_have',
-      bonus: 'nice_to_have',
-      supplementary: 'nice_to_have',
-      extra: 'nice_to_have',
-    },
-    'questionPriority'
+  question_type: z.preprocess(
+    val => (val === null || val === undefined ? undefined : val),
+    QuestionTypeSchema.default('open')
   ),
-  question_category: createLLMEnumSchema(
-    [
-      'company_context',
-      'audience',
-      'expected_outcomes',
-      'content_structure',
-      'focus_priorities',
-      'business_goals',
-      'practical_application',
-      'constraints',
-    ] as const,
-    {
-      company: 'company_context',
-      organization: 'company_context',
-      corporate: 'company_context',
-      employer: 'company_context',
-      learners: 'audience',
-      students: 'audience',
-      users: 'audience',
-      target: 'audience',
-      outcomes: 'expected_outcomes',
-      results: 'expected_outcomes',
-      goals: 'expected_outcomes',
-      objectives: 'expected_outcomes',
-      structure: 'content_structure',
-      format: 'content_structure',
-      layout: 'content_structure',
-      arrangement: 'content_structure',
-      focus: 'focus_priorities',
-      priorities: 'focus_priorities',
-      emphasis: 'focus_priorities',
-      key_areas: 'focus_priorities',
-      business: 'business_goals',
-      commercial: 'business_goals',
-      revenue: 'business_goals',
-      roi: 'business_goals',
-      practical: 'practical_application',
-      'hands-on': 'practical_application',
-      'real-world': 'practical_application',
-      applied: 'practical_application',
-      limits: 'constraints',
-      restrictions: 'constraints',
-      requirements: 'constraints',
-      boundaries: 'constraints',
-    },
-    'questionCategory'
+  question_priority: z.preprocess(
+    val => (val === null || val === undefined ? 'important' : val),
+    createLLMEnumSchema(
+      ['critical', 'important', 'nice_to_have'] as const,
+      {
+        essential: 'critical',
+        'must-have': 'critical',
+        urgent: 'critical',
+        high: 'critical',
+        mandatory: 'critical',
+        significant: 'important',
+        needed: 'important',
+        medium: 'important',
+        useful: 'important',
+        optional: 'nice_to_have',
+        low: 'nice_to_have',
+        bonus: 'nice_to_have',
+        supplementary: 'nice_to_have',
+        extra: 'nice_to_have',
+      },
+      'questionPriority'
+    )
+  ),
+  question_category: z.preprocess(
+    val => (val === null || val === undefined ? 'content_structure' : val),
+    createLLMEnumSchema(
+      [
+        'company_context',
+        'audience',
+        'expected_outcomes',
+        'content_structure',
+        'focus_priorities',
+        'business_goals',
+        'practical_application',
+        'constraints',
+      ] as const,
+      {
+        company: 'company_context',
+        organization: 'company_context',
+        corporate: 'company_context',
+        employer: 'company_context',
+        learners: 'audience',
+        students: 'audience',
+        users: 'audience',
+        target: 'audience',
+        outcomes: 'expected_outcomes',
+        results: 'expected_outcomes',
+        goals: 'expected_outcomes',
+        objectives: 'expected_outcomes',
+        structure: 'content_structure',
+        format: 'content_structure',
+        layout: 'content_structure',
+        arrangement: 'content_structure',
+        focus: 'focus_priorities',
+        priorities: 'focus_priorities',
+        emphasis: 'focus_priorities',
+        key_areas: 'focus_priorities',
+        business: 'business_goals',
+        commercial: 'business_goals',
+        revenue: 'business_goals',
+        roi: 'business_goals',
+        practical: 'practical_application',
+        'hands-on': 'practical_application',
+        'real-world': 'practical_application',
+        applied: 'practical_application',
+        limits: 'constraints',
+        restrictions: 'constraints',
+        requirements: 'constraints',
+        boundaries: 'constraints',
+      },
+      'questionCategory'
+    )
   ),
   suggested_answers: z.preprocess(val => {
+    if (val === null || val === undefined) return [];
     if (!Array.isArray(val)) return val;
     return val
       .map(normalizeSuggestedAnswer)
@@ -285,8 +295,8 @@ function truncateContent(content: string, maxTokens: number): string {
  * Build condensed context from budget allocation and document content.
  *
  * Creates a compact summary of document context for prompt injection.
- * Includes actual document text (truncated to ~4K total tokens) so the model
- * can avoid asking questions already answered in the documents.
+ * Includes actual document text (already budget-resolved by allocator) with safety truncation
+ * to prevent extreme cases from breaking the LLM context.
  *
  * @param budgetAllocation - Stage 4 budget allocation result (nullable when no documents)
  * @param documentSummaries - Document content from Stage 3 (reused from orchestrator)
@@ -315,14 +325,28 @@ function buildCondensedContext(
   );
   contextParts.push(`- SUPPLEMENTARY: ${breakdown.supplementary.count} documents (summaries only)`);
 
-  // Actual document content (truncated to ~4K total tokens)
+  // Actual document content (use per-document content as-is, already budget-resolved by allocator)
+  // Safety truncation: per-doc limit + total limit across all documents
   if (documentSummaries && documentSummaries.length > 0) {
-    const tokensPerDoc = Math.floor(4000 / documentSummaries.length);
+    const SAFETY_MAX_TOKENS_PER_DOC = 100_000;
+    const SAFETY_MAX_TOTAL_TOKENS = 500_000;
+    let totalTokensUsed = 0;
     contextParts.push('\nDOCUMENT CONTENTS:');
     for (const doc of documentSummaries) {
-      contextParts.push(
-        `\n[${doc.file_name}]\n${truncateContent(doc.processed_content, tokensPerDoc)}`
+      const availableTokens = Math.min(
+        SAFETY_MAX_TOKENS_PER_DOC,
+        SAFETY_MAX_TOTAL_TOKENS - totalTokensUsed
       );
+      if (availableTokens <= 0) {
+        contextParts.push(
+          `\n[TRUNCATED] Remaining documents omitted — total context limit (${SAFETY_MAX_TOTAL_TOKENS} tokens) reached.`
+        );
+        break;
+      }
+      const truncated = truncateContent(doc.processed_content, availableTokens);
+      contextParts.push(`\n[${doc.file_name}]\n${truncated}`);
+      // Estimate tokens used (same heuristic as truncateContent: 1 token ≈ 4 chars)
+      totalTokensUsed += Math.ceil(truncated.length / 4);
     }
   }
 
@@ -717,6 +741,27 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
       throw new Error(
         `JSON parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`
       );
+    }
+
+    // Defensive: filter out malformed questions before validation
+    if (parsedOutput && typeof parsedOutput === 'object' && 'questions' in parsedOutput) {
+      const raw = parsedOutput as { questions: unknown[] };
+      if (Array.isArray(raw.questions)) {
+        const originalCount = raw.questions.length;
+        raw.questions = raw.questions.filter(
+          q =>
+            q &&
+            typeof q === 'object' &&
+            'question_text' in q &&
+            typeof (q as Record<string, unknown>).question_text === 'string'
+        );
+        if (raw.questions.length < originalCount) {
+          phaseLogger.warn(
+            { originalCount, filteredCount: raw.questions.length },
+            'Filtered out malformed questions without question_text from LLM output'
+          );
+        }
+      }
     }
 
     // Validate with Zod (normalization of suggested_answers handled by z.preprocess in schema)

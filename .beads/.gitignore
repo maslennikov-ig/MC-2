@@ -10,8 +10,20 @@ daemon.lock
 daemon.log
 daemon.pid
 bd.sock
+bd.sock.startlock
 sync-state.json
 last-touched
+.sync.lock
+.jsonl.lock
+.migration-hint-ts
+
+# Sync branch export state
+sync_base.jsonl
+export-state/
+
+# Dolt backend files
+dolt/
+dolt-access.lock
 
 # Local version tracking (prevents upgrade notification spam after git ops)
 .local_version

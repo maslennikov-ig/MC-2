@@ -18,8 +18,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { POST as pausePost, GET as pauseGet } from '@/app/api/courses/[slug]/pause/route'
-import { POST as resumePost } from '@/app/api/courses/[slug]/resume/route'
+import { POST as pausePost, GET as pauseGet } from '@/app/api/courses/[orgSlug]/[courseSlug]/pause/route'
+import { POST as resumePost } from '@/app/api/courses/[orgSlug]/[courseSlug]/resume/route'
 import { canPauseGeneration, PAUSABLE_STATUSES } from '@megacampus/shared-types'
 
 // Mock Supabase client
@@ -45,6 +45,11 @@ vi.mock('@/lib/logger', () => ({
   },
 }))
 
+// Mock getCourseByOrgAndSlug helper
+vi.mock('@/lib/helpers/organization', () => ({
+  getCourseByOrgAndSlug: vi.fn(),
+}))
+
 /**
  * Helper to create mock NextRequest for testing
  */
@@ -55,11 +60,14 @@ function createMockRequest(url = 'http://localhost:3000/api/test'): NextRequest 
 }
 
 /**
- * Helper to create mock params with slug
+ * Helper to create mock params with orgSlug and courseSlug
  */
-function createMockParams(slug: string): { params: Promise<{ slug: string }> } {
+function createMockParams(
+  courseSlug: string,
+  orgSlug = 'test-org'
+): { params: Promise<{ orgSlug: string; courseSlug: string }> } {
   return {
-    params: Promise.resolve({ slug }),
+    params: Promise.resolve({ orgSlug, courseSlug }),
   }
 }
 
@@ -91,35 +99,20 @@ function mockUnauthenticatedUser() {
 }
 
 /**
- * Helper to mock course lookup
+ * Helper to mock course lookup via getCourseByOrgAndSlug
  */
-function mockCourseLookup(
-  _slug: string,
+async function mockCourseLookup(
+  _orgSlug: string,
+  _courseSlug: string,
   course: {
     id: string
     user_id: string
     generation_status?: string
     generation_paused_at?: string | null
-  } | null,
-  error: unknown = null
+  } | null
 ) {
-  const mockSelect = vi.fn().mockReturnThis()
-  const mockEq = vi.fn().mockReturnThis()
-  const mockSingle = vi.fn().mockResolvedValue({ data: course, error })
-
-  mockSupabaseClient.from.mockReturnValue({
-    select: mockSelect,
-  })
-
-  mockSelect.mockReturnValue({
-    eq: mockEq,
-  })
-
-  mockEq.mockReturnValue({
-    single: mockSingle,
-  })
-
-  return { mockSelect, mockEq, mockSingle }
+  const { getCourseByOrgAndSlug } = await import('@/lib/helpers/organization')
+  ;(getCourseByOrgAndSlug as any).mockResolvedValue(course)
 }
 
 describe('Pause/Resume API Endpoints', () => {
@@ -147,7 +140,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 404 if course not found', async () => {
       mockAuthenticatedUser()
-      mockCourseLookup('test-course', null, { message: 'Not found' })
+      await mockCourseLookup('test-org', 'test-course', null)
 
       const request = createMockRequest()
       const params = createMockParams('test-course')
@@ -161,7 +154,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 403 if user does not own the course', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'other-user-789', // Different user
       })
@@ -178,7 +171,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 400 if RPC returns success: false', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
       })
@@ -204,7 +197,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 500 if RPC call fails with error', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
       })
@@ -227,7 +220,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 200 on successful pause', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
       })
@@ -255,7 +248,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should call RPC with correct parameters', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
       })
@@ -284,7 +277,7 @@ describe('Pause/Resume API Endpoints', () => {
       const json = await response.json()
 
       expect(response.status).toBe(400)
-      expect(json.error).toBe('Course slug is required')
+      expect(json.error).toBe('Organization slug and course slug are required')
     })
   })
 
@@ -292,7 +285,7 @@ describe('Pause/Resume API Endpoints', () => {
   // POST /api/courses/[slug]/resume - Resume generation
   // ============================================================================
 
-  describe('POST /api/courses/[slug]/resume', () => {
+  describe('POST /api/courses/[orgSlug]/[courseSlug]/resume', () => {
     it('should return 401 if not authenticated', async () => {
       mockUnauthenticatedUser()
 
@@ -308,7 +301,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 404 if course not found', async () => {
       mockAuthenticatedUser()
-      mockCourseLookup('test-course', null, { message: 'Not found' })
+      await mockCourseLookup('test-org', 'test-course', null)
 
       const request = createMockRequest()
       const params = createMockParams('test-course')
@@ -322,7 +315,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 403 if user does not own the course', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'other-user-789', // Different user
         generation_paused_at: '2024-01-14T10:00:00Z',
@@ -340,7 +333,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 400 if trying to resume non-paused course', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
         generation_paused_at: null, // Not paused
@@ -358,7 +351,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 500 if RPC call fails with error', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
         generation_paused_at: '2024-01-14T10:00:00Z',
@@ -382,7 +375,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 400 if RPC returns success: false', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
         generation_paused_at: '2024-01-14T10:00:00Z',
@@ -409,7 +402,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should return 200 on successful resume', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
         generation_paused_at: '2024-01-14T10:00:00Z',
@@ -440,7 +433,7 @@ describe('Pause/Resume API Endpoints', () => {
 
     it('should call RPC with correct parameters', async () => {
       mockAuthenticatedUser('user-123')
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
         generation_paused_at: '2024-01-14T10:00:00Z',
@@ -474,17 +467,17 @@ describe('Pause/Resume API Endpoints', () => {
       const json = await response.json()
 
       expect(response.status).toBe(400)
-      expect(json.error).toBe('Course slug is required')
+      expect(json.error).toBe('Organization slug and course slug are required')
     })
   })
 
   // ============================================================================
-  // GET /api/courses/[slug]/pause - Get pause status
+  // GET /api/courses/[orgSlug]/[courseSlug]/pause - Get pause status
   // ============================================================================
 
-  describe('GET /api/courses/[slug]/pause', () => {
+  describe('GET /api/courses/[orgSlug]/[courseSlug]/pause', () => {
     it('should return 404 if course not found', async () => {
-      mockCourseLookup('test-course', null, { message: 'Not found' })
+      await mockCourseLookup('test-org', 'test-course', null)
 
       const request = createMockRequest()
       const params = createMockParams('test-course')
@@ -497,7 +490,7 @@ describe('Pause/Resume API Endpoints', () => {
     })
 
     it('should return pause status for paused course', async () => {
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
         generation_status: 'stage_5_generating',
@@ -518,7 +511,7 @@ describe('Pause/Resume API Endpoints', () => {
     })
 
     it('should return pause status for non-paused pausable course', async () => {
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
         generation_status: 'stage_5_generating', // Pausable status
@@ -539,7 +532,7 @@ describe('Pause/Resume API Endpoints', () => {
     })
 
     it('should return pause status for non-pausable course', async () => {
-      mockCourseLookup('test-course', {
+      await mockCourseLookup('test-org', 'test-course', {
         id: 'course-456',
         user_id: 'user-123',
         generation_status: 'completed', // Non-pausable status
@@ -567,7 +560,7 @@ describe('Pause/Resume API Endpoints', () => {
       const json = await response.json()
 
       expect(response.status).toBe(400)
-      expect(json.error).toBe('Course slug is required')
+      expect(json.error).toBe('Organization slug and course slug are required')
     })
   })
 

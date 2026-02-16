@@ -4,6 +4,9 @@ import { useGenerationRealtime } from '@/components/generation-monitoring/realti
 import { EmailNotificationRequest } from './EmailNotificationRequest'
 import { useTranslations } from 'next-intl'
 import { ACTIVE_STATUSES } from '@/lib/generation-graph/constants'
+import type { Database } from '@megacampus/shared-types'
+
+type GenerationStatus = Database['public']['Enums']['generation_status']
 
 const LONG_RUNNING_THRESHOLD = 5 * 60 * 1000 // 5 minutes
 
@@ -14,7 +17,7 @@ export const LongRunningIndicator = () => {
   const t = useTranslations('generation')
 
   useEffect(() => {
-    if (!status || !ACTIVE_STATUSES.includes(status)) return
+    if (!status || !ACTIVE_STATUSES.includes(status as GenerationStatus)) return
 
     const interval = setInterval(() => {
       if (Date.now() - startTime > LONG_RUNNING_THRESHOLD) {

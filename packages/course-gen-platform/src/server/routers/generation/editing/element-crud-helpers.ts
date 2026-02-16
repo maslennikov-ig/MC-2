@@ -8,7 +8,7 @@ import type {
 import {
   deleteElement as deleteStructureElement,
   addElement as addStructureElement,
-  ensureStableIdsInMemory,
+  ensureStableIdsAndSchemaVersionInMemory,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
@@ -142,13 +142,14 @@ export async function handleDeleteElement(
   }
 
   const result = deleteStructureElement(courseStructure, elementPath);
-  assertStableIds(result.updatedStructure);
+  const structureToPersist = ensureStableIdsAndSchemaVersionInMemory(result.updatedStructure);
+  assertStableIds(structureToPersist);
   const now = new Date().toISOString();
 
   const { error: updateError } = await supabase
     .from('courses')
     .update({
-      course_structure: result.updatedStructure,
+      course_structure: structureToPersist,
       updated_at: now,
     })
     .eq('id', courseId);
@@ -170,7 +171,7 @@ export async function handleDeleteElement(
   }
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  const structureForNodes = structureToPersist;
   await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },
@@ -552,12 +553,13 @@ export async function handleAddElement(
     result.updatedStructure
   );
 
-  assertStableIds(result.updatedStructure);
+  const structureToPersist = ensureStableIdsAndSchemaVersionInMemory(result.updatedStructure);
+  assertStableIds(structureToPersist);
   const now = new Date().toISOString();
   const { error: updateError } = await supabase
     .from('courses')
     .update({
-      course_structure: result.updatedStructure,
+      course_structure: structureToPersist,
       updated_at: now,
     })
     .eq('id', courseId);
@@ -579,7 +581,7 @@ export async function handleAddElement(
   }
 
   // Phase 4: Dual-write to course_nodes (non-blocking, non-fatal)
-  const structureForNodes = ensureStableIdsInMemory(result.updatedStructure);
+  const structureForNodes = structureToPersist;
   await writeCourseNodes(courseId, structureForNodes, supabase, logger).catch(err =>
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },

@@ -649,47 +649,8 @@ export function fitsInContext(model: ModelConfig, totalTokens: number): boolean 
 }
 
 // ============================================================================
-// STAGE 4 ANALYSIS MODELS
+// STAGE 4 ANALYSIS CONSTANTS
 // ============================================================================
-
-/**
- * Stage 4 Analysis model configuration by language and context tier
- *
- * Decision logic:
- * - If total_minimum_tokens <= 260K: use standard tier
- * - If total_minimum_tokens > 260K: use extended tier (1M context)
- *
- * Minimum = CORE_full + all_summaries (IMPORTANT + SUPPLEMENTARY)
- */
-export const STAGE4_MODELS = {
-  ru: {
-    standard: {
-      primary: 'qwen/qwen3-235b-a22b-2507',
-      fallback: 'moonshotai/kimi-k2-0905',
-      maxContext: 260_000,
-    },
-    extended: {
-      primary: 'google/gemini-2.5-flash-preview-09-2025',
-      fallback: 'qwen/qwen-plus-2025-07-28',
-      maxContext: 1_000_000,
-      cacheRead: true, // Gemini supports cache-read for 10x savings
-    },
-  },
-  en: {
-    standard: {
-      primary: 'x-ai/grok-4.1-fast:free',
-      fallback: 'moonshotai/kimi-k2-0905',
-      maxContext: 260_000,
-    },
-    extended: {
-      // Must differ from standard.primary for fallback escalation to work
-      primary: 'google/gemini-2.5-flash-preview-09-2025',
-      fallback: 'moonshotai/kimi-linear-48b-a3b-instruct',
-      maxContext: 1_000_000,
-      cacheRead: true, // Gemini supports cache-read for 10x savings
-    },
-  },
-} as const;
 
 /**
  * Hard token limit even for 1M context models
@@ -701,56 +662,3 @@ export const STAGE4_HARD_TOKEN_LIMIT = 700_000;
  * Threshold for switching from standard to extended tier
  */
 export const STAGE4_CONTEXT_THRESHOLD = 260_000;
-
-/**
- * Stage 4 model tier type
- */
-export type Stage4ModelTier = 'standard' | 'extended';
-
-/**
- * Stage 4 model selection result
- */
-export interface Stage4ModelSelection {
-  modelId: string;
-  fallbackModelId: string;
-  tier: Stage4ModelTier;
-  maxContext: number;
-  cacheReadEnabled: boolean;
-}
-
-/**
- * Select model for Stage 4 Analysis based on minimum token requirement and language
- *
- * @param minimumTokens - CORE_full + all_summaries
- * @param language - Content language ('ru' | 'en')
- * @returns Stage4ModelSelection with primary and fallback models
- *
- * @example
- * ```typescript
- * // Small Russian course - uses Qwen3 (260K context)
- * const selection = selectModelForStage4(150_000, 'ru');
- * // selection.modelId === 'qwen/qwen3-235b-a22b-2507'
- * // selection.tier === 'standard'
- *
- * // Large Russian course - uses Gemini (1M context with cache)
- * const selection = selectModelForStage4(300_000, 'ru');
- * // selection.modelId === 'google/gemini-2.5-flash-preview-09-2025'
- * // selection.tier === 'extended'
- * // selection.cacheReadEnabled === true
- * ```
- */
-export function selectModelForStage4(
-  minimumTokens: number,
-  language: 'ru' | 'en'
-): Stage4ModelSelection {
-  const tier: Stage4ModelTier = minimumTokens > STAGE4_CONTEXT_THRESHOLD ? 'extended' : 'standard';
-  const config = STAGE4_MODELS[language][tier];
-
-  return {
-    modelId: config.primary,
-    fallbackModelId: config.fallback,
-    tier,
-    maxContext: config.maxContext,
-    cacheReadEnabled: 'cacheRead' in config ? config.cacheRead : false,
-  };
-}

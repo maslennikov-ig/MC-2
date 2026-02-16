@@ -112,6 +112,9 @@ export interface VideoScriptPanelProps {
 
   /** Optional className */
   className?: string
+
+  /** Course language for localized callout titles (ISO 639-1) */
+  language?: string
 }
 
 // ============================================================================
@@ -421,6 +424,7 @@ export function VideoScriptPanel({
   isApproving = false,
   isRegenerating = false,
   className,
+  language,
 }: VideoScriptPanelProps): React.JSX.Element {
   const locale = useLocale()
   const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru
@@ -845,7 +849,7 @@ export function VideoScriptPanel({
           <ScrollArea className="h-full">
             <div className="p-6">
               {fullScriptText ? (
-                <MarkdownRendererFull content={fullScriptText} preset="preview" />
+                <MarkdownRendererFull content={fullScriptText} preset="preview" language={language} />
               ) : (
                 <p className="text-muted-foreground py-8 text-center text-sm">{t.noContent}</p>
               )}

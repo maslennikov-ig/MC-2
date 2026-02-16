@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { redirect } from 'next/navigation'
 import { NextIntlClientProvider } from 'next-intl'
 import { useTheme } from 'next-themes'
 import { RefinementChat } from '@/components/generation-graph/panels/RefinementChat'
@@ -95,6 +96,11 @@ interface CourseInfo {
  * then renders ChatDebugContent inside it so useTranslations works.
  */
 export default function Stage5ChatDebugPage() {
+  // Block access to debug page in production
+  if (process.env.NODE_ENV === 'production') {
+    redirect('/')
+  }
+
   const [isMounted, setIsMounted] = useState(false)
   const { theme, setTheme } = useTheme()
   const prevThemeRef = useRef<string | undefined>(undefined)

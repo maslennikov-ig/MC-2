@@ -222,30 +222,13 @@ export async function classifyIntent(
   }
 
   try {
-    // Resolve model config from model-config-service (DB → cache → hardcoded)
-    // Fallback to env var / hardcoded only if service is unavailable at cold start
-    let modelId = 'xiaomi/mimo-v2-flash';
-    let temperature = 0.1;
-    let maxTokens = 200;
-    try {
-      const configService = createModelConfigService();
-      const phaseConfig = await configService.getModelForPhase('chat_intent_classification');
-      modelId = phaseConfig.modelId;
-      temperature = phaseConfig.temperature;
-      maxTokens = phaseConfig.maxTokens;
-    } catch (configErr) {
-      // If this is a chat phase misconfiguration error, propagate it (don't mask)
-      if (isMissingChatPhaseConfigError(configErr)) {
-        throw configErr;
-      }
-      // For transient errors (DB down, timeout), fallback to env var / hardcoded
-      const envModel = process.env.CHAT_CLASSIFICATION_MODEL;
-      if (envModel) modelId = envModel;
-      logger.warn(
-        { err: configErr, fallbackModel: modelId },
-        'Intent classifier: model-config-service unavailable, using fallback'
-      );
-    }
+    // Resolve model config from model-config-service.
+    // Chat phase config is mandatory: no env/hardcoded fallback.
+    const configService = createModelConfigService();
+    const phaseConfig = await configService.getModelForPhase('chat_intent_classification');
+    const modelId = phaseConfig.modelId;
+    const temperature = phaseConfig.temperature;
+    const maxTokens = phaseConfig.maxTokens;
 
     // Using zodResponseFormat to generate JSON Schema from Zod schema.
     // Note: We use chat.completions.create() instead of chat.completions.parse()

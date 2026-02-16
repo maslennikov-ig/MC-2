@@ -15,6 +15,7 @@ import { verifyPatch } from '../verifier/delta-judge';
 import { executeExpansion } from '../section-expander';
 import { selectFixPromptTemplate } from '../fix-templates';
 import { processInlineFixes, INLINE_FIXER_ENABLED } from '../inline-fixer';
+import { runMermaidFixPipeline } from '../../utils/mermaid-fix-pipeline';
 
 import { emitEvent } from './events';
 import { extractSectionContent } from './content-utils';
@@ -188,6 +189,26 @@ export async function executePatcherTask(
       );
       patchedContent = standardResult.patchedContent;
       tokensUsed = standardResult.tokensUsed;
+    }
+
+    // Run full mermaid fix pipeline on patched content (regex → validate → LLM fix → revalidate → fallback)
+    try {
+      const mermaidResult = await runMermaidFixPipeline(patchedContent);
+      if (mermaidResult.modified) {
+        patchedContent = mermaidResult.content;
+        logger.debug(
+          { sectionId: task.sectionId, metrics: mermaidResult.metrics },
+          'Patcher: Mermaid fix pipeline applied to patched content'
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          sectionId: task.sectionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Patcher: Mermaid fix pipeline failed, using content as-is'
+      );
     }
 
     // Verify patch using Delta Judge
@@ -428,10 +449,31 @@ export async function executeExpanderTask(
     // Execute expansion
     const expandResult = await executeExpansion(expanderInput);
 
+    // Run full mermaid fix pipeline on expanded content (regex → validate → LLM fix → revalidate → fallback)
+    let expandedContent = expandResult.regeneratedContent;
+    try {
+      const mermaidResult = await runMermaidFixPipeline(expandedContent);
+      if (mermaidResult.modified) {
+        expandedContent = mermaidResult.content;
+        logger.debug(
+          { sectionId: task.sectionId, metrics: mermaidResult.metrics },
+          'Expander: Mermaid fix pipeline applied to expanded content'
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          sectionId: task.sectionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Expander: Mermaid fix pipeline failed, using content as-is'
+      );
+    }
+
     emitEvent(onStreamEvent, {
       type: 'patch_applied',
       sectionId: task.sectionId,
-      content: expandResult.regeneratedContent,
+      content: expandedContent,
       diffSummary: `Regenerated section (${expandResult.wordCount} words)`,
     });
 
@@ -439,11 +481,11 @@ export async function executeExpanderTask(
     let verificationPassed = true;
     let deltaJudgeTokens = 0;
 
-    if (expandResult.regeneratedContent !== sectionContent && expandResult.success) {
+    if (expandedContent !== sectionContent && expandResult.success) {
       try {
         const result = await verifyPatchWithDeltaJudge(
           sectionContent,
-          expandResult.regeneratedContent,
+          expandedContent,
           task,
           onStreamEvent
         );
@@ -479,7 +521,7 @@ export async function executeExpanderTask(
     return {
       success: expandResult.success && verificationPassed,
       sectionId: task.sectionId,
-      regeneratedContent: verificationPassed ? expandResult.regeneratedContent : sectionContent,
+      regeneratedContent: verificationPassed ? expandedContent : sectionContent,
       tokensUsed: expandResult.tokensUsed + deltaJudgeTokens,
     };
   } catch (error) {

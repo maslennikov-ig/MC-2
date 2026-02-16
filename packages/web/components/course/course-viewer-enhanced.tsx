@@ -263,6 +263,7 @@ export default function CourseViewerEnhanced({
                 onMarkComplete={markLessonComplete}
                 onExitFocus={() => setFocusMode(false)}
                 onRefreshEnrichments={() => void refreshEnrichments()}
+                courseLanguage={(course.request_data?.language as string) || course.language || 'ru'}
               />
             ) : (
               <div className="flex h-full items-center justify-center">

@@ -296,7 +296,9 @@
       "qdrant": "Qdrant",
       "qdrantDesc": "Vector database",
       "telegram": "Telegram Bot",
-      "telegramDesc": "Notifications"
+      "telegramDesc": "Notifications",
+      "mermaid": "Mermaid Pipeline",
+      "mermaidDesc": "Diagram syntax fixer"
     },
     "status": {
       "healthy": "Healthy",

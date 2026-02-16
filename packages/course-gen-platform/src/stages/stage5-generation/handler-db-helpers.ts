@@ -380,16 +380,28 @@ async function materializeLessonsBatch(
 export async function markCourseAsFailed(
   courseId: string,
   errorCode: GenerationErrorCode,
-  jobLogger: pino.Logger
+  jobLogger: pino.Logger,
+  errorDetails?: { message?: string; phase?: string; duration_ms?: number }
 ): Promise<void> {
   try {
     const supabaseAdmin = getSupabaseAdmin();
+
+    // Build error metadata with context
+    const errorMetadata = {
+      error_code: errorCode,
+      failed_at: new Date().toISOString(),
+      failed_phase: errorDetails?.phase ?? 'unknown',
+      error_message: errorDetails?.message ?? errorCode,
+      duration_ms: errorDetails?.duration_ms ?? 0,
+    };
+
     const { error: statusUpdateError } = await supabaseAdmin
       .from('courses')
       .update({
         generation_status: 'failed',
         failed_at_stage: 5,
         error_code: errorCode as unknown as Database['public']['Enums']['stage_error_code'],
+        generation_metadata: errorMetadata,
         updated_at: new Date().toISOString(),
       })
       .eq('id', courseId);
@@ -400,7 +412,7 @@ export async function markCourseAsFailed(
         'Failed to update generation_status to failed'
       );
     } else {
-      jobLogger.info({ courseId }, 'Generation status updated to failed');
+      jobLogger.info({ courseId, errorMetadata }, 'Generation status updated to failed');
     }
   } catch (statusError) {
     jobLogger.error(

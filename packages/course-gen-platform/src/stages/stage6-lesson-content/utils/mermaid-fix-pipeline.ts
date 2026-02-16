@@ -252,7 +252,7 @@ function extractMermaidBlocks(content: string): MermaidBlock[] {
 function generateFallbackText(brokenDiagram: string): string {
   // Extract diagram type from first line
   const typeMatch = brokenDiagram.match(
-    /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|mindmap)/m
+    /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|mindmap|timeline)/m
   );
   const diagramType = typeMatch ? typeMatch[1] : 'diagram';
 

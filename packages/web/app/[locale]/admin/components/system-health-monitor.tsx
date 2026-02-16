@@ -80,6 +80,7 @@ const SERVICE_CONFIG: Record<string, { key: string; icon: React.ElementType }> =
   Worker: { key: 'worker', icon: Cog },
   'Worker Stage 7': { key: 'workerStage7', icon: Cog },
   'Telegram Bot': { key: 'telegram', icon: Send },
+  'Mermaid Pipeline': { key: 'mermaid', icon: Cog },
 }
 
 // Overall status icon mapping
@@ -113,6 +114,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     | 'supabase'
     | 'qdrant'
     | 'telegram'
+    | 'mermaid'
   const serviceKey = config.key as ServiceKey
 
   // Use a mapping approach for type safety
@@ -125,6 +127,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     supabase: t('services.supabase'),
     qdrant: t('services.qdrant'),
     telegram: t('services.telegram'),
+    mermaid: t('services.mermaid'),
   }
 
   const serviceDescs: Record<ServiceKey, string> = {
@@ -136,6 +139,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     supabase: t('services.supabaseDesc'),
     qdrant: t('services.qdrantDesc'),
     telegram: t('services.telegramDesc'),
+    mermaid: t('services.mermaidDesc'),
   }
 
   const localizedName = serviceNames[serviceKey] || service.name
@@ -256,7 +260,7 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
         <div className="animate-pulse space-y-4">
           <div className="h-6 w-1/3 rounded bg-gray-200 dark:bg-gray-700" />
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
-            {Array.from({ length: 7 }).map((_, i) => (
+            {Array.from({ length: 9 }).map((_, i) => (
               <div key={i} className="h-28 rounded-xl bg-gray-200 dark:bg-gray-700" />
             ))}
           </div>

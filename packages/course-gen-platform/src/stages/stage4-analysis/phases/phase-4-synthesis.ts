@@ -4,6 +4,10 @@
  * Synthesizes document summaries and analysis outputs into clear generation instructions
  * for Stage 5 (Course Structure Generation). Model configured via database (llm_model_config table).
  *
+ * Document handling: receives full DocumentSummaryResult objects (budget-resolved by orchestrator).
+ * Uses hardcoded 25K token split — not budget-aware. Synthesis needs broad coverage of all
+ * documents rather than deep analysis, so equal split is acceptable.
+ *
  * @module phase-4-synthesis
  */
 
@@ -22,6 +26,7 @@ import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { extractJSON } from '@/shared/utils/json-repair';
 import { logger } from '@/shared/logger';
+import { createPromptService } from '@/shared/prompts/prompt-service';
 
 /**
  * Input data for Phase 4 Document Synthesis
@@ -116,7 +121,7 @@ export async function runPhase4Synthesis(input: Phase4Input): Promise<Phase4Outp
   const modelId = model.model || 'unknown';
 
   // Build synthesis prompt
-  const prompt = buildPhase4Prompt(input, documentCount);
+  const prompt = await buildPhase4Prompt(input, documentCount);
 
   // Execute LLM call with observability tracking
   const result = await trackPhaseExecution(
@@ -124,7 +129,7 @@ export async function runPhase4Synthesis(input: Phase4Input): Promise<Phase4Outp
     input.course_id,
     modelId,
     async () => {
-      const messages = [new SystemMessage(getPhase4SystemPrompt()), new HumanMessage(prompt)];
+      const messages = [new SystemMessage(await getPhase4SystemPrompt()), new HumanMessage(prompt)];
       const response = await model.invoke(messages);
 
       const content = getTextContent(response.content);
@@ -240,7 +245,7 @@ ${getTextContent(m.content)}`
 
     const regenerationResult = await regenerator.regenerate({
       rawOutput: preprocessedOutput,
-      originalPrompt: buildPhase4Prompt(input, documentCount),
+      originalPrompt: await buildPhase4Prompt(input, documentCount),
       parseError: parseError instanceof Error ? parseError.message : String(parseError),
     });
 
@@ -342,7 +347,7 @@ function truncateDocumentContent(content: string, maxTokens: number = 10000): st
  * @param documentCount - Number of documents to synthesize
  * @returns Formatted prompt string with token-aware truncation
  */
-function buildPhase4Prompt(input: Phase4Input, documentCount: number): string {
+async function buildPhase4Prompt(input: Phase4Input, documentCount: number): Promise<string> {
   const { phase1_output, phase2_output, phase3_output, language } = input;
 
   // Determine output language based on course language
@@ -379,108 +384,36 @@ function buildPhase4Prompt(input: Phase4Input, documentCount: number): string {
       .join('\n\n');
   }
 
+  // Pre-assemble phase outputs
+  const phase1KeyConcepts = phase1_output.topic_analysis.key_concepts.join(', ');
+  const phase2SectionsBreakdown = phase2_output.recommended_structure.sections_breakdown
+    .map(
+      section => `- ${section.area}: ${section.estimated_lessons} lessons (${section.importance})`
+    )
+    .join('\n');
+  const phase3ProgressionLogic = phase3_output.pedagogical_strategy.progression_logic;
+
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase4OutputSchema);
 
-  return `You are synthesizing course analysis into clear generation instructions for Stage 5 Course Generation.
-
-CRITICAL RULES:
-1. ALL your response MUST be in ${outputLanguage.toUpperCase()} (the course target language is ${outputLanguage})
-2. You MUST respond with valid JSON matching this EXACT schema:
-
-${schemaDescription}
-
----
-
-ANALYSIS SUMMARY:
-
-Course Topic: ${input.topic}
-Target Language: ${input.language} (for final course output)
-Category: ${category}
-Scope: ${totalLessons} lessons, ${totalSections} sections
-Document Count: ${documentCount}
-${researchFlagsSection}
-
----
-
-PREVIOUS PHASE OUTPUTS:
-
-Phase 1 - Key Concepts:
-${phase1_output.topic_analysis.key_concepts.join(', ')}
-
-Phase 2 - Sections Breakdown:
-${phase2_output.recommended_structure.sections_breakdown.map(section => `- ${section.area}: ${section.estimated_lessons} lessons (${section.importance})`).join('\n')}
-
-Phase 3 - Pedagogical Approach:
-${phase3_output.pedagogical_strategy.progression_logic}
-${documentSummariesSection}${clarifyingContext}
-
----
-
-TASK: Generate synthesis output
-
-1. **generation_guidance** (structured object):
-   - **tone**: Select based on course category and target_audience
-     * "conversational but precise": Most programming/technical courses
-     * "formal academic": Academic subjects, research-based courses
-     * "casual friendly": Personal development, hobbies
-     * "technical professional": Professional certifications, business
-
-   - **use_analogies**: true if topic benefits from comparisons (abstract concepts, technical topics)
-
-   - **specific_analogies** (optional): List 1-3 specific analogies that fit this topic
-     * Example for programming: ["functions like recipes", "variables like labeled boxes"]
-     * Example for networking: ["packets like letters", "router like post office"]
-
-   - **avoid_jargon**: List technical terms that should be avoided or explained
-     * Based on target_audience level (beginners need more avoidance)
-     * Example: ["polymorphism", "encapsulation"] for beginner OOP course
-
-   - **include_visuals**: Recommend visual aids based on topic nature
-     * "diagrams": For system architecture, workflows, relationships
-     * "flowcharts": For processes, algorithms, decision trees
-     * "code examples": For programming courses
-     * "screenshots": For software tutorials
-     * "animations": For dynamic processes
-     * "plots": For data science, statistics
-
-   - **exercise_types**: Select appropriate assessment methods
-     * "coding": Programming, scripting courses
-     * "derivation": Math, physics, theoretical subjects
-     * "interpretation": Literature, philosophy, analysis
-     * "debugging": Software development
-     * "refactoring": Advanced programming
-     * "analysis": Critical thinking, research-based
-
-   - **contextual_language_hints**: Describe audience level and communication style
-     * Example: "Assume no prior programming experience, use simple metaphors"
-     * Example: "Target experienced developers, use industry terminology"
-     * If research flags exist, mention them briefly here
-
-   - **real_world_examples** (optional): List 1-3 practical applications to reference
-     * Example for web dev: ["e-commerce checkout", "social media feed", "real-time chat"]
-
----
-
-OUTPUT FORMAT (JSON only, no markdown):
-
-{
-  "generation_guidance": {
-    "tone": "conversational but precise" | "formal academic" | "casual friendly" | "technical professional",
-    "use_analogies": true | false,
-    "specific_analogies": ["analogy1", "analogy2"],
-    "avoid_jargon": ["term1", "term2"],
-    "include_visuals": ["diagrams", "code examples"],
-    "exercise_types": ["coding", "debugging"],
-    "contextual_language_hints": "Audience assumptions and communication style",
-    "real_world_examples": ["example1", "example2"]
-  }
-}
-
-IMPORTANT:
-- generation_guidance fields MUST all be populated (only specific_analogies and real_world_examples are optional)
-- ALL text content (avoid_jargon, contextual_language_hints, specific_analogies, real_world_examples) MUST be in ${outputLanguage.toUpperCase()}
-- If research flags exist, mention them briefly in contextual_language_hints`;
+  const promptService = createPromptService();
+  return promptService.renderPrompt('stage4_phase4_synthesis_user', {
+    outputLanguage,
+    outputLanguageUpper: outputLanguage.toUpperCase(),
+    schemaDescription,
+    topic: input.topic,
+    language: input.language,
+    category,
+    totalLessons: String(totalLessons),
+    totalSections: String(totalSections),
+    documentCount: String(documentCount),
+    researchFlagsSection,
+    phase1KeyConcepts,
+    phase2SectionsBreakdown,
+    phase3ProgressionLogic,
+    documentSummariesSection,
+    clarifyingContext,
+  });
 }
 
 /**
@@ -488,19 +421,7 @@ IMPORTANT:
  *
  * @returns System prompt string
  */
-function getPhase4SystemPrompt(): string {
-  return `You are an expert curriculum architect specializing in synthesizing diverse information sources into structured course generation guidance.
-
-Your role:
-1. Analyze outputs from previous analysis phases (categorization, scope, expert analysis)
-2. Synthesize document summaries (if provided) into key insights
-3. Generate structured generation_guidance that specifies tone, pedagogy, and content approach
-
-Quality standards:
-- generation_guidance must be complete and well-reasoned based on course category and target audience
-- All output in English (internal processing language)
-- Preserve all critical insights from previous phases
-- Balance structured guidance with practical applicability
-
-You have 15+ years experience in curriculum design and instructional synthesis.`;
+async function getPhase4SystemPrompt(): Promise<string> {
+  const promptService = createPromptService();
+  return promptService.renderPrompt('stage4_phase4_synthesis_system', {});
 }

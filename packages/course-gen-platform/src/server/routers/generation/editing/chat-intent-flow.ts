@@ -68,6 +68,10 @@ interface IntentRouteMsgParams {
   responseIntent: 'refine' | 'regenerate';
 }
 
+function isFeatureFlagEnabled(flagValue: string | undefined): boolean {
+  return flagValue === 'true';
+}
+
 // ============================================================================
 // Full Regeneration Handler (shared between explicit intent and classified)
 // ============================================================================
@@ -207,6 +211,9 @@ async function handleDirectExecutionRoute(
     nodeContextBlockPath,
     params.nodeContext?.stageId
   );
+  const metadata = directResult.requiresClarification
+    ? ({ clarificationType: 'ambiguous_intent' } as const)
+    : undefined;
 
   // Save assistant message
   await supabaseAdmin.from('course_chat_messages').insert({
@@ -230,6 +237,7 @@ async function handleDirectExecutionRoute(
     modelUsed: 'intent_classifier',
     inputTokens: 200,
     outputTokens: 50,
+    ...(metadata ? { metadata } : {}),
   };
 }
 
@@ -656,27 +664,65 @@ Respond ONLY with valid JSON, no markdown fences.`;
 
     if (statusMatch) {
       // Consistency check (plan:318): verify ratio of lesson_contents with
-      // completed/review_required status. A majority (>50%) indicates
-      // Stage 6 content has actually been generated, not just status set.
+      // completed/review_required LATEST status per lesson UUID.
+      // A majority (>50%) indicates Stage 6 content has actually been generated,
+      // not just status set.
       try {
-        const [{ count: totalCount }, { count: completedCount }] = await Promise.all([
-          supabaseAdmin
-            .from('lesson_contents')
-            .select('id', { count: 'exact', head: true })
-            .eq('course_id', courseId),
-          supabaseAdmin
-            .from('lesson_contents')
-            .select('id', { count: 'exact', head: true })
-            .eq('course_id', courseId)
-            .in('status', ['completed', 'review_required']),
-        ]);
+        const { data: lessons, error: lessonsError } = await supabaseAdmin
+          .from('lessons')
+          .select('id, sections!inner(course_id)')
+          .eq('sections.course_id', courseId);
 
-        const total = totalCount ?? 0;
-        const completed = completedCount ?? 0;
-        stage6ContentReady = total > 0 && completed / total > 0.5;
-      } catch {
-        // Non-fatal: fall back to status-only check
-        stage6ContentReady = true;
+        if (lessonsError) {
+          throw lessonsError;
+        }
+
+        const lessonIds = (lessons || []).map(lesson => lesson.id);
+        if (lessonIds.length === 0) {
+          stage6ContentReady = false;
+        } else {
+          const { data: contents, error: contentsError } = await supabaseAdmin
+            .from('lesson_contents')
+            .select('lesson_id, status, created_at')
+            .eq('course_id', courseId)
+            .in('lesson_id', lessonIds)
+            .order('created_at', { ascending: false });
+
+          if (contentsError) {
+            throw contentsError;
+          }
+
+          const latestStatusByLesson = new Map<string, string>();
+          for (const row of contents || []) {
+            if (!latestStatusByLesson.has(row.lesson_id)) {
+              latestStatusByLesson.set(row.lesson_id, row.status);
+            }
+          }
+
+          let completedLessons = 0;
+          for (const lessonId of lessonIds) {
+            const latestStatus = latestStatusByLesson.get(lessonId);
+            if (latestStatus === 'completed' || latestStatus === 'review_required') {
+              completedLessons++;
+            }
+          }
+
+          stage6ContentReady = completedLessons / lessonIds.length > 0.5;
+        }
+      } catch (consistencyError) {
+        // Non-fatal: keep CTA disabled when consistency check cannot be verified.
+        logger.warn(
+          {
+            requestId,
+            courseId,
+            error:
+              consistencyError instanceof Error
+                ? consistencyError.message
+                : String(consistencyError),
+          },
+          'Chat: Stage 6 consistency check failed, CTA disabled'
+        );
+        stage6ContentReady = false;
       }
     }
 
@@ -863,7 +909,9 @@ export async function executeIntentClassificationFlow(
 
   // Step 3: Handle direct execution intents (DELETE, MOVE) - 0 tokens
   // Gated by CHAT_STRUCTURAL_PROPOSALS_ENABLED for phased rollout
-  const structuralProposalsEnabled = process.env.CHAT_STRUCTURAL_PROPOSALS_ENABLED !== 'false';
+  const structuralProposalsEnabled = isFeatureFlagEnabled(
+    process.env.CHAT_STRUCTURAL_PROPOSALS_ENABLED
+  );
 
   if (
     structuralProposalsEnabled &&
@@ -888,21 +936,22 @@ export async function executeIntentClassificationFlow(
     return handleInfoQueryRoute(userMessage, courseStructure, supabaseAdmin, courseId, msgParams);
   }
 
-  // Step 5: Plan requirement (plan:208): confidence < 0.6 => clarification response
-  // MUST be checked BEFORE LLM routing to prevent low-confidence intents
-  // (0.5-0.6) from bypassing clarification and going straight to LLM.
-  if (
-    classifiedIntent.intent !== 'UNKNOWN' &&
-    classifiedIntent.confidence < thresholds.CLARIFICATION
-  ) {
+  // Step 5: Clarification for ambiguous intent.
+  // Plan requirement (plan:208): confidence < 0.6 => clarification response.
+  // Also clarify UNKNOWN intent instead of falling back to legacy flow.
+  const needsClarification =
+    classifiedIntent.intent === 'UNKNOWN' || classifiedIntent.confidence < thresholds.CLARIFICATION;
+
+  if (needsClarification) {
     logger.info(
       {
         requestId,
         classifiedIntent: classifiedIntent.intent,
         confidence: classifiedIntent.confidence,
         threshold: thresholds.CLARIFICATION,
+        reason: classifiedIntent.intent === 'UNKNOWN' ? 'unknown_intent' : 'low_confidence_intent',
       },
-      'Chat: Low confidence — returning clarification instead of LLM routing'
+      'Chat: Returning clarification instead of legacy/LLM routing'
     );
 
     const clarificationMessage =
@@ -973,14 +1022,14 @@ export async function executeIntentClassificationFlow(
     );
   }
 
-  // Fallback: UNKNOWN intent - return null to use legacy flow
+  // Fallback: unhandled classification path - use legacy flow
   logger.info(
     {
       requestId,
       classifiedIntent: classifiedIntent.intent,
       confidence: classifiedIntent.confidence,
     },
-    'Chat: UNKNOWN intent, falling back to legacy flow'
+    'Chat: Unhandled classification route, falling back to legacy flow'
   );
 
   return null;

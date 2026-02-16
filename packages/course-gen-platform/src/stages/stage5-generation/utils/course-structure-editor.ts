@@ -806,3 +806,25 @@ export function ensureStableIdsInMemory(structure: CourseStructure): CourseStruc
     ...(sections ? { sections } : {}),
   };
 }
+
+/**
+ * Normalize structure for persistence in Stage 5 editing flows.
+ *
+ * Ensures stable IDs and stamps schema_version=2 for legacy structures.
+ * Keeps newer schema versions intact.
+ */
+export function ensureStableIdsAndSchemaVersionInMemory(
+  structure: CourseStructure
+): CourseStructure {
+  const withIds = ensureStableIdsInMemory(structure);
+  const currentVersion = (withIds as { schema_version?: number }).schema_version;
+
+  if (typeof currentVersion === 'number' && currentVersion >= 2) {
+    return withIds;
+  }
+
+  return {
+    ...withIds,
+    schema_version: 2,
+  };
+}

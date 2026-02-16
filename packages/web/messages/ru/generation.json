@@ -101,7 +101,8 @@
       "shorter": "Короче",
       "moreExamples": "Больше примеров",
       "simplify": "Упростить",
-      "moreDetail": "Подробнее"
+      "moreDetail": "Подробнее",
+      "regenerateCourse": "Перегенерировать курс"
     },
     "modes": {
       "refine": "Уточнить",

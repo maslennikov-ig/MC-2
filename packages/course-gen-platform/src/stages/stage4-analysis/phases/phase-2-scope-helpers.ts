@@ -96,7 +96,7 @@ export async function parseWithRepairCascade(
   model: ChatOpenAI,
   modelId: string,
   validatedInput: Phase2Input,
-  buildPromptTextFn: (input: Phase2Input) => string
+  buildPromptTextFn: (input: Phase2Input) => Promise<string>
 ): Promise<{ parsedOutput: unknown; repairMetadata: RepairMetadata }> {
   const repairMetadata: RepairMetadata = {
     layer_used: 'none',
@@ -133,7 +133,7 @@ export async function parseWithRepairCascade(
 
     const result = await regenerator.regenerate({
       rawOutput: preprocessedOutput,
-      originalPrompt: buildPromptTextFn(validatedInput),
+      originalPrompt: await buildPromptTextFn(validatedInput),
       parseError: parseError instanceof Error ? parseError.message : String(parseError),
     });
 
@@ -318,4 +318,121 @@ export function postProcessSections(sections: unknown[]): Record<string, unknown
         : 'intermediate',
     };
   });
+}
+
+// ============================================================================
+// OVERLAP DETECTION (delegates to unified QualityValidator.detectOverlapFromTexts)
+// ============================================================================
+
+import {
+  QualityValidator,
+  OVERLAP_THRESHOLDS,
+  type CrossSectionOverlapResult,
+} from '@/shared/validation/quality-validator';
+
+/**
+ * Overlap detection result for Phase 2 sections_breakdown.
+ * Wraps CrossSectionOverlapResult with Stage 4-specific field names.
+ */
+export interface SectionOverlapResult {
+  hasOverlap: boolean;
+  overlappingPairs: Array<{
+    sectionIndexA: number;
+    sectionIndexB: number;
+    areaA: string;
+    areaB: string;
+    similarity: number;
+  }>;
+  threshold: number;
+}
+
+/**
+ * Detect semantic overlap between sections in Phase 2 sections_breakdown.
+ *
+ * Thin wrapper over QualityValidator.detectOverlapFromTexts().
+ * Concatenates per section: area + key_topics + learning_objectives,
+ * then delegates to the unified overlap detection core (batch embeddings).
+ *
+ * Uses OVERLAP_THRESHOLDS.stage4 (0.80 base, 0.75 for Russian).
+ *
+ * @param sections - sections_breakdown from Phase 2 output
+ * @param language - course language (for threshold adjustment)
+ * @returns Overlap detection result with pairs exceeding threshold
+ */
+export async function detectSectionBreakdownOverlap(
+  sections: Array<{
+    area: string;
+    key_topics?: string[];
+    learning_objectives?: string[];
+  }>,
+  language: string = 'en'
+): Promise<SectionOverlapResult> {
+  if (sections.length < 2) {
+    return { hasOverlap: false, overlappingPairs: [], threshold: OVERLAP_THRESHOLDS.stage4 };
+  }
+
+  // Build text representations (Stage 4 specific: area + key_topics + learning_objectives)
+  const texts = sections.map(section => {
+    const parts: string[] = [];
+    if (section.area) parts.push(section.area);
+    if (section.key_topics?.length) parts.push(section.key_topics.join(', '));
+    if (section.learning_objectives?.length) parts.push(section.learning_objectives.join(', '));
+    return parts.join('\n') || 'Empty section';
+  });
+
+  const labels = sections.map(section => section.area || 'Untitled');
+
+  // Delegate to unified core (batch embeddings, language-adjusted threshold)
+  const validator = new QualityValidator();
+  const coreResult: CrossSectionOverlapResult = await validator.detectOverlapFromTexts(
+    texts,
+    labels,
+    language,
+    OVERLAP_THRESHOLDS.stage4
+  );
+
+  // Map to Stage 4-specific result format
+  return {
+    hasOverlap: coreResult.hasOverlap,
+    overlappingPairs: coreResult.overlappingPairs.map(pair => ({
+      sectionIndexA: pair.sectionA,
+      sectionIndexB: pair.sectionB,
+      areaA: pair.sectionATitle,
+      areaB: pair.sectionBTitle,
+      similarity: pair.similarity,
+    })),
+    threshold: coreResult.overlapThreshold,
+  };
+}
+
+/**
+ * Build overlap feedback string for Phase 2 retry prompt.
+ * Tells the LLM which sections overlap and how to fix it.
+ */
+export function buildOverlapFeedback(overlapResult: SectionOverlapResult): string {
+  if (!overlapResult.hasOverlap) return '';
+
+  const lines = [
+    'CRITICAL: The previous generation produced sections with overlapping content that MUST be fixed:',
+    '',
+  ];
+
+  for (const pair of overlapResult.overlappingPairs) {
+    lines.push(
+      `- Section ${pair.sectionIndexA} "${pair.areaA}" and Section ${pair.sectionIndexB} "${pair.areaB}" have ${Math.round(pair.similarity * 100)}% content overlap.`
+    );
+    lines.push(
+      `  ACTION: Either MERGE these into ONE section, or CLEARLY DIFFERENTIATE their scope so each covers a unique aspect.`
+    );
+  }
+
+  lines.push('');
+  lines.push(
+    'You MUST NOT generate sections with overlapping topics. Each section must cover a UNIQUE aspect of the course.'
+  );
+  lines.push(
+    'If two topics are closely related, combine them into a single more comprehensive section.'
+  );
+
+  return lines.join('\n');
 }

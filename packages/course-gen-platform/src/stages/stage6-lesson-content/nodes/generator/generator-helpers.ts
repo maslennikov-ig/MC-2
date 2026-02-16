@@ -194,6 +194,28 @@ export function formatInterLessonContextXML(
     parts.push(`  <terms_already_defined>${termsDefined.join(', ')}</terms_already_defined>`);
   }
 
+  // Course position
+  if (lessonContext.course_position) {
+    const pos = lessonContext.course_position;
+    const isFirstInCourse = pos.lesson_index_in_course === 1;
+    const isLastInCourse = pos.lesson_index_in_course === pos.total_lessons_in_course;
+    const isFirstInModule = pos.lesson_index_in_module === 1;
+    const isLastInModule = pos.lesson_index_in_module === pos.total_lessons_in_module;
+
+    parts.push('  <course_position>');
+    parts.push(
+      `    <current>Lesson ${pos.lesson_index_in_module} of ${pos.total_lessons_in_module} in Module "${pos.module_title}" (module ${pos.module_index} of ${pos.total_modules})</current>`
+    );
+    parts.push(
+      `    <global>Lesson ${pos.lesson_index_in_course} of ${pos.total_lessons_in_course} in the entire course</global>`
+    );
+    parts.push(`    <is_first_in_course>${isFirstInCourse}</is_first_in_course>`);
+    parts.push(`    <is_last_in_course>${isLastInCourse}</is_last_in_course>`);
+    parts.push(`    <is_first_in_module>${isFirstInModule}</is_first_in_module>`);
+    parts.push(`    <is_last_in_module>${isLastInModule}</is_last_in_module>`);
+    parts.push('  </course_position>');
+  }
+
   parts.push('</inter_lesson_context>');
 
   return parts.join('\n');
