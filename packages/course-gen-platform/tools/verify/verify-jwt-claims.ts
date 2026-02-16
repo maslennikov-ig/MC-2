@@ -37,8 +37,14 @@ const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Test user credentials (from T045)
-const TEST_EMAIL = 'test-auth@megacampus.ai';
-const TEST_PASSWORD = 'SecureTestPass123!'; // You may need to adjust this
+const TEST_EMAIL = process.env.TEST_EMAIL || 'test-auth@megacampus.ai';
+const TEST_PASSWORD = process.env.TEST_PASSWORD || '';
+
+if (!TEST_PASSWORD) {
+  console.error('ERROR: TEST_PASSWORD environment variable is not set.');
+  console.error('Usage: TEST_PASSWORD=your_password pnpm tsx tools/verify/verify-jwt-claims.ts');
+  process.exit(1);
+}
 
 interface CustomJWTClaims {
   aud: string;

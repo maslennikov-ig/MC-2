@@ -37,7 +37,7 @@ export function isAnalysisResult(data: unknown): data is AnalysisResult {
  * Parse and validate AnalysisResult from unknown data (Zod-based)
  *
  * Used to safely parse courses.analysis_result JSONB column data.
- * Returns null if validation fails (with warning logged to console).
+ * Returns null if validation fails. Callers should handle null appropriately.
  *
  * @param data - Unknown data from database or API
  * @returns Validated AnalysisResult or null if invalid
@@ -53,9 +53,6 @@ export function isAnalysisResult(data: unknown): data is AnalysisResult {
 export function parseAnalysisResult(data: unknown): AnalysisResult | null {
   const result = AnalysisResultSchema.safeParse(data);
   if (!result.success) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[parseAnalysisResult] Invalid analysis result:', result.error.issues);
-    }
     return null;
   }
   return result.data;

@@ -87,8 +87,7 @@ export function useRealtimeStatusData({
     })
 
     let mappedStatus: 'idle' | 'running' | 'completed' | 'failed' | 'paused' = 'idle'
-    // FIXME: ACTIVE_STATUSES is typed as CourseStatus[] but should be GenerationStatus[]
-    if (pipelineStatus && ACTIVE_STATUSES.includes(pipelineStatus as any)) {
+    if (pipelineStatus && ACTIVE_STATUSES.includes(pipelineStatus)) {
       mappedStatus = 'running'
     } else if (pipelineStatus === 'completed') {
       mappedStatus = 'completed'

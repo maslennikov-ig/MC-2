@@ -22,7 +22,7 @@ import { RoleSelect } from './role-select'
 import { ActivationSwitch } from './activation-switch'
 import { DeleteButton } from './delete-button'
 import { useTranslations } from 'next-intl'
-import { createBrowserClient } from '@supabase/ssr'
+import { useSupabase } from '@/lib/supabase/browser-client'
 import type { Role } from '@megacampus/shared-types'
 
 /** Debounce timeout for search input in milliseconds */
@@ -38,6 +38,7 @@ export function UsersTable() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [currentUserId, setCurrentUserId] = useState<string | null>('loading')
 
+  const { supabase } = useSupabase()
   const utils = trpc.useUtils()
 
   // Debounce search input
@@ -48,12 +49,8 @@ export function UsersTable() {
     return () => clearTimeout(timer)
   }, [search])
 
-  // Fetch current user ID from Supabase auth
+  // Fetch current user ID from Supabase auth (uses shared singleton client)
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
     supabase.auth
       .getUser()
       .then(({ data }) => {
@@ -64,7 +61,7 @@ export function UsersTable() {
         setCurrentUserId(null)
         toast.error('Failed to identify current user. Some actions disabled for safety.')
       })
-  }, [])
+  }, [supabase])
 
   // Fetch current user role via tRPC
   const { data: currentUserRoleData } = trpc.admin.getCurrentUserRole.useQuery(undefined, {

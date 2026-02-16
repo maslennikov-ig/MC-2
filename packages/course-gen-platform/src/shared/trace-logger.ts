@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from './supabase/admin';
 import { logger } from './logger';
+import type { Database } from '@megacampus/shared-types';
 
 interface TraceLogParams {
   courseId: string;
@@ -10,11 +11,11 @@ interface TraceLogParams {
   stage: 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
   phase: string;
   stepName: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trace data accepts arbitrary objects (Date, enums, etc.) that Supabase serializes
   inputData?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trace data accepts arbitrary objects
   outputData?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trace data accepts arbitrary objects
   errorData?: any;
   modelUsed?: string | null;
   promptText?: string | null;
@@ -41,7 +42,6 @@ function isValidUuid(value: string): boolean {
  * This function is fire-and-forget (does not block execution) but logs errors if insertion fails.
  */
 export async function logTrace(params: TraceLogParams): Promise<void> {
-  /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   // Don't await this in critical path, but catch errors
   try {
     const supabase = getSupabaseAdmin();
@@ -69,8 +69,7 @@ export async function logTrace(params: TraceLogParams): Promise<void> {
     const safeOutput = params.outputData || undefined; // undefined to skip if null
     const safeError = params.errorData || undefined;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('generation_trace') as any).insert({
+    const insertPayload: Database['public']['Tables']['generation_trace']['Insert'] = {
       course_id: params.courseId,
       lesson_id: validLessonId,
       stage: params.stage,
@@ -89,7 +88,9 @@ export async function logTrace(params: TraceLogParams): Promise<void> {
       retry_attempt: params.retryAttempt || 0,
       was_cached: params.wasCached || false,
       quality_score: params.qualityScore || null,
-    });
+    };
+
+    const { error } = await supabase.from('generation_trace').insert(insertPayload);
 
     if (error) {
       logger.error({ error, params }, 'Failed to log generation trace');

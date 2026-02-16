@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { redirect } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -126,6 +127,11 @@ function RatingCell({ rating }: { rating: Rating }) {
 }
 
 export default function ClarifyingRedesignPage() {
+  // Block access to mock page in production
+  if (process.env.NODE_ENV === 'production') {
+    redirect('/')
+  }
+
   const [selectedVariant, setSelectedVariant] = useState<VariantKey | null>(null)
   const [activeTab, setActiveTab] = useState<VariantKey>('minimal')
 

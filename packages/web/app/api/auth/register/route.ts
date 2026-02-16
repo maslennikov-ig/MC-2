@@ -102,9 +102,9 @@ export async function POST(req: Request) {
 
     const body = await req.json()
 
-    // Log registration attempt
+    // Log registration attempt (mask email for PII protection)
     logger.info('Registration attempt', {
-      email: body.email?.toLowerCase(),
+      email: body.email?.toLowerCase().replace(/(.{2})(.*)(@.*)/, '$1***$3'),
       ip,
       timestamp: new Date().toISOString(),
     })
@@ -132,12 +132,14 @@ export async function POST(req: Request) {
     }
 
     // Create user in Supabase Auth
-    logger.info('Creating user in Supabase Auth', { email: email.toLowerCase() })
+    logger.info('Creating user in Supabase Auth', {
+      email: email.toLowerCase().replace(/(.{2})(.*)(@.*)/, '$1***$3'),
+    })
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email.toLowerCase(),
       password,
-      email_confirm: true, // Auto-confirm for now, change to false for production
+      email_confirm: true, // Email auto-confirmed, confirmation flow not yet implemented
       user_metadata: {
         full_name: fullName,
         role: 'user',
@@ -149,7 +151,7 @@ export async function POST(req: Request) {
         error: authError,
         message: authError.message,
         code: authError.code,
-        email: email.toLowerCase(),
+        email: email.toLowerCase().replace(/(.{2})(.*)(@.*)/, '$1***$3'),
       })
       logPermanentFailure({
         error_message: authError.message || 'Auth creation failed',
@@ -168,22 +170,19 @@ export async function POST(req: Request) {
         authError.message?.includes('duplicate') ||
         authError.message?.includes('already registered')
       ) {
-        return NextResponse.json(
-          { error: 'Пользователь с таким email уже существует' },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 })
       }
 
       if (authError.message?.includes('password')) {
         return NextResponse.json(
-          { error: 'Пароль не соответствует требованиям безопасности' },
+          { error: 'Password does not meet security requirements' },
           { status: 400 }
         )
       }
 
       return NextResponse.json(
         {
-          error: 'Не удалось создать учетную запись. Попробуйте позже или обратитесь в поддержку.',
+          error: 'Failed to create account. Please try again later or contact support.',
           details: process.env.NODE_ENV === 'development' ? authError.message : undefined,
         },
         { status: 500 }

@@ -159,7 +159,7 @@ function GraphViewInner({
 
   // Realtime Data
   const { traces, status: pipelineStatusRaw, isConnected } = useGenerationRealtime()
-  // FIXME: realtime-provider returns CourseStatus but should return GenerationStatus
+  // realtime-provider returns string status; cast to GenerationStatus for type-safe comparisons
   const pipelineStatus = pipelineStatusRaw as
     | Database['public']['Enums']['generation_status']
     | null
@@ -411,7 +411,17 @@ function GraphViewInner({
         courseLanguage,
       },
     }
-  }, [courseId, courseTitle, tier, nodes, visualStyle, courseStyle, readOnly, analysisResult, courseLanguage])
+  }, [
+    courseId,
+    courseTitle,
+    tier,
+    nodes,
+    visualStyle,
+    courseStyle,
+    readOnly,
+    analysisResult,
+    courseLanguage,
+  ])
 
   // Mobile view - show simplified graph (no separate list view)
   // Graph view works on mobile with touch gestures enabled
