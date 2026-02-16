@@ -3,6 +3,7 @@ import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { regenerateSections } from '../utils/section-regenerator';
 import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
+import { validateGeneratedContent } from './generator/generator-content';
 
 /**
  * Section Regenerator Node - Regenerates specific sections identified by self-reviewer
@@ -111,6 +112,21 @@ export async function sectionRegeneratorNode(
           error: error instanceof Error ? error.message : String(error),
         },
         'Section regenerator: Mermaid fix pipeline failed, using original content'
+      );
+    }
+
+    // Validate for prompt template markers (hallucination detection)
+    const validation = validateGeneratedContent(finalContent);
+    if (!validation.isValid) {
+      logger.warn(
+        {
+          event: 'hallucination_detected',
+          component: 'section-regenerator',
+          lessonId: state.lessonSpec.lesson_id,
+          markersCount: validation.detectedMarkers.length,
+          detectedMarkers: validation.detectedMarkers,
+        },
+        'Section regenerator: Detected prompt template markers in regenerated content'
       );
     }
 

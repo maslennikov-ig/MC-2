@@ -18,6 +18,7 @@ import type { FixPromptContext } from '../fix-templates';
 import { logger } from '../../../../shared/logger';
 import { LLMClient } from '../../../../shared/llm';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
+import { validateGeneratedContent } from '../../nodes/generator/generator-content';
 
 import { buildPatcherSystemPrompt } from '../patcher';
 import { buildCoherencePreservingPrompt } from '../fix-templates';
@@ -183,6 +184,26 @@ export async function applyCoherencePreservingPatch(
 
   // Parse response
   const patchedContent = parsePatcherResponse(response);
+
+  // Validate for prompt template markers (hallucination detection)
+  const markerValidation = validateGeneratedContent(patchedContent);
+  if (!markerValidation.isValid) {
+    logger.warn(
+      {
+        event: 'hallucination_detected',
+        component: 'coherence-patcher',
+        sectionId: task.sectionId,
+        markersCount: markerValidation.detectedMarkers.length,
+        detectedMarkers: markerValidation.detectedMarkers,
+      },
+      'Coherence patcher: REJECTED - response contains prompt template markers'
+    );
+
+    return {
+      patchedContent: sectionContent,
+      tokensUsed: response.tokensUsed,
+    };
+  }
 
   // Emit event
   emitEvent(onStreamEvent, {
