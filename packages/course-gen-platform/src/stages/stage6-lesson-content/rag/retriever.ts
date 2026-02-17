@@ -249,14 +249,44 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
       return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
     }
 
-    logger.debug(
+    // Compute Tier 1 max score for threshold tuning data
+    const tier1MaxScore =
+      allChunks.length > 0 ? Math.max(...allChunks.map(c => c.similarity_score)) : 0;
+
+    logger.info(
       {
         lessonId: lessonSpec.lesson_id,
         tier1ChunksFound: allChunks.length,
+        tier1MaxScore: tier1MaxScore.toFixed(3),
         tier1DurationMs,
       },
       '[Lesson RAG] Tier 1 passed - proceeding to Tier 2'
     );
+
+    // Log trace for Tier 1 pass (helps measure false negative rate)
+    try {
+      await logTrace({
+        courseId,
+        lessonId: lessonSpec.lesson_id,
+        stage: 'stage_6',
+        phase: 'rag_retrieval',
+        stepName: 'tier1_pass',
+        inputData: {
+          lessonId: lessonSpec.lesson_id,
+          tier1Queries: tier1Queries.length,
+          totalQueries: queries.length,
+          tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
+        },
+        outputData: {
+          tier1ChunksFound: allChunks.length,
+          tier1MaxScore,
+          tier1Exit: false,
+        },
+        durationMs: tier1DurationMs,
+      });
+    } catch {
+      // Don't fail on trace error
+    }
   }
 
   // ============================================================================
