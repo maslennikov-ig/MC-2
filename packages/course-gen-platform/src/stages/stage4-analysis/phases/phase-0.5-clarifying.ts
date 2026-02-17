@@ -26,6 +26,7 @@ import { logTrace } from '@/shared/trace-logger';
 import logger from '@/shared/logger';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
+import { SYSTEM_PROMPT_RESERVE } from './stage4-budget-allocator';
 import { createLLMEnumSchema } from '@megacampus/shared-types';
 import type { ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
 import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
@@ -326,10 +327,16 @@ function buildCondensedContext(
   contextParts.push(`- SUPPLEMENTARY: ${breakdown.supplementary.count} documents (summaries only)`);
 
   // Actual document content (use per-document content as-is, already budget-resolved by allocator)
-  // Safety truncation: per-doc limit + total limit across all documents
+  // Safety truncation: derive limits from budget allocator's model context window
   if (documentSummaries && documentSummaries.length > 0) {
-    const SAFETY_MAX_TOKENS_PER_DOC = 100_000;
-    const SAFETY_MAX_TOTAL_TOKENS = 500_000;
+    // Reserve tokens for: system prompt (~2K) + human prompt template (~500) + expected output (~5K) + safety margin
+    const PHASE_05_PROMPT_OUTPUT_RESERVE = SYSTEM_PROMPT_RESERVE + 5_000;
+    const modelMaxContext = budgetAllocation?.modelSelection?.maxContext ?? 260_000;
+    const SAFETY_MAX_TOTAL_TOKENS = Math.max(
+      modelMaxContext - PHASE_05_PROMPT_OUTPUT_RESERVE,
+      50_000
+    );
+    const SAFETY_MAX_TOKENS_PER_DOC = Math.min(100_000, SAFETY_MAX_TOTAL_TOKENS);
     let totalTokensUsed = 0;
     contextParts.push('\nDOCUMENT CONTENTS:');
     for (const doc of documentSummaries) {
@@ -664,11 +671,18 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
   try {
     // =================================================================
     // STEP 1: Get model from database config
+    // Pass budgetAllocation.totalTokens so ModelConfigService selects the right tier:
+    // - standard tier (262K) for small document sets
+    // - extended tier (1M) when documents exceed 260K threshold
     // =================================================================
-    const model = await getModelForPhase('stage_4_clarifying', courseId, undefined, language);
+    const totalDocTokens = input.budgetAllocation?.totalTokens ?? undefined;
+    const model = await getModelForPhase('stage_4_clarifying', courseId, totalDocTokens, language);
     const modelId = model.model || 'unknown';
 
-    phaseLogger.debug({ modelId }, 'Model selected for clarifying questions generation');
+    phaseLogger.debug(
+      { modelId, totalDocTokens, tier: input.budgetAllocation?.modelSelection?.tier },
+      'Model selected for clarifying questions generation'
+    );
 
     // =================================================================
     // STEP 2: Build prompt
