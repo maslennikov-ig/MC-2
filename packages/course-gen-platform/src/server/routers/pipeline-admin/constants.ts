@@ -332,6 +332,12 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     maxTokens: 8000,
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
+  stage_6_rag_planning: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.3,
+    maxTokens: 4096,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
   stage_6_simple: {
     modelId: 'moonshotai/kimi-k2-thinking',
     temperature: 0.7,

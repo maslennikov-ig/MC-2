@@ -208,6 +208,11 @@ const PHASE_FALLBACK_CONFIG: Record<
     temperature: 0.5,
     maxTokens: 8000,
   },
+  stage_6_rag_planning: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.3,
+    maxTokens: 4096,
+  },
   stage_6_simple: {
     modelId: 'moonshotai/kimi-k2-thinking',
     temperature: 0.7,
