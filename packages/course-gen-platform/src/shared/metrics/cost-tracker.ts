@@ -69,7 +69,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   'deepseek/deepseek-v3.1-terminus': { input: 0.27, output: 1.1 },
 
   // Fallback model
-  'moonshotai/kimi-k2-0905': { input: 0.55, output: 2.25 },
+  'moonshotai/kimi-k2-thinking': { input: 0.55, output: 2.25 },
 
   // Large context model
   'x-ai/grok-4-fast': { input: 0.2, output: 0.5 },
@@ -89,6 +89,9 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   'minimax/minimax-m2': { input: 0.255, output: 1.02 }, // Legacy
   'minimax/minimax-m2.1': { input: 0.3, output: 1.2 }, // New recommended
   'z-ai/glm-4.6': { input: 0.2, output: 0.8 },
+  'minimax/minimax-m2.5': { input: 0.35, output: 1.4 },
+  'z-ai/glm-5': { input: 0.25, output: 1.0 },
+  'qwen/qwen3.5-plus-02-15': { input: 0.15, output: 0.7 },
 
   // Legacy models
   'qwen/qwen3-max': { input: 1.2, output: 6.0 },
