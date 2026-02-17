@@ -466,13 +466,21 @@ export function applyPatching(
   // this step does nothing. Only activates if foreign chars still remain.
   if (language) {
     // Determine which zero-tolerance scripts to check based on language
-    const scriptsToStrip = [...ZERO_TOLERANCE_SCRIPTS].filter(script => {
+    const allScripts = [...ZERO_TOLERANCE_SCRIPTS];
+    const scriptsToStrip = allScripts.filter(script => {
       // Don't strip CJK if target language IS Chinese, etc.
       if (script === 'CJK' && (language === 'zh' || language === 'ja' || language === 'ko'))
         return false;
       if (script === 'ARABIC' && language === 'ar') return false;
       if (script === 'DEVANAGARI' && (language === 'hi' || language === 'bn')) return false;
       return true;
+    });
+
+    nodeLogger.debug({
+      msg: 'Safety net: checking for residual foreign characters',
+      language,
+      scriptsToStrip,
+      skippedScripts: allScripts.filter(s => !scriptsToStrip.includes(s)),
     });
 
     if (scriptsToStrip.length > 0) {

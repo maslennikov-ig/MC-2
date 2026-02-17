@@ -167,11 +167,9 @@ export function extractForeignCharFragments(
     const pattern = FOREIGN_SCRIPT_PATTERNS[scriptKey];
     if (!pattern) continue;
 
-    // Create a global version for matching all occurrences
+    // Use matchAll for safe iteration (no lastIndex mutation)
     const globalPattern = new RegExp(pattern.source, 'g');
-    let match: RegExpExecArray | null;
-
-    while ((match = globalPattern.exec(proseContent)) !== null) {
+    for (const match of proseContent.matchAll(globalPattern)) {
       const charIndex = match.index;
       const foreignChars = match[0];
 
@@ -273,10 +271,10 @@ export function stripForeignScriptCharacters(
 
   // Step 2: Strip foreign characters from prose text
   for (const scriptKey of scriptsToStrip) {
-    const pattern = FOREIGN_SCRIPT_STRIP_PATTERNS[scriptKey];
-    if (pattern) {
-      // Reset lastIndex for global regex
-      pattern.lastIndex = 0;
+    const sourcePattern = FOREIGN_SCRIPT_STRIP_PATTERNS[scriptKey];
+    if (sourcePattern) {
+      // Create new instance to avoid mutating shared module-level constant
+      const pattern = new RegExp(sourcePattern.source, 'g');
       const matches = processedContent.match(pattern);
       if (matches) {
         fixCount += matches.length;

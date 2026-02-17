@@ -247,6 +247,8 @@ export function checkLanguageConsistency(
 
   /** Threshold for minor language issues (>5 chars = failed check) */
   const MINOR_LANGUAGE_THRESHOLD = 5;
+  /** Critical severity threshold for massive foreign char contamination */
+  const CRITICAL_FOREIGN_COUNT = 20;
   /** Divisor for language score contribution calculation */
   const LANGUAGE_SCORE_DIVISOR = 20;
 
@@ -282,7 +284,10 @@ export function checkLanguageConsistency(
       filter: 'languageConsistency',
       expected: `No unexpected ${scriptsFound.join('/')} characters`,
       actual: `${totalForeignCount} foreign characters found`,
-      severity: hasZeroToleranceViolation || totalForeignCount > 20 ? 'critical' : 'major',
+      severity:
+        hasZeroToleranceViolation || totalForeignCount > CRITICAL_FOREIGN_COUNT
+          ? 'critical'
+          : 'major',
     };
     result.suggestion = `Content contains ${totalForeignCount} unexpected characters from ${scriptsFound.join(', ')} script(s). Examples: "${allSamples.slice(0, 3).join('", "')}". Remove or replace these characters.`;
   }
