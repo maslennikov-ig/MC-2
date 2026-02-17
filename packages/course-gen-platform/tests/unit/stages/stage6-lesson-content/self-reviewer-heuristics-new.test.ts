@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   extractForeignCharFragments,
   stripForeignScriptCharacters,
+  protectMarkdownElements,
 } from '@/stages/stage6-lesson-content/nodes/self-reviewer/self-reviewer-heuristics';
 
 describe('extractForeignCharFragments', () => {
@@ -559,5 +560,53 @@ def example公司():
 
       expect(result.fixCount).toBe(4);
     });
+  });
+});
+
+describe('protectMarkdownElements', () => {
+  it('should protect code blocks and restore them', () => {
+    const content = 'Text before\n```js\nconst x = 1;\n```\nText after';
+    const { content: protectedContent, restore } = protectMarkdownElements(content);
+    expect(protectedContent).not.toContain('const x = 1');
+    expect(protectedContent).toContain('__PROT_');
+    const restored = restore(protectedContent);
+    expect(restored).toBe(content);
+  });
+
+  it('should protect inline code', () => {
+    const content = 'Use `console.log()` for debugging';
+    const { content: protectedContent, restore } = protectMarkdownElements(content);
+    expect(protectedContent).not.toContain('console.log');
+    expect(restore(protectedContent)).toBe(content);
+  });
+
+  it('should protect LaTeX blocks', () => {
+    const content = 'Formula $$E = mc^2$$ here';
+    const { content: protectedContent, restore } = protectMarkdownElements(content);
+    expect(protectedContent).not.toContain('E = mc^2');
+    expect(restore(protectedContent)).toBe(content);
+  });
+
+  it('should protect LaTeX inline', () => {
+    const content = 'Formula $x + y$ here';
+    const { content: protectedContent, restore } = protectMarkdownElements(content);
+    expect(protectedContent).not.toContain('x + y');
+    expect(restore(protectedContent)).toBe(content);
+  });
+
+  it('should protect all elements simultaneously', () => {
+    const content = 'Text ```js\ncode\n``` and `inline` and $$latex$$ and $x$';
+    const { content: protectedContent, restore } = protectMarkdownElements(content);
+    expect(protectedContent).not.toContain('code');
+    expect(protectedContent).not.toContain('inline');
+    expect(protectedContent).not.toContain('latex');
+    expect(protectedContent).not.toContain('$x$');
+    expect(restore(protectedContent)).toBe(content);
+  });
+
+  it('should handle content with $ in code blocks correctly', () => {
+    const content = '```bash\necho $HOME\n```';
+    const { content: protectedContent, restore } = protectMarkdownElements(content);
+    expect(restore(protectedContent)).toBe(content);
   });
 });

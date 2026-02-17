@@ -182,6 +182,16 @@ export async function selfReviewerNode(
           )
         : undefined;
 
+    // Log if detected issues were truncated (formatDetectedIssues limits to 10)
+    if (detectedIssues && detectedIssues.length > 10) {
+      nodeLogger.warn({
+        msg: 'Detected issues truncated for LLM prompt',
+        totalIssues: detectedIssues.length,
+        included: 10,
+        dropped: detectedIssues.length - 10,
+      });
+    }
+
     const llmResult = await runLLMReview({
       lessonSpec: state.lessonSpec,
       ragChunks: state.ragChunks || [],
