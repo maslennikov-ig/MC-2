@@ -12,7 +12,6 @@
 
 import { logger } from '@/shared/logger';
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
-import { createModelConfigService } from '@/shared/llm/model-config-service';
 import {
   getRecommendedTemperatureV2,
   type LessonSpecificationV2,
@@ -40,6 +39,7 @@ import {
   extractTokenUsageWithFallback,
   formatGenerationGuidanceXML,
 } from './generator-helpers';
+import { selectStage6ModelTier } from './model-selector';
 
 /**
  * Generate complete lesson content in a single LLM call
@@ -205,11 +205,15 @@ export async function generateLessonSingleCall(
     'Calculated token budget for single-call generation'
   );
 
-  // Step 12: Get model
+  // Step 12: Get model (3-tier routing by difficulty_level)
   const temperature = getRecommendedTemperatureV2(lessonSpec.metadata.content_archetype);
-  const modelConfigService = createModelConfigService();
-  const modelId =
-    modelOverride ?? (await modelConfigService.getModelForPhase('stage_6_refinement')).modelId;
+  let modelId: string;
+  if (modelOverride) {
+    modelId = modelOverride;
+  } else {
+    const tierResult = await selectStage6ModelTier(lessonSpec);
+    modelId = tierResult.model;
+  }
 
   // Step 13: Invoke LLM
   logger.info(

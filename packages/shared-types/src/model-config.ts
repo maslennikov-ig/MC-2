@@ -38,6 +38,10 @@ export type PhaseName =
   | 'stage_5_sections'
   | 'stage_5_tier1' // Standard complexity tier (Tier 1 models)
   | 'stage_5_escalation' // Escalation/retry tier (language-specific premium models)
+  // Stage 5: 3-tier generation routing
+  | 'stage_5_simple'
+  | 'stage_5_normal'
+  | 'stage_5_complex'
   | 'stage_5_standard_ru'
   | 'stage_5_standard_en'
   | 'stage_5_extended_ru'
@@ -45,6 +49,10 @@ export type PhaseName =
   // Stage 6: Lesson Content
   | 'stage_6_judge'
   | 'stage_6_refinement'
+  // Stage 6: 3-tier generation routing
+  | 'stage_6_simple'
+  | 'stage_6_normal'
+  | 'stage_6_complex'
   | 'stage_6_standard_ru'
   | 'stage_6_standard_en'
   | 'stage_6_extended_ru'
@@ -99,7 +107,7 @@ export type PhaseName =
  *   course_id: '550e8400-e29b-41d4-a716-446655440000',
  *   phase_name: 'stage_4_expert',
  *   model_id: 'openai/gpt-oss-120b',
- *   fallback_model_id: 'google/gemini-2.5-flash',
+ *   fallback_model_id: 'google/gemini-3-flash-preview',
  *   temperature: 0.5,
  *   max_tokens: 8000
  * }
@@ -130,7 +138,7 @@ export interface ModelConfig {
    *
    * @example 'openai/gpt-oss-20b'
    * @example 'openai/gpt-oss-120b'
-   * @example 'google/gemini-2.5-flash'
+   * @example 'google/gemini-3-flash-preview'
    */
   model_id: string;
 
@@ -139,7 +147,7 @@ export interface ModelConfig {
    * Used if primary model fails or produces low-quality output
    *
    * @example 'openai/gpt-oss-120b'
-   * @example 'google/gemini-2.5-flash'
+   * @example 'google/gemini-3-flash-preview'
    */
   fallback_model_id?: string | null;
 

@@ -312,14 +312,14 @@ describe('LLMClient', () => {
       expect(cost).toBeCloseTo(0.44, 4);
     });
 
-    it('should estimate cost for google/gemini-2.5-flash-preview', () => {
+    it('should estimate cost for google/gemini-3-flash-preview', () => {
       const client = new LLMClient();
       const response = {
         content: 'test',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
         totalTokens: 2_000_000,
-        model: 'google/gemini-2.5-flash-preview',
+        model: 'google/gemini-3-flash-preview',
         finishReason: 'stop',
       };
 

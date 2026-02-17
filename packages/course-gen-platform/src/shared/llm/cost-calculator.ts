@@ -40,7 +40,7 @@ export interface ModelPricing {
  *   Use validateQwen3MaxContext() before generation to prevent overflow
  * - openai/gpt-oss-20b: $0.08 per 1M tokens combined (section generation)
  * - openai/gpt-oss-120b: $0.20 per 1M tokens combined (section generation)
- * - google/gemini-2.5-flash: $0.15 per 1M tokens combined (validation)
+ * - google/gemini-3-flash-preview: $0.50/$3.00 per 1M tokens (validation)
  *
  * @see specs/008-generation-generation-json/research-decisions/rt-001-model-routing.md
  */
@@ -87,12 +87,16 @@ export const OPENROUTER_PRICING: Record<string, ModelPricing> = {
     inputPricePerMillion: 0.2,
     outputPricePerMillion: 0.2,
   },
+  'google/gemini-3-flash-preview': {
+    inputPricePerMillion: 0.50,
+    outputPricePerMillion: 3.0,
+  },
+  // Legacy Gemini models (kept for historical cost tracking)
   'google/gemini-2.5-flash': {
     combinedPricePerMillion: 0.15,
     inputPricePerMillion: 0.15,
     outputPricePerMillion: 0.15,
   },
-  // Additional models from orchestrator version (Stage 3 Summarization)
   'google/gemini-2.5-flash-preview': {
     combinedPricePerMillion: 0.1,
     inputPricePerMillion: 0.1,

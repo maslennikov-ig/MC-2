@@ -117,7 +117,7 @@ function createMockLLMFlowParams(
     requestId: 'req-123',
     supabaseAdmin: mockSupabaseAdmin as any,
     fallbackConfig: {
-      modelId: 'moonshotai/kimi-k2-0905',
+      modelId: 'moonshotai/kimi-k2-thinking',
       temperature: 0.7,
       maxTokens: 2000,
     },
@@ -290,16 +290,16 @@ describe('executeLegacyLLMFlow - 3-Tier Model Fallback', () => {
 
       const result = await executeLegacyLLMFlow(params);
 
-      // Second call should use fallbackConfig.modelId (moonshotai/kimi-k2-0905)
+      // Second call should use fallbackConfig.modelId (moonshotai/kimi-k2-thinking)
       expect(llmClient.generateChatCompletion).toHaveBeenNthCalledWith(
         2,
         expect.any(Array),
         expect.objectContaining({
-          model: 'moonshotai/kimi-k2-0905',
+          model: 'moonshotai/kimi-k2-thinking',
         })
       );
 
-      expect(result.modelUsed).toBe('moonshotai/kimi-k2-0905');
+      expect(result.modelUsed).toBe('moonshotai/kimi-k2-thinking');
     });
   });
 
@@ -699,15 +699,15 @@ describe('resolveModelConfig - DB Unavailable Fallback', () => {
 
     const result = await executeLegacyLLMFlow(params);
 
-    // Should use CHAT_STAGE_FALLBACK_MODELS.stage_5.primary = 'moonshotai/kimi-k2-0905'
+    // Should use CHAT_STAGE_FALLBACK_MODELS.stage_5.primary = 'moonshotai/kimi-k2-thinking'
     expect(llmClient.generateChatCompletion).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({
-        model: 'moonshotai/kimi-k2-0905',
+        model: 'moonshotai/kimi-k2-thinking',
       })
     );
 
-    expect(result.modelUsed).toBe('moonshotai/kimi-k2-0905');
+    expect(result.modelUsed).toBe('moonshotai/kimi-k2-thinking');
 
     // Verify warning logged
     expect(logger.warn).toHaveBeenCalledWith(
@@ -757,15 +757,15 @@ describe('resolveModelConfig - DB Unavailable Fallback', () => {
 
     const result = await executeLegacyLLMFlow(params);
 
-    // DEFAULT_CHAT_FALLBACK_MODELS.primary = 'moonshotai/kimi-k2-0905'
+    // DEFAULT_CHAT_FALLBACK_MODELS.primary = 'moonshotai/kimi-k2-thinking'
     expect(llmClient.generateChatCompletion).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({
-        model: 'moonshotai/kimi-k2-0905',
+        model: 'moonshotai/kimi-k2-thinking',
       })
     );
 
-    expect(result.modelUsed).toBe('moonshotai/kimi-k2-0905');
+    expect(result.modelUsed).toBe('moonshotai/kimi-k2-thinking');
   });
 
   it('should use fallbackConfig temperature and maxTokens when DB unavailable', async () => {
