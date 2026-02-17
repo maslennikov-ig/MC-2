@@ -56,8 +56,8 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(pricing.outputPricePerMillion).toBe(0.2);
     });
 
-    it('should have pricing for google/gemini-2.5-flash with unified pricing', () => {
-      const pricing = OPENROUTER_PRICING['google/gemini-2.5-flash'];
+    it('should have pricing for google/gemini-3-flash-preview with unified pricing', () => {
+      const pricing = OPENROUTER_PRICING['google/gemini-3-flash-preview'];
       expect(pricing).toBeDefined();
       expect(pricing.combinedPricePerMillion).toBe(0.15);
       expect(pricing.inputPricePerMillion).toBe(0.15);
@@ -147,7 +147,7 @@ describe('Stage 5 Cost Calculator Service', () => {
         model_used: {
           metadata: 'qwen/qwen3-max',
           sections: 'openai/gpt-oss-20b',
-          validation: 'google/gemini-2.5-flash',
+          validation: 'google/gemini-3-flash-preview',
         },
         total_tokens: {
           metadata: 10000,
@@ -182,7 +182,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(cost.total_cost_usd).toBeCloseTo(0.04075, 6);
 
       // Model breakdown
-      expect(cost.model_breakdown.validation_model).toBe('google/gemini-2.5-flash');
+      expect(cost.model_breakdown.validation_model).toBe('google/gemini-3-flash-preview');
     });
 
     it('should handle zero tokens gracefully', () => {
@@ -359,7 +359,7 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should return true for OSS models with unified pricing', () => {
       expect(hasUnifiedPricing('openai/gpt-oss-20b')).toBe(true);
       expect(hasUnifiedPricing('openai/gpt-oss-120b')).toBe(true);
-      expect(hasUnifiedPricing('google/gemini-2.5-flash')).toBe(true);
+      expect(hasUnifiedPricing('google/gemini-3-flash-preview')).toBe(true);
     });
 
     it('should return false for models with split pricing', () => {
@@ -441,7 +441,7 @@ describe('Stage 5 Cost Calculator Service', () => {
         model_used: {
           metadata: 'qwen/qwen3-max',
           sections: 'openai/gpt-oss-120b',
-          validation: 'google/gemini-2.5-flash',
+          validation: 'google/gemini-3-flash-preview',
         },
         total_tokens: {
           metadata: 8000, // +60% due to retries

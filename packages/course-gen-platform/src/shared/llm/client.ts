@@ -30,7 +30,7 @@ import {
  * Options for LLM completion requests
  */
 export interface LLMClientOptions {
-  /** Model identifier (e.g., 'openai/gpt-oss-20b', 'google/gemini-2.5-flash-preview') */
+  /** Model identifier (e.g., 'openai/gpt-oss-20b', 'google/gemini-3-flash-preview') */
   model: string;
   /** Maximum output tokens to generate */
   maxTokens?: number;
@@ -389,7 +389,7 @@ Create a summary that someone could use to understand the core content without r
     const pricing: Record<string, { input: number; output: number }> = {
       'openai/gpt-oss-20b': { input: 0.03, output: 0.14 },
       'openai/gpt-oss-120b': { input: 0.04, output: 0.4 },
-      'google/gemini-2.5-flash-preview': { input: 0.1, output: 0.4 },
+      'google/gemini-3-flash-preview': { input: 0.50, output: 3.0 },
     };
 
     const modelPricing = pricing[model] || { input: 0.05, output: 0.15 }; // Default fallback

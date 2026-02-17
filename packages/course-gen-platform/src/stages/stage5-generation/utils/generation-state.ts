@@ -356,7 +356,7 @@ export interface GenerateSectionsResult {
    * Possible values:
    * - "openai/gpt-oss-120b" (80% of batches)
    * - "qwen/qwen3-max" (20% escalation)
-   * - "google/gemini-2.5-flash" (rate limit overflow)
+   * - "google/gemini-3-flash-preview" (rate limit overflow)
    */
   model: string;
 

@@ -34,7 +34,7 @@ export interface QualityFallbackResult {
  * Invokes quality fallback model as last resort for validation/quality failures
  *
  * Uses the 'quality_fallback' phase from langchain-models, which defaults to
- * moonshotai/kimi-k2-0905 (S-TIER quality, reliable structured output).
+ * moonshotai/kimi-k2-thinking (S-TIER quality, reliable structured output).
  *
  * NOTE: This is NOT for context overflow. For large inputs, use 'emergency' phase.
  *
@@ -50,7 +50,7 @@ export interface QualityFallbackResult {
  * try {
  *   const result = await qualityFallback(prompt, courseId);
  *   console.log(result.output); // Raw JSON from Kimi K2
- *   console.log(result.modelUsed); // 'moonshotai/kimi-k2-0905'
+ *   console.log(result.modelUsed); // 'moonshotai/kimi-k2-thinking'
  * } catch (error) {
  *   // This is a critical failure - all repair layers exhausted
  *   console.error('Quality fallback failed:', error);
@@ -65,7 +65,7 @@ export async function qualityFallback(
 
   try {
     const fallbackModel = await getModelForPhase('quality_fallback', courseId);
-    const fallbackModelId = fallbackModel.model || 'moonshotai/kimi-k2-0905';
+    const fallbackModelId = fallbackModel.model || 'moonshotai/kimi-k2-thinking';
 
     logger.info({ fallbackModelId }, 'Invoking quality fallback model');
 

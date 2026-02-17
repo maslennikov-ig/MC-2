@@ -110,7 +110,7 @@ export const MODEL_FALLBACK = {
     ru: 'qwen/qwen3-235b-a22b-2507',
     en: 'deepseek/deepseek-v3.1-terminus',
   },
-  fallback: 'moonshotai/kimi-k2-0905',
+  fallback: 'moonshotai/kimi-k2-thinking',
   maxPrimaryAttempts: 2,
 } as const;
 

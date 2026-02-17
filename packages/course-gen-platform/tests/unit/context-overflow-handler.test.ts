@@ -176,12 +176,12 @@ describe('Context Overflow Handler', () => {
       const fallback = getContextOverflowFallback('xiaomi/mimo-v2-flash', 'ru');
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-2.5-flash');
+      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
       expect(fallback!.maxContext).toBe(1_000_000);
     });
 
     it('should return null when already on Gemini 2.5 Flash', () => {
-      const fallback = getContextOverflowFallback('google/gemini-2.5-flash', 'ru');
+      const fallback = getContextOverflowFallback('google/gemini-3-flash-preview', 'ru');
       expect(fallback).toBeNull();
     });
 
@@ -189,13 +189,13 @@ describe('Context Overflow Handler', () => {
       const fallback = getContextOverflowFallback('unknown/model', 'en');
 
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-2.5-flash');
+      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
     });
 
     it('should return null for empty model ID (not Gemini)', () => {
       const fallback = getContextOverflowFallback('', 'ru');
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-2.5-flash');
+      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
     });
   });
 
@@ -242,7 +242,7 @@ describe('Context Overflow Handler', () => {
 
       expect(isOverflow).toBe(true);
       expect(fallback).not.toBeNull();
-      expect(fallback!.modelId).toBe('google/gemini-2.5-flash');
+      expect(fallback!.modelId).toBe('google/gemini-3-flash-preview');
     });
 
     it('should not provide fallback for non-context errors', () => {
@@ -273,7 +273,8 @@ describe('Context Overflow Handler', () => {
       const calledModels: string[] = [];
 
       // Operation always throws context overflow
-      const operation = async (modelId: string) => {
+      const operation = async (modelId: string): Promise<never> => {
+        await Promise.resolve(); // Satisfy eslint require-await
         calledModels.push(modelId);
         throw new Error('context_length_exceeded');
       };
@@ -289,7 +290,8 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should succeed on fallback model and report full chain', async () => {
-      const operation = async (modelId: string) => {
+      const operation = async (modelId: string): Promise<string> => {
+        await Promise.resolve(); // Satisfy eslint require-await
         if (modelId === 'model-a') {
           throw new Error('context_length_exceeded');
         }
@@ -323,8 +325,9 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should include initialModel and finalModel in exhaustion error', async () => {
-      // No tierConfig → generic fallback to gemini-2.5-flash, then no more options
-      const operation = async (_modelId: string) => {
+      // No tierConfig → generic fallback to gemini-3-flash-preview, then no more options
+      const operation = async (_modelId: string): Promise<never> => {
+        await Promise.resolve(); // Satisfy eslint require-await
         throw new Error('context_length_exceeded');
       };
 

@@ -15,7 +15,7 @@ import { STAGE4_HARD_TOKEN_LIMIT, STAGE4_CONTEXT_THRESHOLD } from '../../../shar
 import logger from '../../../shared/logger';
 
 /** Emergency universal fallback model when DB config is unavailable */
-const EMERGENCY_FALLBACK_MODEL = 'google/gemini-2.5-flash';
+const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
 
 // ============================================================================
 // TYPE DEFINITIONS

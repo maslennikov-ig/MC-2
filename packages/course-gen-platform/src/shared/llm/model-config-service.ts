@@ -31,7 +31,7 @@ import { normalizeLanguageForReserve, type LanguageCode } from '@megacampus/shar
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
 
 /** Emergency universal fallback model when DB config is unavailable */
-const EMERGENCY_FALLBACK_MODEL = 'google/gemini-2.5-flash';
+const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
 import * as ModelConfigDB from './model-config-db';
 
 // Re-export types and constants from model-config-db for backward compatibility

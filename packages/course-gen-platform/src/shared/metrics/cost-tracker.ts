@@ -77,6 +77,8 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   // Legacy/alternative models
   'openrouter/kimi-k2-instruct': { input: 0.15, output: 0.6 },
   'anthropic/claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
+  'google/gemini-3-flash-preview': { input: 0.50, output: 3.0 },
+  // Legacy Gemini models (kept for historical cost tracking)
   'google/gemini-2.0-flash-001': { input: 0.1, output: 0.4 },
   'google/gemini-2.5-flash': { input: 0.075, output: 0.3 },
   'google/gemini-2.5-flash-preview': { input: 0.1, output: 0.4 },

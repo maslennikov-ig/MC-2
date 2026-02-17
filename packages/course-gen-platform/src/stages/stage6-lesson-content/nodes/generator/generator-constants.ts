@@ -147,3 +147,21 @@ export function calculateDynamicContextWindow(durationMinutes: number, language:
     languageMultiplier;
   return Math.min(DYNAMIC_CONTEXT_MAX_CHARS, Math.ceil(calculated));
 }
+
+// ============================================================================
+// STAGE 6 3-TIER MODEL ROUTING
+// ============================================================================
+
+/**
+ * LAST-RESORT fallback models for Stage 6 3-tier routing.
+ * Primary selection uses getModelForPhase() from database.
+ * These are ONLY used when database is completely unavailable.
+ */
+export const STAGE6_TIER_MODELS = {
+  /** Simple tier: for beginner difficulty lessons */
+  simple: 'moonshotai/kimi-k2-thinking',
+  /** Normal tier: for intermediate difficulty lessons */
+  normal: 'moonshotai/kimi-k2-thinking',
+  /** Complex tier: for advanced difficulty + module 1 lessons */
+  complex: 'qwen/qwen3.5-plus-02-15',
+} as const;

@@ -33,7 +33,7 @@ export const DEFAULT_FALLBACK_MODEL_ID = 'qwen/qwen3-235b-a22b-2507';
 // ============================================================================
 
 /** Primary chat model (Kimi K2) — used for chat_node_refinement, chat_global_guidance, etc. */
-export const CHAT_PRIMARY_MODEL_ID = 'moonshotai/kimi-k2-0905';
+export const CHAT_PRIMARY_MODEL_ID = 'moonshotai/kimi-k2-thinking';
 
 /** Fallback chat model (Kimi K2.5) — used when primary chat model fails */
 export const CHAT_FALLBACK_MODEL_ID = 'moonshotai/kimi-k2.5';

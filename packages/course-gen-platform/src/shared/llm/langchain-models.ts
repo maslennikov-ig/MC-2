@@ -106,12 +106,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_4_extended_ru: {
-    modelId: 'google/gemini-2.5-flash', // Extended context
+    modelId: 'google/gemini-3-flash-preview', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_4_extended_en: {
-    modelId: 'google/gemini-2.5-flash', // Extended context
+    modelId: 'google/gemini-3-flash-preview', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -132,7 +132,22 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 30000,
   },
   stage_5_escalation: {
-    modelId: 'moonshotai/kimi-k2-0905',
+    modelId: 'moonshotai/kimi-k2-thinking',
+    temperature: 0.7,
+    maxTokens: 30000,
+  },
+  stage_5_simple: {
+    modelId: 'openai/gpt-oss-120b',
+    temperature: 0.7,
+    maxTokens: 30000,
+  },
+  stage_5_normal: {
+    modelId: 'moonshotai/kimi-k2-thinking',
+    temperature: 0.7,
+    maxTokens: 30000,
+  },
+  stage_5_complex: {
+    modelId: 'qwen/qwen3.5-plus-02-15',
     temperature: 0.7,
     maxTokens: 30000,
   },
@@ -147,12 +162,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_5_extended_ru: {
-    modelId: 'google/gemini-2.5-flash', // Extended context
+    modelId: 'google/gemini-3-flash-preview', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_5_extended_en: {
-    modelId: 'google/gemini-2.5-flash', // Extended context
+    modelId: 'google/gemini-3-flash-preview', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -173,12 +188,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 10000,
   },
   stage_2_extended_ru: {
-    modelId: 'google/gemini-2.5-flash', // Extended context
+    modelId: 'google/gemini-3-flash-preview', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_2_extended_en: {
-    modelId: 'google/gemini-2.5-flash', // Extended context
+    modelId: 'google/gemini-3-flash-preview', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -191,6 +206,21 @@ const PHASE_FALLBACK_CONFIG: Record<
   stage_6_refinement: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.5,
+    maxTokens: 8000,
+  },
+  stage_6_simple: {
+    modelId: 'moonshotai/kimi-k2-thinking',
+    temperature: 0.7,
+    maxTokens: 8000,
+  },
+  stage_6_normal: {
+    modelId: 'moonshotai/kimi-k2-thinking',
+    temperature: 0.7,
+    maxTokens: 8000,
+  },
+  stage_6_complex: {
+    modelId: 'qwen/qwen3.5-plus-02-15',
+    temperature: 0.7,
     maxTokens: 8000,
   },
   stage_6_arbiter: {
@@ -224,7 +254,7 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_6_extended_ru: {
-    modelId: 'google/gemini-2.5-flash', // Extended context
+    modelId: 'google/gemini-3-flash-preview', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },

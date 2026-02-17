@@ -44,7 +44,7 @@ export interface SummarizationJobData {
   /** Processing strategy */
   strategy: SummarizationStrategy;
 
-  /** Model identifier: 'openai/gpt-oss-20b' | 'openai/gpt-oss-120b' | 'google/gemini-2.5-flash-preview' */
+  /** Model identifier: 'openai/gpt-oss-20b' | 'openai/gpt-oss-120b' | 'google/gemini-3-flash-preview' */
   model: string;
 
   /** Threshold for no-summary decision (tokens). Default: 3000 */
