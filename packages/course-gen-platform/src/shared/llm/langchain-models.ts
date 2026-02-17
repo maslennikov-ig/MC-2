@@ -293,7 +293,7 @@ const PHASE_FALLBACK_CONFIG: Record<
   stage_7_quiz: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
-    maxTokens: 4096,
+    maxTokens: 8192,
   },
   stage_7_presentation: {
     modelId: DEFAULT_MODEL_ID,
