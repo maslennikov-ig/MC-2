@@ -29,7 +29,7 @@ import {
 import { createModelConfigService } from '../../shared/llm/model-config-service';
 import logger from '../../shared/logger';
 import { logTrace } from '../../shared/trace-logger';
-import type { StructureAnalysisJob, DocumentSummary } from '@megacampus/shared-types';
+import type { StructureAnalysisJob } from '@megacampus/shared-types';
 import type {
   AnalysisResult,
   Phase1Output,
@@ -134,8 +134,16 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
   let budgetAllocation: Stage4BudgetAllocation | null = null;
   let tierConfig: Stage4TierConfig | undefined;
 
-  if (input.document_summaries && input.document_summaries.length > 0) {
-    orchestrationLogger.info('Starting budget allocation');
+  // Extract DocumentSummaryResult[] early — has stage3_priority from fetchDocumentSummaries
+  const originalDocumentSummaries =
+    (input.document_summaries as unknown as DocumentSummaryResult[]) || [];
+
+  if (originalDocumentSummaries.length > 0) {
+    const withStage3 = originalDocumentSummaries.filter(d => d.stage3_priority != null).length;
+    orchestrationLogger.info(
+      { documentCount: originalDocumentSummaries.length, withStage3Priority: withStage3 },
+      'Starting budget allocation'
+    );
 
     // Fetch tier configs from DB (single source of truth)
     try {
@@ -148,10 +156,14 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
       );
     }
 
-    const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(input.document_summaries);
+    const documentInfos: Stage4DocumentInfo[] = prepareDocumentInfos(originalDocumentSummaries);
 
     try {
-      budgetAllocation = allocateStage4Budget(documentInfos, validateLocale(input.language), tierConfig);
+      budgetAllocation = allocateStage4Budget(
+        documentInfos,
+        validateLocale(input.language),
+        tierConfig
+      );
       validateStage4Budget(budgetAllocation);
     } catch (budgetError) {
       orchestrationLogger.error(
@@ -185,7 +197,7 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
       phase: 'budget_allocation',
       stepName: 'allocate_budget',
       inputData: {
-        documentCount: input.document_summaries.length,
+        documentCount: originalDocumentSummaries.length,
         language: input.language,
       },
       outputData: {
@@ -197,9 +209,6 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
   }
 
   // Resolve document content: replace processed_content with markdown_content for full_text documents
-  const originalDocumentSummaries =
-    (input.document_summaries as unknown as import('./handler-helpers').DocumentSummaryResult[]) ||
-    [];
   let resolvedDocumentSummaries = originalDocumentSummaries;
 
   if (budgetAllocation) {
@@ -349,16 +358,96 @@ export async function finalizeAnalysis(context: AnalysisContext): Promise<Analys
 /**
  * Prepare document info for budget allocation
  *
- * @param documentSummaries - Document summaries from job input
- * @returns Array of document info objects sorted by token count
+ * Uses Stage 3 LLM-based tournament priorities when available (CORE/IMPORTANT/SUPPLEMENTARY).
+ * Falls back to size-based heuristic for backward compatibility when Stage 3 data is missing.
+ *
+ * Stage 3 priorities are stored in `file_catalog.priority` and propagated via
+ * `DocumentSummaryResult.stage3_priority`. This ensures the budget allocator loads
+ * full text for the most **relevant** document (by content), not the largest one.
+ *
+ * @param documentSummaries - Document summaries with optional Stage 3 priority data
+ * @returns Array of document info objects for budget allocator
  */
 export function prepareDocumentInfos(
-  documentSummaries: DocumentSummary[] | undefined
+  documentSummaries: DocumentSummaryResult[] | undefined
 ): Stage4DocumentInfo[] {
   if (!documentSummaries || documentSummaries.length === 0) {
     return [];
   }
 
+  const hasStage3Priorities = documentSummaries.some(d => d.stage3_priority != null);
+
+  if (hasStage3Priorities) {
+    return prepareWithStage3Priorities(documentSummaries);
+  }
+
+  // Fallback: size-based heuristic (backward compatibility for courses without Stage 3 data)
+  return prepareWithSizeHeuristic(documentSummaries);
+}
+
+const VALID_PRIORITIES = new Set(['CORE', 'IMPORTANT', 'SUPPLEMENTARY']);
+
+function isValidPriority(value: unknown): value is 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' {
+  return typeof value === 'string' && VALID_PRIORITIES.has(value);
+}
+
+/**
+ * Use Stage 3 LLM-determined priorities.
+ * Validates exactly 1 CORE document and all values are valid;
+ * falls back to size heuristic if inconsistent.
+ */
+function prepareWithStage3Priorities(
+  documentSummaries: DocumentSummaryResult[]
+): Stage4DocumentInfo[] {
+  // Validate all priority values are recognized
+  const invalidDocs = documentSummaries.filter(d => !isValidPriority(d.stage3_priority));
+  if (invalidDocs.length > 0) {
+    logger.warn(
+      {
+        invalidDocs: invalidDocs.map(d => ({
+          id: d.document_id,
+          priority: d.stage3_priority,
+        })),
+      },
+      'Invalid Stage 3 priority values in database, falling back to size heuristic'
+    );
+    return prepareWithSizeHeuristic(documentSummaries);
+  }
+
+  const coreDocs = documentSummaries.filter(d => d.stage3_priority === 'CORE');
+
+  // Validate: exactly 1 CORE expected from Stage 3 tournament
+  if (coreDocs.length !== 1) {
+    logger.warn(
+      {
+        coreCount: coreDocs.length,
+        totalDocs: documentSummaries.length,
+        priorities: documentSummaries.map(d => ({
+          id: d.document_id,
+          priority: d.stage3_priority,
+        })),
+      },
+      'Stage 3 priorities inconsistent (expected exactly 1 CORE), falling back to size heuristic'
+    );
+    return prepareWithSizeHeuristic(documentSummaries);
+  }
+
+  return documentSummaries.map(doc => ({
+    file_id: doc.document_id,
+    priority: doc.stage3_priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY',
+    original_tokens: doc.summary_metadata.original_tokens,
+    summary_tokens: doc.summary_metadata.summary_tokens,
+    importance_score: doc.stage3_importance_score ?? doc.summary_metadata.quality_score,
+  }));
+}
+
+/**
+ * Fallback: assign priorities by document size (largest = CORE).
+ * Used when Stage 3 classification data is not available.
+ */
+function prepareWithSizeHeuristic(
+  documentSummaries: DocumentSummaryResult[]
+): Stage4DocumentInfo[] {
   const sortedDocs = [...documentSummaries].sort(
     (a, b) => b.summary_metadata.original_tokens - a.summary_metadata.original_tokens
   );

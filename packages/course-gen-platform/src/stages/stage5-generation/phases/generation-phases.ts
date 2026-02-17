@@ -98,7 +98,10 @@ const QUALITY_CONFIG = {
 
 /** Sanitize text for safe prompt injection: strip newlines, limit length @internal */
 export const sanitizeDigest = (s: string, maxLen = 200): string =>
-  s.replace(/[\n\r]+/g, ' ').trim().slice(0, maxLen);
+  s
+    .replace(/[\n\r]+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
 
 /**
  * Build a text digest of a generated section for cross-section context.
@@ -465,7 +468,10 @@ export class GenerationPhases {
     const courseId = state.input.course_id;
 
     try {
-      this.logger.info({ phase: 'generate_sections' }, 'Starting sequential section generation with digest accumulation');
+      this.logger.info(
+        { phase: 'generate_sections' },
+        'Starting sequential section generation with digest accumulation'
+      );
 
       // Determine total sections from analysis_result
       if (!state.input.analysis_result) {
@@ -1041,10 +1047,15 @@ export class GenerationPhases {
       }
 
       // 2. Validate section similarities
-      const expectedTopics =
+      const allTopics =
         state.input.analysis_result?.recommended_structure.sections_breakdown.map(
           section => section.area || 'Untitled Section'
         ) || [];
+
+      // Align with generation logic (lines 479-495): respect total_sections cap
+      const recStruct = state.input.analysis_result?.recommended_structure;
+      const cappedCount = Math.min(recStruct?.total_sections ?? allTopics.length, allTopics.length);
+      const expectedTopics = allTopics.slice(0, cappedCount);
 
       const sectionResults = await this.qualityValidator.validateSections(
         expectedTopics,

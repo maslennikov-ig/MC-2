@@ -248,6 +248,20 @@ function applyStructureDefaults(parsedData: Record<string, unknown>): void {
     recStructure.sections_breakdown = postProcessSections(
       recStructure.sections_breakdown as unknown[]
     );
+
+    // Enforce total_sections consistency with sections_breakdown
+    const breakdownLength = (recStructure.sections_breakdown as unknown[]).length;
+    if (recStructure.total_sections !== breakdownLength) {
+      logger.warn(
+        {
+          phase: 'phase-2-scope',
+          totalSections: recStructure.total_sections,
+          breakdownLength,
+        },
+        'total_sections mismatch with sections_breakdown.length, auto-correcting'
+      );
+      recStructure.total_sections = breakdownLength;
+    }
   }
 }
 
