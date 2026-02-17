@@ -17,6 +17,10 @@
  * RegExp.test() with /g flag retains lastIndex between calls, causing
  * intermittent failures when checking multiple sections. Without /g,
  * test() always starts from index 0.
+ *
+ * Note: FOREIGN_SCRIPT_STRIP_PATTERNS below intentionally use /g because
+ * they are consumed by .replace()/.match() (which reset lastIndex), not .test().
+ * extractForeignCharFragments creates new RegExp instances for matchAll iteration.
  */
 const FOREIGN_SCRIPT_PATTERNS: Record<string, RegExp> = {
   CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]/,
@@ -129,6 +133,221 @@ export function findSectionsWithForeignCharacters(
 }
 
 // ============================================================================
+// FOREIGN CHARACTER FRAGMENT EXTRACTION
+// ============================================================================
+
+/**
+ * Detected foreign character fragment with surrounding context
+ */
+export interface ForeignCharFragment {
+  /** The text fragment containing foreign characters (3-80 chars) */
+  fragment: string;
+  /** Surrounding context for LLM understanding (up to 150 chars) */
+  context: string;
+  /** Detected script types (e.g., ['CJK']) */
+  scriptTypes: string[];
+}
+
+/**
+ * Extract text fragments containing foreign characters with surrounding context
+ *
+ * Used to provide precise guidance to the LLM self-reviewer about which
+ * parts of the content need translation or correction.
+ *
+ * @param content - Full markdown content
+ * @param scriptsFound - Script types detected (e.g., ['CJK', 'ARABIC'])
+ * @returns Array of fragments with context
+ */
+export function extractForeignCharFragments(
+  content: string,
+  scriptsFound: string[]
+): ForeignCharFragment[] {
+  const fragments: ForeignCharFragment[] = [];
+
+  // Remove code blocks from analysis
+  const proseContent = content.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '');
+
+  for (const scriptKey of scriptsFound) {
+    const pattern = FOREIGN_SCRIPT_PATTERNS[scriptKey];
+    if (!pattern) continue;
+
+    // Use matchAll for safe iteration (no lastIndex mutation)
+    const globalPattern = new RegExp(pattern.source, 'g');
+    for (const match of proseContent.matchAll(globalPattern)) {
+      const charIndex = match.index;
+      const foreignChars = match[0];
+
+      // Extract fragment: foreign chars + 20 chars before and after
+      const fragStart = Math.max(0, charIndex - 20);
+      const fragEnd = Math.min(proseContent.length, charIndex + foreignChars.length + 20);
+      const fragment = proseContent.slice(fragStart, fragEnd).trim();
+
+      // Extract broader context: up to 75 chars before and after
+      const ctxStart = Math.max(0, charIndex - 75);
+      const ctxEnd = Math.min(proseContent.length, charIndex + foreignChars.length + 75);
+      const context = proseContent.slice(ctxStart, ctxEnd).trim();
+
+      fragments.push({
+        fragment,
+        context,
+        scriptTypes: [scriptKey],
+      });
+    }
+  }
+
+  return fragments;
+}
+
+// ============================================================================
+// MARKDOWN ELEMENT PROTECTION UTILITY
+// ============================================================================
+
+/**
+ * Result of protecting markdown elements from text processing
+ */
+interface ProtectedContent {
+  /** Content with protected elements replaced by placeholders */
+  content: string;
+  /** Call to restore original elements back into processed content */
+  restore: (processedContent: string) => string;
+}
+
+/**
+ * Protect markdown elements from modification during text processing
+ *
+ * Replaces code blocks, inline code, and LaTeX formulas with unique placeholders.
+ * Returns a restore function that puts them back. This ensures code/mermaid/LaTeX
+ * are never modified by text processing operations.
+ *
+ * Protection order matters: code blocks first (greedy), then inline code,
+ * then LaTeX blocks (greedy), then LaTeX inline. This prevents inner patterns
+ * from being matched before outer ones.
+ *
+ * @param content - Raw markdown content with elements to protect
+ * @returns Object with placeholder-replaced content and a restore function
+ */
+export function protectMarkdownElements(content: string): ProtectedContent {
+  const protectedBlocks: Array<{ placeholder: string; content: string }> = [];
+  let blockIndex = 0;
+
+  // Protect code blocks (```...```) - must be first to catch nested backticks
+  let processedContent = content.replace(/```[\s\S]*?```/g, match => {
+    const placeholder = `__PROT_BLOCK_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+
+  // Protect inline code (`...`)
+  processedContent = processedContent.replace(/`[^`]+`/g, match => {
+    const placeholder = `__PROT_INLINE_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+
+  // Protect LaTeX blocks ($$...$$) - must be before inline LaTeX
+  processedContent = processedContent.replace(/\$\$[\s\S]*?\$\$/g, match => {
+    const placeholder = `__PROT_LATEX_B_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+
+  // Protect LaTeX inline ($...$)
+  processedContent = processedContent.replace(/\$[^$]+\$/g, match => {
+    const placeholder = `__PROT_LATEX_I_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+
+  return {
+    content: processedContent,
+    restore: (processed: string): string => {
+      let result = processed;
+      // Order doesn't matter: each placeholder is unique, no nesting possible
+      for (const block of protectedBlocks) {
+        // Use function replacement to avoid $ special replacement characters
+        result = result.replace(block.placeholder, () => block.content);
+      }
+      return result;
+    },
+  };
+}
+
+// ============================================================================
+// FOREIGN SCRIPT CHARACTER STRIPPING
+// ============================================================================
+
+/**
+ * Global regex patterns for foreign script character removal
+ * Uses /g flag since we need to replace ALL occurrences
+ */
+const FOREIGN_SCRIPT_STRIP_PATTERNS: Record<string, RegExp> = {
+  CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]+/g,
+  ARABIC: /[\u0600-\u06FF]+/g,
+  DEVANAGARI: /[\u0900-\u097F]+/g,
+  THAI: /[\u0E00-\u0E7F]+/g,
+  HEBREW: /[\u0590-\u05FF]+/g,
+};
+
+/**
+ * Strip foreign script characters from content while preserving code blocks
+ *
+ * Used as a safety net after LLM review to catch small foreign character leaks
+ * (1-10 chars) that the LLM didn't fix. Protects code blocks, inline code,
+ * LaTeX, and mermaid diagrams from modification.
+ *
+ * @param content - Markdown content potentially containing foreign characters
+ * @param scriptsToStrip - Script names to remove (e.g., ['CJK', 'ARABIC'])
+ * @returns Object with cleaned content and count of fixes applied
+ *
+ * @example
+ * ```typescript
+ * const result = stripForeignScriptCharacters(
+ *   'Текст с公司的 примером',
+ *   ['CJK']
+ * );
+ * // result.content === 'Текст с примером'
+ * // result.fixCount === 1
+ * ```
+ */
+export function stripForeignScriptCharacters(
+  content: string,
+  scriptsToStrip: string[]
+): { content: string; fixCount: number } {
+  let fixCount = 0;
+
+  const { content: proseContent, restore } = protectMarkdownElements(content);
+  let processedContent = proseContent;
+
+  // Strip foreign characters from prose text
+  for (const scriptKey of scriptsToStrip) {
+    const sourcePattern = FOREIGN_SCRIPT_STRIP_PATTERNS[scriptKey];
+    if (sourcePattern) {
+      // Create new instance to avoid mutating shared module-level constant
+      const pattern = new RegExp(sourcePattern.source, 'g');
+      const matches = processedContent.match(pattern);
+      if (matches) {
+        fixCount += matches.length;
+      }
+      processedContent = processedContent.replace(pattern, '');
+    }
+  }
+
+  // Clean up whitespace artifacts from removal
+  processedContent = processedContent.replace(/ {2,}/g, ' ');
+  processedContent = processedContent.replace(/ ([.,;:!?])/g, '$1');
+  processedContent = processedContent.replace(/\n{3,}/g, '\n\n');
+
+  // Restore protected blocks
+  processedContent = restore(processedContent);
+
+  return { content: processedContent.trim(), fixCount };
+}
+
+// ============================================================================
 // CHATBOT ARTIFACT REMOVAL
 // ============================================================================
 
@@ -161,14 +380,6 @@ const CHATBOT_ARTIFACT_PATTERNS: RegExp[] = [
 ];
 
 /**
- * Protected block placeholder for code/mermaid blocks during artifact removal
- */
-interface ProtectedBlock {
-  placeholder: string;
-  content: string;
-}
-
-/**
  * Remove chatbot artifacts from content while preserving code blocks and mermaid diagrams
  *
  * CRITICAL: Mermaid diagrams and code blocks are protected infrastructure.
@@ -186,58 +397,19 @@ interface ProtectedBlock {
  * ```
  */
 export function removeChatbotArtifacts(content: string): string {
-  // Step 1: Extract and protect code blocks (including mermaid)
-  // Pattern matches ```language ... ``` blocks
-  const protectedBlocks: ProtectedBlock[] = [];
-  let blockIndex = 0;
+  const { content: proseContent, restore } = protectMarkdownElements(content);
+  let processedContent = proseContent;
 
-  // Replace all code blocks with placeholders
-  let processedContent = content.replace(/```[\s\S]*?```/g, match => {
-    const placeholder = `__PROTECTED_BLOCK_${blockIndex}__`;
-    protectedBlocks.push({ placeholder, content: match });
-    blockIndex++;
-    return placeholder;
-  });
-
-  // Also protect inline code (backticks)
-  processedContent = processedContent.replace(/`[^`]+`/g, match => {
-    const placeholder = `__PROTECTED_INLINE_${blockIndex}__`;
-    protectedBlocks.push({ placeholder, content: match });
-    blockIndex++;
-    return placeholder;
-  });
-
-  // Also protect LaTeX formulas
-  processedContent = processedContent.replace(/\$\$[\s\S]*?\$\$/g, match => {
-    const placeholder = `__PROTECTED_LATEX_BLOCK_${blockIndex}__`;
-    protectedBlocks.push({ placeholder, content: match });
-    blockIndex++;
-    return placeholder;
-  });
-  processedContent = processedContent.replace(/\$[^$]+\$/g, match => {
-    const placeholder = `__PROTECTED_LATEX_INLINE_${blockIndex}__`;
-    protectedBlocks.push({ placeholder, content: match });
-    blockIndex++;
-    return placeholder;
-  });
-
-  // Step 2: Apply chatbot artifact removal to prose text only
+  // Apply chatbot artifact removal to prose text only
   for (const pattern of CHATBOT_ARTIFACT_PATTERNS) {
     processedContent = processedContent.replace(pattern, '');
   }
 
-  // Step 3: Restore all protected blocks
-  // IMPORTANT: Use a function replacement to avoid $ being interpreted as special replacement pattern
-  // In String.replace(), $$ means literal $, so "$$x$$" would become "$x$" if not escaped
-  for (const block of protectedBlocks) {
-    processedContent = processedContent.replace(block.placeholder, () => block.content);
-  }
+  // Restore protected blocks
+  processedContent = restore(processedContent);
 
-  // Clean up multiple consecutive newlines created by removal
+  // Clean up multiple consecutive newlines
   processedContent = processedContent.replace(/\n{3,}/g, '\n\n');
 
-  // Trim leading/trailing whitespace
-  processedContent = processedContent.trim();
-
-  return processedContent;
+  return processedContent.trim();
 }

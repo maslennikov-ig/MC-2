@@ -147,14 +147,24 @@ If Phase 1 passes, check structure and fixable issues.
    - Suggest leading with concrete facts or examples
    - This is informational feedback, NOT a blocking issue
 
-## Phase 2.5: Language & Grammar Fixes (Status: FIXED)
-Check for language-specific grammar errors that can be fixed with EXACT text replacement.
+## Phase 2.5: Language, Grammar & Spelling Fixes (Status: FIXED)
+Check for language-specific grammar errors AND spelling mistakes that can be fixed with EXACT text replacement.
 Use the rules from \`<GRAMMAR_RULES>\` section for the target language.
 
 ### Grammar Error Types (see GRAMMAR_RULES for details):
 1. **Case/preposition errors**: Wrong word form after preposition
 2. **Agreement errors**: Adjective/verb doesn't match noun in gender/number
 3. **Numeral agreement**: Wrong form after numerals (2-4 vs 5+)
+
+### Spelling & Typo Detection:
+4. **Misspelled words**: Extra, missing, or wrong letters in common words
+   - E.g., "Китайе" → "Китае", "прогрмма" → "программа"
+5. **Wrong proper noun forms**: Incorrect declension of country/city names
+   - E.g., "в Китайе" → "в Китае", "из Германие" → "из Германии"
+6. **Confused acronyms/abbreviations**: Similar-looking but different terms
+   - E.g., "eNOS" (enzyme) vs "eNPS" (employee metric) — verify which fits the context
+7. **Look-alike character substitution**: Cyrillic/Latin confusion in words
+   - E.g., Latin "c" in Cyrillic word, Cyrillic "е" in Latin acronym
 
 ### Wrong Script Characters:
 Find isolated characters from wrong writing system (e.g., Chinese in Russian text).
@@ -164,8 +174,8 @@ Find isolated characters from wrong writing system (e.g., Chinese in Russian tex
 - Proper nouns, brand names
 - URLs and file paths
 
-### Output Format for Grammar Issues:
-For each grammar issue, output with severity "FIXABLE":
+### Output Format for Grammar & Spelling Issues:
+For each grammar or spelling issue, output with severity "FIXABLE":
 {
   "type": "GRAMMAR",
   "severity": "FIXABLE",
@@ -175,7 +185,7 @@ For each grammar issue, output with severity "FIXABLE":
   "inlineReplacement": "corrected text"
 }
 
-### Grammar Rules:
+### Grammar & Spelling Rules:
 - Only flag if 100% certain of the error
 - quotedText must be EXACT match from content (case-sensitive)
 - Fix ONLY the grammar, don't rephrase or improve style
@@ -251,18 +261,34 @@ IMPORTANT: Do NOT include patched_content field. Fixes are automated.
 }
 
 /**
+ * Detected issue from heuristic analysis to pass to LLM for intelligent fixing
+ */
+export interface DetectedIssueForLLM {
+  /** The text fragment containing the issue */
+  fragment: string;
+  /** Broader context around the fragment */
+  context: string;
+  /** Type of issue (e.g., 'foreign_script', 'encoding_error') */
+  issueType: string;
+  /** Human-readable description */
+  description: string;
+}
+
+/**
  * Build the user message with dynamic content
  *
  * @param language - Target language code (e.g., 'ru', 'en')
  * @param lessonSpec - Lesson specification with objectives
  * @param ragChunks - RAG context chunks (summarized)
  * @param lessonContent - The generated content to review (raw markdown)
+ * @param detectedIssues - Optional pre-detected issues from heuristic phase for targeted fixing
  */
 export function buildSelfReviewerUserMessage(
   language: string,
   lessonSpec: LessonSpecificationV2,
   ragChunks: RAGChunk[],
-  lessonContent: string
+  lessonContent: string,
+  detectedIssues?: DetectedIssueForLLM[]
 ): string {
   // Format RAG context (limit to avoid token explosion)
   const ragContextSummary = formatRAGContext(ragChunks, 5);
@@ -272,6 +298,9 @@ export function buildSelfReviewerUserMessage(
 
   // Get language-specific grammar rules for Phase 2.5
   const grammarRules = getGrammarRulesForPrompt(language);
+
+  // Format detected issues section (if any)
+  const detectedIssuesSection = formatDetectedIssues(detectedIssues);
 
   return `<TARGET_LANGUAGE>
 ${sanitizeForPrompt(language)}
@@ -288,10 +317,38 @@ ${sanitizeForPrompt(specSummary)}
 <RAG_CONTEXT>
 ${sanitizeForPrompt(ragContextSummary)}
 </RAG_CONTEXT>
-
+${detectedIssuesSection}
 <LESSON_CONTENT>
 ${sanitizeForPrompt(lessonContent)}
 </LESSON_CONTENT>`;
+}
+
+/**
+ * Format detected issues from heuristic analysis for LLM context
+ *
+ * Provides the LLM with specific fragments that need fixing,
+ * enabling targeted corrections (translation, removal, etc.)
+ */
+function formatDetectedIssues(issues?: DetectedIssueForLLM[]): string {
+  if (!issues || issues.length === 0) return '';
+
+  const formatted = issues
+    .slice(0, 10) // Limit to avoid token explosion
+    .map(
+      (issue, i) =>
+        `${i + 1}. [${issue.issueType}] ${issue.description}\n   Fragment: "${issue.fragment}"\n   Context: "...${issue.context}..."`
+    )
+    .join('\n');
+
+  return `
+<DETECTED_ISSUES>
+ATTENTION: Heuristic analysis detected the following issues that MUST be fixed.
+For each issue, provide a GRAMMAR FIXABLE entry with "quotedText" (exact text from content) and "inlineReplacement" (corrected text).
+Translate foreign characters to the target language or remove them if appropriate. Do NOT break the meaning of the text.
+
+${formatted}
+</DETECTED_ISSUES>
+`;
 }
 
 /**

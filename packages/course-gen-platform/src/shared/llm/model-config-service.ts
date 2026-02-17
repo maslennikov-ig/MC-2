@@ -31,7 +31,7 @@ import { normalizeLanguageForReserve, type LanguageCode } from '@megacampus/shar
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
 
 /** Emergency universal fallback model when DB config is unavailable */
-const EMERGENCY_FALLBACK_MODEL = 'google/gemini-2.5-flash';
+const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
 import * as ModelConfigDB from './model-config-db';
 
 // Re-export types and constants from model-config-db for backward compatibility
@@ -734,7 +734,12 @@ class ModelConfigServiceImpl {
    */
   async getStage4TierConfigs(language: LanguageCode): Promise<{
     standard: { modelId: string; fallbackModelId: string; maxContext: number };
-    extended: { modelId: string; fallbackModelId: string; maxContext: number; cacheReadEnabled: boolean };
+    extended: {
+      modelId: string;
+      fallbackModelId: string;
+      maxContext: number;
+      cacheReadEnabled: boolean;
+    };
   }> {
     const representativePhase = 'stage_4_scope';
 
@@ -767,7 +772,7 @@ class ModelConfigServiceImpl {
             modelId: extendedConfig.modelId,
             fallbackModelId: extendedConfig.fallbackModelId || extendedConfig.modelId,
             maxContext: extendedConfig.maxContextTokens || 1_000_000,
-            cacheReadEnabled: false, // Phase configs don't carry cacheRead; safe default
+            cacheReadEnabled: extendedConfig.cacheReadEnabled,
           }
         : (() => {
             logger.warn(

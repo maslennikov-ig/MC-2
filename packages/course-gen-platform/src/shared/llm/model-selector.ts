@@ -130,7 +130,7 @@ export const MODEL_TIERS = {
     /** English: DeepSeek Terminus - optimized for English */
     en: 'deepseek/deepseek-v3.1-terminus',
     /** Fallback: Kimi K2 - good multilingual coverage */
-    fallback: 'moonshotai/kimi-k2-0905',
+    fallback: 'moonshotai/kimi-k2-thinking',
   },
   /** Extended context models for large documents (>80K tokens) */
   extended: {
@@ -138,8 +138,8 @@ export const MODEL_TIERS = {
     ru: 'qwen/qwen3-235b-a22b-2507',
     /** English: Claude Sonnet 4 - 200K context */
     en: 'anthropic/claude-sonnet-4-20250514',
-    /** Fallback: Gemini Flash - 1M context */
-    fallback: 'google/gemini-2.5-flash',
+    /** Fallback: Gemini 3 Flash - 1M context */
+    fallback: 'google/gemini-3-flash-preview',
   },
 } as const;
 
@@ -161,11 +161,11 @@ export const MODELS: Record<string, ModelConfig> = {
   },
 
   'gemini-flash': {
-    modelId: 'google/gemini-2.5-flash',
-    displayName: 'Gemini 2.5 Flash',
+    modelId: 'google/gemini-3-flash-preview',
+    displayName: 'Gemini 3 Flash',
     maxContextTokens: 1_000_000,
-    costPer1kInput: 0.000075,
-    costPer1kOutput: 0.0003,
+    costPer1kInput: 0.0005,
+    costPer1kOutput: 0.003,
     capabilities: ['analysis', 'large_context', 'multilingual'],
   },
 
@@ -190,7 +190,7 @@ export const MODELS: Record<string, ModelConfig> = {
 
   // Generation Models - Fallback
   'kimi-k2': {
-    modelId: 'moonshotai/kimi-k2-0905',
+    modelId: 'moonshotai/kimi-k2-thinking',
     displayName: 'Kimi K2',
     maxContextTokens: 128_000,
     costPer1kInput: 0.00055,
@@ -220,8 +220,8 @@ export const MODELS: Record<string, ModelConfig> = {
 
   // Stage 4 Analysis Models
   'gemini-flash-preview': {
-    modelId: 'google/gemini-2.5-flash-preview-09-2025',
-    displayName: 'Gemini 2.5 Flash Preview',
+    modelId: 'google/gemini-3-flash-preview',
+    displayName: 'Gemini 3 Flash Preview',
     maxContextTokens: 1_000_000,
     costPer1kInput: 0.000075,
     costPer1kOutput: 0.0003,
@@ -307,7 +307,7 @@ export const ARCHETYPE_TEMPERATURES = CONTENT_ARCHETYPE_TEMPERATURES_V2;
  *
  * // Large context - uses Gemini Flash
  * const model = selectModelForAnalysis(100_000);
- * // model.modelId === 'google/gemini-2.5-flash'
+ * // model.modelId === 'google/gemini-3-flash-preview'
  * ```
  */
 export function selectModelForAnalysis(totalHighPriorityTokens: number): ModelConfig {
@@ -511,10 +511,10 @@ export function selectModelForGeneration(
  * @example
  * ```typescript
  * const fallback = getFallbackModel('qwen3-max');
- * // fallback.modelId === 'moonshotai/kimi-k2-0905'
+ * // fallback.modelId === 'moonshotai/kimi-k2-thinking'
  *
  * const fallback = getFallbackModel('oss-120b');
- * // fallback.modelId === 'google/gemini-2.5-flash'
+ * // fallback.modelId === 'google/gemini-3-flash-preview'
  * ```
  */
 export function getFallbackModel(primaryModelKey: string): ModelConfig {

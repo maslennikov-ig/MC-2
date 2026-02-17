@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.6] - 2026-02-17
+
+### Added
+
+- **llm**: Gemini caching, config-seed auto-load, code review fixes (4b53bc8c)
+- **llm**: replace all Gemini models with gemini-3-flash-preview (bd2f5176)
+- **stage6**: update CLEV judge and delta judge models (d7630b49)
+- **stage6**: add spelling & typo detection to self-reviewer Phase 2.5 (11b7fdeb)
+
+### Changed
+
+- **stage6**: code review improvements — DRY, logging, readability (7849a10f)
+
+### Fixed
+
+- **types**: add stage_6_rag_planning to PhaseName and CHECK constraint (582fed06)
+- **stage6**: correct misleading comment in protectMarkdownElements restore (54f4ceb9)
+- **stage6**: address code review findings for CJK auto-fix (5c7bf8a7)
+- **deploy**: restart workers during Blue/Green deployment (95917804)
+- **stage6**: add 3-layer CJK character auto-fix in self-reviewer (8c2521b7)
+
+### Other
+
+- **llm**: add unit tests for loadDefaultPhaseConfigs config-seed loader (3f278e3f)
+
 ## [0.30.5] - 2026-02-17
 
 ### Fixed

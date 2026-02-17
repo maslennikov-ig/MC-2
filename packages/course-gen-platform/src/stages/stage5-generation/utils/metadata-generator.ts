@@ -78,7 +78,7 @@ const MODELS = {
   en_metadata_primary: 'deepseek/deepseek-v3.1-terminus',
 
   // Fallback for all languages: Kimi K2-0905 (9.2 EN / 9.5 RU - Gold)
-  metadata_fallback: 'moonshotai/kimi-k2-0905',
+  metadata_fallback: 'moonshotai/kimi-k2-thinking',
 
   // Legacy (for emergency cases)
   oss120b: 'openai/gpt-oss-120b',

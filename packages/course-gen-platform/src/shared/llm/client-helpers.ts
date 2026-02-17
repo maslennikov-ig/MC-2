@@ -36,6 +36,19 @@ export type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & 
 };
 
 /**
+ * Check if model supports explicit cache_control breakpoints via OpenRouter.
+ *
+ * Only Anthropic models use explicit cache_control breakpoints.
+ * Google/Gemini models use implicit caching (automatic, 0.25x cost, no write fees),
+ * which is cheaper than explicit caching and requires no breakpoints.
+ *
+ * @see https://openrouter.ai/docs/guides/best-practices/prompt-caching
+ */
+function supportsExplicitCaching(model: string): boolean {
+  return model.includes('anthropic');
+}
+
+/**
  * Build request options for a single-turn completion request.
  *
  * @param model - Model identifier
@@ -43,7 +56,8 @@ export type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & 
  * @param systemPrompt - System prompt for model behavior
  * @param maxTokens - Maximum output tokens to generate
  * @param temperature - Sampling temperature
- * @param enableCaching - Whether to enable Anthropic cache_control
+ * @param enableCaching - Whether to enable prompt caching (Anthropic: explicit cache_control header;
+ *   Google/Gemini: implicit caching, automatic, no breakpoints needed; DeepSeek: auto server-side)
  * @returns Tuple of [messages, requestOptions]
  */
 export function buildCompletionRequest(
@@ -59,8 +73,8 @@ export function buildCompletionRequest(
     { role: 'user', content: prompt },
   ];
 
-  // Add cache_control to system message for Anthropic models
-  if (enableCaching && model.includes('anthropic')) {
+  // Add cache_control to system message for Anthropic and Google models
+  if (enableCaching && supportsExplicitCaching(model)) {
     messages[0].cache_control = { type: 'ephemeral' };
   }
 
@@ -71,7 +85,7 @@ export function buildCompletionRequest(
     temperature,
   };
 
-  // Add OpenRouter-specific cache enablement
+  // Add OpenRouter-specific cache enablement for Anthropic
   if (enableCaching && model.includes('anthropic')) {
     requestOptions.extra_body = {
       provider: { cache_control: true },
@@ -88,7 +102,8 @@ export function buildCompletionRequest(
  * @param messages - Array of chat messages
  * @param maxTokens - Maximum output tokens to generate
  * @param temperature - Sampling temperature
- * @param enableCaching - Whether to enable prompt caching (Anthropic: cache_control header;
+ * @param enableCaching - Whether to enable prompt caching (Anthropic: explicit cache_control header;
+ *   Google/Gemini: implicit caching, automatic, no breakpoints needed;
  *   DeepSeek: auto-caches repeated prefixes server-side; other providers: no-op)
  * @returns Tuple of [messagesWithCacheControl, requestOptions]
  */
@@ -100,8 +115,8 @@ export function buildChatCompletionRequest(
   enableCaching: boolean
 ): [MessageWithCacheControl[], OpenRouterRequestOptions] {
   const messagesWithCacheControl: MessageWithCacheControl[] = messages.map((msg, idx) => {
-    // Add cache_control to system message for Anthropic models
-    if (enableCaching && model.includes('anthropic') && idx === 0 && msg.role === 'system') {
+    // Add cache_control to system message for Anthropic and Google models
+    if (enableCaching && supportsExplicitCaching(model) && idx === 0 && msg.role === 'system') {
       return { ...msg, cache_control: { type: 'ephemeral' } };
     }
     return msg;
@@ -114,7 +129,7 @@ export function buildChatCompletionRequest(
     temperature,
   };
 
-  // Add OpenRouter-specific cache enablement
+  // Add OpenRouter-specific cache enablement for Anthropic
   if (enableCaching && model.includes('anthropic')) {
     requestOptions.extra_body = {
       provider: { cache_control: true },

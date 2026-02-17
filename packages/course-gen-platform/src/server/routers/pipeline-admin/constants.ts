@@ -89,7 +89,14 @@ export const PIPELINE_STAGES = [
     name: 'Lesson Generation',
     description: 'Generate full lesson content with exercises',
     handlerPath: 'stages/stage6-lesson-content',
-    linkedPhases: ['stage_6_judge', 'stage_6_refinement'] as PhaseName[],
+    linkedPhases: [
+      'stage_6_judge',
+      'stage_6_refinement',
+      'stage_6_rag_planning',
+      'stage_6_simple',
+      'stage_6_normal',
+      'stage_6_complex',
+    ] as PhaseName[],
     linkedPrompts: [
       'stage_6_planner',
       'stage_6_expander',
@@ -172,13 +179,13 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_2_extended_ru: {
-    modelId: 'google/gemini-2.5-flash',
+    modelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_2_extended_en: {
-    modelId: 'google/gemini-2.5-flash',
+    modelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
@@ -192,7 +199,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
   },
   // Stage 4: Analysis
   stage_4_clarifying: {
-    modelId: 'google/gemini-2.0-flash-thinking-exp-01-21',
+    modelId: 'google/gemini-3-flash-preview',
     temperature: 0.5,
     maxTokens: 4000,
     fallbackModelId: 'anthropic/claude-sonnet-4',
@@ -234,13 +241,13 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_4_extended_ru: {
-    modelId: 'google/gemini-2.5-flash',
+    modelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_4_extended_en: {
-    modelId: 'google/gemini-2.5-flash',
+    modelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
@@ -262,13 +269,31 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     modelId: 'openai/gpt-oss-120b',
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'moonshotai/kimi-k2-0905',
+    fallbackModelId: 'moonshotai/kimi-k2-thinking',
   },
   stage_5_escalation: {
-    modelId: 'moonshotai/kimi-k2-0905',
+    modelId: 'moonshotai/kimi-k2-thinking',
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'google/gemini-2.5-flash',
+    fallbackModelId: 'google/gemini-3-flash-preview',
+  },
+  stage_5_simple: {
+    modelId: 'openai/gpt-oss-120b',
+    temperature: 0.7,
+    maxTokens: 30000,
+    fallbackModelId: 'xiaomi/mimo-v2-flash',
+  },
+  stage_5_normal: {
+    modelId: 'moonshotai/kimi-k2-thinking',
+    temperature: 0.7,
+    maxTokens: 30000,
+    fallbackModelId: 'google/gemini-3-flash-preview',
+  },
+  stage_5_complex: {
+    modelId: 'qwen/qwen3.5-plus-02-15',
+    temperature: 0.7,
+    maxTokens: 30000,
+    fallbackModelId: 'moonshotai/kimi-k2-thinking',
   },
   stage_5_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
@@ -283,13 +308,13 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_5_extended_ru: {
-    modelId: 'google/gemini-2.5-flash',
+    modelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   stage_5_extended_en: {
-    modelId: 'google/gemini-2.5-flash',
+    modelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
@@ -307,6 +332,30 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     maxTokens: 8000,
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
+  stage_6_rag_planning: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.3,
+    maxTokens: 4096,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_simple: {
+    modelId: 'moonshotai/kimi-k2-thinking',
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: 'google/gemini-3-flash-preview',
+  },
+  stage_6_normal: {
+    modelId: 'moonshotai/kimi-k2-thinking',
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: 'google/gemini-3-flash-preview',
+  },
+  stage_6_complex: {
+    modelId: 'qwen/qwen3.5-plus-02-15',
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: 'moonshotai/kimi-k2-thinking',
+  },
   stage_6_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
     temperature: MODEL_DEFAULTS.temperature,
@@ -320,7 +369,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_6_extended_ru: {
-    modelId: 'google/gemini-2.5-flash',
+    modelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 15000,
     fallbackModelId: DEFAULT_MODEL_ID,
@@ -405,7 +454,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     modelId: 'x-ai/grok-4-fast',
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'google/gemini-2.5-flash',
+    fallbackModelId: 'google/gemini-3-flash-preview',
   },
   quality_fallback: {
     modelId: DEFAULT_MODEL_ID,

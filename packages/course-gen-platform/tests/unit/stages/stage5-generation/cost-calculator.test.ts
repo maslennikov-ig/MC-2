@@ -56,12 +56,11 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(pricing.outputPricePerMillion).toBe(0.2);
     });
 
-    it('should have pricing for google/gemini-2.5-flash with unified pricing', () => {
-      const pricing = OPENROUTER_PRICING['google/gemini-2.5-flash'];
+    it('should have pricing for google/gemini-3-flash-preview with split pricing', () => {
+      const pricing = OPENROUTER_PRICING['google/gemini-3-flash-preview'];
       expect(pricing).toBeDefined();
-      expect(pricing.combinedPricePerMillion).toBe(0.15);
-      expect(pricing.inputPricePerMillion).toBe(0.15);
-      expect(pricing.outputPricePerMillion).toBe(0.15);
+      expect(pricing.inputPricePerMillion).toBe(0.5);
+      expect(pricing.outputPricePerMillion).toBe(3.0);
     });
 
     it('should have positive pricing values for all models', () => {
@@ -147,7 +146,7 @@ describe('Stage 5 Cost Calculator Service', () => {
         model_used: {
           metadata: 'qwen/qwen3-max',
           sections: 'openai/gpt-oss-20b',
-          validation: 'google/gemini-2.5-flash',
+          validation: 'google/gemini-3-flash-preview',
         },
         total_tokens: {
           metadata: 10000,
@@ -175,14 +174,14 @@ describe('Stage 5 Cost Calculator Service', () => {
       // Sections cost (gpt-oss-20b, unified): 50000/1M * 0.08 = 0.004
       expect(cost.sections_cost_usd).toBeCloseTo(0.004, 6);
 
-      // Validation cost (gemini-2.5-flash, unified): 5000/1M * 0.15 = 0.00075
-      expect(cost.validation_cost_usd).toBeCloseTo(0.00075, 6);
+      // Validation cost (gemini-3-flash-preview, split, 50/50): (2500/1M * 0.50) + (2500/1M * 3.00) = 0.00125 + 0.0075 = 0.00875
+      expect(cost.validation_cost_usd).toBeCloseTo(0.00875, 6);
 
-      // Total cost: 0.036 + 0.004 + 0.00075 = 0.04075
-      expect(cost.total_cost_usd).toBeCloseTo(0.04075, 6);
+      // Total cost: 0.036 + 0.004 + 0.00875 = 0.04875
+      expect(cost.total_cost_usd).toBeCloseTo(0.04875, 6);
 
       // Model breakdown
-      expect(cost.model_breakdown.validation_model).toBe('google/gemini-2.5-flash');
+      expect(cost.model_breakdown.validation_model).toBe('google/gemini-3-flash-preview');
     });
 
     it('should handle zero tokens gracefully', () => {
@@ -359,7 +358,6 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should return true for OSS models with unified pricing', () => {
       expect(hasUnifiedPricing('openai/gpt-oss-20b')).toBe(true);
       expect(hasUnifiedPricing('openai/gpt-oss-120b')).toBe(true);
-      expect(hasUnifiedPricing('google/gemini-2.5-flash')).toBe(true);
     });
 
     it('should return false for models with split pricing', () => {
@@ -441,7 +439,7 @@ describe('Stage 5 Cost Calculator Service', () => {
         model_used: {
           metadata: 'qwen/qwen3-max',
           sections: 'openai/gpt-oss-120b',
-          validation: 'google/gemini-2.5-flash',
+          validation: 'google/gemini-3-flash-preview',
         },
         total_tokens: {
           metadata: 8000, // +60% due to retries

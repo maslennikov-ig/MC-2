@@ -30,7 +30,7 @@ function example1_calculateFromMetadata() {
     model_used: {
       metadata: 'qwen/qwen3-max', // High-quality metadata generation
       sections: 'openai/gpt-oss-120b', // Cost-effective section generation
-      validation: 'google/gemini-2.5-flash', // Fast validation
+      validation: 'google/gemini-3-flash-preview', // Fast validation
     },
     total_tokens: {
       metadata: 5000, // ~5K tokens for metadata generation
@@ -97,7 +97,7 @@ function example2_preGenerationEstimate() {
 
   const metadataCost = estimateCost('qwen/qwen3-max', estimatedMetadataTokens, 0);
   const sectionsCost = estimateCost('openai/gpt-oss-120b', estimatedSectionsTokens, 0);
-  const validationCost = estimateCost('google/gemini-2.5-flash', estimatedValidationTokens, 0);
+  const validationCost = estimateCost('google/gemini-3-flash-preview', estimatedValidationTokens, 0);
 
   const totalEstimatedCost = metadataCost + sectionsCost + validationCost;
 
@@ -144,7 +144,7 @@ function example3_modelComparison() {
   const models = [
     'openai/gpt-oss-20b',
     'openai/gpt-oss-120b',
-    'google/gemini-2.5-flash',
+    'google/gemini-3-flash-preview',
     'qwen/qwen3-max',
   ];
 

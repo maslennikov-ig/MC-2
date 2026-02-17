@@ -182,7 +182,7 @@ const LANGUAGE_UNEXPECTED_SCRIPTS: Record<string, (keyof typeof UNICODE_SCRIPTS)
  * Scripts that require ZERO tolerance (any occurrence is a failure)
  * These are completely incompatible scripts that never appear legitimately
  */
-const ZERO_TOLERANCE_SCRIPTS: Set<string> = new Set([
+export const ZERO_TOLERANCE_SCRIPTS: Set<string> = new Set([
   'CJK', // Chinese/Japanese/Korean ideographs
   'ARABIC', // Arabic script
   'DEVANAGARI', // Hindi/Sanskrit script
@@ -247,6 +247,8 @@ export function checkLanguageConsistency(
 
   /** Threshold for minor language issues (>5 chars = failed check) */
   const MINOR_LANGUAGE_THRESHOLD = 5;
+  /** Critical severity threshold for massive foreign char contamination */
+  const CRITICAL_FOREIGN_COUNT = 20;
   /** Divisor for language score contribution calculation */
   const LANGUAGE_SCORE_DIVISOR = 20;
 
@@ -278,11 +280,24 @@ export function checkLanguageConsistency(
   };
 
   if (!passed) {
+    // Determine severity explicitly:
+    // - CJK/Arabic/Devanagari = always critical (zero-tolerance scripts)
+    // - >20 foreign chars = critical (massive contamination regardless of script)
+    // - Otherwise = major (moderate issues)
+    let severity: 'critical' | 'major';
+    if (hasZeroToleranceViolation) {
+      severity = 'critical';
+    } else if (totalForeignCount > CRITICAL_FOREIGN_COUNT) {
+      severity = 'critical';
+    } else {
+      severity = 'major';
+    }
+
     result.failure = {
       filter: 'languageConsistency',
       expected: `No unexpected ${scriptsFound.join('/')} characters`,
       actual: `${totalForeignCount} foreign characters found`,
-      severity: totalForeignCount > 20 ? 'critical' : 'major',
+      severity,
     };
     result.suggestion = `Content contains ${totalForeignCount} unexpected characters from ${scriptsFound.join(', ')} script(s). Examples: "${allSamples.slice(0, 3).join('", "')}". Remove or replace these characters.`;
   }

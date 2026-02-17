@@ -37,7 +37,10 @@ import { MODEL_FALLBACK } from '../config';
 
 // Import from extracted modules
 import { HEURISTIC_TOKENS_USED, SELF_REVIEW_CONFIG } from './self-reviewer/self-reviewer-constants';
-import { removeChatbotArtifacts } from './self-reviewer/self-reviewer-heuristics';
+import {
+  removeChatbotArtifacts,
+  extractForeignCharFragments,
+} from './self-reviewer/self-reviewer-heuristics';
 import {
   buildHeuristicDetails,
   buildReasoningMessage,
@@ -166,11 +169,35 @@ export async function selfReviewerNode(
 
     nodeLogger.debug({ msg: 'Running LLM-based semantic review' });
 
+    // Build detected issues from heuristic findings for targeted LLM fixing
+    const detectedIssues =
+      !heuristics.languageCheck.passed && heuristics.languageCheck.foreignCharacters > 0
+        ? extractForeignCharFragments(generatedContent, heuristics.languageCheck.scriptsFound).map(
+            frag => ({
+              fragment: frag.fragment,
+              context: frag.context,
+              issueType: 'foreign_script' as const,
+              description: `Foreign ${frag.scriptTypes.join('/')} characters detected. Translate to ${language} or remove if meaning is preserved.`,
+            })
+          )
+        : undefined;
+
+    // Log if detected issues were truncated (formatDetectedIssues limits to 10)
+    if (detectedIssues && detectedIssues.length > 10) {
+      nodeLogger.warn({
+        msg: 'Detected issues truncated for LLM prompt',
+        totalIssues: detectedIssues.length,
+        included: 10,
+        dropped: detectedIssues.length - 10,
+      });
+    }
+
     const llmResult = await runLLMReview({
       lessonSpec: state.lessonSpec,
       ragChunks: state.ragChunks || [],
       generatedContent,
       language,
+      detectedIssues: detectedIssues && detectedIssues.length > 0 ? detectedIssues : undefined,
     });
 
     // Handle LLM failure - fallback to heuristics only
@@ -213,8 +240,12 @@ export async function selfReviewerNode(
       durationMs
     );
 
-    // Apply patching if needed
-    const { result: patchedResult, patchedContent } = applyPatching(result, generatedContent);
+    // Apply patching if needed (includes safety net for foreign character stripping)
+    const { result: patchedResult, patchedContent } = applyPatching(
+      result,
+      generatedContent,
+      language
+    );
     result = patchedResult;
 
     nodeLogger.info({

@@ -20,9 +20,9 @@ export const MODELS = {
   /** Normal tier: main workhorse (309B MoE) for most sections */
   normal: 'xiaomi/mimo-v2-flash',
   /** Complex tier: premium model for hardest sections + first section */
-  complex: 'moonshotai/kimi-k2-0905',
+  complex: 'moonshotai/kimi-k2-thinking',
   /** Context overflow: large context model */
-  tier3_gemini: 'google/gemini-2.5-flash',
+  tier3_gemini: 'google/gemini-3-flash-preview',
 } as const;
 
 /**

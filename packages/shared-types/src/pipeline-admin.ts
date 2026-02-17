@@ -41,6 +41,9 @@ export const phaseNameSchema = z.enum([
   'stage_5_sections',
   'stage_5_tier1', // Standard complexity tier (Tier 1 models)
   'stage_5_escalation', // Escalation/retry tier (language-specific premium models)
+  'stage_5_simple', // 3-tier: cheap model for simple sections
+  'stage_5_normal', // 3-tier: main workhorse for standard sections
+  'stage_5_complex', // 3-tier: premium model for complex sections
   'stage_5_standard_ru',
   'stage_5_standard_en',
   'stage_5_extended_ru',
@@ -48,6 +51,11 @@ export const phaseNameSchema = z.enum([
   // Stage 6: Lesson Content
   'stage_6_judge',
   'stage_6_refinement',
+  'stage_6_rag_planning',
+  // Stage 6: 3-tier generation routing
+  'stage_6_simple',
+  'stage_6_normal',
+  'stage_6_complex',
   'stage_6_standard_ru',
   'stage_6_standard_en',
   'stage_6_extended_ru',

@@ -62,6 +62,8 @@ export interface PhaseModelConfig {
   maxRetries: number;
   /** Phase timeout in milliseconds. NULL means no timeout (infinite). */
   timeoutMs: number | null;
+  /** Whether cache read optimization is enabled for this phase */
+  cacheReadEnabled: boolean;
   /** Context tier used (standard or extended) */
   tier: 'standard' | 'extended';
   /** Source of configuration */
@@ -206,7 +208,7 @@ export async function fetchPhaseConfigFromDb(
   // Build all queries in parallel (optimization: ~50-100ms saved per sequential query)
   // Priority order: course override (by language) > global config (by language)
   const selectFields =
-    'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier';
+    'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier, cache_read_enabled';
 
   // Build course override queries (if courseId provided)
   const courseOverrideQueries = courseId
@@ -280,6 +282,7 @@ export async function fetchPhaseConfigFromDb(
         qualityThreshold: courseOverride.quality_threshold,
         maxRetries: courseOverride.max_retries ?? 3,
         timeoutMs: courseOverride.timeout_ms,
+        cacheReadEnabled: courseOverride.cache_read_enabled || false,
         tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
         source: 'database',
         actualLanguage: langToTry,
@@ -323,6 +326,7 @@ export async function fetchPhaseConfigFromDb(
         qualityThreshold: globalConfig.quality_threshold,
         maxRetries: globalConfig.max_retries ?? 3,
         timeoutMs: globalConfig.timeout_ms,
+        cacheReadEnabled: globalConfig.cache_read_enabled || false,
         tier: (globalConfig.context_tier as 'standard' | 'extended') || tier,
         source: 'database',
         actualLanguage: langToTry,
@@ -424,201 +428,25 @@ function mapJudgeConfig(config: LLMModelConfigRow): JudgeModelConfig {
 }
 
 /**
- * Hardcoded fallback configurations for phases (standard tier)
- * Used as "last resort" when database unavailable AND no cached data
- *
- * These match production DB configs as of 2026-01-20.
- * Production should always use database config for flexibility.
+ * Minimal emergency fallback when config-seed.json is unavailable.
+ * Only used when ALL other config sources fail (DB, cache, LKG, seed file).
  */
-export const DEFAULT_PHASE_CONFIGS: Record<string, PhaseModelConfig> = {
-  // Stage 2
-  stage_2_summarization: {
+const EMERGENCY_FALLBACK_CONFIGS: Record<string, PhaseModelConfig> = {
+  global_default: {
     modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Stage 3
-  stage_3_classification: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.5,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Stage 4
-  stage_4_classification: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
+    fallbackModelId: 'google/gemini-3-flash-preview',
     temperature: 0.7,
     maxTokens: 4096,
     maxContextTokens: 128000,
     qualityThreshold: null,
     maxRetries: 3,
     timeoutMs: null,
+    cacheReadEnabled: false,
     tier: 'standard',
     source: 'hardcoded',
   },
-  stage_4_scope: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_4_expert: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.5,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_4_synthesis: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 6000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Stage 5
-  stage_5_sections: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_5_metadata: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_5_tier1: {
-    modelId: 'openai/gpt-oss-120b',
-    fallbackModelId: 'moonshotai/kimi-k2-0905',
-    temperature: 0.7,
-    maxTokens: 30000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_5_escalation: {
-    modelId: 'moonshotai/kimi-k2-0905',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 30000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Stage 6
-  stage_6_refinement: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_6_section_expander: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_6_patcher: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_6_delta_judge: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.3,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  stage_6_arbiter: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.3,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  // Emergency & fallback
   emergency: {
-    modelId: 'google/gemini-2.5-flash',
+    modelId: 'google/gemini-3-flash-preview',
     fallbackModelId: 'xiaomi/mimo-v2-flash',
     temperature: 0.7,
     maxTokens: 4096,
@@ -626,31 +454,168 @@ export const DEFAULT_PHASE_CONFIGS: Record<string, PhaseModelConfig> = {
     qualityThreshold: null,
     maxRetries: 3,
     timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  quality_fallback: {
-    modelId: 'openai/gpt-oss-120b',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.5,
-    maxTokens: 8000,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
-    tier: 'standard',
-    source: 'hardcoded',
-  },
-  global_default: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    fallbackModelId: 'google/gemini-2.5-flash',
-    temperature: 0.7,
-    maxTokens: 4096,
-    maxContextTokens: 128000,
-    qualityThreshold: null,
-    maxRetries: 3,
-    timeoutMs: null,
+    cacheReadEnabled: false,
     tier: 'standard',
     source: 'hardcoded',
   },
 };
+
+/**
+ * Convert a config-seed.json entry to PhaseModelConfig format.
+ *
+ * Handles type conversions:
+ * - temperature: stored as string in seed, parsed to number
+ * - quality_threshold: stored as string in seed, parsed to number or null
+ * - cache_read_enabled: may be absent in older seeds, defaults to false
+ */
+function seedEntryToPhaseConfig(entry: Record<string, unknown>): PhaseModelConfig {
+  return {
+    modelId: entry.model_id as string,
+    fallbackModelId: (entry.fallback_model_id as string) || null,
+    temperature:
+      typeof entry.temperature === 'string'
+        ? parseFloat(entry.temperature) || 0.7
+        : ((entry.temperature as number) ?? 0.7),
+    maxTokens: (entry.max_tokens as number) || 4096,
+    maxContextTokens: (entry.max_context_tokens as number) || null,
+    qualityThreshold:
+      entry.quality_threshold != null
+        ? typeof entry.quality_threshold === 'string'
+          ? parseFloat(entry.quality_threshold)
+          : (entry.quality_threshold as number)
+        : null,
+    maxRetries: (entry.max_retries as number) ?? 3,
+    timeoutMs: (entry.timeout_ms as number) || null,
+    cacheReadEnabled: (entry.cache_read_enabled as boolean) || false,
+    tier: ((entry.context_tier as string) || 'standard') as 'standard' | 'extended',
+    source: 'hardcoded',
+  };
+}
+
+/**
+ * Load DEFAULT_PHASE_CONFIGS from config-seed.json (auto-updated from DB during prebuild).
+ * Falls back to minimal emergency configs if seed file is unavailable.
+ *
+ * NOTE: Uses synchronous fs.readFileSync() at module load time. This is intentional:
+ * - config-seed.json is small (~17KB), read takes ~3-7ms on SSD
+ * - Runs once at process startup, not on every request
+ * - Making it async would require changing the entire export surface to lazy init
+ * - Emergency fallback ensures the module always loads even if file is missing/corrupt
+ *
+ * Selection logic per phase_name:
+ * - Prefers standard tier + 'any' language entry
+ * - Falls back to first available entry for that phase
+ * - Skips judge-specific entries (judge_role != null)
+ */
+function loadDefaultPhaseConfigs(): Record<string, PhaseModelConfig> {
+  // Use console instead of logger for module-init code:
+  // logger may not be initialized yet (e.g., in test environments with mocked logger)
+  const log = {
+    info: (msg: string) => console.log(`[DEFAULT_PHASE_CONFIGS] ${msg}`),
+    warn: (msg: string) => console.warn(`[DEFAULT_PHASE_CONFIGS] ${msg}`),
+    error: (msg: string) => console.error(`[DEFAULT_PHASE_CONFIGS] ${msg}`),
+  };
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require needed for module-init code
+    const fs = require('fs') as typeof import('fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require needed for module-init code
+    const path = require('path') as typeof import('path');
+
+    // Try multiple paths for config-seed.json:
+    // 1. dist/config/ (production — after tsc build)
+    // 2. src/config/ (development — when running via ts-node/tsx)
+    const candidates = [
+      path.join(__dirname, '../../config/config-seed.json'), // dist/shared/llm → dist/config
+      path.join(__dirname, '../../../src/config/config-seed.json'), // dist/shared/llm → src/config (fallback)
+    ];
+
+    let seedPath: string | null = null;
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        seedPath = candidate;
+        break;
+      }
+    }
+
+    if (!seedPath) {
+      log.warn('config-seed.json not found in any candidate path, using emergency fallback');
+      return { ...EMERGENCY_FALLBACK_CONFIGS };
+    }
+
+    const rawContent = fs.readFileSync(seedPath, 'utf-8');
+    let seedData: unknown;
+    try {
+      seedData = JSON.parse(rawContent);
+    } catch (parseErr) {
+      log.error(
+        `Malformed config-seed.json (${parseErr instanceof Error ? parseErr.message : String(parseErr)}), using emergency fallback`
+      );
+      return { ...EMERGENCY_FALLBACK_CONFIGS };
+    }
+
+    // Validate structure: must be a non-empty array with phase_name entries
+    if (!Array.isArray(seedData)) {
+      log.error(
+        `config-seed.json is not an array (got ${typeof seedData}), using emergency fallback`
+      );
+      return { ...EMERGENCY_FALLBACK_CONFIGS };
+    }
+
+    if (seedData.length > 0 && !(seedData[0] as Record<string, unknown>).phase_name) {
+      log.error(
+        'config-seed.json entries missing required field: phase_name, using emergency fallback'
+      );
+      return { ...EMERGENCY_FALLBACK_CONFIGS };
+    }
+
+    const configs: Record<string, PhaseModelConfig> = {};
+
+    for (const entry of seedData as Array<Record<string, unknown>>) {
+      const phaseName = entry.phase_name as string;
+      if (!phaseName) continue;
+
+      const tier = (entry.context_tier as string) || 'standard';
+      const language = (entry.language as string) || 'any';
+
+      // Skip judge-specific entries (they have dedicated lookup via fetchJudgeConfigsFromDb)
+      if (entry.judge_role) continue;
+
+      // Priority: standard tier + 'any' language is the best default
+      const isIdeal = tier === 'standard' && language === 'any';
+      const existing = configs[phaseName];
+
+      if (!existing || isIdeal) {
+        configs[phaseName] = seedEntryToPhaseConfig(entry);
+      }
+    }
+
+    // Ensure emergency configs are always present
+    if (!configs['global_default']) {
+      configs['global_default'] = EMERGENCY_FALLBACK_CONFIGS['global_default'];
+    }
+    if (!configs['emergency']) {
+      configs['emergency'] = EMERGENCY_FALLBACK_CONFIGS['emergency'];
+    }
+
+    log.info(`Loaded ${Object.keys(configs).length} phase configs from ${seedPath}`);
+
+    return configs;
+  } catch (err) {
+    log.warn(
+      `Failed to load config-seed.json (${err instanceof Error ? err.message : String(err)}), using emergency fallback`
+    );
+    return { ...EMERGENCY_FALLBACK_CONFIGS };
+  }
+}
+
+/**
+ * Default phase configurations loaded from config-seed.json.
+ *
+ * Auto-synced with database via prebuild step (generate-config-seed.ts).
+ * Used as "last resort" fallback when DB, cache, and LKG file are all unavailable.
+ *
+ * @see src/build/generate-config-seed.ts - Prebuild script that refreshes the seed
+ * @see src/config/config-seed.json - Git-tracked seed file
+ */
+export const DEFAULT_PHASE_CONFIGS: Record<string, PhaseModelConfig> = loadDefaultPhaseConfigs();

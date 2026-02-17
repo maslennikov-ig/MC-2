@@ -80,7 +80,13 @@ export const RUSSIAN_RULES: GrammarRuleSet = {
    - "вы научитесь" ✓, "вы научится" ✗
 
 6. **Adjective-noun case agreement** (падеж прилагательного):
-   - Adjective must match noun case: "простые рассылки" ✓, "простые рассылок" ✗`,
+   - Adjective must match noun case: "простые рассылки" ✓, "простые рассылок" ✗
+
+7. **Spelling & typos** (опечатки):
+   - Misspelled words: extra/missing/wrong letters (e.g., "прогрмма" → "программа")
+   - Wrong proper noun declension (e.g., "в Китайе" → "в Китае", "из Германие" → "из Германии")
+   - Confused similar acronyms: verify which acronym fits the context
+   - Cyrillic/Latin look-alike substitution: "с" (Cyrillic) vs "c" (Latin) in wrong places`,
   examples: [
     {
       error: 'о принцип работы',
@@ -111,6 +117,16 @@ export const RUSSIAN_RULES: GrammarRuleSet = {
       error: 'простые рассылок',
       fix: 'простые рассылки',
       explanation: 'Adjective and noun must agree in case',
+    },
+    {
+      error: 'в Китайе',
+      fix: 'в Китае',
+      explanation: 'Incorrect prepositional case of "Китай"',
+    },
+    {
+      error: 'прогрмма',
+      fix: 'программа',
+      explanation: 'Typo: missing letter "а"',
     },
   ],
 };
@@ -143,7 +159,12 @@ export const ENGLISH_RULES: GrammarRuleSet = {
 3. **Common preposition errors**:
    - "different from" ✓, "different than" ✗ (formal)
    - "consists of" ✓, "consists from" ✗
-   - "depends on" ✓, "depends from" ✗`,
+   - "depends on" ✓, "depends from" ✗
+
+4. **Spelling & typos**:
+   - Misspelled words: extra/missing/wrong letters (e.g., "occured" → "occurred")
+   - Confused similar acronyms: verify which acronym fits the context (e.g., eNOS vs eNPS)
+   - Wrong proper nouns: check spelling of technologies, frameworks, companies`,
   examples: [
     {
       error: 'The data show',
@@ -159,6 +180,11 @@ export const ENGLISH_RULES: GrammarRuleSet = {
       error: 'different than',
       fix: 'different from',
       explanation: 'Formal usage prefers "different from"',
+    },
+    {
+      error: 'occured',
+      fix: 'occurred',
+      explanation: 'Typo: double "r" required',
     },
   ],
 };
