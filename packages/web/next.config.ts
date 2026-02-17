@@ -157,6 +157,8 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Allow cross-origin dev requests from local network IPs (e.g. testing from other devices)
+  allowedDevOrigins: ['192.168.1.*', 'localhost'],
   // Exclude pino from bundling to fix worker thread errors during build
   // Pino uses thread-stream which requires native worker files
   // Also exclude shared-logger which imports pino as workspace dependency
