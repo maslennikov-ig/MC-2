@@ -39,6 +39,30 @@ export const RERANKER_CONFIG = {
 } as const;
 
 /**
+ * Two-Tier retrieval configuration
+ *
+ * Tier 1 (Light Gate): Execute first N queries with a very permissive threshold.
+ * If BOTH queries return 0 results ("Strike-Two"), skip remaining queries + reranking.
+ * If any query returns results, proceed to Tier 2 (full retrieval).
+ *
+ * This eliminates ~75% of wasted Jina Reranker API calls and ~65% of Qdrant queries
+ * for lessons where uploaded documents are irrelevant.
+ *
+ * @see docs/plans/dapper-jumping-plum.md
+ * @see docs/research/Architecture Decision Report: Adaptive RAG Optimization
+ */
+export const TWO_TIER_CONFIG = {
+  /** Number of queries in Tier 1 (light gate) — "Strike-Two" policy */
+  TIER1_QUERY_COUNT: 2,
+  /** Score threshold for Tier 1 — very permissive to minimize false positives.
+   *  Must be LOWER than LESSON_RAG_CONFIG.SCORE_THRESHOLD (0.25) to create safety margin.
+   *  At 0.15, we only skip when there's truly nothing remotely relevant. */
+  TIER1_SCORE_THRESHOLD: 0.15,
+  /** Enable two-tier retrieval (set RAG_TWO_TIER_ENABLED=false to disable) */
+  enabled: process.env.RAG_TWO_TIER_ENABLED !== 'false',
+} as const;
+
+/**
  * Technical short terms whitelist - important keywords that shouldn't be filtered out
  * despite being ≤4 characters
  */
