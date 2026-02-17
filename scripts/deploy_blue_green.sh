@@ -175,7 +175,22 @@ echo ""
 echo "Stopping old application environment ($CURRENT_COLOR)..."
 docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
 
-# 12. Docker Cleanup (prevent disk space exhaustion)
+# 12. Update Workers with New Image
+# Workers use the same api image but are NOT part of Blue/Green (no traffic switching needed).
+# They must be restarted to pick up new code after each deploy.
+echo "Updating workers with new image..."
+WORKER_COMPOSE="$BASE_PATH/docker-compose.production.yml"
+# Pull latest api image (already pulled by app deploy, but ensure workers see it)
+docker compose -f "$WORKER_COMPOSE" pull worker worker-stage6 worker-stage7 2>/dev/null || true
+# Restart workers one at a time to minimize job processing gaps
+for SVC in worker worker-stage6 worker-stage7; do
+    echo "   Restarting $SVC..."
+    docker compose -f "$WORKER_COMPOSE" up -d --force-recreate --no-deps "$SVC"
+done
+echo "   Workers updated!"
+echo ""
+
+# 13. Docker Cleanup (prevent disk space exhaustion)
 echo ""
 echo "Cleaning up Docker resources..."
 
