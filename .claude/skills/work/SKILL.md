@@ -1,6 +1,6 @@
 # Work with Tasks
 
-Skill для работы с задачами: просмотр, выбор, выполнение.
+Skill для работы с задачами: просмотр, выбор, выполнение с обязательным использованием Context7 для актуальной документации.
 
 ## Usage
 
@@ -14,6 +14,23 @@ Optional arguments:
 - `/work pick` — автовыбор задачи по приоритету
 - `/work defer mc2-xxx +3m` — отложить задачу на 3 месяца
 - `/work deferred` — показать отложенные задачи
+
+---
+
+## CRITICAL: Context7 MCP — MANDATORY
+
+**Before implementing ANY task, query Context7 for up-to-date documentation on involved libraries.**
+
+Skip only for trivial changes that don't touch library APIs (typos, comments, config values).
+
+### How to use (2-step)
+
+```
+1. mcp__context7__resolve-library-id  — resolve library name to ID
+2. mcp__context7__query-docs          — query docs by resolved ID + topic
+```
+
+When delegating to subagents — fetch docs first, include in delegation context.
 
 ---
 
@@ -86,20 +103,22 @@ fi
 ### Rules
 
 1. **Read task description** before starting
-2. **Gather context** — read related files, understand scope
-3. **Delegate to subagent** if complex (see CLAUDE.md)
-4. **Verify changes** — type-check, build, tests
-5. **Close task** when done
+2. **Query Context7** for documentation on involved libraries (MANDATORY)
+3. **Gather context** — read related files, understand scope
+4. **Delegate to subagent** if complex (see CLAUDE.md), include Context7 docs in delegation
+5. **Verify changes** — type-check, build, tests
+6. **Close task** when done
 
 ### Execution Pattern
 
 ```
-1. bd show mc2-xxx         — read full description
-2. Gather context          — read files, search codebase
-3. Implement               — delegate or execute directly
-4. Verify                  — pnpm type-check && pnpm build
-5. bd close mc2-xxx        — mark complete
-6. git commit && git push  — commit changes
+1. bd show mc2-xxx                — read full description
+2. Context7: resolve + query      — get docs for involved libraries (MANDATORY)
+3. Gather context                 — read files, search codebase
+4. Implement                      — delegate or execute directly
+5. Verify                         — pnpm type-check && pnpm build
+6. bd close mc2-xxx               — mark complete
+7. git commit && git push         — commit changes
 ```
 
 ### Subagent Selection
@@ -225,6 +244,10 @@ bd ready -l backend       # Only backend
 bd update mc2-xxx --defer "+3m"       # Отложить на 3 месяца
 bd update mc2-xxx --defer ""          # Снять defer
 bd ready --include-deferred           # Показать отложенные
+
+# Context7 (MANDATORY before implementation)
+# Step 1: mcp__context7__resolve-library-id
+# Step 2: mcp__context7__query-docs
 ```
 
 ---
@@ -303,7 +326,8 @@ bd search "REF:"
 Before closing any task:
 
 - [ ] Task description read and understood
-- [ ] Context gathered (files, patterns)
+- [ ] Context7 queried for involved libraries (MANDATORY)
+- [ ] Context gathered (files, patterns, recent commits)
 - [ ] Implementation complete
 - [ ] `pnpm type-check` passes
 - [ ] `pnpm build` passes
