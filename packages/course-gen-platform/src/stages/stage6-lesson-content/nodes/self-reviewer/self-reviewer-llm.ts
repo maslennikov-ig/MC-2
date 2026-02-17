@@ -17,6 +17,7 @@ import {
   buildSelfReviewerUserMessage,
   estimateSelfReviewerTokens,
 } from '../../judge/self-reviewer/self-reviewer-prompt';
+import type { DetectedIssueForLLM } from '../../judge/self-reviewer/self-reviewer-prompt';
 import {
   LLM_PER_ATTEMPT_TIMEOUT_MS,
   LLMIssueSchema,
@@ -24,7 +25,8 @@ import {
 } from './self-reviewer-constants';
 import { withRetry, extractSectionsToRegenerate } from './self-reviewer-helpers';
 import { parseSelfReviewerResponse } from './self-reviewer-json';
-import { removeChatbotArtifacts } from './self-reviewer-heuristics';
+import { removeChatbotArtifacts, stripForeignScriptCharacters } from './self-reviewer-heuristics';
+import { ZERO_TOLERANCE_SCRIPTS } from '../../judge/heuristic-filter';
 
 // ============================================================================
 // TYPES
@@ -47,6 +49,8 @@ export interface LLMReviewOptions {
   ragChunks: RAGChunk[];
   generatedContent: string;
   language: string;
+  /** Pre-detected issues from heuristic phase for targeted LLM fixing */
+  detectedIssues?: DetectedIssueForLLM[];
 }
 
 // ============================================================================
@@ -62,7 +66,7 @@ export interface LLMReviewOptions {
  * @returns LLM review result with parsed response or error
  */
 export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReviewResult> {
-  const { lessonSpec, ragChunks, generatedContent, language } = options;
+  const { lessonSpec, ragChunks, generatedContent, language, detectedIssues } = options;
   const nodeLogger = logger.child({ phase: 'llmReview' });
 
   // Get model configuration
@@ -88,7 +92,8 @@ export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReview
     language,
     lessonSpec,
     ragChunks,
-    generatedContent
+    generatedContent,
+    detectedIssues
   );
 
   // Calculate dynamic max tokens
@@ -362,7 +367,8 @@ function applyGrammarFixes(
  */
 export function applyPatching(
   result: SelfReviewResult,
-  generatedContent: string
+  generatedContent: string,
+  language?: string
 ): { result: SelfReviewResult; patchedContent: string | null } {
   const nodeLogger = logger.child({ phase: 'patching' });
   let patchedContent: string | null = null;
@@ -452,6 +458,39 @@ export function applyPatching(
     } else {
       patchedContent = JSON.stringify(result.patchedContent, null, 2);
       nodeLogger.info({ msg: 'Content successfully patched by self-reviewer' });
+    }
+  }
+
+  // STEP 4: Safety net — strip remaining foreign characters from zero-tolerance scripts
+  // This runs AFTER all LLM-based fixes. If the LLM already translated/removed foreign chars,
+  // this step does nothing. Only activates if foreign chars still remain.
+  if (language) {
+    // Determine which zero-tolerance scripts to check based on language
+    const scriptsToStrip = [...ZERO_TOLERANCE_SCRIPTS].filter(script => {
+      // Don't strip CJK if target language IS Chinese, etc.
+      if (script === 'CJK' && (language === 'zh' || language === 'ja' || language === 'ko'))
+        return false;
+      if (script === 'ARABIC' && language === 'ar') return false;
+      if (script === 'DEVANAGARI' && (language === 'hi' || language === 'bn')) return false;
+      return true;
+    });
+
+    if (scriptsToStrip.length > 0) {
+      const stripResult = stripForeignScriptCharacters(workingContent, scriptsToStrip);
+      if (stripResult.fixCount > 0) {
+        nodeLogger.warn({
+          msg: 'Safety net: stripped remaining foreign characters after LLM review',
+          fixCount: stripResult.fixCount,
+          scriptsStripped: scriptsToStrip,
+          language,
+        });
+        workingContent = stripResult.content;
+        patchedContent = workingContent;
+        if (updatedResult.status === 'PASS' || updatedResult.status === 'PASS_WITH_FLAGS') {
+          updatedResult.status = 'FIXED';
+        }
+        updatedResult.reasoning += ` (${stripResult.fixCount} residual foreign character(s) stripped as safety net)`;
+      }
     }
   }
 

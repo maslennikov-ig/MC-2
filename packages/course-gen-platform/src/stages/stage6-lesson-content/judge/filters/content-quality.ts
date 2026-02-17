@@ -182,7 +182,7 @@ const LANGUAGE_UNEXPECTED_SCRIPTS: Record<string, (keyof typeof UNICODE_SCRIPTS)
  * Scripts that require ZERO tolerance (any occurrence is a failure)
  * These are completely incompatible scripts that never appear legitimately
  */
-const ZERO_TOLERANCE_SCRIPTS: Set<string> = new Set([
+export const ZERO_TOLERANCE_SCRIPTS: Set<string> = new Set([
   'CJK', // Chinese/Japanese/Korean ideographs
   'ARABIC', // Arabic script
   'DEVANAGARI', // Hindi/Sanskrit script
@@ -282,7 +282,7 @@ export function checkLanguageConsistency(
       filter: 'languageConsistency',
       expected: `No unexpected ${scriptsFound.join('/')} characters`,
       actual: `${totalForeignCount} foreign characters found`,
-      severity: totalForeignCount > 20 ? 'critical' : 'major',
+      severity: hasZeroToleranceViolation || totalForeignCount > 20 ? 'critical' : 'major',
     };
     result.suggestion = `Content contains ${totalForeignCount} unexpected characters from ${scriptsFound.join(', ')} script(s). Examples: "${allSamples.slice(0, 3).join('", "')}". Remove or replace these characters.`;
   }

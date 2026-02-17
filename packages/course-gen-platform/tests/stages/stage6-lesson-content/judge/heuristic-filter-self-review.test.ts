@@ -159,9 +159,21 @@ const имя = "значение";
       expect(result.failure?.severity).toBe('critical');
     });
 
-    it('should have major severity for moderate foreign characters (6-20)', () => {
+    it('should have critical severity for ANY zero-tolerance script characters (CJK in Russian)', () => {
+      // CJK is zero-tolerance: even 6-20 chars should be critical (not major)
       const content = 'Русский текст с китайскими 中文字符在这 символами.';
       const result = checkLanguageConsistency(content, 'ru');
+
+      expect(result.passed).toBe(false);
+      expect(result.foreignCharacters).toBeGreaterThan(5);
+      expect(result.foreignCharacters).toBeLessThanOrEqual(20);
+      expect(result.failure?.severity).toBe('critical');
+    });
+
+    it('should have major severity for moderate non-zero-tolerance foreign characters (6-20)', () => {
+      // Cyrillic in English is NOT zero-tolerance, so severity is 'major' for 6-20 chars
+      const content = 'English text with кириллиц symbols and more text here for context.';
+      const result = checkLanguageConsistency(content, 'en');
 
       expect(result.passed).toBe(false);
       expect(result.foreignCharacters).toBeGreaterThan(5);
