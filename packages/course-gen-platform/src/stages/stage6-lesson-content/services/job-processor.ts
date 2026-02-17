@@ -96,6 +96,42 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
 }
 
 /**
+ * Errors that should NOT be retried — structural/input issues that will fail again.
+ * Aligned with Stage 5 isRetryableError pattern (v0.30.4).
+ */
+function isNonRetryableStage6Error(error: Error): boolean {
+  const msg = error.message.toLowerCase();
+  return (
+    msg.includes('invalid job input') ||
+    msg.includes('invalid lesson_id') ||
+    msg.includes('invalid depth value') ||
+    msg.includes('mismatch') ||
+    msg.includes('schema validation') ||
+    msg.includes('zod') ||
+    msg.includes('unauthorized') ||
+    msg.includes('forbidden') ||
+    msg.includes('invalid api key') ||
+    msg.includes('cannot aggregate empty') ||
+    msg.includes('missing prerequisites')
+  );
+}
+
+/**
+ * Check if orchestrator result errors indicate a non-retryable structural problem.
+ */
+function hasNonRetryableResultErrors(errors: string[]): boolean {
+  return errors.some(e => {
+    const msg = e.toLowerCase();
+    return (
+      msg.includes('mismatch') ||
+      msg.includes('schema validation') ||
+      msg.includes('invalid') ||
+      msg.includes('zod')
+    );
+  });
+}
+
+/**
  * Process job with model fallback strategy
  */
 // RAG chunk type for Stage 6 (matches actual Qdrant search result structure)
@@ -144,6 +180,16 @@ export async function processWithFallback(
       }
 
       lastError = new Error(result.errors.join(', ') || 'Unknown generation error');
+
+      // Bail out immediately for non-retryable structural errors in result
+      if (hasNonRetryableResultErrors(result.errors)) {
+        logger.warn(
+          { jobId, model: modelConfig.primary, attempt, errors: result.errors },
+          'Non-retryable result errors, skipping remaining attempts and fallback'
+        );
+        throw lastError;
+      }
+
       logger.warn(
         {
           jobId,
@@ -155,6 +201,16 @@ export async function processWithFallback(
       );
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Bail out immediately for non-retryable structural errors
+      if (isNonRetryableStage6Error(lastError)) {
+        logger.warn(
+          { jobId, model: modelConfig.primary, attempt, error: lastError.message },
+          'Non-retryable error, skipping remaining attempts and fallback'
+        );
+        throw lastError;
+      }
+
       logger.warn(
         {
           jobId,
