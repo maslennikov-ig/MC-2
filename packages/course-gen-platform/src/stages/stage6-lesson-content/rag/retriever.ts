@@ -7,7 +7,7 @@ import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { checkCourseHasIndexedDocuments } from '@/shared/rag/document-availability';
 
-import { LESSON_RAG_CONFIG, RERANKER_CONFIG } from './constants';
+import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants';
 import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
 import { generateCacheKey, buildLessonQueries, createEmptyResult } from './helpers';
 import { rerankChunks } from './reranking';
@@ -121,38 +121,160 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
   const seenChunkIds = new Set<string>();
   const queriesUsed: string[] = [];
 
-  for (const query of queries) {
-    try {
-      const primaryDocIds = lessonSpec.rag_context?.primary_documents;
-      const filteringByDocs = primaryDocIds && primaryDocIds.length > 0;
+  // Shared filter config for all queries
+  const primaryDocIds = lessonSpec.rag_context?.primary_documents;
+  const filteringByDocs = primaryDocIds && primaryDocIds.length > 0;
 
-      // Log primary_documents filtering status on first query only
-      if (queries.indexOf(query) === 0) {
+  logger.debug(
+    {
+      lessonId: lessonSpec.lesson_id,
+      filteringByDocs,
+      documentCount: primaryDocIds?.length ?? 0,
+      twoTierEnabled: TWO_TIER_CONFIG.enabled,
+    },
+    filteringByDocs
+      ? `RAG filtering by ${primaryDocIds.length} documents`
+      : 'RAG searching all course documents'
+  );
+
+  // ============================================================================
+  // TWO-TIER RETRIEVAL: Tier 1 (Light Gate)
+  // Execute first N queries with permissive threshold. If ALL return 0 → early exit.
+  // This saves ~65% Qdrant queries and ~75% Jina Reranker calls for irrelevant lessons.
+  // @see docs/plans/dapper-jumping-plum.md
+  // ============================================================================
+  const tier1QueryCount = TWO_TIER_CONFIG.enabled
+    ? Math.min(TWO_TIER_CONFIG.TIER1_QUERY_COUNT, queries.length)
+    : 0;
+  const tier1Queries = queries.slice(0, tier1QueryCount);
+  const tier2Queries = TWO_TIER_CONFIG.enabled ? queries.slice(tier1QueryCount) : queries;
+  if (TWO_TIER_CONFIG.enabled && tier1Queries.length > 0) {
+    const tier1StartTime = Date.now();
+
+    for (const query of tier1Queries) {
+      try {
+        const searchOptions: SearchOptions = {
+          limit: Math.ceil(candidateCount / queries.length) + 2,
+          score_threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
+          enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
+          enable_priority_boost: enablePriorityBoost,
+          filters: {
+            course_id: courseId,
+            ...(filteringByDocs && { document_ids: primaryDocIds }),
+          },
+        };
+
+        const response = await searchChunks(query, searchOptions);
+
+        for (const result of response.results) {
+          if (!seenChunkIds.has(result.chunk_id)) {
+            seenChunkIds.add(result.chunk_id);
+            allChunks.push({
+              chunk_id: result.chunk_id,
+              document_id: result.document_id,
+              document_name: result.document_name,
+              content: result.content,
+              heading_path: result.heading_path,
+              similarity_score: result.score,
+              matched_query: query,
+            });
+            queriesUsed.push(query);
+          }
+        }
+
         logger.debug(
           {
             lessonId: lessonSpec.lesson_id,
-            filteringByDocs,
-            documentCount: primaryDocIds?.length ?? 0,
+            query: query.substring(0, 50),
+            resultsCount: response.results.length,
+            totalUnique: allChunks.length,
+            tier: 1,
           },
-          filteringByDocs
-            ? `RAG filtering by ${primaryDocIds.length} documents`
-            : 'RAG searching all course documents'
+          '[Lesson RAG] Tier 1 query executed'
+        );
+      } catch (error) {
+        logger.warn(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            query: query.substring(0, 50),
+            lessonId: lessonSpec.lesson_id,
+            tier: 1,
+          },
+          '[Lesson RAG] Tier 1 query failed - continuing'
         );
       }
+    }
 
+    const tier1DurationMs = Date.now() - tier1StartTime;
+
+    // Strike-Two: if ALL Tier 1 queries returned 0 chunks → early exit
+    if (allChunks.length === 0) {
+      logger.info(
+        {
+          lessonId: lessonSpec.lesson_id,
+          courseId,
+          tier1Queries: tier1Queries.length,
+          tier1DurationMs,
+          tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
+        },
+        '[Lesson RAG] Tier 1 exit - no results from gate queries (Strike-Two)'
+      );
+
+      // Log trace for observability
+      try {
+        await logTrace({
+          courseId,
+          lessonId: lessonSpec.lesson_id,
+          stage: 'stage_6',
+          phase: 'rag_retrieval',
+          stepName: 'tier1_exit',
+          inputData: {
+            lessonId: lessonSpec.lesson_id,
+            tier1Queries: tier1Queries.length,
+            totalQueries: queries.length,
+            tier1Threshold: TWO_TIER_CONFIG.TIER1_SCORE_THRESHOLD,
+          },
+          outputData: {
+            tier1ChunksFound: 0,
+            tier1Exit: true,
+            queriesSaved: tier2Queries.length,
+            rerankerSkipped: true,
+          },
+          durationMs: tier1DurationMs,
+        });
+      } catch {
+        // Don't fail on trace error
+      }
+
+      return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+    }
+
+    logger.debug(
+      {
+        lessonId: lessonSpec.lesson_id,
+        tier1ChunksFound: allChunks.length,
+        tier1DurationMs,
+      },
+      '[Lesson RAG] Tier 1 passed - proceeding to Tier 2'
+    );
+  }
+
+  // ============================================================================
+  // TIER 2: Full Retrieval (remaining queries + reranking)
+  // Only reached if Tier 1 found at least one chunk, or if Two-Tier is disabled.
+  // ============================================================================
+  const tier2QueryList = TWO_TIER_CONFIG.enabled ? tier2Queries : queries;
+
+  for (const query of tier2QueryList) {
+    try {
       const searchOptions: SearchOptions = {
-        limit: Math.ceil(candidateCount / queries.length) + 2, // Extra for deduplication
+        limit: Math.ceil(candidateCount / queries.length) + 2,
         score_threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
         enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
-        // Priority boosting: CORE +20%, IMPORTANT +12% score boost
-        // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
         enable_priority_boost: enablePriorityBoost,
         filters: {
           course_id: courseId,
-          // Filter by primary documents if specified (empty array = search all)
-          ...(filteringByDocs && {
-            document_ids: primaryDocIds,
-          }),
+          ...(filteringByDocs && { document_ids: primaryDocIds }),
         },
       };
 
@@ -180,8 +302,9 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
           query: query.substring(0, 50),
           resultsCount: response.results.length,
           totalUnique: allChunks.length,
+          tier: 2,
         },
-        '[Lesson RAG] Query executed'
+        '[Lesson RAG] Tier 2 query executed'
       );
     } catch (error) {
       logger.warn(
@@ -189,8 +312,9 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
           err: error instanceof Error ? error.message : String(error),
           query: query.substring(0, 50),
           lessonId: lessonSpec.lesson_id,
+          tier: 2,
         },
-        '[Lesson RAG] Query failed - continuing with remaining queries'
+        '[Lesson RAG] Tier 2 query failed - continuing with remaining queries'
       );
     }
 
@@ -246,6 +370,8 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         lessonId: lessonSpec.lesson_id,
         queriesCount: queries.length,
         targetChunks,
+        twoTierEnabled: TWO_TIER_CONFIG.enabled,
+        tier1QueryCount: TWO_TIER_CONFIG.enabled ? tier1Queries.length : 0,
       },
       outputData: {
         rerankerEnabled: RERANKER_CONFIG.enabled,
