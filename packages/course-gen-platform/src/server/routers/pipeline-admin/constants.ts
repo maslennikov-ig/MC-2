@@ -89,7 +89,14 @@ export const PIPELINE_STAGES = [
     name: 'Lesson Generation',
     description: 'Generate full lesson content with exercises',
     handlerPath: 'stages/stage6-lesson-content',
-    linkedPhases: ['stage_6_judge', 'stage_6_refinement', 'stage_6_simple', 'stage_6_normal', 'stage_6_complex'] as PhaseName[],
+    linkedPhases: [
+      'stage_6_judge',
+      'stage_6_refinement',
+      'stage_6_rag_planning',
+      'stage_6_simple',
+      'stage_6_normal',
+      'stage_6_complex',
+    ] as PhaseName[],
     linkedPrompts: [
       'stage_6_planner',
       'stage_6_expander',
