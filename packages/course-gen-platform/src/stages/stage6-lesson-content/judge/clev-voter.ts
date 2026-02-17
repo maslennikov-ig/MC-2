@@ -9,7 +9,7 @@
  *
  * Vote aggregation uses weighted mean based on model historical accuracy:
  * - Formula: w_i = 1 / (1 + exp(-accuracy_i))
- * - Weights: Qwen3-235B (0.75), DeepSeek (0.74), Kimi K2 (0.73), Minimax M2 (0.72)
+ * - Weights: Minimax M2.5 (0.76), Qwen3.5 Plus (0.75), GLM-5 (0.74)
  *
  * Reference:
  * - docs/research/010-stage6-generation-strategy/ (CLEV research)
@@ -118,8 +118,8 @@ export interface CLEVEvaluationInput {
  * 4. Throws explicit error if no cache and database unavailable
  *
  * RULE: Judges must be DIFFERENT from the generation model to avoid self-evaluation bias.
- * - If Russian (qwen3 generates) → use deepseek/kimi/minimax/glm as judges
- * - If other languages (deepseek generates) → use qwq/kimi/minimax/glm as judges
+ * - Judges: minimax-m2.5 (primary), glm-5 (secondary), qwen3.5-plus (tiebreaker)
+ * - All judges are language-agnostic (same for any content language)
  *
  * @param language - Content language ('ru' for Russian, anything else for other)
  * @returns CLEV judge configuration (primary, secondary, tiebreaker)
@@ -534,8 +534,11 @@ function aggregateVerdicts(
     }
 
     // Fallback weights for known model families (used when judgeModels not provided)
-    // These are reasonable defaults based on model performance benchmarks
+    // Ordered from most specific to generic family match
+    if (modelId.includes('minimax-m2.5')) return 0.76;
+    if (modelId.includes('qwen3.5') || modelId.includes('qwen/qwen3.5')) return 0.75;
     if (modelId.includes('qwen3') || modelId.includes('qwen/qwen3')) return 0.75;
+    if (modelId.includes('glm-5') || modelId.includes('z-ai/glm-5')) return 0.74;
     if (modelId.includes('deepseek')) return 0.74;
     if (modelId.includes('kimi')) return 0.73;
     if (modelId.includes('minimax')) return 0.72;
