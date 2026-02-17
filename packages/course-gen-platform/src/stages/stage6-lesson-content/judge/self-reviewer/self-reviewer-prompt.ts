@@ -147,14 +147,24 @@ If Phase 1 passes, check structure and fixable issues.
    - Suggest leading with concrete facts or examples
    - This is informational feedback, NOT a blocking issue
 
-## Phase 2.5: Language & Grammar Fixes (Status: FIXED)
-Check for language-specific grammar errors that can be fixed with EXACT text replacement.
+## Phase 2.5: Language, Grammar & Spelling Fixes (Status: FIXED)
+Check for language-specific grammar errors AND spelling mistakes that can be fixed with EXACT text replacement.
 Use the rules from \`<GRAMMAR_RULES>\` section for the target language.
 
 ### Grammar Error Types (see GRAMMAR_RULES for details):
 1. **Case/preposition errors**: Wrong word form after preposition
 2. **Agreement errors**: Adjective/verb doesn't match noun in gender/number
 3. **Numeral agreement**: Wrong form after numerals (2-4 vs 5+)
+
+### Spelling & Typo Detection:
+4. **Misspelled words**: Extra, missing, or wrong letters in common words
+   - E.g., "Китайе" → "Китае", "прогрмма" → "программа"
+5. **Wrong proper noun forms**: Incorrect declension of country/city names
+   - E.g., "в Китайе" → "в Китае", "из Германие" → "из Германии"
+6. **Confused acronyms/abbreviations**: Similar-looking but different terms
+   - E.g., "eNOS" (enzyme) vs "eNPS" (employee metric) — verify which fits the context
+7. **Look-alike character substitution**: Cyrillic/Latin confusion in words
+   - E.g., Latin "c" in Cyrillic word, Cyrillic "е" in Latin acronym
 
 ### Wrong Script Characters:
 Find isolated characters from wrong writing system (e.g., Chinese in Russian text).
@@ -164,8 +174,8 @@ Find isolated characters from wrong writing system (e.g., Chinese in Russian tex
 - Proper nouns, brand names
 - URLs and file paths
 
-### Output Format for Grammar Issues:
-For each grammar issue, output with severity "FIXABLE":
+### Output Format for Grammar & Spelling Issues:
+For each grammar or spelling issue, output with severity "FIXABLE":
 {
   "type": "GRAMMAR",
   "severity": "FIXABLE",
@@ -175,7 +185,7 @@ For each grammar issue, output with severity "FIXABLE":
   "inlineReplacement": "corrected text"
 }
 
-### Grammar Rules:
+### Grammar & Spelling Rules:
 - Only flag if 100% certain of the error
 - quotedText must be EXACT match from content (case-sensitive)
 - Fix ONLY the grammar, don't rephrase or improve style
