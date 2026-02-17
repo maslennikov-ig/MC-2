@@ -72,6 +72,29 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         '[Lesson RAG] Using cached context'
       );
 
+      // Log trace for cache hit observability
+      try {
+        await logTrace({
+          courseId,
+          lessonId: lessonSpec.lesson_id,
+          stage: 'stage_6',
+          phase: 'rag_retrieval',
+          stepName: 'cache_hit',
+          inputData: {
+            lessonId: lessonSpec.lesson_id,
+            ragContextId,
+          },
+          outputData: {
+            cachedChunks: cached.chunks.length,
+            coverageScore: cached.coverageScore,
+            cached: true,
+          },
+          durationMs: Date.now() - startTime,
+        });
+      } catch {
+        // Don't fail on trace error
+      }
+
       // Convert cached chunks (section-rag format) to shared-types RAGChunk format
       const convertedChunks: RAGChunk[] = cached.chunks.map((chunk: SectionRAGChunk) => ({
         chunk_id: chunk.chunkId,
