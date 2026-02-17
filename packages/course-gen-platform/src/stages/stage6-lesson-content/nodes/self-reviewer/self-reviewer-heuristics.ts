@@ -266,7 +266,7 @@ export function protectMarkdownElements(content: string): ProtectedContent {
     content: processedContent,
     restore: (processed: string): string => {
       let result = processed;
-      // Restore in reverse order to handle any potential nesting correctly
+      // Order doesn't matter: each placeholder is unique, no nesting possible
       for (const block of protectedBlocks) {
         // Use function replacement to avoid $ special replacement characters
         result = result.replace(block.placeholder, () => block.content);
