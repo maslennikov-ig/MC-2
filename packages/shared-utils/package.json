@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/shared-utils",
-  "version": "0.30.5",
+  "version": "0.30.6",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

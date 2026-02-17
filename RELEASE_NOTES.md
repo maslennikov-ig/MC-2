@@ -2,6 +2,33 @@
 
 _Released on 2025-12-26_
 
+## v0.30.6
+
+_Released on 2026-02-17_
+
+### ✨ New Features
+
+- **llm**: Gemini caching, config-seed auto-load, code review fixes
+- **llm**: Replace all Gemini models with gemini-3-flash-preview
+- **stage6**: Update CLEV judge and delta judge models
+- **stage6**: Add spelling & typo detection to self-reviewer Phase 2.5
+
+### 🔧 Improvements
+
+- **stage6**: Code review improvements — DRY, logging, readability
+
+### 🐛 Bug Fixes
+
+- **types**: Add stage_6_rag_planning to PhaseName and CHECK constraint
+- **stage6**: Correct misleading comment in protectMarkdownElements restore
+- **stage6**: Address code review findings for CJK auto-fix
+- **deploy**: Restart workers during Blue/Green deployment
+- **stage6**: Add 3-layer CJK character auto-fix in self-reviewer
+
+---
+
+_This release was automatically generated from 11 commits._
+
 ## v0.30.5
 
 _Released on 2026-02-17_
