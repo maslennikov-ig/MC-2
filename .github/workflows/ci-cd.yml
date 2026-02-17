@@ -874,6 +874,10 @@ jobs:
 
           if [ "$DEPLOY_RESULT" == "success" ]; then
             MESSAGE="🚀 *MegaCampus $ENV_NAME*%0A%0A✅ SUCCESS%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A🌿 Branch: $BRANCH%0A👤 Author: $ACTOR%0A🔗 [View]($RUN_URL)%0A%0A🌐 $ENV_URL"
+          elif [ "$DEPLOY_RESULT" == "cancelled" ]; then
+            MESSAGE="🚀 *MegaCampus $ENV_NAME*%0A%0A⏹ CANCELLED%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A🌿 Branch: $BRANCH%0A👤 Author: $ACTOR%0A🔗 [Logs]($RUN_URL)"
+          elif [ "$DEPLOY_RESULT" == "skipped" ]; then
+            MESSAGE="🚀 *MegaCampus $ENV_NAME*%0A%0A⏭ SKIPPED%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A🌿 Branch: $BRANCH%0A👤 Author: $ACTOR%0A🔗 [Logs]($RUN_URL)"
           else
             MESSAGE="🚀 *MegaCampus $ENV_NAME*%0A%0A❌ FAILED%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A🌿 Branch: $BRANCH%0A👤 Author: $ACTOR%0A🔗 [Logs]($RUN_URL)"
           fi
