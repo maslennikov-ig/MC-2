@@ -46,11 +46,17 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
   // Validate input
   const validatedInput = Phase2InputSchema.parse(input);
 
+  // Estimate total document tokens for model tier selection
+  // If documents exceed 260K threshold, ModelConfigService selects extended tier (1M context)
+  const estimatedDocTokens = validatedInput.document_summaries
+    ? Math.ceil(validatedInput.document_summaries.reduce((sum, s) => sum + s.length, 0) / 4)
+    : undefined;
+
   // Get model for Phase 2 from database config
   const model = await getModelForPhase(
     'stage_4_scope',
     validatedInput.course_id,
-    undefined,
+    estimatedDocTokens,
     validatedInput.language
   );
   const modelId = model.model || 'unknown';
@@ -146,9 +152,7 @@ async function buildPhase2PromptText(input: Phase2Input): Promise<string> {
  * @param input - Validated Phase 2 input
  * @returns Formatted prompt messages
  */
-async function buildPhase2Prompt(
-  input: Phase2Input
-): Promise<{ role: string; content: string }[]> {
+async function buildPhase2Prompt(input: Phase2Input): Promise<{ role: string; content: string }[]> {
   const { phase1_output, topic, document_summaries, language } = input;
 
   // Determine output language based on course language
@@ -354,4 +358,3 @@ async function buildUserPrompt(
     targetSectionsHint: String(input.target_sections || 3),
   });
 }
-
