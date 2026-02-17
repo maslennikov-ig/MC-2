@@ -150,8 +150,10 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Failed to create section record`                         | graceful_fallback | Individual section insert skipped (already exists) |
 | `Content failed sanity check.*non-blocking`               | expected_behavior | Sanity check warning, content still accepted       |
 | `Unavailable For Legal Reasons\|content policy violation` | content_policy    | Jina API content policy rejection (PII/legal)      |
+| `Using STALE phase config due to database error`          | graceful_fallback | ModelConfigBunker stale config during DB outage    |
+| `\[Phase 6\] Max retries reached.*best-effort`            | graceful_fallback | Phase 6 summary retries exhausted, best-effort     |
 
-**Total rules: 53** (test validates sync with code)
+**Total rules: 56** (test validates sync with code)
 
 **Test environment auto-muting:**
 
