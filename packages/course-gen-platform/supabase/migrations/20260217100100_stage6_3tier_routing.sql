@@ -14,7 +14,7 @@ ALTER TABLE llm_model_config ADD CONSTRAINT llm_model_config_phase_name_check CH
     'stage_5_metadata', 'stage_5_sections', 'stage_5_tier1', 'stage_5_escalation',
     'stage_5_simple', 'stage_5_normal', 'stage_5_complex',
     'stage_5_standard_ru', 'stage_5_standard_en', 'stage_5_extended_ru', 'stage_5_extended_en',
-    'stage_6_judge', 'stage_6_refinement',
+    'stage_6_judge', 'stage_6_refinement', 'stage_6_rag_planning',
     'stage_6_simple', 'stage_6_normal', 'stage_6_complex',
     'stage_6_standard_ru', 'stage_6_standard_en', 'stage_6_extended_ru', 'stage_6_extended_en',
     'stage_6_arbiter', 'stage_6_patcher', 'stage_6_section_expander', 'stage_6_delta_judge',
