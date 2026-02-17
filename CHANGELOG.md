@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.4] - 2026-02-17
+
+### Fixed
+
+- **stage5**: prevent infinite retry loop on section count mismatch (68855d98)
+- **stage4**: use Stage 3 LLM priorities in prepareDocumentInfos instead of size heuristic (4f16a5c1)
+- **web**: add startup grace period to health check endpoint (1b1616db)
+- **stage4**: pass tokenCount to getModelForPhase in Phase 0.5 and Phase 2 (6b063e10)
+- **ci**: distinguish cancelled/skipped from failed in Telegram notifications (a68b3393)
+- **ci**: repair deploy verification and test failures (cccef329)
+- **tests**: unskip 3 generate-on-demand tests by fixing mock gaps (d6637870)
+- **tests**: repair 4 pre-existing test failures (17eaa977)
+
+### Other
+
+- update 1 skill(s), update docs (aa46d0e1)
+- **stage4**: add runtime validation for Stage 3 priority values (141f5b12)
+- **process-logs**: sync auto-mute docs with code (53 → 56 rules) (bc7e9788)
+
 ## [0.30.3] - 2026-02-16
 
 ### Fixed
