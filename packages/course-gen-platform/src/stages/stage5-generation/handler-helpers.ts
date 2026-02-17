@@ -29,6 +29,7 @@ import {
   PipelineError,
   classifyPipelineError,
 } from '@/shared/errors';
+import { ValidationError as QualityValidationError } from '@/shared/validation/quality-validator';
 
 // DB helpers are in ./handler-db-helpers — import directly from there
 
@@ -226,6 +227,7 @@ export type GenerationErrorCode =
 function classifyByInstance(error: Error | string): GenerationErrorCode | null {
   if (error instanceof OrchestrationFailedError) return 'ORCHESTRATION_FAILED';
   if (error instanceof ValidationFailedError) return 'VALIDATION_FAILED';
+  if (error instanceof QualityValidationError) return 'VALIDATION_FAILED';
   if (error instanceof QualityThresholdNotMetError) return 'QUALITY_THRESHOLD_NOT_MET';
   if (error instanceof MinimumLessonsNotMetError) return 'MINIMUM_LESSONS_NOT_MET';
   if (error instanceof DatabaseError) return 'DATABASE_ERROR';
@@ -353,6 +355,17 @@ export async function processWithFallback(
       return await orchestrator.execute(input, primaryModel);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Bail out immediately for non-retryable errors (e.g. structural validation mismatch)
+      const errorCode = classifyGenerationError(error instanceof Error ? error : String(error));
+      if (!isRetryableError(errorCode)) {
+        phaseLogger.warn(
+          { courseId, attempt, model: primaryModel, errorCode, error: errorMessage },
+          'Stage 5: Non-retryable error, skipping remaining attempts and fallback'
+        );
+        throw error;
+      }
+
       phaseLogger.warn(
         {
           courseId,
