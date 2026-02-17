@@ -43,7 +43,7 @@ export async function selectStage6ModelTier(
   lessonSpec: LessonSpecificationV2
 ): Promise<Stage6ModelTier> {
   const difficultyLevel = lessonSpec.difficulty_level || 'intermediate';
-  const moduleNumber = lessonSpec.lesson_id?.split('.')[0];
+  const moduleNumber = lessonSpec.lesson_id?.split('.')[0] || '';
   const isFirstModule = moduleNumber === '1';
 
   let targetTier: 'simple' | 'normal' | 'complex';

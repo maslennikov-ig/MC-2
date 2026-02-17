@@ -325,8 +325,8 @@ describe('LLMClient', () => {
 
       const cost = client.estimateCost(response);
 
-      // $0.10/1M input + $0.40/1M output = $0.50
-      expect(cost).toBeCloseTo(0.5, 4);
+      // $0.50/1M input + $3.00/1M output = $3.50
+      expect(cost).toBeCloseTo(3.5, 4);
     });
 
     it('should use fallback pricing for unknown models', () => {

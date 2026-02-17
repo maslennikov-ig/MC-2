@@ -220,8 +220,8 @@ export const MODELS: Record<string, ModelConfig> = {
 
   // Stage 4 Analysis Models
   'gemini-flash-preview': {
-    modelId: 'google/gemini-2.5-flash-preview-09-2025',
-    displayName: 'Gemini 2.5 Flash Preview',
+    modelId: 'google/gemini-3-flash-preview',
+    displayName: 'Gemini 3 Flash Preview',
     maxContextTokens: 1_000_000,
     costPer1kInput: 0.000075,
     costPer1kOutput: 0.0003,
