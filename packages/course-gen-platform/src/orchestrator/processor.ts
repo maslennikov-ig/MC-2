@@ -397,12 +397,16 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
  * Max time a job can run before being forcefully killed.
  * This prevents runaway jobs from blocking the worker thread forever.
  *
- * Default: 600000ms (10 minutes) - same as lockDuration in worker.ts
+ * Default: 2700000ms (45 minutes) - same as lockDuration in worker.ts
+ * Stage 5 generates sections SEQUENTIALLY with thinking models:
+ * - kimi-k2-thinking: 55-180s per section (complex), mimo-v2-flash: ~25s (normal)
+ * - comprehensive preset: up to 15 sections → worst case ~47 min
+ * - standard preset: up to 8 sections → worst case ~26 min
  * Configure via PROCESSOR_MAX_TTL_MS environment variable.
  *
  * Exit code 10 signals TTL timeout to parent process for metrics/logging.
  */
-const PROCESSOR_MAX_TTL_MS = parseInt(process.env.PROCESSOR_MAX_TTL_MS || '600000');
+const PROCESSOR_MAX_TTL_MS = parseInt(process.env.PROCESSOR_MAX_TTL_MS || '2700000');
 const TTL_EXIT_CODE = 10;
 
 /**

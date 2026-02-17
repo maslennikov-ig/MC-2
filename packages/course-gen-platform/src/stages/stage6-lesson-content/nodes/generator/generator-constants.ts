@@ -158,10 +158,10 @@ export function calculateDynamicContextWindow(durationMinutes: number, language:
  * These are ONLY used when database is completely unavailable.
  */
 export const STAGE6_TIER_MODELS = {
-  /** Simple tier: for beginner difficulty lessons */
-  simple: 'moonshotai/kimi-k2-thinking',
-  /** Normal tier: for intermediate difficulty lessons */
+  /** Simple tier: fast cheap model for beginner difficulty lessons */
+  simple: 'xiaomi/mimo-v2-flash',
+  /** Normal tier: thinking model for intermediate difficulty lessons */
   normal: 'moonshotai/kimi-k2-thinking',
-  /** Complex tier: for advanced difficulty + module 1 lessons */
+  /** Complex tier: premium model for advanced difficulty + module 1 lessons */
   complex: 'qwen/qwen3.5-plus-02-15',
 } as const;

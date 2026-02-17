@@ -146,18 +146,18 @@ UPDATE llm_model_config SET is_active = false WHERE phase_name = 'chat_node_refi
 
 Routing based on `sections_breakdown.importance` field from Stage 4:
 
-- **simple**: Trivial intro/overview sections -> cheap model
-- **normal**: Standard course content (majority of sections) -> main workhorse
-- **complex**: Hardest material + first section of every course -> premium model
+- **simple**: Trivial intro/overview sections -> fast cheap model (Xiaomi)
+- **normal**: Standard course content (majority of sections) -> thinking model (Kimi)
+- **complex**: Hardest material + first section of every course -> premium model (Qwen3.5)
 
 | Phase           | Tier     | Primary Model                 | Fallback Model                | Temp | Tokens | Description                          |
 | --------------- | -------- | ----------------------------- | ----------------------------- | ---- | ------ | ------------------------------------ |
-| stage_5_simple  | standard | openai/gpt-oss-120b           | xiaomi/mimo-v2-flash          | 0.70 | 30000  | Trivial sections (importance=simple) |
-| stage_5_simple  | extended | google/gemini-3-flash-preview | openai/gpt-oss-120b           | 0.70 | 30000  | Trivial sections (large context)     |
-| stage_5_normal  | standard | xiaomi/mimo-v2-flash          | google/gemini-3-flash-preview | 0.70 | 30000  | Standard sections (majority)         |
-| stage_5_normal  | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash          | 0.70 | 30000  | Standard sections (large context)    |
-| stage_5_complex | standard | moonshotai/kimi-k2-thinking   | google/gemini-3-flash-preview | 0.70 | 30000  | Complex + first section (premium)    |
-| stage_5_complex | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-thinking   | 0.70 | 30000  | Complex + first (large context)      |
+| stage_5_simple  | standard | xiaomi/mimo-v2-flash          | moonshotai/kimi-k2-thinking   | 0.70 | 30000  | Trivial sections (importance=simple) |
+| stage_5_simple  | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash          | 0.70 | 30000  | Trivial sections (large context)     |
+| stage_5_normal  | standard | moonshotai/kimi-k2-thinking   | google/gemini-3-flash-preview | 0.70 | 30000  | Standard sections (majority)         |
+| stage_5_normal  | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-thinking   | 0.70 | 30000  | Standard sections (large context)    |
+| stage_5_complex | standard | qwen/qwen3.5-plus-02-15       | moonshotai/kimi-k2-thinking   | 0.70 | 30000  | Complex + first section (premium)    |
+| stage_5_complex | extended | google/gemini-3-flash-preview | qwen/qwen3.5-plus-02-15       | 0.70 | 30000  | Complex + first (large context)      |
 
 ### Escalation (retry fallback)
 
@@ -177,16 +177,18 @@ Routing based on `sections_breakdown.importance` field from Stage 4:
 
 Routing based on `difficulty_level` field from Stage 5 LessonSpecificationV2:
 
-- **simple**: Beginner difficulty lessons -> cost-effective model
-- **normal**: Intermediate difficulty (majority) -> main workhorse
-- **complex**: Advanced difficulty + all Module 1 lessons -> premium model
+- **simple**: Beginner difficulty lessons -> fast cheap model (Xiaomi)
+- **normal**: Intermediate difficulty (majority) -> thinking model (Kimi)
+- **complex**: Advanced difficulty + all Module 1 lessons -> premium model (Qwen3.5)
 
 **First module rule**: All lessons in Module 1 (lesson_id starts with "1.") always use complex tier for best first impression quality.
 
+**Consistent with Stage 5**: Both stages use the same model hierarchy (simple=Xiaomi, normal=Kimi, complex=Qwen3.5).
+
 | Phase           | Tier     | Primary Model                 | Fallback Model                | Temp | Tokens | Description                         |
 | --------------- | -------- | ----------------------------- | ----------------------------- | ---- | ------ | ----------------------------------- |
-| stage_6_simple  | standard | moonshotai/kimi-k2-thinking   | google/gemini-3-flash-preview | 0.70 | 8000   | Beginner difficulty lessons         |
-| stage_6_simple  | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-thinking   | 0.70 | 8000   | Beginner (large context)            |
+| stage_6_simple  | standard | xiaomi/mimo-v2-flash          | moonshotai/kimi-k2-thinking   | 0.70 | 8000   | Beginner difficulty lessons         |
+| stage_6_simple  | extended | google/gemini-3-flash-preview | xiaomi/mimo-v2-flash          | 0.70 | 8000   | Beginner (large context)            |
 | stage_6_normal  | standard | moonshotai/kimi-k2-thinking   | google/gemini-3-flash-preview | 0.70 | 8000   | Intermediate difficulty (majority)  |
 | stage_6_normal  | extended | google/gemini-3-flash-preview | moonshotai/kimi-k2-thinking   | 0.70 | 8000   | Intermediate (large context)        |
 | stage_6_complex | standard | qwen/qwen3.5-plus-02-15       | moonshotai/kimi-k2-thinking   | 0.70 | 8000   | Advanced + Module 1 (premium)       |
@@ -297,8 +299,8 @@ Stage-specific models with automatic fallback:
 | Grok 4.1 Fast          | x-ai/grok-4.1-fast            | xAI      | Быстрая, Stage 4 non-Russian                     |
 | DeepSeek V3.2          | deepseek/deepseek-v3.2        | DeepSeek | Лучшая для русского                              |
 | Qwen3 235B             | qwen/qwen3-235b-a22b-2507     | Alibaba  | Лучшая для английского                           |
-| Qwen3.5 Plus           | qwen/qwen3.5-plus-02-15       | Alibaba  | Stage 6 complex tier + judges                    |
-| Kimi K2 Thinking       | moonshotai/kimi-k2-thinking   | Moonshot | Мультиязычная reasoning-модель                   |
+| Qwen3.5 Plus           | qwen/qwen3.5-plus-02-15       | Alibaba  | Stage 5/6 complex tier + judges                  |
+| Kimi K2 Thinking       | moonshotai/kimi-k2-thinking   | Moonshot | Stage 5/6 normal tier, reasoning-модель          |
 | Kimi K2.5              | moonshotai/kimi-k2.5          | Moonshot | Fallback для Kimi K2 Thinking                    |
 | Minimax M2.5           | minimax/minimax-m2.5          | Minimax  | Primary CLEV judge                               |
 | GLM-5                  | z-ai/glm-5                    | Zhipu AI | Secondary CLEV judge                             |
@@ -354,4 +356,4 @@ Hardcoded fallback конфигурации загружаются из `config-
 - **Total configs**: ~90
 - **Active configs**: ~90
 - **Last updated**: 2026-02-17
-- **Last change**: Gemini → gemini-3-flash-preview everywhere, prompt caching, DEFAULT_PHASE_CONFIGS auto-sync from seed, Stage 6 3-tier routing, CLEV judges update
+- **Last change**: Unified Stage 5/6 3-tier models (simple=Xiaomi, normal=Kimi, complex=Qwen3.5)

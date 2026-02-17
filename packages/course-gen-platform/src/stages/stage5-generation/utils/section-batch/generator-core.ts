@@ -214,8 +214,27 @@ function validateAndInjectDuration(
     courseId: input.course_id,
   });
 
+  const WARN_LEARNING_OBJECTIVES_THRESHOLD = 8;
+
   sectionsToValidate = sectionsToValidate.map(section => {
     const sectionObj = section as Record<string, unknown>;
+
+    // Warn if too many learning_objectives, but don't block or truncate
+    if (
+      sectionObj.learning_objectives &&
+      Array.isArray(sectionObj.learning_objectives) &&
+      sectionObj.learning_objectives.length > WARN_LEARNING_OBJECTIVES_THRESHOLD
+    ) {
+      logger.warn({
+        msg: 'Section has many learning_objectives',
+        batchNum,
+        sectionIndex,
+        count: sectionObj.learning_objectives.length,
+        threshold: WARN_LEARNING_OBJECTIVES_THRESHOLD,
+        courseId: input.course_id,
+      });
+    }
+
     if (sectionObj.lessons && Array.isArray(sectionObj.lessons)) {
       return {
         ...sectionObj,

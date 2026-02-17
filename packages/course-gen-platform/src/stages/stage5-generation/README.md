@@ -2,7 +2,7 @@
 
 ## Overview
 
-Stage 5 generates the complete course structure including metadata, sections, and lesson skeletons. It implements a 5-phase LangGraph StateGraph workflow with hybrid model routing, quality validation, and cost optimization through parallel batch processing.
+Stage 5 generates the complete course structure including metadata, sections, and lesson skeletons. It implements a 4-phase LangGraph StateGraph workflow with hybrid model routing, sequential section generation with digest accumulation, and quality validation.
 
 **Input:** `AnalysisResult` from Stage 4, frontend parameters, optional document summaries
 **Output:** `CourseStructure` and `GenerationMetadata` stored in database
@@ -11,7 +11,7 @@ Stage 5 generates the complete course structure including metadata, sections, an
 
 ### Core Components
 
-- **Orchestrator:** `orchestrator.ts` - LangGraph StateGraph with 5 generation phases
+- **Orchestrator:** `orchestrator.ts` - LangGraph StateGraph with 4 generation phases
 - **Handler:** `handler.ts` - BullMQ job handler with XSS sanitization
 - **Phases:** `phases/generation-phases.ts` - Phase implementations
 - **Utils:** Metadata generator, section batch generator, quality validator
@@ -25,16 +25,13 @@ GenerationJobInput
 Phase 1: validate_input (Schema Validation)
     |
     v
-Phase 2: generate_metadata (RT-001 Hybrid Routing)
+Phase 2: generate_metadata (Thinking Model)
     |
     v
-Phase 3: generate_sections (Parallel Batch Processing)
+Phase 3: generate_sections (Sequential with Digest Accumulation)
     |
     v
-Phase 4: validate_quality (Embedding + LLM-as-Judge)
-    |
-    v
-Phase 5: validate_lessons (Minimum 10 Lessons Check)
+Phase 4: validate_quality (Embedding + Overlap Detection)
     |
     v
 CourseStructure -> courses.course_structure
@@ -86,26 +83,42 @@ GenerationMetadata -> courses.generation_metadata
 
 **Retry:** Max 3 attempts with exponential backoff.
 
+**Typical duration:** ~70s with thinking models (kimi-k2-thinking)
+
 ---
 
 ### Phase 3: Generate Sections
 
-**File:** `utils/section-batch-generator.ts`
+**File:** `utils/section-batch/section-batch-generator.ts`
 **Model:** Configured via database (supports tiered routing)
 
 **Purpose:** Generate all course sections with lessons.
 
-**Model Selection:**
+**Sequential Processing with Digest Accumulation:**
 
-- Primary model from database config
-- Escalation model for complex sections
-- Emergency model for overflow contexts
+Sections are generated **one-by-one in order** (not parallel). Each section receives
+a digest of previously generated lessons (titles + topics) to prevent content overlap
+at the concrete lesson level. This complements Stage 4's abstract-level anti-overlap.
 
-**Parallel Processing (SC-003):**
+- Sections generated sequentially: section 1, then section 2, etc.
+- Each section's digest grows as more sections are completed
+- Retries for failed sections use `pLimit(2)` for parallel recovery
 
-- Batch size: 4 sections concurrent
-- 2-second delay between batches (rate limiting)
-- Target: <150s total generation time
+**Model Tiered Routing (RT-001):**
+
+- **Complex tier** (`kimi-k2-thinking`): First section + sections with `importance: "complex"` (~55-180s each)
+- **Normal tier** (`mimo-v2-flash`): Standard sections (~25s each)
+- Models configured via database `llm_model_config` table
+
+**Timing Estimates (sequential):**
+
+| Preset        | Sections | Worst Case | Typical |
+| ------------- | -------- | ---------- | ------- |
+| micro         | 1        | ~5 min     | ~2 min  |
+| mini          | 3        | ~11 min    | ~5 min  |
+| compact       | 5        | ~17 min    | ~8 min  |
+| standard      | 8        | ~26 min    | ~12 min |
+| comprehensive | 15       | ~47 min    | ~20 min |
 
 **Output per Section:**
 
@@ -134,32 +147,19 @@ GenerationMetadata -> courses.generation_metadata
 **File:** `phases/generation-phases.ts`
 **Model:** Jina-v3 embeddings (primary) + LLM-as-judge from database (edge cases)
 
-**Purpose:** Validate generated content quality.
+**Purpose:** Validate generated content quality + detect section overlap.
 
 **Validation Method:**
 
 1. **Metadata similarity:** Compare with analysis_result requirements
 2. **Section similarity:** Compare each section with expected topics
-3. **Overall score:** 40% metadata + 60% sections weighted average
+3. **Overlap detection:** Cross-section lesson overlap check with targeted regeneration
+4. **Overall score:** 40% metadata + 60% sections weighted average
 
 **Threshold:** 0.75 minimum similarity
 
 **Note:** Quality validation is **non-blocking** in Stage 5 (skeleton generation).
 Full enforcement occurs in Stage 6 (lesson content generation).
-
----
-
-### Phase 5: Validate Lessons
-
-**File:** `phases/generation-phases.ts`
-**Model:** None (count validation only)
-
-**Purpose:** Enforce minimum lesson count (FR-015).
-
-**Validation:**
-
-- Total lessons across all sections >= 10
-- **Blocking** - fails job if not met
 
 ---
 
@@ -181,28 +181,6 @@ Helper functions to format nested AnalysisResult fields for LLM prompts.
 4. `formatContextualLanguageForPrompt(contextual, strategy?)` - Formats 6-field contextual object
 5. `formatPedagogicalStrategyForPrompt(strategy)` - Formats 5-field strategy object
 6. `formatGenerationGuidanceForPrompt(guidance)` - Formats generation_guidance
-
-**Usage Example:**
-
-```typescript
-import {
-  getDifficultyFromAnalysis,
-  formatCourseCategoryForPrompt,
-  formatPedagogicalStrategyForPrompt,
-} from './utils/analysis-formatters';
-
-const difficulty = getDifficultyFromAnalysis(input.analysis_result);
-const category = formatCourseCategoryForPrompt(input.analysis_result.course_category);
-const strategy = formatPedagogicalStrategyForPrompt(input.analysis_result.pedagogical_strategy);
-
-prompt += `
-Difficulty: ${difficulty}
-Category: ${category}
-
-Pedagogical Strategy:
-${strategy}
-`;
-```
 
 ---
 
@@ -274,7 +252,6 @@ interface GenerationMetadata {
     sections_similarity: number[];
     overall: number;
   };
-  batch_count: number;
   retry_count: {
     metadata: number;
     sections: number[];
@@ -313,7 +290,6 @@ interface GenerationMetadata {
 | `ORCHESTRATION_FAILED`      | LangGraph workflow failure    | Yes    |
 | `VALIDATION_FAILED`         | Zod schema validation failure | Yes    |
 | `QUALITY_THRESHOLD_NOT_MET` | Quality < 0.75                | Yes    |
-| `MINIMUM_LESSONS_NOT_MET`   | Lessons < 10                  | Yes    |
 | `DATABASE_ERROR`            | Supabase commit failure       | Yes    |
 | `UNKNOWN`                   | Unexpected error              | Yes    |
 
@@ -323,6 +299,7 @@ interface GenerationMetadata {
 - Exponential backoff: 1s, 2s, 4s
 - Model escalation on repeated failures
 - BullMQ automatic retry on job failure
+- Failed section retries: `pLimit(2)` parallel recovery
 
 ### Status Updates (FR-024)
 
@@ -336,6 +313,18 @@ On failure:
 
 ## Configuration
 
+### Timeouts
+
+```
+PROCESSOR_MAX_TTL_MS=2700000   # 45 min - max job runtime (env var override)
+BullMQ lockDuration=2700000    # 45 min - must match processor TTL
+Generation lock TTL=2700000    # 45 min - Redis lock for concurrent prevention
+Lock heartbeat=120000          # 2 min - auto-extends lock during processing
+```
+
+**Why 45 minutes:** Sequential generation with thinking models (kimi-k2-thinking)
+can take 55-180s per section. Comprehensive courses (15 sections) need ~47 min worst case.
+
 ### Environment Variables
 
 ```bash
@@ -344,11 +333,9 @@ OPENROUTER_API_KEY=sk-or-...
 
 # Quality Settings
 QUALITY_THRESHOLD=0.75
-MIN_LESSONS=10
 
-# Performance
-PARALLEL_BATCH_SIZE=4
-BATCH_DELAY_MS=2000
+# Timeout (optional override)
+PROCESSOR_MAX_TTL_MS=2700000
 ```
 
 ### Model Configuration
@@ -373,7 +360,6 @@ Admin panel allows per-phase model selection with fallback hierarchy:
 - Metadata generation
 - Section batch generation
 - Quality validation scoring
-- Lesson count validation
 - Cost calculation
 - Analysis formatters (67 tests, 100% coverage)
 
@@ -393,7 +379,7 @@ pnpm test tests/unit/stages/stage5/
 
 **Scenarios:**
 
-- Full 5-phase pipeline
+- Full 4-phase pipeline
 - RAG integration
 - Error recovery
 - Quality threshold enforcement
@@ -437,12 +423,7 @@ Atomic multi-step status update:
 
 1. `generation_status` = `'stage_5_init'`
 2. `generation_status` = `'stage_5_generating'`
-3. `generation_status` = `'stage_5_complete'`
-4. `generation_status` = `'finalizing'`
-5. Final commit:
-   - `course_structure` = sanitized structure
-   - `generation_metadata` = metadata
-   - `generation_status` = `'completed'`
+3. `generation_status` = `'stage_5_complete'` or `'stage_5_awaiting_approval'`
 
 ---
 
@@ -450,11 +431,13 @@ Atomic multi-step status update:
 
 ### Average Generation Costs
 
-| Course Size | Sections | Lessons | Cost   |
-| ----------- | -------- | ------- | ------ |
-| Small       | 4-5      | 15-20   | ~$0.15 |
-| Medium      | 6-8      | 25-35   | ~$0.25 |
-| Large       | 9-12     | 40-60   | ~$0.40 |
+| Course Size   | Sections | Lessons | Cost   |
+| ------------- | -------- | ------- | ------ |
+| Micro         | 1        | 1-5     | ~$0.02 |
+| Mini          | 3        | 8-16    | ~$0.08 |
+| Compact       | 5        | 15-30   | ~$0.15 |
+| Standard      | 8        | 30-50   | ~$0.25 |
+| Comprehensive | 15       | 60-100  | ~$0.45 |
 
 ### Cost Breakdown
 
@@ -468,31 +451,13 @@ Atomic multi-step status update:
 
 ## Performance Targets
 
-| Metric                  | Target | Actual     |
-| ----------------------- | ------ | ---------- |
-| Total generation time   | <150s  | ~90-120s   |
-| Sections per second     | >0.5   | ~0.8-1.0   |
-| Quality score           | >0.75  | ~0.80-0.85 |
-| First-pass success rate | >85%   | ~90%       |
-
----
-
-## Stage Completion
-
-On successful completion:
-
-1. `CourseStructure` stored in `courses.course_structure`
-2. `GenerationMetadata` stored in `courses.generation_metadata`
-3. Course status updated to `'completed'`
-4. Course ready for viewing/editing
-
----
-
-## Related Documentation
-
-- **Schema Unification**: `specs/008-generation-generation-json/dependencies/schema-unification/ARCHITECTURE-SUMMARY.md`
-- **Migration Guide**: `docs/migrations/MIGRATION-unified-schemas.md`
-- **Spec**: `docs/FUTURE/SPEC-2025-11-12-001-unify-stage4-stage5-schemas.md`
+| Metric                  | Target  | Notes                              |
+| ----------------------- | ------- | ---------------------------------- |
+| Standard course (8 sec) | <15 min | Mix of thinking + flash models     |
+| Comprehensive (15 sec)  | <30 min | Sequential, mostly thinking models |
+| Quality score           | >0.75   | Non-blocking, informational        |
+| First-pass success rate | >85%    | Per-section                        |
+| Processor TTL           | 45 min  | Hard kill timeout                  |
 
 ---
 
@@ -509,26 +474,43 @@ Warning: Quality below target (informational): overall similarity 0.72 < thresho
 **Cause:** Generated content diverges from analysis requirements
 **Note:** Non-blocking in Stage 5, informational only
 
-**2. Minimum Lessons Not Met**
+**2. Processor TTL Exceeded**
 
 ```
-Error: Lesson count validation failed: only 8 lessons, minimum 10 required (FR-015)
+Processor TTL exceeded - force killing worker thread
 ```
 
-**Cause:** Section generation produced insufficient lessons
-**Resolution:** Job will retry with explicit minimum constraint
+**Cause:** Sequential generation with thinking models exceeded 45-minute limit.
+Typically happens with comprehensive courses (15+ sections) where most sections
+use complex-tier thinking models.
 
-**3. Section Generation Timeout**
+**Resolution:**
+
+- Increase `PROCESSOR_MAX_TTL_MS` env var
+- Switch some sections to normal-tier (flash) models in admin panel
+- Generation lock auto-expires via Redis TTL; retries work after expiry
+
+**3. Generation Lock Conflict**
 
 ```
-Error: Section generation timeout after 300s
+Course X is already being processed: Lock held by stage-5-Y
 ```
 
-**Cause:** Rate limiting or model unavailable
-**Resolution:** Retry with smaller batch size
+**Cause:** Previous job crashed/timed out and lock hasn't expired yet
+**Resolution:** Lock expires automatically via Redis TTL (45 min).
+For immediate fix: flush Redis lock key `generation:lock:{courseId}`
+
+**4. RT-006 Validation Failed**
+
+```
+RT-006 validation failed: Maximum 5 learning objectives per lesson
+```
+
+**Cause:** LLM generated too many objectives
+**Resolution:** Auto-retry with stricter prompt constraints
 
 ---
 
-**Last Updated:** 2025-11-21
-**Version:** 1.0.0
+**Last Updated:** 2026-02-17
+**Version:** 2.0.0
 **Owner:** course-gen-platform team

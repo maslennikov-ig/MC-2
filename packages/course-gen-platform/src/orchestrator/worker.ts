@@ -254,7 +254,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         // Lock duration for long-running jobs (document processing can take several minutes)
         // Default is 30s, but we need more for PDF processing, embedding generation, etc.
         // With sandboxed processors, lock renewal is handled automatically by the thread
-        lockDuration: 600000, // 10 minutes (same as Stage 3 summarization worker)
+        lockDuration: 2700000, // 45 minutes - must match PROCESSOR_MAX_TTL_MS
         // Exponential backoff: 2^attempt * 1000ms
         // Attempt 1: 2s, Attempt 2: 4s, Attempt 3: 8s, etc.
         settings: {

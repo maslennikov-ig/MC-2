@@ -61,7 +61,7 @@ export interface LockOptions {
 // ============================================================================
 
 const LOCK_KEY_PREFIX = 'generation:lock:';
-const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const DEFAULT_TTL_MS = 45 * 60 * 1000; // 45 minutes - must match PROCESSOR_MAX_TTL_MS
 
 // ============================================================================
 // GenerationLockService
