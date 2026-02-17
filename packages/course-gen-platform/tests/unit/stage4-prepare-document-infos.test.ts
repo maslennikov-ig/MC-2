@@ -224,6 +224,40 @@ describe('prepareDocumentInfos', () => {
       expect(coreDocs).toHaveLength(1);
       expect(coreDocs[0].file_id).toBe('doc-2'); // 120K > 80K
     });
+
+    it('falls back to size heuristic when priority values are invalid', () => {
+      const docs: DocumentSummaryResult[] = [
+        makeDoc({
+          document_id: 'doc-1',
+          summary_metadata: {
+            original_tokens: 50000,
+            summary_tokens: 5000,
+            compression_ratio: 0.1,
+            quality_score: 0.9,
+          },
+          stage3_priority: 'INVALID_VALUE' as 'CORE',
+          stage3_importance_score: 0.8,
+        }),
+        makeDoc({
+          document_id: 'doc-2',
+          summary_metadata: {
+            original_tokens: 100000,
+            summary_tokens: 10000,
+            compression_ratio: 0.1,
+            quality_score: 0.7,
+          },
+          stage3_priority: 'CORE',
+          stage3_importance_score: 0.9,
+        }),
+      ];
+
+      const result = prepareDocumentInfos(docs);
+
+      // Invalid value → size heuristic → largest = CORE
+      const coreDoc = result.find(d => d.priority === 'CORE');
+      expect(coreDoc).toBeDefined();
+      expect(coreDoc!.file_id).toBe('doc-2'); // 100K > 50K
+    });
   });
 
   describe('without Stage 3 priorities (backward compat)', () => {

@@ -385,13 +385,35 @@ export function prepareDocumentInfos(
   return prepareWithSizeHeuristic(documentSummaries);
 }
 
+const VALID_PRIORITIES = new Set(['CORE', 'IMPORTANT', 'SUPPLEMENTARY']);
+
+function isValidPriority(value: unknown): value is 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' {
+  return typeof value === 'string' && VALID_PRIORITIES.has(value);
+}
+
 /**
  * Use Stage 3 LLM-determined priorities.
- * Validates exactly 1 CORE document; falls back to size heuristic if inconsistent.
+ * Validates exactly 1 CORE document and all values are valid;
+ * falls back to size heuristic if inconsistent.
  */
 function prepareWithStage3Priorities(
   documentSummaries: DocumentSummaryResult[]
 ): Stage4DocumentInfo[] {
+  // Validate all priority values are recognized
+  const invalidDocs = documentSummaries.filter(d => !isValidPriority(d.stage3_priority));
+  if (invalidDocs.length > 0) {
+    logger.warn(
+      {
+        invalidDocs: invalidDocs.map(d => ({
+          id: d.document_id,
+          priority: d.stage3_priority,
+        })),
+      },
+      'Invalid Stage 3 priority values in database, falling back to size heuristic'
+    );
+    return prepareWithSizeHeuristic(documentSummaries);
+  }
+
   const coreDocs = documentSummaries.filter(d => d.stage3_priority === 'CORE');
 
   // Validate: exactly 1 CORE expected from Stage 3 tournament
