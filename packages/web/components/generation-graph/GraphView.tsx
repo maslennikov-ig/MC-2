@@ -41,7 +41,7 @@ import { logger } from '@/lib/client-logger'
 import { useFallbackPolling } from './hooks/useFallbackPolling'
 import { useViewportPreservation } from './hooks/useViewportPreservation'
 import { useGracefulDegradation } from './hooks/useGracefulDegradation'
-import { LongRunningIndicator } from './controls/LongRunningIndicator'
+
 import { useBackgroundTab } from './hooks/useBackgroundTab'
 import { useSessionRecovery } from './hooks/useSessionRecovery'
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation'
@@ -511,7 +511,7 @@ function GraphViewInner({
                   <GraphControls isDark={isDark} />
                   <GraphMinimap isDark={isDark} />
                   <GraphInteractions setIsPanning={setIsPanning} />
-                  <LongRunningIndicator />
+
                   {/* Custom Attribution */}
                   <Panel position="bottom-right" className="!mr-1 !mb-0">
                     <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>

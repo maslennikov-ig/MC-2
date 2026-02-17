@@ -15,12 +15,12 @@ export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
  * To change models, update llm_model_config table via admin panel.
  */
 export const MODELS = {
-  /** Simple tier: cheap model for trivial sections */
-  simple: 'openai/gpt-oss-120b',
-  /** Normal tier: main workhorse (309B MoE) for most sections */
-  normal: 'xiaomi/mimo-v2-flash',
+  /** Simple tier: fast cheap model for trivial sections */
+  simple: 'xiaomi/mimo-v2-flash',
+  /** Normal tier: thinking model for most sections */
+  normal: 'moonshotai/kimi-k2-thinking',
   /** Complex tier: premium model for hardest sections + first section */
-  complex: 'moonshotai/kimi-k2-thinking',
+  complex: 'qwen/qwen3.5-plus-02-15',
   /** Context overflow: large context model */
   tier3_gemini: 'google/gemini-3-flash-preview',
 } as const;

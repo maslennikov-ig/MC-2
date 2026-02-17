@@ -415,9 +415,8 @@ const SectionBaseSchemaForGeneration = z.object({
   learning_objectives: z
     .array(z.string().min(10).max(600))
     .min(1, 'At least 1 section-level learning objective required')
-    .max(5, 'Maximum 5 section-level learning objectives')
     .describe(
-      'Section-level learning objectives (simple strings per spec data-model.md, min 10 chars, 1-5 items)'
+      'Section-level learning objectives (simple strings per spec data-model.md, min 10 chars)'
     ),
 
   // Nested lessons (WITHOUT duration - will be injected)
@@ -466,9 +465,8 @@ export const SectionSchema = z
     learning_objectives: z
       .array(z.string().min(10).max(600))
       .min(1, 'At least 1 section-level learning objective required')
-      .max(5, 'Maximum 5 section-level learning objectives')
       .describe(
-        'Section-level learning objectives (simple strings per spec data-model.md, min 10 chars, 1-5 items)'
+        'Section-level learning objectives (simple strings per spec data-model.md, min 10 chars)'
       ),
 
     // Lessons with injected duration
