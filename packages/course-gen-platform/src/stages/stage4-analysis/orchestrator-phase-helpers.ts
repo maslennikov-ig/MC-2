@@ -509,9 +509,9 @@ export async function runExpertPhase(context: AnalysisContext): Promise<void> {
         clarifying_answers: clarifyingAnswers,
         budget_context: context.budgetAllocation
           ? {
-              documents: context.budgetAllocation.documents.map((d) => {
+              documents: context.budgetAllocation.documents.map(d => {
                 const docSummary = resolvedDocumentSummaries?.find(
-                  (ds) => ds.document_id === d.file_id
+                  ds => ds.document_id === d.file_id
                 );
                 if (!docSummary) {
                   orchestrationLogger.warn(
@@ -634,6 +634,25 @@ export async function runSynthesisPhase(context: AnalysisContext): Promise<void>
 }
 
 /**
+ * Errors that indicate structural/input problems — retrying won't help.
+ * Aligned with Stage 5/6 non-retryable bail-out pattern.
+ */
+function isNonRetryablePhaseError(error: Error): boolean {
+  const msg = error.message.toLowerCase();
+  return (
+    msg.includes('validation failed') ||
+    msg.includes('validation error') ||
+    msg.includes('schema validation') ||
+    msg.includes('zod') ||
+    msg.includes('unauthorized') ||
+    msg.includes('forbidden') ||
+    msg.includes('invalid api key') ||
+    msg.includes('invalid phase') ||
+    msg.includes('mismatch')
+  );
+}
+
+/**
  * Execute phase with retry and exponential backoff
  */
 export async function executePhaseWithRetry<T>(
@@ -664,6 +683,15 @@ export async function executePhaseWithRetry<T>(
       return await phaseFunc();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry structural/validation errors — they'll fail again
+      if (isNonRetryablePhaseError(lastError)) {
+        phaseLogger.warn(
+          { phase: phaseName, attempt, error: lastError.message },
+          `Phase ${phaseName} hit non-retryable error, bailing out`
+        );
+        throw lastError;
+      }
 
       phaseLogger.warn(
         {
