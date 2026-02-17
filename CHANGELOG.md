@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.5] - 2026-02-17
+
+### Fixed
+
+- **stages**: add non-retryable bail-out to Stage 4 and Stage 6 retry loops (470d07ed)
+
+### Other
+
+- update docs (01bff0ae)
+
 ## [0.30.4] - 2026-02-17
 
 ### Fixed

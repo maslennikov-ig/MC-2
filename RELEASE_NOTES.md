@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.30.5
+
+_Released on 2026-02-17_
+
+### 🐛 Bug Fixes
+
+- **stages**: Add non-retryable bail-out to Stage 4 and Stage 6 retry loops
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.30.4
 
 _Released on 2026-02-17_
