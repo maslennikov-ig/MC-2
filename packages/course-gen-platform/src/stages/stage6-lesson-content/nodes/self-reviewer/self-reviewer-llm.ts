@@ -438,7 +438,12 @@ export function applyPatching(
     if (!validation.success) {
       nodeLogger.warn({
         msg: 'Invalid patchedContent from LLM, downgrading status',
-        errors: validation.error.errors.map(e => e.message),
+        errors: validation.error.errors.map(e => ({
+          path: e.path.join('.'),
+          message: e.message,
+        })),
+        issuesCount: result.issues.length,
+        originalStatus: result.status,
       });
 
       updatedResult.patchedContent = null;

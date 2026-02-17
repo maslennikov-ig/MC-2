@@ -280,14 +280,24 @@ export function checkLanguageConsistency(
   };
 
   if (!passed) {
+    // Determine severity explicitly:
+    // - CJK/Arabic/Devanagari = always critical (zero-tolerance scripts)
+    // - >20 foreign chars = critical (massive contamination regardless of script)
+    // - Otherwise = major (moderate issues)
+    let severity: 'critical' | 'major';
+    if (hasZeroToleranceViolation) {
+      severity = 'critical';
+    } else if (totalForeignCount > CRITICAL_FOREIGN_COUNT) {
+      severity = 'critical';
+    } else {
+      severity = 'major';
+    }
+
     result.failure = {
       filter: 'languageConsistency',
       expected: `No unexpected ${scriptsFound.join('/')} characters`,
       actual: `${totalForeignCount} foreign characters found`,
-      severity:
-        hasZeroToleranceViolation || totalForeignCount > CRITICAL_FOREIGN_COUNT
-          ? 'critical'
-          : 'major',
+      severity,
     };
     result.suggestion = `Content contains ${totalForeignCount} unexpected characters from ${scriptsFound.join(', ')} script(s). Examples: "${allSamples.slice(0, 3).join('", "')}". Remove or replace these characters.`;
   }
