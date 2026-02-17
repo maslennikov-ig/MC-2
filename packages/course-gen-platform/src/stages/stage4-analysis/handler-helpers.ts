@@ -275,6 +275,10 @@ type SummaryMetadata = {
   summary_tokens?: number;
   compression_ratio?: number;
   quality_score?: number;
+  /** Stage 3 classification data (stored by tournament classifier) */
+  classification?: {
+    importance_score?: number;
+  };
 };
 
 /** Document summary shape returned from buildAnalysisInput */
@@ -289,6 +293,10 @@ export type DocumentSummaryResult = {
     compression_ratio: number;
     quality_score: number;
   };
+  /** Stage 3 priority from file_catalog.priority column (CORE/IMPORTANT/SUPPLEMENTARY) */
+  stage3_priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | null;
+  /** Stage 3 importance score from summary_metadata.classification.importance_score */
+  stage3_importance_score: number | null;
 };
 
 /** Fetch course metadata from database */
@@ -323,13 +331,16 @@ async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummary
   const supabase = getSupabaseAdmin();
   const { data: documents } = await supabase
     .from('file_catalog')
-    .select('id, original_name, filename, processed_content, summary_metadata')
+    .select('id, original_name, filename, processed_content, summary_metadata, priority')
     .eq('course_id', courseId)
     .eq('vector_status', 'indexed')
     .not('processed_content', 'is', null);
 
   return (documents || []).map(doc => {
     const metadata = doc.summary_metadata as SummaryMetadata | null;
+    const stage3Priority = doc.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | null;
+    const stage3ImportanceScore = metadata?.classification?.importance_score ?? null;
+
     return {
       document_id: doc.id,
       file_name: doc.original_name || doc.filename || 'unknown',
@@ -341,6 +352,8 @@ async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummary
         compression_ratio: metadata?.compression_ratio || 1,
         quality_score: metadata?.quality_score || 0.8,
       },
+      stage3_priority: stage3Priority,
+      stage3_importance_score: stage3ImportanceScore,
     };
   });
 }
@@ -375,9 +388,7 @@ export async function resolveDocumentContent(
   allocation: Stage4BudgetAllocation,
   documents: DocumentSummaryResult[]
 ): Promise<DocumentSummaryResult[]> {
-  const fullTextIds = allocation.documents
-    .filter(d => d.mode === 'full_text')
-    .map(d => d.file_id);
+  const fullTextIds = allocation.documents.filter(d => d.mode === 'full_text').map(d => d.file_id);
 
   if (fullTextIds.length === 0) return documents;
 
