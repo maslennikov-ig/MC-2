@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.7] - 2026-02-17
+
+### Added
+
+- **stage6**: add cache_hit trace event and document edge cases (8d13c986)
+- **stage6**: add tier1_pass trace event and max score logging (6553e278)
+- **stage6**: add Two-Tier RAG retrieval to eliminate 75% wasted queries (b4610a8c)
+
+### Fixed
+
+- **course-gen-platform**: update 10 source file(s), update docs, +1 more (f21f46d4)
+- **stage7**: increase hardcoded MAX_OUTPUT_TOKENS in quiz/video handlers (23adf3d7)
+- **llm**: increase max_tokens for LLM phases and add defensive question filtering (dd4feb9c)
+- **llm**: resolve config-seed.json ESM loading error in dev mode (9ba1db0b)
+- **types**: add stage_6_rag_planning to Record<PhaseName> fallback configs (1a69ccae)
+
+### Other
+
+- remove stale root-level report files (c084586f)
+- **web**: fix dev warnings — allowedDevOrigins, pino externals, baseline-browser-mapping (f57cabc3)
+- **stage6**: add unit tests for Two-Tier RAG retrieval (1cb3cdb6)
+- **llm**: add stage_6_rag_planning to model config documentation (e2aa5a38)
+
 ## [0.30.6] - 2026-02-17
 
 ### Added

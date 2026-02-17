@@ -2,6 +2,28 @@
 
 _Released on 2025-12-26_
 
+## v0.30.7
+
+_Released on 2026-02-17_
+
+### ✨ New Features
+
+- **stage6**: Add cache_hit trace event and document edge cases
+- **stage6**: Add tier1_pass trace event and max score logging
+- **stage6**: Add Two-Tier RAG retrieval to eliminate 75% wasted queries
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 10 source file(s), update docs, +1 more
+- **stage7**: Increase hardcoded MAX_OUTPUT_TOKENS in quiz/video handlers
+- **llm**: Increase max_tokens for LLM phases and add defensive question filtering
+- **llm**: Resolve config-seed.json ESM loading error in dev mode
+- **types**: Add stage_6_rag_planning to Record<PhaseName> fallback configs
+
+---
+
+_This release was automatically generated from 12 commits._
+
 ## v0.30.6
 
 _Released on 2026-02-17_
