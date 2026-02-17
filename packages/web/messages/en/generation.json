@@ -168,12 +168,6 @@
     "graphView": "Graph View",
     "listView": "List View"
   },
-  "longRunning": {
-    "message": "Taking longer than usual...",
-    "emailNotify": "Notify me by email when complete",
-    "emailPlaceholder": "Enter your email",
-    "subscribe": "Subscribe"
-  },
   "metrics": {
     "duration": "Duration",
     "tokens": "Tokens",

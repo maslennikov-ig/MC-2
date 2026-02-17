@@ -73,17 +73,17 @@ const PHASE_FALLBACK_CONFIG: Record<
   stage_4_clarifying: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.5, // Moderate creativity for question generation
-    maxTokens: 4000,
+    maxTokens: 16000, // Large JSON output: 7+ questions with answers + thinking overhead
   },
   stage_4_classification: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
-    maxTokens: 4096,
+    maxTokens: 8192,
   },
   stage_4_scope: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
-    maxTokens: 4096,
+    maxTokens: 8192,
   },
   stage_4_expert: {
     modelId: DEFAULT_MODEL_ID,
@@ -93,7 +93,7 @@ const PHASE_FALLBACK_CONFIG: Record<
   stage_4_synthesis: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
-    maxTokens: 6000,
+    maxTokens: 16000, // Large structured output for course synthesis
   },
   stage_4_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
@@ -119,7 +119,7 @@ const PHASE_FALLBACK_CONFIG: Record<
   stage_5_metadata: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
-    maxTokens: 4096,
+    maxTokens: 8192,
   },
   stage_5_sections: {
     modelId: DEFAULT_MODEL_ID,
@@ -293,7 +293,7 @@ const PHASE_FALLBACK_CONFIG: Record<
   stage_7_quiz: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
-    maxTokens: 4096,
+    maxTokens: 8192,
   },
   stage_7_presentation: {
     modelId: DEFAULT_MODEL_ID,

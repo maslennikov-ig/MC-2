@@ -90,12 +90,13 @@ fi
 
 # Clean stalled BullMQ jobs (optional - only if Redis is running)
 if redis-cli ping &>/dev/null; then
-    # Clean Stage 6 stalled jobs
-    STALLED_COUNT=$(redis-cli SCARD "bull:course-generation:stalled" 2>/dev/null || echo "0")
+    # Clean stalled jobs (use BULLMQ_QUEUE_NAME from .env, fallback to default)
+    QUEUE_NAME=$(grep -oP 'BULLMQ_QUEUE_NAME=\K.*' "$SCRIPT_DIR/packages/course-gen-platform/.env" 2>/dev/null || echo "course-generation")
+    STALLED_COUNT=$(redis-cli SCARD "bull:${QUEUE_NAME}:stalled" 2>/dev/null || echo "0")
     if [ "$STALLED_COUNT" != "0" ] && [ -n "$STALLED_COUNT" ]; then
-        echo -e "   Found $STALLED_COUNT stalled Stage 6 jobs, cleaning..."
-        redis-cli DEL "bull:course-generation:stalled" &>/dev/null
-        echo -e "   ${GREEN}✅ Stalled Stage 6 jobs cleared${NC}"
+        echo -e "   Found $STALLED_COUNT stalled jobs in ${QUEUE_NAME}, cleaning..."
+        redis-cli DEL "bull:${QUEUE_NAME}:stalled" &>/dev/null
+        echo -e "   ${GREEN}✅ Stalled jobs cleared${NC}"
     fi
     # Clean Stage 7 stalled jobs
     STALLED_COUNT_S7=$(redis-cli SCARD "bull:stage7-enrichments:stalled" 2>/dev/null || echo "0")
@@ -181,9 +182,9 @@ echo -e "\n${BLUE}🎨 Starting Stage 7 Enrichment Worker...${NC}"
 (pnpm --filter course-gen-platform dev:worker:stage7 2>&1 | tee "$WORKER_STAGE7_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[stage7] /" | log_service stage7 "$WORKER_STAGE7_LOG") &
 WORKER_STAGE7_PID=$!
 
-# 5. Start Frontend (--hostname 0.0.0.0 for LAN access)
-echo -e "\n${BLUE}🖥️  Starting Frontend (web)...${NC}"
-(cd "$SCRIPT_DIR/packages/web" && pnpm dev:webpack --hostname 0.0.0.0 2>&1 | tee >(ansifilter > "$FRONTEND_LOG") | sed "s/^/[frontend] /" | log_service frontend "$FRONTEND_LOG") &
+# 5. Start Frontend (Turbopack, --hostname 0.0.0.0 for LAN access)
+echo -e "\n${BLUE}🖥️  Starting Frontend (web, Turbopack)...${NC}"
+(cd "$SCRIPT_DIR/packages/web" && pnpm dev --hostname 0.0.0.0 2>&1 | tee >(ansifilter > "$FRONTEND_LOG") | sed "s/^/[frontend] /" | log_service frontend "$FRONTEND_LOG") &
 FRONTEND_PID=$!
 
 # =============================================================================

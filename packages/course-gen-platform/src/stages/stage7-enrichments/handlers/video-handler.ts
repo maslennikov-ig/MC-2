@@ -45,7 +45,7 @@ const FALLBACK_MODEL = DEFAULT_MODEL_ID;
 /**
  * Maximum tokens for script generation response
  */
-const MAX_OUTPUT_TOKENS = 4096;
+const MAX_OUTPUT_TOKENS = 8192;
 
 /**
  * Temperature for creative script generation

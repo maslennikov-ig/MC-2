@@ -6,6 +6,9 @@
  * Extracted from model-config-service.ts to improve maintainability.
  */
 
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import type { Database } from '@megacampus/shared-types';
@@ -517,22 +520,26 @@ function loadDefaultPhaseConfigs(): Record<string, PhaseModelConfig> {
   };
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require needed for module-init code
-    const fs = require('fs') as typeof import('fs');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- sync require needed for module-init code
-    const path = require('path') as typeof import('path');
+    // Resolve __dirname equivalent for ESM (tsx dev) and CJS (compiled dist) environments
+    let currentDir: string;
+    try {
+      currentDir = dirname(fileURLToPath(import.meta.url));
+    } catch {
+      // Fallback for CJS (compiled code where __dirname is available)
+      currentDir = __dirname;
+    }
 
     // Try multiple paths for config-seed.json:
     // 1. dist/config/ (production — after tsc build)
     // 2. src/config/ (development — when running via ts-node/tsx)
     const candidates = [
-      path.join(__dirname, '../../config/config-seed.json'), // dist/shared/llm → dist/config
-      path.join(__dirname, '../../../src/config/config-seed.json'), // dist/shared/llm → src/config (fallback)
+      join(currentDir, '../../config/config-seed.json'), // dist/shared/llm → dist/config
+      join(currentDir, '../../../src/config/config-seed.json'), // dist/shared/llm → src/config (fallback)
     ];
 
     let seedPath: string | null = null;
     for (const candidate of candidates) {
-      if (fs.existsSync(candidate)) {
+      if (existsSync(candidate)) {
         seedPath = candidate;
         break;
       }
@@ -543,7 +550,7 @@ function loadDefaultPhaseConfigs(): Record<string, PhaseModelConfig> {
       return { ...EMERGENCY_FALLBACK_CONFIGS };
     }
 
-    const rawContent = fs.readFileSync(seedPath, 'utf-8');
+    const rawContent = readFileSync(seedPath, 'utf-8');
     let seedData: unknown;
     try {
       seedData = JSON.parse(rawContent);

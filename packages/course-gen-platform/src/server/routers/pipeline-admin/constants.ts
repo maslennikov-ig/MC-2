@@ -278,10 +278,10 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: 'google/gemini-3-flash-preview',
   },
   stage_5_simple: {
-    modelId: 'openai/gpt-oss-120b',
+    modelId: 'xiaomi/mimo-v2-flash',
     temperature: 0.7,
     maxTokens: 30000,
-    fallbackModelId: 'xiaomi/mimo-v2-flash',
+    fallbackModelId: 'moonshotai/kimi-k2-thinking',
   },
   stage_5_normal: {
     modelId: 'moonshotai/kimi-k2-thinking',
@@ -339,10 +339,10 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_6_simple: {
-    modelId: 'moonshotai/kimi-k2-thinking',
+    modelId: 'xiaomi/mimo-v2-flash',
     temperature: 0.7,
     maxTokens: 8000,
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    fallbackModelId: 'moonshotai/kimi-k2-thinking',
   },
   stage_6_normal: {
     modelId: 'moonshotai/kimi-k2-thinking',

@@ -168,12 +168,6 @@
     "graphView": "Граф",
     "listView": "Список"
   },
-  "longRunning": {
-    "message": "Занимает больше времени, чем обычно...",
-    "emailNotify": "Уведомить по email, когда завершится",
-    "emailPlaceholder": "Введите ваш email",
-    "subscribe": "Подписаться"
-  },
   "metrics": {
     "duration": "Время",
     "tokens": "Токены",

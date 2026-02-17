@@ -762,6 +762,8 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
       const raw = parsedOutput as { questions: unknown[] };
       if (Array.isArray(raw.questions)) {
         const originalCount = raw.questions.length;
+
+        // Filter out questions without question_text
         raw.questions = raw.questions.filter(
           q =>
             q &&
@@ -769,10 +771,28 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
             'question_text' in q &&
             typeof (q as Record<string, unknown>).question_text === 'string'
         );
+
+        // Filter out questions with insufficient suggested_answers (< 2)
+        // This handles truncated LLM output where the last question is incomplete
+        raw.questions = raw.questions.filter(q => {
+          const answers = (q as Record<string, unknown>).suggested_answers;
+          if (!Array.isArray(answers) || answers.length < 2) {
+            phaseLogger.warn(
+              {
+                questionText: String((q as Record<string, unknown>).question_text).substring(0, 80),
+                answersCount: Array.isArray(answers) ? answers.length : 0,
+              },
+              'Filtered out question with insufficient suggested_answers (likely truncated output)'
+            );
+            return false;
+          }
+          return true;
+        });
+
         if (raw.questions.length < originalCount) {
           phaseLogger.warn(
             { originalCount, filteredCount: raw.questions.length },
-            'Filtered out malformed questions without question_text from LLM output'
+            'Filtered out malformed questions from LLM output'
           );
         }
       }

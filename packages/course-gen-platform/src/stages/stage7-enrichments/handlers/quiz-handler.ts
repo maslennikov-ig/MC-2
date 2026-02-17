@@ -46,7 +46,7 @@ const FALLBACK_MODEL = DEFAULT_MODEL_ID;
 /**
  * Maximum tokens for quiz generation response
  */
-const MAX_OUTPUT_TOKENS = 4096;
+const MAX_OUTPUT_TOKENS = 8192;
 
 /**
  * Temperature for quiz generation
