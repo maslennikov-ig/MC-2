@@ -48,6 +48,12 @@
 - Если ОБА запроса вернули 0 результатов → exit ("Strike-Two")
 - Если хотя бы один вернул результат → proceed to Tier 2
 
+**Edge case: `queries.length < 2`:**
+
+- Tier 1 использует `Math.min(TIER1_QUERY_COUNT, queries.length)` запросов
+- При 1 запросе: Tier 1 = 1 query, Tier 2 = 0 queries. Если единственный запрос вернул 0 → exit. Если вернул chunks → reranking.
+- При 0 запросов: ранний выход до Two-Tier логики (line 103-112 в retriever.ts)
+
 **Детали Tier 2 (Full Retrieval):**
 
 - Выполнить оставшиеся 8 запросов
