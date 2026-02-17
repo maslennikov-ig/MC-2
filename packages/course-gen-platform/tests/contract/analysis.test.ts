@@ -202,7 +202,7 @@ function createTestClient(port: number, token?: string) {
  */
 async function createTestCourse(
   title: string,
-  generationStatus: string = 'stage_2_processing'
+  generationStatus: string = 'stage_2_complete'
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
 
