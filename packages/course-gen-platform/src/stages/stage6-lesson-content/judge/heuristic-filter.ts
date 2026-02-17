@@ -47,6 +47,7 @@ export {
 export {
   checkLearningObjectiveCoverage,
   checkLanguageConsistency,
+  ZERO_TOLERANCE_SCRIPTS,
 } from './filters/content-quality';
 
 export { checkContentTruncation, checkMermaidSyntax } from './filters/structural-checks';

@@ -251,18 +251,34 @@ IMPORTANT: Do NOT include patched_content field. Fixes are automated.
 }
 
 /**
+ * Detected issue from heuristic analysis to pass to LLM for intelligent fixing
+ */
+export interface DetectedIssueForLLM {
+  /** The text fragment containing the issue */
+  fragment: string;
+  /** Broader context around the fragment */
+  context: string;
+  /** Type of issue (e.g., 'foreign_script', 'encoding_error') */
+  issueType: string;
+  /** Human-readable description */
+  description: string;
+}
+
+/**
  * Build the user message with dynamic content
  *
  * @param language - Target language code (e.g., 'ru', 'en')
  * @param lessonSpec - Lesson specification with objectives
  * @param ragChunks - RAG context chunks (summarized)
  * @param lessonContent - The generated content to review (raw markdown)
+ * @param detectedIssues - Optional pre-detected issues from heuristic phase for targeted fixing
  */
 export function buildSelfReviewerUserMessage(
   language: string,
   lessonSpec: LessonSpecificationV2,
   ragChunks: RAGChunk[],
-  lessonContent: string
+  lessonContent: string,
+  detectedIssues?: DetectedIssueForLLM[]
 ): string {
   // Format RAG context (limit to avoid token explosion)
   const ragContextSummary = formatRAGContext(ragChunks, 5);
@@ -272,6 +288,9 @@ export function buildSelfReviewerUserMessage(
 
   // Get language-specific grammar rules for Phase 2.5
   const grammarRules = getGrammarRulesForPrompt(language);
+
+  // Format detected issues section (if any)
+  const detectedIssuesSection = formatDetectedIssues(detectedIssues);
 
   return `<TARGET_LANGUAGE>
 ${sanitizeForPrompt(language)}
@@ -288,10 +307,38 @@ ${sanitizeForPrompt(specSummary)}
 <RAG_CONTEXT>
 ${sanitizeForPrompt(ragContextSummary)}
 </RAG_CONTEXT>
-
+${detectedIssuesSection}
 <LESSON_CONTENT>
 ${sanitizeForPrompt(lessonContent)}
 </LESSON_CONTENT>`;
+}
+
+/**
+ * Format detected issues from heuristic analysis for LLM context
+ *
+ * Provides the LLM with specific fragments that need fixing,
+ * enabling targeted corrections (translation, removal, etc.)
+ */
+function formatDetectedIssues(issues?: DetectedIssueForLLM[]): string {
+  if (!issues || issues.length === 0) return '';
+
+  const formatted = issues
+    .slice(0, 10) // Limit to avoid token explosion
+    .map(
+      (issue, i) =>
+        `${i + 1}. [${issue.issueType}] ${issue.description}\n   Fragment: "${issue.fragment}"\n   Context: "...${issue.context}..."`
+    )
+    .join('\n');
+
+  return `
+<DETECTED_ISSUES>
+ATTENTION: Heuristic analysis detected the following issues that MUST be fixed.
+For each issue, provide a GRAMMAR FIXABLE entry with "quotedText" (exact text from content) and "inlineReplacement" (corrected text).
+Translate foreign characters to the target language or remove them if appropriate. Do NOT break the meaning of the text.
+
+${formatted}
+</DETECTED_ISSUES>
+`;
 }
 
 /**

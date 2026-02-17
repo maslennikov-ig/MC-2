@@ -129,6 +129,179 @@ export function findSectionsWithForeignCharacters(
 }
 
 // ============================================================================
+// FOREIGN CHARACTER FRAGMENT EXTRACTION
+// ============================================================================
+
+/**
+ * Detected foreign character fragment with surrounding context
+ */
+export interface ForeignCharFragment {
+  /** The text fragment containing foreign characters (3-80 chars) */
+  fragment: string;
+  /** Surrounding context for LLM understanding (up to 150 chars) */
+  context: string;
+  /** Detected script types (e.g., ['CJK']) */
+  scriptTypes: string[];
+}
+
+/**
+ * Extract text fragments containing foreign characters with surrounding context
+ *
+ * Used to provide precise guidance to the LLM self-reviewer about which
+ * parts of the content need translation or correction.
+ *
+ * @param content - Full markdown content
+ * @param scriptsFound - Script types detected (e.g., ['CJK', 'ARABIC'])
+ * @returns Array of fragments with context
+ */
+export function extractForeignCharFragments(
+  content: string,
+  scriptsFound: string[]
+): ForeignCharFragment[] {
+  const fragments: ForeignCharFragment[] = [];
+
+  // Remove code blocks from analysis
+  const proseContent = content.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '');
+
+  for (const scriptKey of scriptsFound) {
+    const pattern = FOREIGN_SCRIPT_PATTERNS[scriptKey];
+    if (!pattern) continue;
+
+    // Create a global version for matching all occurrences
+    const globalPattern = new RegExp(pattern.source, 'g');
+    let match: RegExpExecArray | null;
+
+    while ((match = globalPattern.exec(proseContent)) !== null) {
+      const charIndex = match.index;
+      const foreignChars = match[0];
+
+      // Extract fragment: foreign chars + 20 chars before and after
+      const fragStart = Math.max(0, charIndex - 20);
+      const fragEnd = Math.min(proseContent.length, charIndex + foreignChars.length + 20);
+      const fragment = proseContent.slice(fragStart, fragEnd).trim();
+
+      // Extract broader context: up to 75 chars before and after
+      const ctxStart = Math.max(0, charIndex - 75);
+      const ctxEnd = Math.min(proseContent.length, charIndex + foreignChars.length + 75);
+      const context = proseContent.slice(ctxStart, ctxEnd).trim();
+
+      fragments.push({
+        fragment,
+        context,
+        scriptTypes: [scriptKey],
+      });
+    }
+  }
+
+  return fragments;
+}
+
+// ============================================================================
+// FOREIGN SCRIPT CHARACTER STRIPPING
+// ============================================================================
+
+/**
+ * Global regex patterns for foreign script character removal
+ * Uses /g flag since we need to replace ALL occurrences
+ */
+const FOREIGN_SCRIPT_STRIP_PATTERNS: Record<string, RegExp> = {
+  CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]+/g,
+  ARABIC: /[\u0600-\u06FF]+/g,
+  DEVANAGARI: /[\u0900-\u097F]+/g,
+  THAI: /[\u0E00-\u0E7F]+/g,
+  HEBREW: /[\u0590-\u05FF]+/g,
+};
+
+/**
+ * Strip foreign script characters from content while preserving code blocks
+ *
+ * Used as a safety net after LLM review to catch small foreign character leaks
+ * (1-10 chars) that the LLM didn't fix. Protects code blocks, inline code,
+ * LaTeX, and mermaid diagrams from modification.
+ *
+ * @param content - Markdown content potentially containing foreign characters
+ * @param scriptsToStrip - Script names to remove (e.g., ['CJK', 'ARABIC'])
+ * @returns Object with cleaned content and count of fixes applied
+ *
+ * @example
+ * ```typescript
+ * const result = stripForeignScriptCharacters(
+ *   'Текст с公司的 примером',
+ *   ['CJK']
+ * );
+ * // result.content === 'Текст с примером'
+ * // result.fixCount === 1
+ * ```
+ */
+export function stripForeignScriptCharacters(
+  content: string,
+  scriptsToStrip: string[]
+): { content: string; fixCount: number } {
+  let fixCount = 0;
+
+  // Step 1: Protect code blocks, inline code, LaTeX
+  const protectedBlocks: Array<{ placeholder: string; content: string }> = [];
+  let blockIndex = 0;
+
+  let processedContent = content.replace(/```[\s\S]*?```/g, match => {
+    const placeholder = `__STRIP_BLOCK_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+
+  processedContent = processedContent.replace(/`[^`]+`/g, match => {
+    const placeholder = `__STRIP_INLINE_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+
+  processedContent = processedContent.replace(/\$\$[\s\S]*?\$\$/g, match => {
+    const placeholder = `__STRIP_LATEX_B_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+
+  processedContent = processedContent.replace(/\$[^$]+\$/g, match => {
+    const placeholder = `__STRIP_LATEX_I_${blockIndex}__`;
+    protectedBlocks.push({ placeholder, content: match });
+    blockIndex++;
+    return placeholder;
+  });
+
+  // Step 2: Strip foreign characters from prose text
+  for (const scriptKey of scriptsToStrip) {
+    const pattern = FOREIGN_SCRIPT_STRIP_PATTERNS[scriptKey];
+    if (pattern) {
+      // Reset lastIndex for global regex
+      pattern.lastIndex = 0;
+      const matches = processedContent.match(pattern);
+      if (matches) {
+        fixCount += matches.length;
+      }
+      processedContent = processedContent.replace(pattern, '');
+    }
+  }
+
+  // Step 3: Clean up whitespace artifacts from removal
+  // Double spaces → single space
+  processedContent = processedContent.replace(/ {2,}/g, ' ');
+  // Space before punctuation
+  processedContent = processedContent.replace(/ ([.,;:!?])/g, '$1');
+  // Multiple newlines
+  processedContent = processedContent.replace(/\n{3,}/g, '\n\n');
+
+  // Step 4: Restore protected blocks
+  for (const block of protectedBlocks) {
+    processedContent = processedContent.replace(block.placeholder, () => block.content);
+  }
+
+  return { content: processedContent.trim(), fixCount };
+}
+
+// ============================================================================
 // CHATBOT ARTIFACT REMOVAL
 // ============================================================================
 
