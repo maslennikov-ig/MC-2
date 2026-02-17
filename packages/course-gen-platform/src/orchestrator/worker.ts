@@ -233,7 +233,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
       {
         processorFile,
         concurrency,
-        useWorkerThreads: true,
+        useWorkerThreads: !process.env.VITEST,
       },
       'Creating BullMQ worker with sandboxed processor'
     );
@@ -248,7 +248,9 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         concurrency,
         // Enable worker threads for better performance (vs spawning processes)
         // Worker threads share memory with main process but execute independently
-        useWorkerThreads: true,
+        // Disabled in test: BullMQ 5.x main-worker.js has extensionless ESM import
+        // that fails under Node 22 strict resolution (ERR_MODULE_NOT_FOUND: main-base)
+        useWorkerThreads: !process.env.VITEST,
         // Lock duration for long-running jobs (document processing can take several minutes)
         // Default is 30s, but we need more for PDF processing, embedding generation, etc.
         // With sandboxed processors, lock renewal is handled automatically by the thread
@@ -489,7 +491,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
       {
         queueName: QUEUE_NAME,
         concurrency,
-        useWorkerThreads: true,
+        useWorkerThreads: !process.env.VITEST,
         processorFile,
         registeredHandlers: registeredJobTypes,
       },
@@ -564,7 +566,7 @@ export function getWorkerStatus(): object | null {
     isRunning: isWorkerRunning(),
     isPaused: isWorkerPaused,
     queueName: QUEUE_NAME,
-    useWorkerThreads: true,
+    useWorkerThreads: !process.env.VITEST,
     registeredHandlers: registeredJobTypes,
   };
 }

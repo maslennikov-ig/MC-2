@@ -658,14 +658,23 @@ jobs:
 
       - name: Verify deployment
         run: |
-          echo "Waiting for services..."
-          sleep 30
+          echo "Waiting for services to start..."
+          sleep 15
 
-          # Check Web via HTTPS (nginx proxies to correct port)
-          if curl -f -s https://ai.megacampus.ru/api/health > /dev/null; then
-            echo "Web service healthy"
-          else
-            echo "Web health check failed!"
+          # Check Web via HTTPS with retry (Next.js cold start can take >30s)
+          WEB_OK=false
+          for i in $(seq 1 12); do
+            if curl -f -s --max-time 10 https://ai.megacampus.ru/api/health > /dev/null 2>&1; then
+              WEB_OK=true
+              echo "Web service healthy (attempt $i)"
+              break
+            fi
+            echo "Waiting for web... ($i/12)"
+            sleep 10
+          done
+
+          if [ "$WEB_OK" != "true" ]; then
+            echo "Web health check failed after 12 attempts!"
             exit 1
           fi
 

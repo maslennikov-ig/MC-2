@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 54 (no optimization needed)
+ * Current rule count: 56 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -404,6 +404,22 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /No digest section found/i,
     reason: 'graceful_fallback',
     description: 'Stage 6 returns empty digest when no digest section exists - non-blocking',
+  },
+
+  // === ModelConfigBunker Stale Config Fallback ===
+  {
+    pattern: /Using STALE phase config due to database error/i,
+    reason: 'graceful_fallback',
+    description:
+      'ModelConfigBunker using stale config during DB outage - graceful degradation with cached data',
+  },
+
+  // === Stage 6 Max Retries Best-Effort ===
+  {
+    pattern: /\[Phase 6\] Max retries reached.*best-effort/i,
+    reason: 'graceful_fallback',
+    description:
+      'Phase 6 summary generation exhausted retries, using best-effort result - non-blocking fallback',
   },
 ];
 
