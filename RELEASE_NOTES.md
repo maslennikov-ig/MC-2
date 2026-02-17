@@ -2,6 +2,25 @@
 
 _Released on 2025-12-26_
 
+## v0.30.4
+
+_Released on 2026-02-17_
+
+### 🐛 Bug Fixes
+
+- **stage5**: Prevent infinite retry loop on section count mismatch
+- **stage4**: Use Stage 3 LLM priorities in prepareDocumentInfos instead of size heuristic
+- **web**: Add startup grace period to health check endpoint
+- **stage4**: Pass tokenCount to getModelForPhase in Phase 0.5 and Phase 2
+- **CI/CD**: Distinguish cancelled/skipped from failed in Telegram notifications
+- **CI/CD**: Repair deploy verification and test failures
+- **tests**: Unskip 3 generate-on-demand tests by fixing mock gaps
+- **tests**: Repair 4 pre-existing test failures
+
+---
+
+_This release was automatically generated from 11 commits._
+
 ## v0.30.3
 
 _Released on 2026-02-16_
