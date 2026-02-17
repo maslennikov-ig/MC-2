@@ -640,6 +640,7 @@ async function getModelConfigForSummarization(
       qualityThreshold: 0.75,
       maxRetries: 3,
       timeoutMs: null,
+      cacheReadEnabled: false,
       tier,
       source: 'hardcoded' as const,
     };
