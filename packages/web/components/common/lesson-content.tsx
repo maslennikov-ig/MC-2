@@ -420,7 +420,10 @@ export default function LessonContent({
               className="group w-full cursor-pointer rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-6 text-left shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-900/20 dark:to-teal-900/10 dark:hover:border-emerald-700/50"
             >
               <div className="mb-3 flex items-center gap-2">
-                <ArrowRight className="h-5 w-5 text-emerald-600 transition-transform group-hover:translate-x-1 dark:text-emerald-400" />
+                <ArrowRight
+                  aria-hidden="true"
+                  className="h-5 w-5 text-emerald-600 transition-transform group-hover:translate-x-1 dark:text-emerald-400"
+                />
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   В следующем уроке
                 </h2>

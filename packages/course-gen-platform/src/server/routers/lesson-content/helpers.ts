@@ -15,6 +15,14 @@ import type {
 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import type { SectionBreakdown } from '@megacampus/shared-types/analysis-schemas';
+import {
+  inferTargetAudience,
+  mapTone,
+  inferBloomLevel,
+  inferContentArchetype,
+  inferHookStrategy,
+  mapDepth,
+} from '../../../stages/stage5-generation/utils/semantic-scaffolding';
 
 export type LessonFromStructure = {
   lesson_number: number;
@@ -30,15 +38,6 @@ export type SectionFromStructure = {
   section_title: string;
   lessons: LessonFromStructure[];
 };
-
-import {
-  inferTargetAudience,
-  mapTone,
-  inferBloomLevel,
-  inferContentArchetype,
-  inferHookStrategy,
-  mapDepth,
-} from '../../../stages/stage5-generation/utils/semantic-scaffolding';
 
 /**
  * Verify user has access to course (course owner or same organization)
@@ -162,6 +161,26 @@ function buildLessonContextFromStructure(
   }
 
   const currentIdx = allLessons.findIndex(l => l.id === lessonId);
+
+  // Guard: if lessonId not found in flat list, return minimal context
+  if (currentIdx === -1) {
+    return {
+      previous_lesson: null,
+      next_lesson: null,
+      concepts_already_covered: [],
+      terms_already_defined: [],
+      course_position: {
+        lesson_index_in_module: parseInt(lessonId.split('.')[1] ?? '1', 10) || 1,
+        total_lessons_in_module: 1,
+        module_index: sectionNumber,
+        total_modules: sections.length,
+        lesson_index_in_course: 1,
+        total_lessons_in_course: allLessons.length || 1,
+        module_title: `Module ${sectionNumber}`,
+      },
+    };
+  }
+
   const current = allLessons[currentIdx];
 
   // Previous lesson context
@@ -170,7 +189,7 @@ function buildLessonContextFromStructure(
     ? {
         lesson_id: prev.id,
         title: prev.title,
-        key_concepts: prev.objectives.slice(0, 5),
+        key_concepts: prev.keyTopics.slice(0, 5),
       }
     : null;
 
@@ -180,7 +199,7 @@ function buildLessonContextFromStructure(
     ? {
         lesson_id: next.id,
         title: next.title,
-        key_concepts: next.objectives.slice(0, 5),
+        key_concepts: next.keyTopics.slice(0, 3),
       }
     : null;
 
