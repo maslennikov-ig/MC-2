@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.8] - 2026-02-18
+
+### Changed
+
+- **stage6**: consolidate helpers, extract FSM transition, batch section queries (92931de2)
+
+### Fixed
+
+- **stage6**: use keyTopics for key_concepts, guard currentIdx=-1, fix import order (6600f8fd)
+- **stage6,web**: add lesson_context to partialGenerate, make next-lesson card clickable (089de18a)
+- **web**: fix callout block detection in markdown renderers (67425ae6)
+- **stage6,web**: deduplicate lesson objectives, improve conclusion, add next-lesson card (a4dbcecc)
+- **stage6**: use dedicated stage6 queue for partialGenerate (9ebde8a9)
+- **stage6**: skip completion check for partialGenerate jobs (fbd40ebe)
+- **json-repair**: downgrade log from ERROR to WARN when all repair strategies fail (783ce4f6)
+- **stage6**: pass course style to partialGenerate job data (e82a2bad)
+
 ## [0.30.7] - 2026-02-17
 
 ### Added

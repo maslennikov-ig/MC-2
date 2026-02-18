@@ -2,6 +2,29 @@
 
 _Released on 2025-12-26_
 
+## v0.30.8
+
+_Released on 2026-02-18_
+
+### 🔧 Improvements
+
+- **stage6**: Consolidate helpers, extract FSM transition, batch section queries
+
+### 🐛 Bug Fixes
+
+- **stage6**: Use keyTopics for key_concepts, guard currentIdx=-1, fix import order
+- **stage6,web**: Add lesson_context to partialGenerate, make next-lesson card clickable
+- **web**: Fix callout block detection in markdown renderers
+- **stage6,web**: Deduplicate lesson objectives, improve conclusion, add next-lesson card
+- **stage6**: Use dedicated stage6 queue for partialGenerate
+- **stage6**: Skip completion check for partialGenerate jobs
+- **json-repair**: Downgrade log from ERROR to WARN when all repair strategies fail
+- **stage6**: Pass course style to partialGenerate job data
+
+---
+
+_This release was automatically generated from 9 commits._
+
 ## v0.30.7
 
 _Released on 2026-02-17_
