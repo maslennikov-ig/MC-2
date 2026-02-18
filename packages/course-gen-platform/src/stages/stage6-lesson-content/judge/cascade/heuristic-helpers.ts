@@ -14,6 +14,12 @@ import type { HeuristicThresholds, HeuristicResults } from './types';
 
 const CYRILLIC_WORD_REGEX = /[а-яё]{4,}/g;
 const CYRILLIC_KEYWORD_REGEX = /^[а-яё]+$/;
+const DEFAULT_NON_BLOCKING_KEYWORD_THRESHOLD = 0.35;
+const KEYWORD_THRESHOLD_BY_LANGUAGE: Record<string, number> = {
+  ru: 0.35,
+  en: 0.5,
+};
+const KEYWORD_BLOCKING_LANGUAGES = new Set(['ru', 'en']);
 const russianStemmer = newStemmer('russian');
 
 function stemRussianText(text: string): string {
@@ -43,6 +49,38 @@ function matchKeywordInText(
   }
 
   return stemmedRussianText.includes(keywordStem);
+}
+
+function normalizeLanguageCode(language: string): string {
+  const raw = language.trim().toLowerCase();
+  if (!raw) {
+    return 'en';
+  }
+
+  if (raw === 'english') {
+    return 'en';
+  }
+  if (raw === 'russian') {
+    return 'ru';
+  }
+
+  return raw.split(/[-_]/)[0];
+}
+
+function getKeywordCoveragePolicy(language: string): {
+  normalizedLanguage: string;
+  threshold: number;
+  isBlocking: boolean;
+} {
+  const normalizedLanguage = normalizeLanguageCode(language);
+  const threshold =
+    KEYWORD_THRESHOLD_BY_LANGUAGE[normalizedLanguage] ?? DEFAULT_NON_BLOCKING_KEYWORD_THRESHOLD;
+
+  return {
+    normalizedLanguage,
+    threshold,
+    isBlocking: KEYWORD_BLOCKING_LANGUAGES.has(normalizedLanguage),
+  };
 }
 
 /**
@@ -370,6 +408,7 @@ export function runHeuristicFilters(
   const startTime = Date.now();
   const failureReasons: string[] = [];
   const warnings: string[] = [];
+  const normalizedLanguage = normalizeLanguageCode(language);
 
   // Extract text for analysis
   const fullText = extractTextContent(content);
@@ -408,7 +447,7 @@ export function runHeuristicFilters(
   // Flesch-Kincaid uses English syllable counting (/[aeiouy]+/g) which doesn't work for:
   // - Russian (Cyrillic): а, е, и, о, у, ы, э, ю, я
   // - Spanish, German, French, etc. (different vowel patterns)
-  const isEnglish = language === 'en' || language === 'english';
+  const isEnglish = normalizedLanguage === 'en';
   const fleschKincaidSkipped = !isEnglish;
   let fleschKincaid = 0;
 
@@ -429,6 +468,7 @@ export function runHeuristicFilters(
     logger.debug({
       msg: 'Flesch-Kincaid check skipped for non-English content',
       language,
+      normalizedLanguage,
       lessonId: lessonSpec.lesson_id,
     });
   }
@@ -442,11 +482,20 @@ export function runHeuristicFilters(
 
   // Calculate keyword coverage
   const keywordCoverage = calculateKeywordCoverage(content, lessonSpec);
+  const keywordCoveragePolicy = getKeywordCoveragePolicy(language);
+  const keywordCoverageThresholdPct = (keywordCoveragePolicy.threshold * 100).toFixed(0);
+  const keywordCoverageWouldBlock = keywordCoverage < keywordCoveragePolicy.threshold;
 
-  if (keywordCoverage < 0.35) {
-    failureReasons.push(
-      `Keyword coverage (${(keywordCoverage * 100).toFixed(0)}%) below 35% threshold`
-    );
+  if (keywordCoverageWouldBlock) {
+    const reason = `Keyword coverage (${(keywordCoverage * 100).toFixed(0)}%) below ${keywordCoverageThresholdPct}% threshold`;
+
+    if (keywordCoveragePolicy.isBlocking) {
+      failureReasons.push(reason);
+    } else {
+      warnings.push(
+        `${reason} (non-blocking for language "${keywordCoveragePolicy.normalizedLanguage}")`
+      );
+    }
   }
 
   // Check examples count
@@ -475,6 +524,10 @@ export function runHeuristicFilters(
     fleschKincaid: fleschKincaid.toFixed(1),
     sectionsPresent: sectionsCheck.present,
     keywordCoverage: (keywordCoverage * 100).toFixed(0) + '%',
+    keywordCoverageThreshold: keywordCoverageThresholdPct + '%',
+    keywordCoverageBlocking: keywordCoveragePolicy.isBlocking,
+    keywordCoverageWouldBlock,
+    language: normalizedLanguage,
     examplesCount,
     exercisesCount,
     failureCount: failureReasons.length,
@@ -499,6 +552,9 @@ export function runHeuristicFilters(
     sectionsPresent: sectionsCheck.present,
     missingSections: sectionsCheck.missing,
     keywordCoverage,
+    keywordCoverageThreshold: keywordCoveragePolicy.threshold,
+    keywordCoverageBlocking: keywordCoveragePolicy.isBlocking,
+    keywordCoverageWouldBlock,
     examplesCount,
     exercisesCount,
     failureReasons,
