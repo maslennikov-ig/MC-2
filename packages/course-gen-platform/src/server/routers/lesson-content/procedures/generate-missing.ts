@@ -15,8 +15,12 @@ import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import {
   verifyCourseAccess,
   buildMinimalLessonSpec,
+  buildLessonId,
+  resolveSectionNumber,
+  parseLessonId,
+  findLessonByOrder,
+  transitionToStage6Generating,
   type SectionFromStructure,
-  type LessonFromStructure,
 } from '../helpers';
 import { addJob } from '../../../../orchestrator/queue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
@@ -32,34 +36,6 @@ type LessonWithContentRow = {
   lesson_contents: Array<{ id: string }> | null;
   sections: { order_index: number } | Array<{ order_index: number }> | null;
 };
-
-function buildLessonId(sectionNumber: number, lessonOrder: number): string {
-  return `${sectionNumber}.${lessonOrder}`;
-}
-
-function resolveSectionNumber(section: SectionFromStructure, sectionIndex: number): number {
-  return section.section_number ?? sectionIndex + 1;
-}
-
-function parseLessonId(lessonId: string): { sectionNum: number; lessonOrder: number } | null {
-  const match = lessonId.match(/^(\d+)\.(\d+)$/);
-  if (!match) return null;
-
-  const sectionNum = parseInt(match[1], 10);
-  const lessonOrder = parseInt(match[2], 10);
-
-  if (sectionNum <= 0 || lessonOrder <= 0) return null;
-
-  return { sectionNum, lessonOrder };
-}
-
-function findLessonByOrder(
-  section: SectionFromStructure,
-  lessonOrder: number
-): LessonFromStructure | null {
-  const lesson = section.lessons[lessonOrder - 1];
-  return lesson ?? null;
-}
 
 const generateMissingInputSchema = z.object({
   courseId: z.string().uuid('Invalid course ID'),
@@ -240,97 +216,8 @@ export const generateMissingContent = protectedProcedure
         };
       }
 
-      // Step 7: Auto-transition FSM status for Stage 6
-      const { data: statusData } = await supabase
-        .from('courses')
-        .select('generation_status')
-        .eq('id', courseId)
-        .single();
-
-      const currentStatus = statusData?.generation_status;
-
-      const statusesAllowingStage6 = [
-        'stage_5_complete',
-        'stage_5_awaiting_approval',
-        'stage_6_init',
-        'stage_6_generating',
-        'stage_6_complete',
-      ];
-
-      if (currentStatus === 'stage_5_awaiting_approval') {
-        logger.info(
-          {
-            requestId,
-            courseId,
-            currentStatus,
-          },
-          'Auto-approving Stage 5 and starting Stage 6 for missing content'
-        );
-
-        await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_init' })
-          .eq('id', courseId);
-
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_generating' })
-          .eq('id', courseId);
-
-        if (updateError) {
-          logger.error(
-            { requestId, courseId, error: updateError },
-            'Failed to update generation_status to stage_6_generating'
-          );
-        }
-      } else if (currentStatus === 'stage_5_complete') {
-        await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_init' })
-          .eq('id', courseId);
-
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_generating' })
-          .eq('id', courseId);
-
-        if (updateError) {
-          logger.error(
-            { requestId, courseId, error: updateError },
-            'Failed to update generation_status to stage_6_generating'
-          );
-        }
-      } else if (currentStatus === 'stage_6_init') {
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_generating' })
-          .eq('id', courseId);
-
-        if (updateError) {
-          logger.error(
-            { requestId, courseId, error: updateError },
-            'Failed to update generation_status to stage_6_generating'
-          );
-        }
-      } else if (currentStatus === 'stage_6_complete') {
-        // Transitioning back to generating when adding content for new lessons
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_generating' })
-          .eq('id', courseId);
-
-        if (updateError) {
-          logger.error(
-            { requestId, courseId, error: updateError },
-            'Failed to update generation_status to stage_6_generating'
-          );
-        }
-      } else if (!statusesAllowingStage6.includes(currentStatus || '')) {
-        logger.warn(
-          { requestId, courseId, currentStatus },
-          'Course not ready for Stage 6 generation'
-        );
-      }
+      // Step 7: Transition FSM to stage_6_generating
+      await transitionToStage6Generating(courseId, requestId);
 
       // Step 8: Materialize sections and lessons from course_structure if not exists
       const { data: existingSections } = await supabase
@@ -449,6 +336,25 @@ export const generateMissingContent = protectedProcedure
       }
 
       // Step 9.5: Ensure all missing lessons exist in database (recreate if deleted)
+
+      // Batch: resolve all section IDs at once (avoids N+1 per-lesson queries)
+      const uniqueSectionNums = [
+        ...new Set(
+          lessonSpecs
+            .map(s => parseLessonId(s.lesson_id)?.sectionNum)
+            .filter((n): n is number => n != null)
+        ),
+      ];
+      const { data: sectionRows } = await supabase
+        .from('sections')
+        .select('id, order_index')
+        .eq('course_id', courseId)
+        .in('order_index', uniqueSectionNums);
+      const sectionNumToId = new Map<number, string>();
+      for (const row of sectionRows ?? []) {
+        sectionNumToId.set(row.order_index, row.id);
+      }
+
       for (const spec of lessonSpecs) {
         const parsedLessonId = parseLessonId(spec.lesson_id);
         if (!parsedLessonId) {
@@ -461,14 +367,8 @@ export const generateMissingContent = protectedProcedure
 
         const { sectionNum, lessonOrder } = parsedLessonId;
 
-        const { data: sectionData } = await supabase
-          .from('sections')
-          .select('id')
-          .eq('course_id', courseId)
-          .eq('order_index', sectionNum)
-          .single();
-
-        if (!sectionData) {
+        const sectionId = sectionNumToId.get(sectionNum);
+        if (!sectionId) {
           logger.warn(
             { requestId, courseId, lessonId: spec.lesson_id, sectionNum },
             'Section not found in database for lesson recreation'
@@ -479,7 +379,7 @@ export const generateMissingContent = protectedProcedure
         const { data: existingLesson } = await supabase
           .from('lessons')
           .select('id')
-          .eq('section_id', sectionData.id)
+          .eq('section_id', sectionId)
           .eq('order_index', lessonOrder)
           .single();
 
@@ -491,7 +391,7 @@ export const generateMissingContent = protectedProcedure
 
           if (lesson) {
             const { error: createError } = await supabase.from('lessons').insert({
-              section_id: sectionData.id,
+              section_id: sectionId,
               title: lesson.lesson_title,
               order_index: lessonOrder,
               lesson_type: 'text',
