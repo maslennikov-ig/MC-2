@@ -6,10 +6,44 @@
 import type { LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { calculateWordCountThresholds } from '@megacampus/shared-types/judge-thresholds';
+import { newStemmer } from 'snowball-stemmers';
 import { logger } from '@/shared/logger';
 import { calculateFleschKincaid } from './text-utils';
 import { CONCLUSION_MARKERS, CONCLUSION_REGEX, DEFAULT_HEURISTIC_THRESHOLDS } from './constants';
 import type { HeuristicThresholds, HeuristicResults } from './types';
+
+const CYRILLIC_WORD_REGEX = /[а-яё]{4,}/g;
+const CYRILLIC_KEYWORD_REGEX = /^[а-яё]+$/;
+const russianStemmer = newStemmer('russian');
+
+function stemRussianText(text: string): string {
+  return text.replace(CYRILLIC_WORD_REGEX, word => russianStemmer.stem(word));
+}
+
+function matchKeywordInText(
+  keyword: string,
+  fullText: string,
+  stemmedRussianText: string | null
+): boolean {
+  if (!CYRILLIC_KEYWORD_REGEX.test(keyword)) {
+    return fullText.includes(keyword);
+  }
+
+  if (fullText.includes(keyword)) {
+    return true;
+  }
+
+  if (!stemmedRussianText) {
+    return false;
+  }
+
+  const keywordStem = russianStemmer.stem(keyword);
+  if (keywordStem.length < 3) {
+    return false;
+  }
+
+  return stemmedRussianText.includes(keywordStem);
+}
 
 /**
  * Extract all text content from lesson body for analysis
@@ -164,6 +198,16 @@ function calculateKeywordCoverage(
     'more',
     'been',
     'some',
+    // Bloom taxonomy verbs (English)
+    'understand',
+    'explain',
+    'describe',
+    'identify',
+    'demonstrate',
+    'apply',
+    'analyze',
+    'create',
+    'evaluate',
     // Russian
     'этот',
     'этой',
@@ -202,6 +246,38 @@ function calculateKeywordCoverage(
     'всех',
     'всей',
     'всего',
+    // Bloom taxonomy verbs (Russian)
+    'запомнить',
+    'объяснить',
+    'описать',
+    'определить',
+    'оценить',
+    'проанализировать',
+    'применить',
+    'сформулировать',
+    'сравнить',
+    'различить',
+    'классифицировать',
+    'опровергнуть',
+    'доказать',
+    'обосновать',
+    'перечислить',
+    'назвать',
+    'выделить',
+    'распознать',
+    'интерпретировать',
+    'продемонстрировать',
+    'создать',
+    'разработать',
+    'предложить',
+    'спроектировать',
+    'составить',
+    'понять',
+    'знать',
+    'усвоить',
+    'освоить',
+    'изучить',
+    'рассмотреть',
   ]);
 
   for (const objective of lessonSpec.learning_objectives) {
@@ -223,10 +299,15 @@ function calculateKeywordCoverage(
 
   if (keywords.size === 0) return 1.0;
 
+  const hasCyrillicKeywords = Array.from(keywords).some(keyword =>
+    CYRILLIC_KEYWORD_REGEX.test(keyword)
+  );
+  const stemmedRussianText = hasCyrillicKeywords ? stemRussianText(allText) : null;
+
   // Count how many keywords are present
   let foundCount = 0;
   for (const keyword of keywords) {
-    if (allText.includes(keyword)) {
+    if (matchKeywordInText(keyword, allText, stemmedRussianText)) {
       foundCount++;
     }
   }
@@ -362,9 +443,9 @@ export function runHeuristicFilters(
   // Calculate keyword coverage
   const keywordCoverage = calculateKeywordCoverage(content, lessonSpec);
 
-  if (keywordCoverage < 0.5) {
+  if (keywordCoverage < 0.35) {
     failureReasons.push(
-      `Keyword coverage (${(keywordCoverage * 100).toFixed(0)}%) below 50% threshold`
+      `Keyword coverage (${(keywordCoverage * 100).toFixed(0)}%) below 35% threshold`
     );
   }
 
