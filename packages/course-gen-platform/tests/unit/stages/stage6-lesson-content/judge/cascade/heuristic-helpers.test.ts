@@ -87,6 +87,29 @@ describe('cascade heuristic keyword helpers', () => {
     expect(result.failureReasons).toContain('Keyword coverage (33%) below 35% threshold');
   });
 
+  it('uses 50 percent keyword coverage threshold as blocker for English', () => {
+    const content = createLessonContent('alpha appears but the rest of topics are missing.');
+    const lessonSpec = createLessonSpec(['alpha beta gamma delta epsilon']);
+
+    const result = runHeuristicFilters(content, lessonSpec, RELAXED_THRESHOLDS, 'en');
+
+    expect(result.keywordCoverage).toBeCloseTo(0.2, 5);
+    expect(result.failureReasons).toContain('Keyword coverage (20%) below 50% threshold');
+  });
+
+  it('uses keyword coverage as non-blocking warning for non-ru/en languages', () => {
+    const content = createLessonContent('alpha appears but the rest of topics are missing.');
+    const lessonSpec = createLessonSpec(['alpha beta gamma']);
+
+    const result = runHeuristicFilters(content, lessonSpec, RELAXED_THRESHOLDS, 'es');
+
+    expect(result.keywordCoverage).toBeCloseTo(1 / 3, 5);
+    expect(result.failureReasons.some(reason => reason.includes('Keyword coverage'))).toBe(false);
+    expect(result.warnings).toContain(
+      'Keyword coverage (33%) below 35% threshold (non-blocking for language "es")'
+    );
+  });
+
   it('keeps Latin behavior as exact-match only (no stemming fallback)', () => {
     const content = createLessonContent('This lesson discusses normalized schemas and trade-offs.');
     const lessonSpec = createLessonSpec(['normalization']);

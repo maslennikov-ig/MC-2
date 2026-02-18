@@ -100,6 +100,12 @@ export interface HeuristicResults {
   missingSections: string[];
   /** Keyword coverage ratio (0-1) */
   keywordCoverage: number;
+  /** Language-normalized threshold used for keyword coverage check */
+  keywordCoverageThreshold: number;
+  /** Whether keyword coverage is a blocking gate for the current language */
+  keywordCoverageBlocking: boolean;
+  /** Whether coverage is below threshold regardless of blocking mode */
+  keywordCoverageWouldBlock: boolean;
   /** Number of examples found */
   examplesCount: number;
   /** Number of exercises found */
