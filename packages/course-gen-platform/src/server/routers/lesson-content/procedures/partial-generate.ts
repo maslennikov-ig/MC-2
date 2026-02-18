@@ -17,6 +17,7 @@ import {
   findLessonByOrder,
   transitionToStage6Generating,
   removeStaleJob,
+  shouldSkipCompletionCheckForPartialGeneration,
   type SectionFromStructure,
 } from '../helpers';
 import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
@@ -112,7 +113,7 @@ export const partialGenerate = protectedProcedure
 
       const { data: course, error: courseError } = await supabase
         .from('courses')
-        .select('course_structure, language, analysis_result, style')
+        .select('course_structure, language, analysis_result, style, generation_status')
         .eq('id', courseId)
         .single();
 
@@ -439,6 +440,9 @@ export const partialGenerate = protectedProcedure
 
       // Step 6: Enqueue all lessons using dedicated Stage 6 queue (30 concurrent workers)
       const courseLanguage = (course.language || 'en') as Language;
+      const skipCompletionCheck = shouldSkipCompletionCheckForPartialGeneration(
+        course.generation_status
+      );
       const stage6Queue = createStage6Queue();
       const jobs = await Promise.all(
         lessonSpecs.map(async spec => {
@@ -449,7 +453,7 @@ export const partialGenerate = protectedProcedure
             style: (course.style as CourseStyle | null) ?? undefined,
             ragChunks: [],
             ragContextId: null,
-            skipCompletionCheck: true,
+            skipCompletionCheck,
             // For job_status tracking
             organizationId: currentUser.organizationId,
             userId: currentUser.id,
@@ -476,6 +480,7 @@ export const partialGenerate = protectedProcedure
         {
           requestId,
           courseId,
+          skipCompletionCheck,
           lessonsEnqueued: jobs.length,
           jobIds: jobs.map(j => j.id),
           selectedLessonIds: lessonSpecs.map(s => s.lesson_id),

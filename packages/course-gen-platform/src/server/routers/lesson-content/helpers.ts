@@ -73,6 +73,23 @@ export function findLessonByOrder(
 }
 
 /**
+ * Decide whether partial Stage 6 jobs should skip backend completion checks.
+ *
+ * We skip only when re-generating content from an already completed Stage 6
+ * course (`stage_6_complete`) to avoid premature status flips while selected
+ * jobs are still running.
+ *
+ * For in-flight Stage 6 generation (`stage_6_generating`) we must NOT skip
+ * this check, otherwise retries can finish all lessons but leave the course
+ * stuck in `stage_6_generating`.
+ */
+export function shouldSkipCompletionCheckForPartialGeneration(
+  generationStatus: string | null | undefined
+): boolean {
+  return generationStatus === 'stage_6_complete';
+}
+
+/**
  * Verify user has access to course (course owner or same organization)
  *
  * @param courseId - Course UUID
