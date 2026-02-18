@@ -9,14 +9,14 @@ import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { partialGenerateInputSchema } from '../schemas';
 import { verifyCourseAccess, buildMinimalLessonSpec } from '../helpers';
-import { addJob } from '../../../../orchestrator/queue';
+import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
+import type { Stage6JobInput } from '../../../../stages/stage6-lesson-content/types';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { invalidateLessonUuidCache } from '../../../../shared/database/lesson-resolver';
 import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
-import type { LessonContentJobData, Language, CourseStyle } from '@megacampus/shared-types';
+import type { Language, CourseStyle } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
-import { validateLocale } from '@/shared/validation';
 
 type LessonFromStructure = {
   lesson_number: number;
@@ -579,35 +579,32 @@ export const partialGenerate = protectedProcedure
         }
       }
 
-      // Step 6: Enqueue all lessons using addJob with deduplication
+      // Step 6: Enqueue all lessons using dedicated Stage 6 queue (30 concurrent workers)
       const courseLanguage = (course.language || 'en') as Language;
+      const stage6Queue = createStage6Queue();
       const jobs = await Promise.all(
         lessonSpecs.map(spec => {
-          const jobData: LessonContentJobData = {
-            organizationId: currentUser.organizationId,
+          const jobData: Stage6JobInput = {
+            lessonSpec: spec,
             courseId,
+            language: courseLanguage,
+            style: (course.style as CourseStyle | null) ?? undefined,
+            ragChunks: [],
+            ragContextId: null,
+            skipCompletionCheck: true,
+            // For job_status tracking
+            organizationId: currentUser.organizationId,
             userId: currentUser.id,
             jobType: JobType.LESSON_CONTENT,
-            createdAt: new Date().toISOString(),
-            lessonSpec: spec,
-            ragChunks: [], // Deprecated: RAG chunks are now fetched by handler via retrieveLessonContext()
-            ragContextId: null,
-            language: courseLanguage, // Pass course language for content generation
-            locale: validateLocale(courseLanguage),
-            style: (course.style as CourseStyle | null) ?? undefined,
-            skipCompletionCheck: true,
           };
 
           // Deterministic job ID for deduplication
-          // Format: stage6:{courseId}:{lessonId}
+          const jobName = `lesson:${spec.lesson_id}`;
           const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
 
-          return addJob(JobType.LESSON_CONTENT, jobData, {
+          return stage6Queue.add(jobName, jobData, {
             priority,
-            deduplication: {
-              id: deduplicationId,
-              ttl: 150000, // 2.5 minutes - half of job timeout to allow faster retries
-            },
+            jobId: deduplicationId,
           });
         })
       );
