@@ -223,10 +223,10 @@ OK: Bundle size 0.45 MB is within limits
 
 ### CI Integration
 
-The analyzer outputs GitHub Actions format:
+The analyzer writes to `$GITHUB_OUTPUT` environment file (GitHub Actions):
 
 ```
-::set-output name=bundle_size_mb::0.45
+bundle_size_mb=0.45
 ```
 
 ---
