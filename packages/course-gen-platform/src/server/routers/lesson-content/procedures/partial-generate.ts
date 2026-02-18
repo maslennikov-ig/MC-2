@@ -13,7 +13,7 @@ import { addJob } from '../../../../orchestrator/queue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { invalidateLessonUuidCache } from '../../../../shared/database/lesson-resolver';
 import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
-import type { LessonContentJobData, Language } from '@megacampus/shared-types';
+import type { LessonContentJobData, Language, CourseStyle } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
 import { validateLocale } from '@/shared/validation';
@@ -145,7 +145,7 @@ export const partialGenerate = protectedProcedure
 
       const { data: course, error: courseError } = await supabase
         .from('courses')
-        .select('course_structure, language, analysis_result')
+        .select('course_structure, language, analysis_result, style')
         .eq('id', courseId)
         .single();
 
@@ -594,6 +594,7 @@ export const partialGenerate = protectedProcedure
             ragContextId: null,
             language: courseLanguage, // Pass course language for content generation
             locale: validateLocale(courseLanguage),
+            style: (course.style as CourseStyle | null) ?? undefined,
           };
 
           // Deterministic job ID for deduplication
