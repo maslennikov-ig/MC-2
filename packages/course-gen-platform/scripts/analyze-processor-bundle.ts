@@ -62,8 +62,11 @@ function main(): void {
     console.log(`✅ OK: Bundle size ${formatSize(stats.size)} is within limits`);
   }
 
-  // Output for CI parsing
-  console.log(`\n::set-output name=bundle_size_mb::${sizeMB.toFixed(2)}`);
+  // Output for CI parsing (GITHUB_OUTPUT environment file)
+  const githubOutput = process.env.GITHUB_OUTPUT;
+  if (githubOutput) {
+    fs.appendFileSync(githubOutput, `bundle_size_mb=${sizeMB.toFixed(2)}\n`);
+  }
 }
 
 main();
