@@ -6,6 +6,7 @@
  */
 
 import { TRPCError } from '@trpc/server';
+import type { Queue } from 'bullmq';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import type { Language } from '@megacampus/shared-types';
@@ -576,4 +577,39 @@ export async function transitionToStage6Generating(
     logger.warn({ requestId, courseId, currentStatus }, 'Course not ready for Stage 6 generation');
   }
   // stage_6_generating → no-op, already in target state
+}
+
+/**
+ * Remove a completed/failed job from BullMQ queue to allow re-generation.
+ *
+ * BullMQ's jobId deduplication prevents adding a new job if one with the
+ * same ID already exists — even if that job is completed. Since we retain
+ * completed jobs for 24 hours (removeOnComplete: { age: 86400 }), a second
+ * call to queue.add() with the same jobId silently returns the old job
+ * instead of creating a new one.
+ *
+ * This function removes stale (completed/failed) jobs so that a fresh job
+ * can be enqueued with the same deterministic ID, preserving deduplication
+ * protection against concurrent duplicate requests.
+ *
+ * @param queue - BullMQ Queue instance
+ * @param jobId - Deterministic job ID to check
+ * @param requestId - Request ID for structured logging
+ */
+export async function removeStaleJob(
+  queue: Queue,
+  jobId: string,
+  requestId: string
+): Promise<void> {
+  const existingJob = await queue.getJob(jobId);
+  if (!existingJob) return;
+
+  const state = await existingJob.getState();
+  if (state === 'completed' || state === 'failed') {
+    await existingJob.remove();
+    logger.debug(
+      { requestId, jobId, previousState: state },
+      'Removed stale job to allow re-generation'
+    );
+  }
 }
