@@ -32,7 +32,6 @@ import { getRemarkPlugins, getRehypePluginsTrusted, getRehypePluginsUntrusted } 
 import {
   CodeBlock,
   MermaidDiagram,
-  Callout,
   H1,
   H2,
   H3,
@@ -42,7 +41,8 @@ import {
   ResponsiveTable,
   Link,
 } from './components'
-import type { MarkdownRendererProps, CalloutType } from './types'
+import { parseCalloutFromChildren } from './utils/callout-parser'
+import type { MarkdownRendererProps } from './types'
 
 /**
  * Server-side markdown renderer component
@@ -82,10 +82,7 @@ export async function MarkdownRenderer({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const remarkPlugins = getRemarkPlugins(config) as any[]
   const rehypePlugins = (
-    trusted
-      ? getRehypePluginsTrusted(config)
-      : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        getRehypePluginsUntrusted(config)
+    trusted ? getRehypePluginsTrusted(config) : getRehypePluginsUntrusted(config)
   ) as any[]
 
   // Build components map based on features
@@ -222,46 +219,8 @@ export async function MarkdownRenderer({
     mdxComponents.blockquote = ((props: unknown) => {
       const { children, ...rest } = props as React.PropsWithChildren<Record<string, unknown>>
 
-      // Try to detect GitHub-style callout syntax: [!TYPE]
-      // The structure from MDX is usually: blockquote > p > text
-      const firstChild = React.Children.toArray(children)[0]
-
-      if (React.isValidElement(firstChild) && firstChild.type === 'p') {
-        const pChildren = (firstChild as React.ReactElement<{ children: React.ReactNode }>).props
-          .children
-
-        // Extract text from first paragraph child
-        let textContent = ''
-        if (typeof pChildren === 'string') {
-          textContent = pChildren
-        } else if (Array.isArray(pChildren)) {
-          const firstText = pChildren.find((c) => typeof c === 'string')
-          if (firstText) {
-            textContent = firstText as string
-          }
-        }
-
-        // Match pattern like [!NOTE], [!TIP], [!WARNING], [!DANGER], [!INFO]
-        const match = textContent.match(/^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i)
-
-        if (match) {
-          const type = match[1].toLowerCase() as CalloutType
-
-          // Remove the [!TYPE] marker and surrounding quotes from the text
-          const remainingText = textContent.replace(/^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]["'«»\u201C\u201D]*\s*/i, '')
-
-          // Reconstruct children without the marker
-          const newFirstParagraph = remainingText ? <p>{remainingText}</p> : null
-          const restChildren = React.Children.toArray(children).slice(1)
-
-          return (
-            <Callout type={type} language={language}>
-              {newFirstParagraph}
-              {restChildren}
-            </Callout>
-          )
-        }
-      }
+      const callout = parseCalloutFromChildren(children, language)
+      if (callout) return callout
 
       // Default blockquote rendering (no callout pattern detected)
       return <blockquote {...rest}>{children}</blockquote>

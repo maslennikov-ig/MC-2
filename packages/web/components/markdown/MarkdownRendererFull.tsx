@@ -45,9 +45,9 @@ import { getPresetConfig } from './presets'
 import { ResponsiveTable } from './components/ResponsiveTable'
 import { Link } from './components/Link'
 import { MermaidDiagram } from './components/MermaidDiagram'
-import { Callout } from './components/Callout'
 import { escapeCurrencyDollarSigns } from './utils/escape-currency'
-import type { PresetName, FeatureFlags, CalloutType } from './types'
+import { parseCalloutFromChildren } from './utils/callout-parser'
+import type { PresetName, FeatureFlags } from './types'
 import type { Components } from 'react-markdown'
 
 // KaTeX CSS for math rendering
@@ -213,47 +213,6 @@ function formatLanguage(lang: string): string {
     xml: 'XML',
   }
   return displayNames[lang.toLowerCase()] || lang.charAt(0).toUpperCase() + lang.slice(1)
-}
-
-/**
- * Try to detect GitHub-style callout syntax in blockquote children.
- * Returns a Callout element if detected, null otherwise.
- */
-function tryParseCallout(children: React.ReactNode, language?: string): React.JSX.Element | null {
-  const firstChild = React.Children.toArray(children)[0]
-
-  if (React.isValidElement(firstChild) && firstChild.type === 'p') {
-    const pChildren = (firstChild as React.ReactElement<{ children: React.ReactNode }>).props
-      .children
-
-    let textContent = ''
-    if (typeof pChildren === 'string') {
-      textContent = pChildren
-    } else if (Array.isArray(pChildren)) {
-      const firstText = pChildren.find((c) => typeof c === 'string')
-      if (firstText) {
-        textContent = firstText
-      }
-    }
-
-    const match = textContent.match(/^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i)
-
-    if (match) {
-      const type = match[1].toLowerCase() as CalloutType
-      const remainingText = textContent.replace(/^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]["'«»\u201C\u201D]*\s*/i, '')
-      const newFirstParagraph = remainingText ? <p>{remainingText}</p> : null
-      const restChildren = React.Children.toArray(children).slice(1)
-
-      return (
-        <Callout type={type} language={language}>
-          {newFirstParagraph}
-          {restChildren}
-        </Callout>
-      )
-    }
-  }
-
-  return null
 }
 
 /**
@@ -425,7 +384,7 @@ export function MarkdownRendererFull({
     // Blockquote styling with optional callout/admonition support
     blockquote: ({ children }) => {
       if (config.callouts) {
-        const callout = tryParseCallout(children, language)
+        const callout = parseCalloutFromChildren(children, language)
         if (callout) return callout
       }
       return (
