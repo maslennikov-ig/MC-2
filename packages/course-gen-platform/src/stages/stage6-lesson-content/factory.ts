@@ -1,6 +1,12 @@
 import { Worker, Queue } from 'bullmq';
 import { getRedisClient } from '@/shared/cache/redis';
 import { logger } from '@/shared/logger';
+import {
+  createJobStatus,
+  markJobCompleted,
+  markJobFailed,
+} from '@/orchestrator/job-status-tracker';
+import type { JobData } from '@megacampus/shared-types';
 import { HANDLER_CONFIG } from './config';
 import { Stage6JobInput, Stage6JobResult, ProgressUpdate } from './types';
 import { processStage6Job } from './services/job-processor';
@@ -38,6 +44,12 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
       },
       'Stage 6 job completed'
     );
+    // Track in job_status table for frontend polling
+    if (job) {
+      markJobCompleted(job as unknown as import('bullmq').Job<JobData>).catch(err => {
+        logger.warn({ jobId: job.id, error: err }, 'Failed to mark job completed in job_status');
+      });
+    }
   });
 
   worker.on('failed', (job, error) => {
@@ -49,6 +61,21 @@ export function createStage6Worker(redisUrl?: string): Worker<Stage6JobInput, St
       },
       'Stage 6 job failed'
     );
+    // Track in job_status table for frontend polling
+    if (job) {
+      markJobFailed(job as unknown as import('bullmq').Job<JobData>, error).catch(err => {
+        logger.warn({ jobId: job.id, error: err }, 'Failed to mark job failed in job_status');
+      });
+    }
+  });
+
+  worker.on('active', job => {
+    // Track in job_status table for frontend polling
+    if (job?.data?.organizationId) {
+      createJobStatus(job as unknown as import('bullmq').Job<JobData>).catch(err => {
+        logger.warn({ jobId: job.id, error: err }, 'Failed to create job status');
+      });
+    }
   });
 
   worker.on('progress', (job, progress) => {

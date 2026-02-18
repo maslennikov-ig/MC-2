@@ -53,6 +53,15 @@ export interface Stage6JobInput {
    * Set to true for partialGenerate jobs where frontend tracks completion independently
    */
   skipCompletionCheck?: boolean;
+
+  /** Organization UUID (for job status tracking, optional) */
+  organizationId?: string;
+
+  /** User UUID who triggered the generation (for job status tracking, optional) */
+  userId?: string;
+
+  /** Job type identifier (for job status tracking, optional) */
+  jobType?: string;
 }
 
 /**
