@@ -88,6 +88,14 @@ export function LessonView({
   onRefreshEnrichments,
   courseLanguage,
 }: LessonViewProps) {
+  const nextLessonData =
+    currentIndex < totalLessonsOrdered - 1
+      ? {
+          title: allLessonsOrdered[currentIndex + 1].title,
+          objectives: allLessonsOrdered[currentIndex + 1].objectives,
+        }
+      : undefined
+
   if (focusMode) {
     return (
       <div className="min-h-screen bg-white dark:bg-gray-950">
@@ -174,16 +182,15 @@ export function LessonView({
             </motion.div>
           </AnimatePresence>
 
-          <div className="prose prose-lg dark:prose-invert prose-purple max-w-none">
-            <LessonContent
-              lesson={currentLesson}
-              section={currentSection}
-              assets={assets}
-              lessonContent={lessonContent}
-              enrichments={enrichments}
-              courseLanguage={courseLanguage}
-            />
-          </div>
+          <LessonContent
+            lesson={currentLesson}
+            section={currentSection}
+            assets={assets}
+            lessonContent={lessonContent}
+            enrichments={enrichments}
+            courseLanguage={courseLanguage}
+            nextLesson={nextLessonData}
+          />
 
           <div className="mt-16 border-t border-gray-200 pt-8 dark:border-gray-800">
             <div className="flex items-center justify-between text-left">
@@ -288,6 +295,7 @@ export function LessonView({
           }}
           onFormatChange={undefined}
           courseLanguage={courseLanguage}
+          nextLesson={nextLessonData}
         />
       </TabsContent>
 

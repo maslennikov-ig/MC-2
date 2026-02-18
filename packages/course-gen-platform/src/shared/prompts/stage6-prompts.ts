@@ -160,7 +160,7 @@ CRITICAL INSTRUCTIONS:
 7. INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
    - Reference previous lesson naturally: "As we explored in [previous_lesson.title]..." or "Building on [concept]..."
    - Do NOT re-explain terms from terms_already_defined — the reader already knows them
-   - In conclusion sections, tease next lesson: "In the next lesson, we will explore [next_lesson.title]..."
+   - In conclusion sections: write ONLY short bullet-point takeaways. Do NOT preview or tease the next lesson — a separate UI element handles this.
    - COURSE POSITION (from course_position if provided):
      - Use position awareness to write appropriate introductions and conclusions
      - If is_first_in_course: include course-level welcome and motivation, set expectations for the learning journey
@@ -362,11 +362,11 @@ Write a COMPLETE lesson for a {{durationMinutes}}-minute reading session.
 Target: approximately {{targetWordCount}} words total (excluding exercises and digest).
 
 STRUCTURE (use ## headers for each section):
-1. ## {{introductionHeader}} — Hook ({{hookStrategy}}) + preview of learning objectives (100-150 words)
+1. ## {{introductionHeader}} — Hook ({{hookStrategy}}) + motivating context for the topic (100-150 words). IMPORTANT: Do NOT list or preview learning objectives — they are displayed separately in the UI above the lesson content.
 2. Content sections (one ## header per topic from sections_to_cover).
    All sections combined should be approximately {{sectionsWordBudget}} words.
    Each section should be focused and proportional.
-3. ## {{summaryHeader}} — Brief recap + next steps (80-120 words)
+3. ## {{summaryHeader}} — Bullet-point list of 3-5 key takeaways from this lesson (what the reader learned). Total: 40-80 words. IMPORTANT: Do NOT restate or paraphrase content from earlier sections. Use SHORT thesis-style bullets only (one line each). Do NOT include "next lesson" preview — it is handled by the UI.
 4. ## {{exercisesHeader}} — Exactly 2 practical exercises
 
 Exercise format (use {{outputLanguage}} labels):
@@ -398,7 +398,7 @@ CRITICAL RULES:
 - INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
   - Reference previous lesson naturally if context is given
   - Do NOT re-explain terms from terms_already_defined
-  - In summary, tease next lesson if next_lesson info is provided
+  - In summary: write ONLY short bullet-point takeaways (not full sentences restating content). Do NOT preview the next lesson — a separate UI element handles this.
   - COURSE POSITION (from course_position if provided):
     - Use position awareness to write appropriate introductions and conclusions
     - If is_first_in_course: include course-level welcome and motivation, set expectations for the learning journey
@@ -546,7 +546,7 @@ Create a detailed lesson outline based on the specification above. The outline m
 
 1. **Introduction**: Plan the opening using the specified hook strategy ({{hookStrategy}})
    - Design a {{hookStrategy}} hook about: {{hookTopic}}
-   - Preview the key learning objectives
+   - Provide motivating context for the topic. Do NOT list or preview learning objectives — they are displayed separately in the UI.
 
 2. **Main Sections**: For each section listed above, create:
    - 3-5 key points to cover
@@ -887,7 +887,7 @@ Assemble a complete lesson from the expanded sections above. You must:
 
 1. **Write Introduction**:
    - Create a {{hookStrategy}} hook about: {{hookTopic}}
-   - Preview the key learning objectives
+   - Provide motivating context for the topic. Do NOT list or preview learning objectives — they are displayed separately in the UI.
    - Transition smoothly into the first section
 
 2. **Assemble Sections**:
