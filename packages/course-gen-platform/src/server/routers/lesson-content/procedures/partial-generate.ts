@@ -16,6 +16,7 @@ import {
   parseLessonId,
   findLessonByOrder,
   transitionToStage6Generating,
+  removeStaleJob,
   type SectionFromStructure,
 } from '../helpers';
 import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
@@ -440,7 +441,7 @@ export const partialGenerate = protectedProcedure
       const courseLanguage = (course.language || 'en') as Language;
       const stage6Queue = createStage6Queue();
       const jobs = await Promise.all(
-        lessonSpecs.map(spec => {
+        lessonSpecs.map(async spec => {
           const jobData: Stage6JobInput = {
             lessonSpec: spec,
             courseId,
@@ -458,6 +459,10 @@ export const partialGenerate = protectedProcedure
           // Deterministic job ID for deduplication
           const jobName = `lesson:${spec.lesson_id}`;
           const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
+
+          // Remove stale completed/failed job to allow re-generation
+          // (BullMQ rejects queue.add with same jobId if old job still exists)
+          await removeStaleJob(stage6Queue, deduplicationId, requestId);
 
           return stage6Queue.add(jobName, jobData, {
             priority,
