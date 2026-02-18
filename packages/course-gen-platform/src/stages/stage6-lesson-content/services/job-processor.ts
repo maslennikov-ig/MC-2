@@ -20,7 +20,7 @@ import { createLessonLabel, LessonLabel, validateLanguageCode } from '@megacampu
 
 import { Stage6JobInput, Stage6JobResult, ProgressUpdate, ModelConfig } from '../types';
 import { MODEL_FALLBACK } from '../config';
-import { getStage6ModelConfig } from './model-service';
+import { selectStage6ModelTier } from '../nodes/generator/model-selector';
 import {
   handlePartialSuccess,
   markForReview,
@@ -447,7 +447,10 @@ export async function processStage6Job(
   }
 
   const lessonUuid = await resolveLessonUuid(courseId, lessonLabel);
-  const modelConfig: ModelConfig = await getStage6ModelConfig(lessonSpec, language);
+
+  // 3-tier model selection: simple/normal/complex based on difficulty + first-module rule
+  const tierResult = await selectStage6ModelTier(lessonSpec);
+  const modelConfig: ModelConfig = { primary: tierResult.model, fallback: tierResult.fallback };
 
   // Check pause status for logging (Issue #9 from code review)
   // Note: If we reached here, course was not paused at job start (checkPauseAndDelay passed)

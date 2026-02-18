@@ -165,3 +165,13 @@ export const STAGE6_TIER_MODELS = {
   /** Complex tier: premium model for advanced difficulty + module 1 lessons */
   complex: 'qwen/qwen3.5-plus-02-15',
 } as const;
+
+/**
+ * LAST-RESORT fallback models per tier (used when database is unavailable).
+ * Maps to the fallback_model_id column in llm_model_config for each stage_6_* phase.
+ */
+export const STAGE6_TIER_FALLBACKS = {
+  simple: 'moonshotai/kimi-k2-thinking',
+  normal: 'moonshotai/kimi-k2-thinking',
+  complex: 'moonshotai/kimi-k2-thinking',
+} as const;
