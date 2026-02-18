@@ -595,6 +595,7 @@ export const partialGenerate = protectedProcedure
             language: courseLanguage, // Pass course language for content generation
             locale: validateLocale(courseLanguage),
             style: (course.style as CourseStyle | null) ?? undefined,
+            skipCompletionCheck: true,
           };
 
           // Deterministic job ID for deduplication

@@ -47,6 +47,12 @@ export interface Stage6JobInput {
    * for higher quality content generation
    */
   analysisResult?: AnalysisResult;
+
+  /**
+   * Skip automatic course completion check after job completes
+   * Set to true for partialGenerate jobs where frontend tracks completion independently
+   */
+  skipCompletionCheck?: boolean;
 }
 
 /**
