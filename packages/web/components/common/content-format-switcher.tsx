@@ -74,6 +74,8 @@ interface ContentFormatSwitcherProps {
     title: string
     objectives?: string[] | null
   }
+  /** Callback to navigate to the next lesson */
+  onNextLesson?: () => void
 }
 
 export default function ContentFormatSwitcher({
@@ -86,6 +88,7 @@ export default function ContentFormatSwitcher({
   onFormatChange,
   courseLanguage,
   nextLesson,
+  onNextLesson,
 }: ContentFormatSwitcherProps) {
   const [currentFormat, setCurrentFormat] = useState<'text' | 'video' | 'audio' | 'presentation'>(
     'text'
@@ -215,6 +218,7 @@ export default function ContentFormatSwitcher({
         enrichments={enrichments}
         courseLanguage={courseLanguage}
         nextLesson={nextLesson}
+        onNextLesson={onNextLesson}
       />
     )
   }
@@ -308,6 +312,7 @@ export default function ContentFormatSwitcher({
               enrichments={enrichments}
               courseLanguage={courseLanguage}
               nextLesson={nextLesson}
+              onNextLesson={onNextLesson}
             />
           )}
 

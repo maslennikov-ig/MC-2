@@ -43,6 +43,8 @@ interface LessonContentProps {
     title: string
     objectives?: string[] | null
   }
+  /** Callback to navigate to the next lesson */
+  onNextLesson?: () => void
 }
 
 export default function LessonContent({
@@ -53,6 +55,7 @@ export default function LessonContent({
   enrichments,
   courseLanguage,
   nextLesson,
+  onNextLesson,
 }: LessonContentProps) {
   const [videoMode, setVideoMode] = useState<'hidden' | 'normal' | 'floating'>('hidden')
 
@@ -410,30 +413,61 @@ export default function LessonContent({
       {/* Next Lesson Preview */}
       {nextLesson && (
         <div className="mt-12 mb-4">
-          <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-6 shadow-sm transition-shadow hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-900/20 dark:to-teal-900/10">
-            <div className="mb-3 flex items-center gap-2">
-              <ArrowRight className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                В следующем уроке
-              </h2>
+          {onNextLesson ? (
+            <button
+              type="button"
+              onClick={onNextLesson}
+              className="group w-full cursor-pointer rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-6 text-left shadow-sm transition-all hover:border-emerald-300 hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-900/20 dark:to-teal-900/10 dark:hover:border-emerald-700/50"
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <ArrowRight className="h-5 w-5 text-emerald-600 transition-transform group-hover:translate-x-1 dark:text-emerald-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  В следующем уроке
+                </h2>
+              </div>
+              <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
+                {nextLesson.title}
+              </p>
+              {nextLesson.objectives && nextLesson.objectives.length > 0 && (
+                <ul className="space-y-1.5">
+                  {nextLesson.objectives.slice(0, 3).map((obj, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                    >
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                      {obj}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </button>
+          ) : (
+            <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-6 shadow-sm transition-shadow hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-900/20 dark:to-teal-900/10">
+              <div className="mb-3 flex items-center gap-2">
+                <ArrowRight className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  В следующем уроке
+                </h2>
+              </div>
+              <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
+                {nextLesson.title}
+              </p>
+              {nextLesson.objectives && nextLesson.objectives.length > 0 && (
+                <ul className="space-y-1.5">
+                  {nextLesson.objectives.slice(0, 3).map((obj, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                    >
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                      {obj}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
-              {nextLesson.title}
-            </p>
-            {nextLesson.objectives && nextLesson.objectives.length > 0 && (
-              <ul className="space-y-1.5">
-                {nextLesson.objectives.slice(0, 3).map((obj, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
-                  >
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                    {obj}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          )}
         </div>
       )}
     </motion.div>

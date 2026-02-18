@@ -190,6 +190,7 @@ export function LessonView({
             enrichments={enrichments}
             courseLanguage={courseLanguage}
             nextLesson={nextLessonData}
+            onNextLesson={onNext}
           />
 
           <div className="mt-16 border-t border-gray-200 pt-8 dark:border-gray-800">
@@ -296,6 +297,7 @@ export function LessonView({
           onFormatChange={undefined}
           courseLanguage={courseLanguage}
           nextLesson={nextLessonData}
+          onNextLesson={onNext}
         />
       </TabsContent>
 
