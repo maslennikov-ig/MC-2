@@ -17,11 +17,12 @@
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
-import { STAGE6_TIER_MODELS } from './generator-constants';
+import { STAGE6_TIER_MODELS, STAGE6_TIER_FALLBACKS } from './generator-constants';
 import { logger } from '@/shared/logger';
 
 export interface Stage6ModelTier {
   model: string;
+  fallback: string;
   tier: 'simple' | 'normal' | 'complex';
   reason: string;
 }
@@ -37,7 +38,7 @@ export interface Stage6ModelTier {
  * First module rule: All lessons in module 1 (lesson_id starts with "1.") always use complex tier.
  *
  * @param lessonSpec - Lesson specification from Stage 5
- * @returns Model tier with selected model ID and reasoning
+ * @returns Model tier with selected primary + fallback model IDs and reasoning
  */
 export async function selectStage6ModelTier(
   lessonSpec: LessonSpecificationV2
@@ -69,12 +70,14 @@ export async function selectStage6ModelTier(
     const modelConfigService = createModelConfigService();
     const config = await modelConfigService.getModelForPhase(phaseName);
     const modelId = config.modelId || STAGE6_TIER_MODELS[targetTier];
+    const fallbackId = config.fallbackModelId || STAGE6_TIER_FALLBACKS[targetTier];
 
     logger.info({
       msg: `Stage 6 model tier selection: ${targetTier}`,
       tier: targetTier,
       phase: phaseName,
       modelId,
+      fallbackId,
       source: config.source,
       lessonId: lessonSpec.lesson_id,
       difficultyLevel,
@@ -83,6 +86,7 @@ export async function selectStage6ModelTier(
 
     return {
       model: modelId,
+      fallback: fallbackId,
       tier: targetTier,
       reason: `${tierReason} → ${modelId} (from ${config.source})`,
     };
@@ -95,6 +99,7 @@ export async function selectStage6ModelTier(
 
     return {
       model: STAGE6_TIER_MODELS[targetTier],
+      fallback: STAGE6_TIER_FALLBACKS[targetTier],
       tier: targetTier,
       reason: `${tierReason} → ${STAGE6_TIER_MODELS[targetTier]} (hardcoded fallback)`,
     };
