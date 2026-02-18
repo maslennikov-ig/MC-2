@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Target, Clock, CheckCircle, PlayCircle, Film, X, BookOpen } from 'lucide-react'
+import { Target, Clock, CheckCircle, PlayCircle, Film, X, BookOpen, ArrowRight } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 import { MarkdownRendererFull } from '@/components/markdown'
@@ -38,6 +38,11 @@ interface LessonContentProps {
   enrichments?: Array<{ enrichment_type: string; content: unknown; status: string }>
   /** Course content language for localized callout titles */
   courseLanguage?: string
+  /** Next lesson info for "What's next" card */
+  nextLesson?: {
+    title: string
+    objectives?: string[] | null
+  }
 }
 
 export default function LessonContent({
@@ -47,6 +52,7 @@ export default function LessonContent({
   lessonContent,
   enrichments,
   courseLanguage,
+  nextLesson,
 }: LessonContentProps) {
   const [videoMode, setVideoMode] = useState<'hidden' | 'normal' | 'floating'>('hidden')
 
@@ -371,7 +377,7 @@ export default function LessonContent({
           <div className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/50 p-6 shadow-sm transition-shadow hover:shadow-md dark:border-purple-800/30 dark:from-purple-900/20 dark:to-purple-900/10">
             <div className="mb-4 flex items-center gap-2">
               <Target className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Цели обучения</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Цели урока</h2>
             </div>
             <ul className="space-y-2">
               {lesson.objectives.map((objective, index) => (
@@ -400,6 +406,36 @@ export default function LessonContent({
       <div className="prose prose-lg dark:prose-invert prose-purple max-w-none">
         <MarkdownRendererFull content={mainContent} preset="lesson" language={courseLanguage} />
       </div>
+
+      {/* Next Lesson Preview */}
+      {nextLesson && (
+        <div className="mt-12 mb-4">
+          <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-6 shadow-sm transition-shadow hover:shadow-md dark:border-emerald-800/30 dark:from-emerald-900/20 dark:to-teal-900/10">
+            <div className="mb-3 flex items-center gap-2">
+              <ArrowRight className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                В следующем уроке
+              </h2>
+            </div>
+            <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
+              {nextLesson.title}
+            </p>
+            {nextLesson.objectives && nextLesson.objectives.length > 0 && (
+              <ul className="space-y-1.5">
+                {nextLesson.objectives.slice(0, 3).map((obj, idx) => (
+                  <li
+                    key={idx}
+                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                  >
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                    {obj}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }

@@ -118,7 +118,7 @@ export const ANALYSIS_RESULT_FIELDS: FieldConfig[] = [
 // Stage 5 field configurations (per lesson)
 export const COURSE_STRUCTURE_LESSON_FIELDS: FieldConfig[] = [
   { path: 'title', label: 'Название', type: 'text', regeneratable: true },
-  { path: 'learning_objectives', label: 'Цели обучения', type: 'chips', regeneratable: true },
+  { path: 'learning_objectives', label: 'Цели урока', type: 'chips', regeneratable: true },
   { path: 'key_topics', label: 'Ключевые темы', type: 'chips', regeneratable: true },
   {
     path: 'estimated_duration_minutes',

@@ -921,7 +921,7 @@
     "intermediate": "Средний",
     "advanced": "Продвинутый",
     "metadataCard": "Метаданные курса",
-    "learningOutcomes": "Цели обучения",
+    "learningOutcomes": "Цели урока",
     "prerequisites": "Предварительные знания",
     "difficulty": "Сложность",
     "duration": "Длительность",
@@ -1064,7 +1064,7 @@
       "critique": "Комментарий"
     },
     "blueprint": {
-      "learningObjectives": "Цели обучения",
+      "learningObjectives": "Цели урока",
       "prerequisites": "Пререквизиты",
       "targetAudience": "Целевая аудитория",
       "estimatedDuration": "Длительность",
