@@ -39,6 +39,38 @@ export type SectionFromStructure = {
   lessons: LessonFromStructure[];
 };
 
+// ── Shared lesson/section utility functions ──
+
+export function buildLessonId(sectionNumber: number, lessonOrder: number): string {
+  return `${sectionNumber}.${lessonOrder}`;
+}
+
+export function resolveSectionNumber(section: SectionFromStructure, sectionIndex: number): number {
+  return section.section_number ?? sectionIndex + 1;
+}
+
+export function parseLessonId(
+  lessonId: string
+): { sectionNum: number; lessonOrder: number } | null {
+  const match = lessonId.match(/^(\d+)\.(\d+)$/);
+  if (!match) return null;
+
+  const sectionNum = parseInt(match[1], 10);
+  const lessonOrder = parseInt(match[2], 10);
+
+  if (sectionNum <= 0 || lessonOrder <= 0) return null;
+
+  return { sectionNum, lessonOrder };
+}
+
+export function findLessonByOrder(
+  section: SectionFromStructure,
+  lessonOrder: number
+): LessonFromStructure | null {
+  const lesson = section.lessons[lessonOrder - 1];
+  return lesson ?? null;
+}
+
 /**
  * Verify user has access to course (course owner or same organization)
  *
@@ -452,4 +484,96 @@ export function buildMinimalLessonSpec(
   }
 
   return spec;
+}
+
+/**
+ * Transition a course's generation_status through the FSM to stage_6_generating.
+ *
+ * Handles all valid starting states:
+ * - stage_5_awaiting_approval → stage_6_init → stage_6_generating
+ * - stage_5_complete          → stage_6_init → stage_6_generating
+ * - stage_6_init              → stage_6_generating
+ * - stage_6_complete          → stage_6_generating  (re-generation of missing/partial content)
+ * - stage_6_generating        → no-op (already in target state)
+ *
+ * Logs a warning if the current status is not in the set of allowed statuses.
+ *
+ * @param courseId  - Course UUID
+ * @param requestId - Request ID for structured logging
+ */
+export async function transitionToStage6Generating(
+  courseId: string,
+  requestId: string
+): Promise<void> {
+  const supabase = getSupabaseAdmin();
+
+  const { data: statusData } = await supabase
+    .from('courses')
+    .select('generation_status')
+    .eq('id', courseId)
+    .single();
+
+  const currentStatus = statusData?.generation_status;
+
+  const statusesAllowingStage6 = [
+    'stage_5_complete',
+    'stage_5_awaiting_approval',
+    'stage_6_init',
+    'stage_6_generating',
+    'stage_6_complete',
+  ];
+
+  if (currentStatus === 'stage_5_awaiting_approval' || currentStatus === 'stage_5_complete') {
+    logger.info(
+      { requestId, courseId, currentStatus },
+      currentStatus === 'stage_5_awaiting_approval'
+        ? 'Auto-approving Stage 5 and starting Stage 6'
+        : 'Starting Stage 6 from stage_5_complete'
+    );
+
+    // FSM requires intermediate step through stage_6_init
+    await supabase.from('courses').update({ generation_status: 'stage_6_init' }).eq('id', courseId);
+
+    const { error: updateError } = await supabase
+      .from('courses')
+      .update({ generation_status: 'stage_6_generating' })
+      .eq('id', courseId);
+
+    if (updateError) {
+      logger.error(
+        { requestId, courseId, error: updateError },
+        'Failed to update generation_status to stage_6_generating'
+      );
+    }
+  } else if (currentStatus === 'stage_6_init') {
+    logger.info({ requestId, courseId, currentStatus }, 'Starting Stage 6 generation');
+
+    const { error: updateError } = await supabase
+      .from('courses')
+      .update({ generation_status: 'stage_6_generating' })
+      .eq('id', courseId);
+
+    if (updateError) {
+      logger.error(
+        { requestId, courseId, error: updateError },
+        'Failed to update generation_status to stage_6_generating'
+      );
+    }
+  } else if (currentStatus === 'stage_6_complete') {
+    // Re-generation: transition back to generating for new/missing content
+    const { error: updateError } = await supabase
+      .from('courses')
+      .update({ generation_status: 'stage_6_generating' })
+      .eq('id', courseId);
+
+    if (updateError) {
+      logger.error(
+        { requestId, courseId, error: updateError },
+        'Failed to update generation_status to stage_6_generating'
+      );
+    }
+  } else if (!statusesAllowingStage6.includes(currentStatus || '')) {
+    logger.warn({ requestId, courseId, currentStatus }, 'Course not ready for Stage 6 generation');
+  }
+  // stage_6_generating → no-op, already in target state
 }

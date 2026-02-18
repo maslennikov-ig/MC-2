@@ -11,8 +11,12 @@ import { partialGenerateInputSchema } from '../schemas';
 import {
   verifyCourseAccess,
   buildMinimalLessonSpec,
+  buildLessonId,
+  resolveSectionNumber,
+  parseLessonId,
+  findLessonByOrder,
+  transitionToStage6Generating,
   type SectionFromStructure,
-  type LessonFromStructure,
 } from '../helpers';
 import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
 import type { Stage6JobInput } from '../../../../stages/stage6-lesson-content/types';
@@ -22,34 +26,6 @@ import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
 import type { Language, CourseStyle } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
-
-function buildLessonId(sectionNumber: number, lessonOrder: number): string {
-  return `${sectionNumber}.${lessonOrder}`;
-}
-
-function resolveSectionNumber(section: SectionFromStructure, sectionIndex: number): number {
-  return section.section_number ?? sectionIndex + 1;
-}
-
-function parseLessonId(lessonId: string): { sectionNum: number; lessonOrder: number } | null {
-  const match = lessonId.match(/^(\d+)\.(\d+)$/);
-  if (!match) return null;
-
-  const sectionNum = parseInt(match[1], 10);
-  const lessonOrder = parseInt(match[2], 10);
-
-  if (sectionNum <= 0 || lessonOrder <= 0) return null;
-
-  return { sectionNum, lessonOrder };
-}
-
-function findLessonByOrder(
-  section: SectionFromStructure,
-  lessonOrder: number
-): LessonFromStructure | null {
-  const lesson = section.lessons[lessonOrder - 1];
-  return lesson ?? null;
-}
 
 /**
  * Partial Stage 6 generation for selected lessons
@@ -175,125 +151,8 @@ export const partialGenerate = protectedProcedure
         });
       }
 
-      // Step 3.5: Auto-approve Stage 5 if awaiting approval
-      // When user triggers partial generation, structure is implicitly approved
-      const { data: statusData } = await supabase
-        .from('courses')
-        .select('generation_status')
-        .eq('id', courseId)
-        .single();
-
-      const currentStatus = statusData?.generation_status;
-
-      // Stage 6 status flow: stage_5_complete -> stage_6_init -> stage_6_generating -> stage_6_complete
-      // When user starts generation, we transition to stage_6_generating
-      const statusesAllowingStage6 = [
-        'stage_5_complete',
-        'stage_5_awaiting_approval',
-        'stage_6_init',
-        'stage_6_generating',
-        'stage_6_complete',
-      ];
-
-      if (currentStatus === 'stage_5_awaiting_approval') {
-        logger.info(
-          {
-            requestId,
-            courseId,
-            currentStatus,
-          },
-          'Auto-approving Stage 5 and starting Stage 6'
-        );
-
-        // FSM requires: stage_5_awaiting_approval -> stage_6_init -> stage_6_generating
-        // First transition to stage_6_init
-        await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_init' })
-          .eq('id', courseId);
-
-        // Then transition to stage_6_generating
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_generating' })
-          .eq('id', courseId);
-
-        if (updateError) {
-          logger.error(
-            {
-              requestId,
-              courseId,
-              error: updateError,
-            },
-            'Failed to update generation_status to stage_6_generating'
-          );
-        }
-      } else if (currentStatus === 'stage_5_complete') {
-        // FSM requires: stage_5_complete -> stage_6_init -> stage_6_generating
-        await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_init' })
-          .eq('id', courseId);
-
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_generating' })
-          .eq('id', courseId);
-
-        if (updateError) {
-          logger.error(
-            {
-              requestId,
-              courseId,
-              error: updateError,
-            },
-            'Failed to update generation_status to stage_6_generating'
-          );
-        }
-
-        logger.info(
-          {
-            requestId,
-            courseId,
-          },
-          'Started Stage 6 generation from stage_5_complete'
-        );
-      } else if (currentStatus === 'stage_6_init') {
-        // Transition to stage_6_generating when starting generation
-        logger.info(
-          {
-            requestId,
-            courseId,
-            currentStatus,
-          },
-          'Starting Stage 6 generation'
-        );
-
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_6_generating' })
-          .eq('id', courseId);
-
-        if (updateError) {
-          logger.error(
-            {
-              requestId,
-              courseId,
-              error: updateError,
-            },
-            'Failed to update generation_status to stage_6_generating'
-          );
-        }
-      } else if (!statusesAllowingStage6.includes(currentStatus || '')) {
-        logger.warn(
-          {
-            requestId,
-            courseId,
-            currentStatus,
-          },
-          'Course not ready for Stage 6 generation'
-        );
-      }
+      // Step 3.5: Transition FSM to stage_6_generating
+      await transitionToStage6Generating(courseId, requestId);
 
       // Step 3.6: Materialize sections and lessons from course_structure if not exists
       // This runs regardless of status - ensures DB has actual section/lesson records
@@ -485,6 +344,25 @@ export const partialGenerate = protectedProcedure
 
       // Step 5.5: Ensure all lessons exist in database (recreate if deleted)
       // This handles the case where a lesson was deleted but user wants to regenerate it
+
+      // Batch: resolve all section IDs at once (avoids N+1 per-lesson queries)
+      const uniqueSectionNums = [
+        ...new Set(
+          lessonSpecs
+            .map(s => parseLessonId(s.lesson_id)?.sectionNum)
+            .filter((n): n is number => n != null)
+        ),
+      ];
+      const { data: sectionRows } = await supabase
+        .from('sections')
+        .select('id, order_index')
+        .eq('course_id', courseId)
+        .in('order_index', uniqueSectionNums);
+      const sectionNumToId = new Map<number, string>();
+      for (const row of sectionRows ?? []) {
+        sectionNumToId.set(row.order_index, row.id);
+      }
+
       for (const spec of lessonSpecs) {
         const parsedLessonId = parseLessonId(spec.lesson_id);
         if (!parsedLessonId) {
@@ -497,22 +375,10 @@ export const partialGenerate = protectedProcedure
 
         const { sectionNum, lessonOrder } = parsedLessonId;
 
-        // Find section ID
-        const { data: sectionData } = await supabase
-          .from('sections')
-          .select('id')
-          .eq('course_id', courseId)
-          .eq('order_index', sectionNum)
-          .single();
-
-        if (!sectionData) {
+        const sectionId = sectionNumToId.get(sectionNum);
+        if (!sectionId) {
           logger.warn(
-            {
-              requestId,
-              courseId,
-              lessonId: spec.lesson_id,
-              sectionNum,
-            },
+            { requestId, courseId, lessonId: spec.lesson_id, sectionNum },
             'Section not found in database for lesson recreation'
           );
           continue;
@@ -522,7 +388,7 @@ export const partialGenerate = protectedProcedure
         const { data: existingLesson } = await supabase
           .from('lessons')
           .select('id')
-          .eq('section_id', sectionData.id)
+          .eq('section_id', sectionId)
           .eq('order_index', lessonOrder)
           .single();
 
@@ -535,7 +401,7 @@ export const partialGenerate = protectedProcedure
 
           if (lesson) {
             const { error: createError } = await supabase.from('lessons').insert({
-              section_id: sectionData.id,
+              section_id: sectionId,
               title: lesson.lesson_title,
               order_index: lessonOrder,
               lesson_type: 'text',
