@@ -8,7 +8,12 @@ import { nanoid } from 'nanoid';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { partialGenerateInputSchema } from '../schemas';
-import { verifyCourseAccess, buildMinimalLessonSpec } from '../helpers';
+import {
+  verifyCourseAccess,
+  buildMinimalLessonSpec,
+  type SectionFromStructure,
+  type LessonFromStructure,
+} from '../helpers';
 import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
 import type { Stage6JobInput } from '../../../../stages/stage6-lesson-content/types';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
@@ -17,21 +22,6 @@ import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
 import type { Language, CourseStyle } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
-
-type LessonFromStructure = {
-  lesson_number: number;
-  lesson_title: string;
-  lesson_objectives?: string[];
-  key_topics?: string[];
-  estimated_duration_minutes?: number;
-  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
-};
-
-type SectionFromStructure = {
-  section_number?: number;
-  section_title: string;
-  lessons: LessonFromStructure[];
-};
 
 function buildLessonId(sectionNumber: number, lessonOrder: number): string {
   return `${sectionNumber}.${lessonOrder}`;
@@ -471,7 +461,8 @@ export const partialGenerate = protectedProcedure
           lesson,
           sectionNum,
           requestId,
-          analysisResult
+          analysisResult,
+          courseStructure
         );
         lessonSpecs.push(spec);
       }
