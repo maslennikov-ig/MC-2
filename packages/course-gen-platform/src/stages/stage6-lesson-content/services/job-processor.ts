@@ -556,13 +556,17 @@ export async function processStage6Job(
       }
 
       // Check if all lessons are complete and update course status to stage_6_complete
-      // This runs after each successful lesson save (non-blocking)
-      checkAndSetStage6Complete(courseId).catch(err => {
-        jobLogger.warn(
-          { courseId, error: err instanceof Error ? err.message : String(err) },
-          'Non-blocking: Failed to check Stage 6 completion'
-        );
-      });
+      // Skip for partialGenerate jobs — frontend tracks completion independently
+      if (!job.data.skipCompletionCheck) {
+        checkAndSetStage6Complete(courseId).catch(err => {
+          jobLogger.warn(
+            { courseId, error: err instanceof Error ? err.message : String(err) },
+            'Non-blocking: Failed to check Stage 6 completion'
+          );
+        });
+      } else {
+        jobLogger.debug('Skipping completion check (partialGenerate job)');
+      }
     }
 
     jobLogger.info(
