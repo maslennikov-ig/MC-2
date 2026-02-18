@@ -414,7 +414,10 @@ export function safeJSONParse(jsonStr: string): unknown {
     error: result.error,
   };
 
-  logger.error(errorDetails, 'JSON repair failed after all strategies');
+  logger.warn(
+    errorDetails,
+    'JSON repair failed after all strategies, caller may try markdown fallback'
+  );
 
   throw new ValidationError(
     `Failed to parse JSON after repair attempts: ${result.error}. Attempts: ${result.attempts?.join(', ')}`
