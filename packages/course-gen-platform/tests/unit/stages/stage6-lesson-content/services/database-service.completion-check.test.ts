@@ -29,6 +29,7 @@ vi.mock('@/shared/logger', () => ({
 }));
 
 import { checkAndSetStage6Complete } from '@/stages/stage6-lesson-content/services/database-service';
+import { markForReview } from '@/stages/stage6-lesson-content/services/database-service';
 
 type CourseRow = {
   generation_status: string;
@@ -41,8 +42,10 @@ type CourseRow = {
 
 function createSupabaseAdminMock(options: {
   courseRow: CourseRow;
-  lessonContentsRows: Array<{ lesson_id: string; status?: string }>;
+  lessonContentsRows: Array<{ lesson_id: string; status?: string; created_at?: string }>;
   updateError?: { message: string } | null;
+  lessonUpdateError?: { message: string } | null;
+  insertError?: { message: string } | null;
 }) {
   const courseSelectQuery = {
     eq: vi.fn(function () {
@@ -54,23 +57,23 @@ function createSupabaseAdminMock(options: {
     }),
   };
 
-  let lessonContentsStatusFilter: string | null = null;
+  const rowsWithCreatedAt = options.lessonContentsRows.map((row, index) => ({
+    created_at: row.created_at ?? `2026-01-01T00:00:${String(index).padStart(2, '0')}Z`,
+    ...row,
+  }));
+
   const buildLessonContentsResult = () => ({
-    data:
-      lessonContentsStatusFilter === null
-        ? options.lessonContentsRows
-        : options.lessonContentsRows.filter(row => row.status === lessonContentsStatusFilter),
+    data: rowsWithCreatedAt
+      .slice()
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     error: null,
   });
 
   const lessonContentsQuery = {
-    eq: vi.fn(function (column: string, value: string) {
-      if (column === 'status') {
-        lessonContentsStatusFilter = value;
-      }
+    eq: vi.fn(function () {
       return lessonContentsQuery;
     }),
-    not: vi.fn().mockImplementation(() => Promise.resolve(buildLessonContentsResult())),
+    order: vi.fn().mockImplementation(() => Promise.resolve(buildLessonContentsResult())),
     then: (
       resolve: (v: ReturnType<typeof buildLessonContentsResult>) => unknown,
       reject?: (e: unknown) => unknown
@@ -91,19 +94,35 @@ function createSupabaseAdminMock(options: {
     update: vi.fn().mockReturnValue(updateQuery),
   };
 
+  const lessonUpdateResult = { error: options.lessonUpdateError ?? null };
+  const lessonUpdateQuery = {
+    eq: vi.fn(function () {
+      return lessonUpdateQuery;
+    }),
+    then: (resolve: (v: typeof lessonUpdateResult) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve(lessonUpdateResult).then(resolve, reject),
+  };
+
+  const lessonsTable = {
+    update: vi.fn().mockReturnValue(lessonUpdateQuery),
+  };
+
+  const insertResult = { error: options.insertError ?? null };
   const lessonContentsTable = {
     select: vi.fn().mockReturnValue(lessonContentsQuery),
+    insert: vi.fn().mockResolvedValue(insertResult),
   };
 
   const supabase = {
     from: vi.fn((table: string) => {
       if (table === 'courses') return coursesTable;
+      if (table === 'lessons') return lessonsTable;
       if (table === 'lesson_contents') return lessonContentsTable;
       throw new Error(`Unexpected table: ${table}`);
     }),
   };
 
-  return { supabase, coursesTable, lessonContentsQuery };
+  return { supabase, coursesTable, lessonContentsTable, lessonsTable };
 }
 
 function createCourseRow(autoFinalize = true): CourseRow {
@@ -151,6 +170,81 @@ describe('checkAndSetStage6Complete', () => {
     await checkAndSetStage6Complete('course-123');
 
     expect(coursesTable.update).toHaveBeenCalledTimes(1);
+    expect(coursesTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({ generation_status: 'completed' })
+    );
     expect(mockNotifyCourseCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('moves to stage_6_complete when lessons are terminal but not fully completed', async () => {
+    const { supabase, coursesTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [
+        { lesson_id: 'lesson-1', status: 'review_required' },
+        { lesson_id: 'lesson-2', status: 'failed' },
+      ],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await checkAndSetStage6Complete('course-123');
+
+    expect(coursesTable.update).toHaveBeenCalledTimes(1);
+    expect(coursesTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({ generation_status: 'stage_6_complete' })
+    );
+    expect(mockNotifyCourseCompletion).not.toHaveBeenCalled();
+  });
+
+  it('uses latest lesson status when deciding terminal completion', async () => {
+    const { supabase, coursesTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [
+        // Latest status for lesson-1 is generating -> not terminal.
+        { lesson_id: 'lesson-1', status: 'failed', created_at: '2026-01-01T00:00:00Z' },
+        { lesson_id: 'lesson-1', status: 'generating', created_at: '2026-01-01T00:00:10Z' },
+        { lesson_id: 'lesson-2', status: 'completed', created_at: '2026-01-01T00:00:20Z' },
+      ],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await checkAndSetStage6Complete('course-123');
+
+    expect(coursesTable.update).not.toHaveBeenCalled();
+    expect(mockNotifyCourseCompletion).not.toHaveBeenCalled();
+  });
+});
+
+describe('markForReview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('persists failed terminal marker in lesson_contents', async () => {
+    const { supabase, lessonContentsTable, lessonsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await markForReview(
+      'course-123',
+      'lesson-uuid' as unknown as string,
+      '1.1' as unknown as string,
+      'Generation failed after retries'
+    );
+
+    expect(lessonsTable.update).toHaveBeenCalledTimes(1);
+    expect(lessonContentsTable.insert).toHaveBeenCalledTimes(1);
+    expect(lessonContentsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lesson_id: 'lesson-uuid',
+        course_id: 'course-123',
+        status: 'failed',
+        metadata: expect.objectContaining({
+          lessonLabel: '1.1',
+          failureReason: 'Generation failed after retries',
+        }),
+      })
+    );
   });
 });

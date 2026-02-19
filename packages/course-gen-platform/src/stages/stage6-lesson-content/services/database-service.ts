@@ -15,6 +15,14 @@ import {
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 import { parseGenerationProgress } from '@/shared/schemas/generation-progress.schema';
 
+const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
+  'completed',
+  'review_required',
+  'failed',
+  'approved',
+]);
+const STAGE6_FULLY_COMPLETED_STATUSES = new Set(['completed', 'approved']);
+
 /**
  * Handle partial success scenarios
  */
@@ -106,25 +114,51 @@ export async function markForReview(
   reason: string
 ): Promise<void> {
   const supabaseAdmin = getSupabaseAdmin();
+  const markedAt = new Date().toISOString();
 
   try {
-    const { error } = await supabaseAdmin
+    const { error: lessonUpdateError } = await supabaseAdmin
       .from('lessons')
       .update({
-        updated_at: new Date().toISOString(),
+        updated_at: markedAt,
       })
       .eq('id', lessonUuid);
 
-    if (error) {
+    if (lessonUpdateError) {
       logger.warn(
         {
           courseId,
           lessonUuid,
           lessonLabel,
           reason,
-          error: error.message,
+          error: lessonUpdateError.message,
         },
         'Failed to update lesson for review'
+      );
+    }
+
+    const { error: failedContentError } = await supabaseAdmin.from('lesson_contents').insert({
+      lesson_id: lessonUuid,
+      course_id: courseId,
+      status: 'failed',
+      metadata: {
+        lessonLabel,
+        markedForReviewAt: markedAt,
+        failureReason: reason,
+      },
+      generation_attempt: 1,
+    });
+
+    if (failedContentError) {
+      logger.warn(
+        {
+          courseId,
+          lessonUuid,
+          lessonLabel,
+          reason,
+          error: failedContentError.message,
+        },
+        'Failed to persist failed lesson content marker'
       );
     } else {
       logger.info(
@@ -535,9 +569,9 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
     // Rejected drafts must not contribute to Stage 6 completion.
     const { data: contentsData, error: contentsError } = await supabaseAdmin
       .from('lesson_contents')
-      .select('lesson_id')
+      .select('lesson_id, status, created_at')
       .eq('course_id', courseId)
-      .eq('status', 'completed');
+      .order('created_at', { ascending: false });
 
     if (contentsError) {
       logger.warn(
@@ -550,24 +584,41 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
       return;
     }
 
-    // Count unique lessons with content (there may be multiple content versions per lesson)
-    const uniqueLessonIds = new Set(contentsData?.map(c => c.lesson_id) || []);
-    const completedLessonsCount = uniqueLessonIds.size;
+    const latestStatusByLesson = new Map<string, string>();
+    for (const content of contentsData || []) {
+      if (!latestStatusByLesson.has(content.lesson_id)) {
+        latestStatusByLesson.set(content.lesson_id, content.status);
+      }
+    }
+
+    let terminalLessonsCount = 0;
+    let fullyCompletedLessonsCount = 0;
+    for (const latestStatus of latestStatusByLesson.values()) {
+      if (STAGE6_TERMINAL_LESSON_STATUSES.has(latestStatus)) {
+        terminalLessonsCount++;
+      }
+      if (STAGE6_FULLY_COMPLETED_STATUSES.has(latestStatus)) {
+        fullyCompletedLessonsCount++;
+      }
+    }
 
     logger.debug(
       {
         courseId,
         expectedLessonsCount,
-        completedLessonsCount,
+        terminalLessonsCount,
+        fullyCompletedLessonsCount,
         autoFinalize: course.auto_finalize_after_stage6,
       },
       'Checking Stage 6 completion'
     );
 
-    // If all lessons are complete, transition to stage_6_complete
-    if (completedLessonsCount >= expectedLessonsCount) {
-      // Determine target status based on auto_finalize flag
-      const shouldAutoFinalize = course.auto_finalize_after_stage6 === true;
+    // If all lessons reached a terminal state, transition course out of stage_6_generating.
+    if (terminalLessonsCount >= expectedLessonsCount) {
+      // Auto-finalize only when every lesson has fully completed content.
+      const shouldAutoFinalize =
+        course.auto_finalize_after_stage6 === true &&
+        fullyCompletedLessonsCount >= expectedLessonsCount;
 
       // Set generation_completed_at when finalizing
       const completedAt = shouldAutoFinalize ? new Date().toISOString() : undefined;
@@ -598,8 +649,10 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
       const updatedProgress: GenerationProgress = {
         ...existingProgress,
         percentage: 100,
-        message: shouldAutoFinalize ? 'Курс успешно создан!' : 'Генерация уроков завершена',
-        lessons_completed: completedLessonsCount,
+        message: shouldAutoFinalize
+          ? 'Курс успешно создан!'
+          : 'Генерация уроков завершена, требуется проверка',
+        lessons_completed: terminalLessonsCount,
         ...(updatedSteps && { steps: updatedSteps }),
       };
 
@@ -633,25 +686,28 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
           {
             courseId,
             expectedLessonsCount,
-            completedLessonsCount,
+            terminalLessonsCount,
+            fullyCompletedLessonsCount,
             autoFinalize: shouldAutoFinalize,
           },
           shouldAutoFinalize
             ? 'All lessons generated - course auto-finalized to completed'
-            : 'All lessons generated - course status updated to stage_6_complete'
+            : 'All lessons reached terminal status - course moved to stage_6_complete'
         );
 
-        // Send completion notifications (non-blocking)
-        try {
-          await notifyCourseCompletion(courseId);
-        } catch (notifyError) {
-          logger.warn(
-            {
-              courseId,
-              error: notifyError instanceof Error ? notifyError.message : String(notifyError),
-            },
-            'Failed to send completion notifications (non-fatal)'
-          );
+        // Send "course ready" notifications only for true auto-finalization.
+        if (shouldAutoFinalize) {
+          try {
+            await notifyCourseCompletion(courseId);
+          } catch (notifyError) {
+            logger.warn(
+              {
+                courseId,
+                error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+              },
+              'Failed to send completion notifications (non-fatal)'
+            );
+          }
         }
       }
     }
