@@ -530,13 +530,13 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
       return;
     }
 
-    // Count lessons with generated content from lesson_contents table
-    // lesson_contents has course_id directly, content stored as jsonb
+    // Count lessons with completed content only.
+    // Rejected drafts must not contribute to Stage 6 completion.
     const { data: contentsData, error: contentsError } = await supabaseAdmin
       .from('lesson_contents')
-      .select('id, lesson_id')
+      .select('lesson_id')
       .eq('course_id', courseId)
-      .not('content', 'is', null);
+      .eq('status', 'completed');
 
     if (contentsError) {
       logger.warn(
