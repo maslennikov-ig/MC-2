@@ -4,24 +4,25 @@ import { NextResponse } from 'next/server'
  * Public health check endpoint - minimal response only.
  * Detailed infrastructure checks are available at /api/admin/health (authenticated).
  *
- * Returns 503 if heap usage exceeds 90% AND process has been running for >60s.
- * During cold start V8 allocates a small initial heap, making the ratio
- * unreliable (can be >90% with only 5MB used). Grace period avoids false 503s
- * that break Blue/Green deploy verification.
+ * Degraded (503) when BOTH conditions are true:
+ *   1. RSS exceeds 512 MB (absolute memory pressure)
+ *   2. Heap ratio > 90% (V8 cannot reclaim memory)
+ *
+ * Previous logic used heap ratio alone, but V8 in Next.js standalone keeps
+ * heapTotal close to heapUsed (compact GC), so ratio is routinely >90%
+ * even at 5-10 MB used. The absolute RSS threshold prevents false 503s.
  *
  * Security: This endpoint is unauthenticated. Do NOT expose Node.js version,
  * memory usage values, environment variables, Supabase connectivity, or any
  * other infrastructure details here.
  */
 
-const START_TIME = Date.now()
-const STARTUP_GRACE_MS = 60_000
+const RSS_THRESHOLD_BYTES = 512 * 1024 * 1024 // 512 MB
 
 export function GET() {
   const memory = process.memoryUsage()
-  const uptimeMs = Date.now() - START_TIME
   const heapRatio = memory.heapUsed / memory.heapTotal
-  const healthy = uptimeMs < STARTUP_GRACE_MS || heapRatio < 0.9
+  const healthy = memory.rss < RSS_THRESHOLD_BYTES || heapRatio < 0.9
 
   return NextResponse.json(
     { status: healthy ? 'ok' : 'degraded', timestamp: new Date().toISOString() },
