@@ -211,3 +211,25 @@ export function buildEnrichedJudgeOutput(
 
   return result;
 }
+
+/**
+ * Extract unique model identifiers from an enriched judge output.
+ * Collects the single judge model (if present) and all CLEV vote model IDs.
+ */
+export function extractJudgeModels(
+  enrichedOutput: ReturnType<typeof buildEnrichedJudgeOutput>
+): string[] {
+  const models = new Set<string>();
+
+  if (enrichedOutput.singleJudge?.model) {
+    models.add(enrichedOutput.singleJudge.model);
+  }
+
+  for (const vote of enrichedOutput.votes ?? []) {
+    if (vote.model_id) {
+      models.add(vote.model_id);
+    }
+  }
+
+  return Array.from(models);
+}

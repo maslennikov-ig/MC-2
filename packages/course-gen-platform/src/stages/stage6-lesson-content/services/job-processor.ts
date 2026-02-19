@@ -18,9 +18,15 @@ import {
 import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
 import { createLessonLabel, LessonLabel, validateLanguageCode } from '@megacampus/shared-types';
 
-import { Stage6JobInput, Stage6JobResult, ProgressUpdate, ModelConfig } from '../types';
+import {
+  Stage6JobInput,
+  Stage6JobResult,
+  ProgressUpdate,
+  ModelConfig,
+  Stage6ModelTierName,
+} from '../types';
 import { MODEL_FALLBACK } from '../config';
-import { getStage6ModelConfig } from './model-service';
+import { selectStage6ModelTier } from '../nodes/generator/model-selector';
 import {
   handlePartialSuccess,
   markForReview,
@@ -74,6 +80,10 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     userRefinementPrompt,
     style,
     analysisResult,
+    selectedModel,
+    fallbackModel,
+    selectedModelTier,
+    selectedModelTierReason,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -90,6 +100,10 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     modelOverride,
     style,
     analysisResult,
+    selectedModel: selectedModel ?? null,
+    fallbackModel: fallbackModel ?? null,
+    selectedModelTier: selectedModelTier ?? null,
+    selectedModelTierReason: selectedModelTierReason ?? null,
   };
 
   return executeStage6Orchestrator(orchestratorInput);
@@ -150,7 +164,13 @@ export async function processWithFallback(
   modelConfig: ModelConfig,
   lessonUuid: string | null,
   ragChunks: RAGChunk[],
-  ragContextId: string | null
+  ragContextId: string | null,
+  modelSelection?: {
+    selectedModel: string;
+    fallbackModel: string;
+    selectedModelTier: Stage6ModelTierName;
+    selectedModelTierReason: string;
+  }
 ): Promise<Stage6Output> {
   let lastError: Error | null = null;
   const jobId = job.id ?? 'unknown';
@@ -173,9 +193,26 @@ export async function processWithFallback(
         ragChunks,
         ragContextId,
         modelOverride: modelConfig.primary,
+        selectedModel: modelSelection?.selectedModel ?? null,
+        fallbackModel: modelSelection?.fallbackModel ?? null,
+        selectedModelTier: modelSelection?.selectedModelTier ?? null,
+        selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
       });
 
       if (result.success) {
+        return result;
+      }
+
+      if (result.reviewInfo?.needsReview) {
+        logger.warn(
+          {
+            jobId,
+            model: modelConfig.primary,
+            attempt,
+            reviewInfo: result.reviewInfo,
+          },
+          'Primary model attempt ended with review_required (fail-open)'
+        );
         return result;
       }
 
@@ -245,6 +282,10 @@ export async function processWithFallback(
       ragChunks,
       ragContextId,
       modelOverride: modelConfig.fallback,
+      selectedModel: modelSelection?.selectedModel ?? null,
+      fallbackModel: modelSelection?.fallbackModel ?? null,
+      selectedModelTier: modelSelection?.selectedModelTier ?? null,
+      selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
     });
 
     if (result.success) {
@@ -254,6 +295,18 @@ export async function processWithFallback(
           fallbackModel: modelConfig.fallback,
         },
         'Fallback model succeeded'
+      );
+      return result;
+    }
+
+    if (result.reviewInfo?.needsReview) {
+      logger.warn(
+        {
+          jobId,
+          fallbackModel: modelConfig.fallback,
+          reviewInfo: result.reviewInfo,
+        },
+        'Fallback attempt ended with review_required (fail-open)'
       );
       return result;
     }
@@ -335,6 +388,29 @@ async function enrichSummaryPreviewFromDB(
 }
 
 /**
+ * Build a zero-value metrics object for early-return / error paths where
+ * tier selection has already completed but no generation was performed.
+ */
+function buildZeroMetrics(
+  tierResult: { model: string; fallback: string; tier: Stage6ModelTierName; reason: string },
+  durationMs: number
+): Stage6JobResult['metrics'] {
+  return {
+    tokensUsed: 0,
+    durationMs,
+    modelUsed: null,
+    selectedModel: tierResult.model,
+    fallbackModel: tierResult.fallback,
+    selectedModelTier: tierResult.tier,
+    selectedModelTierReason: tierResult.reason,
+    qualityScore: 0,
+    regenerateCount: 0,
+    truncationCount: 0,
+    rejectedTokens: 0,
+  };
+}
+
+/**
  * Process a single Stage 6 job
  * @param job - The BullMQ job to process
  * @param token - Job token for lock management (required for pause/delay, validated at runtime)
@@ -374,7 +450,14 @@ export async function processStage6Job(
         tokensUsed: 0,
         durationMs: Date.now() - startTime,
         modelUsed: null,
+        selectedModel: null,
+        fallbackModel: null,
+        selectedModelTier: null,
+        selectedModelTierReason: null,
         qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
       },
     };
   }
@@ -441,13 +524,23 @@ export async function processStage6Job(
         tokensUsed: 0,
         durationMs: Date.now() - startTime,
         modelUsed: null,
+        selectedModel: null,
+        fallbackModel: null,
+        selectedModelTier: null,
+        selectedModelTierReason: null,
         qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
       },
     };
   }
 
   const lessonUuid = await resolveLessonUuid(courseId, lessonLabel);
-  const modelConfig: ModelConfig = await getStage6ModelConfig(lessonSpec, language);
+
+  // 3-tier model selection: simple/normal/complex based on difficulty + first-module rule
+  const tierResult = await selectStage6ModelTier(lessonSpec);
+  const modelConfig: ModelConfig = { primary: tierResult.model, fallback: tierResult.fallback };
 
   // Check pause status for logging (Issue #9 from code review)
   // Note: If we reached here, course was not paused at job start (checkPauseAndDelay passed)
@@ -462,6 +555,9 @@ export async function processStage6Job(
     language,
     style: style ?? 'default',
     primaryModel: modelConfig.primary,
+    fallbackModel: modelConfig.fallback,
+    selectedModelTier: tierResult.tier,
+    selectedModelTierReason: tierResult.reason,
     isPaused: pauseStatusForLogging,
   });
 
@@ -487,10 +583,29 @@ export async function processStage6Job(
       ragChunksCount: ragChunks.length,
       ragContextId,
       primaryModel: modelConfig.primary,
+      selectedModel: tierResult.model,
+      fallbackModel: modelConfig.fallback,
+      selectedModelTier: tierResult.tier,
+      selectedModelTierReason: tierResult.reason,
       isPaused: pauseStatusForLogging,
     },
     durationMs: 0,
   });
+
+  const runCompletionCheck = () => {
+    // Skip for partialGenerate jobs — frontend tracks completion independently.
+    if (job.data.skipCompletionCheck) {
+      jobLogger.debug('Skipping completion check (partialGenerate job)');
+      return;
+    }
+
+    checkAndSetStage6Complete(courseId).catch(err => {
+      jobLogger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'Non-blocking: Failed to check Stage 6 completion'
+      );
+    });
+  };
 
   await updateJobProgress(job, {
     lessonId: lessonSpec.lesson_id,
@@ -500,9 +615,28 @@ export async function processStage6Job(
   });
 
   try {
-    const result = await processWithFallback(job, modelConfig, lessonUuid, ragChunks, ragContextId);
+    const result = await processWithFallback(
+      job,
+      modelConfig,
+      lessonUuid,
+      ragChunks,
+      ragContextId,
+      {
+        selectedModel: tierResult.model,
+        fallbackModel: tierResult.fallback,
+        selectedModelTier: tierResult.tier,
+        selectedModelTierReason: tierResult.reason,
+      }
+    );
 
     const durationMs = Date.now() - startTime;
+    const needsReview = result.reviewInfo?.needsReview === true;
+
+    result.metrics.selectedModel = result.metrics.selectedModel ?? tierResult.model;
+    result.metrics.fallbackModel = result.metrics.fallbackModel ?? tierResult.fallback;
+    result.metrics.selectedModelTier = result.metrics.selectedModelTier ?? tierResult.tier;
+    result.metrics.selectedModelTierReason =
+      result.metrics.selectedModelTierReason ?? tierResult.reason;
 
     let sanityResult: SanityCheckResult = { ok: true };
     if (result.lessonContent) {
@@ -527,11 +661,51 @@ export async function processStage6Job(
       lessonId: lessonSpec.lesson_id,
       phase: 'complete',
       progress: 100,
-      message: result.success ? 'Generation complete' : 'Generation completed with errors',
+      message: needsReview
+        ? 'Generation complete (review required)'
+        : result.success
+          ? 'Generation complete'
+          : 'Generation completed with errors',
       tokensUsed: result.metrics.tokensUsed,
     });
 
-    if (result.lessonContent && result.errors.length > 0) {
+    if (needsReview) {
+      if (lessonUuid && result.lessonContent) {
+        await handlePartialSuccess(
+          job.id ?? 'unknown',
+          courseId,
+          lessonUuid,
+          lessonLabel,
+          result,
+          language
+        );
+        runCompletionCheck();
+      } else if (lessonUuid) {
+        await markForReview(
+          courseId,
+          lessonUuid,
+          lessonLabel,
+          result.reviewInfo?.reasons?.join('; ') || 'Review required by generation pipeline',
+          {
+            modelUsed: result.metrics.modelUsed,
+            selectedModel: result.metrics.selectedModel,
+            fallbackModel: result.metrics.fallbackModel,
+            selectedModelTier: result.metrics.selectedModelTier,
+            selectedModelTierReason: result.metrics.selectedModelTierReason,
+            regenerateCount: result.metrics.regenerateCount,
+            truncationCount: result.metrics.truncationCount,
+            rejectedTokens: result.metrics.rejectedTokens,
+            reviewInfo: result.reviewInfo,
+          }
+        );
+        runCompletionCheck();
+      } else {
+        jobLogger.warn(
+          { lessonLabel },
+          'Cannot save review_required marker - lessonUuid not resolved'
+        );
+      }
+    } else if (result.lessonContent && result.errors.length > 0) {
       if (lessonUuid) {
         await handlePartialSuccess(
           job.id ?? 'unknown',
@@ -541,12 +715,13 @@ export async function processStage6Job(
           result,
           language
         );
+        runCompletionCheck();
       } else {
         jobLogger.warn({ lessonLabel }, 'Cannot save partial success - lessonUuid not resolved');
       }
     }
 
-    if (result.success && result.lessonContent) {
+    if (!needsReview && result.success && result.lessonContent) {
       await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult, language);
 
       // Save source documents attribution for traceability
@@ -555,14 +730,8 @@ export async function processStage6Job(
         await saveSourceDocuments(courseId, lessonUuid, sourceDocuments);
       }
 
-      // Check if all lessons are complete and update course status to stage_6_complete
-      // This runs after each successful lesson save (non-blocking)
-      checkAndSetStage6Complete(courseId).catch(err => {
-        jobLogger.warn(
-          { courseId, error: err instanceof Error ? err.message : String(err) },
-          'Non-blocking: Failed to check Stage 6 completion'
-        );
-      });
+      // Check if all lessons reached terminal statuses and update course status.
+      runCompletionCheck();
     }
 
     jobLogger.info(
@@ -572,7 +741,15 @@ export async function processStage6Job(
         tokensUsed: result.metrics.tokensUsed,
         qualityScore: result.metrics.qualityScore,
         modelUsed: result.metrics.modelUsed,
-        hasPartialContent: result.lessonContent !== null && result.errors.length > 0,
+        selectedModel: result.metrics.selectedModel,
+        fallbackModel: result.metrics.fallbackModel,
+        selectedModelTier: result.metrics.selectedModelTier,
+        regenerateCount: result.metrics.regenerateCount,
+        truncationCount: result.metrics.truncationCount,
+        rejectedTokens: result.metrics.rejectedTokens,
+        reviewRequired: needsReview,
+        hasPartialContent:
+          result.lessonContent !== null && (result.errors.length > 0 || needsReview),
       },
       'Stage 6 job processed'
     );
@@ -587,8 +764,17 @@ export async function processStage6Job(
       outputData: {
         qualityScore: result.metrics.qualityScore,
         modelUsed: result.metrics.modelUsed,
+        selectedModel: result.metrics.selectedModel,
+        fallbackModel: result.metrics.fallbackModel,
+        selectedModelTier: result.metrics.selectedModelTier,
+        selectedModelTierReason: result.metrics.selectedModelTierReason,
+        reviewRequired: needsReview,
         tokensUsed: result.metrics.tokensUsed,
+        regenerateCount: result.metrics.regenerateCount,
+        truncationCount: result.metrics.truncationCount,
+        rejectedTokens: result.metrics.rejectedTokens,
       },
+      modelUsed: result.metrics.modelUsed,
       durationMs,
     });
 
@@ -632,8 +818,19 @@ export async function processStage6Job(
         courseId,
         lessonUuid,
         lessonLabel,
-        `Generation failed after model fallback: ${errorMsg}`
+        `Generation failed after model fallback: ${errorMsg}`,
+        {
+          modelUsed: null,
+          selectedModel: tierResult.model,
+          fallbackModel: tierResult.fallback,
+          selectedModelTier: tierResult.tier,
+          selectedModelTierReason: tierResult.reason,
+          regenerateCount: 0,
+          truncationCount: 0,
+          rejectedTokens: 0,
+        }
       );
+      runCompletionCheck();
     } else {
       jobLogger.warn({ lessonLabel, errorMsg }, 'Cannot mark for review - lessonUuid not resolved');
     }
@@ -650,12 +847,7 @@ export async function processStage6Job(
       success: false,
       lessonContent: null,
       errors: [errorMsg],
-      metrics: {
-        tokensUsed: 0,
-        durationMs,
-        modelUsed: null,
-        qualityScore: 0,
-      },
+      metrics: buildZeroMetrics(tierResult, durationMs),
     };
   }
 }

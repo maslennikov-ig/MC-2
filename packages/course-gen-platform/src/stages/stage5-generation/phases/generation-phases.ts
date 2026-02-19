@@ -624,6 +624,15 @@ export class GenerationPhases {
       // Aggregate metrics
       const totalTokensUsed = successfulResults.reduce((sum, r) => sum + r.result.tokensUsed, 0);
       const aggregatedRetryCounts = successfulResults.map(r => r.result.retryCount);
+      const sectionModelBreakdown = successfulResults
+        .map(r => ({
+          section_number: r.index + 1,
+          model: r.result.modelUsed,
+          tier: r.result.tier,
+          retry_count: r.result.retryCount,
+        }))
+        .sort((a, b) => a.section_number - b.section_number);
+      const uniqueSectionModels = [...new Set(sectionModelBreakdown.map(item => item.model))];
       const lastModelUsed =
         successfulResults.length > 0
           ? successfulResults[successfulResults.length - 1].result.modelUsed
@@ -640,6 +649,7 @@ export class GenerationPhases {
           durationPerSection:
             allSections.length > 0 ? Math.round(duration / allSections.length) : 0,
           failedSections: finalFailures.length,
+          uniqueSectionModels,
         },
         `Section generation completed in ${Math.round(duration / 1000)}s (${allSections.length}/${totalSections} sections)`
       );
@@ -654,6 +664,7 @@ export class GenerationPhases {
           successCount: successfulResults.length,
           failureCount: finalFailures.length,
           digestChars: previousSectionsDigest.length,
+          sectionModelBreakdown,
         },
         tokensUsed: totalTokensUsed,
         durationMs: duration,
@@ -671,6 +682,7 @@ export class GenerationPhases {
         modelUsed: {
           ...state.modelUsed,
           sections: lastModelUsed,
+          sections_breakdown: sectionModelBreakdown,
         },
         retryCount: {
           ...state.retryCount,
@@ -779,7 +791,12 @@ export class GenerationPhases {
         stage: 'stage_5',
         phase: 'generate_sections',
         stepName: `section_${sectionIndex + 1}_complete`,
-        outputData: { lessonsGenerated: result.sections[0]?.lessons.length || 0 },
+        outputData: {
+          lessonsGenerated: result.sections[0]?.lessons.length || 0,
+          modelUsed: result.modelUsed,
+          tier: result.tier,
+          retryCount: result.retryCount,
+        },
         modelUsed: result.modelUsed,
         tokensUsed: result.tokensUsed,
         durationMs: sectionDuration,

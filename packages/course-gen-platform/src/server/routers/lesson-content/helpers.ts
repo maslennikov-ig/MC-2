@@ -6,10 +6,14 @@
  */
 
 import { TRPCError } from '@trpc/server';
+import type { Queue } from 'bullmq';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import type { Language } from '@megacampus/shared-types';
-import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import type {
+  LessonSpecificationV2,
+  LessonContext,
+} from '@megacampus/shared-types/lesson-specification-v2';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import type { SectionBreakdown } from '@megacampus/shared-types/analysis-schemas';
 import {
@@ -20,6 +24,70 @@ import {
   inferHookStrategy,
   mapDepth,
 } from '../../../stages/stage5-generation/utils/semantic-scaffolding';
+
+export type LessonFromStructure = {
+  lesson_number: number;
+  lesson_title: string;
+  lesson_objectives?: string[];
+  key_topics?: string[];
+  estimated_duration_minutes?: number;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
+};
+
+export type SectionFromStructure = {
+  section_number?: number;
+  section_title: string;
+  lessons: LessonFromStructure[];
+};
+
+// ── Shared lesson/section utility functions ──
+
+export function buildLessonId(sectionNumber: number, lessonOrder: number): string {
+  return `${sectionNumber}.${lessonOrder}`;
+}
+
+export function resolveSectionNumber(section: SectionFromStructure, sectionIndex: number): number {
+  return section.section_number ?? sectionIndex + 1;
+}
+
+export function parseLessonId(
+  lessonId: string
+): { sectionNum: number; lessonOrder: number } | null {
+  const match = lessonId.match(/^(\d+)\.(\d+)$/);
+  if (!match) return null;
+
+  const sectionNum = parseInt(match[1], 10);
+  const lessonOrder = parseInt(match[2], 10);
+
+  if (sectionNum <= 0 || lessonOrder <= 0) return null;
+
+  return { sectionNum, lessonOrder };
+}
+
+export function findLessonByOrder(
+  section: SectionFromStructure,
+  lessonOrder: number
+): LessonFromStructure | null {
+  const lesson = section.lessons[lessonOrder - 1];
+  return lesson ?? null;
+}
+
+/**
+ * Decide whether partial Stage 6 jobs should skip backend completion checks.
+ *
+ * We skip only when re-generating content from an already completed Stage 6
+ * course (`stage_6_complete`) to avoid premature status flips while selected
+ * jobs are still running.
+ *
+ * For in-flight Stage 6 generation (`stage_6_generating`) we must NOT skip
+ * this check, otherwise retries can finish all lessons but leave the course
+ * stuck in `stage_6_generating`.
+ */
+export function shouldSkipCompletionCheckForPartialGeneration(
+  generationStatus: string | null | undefined
+): boolean {
+  return generationStatus === 'stage_6_complete';
+}
 
 /**
  * Verify user has access to course (course owner or same organization)
@@ -98,6 +166,131 @@ export async function verifyCourseAccess(
 }
 
 /**
+ * Build LessonContext from course_structure data.
+ *
+ * Constructs a complete LessonContext object providing inter-lesson coherence
+ * information: previous/next lesson references, already-covered concepts, and
+ * the lesson's position within the course hierarchy.
+ *
+ * @param lessonId - Lesson ID in format "section.lesson" (e.g., "1.2")
+ * @param sectionNumber - Section number (1-based)
+ * @param courseStructure - The full course structure with sections array
+ * @returns Populated LessonContext object
+ */
+function buildLessonContextFromStructure(
+  lessonId: string,
+  sectionNumber: number,
+  courseStructure: { sections: SectionFromStructure[] }
+): LessonContext {
+  const sections = courseStructure.sections;
+
+  // Build flat ordered list of all lessons across the entire course
+  const allLessons: Array<{
+    id: string;
+    title: string;
+    objectives: string[];
+    keyTopics: string[];
+    sectionTitle: string;
+    sectionIndex: number;
+  }> = [];
+
+  for (let si = 0; si < sections.length; si++) {
+    const section = sections[si];
+    const sNum = section.section_number ?? si + 1;
+    for (let li = 0; li < section.lessons.length; li++) {
+      const lesson = section.lessons[li];
+      allLessons.push({
+        id: `${sNum}.${li + 1}`,
+        title: lesson.lesson_title,
+        objectives: lesson.lesson_objectives || [],
+        keyTopics: lesson.key_topics || [],
+        sectionTitle: section.section_title,
+        sectionIndex: sNum,
+      });
+    }
+  }
+
+  const currentIdx = allLessons.findIndex(l => l.id === lessonId);
+
+  // Guard: if lessonId not found in flat list, return minimal context
+  if (currentIdx === -1) {
+    return {
+      previous_lesson: null,
+      next_lesson: null,
+      concepts_already_covered: [],
+      terms_already_defined: [],
+      course_position: {
+        lesson_index_in_module: parseInt(lessonId.split('.')[1] ?? '1', 10) || 1,
+        total_lessons_in_module: 1,
+        module_index: sectionNumber,
+        total_modules: sections.length,
+        lesson_index_in_course: 1,
+        total_lessons_in_course: allLessons.length || 1,
+        module_title: `Module ${sectionNumber}`,
+      },
+    };
+  }
+
+  const current = allLessons[currentIdx];
+
+  // Previous lesson context
+  const prev = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
+  const previous_lesson = prev
+    ? {
+        lesson_id: prev.id,
+        title: prev.title,
+        key_concepts: prev.keyTopics.slice(0, 5),
+      }
+    : null;
+
+  // Next lesson context (no summary_preview per schema)
+  const next = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
+  const next_lesson = next
+    ? {
+        lesson_id: next.id,
+        title: next.title,
+        key_concepts: next.keyTopics.slice(0, 3),
+      }
+    : null;
+
+  // Accumulate unique key_topics from all lessons before the current one (max 20)
+  const concepts_already_covered: string[] = [];
+  for (let i = 0; i < currentIdx && concepts_already_covered.length < 20; i++) {
+    for (const topic of allLessons[i].keyTopics) {
+      if (!concepts_already_covered.includes(topic) && concepts_already_covered.length < 20) {
+        concepts_already_covered.push(topic);
+      }
+    }
+  }
+
+  // Terms already defined = key_topics from the immediately preceding lesson only
+  const terms_already_defined = prev ? prev.keyTopics.slice(0, 10) : [];
+
+  // Course position metadata
+  const currentSection = sections.find((s, i) => (s.section_number ?? i + 1) === sectionNumber);
+  const lessonsInModule = currentSection?.lessons.length ?? 1;
+  const lessonOrderInModule = parseInt(lessonId.split('.')[1] ?? '1', 10);
+
+  const course_position = {
+    lesson_index_in_module: lessonOrderInModule,
+    total_lessons_in_module: lessonsInModule,
+    module_index: sectionNumber,
+    total_modules: sections.length,
+    lesson_index_in_course: currentIdx + 1,
+    total_lessons_in_course: allLessons.length,
+    module_title: current?.sectionTitle ?? `Module ${sectionNumber}`,
+  };
+
+  return {
+    previous_lesson,
+    next_lesson,
+    concepts_already_covered,
+    terms_already_defined,
+    course_position,
+  };
+}
+
+/**
  * Build minimal LessonSpecificationV2 from course_structure lesson data
  *
  * Creates a simplified but valid LessonSpecificationV2 object from the basic
@@ -122,7 +315,8 @@ export function buildMinimalLessonSpec(
   },
   sectionNumber: number,
   requestId: string,
-  analysisResult?: AnalysisResult | null
+  analysisResult?: AnalysisResult | null,
+  courseStructure?: { sections: SectionFromStructure[] }
 ): LessonSpecificationV2 {
   // Get RAG plan from document_relevance_mapping for this section
   const ragPlan = analysisResult?.document_relevance_mapping?.[String(sectionNumber)];
@@ -258,8 +452,8 @@ export function buildMinimalLessonSpec(
     key_points_to_cover: ['Key takeaways from this lesson', 'Next steps for learners'],
   });
 
-  // Return minimal but valid LessonSpecificationV2
-  return {
+  // Build the base minimal but valid LessonSpecificationV2
+  const spec: LessonSpecificationV2 = {
     lesson_id: lessonId,
     title: lesson.lesson_title,
     description: (lesson.lesson_objectives || [])[0] || `This lesson covers ${lesson.lesson_title}`,
@@ -287,4 +481,152 @@ export function buildMinimalLessonSpec(
     estimated_duration_minutes: lesson.estimated_duration_minutes || 15,
     difficulty_level: lesson.difficulty_level || 'intermediate',
   };
+
+  // Build lesson_context from courseStructure if available
+  if (courseStructure) {
+    spec.lesson_context = buildLessonContextFromStructure(lessonId, sectionNumber, courseStructure);
+
+    logger.debug(
+      {
+        requestId,
+        lessonId,
+        moduleIndex: spec.lesson_context.course_position?.module_index,
+        lessonIndexInCourse: spec.lesson_context.course_position?.lesson_index_in_course,
+        totalLessons: spec.lesson_context.course_position?.total_lessons_in_course,
+        hasPrevious: spec.lesson_context.previous_lesson !== null,
+        hasNext: spec.lesson_context.next_lesson !== null,
+        conceptsCoveredCount: spec.lesson_context.concepts_already_covered.length,
+      },
+      'lesson_context built from course_structure'
+    );
+  }
+
+  return spec;
+}
+
+/**
+ * Transition a course's generation_status through the FSM to stage_6_generating.
+ *
+ * Handles all valid starting states:
+ * - stage_5_awaiting_approval → stage_6_init → stage_6_generating
+ * - stage_5_complete          → stage_6_init → stage_6_generating
+ * - stage_6_init              → stage_6_generating
+ * - stage_6_complete          → stage_6_generating  (re-generation of missing/partial content)
+ * - stage_6_generating        → no-op (already in target state)
+ *
+ * Logs a warning if the current status is not in the set of allowed statuses.
+ *
+ * @param courseId  - Course UUID
+ * @param requestId - Request ID for structured logging
+ */
+export async function transitionToStage6Generating(
+  courseId: string,
+  requestId: string
+): Promise<void> {
+  const supabase = getSupabaseAdmin();
+
+  const { data: statusData } = await supabase
+    .from('courses')
+    .select('generation_status')
+    .eq('id', courseId)
+    .single();
+
+  const currentStatus = statusData?.generation_status;
+
+  const statusesAllowingStage6 = [
+    'stage_5_complete',
+    'stage_5_awaiting_approval',
+    'stage_6_init',
+    'stage_6_generating',
+    'stage_6_complete',
+  ];
+
+  if (currentStatus === 'stage_5_awaiting_approval' || currentStatus === 'stage_5_complete') {
+    logger.info(
+      { requestId, courseId, currentStatus },
+      currentStatus === 'stage_5_awaiting_approval'
+        ? 'Auto-approving Stage 5 and starting Stage 6'
+        : 'Starting Stage 6 from stage_5_complete'
+    );
+
+    // FSM requires intermediate step through stage_6_init
+    await supabase.from('courses').update({ generation_status: 'stage_6_init' }).eq('id', courseId);
+
+    const { error: updateError } = await supabase
+      .from('courses')
+      .update({ generation_status: 'stage_6_generating' })
+      .eq('id', courseId);
+
+    if (updateError) {
+      logger.error(
+        { requestId, courseId, error: updateError },
+        'Failed to update generation_status to stage_6_generating'
+      );
+    }
+  } else if (currentStatus === 'stage_6_init') {
+    logger.info({ requestId, courseId, currentStatus }, 'Starting Stage 6 generation');
+
+    const { error: updateError } = await supabase
+      .from('courses')
+      .update({ generation_status: 'stage_6_generating' })
+      .eq('id', courseId);
+
+    if (updateError) {
+      logger.error(
+        { requestId, courseId, error: updateError },
+        'Failed to update generation_status to stage_6_generating'
+      );
+    }
+  } else if (currentStatus === 'stage_6_complete') {
+    // Re-generation: transition back to generating for new/missing content
+    const { error: updateError } = await supabase
+      .from('courses')
+      .update({ generation_status: 'stage_6_generating' })
+      .eq('id', courseId);
+
+    if (updateError) {
+      logger.error(
+        { requestId, courseId, error: updateError },
+        'Failed to update generation_status to stage_6_generating'
+      );
+    }
+  } else if (!statusesAllowingStage6.includes(currentStatus || '')) {
+    logger.warn({ requestId, courseId, currentStatus }, 'Course not ready for Stage 6 generation');
+  }
+  // stage_6_generating → no-op, already in target state
+}
+
+/**
+ * Remove a completed/failed job from BullMQ queue to allow re-generation.
+ *
+ * BullMQ's jobId deduplication prevents adding a new job if one with the
+ * same ID already exists — even if that job is completed. Since we retain
+ * completed jobs for 24 hours (removeOnComplete: { age: 86400 }), a second
+ * call to queue.add() with the same jobId silently returns the old job
+ * instead of creating a new one.
+ *
+ * This function removes stale (completed/failed) jobs so that a fresh job
+ * can be enqueued with the same deterministic ID, preserving deduplication
+ * protection against concurrent duplicate requests.
+ *
+ * @param queue - BullMQ Queue instance
+ * @param jobId - Deterministic job ID to check
+ * @param requestId - Request ID for structured logging
+ */
+export async function removeStaleJob(
+  queue: Queue,
+  jobId: string,
+  requestId: string
+): Promise<void> {
+  const existingJob = await queue.getJob(jobId);
+  if (!existingJob) return;
+
+  const state = await existingJob.getState();
+  if (state === 'completed' || state === 'failed') {
+    await existingJob.remove();
+    logger.debug(
+      { requestId, jobId, previousState: state },
+      'Removed stale job to allow re-generation'
+    );
+  }
 }

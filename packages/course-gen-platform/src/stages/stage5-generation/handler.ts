@@ -459,6 +459,8 @@ class Stage5GenerationHandler {
         overall_quality: result.generation_metadata.quality_scores.overall,
         model_metadata: result.generation_metadata.model_used.metadata,
         model_sections: result.generation_metadata.model_used.sections,
+        model_sections_breakdown_count:
+          result.generation_metadata.model_used.sections_breakdown?.length ?? 0,
         batch_count: result.generation_metadata.batch_count,
         retry_metadata: result.generation_metadata.retry_count.metadata,
         retry_sections: result.generation_metadata.retry_count.sections,

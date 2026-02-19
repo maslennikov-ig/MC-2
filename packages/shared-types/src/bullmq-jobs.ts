@@ -296,6 +296,8 @@ export const LessonContentJobDataSchema = BaseJobDataSchema.extend({
    * @default 'professional' (fallback in getStylePrompt)
    */
   style: CourseStyleSchema.optional(),
+  /** Skip automatic completion check (used by partialGenerate) */
+  skipCompletionCheck: z.boolean().optional(),
 });
 
 export type LessonContentJobData = z.infer<typeof LessonContentJobDataSchema>;

@@ -94,6 +94,12 @@ export interface ModelUsedState {
   metadata: string;
   sections: string;
   validation?: string;
+  sections_breakdown?: Array<{
+    section_number: number;
+    model: string;
+    tier?: string;
+    retry_count: number;
+  }>;
 }
 
 /**

@@ -18,6 +18,7 @@
 
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
+import { getContentLabels } from '@megacampus/shared-types';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 
@@ -25,7 +26,11 @@ import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 import { calculateDynamicContextWindow } from './generator/generator-constants';
 import { validateGeneratedContent } from './generator/generator-content';
 import { generateSection } from './generator/generator-section';
-import { generateLessonSingleCall } from './generator/generator-single-call';
+import {
+  extractLessonDigest,
+  generateLessonSingleCall,
+  generateTruncationContinuation,
+} from './generator/generator-single-call';
 
 // Re-export for backward compatibility (used by section-regenerator)
 export { calculateDynamicContextWindow, generateSection };
@@ -42,6 +47,8 @@ export { calculateDynamicContextWindow, generateSection };
 export async function generatorNode(state: LessonGraphStateType): Promise<LessonGraphStateUpdate> {
   const startTime = performance.now();
   const { lessonSpec, ragChunks, courseId, lessonUuid, language, style, analysisResult } = state;
+  const generationMode = state.regenerationMode;
+  const useContinuation = generationMode === 'truncation_continuation' && !!state.generatedContent;
 
   logger.info(
     {
@@ -49,6 +56,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       sectionCount: lessonSpec.sections.length,
       ragChunksCount: ragChunks.length,
       durationMinutes: lessonSpec.estimated_duration_minutes,
+      generationMode: generationMode ?? 'single_call',
     },
     'Generator node: Starting single-call content generation'
   );
@@ -68,7 +76,10 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       ragChunksCount: ragChunks.length,
       language,
       style: style ?? 'default',
-      generationMethod: 'single-call',
+      generationMethod: useContinuation ? 'truncation-continuation' : 'single-call',
+      regenerateCount: state.regenerateCount ?? 0,
+      truncationCount: state.truncationCount ?? 0,
+      rejectedTokens: state.rejectedTokens ?? 0,
     },
     durationMs: 0,
   });
@@ -77,17 +88,41 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
     // ========================================================================
     // 1. GENERATE FULL LESSON IN SINGLE CALL
     // ========================================================================
-    const result = await generateLessonSingleCall(
-      lessonSpec,
-      ragChunks,
-      language,
-      state.modelOverride,
-      style,
-      analysisResult
-    );
+    let generatedContent: string;
+    let lessonDigest: string;
+    let totalTokens: number;
+    let modelUsed: string;
 
-    let generatedContent = result.content;
-    const totalTokens = result.tokensUsed;
+    if (useContinuation) {
+      const continuationResult = await generateTruncationContinuation(
+        lessonSpec,
+        state.generatedContent!,
+        language
+      );
+      const labels = getContentLabels(language);
+      const digestExtraction = extractLessonDigest(
+        continuationResult.mergedContent,
+        labels.lessonDigest
+      );
+
+      generatedContent = digestExtraction.content;
+      lessonDigest = digestExtraction.digest || state.lessonDigest || '';
+      totalTokens = continuationResult.tokensUsed;
+      modelUsed = continuationResult.modelUsed;
+    } else {
+      const result = await generateLessonSingleCall(
+        lessonSpec,
+        ragChunks,
+        language,
+        state.modelOverride,
+        style,
+        analysisResult
+      );
+      generatedContent = result.content;
+      lessonDigest = result.lessonDigest;
+      totalTokens = result.tokensUsed;
+      modelUsed = result.modelUsed;
+    }
 
     // ========================================================================
     // 2. MERMAID FIX PIPELINE (on full content, single pass)
@@ -144,9 +179,10 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         contentLength: generatedContent.length,
         wordCount,
         h2Count,
-        hasDigest: result.lessonDigest.length > 0,
+        hasDigest: lessonDigest.length > 0,
         totalTokens,
         durationMs,
+        generationMethod: useContinuation ? 'truncation-continuation' : 'single-call',
       },
       'Generator node: Single-call content generation complete'
     );
@@ -168,19 +204,30 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         contentLength: generatedContent.length,
         wordCount,
         h2Count,
-        hasDigest: result.lessonDigest.length > 0,
-        digestLength: result.lessonDigest.length,
-        generationMethod: 'single-call',
+        hasDigest: lessonDigest.length > 0,
+        digestLength: lessonDigest.length,
+        generationMethod: useContinuation ? 'truncation-continuation' : 'single-call',
         targetWordCount: (lessonSpec.estimated_duration_minutes || 15) * 150,
+        selectedModel: state.selectedModel,
+        selectedModelTier: state.selectedModelTier,
+        selectedModelTierReason: state.selectedModelTierReason,
+        modelOverride: state.modelOverride,
+        regenerateCount: state.regenerateCount ?? 0,
+        truncationCount: state.truncationCount ?? 0,
+        rejectedTokens: state.rejectedTokens ?? 0,
       },
+      modelUsed,
       tokensUsed: totalTokens,
       durationMs,
     });
 
     return {
       generatedContent,
-      lessonDigest: result.lessonDigest,
+      lessonDigest,
+      modelUsed,
       tokensUsed: totalTokens,
+      lastGenerationTokens: totalTokens,
+      regenerationMode: null,
       durationMs,
       currentNode: 'selfReviewer',
     };
@@ -218,6 +265,8 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
     return {
       errors: [`Generator failed: ${errorMessage}`],
       currentNode: 'generator',
+      lastGenerationTokens: 0,
+      regenerationMode: null,
       durationMs,
     };
   }

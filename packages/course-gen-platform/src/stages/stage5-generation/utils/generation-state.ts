@@ -191,6 +191,14 @@ export interface GenerationState {
     /** Primary model for Phase 3 section generation */
     sections: string;
 
+    /** Per-section model usage breakdown for observability */
+    sections_breakdown?: Array<{
+      section_number: number;
+      model: string;
+      tier?: string;
+      retry_count: number;
+    }>;
+
     /**
      * Model for Phase 4 LLM-as-judge validation (optional)
      *
@@ -476,6 +484,7 @@ export function initializeState(input: GenerationJobInput): GenerationState {
     modelUsed: {
       metadata: '',
       sections: '',
+      sections_breakdown: [],
     },
     retryCount: {
       metadata: 0,

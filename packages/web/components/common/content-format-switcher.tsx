@@ -70,6 +70,12 @@ interface ContentFormatSwitcherProps {
   onFormatChange?: (format: string) => void
   /** Course content language for localized callout titles */
   courseLanguage?: string
+  nextLesson?: {
+    title: string
+    objectives?: string[] | null
+  }
+  /** Callback to navigate to the next lesson */
+  onNextLesson?: () => void
 }
 
 export default function ContentFormatSwitcher({
@@ -81,6 +87,8 @@ export default function ContentFormatSwitcher({
   availableFormats = {},
   onFormatChange,
   courseLanguage,
+  nextLesson,
+  onNextLesson,
 }: ContentFormatSwitcherProps) {
   const [currentFormat, setCurrentFormat] = useState<'text' | 'video' | 'audio' | 'presentation'>(
     'text'
@@ -191,10 +199,10 @@ export default function ContentFormatSwitcher({
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen()
+      void document.documentElement.requestFullscreen()
       setIsFullscreen(true)
     } else {
-      document.exitFullscreen()
+      void document.exitFullscreen()
       setIsFullscreen(false)
     }
   }
@@ -209,6 +217,8 @@ export default function ContentFormatSwitcher({
         lessonContent={lessonContent}
         enrichments={enrichments}
         courseLanguage={courseLanguage}
+        nextLesson={nextLesson}
+        onNextLesson={onNextLesson}
       />
     )
   }
@@ -301,6 +311,8 @@ export default function ContentFormatSwitcher({
               lessonContent={lessonContent}
               enrichments={enrichments}
               courseLanguage={courseLanguage}
+              nextLesson={nextLesson}
+              onNextLesson={onNextLesson}
             />
           )}
 

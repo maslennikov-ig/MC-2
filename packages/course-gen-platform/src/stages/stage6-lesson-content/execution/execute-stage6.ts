@@ -2,6 +2,7 @@ import { logger } from '@/shared/logger';
 import { getGraph } from '../graph';
 import type { Stage6Input, Stage6Output } from '../types';
 import type { LessonGraphStateType } from '../state';
+import { buildLessonContent, extractContentBody } from '../judge/judge-helpers';
 
 /**
  * Execute Stage 6 lesson generation
@@ -52,9 +53,18 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       modelOverride: validatedModelOverride,
       style: input.style ?? null,
       analysisResult: input.analysisResult ?? null,
+      selectedModel: input.selectedModel ?? null,
+      fallbackModel: input.fallbackModel ?? null,
+      selectedModelTier: input.selectedModelTier ?? null,
+      selectedModelTierReason: input.selectedModelTierReason ?? null,
       currentNode: 'generator',
       errors: [],
       retryCount: 0,
+      regenerateCount: 0,
+      truncationCount: 0,
+      rejectedTokens: 0,
+      lastGenerationTokens: 0,
+      regenerationMode: null,
     };
 
     // Execute graph
@@ -62,8 +72,22 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
 
     const durationMs = Date.now() - startTime;
 
-    // Determine success based on output
-    const success = Boolean(result.lessonContent) && result.errors.length === 0;
+    // Fail-open: review-required outcomes should not trigger outer fallback loops.
+    const needsReview = result.needsHumanReview || result.reviewInfo?.needsReview === true;
+    let lessonContent = result.lessonContent ?? null;
+    let synthesizedReviewContent = false;
+
+    // If the graph ended in review mode without structured content, synthesize best-effort content
+    // from generated markdown so it can be persisted as review_required.
+    if (needsReview && !lessonContent) {
+      const contentBody = extractContentBody(result);
+      if (contentBody) {
+        lessonContent = buildLessonContent(result, contentBody, result.qualityScore ?? 0);
+        synthesizedReviewContent = true;
+      }
+    }
+
+    const success = needsReview ? true : Boolean(lessonContent) && result.errors.length === 0;
 
     logger.info(
       {
@@ -73,19 +97,28 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         tokensUsed: result.tokensUsed,
         finalNode: result.currentNode,
         errorCount: result.errors.length,
+        needsReview,
+        synthesizedReviewContent,
       },
       'Stage 6 generation complete'
     );
 
     return {
-      lessonContent: result.lessonContent ?? null,
+      lessonContent,
       success,
       errors: result.errors,
       metrics: {
         tokensUsed: result.tokensUsed,
         durationMs,
         modelUsed: result.modelUsed ?? null,
+        selectedModel: result.selectedModel ?? null,
+        fallbackModel: result.fallbackModel ?? null,
+        selectedModelTier: result.selectedModelTier ?? null,
+        selectedModelTierReason: result.selectedModelTierReason ?? null,
         qualityScore: result.qualityScore ?? 0,
+        regenerateCount: result.regenerateCount ?? 0,
+        truncationCount: result.truncationCount ?? 0,
+        rejectedTokens: result.rejectedTokens ?? 0,
       },
       // Include review info for UI warnings (undefined if not set)
       reviewInfo: result.reviewInfo ?? undefined,
@@ -112,7 +145,14 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         tokensUsed: 0,
         durationMs,
         modelUsed: null,
+        selectedModel: null,
+        fallbackModel: null,
+        selectedModelTier: null,
+        selectedModelTierReason: null,
         qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
       },
     };
   }
