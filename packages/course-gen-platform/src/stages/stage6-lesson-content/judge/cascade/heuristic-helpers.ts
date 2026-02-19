@@ -12,6 +12,7 @@ import { calculateFleschKincaid } from './text-utils';
 import { CONCLUSION_MARKERS, CONCLUSION_REGEX, DEFAULT_HEURISTIC_THRESHOLDS } from './constants';
 import type { HeuristicThresholds, HeuristicResults } from './types';
 
+/** Matches lowercase Cyrillic words (4+ chars). Callers MUST lowercase text before matching. */
 const CYRILLIC_WORD_REGEX = /[а-яё]{4,}/g;
 const CYRILLIC_KEYWORD_REGEX = /^[а-яё]+$/;
 const DEFAULT_NON_BLOCKING_KEYWORD_THRESHOLD = 0.35;
@@ -140,7 +141,7 @@ function matchKeywordInText(
   return stemmedRussianText.includes(keywordStem);
 }
 
-function normalizeLanguageCode(language: string): string {
+export function normalizeLanguageCode(language: string): string {
   const raw = language.trim().toLowerCase();
   if (!raw) {
     return 'en';

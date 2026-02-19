@@ -249,4 +249,58 @@ describe('markForReview', () => {
       { onConflict: 'lesson_id' }
     );
   });
+
+  it('uses upsert with onConflict on repeated calls for same lesson', async () => {
+    const { supabase, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await markForReview(
+      'course-123',
+      'lesson-uuid' as unknown as string,
+      '1.1' as unknown as string,
+      'First failure'
+    );
+
+    await markForReview(
+      'course-123',
+      'lesson-uuid' as unknown as string,
+      '1.1' as unknown as string,
+      'Second failure'
+    );
+
+    expect(lessonContentsTable.upsert).toHaveBeenCalledTimes(2);
+    expect(lessonContentsTable.upsert).toHaveBeenNthCalledWith(1, expect.any(Object), {
+      onConflict: 'lesson_id',
+    });
+    expect(lessonContentsTable.upsert).toHaveBeenNthCalledWith(2, expect.any(Object), {
+      onConflict: 'lesson_id',
+    });
+  });
+
+  it('uses regenerateCount for generation_attempt field', async () => {
+    const { supabase, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await markForReview(
+      'course-123',
+      'lesson-uuid' as unknown as string,
+      '1.1' as unknown as string,
+      'Generation failed after retries',
+      { regenerateCount: 3 }
+    );
+
+    expect(lessonContentsTable.upsert).toHaveBeenCalledTimes(1);
+    expect(lessonContentsTable.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generation_attempt: 4,
+      }),
+      expect.any(Object)
+    );
+  });
 });

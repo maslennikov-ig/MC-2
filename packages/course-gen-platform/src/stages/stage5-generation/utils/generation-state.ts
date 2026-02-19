@@ -589,7 +589,6 @@ export function updateStateWithSections(
     modelUsed: {
       ...state.modelUsed,
       sections: result.model,
-      sections_breakdown: state.modelUsed.sections_breakdown,
     },
     retryCount: {
       ...state.retryCount,
