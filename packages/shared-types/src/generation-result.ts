@@ -762,10 +762,26 @@ export type CourseMetadataWithoutInjectedFields = z.infer<
  * Model usage per generation phase
  * Tracks which models were used for metadata, sections, and validation
  */
+export const SectionModelUsageSchema = z.object({
+  section_number: z.number().int().min(1).describe('Section number (1-based)'),
+  model: z.string().describe('Actual model used for this section generation'),
+  tier: z
+    .string()
+    .optional()
+    .describe('Model tier selected for this section (simple/normal/complex)'),
+  retry_count: z.number().int().min(0).describe('Retry count for this section generation'),
+});
+
+export type SectionModelUsage = z.infer<typeof SectionModelUsageSchema>;
+
 export const ModelUsageSchema = z.object({
   metadata: z.string().describe('Model used for metadata generation (e.g., qwen/qwen3-max)'),
   sections: z.string().describe('Model used for section generation (e.g., openai/gpt-oss-20b)'),
   validation: z.string().optional().describe('Model used for validation (if applicable)'),
+  sections_breakdown: z
+    .array(SectionModelUsageSchema)
+    .optional()
+    .describe('Per-section model usage breakdown (actual model, tier, retries)'),
 });
 
 export type ModelUsage = z.infer<typeof ModelUsageSchema>;

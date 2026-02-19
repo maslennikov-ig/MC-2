@@ -325,7 +325,15 @@ export async function selfReviewerNode(
         state.lessonUuid,
         generatedContent,
         result,
-        retryCount + 1
+        retryCount + 1,
+        {
+          modelUsed: llmResult.modelUsed ?? state.modelUsed,
+          selectedModel: state.selectedModel,
+          fallbackModel: state.fallbackModel,
+          selectedModelTier: state.selectedModelTier,
+          selectedModelTierReason: state.selectedModelTierReason,
+          modelOverride: state.modelOverride,
+        }
       );
     }
 
@@ -483,7 +491,15 @@ async function handleCriticalIssues(
     state.lessonUuid,
     generatedContent,
     result,
-    retryCount + 1
+    retryCount + 1,
+    {
+      modelUsed: state.modelUsed,
+      selectedModel: state.selectedModel,
+      fallbackModel: state.fallbackModel,
+      selectedModelTier: state.selectedModelTier,
+      selectedModelTierReason: state.selectedModelTierReason,
+      modelOverride: state.modelOverride,
+    }
   );
 
   // Include modelOverride if analysis requires fallback
@@ -560,7 +576,15 @@ async function handleModelFallback(
     state.lessonUuid,
     generatedContent,
     result,
-    retryCount + 1
+    retryCount + 1,
+    {
+      modelUsed: state.modelUsed,
+      selectedModel: state.selectedModel,
+      fallbackModel: state.fallbackModel,
+      selectedModelTier: state.selectedModelTier,
+      selectedModelTierReason: state.selectedModelTierReason,
+      modelOverride: state.modelOverride,
+    }
   );
 
   return {
@@ -646,7 +670,15 @@ async function handleError(
     state.lessonUuid,
     state.generatedContent,
     result,
-    retryCount + 1
+    retryCount + 1,
+    {
+      modelUsed: state.modelUsed,
+      selectedModel: state.selectedModel,
+      fallbackModel: state.fallbackModel,
+      selectedModelTier: state.selectedModelTier,
+      selectedModelTierReason: state.selectedModelTierReason,
+      modelOverride: state.modelOverride,
+    }
   );
 
   return {

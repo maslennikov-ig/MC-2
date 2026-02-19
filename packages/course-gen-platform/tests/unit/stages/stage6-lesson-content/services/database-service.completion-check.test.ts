@@ -219,7 +219,7 @@ describe('markForReview', () => {
     vi.clearAllMocks();
   });
 
-  it('persists failed terminal marker in lesson_contents', async () => {
+  it('persists review_required terminal marker in lesson_contents', async () => {
     const { supabase, lessonContentsTable, lessonsTable } = createSupabaseAdminMock({
       courseRow: createCourseRow(true),
       lessonContentsRows: [],
@@ -239,7 +239,7 @@ describe('markForReview', () => {
       expect.objectContaining({
         lesson_id: 'lesson-uuid',
         course_id: 'course-123',
-        status: 'failed',
+        status: 'review_required',
         metadata: expect.objectContaining({
           lessonLabel: '1.1',
           failureReason: 'Generation failed after retries',

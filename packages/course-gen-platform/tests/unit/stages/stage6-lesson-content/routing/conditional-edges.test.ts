@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { shouldProceedToJudge } from '@/stages/stage6-lesson-content/routing/conditional-edges';
+import {
+  shouldProceedToJudge,
+  shouldRetryAfterJudge,
+} from '@/stages/stage6-lesson-content/routing/conditional-edges';
 import { HANDLER_CONFIG } from '@/stages/stage6-lesson-content/config';
 import type { LessonGraphStateType } from '@/stages/stage6-lesson-content/state';
 
@@ -62,5 +65,22 @@ describe('shouldProceedToJudge', () => {
 
     expect(shouldProceedToJudge(state)).toBe('__end__');
     expect(state.errors[0]).toContain('Self-review regeneration retries exceeded');
+    expect(state.needsHumanReview).toBe(true);
+    expect(state.reviewInfo?.needsReview).toBe(true);
+  });
+});
+
+describe('shouldRetryAfterJudge', () => {
+  it('marks review_required instead of hard failing when judge retries exceed cap', () => {
+    const state = buildState({
+      retryCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES,
+      needsRegeneration: true,
+      qualityScore: 0.61,
+    });
+
+    expect(shouldRetryAfterJudge(state)).toBe('__end__');
+    expect(state.needsHumanReview).toBe(true);
+    expect(state.reviewInfo?.needsReview).toBe(true);
+    expect(state.errors[0]).toContain('Max regeneration retries');
   });
 });

@@ -2,6 +2,20 @@ import { type LessonGraphStateType } from '../state';
 import { logger } from '@/shared/logger';
 import { HANDLER_CONFIG } from '../config';
 
+function markReviewRequired(state: LessonGraphStateType, reason: string): void {
+  const existingReasons = state.reviewInfo?.reasons ?? [];
+  const reasons = existingReasons.includes(reason) ? existingReasons : [...existingReasons, reason];
+
+  state.needsHumanReview = true;
+  state.needsRegeneration = false;
+  state.reviewInfo = {
+    needsReview: true,
+    reasons,
+    factualAccuracyScore: state.reviewInfo?.factualAccuracyScore,
+    unverifiedClaims: state.reviewInfo?.unverifiedClaims,
+  };
+}
+
 /**
  * Routing function for judge node conditional edges
  *
@@ -28,20 +42,23 @@ export function shouldRetryAfterJudge(state: LessonGraphStateType): string {
 
   // Priority 2: Max retries exceeded - log error and end
   if (state.needsRegeneration && state.retryCount >= maxRetries) {
-    logger.error(
+    const reason =
+      `Max regeneration retries (${maxRetries}) exceeded. ` +
+      `Latest quality score: ${((state.qualityScore ?? 0) * 100).toFixed(1)}%.`;
+
+    logger.warn(
       {
         lessonId: state.lessonSpec.lesson_id,
         retryCount: state.retryCount,
         maxRetries,
         qualityScore: state.qualityScore,
       },
-      'Judge routing: Max regeneration retries exceeded - ending with failure'
+      'Judge routing: Max regeneration retries exceeded - marking as review_required'
     );
 
-    // Add error to state via mutation (LangGraph allows this for annotations)
+    markReviewRequired(state, reason);
     state.errors.push(
-      `Max regeneration retries (${maxRetries}) exceeded. Quality score: ${((state.qualityScore ?? 0) * 100).toFixed(1)}%. ` +
-        `Review LessonSpecification for key_topics/lesson_objectives mismatch.`
+      `${reason} Review LessonSpecification for key_topics/lesson_objectives mismatch.`
     );
     return '__end__';
   }
@@ -114,17 +131,18 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
     // Check retry limit
     const maxRetries = HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
     if (state.retryCount >= maxRetries) {
-      logger.error(
+      const reason = `Self-review regeneration retries exceeded (${maxRetries}). Last status: ${status}.`;
+
+      logger.warn(
         {
           lessonId: state.lessonSpec.lesson_id,
           retryCount: state.retryCount,
           maxRetries,
         },
-        'SelfReviewer routing: Max retries exceeded - ending graph'
+        'SelfReviewer routing: Max retries exceeded - marking as review_required'
       );
-      state.errors.push(
-        `Self-review regeneration retries exceeded (${maxRetries}). Last status: ${status}.`
-      );
+      markReviewRequired(state, reason);
+      state.errors.push(reason);
       return '__end__';
     }
 
