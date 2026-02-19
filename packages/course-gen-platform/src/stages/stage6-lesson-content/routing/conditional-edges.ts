@@ -122,6 +122,9 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
         },
         'SelfReviewer routing: Max retries exceeded - ending graph'
       );
+      state.errors.push(
+        `Self-review regeneration retries exceeded (${maxRetries}). Last status: ${status}.`
+      );
       return '__end__';
     }
 
