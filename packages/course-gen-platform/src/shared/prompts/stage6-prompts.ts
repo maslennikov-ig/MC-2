@@ -137,6 +137,7 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
    \`\`\`
 
 5. **Tables** — For comparisons, structured data
+   Tables must be standalone blocks — NEVER place markdown tables inside numbered or bulleted lists.
 
 *Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
 </visual_toolkit>
@@ -346,7 +347,7 @@ Use actively to create engaging content:
 2. **Math Formulas** (LaTeX): inline \`$E=mc^2$\` or block \`$$\\sum_{i=1}^{n} x_i$$\`
 3. **Callouts**: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO]
    CRITICAL: NEVER wrap callout markers in quotes. WRONG: > "[!TIP]"  CORRECT: > [!TIP]
-4. **Tables** for comparisons
+4. **Tables** for comparisons. Tables must be standalone blocks — NEVER place tables inside numbered or bulleted lists.
 5. **Code blocks** with filenames when relevant
 *Syntax keywords stay in English regardless of output language.*
 </visual_toolkit>
@@ -731,6 +732,7 @@ Format as markdown outline. Target total reading time: {{durationMinutes}} minut
    \`\`\`
 
 5. **Tables** — For comparisons, structured data
+   Tables must be standalone blocks — NEVER place markdown tables inside numbered or bulleted lists.
 
 *Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
 </visual_toolkit>

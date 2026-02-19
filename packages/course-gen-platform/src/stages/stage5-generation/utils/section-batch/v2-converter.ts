@@ -2,6 +2,7 @@ import type { Section, GenerationJobInput, Lesson } from '@megacampus/shared-typ
 import type {
   LessonSpecificationV2,
   BloomLevelV2,
+  HookStrategyV2,
   LessonRAGContextV2,
   LessonContext,
   AdjacentLessonContext,
@@ -9,6 +10,12 @@ import type {
 import logger from '@/shared/logger';
 import { inferSemanticScaffolding } from '../semantic-scaffolding';
 import { buildFallbackSearchQueries } from '../rag-fallback-queries';
+
+/**
+ * All available hook strategies for round-robin rotation.
+ * Ensures variety between lessons within the same section.
+ */
+const HOOK_STRATEGIES: HookStrategyV2[] = ['question', 'analogy', 'statistic', 'challenge'];
 
 const BLOOM_KEYWORDS: Record<BloomLevelV2, string[]> = {
   create: ['create', 'design', 'build', 'develop', 'construct', 'compose', 'invent', 'formulate'],
@@ -64,15 +71,14 @@ function buildRAGContext(
     const topic = analysisResult?.topic_analysis?.determined_topic ?? 'course';
 
     return {
-      primary_documents: [],  // empty = search all course documents
+      primary_documents: [], // empty = search all course documents
       search_queries: buildFallbackSearchQueries(section, topic, sectionId),
       expected_chunks: 7,
     };
   }
 
   return {
-    primary_documents:
-      ragPlan.primary_documents?.length > 0 ? ragPlan.primary_documents : [],  // empty = search all
+    primary_documents: ragPlan.primary_documents?.length > 0 ? ragPlan.primary_documents : [], // empty = search all
     search_queries:
       ragPlan.search_queries?.length > 0
         ? ragPlan.search_queries
@@ -180,6 +186,23 @@ function buildLessonContext(
 }
 
 /**
+ * Rotate hook strategy for variety between lessons within a section.
+ * First lesson keeps the inferred strategy, subsequent lessons cycle through alternatives.
+ *
+ * @param inferred - Strategy inferred from section content
+ * @param lessonIndex - 0-based lesson index within the section
+ * @returns Rotated hook strategy
+ */
+function rotateHookStrategy(inferred: HookStrategyV2, lessonIndex: number): HookStrategyV2 {
+  if (lessonIndex === 0) return inferred;
+
+  // Build rotation order starting from inferred, then cycling others
+  const inferredIdx = HOOK_STRATEGIES.indexOf(inferred);
+  const rotatedIdx = (inferredIdx + lessonIndex) % HOOK_STRATEGIES.length;
+  return HOOK_STRATEGIES[rotatedIdx];
+}
+
+/**
  * Convert a Section to LessonSpecificationV2[] output
  */
 export function convertSectionToV2Specs(
@@ -252,7 +275,7 @@ export function convertSectionToV2Specs(
       },
       learning_objectives: learningObjectives,
       intro_blueprint: {
-        hook_strategy: scaffolding?.hookStrategy || 'question',
+        hook_strategy: rotateHookStrategy(scaffolding?.hookStrategy || 'question', lessonIndex),
         hook_topic: (lesson.key_topics || [])[0] || lesson.lesson_title,
         key_learning_objectives:
           (lesson.lesson_objectives || []).slice(0, 3).join(', ') || lesson.lesson_title,

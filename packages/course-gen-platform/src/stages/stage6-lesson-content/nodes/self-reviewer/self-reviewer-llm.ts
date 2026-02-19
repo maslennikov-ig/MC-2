@@ -25,7 +25,11 @@ import {
 } from './self-reviewer-constants';
 import { withRetry, extractSectionsToRegenerate } from './self-reviewer-helpers';
 import { parseSelfReviewerResponse } from './self-reviewer-json';
-import { removeChatbotArtifacts, stripForeignScriptCharacters } from './self-reviewer-heuristics';
+import {
+  removeChatbotArtifacts,
+  replaceEnglishStructuralHeaders,
+  stripForeignScriptCharacters,
+} from './self-reviewer-heuristics';
 import { ZERO_TOLERANCE_SCRIPTS } from '../../judge/heuristic-filter';
 
 // ============================================================================
@@ -391,6 +395,24 @@ export function applyPatching(
       patchedContent = workingContent;
       updatedResult.status = 'FIXED';
       updatedResult.reasoning += ` (${grammarResult.appliedCount} grammar fix(es) applied)`;
+    }
+  }
+
+  // STEP 1.5: Replace English structural headers with Russian equivalents (ru only)
+  if (language) {
+    const headerResult = replaceEnglishStructuralHeaders(workingContent, language);
+    if (headerResult.replacedCount > 0) {
+      workingContent = headerResult.content;
+      patchedContent = workingContent;
+      if (updatedResult.status === 'PASS' || updatedResult.status === 'PASS_WITH_FLAGS') {
+        updatedResult.status = 'FIXED';
+      }
+      updatedResult.reasoning += ` (${headerResult.replacedCount} English structural header(s) replaced)`;
+      nodeLogger.info({
+        msg: 'English structural headers replaced',
+        replacedCount: headerResult.replacedCount,
+        language,
+      });
     }
   }
 
