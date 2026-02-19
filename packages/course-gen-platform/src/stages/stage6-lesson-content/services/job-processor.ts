@@ -495,6 +495,21 @@ export async function processStage6Job(
     durationMs: 0,
   });
 
+  const runCompletionCheck = () => {
+    // Skip for partialGenerate jobs — frontend tracks completion independently.
+    if (job.data.skipCompletionCheck) {
+      jobLogger.debug('Skipping completion check (partialGenerate job)');
+      return;
+    }
+
+    checkAndSetStage6Complete(courseId).catch(err => {
+      jobLogger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'Non-blocking: Failed to check Stage 6 completion'
+      );
+    });
+  };
+
   await updateJobProgress(job, {
     lessonId: lessonSpec.lesson_id,
     phase: 'planner',
@@ -544,6 +559,7 @@ export async function processStage6Job(
           result,
           language
         );
+        runCompletionCheck();
       } else {
         jobLogger.warn({ lessonLabel }, 'Cannot save partial success - lessonUuid not resolved');
       }
@@ -558,18 +574,8 @@ export async function processStage6Job(
         await saveSourceDocuments(courseId, lessonUuid, sourceDocuments);
       }
 
-      // Check if all lessons are complete and update course status to stage_6_complete
-      // Skip for partialGenerate jobs — frontend tracks completion independently
-      if (!job.data.skipCompletionCheck) {
-        checkAndSetStage6Complete(courseId).catch(err => {
-          jobLogger.warn(
-            { courseId, error: err instanceof Error ? err.message : String(err) },
-            'Non-blocking: Failed to check Stage 6 completion'
-          );
-        });
-      } else {
-        jobLogger.debug('Skipping completion check (partialGenerate job)');
-      }
+      // Check if all lessons reached terminal statuses and update course status.
+      runCompletionCheck();
     }
 
     jobLogger.info(
@@ -642,6 +648,7 @@ export async function processStage6Job(
         lessonLabel,
         `Generation failed after model fallback: ${errorMsg}`
       );
+      runCompletionCheck();
     } else {
       jobLogger.warn({ lessonLabel, errorMsg }, 'Cannot mark for review - lessonUuid not resolved');
     }
