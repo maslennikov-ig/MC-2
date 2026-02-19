@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
-import { runHeuristicFilters } from '@/stages/stage6-lesson-content/judge/cascade/heuristic-helpers';
+import {
+  runHeuristicFilters,
+  normalizeLanguageCode,
+} from '@/stages/stage6-lesson-content/judge/cascade/heuristic-helpers';
 import type { HeuristicThresholds } from '@/stages/stage6-lesson-content/judge/cascade/types';
 
 const RELAXED_THRESHOLDS: HeuristicThresholds = {
@@ -117,5 +120,44 @@ describe('cascade heuristic keyword helpers', () => {
     const result = runHeuristicFilters(content, lessonSpec, RELAXED_THRESHOLDS, 'ru');
 
     expect(result.keywordCoverage).toBe(0);
+  });
+});
+
+describe('normalizeLanguageCode', () => {
+  it('returns "en" for empty string', () => {
+    expect(normalizeLanguageCode('')).toBe('en');
+  });
+
+  it('returns "en" for whitespace-only', () => {
+    expect(normalizeLanguageCode('   ')).toBe('en');
+  });
+
+  it('normalizes "english" to "en"', () => {
+    expect(normalizeLanguageCode('english')).toBe('en');
+  });
+
+  it('normalizes "English" (capitalized) to "en"', () => {
+    expect(normalizeLanguageCode('English')).toBe('en');
+  });
+
+  it('normalizes "russian" to "ru"', () => {
+    expect(normalizeLanguageCode('russian')).toBe('ru');
+  });
+
+  it('normalizes "RU" (uppercase) to "ru"', () => {
+    expect(normalizeLanguageCode('RU')).toBe('ru');
+  });
+
+  it('extracts base from "en-US" locale tag', () => {
+    expect(normalizeLanguageCode('en-US')).toBe('en');
+  });
+
+  it('extracts base from "ru_RU" underscore locale', () => {
+    expect(normalizeLanguageCode('ru_RU')).toBe('ru');
+  });
+
+  it('passes through simple codes unchanged', () => {
+    expect(normalizeLanguageCode('es')).toBe('es');
+    expect(normalizeLanguageCode('fr')).toBe('fr');
   });
 });

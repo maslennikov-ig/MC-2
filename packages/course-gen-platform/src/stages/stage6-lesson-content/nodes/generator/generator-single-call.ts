@@ -38,6 +38,7 @@ import {
   STAGE6_TIER_MODELS,
   TRUNCATION_CONTINUATION_TAIL_CHARS,
   TRUNCATION_CONTINUATION_MAX_TOKENS,
+  TRUNCATION_CONTINUATION_PROMPT_TEMPLATE,
 } from './generator-constants';
 import {
   formatInterLessonContextXML,
@@ -293,29 +294,13 @@ export async function generateTruncationContinuation(
   const modelId = await resolveContinuationModelId();
   const model = createOpenRouterModel(modelId, 0.2, TRUNCATION_CONTINUATION_MAX_TOKENS);
 
-  const prompt = `<task>
-You are repairing a lesson markdown that was truncated.
-Return ONLY the continuation text that should be appended to the existing lesson.
-</task>
-
-<hard_requirements>
-- Keep output in ${getLanguageName(language)} only.
-- Do NOT repeat existing text verbatim.
-- Continue naturally from the tail and finish incomplete sentence/paragraph/code block if needed.
-- Preserve markdown structure and heading style.
-- Output ONLY markdown continuation, no explanations.
-</hard_requirements>
-
-<lesson>
-<title>${lessonSpec.title}</title>
-<sections>
-${sectionsList}
-</sections>
-</lesson>
-
-<tail_context>
-${tailContext}
-</tail_context>`;
+  const prompt = TRUNCATION_CONTINUATION_PROMPT_TEMPLATE.replace(
+    '{{outputLanguage}}',
+    getLanguageName(language)
+  )
+    .replace('{{lessonTitle}}', lessonSpec.title)
+    .replace('{{sectionsList}}', sectionsList)
+    .replace('{{tailContext}}', tailContext);
 
   logger.info(
     {
@@ -367,7 +352,7 @@ async function resolveContinuationModelId(): Promise<string> {
   }
 }
 
-function mergeContinuationContent(existingContent: string, continuationRaw: string): string {
+export function mergeContinuationContent(existingContent: string, continuationRaw: string): string {
   const continuation = continuationRaw.trim();
   if (continuation.length === 0) {
     return existingContent;

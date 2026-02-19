@@ -99,6 +99,35 @@ export const TRUNCATION_CONTINUATION_TAIL_CHARS = 2200;
  */
 export const TRUNCATION_CONTINUATION_MAX_TOKENS = 1400;
 
+/**
+ * Prompt template for truncation continuation repair.
+ *
+ * Placeholders: {{outputLanguage}}, {{sectionsList}}, {{lessonTitle}}, {{tailContext}}
+ */
+export const TRUNCATION_CONTINUATION_PROMPT_TEMPLATE = `<task>
+You are repairing a lesson markdown that was truncated.
+Return ONLY the continuation text that should be appended to the existing lesson.
+</task>
+
+<hard_requirements>
+- Keep output in {{outputLanguage}} only.
+- Do NOT repeat existing text verbatim.
+- Continue naturally from the tail and finish incomplete sentence/paragraph/code block if needed.
+- Preserve markdown structure and heading style.
+- Output ONLY markdown continuation, no explanations.
+</hard_requirements>
+
+<lesson>
+<title>{{lessonTitle}}</title>
+<sections>
+{{sectionsList}}
+</sections>
+</lesson>
+
+<tail_context>
+{{tailContext}}
+</tail_context>`;
+
 // ============================================================================
 // CONTEXT WINDOW CONFIGURATION
 // ============================================================================

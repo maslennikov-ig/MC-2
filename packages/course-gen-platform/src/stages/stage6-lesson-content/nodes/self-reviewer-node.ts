@@ -747,7 +747,7 @@ function countIssuesByType(issues: SelfReviewIssue[]): Record<string, number> {
   };
 }
 
-function buildRegenerateTelemetryUpdate(
+export function buildRegenerateTelemetryUpdate(
   state: LessonGraphStateType,
   issues: SelfReviewIssue[]
 ): {
@@ -777,7 +777,7 @@ function buildRegenerateTelemetryUpdate(
   };
 }
 
-function isCriticalTruncationOnly(issues: SelfReviewIssue[]): boolean {
+export function isCriticalTruncationOnly(issues: SelfReviewIssue[]): boolean {
   const criticalIssues = issues.filter(issue => issue.severity === 'CRITICAL');
   return criticalIssues.length > 0 && criticalIssues.every(issue => issue.type === 'TRUNCATION');
 }
