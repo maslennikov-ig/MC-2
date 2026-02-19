@@ -196,10 +196,9 @@ function buildLessonContext(
 function rotateHookStrategy(inferred: HookStrategyV2, lessonIndex: number): HookStrategyV2 {
   if (lessonIndex === 0) return inferred;
 
-  // Build rotation order starting from inferred, then cycling others
-  const inferredIdx = HOOK_STRATEGIES.indexOf(inferred);
-  const rotatedIdx = (inferredIdx + lessonIndex) % HOOK_STRATEGIES.length;
-  return HOOK_STRATEGIES[rotatedIdx];
+  // Exclude inferred from rotation pool to maximize variety
+  const others = HOOK_STRATEGIES.filter(s => s !== inferred);
+  return others[(lessonIndex - 1) % others.length];
 }
 
 /**

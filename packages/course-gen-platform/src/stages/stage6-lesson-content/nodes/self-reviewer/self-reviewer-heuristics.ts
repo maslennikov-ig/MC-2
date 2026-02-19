@@ -433,6 +433,10 @@ function getEnToRuHeaderMap(): Map<string, string> {
   const enLabels = CONTENT_LABELS['en'];
   const ruLabels = CONTENT_LABELS['ru'];
 
+  if (!enLabels || !ruLabels) {
+    return new Map();
+  }
+
   for (const key of Object.keys(enLabels) as Array<keyof typeof enLabels>) {
     const enValue = enLabels[key];
     const ruValue = ruLabels[key];
@@ -445,12 +449,15 @@ function getEnToRuHeaderMap(): Map<string, string> {
 }
 
 /**
- * Pattern matching structural LLM artifact headers like "## SECTION CONCLUSION",
+ * Create regex matching structural LLM artifact headers like "## SECTION CONCLUSION",
  * "## MODULE INTRODUCTION", etc. These are not real content labels — they are
  * markers that LLMs sometimes emit. Matched lines are removed entirely.
+ *
+ * Factory function avoids module-level stateful /g regex (lastIndex mutation risk).
  */
-const STRUCTURAL_ARTIFACT_HEADER_REGEX =
-  /^(#{1,6}\s*)(SECTION|MODULE|COURSE|LESSON)\s+(CONCLUSION|INTRODUCTION|SUMMARY|OVERVIEW|DIGEST)\s*$/gim;
+function createStructuralArtifactRegex(): RegExp {
+  return /^(#{1,6}\s*)(SECTION|MODULE|COURSE|LESSON)\s+(CONCLUSION|INTRODUCTION|SUMMARY|OVERVIEW|DIGEST)\s*$/gim;
+}
 
 /**
  * Replace English structural headers with Russian equivalents (ru-only heuristic)
@@ -492,9 +499,7 @@ export function replaceEnglishStructuralHeaders(
   });
 
   // Step 2: Remove structural LLM artifact headers entirely (e.g. "## SECTION CONCLUSION")
-  // Reset lastIndex since the regex has /g flag and may be reused
-  STRUCTURAL_ARTIFACT_HEADER_REGEX.lastIndex = 0;
-  processed = processed.replace(STRUCTURAL_ARTIFACT_HEADER_REGEX, () => {
+  processed = processed.replace(createStructuralArtifactRegex(), () => {
     replacedCount++;
     return '';
   });
