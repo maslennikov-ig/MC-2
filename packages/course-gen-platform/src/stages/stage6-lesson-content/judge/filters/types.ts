@@ -122,6 +122,12 @@ export interface HeuristicFilterResult {
     /** Section duplication check results */
     sectionDuplication?: {
       duplicatePairs: Array<{ title1: string; title2: string; similarity: number }>;
+      overlapPairs: Array<{
+        title1: string;
+        title2: string;
+        overlap: number;
+        sharedNgrams: number;
+      }>;
       totalSections: number;
     };
   };
@@ -159,7 +165,7 @@ export const DEFAULT_HEURISTIC_CONFIG: HeuristicFilterConfig = {
     max: 14, // No higher than college freshman
     target: 10, // Target 10th grade level
   },
-  requiredSections: ['introduction', 'conclusion'],
+  requiredSections: ['introduction'],
   keywordCoverageThreshold: 0.5, // 50% of keywords must be present
   contentDensityThreshold: 100, // At least 100 words per section
 };

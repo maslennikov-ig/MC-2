@@ -185,7 +185,6 @@ export interface Stage6SingleCallGeneratorVars {
   stylePrompt: string;
   outputLanguage: string;
   introductionHeader: string;
-  summaryHeader: string;
   exercisesHeader: string;
   exerciseLabel: string;
   taskLabel: string;

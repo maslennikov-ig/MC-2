@@ -6,30 +6,40 @@
 import type { FilterCheckResult } from './types';
 import { logger } from '@/shared/logger';
 
+interface DuplicateTitlePair {
+  title1: string;
+  title2: string;
+  similarity: number;
+}
+
+interface OverlapPair {
+  title1: string;
+  title2: string;
+  overlap: number;
+  sharedNgrams: number;
+}
+
 // ============================================================================
 // SECTION DUPLICATION CHECK
 // ============================================================================
 
 /**
- * Check for duplicate or near-duplicate section titles
+ * Check for duplicate titles and high-overlap section bodies.
  *
- * Detects when LLM generates the same section multiple times,
- * which indicates generation loop or hallucination.
- *
- * Uses Levenshtein similarity - titles > 80% similar are considered duplicates.
- *
- * @param content - Content to check (markdown string)
- * @returns Filter check result with duplicate details
+ * Detects:
+ * - near-duplicate headers (generation loops)
+ * - recap-like content repetition across sections (cross-section duplication)
  */
 export function checkSectionDuplication(content: string): FilterCheckResult & {
-  duplicatePairs: Array<{ title1: string; title2: string; similarity: number }>;
+  duplicatePairs: DuplicateTitlePair[];
+  overlapPairs: OverlapPair[];
   totalSections: number;
 } {
   // Extract all section headers (## and ### only, skip # which is lesson title)
   const headerMatches = content.match(/^#{2,3}\s+(.+)$/gm) || [];
   const headers = headerMatches.map(h => h.replace(/^#{2,3}\s+/, '').trim());
 
-  const duplicatePairs: Array<{ title1: string; title2: string; similarity: number }> = [];
+  const duplicatePairs: DuplicateTitlePair[] = [];
 
   // Compare each pair of headers for similarity
   for (let i = 0; i < headers.length; i++) {
@@ -45,44 +55,183 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
     }
   }
 
-  const passed = duplicatePairs.length === 0;
-  // Each duplicate pair reduces score by 25% (max 4 pairs = 0 score)
-  const scoreContribution = Math.max(0, 1 - duplicatePairs.length * 0.25);
+  const overlapPairs = detectSectionBodyOverlap(content);
+  const totalDuplicationPairs = duplicatePairs.length + overlapPairs.length;
+
+  const passed = totalDuplicationPairs === 0;
+  // Each duplicate/overlap pair reduces score by 25% (max 4 pairs = 0 score)
+  const scoreContribution = Math.max(0, 1 - totalDuplicationPairs * 0.25);
 
   const result: FilterCheckResult & {
-    duplicatePairs: Array<{ title1: string; title2: string; similarity: number }>;
+    duplicatePairs: DuplicateTitlePair[];
+    overlapPairs: OverlapPair[];
     totalSections: number;
   } = {
     passed,
-    actual: passed ? 'no duplicates' : `${duplicatePairs.length} duplicate pairs`,
+    actual: passed
+      ? 'no duplicates'
+      : `${duplicatePairs.length} duplicate title pairs, ${overlapPairs.length} overlap pairs`,
     scoreContribution,
     duplicatePairs,
+    overlapPairs,
     totalSections: headers.length,
   };
 
   if (!passed) {
     result.failure = {
       filter: 'sectionDuplication',
-      expected: '0 duplicate sections',
-      actual: `${duplicatePairs.length} duplicate pairs`,
-      severity: duplicatePairs.length > 2 ? 'critical' : 'major',
+      expected: '0 duplicate sections or high-overlap section bodies',
+      actual: `${duplicatePairs.length} duplicate title pairs, ${overlapPairs.length} overlap pairs`,
+      severity: totalDuplicationPairs > 2 ? 'critical' : 'major',
     };
-    const examples = duplicatePairs
+
+    const titleExamples = duplicatePairs
       .slice(0, 2)
       .map(p => `"${p.title1}" ≈ "${p.title2}"`)
       .join('; ');
-    result.suggestion = `Duplicate sections detected: ${examples}${duplicatePairs.length > 2 ? ` (+${duplicatePairs.length - 2} more)` : ''}. Remove duplicates to improve content structure.`;
+
+    const overlapExamples = overlapPairs
+      .slice(0, 2)
+      .map(p => `"${p.title1}" ↔ "${p.title2}" (${Math.round(p.overlap * 100)}% shared phrasing)`)
+      .join('; ');
+
+    const exampleParts = [titleExamples, overlapExamples].filter(Boolean).join('; ');
+    result.suggestion = `Duplicate sections detected: ${exampleParts}${totalDuplicationPairs > 2 ? ` (+${totalDuplicationPairs - 2} more)` : ''}. Remove repeated recaps and keep each section unique.`;
   }
 
-  if (duplicatePairs.length > 0) {
+  if (totalDuplicationPairs > 0) {
     logger.warn({
       msg: 'Section duplication detected',
       duplicatePairs: duplicatePairs.slice(0, 5),
+      overlapPairs: overlapPairs.slice(0, 5),
       totalSections: headers.length,
     });
   }
 
   return result;
+}
+
+/**
+ * Extract top-level markdown sections (## headers) with their body content.
+ */
+function extractTopLevelSections(content: string): Array<{ title: string; content: string }> {
+  const lines = content.split('\n');
+  const sections: Array<{ title: string; content: string }> = [];
+
+  let currentTitle = '';
+  let currentBody: string[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const headerMatch = line.match(/^##\s+(.+)$/);
+
+    if (headerMatch) {
+      if (currentTitle) {
+        sections.push({ title: currentTitle, content: currentBody.join('\n').trim() });
+      }
+
+      currentTitle = headerMatch[1].trim();
+      currentBody = [];
+      continue;
+    }
+
+    if (currentTitle) {
+      currentBody.push(rawLine);
+    }
+  }
+
+  if (currentTitle) {
+    sections.push({ title: currentTitle, content: currentBody.join('\n').trim() });
+  }
+
+  return sections;
+}
+
+/**
+ * Detect high overlap between top-level section bodies via 5-gram containment.
+ */
+function detectSectionBodyOverlap(content: string): OverlapPair[] {
+  const sections = extractTopLevelSections(content).filter(section => {
+    const lowerTitle = section.title.toLowerCase();
+
+    // Ignore template-heavy sections that naturally reuse wording.
+    return !/(exercise|упражнен|digest|краткое содержание)/i.test(lowerTitle);
+  });
+
+  const overlapPairs: OverlapPair[] = [];
+
+  for (let i = 0; i < sections.length; i++) {
+    for (let j = i + 1; j < sections.length; j++) {
+      const overlapAnalysis = calculateSectionOverlap(sections[i].content, sections[j].content);
+      if (overlapAnalysis.overlap >= 0.32) {
+        overlapPairs.push({
+          title1: sections[i].title,
+          title2: sections[j].title,
+          overlap: overlapAnalysis.overlap,
+          sharedNgrams: overlapAnalysis.sharedNgrams,
+        });
+      }
+    }
+  }
+
+  return overlapPairs;
+}
+
+/**
+ * Calculate overlap between two section bodies via 5-gram containment.
+ */
+function calculateSectionOverlap(
+  sectionA: string,
+  sectionB: string
+): { overlap: number; sharedNgrams: number } {
+  const tokensA = normalizeTokens(sectionA);
+  const tokensB = normalizeTokens(sectionB);
+
+  // Short sections are noisy; skip overlap checks for them.
+  if (tokensA.length < 40 || tokensB.length < 40) {
+    return { overlap: 0, sharedNgrams: 0 };
+  }
+
+  const ngramsA = buildNgramSet(tokensA, 5);
+  const ngramsB = buildNgramSet(tokensB, 5);
+
+  if (ngramsA.size === 0 || ngramsB.size === 0) {
+    return { overlap: 0, sharedNgrams: 0 };
+  }
+
+  let intersection = 0;
+  const [smaller, larger] = ngramsA.size < ngramsB.size ? [ngramsA, ngramsB] : [ngramsB, ngramsA];
+  for (const gram of smaller) {
+    if (larger.has(gram)) intersection++;
+  }
+
+  const overlap = intersection / Math.min(ngramsA.size, ngramsB.size);
+  return { overlap, sharedNgrams: intersection };
+}
+
+function normalizeTokens(content: string): string[] {
+  return content
+    .toLowerCase()
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]+\)/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(token => token.length >= 3);
+}
+
+function buildNgramSet(tokens: string[], n: number): Set<string> {
+  const set = new Set<string>();
+
+  if (tokens.length < n) {
+    return set;
+  }
+
+  for (let i = 0; i <= tokens.length - n; i++) {
+    set.add(tokens.slice(i, i + n).join(' '));
+  }
+
+  return set;
 }
 
 /**

@@ -30,7 +30,7 @@ export const DEFAULT_HEURISTIC_THRESHOLDS: HeuristicThresholds = {
   minWordCount: 500,
   maxWordCount: 10000,
   targetFleschKincaid: { min: 8, max: 12 },
-  requiredSections: ['introduction', 'conclusion', 'exercises'],
+  requiredSections: ['introduction', 'exercises'],
   minExamples: 0, // Disabled: examples extraction not implemented yet
   minExercises: 2, // Enabled: exercises generation implemented in generator.ts
 };

@@ -91,7 +91,7 @@ export async function generateLessonSingleCall(
   // Step 1: Calculate word budget (min 5 min to prevent 0/negative budgets)
   const durationMinutes = Math.max(5, lessonSpec.estimated_duration_minutes || 15);
   const targetWordCount = Math.round(durationMinutes * WORDS_PER_MINUTE);
-  const sectionsWordBudget = Math.round(targetWordCount - 300); // Subtract intro/summary overhead
+  const sectionsWordBudget = Math.round(targetWordCount - 200); // Subtract intro overhead
 
   // Step 2: Prepare RAG context (CRITICAL - user requirement)
   // Deduplicate chunks by chunk_id
@@ -148,7 +148,7 @@ export async function generateLessonSingleCall(
   const digestHeader = labels.lessonDigest;
 
   // Step 7: Build sections list
-  // Filter out "Conclusion" — it's generated as the summary section in the prompt
+  // Keep this as a safety net for legacy Stage 5 specs that still include a synthetic conclusion.
   const contentSections = lessonSpec.sections.filter(
     s =>
       !s.title.toLowerCase().includes('conclusion') && !s.title.toLowerCase().includes('заключение')
@@ -184,7 +184,6 @@ export async function generateLessonSingleCall(
     stylePrompt,
     outputLanguage: getLanguageName(language),
     introductionHeader: labels.introduction,
-    summaryHeader: labels.summary,
     exercisesHeader: labels.exercises,
     exerciseLabel: labels.exercise,
     taskLabel: labels.task,

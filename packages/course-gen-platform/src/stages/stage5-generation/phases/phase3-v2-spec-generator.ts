@@ -468,8 +468,7 @@ export class V2LessonSpecGenerator {
     const primaryDocuments = ragPlan?.primary_documents || [];
 
     // Empty array = search all course documents (do not use 'default' sentinel)
-    const finalPrimaryDocs =
-      primaryDocuments.length > 0 ? primaryDocuments : [];
+    const finalPrimaryDocs = primaryDocuments.length > 0 ? primaryDocuments : [];
 
     // Use section-specific topics for better search queries
     const sectionBreakdown = analysisResult.recommended_structure?.sections_breakdown?.find(
@@ -478,13 +477,11 @@ export class V2LessonSpecGenerator {
     const fallbackQueries = buildFallbackSearchQueries(
       sectionBreakdown,
       analysisResult.topic_analysis.determined_topic,
-      sectionId,
+      sectionId
     );
 
     const finalSearchQueries =
-      searchQueries.length > 0 && searchQueries[0].length >= 3
-        ? searchQueries
-        : fallbackQueries;
+      searchQueries.length > 0 && searchQueries[0].length >= 3 ? searchQueries : fallbackQueries;
 
     return {
       primary_documents: finalPrimaryDocs,
@@ -655,15 +652,6 @@ export class V2LessonSpecGenerator {
         });
       }
     }
-
-    // Always add Conclusion section (required by heuristic filter)
-    specs.push({
-      title: 'Conclusion',
-      content_archetype: 'concept_explainer',
-      rag_context_id: sectionId,
-      constraints: { depth: 'summary', required_keywords: [], prohibited_terms: [] },
-      key_points_to_cover: ['Key takeaways from this lesson', 'Next steps for learners'],
-    });
 
     return specs;
   }
