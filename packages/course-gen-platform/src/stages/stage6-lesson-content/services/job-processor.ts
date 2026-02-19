@@ -407,6 +407,7 @@ function buildZeroMetrics(
     regenerateCount: 0,
     truncationCount: 0,
     rejectedTokens: 0,
+    regenerationMode: null,
   };
 }
 
@@ -458,6 +459,7 @@ export async function processStage6Job(
         regenerateCount: 0,
         truncationCount: 0,
         rejectedTokens: 0,
+        regenerationMode: null,
       },
     };
   }
@@ -532,6 +534,7 @@ export async function processStage6Job(
         regenerateCount: 0,
         truncationCount: 0,
         rejectedTokens: 0,
+        regenerationMode: null,
       },
     };
   }
@@ -695,6 +698,7 @@ export async function processStage6Job(
             regenerateCount: result.metrics.regenerateCount,
             truncationCount: result.metrics.truncationCount,
             rejectedTokens: result.metrics.rejectedTokens,
+            regenerationMode: result.metrics.regenerationMode ?? null,
             reviewInfo: result.reviewInfo,
           }
         );
@@ -828,6 +832,7 @@ export async function processStage6Job(
           regenerateCount: 0,
           truncationCount: 0,
           rejectedTokens: 0,
+          regenerationMode: null,
         }
       );
       runCompletionCheck();

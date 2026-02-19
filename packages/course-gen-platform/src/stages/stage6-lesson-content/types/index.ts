@@ -129,6 +129,9 @@ export interface Stage6JobResult {
 
     /** Tokens spent on attempts that ended in REGENERATE */
     rejectedTokens: number;
+
+    /** Last regeneration mode used (null if no regeneration needed) */
+    regenerationMode: 'full_regenerate' | 'truncation_continuation' | null;
   };
 }
 
@@ -249,6 +252,8 @@ export interface Stage6Output {
     truncationCount: number;
     /** Tokens spent on attempts that ended in REGENERATE */
     rejectedTokens: number;
+    /** Last regeneration mode used (null if no regeneration needed) */
+    regenerationMode: 'full_regenerate' | 'truncation_continuation' | null;
   };
   /** Human review metadata (for UI warnings) */
   reviewInfo?: {

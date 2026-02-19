@@ -119,6 +119,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         regenerateCount: result.regenerateCount ?? 0,
         truncationCount: result.truncationCount ?? 0,
         rejectedTokens: result.rejectedTokens ?? 0,
+        regenerationMode: result.regenerationMode ?? null,
       },
       // Include review info for UI warnings (undefined if not set)
       reviewInfo: result.reviewInfo ?? undefined,
@@ -153,6 +154,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         regenerateCount: 0,
         truncationCount: 0,
         rejectedTokens: 0,
+        regenerationMode: null,
       },
     };
   }
