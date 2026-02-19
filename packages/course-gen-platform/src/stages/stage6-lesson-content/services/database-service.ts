@@ -62,6 +62,7 @@ export async function handlePartialSuccess(
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
+          regenerationMode: result.metrics.regenerationMode ?? null,
           reviewInfo: result.reviewInfo ?? undefined,
         })
       ) as Json,
@@ -120,6 +121,7 @@ export interface ReviewMarkerContext {
   regenerateCount?: number | null;
   truncationCount?: number | null;
   rejectedTokens?: number | null;
+  regenerationMode?: string | null;
   reviewInfo?: Stage6Output['reviewInfo'];
 }
 
@@ -170,6 +172,7 @@ export async function markForReview(
         regenerateCount: context.regenerateCount ?? null,
         truncationCount: context.truncationCount ?? null,
         rejectedTokens: context.rejectedTokens ?? null,
+        regenerationMode: context.regenerationMode ?? null,
         reviewInfo: context.reviewInfo ?? undefined,
       },
       generation_attempt: (context.regenerateCount ?? 0) + 1,
@@ -254,6 +257,7 @@ export async function saveLessonContent(
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
+          regenerationMode: result.metrics.regenerationMode ?? null,
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: extractContentMarkdown(result.lessonContent, language),
@@ -379,6 +383,7 @@ export async function saveRejectedContent(
     regenerateCount?: number | null;
     truncationCount?: number | null;
     rejectedTokens?: number | null;
+    regenerationMode?: string | null;
   }
 ): Promise<void> {
   if (!generatedContent) {
@@ -435,6 +440,7 @@ export async function saveRejectedContent(
       regenerateCount: context?.regenerateCount ?? null,
       truncationCount: context?.truncationCount ?? null,
       rejectedTokens: context?.rejectedTokens ?? null,
+      regenerationMode: context?.regenerationMode ?? null,
       generationAttempt,
     };
 

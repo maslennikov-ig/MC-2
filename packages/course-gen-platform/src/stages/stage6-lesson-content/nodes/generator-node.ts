@@ -227,7 +227,6 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       modelUsed,
       tokensUsed: totalTokens,
       lastGenerationTokens: totalTokens,
-      regenerationMode: null,
       durationMs,
       currentNode: 'selfReviewer',
     };
@@ -266,7 +265,6 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       errors: [`Generator failed: ${errorMessage}`],
       currentNode: 'generator',
       lastGenerationTokens: 0,
-      regenerationMode: null,
       durationMs,
     };
   }
