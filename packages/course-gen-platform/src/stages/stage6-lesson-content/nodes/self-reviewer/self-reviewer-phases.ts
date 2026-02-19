@@ -12,6 +12,7 @@ import {
   checkLanguageConsistency,
   checkContentTruncation,
   checkMermaidSyntax,
+  ZERO_TOLERANCE_SCRIPTS,
 } from '../../judge/heuristic-filter';
 import { MODEL_FALLBACK } from '../../config';
 import { SELF_REVIEW_CONFIG } from './self-reviewer-constants';
@@ -242,18 +243,40 @@ export function buildMinorIssues(heuristics: HeuristicCheckResults): SelfReviewI
   const nodeLogger = logger.child({ phase: 'minorIssues' });
 
   if (!languageCheck.passed) {
-    issues.push({
-      type: 'LANGUAGE',
-      severity: 'INFO',
-      location: 'global',
-      description: `Minor script mixing: ${languageCheck.foreignCharacters} foreign characters from ${languageCheck.scriptsFound.join(', ')}. Examples: "${languageCheck.foreignSamples.join('", "')}"`,
-    });
+    const hasZeroToleranceScripts = languageCheck.scriptsFound.some(script =>
+      ZERO_TOLERANCE_SCRIPTS.has(script)
+    );
 
-    nodeLogger.debug({
-      msg: 'Minor language consistency issues',
-      foreignCharacters: languageCheck.foreignCharacters,
-      samples: languageCheck.foreignSamples,
-    });
+    if (hasZeroToleranceScripts) {
+      // Zero-tolerance scripts (CJK/Arabic/Devanagari): mark as FIXABLE for automatic stripping
+      issues.push({
+        type: 'LANGUAGE',
+        severity: 'FIXABLE',
+        location: 'global',
+        description: `Zero-tolerance foreign characters detected: ${languageCheck.foreignCharacters} chars from ${languageCheck.scriptsFound.join(', ')}. Auto-stripping required. Examples: "${languageCheck.foreignSamples.join('", "')}"`,
+      });
+
+      nodeLogger.warn({
+        msg: 'Zero-tolerance scripts in minor foreign characters - marked FIXABLE for auto-strip',
+        foreignCharacters: languageCheck.foreignCharacters,
+        scriptsFound: languageCheck.scriptsFound,
+        samples: languageCheck.foreignSamples,
+      });
+    } else {
+      // Non-zero-tolerance scripts: keep as INFO
+      issues.push({
+        type: 'LANGUAGE',
+        severity: 'INFO',
+        location: 'global',
+        description: `Minor script mixing: ${languageCheck.foreignCharacters} foreign characters from ${languageCheck.scriptsFound.join(', ')}. Examples: "${languageCheck.foreignSamples.join('", "')}"`,
+      });
+
+      nodeLogger.debug({
+        msg: 'Minor language consistency issues',
+        foreignCharacters: languageCheck.foreignCharacters,
+        samples: languageCheck.foreignSamples,
+      });
+    }
   }
 
   if (!truncationCheck.passed) {

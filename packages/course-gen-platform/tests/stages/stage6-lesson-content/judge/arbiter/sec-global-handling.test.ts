@@ -5,7 +5,7 @@
  * - ALL global issues are tracked in lesson_improvement_suggestions table
  * - Minor global issues: tracked but skipped (no token spent)
  * - Major global issues: redirected to sec_introduction
- * - Critical global issues: redirected to sec_introduction AND sec_conclusion
+ * - Critical global issues: redirected to sec_introduction
  *
  * Reference:
  * - docs/plans/2026-01-stage6-fixes-plan.md (P1: sec_global strategy)
@@ -128,7 +128,7 @@ function createArbiterInput(options: { issues: JudgeIssue[]; lessonContent?: any
 
 describe('T040 - sec_global Handling', () => {
   describe('processGlobalIssues - issue identification', () => {
-    it('should identify global issues from location="sec_global"', async () => {
+    it('should identify global issues from location="sec_global"', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'sec_global', severity: 'minor' }),
@@ -136,14 +136,14 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // sec_global issue should not create a task (minor severity skipped)
       const taskLocations = result.plan.tasks.map(t => t.sectionId);
       expect(taskLocations).not.toContain('sec_global');
     });
 
-    it('should identify global issues from location containing "global"', async () => {
+    it('should identify global issues from location containing "global"', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'Global issue affecting all sections', severity: 'minor' }),
@@ -151,26 +151,26 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // Global issue should not create a task (minor severity skipped)
       const taskLocations = result.plan.tasks.map(t => t.sectionId);
       expect(taskLocations.every(loc => !loc.includes('global'))).toBe(true);
     });
 
-    it('should skip minor global issues (no tokens spent)', async () => {
+    it('should skip minor global issues (no tokens spent)', () => {
       const input = createArbiterInput({
         issues: [createMockIssue({ location: 'sec_global', severity: 'minor' })],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // No tasks should be created for minor sec_global
       expect(result.plan.tasks).toHaveLength(0);
       expect(result.plan.estimatedCost).toBe(0);
     });
 
-    it('should redirect major global issues to intro', async () => {
+    it('should redirect major global issues to intro', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -182,18 +182,18 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // Should create task for sec_introduction
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
       expect(introTask).toBeDefined();
 
-      // Should not create task for sec_conclusion (only major, not critical)
+      // Should never create task for sec_conclusion
       const conclusionTask = result.plan.tasks.find(t => t.sectionId === 'sec_conclusion');
       expect(conclusionTask).toBeUndefined();
     });
 
-    it('should redirect critical global issues to intro AND conclusion', async () => {
+    it('should redirect critical global issues to intro only', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -205,17 +205,17 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
-      // Should create tasks for both intro and conclusion
+      // Should create task for intro only
       const taskSections = result.plan.tasks.map(t => t.sectionId);
       expect(taskSections).toContain('sec_introduction');
-      expect(taskSections).toContain('sec_conclusion');
+      expect(taskSections).not.toContain('sec_conclusion');
     });
   });
 
   describe('redirectGlobalToSections - redirection logic', () => {
-    it('should create intro task with [Redirected from global] prefix', async () => {
+    it('should create intro task with [Redirected from global] prefix', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -227,7 +227,7 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
       expect(introTask).toBeDefined();
@@ -238,7 +238,7 @@ describe('T040 - sec_global Handling', () => {
       expect(introIssue?.description).toContain('Global issue description');
     });
 
-    it('should create conclusion task only for critical severity', async () => {
+    it('should keep redirection intro-only for major and critical severity', () => {
       const majorInput = createArbiterInput({
         issues: [createMockIssue({ location: 'sec_global', severity: 'major' })],
       });
@@ -247,21 +247,21 @@ describe('T040 - sec_global Handling', () => {
         issues: [createMockIssue({ location: 'sec_global', severity: 'critical' })],
       });
 
-      const majorResult = await consolidateVerdicts(majorInput);
-      const criticalResult = await consolidateVerdicts(criticalInput);
+      const majorResult = consolidateVerdicts(majorInput);
+      const criticalResult = consolidateVerdicts(criticalInput);
 
       // Major: only intro
       const majorSections = majorResult.plan.tasks.map(t => t.sectionId);
       expect(majorSections).toContain('sec_introduction');
       expect(majorSections).not.toContain('sec_conclusion');
 
-      // Critical: both intro and conclusion
+      // Critical: still intro only
       const criticalSections = criticalResult.plan.tasks.map(t => t.sectionId);
       expect(criticalSections).toContain('sec_introduction');
-      expect(criticalSections).toContain('sec_conclusion');
+      expect(criticalSections).not.toContain('sec_conclusion');
     });
 
-    it('should modify suggestedFix for intro task', async () => {
+    it('should modify suggestedFix for intro task', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -272,7 +272,7 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
       const introIssue = introTask?.sourceIssues[0];
@@ -281,7 +281,7 @@ describe('T040 - sec_global Handling', () => {
       expect(introIssue?.suggestedFix).toContain('Add more context');
     });
 
-    it('should modify suggestedFix for conclusion task', async () => {
+    it('should modify suggestedFix for critical issues redirected to intro task', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -292,18 +292,18 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
-      const conclusionTask = result.plan.tasks.find(t => t.sectionId === 'sec_conclusion');
-      const conclusionIssue = conclusionTask?.sourceIssues[0];
+      const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
+      const introIssue = introTask?.sourceIssues[0];
 
-      expect(conclusionIssue?.suggestedFix).toContain('Reinforce in conclusion');
-      expect(conclusionIssue?.suggestedFix).toContain('Add more context');
+      expect(introIssue?.suggestedFix).toContain('Improve introduction to address');
+      expect(introIssue?.suggestedFix).toContain('Add more context');
     });
   });
 
   describe('consolidateVerdicts - integration tests', () => {
-    it('should exclude minor sec_global issues from tasks', async () => {
+    it('should exclude minor sec_global issues from tasks', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'section 1', severity: 'minor' }),
@@ -312,14 +312,14 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // Only section 1 and section 2 tasks, no sec_global
       expect(result.plan.tasks).toHaveLength(2);
       expect(result.plan.tasks.every(t => t.sectionId !== 'sec_global')).toBe(true);
     });
 
-    it('should create intro task for major sec_global issues', async () => {
+    it('should create intro task for major sec_global issues', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -330,12 +330,12 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       expect(result.plan.tasks.some(t => t.sectionId === 'sec_introduction')).toBe(true);
     });
 
-    it('should create intro+conclusion tasks for critical sec_global issues', async () => {
+    it('should create intro task for critical sec_global issues', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -346,29 +346,29 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const taskSections = result.plan.tasks.map(t => t.sectionId);
       expect(taskSections).toContain('sec_introduction');
-      expect(taskSections).toContain('sec_conclusion');
+      expect(taskSections).not.toContain('sec_conclusion');
     });
 
-    it('should handle multiple sec_global issues with different severities', async () => {
+    it('should handle multiple sec_global issues with different severities', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'sec_global', severity: 'minor' }), // Skip
           createMockIssue({ location: 'sec_global', severity: 'major' }), // → intro
-          createMockIssue({ location: 'sec_global', severity: 'critical' }), // → intro + conclusion
+          createMockIssue({ location: 'sec_global', severity: 'critical' }), // → intro
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const taskSections = result.plan.tasks.map(t => t.sectionId);
 
-      // Should have intro and conclusion tasks
+      // Should have intro task only
       expect(taskSections).toContain('sec_introduction');
-      expect(taskSections).toContain('sec_conclusion');
+      expect(taskSections).not.toContain('sec_conclusion');
 
       // Intro task should have multiple issues (major + critical issues both redirect to intro)
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
@@ -378,7 +378,7 @@ describe('T040 - sec_global Handling', () => {
       expect(introTask?.priority).toBe('critical');
     });
 
-    it('should mix regular and global issues correctly', async () => {
+    it('should mix regular and global issues correctly', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'section 1', severity: 'minor' }),
@@ -387,7 +387,7 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const taskSections = result.plan.tasks.map(t => t.sectionId);
 
@@ -398,7 +398,7 @@ describe('T040 - sec_global Handling', () => {
       expect(taskSections).not.toContain('sec_global');
     });
 
-    it('should calculate correct token cost (excluding skipped minor globals)', async () => {
+    it('should calculate correct token cost (excluding skipped minor globals)', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'sec_global', severity: 'minor' }), // Skip (0 tokens)
@@ -406,7 +406,7 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // Should only count cost for section 1 task
       expect(result.plan.tasks).toHaveLength(1);
@@ -415,16 +415,16 @@ describe('T040 - sec_global Handling', () => {
   });
 
   describe('edge cases and boundary conditions', () => {
-    it('should handle empty issues array', async () => {
+    it('should handle empty issues array', () => {
       const input = createArbiterInput({ issues: [] });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       expect(result.plan.tasks).toHaveLength(0);
       expect(result.plan.estimatedCost).toBe(0);
     });
 
-    it('should handle only minor sec_global issues', async () => {
+    it('should handle only minor sec_global issues', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'sec_global', severity: 'minor' }),
@@ -433,13 +433,13 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // All should be skipped
       expect(result.plan.tasks).toHaveLength(0);
     });
 
-    it('should handle only critical sec_global issues', async () => {
+    it('should handle only critical sec_global issues', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'sec_global', severity: 'critical' }),
@@ -447,22 +447,20 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
-      // Should redirect all to intro + conclusion
+      // Should redirect all to intro only
       const taskSections = result.plan.tasks.map(t => t.sectionId);
       expect(taskSections).toContain('sec_introduction');
-      expect(taskSections).toContain('sec_conclusion');
+      expect(taskSections).not.toContain('sec_conclusion');
 
-      // Intro and conclusion tasks should have issues (grouped into single tasks per section)
+      // Intro task should have grouped issues
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
-      const conclusionTask = result.plan.tasks.find(t => t.sectionId === 'sec_conclusion');
 
       expect(introTask?.sourceIssues.length).toBeGreaterThan(0);
-      expect(conclusionTask?.sourceIssues.length).toBeGreaterThan(0);
     });
 
-    it('should preserve issue fields when redirecting', async () => {
+    it('should preserve issue fields when redirecting', () => {
       const originalIssue = createMockIssue({
         location: 'sec_global',
         severity: 'major',
@@ -475,7 +473,7 @@ describe('T040 - sec_global Handling', () => {
 
       const input = createArbiterInput({ issues: [originalIssue] });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
       const redirectedIssue = introTask?.sourceIssues[0];
@@ -487,7 +485,7 @@ describe('T040 - sec_global Handling', () => {
       expect(redirectedIssue?.inlineReplacement).toBe('Original replacement');
     });
 
-    it('should handle case-insensitive global location matching', async () => {
+    it('should handle case-insensitive global location matching', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'GLOBAL', severity: 'major' }),
@@ -496,7 +494,7 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // All should be redirected to intro (grouped into one task)
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
@@ -510,7 +508,7 @@ describe('T040 - sec_global Handling', () => {
       expect(globalTasks).toHaveLength(0);
     });
 
-    it('should handle global issues with different criteria', async () => {
+    it('should handle global issues with different criteria', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -531,39 +529,34 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
-      const conclusionTask = result.plan.tasks.find(t => t.sectionId === 'sec_conclusion');
-
       // Intro should have all issues (grouped by section)
       expect(introTask).toBeDefined();
       expect(introTask?.sourceIssues.length).toBeGreaterThan(0);
 
-      // Conclusion should have only critical issue(s)
-      expect(conclusionTask).toBeDefined();
-      expect(conclusionTask?.sourceIssues.length).toBeGreaterThan(0);
-      expect(conclusionTask?.sourceIssues.every(i => i.severity === 'critical')).toBe(true);
+      // Intro should include redirected critical issues
+      expect(introTask?.sourceIssues.some(i => i.severity === 'critical')).toBe(true);
     });
   });
 
   describe('task priority and execution', () => {
-    it('should set correct priority for redirected issues', async () => {
+    it('should set correct priority for redirected issues', () => {
       const input = createArbiterInput({
         issues: [createMockIssue({ location: 'sec_global', severity: 'critical' })],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
-      const conclusionTask = result.plan.tasks.find(t => t.sectionId === 'sec_conclusion');
 
-      // Both tasks should have critical priority
+      // Intro task should have critical priority
       expect(introTask?.priority).toBe('critical');
-      expect(conclusionTask?.priority).toBe('critical');
+      expect(result.plan.tasks.some(t => t.sectionId === 'sec_conclusion')).toBe(false);
     });
 
-    it('should set correct actionType based on criterion', async () => {
+    it('should set correct actionType based on criterion', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({
@@ -574,7 +567,7 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       const introTask = result.plan.tasks.find(t => t.sectionId === 'sec_introduction');
 
@@ -582,18 +575,18 @@ describe('T040 - sec_global Handling', () => {
       expect(introTask?.actionType).toBe('REGENERATE_SECTION');
     });
 
-    it('should create execution batches correctly with redirected tasks', async () => {
+    it('should create execution batches correctly with redirected tasks', () => {
       const input = createArbiterInput({
         issues: [
-          createMockIssue({ location: 'sec_global', severity: 'critical' }), // → intro + conclusion
+          createMockIssue({ location: 'sec_global', severity: 'critical' }), // → intro
           createMockIssue({ location: 'section 1', severity: 'major' }),
           createMockIssue({ location: 'section 2', severity: 'major' }),
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
-      // Should have multiple batches (intro, conclusion, sec_1, sec_2)
+      // Should have multiple batches (intro, sec_1, sec_2)
       expect(result.plan.executionBatches.length).toBeGreaterThan(0);
 
       // All tasks should be included in batches
@@ -603,7 +596,7 @@ describe('T040 - sec_global Handling', () => {
   });
 
   describe('observability and tracking', () => {
-    it('should track all global issues in acceptedIssues (for DB insert)', async () => {
+    it('should track all global issues in acceptedIssues (for DB insert)', () => {
       const input = createArbiterInput({
         issues: [
           createMockIssue({ location: 'sec_global', severity: 'minor' }), // Tracked but skipped
@@ -611,7 +604,7 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       // All issues should be in acceptedIssues (for tracking)
       // Note: minor global issues won't create tasks, but should still be in acceptedIssues
@@ -620,7 +613,7 @@ describe('T040 - sec_global Handling', () => {
       expect(result.acceptedIssues.length).toBeGreaterThan(0);
     });
 
-    it('should provide correct estimatedCost (excluding skipped minor globals)', async () => {
+    it('should provide correct estimatedCost (excluding skipped minor globals)', () => {
       const minorInput = createArbiterInput({
         issues: [
           createMockIssue({ location: 'sec_global', severity: 'minor' }), // 0 tokens
@@ -633,19 +626,19 @@ describe('T040 - sec_global Handling', () => {
         ],
       });
 
-      const minorResult = await consolidateVerdicts(minorInput);
-      const majorResult = await consolidateVerdicts(majorInput);
+      const minorResult = consolidateVerdicts(minorInput);
+      const majorResult = consolidateVerdicts(majorInput);
 
       expect(minorResult.plan.estimatedCost).toBe(0);
       expect(majorResult.plan.estimatedCost).toBeGreaterThan(0);
     });
 
-    it('should preserve agreementScore and conflictResolutions', async () => {
+    it('should preserve agreementScore and conflictResolutions', () => {
       const input = createArbiterInput({
         issues: [createMockIssue({ location: 'sec_global', severity: 'major' })],
       });
 
-      const result = await consolidateVerdicts(input);
+      const result = consolidateVerdicts(input);
 
       expect(result.plan.agreementScore).toBeGreaterThanOrEqual(0);
       expect(result.plan.agreementScore).toBeLessThanOrEqual(1);

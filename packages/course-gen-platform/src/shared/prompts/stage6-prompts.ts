@@ -137,6 +137,7 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
    \`\`\`
 
 5. **Tables** — For comparisons, structured data
+   Tables must be standalone blocks — NEVER place markdown tables inside numbered or bulleted lists.
 
 *Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
 </visual_toolkit>
@@ -160,14 +161,12 @@ CRITICAL INSTRUCTIONS:
 7. INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
    - Reference previous lesson naturally: "As we explored in [previous_lesson.title]..." or "Building on [concept]..."
    - Do NOT re-explain terms from terms_already_defined — the reader already knows them
-   - In conclusion sections: write ONLY short bullet-point takeaways. Do NOT preview or tease the next lesson — a separate UI element handles this.
    - COURSE POSITION (from course_position if provided):
-     - Use position awareness to write appropriate introductions and conclusions
+     - Use position awareness to write appropriate introductions
      - If is_first_in_course: include course-level welcome and motivation, set expectations for the learning journey
      - If is_first_in_module: briefly introduce the module theme and bridge from previous module
-     - If is_last_in_module but NOT is_last_in_course: write a MODULE summary and bridge to the next module. Do NOT write a course-level conclusion
-     - If is_last_in_course: write a comprehensive COURSE conclusion with reflection on the full learning journey
-     - For all other lessons: write a standard lesson conclusion that connects to the next lesson
+     - If is_last_in_module but NOT is_last_in_course: briefly synthesize module progress in the final body section
+     - If is_last_in_course: reinforce course-level outcomes in the final body section
    Example:
    ✓ GOOD: "Building on the React hooks concept from the previous lesson, let's explore..."
    ✗ BAD: "React hooks allow you to use state in functional components..." (re-explaining known term)
@@ -346,7 +345,7 @@ Use actively to create engaging content:
 2. **Math Formulas** (LaTeX): inline \`$E=mc^2$\` or block \`$$\\sum_{i=1}^{n} x_i$$\`
 3. **Callouts**: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO]
    CRITICAL: NEVER wrap callout markers in quotes. WRONG: > "[!TIP]"  CORRECT: > [!TIP]
-4. **Tables** for comparisons
+4. **Tables** for comparisons. Tables must be standalone blocks — NEVER place tables inside numbered or bulleted lists.
 5. **Code blocks** with filenames when relevant
 *Syntax keywords stay in English regardless of output language.*
 </visual_toolkit>
@@ -365,9 +364,8 @@ STRUCTURE (use ## headers for each section):
 1. ## {{introductionHeader}} — Hook ({{hookStrategy}}) + motivating context for the topic (100-150 words). IMPORTANT: Do NOT list or preview learning objectives — they are displayed separately in the UI above the lesson content.
 2. Content sections (one ## header per topic from sections_to_cover).
    All sections combined should be approximately {{sectionsWordBudget}} words.
-   Each section should be focused and proportional.
-3. ## {{summaryHeader}} — Bullet-point list of 3-5 key takeaways from this lesson (what the reader learned). Total: 40-80 words. IMPORTANT: Do NOT restate or paraphrase content from earlier sections. Use SHORT thesis-style bullets only (one line each). Do NOT include "next lesson" preview — it is handled by the UI.
-4. ## {{exercisesHeader}} — Exactly 2 practical exercises
+   Each section should be focused and proportional. Never pre-summarize later sections.
+3. ## {{exercisesHeader}} — Exactly 2 practical exercises
 
 Exercise format (use {{outputLanguage}} labels):
 ### {{exerciseLabel}} 1: [Title]
@@ -382,7 +380,7 @@ Exercise format (use {{outputLanguage}} labels):
 ### {{exerciseLabel}} 2: [Title]
 [Same format]
 
-5. ## {{digestHeader}} — Write a 3-5 sentence factual summary of the lesson content.
+4. ## {{digestHeader}} — Write a 3-5 sentence factual summary of the lesson content.
    - Use objective, encyclopedic tone (no "you will learn", "exciting", etc.)
    - Focus on what topics were covered and key takeaways
    - This will be used as context for the next lesson generation
@@ -398,14 +396,13 @@ CRITICAL RULES:
 - INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
   - Reference previous lesson naturally if context is given
   - Do NOT re-explain terms from terms_already_defined
-  - In summary: write ONLY short bullet-point takeaways (not full sentences restating content). Do NOT preview the next lesson — a separate UI element handles this.
   - COURSE POSITION (from course_position if provided):
-    - Use position awareness to write appropriate introductions and conclusions
+    - Use position awareness to write appropriate introductions
     - If is_first_in_course: include course-level welcome and motivation, set expectations for the learning journey
     - If is_first_in_module: briefly introduce the module theme and bridge from previous module
-    - If is_last_in_module but NOT is_last_in_course: write a MODULE summary and bridge to the next module. Do NOT write a course-level conclusion
-    - If is_last_in_course: write a comprehensive COURSE conclusion with reflection on the full learning journey
-    - For all other lessons: write a standard lesson conclusion that connects to the next lesson
+    - If is_last_in_module but NOT is_last_in_course: briefly synthesize module progress in the final body section
+    - If is_last_in_course: reinforce course-level outcomes in the final body section
+- Anti-overlap rule: do NOT recap or enumerate techniques/topics that belong to later sections.
 </task>`,
     variables: [
       { name: 'lessonTitle', description: 'Lesson title', required: true },
@@ -462,11 +459,6 @@ CRITICAL RULES:
         description: 'Localized "Introduction" header',
         required: true,
       },
-      {
-        name: 'summaryHeader',
-        description: 'Localized "Summary/Conclusion" header',
-        required: true,
-      },
       { name: 'exercisesHeader', description: 'Localized "Exercises" header', required: true },
       { name: 'exerciseLabel', description: 'Localized "Exercise" label', required: true },
       { name: 'taskLabel', description: 'Localized "Task" label', required: true },
@@ -481,8 +473,7 @@ CRITICAL RULES:
       },
       {
         name: 'sectionsWordBudget',
-        description:
-          'Word budget for main content sections (excludes intro, summary, exercises, digest)',
+        description: 'Word budget for main content sections (excludes intro, exercises, digest)',
         required: true,
       },
     ],
@@ -559,9 +550,9 @@ Create a detailed lesson outline based on the specification above. The outline m
      > **Example: [Name]** — [Brief scenario description]
    - Transition to next section
 
-3. **Conclusion**: Plan a summary that:
-   - Reinforces each learning objective
-   - Provides actionable next steps
+3. **Final Section Guidance**:
+   - Ensure the last main section naturally synthesizes learning objective progress
+   - Do NOT add a separate standalone conclusion section
 
 {{#userRefinementPrompt}}
 IMPORTANT: You MUST incorporate the user refinement instructions provided above into the outline structure.
@@ -731,6 +722,7 @@ Format as markdown outline. Target total reading time: {{durationMinutes}} minut
    \`\`\`
 
 5. **Tables** — For comparisons, structured data
+   Tables must be standalone blocks — NEVER place markdown tables inside numbered or bulleted lists.
 
 *Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
 </visual_toolkit>
@@ -850,7 +842,7 @@ Output as markdown. Do NOT include the section title as a header.
     promptKey: 'stage6_assembler',
     promptName: 'Stage 6 - Assembler: Content Assembly [DEPRECATED]',
     promptDescription:
-      '[DEPRECATED - Stage 6 refactored from 6-node to 3-node pipeline] Assembles expanded sections into cohesive lesson with introduction, transitions, exercises, and conclusion. Preserves all visual elements.',
+      '[DEPRECATED - Stage 6 refactored from 6-node to 3-node pipeline] Assembles expanded sections into cohesive lesson with introduction, transitions, and exercises. Preserves all visual elements.',
     promptTemplate: `<lesson_context>
   <metadata>
     <title>{{lessonTitle}}</title>
@@ -903,10 +895,9 @@ Assemble a complete lesson from the expanded sections above. You must:
 
 3. **Create Exercises**: Follow the structure templates provided
 
-4. **Write Conclusion**:
-   - Summarize key takeaways
-   - Reinforce learning objectives
-   - Provide next steps
+4. **Final Section Integrity**:
+   - Keep the final body section concise and focused
+   - Do NOT add a standalone conclusion section
 
 Output as complete markdown lesson.
 </task>`,
@@ -1089,7 +1080,7 @@ The validation feedback (issues, strengths, suggestions) should be written in {{
 VALIDATION CRITERIA:
 1. **Completeness**: All learning objectives covered
 2. **Accuracy**: Content matches specification requirements
-3. **Structure**: Follows required structure (intro, sections, exercises, conclusion)
+3. **Structure**: Follows required structure (intro, sections, exercises)
 4. **Constraints**: Adheres to required keywords, prohibited terms, depth
 5. **Quality**: Clear, engaging, appropriate for target audience
 6. **Language Consistency**: All content is in the specified output language ({{outputLanguage}})

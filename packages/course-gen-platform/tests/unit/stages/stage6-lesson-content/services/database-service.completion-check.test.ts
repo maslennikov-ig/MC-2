@@ -172,7 +172,7 @@ describe('checkAndSetStage6Complete', () => {
 
     expect(coursesTable.update).toHaveBeenCalledTimes(1);
     expect(coursesTable.update).toHaveBeenCalledWith(
-      expect.objectContaining({ generation_status: 'completed' })
+      expect.objectContaining({ generation_status: 'completed', status: 'published' })
     );
     expect(mockNotifyCourseCompletion).toHaveBeenCalledTimes(1);
   });
@@ -190,9 +190,9 @@ describe('checkAndSetStage6Complete', () => {
     await checkAndSetStage6Complete('course-123');
 
     expect(coursesTable.update).toHaveBeenCalledTimes(1);
-    expect(coursesTable.update).toHaveBeenCalledWith(
-      expect.objectContaining({ generation_status: 'stage_6_complete' })
-    );
+    const updateArg = coursesTable.update.mock.calls[0][0];
+    expect(updateArg).toEqual(expect.objectContaining({ generation_status: 'stage_6_complete' }));
+    expect(updateArg).not.toHaveProperty('status');
     expect(mockNotifyCourseCompletion).not.toHaveBeenCalled();
   });
 
@@ -235,8 +235,8 @@ describe('markForReview', () => {
     );
 
     expect(lessonsTable.update).toHaveBeenCalledTimes(1);
-    expect(lessonContentsTable.upsert).toHaveBeenCalledTimes(1);
-    expect(lessonContentsTable.upsert).toHaveBeenCalledWith(
+    expect(lessonContentsTable.insert).toHaveBeenCalledTimes(1);
+    expect(lessonContentsTable.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         lesson_id: 'lesson-uuid',
         course_id: 'course-123',
@@ -245,12 +245,11 @@ describe('markForReview', () => {
           lessonLabel: '1.1',
           failureReason: 'Generation failed after retries',
         }),
-      }),
-      { onConflict: 'lesson_id' }
+      })
     );
   });
 
-  it('uses upsert with onConflict on repeated calls for same lesson', async () => {
+  it('creates separate rows on repeated calls for same lesson', async () => {
     const { supabase, lessonContentsTable } = createSupabaseAdminMock({
       courseRow: createCourseRow(true),
       lessonContentsRows: [],
@@ -271,13 +270,7 @@ describe('markForReview', () => {
       'Second failure'
     );
 
-    expect(lessonContentsTable.upsert).toHaveBeenCalledTimes(2);
-    expect(lessonContentsTable.upsert).toHaveBeenNthCalledWith(1, expect.any(Object), {
-      onConflict: 'lesson_id',
-    });
-    expect(lessonContentsTable.upsert).toHaveBeenNthCalledWith(2, expect.any(Object), {
-      onConflict: 'lesson_id',
-    });
+    expect(lessonContentsTable.insert).toHaveBeenCalledTimes(2);
   });
 
   it('uses regenerateCount for generation_attempt field', async () => {
@@ -295,12 +288,11 @@ describe('markForReview', () => {
       { regenerateCount: 3 }
     );
 
-    expect(lessonContentsTable.upsert).toHaveBeenCalledTimes(1);
-    expect(lessonContentsTable.upsert).toHaveBeenCalledWith(
+    expect(lessonContentsTable.insert).toHaveBeenCalledTimes(1);
+    expect(lessonContentsTable.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         generation_attempt: 4,
-      }),
-      expect.any(Object)
+      })
     );
   });
 });

@@ -69,7 +69,7 @@ function isGlobalIssue(issue: JudgeIssue): boolean {
 interface GlobalIssueResult {
   /** Issues to track in DB (all global issues) */
   toTrack: JudgeIssue[];
-  /** Issues to redirect to intro/conclusion (major/critical only) */
+  /** Issues to redirect to specific editable sections (major/critical only) */
   toRedirect: JudgeIssue[];
   /** Issues to skip (minor global issues) */
   toSkip: JudgeIssue[];
@@ -81,7 +81,7 @@ interface GlobalIssueResult {
  * Strategy:
  * - ALL global issues: track in lesson_improvement_suggestions table
  * - Minor global issues: skip (don't spend tokens)
- * - Major/Critical global issues: redirect to intro + conclusion sections
+ * - Major/Critical global issues: redirect to intro section
  *
  * @param issues - All issues from judge
  * @returns Categorized global issues
@@ -109,10 +109,9 @@ function processGlobalIssues(issues: JudgeIssue[]): GlobalIssueResult {
 }
 
 /**
- * Redirect global issues to intro and conclusion sections
+ * Redirect global issues to intro section
  *
- * Creates modified issues targeting intro (for opening improvements)
- * and conclusion (for closing improvements).
+ * Creates modified issues targeting intro (for opening improvements).
  *
  * @param globalIssues - Major/critical global issues to redirect
  * @returns New issues targeting specific sections
@@ -128,16 +127,6 @@ function redirectGlobalToSections(globalIssues: JudgeIssue[]): JudgeIssue[] {
       description: `[Redirected from global] ${issue.description}`,
       suggestedFix: `Improve introduction to address: ${issue.suggestedFix}`,
     });
-
-    // Also redirect critical issues to conclusion
-    if (issue.severity === 'critical') {
-      redirected.push({
-        ...issue,
-        location: 'sec_conclusion',
-        description: `[Redirected from global] ${issue.description}`,
-        suggestedFix: `Reinforce in conclusion: ${issue.suggestedFix}`,
-      });
-    }
   }
 
   return redirected;

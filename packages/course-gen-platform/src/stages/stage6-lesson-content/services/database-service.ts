@@ -43,34 +43,31 @@ export async function handlePartialSuccess(
   try {
     // Save partial content to lesson_contents table (not lessons table)
     // Serialize content to convert Date objects to strings (LessonContent has Date fields)
-    const { error } = await supabaseAdmin.from('lesson_contents').upsert(
-      {
-        lesson_id: lessonUuid,
-        course_id: courseId,
-        content: JSON.parse(JSON.stringify(result.lessonContent)) as Json,
-        status: 'review_required', // Mark as partial success requiring review
-        metadata: JSON.parse(
-          JSON.stringify({
-            markdownContent: extractContentMarkdown(result.lessonContent, language),
-            partial: true,
-            errors: result.errors,
-            modelUsed: result.metrics.modelUsed,
-            selectedModel: result.metrics.selectedModel,
-            fallbackModel: result.metrics.fallbackModel,
-            selectedModelTier: result.metrics.selectedModelTier,
-            selectedModelTierReason: result.metrics.selectedModelTierReason,
-            qualityScore: result.metrics.qualityScore,
-            regenerateCount: result.metrics.regenerateCount,
-            truncationCount: result.metrics.truncationCount,
-            rejectedTokens: result.metrics.rejectedTokens,
-            reviewInfo: result.reviewInfo ?? undefined,
-          })
-        ) as Json,
-      },
-      {
-        onConflict: 'lesson_id',
-      }
-    );
+    const { error } = await supabaseAdmin.from('lesson_contents').insert({
+      lesson_id: lessonUuid,
+      course_id: courseId,
+      content: JSON.parse(JSON.stringify(result.lessonContent)) as Json,
+      status: 'review_required', // Mark as partial success requiring review
+      metadata: JSON.parse(
+        JSON.stringify({
+          markdownContent: extractContentMarkdown(result.lessonContent, language),
+          partial: true,
+          errors: result.errors,
+          modelUsed: result.metrics.modelUsed,
+          selectedModel: result.metrics.selectedModel,
+          fallbackModel: result.metrics.fallbackModel,
+          selectedModelTier: result.metrics.selectedModelTier,
+          selectedModelTierReason: result.metrics.selectedModelTierReason,
+          qualityScore: result.metrics.qualityScore,
+          regenerateCount: result.metrics.regenerateCount,
+          truncationCount: result.metrics.truncationCount,
+          rejectedTokens: result.metrics.rejectedTokens,
+          regenerationMode: result.metrics.regenerationMode ?? null,
+          reviewInfo: result.reviewInfo ?? undefined,
+        })
+      ) as Json,
+      generation_attempt: (result.metrics.regenerateCount ?? 0) + 1,
+    });
 
     if (error) {
       logger.warn(
@@ -124,6 +121,7 @@ export interface ReviewMarkerContext {
   regenerateCount?: number | null;
   truncationCount?: number | null;
   rejectedTokens?: number | null;
+  regenerationMode?: string | null;
   reviewInfo?: Stage6Output['reviewInfo'];
 }
 
@@ -158,29 +156,27 @@ export async function markForReview(
       );
     }
 
-    const { error: failedContentError } = await supabaseAdmin.from('lesson_contents').upsert(
-      {
-        lesson_id: lessonUuid,
-        course_id: courseId,
-        status: 'review_required',
-        metadata: {
-          lessonLabel,
-          markedForReviewAt: markedAt,
-          failureReason: reason,
-          modelUsed: context.modelUsed ?? null,
-          selectedModel: context.selectedModel ?? null,
-          fallbackModel: context.fallbackModel ?? null,
-          selectedModelTier: context.selectedModelTier ?? null,
-          selectedModelTierReason: context.selectedModelTierReason ?? null,
-          regenerateCount: context.regenerateCount ?? null,
-          truncationCount: context.truncationCount ?? null,
-          rejectedTokens: context.rejectedTokens ?? null,
-          reviewInfo: context.reviewInfo ?? undefined,
-        },
-        generation_attempt: (context.regenerateCount ?? 0) + 1,
+    const { error: failedContentError } = await supabaseAdmin.from('lesson_contents').insert({
+      lesson_id: lessonUuid,
+      course_id: courseId,
+      status: 'review_required',
+      metadata: {
+        lessonLabel,
+        markedForReviewAt: markedAt,
+        failureReason: reason,
+        modelUsed: context.modelUsed ?? null,
+        selectedModel: context.selectedModel ?? null,
+        fallbackModel: context.fallbackModel ?? null,
+        selectedModelTier: context.selectedModelTier ?? null,
+        selectedModelTierReason: context.selectedModelTierReason ?? null,
+        regenerateCount: context.regenerateCount ?? null,
+        truncationCount: context.truncationCount ?? null,
+        rejectedTokens: context.rejectedTokens ?? null,
+        regenerationMode: context.regenerationMode ?? null,
+        reviewInfo: context.reviewInfo ?? undefined,
       },
-      { onConflict: 'lesson_id' }
-    );
+      generation_attempt: (context.regenerateCount ?? 0) + 1,
+    });
 
     if (failedContentError) {
       logger.warn(
@@ -261,6 +257,7 @@ export async function saveLessonContent(
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
+          regenerationMode: result.metrics.regenerationMode ?? null,
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: extractContentMarkdown(result.lessonContent, language),
@@ -386,6 +383,7 @@ export async function saveRejectedContent(
     regenerateCount?: number | null;
     truncationCount?: number | null;
     rejectedTokens?: number | null;
+    regenerationMode?: string | null;
   }
 ): Promise<void> {
   if (!generatedContent) {
@@ -442,6 +440,7 @@ export async function saveRejectedContent(
       regenerateCount: context?.regenerateCount ?? null,
       truncationCount: context?.truncationCount ?? null,
       rejectedTokens: context?.rejectedTokens ?? null,
+      regenerationMode: context?.regenerationMode ?? null,
       generationAttempt,
     };
 
@@ -730,6 +729,8 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
           generation_status: shouldAutoFinalize ? 'completed' : 'stage_6_complete',
           generation_progress: updatedProgress,
           ...(completedAt && { generation_completed_at: completedAt }),
+          // Set publication status when auto-finalizing so the course becomes viewable
+          ...(shouldAutoFinalize && { status: 'published' as const }),
         })
         .eq('id', courseId)
         .eq('generation_status', 'stage_6_generating'); // Only update if still generating

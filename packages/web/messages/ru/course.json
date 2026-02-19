@@ -61,6 +61,8 @@
     "allLessonsTooltip": "Все уроки курса",
     "constructor": "Конструктор",
     "constructorTooltip": "Конструктор курса",
+    "showMore": "Показать полностью",
+    "collapse": "Свернуть",
     "focusMode": "Режим чтения",
     "focusModeTooltip": "Режим чтения (F11 или Ctrl+K)",
     "prev": "Назад",

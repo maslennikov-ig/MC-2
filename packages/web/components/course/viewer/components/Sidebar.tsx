@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronRight,
@@ -21,6 +21,44 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import LessonProgressCard from '@/components/common/lesson-progress-card'
 import { Course, Section, Lesson } from '@/types/database'
 import { buildCourseLessonsUrl, buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
+
+function SectionDescription({ description }: { description: string }) {
+  const t = useTranslations('course.viewer')
+  const [expanded, setExpanded] = useState(false)
+  const [clamped, setClamped] = useState(false)
+  const textRef = useRef<HTMLParagraphElement>(null)
+
+  useEffect(() => {
+    setExpanded(false)
+    setClamped(false)
+    const frame = requestAnimationFrame(() => {
+      const el = textRef.current
+      if (el) {
+        setClamped(el.scrollHeight > el.clientHeight)
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [description])
+
+  return (
+    <div className="bg-muted/30 mx-2 mt-2 mb-1 rounded-lg p-3">
+      <p
+        ref={textRef}
+        className={`text-muted-foreground text-xs leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}
+      >
+        {description}
+      </p>
+      {(clamped || expanded) && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+        >
+          {expanded ? t('collapse') : t('showMore')}
+        </button>
+      )}
+    </div>
+  )
+}
 
 interface SidebarProps {
   course: Course
@@ -206,6 +244,9 @@ export function Sidebar({
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
+                    {section.description && section.description.trim() && (
+                      <SectionDescription description={section.description} />
+                    )}
                     <div className="space-y-1 px-2 pb-2">
                       {sectionLessons.map((lesson) => {
                         const isCompleted = completedLessons.has(lesson.id)

@@ -317,14 +317,12 @@ describe('Stage 6 LLM Judge System Integration', () => {
       const lessonSpec = createMockLessonSpec();
       const lessonContent = createMockLessonContent();
 
-      // Extract text from lesson content with required sections (introduction/conclusion)
+      // Extract text from lesson content with required sections (introduction + exercises)
       const fullText = [
         '# Introduction',
         lessonContent.intro,
         ...lessonContent.sections.map(s => `## ${s.title}\n${s.content}`),
         ...lessonContent.examples.map(e => `### Example: ${e.title}\n${e.content}`),
-        '# Conclusion',
-        'In this lesson, we explored the key concepts of machine learning, including supervised learning algorithms and model evaluation techniques.',
         ...lessonContent.exercises.map(e => `### Exercise\n${e.question}\n${e.solution}`),
       ].join('\n\n');
 
@@ -343,7 +341,6 @@ describe('Stage 6 LLM Judge System Integration', () => {
 
       // Verify required sections are found
       expect(result.metrics.foundSections).toContain('introduction');
-      expect(result.metrics.foundSections).toContain('conclusion');
     });
 
     it('should flag low-quality content for LLM evaluation', () => {
@@ -419,29 +416,25 @@ linear algebra, calculus, and probability theory.`;
 # Introduction
 Some intro text here.
 
-# Conclusion
-Some conclusion text here.
+# Main Content
+Some main text here.
 `;
 
-      const result = checkSectionHeaders(contentWithHeaders, ['introduction', 'conclusion']);
+      const result = checkSectionHeaders(contentWithHeaders, ['introduction']);
       expect(result.passed).toBe(true);
       expect(result.foundSections).toContain('introduction');
-      expect(result.foundSections).toContain('conclusion');
       expect(result.missingSections.length).toBe(0);
     });
 
     it('should detect missing required sections', () => {
-      const contentWithoutConclusion = `
-# Introduction
-Some intro text here.
-
+      const contentWithoutIntroduction = `
 # Main Content
 The main content goes here.
 `;
 
-      const result = checkSectionHeaders(contentWithoutConclusion, ['introduction', 'conclusion']);
+      const result = checkSectionHeaders(contentWithoutIntroduction, ['introduction']);
       expect(result.passed).toBe(false);
-      expect(result.missingSections).toContain('conclusion');
+      expect(result.missingSections).toContain('introduction');
     });
 
     it('should check content density per section', () => {

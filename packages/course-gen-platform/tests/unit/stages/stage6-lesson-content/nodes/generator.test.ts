@@ -889,12 +889,12 @@ This lesson covered TypeScript basics including types and functions.`,
       await generateLessonSingleCall(mockLessonSpec, [], 'en', null, null, null);
 
       // 5 min × 150 = 750 words total
-      // sectionsWordBudget = 750 - 300 = 450
+      // sectionsWordBudget = 750 - 200 = 550
       expect(mockRenderPrompt).toHaveBeenCalledWith(
         'stage6_single_call_generator',
         expect.objectContaining({
           targetWordCount: '750',
-          sectionsWordBudget: '450',
+          sectionsWordBudget: '550',
           durationMinutes: '5',
         })
       );
@@ -929,12 +929,12 @@ This lesson covered TypeScript basics including types and functions.`,
       await generateLessonSingleCall(longerSpec, [], 'en', null, null, null);
 
       // 15 min × 150 = 2250 words
-      // sectionsWordBudget = 2250 - 300 = 1950
+      // sectionsWordBudget = 2250 - 200 = 2050
       expect(mockRenderPrompt).toHaveBeenCalledWith(
         'stage6_single_call_generator',
         expect.objectContaining({
           targetWordCount: '2250',
-          sectionsWordBudget: '1950',
+          sectionsWordBudget: '2050',
           durationMinutes: '15',
         })
       );
