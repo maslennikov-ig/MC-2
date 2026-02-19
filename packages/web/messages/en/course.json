@@ -61,6 +61,8 @@
     "allLessonsTooltip": "All course lessons",
     "constructor": "Constructor",
     "constructorTooltip": "Course Constructor",
+    "showMore": "Show more",
+    "collapse": "Collapse",
     "focusMode": "Focus Mode",
     "focusModeTooltip": "Focus Mode (F11 or Ctrl+K)",
     "prev": "Back",

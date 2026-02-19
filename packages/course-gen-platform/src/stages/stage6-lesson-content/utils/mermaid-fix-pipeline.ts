@@ -211,18 +211,47 @@ const RAW_MERMAID_KEYWORD_REGEX = new RegExp(
 );
 
 /**
- * Patterns that indicate actual Mermaid syntax (not just normal prose)
+ * Patterns that indicate actual Mermaid syntax (not just normal prose).
+ *
+ * These patterns are intentionally specific to avoid false positives on
+ * educational text that mentions words like "pie", "timeline", "journey",
+ * or "section" in ordinary sentences.
+ *
+ * Design decisions:
+ * - `/\[.*?\]|\(.*?\)|\{.*?\}/` removed — too broad (matches markdown links,
+ *   checkboxes, any parenthesised text)
+ * - `subgraph|end\b` split: require "subgraph <Name>" and "end" alone on a line
+ * - `class\s+\w+`, `state\s+`, `section\s+` removed — too common in prose
+ * - `/^\s+\w/m` removed — any indented line is too broad
+ * - Added `/^\s+\w+[\[\({\|]/m` — indented node followed immediately by a
+ *   shape bracket, which is unambiguous Mermaid node syntax
+ * - Added `/^\s+\w+\s*-->|^\s+\w+\s*---/m` — indented node with arrow,
+ *   specific to flowchart/graph diagrams
  */
 const MERMAID_SYNTAX_PATTERNS: RegExp[] = [
-  /-->|---|-\.->|==>|~~~/,
-  /\[.*?\]|\(.*?\)|\{.*?\}/,
-  /subgraph|end\b/i,
-  /participant|actor|activate|deactivate/i,
-  /class\s+\w+/i,
-  /state\s+/i,
-  /"[^"]*"\s*:\s*\d/,
-  /section\s+/i,
-  /^\s+\w/m,
+  /-->|---|-\.->|==>|~~~/, // Mermaid arrows (very specific)
+  /^\s+\w+\s*-->|^\s+\w+\s*---/m, // Indented node with arrow (e.g. "  A --> B")
+  /subgraph\s+\w/i, // "subgraph Name" (not bare "subgraph" or "end")
+  /^\s*end\s*$/m, // "end" alone on a line (Mermaid block closer)
+  /^participant\s+\w/im, // "participant Alice" (sequence diagrams)
+  /^actor\s+\w/im, // "actor User" (sequence diagrams)
+  /"[^"]+"\s*:\s*\d/, // gantt/pie data: "Label" : 42
+  /^\s+\w+[\[\({\|]/m, // Indented node with shape bracket: "  A[text]"
+];
+
+/**
+ * Strict patterns for block continuation after empty lines.
+ *
+ * A subset of MERMAID_SYNTAX_PATTERNS requiring unambiguous Mermaid syntax.
+ * Used when scanning forward past an empty line to decide whether the block
+ * is still continuing — prose keywords must never trigger continuation.
+ */
+const MERMAID_CONTINUATION_PATTERNS: RegExp[] = [
+  /-->|---|-\.->|==>|~~~/, // Mermaid arrows
+  /^\s+\w+\s*-->|^\s+\w+\s*---/m, // Indented node with arrow
+  /^\s*end\s*$/m, // "end" alone on a line
+  /"[^"]+"\s*:\s*\d/, // pie/gantt data
+  /^\s+\w+[\[\({\|]/m, // Indented node with shape bracket
 ];
 
 /**
@@ -248,7 +277,7 @@ interface WrapRawMermaidResult {
 function wrapRawMermaidBlocks(content: string): WrapRawMermaidResult {
   // 1. Identify all existing code-fence regions so we don't double-wrap
   const codeFenceRegions: Array<{ start: number; end: number }> = [];
-  const codeFenceRegex = /```[\s\S]*?```/g;
+  const codeFenceRegex = /(?:```|~~~)[\s\S]*?(?:```|~~~)/g;
   let fenceMatch: RegExpExecArray | null;
   while ((fenceMatch = codeFenceRegex.exec(content)) !== null) {
     codeFenceRegions.push({
@@ -316,7 +345,7 @@ function wrapRawMermaidBlocks(content: string): WrapRawMermaidResult {
         const nextNonEmpty = lines.slice(scan + 1).find(l => l.trim() !== '');
         if (
           nextNonEmpty === undefined ||
-          !MERMAID_SYNTAX_PATTERNS.some(p => p.test(nextNonEmpty))
+          !MERMAID_CONTINUATION_PATTERNS.some(p => p.test(nextNonEmpty))
         ) {
           break;
         }
