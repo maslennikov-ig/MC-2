@@ -42,6 +42,8 @@ export interface SectionRegenerationResult {
   regeneratedSections: string[];
   /** Sections that failed to regenerate */
   failedSections: string[];
+  /** Distinct model IDs used during regeneration */
+  modelsUsed: string[];
   /** Error message if any */
   errorMessage?: string;
 }
@@ -106,7 +108,7 @@ async function regenerateIntroduction(
   language: string,
   modelOverride?: string | null,
   style?: string | null
-): Promise<{ content: string; tokensUsed: number }> {
+): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
   // Create a synthetic section spec for introduction
   const labels = getContentLabels(language);
   const introSection: SectionSpecV2 = {
@@ -143,7 +145,7 @@ async function regenerateSummary(
   language: string,
   modelOverride?: string | null,
   style?: string | null
-): Promise<{ content: string; tokensUsed: number }> {
+): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
   // Create a synthetic section spec for summary
   const labels = getContentLabels(language);
   const summarySection: SectionSpecV2 = {
@@ -204,6 +206,7 @@ export async function regenerateSections(
     let totalTokens = 0;
     const regeneratedSections: string[] = [];
     const failedSections: string[] = [];
+    const modelsUsed = new Set<string>();
 
     // Regenerate each section
     for (const sectionId of sectionIds) {
@@ -214,7 +217,7 @@ export async function regenerateSections(
         const currentParsed = parseMarkdownSections(currentMarkdown);
         const context = getSectionContext(currentParsed, sectionId);
 
-        let result: { content: string; tokensUsed: number };
+        let result: { content: string; tokensUsed: number; modelUsed: string };
 
         if (sectionId === 'introduction') {
           result = await regenerateIntroduction(lessonSpec, language, modelOverride, style);
@@ -248,6 +251,7 @@ export async function regenerateSections(
         currentMarkdown = mergeSectionIntoMarkdown(currentParsed, sectionId, newSectionContent);
 
         totalTokens += result.tokensUsed;
+        modelsUsed.add(result.modelUsed);
         regeneratedSections.push(sectionId);
 
         nodeLogger.debug({
@@ -286,6 +290,7 @@ export async function regenerateSections(
       durationMs,
       regeneratedSections,
       failedSections,
+      modelsUsed: Array.from(modelsUsed),
       errorMessage:
         failedSections.length > 0
           ? `Failed to regenerate sections: ${failedSections.join(', ')}`
@@ -307,6 +312,7 @@ export async function regenerateSections(
       durationMs,
       regeneratedSections: [],
       failedSections: sectionIds,
+      modelsUsed: [],
       errorMessage,
     };
   }

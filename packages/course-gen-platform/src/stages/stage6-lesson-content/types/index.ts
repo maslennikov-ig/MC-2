@@ -3,6 +3,8 @@ import type { LessonContent, RAGChunk } from '@megacampus/shared-types/lesson-co
 import type { CourseStyle } from '@megacampus/shared-types/style-prompts';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 
+export type Stage6ModelTierName = 'simple' | 'normal' | 'complex';
+
 /**
  * Stage 6 job input structure
  * Contains lesson specification and context for generation
@@ -28,6 +30,18 @@ export interface Stage6JobInput {
 
   /** Optional model override for fallback retry */
   modelOverride?: string;
+
+  /** Model selected by Stage 6 tier routing before overrides/retries */
+  selectedModel?: string | null;
+
+  /** Fallback model paired with selectedModel */
+  fallbackModel?: string | null;
+
+  /** Selected Stage 6 tier */
+  selectedModelTier?: Stage6ModelTierName | null;
+
+  /** Human-readable tier selection reason */
+  selectedModelTierReason?: string | null;
 
   /** Optional user instructions for refinement */
   userRefinementPrompt?: string;
@@ -92,8 +106,29 @@ export interface Stage6JobResult {
     /** Model identifier used for generation */
     modelUsed: string | null;
 
+    /** Model selected by Stage 6 tier routing before overrides/retries */
+    selectedModel: string | null;
+
+    /** Fallback model paired with selectedModel */
+    fallbackModel: string | null;
+
+    /** Selected Stage 6 tier */
+    selectedModelTier: Stage6ModelTierName | null;
+
+    /** Human-readable tier selection reason */
+    selectedModelTierReason: string | null;
+
     /** Quality score from validation (0-1) */
     qualityScore: number;
+
+    /** Number of full regenerate loops requested */
+    regenerateCount: number;
+
+    /** Number of truncation-only regenerate detections */
+    truncationCount: number;
+
+    /** Tokens spent on attempts that ended in REGENERATE */
+    rejectedTokens: number;
   };
 }
 
@@ -164,6 +199,18 @@ export interface Stage6Input {
    * for higher quality content generation
    */
   analysisResult?: AnalysisResult;
+
+  /** Model selected by Stage 6 tier routing before overrides/retries */
+  selectedModel?: string | null;
+
+  /** Fallback model paired with selectedModel */
+  fallbackModel?: string | null;
+
+  /** Selected Stage 6 tier */
+  selectedModelTier?: Stage6ModelTierName | null;
+
+  /** Human-readable tier selection reason */
+  selectedModelTierReason?: string | null;
 }
 
 /**
@@ -186,8 +233,22 @@ export interface Stage6Output {
     durationMs: number;
     /** Model used for generation */
     modelUsed: string | null;
+    /** Model selected by Stage 6 tier routing before overrides/retries */
+    selectedModel: string | null;
+    /** Fallback model paired with selectedModel */
+    fallbackModel: string | null;
+    /** Selected Stage 6 tier */
+    selectedModelTier: Stage6ModelTierName | null;
+    /** Human-readable tier selection reason */
+    selectedModelTierReason: string | null;
     /** Quality score from judge (0-1, or 0 if not evaluated) */
     qualityScore: number;
+    /** Number of full regenerate loops requested */
+    regenerateCount: number;
+    /** Number of truncation-only regenerate detections */
+    truncationCount: number;
+    /** Tokens spent on attempts that ended in REGENERATE */
+    rejectedTokens: number;
   };
   /** Human review metadata (for UI warnings) */
   reviewInfo?: {

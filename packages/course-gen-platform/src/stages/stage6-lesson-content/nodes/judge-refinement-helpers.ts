@@ -19,7 +19,7 @@ import type { CascadeResult } from '../judge/cascade-evaluator';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { buildLessonContent } from '../judge/judge-helpers';
-import { buildEnrichedJudgeOutput } from '../judge/judge-output-builder';
+import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import type { JudgeContext } from './judge-node-helpers';
 
@@ -307,6 +307,13 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     needsRegeneration,
     needsHumanReview
   );
+  const judgeModelsUsed = extractJudgeModels(enrichedOutput);
+  const modelUsed =
+    judgeModelsUsed.length === 0
+      ? null
+      : judgeModelsUsed.length === 1
+        ? judgeModelsUsed[0]
+        : judgeModelsUsed.join(', ');
 
   // Log trace
   await logTrace({
@@ -321,7 +328,11 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
       moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
       syntheticDecision: true,
     },
-    outputData: enrichedOutput,
+    outputData: {
+      ...enrichedOutput,
+      judgeModelsUsed,
+    },
+    modelUsed,
     tokensUsed: cascadeResult?.totalTokensUsed,
     durationMs,
   });
@@ -344,6 +355,10 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     needsRegeneration,
     needsHumanReview,
     lessonContent: needsRegeneration ? null : state.lessonContent,
+    regenerationMode: needsRegeneration ? 'full_regenerate' : null,
+    regenerateCount: needsRegeneration
+      ? (state.regenerateCount ?? 0) + 1
+      : (state.regenerateCount ?? 0),
     retryCount: needsRegeneration ? state.retryCount + 1 : state.retryCount,
     tokensUsed: cascadeResult?.totalTokensUsed ?? 0,
     durationMs,
