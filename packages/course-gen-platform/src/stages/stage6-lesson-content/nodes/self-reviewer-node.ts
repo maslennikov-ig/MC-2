@@ -309,6 +309,14 @@ export async function selfReviewerNode(
       stateUpdate.generatedContent = patchedContent;
     }
 
+    if (result.status === 'REGENERATE') {
+      stateUpdate.retryCount = retryCount + 1;
+
+      if (shouldEscalateTruncationRegenerate(retryCount, result.issues)) {
+        stateUpdate.modelOverride = MODEL_FALLBACK.fallback;
+      }
+    }
+
     // Save rejected content if LLM returned REGENERATE status
     if (result.status === 'REGENERATE') {
       await saveRejectedContent(
@@ -393,6 +401,7 @@ async function handleEmptyContent(
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    retryCount: (state.retryCount || 0) + 1,
   };
 }
 
@@ -483,13 +492,20 @@ async function handleCriticalIssues(
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    retryCount: retryCount + 1,
   };
 
   if (criticalAnalysis.requiresModelFallback && criticalAnalysis.fallbackModel) {
     return {
       ...baseResult,
       modelOverride: criticalAnalysis.fallbackModel,
-      retryCount: retryCount + 1,
+    };
+  }
+
+  if (shouldEscalateTruncationRegenerate(retryCount, criticalAnalysis.issues)) {
+    return {
+      ...baseResult,
+      modelOverride: MODEL_FALLBACK.fallback,
     };
   }
 
@@ -637,6 +653,7 @@ async function handleError(
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    retryCount: retryCount + 1,
   };
 }
 
@@ -655,4 +672,22 @@ function countIssuesByType(issues: SelfReviewIssue[]): Record<string, number> {
     SHORT_SECTION: issues.filter(i => i.type === 'SHORT_SECTION').length,
     LOGIC: issues.filter(i => i.type === 'LOGIC').length,
   };
+}
+
+function shouldEscalateTruncationRegenerate(
+  retryCount: number,
+  issues: SelfReviewIssue[]
+): boolean {
+  const criticalIssues = issues.filter(issue => issue.severity === 'CRITICAL');
+  if (criticalIssues.length === 0) {
+    return false;
+  }
+
+  const criticalTruncationOnly = criticalIssues.every(issue => issue.type === 'TRUNCATION');
+  if (!criticalTruncationOnly) {
+    return false;
+  }
+
+  // retryCount is the count before this REGENERATE result is applied.
+  return retryCount + 1 >= MODEL_FALLBACK.maxPrimaryAttempts;
 }
