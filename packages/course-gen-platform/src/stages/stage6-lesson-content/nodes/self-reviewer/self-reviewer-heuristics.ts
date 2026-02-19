@@ -6,6 +6,8 @@
  * These are fast, no-LLM-cost heuristic checks.
  */
 
+import { CONTENT_LABELS } from '@megacampus/shared-types';
+
 // ============================================================================
 // FOREIGN CHARACTER SECTION DETECTION
 // ============================================================================
@@ -412,4 +414,93 @@ export function removeChatbotArtifacts(content: string): string {
   processedContent = processedContent.replace(/\n{3,}/g, '\n\n');
 
   return processedContent.trim();
+}
+
+// ============================================================================
+// ENGLISH STRUCTURAL HEADER REPLACEMENT
+// ============================================================================
+
+/**
+ * Lazy-initialized map from lowercase English label values to Russian equivalents.
+ * Only entries where the English and Russian values differ are included.
+ */
+let enToRuHeaderMap: Map<string, string> | null = null;
+
+function getEnToRuHeaderMap(): Map<string, string> {
+  if (enToRuHeaderMap) return enToRuHeaderMap;
+
+  enToRuHeaderMap = new Map<string, string>();
+  const enLabels = CONTENT_LABELS['en'];
+  const ruLabels = CONTENT_LABELS['ru'];
+
+  for (const key of Object.keys(enLabels) as Array<keyof typeof enLabels>) {
+    const enValue = enLabels[key];
+    const ruValue = ruLabels[key];
+    if (enValue.toLowerCase() !== ruValue.toLowerCase()) {
+      enToRuHeaderMap.set(enValue.toLowerCase(), ruValue);
+    }
+  }
+
+  return enToRuHeaderMap;
+}
+
+/**
+ * Pattern matching structural LLM artifact headers like "## SECTION CONCLUSION",
+ * "## MODULE INTRODUCTION", etc. These are not real content labels — they are
+ * markers that LLMs sometimes emit. Matched lines are removed entirely.
+ */
+const STRUCTURAL_ARTIFACT_HEADER_REGEX =
+  /^(#{1,6}\s*)(SECTION|MODULE|COURSE|LESSON)\s+(CONCLUSION|INTRODUCTION|SUMMARY|OVERVIEW|DIGEST)\s*$/gim;
+
+/**
+ * Replace English structural headers with Russian equivalents (ru-only heuristic)
+ *
+ * For Russian-language content, replaces headers like `## Introduction` with
+ * `## Введение` using the CONTENT_LABELS map. Also removes LLM structural
+ * artifact headers like `## SECTION CONCLUSION` entirely.
+ *
+ * CRITICAL: Only activates when targetLanguage === 'ru'. For all other languages
+ * the function returns content unchanged to prevent false positives.
+ *
+ * Code blocks and LaTeX are protected before processing via protectMarkdownElements.
+ *
+ * @param content - Raw markdown content
+ * @param targetLanguage - ISO 639-1 language code of the target lesson
+ * @returns Object with modified content and count of replacements/removals made
+ */
+export function replaceEnglishStructuralHeaders(
+  content: string,
+  targetLanguage: string
+): { content: string; replacedCount: number } {
+  if (targetLanguage !== 'ru') {
+    return { content, replacedCount: 0 };
+  }
+
+  const { content: safeContent, restore } = protectMarkdownElements(content);
+  let replacedCount = 0;
+  const headerMap = getEnToRuHeaderMap();
+
+  // Step 1: Replace known English labels with Russian equivalents in headers
+  let processed = safeContent.replace(/^(#{1,6}\s+)(.+)$/gm, (match, hashes, headerText) => {
+    const trimmed = headerText.trim().toLowerCase();
+    const replacement = headerMap.get(trimmed);
+    if (replacement) {
+      replacedCount++;
+      return `${hashes}${replacement}`;
+    }
+    return match;
+  });
+
+  // Step 2: Remove structural LLM artifact headers entirely (e.g. "## SECTION CONCLUSION")
+  // Reset lastIndex since the regex has /g flag and may be reused
+  STRUCTURAL_ARTIFACT_HEADER_REGEX.lastIndex = 0;
+  processed = processed.replace(STRUCTURAL_ARTIFACT_HEADER_REGEX, () => {
+    replacedCount++;
+    return '';
+  });
+
+  // Clean up multiple blank lines left by removals
+  processed = processed.replace(/\n{3,}/g, '\n\n');
+
+  return { content: restore(processed), replacedCount };
 }

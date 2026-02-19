@@ -127,6 +127,8 @@ export interface MermaidPipelineResult {
   metrics: {
     /** Total number of Mermaid diagrams found */
     diagramsTotal: number;
+    /** Diagrams auto-wrapped from raw text (Stage 0) */
+    diagramsAutoWrapped: number;
     /** Diagrams fixed by regex sanitization only */
     diagramsFixedRegex: number;
     /** Diagrams fixed by LLM after regex failed */
@@ -166,6 +168,194 @@ interface MermaidBlock {
 interface ProcessedBlock {
   block: MermaidBlock;
   fixedCode: string;
+}
+
+// ============================================================================
+// RAW MERMAID BLOCK WRAPPING (Stage 0)
+// ============================================================================
+
+/**
+ * Mermaid diagram type keywords — all valid diagram openers
+ */
+const MERMAID_KEYWORDS = [
+  'flowchart',
+  'graph',
+  'sequenceDiagram',
+  'classDiagram',
+  'stateDiagram-v2',
+  'stateDiagram',
+  'erDiagram',
+  'journey',
+  'gantt',
+  'pie',
+  'mindmap',
+  'timeline',
+  'gitgraph',
+  'C4Context',
+  'C4Container',
+  'C4Component',
+  'C4Deployment',
+  'sankey-beta',
+  'xychart-beta',
+  'block-beta',
+  'packet-beta',
+] as const;
+
+/**
+ * Regex that matches a line starting with a Mermaid keyword (with optional direction suffix)
+ * Must be at the start of a line; captures the full keyword line.
+ */
+const RAW_MERMAID_KEYWORD_REGEX = new RegExp(
+  `^(${MERMAID_KEYWORDS.join('|')})(?:\\s+(TD|TB|BT|RL|LR))?\\s*$`,
+  'im'
+);
+
+/**
+ * Patterns that indicate actual Mermaid syntax (not just normal prose)
+ */
+const MERMAID_SYNTAX_PATTERNS: RegExp[] = [
+  /-->|---|-\.->|==>|~~~/,
+  /\[.*?\]|\(.*?\)|\{.*?\}/,
+  /subgraph|end\b/i,
+  /participant|actor|activate|deactivate/i,
+  /class\s+\w+/i,
+  /state\s+/i,
+  /"[^"]*"\s*:\s*\d/,
+  /section\s+/i,
+  /^\s+\w/m,
+];
+
+/**
+ * Result of wrapping raw Mermaid blocks
+ */
+interface WrapRawMermaidResult {
+  content: string;
+  wrappedCount: number;
+}
+
+/**
+ * Detect and wrap raw (unfenced) Mermaid blocks in content.
+ *
+ * Scans the content for lines that look like the start of a Mermaid diagram
+ * but are not inside an existing code fence. If the subsequent lines contain
+ * recognisable Mermaid syntax the whole block is wrapped in ```mermaid fences.
+ *
+ * Replacements are applied in reverse order to preserve string indices.
+ *
+ * @param content - Markdown content to scan
+ * @returns Modified content and count of newly wrapped blocks
+ */
+function wrapRawMermaidBlocks(content: string): WrapRawMermaidResult {
+  // 1. Identify all existing code-fence regions so we don't double-wrap
+  const codeFenceRegions: Array<{ start: number; end: number }> = [];
+  const codeFenceRegex = /```[\s\S]*?```/g;
+  let fenceMatch: RegExpExecArray | null;
+  while ((fenceMatch = codeFenceRegex.exec(content)) !== null) {
+    codeFenceRegions.push({
+      start: fenceMatch.index,
+      end: fenceMatch.index + fenceMatch[0].length,
+    });
+  }
+
+  function isInsideCodeFence(index: number): boolean {
+    return codeFenceRegions.some(r => index >= r.start && index < r.end);
+  }
+
+  // 2. Split content into lines, tracking byte offsets for each line start
+  const lines = content.split('\n');
+  const lineOffsets: number[] = [];
+  let offset = 0;
+  for (const line of lines) {
+    lineOffsets.push(offset);
+    offset += line.length + 1; // +1 for '\n'
+  }
+
+  // 3. Find candidate keyword lines
+  const replacements: Array<{ start: number; end: number; wrapped: string }> = [];
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx];
+    const lineStart = lineOffsets[lineIdx];
+
+    // Must match Mermaid keyword at start of line
+    if (!RAW_MERMAID_KEYWORD_REGEX.test(line)) {
+      continue;
+    }
+
+    // Must NOT be inside an existing code fence
+    if (isInsideCodeFence(lineStart)) {
+      continue;
+    }
+
+    // 4. Validate the following lines contain actual Mermaid syntax
+    const lookAheadEnd = Math.min(lineIdx + 20, lines.length);
+    const lookAheadLines = lines.slice(lineIdx + 1, lookAheadEnd);
+    const hasMermaidSyntax = MERMAID_SYNTAX_PATTERNS.some(pattern =>
+      lookAheadLines.some(l => pattern.test(l))
+    );
+
+    if (!hasMermaidSyntax) {
+      // Keyword appeared in normal prose — skip
+      continue;
+    }
+
+    // 5. Determine end of the raw block
+    let blockEndLineIdx = lineIdx; // inclusive last line of block
+    const headerRegex = /^#{1,6}\s/;
+
+    for (let scan = lineIdx + 1; scan < lines.length; scan++) {
+      const scanLine = lines[scan];
+
+      // Stop at markdown headings
+      if (headerRegex.test(scanLine)) {
+        break;
+      }
+
+      // Stop at empty line followed by a non-Mermaid-syntax line
+      if (scanLine.trim() === '') {
+        const nextNonEmpty = lines.slice(scan + 1).find(l => l.trim() !== '');
+        if (
+          nextNonEmpty === undefined ||
+          !MERMAID_SYNTAX_PATTERNS.some(p => p.test(nextNonEmpty))
+        ) {
+          break;
+        }
+      }
+
+      blockEndLineIdx = scan;
+    }
+
+    // 6. Determine character offsets for the block
+    const blockStart = lineOffsets[lineIdx];
+    // End is after the last character of the last block line (before its '\n')
+    const blockEnd = lineOffsets[blockEndLineIdx] + lines[blockEndLineIdx].length;
+
+    // Make sure the block doesn't overlap an existing code fence
+    if (codeFenceRegions.some(r => blockStart < r.end && blockEnd > r.start)) {
+      continue;
+    }
+
+    const rawBlock = content.slice(blockStart, blockEnd);
+    const wrapped = `\`\`\`mermaid\n${rawBlock}\n\`\`\``;
+
+    replacements.push({ start: blockStart, end: blockEnd, wrapped });
+
+    // Skip processed lines to avoid overlapping replacements
+    lineIdx = blockEndLineIdx;
+  }
+
+  if (replacements.length === 0) {
+    return { content, wrappedCount: 0 };
+  }
+
+  // 7. Apply replacements in reverse order
+  let result = content;
+  for (let i = replacements.length - 1; i >= 0; i--) {
+    const { start, end, wrapped } = replacements[i];
+    result = result.slice(0, start) + wrapped + result.slice(end);
+  }
+
+  return { content: result, wrappedCount: replacements.length };
 }
 
 // ============================================================================
@@ -328,14 +518,29 @@ export async function runMermaidFixPipeline(
     // Initialize metrics
     const metrics = {
       diagramsTotal: 0,
+      diagramsAutoWrapped: 0,
       diagramsFixedRegex: 0,
       diagramsFixedLLM: 0,
       diagramsFallback: 0,
       durationMs: 0,
     };
 
-    // Extract all Mermaid blocks
-    const blocks = extractMermaidBlocks(content);
+    // -------------------------------------------------------------------------
+    // Stage 0: Auto-wrap raw Mermaid blocks that aren't code-fenced
+    // -------------------------------------------------------------------------
+    const wrapResult = wrapRawMermaidBlocks(content);
+    const processableContent = wrapResult.content;
+
+    if (wrapResult.wrappedCount > 0) {
+      metrics.diagramsAutoWrapped = wrapResult.wrappedCount;
+      logger.info(
+        { wrappedCount: wrapResult.wrappedCount },
+        'Mermaid pipeline: Stage 0 - Wrapped raw Mermaid blocks'
+      );
+    }
+
+    // Extract all Mermaid blocks (now including auto-wrapped ones)
+    const blocks = extractMermaidBlocks(processableContent);
     metrics.diagramsTotal = blocks.length;
 
     // Edge case: No Mermaid blocks
@@ -343,8 +548,8 @@ export async function runMermaidFixPipeline(
       logger.info({}, 'Mermaid pipeline: No Mermaid blocks found');
       metrics.durationMs = Date.now() - startTime;
       return {
-        content,
-        modified: false,
+        content: processableContent,
+        modified: wrapResult.wrappedCount > 0,
         metrics,
       };
     }
@@ -574,9 +779,9 @@ export async function runMermaidFixPipeline(
     }
 
     // -------------------------------------------------------------------------
-    // Replace blocks in original content
+    // Replace blocks in original content (Stage 0 wrapping already applied)
     // -------------------------------------------------------------------------
-    let finalContent = content;
+    let finalContent = processableContent;
 
     if (anyModified) {
       logger.debug({}, 'Mermaid pipeline: Replacing blocks in content');
@@ -640,10 +845,11 @@ export async function runMermaidFixPipeline(
     logger.info(
       {
         total: metrics.diagramsTotal,
+        autoWrapped: metrics.diagramsAutoWrapped,
         fixedRegex: metrics.diagramsFixedRegex,
         fixedLLM: metrics.diagramsFixedLLM,
         fallback: metrics.diagramsFallback,
-        modified: anyModified,
+        modified: anyModified || wrapResult.wrappedCount > 0,
         durationMs: metrics.durationMs,
       },
       'Mermaid pipeline: Pipeline complete'
@@ -651,7 +857,7 @@ export async function runMermaidFixPipeline(
 
     return {
       content: finalContent,
-      modified: anyModified,
+      modified: anyModified || wrapResult.wrappedCount > 0,
       metrics,
     };
   } catch (error) {
