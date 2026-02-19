@@ -470,11 +470,13 @@ export const generationMonitoringRouter = router({
           .update({ generation_status: 'finalizing' })
           .eq('id', input.courseId);
 
-        // 2. Update to completed
+        // 2. Update to completed and published
         const { error } = await supabase
           .from('courses')
           .update({
             generation_status: 'completed',
+            status: 'published',
+            generation_completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq('id', input.courseId);
