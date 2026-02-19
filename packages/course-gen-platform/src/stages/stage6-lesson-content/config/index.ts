@@ -31,6 +31,12 @@ export const HANDLER_CONFIG = {
 
   /** Maximum regeneration attempts before giving up (prevents infinite loops) */
   MAX_REGENERATION_RETRIES: 2,
+
+  /**
+   * Maximum truncation continuation attempts before fail-open review_required.
+   * Truncation-only retries use cheap continuation instead of full regenerate.
+   */
+  MAX_TRUNCATION_CONTINUATION_ATTEMPTS: 2,
 } as const;
 
 /**

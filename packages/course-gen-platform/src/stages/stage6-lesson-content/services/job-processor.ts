@@ -432,6 +432,9 @@ export async function processStage6Job(
         selectedModelTier: null,
         selectedModelTierReason: null,
         qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
       },
     };
   }
@@ -503,6 +506,9 @@ export async function processStage6Job(
         selectedModelTier: null,
         selectedModelTierReason: null,
         qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
       },
     };
   }
@@ -663,6 +669,9 @@ export async function processStage6Job(
             fallbackModel: result.metrics.fallbackModel,
             selectedModelTier: result.metrics.selectedModelTier,
             selectedModelTierReason: result.metrics.selectedModelTierReason,
+            regenerateCount: result.metrics.regenerateCount,
+            truncationCount: result.metrics.truncationCount,
+            rejectedTokens: result.metrics.rejectedTokens,
             reviewInfo: result.reviewInfo,
           }
         );
@@ -712,6 +721,9 @@ export async function processStage6Job(
         selectedModel: result.metrics.selectedModel,
         fallbackModel: result.metrics.fallbackModel,
         selectedModelTier: result.metrics.selectedModelTier,
+        regenerateCount: result.metrics.regenerateCount,
+        truncationCount: result.metrics.truncationCount,
+        rejectedTokens: result.metrics.rejectedTokens,
         reviewRequired: needsReview,
         hasPartialContent:
           result.lessonContent !== null && (result.errors.length > 0 || needsReview),
@@ -735,6 +747,9 @@ export async function processStage6Job(
         selectedModelTierReason: result.metrics.selectedModelTierReason,
         reviewRequired: needsReview,
         tokensUsed: result.metrics.tokensUsed,
+        regenerateCount: result.metrics.regenerateCount,
+        truncationCount: result.metrics.truncationCount,
+        rejectedTokens: result.metrics.rejectedTokens,
       },
       modelUsed: result.metrics.modelUsed,
       durationMs,
@@ -787,6 +802,9 @@ export async function processStage6Job(
           fallbackModel: tierResult.fallback,
           selectedModelTier: tierResult.tier,
           selectedModelTierReason: tierResult.reason,
+          regenerateCount: 0,
+          truncationCount: 0,
+          rejectedTokens: 0,
         }
       );
       runCompletionCheck();
@@ -815,6 +833,9 @@ export async function processStage6Job(
         selectedModelTier: tierResult.tier,
         selectedModelTierReason: tierResult.reason,
         qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
       },
     };
   }

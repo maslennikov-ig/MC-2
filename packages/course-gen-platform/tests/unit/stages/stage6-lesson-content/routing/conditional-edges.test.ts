@@ -17,6 +17,63 @@ function buildState(overrides: Partial<LessonGraphStateType> = {}): LessonGraphS
 }
 
 describe('shouldProceedToJudge', () => {
+  it('routes to truncation continuation when mode is set and cap not exceeded', () => {
+    const state = buildState({
+      // retry cap is ignored for truncation continuation; dedicated cap is used.
+      retryCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES + 1,
+      truncationCount: HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS,
+      regenerationMode: 'truncation_continuation',
+      selfReviewResult: {
+        status: 'REGENERATE',
+        reasoning: 'Critical truncation',
+        issues: [
+          {
+            type: 'TRUNCATION',
+            severity: 'CRITICAL',
+            location: 'global',
+            description: 'Cut off',
+          },
+        ],
+        patchedContent: null,
+        tokensUsed: 0,
+        durationMs: 10,
+        heuristicsPassed: false,
+      },
+    });
+
+    expect(shouldProceedToJudge(state)).toBe('generator');
+    expect(state.needsHumanReview).toBeFalsy();
+  });
+
+  it('ends as review_required when truncation continuation cap is exceeded', () => {
+    const state = buildState({
+      retryCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES + 1,
+      truncationCount: HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS + 1,
+      regenerationMode: 'truncation_continuation',
+      selfReviewResult: {
+        status: 'REGENERATE',
+        reasoning: 'Critical truncation',
+        issues: [
+          {
+            type: 'TRUNCATION',
+            severity: 'CRITICAL',
+            location: 'global',
+            description: 'Cut off',
+          },
+        ],
+        patchedContent: null,
+        tokensUsed: 0,
+        durationMs: 10,
+        heuristicsPassed: false,
+      },
+    });
+
+    expect(shouldProceedToJudge(state)).toBe('__end__');
+    expect(state.needsHumanReview).toBe(true);
+    expect(state.reviewInfo?.needsReview).toBe(true);
+    expect(state.errors[0]).toContain('Truncation continuation attempts exceeded');
+  });
+
   it('routes to generator for REGENERATE while retries are below cap', () => {
     const state = buildState({
       retryCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES - 1,

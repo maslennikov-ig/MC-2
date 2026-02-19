@@ -88,6 +88,17 @@ export const SINGLE_CALL_MAX_TOKENS = 16384;
  */
 export const SINGLE_CALL_RAG_BUDGET_CHARS = 20000;
 
+/**
+ * Tail window (chars) passed to truncation continuation repair prompt.
+ * Keeps continuation prompts cheap and focused on the broken tail.
+ */
+export const TRUNCATION_CONTINUATION_TAIL_CHARS = 2200;
+
+/**
+ * Max tokens for truncation continuation repair calls.
+ */
+export const TRUNCATION_CONTINUATION_MAX_TOKENS = 1400;
+
 // ============================================================================
 // CONTEXT WINDOW CONFIGURATION
 // ============================================================================

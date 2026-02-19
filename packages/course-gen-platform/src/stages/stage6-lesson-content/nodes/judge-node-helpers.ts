@@ -498,6 +498,10 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     needsRegeneration,
     needsHumanReview,
     reviewInfo: reviewInfo ?? undefined,
+    regenerationMode: needsRegeneration ? 'full_regenerate' : null,
+    regenerateCount: needsRegeneration
+      ? (state.regenerateCount ?? 0) + 1
+      : (state.regenerateCount ?? 0),
     retryCount: needsRegeneration ? state.retryCount + 1 : state.retryCount,
     tokensUsed: totalTokensUsed,
     durationMs,

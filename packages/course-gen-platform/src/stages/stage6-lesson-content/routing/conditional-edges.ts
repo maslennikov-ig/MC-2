@@ -118,6 +118,43 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
 
   // REGENERATE status: Fatal errors detected, skip judge and restart pipeline
   if (status === 'REGENERATE') {
+    const isTruncationContinuation = state.regenerationMode === 'truncation_continuation';
+
+    if (isTruncationContinuation) {
+      const maxContinuationAttempts = HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS;
+      const truncationCount = state.truncationCount ?? 0;
+
+      if (truncationCount > maxContinuationAttempts) {
+        const reason =
+          `Truncation continuation attempts exceeded (${maxContinuationAttempts}). ` +
+          `Marked as review_required (fail-open).`;
+
+        logger.warn(
+          {
+            lessonId: state.lessonSpec.lesson_id,
+            truncationCount,
+            maxContinuationAttempts,
+          },
+          'SelfReviewer routing: Truncation continuation cap exceeded - marking as review_required'
+        );
+
+        markReviewRequired(state, reason);
+        state.errors.push(reason);
+        return '__end__';
+      }
+
+      logger.info(
+        {
+          lessonId: state.lessonSpec.lesson_id,
+          truncationCount,
+          maxContinuationAttempts,
+        },
+        'SelfReviewer routing: truncation-only regenerate - routing to generator continuation'
+      );
+
+      return 'generator';
+    }
+
     logger.info(
       {
         lessonId: state.lessonSpec.lesson_id,

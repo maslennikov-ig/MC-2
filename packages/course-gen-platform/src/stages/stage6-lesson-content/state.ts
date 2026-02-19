@@ -285,6 +285,50 @@ export const LessonGraphState = Annotation.Root({
   }),
 
   /**
+   * Regeneration strategy selected for the next generator run.
+   * - full_regenerate: run complete single-call generation again
+   * - truncation_continuation: run cheap tail continuation/repair
+   */
+  regenerationMode: Annotation<'full_regenerate' | 'truncation_continuation' | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Number of full-regenerate loops requested in this Stage 6 run.
+   */
+  regenerateCount: Annotation<number>({
+    reducer: (x, y) => y ?? x,
+    default: () => 0,
+  }),
+
+  /**
+   * Number of truncation-only failures detected by self-reviewer.
+   */
+  truncationCount: Annotation<number>({
+    reducer: (x, y) => y ?? x,
+    default: () => 0,
+  }),
+
+  /**
+   * Total generation tokens spent on attempts that ended in REGENERATE.
+   * Tracks token waste attribution for rejected versions.
+   */
+  rejectedTokens: Annotation<number>({
+    reducer: (x, y) => y ?? x,
+    default: () => 0,
+  }),
+
+  /**
+   * Tokens used by the latest generator attempt.
+   * Used to attribute rejected token spend when self-review returns REGENERATE.
+   */
+  lastGenerationTokens: Annotation<number>({
+    reducer: (x, y) => y ?? x,
+    default: () => 0,
+  }),
+
+  /**
    * Model used for generation
    * Tracks which LLM processed this lesson
    */

@@ -60,6 +60,11 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       currentNode: 'generator',
       errors: [],
       retryCount: 0,
+      regenerateCount: 0,
+      truncationCount: 0,
+      rejectedTokens: 0,
+      lastGenerationTokens: 0,
+      regenerationMode: null,
     };
 
     // Execute graph
@@ -111,6 +116,9 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         selectedModelTier: result.selectedModelTier ?? null,
         selectedModelTierReason: result.selectedModelTierReason ?? null,
         qualityScore: result.qualityScore ?? 0,
+        regenerateCount: result.regenerateCount ?? 0,
+        truncationCount: result.truncationCount ?? 0,
+        rejectedTokens: result.rejectedTokens ?? 0,
       },
       // Include review info for UI warnings (undefined if not set)
       reviewInfo: result.reviewInfo ?? undefined,
@@ -142,6 +150,9 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         selectedModelTier: null,
         selectedModelTierReason: null,
         qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
       },
     };
   }
