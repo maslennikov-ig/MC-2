@@ -610,7 +610,10 @@ Second digest text.`;
 // ============================================================================
 
 // Import the function to test
-import { generateLessonSingleCall } from '@/stages/stage6-lesson-content/nodes/generator/generator-single-call';
+import {
+  generateLessonSingleCall,
+  generateTruncationContinuation,
+} from '@/stages/stage6-lesson-content/nodes/generator/generator-single-call';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 
@@ -1098,6 +1101,55 @@ More content.`,
 
       // Should have estimated token count (not 0)
       expect(result.tokensUsed).toBeGreaterThan(0);
+    });
+  });
+
+  describe('generateTruncationContinuation', () => {
+    it('should use simple-tier model config and append continuation text', async () => {
+      mockModelInvoke.mockResolvedValue({
+        content: `---existing tail---
+
+Additional completion in Russian.`,
+        response_metadata: {
+          usage: { total_tokens: 123 },
+        },
+      });
+
+      const existingContent = `# Заголовок
+
+Текст урока.
+
+---existing tail---`;
+
+      const result = await generateTruncationContinuation(mockLessonSpec, existingContent, 'ru');
+
+      expect(result.modelUsed).toBe('test-model-id');
+      expect(result.tokensUsed).toBe(123);
+      expect(result.continuation).toContain('Additional completion');
+      expect(result.mergedContent).toContain('Additional completion');
+      expect(result.mergedContent).toContain('---existing tail---');
+    });
+
+    it('should remove duplicated overlap from continuation prefix', async () => {
+      const marker = 'TAIL_MARKER_1234567890ABCDEFGHIJ1234567890KLMNOPQRST';
+      mockModelInvoke.mockResolvedValue({
+        content: `${marker}
+Новая строка завершения.`,
+        response_metadata: {
+          usage: { total_tokens: 90 },
+        },
+      });
+
+      const existingContent = `Предыдущий текст
+
+${marker}`;
+
+      const result = await generateTruncationContinuation(mockLessonSpec, existingContent, 'ru');
+
+      const overlapMatches =
+        result.mergedContent.match(/TAIL_MARKER_1234567890ABCDEFGHIJ1234567890KLMNOPQRST/g) ?? [];
+      expect(overlapMatches).toHaveLength(1);
+      expect(result.mergedContent).toContain('Новая строка завершения');
     });
   });
 

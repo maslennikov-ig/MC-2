@@ -120,6 +120,15 @@ export interface Stage6JobResult {
 
     /** Quality score from validation (0-1) */
     qualityScore: number;
+
+    /** Number of full regenerate loops requested */
+    regenerateCount: number;
+
+    /** Number of truncation-only regenerate detections */
+    truncationCount: number;
+
+    /** Tokens spent on attempts that ended in REGENERATE */
+    rejectedTokens: number;
   };
 }
 
@@ -234,6 +243,12 @@ export interface Stage6Output {
     selectedModelTierReason: string | null;
     /** Quality score from judge (0-1, or 0 if not evaluated) */
     qualityScore: number;
+    /** Number of full regenerate loops requested */
+    regenerateCount: number;
+    /** Number of truncation-only regenerate detections */
+    truncationCount: number;
+    /** Tokens spent on attempts that ended in REGENERATE */
+    rejectedTokens: number;
   };
   /** Human review metadata (for UI warnings) */
   reviewInfo?: {

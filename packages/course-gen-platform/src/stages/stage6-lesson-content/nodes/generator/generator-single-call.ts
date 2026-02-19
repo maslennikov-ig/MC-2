@@ -12,10 +12,12 @@
 
 import { logger } from '@/shared/logger';
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
+import { createModelConfigService } from '@/shared/llm/model-config-service';
 import {
   getRecommendedTemperatureV2,
   type LessonSpecificationV2,
 } from '@megacampus/shared-types/lesson-specification-v2';
+import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
   getLanguageName,
   getTokenMultiplier,
@@ -33,6 +35,9 @@ import {
   SINGLE_CALL_MIN_TOKENS,
   SINGLE_CALL_MAX_TOKENS,
   SINGLE_CALL_RAG_BUDGET_CHARS,
+  STAGE6_TIER_MODELS,
+  TRUNCATION_CONTINUATION_TAIL_CHARS,
+  TRUNCATION_CONTINUATION_MAX_TOKENS,
 } from './generator-constants';
 import {
   formatInterLessonContextXML,
@@ -263,6 +268,128 @@ export async function generateLessonSingleCall(
     tokensUsed: tokenResult.tokens,
     modelUsed: modelId,
   };
+}
+
+/**
+ * Generate cheap continuation/repair text for truncation-only failures.
+ *
+ * This path avoids full lesson regeneration and only appends missing tail content
+ * using a small token budget and the Stage 6 simple-tier model.
+ */
+export async function generateTruncationContinuation(
+  lessonSpec: LessonSpecificationV2,
+  currentContent: string,
+  language: string
+): Promise<{
+  mergedContent: string;
+  continuation: string;
+  tokensUsed: number;
+  modelUsed: string;
+}> {
+  const lessonId = lessonSpec.lesson_id;
+  const tailContext = currentContent.slice(-TRUNCATION_CONTINUATION_TAIL_CHARS);
+  const sectionsList = lessonSpec.sections.map((s, i) => `${i + 1}. ${s.title}`).join('\n');
+
+  const modelId = await resolveContinuationModelId();
+  const model = createOpenRouterModel(modelId, 0.2, TRUNCATION_CONTINUATION_MAX_TOKENS);
+
+  const prompt = `<task>
+You are repairing a lesson markdown that was truncated.
+Return ONLY the continuation text that should be appended to the existing lesson.
+</task>
+
+<hard_requirements>
+- Keep output in ${getLanguageName(language)} only.
+- Do NOT repeat existing text verbatim.
+- Continue naturally from the tail and finish incomplete sentence/paragraph/code block if needed.
+- Preserve markdown structure and heading style.
+- Output ONLY markdown continuation, no explanations.
+</hard_requirements>
+
+<lesson>
+<title>${lessonSpec.title}</title>
+<sections>
+${sectionsList}
+</sections>
+</lesson>
+
+<tail_context>
+${tailContext}
+</tail_context>`;
+
+  logger.info(
+    {
+      lessonId,
+      modelId,
+      tailChars: tailContext.length,
+      maxTokens: TRUNCATION_CONTINUATION_MAX_TOKENS,
+    },
+    'Invoking truncation continuation repair'
+  );
+
+  const response = await model.invoke(prompt);
+  const responseContent =
+    typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+  const continuation = responseContent.trim();
+  const mergedContent = mergeContinuationContent(currentContent, continuation);
+
+  const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
+  if (tokenResult.isEstimated) {
+    logger.debug(
+      { lessonId, estimatedTokens: tokenResult.tokens },
+      'Token usage estimated for truncation continuation'
+    );
+  }
+
+  return {
+    mergedContent,
+    continuation,
+    tokensUsed: tokenResult.tokens,
+    modelUsed: modelId,
+  };
+}
+
+async function resolveContinuationModelId(): Promise<string> {
+  const phase = 'stage_6_simple' as PhaseName;
+  try {
+    const modelConfigService = createModelConfigService();
+    const config = await modelConfigService.getModelForPhase(phase);
+    return config.modelId || STAGE6_TIER_MODELS.simple;
+  } catch (error) {
+    logger.warn(
+      {
+        phase,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to resolve continuation model from config, using hardcoded fallback'
+    );
+    return STAGE6_TIER_MODELS.simple;
+  }
+}
+
+function mergeContinuationContent(existingContent: string, continuationRaw: string): string {
+  const continuation = continuationRaw.trim();
+  if (continuation.length === 0) {
+    return existingContent;
+  }
+
+  // Remove duplicated overlap if model repeats tail text.
+  const maxOverlap = Math.min(400, existingContent.length, continuation.length);
+  let overlap = 0;
+
+  for (let size = maxOverlap; size >= 40; size--) {
+    if (existingContent.slice(-size) === continuation.slice(0, size)) {
+      overlap = size;
+      break;
+    }
+  }
+
+  const appendPart = continuation.slice(overlap).trimStart();
+  if (appendPart.length === 0) {
+    return existingContent;
+  }
+
+  return `${existingContent.trimEnd()}\n\n${appendPart}`;
 }
 
 /**

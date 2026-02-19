@@ -81,7 +81,16 @@ function buildState(
     currentNode: 'selfReviewer',
     errors: [],
     modelUsed: null,
+    selectedModel: null,
+    fallbackModel: null,
+    selectedModelTier: null,
+    selectedModelTierReason: null,
     tokensUsed: 0,
+    lastGenerationTokens: 1500,
+    regenerateCount: 0,
+    truncationCount: 0,
+    rejectedTokens: 0,
+    regenerationMode: null,
     durationMs: 0,
     totalCostUsd: 0,
     nodeCosts: [],
@@ -109,6 +118,9 @@ describe('selfReviewerNode truncation escalation', () => {
 
     expect(result.selfReviewResult?.status).toBe('REGENERATE');
     expect(result.retryCount).toBe(1);
+    expect(result.regenerationMode).toBe('truncation_continuation');
+    expect(result.truncationCount).toBe(1);
+    expect(result.rejectedTokens).toBe(1500);
     expect(result.modelOverride).toBeUndefined();
   });
 
@@ -117,6 +129,9 @@ describe('selfReviewerNode truncation escalation', () => {
 
     expect(result.selfReviewResult?.status).toBe('REGENERATE');
     expect(result.retryCount).toBe(2);
+    expect(result.regenerationMode).toBe('truncation_continuation');
+    expect(result.truncationCount).toBe(1);
+    expect(result.rejectedTokens).toBe(1500);
     expect(result.modelOverride).toBe(MODEL_FALLBACK.fallback);
   });
 });

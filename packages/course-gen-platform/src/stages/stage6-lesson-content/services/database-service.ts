@@ -61,6 +61,9 @@ export async function handlePartialSuccess(
             selectedModelTier: result.metrics.selectedModelTier,
             selectedModelTierReason: result.metrics.selectedModelTierReason,
             qualityScore: result.metrics.qualityScore,
+            regenerateCount: result.metrics.regenerateCount,
+            truncationCount: result.metrics.truncationCount,
+            rejectedTokens: result.metrics.rejectedTokens,
             reviewInfo: result.reviewInfo ?? undefined,
           })
         ) as Json,
@@ -119,6 +122,9 @@ export interface ReviewMarkerContext {
   fallbackModel?: string | null;
   selectedModelTier?: string | null;
   selectedModelTierReason?: string | null;
+  regenerateCount?: number | null;
+  truncationCount?: number | null;
+  rejectedTokens?: number | null;
   reviewInfo?: Stage6Output['reviewInfo'];
 }
 
@@ -166,6 +172,9 @@ export async function markForReview(
         fallbackModel: context.fallbackModel ?? null,
         selectedModelTier: context.selectedModelTier ?? null,
         selectedModelTierReason: context.selectedModelTierReason ?? null,
+        regenerateCount: context.regenerateCount ?? null,
+        truncationCount: context.truncationCount ?? null,
+        rejectedTokens: context.rejectedTokens ?? null,
         reviewInfo: context.reviewInfo ?? undefined,
       },
       generation_attempt: 1,
@@ -247,6 +256,9 @@ export async function saveLessonContent(
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
           qualityScore: result.metrics.qualityScore,
+          regenerateCount: result.metrics.regenerateCount,
+          truncationCount: result.metrics.truncationCount,
+          rejectedTokens: result.metrics.rejectedTokens,
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: extractContentMarkdown(result.lessonContent, language),
@@ -369,6 +381,9 @@ export async function saveRejectedContent(
     selectedModelTier?: string | null;
     selectedModelTierReason?: string | null;
     modelOverride?: string | null;
+    regenerateCount?: number | null;
+    truncationCount?: number | null;
+    rejectedTokens?: number | null;
   }
 ): Promise<void> {
   if (!generatedContent) {
@@ -422,6 +437,9 @@ export async function saveRejectedContent(
       selectedModelTier: context?.selectedModelTier ?? null,
       selectedModelTierReason: context?.selectedModelTierReason ?? null,
       modelOverride: context?.modelOverride ?? null,
+      regenerateCount: context?.regenerateCount ?? null,
+      truncationCount: context?.truncationCount ?? null,
+      rejectedTokens: context?.rejectedTokens ?? null,
       generationAttempt,
     };
 
