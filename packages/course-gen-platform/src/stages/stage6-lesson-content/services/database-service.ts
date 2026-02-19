@@ -35,9 +35,8 @@ export async function handlePartialSuccess(
   language: string = 'en'
 ): Promise<void> {
   const isReviewRequired = result.reviewInfo?.needsReview === true;
-  if (!result.lessonContent || (!isReviewRequired && result.errors.length === 0)) {
-    return;
-  }
+  if (!result.lessonContent) return;
+  if (!isReviewRequired && result.errors.length === 0) return;
 
   const supabaseAdmin = getSupabaseAdmin();
 
@@ -159,26 +158,29 @@ export async function markForReview(
       );
     }
 
-    const { error: failedContentError } = await supabaseAdmin.from('lesson_contents').insert({
-      lesson_id: lessonUuid,
-      course_id: courseId,
-      status: 'review_required',
-      metadata: {
-        lessonLabel,
-        markedForReviewAt: markedAt,
-        failureReason: reason,
-        modelUsed: context.modelUsed ?? null,
-        selectedModel: context.selectedModel ?? null,
-        fallbackModel: context.fallbackModel ?? null,
-        selectedModelTier: context.selectedModelTier ?? null,
-        selectedModelTierReason: context.selectedModelTierReason ?? null,
-        regenerateCount: context.regenerateCount ?? null,
-        truncationCount: context.truncationCount ?? null,
-        rejectedTokens: context.rejectedTokens ?? null,
-        reviewInfo: context.reviewInfo ?? undefined,
+    const { error: failedContentError } = await supabaseAdmin.from('lesson_contents').upsert(
+      {
+        lesson_id: lessonUuid,
+        course_id: courseId,
+        status: 'review_required',
+        metadata: {
+          lessonLabel,
+          markedForReviewAt: markedAt,
+          failureReason: reason,
+          modelUsed: context.modelUsed ?? null,
+          selectedModel: context.selectedModel ?? null,
+          fallbackModel: context.fallbackModel ?? null,
+          selectedModelTier: context.selectedModelTier ?? null,
+          selectedModelTierReason: context.selectedModelTierReason ?? null,
+          regenerateCount: context.regenerateCount ?? null,
+          truncationCount: context.truncationCount ?? null,
+          rejectedTokens: context.rejectedTokens ?? null,
+          reviewInfo: context.reviewInfo ?? undefined,
+        },
+        generation_attempt: (context.regenerateCount ?? 0) + 1,
       },
-      generation_attempt: 1,
-    });
+      { onConflict: 'lesson_id' }
+    );
 
     if (failedContentError) {
       logger.warn(

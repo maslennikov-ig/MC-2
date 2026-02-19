@@ -20,10 +20,99 @@ const KEYWORD_THRESHOLD_BY_LANGUAGE: Record<string, number> = {
   en: 0.5,
 };
 const KEYWORD_BLOCKING_LANGUAGES = new Set(['ru', 'en']);
-const russianStemmer = newStemmer('russian');
+
+// Issue R-2: Lazy-init stemmer to avoid crashing at import time if snowball-stemmers is unavailable
+let _russianStemmer: { stem: (w: string) => string } | null = null;
+
+function getRussianStemmer(): { stem: (w: string) => string } {
+  if (!_russianStemmer) {
+    try {
+      _russianStemmer = newStemmer('russian');
+    } catch {
+      logger.warn('snowball-stemmers unavailable; Russian keyword stemming disabled');
+      _russianStemmer = { stem: (w: string) => w };
+    }
+  }
+  return _russianStemmer;
+}
+
+// Issue R-1: Russian Bloom taxonomy verbs for stop-list (will be stemmed at first use)
+const BLOOM_VERBS_RU = [
+  'запомнить',
+  'объяснить',
+  'описать',
+  'определить',
+  'оценить',
+  'проанализировать',
+  'применить',
+  'сформулировать',
+  'сравнить',
+  'различить',
+  'классифицировать',
+  'опровергнуть',
+  'доказать',
+  'обосновать',
+  'перечислить',
+  'назвать',
+  'выделить',
+  'распознать',
+  'интерпретировать',
+  'продемонстрировать',
+  'создать',
+  'разработать',
+  'предложить',
+  'спроектировать',
+  'составить',
+  'понять',
+  'знать',
+  'усвоить',
+  'освоить',
+  'изучить',
+  'рассмотреть',
+  // Imperfective forms commonly found in learning objectives
+  'применять',
+  'понимать',
+  'анализировать',
+  'оценивать',
+  'объяснять',
+  'описывать',
+  'определять',
+  'сравнивать',
+  'различать',
+  'классифицировать',
+  'доказывать',
+  'обосновывать',
+  'перечислять',
+  'называть',
+  'выделять',
+  'распознавать',
+  'интерпретировать',
+  'демонстрировать',
+  'создавать',
+  'разрабатывать',
+  'предлагать',
+  'проектировать',
+  'составлять',
+  'изучать',
+  'рассматривать',
+  'использовать',
+  'формулировать',
+];
+
+// Lazy-computed set of stemmed Bloom verb stems for Russian
+let _bloomVerbStems: Set<string> | null = null;
+
+function getBloomVerbStems(): Set<string> {
+  if (!_bloomVerbStems) {
+    const stemmer = getRussianStemmer();
+    _bloomVerbStems = new Set(BLOOM_VERBS_RU.map(verb => stemmer.stem(verb)));
+  }
+  return _bloomVerbStems;
+}
 
 function stemRussianText(text: string): string {
-  return text.replace(CYRILLIC_WORD_REGEX, word => russianStemmer.stem(word));
+  const stemmer = getRussianStemmer();
+  return text.replace(CYRILLIC_WORD_REGEX, word => stemmer.stem(word));
 }
 
 function matchKeywordInText(
@@ -43,7 +132,7 @@ function matchKeywordInText(
     return false;
   }
 
-  const keywordStem = russianStemmer.stem(keyword);
+  const keywordStem = getRussianStemmer().stem(keyword);
   if (keywordStem.length < 3) {
     return false;
   }
@@ -217,7 +306,8 @@ function calculateKeywordCoverage(
   // Extract keywords from learning objectives (supports Latin and Cyrillic)
   const keywords = new Set<string>();
 
-  // Common words to exclude (English and Russian)
+  // Common structural/functional words to exclude (English and Russian)
+  // Note: Russian Bloom taxonomy verbs are excluded via stemming (see getBloomVerbStems())
   const commonWords = new Set([
     // English
     'that',
@@ -246,7 +336,7 @@ function calculateKeywordCoverage(
     'analyze',
     'create',
     'evaluate',
-    // Russian
+    // Russian structural/functional words
     'этот',
     'этой',
     'этих',
@@ -284,39 +374,10 @@ function calculateKeywordCoverage(
     'всех',
     'всей',
     'всего',
-    // Bloom taxonomy verbs (Russian)
-    'запомнить',
-    'объяснить',
-    'описать',
-    'определить',
-    'оценить',
-    'проанализировать',
-    'применить',
-    'сформулировать',
-    'сравнить',
-    'различить',
-    'классифицировать',
-    'опровергнуть',
-    'доказать',
-    'обосновать',
-    'перечислить',
-    'назвать',
-    'выделить',
-    'распознать',
-    'интерпретировать',
-    'продемонстрировать',
-    'создать',
-    'разработать',
-    'предложить',
-    'спроектировать',
-    'составить',
-    'понять',
-    'знать',
-    'усвоить',
-    'освоить',
-    'изучить',
-    'рассмотреть',
   ]);
+
+  const bloomStems = getBloomVerbStems();
+  const stemmer = getRussianStemmer();
 
   for (const objective of lessonSpec.learning_objectives) {
     const text = objective.objective.toLowerCase();
@@ -329,9 +390,17 @@ function calculateKeywordCoverage(
 
     for (const word of [...latinWords, ...cyrillicWords]) {
       const normalizedWord = word.toLowerCase();
-      if (!commonWords.has(normalizedWord)) {
-        keywords.add(normalizedWord);
+      if (commonWords.has(normalizedWord)) {
+        continue;
       }
+      // For Cyrillic words, also check if the stem matches a Bloom verb stem
+      if (
+        CYRILLIC_KEYWORD_REGEX.test(normalizedWord) &&
+        bloomStems.has(stemmer.stem(normalizedWord))
+      ) {
+        continue;
+      }
+      keywords.add(normalizedWord);
     }
   }
 

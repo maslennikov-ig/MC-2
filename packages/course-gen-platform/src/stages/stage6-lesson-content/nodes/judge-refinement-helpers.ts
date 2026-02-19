@@ -19,7 +19,7 @@ import type { CascadeResult } from '../judge/cascade-evaluator';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { buildLessonContent } from '../judge/judge-helpers';
-import { buildEnrichedJudgeOutput } from '../judge/judge-output-builder';
+import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import type { JudgeContext } from './judge-node-helpers';
 
@@ -355,25 +355,13 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     needsRegeneration,
     needsHumanReview,
     lessonContent: needsRegeneration ? null : state.lessonContent,
+    regenerationMode: needsRegeneration ? 'full_regenerate' : null,
+    regenerateCount: needsRegeneration
+      ? (state.regenerateCount ?? 0) + 1
+      : (state.regenerateCount ?? 0),
     retryCount: needsRegeneration ? state.retryCount + 1 : state.retryCount,
     tokensUsed: cascadeResult?.totalTokensUsed ?? 0,
     durationMs,
     progressSummary: syntheticProgress,
   };
-}
-
-function extractJudgeModels(enrichedOutput: ReturnType<typeof buildEnrichedJudgeOutput>): string[] {
-  const models = new Set<string>();
-
-  if (enrichedOutput.singleJudge?.model) {
-    models.add(enrichedOutput.singleJudge.model);
-  }
-
-  for (const vote of enrichedOutput.votes ?? []) {
-    if (vote.model_id) {
-      models.add(vote.model_id);
-    }
-  }
-
-  return Array.from(models);
 }

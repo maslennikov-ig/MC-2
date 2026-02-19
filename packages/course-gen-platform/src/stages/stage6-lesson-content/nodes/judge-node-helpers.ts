@@ -18,7 +18,7 @@ import { DecisionAction, type DecisionResult } from '../judge/decision-engine';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { buildLessonContent } from '../judge/judge-helpers';
-import { buildEnrichedJudgeOutput } from '../judge/judge-output-builder';
+import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import { executeTargetedRefinementFlow, buildReviewInfo } from './judge-refinement-helpers';
 
@@ -512,20 +512,4 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
       targetedRefinementTokensUsed: refinementTokensUsed,
     }),
   };
-}
-
-function extractJudgeModels(enrichedOutput: ReturnType<typeof buildEnrichedJudgeOutput>): string[] {
-  const models = new Set<string>();
-
-  if (enrichedOutput.singleJudge?.model) {
-    models.add(enrichedOutput.singleJudge.model);
-  }
-
-  for (const vote of enrichedOutput.votes ?? []) {
-    if (vote.model_id) {
-      models.add(vote.model_id);
-    }
-  }
-
-  return Array.from(models);
 }
