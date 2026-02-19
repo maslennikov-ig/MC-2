@@ -730,6 +730,8 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
           generation_status: shouldAutoFinalize ? 'completed' : 'stage_6_complete',
           generation_progress: updatedProgress,
           ...(completedAt && { generation_completed_at: completedAt }),
+          // Set publication status when auto-finalizing so the course becomes viewable
+          ...(shouldAutoFinalize && { status: 'published' as const }),
         })
         .eq('id', courseId)
         .eq('generation_status', 'stage_6_generating'); // Only update if still generating

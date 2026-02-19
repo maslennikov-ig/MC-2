@@ -172,7 +172,7 @@ describe('checkAndSetStage6Complete', () => {
 
     expect(coursesTable.update).toHaveBeenCalledTimes(1);
     expect(coursesTable.update).toHaveBeenCalledWith(
-      expect.objectContaining({ generation_status: 'completed' })
+      expect.objectContaining({ generation_status: 'completed', status: 'published' })
     );
     expect(mockNotifyCourseCompletion).toHaveBeenCalledTimes(1);
   });
@@ -190,9 +190,9 @@ describe('checkAndSetStage6Complete', () => {
     await checkAndSetStage6Complete('course-123');
 
     expect(coursesTable.update).toHaveBeenCalledTimes(1);
-    expect(coursesTable.update).toHaveBeenCalledWith(
-      expect.objectContaining({ generation_status: 'stage_6_complete' })
-    );
+    const updateArg = coursesTable.update.mock.calls[0][0];
+    expect(updateArg).toEqual(expect.objectContaining({ generation_status: 'stage_6_complete' }));
+    expect(updateArg).not.toHaveProperty('status');
     expect(mockNotifyCourseCompletion).not.toHaveBeenCalled();
   });
 
