@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.10] - 2026-02-19
+
+### Fixed
+
+- **stage6**: remove synthetic conclusion flow and guard recap overlap (770b331d)
+
+### Other
+
+- update docs (08e431ea)
+
 ## [0.30.9] - 2026-02-19
 
 ### Added
