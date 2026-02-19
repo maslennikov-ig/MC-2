@@ -388,6 +388,29 @@ async function enrichSummaryPreviewFromDB(
 }
 
 /**
+ * Build a zero-value metrics object for early-return / error paths where
+ * tier selection has already completed but no generation was performed.
+ */
+function buildZeroMetrics(
+  tierResult: { model: string; fallback: string; tier: Stage6ModelTierName; reason: string },
+  durationMs: number
+): Stage6JobResult['metrics'] {
+  return {
+    tokensUsed: 0,
+    durationMs,
+    modelUsed: null,
+    selectedModel: tierResult.model,
+    fallbackModel: tierResult.fallback,
+    selectedModelTier: tierResult.tier,
+    selectedModelTierReason: tierResult.reason,
+    qualityScore: 0,
+    regenerateCount: 0,
+    truncationCount: 0,
+    rejectedTokens: 0,
+  };
+}
+
+/**
  * Process a single Stage 6 job
  * @param job - The BullMQ job to process
  * @param token - Job token for lock management (required for pause/delay, validated at runtime)
@@ -824,19 +847,7 @@ export async function processStage6Job(
       success: false,
       lessonContent: null,
       errors: [errorMsg],
-      metrics: {
-        tokensUsed: 0,
-        durationMs,
-        modelUsed: null,
-        selectedModel: tierResult.model,
-        fallbackModel: tierResult.fallback,
-        selectedModelTier: tierResult.tier,
-        selectedModelTierReason: tierResult.reason,
-        qualityScore: 0,
-        regenerateCount: 0,
-        truncationCount: 0,
-        rejectedTokens: 0,
-      },
+      metrics: buildZeroMetrics(tierResult, durationMs),
     };
   }
 }

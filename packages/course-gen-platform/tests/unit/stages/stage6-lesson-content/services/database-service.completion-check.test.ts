@@ -111,6 +111,7 @@ function createSupabaseAdminMock(options: {
   const lessonContentsTable = {
     select: vi.fn().mockReturnValue(lessonContentsQuery),
     insert: vi.fn().mockResolvedValue(insertResult),
+    upsert: vi.fn().mockResolvedValue(insertResult),
   };
 
   const supabase = {
@@ -234,8 +235,8 @@ describe('markForReview', () => {
     );
 
     expect(lessonsTable.update).toHaveBeenCalledTimes(1);
-    expect(lessonContentsTable.insert).toHaveBeenCalledTimes(1);
-    expect(lessonContentsTable.insert).toHaveBeenCalledWith(
+    expect(lessonContentsTable.upsert).toHaveBeenCalledTimes(1);
+    expect(lessonContentsTable.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         lesson_id: 'lesson-uuid',
         course_id: 'course-123',
@@ -244,7 +245,8 @@ describe('markForReview', () => {
           lessonLabel: '1.1',
           failureReason: 'Generation failed after retries',
         }),
-      })
+      }),
+      { onConflict: 'lesson_id' }
     );
   });
 });
