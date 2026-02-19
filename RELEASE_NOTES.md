@@ -2,6 +2,40 @@
 
 _Released on 2025-12-26_
 
+## v0.30.9
+
+_Released on 2026-02-19_
+
+### ✨ New Features
+
+- Tester feedback fixes — CJK patching, header replacement, mermaid wrapping, sidebar descriptions
+- **stage6**: Add truncation continuation path and reject telemetry
+- **stage6**: Track actual model usage in traces and metadata
+
+### 🐛 Bug Fixes
+
+- Code review fixes — mermaid false positives, sidebar i18n, regex safety
+- **stage6**: Persist regenerationMode to lesson_contents metadata
+- **stage6**: Replace broken upsert with insert in markForReview and handlePartialSuccess
+- **stage6**: Set status=published when course generation completes
+- **web**: Fix false-positive unhealthy status in health endpoint
+- **stage6**: Remaining P3 recommendations and test gap coverage
+- **stage6**: Code review fixes — P1 regenerationMode bug, upsert alignment, dedup
+- **stage6**: Fail-open regenerate caps and persist model telemetry
+- **stage6**: Cap regenerate loops on repeated truncation
+- **stage6**: Finalize on terminal lesson statuses
+- **stage6**: Ignore rejected lessons in completion check
+- **stage6**: Run completion check during in-flight partial retries
+- **stage6**: Make keyword coverage language-aware
+- **stage6**: Improve russian keyword coverage heuristics
+- **stage6**: Wire 3-tier model routing into job processor
+- **stage6**: Remove stale BullMQ jobs before re-generation
+- **CI/CD**: Replace deprecated set-output with GITHUB_OUTPUT env file
+
+---
+
+_This release was automatically generated from 23 commits._
+
 ## v0.30.8
 
 _Released on 2026-02-18_

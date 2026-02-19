@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.9] - 2026-02-19
+
+### Added
+
+- tester feedback fixes — CJK patching, header replacement, mermaid wrapping, sidebar descriptions (a438ae3f)
+- **stage6**: add truncation continuation path and reject telemetry (f39c8abe)
+- **stage6**: track actual model usage in traces and metadata (245ab0ac)
+
+### Fixed
+
+- code review fixes — mermaid false positives, sidebar i18n, regex safety (bdcd1e32)
+- **stage6**: persist regenerationMode to lesson_contents metadata (5ae797ad)
+- **stage6**: replace broken upsert with insert in markForReview and handlePartialSuccess (5b19a875)
+- **stage6**: set status=published when course generation completes (4a430bbb)
+- **web**: fix false-positive unhealthy status in health endpoint (e94dacdd)
+- **stage6**: remaining P3 recommendations and test gap coverage (eaeb9d7a)
+- **stage6**: code review fixes — P1 regenerationMode bug, upsert alignment, dedup (361618bf)
+- **stage6**: fail-open regenerate caps and persist model telemetry (1451017c)
+- **stage6**: cap regenerate loops on repeated truncation (0684e10a)
+- **stage6**: finalize on terminal lesson statuses (e19810db)
+- **stage6**: ignore rejected lessons in completion check (41d00aee)
+- **stage6**: run completion check during in-flight partial retries (3ea8f93d)
+- **stage6**: make keyword coverage language-aware (5395aee9)
+- **stage6**: improve russian keyword coverage heuristics (d2122fea)
+- **stage6**: wire 3-tier model routing into job processor (9ff4df80)
+- **stage6**: remove stale BullMQ jobs before re-generation (944e00f3)
+- **ci**: replace deprecated set-output with GITHUB_OUTPUT env file (d4ee871a)
+
+### Other
+
+- add unit tests for tester feedback fixes — 4 test suites, 66 tests (1957305a)
+- Merge branch 'fix/stage6-ru-keyword-coverage' into develop (aa4be5e4)
+- retrigger pipeline after flaky contract test failure (fec2bd5f)
+
 ## [0.30.8] - 2026-02-18
 
 ### Changed
