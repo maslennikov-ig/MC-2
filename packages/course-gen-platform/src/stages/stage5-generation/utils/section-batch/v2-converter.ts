@@ -15,7 +15,7 @@ import { buildFallbackSearchQueries } from '../rag-fallback-queries';
  * All available hook strategies for round-robin rotation.
  * Ensures variety between lessons within the same section.
  */
-const HOOK_STRATEGIES: HookStrategyV2[] = ['question', 'analogy', 'statistic', 'challenge'];
+export const HOOK_STRATEGIES: HookStrategyV2[] = ['question', 'analogy', 'statistic', 'challenge'];
 
 const BLOOM_KEYWORDS: Record<BloomLevelV2, string[]> = {
   create: ['create', 'design', 'build', 'develop', 'construct', 'compose', 'invent', 'formulate'],
@@ -193,7 +193,7 @@ function buildLessonContext(
  * @param lessonIndex - 0-based lesson index within the section
  * @returns Rotated hook strategy
  */
-function rotateHookStrategy(inferred: HookStrategyV2, lessonIndex: number): HookStrategyV2 {
+export function rotateHookStrategy(inferred: HookStrategyV2, lessonIndex: number): HookStrategyV2 {
   if (lessonIndex === 0) return inferred;
 
   // Exclude inferred from rotation pool to maximize variety
