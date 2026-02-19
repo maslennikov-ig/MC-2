@@ -70,6 +70,7 @@ export async function generateLessonSingleCall(
   content: string;
   lessonDigest: string;
   tokensUsed: number;
+  modelUsed: string;
 }> {
   logger.info(
     {
@@ -260,6 +261,7 @@ export async function generateLessonSingleCall(
     content,
     lessonDigest: digest,
     tokensUsed: tokenResult.tokens,
+    modelUsed: modelId,
   };
 }
 

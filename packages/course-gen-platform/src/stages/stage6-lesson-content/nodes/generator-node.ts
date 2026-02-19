@@ -173,6 +173,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         generationMethod: 'single-call',
         targetWordCount: (lessonSpec.estimated_duration_minutes || 15) * 150,
       },
+      modelUsed: result.modelUsed,
       tokensUsed: totalTokens,
       durationMs,
     });
@@ -180,6 +181,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
     return {
       generatedContent,
       lessonDigest: result.lessonDigest,
+      modelUsed: result.modelUsed,
       tokensUsed: totalTokens,
       durationMs,
       currentNode: 'selfReviewer',
