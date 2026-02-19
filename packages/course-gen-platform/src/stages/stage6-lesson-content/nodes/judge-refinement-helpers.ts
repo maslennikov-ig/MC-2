@@ -307,6 +307,13 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     needsRegeneration,
     needsHumanReview
   );
+  const judgeModelsUsed = extractJudgeModels(enrichedOutput);
+  const modelUsed =
+    judgeModelsUsed.length === 0
+      ? null
+      : judgeModelsUsed.length === 1
+        ? judgeModelsUsed[0]
+        : judgeModelsUsed.join(', ');
 
   // Log trace
   await logTrace({
@@ -321,7 +328,11 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
       moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
       syntheticDecision: true,
     },
-    outputData: enrichedOutput,
+    outputData: {
+      ...enrichedOutput,
+      judgeModelsUsed,
+    },
+    modelUsed,
     tokensUsed: cascadeResult?.totalTokensUsed,
     durationMs,
   });
@@ -349,4 +360,20 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     durationMs,
     progressSummary: syntheticProgress,
   };
+}
+
+function extractJudgeModels(enrichedOutput: ReturnType<typeof buildEnrichedJudgeOutput>): string[] {
+  const models = new Set<string>();
+
+  if (enrichedOutput.singleJudge?.model) {
+    models.add(enrichedOutput.singleJudge.model);
+  }
+
+  for (const vote of enrichedOutput.votes ?? []) {
+    if (vote.model_id) {
+      models.add(vote.model_id);
+    }
+  }
+
+  return Array.from(models);
 }

@@ -286,6 +286,7 @@ export async function selfReviewerNode(
         reasoning: result.reasoning,
         issuesCount: result.issues.length,
         issuesByType: countIssuesByType(result.issues),
+        modelUsed: llmResult.modelUsed,
         heuristicsPassed: result.heuristicsPassed,
         heuristicDetails: result.heuristicDetails,
         llmReviewPerformed: true,
@@ -293,6 +294,7 @@ export async function selfReviewerNode(
         wasPatched: patchedContent !== null,
         progressSummary,
       },
+      modelUsed: llmResult.modelUsed,
       durationMs: result.durationMs,
     });
 

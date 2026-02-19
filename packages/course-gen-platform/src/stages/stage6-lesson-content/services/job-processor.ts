@@ -596,6 +596,7 @@ export async function processStage6Job(
         modelUsed: result.metrics.modelUsed,
         tokensUsed: result.metrics.tokensUsed,
       },
+      modelUsed: result.metrics.modelUsed,
       durationMs,
     });
 

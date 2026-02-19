@@ -46,6 +46,7 @@ export async function handlePartialSuccess(
             markdownContent: extractContentMarkdown(result.lessonContent, language),
             partial: true,
             errors: result.errors,
+            modelUsed: result.metrics.modelUsed,
             qualityScore: result.metrics.qualityScore,
           })
         ) as Json,
