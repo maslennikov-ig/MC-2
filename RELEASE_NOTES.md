@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.30.10
+
+_Released on 2026-02-19_
+
+### 🐛 Bug Fixes
+
+- **stage6**: Remove synthetic conclusion flow and guard recap overlap
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.30.9
 
 _Released on 2026-02-19_
