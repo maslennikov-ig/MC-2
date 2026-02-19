@@ -80,6 +80,12 @@ const GenerationStateAnnotation = Annotation.Root({
     metadata: string;
     sections: string;
     validation?: string;
+    sections_breakdown?: Array<{
+      section_number: number;
+      model: string;
+      tier?: string;
+      retry_count: number;
+    }>;
   }>,
 
   // Retry tracking
@@ -224,9 +230,10 @@ export class GenerationOrchestrator {
     );
 
     // STEP 5: Assemble and return result (use updated sections if overlap was resolved)
-    const stateForAssembly = updatedSections !== finalState.sections
-      ? { ...finalState, sections: updatedSections }
-      : finalState;
+    const stateForAssembly =
+      updatedSections !== finalState.sections
+        ? { ...finalState, sections: updatedSections }
+        : finalState;
 
     return this.assembleAndReturnResult(stateForAssembly, input, totalDuration);
   }
@@ -303,7 +310,7 @@ export class GenerationOrchestrator {
       }
 
       // Re-run overlap detection on updated sections
-      currentOverlapResult = await detectOverlap(updatedSections, input, this.logger) || {
+      currentOverlapResult = (await detectOverlap(updatedSections, input, this.logger)) || {
         hasOverlap: false,
         overlapCount: 0,
         overlapThreshold: 0,
@@ -335,10 +342,7 @@ export class GenerationOrchestrator {
         durationMs: 0,
       });
     } else if (updatedSections !== sections) {
-      this.logger.info(
-        { courseId: input.course_id },
-        'Overlap resolved after regeneration'
-      );
+      this.logger.info({ courseId: input.course_id }, 'Overlap resolved after regeneration');
     }
 
     return updatedSections;

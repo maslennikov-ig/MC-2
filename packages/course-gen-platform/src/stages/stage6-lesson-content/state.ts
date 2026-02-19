@@ -294,6 +294,38 @@ export const LessonGraphState = Annotation.Root({
   }),
 
   /**
+   * Model selected by Stage 6 tier routing before overrides/retries.
+   */
+  selectedModel: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Fallback model paired with selectedModel.
+   */
+  fallbackModel: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Selected tier from Stage 6 model routing.
+   */
+  selectedModelTier: Annotation<'simple' | 'normal' | 'complex' | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Human-readable tier selection reason.
+   */
+  selectedModelTierReason: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
    * Total tokens used across all phases
    * Accumulated for cost tracking
    */

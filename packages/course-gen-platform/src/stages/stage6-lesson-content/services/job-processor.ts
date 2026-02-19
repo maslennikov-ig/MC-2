@@ -18,7 +18,13 @@ import {
 import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
 import { createLessonLabel, LessonLabel, validateLanguageCode } from '@megacampus/shared-types';
 
-import { Stage6JobInput, Stage6JobResult, ProgressUpdate, ModelConfig } from '../types';
+import {
+  Stage6JobInput,
+  Stage6JobResult,
+  ProgressUpdate,
+  ModelConfig,
+  Stage6ModelTierName,
+} from '../types';
 import { MODEL_FALLBACK } from '../config';
 import { selectStage6ModelTier } from '../nodes/generator/model-selector';
 import {
@@ -74,6 +80,10 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     userRefinementPrompt,
     style,
     analysisResult,
+    selectedModel,
+    fallbackModel,
+    selectedModelTier,
+    selectedModelTierReason,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -90,6 +100,10 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     modelOverride,
     style,
     analysisResult,
+    selectedModel: selectedModel ?? null,
+    fallbackModel: fallbackModel ?? null,
+    selectedModelTier: selectedModelTier ?? null,
+    selectedModelTierReason: selectedModelTierReason ?? null,
   };
 
   return executeStage6Orchestrator(orchestratorInput);
@@ -150,7 +164,13 @@ export async function processWithFallback(
   modelConfig: ModelConfig,
   lessonUuid: string | null,
   ragChunks: RAGChunk[],
-  ragContextId: string | null
+  ragContextId: string | null,
+  modelSelection?: {
+    selectedModel: string;
+    fallbackModel: string;
+    selectedModelTier: Stage6ModelTierName;
+    selectedModelTierReason: string;
+  }
 ): Promise<Stage6Output> {
   let lastError: Error | null = null;
   const jobId = job.id ?? 'unknown';
@@ -173,9 +193,26 @@ export async function processWithFallback(
         ragChunks,
         ragContextId,
         modelOverride: modelConfig.primary,
+        selectedModel: modelSelection?.selectedModel ?? null,
+        fallbackModel: modelSelection?.fallbackModel ?? null,
+        selectedModelTier: modelSelection?.selectedModelTier ?? null,
+        selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
       });
 
       if (result.success) {
+        return result;
+      }
+
+      if (result.reviewInfo?.needsReview) {
+        logger.warn(
+          {
+            jobId,
+            model: modelConfig.primary,
+            attempt,
+            reviewInfo: result.reviewInfo,
+          },
+          'Primary model attempt ended with review_required (fail-open)'
+        );
         return result;
       }
 
@@ -245,6 +282,10 @@ export async function processWithFallback(
       ragChunks,
       ragContextId,
       modelOverride: modelConfig.fallback,
+      selectedModel: modelSelection?.selectedModel ?? null,
+      fallbackModel: modelSelection?.fallbackModel ?? null,
+      selectedModelTier: modelSelection?.selectedModelTier ?? null,
+      selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
     });
 
     if (result.success) {
@@ -254,6 +295,18 @@ export async function processWithFallback(
           fallbackModel: modelConfig.fallback,
         },
         'Fallback model succeeded'
+      );
+      return result;
+    }
+
+    if (result.reviewInfo?.needsReview) {
+      logger.warn(
+        {
+          jobId,
+          fallbackModel: modelConfig.fallback,
+          reviewInfo: result.reviewInfo,
+        },
+        'Fallback attempt ended with review_required (fail-open)'
       );
       return result;
     }
@@ -374,6 +427,10 @@ export async function processStage6Job(
         tokensUsed: 0,
         durationMs: Date.now() - startTime,
         modelUsed: null,
+        selectedModel: null,
+        fallbackModel: null,
+        selectedModelTier: null,
+        selectedModelTierReason: null,
         qualityScore: 0,
       },
     };
@@ -441,6 +498,10 @@ export async function processStage6Job(
         tokensUsed: 0,
         durationMs: Date.now() - startTime,
         modelUsed: null,
+        selectedModel: null,
+        fallbackModel: null,
+        selectedModelTier: null,
+        selectedModelTierReason: null,
         qualityScore: 0,
       },
     };
@@ -465,6 +526,9 @@ export async function processStage6Job(
     language,
     style: style ?? 'default',
     primaryModel: modelConfig.primary,
+    fallbackModel: modelConfig.fallback,
+    selectedModelTier: tierResult.tier,
+    selectedModelTierReason: tierResult.reason,
     isPaused: pauseStatusForLogging,
   });
 
@@ -490,6 +554,10 @@ export async function processStage6Job(
       ragChunksCount: ragChunks.length,
       ragContextId,
       primaryModel: modelConfig.primary,
+      selectedModel: tierResult.model,
+      fallbackModel: modelConfig.fallback,
+      selectedModelTier: tierResult.tier,
+      selectedModelTierReason: tierResult.reason,
       isPaused: pauseStatusForLogging,
     },
     durationMs: 0,
@@ -518,9 +586,28 @@ export async function processStage6Job(
   });
 
   try {
-    const result = await processWithFallback(job, modelConfig, lessonUuid, ragChunks, ragContextId);
+    const result = await processWithFallback(
+      job,
+      modelConfig,
+      lessonUuid,
+      ragChunks,
+      ragContextId,
+      {
+        selectedModel: tierResult.model,
+        fallbackModel: tierResult.fallback,
+        selectedModelTier: tierResult.tier,
+        selectedModelTierReason: tierResult.reason,
+      }
+    );
 
     const durationMs = Date.now() - startTime;
+    const needsReview = result.reviewInfo?.needsReview === true;
+
+    result.metrics.selectedModel = result.metrics.selectedModel ?? tierResult.model;
+    result.metrics.fallbackModel = result.metrics.fallbackModel ?? tierResult.fallback;
+    result.metrics.selectedModelTier = result.metrics.selectedModelTier ?? tierResult.tier;
+    result.metrics.selectedModelTierReason =
+      result.metrics.selectedModelTierReason ?? tierResult.reason;
 
     let sanityResult: SanityCheckResult = { ok: true };
     if (result.lessonContent) {
@@ -545,11 +632,48 @@ export async function processStage6Job(
       lessonId: lessonSpec.lesson_id,
       phase: 'complete',
       progress: 100,
-      message: result.success ? 'Generation complete' : 'Generation completed with errors',
+      message: needsReview
+        ? 'Generation complete (review required)'
+        : result.success
+          ? 'Generation complete'
+          : 'Generation completed with errors',
       tokensUsed: result.metrics.tokensUsed,
     });
 
-    if (result.lessonContent && result.errors.length > 0) {
+    if (needsReview) {
+      if (lessonUuid && result.lessonContent) {
+        await handlePartialSuccess(
+          job.id ?? 'unknown',
+          courseId,
+          lessonUuid,
+          lessonLabel,
+          result,
+          language
+        );
+        runCompletionCheck();
+      } else if (lessonUuid) {
+        await markForReview(
+          courseId,
+          lessonUuid,
+          lessonLabel,
+          result.reviewInfo?.reasons?.join('; ') || 'Review required by generation pipeline',
+          {
+            modelUsed: result.metrics.modelUsed,
+            selectedModel: result.metrics.selectedModel,
+            fallbackModel: result.metrics.fallbackModel,
+            selectedModelTier: result.metrics.selectedModelTier,
+            selectedModelTierReason: result.metrics.selectedModelTierReason,
+            reviewInfo: result.reviewInfo,
+          }
+        );
+        runCompletionCheck();
+      } else {
+        jobLogger.warn(
+          { lessonLabel },
+          'Cannot save review_required marker - lessonUuid not resolved'
+        );
+      }
+    } else if (result.lessonContent && result.errors.length > 0) {
       if (lessonUuid) {
         await handlePartialSuccess(
           job.id ?? 'unknown',
@@ -565,7 +689,7 @@ export async function processStage6Job(
       }
     }
 
-    if (result.success && result.lessonContent) {
+    if (!needsReview && result.success && result.lessonContent) {
       await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult, language);
 
       // Save source documents attribution for traceability
@@ -585,7 +709,12 @@ export async function processStage6Job(
         tokensUsed: result.metrics.tokensUsed,
         qualityScore: result.metrics.qualityScore,
         modelUsed: result.metrics.modelUsed,
-        hasPartialContent: result.lessonContent !== null && result.errors.length > 0,
+        selectedModel: result.metrics.selectedModel,
+        fallbackModel: result.metrics.fallbackModel,
+        selectedModelTier: result.metrics.selectedModelTier,
+        reviewRequired: needsReview,
+        hasPartialContent:
+          result.lessonContent !== null && (result.errors.length > 0 || needsReview),
       },
       'Stage 6 job processed'
     );
@@ -600,6 +729,11 @@ export async function processStage6Job(
       outputData: {
         qualityScore: result.metrics.qualityScore,
         modelUsed: result.metrics.modelUsed,
+        selectedModel: result.metrics.selectedModel,
+        fallbackModel: result.metrics.fallbackModel,
+        selectedModelTier: result.metrics.selectedModelTier,
+        selectedModelTierReason: result.metrics.selectedModelTierReason,
+        reviewRequired: needsReview,
         tokensUsed: result.metrics.tokensUsed,
       },
       modelUsed: result.metrics.modelUsed,
@@ -646,7 +780,14 @@ export async function processStage6Job(
         courseId,
         lessonUuid,
         lessonLabel,
-        `Generation failed after model fallback: ${errorMsg}`
+        `Generation failed after model fallback: ${errorMsg}`,
+        {
+          modelUsed: null,
+          selectedModel: tierResult.model,
+          fallbackModel: tierResult.fallback,
+          selectedModelTier: tierResult.tier,
+          selectedModelTierReason: tierResult.reason,
+        }
       );
       runCompletionCheck();
     } else {
@@ -669,6 +810,10 @@ export async function processStage6Job(
         tokensUsed: 0,
         durationMs,
         modelUsed: null,
+        selectedModel: tierResult.model,
+        fallbackModel: tierResult.fallback,
+        selectedModelTier: tierResult.tier,
+        selectedModelTierReason: tierResult.reason,
         qualityScore: 0,
       },
     };

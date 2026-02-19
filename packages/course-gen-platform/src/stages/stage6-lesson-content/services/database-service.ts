@@ -34,7 +34,8 @@ export async function handlePartialSuccess(
   result: Stage6Output,
   language: string = 'en'
 ): Promise<void> {
-  if (!result.lessonContent || result.errors.length === 0) {
+  const isReviewRequired = result.reviewInfo?.needsReview === true;
+  if (!result.lessonContent || (!isReviewRequired && result.errors.length === 0)) {
     return;
   }
 
@@ -55,7 +56,12 @@ export async function handlePartialSuccess(
             partial: true,
             errors: result.errors,
             modelUsed: result.metrics.modelUsed,
+            selectedModel: result.metrics.selectedModel,
+            fallbackModel: result.metrics.fallbackModel,
+            selectedModelTier: result.metrics.selectedModelTier,
+            selectedModelTierReason: result.metrics.selectedModelTierReason,
             qualityScore: result.metrics.qualityScore,
+            reviewInfo: result.reviewInfo ?? undefined,
           })
         ) as Json,
       },
@@ -107,11 +113,21 @@ export async function handlePartialSuccess(
 /**
  * Mark lesson for manual review
  */
+export interface ReviewMarkerContext {
+  modelUsed?: string | null;
+  selectedModel?: string | null;
+  fallbackModel?: string | null;
+  selectedModelTier?: string | null;
+  selectedModelTierReason?: string | null;
+  reviewInfo?: Stage6Output['reviewInfo'];
+}
+
 export async function markForReview(
   courseId: string,
   lessonUuid: LessonUUID,
   lessonLabel: LessonLabel,
-  reason: string
+  reason: string,
+  context: ReviewMarkerContext = {}
 ): Promise<void> {
   const supabaseAdmin = getSupabaseAdmin();
   const markedAt = new Date().toISOString();
@@ -140,11 +156,17 @@ export async function markForReview(
     const { error: failedContentError } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
-      status: 'failed',
+      status: 'review_required',
       metadata: {
         lessonLabel,
         markedForReviewAt: markedAt,
         failureReason: reason,
+        modelUsed: context.modelUsed ?? null,
+        selectedModel: context.selectedModel ?? null,
+        fallbackModel: context.fallbackModel ?? null,
+        selectedModelTier: context.selectedModelTier ?? null,
+        selectedModelTierReason: context.selectedModelTierReason ?? null,
+        reviewInfo: context.reviewInfo ?? undefined,
       },
       generation_attempt: 1,
     });
@@ -158,7 +180,7 @@ export async function markForReview(
           reason,
           error: failedContentError.message,
         },
-        'Failed to persist failed lesson content marker'
+        'Failed to persist review_required lesson marker'
       );
     } else {
       logger.info(
@@ -167,6 +189,7 @@ export async function markForReview(
           lessonUuid,
           lessonLabel,
           reason,
+          context,
         },
         'Lesson marked for manual review'
       );
@@ -219,6 +242,10 @@ export async function saveLessonContent(
           lessonLabel,
           tokensUsed: result.metrics.tokensUsed,
           modelUsed: result.metrics.modelUsed,
+          selectedModel: result.metrics.selectedModel,
+          fallbackModel: result.metrics.fallbackModel,
+          selectedModelTier: result.metrics.selectedModelTier,
+          selectedModelTierReason: result.metrics.selectedModelTierReason,
           qualityScore: result.metrics.qualityScore,
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
@@ -334,7 +361,15 @@ export async function saveRejectedContent(
   lessonUuid: string | null,
   generatedContent: string | null,
   selfReviewResult: SelfReviewResult,
-  generationAttempt: number
+  generationAttempt: number,
+  context?: {
+    modelUsed?: string | null;
+    selectedModel?: string | null;
+    fallbackModel?: string | null;
+    selectedModelTier?: string | null;
+    selectedModelTierReason?: string | null;
+    modelOverride?: string | null;
+  }
 ): Promise<void> {
   if (!generatedContent) {
     logger.debug(
@@ -381,6 +416,13 @@ export async function saveRejectedContent(
       durationMs: selfReviewResult.durationMs,
       contentLength: generatedContent.length,
       wordCount: generatedContent.split(/\s+/).filter(Boolean).length,
+      modelUsed: context?.modelUsed ?? null,
+      selectedModel: context?.selectedModel ?? null,
+      fallbackModel: context?.fallbackModel ?? null,
+      selectedModelTier: context?.selectedModelTier ?? null,
+      selectedModelTierReason: context?.selectedModelTierReason ?? null,
+      modelOverride: context?.modelOverride ?? null,
+      generationAttempt,
     };
 
     const { error } = await supabaseAdmin.from('lesson_contents').insert({

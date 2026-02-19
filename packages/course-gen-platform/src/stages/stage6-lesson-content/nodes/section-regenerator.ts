@@ -153,6 +153,7 @@ export async function sectionRegeneratorNode(
     return {
       currentNode: 'sectionRegenerator' as LessonGraphNode,
       generatedContent: finalContent,
+      modelUsed: regenModelUsed,
       tokensUsed: result.tokensUsed,
       durationMs,
       sectionRegenerationResult: {
