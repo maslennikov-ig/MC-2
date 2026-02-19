@@ -286,6 +286,7 @@ export async function selfReviewerNode(
         reasoning: result.reasoning,
         issuesCount: result.issues.length,
         issuesByType: countIssuesByType(result.issues),
+        modelUsed: llmResult.modelUsed,
         heuristicsPassed: result.heuristicsPassed,
         heuristicDetails: result.heuristicDetails,
         llmReviewPerformed: true,
@@ -293,6 +294,7 @@ export async function selfReviewerNode(
         wasPatched: patchedContent !== null,
         progressSummary,
       },
+      modelUsed: llmResult.modelUsed,
       durationMs: result.durationMs,
     });
 
@@ -307,6 +309,19 @@ export async function selfReviewerNode(
       stateUpdate.generatedContent = patchedContent;
     }
 
+    if (result.status === 'REGENERATE') {
+      const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
+      stateUpdate.retryCount = retryCount + 1;
+      stateUpdate.regenerationMode = telemetryUpdate.regenerationMode;
+      stateUpdate.regenerateCount = telemetryUpdate.regenerateCount;
+      stateUpdate.truncationCount = telemetryUpdate.truncationCount;
+      stateUpdate.rejectedTokens = telemetryUpdate.rejectedTokens;
+
+      if (shouldEscalateTruncationRegenerate(retryCount, result.issues)) {
+        stateUpdate.modelOverride = MODEL_FALLBACK.fallback;
+      }
+    }
+
     // Save rejected content if LLM returned REGENERATE status
     if (result.status === 'REGENERATE') {
       await saveRejectedContent(
@@ -315,7 +330,18 @@ export async function selfReviewerNode(
         state.lessonUuid,
         generatedContent,
         result,
-        retryCount + 1
+        retryCount + 1,
+        {
+          modelUsed: llmResult.modelUsed ?? state.modelUsed,
+          selectedModel: state.selectedModel,
+          fallbackModel: state.fallbackModel,
+          selectedModelTier: state.selectedModelTier,
+          selectedModelTierReason: state.selectedModelTierReason,
+          modelOverride: state.modelOverride,
+          regenerateCount: stateUpdate.regenerateCount ?? state.regenerateCount,
+          truncationCount: stateUpdate.truncationCount ?? state.truncationCount,
+          rejectedTokens: stateUpdate.rejectedTokens ?? state.rejectedTokens,
+        }
       );
     }
 
@@ -387,10 +413,17 @@ async function handleEmptyContent(
     durationMs: result.durationMs,
   });
 
+  const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
+
   return {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    regenerationMode: telemetryUpdate.regenerationMode,
+    regenerateCount: telemetryUpdate.regenerateCount,
+    truncationCount: telemetryUpdate.truncationCount,
+    rejectedTokens: telemetryUpdate.rejectedTokens,
+    retryCount: (state.retryCount || 0) + 1,
   };
 }
 
@@ -466,13 +499,26 @@ async function handleCriticalIssues(
     durationMs: result.durationMs,
   });
 
+  const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
+
   await saveRejectedContent(
     state.courseId,
     state.lessonSpec?.lesson_id ?? 'unknown',
     state.lessonUuid,
     generatedContent,
     result,
-    retryCount + 1
+    retryCount + 1,
+    {
+      modelUsed: state.modelUsed,
+      selectedModel: state.selectedModel,
+      fallbackModel: state.fallbackModel,
+      selectedModelTier: state.selectedModelTier,
+      selectedModelTierReason: state.selectedModelTierReason,
+      modelOverride: state.modelOverride,
+      regenerateCount: telemetryUpdate.regenerateCount,
+      truncationCount: telemetryUpdate.truncationCount,
+      rejectedTokens: telemetryUpdate.rejectedTokens,
+    }
   );
 
   // Include modelOverride if analysis requires fallback
@@ -481,13 +527,24 @@ async function handleCriticalIssues(
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    regenerationMode: telemetryUpdate.regenerationMode,
+    regenerateCount: telemetryUpdate.regenerateCount,
+    truncationCount: telemetryUpdate.truncationCount,
+    rejectedTokens: telemetryUpdate.rejectedTokens,
+    retryCount: retryCount + 1,
   };
 
   if (criticalAnalysis.requiresModelFallback && criticalAnalysis.fallbackModel) {
     return {
       ...baseResult,
       modelOverride: criticalAnalysis.fallbackModel,
-      retryCount: retryCount + 1,
+    };
+  }
+
+  if (shouldEscalateTruncationRegenerate(retryCount, criticalAnalysis.issues)) {
+    return {
+      ...baseResult,
+      modelOverride: MODEL_FALLBACK.fallback,
     };
   }
 
@@ -536,19 +593,36 @@ async function handleModelFallback(
     state.progressSummary
   );
 
+  const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
+
   await saveRejectedContent(
     state.courseId,
     state.lessonSpec?.lesson_id ?? 'unknown',
     state.lessonUuid,
     generatedContent,
     result,
-    retryCount + 1
+    retryCount + 1,
+    {
+      modelUsed: state.modelUsed,
+      selectedModel: state.selectedModel,
+      fallbackModel: state.fallbackModel,
+      selectedModelTier: state.selectedModelTier,
+      selectedModelTierReason: state.selectedModelTierReason,
+      modelOverride: state.modelOverride,
+      regenerateCount: telemetryUpdate.regenerateCount,
+      truncationCount: telemetryUpdate.truncationCount,
+      rejectedTokens: telemetryUpdate.rejectedTokens,
+    }
   );
 
   return {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    regenerationMode: telemetryUpdate.regenerationMode,
+    regenerateCount: telemetryUpdate.regenerateCount,
+    truncationCount: telemetryUpdate.truncationCount,
+    rejectedTokens: telemetryUpdate.rejectedTokens,
     modelOverride: MODEL_FALLBACK.fallback,
     retryCount: retryCount + 1,
   };
@@ -622,19 +696,37 @@ async function handleError(
     durationMs,
   });
 
+  const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
+
   await saveRejectedContent(
     state.courseId,
     state.lessonSpec?.lesson_id ?? 'unknown',
     state.lessonUuid,
     state.generatedContent,
     result,
-    retryCount + 1
+    retryCount + 1,
+    {
+      modelUsed: state.modelUsed,
+      selectedModel: state.selectedModel,
+      fallbackModel: state.fallbackModel,
+      selectedModelTier: state.selectedModelTier,
+      selectedModelTierReason: state.selectedModelTierReason,
+      modelOverride: state.modelOverride,
+      regenerateCount: telemetryUpdate.regenerateCount,
+      truncationCount: telemetryUpdate.truncationCount,
+      rejectedTokens: telemetryUpdate.rejectedTokens,
+    }
   );
 
   return {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    regenerationMode: telemetryUpdate.regenerationMode,
+    regenerateCount: telemetryUpdate.regenerateCount,
+    truncationCount: telemetryUpdate.truncationCount,
+    rejectedTokens: telemetryUpdate.rejectedTokens,
+    retryCount: retryCount + 1,
   };
 }
 
@@ -653,4 +745,51 @@ function countIssuesByType(issues: SelfReviewIssue[]): Record<string, number> {
     SHORT_SECTION: issues.filter(i => i.type === 'SHORT_SECTION').length,
     LOGIC: issues.filter(i => i.type === 'LOGIC').length,
   };
+}
+
+export function buildRegenerateTelemetryUpdate(
+  state: LessonGraphStateType,
+  issues: SelfReviewIssue[]
+): {
+  regenerationMode: 'full_regenerate' | 'truncation_continuation';
+  regenerateCount: number;
+  truncationCount: number;
+  rejectedTokens: number;
+} {
+  const lastGenerationTokens = state.lastGenerationTokens ?? 0;
+  const rejectedTokens = (state.rejectedTokens ?? 0) + Math.max(0, lastGenerationTokens);
+  const truncationOnly = isCriticalTruncationOnly(issues);
+
+  if (truncationOnly) {
+    return {
+      regenerationMode: 'truncation_continuation',
+      regenerateCount: state.regenerateCount ?? 0,
+      truncationCount: (state.truncationCount ?? 0) + 1,
+      rejectedTokens,
+    };
+  }
+
+  return {
+    regenerationMode: 'full_regenerate',
+    regenerateCount: (state.regenerateCount ?? 0) + 1,
+    truncationCount: state.truncationCount ?? 0,
+    rejectedTokens,
+  };
+}
+
+export function isCriticalTruncationOnly(issues: SelfReviewIssue[]): boolean {
+  const criticalIssues = issues.filter(issue => issue.severity === 'CRITICAL');
+  return criticalIssues.length > 0 && criticalIssues.every(issue => issue.type === 'TRUNCATION');
+}
+
+function shouldEscalateTruncationRegenerate(
+  retryCount: number,
+  issues: SelfReviewIssue[]
+): boolean {
+  if (!isCriticalTruncationOnly(issues)) {
+    return false;
+  }
+
+  // retryCount is the count before this REGENERATE result is applied.
+  return retryCount + 1 >= MODEL_FALLBACK.maxPrimaryAttempts;
 }

@@ -41,6 +41,7 @@ export interface LLMReviewResult {
     patched_content: LessonContentBody | null;
   } | null;
   tokensUsed: number;
+  modelUsed: string | null;
   error?: string;
 }
 
@@ -155,6 +156,7 @@ export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReview
         success: false,
         parsed: null,
         tokensUsed: llmResponse.totalTokens,
+        modelUsed: phaseConfig.modelId,
         error: 'invalid response format',
       };
     }
@@ -182,6 +184,7 @@ export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReview
         patched_content: parsed.patched_content ?? null,
       },
       tokensUsed: llmResponse.totalTokens,
+      modelUsed: phaseConfig.modelId,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -194,6 +197,7 @@ export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReview
       success: false,
       parsed: null,
       tokensUsed: 0,
+      modelUsed: phaseConfig.modelId,
       error: errorMessage,
     };
   }

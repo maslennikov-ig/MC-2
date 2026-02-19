@@ -18,7 +18,7 @@ import { DecisionAction, type DecisionResult } from '../judge/decision-engine';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { buildLessonContent } from '../judge/judge-helpers';
-import { buildEnrichedJudgeOutput } from '../judge/judge-output-builder';
+import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import { executeTargetedRefinementFlow, buildReviewInfo } from './judge-refinement-helpers';
 
@@ -434,6 +434,13 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     needsRegeneration ?? false,
     needsHumanReview ?? false
   );
+  const judgeModelsUsed = extractJudgeModels(enrichedOutput);
+  const modelUsed =
+    judgeModelsUsed.length === 0
+      ? null
+      : judgeModelsUsed.length === 1
+        ? judgeModelsUsed[0]
+        : judgeModelsUsed.join(', ');
 
   // Log trace
   await logTrace({
@@ -452,8 +459,10 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
       finalScore,
       decisionAction: decision?.action,
       needsRegeneration,
+      judgeModelsUsed,
       enrichedOutput,
     },
+    modelUsed,
     tokensUsed: totalTokensUsed,
     durationMs,
   });
@@ -489,6 +498,10 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     needsRegeneration,
     needsHumanReview,
     reviewInfo: reviewInfo ?? undefined,
+    regenerationMode: needsRegeneration ? 'full_regenerate' : null,
+    regenerateCount: needsRegeneration
+      ? (state.regenerateCount ?? 0) + 1
+      : (state.regenerateCount ?? 0),
     retryCount: needsRegeneration ? state.retryCount + 1 : state.retryCount,
     tokensUsed: totalTokensUsed,
     durationMs,

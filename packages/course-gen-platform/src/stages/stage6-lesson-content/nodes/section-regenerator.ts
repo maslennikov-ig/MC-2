@@ -57,6 +57,12 @@ export async function sectionRegeneratorNode(
     });
 
     const durationMs = Date.now() - startTime;
+    const regenModelUsed =
+      result.modelsUsed.length === 0
+        ? null
+        : result.modelsUsed.length === 1
+          ? result.modelsUsed[0]
+          : result.modelsUsed.join(', ');
 
     // Log trace at completion
     await logTrace({
@@ -72,8 +78,10 @@ export async function sectionRegeneratorNode(
         success: result.success,
         regeneratedSections: result.regeneratedSections,
         failedSections: result.failedSections,
+        modelsUsed: result.modelsUsed,
         tokensUsed: result.tokensUsed,
       },
+      modelUsed: regenModelUsed,
       tokensUsed: result.tokensUsed,
       durationMs,
     });
@@ -145,6 +153,7 @@ export async function sectionRegeneratorNode(
     return {
       currentNode: 'sectionRegenerator' as LessonGraphNode,
       generatedContent: finalContent,
+      modelUsed: regenModelUsed,
       tokensUsed: result.tokensUsed,
       durationMs,
       sectionRegenerationResult: {

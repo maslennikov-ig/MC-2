@@ -7,6 +7,10 @@ declare module 'snowball-stemmers' {
     stem(word: string): string;
   }
 
+  export function newStemmer(language: string): Stemmer;
+
+  export function algorithms(): string[];
+
   export class english {
     constructor();
     stem(word: string): string;

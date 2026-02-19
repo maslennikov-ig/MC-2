@@ -6,10 +6,172 @@
 import type { LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { calculateWordCountThresholds } from '@megacampus/shared-types/judge-thresholds';
+import { newStemmer } from 'snowball-stemmers';
 import { logger } from '@/shared/logger';
 import { calculateFleschKincaid } from './text-utils';
 import { CONCLUSION_MARKERS, CONCLUSION_REGEX, DEFAULT_HEURISTIC_THRESHOLDS } from './constants';
 import type { HeuristicThresholds, HeuristicResults } from './types';
+
+/** Matches lowercase Cyrillic words (4+ chars). Callers MUST lowercase text before matching. */
+const CYRILLIC_WORD_REGEX = /[а-яё]{4,}/g;
+const CYRILLIC_KEYWORD_REGEX = /^[а-яё]+$/;
+const DEFAULT_NON_BLOCKING_KEYWORD_THRESHOLD = 0.35;
+const KEYWORD_THRESHOLD_BY_LANGUAGE: Record<string, number> = {
+  ru: 0.35,
+  en: 0.5,
+};
+const KEYWORD_BLOCKING_LANGUAGES = new Set(['ru', 'en']);
+
+// Issue R-2: Lazy-init stemmer to avoid crashing at import time if snowball-stemmers is unavailable
+let _russianStemmer: { stem: (w: string) => string } | null = null;
+
+function getRussianStemmer(): { stem: (w: string) => string } {
+  if (!_russianStemmer) {
+    try {
+      _russianStemmer = newStemmer('russian');
+    } catch {
+      logger.warn('snowball-stemmers unavailable; Russian keyword stemming disabled');
+      _russianStemmer = { stem: (w: string) => w };
+    }
+  }
+  return _russianStemmer;
+}
+
+// Issue R-1: Russian Bloom taxonomy verbs for stop-list (will be stemmed at first use)
+const BLOOM_VERBS_RU = [
+  'запомнить',
+  'объяснить',
+  'описать',
+  'определить',
+  'оценить',
+  'проанализировать',
+  'применить',
+  'сформулировать',
+  'сравнить',
+  'различить',
+  'классифицировать',
+  'опровергнуть',
+  'доказать',
+  'обосновать',
+  'перечислить',
+  'назвать',
+  'выделить',
+  'распознать',
+  'интерпретировать',
+  'продемонстрировать',
+  'создать',
+  'разработать',
+  'предложить',
+  'спроектировать',
+  'составить',
+  'понять',
+  'знать',
+  'усвоить',
+  'освоить',
+  'изучить',
+  'рассмотреть',
+  // Imperfective forms commonly found in learning objectives
+  'применять',
+  'понимать',
+  'анализировать',
+  'оценивать',
+  'объяснять',
+  'описывать',
+  'определять',
+  'сравнивать',
+  'различать',
+  'классифицировать',
+  'доказывать',
+  'обосновывать',
+  'перечислять',
+  'называть',
+  'выделять',
+  'распознавать',
+  'интерпретировать',
+  'демонстрировать',
+  'создавать',
+  'разрабатывать',
+  'предлагать',
+  'проектировать',
+  'составлять',
+  'изучать',
+  'рассматривать',
+  'использовать',
+  'формулировать',
+];
+
+// Lazy-computed set of stemmed Bloom verb stems for Russian
+let _bloomVerbStems: Set<string> | null = null;
+
+function getBloomVerbStems(): Set<string> {
+  if (!_bloomVerbStems) {
+    const stemmer = getRussianStemmer();
+    _bloomVerbStems = new Set(BLOOM_VERBS_RU.map(verb => stemmer.stem(verb)));
+  }
+  return _bloomVerbStems;
+}
+
+function stemRussianText(text: string): string {
+  const stemmer = getRussianStemmer();
+  return text.replace(CYRILLIC_WORD_REGEX, word => stemmer.stem(word));
+}
+
+function matchKeywordInText(
+  keyword: string,
+  fullText: string,
+  stemmedRussianText: string | null
+): boolean {
+  if (!CYRILLIC_KEYWORD_REGEX.test(keyword)) {
+    return fullText.includes(keyword);
+  }
+
+  if (fullText.includes(keyword)) {
+    return true;
+  }
+
+  if (!stemmedRussianText) {
+    return false;
+  }
+
+  const keywordStem = getRussianStemmer().stem(keyword);
+  if (keywordStem.length < 3) {
+    return false;
+  }
+
+  return stemmedRussianText.includes(keywordStem);
+}
+
+export function normalizeLanguageCode(language: string): string {
+  const raw = language.trim().toLowerCase();
+  if (!raw) {
+    return 'en';
+  }
+
+  if (raw === 'english') {
+    return 'en';
+  }
+  if (raw === 'russian') {
+    return 'ru';
+  }
+
+  return raw.split(/[-_]/)[0];
+}
+
+function getKeywordCoveragePolicy(language: string): {
+  normalizedLanguage: string;
+  threshold: number;
+  isBlocking: boolean;
+} {
+  const normalizedLanguage = normalizeLanguageCode(language);
+  const threshold =
+    KEYWORD_THRESHOLD_BY_LANGUAGE[normalizedLanguage] ?? DEFAULT_NON_BLOCKING_KEYWORD_THRESHOLD;
+
+  return {
+    normalizedLanguage,
+    threshold,
+    isBlocking: KEYWORD_BLOCKING_LANGUAGES.has(normalizedLanguage),
+  };
+}
 
 /**
  * Extract all text content from lesson body for analysis
@@ -145,7 +307,8 @@ function calculateKeywordCoverage(
   // Extract keywords from learning objectives (supports Latin and Cyrillic)
   const keywords = new Set<string>();
 
-  // Common words to exclude (English and Russian)
+  // Common structural/functional words to exclude (English and Russian)
+  // Note: Russian Bloom taxonomy verbs are excluded via stemming (see getBloomVerbStems())
   const commonWords = new Set([
     // English
     'that',
@@ -164,7 +327,17 @@ function calculateKeywordCoverage(
     'more',
     'been',
     'some',
-    // Russian
+    // Bloom taxonomy verbs (English)
+    'understand',
+    'explain',
+    'describe',
+    'identify',
+    'demonstrate',
+    'apply',
+    'analyze',
+    'create',
+    'evaluate',
+    // Russian structural/functional words
     'этот',
     'этой',
     'этих',
@@ -204,6 +377,9 @@ function calculateKeywordCoverage(
     'всего',
   ]);
 
+  const bloomStems = getBloomVerbStems();
+  const stemmer = getRussianStemmer();
+
   for (const objective of lessonSpec.learning_objectives) {
     const text = objective.objective.toLowerCase();
 
@@ -215,18 +391,31 @@ function calculateKeywordCoverage(
 
     for (const word of [...latinWords, ...cyrillicWords]) {
       const normalizedWord = word.toLowerCase();
-      if (!commonWords.has(normalizedWord)) {
-        keywords.add(normalizedWord);
+      if (commonWords.has(normalizedWord)) {
+        continue;
       }
+      // For Cyrillic words, also check if the stem matches a Bloom verb stem
+      if (
+        CYRILLIC_KEYWORD_REGEX.test(normalizedWord) &&
+        bloomStems.has(stemmer.stem(normalizedWord))
+      ) {
+        continue;
+      }
+      keywords.add(normalizedWord);
     }
   }
 
   if (keywords.size === 0) return 1.0;
 
+  const hasCyrillicKeywords = Array.from(keywords).some(keyword =>
+    CYRILLIC_KEYWORD_REGEX.test(keyword)
+  );
+  const stemmedRussianText = hasCyrillicKeywords ? stemRussianText(allText) : null;
+
   // Count how many keywords are present
   let foundCount = 0;
   for (const keyword of keywords) {
-    if (allText.includes(keyword)) {
+    if (matchKeywordInText(keyword, allText, stemmedRussianText)) {
       foundCount++;
     }
   }
@@ -289,6 +478,7 @@ export function runHeuristicFilters(
   const startTime = Date.now();
   const failureReasons: string[] = [];
   const warnings: string[] = [];
+  const normalizedLanguage = normalizeLanguageCode(language);
 
   // Extract text for analysis
   const fullText = extractTextContent(content);
@@ -327,7 +517,7 @@ export function runHeuristicFilters(
   // Flesch-Kincaid uses English syllable counting (/[aeiouy]+/g) which doesn't work for:
   // - Russian (Cyrillic): а, е, и, о, у, ы, э, ю, я
   // - Spanish, German, French, etc. (different vowel patterns)
-  const isEnglish = language === 'en' || language === 'english';
+  const isEnglish = normalizedLanguage === 'en';
   const fleschKincaidSkipped = !isEnglish;
   let fleschKincaid = 0;
 
@@ -348,6 +538,7 @@ export function runHeuristicFilters(
     logger.debug({
       msg: 'Flesch-Kincaid check skipped for non-English content',
       language,
+      normalizedLanguage,
       lessonId: lessonSpec.lesson_id,
     });
   }
@@ -361,11 +552,20 @@ export function runHeuristicFilters(
 
   // Calculate keyword coverage
   const keywordCoverage = calculateKeywordCoverage(content, lessonSpec);
+  const keywordCoveragePolicy = getKeywordCoveragePolicy(language);
+  const keywordCoverageThresholdPct = (keywordCoveragePolicy.threshold * 100).toFixed(0);
+  const keywordCoverageWouldBlock = keywordCoverage < keywordCoveragePolicy.threshold;
 
-  if (keywordCoverage < 0.5) {
-    failureReasons.push(
-      `Keyword coverage (${(keywordCoverage * 100).toFixed(0)}%) below 50% threshold`
-    );
+  if (keywordCoverageWouldBlock) {
+    const reason = `Keyword coverage (${(keywordCoverage * 100).toFixed(0)}%) below ${keywordCoverageThresholdPct}% threshold`;
+
+    if (keywordCoveragePolicy.isBlocking) {
+      failureReasons.push(reason);
+    } else {
+      warnings.push(
+        `${reason} (non-blocking for language "${keywordCoveragePolicy.normalizedLanguage}")`
+      );
+    }
   }
 
   // Check examples count
@@ -394,6 +594,10 @@ export function runHeuristicFilters(
     fleschKincaid: fleschKincaid.toFixed(1),
     sectionsPresent: sectionsCheck.present,
     keywordCoverage: (keywordCoverage * 100).toFixed(0) + '%',
+    keywordCoverageThreshold: keywordCoverageThresholdPct + '%',
+    keywordCoverageBlocking: keywordCoveragePolicy.isBlocking,
+    keywordCoverageWouldBlock,
+    language: normalizedLanguage,
     examplesCount,
     exercisesCount,
     failureCount: failureReasons.length,
@@ -418,6 +622,9 @@ export function runHeuristicFilters(
     sectionsPresent: sectionsCheck.present,
     missingSections: sectionsCheck.missing,
     keywordCoverage,
+    keywordCoverageThreshold: keywordCoveragePolicy.threshold,
+    keywordCoverageBlocking: keywordCoveragePolicy.isBlocking,
+    keywordCoverageWouldBlock,
     examplesCount,
     exercisesCount,
     failureReasons,

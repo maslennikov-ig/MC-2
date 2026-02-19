@@ -62,7 +62,7 @@ export async function generateSection(
   modelOverride: string | null = null,
   style: string | null = null,
   analysisResult: AnalysisResult | null = null
-): Promise<{ content: string; tokensUsed: number }> {
+): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
   const startTime = performance.now();
 
   // Get temperature based on section's content archetype
@@ -254,5 +254,6 @@ export async function generateSection(
   return {
     content,
     tokensUsed: tokenResult.tokens,
+    modelUsed: modelId,
   };
 }
