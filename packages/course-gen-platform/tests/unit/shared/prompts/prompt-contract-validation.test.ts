@@ -429,7 +429,6 @@ describe('Prompt Contract Validation', () => {
         stylePrompt: key,
         outputLanguage: key,
         introductionHeader: key,
-        summaryHeader: key,
         exercisesHeader: key,
         exerciseLabel: key,
         taskLabel: key,
