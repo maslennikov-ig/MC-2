@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileSearch,
+  ClipboardList,
   Play,
   Shield,
   ArrowUpDown,
@@ -379,6 +380,18 @@ export function HistoryTable() {
               title={t('actions.adminPanel')}
             >
               <Shield className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-gray-500 hover:text-purple-500 dark:hover:text-cyan-400"
+              onClick={(e) => {
+                e.stopPropagation()
+                router.push(`/admin/generation/${row.original.id}/audit`)
+              }}
+              title="Audit"
+            >
+              <ClipboardList className="h-4 w-4" />
             </Button>
           </div>
         ),
