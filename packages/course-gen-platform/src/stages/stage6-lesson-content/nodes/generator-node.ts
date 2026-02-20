@@ -21,6 +21,7 @@ import { logTrace } from '@/shared/trace-logger';
 import { getContentLabels } from '@megacampus/shared-types';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
+import { runTableFixPipeline } from '../utils/table-fix-pipeline';
 
 // Import from extracted modules
 import { calculateDynamicContextWindow } from './generator/generator-constants';
@@ -148,6 +149,31 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         'Mermaid fix pipeline failed, using original content'
       );
       // Keep original content - self-reviewer will catch issues later
+    }
+
+    // ========================================================================
+    // 2.1 TABLE FIX PIPELINE (deterministic markdown table recovery)
+    // ========================================================================
+    try {
+      const tableResult = runTableFixPipeline(generatedContent);
+      if (tableResult.modified) {
+        logger.debug(
+          {
+            lessonId: lessonSpec.lesson_id,
+            metrics: tableResult.metrics,
+          },
+          'Table fix pipeline applied to generated content'
+        );
+        generatedContent = tableResult.content;
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          lessonId: lessonSpec.lesson_id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Table fix pipeline failed, using content from previous step'
+      );
     }
 
     // ========================================================================
