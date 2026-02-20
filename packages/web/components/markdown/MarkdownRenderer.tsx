@@ -42,6 +42,7 @@ import {
   Link,
 } from './components'
 import { parseCalloutFromChildren } from './utils/callout-parser'
+import { normalizeMalformedMarkdownTables } from './utils/normalize-markdown-tables'
 import type { MarkdownRendererProps } from './types'
 
 /**
@@ -72,6 +73,8 @@ export async function MarkdownRenderer({
   if (!content || content.trim() === '') {
     return null
   }
+
+  const normalizedContent = normalizeMalformedMarkdownTables(content)
 
   // Get merged preset configuration with feature overrides
   const config = getPresetConfig(preset, features)
@@ -241,7 +244,7 @@ export async function MarkdownRenderer({
 
   // Compile MDX content on the server
   const { content: compiledContent } = await compileMDX({
-    source: content,
+    source: normalizedContent,
     options: {
       mdxOptions: {
         remarkPlugins,
