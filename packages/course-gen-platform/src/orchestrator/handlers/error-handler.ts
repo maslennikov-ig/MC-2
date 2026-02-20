@@ -335,60 +335,8 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
   });
 }
 
-/**
- * Handle job stalled event
- *
- * Called when a job has been stalled (worker crashed or timed out).
- *
- * @param {string} jobId - The ID of the stalled job
- * @param {JobType} jobType - The type of job
- */
-export function handleJobStalled(jobId: string, jobType: JobType): void {
-  baseLogger.info(
-    {
-      jobId,
-      jobType,
-      timestamp: new Date().toISOString(),
-      note: 'Worker may have crashed or job timed out',
-    },
-    'Job stalled'
-  );
-
-  // TODO (Future): Implement stalled job recovery
-  // - Check if worker is still alive
-  // - Decide whether to retry or fail
-  // - Clean up any partial work
-}
-
-/**
- * Handle job timeout
- *
- * Called when a job exceeds its timeout limit.
- *
- * @param {Job<JobData>} job - The timed out job
- */
-export function handleJobTimeout(job: Job<JobData>): void {
-  baseLogger.error(
-    {
-      jobId: job.id,
-      jobType: job.name,
-      organizationId: job.data.organizationId,
-      courseId: job.data.courseId,
-      timestamp: new Date().toISOString(),
-    },
-    'Job timed out'
-  );
-
-  // TODO (Future): Implement timeout-specific handling
-  // - Cancel any ongoing work
-  // - Clean up resources
-  // - Update status to timeout instead of failure
-}
-
 export default {
   classifyError,
   shouldRetryJob,
   handleJobFailure,
-  handleJobStalled,
-  handleJobTimeout,
 };
