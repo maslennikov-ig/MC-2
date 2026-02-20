@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 56 (no optimization needed)
+ * Current rule count: 58 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -254,9 +254,22 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Unauthenticated tRPC request - 401 is correct response',
   },
   {
-    pattern: /Job \d+ not found/i,
+    pattern: /Job .+ not found/i,
     reason: 'expected_behavior',
     description: 'Frontend polls job status after job record cleanup - expected race condition',
+  },
+
+  // === Infrastructure Issues ===
+  {
+    pattern: /MISCONF Redis.*unable to persist/i,
+    reason: 'infrastructure',
+    description: 'Redis RDB snapshot disk issue - infrastructure problem, not app bug',
+  },
+  {
+    pattern: /Concurrency limit exceeded/i,
+    reason: 'external_service',
+    description:
+      'Jina API server-side concurrency enforcement - distributed limiter handles retries',
   },
 
   // === Heuristic False Positives ===
