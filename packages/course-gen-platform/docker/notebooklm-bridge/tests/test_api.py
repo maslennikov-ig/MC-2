@@ -9,8 +9,12 @@ from app.generator import GenerationResult
 from app.main import create_app, get_media_generator
 
 
+captured_requests: list[tuple[str, object]] = []
+
+
 class MockGenerator:
     async def generate_audio(self, request):
+        captured_requests.append(("audio", request))
         return GenerationResult(
             media_bytes=b"mock-audio",
             mime_type="audio/mpeg",
@@ -20,6 +24,7 @@ class MockGenerator:
         )
 
     async def generate_video_overview(self, request):
+        captured_requests.append(("video", request))
         return GenerationResult(
             media_bytes=b"mock-video",
             mime_type="video/mp4",
@@ -31,6 +36,7 @@ class MockGenerator:
 
 @pytest.fixture
 def client() -> Generator[TestClient, None, None]:
+    captured_requests.clear()
     app = create_app(
         settings=Settings(
             notebooklm_bridge_token="test-token",
@@ -102,6 +108,37 @@ def test_success_audio_generation_returns_contract_shape(client: TestClient) -> 
     assert payload["metadata"]["provider"] == "mock"
 
 
+def test_audio_generation_accepts_sources_and_presets(client: TestClient) -> None:
+    response = client.post(
+        "/artifacts/generate-audio",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "lesson_title": "Lesson 1",
+            "script": "audio script",
+            "language": "en",
+            "voice": "alloy",
+            "sources": [
+                {"title": "Script", "content": "audio script"},
+                {"title": "Raw Lesson", "content": "# Raw markdown"},
+            ],
+            "audio_format": "deep_dive",
+            "audio_length": "default",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_requests, "Expected generator to receive request"
+
+    req_type, request = captured_requests[-1]
+    assert req_type == "audio"
+    assert request.audio_format == "deep_dive"
+    assert request.audio_length == "default"
+    assert request.sources is not None
+    assert len(request.sources) == 2
+    assert request.sources[0].title == "Script"
+    assert request.sources[1].content == "# Raw markdown"
+
+
 def test_success_video_generation_returns_contract_shape(client: TestClient) -> None:
     response = client.post(
         "/video/generate-overview",
@@ -121,6 +158,36 @@ def test_success_video_generation_returns_contract_shape(client: TestClient) -> 
     assert payload["extension"] == "mp4"
     assert payload["duration_seconds"] == 42.0
     assert payload["metadata"]["provider"] == "mock"
+
+
+def test_video_generation_accepts_sources_and_presets(client: TestClient) -> None:
+    response = client.post(
+        "/video/generate-overview",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "lesson_title": "Lesson 1",
+            "script": "video script",
+            "language": "en",
+            "sources": [
+                {"title": "Draft Script", "content": "video script"},
+                {"title": "Objectives", "content": "- Objective A"},
+            ],
+            "video_format": "explainer",
+            "video_style": "auto_select",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_requests, "Expected generator to receive request"
+
+    req_type, request = captured_requests[-1]
+    assert req_type == "video"
+    assert request.video_format == "explainer"
+    assert request.video_style == "auto_select"
+    assert request.sources is not None
+    assert len(request.sources) == 2
+    assert request.sources[0].title == "Draft Script"
+    assert request.sources[1].content == "- Objective A"
 
 
 def test_extra_fields_rejected_by_model(client: TestClient) -> None:

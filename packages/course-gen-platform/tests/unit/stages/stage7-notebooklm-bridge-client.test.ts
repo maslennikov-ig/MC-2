@@ -112,4 +112,102 @@ describe('notebooklm-bridge-client', () => {
       })
     ).rejects.toThrow(/NOTEBOOKLM_BRIDGE_URL/i);
   });
+
+  it('sends optional hybrid sources and audio presets when provided', async () => {
+    process.env.NOTEBOOKLM_BRIDGE_URL = 'https://bridge.local';
+    process.env.NOTEBOOKLM_BRIDGE_TOKEN = 'secret-token';
+
+    const base64 = Buffer.from('audio-bytes').toString('base64');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        JSON.stringify({
+          audio_base64: base64,
+          mime_type: 'audio/mpeg',
+          extension: 'mp3',
+        }),
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { notebookLmBridgeClient } = await import(
+      '../../../src/stages/stage7-enrichments/services/notebooklm-bridge-client'
+    );
+
+    await notebookLmBridgeClient.generateAudio({
+      lessonTitle: 'Lesson 1',
+      script: 'Primary script',
+      language: 'en',
+      voice: 'alloy',
+      sources: [
+        { title: 'Script', content: 'Primary script' },
+        { title: 'Raw lesson', content: 'Raw markdown content' },
+      ],
+      audioFormat: 'deep_dive',
+      audioLength: 'default',
+    });
+
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(requestBody).toMatchObject({
+      lesson_title: 'Lesson 1',
+      script: 'Primary script',
+      language: 'en',
+      voice: 'alloy',
+      audio_format: 'deep_dive',
+      audio_length: 'default',
+      sources: [
+        { title: 'Script', content: 'Primary script' },
+        { title: 'Raw lesson', content: 'Raw markdown content' },
+      ],
+    });
+  });
+
+  it('sends optional hybrid sources and video presets when provided', async () => {
+    process.env.NOTEBOOKLM_BRIDGE_URL = 'https://bridge.local';
+    process.env.NOTEBOOKLM_BRIDGE_TOKEN = 'secret-token';
+
+    const base64 = Buffer.from('video-bytes').toString('base64');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () =>
+        JSON.stringify({
+          video_base64: base64,
+          mime_type: 'video/mp4',
+          extension: 'mp4',
+        }),
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { notebookLmBridgeClient } = await import(
+      '../../../src/stages/stage7-enrichments/services/notebooklm-bridge-client'
+    );
+
+    await notebookLmBridgeClient.generateVideoOverview({
+      lessonTitle: 'Lesson 1',
+      script: 'Video script',
+      language: 'en',
+      sources: [
+        { title: 'Script', content: 'Video script' },
+        { title: 'Objectives', content: 'Objective data' },
+      ],
+      videoFormat: 'explainer',
+      videoStyle: 'auto_select',
+    });
+
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(requestBody).toMatchObject({
+      lesson_title: 'Lesson 1',
+      script: 'Video script',
+      language: 'en',
+      video_format: 'explainer',
+      video_style: 'auto_select',
+      sources: [
+        { title: 'Script', content: 'Video script' },
+        { title: 'Objectives', content: 'Objective data' },
+      ],
+    });
+  });
 });

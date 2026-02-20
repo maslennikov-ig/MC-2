@@ -5,6 +5,23 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class MediaSourceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(..., min_length=1, max_length=300)
+    content: str = Field(..., min_length=1)
+
+    @field_validator("title", "content", mode="before")
+    @classmethod
+    def trim_and_validate_not_blank(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            trimmed = value.strip()
+            if not trimmed:
+                raise ValueError("must not be blank")
+            return trimmed
+        return value
+
+
 class MediaGenerationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -12,8 +29,23 @@ class MediaGenerationRequest(BaseModel):
     script: str = Field(..., min_length=1)
     language: str = Field(..., min_length=2, max_length=16)
     voice: str | None = Field(default=None, max_length=128)
+    sources: list[MediaSourceInput] | None = None
+    audio_format: str | None = Field(default=None, max_length=64)
+    audio_length: str | None = Field(default=None, max_length=64)
+    video_format: str | None = Field(default=None, max_length=64)
+    video_style: str | None = Field(default=None, max_length=64)
 
-    @field_validator("lesson_title", "script", "language", "voice", mode="before")
+    @field_validator(
+        "lesson_title",
+        "script",
+        "language",
+        "voice",
+        "audio_format",
+        "audio_length",
+        "video_format",
+        "video_style",
+        mode="before",
+    )
     @classmethod
     def trim_and_validate_not_blank(cls, value: Any) -> Any:
         if value is None:
@@ -46,4 +78,3 @@ class VideoGenerationResponse(BaseModel):
     extension: str
     duration_seconds: float | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
-

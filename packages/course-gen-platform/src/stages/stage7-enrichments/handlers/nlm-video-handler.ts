@@ -10,7 +10,13 @@
 import { logger } from '@/shared/logger';
 import type { EnrichmentMetadata, VideoEnrichmentContent } from '@megacampus/shared-types';
 import { videoScriptOutputSchema, type VideoScriptOutput } from '../prompts/video-prompt';
-import { notebookLmBridgeClient } from '../services/notebooklm-bridge-client';
+import { getLessonContent } from '../services/database-service';
+import {
+  notebookLmBridgeClient,
+  type NotebookLMSourceInput,
+  type NotebookLMVideoFormatPreset,
+  type NotebookLMVideoStylePreset,
+} from '../services/notebooklm-bridge-client';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type { DraftResult, EnrichmentHandlerInput, GenerateResult } from '../types';
 import { videoHandler } from './video-handler';
@@ -22,6 +28,26 @@ interface ParsedVideoDraft {
   tone?: string;
   pacing?: string;
 }
+
+type NlmSourceStrategy = 'script_only' | 'raw_only' | 'hybrid';
+
+const NLM_SOURCE_STRATEGIES: NlmSourceStrategy[] = ['script_only', 'raw_only', 'hybrid'];
+const NLM_VIDEO_FORMAT_PRESETS: NotebookLMVideoFormatPreset[] = ['explainer', 'brief'];
+const NLM_VIDEO_STYLE_PRESETS: NotebookLMVideoStylePreset[] = [
+  'auto_select',
+  'custom',
+  'classic',
+  'whiteboard',
+  'kawaii',
+  'anime',
+  'watercolor',
+  'retro_print',
+  'heritage',
+  'paper_craft',
+];
+const NLM_DEFAULT_SOURCE_STRATEGY: NlmSourceStrategy = 'hybrid';
+const NLM_DEFAULT_VIDEO_FORMAT: NotebookLMVideoFormatPreset = 'explainer';
+const NLM_DEFAULT_VIDEO_STYLE: NotebookLMVideoStylePreset = 'auto_select';
 
 function buildFullScript(scriptOutput: VideoScriptOutput): string {
   const scriptParts: string[] = [];
@@ -89,6 +115,111 @@ function parseDraft(rawDraft: unknown): ParsedVideoDraft {
   throw new Error('Draft does not contain a valid video script');
 }
 
+function isStringInSet<T extends string>(value: unknown, allowedValues: readonly T[]): value is T {
+  return typeof value === 'string' && allowedValues.includes(value as T);
+}
+
+function resolveSourceStrategy(settings: Record<string, unknown>): NlmSourceStrategy {
+  const strategy = settings.nlm_source_strategy;
+  if (isStringInSet(strategy, NLM_SOURCE_STRATEGIES)) {
+    return strategy;
+  }
+  return NLM_DEFAULT_SOURCE_STRATEGY;
+}
+
+function resolveVideoFormatPreset(settings: Record<string, unknown>): NotebookLMVideoFormatPreset {
+  const preset = settings.nlm_video_format;
+  if (isStringInSet(preset, NLM_VIDEO_FORMAT_PRESETS)) {
+    return preset;
+  }
+  return NLM_DEFAULT_VIDEO_FORMAT;
+}
+
+function resolveVideoStylePreset(settings: Record<string, unknown>): NotebookLMVideoStylePreset {
+  const preset = settings.nlm_video_style;
+  if (isStringInSet(preset, NLM_VIDEO_STYLE_PRESETS)) {
+    return preset;
+  }
+  return NLM_DEFAULT_VIDEO_STYLE;
+}
+
+function buildObjectivesAndMetadataSource(
+  input: EnrichmentHandlerInput
+): NotebookLMSourceInput | null {
+  const { enrichmentContext } = input;
+  const objectives = enrichmentContext.lesson.objectives ?? [];
+
+  const lines: string[] = [
+    `Course: ${enrichmentContext.course.title}`,
+    `Lesson: ${enrichmentContext.lesson.title}`,
+  ];
+
+  if (objectives.length > 0) {
+    lines.push('Learning objectives:');
+    for (const objective of objectives) {
+      lines.push(`- ${objective}`);
+    }
+  }
+
+  const content = lines.join('\n').trim();
+  if (!content) {
+    return null;
+  }
+
+  return {
+    title: 'Lesson Objectives & Metadata',
+    content,
+  };
+}
+
+function buildNotebookLMSources(params: {
+  strategy: NlmSourceStrategy;
+  fullScript: string;
+  rawLessonContent: string | null;
+  input: EnrichmentHandlerInput;
+}): NotebookLMSourceInput[] {
+  const scriptSource: NotebookLMSourceInput = {
+    title: 'Video Draft Script',
+    content: params.fullScript,
+  };
+
+  const rawSource: NotebookLMSourceInput | null =
+    params.rawLessonContent && params.rawLessonContent.trim()
+      ? {
+          title: 'Raw Lesson Content',
+          content: params.rawLessonContent.trim(),
+        }
+      : null;
+
+  const objectivesSource = buildObjectivesAndMetadataSource(params.input);
+  const sources: NotebookLMSourceInput[] = [];
+
+  if (params.strategy === 'script_only') {
+    sources.push(scriptSource);
+  } else if (params.strategy === 'raw_only') {
+    if (rawSource) {
+      sources.push(rawSource);
+    }
+    if (objectivesSource) {
+      sources.push(objectivesSource);
+    }
+  } else {
+    sources.push(scriptSource);
+    if (rawSource) {
+      sources.push(rawSource);
+    }
+    if (objectivesSource) {
+      sources.push(objectivesSource);
+    }
+  }
+
+  if (sources.length === 0) {
+    sources.push(scriptSource);
+  }
+
+  return sources;
+}
+
 async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
   if (!videoHandler.generateDraft) {
     throw new Error('Video draft generation is not configured');
@@ -121,11 +252,37 @@ async function generateFinal(
   );
 
   const parsedDraft = parseDraft(draft.draftContent);
+  let rawLessonContent: string | null = null;
+
+  try {
+    rawLessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  } catch (error) {
+    logger.warn(
+      {
+        lessonId: enrichmentContext.lesson.id,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'NLM video handler: failed to load raw lesson content for source bundle'
+    );
+  }
+
+  const sourceStrategy = resolveSourceStrategy(settings);
+  const videoFormatPreset = resolveVideoFormatPreset(settings);
+  const videoStylePreset = resolveVideoStylePreset(settings);
+  const sources = buildNotebookLMSources({
+    strategy: sourceStrategy,
+    fullScript: parsedDraft.fullScript,
+    rawLessonContent,
+    input,
+  });
 
   const bridgeResult = await notebookLmBridgeClient.generateVideoOverview({
     lessonTitle: enrichmentContext.lesson.title,
     script: parsedDraft.fullScript,
     language: enrichmentContext.course.language || 'en',
+    sources,
+    videoFormat: videoFormatPreset,
+    videoStyle: videoStylePreset,
   });
 
   const content: VideoEnrichmentContent = {
@@ -152,6 +309,10 @@ async function generateFinal(
       section_count: parsedDraft.sectionCount,
       tone: parsedDraft.tone,
       pacing: parsedDraft.pacing,
+      source_strategy_used: sourceStrategy,
+      source_count: sources.length,
+      video_format_preset: videoFormatPreset,
+      video_style_preset: videoStylePreset,
       mime_type: bridgeResult.mimeType,
       format: bridgeResult.extension,
       bridge_response: bridgeResult.responseMetadata,

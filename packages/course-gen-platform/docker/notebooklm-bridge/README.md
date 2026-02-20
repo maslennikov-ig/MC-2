@@ -25,11 +25,27 @@ Both generation endpoints accept JSON:
   "lesson_title": "Lesson title",
   "script": "Narration script",
   "language": "en",
-  "voice": "alloy"
+  "voice": "alloy",
+  "sources": [
+    { "title": "Edited Script", "content": "..." },
+    { "title": "Raw Lesson Content", "content": "..." },
+    { "title": "Lesson Objectives & Metadata", "content": "..." }
+  ],
+  "audio_format": "deep_dive",
+  "audio_length": "default",
+  "video_format": "explainer",
+  "video_style": "auto_select"
 }
 ```
 
-`voice` is optional.
+Optional fields:
+
+- `voice`
+- `sources` (fallbacks to single script source when omitted)
+- `audio_format`: `deep_dive | brief | critique | debate`
+- `audio_length`: `short | default | long`
+- `video_format`: `explainer | brief`
+- `video_style`: `auto_select | custom | classic | whiteboard | kawaii | anime | watercolor | retro_print | heritage | paper_craft`
 
 ## Response Contract
 
