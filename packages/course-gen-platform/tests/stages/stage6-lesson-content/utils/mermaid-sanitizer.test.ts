@@ -211,6 +211,7 @@ describe('checkMermaidSyntax', () => {
       expect(result.totalDiagrams).toBe(0);
       expect(result.affectedDiagrams).toBe(0);
       expect(result.mermaidIssues).toHaveLength(0);
+      expect(result.fallbackComments).toBe(0);
     });
 
     it('should pass for clean Mermaid blocks', () => {
@@ -226,6 +227,7 @@ flowchart TD
       expect(result.passed).toBe(true);
       expect(result.totalDiagrams).toBe(1);
       expect(result.affectedDiagrams).toBe(0);
+      expect(result.fallbackComments).toBe(0);
     });
   });
 
@@ -293,6 +295,17 @@ flowchart TD
 
       expect(result.passed).toBe(false);
       expect(result.mermaidIssues.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should fail when Mermaid fallback comments are present', () => {
+      const content =
+        '# Lesson\n\n<!-- Mermaid flowchart could not be rendered. Please review manually. -->';
+
+      const result = checkMermaidSyntax(content);
+
+      expect(result.passed).toBe(false);
+      expect(result.fallbackComments).toBe(1);
+      expect(result.mermaidIssues.some(i => i.includes('fallback comment'))).toBe(true);
     });
   });
 

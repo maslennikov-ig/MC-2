@@ -31,6 +31,18 @@ vi.mock('../../../../src/stages/stage6-lesson-content/utils/mermaid-validator.js
     .mockResolvedValue({ valid: true, errors: [], diagramType: 'flowchart' }),
 }));
 
+vi.mock('../../../../src/stages/stage6-lesson-content/utils/mermaid-render-validator.js', () => ({
+  validateMermaidBlockRender: vi.fn().mockResolvedValue({
+    blockIndex: 0,
+    diagramType: 'flowchart-v2',
+    parseValid: true,
+    renderValid: true,
+    svgHasRenderableContent: true,
+    errors: [],
+    codeSnippet: 'flowchart TD A-->B',
+  }),
+}));
+
 vi.mock('../../../../src/stages/stage6-lesson-content/utils/mermaid-llm-fixer.js', () => ({
   fixMermaidWithLLM: vi.fn().mockResolvedValue({ fixed: false, content: '' }),
 }));
