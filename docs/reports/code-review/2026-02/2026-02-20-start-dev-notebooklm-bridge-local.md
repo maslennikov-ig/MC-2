@@ -1,7 +1,7 @@
-# Code Review Report: start-dev local NotebookLM bridge option
+# Code Review Report: start-dev always-on local NotebookLM bridge
 
 - Date: 2026-02-20
-- Scope: Add optional local NotebookLM bridge startup to `start-dev.sh`
+- Scope: Make local NotebookLM bridge startup mandatory in `start-dev.sh`
 
 ## Problem
 
@@ -15,14 +15,14 @@
 
 ### Behavior
 
-- Added CLI flag: `--with-nlm-bridge`
-- When enabled, script:
-  - resolves bridge vars from env or `packages/course-gen-platform/.env`
-  - validates `NOTEBOOKLM_BRIDGE_TOKEN`
-  - starts local container `megacampus-notebooklm-bridge-local` on `127.0.0.1:8010`
-  - exports `NOTEBOOKLM_BRIDGE_URL=http://127.0.0.1:8010` for local API/workers
-  - prints bridge endpoint in startup summary
-  - stops the bridge container on shutdown only if script started it
+- `start-dev.sh` now always starts local bridge container `megacampus-notebooklm-bridge-local` on `127.0.0.1:8010`.
+- Script resolves bridge vars from env or `packages/course-gen-platform/.env`.
+- Script validates `NOTEBOOKLM_BRIDGE_TOKEN` and fails fast if missing.
+- Script forces local runtime routing:
+  - `NOTEBOOKLM_BRIDGE_URL=http://127.0.0.1:8010`
+  - `NOTEBOOKLM_BRIDGE_TOKEN=<resolved token>`
+- Bridge endpoint is always printed in startup summary.
+- On shutdown, script stops bridge container only if it started it during this session.
 
 ## Verification
 
@@ -35,10 +35,10 @@ bash -n start-dev.sh
 - Expected usage:
 
 ```bash
-./start-dev.sh --with-nlm-bridge
+./start-dev.sh
 ```
 
 ## Notes
 
-- Default behavior remains unchanged (no bridge startup without flag).
+- Startup now enforces full local Stage 7 path by default.
 - If token/storage are not configured, script fails fast with actionable message.
