@@ -37,20 +37,12 @@ class Settings(BaseSettings):
         alias="NOTEBOOKLM_POLL_INTERVAL_SECONDS",
     )
     notebooklm_allow_fallback: bool = Field(
-        default=True,
+        default=False,
         alias="NOTEBOOKLM_ALLOW_FALLBACK",
-    )
-    notebooklm_api_key: str | None = Field(
-        default=None,
-        alias="NOTEBOOKLM_API_KEY",
     )
     notebooklm_storage_path: str | None = Field(
         default=None,
         alias="NOTEBOOKLM_STORAGE_PATH",
-    )
-    notebooklm_workspace_id: str | None = Field(
-        default=None,
-        alias="NOTEBOOKLM_WORKSPACE_ID",
     )
 
 

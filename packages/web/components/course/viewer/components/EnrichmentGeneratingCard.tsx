@@ -11,7 +11,15 @@ import { getNextMilestone } from '@megacampus/shared-types'
 import { StagedProgress } from '@/components/ui/staged-progress'
 import { cn } from '@/lib/utils'
 
-type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video' | 'cover' | 'card'
+type EnrichmentType =
+  | 'quiz'
+  | 'audio'
+  | 'nlm_audio'
+  | 'presentation'
+  | 'video'
+  | 'nlm_video'
+  | 'cover'
+  | 'card'
 
 const ENRICHMENT_CONFIG: Record<
   EnrichmentType,
@@ -27,6 +35,11 @@ const ENRICHMENT_CONFIG: Record<
     bgColor: 'bg-red-100 dark:bg-red-900/30',
   },
   audio: {
+    icon: Headphones,
+    color: 'text-purple-500 dark:text-purple-400',
+    bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+  },
+  nlm_audio: {
     icon: Headphones,
     color: 'text-purple-500 dark:text-purple-400',
     bgColor: 'bg-purple-100 dark:bg-purple-900/30',
@@ -50,6 +63,11 @@ const ENRICHMENT_CONFIG: Record<
     icon: Image,
     color: 'text-indigo-500 dark:text-indigo-400',
     bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
+  },
+  nlm_video: {
+    icon: Video,
+    color: 'text-red-500 dark:text-red-400',
+    bgColor: 'bg-red-100 dark:bg-red-900/30',
   },
 }
 
@@ -116,10 +134,12 @@ export function EnrichmentGeneratingCard({
         case 'quiz':
           return 'quiz_generating'
         case 'audio':
+        case 'nlm_audio':
           return 'audio_generating'
         case 'presentation':
           return 'presentation_generating'
         case 'video':
+        case 'nlm_video':
           return 'video_generating'
         default:
           return 'generating'
@@ -141,10 +161,14 @@ export function EnrichmentGeneratingCard({
         return t('placeholder.quiz.title')
       case 'audio':
         return t('placeholder.audio.title')
+      case 'nlm_audio':
+        return t('placeholder.nlm_audio.title')
       case 'presentation':
         return t('placeholder.presentation.title')
       case 'video':
         return t('placeholder.video.title')
+      case 'nlm_video':
+        return t('placeholder.nlm_video.title')
       case 'cover':
         return t('images.cover.title')
       case 'card':

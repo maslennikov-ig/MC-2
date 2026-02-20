@@ -16,15 +16,31 @@ API/worker call it through the existing TypeScript client using:
   - These are wired directly in compose for API + Stage 7 worker.
 - `NOTEBOOKLM_BRIDGE_TOKEN`
   - Shared bearer token for bridge authentication.
-  - Set in `.env.dev` / `.env.production` (see examples).
-- `NOTEBOOKLM_UPSTREAM_EMAIL`
-- `NOTEBOOKLM_UPSTREAM_PASSWORD`
-  - Upstream NotebookLM credentials used by bridge service.
-  - Set in `.env.dev` / `.env.production` (see examples).
+  - Generate it locally (for example `openssl rand -hex 32`) and set the same value in:
+    - bridge service env (`NOTEBOOKLM_BRIDGE_TOKEN`)
+    - API/worker env (`NOTEBOOKLM_BRIDGE_TOKEN`)
+- `NOTEBOOKLM_STORAGE_STATE_DIR`
+  - Host directory that contains `storage_state.json` for `notebooklm-py`.
+  - Mounted read-only into bridge container as `/app/secrets/notebooklm`.
+- `NOTEBOOKLM_STORAGE_PATH`
+  - In-container path to auth state JSON, default `/app/secrets/notebooklm/storage_state.json`.
+
+## Upstream NotebookLM Auth State
+
+Before running bridge, create browser auth state file:
+
+```bash
+mkdir -p ./secrets/notebooklm
+notebooklm --storage ./secrets/notebooklm/storage_state.json login
+```
+
+If this file expires, run the login command again to refresh it.
 
 ## Local Run (Dev Compose)
 
 1. Add bridge vars to `.env.dev` (copy placeholders from `.env.production.example` / `.env.example`).
+   - Set `NOTEBOOKLM_BRIDGE_TOKEN`.
+   - Set `NOTEBOOKLM_STORAGE_STATE_DIR` (default `./secrets/notebooklm`).
 2. Start services:
 
 ```bash

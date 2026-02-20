@@ -2,6 +2,8 @@
   "types": {
     "video": "Video",
     "audio": "Audio",
+    "nlm_audio": "NLM Audio",
+    "nlm_video": "NLM Video",
     "presentation": "Presentation",
     "quiz": "Quiz",
     "document": "Document",
@@ -20,6 +22,8 @@
   "typeDescriptions": {
     "video": "AI-generated video lecture based on lesson content",
     "audio": "Text-to-speech narration for convenient listening",
+    "nlm_audio": "Narrated audio generated with NLM flow",
+    "nlm_video": "Narrated video generated with NLM flow",
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
@@ -163,6 +167,8 @@
     "loadError": "Failed to load additional materials. Try refreshing the page.",
     "videoLesson": "Video lesson",
     "audioLesson": "Audio lesson",
+    "nlmAudioLesson": "NLM audio lesson",
+    "nlmVideoLesson": "NLM video lesson",
     "presentationLabel": "Presentation",
     "quizLabel": "Quiz",
     "documentLabel": "Additional reading",
@@ -172,6 +178,8 @@
     "checkKnowledge": "Test your knowledge",
     "audioVersion": "Audio version of lesson",
     "videoVersion": "Video version of lesson",
+    "nlmAudioVersion": "NLM audio version of lesson",
+    "nlmVideoVersion": "NLM video version of lesson",
     "lessonPresentation": "Lesson presentation",
     "additionalMaterials": "Additional materials",
     "play": "Play",
@@ -238,6 +246,8 @@
     "enrichmentTypes": {
       "video": "Video",
       "audio": "Audio",
+      "nlm_audio": "NLM Audio",
+      "nlm_video": "NLM Video",
       "presentation": "Presentation",
       "quiz": "Quiz",
       "document": "Document",
@@ -260,6 +270,11 @@
       "description": "Listen to the lesson",
       "estimatedTime": "~30 sec"
     },
+    "nlm_audio": {
+      "title": "NLM Audio",
+      "description": "Draft and generate narrated lesson audio",
+      "estimatedTime": "~45 sec"
+    },
     "presentation": {
       "title": "Presentation",
       "description": "Key slides from the lesson",
@@ -270,6 +285,11 @@
       "description": "AI video lecture",
       "estimatedTime": "Coming Soon",
       "comingSoon": "Coming Soon"
+    },
+    "nlm_video": {
+      "title": "NLM Video",
+      "description": "Draft and generate narrated lesson video",
+      "estimatedTime": "~120 sec"
     }
   },
   "images": {

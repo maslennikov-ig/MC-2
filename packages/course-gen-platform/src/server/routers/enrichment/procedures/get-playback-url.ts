@@ -83,7 +83,7 @@ export const getPlaybackUrl = protectedProcedure
       }
 
       // Step 3: Check if enrichment type supports playback
-      const playbackTypes = ['audio', 'video'];
+      const playbackTypes = ['audio', 'video', 'nlm_audio', 'nlm_video'];
       if (!playbackTypes.includes(enrichment.enrichment_type)) {
         logger.debug(
           {
@@ -101,7 +101,10 @@ export const getPlaybackUrl = protectedProcedure
       }
 
       // Step 4: Determine file extension and build asset path
-      const extension = enrichment.enrichment_type === 'audio' ? 'mp3' : 'mp4';
+      const extension =
+        enrichment.enrichment_type === 'audio' || enrichment.enrichment_type === 'nlm_audio'
+          ? 'mp3'
+          : 'mp4';
       const assetPath = buildAssetPath(
         enrichment.course_id,
         enrichment.lesson_id,

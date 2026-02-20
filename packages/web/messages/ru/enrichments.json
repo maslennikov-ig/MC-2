@@ -2,6 +2,8 @@
   "types": {
     "video": "Видео",
     "audio": "Аудио",
+    "nlm_audio": "NLM-аудио",
+    "nlm_video": "NLM-видео",
     "presentation": "Презентация",
     "quiz": "Тест",
     "document": "Документ",
@@ -20,6 +22,8 @@
   "typeDescriptions": {
     "video": "AI-сгенерированная видео-лекция на основе материала урока",
     "audio": "Озвучка текста урока для удобного прослушивания",
+    "nlm_audio": "Озвучка урока через NLM-пайплайн",
+    "nlm_video": "Видео урока через NLM-пайплайн",
     "presentation": "Слайды презентации для визуального сопровождения",
     "quiz": "Проверочный тест для закрепления материала",
     "document": "Дополнительный документ для скачивания",
@@ -163,6 +167,8 @@
     "loadError": "Не удалось загрузить дополнительные материалы. Попробуйте обновить страницу.",
     "videoLesson": "Видеолекция",
     "audioLesson": "Аудиоурок",
+    "nlmAudioLesson": "NLM-аудиоурок",
+    "nlmVideoLesson": "NLM-видеоурок",
     "presentationLabel": "Презентация",
     "quizLabel": "Тест",
     "documentLabel": "Дополнительное чтение",
@@ -172,6 +178,8 @@
     "checkKnowledge": "Проверьте свои знания",
     "audioVersion": "Аудио версия урока",
     "videoVersion": "Видео версия урока",
+    "nlmAudioVersion": "NLM-аудио версия урока",
+    "nlmVideoVersion": "NLM-видео версия урока",
     "lessonPresentation": "Презентация к уроку",
     "additionalMaterials": "Дополнительные материалы",
     "play": "Воспроизвести",
@@ -238,6 +246,8 @@
     "enrichmentTypes": {
       "video": "Видео",
       "audio": "Аудио",
+      "nlm_audio": "NLM-аудио",
+      "nlm_video": "NLM-видео",
       "presentation": "Презентация",
       "quiz": "Тест",
       "document": "Документ",
@@ -260,6 +270,11 @@
       "description": "Прослушайте урок",
       "estimatedTime": "~30 сек"
     },
+    "nlm_audio": {
+      "title": "NLM-аудио",
+      "description": "Подготовьте черновик и сгенерируйте озвучку урока",
+      "estimatedTime": "~45 сек"
+    },
     "presentation": {
       "title": "Презентация",
       "description": "Ключевые слайды урока",
@@ -270,6 +285,11 @@
       "description": "AI видеолекция",
       "estimatedTime": "Скоро",
       "comingSoon": "Скоро"
+    },
+    "nlm_video": {
+      "title": "NLM-видео",
+      "description": "Подготовьте черновик и сгенерируйте видео урока",
+      "estimatedTime": "~120 сек"
     }
   },
   "images": {

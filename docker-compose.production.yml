@@ -115,6 +115,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env.production
+    environment:
+      - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-/app/secrets/notebooklm/storage_state.json}
+    volumes:
+      - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:ro
     healthcheck:
       test:
         [

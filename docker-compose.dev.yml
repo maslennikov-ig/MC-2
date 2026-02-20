@@ -16,6 +16,10 @@ services:
       - '127.0.0.1:8010:8000'
     env_file:
       - .env.dev
+    environment:
+      - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-/app/secrets/notebooklm/storage_state.json}
+    volumes:
+      - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:ro
     healthcheck:
       test:
         [

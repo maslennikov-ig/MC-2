@@ -92,7 +92,7 @@ export const approveDraft = protectedProcedure
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Approve draft is only applicable to video and presentation enrichments, not '${enrichment.enrichment_type}'.`,
+          message: `Approve draft is only applicable to two-stage enrichments (video, presentation, nlm_audio, nlm_video), not '${enrichment.enrichment_type}'.`,
         });
       }
 

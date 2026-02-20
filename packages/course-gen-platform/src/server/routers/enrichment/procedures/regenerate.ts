@@ -32,7 +32,9 @@ function getQueue() {
 // Extension map for storage cleanup
 const EXTENSION_MAP: Record<string, string> = {
   audio: 'mp3',
+  nlm_audio: 'mp3',
   video: 'mp4',
+  nlm_video: 'mp4',
   cover: 'webp',
   banner: 'webp',
   card: 'webp',

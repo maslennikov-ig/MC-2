@@ -83,8 +83,10 @@ export const STORAGE_CONFIG = {
  * Other enrichment types are generated ON-DEMAND from the course viewer UI:
  * - 'quiz': Interactive quizzes (user-initiated)
  * - 'audio': Lesson narration (user-initiated)
+ * - 'nlm_audio': NotebookLM-based lesson narration (two-stage, user-initiated)
  * - 'presentation': Slide decks (user-initiated)
  * - 'video': Video content (user-initiated, not yet implemented)
+ * - 'nlm_video': NotebookLM-based video overview (two-stage, user-initiated)
  * - 'banner': Decorative headers (user-initiated)
  *
  * @see packages/course-gen-platform/src/stages/stage7-enrichments/services/auto-card-trigger.ts
@@ -99,8 +101,10 @@ export const AUTO_GENERATED_ENRICHMENT_TYPES = ['cover', 'card'] as const;
 export const ON_DEMAND_ENRICHMENT_TYPES = [
   'quiz',
   'audio',
+  'nlm_audio',
   'presentation',
   'video',
+  'nlm_video',
   'banner',
 ] as const;
 

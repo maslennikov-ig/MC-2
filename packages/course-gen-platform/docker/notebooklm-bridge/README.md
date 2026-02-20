@@ -67,16 +67,25 @@ Environment variables:
 - `NOTEBOOKLM_GENERATION_MODE` (`auto` | `notebooklm` | `fallback`, default `auto`)
 - `NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS` (default `240`)
 - `NOTEBOOKLM_POLL_INTERVAL_SECONDS` (default `2`)
-- `NOTEBOOKLM_ALLOW_FALLBACK` (default `true`)
-- `NOTEBOOKLM_API_KEY` (optional)
+- `NOTEBOOKLM_ALLOW_FALLBACK` (default `false`)
 - `NOTEBOOKLM_STORAGE_PATH` (optional, path to NotebookLM `storage_state.json`)
-- `NOTEBOOKLM_WORKSPACE_ID` (optional)
 
 Behavior:
 
 - `fallback`: always returns placeholder media that still matches the API contract.
 - `auto`: tries `notebooklm-py` first, then falls back if allowed.
 - `notebooklm`: tries `notebooklm-py`; falls back only when `NOTEBOOKLM_ALLOW_FALLBACK=true`.
+
+## Authentication Prerequisite
+
+`notebooklm-py` uses browser auth state. Generate `storage_state.json` first:
+
+```bash
+mkdir -p ./secrets/notebooklm
+notebooklm --storage ./secrets/notebooklm/storage_state.json login
+```
+
+Then provide this file path to the service via `NOTEBOOKLM_STORAGE_PATH`.
 
 ## Local Run
 
@@ -86,6 +95,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 export NOTEBOOKLM_BRIDGE_TOKEN=dev-token
+export NOTEBOOKLM_STORAGE_PATH=./secrets/notebooklm/storage_state.json
 uvicorn app.main:app --reload --port 8000
 ```
 

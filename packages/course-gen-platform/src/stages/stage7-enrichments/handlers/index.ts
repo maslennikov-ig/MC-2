@@ -10,6 +10,8 @@
 export { videoHandler } from './video-handler';
 export { quizHandler } from './quiz-handler';
 export { audioHandler } from './audio-handler';
+export { nlmAudioHandler } from './nlm-audio-handler';
+export { nlmVideoHandler } from './nlm-video-handler';
 export { presentationHandler } from './presentation-handler';
 export { coverHandler } from './cover-handler';
 export { cardHandler } from './card-handler';
