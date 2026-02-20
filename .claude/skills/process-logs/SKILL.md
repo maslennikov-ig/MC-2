@@ -110,7 +110,7 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 
 Some errors are **automatically ignored** by the system with status `auto_muted`. These are expected events, NOT bugs.
 
-**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 50):
+**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 58):
 
 | Pattern                                                   | Reason            | Description                                        |
 | --------------------------------------------------------- | ----------------- | -------------------------------------------------- |
@@ -131,7 +131,7 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Cache directory does not exist`                          | expected_behavior | Cache missing on fresh env, created later          |
 | `ModelConfigBunker.*sync.*fail`                           | external_service  | Network issue, has retry with backoff              |
 | `Invalid status for approval`                             | ui_race_condition | User clicked approve but course progressed         |
-| `Job \d+ not found`                                       | expected_behavior | Frontend polls job status after cleanup            |
+| `Job .+ not found`                                        | expected_behavior | Frontend polls job status after cleanup            |
 | `Failed to log generation trace`                          | expected_behavior | Trace insert failed during pool pressure           |
 | `Patcher.*REJECTED.*truncated`                            | graceful_fallback | Truncated content detected, returns original       |
 | `Preprocessing failed.*using raw`                         | graceful_fallback | Preprocessing failed, using raw LLM output         |
@@ -152,8 +152,10 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Unavailable For Legal Reasons\|content policy violation` | content_policy    | Jina API content policy rejection (PII/legal)      |
 | `Using STALE phase config due to database error`          | graceful_fallback | ModelConfigBunker stale config during DB outage    |
 | `\[Phase 6\] Max retries reached.*best-effort`            | graceful_fallback | Phase 6 summary retries exhausted, best-effort     |
+| `MISCONF Redis.*unable to persist`                        | infrastructure    | Redis RDB/AOF disk issue - infra problem, not app  |
+| `Concurrency limit exceeded`                              | external_service  | Jina API server-side concurrency enforcement       |
 
-**Total rules: 56** (test validates sync with code)
+**Total rules: 58** (test validates sync with code)
 
 **Test environment auto-muting:**
 
