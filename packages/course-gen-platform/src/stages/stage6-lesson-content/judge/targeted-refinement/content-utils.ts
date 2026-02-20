@@ -22,7 +22,10 @@ export function extractSectionContent(content: LessonContent, sectionId: string)
 
   // Handle intro request (special case)
   if (sectionId === 'sec_intro' || sectionId === 'intro') {
-    return body.intro;
+    if (body.intro?.trim()) {
+      return body.intro;
+    }
+    return body.sections.length > 0 ? body.sections[0].content : '';
   }
 
   // Handle named sections

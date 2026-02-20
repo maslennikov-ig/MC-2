@@ -283,6 +283,7 @@ export function runHeuristicFilters(
       sectionDuplication: {
         duplicatePairs: duplicationResult.duplicatePairs,
         overlapPairs: duplicationResult.overlapPairs,
+        introOverlapPairs: duplicationResult.introOverlapPairs,
         totalSections: duplicationResult.totalSections,
       },
     },
