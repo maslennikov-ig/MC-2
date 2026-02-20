@@ -45,9 +45,11 @@ cleanup_old_logs
 # CLI OPTIONS
 # =============================================================================
 VERBOSE=false
+WITH_NLM_BRIDGE=false
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --verbose|-v) VERBOSE=true; shift ;;
+        --with-nlm-bridge) WITH_NLM_BRIDGE=true; shift ;;
         *) shift ;;
     esac
 done
@@ -62,6 +64,85 @@ fi
 
 echo -e "${BLUE}🚀 Starting MegaCampusAI Development Environment...${NC}"
 echo -e "${BLUE}📝 Logs: $LOGS_DIR${NC}"
+
+# =============================================================================
+# NOTEBOOKLM BRIDGE (OPTIONAL LOCAL SERVICE)
+# =============================================================================
+NLM_BRIDGE_CONTAINER="megacampus-notebooklm-bridge-local"
+NLM_BRIDGE_IMAGE="ghcr.io/maslennikov-ig/mc-2/notebooklm-bridge:develop"
+NLM_BRIDGE_PORT="8010"
+NLM_BRIDGE_WAS_RUNNING=false
+NLM_BRIDGE_STARTED_BY_SCRIPT=false
+
+read_env_value() {
+    local key="$1"
+    local file="$2"
+    if [ ! -f "$file" ]; then
+        return 0
+    fi
+    grep -E "^${key}=" "$file" 2>/dev/null | tail -1 | cut -d= -f2-
+}
+
+if [ "$WITH_NLM_BRIDGE" = true ]; then
+    echo -e "\n${YELLOW}🎧 Optional mode: starting local NotebookLM bridge...${NC}"
+
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}❌ Docker not found. Cannot start local NotebookLM bridge.${NC}"
+        exit 1
+    fi
+
+    COURSE_ENV_FILE="$SCRIPT_DIR/packages/course-gen-platform/.env"
+    BRIDGE_TOKEN="${NOTEBOOKLM_BRIDGE_TOKEN:-$(read_env_value NOTEBOOKLM_BRIDGE_TOKEN "$COURSE_ENV_FILE")}"
+    STORAGE_STATE_DIR="${NOTEBOOKLM_STORAGE_STATE_DIR:-$(read_env_value NOTEBOOKLM_STORAGE_STATE_DIR "$COURSE_ENV_FILE")}"
+    STORAGE_PATH="${NOTEBOOKLM_STORAGE_PATH:-$(read_env_value NOTEBOOKLM_STORAGE_PATH "$COURSE_ENV_FILE")}"
+
+    if [ -z "$STORAGE_STATE_DIR" ]; then
+        STORAGE_STATE_DIR="$SCRIPT_DIR/secrets/notebooklm"
+    fi
+    if [ -z "$STORAGE_PATH" ]; then
+        STORAGE_PATH="/app/secrets/notebooklm/storage_state.json"
+    fi
+
+    if [ -z "$BRIDGE_TOKEN" ]; then
+        echo -e "${RED}❌ NOTEBOOKLM_BRIDGE_TOKEN is not set (env or packages/course-gen-platform/.env).${NC}"
+        echo -e "${YELLOW}   Generate one: openssl rand -hex 32${NC}"
+        echo -e "${YELLOW}   Then set NOTEBOOKLM_BRIDGE_TOKEN in your shell or packages/course-gen-platform/.env${NC}"
+        exit 1
+    fi
+
+    mkdir -p "$STORAGE_STATE_DIR"
+
+    # Ensure API/worker use local bridge when this mode is enabled
+    export NOTEBOOKLM_BRIDGE_URL="${NOTEBOOKLM_BRIDGE_URL:-http://127.0.0.1:${NLM_BRIDGE_PORT}}"
+    export NOTEBOOKLM_BRIDGE_TOKEN="$BRIDGE_TOKEN"
+    export NOTEBOOKLM_STORAGE_STATE_DIR="$STORAGE_STATE_DIR"
+    export NOTEBOOKLM_STORAGE_PATH="$STORAGE_PATH"
+
+    if [ "$(docker ps -q -f name=^/${NLM_BRIDGE_CONTAINER}$)" ]; then
+        NLM_BRIDGE_WAS_RUNNING=true
+        echo -e "   ✅ NotebookLM bridge container already running."
+    elif [ "$(docker ps -aq -f name=^/${NLM_BRIDGE_CONTAINER}$)" ]; then
+        echo -e "   🔄 NotebookLM bridge container exists but is stopped. Starting..."
+        docker start "$NLM_BRIDGE_CONTAINER" >/dev/null
+        NLM_BRIDGE_STARTED_BY_SCRIPT=true
+    else
+        echo -e "   ✨ Creating NotebookLM bridge container..."
+        docker run -d \
+            --name "$NLM_BRIDGE_CONTAINER" \
+            -p "127.0.0.1:${NLM_BRIDGE_PORT}:8000" \
+            -e "NOTEBOOKLM_BRIDGE_TOKEN=$BRIDGE_TOKEN" \
+            -e "NOTEBOOKLM_STORAGE_PATH=$STORAGE_PATH" \
+            -v "$STORAGE_STATE_DIR:/app/secrets/notebooklm:ro" \
+            "$NLM_BRIDGE_IMAGE" >/dev/null
+        NLM_BRIDGE_STARTED_BY_SCRIPT=true
+    fi
+
+    if ! curl -sSf "http://127.0.0.1:${NLM_BRIDGE_PORT}/health" >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  NotebookLM bridge started but health endpoint is not ready yet.${NC}"
+    else
+        echo -e "   ${GREEN}✅ NotebookLM bridge healthy at http://127.0.0.1:${NLM_BRIDGE_PORT}${NC}"
+    fi
+fi
 
 # =============================================================================
 # CLEANUP OLD PROCESSES (prevent duplicate workers)
@@ -140,6 +221,10 @@ fi
 cleanup() {
     echo -e "\n${YELLOW}🛑 Shutting down services...${NC}"
     kill $(jobs -p) 2>/dev/null
+    if [ "$WITH_NLM_BRIDGE" = true ] && [ "$NLM_BRIDGE_STARTED_BY_SCRIPT" = true ] && [ "$NLM_BRIDGE_WAS_RUNNING" = false ]; then
+        echo -e "${YELLOW}🧩 Stopping local NotebookLM bridge container...${NC}"
+        docker stop "$NLM_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
+    fi
     echo -e "${GREEN}👋 Development environment stopped.${NC}"
     echo -e "${BLUE}📝 Logs saved to: $LOGS_DIR${NC}"
     exit
@@ -239,6 +324,9 @@ echo -e "   - 📝 Stage 6 Worker (lesson content): running"
 echo -e "   - 🎨 Stage 7 Worker (enrichments): running"
 echo -e "   - 🖥️  Frontend: http://localhost:${DETECTED_PORT}"
 echo -e "   - 📦 BullMQ UI: http://localhost:3456/admin/queues"
+if [ "$WITH_NLM_BRIDGE" = true ]; then
+    echo -e "   - 🎧 NotebookLM Bridge: http://127.0.0.1:${NLM_BRIDGE_PORT}"
+fi
 
 if [ -n "$LOCAL_IP" ]; then
     echo -e ""
@@ -262,6 +350,7 @@ echo -e "   tail -f $LOGS_DIR/backend-latest.log"
 echo -e ""
 echo -e "${YELLOW}💡 Options:${NC}"
 echo -e "   ./start-dev.sh --verbose  # Show all logs (trace level)"
+echo -e "   ./start-dev.sh --with-nlm-bridge  # Start local NotebookLM bridge container"
 echo -e ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services.${NC}\n"
 
