@@ -47,6 +47,7 @@ import { Link } from './components/Link'
 import { MermaidDiagram } from './components/MermaidDiagram'
 import { escapeCurrencyDollarSigns } from './utils/escape-currency'
 import { parseCalloutFromChildren } from './utils/callout-parser'
+import { normalizeMalformedMarkdownTables } from './utils/normalize-markdown-tables'
 import type { PresetName, FeatureFlags } from './types'
 import type { Components } from 'react-markdown'
 
@@ -246,6 +247,8 @@ export function MarkdownRendererFull({
     return <article className={wrapperClassName} />
   }
 
+  const normalizedContent = normalizeMalformedMarkdownTables(content)
+
   // Build remark plugins array based on config
   const remarkPlugins: React.ComponentProps<typeof Markdown>['remarkPlugins'] = [remarkGfm]
   if (config.math) {
@@ -412,7 +415,7 @@ export function MarkdownRendererFull({
   return (
     <article className={wrapperClassName}>
       <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
-        {config.math ? escapeCurrencyDollarSigns(content) : content}
+        {config.math ? escapeCurrencyDollarSigns(normalizedContent) : normalizedContent}
       </Markdown>
     </article>
   )

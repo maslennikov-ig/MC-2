@@ -86,6 +86,26 @@ describe('MarkdownRendererClient - Contract Tests', () => {
       expect(streamdown).toHaveTextContent('Heading')
       expect(streamdown).toHaveAttribute('data-parse-incomplete', 'true')
     })
+
+    it('should normalize malformed tables when not streaming', () => {
+      const malformedTable = '| Column 1 | Column 2\n|----------|\n| Data 1'
+      render(<MarkdownRendererClient content={malformedTable} isStreaming={false} />)
+
+      const streamdown = screen.getByTestId('streamdown')
+      expect(streamdown).toHaveTextContent('| Column 1 | Column 2 |')
+      expect(streamdown).toHaveTextContent('| --- | --- |')
+      expect(streamdown).toHaveTextContent('| Data 1 | |')
+    })
+
+    it('should not normalize malformed tables during streaming', () => {
+      const malformedTable = '| Column 1 | Column 2\n|----------|\n| Data 1'
+      render(<MarkdownRendererClient content={malformedTable} isStreaming={true} />)
+
+      const streamdown = screen.getByTestId('streamdown')
+      expect(streamdown).toHaveTextContent('| Column 1 | Column 2')
+      expect(streamdown).toHaveTextContent('|----------|')
+      expect(streamdown).toHaveTextContent('| Data 1')
+    })
   })
 
   describe('empty content handling', () => {

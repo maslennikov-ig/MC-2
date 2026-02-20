@@ -32,6 +32,7 @@
 import * as React from 'react'
 import { Streamdown } from 'streamdown'
 import { getPresetConfig } from './presets'
+import { normalizeMalformedMarkdownTables } from './utils/normalize-markdown-tables'
 import type { MarkdownRendererClientProps } from './types'
 
 /**
@@ -71,9 +72,12 @@ export function MarkdownRendererClient({
     return <div className={wrapperClassName} />
   }
 
+  // Avoid rewriting partial markdown while streaming, but normalize final content snapshots.
+  const normalizedContent = isStreaming ? content : normalizeMalformedMarkdownTables(content)
+
   return (
     <div className={wrapperClassName}>
-      <Streamdown parseIncompleteMarkdown={isStreaming}>{content}</Streamdown>
+      <Streamdown parseIncompleteMarkdown={isStreaming}>{normalizedContent}</Streamdown>
     </div>
   )
 }

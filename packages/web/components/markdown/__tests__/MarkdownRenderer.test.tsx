@@ -256,6 +256,19 @@ function test() {
 
       const result = await renderAsync(MarkdownRenderer({ content: malformedContent }))
       expect(result).not.toBeNull()
+
+      const table = result!.container.querySelector('table')
+      expect(table).toBeTruthy()
+
+      const headers = table!.querySelectorAll('th')
+      expect(headers.length).toBe(2)
+      expect(headers[0].textContent).toBe('Column 1')
+      expect(headers[1].textContent).toBe('Column 2')
+
+      const cells = table!.querySelectorAll('td')
+      expect(cells.length).toBe(2)
+      expect(cells[0].textContent).toBe('Data 1')
+      expect(cells[1].textContent).toBe('')
     })
 
     it('should handle unbalanced brackets without crashing', async () => {
