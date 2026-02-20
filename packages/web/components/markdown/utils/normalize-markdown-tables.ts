@@ -15,7 +15,7 @@ function splitTableCells(line: string): string[] {
   return withoutEdgePipes.split('|').map((cell) => cell.trim())
 }
 
-function looksLikeMalformedSeparator(line: string): boolean {
+function looksLikeSeparator(line: string): boolean {
   const trimmed = line.trim()
   return trimmed.includes('-') && hasPipeCharacter(trimmed) && SEPARATOR_CHARSET.test(trimmed)
 }
@@ -49,18 +49,57 @@ function formatRow(cells: string[], columnCount: number, indent: string): string
   return `${indent}| ${normalizedCells.join(' | ')} |`
 }
 
+function normalizeBodyRow(cells: string[], expectedColumns: number): string[][] {
+  const trimmed = cells.map((cell) => cell.trim())
+  const compact = trimmed.filter((cell) => cell.length > 0)
+  let working = trimmed
+
+  // Compact placeholder cells from accidental double pipes when deterministic.
+  if (
+    working.length > expectedColumns &&
+    compact.length >= expectedColumns &&
+    (compact.length === expectedColumns || compact.length % expectedColumns === 0)
+  ) {
+    working = compact
+  }
+
+  if (working.length === expectedColumns) {
+    return [working]
+  }
+
+  if (working.length < expectedColumns) {
+    return [[...working, ...Array.from({ length: expectedColumns - working.length }, () => '')]]
+  }
+
+  if (working.length % expectedColumns === 0) {
+    const rows: string[][] = []
+    for (let offset = 0; offset < working.length; offset += expectedColumns) {
+      rows.push(working.slice(offset, offset + expectedColumns))
+    }
+    return rows
+  }
+
+  return [
+    [...working.slice(0, expectedColumns - 1), working.slice(expectedColumns - 1).join(' / ')],
+  ]
+}
+
 function normalizeTableBlock(lines: string[]): string[] {
   const headerCells = splitTableCells(lines[0])
+  const hasNonEmptyHeaderCell = headerCells.some((cell) => cell.length > 0)
+  if (!hasNonEmptyHeaderCell || headerCells.length < 2) {
+    return lines
+  }
+
+  const columnCount = headerCells.length
   const separatorCells = splitTableCells(lines[1])
-  const bodyRows = lines.slice(2).map(splitTableCells)
+  const bodyRows = lines.slice(2)
 
-  const columnCount = Math.max(
-    headerCells.length,
-    separatorCells.length,
-    ...bodyRows.map((row) => row.length)
-  )
-
-  if (columnCount === 0) {
+  // Preserve already-valid tables exactly as they are.
+  if (
+    isValidSeparatorLine(lines[1], columnCount) &&
+    bodyRows.every((row) => splitTableCells(row).length === columnCount)
+  ) {
     return lines
   }
 
@@ -69,10 +108,14 @@ function normalizeTableBlock(lines: string[]): string[] {
     normalizeSeparatorCell(separatorCells[index])
   )
 
+  const normalizedBodyRows = bodyRows.flatMap((row) =>
+    normalizeBodyRow(splitTableCells(row), columnCount)
+  )
+
   return [
     formatRow(headerCells, columnCount, indent),
     formatRow(normalizedSeparatorCells, columnCount, indent),
-    ...bodyRows.map((row) => formatRow(row, columnCount, indent)),
+    ...normalizedBodyRows.map((row) => formatRow(row, columnCount, indent)),
   ]
 }
 
@@ -107,7 +150,7 @@ export function normalizeMalformedMarkdownTables(markdown: string): string {
       Boolean(nextLine) &&
       hasPipeCharacter(line) &&
       hasPipeCharacter(nextLine) &&
-      looksLikeMalformedSeparator(nextLine)
+      looksLikeSeparator(nextLine)
 
     if (!isTableCandidate) {
       normalizedLines.push(line)

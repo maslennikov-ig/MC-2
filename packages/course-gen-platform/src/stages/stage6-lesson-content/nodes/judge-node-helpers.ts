@@ -26,6 +26,7 @@ import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-out
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import { validateMermaidRenderInLessonContentBody } from '../utils/mermaid-render-validator';
 import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
+import { runTableFixPipeline, type TableFixPipelineMetrics } from '../utils/table-fix-pipeline';
 import { executeTargetedRefinementFlow, buildReviewInfo } from './judge-refinement-helpers';
 
 /**
@@ -47,6 +48,7 @@ export interface JudgeContext {
   refinementTokensUsed?: number;
   arbiterOutput?: ArbiterOutput | null;
   mermaidRenderValidation?: MermaidRenderValidationResult | null;
+  tableFixMetrics?: TableFixPipelineMetrics | null;
 }
 
 type MermaidAggregateMetrics = NonNullable<MermaidRenderRemediationMetadata['aggregateMetrics']>;
@@ -60,8 +62,17 @@ interface MermaidContentBodyRemediationResult {
   aggregateMetrics: MermaidAggregateMetrics;
 }
 
+interface TableContentBodyRemediationResult {
+  contentBody: LessonContentBody;
+  transformed: boolean;
+  fieldsScanned: number;
+  fieldsTransformed: number;
+  aggregateMetrics: TableFixPipelineMetrics;
+}
+
 const MERMAID_HINT_REGEX =
   /```mermaid|^\s*(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitgraph)\b/im;
+const TABLE_HINT_REGEX = /\|/;
 
 function createEmptyMermaidAggregateMetrics(): MermaidAggregateMetrics {
   return {
@@ -90,6 +101,29 @@ function mergeMermaidMetrics(
     diagramsSplit: (target.diagramsSplit ?? 0) + (source.diagramsSplit ?? 0),
     diagramsStructuredFallback:
       (target.diagramsStructuredFallback ?? 0) + (source.diagramsStructuredFallback ?? 0),
+  };
+}
+
+function createEmptyTableMetrics(): TableFixPipelineMetrics {
+  return {
+    tablesDetected: 0,
+    tablesModified: 0,
+    separatorRowsNormalized: 0,
+    dataRowsNormalized: 0,
+    durationMs: 0,
+  };
+}
+
+function mergeTableMetrics(
+  target: TableFixPipelineMetrics,
+  source: TableFixPipelineMetrics
+): TableFixPipelineMetrics {
+  return {
+    tablesDetected: target.tablesDetected + source.tablesDetected,
+    tablesModified: target.tablesModified + source.tablesModified,
+    separatorRowsNormalized: target.separatorRowsNormalized + source.separatorRowsNormalized,
+    dataRowsNormalized: target.dataRowsNormalized + source.dataRowsNormalized,
+    durationMs: target.durationMs + source.durationMs,
   };
 }
 
@@ -160,6 +194,84 @@ async function remediateMermaidInContentBody(
       ...exercise,
       question: await remediateMermaidField(exercise.question ?? '', aggregate),
       solution: await remediateMermaidField(exercise.solution ?? '', aggregate),
+      hints,
+    });
+  }
+
+  return {
+    ...aggregate,
+    contentBody: {
+      ...contentBody,
+      intro,
+      sections,
+      examples,
+      exercises,
+    },
+  };
+}
+
+function remediateTableField(value: string, aggregate: TableContentBodyRemediationResult): string {
+  if (!TABLE_HINT_REGEX.test(value)) {
+    return value;
+  }
+
+  aggregate.fieldsScanned++;
+  const pipelineResult = runTableFixPipeline(value);
+  aggregate.aggregateMetrics = mergeTableMetrics(
+    aggregate.aggregateMetrics,
+    pipelineResult.metrics
+  );
+
+  if (!pipelineResult.modified) {
+    return value;
+  }
+
+  aggregate.transformed = true;
+  aggregate.fieldsTransformed++;
+  return pipelineResult.content;
+}
+
+function remediateTablesInContentBody(
+  contentBody: LessonContentBody
+): TableContentBodyRemediationResult {
+  const aggregate: TableContentBodyRemediationResult = {
+    contentBody,
+    transformed: false,
+    fieldsScanned: 0,
+    fieldsTransformed: 0,
+    aggregateMetrics: createEmptyTableMetrics(),
+  };
+
+  const intro = remediateTableField(contentBody.intro ?? '', aggregate);
+
+  const sections: LessonContentBody['sections'] = [];
+  for (const section of contentBody.sections ?? []) {
+    sections.push({
+      ...section,
+      content: remediateTableField(section.content ?? '', aggregate),
+    });
+  }
+
+  const examples: LessonContentBody['examples'] = [];
+  for (const example of contentBody.examples ?? []) {
+    examples.push({
+      ...example,
+      content: remediateTableField(example.content ?? '', aggregate),
+      code: example.code,
+    });
+  }
+
+  const exercises: LessonContentBody['exercises'] = [];
+  for (const exercise of contentBody.exercises ?? []) {
+    const hints: string[] = [];
+    for (const hint of exercise.hints ?? []) {
+      hints.push(remediateTableField(hint, aggregate));
+    }
+
+    exercises.push({
+      ...exercise,
+      question: remediateTableField(exercise.question ?? '', aggregate),
+      solution: remediateTableField(exercise.solution ?? '', aggregate),
       hints,
     });
   }
@@ -481,6 +593,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
   let refinementTokensUsed = 0;
   let arbiterOutput = null;
   let mermaidRenderValidation: MermaidRenderValidationResult | null = null;
+  let tableFixMetrics: TableFixPipelineMetrics | null = null;
 
   switch (decision.action) {
     case DecisionAction.ACCEPT: {
@@ -620,6 +733,23 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
         };
       }
 
+      const tableRemediationResult = remediateTablesInContentBody(contentForMermaidGate);
+      contentForMermaidGate = tableRemediationResult.contentBody;
+      tableFixMetrics = tableRemediationResult.aggregateMetrics;
+
+      if (tableRemediationResult.transformed) {
+        logger.info(
+          {
+            lessonId: state.lessonSpec.lesson_id,
+            recommendationAfterGate: finalRecommendation,
+            tableFixMetrics,
+            fieldsScanned: tableRemediationResult.fieldsScanned,
+            fieldsTransformed: tableRemediationResult.fieldsTransformed,
+          },
+          'Judge node: Table remediation applied to accepted content'
+        );
+      }
+
       finalContent = buildLessonContent(state, contentForMermaidGate, finalScore);
       needsRegeneration = false;
       needsHumanReview = false;
@@ -682,6 +812,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
     refinementTokensUsed,
     arbiterOutput,
     mermaidRenderValidation,
+    tableFixMetrics,
   };
 }
 
@@ -711,6 +842,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     refinementTokensUsed,
     arbiterOutput,
     mermaidRenderValidation,
+    tableFixMetrics,
   } = context;
 
   const durationMs = Date.now() - startTime;
@@ -770,6 +902,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
             remediation: mermaidRenderValidation.remediation ?? null,
           }
         : null,
+      tableRemediation: tableFixMetrics,
     },
     modelUsed,
     tokensUsed: totalTokensUsed,
