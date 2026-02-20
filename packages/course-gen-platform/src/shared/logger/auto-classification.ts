@@ -10,9 +10,9 @@
  * ## Performance Considerations
  *
  * Current implementation uses O(n) linear scan through all rules.
- * With 6 rules, this is negligible (<1ms per call).
+ * With 58 rules, this is still fast (<1ms per call).
  *
- * ### If rules grow to 50+, consider these optimizations:
+ * ### If rules grow to 100+, consider these optimizations:
  *
  * 1. **Pre-filtering by keyword** - Check for common substrings first:
  *    ```typescript

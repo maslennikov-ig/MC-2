@@ -51,6 +51,9 @@ export function shouldWriteToDb(message: string): boolean {
     return true;
   }
 
+  if (entry.count >= MAX_PER_WINDOW) {
+    return false;
+  }
   entry.count++;
-  return entry.count <= MAX_PER_WINDOW;
+  return true;
 }
