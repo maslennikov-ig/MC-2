@@ -268,40 +268,12 @@ export const analysisRouter = router({
           });
         }
 
-        // Step 2.5: Mark course as stage_4_init to prevent duplicate starts
-        // This MUST happen before job creation to prevent race conditions where
-        // multiple requests can start duplicate analyses before the job updates the status
-        // Valid transitions:
-        // - 'stage_2_complete' → 'stage_4_init' (direct path, no Stage 3)
-        // - 'stage_3_complete' → 'stage_4_init' (after Stage 3 summarization completes)
-
-        // Save previous status for rollback on failure
-        previousStatus = course.generation_status;
-
-        const { error: updateError } = await supabase
-          .from('courses')
-          .update({ generation_status: 'stage_4_init' as const })
-          .eq('id', courseId)
-          .eq('organization_id', organizationId);
-
-        if (updateError) {
-          logger.error(
-            {
-              requestId,
-              courseId,
-              error: updateError.message,
-            },
-            'Failed to update course status'
-          );
-
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to start analysis',
-          });
-        }
-
         // Helper function to rollback status on failure
         const rollbackStatus = async () => {
+          if (!previousStatus) {
+            return;
+          }
+
           try {
             await supabase
               .from('courses')
@@ -335,14 +307,67 @@ export const analysisRouter = router({
           }
         };
 
-        logger.info(
-          {
-            requestId,
-            courseId,
-            status: 'stage_4_init',
-          },
-          'Course status updated before job creation'
-        );
+        // Step 2.5: Mark course as stage_4_init to prevent duplicate starts.
+        // Skip this transition for forceRestart when already in active Stage 4 states.
+        // FSM does not allow stage_4_analyzing/stage_4_clarifying -> stage_4_init.
+        const restartableStage4Statuses = [
+          'stage_4_init',
+          'stage_4_analyzing',
+          'stage_4_clarifying',
+        ] as const;
+
+        const shouldKeepCurrentStage4Status =
+          forceRestart &&
+          restartableStage4Statuses.includes(
+            course.generation_status as (typeof restartableStage4Statuses)[number]
+          );
+
+        if (shouldKeepCurrentStage4Status) {
+          logger.info(
+            {
+              requestId,
+              courseId,
+              currentStatus: course.generation_status,
+            },
+            'Force restart requested while Stage 4 is active; keeping current status'
+          );
+        } else {
+          // Save previous status for rollback on failure
+          previousStatus = course.generation_status;
+
+          const { error: updateError } = await supabase
+            .from('courses')
+            .update({ generation_status: 'stage_4_init' as const })
+            .eq('id', courseId)
+            .eq('organization_id', organizationId);
+
+          if (updateError) {
+            logger.error(
+              {
+                requestId,
+                courseId,
+                currentStatus: course.generation_status,
+                error: updateError.message,
+              },
+              'Failed to update course status before analysis start'
+            );
+
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to start analysis',
+            });
+          }
+
+          logger.info(
+            {
+              requestId,
+              courseId,
+              previousStatus,
+              status: 'stage_4_init',
+            },
+            'Course status updated before job creation'
+          );
+        }
 
         // Step 3: Fetch completed document summaries from file_catalog
         // Only include documents that have been processed (processed_content NOT NULL)
