@@ -169,8 +169,11 @@ export default function LessonContent({
             if (section && typeof section === 'object') {
               const sectionObj = section as { title?: string; content?: string }
               if (sectionObj.title && sectionObj.content) {
-                // Section title is already in markdown with ## from LLM
-                sectionParts.push(sectionObj.content)
+                const trimmedContent = sectionObj.content.trim()
+                const hasHeading = /^##\s+/m.test(trimmedContent)
+                sectionParts.push(
+                  hasHeading ? trimmedContent : `## ${sectionObj.title}\n\n${trimmedContent}`
+                )
               }
             }
           }

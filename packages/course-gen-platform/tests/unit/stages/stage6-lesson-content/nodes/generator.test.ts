@@ -746,6 +746,18 @@ describe('generateLessonSingleCall', () => {
     lesson_context: null,
   };
 
+  const validEnglishLessonContent = `## Introduction
+
+This introduction sets the context in a concise way and explains why this topic matters right now.
+
+## Section 1
+
+Core lesson content.
+
+## Exercises
+
+Exercise content.`;
+
   beforeEach(async () => {
     vi.clearAllMocks();
 
@@ -1008,6 +1020,19 @@ This lesson covered TypeScript basics including types and functions.`,
         ],
       };
 
+      mockModelInvoke.mockResolvedValue({
+        content: `## Введение
+
+Короткое вступление.
+
+## Раздел 1
+
+Основной контент.`,
+        response_metadata: {
+          usage: { total_tokens: 320 },
+        },
+      });
+
       await generateLessonSingleCall(russianSpec, [], 'ru', null, null, null);
 
       const sectionsList = mockRenderPrompt.mock.calls[0][1].sectionsList as string;
@@ -1066,6 +1091,131 @@ More content.`,
     });
   });
 
+  describe('intro structural guard', () => {
+    it('should retry once when localized intro header is missing and accept corrected output', async () => {
+      mockModelInvoke
+        .mockResolvedValueOnce({
+          content: `## Introduction
+
+Короткое вступление без локализованного заголовка.
+
+## Раздел 1
+
+Контент раздела.`,
+          response_metadata: {
+            usage: { total_tokens: 200 },
+          },
+        })
+        .mockResolvedValueOnce({
+          content: `## Введение
+
+Короткое вступление без спойлеров.
+
+## Раздел 1
+
+Контент раздела.`,
+          response_metadata: {
+            usage: { total_tokens: 220 },
+          },
+        });
+
+      const result = await generateLessonSingleCall(mockLessonSpec, [], 'ru', null, null, null);
+
+      expect(mockModelInvoke).toHaveBeenCalledTimes(2);
+      expect(mockModelInvoke.mock.calls[1]?.[0]).toContain('MISSING_INTRO_HEADER');
+      expect(mockModelInvoke.mock.calls[1]?.[0]).toContain('## Введение');
+      expect(result.content).toContain('## Введение');
+    });
+
+    it('should retry once when intro is oversized and teaser-like', async () => {
+      const oversizedIntro = Array.from({ length: 190 }, () => 'word').join(' ');
+      mockModelInvoke
+        .mockResolvedValueOnce({
+          content: `## Introduction
+
+${oversizedIntro} In the next lesson, we will cover advanced decorators.
+
+## Section 1
+
+Main section.`,
+          response_metadata: {
+            usage: { total_tokens: 240 },
+          },
+        })
+        .mockResolvedValueOnce({
+          content: validEnglishLessonContent,
+          response_metadata: {
+            usage: { total_tokens: 260 },
+          },
+        });
+
+      const result = await generateLessonSingleCall(mockLessonSpec, [], 'en', null, null, null);
+
+      expect(mockModelInvoke).toHaveBeenCalledTimes(2);
+      expect(mockModelInvoke.mock.calls[1]?.[0]).toContain('OVERSIZE_INTRO');
+      expect(mockModelInvoke.mock.calls[1]?.[0]).toContain('NEXT_LESSON_TEASER');
+      expect(result.content).toContain('## Introduction');
+    });
+
+    it('should retry when intro is not first section and there is long preface before first H2', async () => {
+      const longPreface = Array.from(
+        { length: 30 },
+        () => 'Preface prose that should not appear before the introduction section'
+      ).join(' ');
+
+      mockModelInvoke
+        .mockResolvedValueOnce({
+          content: `# Lesson Title
+
+${longPreface}
+
+## Section 1
+
+Main section content.
+
+## Introduction
+
+Short intro.`,
+          response_metadata: {
+            usage: { total_tokens: 280 },
+          },
+        })
+        .mockResolvedValueOnce({
+          content: validEnglishLessonContent,
+          response_metadata: {
+            usage: { total_tokens: 300 },
+          },
+        });
+
+      await generateLessonSingleCall(mockLessonSpec, [], 'en', null, null, null);
+
+      expect(mockModelInvoke).toHaveBeenCalledTimes(2);
+      expect(mockModelInvoke.mock.calls[1]?.[0]).toContain('INTRO_NOT_FIRST_SECTION');
+      expect(mockModelInvoke.mock.calls[1]?.[0]).toContain('PREFACE_BEFORE_INTRO');
+    });
+
+    it('should throw deterministic error when intro remains invalid after retry', async () => {
+      mockModelInvoke.mockResolvedValue({
+        content: `## Introduction
+
+In the next lesson, we will cover advanced topics.
+
+## Section 1
+
+Main section.`,
+        response_metadata: {
+          usage: { total_tokens: 200 },
+        },
+      });
+
+      await expect(
+        generateLessonSingleCall(mockLessonSpec, [], 'en', null, null, null)
+      ).rejects.toThrowError(/^STAGE6_SINGLE_CALL_INTRO_STRUCTURE_GUARD_FAILED:/);
+
+      expect(mockModelInvoke).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('return shape', () => {
     it('should return correct shape with content, lessonDigest, and tokensUsed', async () => {
       const result = await generateLessonSingleCall(mockLessonSpec, [], 'en', null, null, null);
@@ -1080,7 +1230,7 @@ More content.`,
 
     it('should extract tokens from response metadata', async () => {
       mockModelInvoke.mockResolvedValue({
-        content: 'Content',
+        content: validEnglishLessonContent,
         response_metadata: {
           usage: { total_tokens: 1234 },
         },
@@ -1093,7 +1243,7 @@ More content.`,
 
     it('should estimate tokens when metadata not available', async () => {
       mockModelInvoke.mockResolvedValue({
-        content: 'Short content',
+        content: validEnglishLessonContent,
         response_metadata: {}, // No usage metadata
       });
 

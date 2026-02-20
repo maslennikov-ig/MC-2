@@ -128,6 +128,12 @@ export interface HeuristicFilterResult {
         overlap: number;
         sharedNgrams: number;
       }>;
+      introOverlapPairs: Array<{
+        introTitle: string;
+        sectionTitle: string;
+        overlap: number;
+        sharedNgrams: number;
+      }>;
       totalSections: number;
     };
   };

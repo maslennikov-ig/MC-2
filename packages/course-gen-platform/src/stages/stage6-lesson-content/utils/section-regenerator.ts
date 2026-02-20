@@ -42,6 +42,8 @@ export interface SectionRegenerationResult {
   regeneratedSections: string[];
   /** Sections that failed to regenerate */
   failedSections: string[];
+  /** Sections where regeneration produced no content diff */
+  noOpSections: string[];
   /** Distinct model IDs used during regeneration */
   modelsUsed: string[];
   /** Error message if any */
@@ -96,6 +98,15 @@ function findSectionSpec(
   }
 
   return null;
+}
+
+function normalizeSectionContent(content: string): string {
+  return content
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(line => line.trimEnd())
+    .join('\n')
+    .trim();
 }
 
 /**
@@ -206,6 +217,7 @@ export async function regenerateSections(
     let totalTokens = 0;
     const regeneratedSections: string[] = [];
     const failedSections: string[] = [];
+    const noOpSections: string[] = [];
     const modelsUsed = new Set<string>();
 
     // Regenerate each section
@@ -244,14 +256,49 @@ export async function regenerateSections(
 
         // The generated content doesn't include the header, so add it
         const section = currentParsed.sections.find(s => s.id === sectionId);
-        const sectionTitle = section?.title || sectionId;
+        const labels = getContentLabels(language);
+        const isSyntheticIntroSection = Boolean(
+          sectionId === 'introduction' && section && !section.content.trimStart().startsWith('##')
+        );
+        const sectionTitle =
+          sectionId === 'introduction'
+            ? isSyntheticIntroSection
+              ? labels.introduction
+              : section?.title || labels.introduction
+            : sectionId === 'summary'
+              ? section?.title || labels.summary
+              : section?.title || sectionId;
         const newSectionContent = `## ${sectionTitle}\n\n${result.content}`;
 
         // Merge back into markdown
-        currentMarkdown = mergeSectionIntoMarkdown(currentParsed, sectionId, newSectionContent);
+        const mergedMarkdown = mergeSectionIntoMarkdown(
+          currentParsed,
+          sectionId,
+          newSectionContent
+        );
+        const contentChanged = mergedMarkdown !== currentMarkdown;
+        const isSemanticallyUnchanged = Boolean(
+          section &&
+            normalizeSectionContent(section.content) === normalizeSectionContent(newSectionContent)
+        );
+        const isNoOp = !contentChanged || isSemanticallyUnchanged;
 
         totalTokens += result.tokensUsed;
         modelsUsed.add(result.modelUsed);
+
+        if (isNoOp) {
+          nodeLogger.warn({
+            msg: 'Section regeneration produced no content change',
+            sectionId,
+            generatedLength: result.content.length,
+            noOpReason: !contentChanged ? 'unchanged_markdown' : 'unchanged_section_content',
+          });
+          failedSections.push(sectionId);
+          noOpSections.push(sectionId);
+          continue;
+        }
+
+        currentMarkdown = mergedMarkdown;
         regeneratedSections.push(sectionId);
 
         nodeLogger.debug({
@@ -279,6 +326,7 @@ export async function regenerateSections(
       success,
       regeneratedCount: regeneratedSections.length,
       failedCount: failedSections.length,
+      noOpCount: noOpSections.length,
       totalTokens,
       durationMs,
     });
@@ -290,6 +338,7 @@ export async function regenerateSections(
       durationMs,
       regeneratedSections,
       failedSections,
+      noOpSections,
       modelsUsed: Array.from(modelsUsed),
       errorMessage:
         failedSections.length > 0
@@ -312,6 +361,7 @@ export async function regenerateSections(
       durationMs,
       regeneratedSections: [],
       failedSections: sectionIds,
+      noOpSections: [],
       modelsUsed: [],
       errorMessage,
     };

@@ -5,6 +5,7 @@
 
 import type { FilterCheckResult } from './types';
 import { logger } from '@/shared/logger';
+import { CONTENT_LABELS } from '@megacampus/shared-types';
 
 interface DuplicateTitlePair {
   title1: string;
@@ -18,6 +19,26 @@ interface OverlapPair {
   overlap: number;
   sharedNgrams: number;
 }
+
+interface IntroOverlapPair {
+  introTitle: string;
+  sectionTitle: string;
+  overlap: number;
+  sharedNgrams: number;
+}
+
+interface TopLevelSection {
+  title: string;
+  content: string;
+}
+
+const OVERLAP_THRESHOLD = 0.32;
+const MIN_OVERLAP_TOKENS = 40;
+const PREFACE_INTRO_TITLE = '__preface_intro__';
+const PREFACE_INTRO_DISPLAY_TITLE = 'Preface (before first section)';
+const INTRODUCTION_TITLES = new Set(
+  Object.values(CONTENT_LABELS).map(labels => normalizeTitleForMatch(labels.introduction))
+);
 
 // ============================================================================
 // SECTION DUPLICATION CHECK
@@ -33,6 +54,7 @@ interface OverlapPair {
 export function checkSectionDuplication(content: string): FilterCheckResult & {
   duplicatePairs: DuplicateTitlePair[];
   overlapPairs: OverlapPair[];
+  introOverlapPairs: IntroOverlapPair[];
   totalSections: number;
 } {
   // Extract all section headers (## and ### only, skip # which is lesson title)
@@ -55,8 +77,19 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
     }
   }
 
-  const overlapPairs = detectSectionBodyOverlap(content);
-  const totalDuplicationPairs = duplicatePairs.length + overlapPairs.length;
+  const sections = extractTopLevelSections(content).filter(
+    section => !isTemplateHeavySection(section.title)
+  );
+  const prefaceSection = extractPrefaceSection(content);
+  if (prefaceSection) {
+    sections.unshift(prefaceSection);
+  }
+  const introOverlapPairs = detectIntroductionSectionOverlap(sections);
+  const overlapPairs = detectSectionBodyOverlap(
+    sections.filter(section => !isIntroductionTitle(section.title))
+  );
+  const totalDuplicationPairs =
+    duplicatePairs.length + overlapPairs.length + introOverlapPairs.length;
 
   const passed = totalDuplicationPairs === 0;
   // Each duplicate/overlap pair reduces score by 25% (max 4 pairs = 0 score)
@@ -65,23 +98,25 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
   const result: FilterCheckResult & {
     duplicatePairs: DuplicateTitlePair[];
     overlapPairs: OverlapPair[];
+    introOverlapPairs: IntroOverlapPair[];
     totalSections: number;
   } = {
     passed,
     actual: passed
       ? 'no duplicates'
-      : `${duplicatePairs.length} duplicate title pairs, ${overlapPairs.length} overlap pairs`,
+      : `${duplicatePairs.length} duplicate title pairs, ${overlapPairs.length} overlap pairs, ${introOverlapPairs.length} intro overlap pairs`,
     scoreContribution,
     duplicatePairs,
     overlapPairs,
+    introOverlapPairs,
     totalSections: headers.length,
   };
 
   if (!passed) {
     result.failure = {
       filter: 'sectionDuplication',
-      expected: '0 duplicate sections or high-overlap section bodies',
-      actual: `${duplicatePairs.length} duplicate title pairs, ${overlapPairs.length} overlap pairs`,
+      expected: '0 duplicate sections, section overlap pairs, or intro-vs-section overlaps',
+      actual: `${duplicatePairs.length} duplicate title pairs, ${overlapPairs.length} overlap pairs, ${introOverlapPairs.length} intro overlap pairs`,
       severity: totalDuplicationPairs > 2 ? 'critical' : 'major',
     };
 
@@ -95,7 +130,17 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
       .map(p => `"${p.title1}" ↔ "${p.title2}" (${Math.round(p.overlap * 100)}% shared phrasing)`)
       .join('; ');
 
-    const exampleParts = [titleExamples, overlapExamples].filter(Boolean).join('; ');
+    const introOverlapExamples = introOverlapPairs
+      .slice(0, 2)
+      .map(
+        p =>
+          `"${p.introTitle}" ↔ "${p.sectionTitle}" (${Math.round(p.overlap * 100)}% shared phrasing)`
+      )
+      .join('; ');
+
+    const exampleParts = [titleExamples, overlapExamples, introOverlapExamples]
+      .filter(Boolean)
+      .join('; ');
     result.suggestion = `Duplicate sections detected: ${exampleParts}${totalDuplicationPairs > 2 ? ` (+${totalDuplicationPairs - 2} more)` : ''}. Remove repeated recaps and keep each section unique.`;
   }
 
@@ -104,6 +149,7 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
       msg: 'Section duplication detected',
       duplicatePairs: duplicatePairs.slice(0, 5),
       overlapPairs: overlapPairs.slice(0, 5),
+      introOverlapPairs: introOverlapPairs.slice(0, 5),
       totalSections: headers.length,
     });
   }
@@ -114,9 +160,9 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
 /**
  * Extract top-level markdown sections (## headers) with their body content.
  */
-function extractTopLevelSections(content: string): Array<{ title: string; content: string }> {
+function extractTopLevelSections(content: string): TopLevelSection[] {
   const lines = content.split('\n');
-  const sections: Array<{ title: string; content: string }> = [];
+  const sections: TopLevelSection[] = [];
 
   let currentTitle = '';
   let currentBody: string[] = [];
@@ -150,20 +196,13 @@ function extractTopLevelSections(content: string): Array<{ title: string; conten
 /**
  * Detect high overlap between top-level section bodies via 5-gram containment.
  */
-function detectSectionBodyOverlap(content: string): OverlapPair[] {
-  const sections = extractTopLevelSections(content).filter(section => {
-    const lowerTitle = section.title.toLowerCase();
-
-    // Ignore template-heavy sections that naturally reuse wording.
-    return !/(exercise|упражнен|digest|краткое содержание)/i.test(lowerTitle);
-  });
-
+function detectSectionBodyOverlap(sections: TopLevelSection[]): OverlapPair[] {
   const overlapPairs: OverlapPair[] = [];
 
   for (let i = 0; i < sections.length; i++) {
     for (let j = i + 1; j < sections.length; j++) {
       const overlapAnalysis = calculateSectionOverlap(sections[i].content, sections[j].content);
-      if (overlapAnalysis.overlap >= 0.32) {
+      if (overlapAnalysis.overlap >= OVERLAP_THRESHOLD) {
         overlapPairs.push({
           title1: sections[i].title,
           title2: sections[j].title,
@@ -178,6 +217,35 @@ function detectSectionBodyOverlap(content: string): OverlapPair[] {
 }
 
 /**
+ * Detect high overlap between introduction and non-introduction section bodies.
+ */
+function detectIntroductionSectionOverlap(sections: TopLevelSection[]): IntroOverlapPair[] {
+  const introSections = sections.filter(section => isIntroductionTitle(section.title));
+  if (introSections.length === 0) {
+    return [];
+  }
+
+  const contentSections = sections.filter(section => !isIntroductionTitle(section.title));
+  const introOverlapPairs: IntroOverlapPair[] = [];
+
+  for (const introSection of introSections) {
+    for (const section of contentSections) {
+      const overlapAnalysis = calculateSectionOverlap(introSection.content, section.content);
+      if (overlapAnalysis.overlap >= OVERLAP_THRESHOLD) {
+        introOverlapPairs.push({
+          introTitle: toDisplayTitle(introSection.title),
+          sectionTitle: section.title,
+          overlap: overlapAnalysis.overlap,
+          sharedNgrams: overlapAnalysis.sharedNgrams,
+        });
+      }
+    }
+  }
+
+  return introOverlapPairs;
+}
+
+/**
  * Calculate overlap between two section bodies via 5-gram containment.
  */
 function calculateSectionOverlap(
@@ -188,7 +256,7 @@ function calculateSectionOverlap(
   const tokensB = normalizeTokens(sectionB);
 
   // Short sections are noisy; skip overlap checks for them.
-  if (tokensA.length < 40 || tokensB.length < 40) {
+  if (tokensA.length < MIN_OVERLAP_TOKENS || tokensB.length < MIN_OVERLAP_TOKENS) {
     return { overlap: 0, sharedNgrams: 0 };
   }
 
@@ -207,6 +275,66 @@ function calculateSectionOverlap(
 
   const overlap = intersection / Math.min(ngramsA.size, ngramsB.size);
   return { overlap, sharedNgrams: intersection };
+}
+
+function normalizeTitleForMatch(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isIntroductionTitle(title: string): boolean {
+  if (title === PREFACE_INTRO_TITLE) {
+    return true;
+  }
+
+  const normalized = normalizeTitleForMatch(title);
+  if (INTRODUCTION_TITLES.has(normalized) || normalized === 'intro') {
+    return true;
+  }
+
+  for (const introTitle of INTRODUCTION_TITLES) {
+    if (normalized.startsWith(`${introTitle} `)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isTemplateHeavySection(title: string): boolean {
+  // Template-heavy sections naturally repeat boilerplate instructions.
+  return /(exercise|упражнен|digest|краткое содержание)/i.test(title.toLowerCase());
+}
+
+function toDisplayTitle(title: string): string {
+  return title === PREFACE_INTRO_TITLE ? PREFACE_INTRO_DISPLAY_TITLE : title;
+}
+
+function extractPrefaceSection(content: string): TopLevelSection | null {
+  const lines = content.split('\n');
+  const firstH2Index = lines.findIndex(line => /^##\s+/.test(line));
+  if (firstH2Index <= 0) {
+    return null;
+  }
+
+  const titleLineIndex = lines.findIndex(line => /^#\s+/.test(line));
+  const startIndex = titleLineIndex >= 0 ? titleLineIndex + 1 : 0;
+  if (startIndex >= firstH2Index) {
+    return null;
+  }
+
+  const prefaceContent = lines.slice(startIndex, firstH2Index).join('\n').trim();
+  if (!prefaceContent) {
+    return null;
+  }
+
+  return {
+    title: PREFACE_INTRO_TITLE,
+    content: prefaceContent,
+  };
 }
 
 function normalizeTokens(content: string): string[] {
