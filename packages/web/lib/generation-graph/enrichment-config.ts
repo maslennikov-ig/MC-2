@@ -299,4 +299,6 @@ export const ENRICHMENT_TYPES_ORDERED: EnrichmentType[] = [
   'document',
   'card',
   'banner',
+  'nlm_audio',
+  'nlm_video',
 ]

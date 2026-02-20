@@ -29,11 +29,14 @@ export interface EnrichmentSelectionState {
 const ALL_ENRICHMENT_TYPES: EnrichmentType[] = [
   'quiz',
   'video',
+  'nlm_video',
   'audio',
+  'nlm_audio',
   'presentation',
   'document',
   'cover',
   'card',
+  'banner',
 ]
 
 /**
