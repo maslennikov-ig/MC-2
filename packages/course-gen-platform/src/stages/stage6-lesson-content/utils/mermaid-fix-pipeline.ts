@@ -10,7 +10,8 @@
  *
  * **Stage 2: Validation**
  * - Parse diagram with official mermaid parser
- * - Detect syntax errors with detailed error messages
+ * - Render to SVG and verify graph nodes are present
+ * - Detect syntax and render-integrity failures
  *
  * **Stage 3: LLM Fixing** (conditional)
  * - Only if validation fails AND LLM budget available
@@ -18,13 +19,13 @@
  * - Limit: MAX_LLM_FIXES_PER_LESSON to control cost/time
  *
  * **Stage 4: Re-validation**
- * - Validate LLM-fixed diagram
+ * - Parse + render validate LLM-fixed diagram
  * - Confirm fix was successful
  *
- * **Stage 5: Fallback**
- * - If all else fails, replace with HTML comment
- * - Prevents broken diagrams from breaking entire lesson
- * - Manual review required
+ * **Stage 5: Adaptive Remediation**
+ * - Simplify diagram by stripping fragile directives
+ * - Split oversized flowcharts into at most 2 diagrams when possible
+ * - If rendering still fails, replace with structured markdown summary
  *
  * **Architecture:**
  * - Extract all mermaid blocks from content
@@ -51,8 +52,8 @@
  */
 
 import { sanitizeMermaidBlocks, MERMAID_BLOCK_REGEX } from './mermaid-sanitizer';
-import { validateMermaidSyntax } from './mermaid-validator';
 import { fixMermaidWithLLM } from './mermaid-llm-fixer';
+import { validateMermaidBlockRender } from './mermaid-render-validator';
 // Note: cleanupDOMGlobals intentionally not imported/called here.
 // Mermaid is a singleton that caches DOMPurify reference at first initialization.
 // Calling cleanup would break subsequent pipeline calls with "DOMPurify.addHook is not a function".
@@ -97,7 +98,9 @@ type PipelineStage =
   | 'VALIDATE'
   | 'LLM_FIX'
   | 'REVALIDATE'
-  | 'FALLBACK'
+  | 'SIMPLIFY'
+  | 'SPLIT'
+  | 'STRUCTURED_FALLBACK'
   | 'COMPLETE';
 
 /**
@@ -135,6 +138,12 @@ export interface MermaidPipelineResult {
     diagramsFixedLLM: number;
     /** Diagrams that failed all fixes (replaced with fallback) */
     diagramsFallback: number;
+    /** Diagrams recovered by simplification stage */
+    diagramsSimplified?: number;
+    /** Diagrams recovered by splitting into two diagrams */
+    diagramsSplit?: number;
+    /** Diagrams replaced with structured markdown fallback */
+    diagramsStructuredFallback?: number;
     /** Total pipeline execution time in milliseconds */
     durationMs: number;
   };
@@ -167,7 +176,49 @@ interface MermaidBlock {
  */
 interface ProcessedBlock {
   block: MermaidBlock;
-  fixedCode: string;
+  replacement: string;
+}
+
+interface MermaidPipelineValidation {
+  valid: boolean;
+  errors: string[];
+  diagramType: string | null;
+  failureStage: 'parse' | 'render' | null;
+}
+
+async function validateBlockForPipeline(
+  code: string,
+  blockIndex: number
+): Promise<MermaidPipelineValidation> {
+  const diagnostic = await validateMermaidBlockRender(code, blockIndex);
+
+  if (!diagnostic.parseValid) {
+    return {
+      valid: false,
+      errors: diagnostic.errors,
+      diagramType: diagnostic.diagramType,
+      failureStage: 'parse',
+    };
+  }
+
+  if (!diagnostic.renderValid || !diagnostic.svgHasRenderableContent) {
+    return {
+      valid: false,
+      errors:
+        diagnostic.errors.length > 0
+          ? diagnostic.errors
+          : ['Mermaid render validation failed: SVG has no renderable content'],
+      diagramType: diagnostic.diagramType,
+      failureStage: 'render',
+    };
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    diagramType: diagnostic.diagramType,
+    failureStage: null,
+  };
 }
 
 // ============================================================================
@@ -447,38 +498,163 @@ function extractMermaidBlocks(content: string): MermaidBlock[] {
 }
 
 // ============================================================================
-// FALLBACK GENERATOR
+// ADAPTIVE REMEDIATION HELPERS
 // ============================================================================
 
-/**
- * Generate fallback text for broken diagrams
- *
- * When all fix attempts fail, replace the diagram with an HTML comment
- * that includes the diagram type for manual review.
- *
- * @param brokenDiagram - The diagram code that could not be fixed
- * @returns Fallback HTML comment
- *
- * @example
- * ```typescript
- * const fallback = generateFallbackText('flowchart TD\n  A[Bad syntax');
- * // "<!-- Mermaid flowchart could not be rendered. Please review manually. -->"
- *
- * const fallback2 = generateFallbackText('invalid code');
- * // "<!-- Mermaid diagram could not be rendered. Please review manually. -->"
- * ```
- */
-function generateFallbackText(brokenDiagram: string): string {
-  // Extract diagram type from first line
-  const typeMatch = brokenDiagram.match(
-    /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|mindmap|timeline)/m
-  );
-  const diagramType = typeMatch ? typeMatch[1] : 'diagram';
+const MERMAID_EDGE_PATTERN = /-->|-\.->|==>|---|~~~/;
+const MERMAID_TYPE_PATTERN =
+  /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitgraph|C4Context|C4Container|C4Component|C4Deployment|sankey-beta|xychart-beta|block-beta|packet-beta)\b/i;
+const MERMAID_CONTROL_LINE_PATTERN =
+  /^\s*(?:%%\{.*\}%%|classDef\b|class\b|style\b|linkStyle\b|click\b)/i;
 
-  // Sanitize diagram type to prevent XSS injection via --> or script tags
-  const safeDiagramType = diagramType.replace(/[<>'"&-]/g, '');
+function wrapMermaidBlock(code: string): string {
+  return `\`\`\`mermaid\n${code}\n\`\`\``;
+}
 
-  return `<!-- Mermaid ${safeDiagramType} could not be rendered. Please review manually. -->`;
+function extractDiagramType(code: string): string {
+  const firstLine = code.split('\n').find(line => line.trim().length > 0) ?? '';
+  const typeMatch = firstLine.match(MERMAID_TYPE_PATTERN);
+  return typeMatch ? typeMatch[1] : 'diagram';
+}
+
+function normalizeSingleArrows(line: string): string {
+  let normalized = '';
+
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '-' && line[i + 1] === '>') {
+      const before = i > 0 ? line[i - 1] : '';
+      const after = i + 2 < line.length ? line[i + 2] : '';
+
+      // Keep valid sequence arrows (->>) and existing flow arrows (-->, -.->)
+      const isSequenceArrow = after === '>';
+      const isAlreadyFlowArrow = before === '-' || before === '.';
+      if (!isSequenceArrow && !isAlreadyFlowArrow && after !== '-') {
+        normalized += '-->';
+        i += 1;
+        continue;
+      }
+    }
+
+    normalized += line[i];
+  }
+
+  return normalized;
+}
+
+function simplifyMermaidDiagram(code: string): string {
+  const lines = code
+    .split('\n')
+    .map(line => line.trimEnd())
+    .filter((line, index) => !(index === 0 && line.trim().length === 0));
+
+  if (lines.length === 0) {
+    return code;
+  }
+
+  const [header, ...bodyLines] = lines;
+
+  const simplifiedBody = bodyLines
+    .map(line => line.replace(/<br\s*\/?>/gi, ' '))
+    .map(line => line.replace(/`/g, ''))
+    .map(line => normalizeSingleArrows(line))
+    .filter(line => !MERMAID_CONTROL_LINE_PATTERN.test(line))
+    .map(line => line.replace(/\s{2,}/g, ' ').trimEnd())
+    .filter(line => line.trim().length > 0);
+
+  if (simplifiedBody.length === 0) {
+    return header.trim();
+  }
+
+  return [header.trim(), ...simplifiedBody].join('\n').trim();
+}
+
+function isFlowchartHeader(line: string): boolean {
+  return /^(flowchart|graph)\b/i.test(line.trim());
+}
+
+function isEdgeLine(line: string): boolean {
+  return MERMAID_EDGE_PATTERN.test(line);
+}
+
+function splitMermaidDiagramIntoTwo(
+  code: string
+): { firstDiagram: string; secondDiagram: string } | null {
+  const lines = code
+    .split('\n')
+    .map(line => line.trimEnd())
+    .filter(line => line.trim().length > 0);
+
+  if (lines.length < 3) {
+    return null;
+  }
+
+  const header = lines[0].trim();
+  if (!isFlowchartHeader(header)) {
+    return null;
+  }
+
+  const bodyLines = lines.slice(1).filter(line => !MERMAID_CONTROL_LINE_PATTERN.test(line));
+  const edgeLines = bodyLines.filter(isEdgeLine);
+
+  if (edgeLines.length < 2) {
+    return null;
+  }
+
+  const midpoint = Math.ceil(edgeLines.length / 2);
+  const firstEdges = edgeLines.slice(0, midpoint);
+  const secondEdges = edgeLines.slice(midpoint);
+
+  if (firstEdges.length === 0 || secondEdges.length === 0) {
+    return null;
+  }
+
+  const sharedNodeLines = bodyLines.filter(line => !isEdgeLine(line));
+  const firstDiagram = [header, ...sharedNodeLines, ...firstEdges].join('\n').trim();
+  const secondDiagram = [header, ...sharedNodeLines, ...secondEdges].join('\n').trim();
+
+  return { firstDiagram, secondDiagram };
+}
+
+function extractFallbackSteps(brokenDiagram: string): string[] {
+  const lines = brokenDiagram
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+
+  const edgeSteps: string[] = [];
+
+  for (const line of lines) {
+    const edgeMatch = line.match(
+      /^([A-Za-z0-9_]+)\s*(?:-->|-\.->|==>|---|~~~|->>)\s*(?:\|[^|]*\|\s*)?([A-Za-z0-9_]+)/
+    );
+    if (edgeMatch) {
+      edgeSteps.push(`${edgeMatch[1]} -> ${edgeMatch[2]}`);
+    }
+  }
+
+  if (edgeSteps.length > 0) {
+    return edgeSteps.slice(0, 6);
+  }
+
+  const textualSteps = lines
+    .slice(1)
+    .map(line => line.replace(/[#*`]/g, '').trim())
+    .filter(line => line.length > 0)
+    .slice(0, 4);
+
+  return textualSteps.length > 0 ? textualSteps : ['No stable flow summary could be extracted.'];
+}
+
+function generateStructuredFallbackText(brokenDiagram: string): string {
+  const diagramType = extractDiagramType(brokenDiagram);
+  const summarySteps = extractFallbackSteps(brokenDiagram);
+
+  return [
+    '**Diagram unavailable (auto-remediated)**',
+    `The original Mermaid ${diagramType} diagram could not be rendered reliably and was converted to a text summary.`,
+    'Key flow:',
+    ...summarySteps.map((step, index) => `${index + 1}. ${step}`),
+  ].join('\n');
 }
 
 // ============================================================================
@@ -493,7 +669,10 @@ function generateFallbackText(brokenDiagram: string): string {
  * 2. Validation (always)
  * 3. LLM fixing (conditional - if invalid & budget available)
  * 4. Re-validation (after LLM fix)
- * 5. Fallback (if all else fails)
+ * 5. Adaptive remediation:
+ *    - simplify diagram
+ *    - split into <= 2 diagrams (flowcharts/graphs)
+ *    - structured markdown fallback
  *
  * **Processing flow:**
  * - Extract all Mermaid blocks from content
@@ -551,6 +730,9 @@ export async function runMermaidFixPipeline(
       diagramsFixedRegex: 0,
       diagramsFixedLLM: 0,
       diagramsFallback: 0,
+      diagramsSimplified: 0,
+      diagramsSplit: 0,
+      diagramsStructuredFallback: 0,
       durationMs: 0,
     };
 
@@ -640,13 +822,14 @@ export async function runMermaidFixPipeline(
       // -------------------------------------------------------------------------
       // Stage 2: Validation
       // -------------------------------------------------------------------------
-      let validation = await validateMermaidSyntax(fixedCode);
+      let validation = await validateBlockForPipeline(fixedCode, i);
 
       logger.debug(
         {
           blockIndex: i,
           valid: validation.valid,
           diagramType: validation.diagramType,
+          failureStage: validation.failureStage,
         },
         'Mermaid pipeline: Initial validation'
       );
@@ -655,6 +838,7 @@ export async function runMermaidFixPipeline(
       logPipelineStage('VALIDATE', i, {
         valid: validation.valid,
         diagramType: validation.diagramType,
+        failureStage: validation.failureStage,
       });
 
       if (validation.valid) {
@@ -670,8 +854,19 @@ export async function runMermaidFixPipeline(
           );
         }
 
-        processedBlocks.push({ block, fixedCode });
+        processedBlocks.push({ block, replacement: wrapMermaidBlock(fixedCode) });
         continue;
+      }
+
+      if (validation.failureStage === 'render') {
+        logger.warn(
+          {
+            blockIndex: i,
+            diagramType: validation.diagramType,
+            errors: validation.errors,
+          },
+          'Mermaid pipeline: Parse passed but render integrity failed'
+        );
       }
 
       // -------------------------------------------------------------------------
@@ -731,18 +926,22 @@ export async function runMermaidFixPipeline(
               // -----------------------------------------------------------------------
               // Stage 4: Re-validation
               // -----------------------------------------------------------------------
-              validation = await validateMermaidSyntax(fixedCode);
+              validation = await validateBlockForPipeline(fixedCode, i);
 
               logger.debug(
                 {
                   blockIndex: i,
                   valid: validation.valid,
+                  failureStage: validation.failureStage,
                 },
                 'Mermaid pipeline: Re-validation after LLM fix'
               );
 
               // Log re-validation result
-              logPipelineStage('REVALIDATE', i, { valid: validation.valid });
+              logPipelineStage('REVALIDATE', i, {
+                valid: validation.valid,
+                failureStage: validation.failureStage,
+              });
 
               if (validation.valid) {
                 metrics.diagramsFixedLLM++;
@@ -754,8 +953,19 @@ export async function runMermaidFixPipeline(
                   'Mermaid pipeline: Fixed by LLM'
                 );
 
-                processedBlocks.push({ block, fixedCode });
+                processedBlocks.push({ block, replacement: wrapMermaidBlock(fixedCode) });
                 continue;
+              }
+
+              if (validation.failureStage === 'render') {
+                logger.warn(
+                  {
+                    blockIndex: i,
+                    diagramType: validation.diagramType,
+                    errors: validation.errors,
+                  },
+                  'Mermaid pipeline: LLM fix parse-valid but still render-invalid'
+                );
               }
             }
           }
@@ -786,7 +996,69 @@ export async function runMermaidFixPipeline(
       }
 
       // -------------------------------------------------------------------------
-      // Stage 5: Fallback
+      // Stage 5A: Simplify (deterministic downgrade before splitting/fallback)
+      // -------------------------------------------------------------------------
+      const simplifiedCode = simplifyMermaidDiagram(fixedCode);
+      const simplifyApplied = simplifiedCode !== fixedCode;
+      logPipelineStage('SIMPLIFY', i, { applied: simplifyApplied });
+
+      if (simplifyApplied) {
+        const simplifiedValidation = await validateBlockForPipeline(simplifiedCode, i);
+        if (simplifiedValidation.valid) {
+          logger.info(
+            {
+              blockIndex: i,
+              diagramType: simplifiedValidation.diagramType,
+            },
+            'Mermaid pipeline: Recovered diagram via simplify stage'
+          );
+
+          metrics.diagramsSimplified++;
+          anyModified = true;
+          processedBlocks.push({ block, replacement: wrapMermaidBlock(simplifiedCode) });
+          continue;
+        }
+
+        validation = simplifiedValidation;
+        fixedCode = simplifiedCode;
+      }
+
+      // -------------------------------------------------------------------------
+      // Stage 5B: Split into <= 2 diagrams (flowchart/graph only)
+      // -------------------------------------------------------------------------
+      const splitCandidate = splitMermaidDiagramIntoTwo(fixedCode);
+      if (splitCandidate) {
+        logPipelineStage('SPLIT', i, { attempted: true, parts: 2 });
+
+        const [firstValidation, secondValidation] = await Promise.all([
+          validateBlockForPipeline(splitCandidate.firstDiagram, i),
+          validateBlockForPipeline(splitCandidate.secondDiagram, i),
+        ]);
+
+        if (firstValidation.valid && secondValidation.valid) {
+          logger.info(
+            {
+              blockIndex: i,
+              firstDiagramType: firstValidation.diagramType,
+              secondDiagramType: secondValidation.diagramType,
+            },
+            'Mermaid pipeline: Recovered diagram via split stage'
+          );
+
+          metrics.diagramsSplit++;
+          anyModified = true;
+          processedBlocks.push({
+            block,
+            replacement: `${wrapMermaidBlock(splitCandidate.firstDiagram)}\n\n${wrapMermaidBlock(splitCandidate.secondDiagram)}`,
+          });
+          continue;
+        }
+      } else {
+        logPipelineStage('SPLIT', i, { attempted: false, reason: 'unsupported_or_too_small' });
+      }
+
+      // -------------------------------------------------------------------------
+      // Stage 5C: Structured markdown fallback (no HTML comments)
       // -------------------------------------------------------------------------
       logger.warn(
         {
@@ -794,17 +1066,17 @@ export async function runMermaidFixPipeline(
           errors: validation.errors,
           snippet: getDiagramSnippet(block.code),
         },
-        'Mermaid pipeline: All fixes failed, using fallback'
+        'Mermaid pipeline: All remediation stages failed, using structured markdown fallback'
       );
 
-      // Log fallback
-      logPipelineStage('FALLBACK', i, { reason: 'all_fixes_failed' });
+      logPipelineStage('STRUCTURED_FALLBACK', i, { reason: 'all_fixes_failed' });
 
-      fixedCode = generateFallbackText(block.code);
+      const fallbackMarkdown = generateStructuredFallbackText(block.code);
       metrics.diagramsFallback++;
+      metrics.diagramsStructuredFallback++;
       anyModified = true;
 
-      processedBlocks.push({ block, fixedCode });
+      processedBlocks.push({ block, replacement: fallbackMarkdown });
     }
 
     // -------------------------------------------------------------------------
@@ -852,12 +1124,7 @@ export async function runMermaidFixPipeline(
 
       // Process blocks in reverse order to maintain indices
       for (let i = processedBlocks.length - 1; i >= 0; i--) {
-        const { block, fixedCode } = processedBlocks[i];
-
-        // Reconstruct Mermaid block (unless it's a fallback comment)
-        const replacement = fixedCode.startsWith('<!--')
-          ? fixedCode
-          : `\`\`\`mermaid\n${fixedCode}\n\`\`\``;
+        const { block, replacement } = processedBlocks[i];
 
         finalContent =
           finalContent.slice(0, block.startIndex) +
@@ -877,6 +1144,9 @@ export async function runMermaidFixPipeline(
         autoWrapped: metrics.diagramsAutoWrapped,
         fixedRegex: metrics.diagramsFixedRegex,
         fixedLLM: metrics.diagramsFixedLLM,
+        simplified: metrics.diagramsSimplified,
+        split: metrics.diagramsSplit,
+        structuredFallback: metrics.diagramsStructuredFallback,
         fallback: metrics.diagramsFallback,
         modified: anyModified || wrapResult.wrappedCount > 0,
         durationMs: metrics.durationMs,

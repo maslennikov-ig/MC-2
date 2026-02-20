@@ -13,6 +13,10 @@ import type {
   ArbiterOutput,
 } from '@megacampus/shared-types/judge-types';
 import type { LessonContent, LessonContentBody } from '@megacampus/shared-types/lesson-content';
+import type {
+  MermaidRenderValidationResult,
+  MermaidRenderRemediationMetadata,
+} from '../utils/mermaid-render-validator';
 import type { CascadeEvaluationInput, CascadeResult } from '../judge/cascade-evaluator';
 import { DecisionAction, type DecisionResult } from '../judge/decision-engine';
 import { logger } from '@/shared/logger';
@@ -20,6 +24,8 @@ import { logTrace } from '@/shared/trace-logger';
 import { buildLessonContent } from '../judge/judge-helpers';
 import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
+import { validateMermaidRenderInLessonContentBody } from '../utils/mermaid-render-validator';
+import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 import { executeTargetedRefinementFlow, buildReviewInfo } from './judge-refinement-helpers';
 
 /**
@@ -40,6 +46,158 @@ export interface JudgeContext {
   needsHumanReview?: boolean;
   refinementTokensUsed?: number;
   arbiterOutput?: ArbiterOutput | null;
+  mermaidRenderValidation?: MermaidRenderValidationResult | null;
+}
+
+type MermaidAggregateMetrics = NonNullable<MermaidRenderRemediationMetadata['aggregateMetrics']>;
+
+interface MermaidContentBodyRemediationResult {
+  contentBody: LessonContentBody;
+  transformed: boolean;
+  fieldsScanned: number;
+  fieldsTransformed: number;
+  pipelineRuns: number;
+  aggregateMetrics: MermaidAggregateMetrics;
+}
+
+const MERMAID_HINT_REGEX =
+  /```mermaid|^\s*(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitgraph)\b/im;
+
+function createEmptyMermaidAggregateMetrics(): MermaidAggregateMetrics {
+  return {
+    diagramsTotal: 0,
+    diagramsAutoWrapped: 0,
+    diagramsFixedRegex: 0,
+    diagramsFixedLLM: 0,
+    diagramsFallback: 0,
+    diagramsSimplified: 0,
+    diagramsSplit: 0,
+    diagramsStructuredFallback: 0,
+  };
+}
+
+function mergeMermaidMetrics(
+  target: MermaidAggregateMetrics,
+  source: MermaidAggregateMetrics
+): MermaidAggregateMetrics {
+  return {
+    diagramsTotal: target.diagramsTotal + (source.diagramsTotal ?? 0),
+    diagramsAutoWrapped: target.diagramsAutoWrapped + (source.diagramsAutoWrapped ?? 0),
+    diagramsFixedRegex: target.diagramsFixedRegex + (source.diagramsFixedRegex ?? 0),
+    diagramsFixedLLM: target.diagramsFixedLLM + (source.diagramsFixedLLM ?? 0),
+    diagramsFallback: target.diagramsFallback + (source.diagramsFallback ?? 0),
+    diagramsSimplified: (target.diagramsSimplified ?? 0) + (source.diagramsSimplified ?? 0),
+    diagramsSplit: (target.diagramsSplit ?? 0) + (source.diagramsSplit ?? 0),
+    diagramsStructuredFallback:
+      (target.diagramsStructuredFallback ?? 0) + (source.diagramsStructuredFallback ?? 0),
+  };
+}
+
+async function remediateMermaidField(
+  value: string,
+  aggregate: MermaidContentBodyRemediationResult
+): Promise<string> {
+  if (!MERMAID_HINT_REGEX.test(value)) {
+    return value;
+  }
+
+  aggregate.fieldsScanned++;
+  const pipelineResult = await runMermaidFixPipeline(value, { skipLLM: true });
+  aggregate.pipelineRuns++;
+  aggregate.aggregateMetrics = mergeMermaidMetrics(
+    aggregate.aggregateMetrics,
+    pipelineResult.metrics
+  );
+
+  if (!pipelineResult.modified) {
+    return value;
+  }
+
+  aggregate.transformed = true;
+  aggregate.fieldsTransformed++;
+  return pipelineResult.content;
+}
+
+async function remediateMermaidInContentBody(
+  contentBody: LessonContentBody
+): Promise<MermaidContentBodyRemediationResult> {
+  const aggregate: MermaidContentBodyRemediationResult = {
+    contentBody,
+    transformed: false,
+    fieldsScanned: 0,
+    fieldsTransformed: 0,
+    pipelineRuns: 0,
+    aggregateMetrics: createEmptyMermaidAggregateMetrics(),
+  };
+
+  const intro = await remediateMermaidField(contentBody.intro ?? '', aggregate);
+
+  const sections: LessonContentBody['sections'] = [];
+  for (const section of contentBody.sections ?? []) {
+    sections.push({
+      ...section,
+      content: await remediateMermaidField(section.content ?? '', aggregate),
+    });
+  }
+
+  const examples: LessonContentBody['examples'] = [];
+  for (const example of contentBody.examples ?? []) {
+    examples.push({
+      ...example,
+      content: await remediateMermaidField(example.content ?? '', aggregate),
+      code: example.code,
+    });
+  }
+
+  const exercises: LessonContentBody['exercises'] = [];
+  for (const exercise of contentBody.exercises ?? []) {
+    const hints: string[] = [];
+    for (const hint of exercise.hints ?? []) {
+      hints.push(await remediateMermaidField(hint, aggregate));
+    }
+
+    exercises.push({
+      ...exercise,
+      question: await remediateMermaidField(exercise.question ?? '', aggregate),
+      solution: await remediateMermaidField(exercise.solution ?? '', aggregate),
+      hints,
+    });
+  }
+
+  return {
+    ...aggregate,
+    contentBody: {
+      ...contentBody,
+      intro,
+      sections,
+      examples,
+      exercises,
+    },
+  };
+}
+
+function resolveRemediationStrategy(
+  aggregateMetrics: MermaidAggregateMetrics
+): MermaidRenderRemediationMetadata['strategy'] {
+  const simplified = aggregateMetrics.diagramsSimplified ?? 0;
+  const split = aggregateMetrics.diagramsSplit ?? 0;
+  const structuredFallback = aggregateMetrics.diagramsStructuredFallback ?? 0;
+
+  const strategyCount = [simplified > 0, split > 0, structuredFallback > 0].filter(Boolean).length;
+
+  if (strategyCount > 1) {
+    return 'mixed';
+  }
+  if (structuredFallback > 0) {
+    return 'structured_markdown_fallback';
+  }
+  if (split > 0) {
+    return 'split';
+  }
+  if (simplified > 0) {
+    return 'simplify';
+  }
+  return 'none';
 }
 
 /**
@@ -322,6 +480,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
   let needsHumanReview = false;
   let refinementTokensUsed = 0;
   let arbiterOutput = null;
+  let mermaidRenderValidation: MermaidRenderValidationResult | null = null;
 
   switch (decision.action) {
     case DecisionAction.ACCEPT: {
@@ -382,6 +541,137 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
     }
   }
 
+  if (finalRecommendation === 'ACCEPT' || finalRecommendation === 'ACCEPT_WITH_MINOR_REVISION') {
+    let contentForMermaidGate = finalContent?.content ?? contentBody;
+
+    try {
+      const initialValidation =
+        await validateMermaidRenderInLessonContentBody(contentForMermaidGate);
+
+      if (!initialValidation.passed) {
+        logger.warn(
+          {
+            lessonId: state.lessonSpec.lesson_id,
+            recommendationBeforeGate: finalRecommendation,
+            totalBlocks: initialValidation.totalBlocks,
+            failedBlocks: initialValidation.failedBlocks,
+            fallbackComments: initialValidation.fallbackComments,
+            failedDiagnostics: initialValidation.diagnostics
+              .filter(d => !d.renderValid)
+              .slice(0, 3)
+              .map(d => ({
+                blockIndex: d.blockIndex,
+                errors: d.errors,
+                codeSnippet: d.codeSnippet,
+              })),
+          },
+          'Judge node: Mermaid render gate failed, applying deterministic remediation'
+        );
+
+        const remediationResult = await remediateMermaidInContentBody(contentForMermaidGate);
+        contentForMermaidGate = remediationResult.contentBody;
+
+        const postValidation =
+          await validateMermaidRenderInLessonContentBody(contentForMermaidGate);
+        const remediationMetadata: MermaidRenderRemediationMetadata = {
+          attempted: true,
+          transformed: remediationResult.transformed,
+          strategy: resolveRemediationStrategy(remediationResult.aggregateMetrics),
+          fieldsScanned: remediationResult.fieldsScanned,
+          fieldsTransformed: remediationResult.fieldsTransformed,
+          pipelineRuns: remediationResult.pipelineRuns,
+          aggregateMetrics: remediationResult.aggregateMetrics,
+          initialFailedBlocks: initialValidation.failedBlocks,
+          initialFallbackComments: initialValidation.fallbackComments,
+          postFailedBlocks: postValidation.failedBlocks,
+          postFallbackComments: postValidation.fallbackComments,
+        };
+
+        mermaidRenderValidation = {
+          ...postValidation,
+          remediation: remediationMetadata,
+        };
+
+        if (!postValidation.passed) {
+          logger.warn(
+            {
+              lessonId: state.lessonSpec.lesson_id,
+              recommendationAfterGate: finalRecommendation,
+              postFailedBlocks: postValidation.failedBlocks,
+              postFallbackComments: postValidation.fallbackComments,
+              remediationMetadata,
+            },
+            'Judge node: Mermaid remediation still reports failures, continuing with transformed content'
+          );
+        } else {
+          logger.info(
+            {
+              lessonId: state.lessonSpec.lesson_id,
+              recommendationAfterGate: finalRecommendation,
+              remediationMetadata,
+            },
+            'Judge node: Mermaid remediation succeeded, continuing with transformed content'
+          );
+        }
+      } else {
+        mermaidRenderValidation = {
+          ...initialValidation,
+          remediation: null,
+        };
+      }
+
+      finalContent = buildLessonContent(state, contentForMermaidGate, finalScore);
+      needsRegeneration = false;
+      needsHumanReview = false;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      mermaidRenderValidation = {
+        passed: false,
+        totalBlocks: 0,
+        failedBlocks: 1,
+        fallbackComments: 0,
+        diagnostics: [
+          {
+            blockIndex: -1,
+            diagramType: null,
+            parseValid: false,
+            renderValid: false,
+            svgHasRenderableContent: false,
+            errors: [`Mermaid render gate crashed: ${errorMessage}`],
+            codeSnippet: '',
+          },
+        ],
+        remediation: {
+          attempted: true,
+          transformed: false,
+          strategy: 'none',
+          fieldsScanned: 0,
+          fieldsTransformed: 0,
+          pipelineRuns: 0,
+          aggregateMetrics: createEmptyMermaidAggregateMetrics(),
+          initialFailedBlocks: 0,
+          initialFallbackComments: 0,
+          postFailedBlocks: 0,
+          postFallbackComments: 0,
+          error: errorMessage,
+        },
+      };
+
+      logger.error(
+        {
+          lessonId: state.lessonSpec.lesson_id,
+          recommendationBeforeGate: finalRecommendation,
+          error: errorMessage,
+        },
+        'Judge node: Mermaid render gate crashed, continuing with existing accepted content'
+      );
+
+      finalContent = finalContent ?? buildLessonContent(state, contentForMermaidGate, finalScore);
+      needsRegeneration = false;
+      needsHumanReview = false;
+    }
+  }
+
   return {
     ...context,
     finalContent,
@@ -391,6 +681,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
     needsHumanReview,
     refinementTokensUsed,
     arbiterOutput,
+    mermaidRenderValidation,
   };
 }
 
@@ -419,6 +710,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     needsHumanReview,
     refinementTokensUsed,
     arbiterOutput,
+    mermaidRenderValidation,
   } = context;
 
   const durationMs = Date.now() - startTime;
@@ -461,6 +753,23 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
       needsRegeneration,
       judgeModelsUsed,
       enrichedOutput,
+      mermaidRenderGate: mermaidRenderValidation
+        ? {
+            passed: mermaidRenderValidation.passed,
+            totalBlocks: mermaidRenderValidation.totalBlocks,
+            failedBlocks: mermaidRenderValidation.failedBlocks,
+            fallbackComments: mermaidRenderValidation.fallbackComments,
+            failedDiagnostics: mermaidRenderValidation.diagnostics
+              .filter(d => !d.renderValid)
+              .slice(0, 3)
+              .map(d => ({
+                blockIndex: d.blockIndex,
+                errors: d.errors,
+                codeSnippet: d.codeSnippet,
+              })),
+            remediation: mermaidRenderValidation.remediation ?? null,
+          }
+        : null,
     },
     modelUsed,
     tokensUsed: totalTokensUsed,
