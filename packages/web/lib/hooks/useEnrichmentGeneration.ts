@@ -320,7 +320,11 @@ export function useEnrichmentGeneration({
       try {
         const client = getBrowserTrpcClient()
         const data = (await client.enrichment.generateOnDemand.mutate(
-          { lessonId, enrichmentType: type, settings: settings || {} },
+          {
+            lessonId,
+            enrichmentType: type,
+            settings: settings && Object.keys(settings).length > 0 ? settings : undefined,
+          },
           { signal: controller.signal }
         )) as GenerateOnDemandResponse | undefined
 

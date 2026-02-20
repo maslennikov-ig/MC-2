@@ -249,7 +249,6 @@ export class NotebookLMBridgeClient {
         script: request.script,
         language: request.language,
         voice: request.voice,
-        workflow: 'artifacts.generate_audio',
       },
       config
     );
@@ -276,7 +275,6 @@ export class NotebookLMBridgeClient {
         lesson_title: request.lessonTitle,
         script: request.script,
         language: request.language,
-        workflow: 'video_overview',
       },
       config
     );
