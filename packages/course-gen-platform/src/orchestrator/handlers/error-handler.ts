@@ -15,6 +15,7 @@
 import { Job } from 'bullmq';
 import { JobData, JobType } from '@megacampus/shared-types';
 import logger, { logPermanentFailure } from '../../shared/logger';
+import { logger as baseLogger } from '@megacampus/shared-logger';
 import { metricsStore } from '../metrics';
 import {
   PipelineError,
@@ -164,7 +165,7 @@ export function shouldRetryJob(job: Job<JobData>, error: Error | unknown): boole
 
   // Never retry permanent errors
   if (errorType === ErrorType.PERMANENT) {
-    logger.warn(
+    baseLogger.warn(
       {
         jobId: job.id,
         jobType: job.name,
@@ -195,7 +196,7 @@ export function shouldRetryJob(job: Job<JobData>, error: Error | unknown): boole
 
   // For unknown errors, retry if we have attempts left
   if (errorType === ErrorType.UNKNOWN && currentAttempt < maxAttempts) {
-    logger.warn(
+    baseLogger.warn(
       {
         jobId: job.id,
         jobType: job.name,
@@ -209,7 +210,7 @@ export function shouldRetryJob(job: Job<JobData>, error: Error | unknown): boole
   }
 
   // No more retries
-  logger.error(
+  baseLogger.error(
     {
       jobId: job.id,
       jobType: job.name,
@@ -278,9 +279,9 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
   if (isInterrupt) {
     logger.info(errorLog, 'Job paused (interrupt)');
   } else if (!shouldLogAsError(error)) {
-    logger.warn(errorLog, 'Job failed (transient, will retry)');
+    baseLogger.warn(errorLog, 'Job failed (transient, will retry)');
   } else {
-    logger.error(errorLog, 'Job failed');
+    baseLogger.error(errorLog, 'Job failed');
   }
 
   // Record retry metric if applicable
@@ -330,7 +331,7 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
     },
   }).catch(dbError => {
     // Don't fail the handler if DB logging fails
-    logger.warn({ err: dbError }, 'Failed to log error to database');
+    baseLogger.warn({ err: dbError }, 'Failed to log error to database');
   });
 }
 
@@ -343,7 +344,7 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
  * @param {JobType} jobType - The type of job
  */
 export function handleJobStalled(jobId: string, jobType: JobType): void {
-  logger.warn(
+  baseLogger.info(
     {
       jobId,
       jobType,
@@ -367,7 +368,7 @@ export function handleJobStalled(jobId: string, jobType: JobType): void {
  * @param {Job<JobData>} job - The timed out job
  */
 export function handleJobTimeout(job: Job<JobData>): void {
-  logger.error(
+  baseLogger.error(
     {
       jobId: job.id,
       jobType: job.name,
