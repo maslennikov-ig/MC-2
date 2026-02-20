@@ -22,6 +22,18 @@ import {
 } from '@megacampus/shared-types'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+type NlmEnrichmentType = 'nlm_audio' | 'nlm_video'
+type ViewerOnDemandType = OnDemandEnrichmentType | NlmEnrichmentType
+
+const NLM_ENRICHMENT_TYPES = new Set<NlmEnrichmentType>(['nlm_audio', 'nlm_video'])
+
+function isNlmType(type: string): type is NlmEnrichmentType {
+  return NLM_ENRICHMENT_TYPES.has(type as NlmEnrichmentType)
+}
+
+function isViewerOnDemandType(type: string): type is ViewerOnDemandType {
+  return isOnDemandType(type) || isNlmType(type)
+}
 
 /**
  * Type guard for enrichments with on-demand type
@@ -29,8 +41,8 @@ type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
  */
 function isEnrichmentOnDemand(
   enrichment: EnrichmentRow
-): enrichment is EnrichmentRow & { enrichment_type: OnDemandEnrichmentType } {
-  return isOnDemandType(enrichment.enrichment_type)
+): enrichment is EnrichmentRow & { enrichment_type: ViewerOnDemandType } {
+  return isViewerOnDemandType(enrichment.enrichment_type)
 }
 
 interface EnrichmentsPanelProps {
@@ -208,6 +220,25 @@ export function EnrichmentsPanel({
         </EnrichmentErrorBoundary>
       ))}
 
+      {/* NLM Video Section */}
+      {groupedEnrichments.nlm_video
+        ?.filter((enrichment) => enrichment.status !== 'draft_ready')
+        .map((enrichment) => (
+          <EnrichmentErrorBoundary
+            key={enrichment.id}
+            enrichmentType={t('viewer.enrichmentTypes.nlm_video')}
+            enrichmentId={enrichment.id}
+          >
+            <EnrichmentCard
+              enrichment={enrichment}
+              isActive={activeEnrichmentId === enrichment.id}
+              onToggle={() =>
+                setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
+              }
+            />
+          </EnrichmentErrorBoundary>
+        ))}
+
       {/* Audio Section */}
       {groupedEnrichments.audio?.map((enrichment) => (
         <EnrichmentErrorBoundary
@@ -224,6 +255,25 @@ export function EnrichmentsPanel({
           />
         </EnrichmentErrorBoundary>
       ))}
+
+      {/* NLM Audio Section */}
+      {groupedEnrichments.nlm_audio
+        ?.filter((enrichment) => enrichment.status !== 'draft_ready')
+        .map((enrichment) => (
+          <EnrichmentErrorBoundary
+            key={enrichment.id}
+            enrichmentType={t('viewer.enrichmentTypes.nlm_audio')}
+            enrichmentId={enrichment.id}
+          >
+            <EnrichmentCard
+              enrichment={enrichment}
+              isActive={activeEnrichmentId === enrichment.id}
+              onToggle={() =>
+                setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
+              }
+            />
+          </EnrichmentErrorBoundary>
+        ))}
 
       {/* Presentation Section */}
       {groupedEnrichments.presentation?.map((enrichment) => (
@@ -283,8 +333,19 @@ export function EnrichmentsPanel({
           if (IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')) {
             return true
           }
-          // For other types, only show if no existing enrichment
-          return !groupedEnrichments[type]
+          // For other types, show when there is no enrichment for this type
+          if (!groupedEnrichments[type]) {
+            return true
+          }
+
+          // Two-stage nlm flow: keep placeholder visible when only draft_ready items exist
+          if (isNlmType(type)) {
+            return groupedEnrichments[type].every(
+              (enrichment) => enrichment.status === 'draft_ready'
+            )
+          }
+
+          return false
         }).map((type) => {
           const typeIsGenerating = isGenerating(type)
           const generatingProgress = getProgress(type)
@@ -328,7 +389,7 @@ export function EnrichmentsPanel({
                 if (type === 'video') {
                   return
                 }
-                void startGeneration(type, settings)
+                void startGeneration(type as OnDemandEnrichmentType, settings)
               }}
               disabled={type === 'video' || !lessonId}
               isGenerating={typeIsGenerating}

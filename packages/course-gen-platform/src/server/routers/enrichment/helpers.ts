@@ -459,13 +459,19 @@ export async function findReusableEnrichment(
  * to proceed to final generation:
  * - video: Script draft → user approves → video generation
  * - presentation: Outline draft → user approves → slides generation
- * - cover/banner: Prompt variants → user selects → image generation
+ * - nlm_audio: Script draft → user approves → NotebookLM audio generation
+ * - nlm_video: Script draft → user approves → NotebookLM video generation
  *
  * @param enrichmentType - Type of enrichment
  * @returns True if type uses draft -> final flow
  */
 export function isTwoStageType(enrichmentType: string): boolean {
-  return enrichmentType === 'video' || enrichmentType === 'presentation';
+  return (
+    enrichmentType === 'video' ||
+    enrichmentType === 'presentation' ||
+    enrichmentType === 'nlm_audio' ||
+    enrichmentType === 'nlm_video'
+  );
 }
 
 /**

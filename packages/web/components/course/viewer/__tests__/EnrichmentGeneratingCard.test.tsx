@@ -27,8 +27,10 @@ vi.mock('next-intl', () => ({
     const translations: Record<string, string> = {
       'placeholder.quiz.title': 'Quiz',
       'placeholder.audio.title': 'Audio',
+      'placeholder.nlm_audio.title': 'NLM Audio',
       'placeholder.presentation.title': 'Presentation',
       'placeholder.video.title': 'Video',
+      'placeholder.nlm_video.title': 'NLM Video',
       'images.cover.title': 'Cover',
       'images.card.title': 'Card',
       generating: 'Generating...',
@@ -103,10 +105,22 @@ describe('EnrichmentGeneratingCard', () => {
       expect(screen.getByText('Presentation - Generating...')).toBeInTheDocument()
     })
 
+    it('should render correctly with nlm_audio type', () => {
+      render(<EnrichmentGeneratingCard {...defaultProps} type="nlm_audio" />)
+
+      expect(screen.getByText('NLM Audio - Generating...')).toBeInTheDocument()
+    })
+
     it('should render correctly with video type', () => {
       render(<EnrichmentGeneratingCard {...defaultProps} type="video" />)
 
       expect(screen.getByText('Video - Generating...')).toBeInTheDocument()
+    })
+
+    it('should render correctly with nlm_video type', () => {
+      render(<EnrichmentGeneratingCard {...defaultProps} type="nlm_video" />)
+
+      expect(screen.getByText('NLM Video - Generating...')).toBeInTheDocument()
     })
 
     it('should render correctly with cover type', () => {
@@ -220,8 +234,17 @@ describe('EnrichmentGeneratingCard', () => {
     })
 
     it('should call useRotatingStatusMessage with "audio_generating" for audio type', () => {
+      render(<EnrichmentGeneratingCard {...defaultProps} type="audio" currentStep="generating" />)
+
+      expect(useRotatingStatusMessage).toHaveBeenCalledWith({
+        status: 'audio_generating',
+        interval: 5000,
+      })
+    })
+
+    it('should call useRotatingStatusMessage with "audio_generating" for nlm_audio type', () => {
       render(
-        <EnrichmentGeneratingCard {...defaultProps} type="audio" currentStep="generating" />
+        <EnrichmentGeneratingCard {...defaultProps} type="nlm_audio" currentStep="generating" />
       )
 
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
@@ -231,8 +254,17 @@ describe('EnrichmentGeneratingCard', () => {
     })
 
     it('should call useRotatingStatusMessage with "video_generating" for video type', () => {
+      render(<EnrichmentGeneratingCard {...defaultProps} type="video" currentStep="generating" />)
+
+      expect(useRotatingStatusMessage).toHaveBeenCalledWith({
+        status: 'video_generating',
+        interval: 5000,
+      })
+    })
+
+    it('should call useRotatingStatusMessage with "video_generating" for nlm_video type', () => {
       render(
-        <EnrichmentGeneratingCard {...defaultProps} type="video" currentStep="generating" />
+        <EnrichmentGeneratingCard {...defaultProps} type="nlm_video" currentStep="generating" />
       )
 
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
@@ -243,11 +275,7 @@ describe('EnrichmentGeneratingCard', () => {
 
     it('should call useRotatingStatusMessage with "presentation_generating" for presentation type', () => {
       render(
-        <EnrichmentGeneratingCard
-          {...defaultProps}
-          type="presentation"
-          currentStep="generating"
-        />
+        <EnrichmentGeneratingCard {...defaultProps} type="presentation" currentStep="generating" />
       )
 
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
@@ -257,9 +285,7 @@ describe('EnrichmentGeneratingCard', () => {
     })
 
     it('should call useRotatingStatusMessage with "cover_generating" for cover type', () => {
-      render(
-        <EnrichmentGeneratingCard {...defaultProps} type="cover" currentStep="generating" />
-      )
+      render(<EnrichmentGeneratingCard {...defaultProps} type="cover" currentStep="generating" />)
 
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'cover_generating',
@@ -323,6 +349,13 @@ describe('EnrichmentGeneratingCard', () => {
       expect(cancelButton).toBeInTheDocument()
     })
 
+    it('cancel button should have proper aria-label for nlm_audio', () => {
+      render(<EnrichmentGeneratingCard {...defaultProps} type="nlm_audio" />)
+
+      const cancelButton = screen.getByLabelText('Cancel nlm_audio generation')
+      expect(cancelButton).toBeInTheDocument()
+    })
+
     it('cancel button should have proper aria-label for presentation', () => {
       render(<EnrichmentGeneratingCard {...defaultProps} type="presentation" />)
 
@@ -334,6 +367,13 @@ describe('EnrichmentGeneratingCard', () => {
       render(<EnrichmentGeneratingCard {...defaultProps} type="video" />)
 
       const cancelButton = screen.getByLabelText('Cancel video generation')
+      expect(cancelButton).toBeInTheDocument()
+    })
+
+    it('cancel button should have proper aria-label for nlm_video', () => {
+      render(<EnrichmentGeneratingCard {...defaultProps} type="nlm_video" />)
+
+      const cancelButton = screen.getByLabelText('Cancel nlm_video generation')
       expect(cancelButton).toBeInTheDocument()
     })
 
@@ -397,6 +437,13 @@ describe('EnrichmentGeneratingCard', () => {
       expect(iconElement).toBeInTheDocument()
     })
 
+    it('should have correct color class for nlm_audio icon (purple)', () => {
+      const { container } = render(<EnrichmentGeneratingCard {...defaultProps} type="nlm_audio" />)
+
+      const iconElement = container.querySelector('.text-purple-500')
+      expect(iconElement).toBeInTheDocument()
+    })
+
     it('should have correct color class for presentation icon (orange)', () => {
       const { container } = render(
         <EnrichmentGeneratingCard {...defaultProps} type="presentation" />
@@ -408,6 +455,13 @@ describe('EnrichmentGeneratingCard', () => {
 
     it('should have correct color class for video icon (red)', () => {
       const { container } = render(<EnrichmentGeneratingCard {...defaultProps} type="video" />)
+
+      const iconElement = container.querySelector('.text-red-500')
+      expect(iconElement).toBeInTheDocument()
+    })
+
+    it('should have correct color class for nlm_video icon (red)', () => {
+      const { container } = render(<EnrichmentGeneratingCard {...defaultProps} type="nlm_video" />)
 
       const iconElement = container.querySelector('.text-red-500')
       expect(iconElement).toBeInTheDocument()

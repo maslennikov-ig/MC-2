@@ -14,6 +14,14 @@ import type {
 } from '@megacampus/shared-types';
 
 /**
+ * Stage 7 enrichment type union.
+ *
+ * NLM types are included here to support backend integration while shared-type
+ * enum changes propagate across all packages.
+ */
+export type Stage7EnrichmentType = EnrichmentType | 'nlm_audio' | 'nlm_video';
+
+/**
  * Stage 7 job input structure
  * Contains enrichment specification and context for generation
  */
@@ -22,7 +30,7 @@ export interface Stage7JobInput {
   enrichmentId: string;
 
   /** Type of enrichment to generate */
-  enrichmentType: EnrichmentType;
+  enrichmentType: Stage7EnrichmentType;
 
   /** Parent lesson UUID */
   lessonId: string;
@@ -129,7 +137,7 @@ export interface EnrichmentWithContext {
     id: string;
     lesson_id: string;
     course_id: string;
-    enrichment_type: EnrichmentType;
+    enrichment_type: Stage7EnrichmentType;
     status: EnrichmentStatus;
     order_index: number;
     title: string | null;

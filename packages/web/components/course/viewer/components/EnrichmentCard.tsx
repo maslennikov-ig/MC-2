@@ -35,8 +35,12 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
 
   // Fetch playback URL when audio enrichment becomes active
   useEffect(() => {
-    if (isActive && type === 'audio' && enrichment.status === 'completed') {
-      getEnrichmentPlaybackUrl(enrichment).then(setPlaybackUrl)
+    if (
+      isActive &&
+      (type === 'audio' || type === 'nlm_audio') &&
+      enrichment.status === 'completed'
+    ) {
+      void getEnrichmentPlaybackUrl(enrichment).then(setPlaybackUrl)
     }
   }, [isActive, enrichment.asset_id, enrichment.status, type])
 
@@ -62,7 +66,8 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
           }
           return null
         }
-        case 'audio': {
+        case 'audio':
+        case 'nlm_audio': {
           if (isAudioContent(content)) {
             return content.duration_seconds
               ? t('viewer.minutesShort', { count: Math.ceil(content.duration_seconds / 60) })
@@ -70,7 +75,8 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
           }
           return null
         }
-        case 'video': {
+        case 'video':
+        case 'nlm_video': {
           if (isVideoContent(content)) {
             return content.duration_seconds
               ? t('viewer.minutesShort', { count: Math.ceil(content.duration_seconds / 60) })
@@ -93,8 +99,12 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
         return 'viewer.checkKnowledge'
       case 'audio':
         return 'viewer.audioVersion'
+      case 'nlm_audio':
+        return 'viewer.nlmAudioVersion'
       case 'video':
         return 'viewer.videoVersion'
+      case 'nlm_video':
+        return 'viewer.nlmVideoVersion'
       case 'presentation':
         return 'viewer.lessonPresentation'
       case 'document':
@@ -136,7 +146,7 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
         )}
 
         {/* Show AudioPlayer when active */}
-        {isActive && type === 'audio' && (
+        {isActive && (type === 'audio' || type === 'nlm_audio') && (
           <div className="mb-4">
             <AudioPlayer enrichment={enrichment} playbackUrl={playbackUrl ?? undefined} />
           </div>
@@ -144,11 +154,13 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
 
         {/* Action row */}
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500 dark:text-gray-400">{t(getDescriptionKey())}
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t(getDescriptionKey())}</p>
           <div className="flex gap-2">
             {/* Audio/Video toggle */}
-            {(type === 'audio' || type === 'video') && (
+            {(type === 'audio' ||
+              type === 'nlm_audio' ||
+              type === 'video' ||
+              type === 'nlm_video') && (
               <Button size="sm" className="gap-2" onClick={onToggle}>
                 {isActive ? (
                   <>

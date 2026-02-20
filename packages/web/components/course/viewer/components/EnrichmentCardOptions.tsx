@@ -13,7 +13,15 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip'
 
-type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video' | 'cover' | 'card'
+type EnrichmentType =
+  | 'quiz'
+  | 'audio'
+  | 'nlm_audio'
+  | 'presentation'
+  | 'video'
+  | 'nlm_video'
+  | 'cover'
+  | 'card'
 
 interface QuizOptionsProps {
   type: 'quiz'
@@ -56,12 +64,22 @@ interface VideoOptionsProps {
   type: 'video'
 }
 
+interface NlmAudioOptionsProps {
+  type: 'nlm_audio'
+}
+
+interface NlmVideoOptionsProps {
+  type: 'nlm_video'
+}
+
 export type EnrichmentOptionsProps =
   | QuizOptionsProps
   | AudioOptionsProps
   | PresentationOptionsProps
   | ImageOptionsProps
   | VideoOptionsProps
+  | NlmAudioOptionsProps
+  | NlmVideoOptionsProps
 
 /**
  * Renders type-specific options for enrichment generation.
@@ -71,7 +89,7 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
   const t = useTranslations('enrichments')
 
   // Video has no options
-  if (props.type === 'video') {
+  if (props.type === 'video' || props.type === 'nlm_audio' || props.type === 'nlm_video') {
     return null
   }
 

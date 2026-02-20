@@ -19,6 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import type { Database } from '@/types/database.generated'
 import {
   isEnrichmentContentType,
+  type AudioEnrichmentContent,
   type PresentationEnrichmentContent,
   type VideoEnrichmentContent,
 } from '@megacampus/shared-types'
@@ -27,7 +28,17 @@ import { EnrichmentCardImage } from './EnrichmentCardImage'
 import { EnrichmentCardOptions, getOptionsSectionTitle } from './EnrichmentCardOptions'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
-type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video' | 'cover' | 'card'
+type EnrichmentType =
+  | 'quiz'
+  | 'audio'
+  | 'nlm_audio'
+  | 'presentation'
+  | 'video'
+  | 'nlm_video'
+  | 'cover'
+  | 'card'
+type AudioDraftContent = Omit<AudioEnrichmentContent, 'type'> & { type: 'audio' | 'nlm_audio' }
+type VideoDraftContent = Omit<VideoEnrichmentContent, 'type'> & { type: 'video' | 'nlm_video' }
 
 // Draft preview configuration
 const PREVIEW_SLIDE_COUNT = 3
@@ -67,6 +78,12 @@ const PLACEHOLDER_CONFIG: Record<
     badgeText: '~30 сек',
     icon: Headphones,
   },
+  nlm_audio: {
+    image: '/placeholders/Audio.webp',
+    color: 'text-purple-500 dark:text-purple-400',
+    badgeText: '~30 сек',
+    icon: Headphones,
+  },
   presentation: {
     image: '/placeholders/Presentation.webp',
     color: 'text-orange-500 dark:text-orange-400',
@@ -77,6 +94,12 @@ const PLACEHOLDER_CONFIG: Record<
     image: '/placeholders/Video.webp',
     color: 'text-red-500 dark:text-red-400',
     badgeText: 'Скоро',
+    icon: Video,
+  },
+  nlm_video: {
+    image: '/placeholders/Video.webp',
+    color: 'text-red-500 dark:text-red-400',
+    badgeText: '~120 сек',
     icon: Video,
   },
   cover: {
@@ -91,6 +114,29 @@ const PLACEHOLDER_CONFIG: Record<
     badgeText: '1:1',
     icon: ImageIcon,
   },
+}
+
+const NO_OPTIONS_TYPES: ReadonlySet<EnrichmentType> = new Set(['video', 'nlm_audio', 'nlm_video'])
+
+function isAudioDraftContent(content: unknown): content is AudioDraftContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    (((content as Record<string, unknown>).type === 'audio' &&
+      typeof (content as Record<string, unknown>).script === 'string') ||
+      (content as Record<string, unknown>).type === 'nlm_audio')
+  )
+}
+
+function isVideoDraftContent(content: unknown): content is VideoDraftContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    ((content as Record<string, unknown>).type === 'video' ||
+      (content as Record<string, unknown>).type === 'nlm_video')
+  )
 }
 
 export function UnifiedEnrichmentCard({
@@ -150,7 +196,7 @@ export function UnifiedEnrichmentCard({
   // Check if enrichment is in draft_ready status (two-stage generation)
   const isDraftReady = existingEnrichment?.status === 'draft_ready'
 
-  // Extract draft content for display (presentation slides or video script)
+  // Extract draft content for display (presentation, audio script, or video script)
   const draftContent = useMemo(() => {
     if (!isDraftReady || !existingEnrichment?.content) return null
 
@@ -167,9 +213,22 @@ export function UnifiedEnrichmentCard({
       }
     }
 
-    // For video: show script preview
-    if (isEnrichmentContentType(rawContent, 'video')) {
-      const content = rawContent as VideoEnrichmentContent
+    // For audio (including nlm_audio): show script preview
+    if (isAudioDraftContent(rawContent)) {
+      const content = rawContent
+      const scriptPreview = content.script?.slice(0, PREVIEW_SCRIPT_LENGTH) || ''
+      return {
+        type: 'audio' as const,
+        scriptPreview:
+          scriptPreview +
+          (content.script && content.script.length > PREVIEW_SCRIPT_LENGTH ? '...' : ''),
+        estimatedDuration: content.duration_seconds,
+      }
+    }
+
+    // For video (including nlm_video): show script preview
+    if (isVideoDraftContent(rawContent)) {
+      const content = rawContent
       const scriptPreview = content.script?.slice(0, PREVIEW_SCRIPT_LENGTH) || ''
       return {
         type: 'video' as const,
@@ -212,6 +271,10 @@ export function UnifiedEnrichmentCard({
           voice: audioVoice,
           speed: audioSpeed,
         }
+      case 'nlm_audio':
+      case 'nlm_video':
+      case 'video':
+        return {}
       case 'presentation':
         return {
           slideCount: parseInt(presentationSlides, 10),
@@ -322,8 +385,12 @@ export function UnifiedEnrichmentCard({
           disabled,
           isGenerating,
         }
+      case 'nlm_audio':
+        return { type: 'nlm_audio' as const }
       case 'video':
         return { type: 'video' as const }
+      case 'nlm_video':
+        return { type: 'nlm_video' as const }
       default:
         return { type: 'video' as const }
     }
@@ -424,6 +491,21 @@ export function UnifiedEnrichmentCard({
               </div>
             )}
 
+            {draftContent.type === 'audio' && (
+              <div className="space-y-1 text-sm">
+                {draftContent.estimatedDuration && (
+                  <p className="font-medium text-amber-800 dark:text-amber-200">
+                    {t('draftPreview.estimatedDuration', {
+                      minutes: Math.ceil(draftContent.estimatedDuration / 60),
+                    })}
+                  </p>
+                )}
+                <p className="line-clamp-3 text-amber-700 dark:text-amber-300">
+                  {draftContent.scriptPreview}
+                </p>
+              </div>
+            )}
+
             {draftContent.type === 'video' && (
               <div className="space-y-1 text-sm">
                 {draftContent.estimatedDuration && (
@@ -479,7 +561,7 @@ export function UnifiedEnrichmentCard({
             </motion.p>
 
             {/* Options Collapsible - delegated to subcomponent */}
-            {type !== 'video' && (
+            {!NO_OPTIONS_TYPES.has(type) && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

@@ -4,6 +4,14 @@ import type {
   AudioEnrichmentContent,
 } from '@megacampus/shared-types/enrichment-content'
 
+type AudioLikeContent = Omit<AudioEnrichmentContent, 'type'> & { type: 'audio' | 'nlm_audio' }
+type VideoLikeContent = {
+  type: 'video' | 'nlm_video'
+  duration_seconds?: number
+  script?: string
+  estimated_duration_seconds?: number
+}
+
 // Type guards for safe content parsing
 export function isQuizContent(content: unknown): content is QuizEnrichmentContent {
   return (
@@ -16,12 +24,13 @@ export function isQuizContent(content: unknown): content is QuizEnrichmentConten
   )
 }
 
-export function isAudioContent(content: unknown): content is AudioEnrichmentContent {
+export function isAudioContent(content: unknown): content is AudioLikeContent {
   return (
     typeof content === 'object' &&
     content !== null &&
     'type' in content &&
-    (content as Record<string, unknown>).type === 'audio'
+    ((content as Record<string, unknown>).type === 'audio' ||
+      (content as Record<string, unknown>).type === 'nlm_audio')
   )
 }
 
@@ -36,13 +45,12 @@ export function isPresentationContent(content: unknown): content is Presentation
   )
 }
 
-export function isVideoContent(
-  content: unknown
-): content is { type: 'video'; duration_seconds?: number } {
+export function isVideoContent(content: unknown): content is VideoLikeContent {
   return (
     typeof content === 'object' &&
     content !== null &&
     'type' in content &&
-    (content as Record<string, unknown>).type === 'video'
+    ((content as Record<string, unknown>).type === 'video' ||
+      (content as Record<string, unknown>).type === 'nlm_video')
   )
 }

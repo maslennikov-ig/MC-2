@@ -61,7 +61,8 @@ vi.mock('@/shared/supabase/admin', () => ({
 vi.mock('@/server/routers/enrichment/helpers', () => ({
   verifyLessonAccess: vi.fn(),
   getNextOrderIndex: vi.fn().mockResolvedValue(1),
-  isTwoStageType: (type: string) => type === 'presentation' || type === 'video',
+  isTwoStageType: (type: string) =>
+    type === 'presentation' || type === 'video' || type === 'nlm_audio' || type === 'nlm_video',
   checkExistingEnrichment: vi.fn().mockResolvedValue({ exists: false }),
   findReusableEnrichment: vi.fn().mockResolvedValue(null),
 }));
