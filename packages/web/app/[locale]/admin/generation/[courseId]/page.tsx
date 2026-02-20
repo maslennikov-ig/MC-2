@@ -12,7 +12,7 @@ import { AdminClarifyingTab } from '@/components/generation-monitoring/admin-cla
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { GitBranch } from 'lucide-react'
+import { GitBranch, ClipboardList } from 'lucide-react'
 import { CourseStatus } from '@/types/course-generation'
 import { buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
 
@@ -56,15 +56,23 @@ export default async function AdminGenerationPage({ params }: PageProps) {
               Monitoring generation process and tracing execution steps.
             </p>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link
-              href={buildCourseGeneratingUrl(orgSlug, course.slug || course.id, true)}
-              target="_blank"
-            >
-              <GitBranch className="mr-2 h-4 w-4" />
-              Конструктор курса
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/admin/generation/${courseId}/audit`}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Audit
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={buildCourseGeneratingUrl(orgSlug, course.slug || course.id, true)}
+                target="_blank"
+              >
+                <GitBranch className="mr-2 h-4 w-4" />
+                Конструктор курса
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <Separator />
