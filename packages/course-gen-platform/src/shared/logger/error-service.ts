@@ -13,6 +13,7 @@ import type { ErrorLog, ErrorSeverity, CreateErrorLogParams } from './types';
 import { detectEnvironment } from './utils';
 import { applyAutoMuteStatus, muteTestEnvironmentLog } from './auto-mute-service';
 import { shouldAutoMute } from './auto-classification';
+import { shouldWriteToDb } from './rate-limiter';
 
 /**
  * Log a permanent failure to the error_logs table
@@ -254,6 +255,17 @@ export async function logWarningToDb(
     metadata?: Json;
   } = {}
 ): Promise<void> {
+  // Pre-insert filter: skip DB write for auto-muted warnings
+  // (same logic as writeToErrorLogs in index.ts)
+  if (shouldAutoMute(message).mute) {
+    return;
+  }
+
+  // Rate limit: prevent flood during outages
+  if (!shouldWriteToDb(message)) {
+    return;
+  }
+
   const supabase = getSupabaseAdmin();
   const environment = detectEnvironment();
 
@@ -288,10 +300,5 @@ export async function logWarningToDb(
   // Auto-mute test environment warnings unconditionally
   if (insertedWarning?.id && environment === 'test') {
     await muteTestEnvironmentLog(insertedWarning.id);
-  }
-
-  // Auto-mute non-test warnings that match known patterns
-  if (insertedWarning?.id && environment !== 'test') {
-    applyAutoMuteStatus(insertedWarning.id, message).catch(() => {});
   }
 }

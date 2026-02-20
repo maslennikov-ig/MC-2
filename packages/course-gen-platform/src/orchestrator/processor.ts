@@ -382,7 +382,8 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       });
     } catch (logError) {
       // Don't fail the job if logging fails - just warn
-      logger.warn(
+      // Use baseLogger to avoid recursive DB write attempt when DB is down
+      baseLogger.warn(
         { err: logError, jobId: job.id },
         'Sandboxed processor: Failed to log error to database'
       );
