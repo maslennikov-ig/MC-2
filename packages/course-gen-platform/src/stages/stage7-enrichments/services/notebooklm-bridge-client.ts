@@ -26,11 +26,36 @@ interface MediaDefaults {
   extension: string;
 }
 
+export interface NotebookLMSourceInput {
+  title: string;
+  content: string;
+}
+
+export type NotebookLMAudioFormatPreset = 'deep_dive' | 'brief' | 'critique' | 'debate';
+export type NotebookLMAudioLengthPreset = 'short' | 'default' | 'long';
+export type NotebookLMVideoFormatPreset = 'explainer' | 'brief';
+export type NotebookLMVideoStylePreset =
+  | 'auto_select'
+  | 'custom'
+  | 'classic'
+  | 'whiteboard'
+  | 'kawaii'
+  | 'anime'
+  | 'watercolor'
+  | 'retro_print'
+  | 'heritage'
+  | 'paper_craft';
+
 export interface NotebookLMBridgeGenerateRequest {
   lessonTitle: string;
   script: string;
   language: string;
   voice?: string;
+  sources?: NotebookLMSourceInput[];
+  audioFormat?: NotebookLMAudioFormatPreset;
+  audioLength?: NotebookLMAudioLengthPreset;
+  videoFormat?: NotebookLMVideoFormatPreset;
+  videoStyle?: NotebookLMVideoStylePreset;
 }
 
 export interface NotebookLMBridgeMediaResult {
@@ -137,6 +162,24 @@ function decodeBase64(value: string): Buffer {
   return Buffer.from(cleaned, 'base64');
 }
 
+function normalizeSources(sources: NotebookLMSourceInput[] | undefined): NotebookLMSourceInput[] {
+  if (!sources || sources.length === 0) {
+    return [];
+  }
+
+  return sources
+    .map(source => {
+      const title = source.title?.trim();
+      const content = source.content?.trim();
+      if (!title || !content) {
+        return null;
+      }
+
+      return { title, content };
+    })
+    .filter((value): value is NotebookLMSourceInput => value !== null);
+}
+
 function parseMediaPayload(
   payload: Record<string, unknown>,
   defaults: MediaDefaults
@@ -241,6 +284,7 @@ export class NotebookLMBridgeClient {
     request: NotebookLMBridgeGenerateRequest
   ): Promise<NotebookLMBridgeMediaResult> {
     const config = getBridgeConfig();
+    const sources = normalizeSources(request.sources);
 
     const payload = await postToBridge(
       config.audioPath,
@@ -249,6 +293,9 @@ export class NotebookLMBridgeClient {
         script: request.script,
         language: request.language,
         voice: request.voice,
+        sources: sources.length > 0 ? sources : undefined,
+        audio_format: request.audioFormat,
+        audio_length: request.audioLength,
       },
       config
     );
@@ -268,6 +315,7 @@ export class NotebookLMBridgeClient {
     request: NotebookLMBridgeGenerateRequest
   ): Promise<NotebookLMBridgeMediaResult> {
     const config = getBridgeConfig();
+    const sources = normalizeSources(request.sources);
 
     const payload = await postToBridge(
       config.videoPath,
@@ -275,6 +323,9 @@ export class NotebookLMBridgeClient {
         lesson_title: request.lessonTitle,
         script: request.script,
         language: request.language,
+        sources: sources.length > 0 ? sources : undefined,
+        video_format: request.videoFormat,
+        video_style: request.videoStyle,
       },
       config
     );

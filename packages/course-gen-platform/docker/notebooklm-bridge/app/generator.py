@@ -94,6 +94,7 @@ class NotebookLMMediaGenerator(MediaGenerator):
         media_type: MediaType,
         request: MediaGenerationRequest,
     ) -> GenerationResult:
+        notebooklm_module = self._import_notebooklm_module()
         client = await self._create_client()
 
         async with client:
@@ -101,31 +102,67 @@ class NotebookLMMediaGenerator(MediaGenerator):
             notebook_id = notebook.id
 
             try:
-                source = await client.sources.add_text(
-                    notebook_id=notebook_id,
-                    title=f"{request.lesson_title} Script",
-                    content=request.script,
-                )
+                source_pairs = self._resolve_sources(request)
+                source_ids: list[str] = []
+                source_titles: list[str] = []
 
-                await client.sources.wait_until_ready(
+                for title, content in source_pairs:
+                    source = await client.sources.add_text(
+                        notebook_id=notebook_id,
+                        title=title,
+                        content=content,
+                    )
+                    source_ids.append(source.id)
+                    source_titles.append(title)
+
+                await self._wait_for_sources_ready(
+                    client=client,
                     notebook_id=notebook_id,
-                    source_id=source.id,
-                    timeout=self._settings.notebooklm_generation_timeout_seconds,
-                    initial_interval=self._settings.notebooklm_poll_interval_seconds,
+                    source_ids=source_ids,
                 )
 
                 instructions = self._build_instructions(request)
                 if media_type == "audio":
+                    audio_format = self._resolve_enum_option(
+                        notebooklm_module,
+                        enum_name="AudioFormat",
+                        raw_value=request.audio_format,
+                        field_name="audio_format",
+                    )
+                    audio_length = self._resolve_enum_option(
+                        notebooklm_module,
+                        enum_name="AudioLength",
+                        raw_value=request.audio_length,
+                        field_name="audio_length",
+                    )
                     status = await client.artifacts.generate_audio(
                         notebook_id=notebook_id,
+                        source_ids=source_ids or None,
                         language=request.language,
                         instructions=instructions,
+                        audio_format=audio_format,
+                        audio_length=audio_length,
                     )
                 else:
+                    video_format = self._resolve_enum_option(
+                        notebooklm_module,
+                        enum_name="VideoFormat",
+                        raw_value=request.video_format,
+                        field_name="video_format",
+                    )
+                    video_style = self._resolve_enum_option(
+                        notebooklm_module,
+                        enum_name="VideoStyle",
+                        raw_value=request.video_style,
+                        field_name="video_style",
+                    )
                     status = await client.artifacts.generate_video(
                         notebook_id=notebook_id,
+                        source_ids=source_ids or None,
                         language=request.language,
                         instructions=instructions,
+                        video_format=video_format,
+                        video_style=video_style,
                     )
 
                 if status.is_failed:
@@ -171,11 +208,17 @@ class NotebookLMMediaGenerator(MediaGenerator):
                         "provider": "notebooklm-py",
                         "mode": self._settings.notebooklm_generation_mode,
                         "notebook_id": notebook_id,
-                        "source_id": source.id,
+                        "source_ids": source_ids,
+                        "source_count": len(source_ids),
+                        "source_titles": source_titles,
                         "task_id": status.task_id,
                         "status": final_status.status,
                         "language": request.language,
                         "voice": request.voice,
+                        "audio_format": request.audio_format,
+                        "audio_length": request.audio_length,
+                        "video_format": request.video_format,
+                        "video_style": request.video_style,
                     },
                 )
             finally:
@@ -225,15 +268,82 @@ class NotebookLMMediaGenerator(MediaGenerator):
 
         raise MediaGenerationUnavailableError("notebooklm-py package is not installed")
 
+    def _resolve_sources(self, request: MediaGenerationRequest) -> list[tuple[str, str]]:
+        if request.sources:
+            resolved = [(source.title, source.content) for source in request.sources]
+            if resolved:
+                return resolved
+
+        return [(f"{request.lesson_title} Script", request.script)]
+
+    async def _wait_for_sources_ready(
+        self, client: Any, notebook_id: str, source_ids: list[str]
+    ) -> None:
+        if not source_ids:
+            return
+
+        wait_for_sources = getattr(client.sources, "wait_for_sources", None)
+        timeout = self._settings.notebooklm_generation_timeout_seconds
+        initial_interval = self._settings.notebooklm_poll_interval_seconds
+
+        if callable(wait_for_sources):
+            await wait_for_sources(
+                notebook_id,
+                source_ids,
+                timeout=timeout,
+                initial_interval=initial_interval,
+                max_interval=max(initial_interval * 4, 1.0),
+            )
+            return
+
+        await asyncio.gather(
+            *[
+                client.sources.wait_until_ready(
+                    notebook_id=notebook_id,
+                    source_id=source_id,
+                    timeout=timeout,
+                    initial_interval=initial_interval,
+                )
+                for source_id in source_ids
+            ]
+        )
+
+    @staticmethod
+    def _resolve_enum_option(
+        module: Any,
+        *,
+        enum_name: str,
+        raw_value: str | None,
+        field_name: str,
+    ) -> Any | None:
+        if raw_value is None:
+            return None
+
+        enum_class = getattr(module, enum_name, None)
+        if enum_class is None:
+            raise MediaGenerationUnavailableError(
+                f"notebooklm-py does not expose enum {enum_name}"
+            )
+
+        normalized = raw_value.strip().upper().replace("-", "_")
+        enum_value = enum_class.__members__.get(normalized)
+        if enum_value is not None:
+            return enum_value
+
+        valid_values = ", ".join(name.lower() for name in enum_class.__members__)
+        raise MediaGenerationError(
+            f"Unsupported {field_name}: {raw_value!r}. Allowed values: {valid_values}"
+        )
+
     @staticmethod
     def _build_instructions(request: MediaGenerationRequest) -> str:
+        base = (
+            "Use all notebook sources to create a clear educational overview. "
+            "Preserve factual alignment with provided materials."
+        )
         if request.voice:
-            return (
-                f"Voice preference: {request.voice}. "
-                "Generate output matching the script and style requirements below.\n\n"
-                f"{request.script}"
-            )
-        return request.script
+            return f"{base} Voice preference: {request.voice}."
+        return base
 
     async def _download_artifact_bytes(
         self,
@@ -294,6 +404,11 @@ class NotebookLMMediaGenerator(MediaGenerator):
             "placeholder": True,
             "voice": request.voice,
             "language": request.language,
+            "source_count": len(request.sources) if request.sources else 1,
+            "audio_format": request.audio_format,
+            "audio_length": request.audio_length,
+            "video_format": request.video_format,
+            "video_style": request.video_style,
         }
 
         return GenerationResult(

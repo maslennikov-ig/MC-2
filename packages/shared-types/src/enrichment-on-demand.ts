@@ -89,6 +89,74 @@ export const onDemandAudioSettingsSchema = z.object({
 export type OnDemandAudioSettings = z.infer<typeof onDemandAudioSettingsSchema>;
 
 /**
+ * Source strategy for NotebookLM enrichments.
+ */
+export const onDemandNlmSourceStrategySchema = z.enum(['script_only', 'raw_only', 'hybrid']);
+export type OnDemandNlmSourceStrategy = z.infer<typeof onDemandNlmSourceStrategySchema>;
+
+/**
+ * NotebookLM audio settings for on-demand API.
+ *
+ * Includes draft-shaping hints and final artifact presets.
+ */
+export const onDemandNlmAudioSettingsSchema = z.object({
+  /** Optional draft voice hint */
+  voice: z.string().optional(),
+
+  /** Optional draft speed hint */
+  speed: z.union([z.number().min(0.25).max(4), z.enum(['slow', 'normal', 'fast'])]).optional(),
+
+  /** Source strategy used for NotebookLM generation */
+  nlm_source_strategy: onDemandNlmSourceStrategySchema.optional(),
+
+  /** NotebookLM audio format preset */
+  nlm_audio_format: z.enum(['deep_dive', 'brief', 'critique', 'debate']).optional(),
+
+  /** NotebookLM audio length preset */
+  nlm_audio_length: z.enum(['short', 'default', 'long']).optional(),
+});
+export type OnDemandNlmAudioSettings = z.infer<typeof onDemandNlmAudioSettingsSchema>;
+
+/**
+ * NotebookLM video settings for on-demand API.
+ *
+ * Includes draft script hints and final artifact presets.
+ */
+export const onDemandNlmVideoSettingsSchema = z.object({
+  /** Optional draft tone hint */
+  tone: z.enum(['professional', 'conversational', 'energetic']).optional(),
+
+  /** Optional draft pacing hint */
+  pacing: z.enum(['slow', 'moderate', 'fast']).optional(),
+
+  /** Optional avatar identifier */
+  avatar_id: z.string().optional(),
+
+  /** Source strategy used for NotebookLM generation */
+  nlm_source_strategy: onDemandNlmSourceStrategySchema.optional(),
+
+  /** NotebookLM video format preset */
+  nlm_video_format: z.enum(['explainer', 'brief']).optional(),
+
+  /** NotebookLM video style preset */
+  nlm_video_style: z
+    .enum([
+      'auto_select',
+      'custom',
+      'classic',
+      'whiteboard',
+      'kawaii',
+      'anime',
+      'watercolor',
+      'retro_print',
+      'heritage',
+      'paper_craft',
+    ])
+    .optional(),
+});
+export type OnDemandNlmVideoSettings = z.infer<typeof onDemandNlmVideoSettingsSchema>;
+
+/**
  * Simplified presentation settings for on-demand API
  *
  * User-facing settings for presentation generation requests.
@@ -143,6 +211,8 @@ export type OnDemandImageSettings = z.infer<typeof onDemandImageSettingsSchema>;
  * the internal worker settings in enrichment-settings.ts
  */
 export type OnDemandEnrichmentSettings =
+  | OnDemandNlmAudioSettings
+  | OnDemandNlmVideoSettings
   | OnDemandQuizSettings
   | OnDemandAudioSettings
   | OnDemandPresentationSettings
@@ -179,23 +249,59 @@ export type GenerationStep = z.infer<typeof generationStepSchema>;
  * };
  * ```
  */
-export const generateOnDemandInputSchema = z.object({
-  /** Target lesson UUID */
-  lessonId: z.string().uuid('Invalid lesson ID'),
+const lessonIdInputSchema = z.string().uuid('Invalid lesson ID');
 
-  /** Type of enrichment to generate */
-  enrichmentType: onDemandEnrichmentTypeSchema,
-
-  /** Optional type-specific generation settings */
-  settings: z
-    .union([
-      onDemandQuizSettingsSchema,
-      onDemandAudioSettingsSchema,
-      onDemandPresentationSettingsSchema,
-      onDemandImageSettingsSchema,
-    ])
-    .optional(),
+const onDemandQuizInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('quiz'),
+  settings: onDemandQuizSettingsSchema.optional(),
 });
+
+const onDemandAudioInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('audio'),
+  settings: onDemandAudioSettingsSchema.optional(),
+});
+
+const onDemandNlmAudioInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('nlm_audio'),
+  settings: onDemandNlmAudioSettingsSchema.optional(),
+});
+
+const onDemandPresentationInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('presentation'),
+  settings: onDemandPresentationSettingsSchema.optional(),
+});
+
+const onDemandNlmVideoInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('nlm_video'),
+  settings: onDemandNlmVideoSettingsSchema.optional(),
+});
+
+const onDemandCoverInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('cover'),
+  settings: onDemandImageSettingsSchema.optional(),
+});
+
+const onDemandCardInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('card'),
+  settings: onDemandImageSettingsSchema.optional(),
+});
+
+export const generateOnDemandInputSchema = z.discriminatedUnion('enrichmentType', [
+  onDemandQuizInputSchema,
+  onDemandAudioInputSchema,
+  onDemandNlmAudioInputSchema,
+  onDemandPresentationInputSchema,
+  onDemandNlmVideoInputSchema,
+  onDemandCoverInputSchema,
+  onDemandCardInputSchema,
+]);
 export type GenerateOnDemandInput = z.infer<typeof generateOnDemandInputSchema>;
 
 /**

@@ -19,7 +19,12 @@ import {
   type TTSVoice,
 } from '../prompts/audio-prompt';
 import { getLessonContent } from '../services/database-service';
-import { notebookLmBridgeClient } from '../services/notebooklm-bridge-client';
+import {
+  notebookLmBridgeClient,
+  type NotebookLMAudioFormatPreset,
+  type NotebookLMAudioLengthPreset,
+  type NotebookLMSourceInput,
+} from '../services/notebooklm-bridge-client';
 import type { DraftResult, EnrichmentHandlerInput, GenerateResult } from '../types';
 
 interface NlmAudioDraft {
@@ -30,6 +35,20 @@ interface NlmAudioDraft {
   speed: number;
   duration_seconds: number;
 }
+
+type NlmSourceStrategy = 'script_only' | 'raw_only' | 'hybrid';
+
+const NLM_SOURCE_STRATEGIES: NlmSourceStrategy[] = ['script_only', 'raw_only', 'hybrid'];
+const NLM_AUDIO_FORMAT_PRESETS: NotebookLMAudioFormatPreset[] = [
+  'deep_dive',
+  'brief',
+  'critique',
+  'debate',
+];
+const NLM_AUDIO_LENGTH_PRESETS: NotebookLMAudioLengthPreset[] = ['short', 'default', 'long'];
+const NLM_DEFAULT_SOURCE_STRATEGY: NlmSourceStrategy = 'hybrid';
+const NLM_DEFAULT_AUDIO_FORMAT: NotebookLMAudioFormatPreset = 'deep_dive';
+const NLM_DEFAULT_AUDIO_LENGTH: NotebookLMAudioLengthPreset = 'default';
 
 function normalizeDraft(input: unknown): NlmAudioDraft {
   if (!input || typeof input !== 'object') {
@@ -80,6 +99,111 @@ function resolveSpeed(rawSpeed: unknown): number {
   }
 
   return 1.0;
+}
+
+function isStringInSet<T extends string>(value: unknown, allowedValues: readonly T[]): value is T {
+  return typeof value === 'string' && allowedValues.includes(value as T);
+}
+
+function resolveSourceStrategy(settings: Record<string, unknown>): NlmSourceStrategy {
+  const strategy = settings.nlm_source_strategy;
+  if (isStringInSet(strategy, NLM_SOURCE_STRATEGIES)) {
+    return strategy;
+  }
+  return NLM_DEFAULT_SOURCE_STRATEGY;
+}
+
+function resolveAudioFormatPreset(settings: Record<string, unknown>): NotebookLMAudioFormatPreset {
+  const preset = settings.nlm_audio_format;
+  if (isStringInSet(preset, NLM_AUDIO_FORMAT_PRESETS)) {
+    return preset;
+  }
+  return NLM_DEFAULT_AUDIO_FORMAT;
+}
+
+function resolveAudioLengthPreset(settings: Record<string, unknown>): NotebookLMAudioLengthPreset {
+  const preset = settings.nlm_audio_length;
+  if (isStringInSet(preset, NLM_AUDIO_LENGTH_PRESETS)) {
+    return preset;
+  }
+  return NLM_DEFAULT_AUDIO_LENGTH;
+}
+
+function buildObjectivesAndMetadataSource(
+  input: EnrichmentHandlerInput
+): NotebookLMSourceInput | null {
+  const { enrichmentContext } = input;
+  const objectives = enrichmentContext.lesson.objectives ?? [];
+
+  const lines: string[] = [
+    `Course: ${enrichmentContext.course.title}`,
+    `Lesson: ${enrichmentContext.lesson.title}`,
+  ];
+
+  if (objectives.length > 0) {
+    lines.push('Learning objectives:');
+    for (const objective of objectives) {
+      lines.push(`- ${objective}`);
+    }
+  }
+
+  const content = lines.join('\n').trim();
+  if (!content) {
+    return null;
+  }
+
+  return {
+    title: 'Lesson Objectives & Metadata',
+    content,
+  };
+}
+
+function buildNotebookLMSources(params: {
+  strategy: NlmSourceStrategy;
+  script: string;
+  rawLessonContent: string | null;
+  input: EnrichmentHandlerInput;
+}): NotebookLMSourceInput[] {
+  const scriptSource: NotebookLMSourceInput = {
+    title: 'Narration Draft Script',
+    content: params.script,
+  };
+
+  const rawSource: NotebookLMSourceInput | null =
+    params.rawLessonContent && params.rawLessonContent.trim()
+      ? {
+          title: 'Raw Lesson Content',
+          content: params.rawLessonContent.trim(),
+        }
+      : null;
+
+  const objectivesSource = buildObjectivesAndMetadataSource(params.input);
+  const sources: NotebookLMSourceInput[] = [];
+
+  if (params.strategy === 'script_only') {
+    sources.push(scriptSource);
+  } else if (params.strategy === 'raw_only') {
+    if (rawSource) {
+      sources.push(rawSource);
+    }
+    if (objectivesSource) {
+      sources.push(objectivesSource);
+    }
+  } else {
+    sources.push(scriptSource);
+    if (rawSource) {
+      sources.push(rawSource);
+    }
+    if (objectivesSource) {
+      sources.push(objectivesSource);
+    }
+  }
+
+  if (sources.length === 0) {
+    sources.push(scriptSource);
+  }
+
+  return sources;
 }
 
 async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
@@ -142,7 +266,7 @@ async function generateFinal(
   input: EnrichmentHandlerInput,
   draft: DraftResult
 ): Promise<GenerateResult> {
-  const { enrichmentContext } = input;
+  const { enrichmentContext, settings } = input;
   const startTime = Date.now();
 
   logger.info(
@@ -155,12 +279,38 @@ async function generateFinal(
 
   const normalizedDraft = normalizeDraft(draft.draftContent);
   const language = enrichmentContext.course.language || 'en';
+  let rawLessonContent: string | null = null;
+
+  try {
+    rawLessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  } catch (error) {
+    logger.warn(
+      {
+        lessonId: enrichmentContext.lesson.id,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'NLM audio handler: failed to load raw lesson content for source bundle'
+    );
+  }
+
+  const sourceStrategy = resolveSourceStrategy(settings);
+  const audioFormatPreset = resolveAudioFormatPreset(settings);
+  const audioLengthPreset = resolveAudioLengthPreset(settings);
+  const sources = buildNotebookLMSources({
+    strategy: sourceStrategy,
+    script: normalizedDraft.script,
+    rawLessonContent,
+    input,
+  });
 
   const bridgeResult = await notebookLmBridgeClient.generateAudio({
     lessonTitle: enrichmentContext.lesson.title,
     script: normalizedDraft.script,
     language,
     voice: normalizedDraft.voice_id,
+    sources,
+    audioFormat: audioFormatPreset,
+    audioLength: audioLengthPreset,
   });
 
   const durationSeconds =
@@ -191,6 +341,10 @@ async function generateFinal(
       duration_seconds: durationSeconds,
       format: bridgeResult.extension,
       mime_type: bridgeResult.mimeType,
+      source_strategy_used: sourceStrategy,
+      source_count: sources.length,
+      audio_format_preset: audioFormatPreset,
+      audio_length_preset: audioLengthPreset,
       bridge_response: bridgeResult.responseMetadata,
     },
   };
