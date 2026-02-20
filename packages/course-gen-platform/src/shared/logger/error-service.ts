@@ -289,4 +289,9 @@ export async function logWarningToDb(
   if (insertedWarning?.id && environment === 'test') {
     await muteTestEnvironmentLog(insertedWarning.id);
   }
+
+  // Auto-mute non-test warnings that match known patterns
+  if (insertedWarning?.id && environment !== 'test') {
+    applyAutoMuteStatus(insertedWarning.id, message).catch(() => {});
+  }
 }

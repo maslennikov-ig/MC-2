@@ -24,6 +24,7 @@ import { Worker, Job } from 'bullmq';
 import { getRedisClient, REDIS_UNAVAILABLE_EVENT } from '../shared/cache/redis';
 import { JobData, JobType } from '@megacampus/shared-types';
 import logger from '../shared/logger';
+import { logger as baseLogger } from '@megacampus/shared-logger';
 import { QUEUE_NAME } from './queue';
 import { handleJobFailure } from './handlers/error-handler';
 import type { JobResult } from './handlers/base-handler';
@@ -147,7 +148,7 @@ function startCircuitBreaker(workerInstance: Worker<JobData, JobResult>): void {
     const heapMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
 
     if (!isWorkerPaused && heapMB >= CIRCUIT_BREAKER.pauseThresholdMB) {
-      logger.warn(
+      logger.info(
         { heapMB, threshold: CIRCUIT_BREAKER.pauseThresholdMB },
         'Circuit breaker: Pausing worker due to memory pressure'
       );
@@ -402,7 +403,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
 
     // Event: Job stalled (worker crashed or timed out)
     worker.on('stalled', (jobId: string) => {
-      logger.warn(
+      baseLogger.info(
         {
           jobId,
           queueName: QUEUE_NAME,

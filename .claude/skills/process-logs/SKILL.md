@@ -1,7 +1,7 @@
 ---
 name: process-logs
-description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.8.0
+description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved. Checks Axiom/Pino if DB entries are filtered.
+version: 1.9.0
 ---
 
 # Process Error Logs
@@ -165,6 +165,7 @@ Errors from `NODE_ENV=test` (vitest) are automatically muted at insert time via 
 
 - Skip them in processing — they don't need fixes
 - If you see a pattern that should be auto-muted, add it to `auto-classification.ts`
+- Note: auto-muted patterns are now filtered BEFORE DB insert (pre-insert filter), so most won't appear in error_logs at all. Only errors from `logPermanentFailure()` (canonical path) may still get auto-muted after insert.
 
 **How to add a new auto-mute rule:**
 
@@ -613,3 +614,46 @@ The UI has two views:
 - This ensures grouped view shows correct status
 
 **IMPORTANT:** You don't need to manually handle fingerprint — the trigger does it automatically. Just use the standard `INSERT INTO log_issue_status` by `log_id`.
+
+### Error Logging Architecture (Post-Optimization v1.9)
+
+Error flow after volume optimization:
+
+```
+logger.warn/error()
+    |
+[Proxy Interceptor]
+    ├── Pino → stdout → Axiom  (ALWAYS, no filter)
+    └── writeToErrorLogs()
+          ├── shouldAutoMute() → SKIP if matches auto-mute rules (58 patterns)
+          ├── shouldWriteToDb() → SKIP if rate-limited (>5/min per fingerprint)
+          ├── dbLog: false in context → SKIP if explicitly disabled
+          └── INSERT into error_logs
+
+logPermanentFailure()  (canonical path, bypasses proxy filters)
+    └── INSERT/UPSERT into error_logs → applyAutoMuteStatus()
+```
+
+**Key points:**
+
+- WARN/ERROR always go to Pino/Axiom regardless of DB filters
+- `logPermanentFailure()` is the canonical DB write — NOT affected by pre-insert filter
+- `baseLogger.warn/error()` bypasses proxy entirely (Pino only, no DB)
+- Rate limiter prevents outage floods (max 5 per message per minute)
+- `{ dbLog: false }` in log context opts out of DB write
+
+**If you suspect missing errors in error_logs (filtered by optimization):**
+
+Check Pino/Axiom logs for the full unfiltered stream:
+
+- Axiom dashboard: all WARN/ERROR logs are always captured
+- These are NOT affected by DB-level filtering
+- Use Axiom search when investigating an error that doesn't appear in `/admin/logs`
+- Pino logs to stdout are never filtered — they capture everything
+
+**Files involved in filtering:**
+
+- `src/shared/logger/index.ts` — proxy interceptor + writeToErrorLogs (pre-insert filter)
+- `src/shared/logger/auto-classification.ts` — auto-mute patterns (58 rules)
+- `src/shared/logger/rate-limiter.ts` — per-fingerprint rate limiter
+- `src/shared/logger/error-service.ts` — logPermanentFailure (canonical path, has own auto-mute)

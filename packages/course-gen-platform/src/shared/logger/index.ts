@@ -17,7 +17,8 @@ import type { Logger } from 'pino';
 import { getSupabaseAdmin } from '../supabase/admin';
 import type { Json } from '@megacampus/shared-types';
 import { detectEnvironment } from './utils';
-import { applyAutoMuteStatus } from './auto-mute-service';
+import { shouldAutoMute } from './auto-classification';
+import { shouldWriteToDb } from './rate-limiter';
 
 export type { Logger } from 'pino';
 
@@ -72,6 +73,18 @@ async function writeToErrorLogs(
   context: Record<string, unknown> = {}
 ): Promise<void> {
   try {
+    // Pre-insert filter: skip DB write for auto-muted errors
+    // These errors are already logged to Pino/Axiom via the original logger call
+    const autoMuteResult = shouldAutoMute(message);
+    if (autoMuteResult.mute) {
+      return;
+    }
+
+    // Rate limiter: prevent DB flood during outages (max 5 per message per minute)
+    if (!shouldWriteToDb(message)) {
+      return;
+    }
+
     const supabase = getSupabaseAdmin();
     const environment = detectEnvironment();
 
@@ -159,39 +172,24 @@ async function writeToErrorLogs(
       }
     }
 
-    const result = (await supabase
-      .from('error_logs')
-      .insert({
-        error_message: message,
-        severity: level,
-        environment: environment,
-        organization_id: (organizationId || organization_id || null) as unknown as string,
-        user_id: (userId || user_id || null) as unknown as string,
-        job_id: (jobId || job_id || null) as unknown as string,
-        job_type: (jobType || job_type || null) as unknown as string,
-        course_id: (courseId || course_id || null) as unknown as string,
-        lesson_id: (lessonId || lesson_id || null) as unknown as string,
-        request_id: (requestId || request_id || null) as unknown as string,
-        trpc_path: (trpcPath || trpc_path || null) as unknown as string,
-        trpc_input: sanitizedInput as unknown as Json,
-        attempted_value: (attemptedValue || attempted_value || null) as unknown as string,
-        stack_trace: (stack || null) as unknown as string,
-        metadata: (Object.keys(metadata).length > 0 ? metadata : null) as unknown as Json,
-      })
-      .select('id')
-      .single()) as unknown as { data: { id: string } | null; error: unknown };
-
-    const insertedLog = result.data;
-
-    // Check if this error should be auto-muted
-    // SAFETY: applyAutoMuteStatus uses baseLogger internally to prevent recursion.
-    // DO NOT await - fire-and-forget to prevent blocking main log flow.
-    const logId = insertedLog?.id;
-    if (logId) {
-      applyAutoMuteStatus(logId, message).catch(() => {
-        // Silently ignore auto-mute failures to prevent cascading errors
-      });
-    }
+    // Insert without reading back — auto-mute is handled by pre-insert filter above
+    await supabase.from('error_logs').insert({
+      error_message: message,
+      severity: level,
+      environment: environment,
+      organization_id: (organizationId || organization_id || null) as unknown as string,
+      user_id: (userId || user_id || null) as unknown as string,
+      job_id: (jobId || job_id || null) as unknown as string,
+      job_type: (jobType || job_type || null) as unknown as string,
+      course_id: (courseId || course_id || null) as unknown as string,
+      lesson_id: (lessonId || lesson_id || null) as unknown as string,
+      request_id: (requestId || request_id || null) as unknown as string,
+      trpc_path: (trpcPath || trpc_path || null) as unknown as string,
+      trpc_input: sanitizedInput as unknown as Json,
+      attempted_value: (attemptedValue || attempted_value || null) as unknown as string,
+      stack_trace: (stack || null) as unknown as string,
+      metadata: (Object.keys(metadata).length > 0 ? metadata : null) as unknown as Json,
+    });
   } catch (dbError) {
     // Don't break the app if DB write fails, but log at WARN level for visibility
     baseLogger.warn(
@@ -217,17 +215,16 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
       if (prop === 'warn' && typeof original === 'function') {
         const originalWarn = original as (objOrMsg: unknown, msg?: string) => void;
         return function (objOrMsg: unknown, msg?: string) {
-          // Call original warn
           if (typeof objOrMsg === 'string') {
             originalWarn.call(target, objOrMsg);
             writeToErrorLogs('WARNING', objOrMsg, {}).catch(() => {});
           } else {
             originalWarn.call(target, objOrMsg, msg);
-            writeToErrorLogs(
-              'WARNING',
-              msg || 'Warning',
-              objOrMsg as Record<string, unknown>
-            ).catch(() => {});
+            // Skip DB write if caller explicitly opts out with { dbLog: false }
+            const ctx = objOrMsg as Record<string, unknown>;
+            if (ctx?.dbLog !== false) {
+              writeToErrorLogs('WARNING', msg || 'Warning', ctx).catch(() => {});
+            }
           }
         };
       }
@@ -236,15 +233,15 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
       if (prop === 'error' && typeof original === 'function') {
         const originalError = original as (objOrMsg: unknown, msg?: string) => void;
         return function (objOrMsg: unknown, msg?: string) {
-          // Call original error
           if (typeof objOrMsg === 'string') {
             originalError.call(target, objOrMsg);
             writeToErrorLogs('ERROR', objOrMsg, {}).catch(() => {});
           } else {
             originalError.call(target, objOrMsg, msg);
-            writeToErrorLogs('ERROR', msg || 'Error', objOrMsg as Record<string, unknown>).catch(
-              () => {}
-            );
+            const ctx = objOrMsg as Record<string, unknown>;
+            if (ctx?.dbLog !== false) {
+              writeToErrorLogs('ERROR', msg || 'Error', ctx).catch(() => {});
+            }
           }
         };
       }
@@ -253,17 +250,15 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
       if (prop === 'fatal' && typeof original === 'function') {
         const originalFatal = original as (objOrMsg: unknown, msg?: string) => void;
         return function (objOrMsg: unknown, msg?: string) {
-          // Call original fatal
           if (typeof objOrMsg === 'string') {
             originalFatal.call(target, objOrMsg);
             writeToErrorLogs('CRITICAL', objOrMsg, {}).catch(() => {});
           } else {
             originalFatal.call(target, objOrMsg, msg);
-            writeToErrorLogs(
-              'CRITICAL',
-              msg || 'Fatal error',
-              objOrMsg as Record<string, unknown>
-            ).catch(() => {});
+            const ctx = objOrMsg as Record<string, unknown>;
+            if (ctx?.dbLog !== false) {
+              writeToErrorLogs('CRITICAL', msg || 'Fatal error', ctx).catch(() => {});
+            }
           }
         };
       }
