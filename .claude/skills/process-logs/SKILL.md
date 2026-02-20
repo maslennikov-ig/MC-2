@@ -627,7 +627,6 @@ logger.warn/error()
     └── writeToErrorLogs()
           ├── shouldAutoMute() → SKIP if matches auto-mute rules (58 patterns)
           ├── shouldWriteToDb() → SKIP if rate-limited (>5/min per fingerprint)
-          ├── dbLog: false in context → SKIP if explicitly disabled
           └── INSERT into error_logs
 
 logPermanentFailure()  (canonical path, bypasses proxy filters)
@@ -640,7 +639,6 @@ logPermanentFailure()  (canonical path, bypasses proxy filters)
 - `logPermanentFailure()` is the canonical DB write — NOT affected by pre-insert filter
 - `baseLogger.warn/error()` bypasses proxy entirely (Pino only, no DB)
 - Rate limiter prevents outage floods (max 5 per message per minute)
-- `{ dbLog: false }` in log context opts out of DB write
 
 **If you suspect missing errors in error_logs (filtered by optimization):**
 

@@ -410,8 +410,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         },
         'Job stalled'
       );
-      // Note: We don't know the job type here, so we can't call handleJobStalled with JobType
-      // This could be enhanced by fetching the job from Redis
+      // Stalled handling is logged here; recovery handled by BullMQ retry mechanism
     });
 
     // Event: Worker active (started processing jobs)

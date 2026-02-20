@@ -220,11 +220,11 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
             writeToErrorLogs('WARNING', objOrMsg, {}).catch(() => {});
           } else {
             originalWarn.call(target, objOrMsg, msg);
-            // Skip DB write if caller explicitly opts out with { dbLog: false }
-            const ctx = objOrMsg as Record<string, unknown>;
-            if (ctx?.dbLog !== false) {
-              writeToErrorLogs('WARNING', msg || 'Warning', ctx).catch(() => {});
-            }
+            writeToErrorLogs(
+              'WARNING',
+              msg || 'Warning',
+              objOrMsg as Record<string, unknown>
+            ).catch(() => {});
           }
         };
       }
@@ -238,10 +238,9 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
             writeToErrorLogs('ERROR', objOrMsg, {}).catch(() => {});
           } else {
             originalError.call(target, objOrMsg, msg);
-            const ctx = objOrMsg as Record<string, unknown>;
-            if (ctx?.dbLog !== false) {
-              writeToErrorLogs('ERROR', msg || 'Error', ctx).catch(() => {});
-            }
+            writeToErrorLogs('ERROR', msg || 'Error', objOrMsg as Record<string, unknown>).catch(
+              () => {}
+            );
           }
         };
       }
@@ -255,10 +254,11 @@ function createEnhancedLogger(pinoLogger: Logger): Logger {
             writeToErrorLogs('CRITICAL', objOrMsg, {}).catch(() => {});
           } else {
             originalFatal.call(target, objOrMsg, msg);
-            const ctx = objOrMsg as Record<string, unknown>;
-            if (ctx?.dbLog !== false) {
-              writeToErrorLogs('CRITICAL', msg || 'Fatal error', ctx).catch(() => {});
-            }
+            writeToErrorLogs(
+              'CRITICAL',
+              msg || 'Fatal error',
+              objOrMsg as Record<string, unknown>
+            ).catch(() => {});
           }
         };
       }
