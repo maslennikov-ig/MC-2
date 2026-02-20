@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.11] - 2026-02-20
+
+### Fixed
+
+- **stage6**: improve mermaid diagram remediation pipeline and rendering (f802fe1e)
+- **stage6**: prevent intro-vs-section content duplication in lesson generation (b3f0205d)
+- **logs**: address code review findings — rate limiter bug, logWarningToDb bypass, inconsistent logger (de935b97)
+- **logs**: reduce error log volume with pre-insert filters and double-logging elimination (e53701af)
+- **logs**: fix Job not found auto-mute regex and add Redis/Jina patterns (6c574664)
+
+### Other
+
+- add plans and review reports (ef753f3e)
+- **logs**: remove dead code — dbLog:false, handleJobStalled, handleJobTimeout (759e0dce)
+
 ## [0.30.10] - 2026-02-19
 
 ### Fixed

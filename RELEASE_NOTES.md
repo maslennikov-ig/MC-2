@@ -2,6 +2,22 @@
 
 _Released on 2025-12-26_
 
+## v0.30.11
+
+_Released on 2026-02-20_
+
+### 🐛 Bug Fixes
+
+- **stage6**: Improve mermaid diagram remediation pipeline and rendering
+- **stage6**: Prevent intro-vs-section content duplication in lesson generation
+- **logs**: Address code review findings — rate limiter bug, logWarningToDb bypass, inconsistent logger
+- **logs**: Reduce error log volume with pre-insert filters and double-logging elimination
+- **logs**: Fix Job not found auto-mute regex and add Redis/Jina patterns
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.30.10
 
 _Released on 2026-02-19_
