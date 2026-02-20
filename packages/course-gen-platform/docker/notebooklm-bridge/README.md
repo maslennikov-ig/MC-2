@@ -1,0 +1,97 @@
+# NotebookLM Bridge Service
+
+FastAPI bridge service for Stage 7 NotebookLM artifact generation. It mirrors the TypeScript bridge client contract used by `notebooklm-bridge-client.ts`.
+
+## Endpoints
+
+- `GET /health`
+- `POST /artifacts/generate-audio`
+- `POST /video/generate-overview`
+
+## Authentication
+
+Both POST endpoints require:
+
+- `Authorization: Bearer <NOTEBOOKLM_BRIDGE_TOKEN>`
+
+If the token is missing or invalid, the service returns `401 Unauthorized`.
+
+## Request Contract
+
+Both generation endpoints accept JSON:
+
+```json
+{
+  "lesson_title": "Lesson title",
+  "script": "Narration script",
+  "language": "en",
+  "voice": "alloy"
+}
+```
+
+`voice` is optional.
+
+## Response Contract
+
+`POST /artifacts/generate-audio`
+
+```json
+{
+  "audio_base64": "<base64-media>",
+  "mime_type": "audio/mpeg",
+  "extension": "mp3",
+  "duration_seconds": 42.0,
+  "metadata": {}
+}
+```
+
+`POST /video/generate-overview`
+
+```json
+{
+  "video_base64": "<base64-media>",
+  "mime_type": "video/mp4",
+  "extension": "mp4",
+  "duration_seconds": 42.0,
+  "metadata": {}
+}
+```
+
+## Generation Modes
+
+The service supports direct `notebooklm-py` generation with timeout/polling and fallback mode.
+
+Environment variables:
+
+- `NOTEBOOKLM_BRIDGE_TOKEN` (required)
+- `NOTEBOOKLM_GENERATION_MODE` (`auto` | `notebooklm` | `fallback`, default `auto`)
+- `NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS` (default `240`)
+- `NOTEBOOKLM_POLL_INTERVAL_SECONDS` (default `2`)
+- `NOTEBOOKLM_ALLOW_FALLBACK` (default `true`)
+- `NOTEBOOKLM_API_KEY` (optional)
+- `NOTEBOOKLM_STORAGE_PATH` (optional, path to NotebookLM `storage_state.json`)
+- `NOTEBOOKLM_WORKSPACE_ID` (optional)
+
+Behavior:
+
+- `fallback`: always returns placeholder media that still matches the API contract.
+- `auto`: tries `notebooklm-py` first, then falls back if allowed.
+- `notebooklm`: tries `notebooklm-py`; falls back only when `NOTEBOOKLM_ALLOW_FALLBACK=true`.
+
+## Local Run
+
+```bash
+cd packages/course-gen-platform/docker/notebooklm-bridge
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export NOTEBOOKLM_BRIDGE_TOKEN=dev-token
+uvicorn app.main:app --reload --port 8000
+```
+
+## Tests
+
+```bash
+cd packages/course-gen-platform/docker/notebooklm-bridge
+python3 -m pytest -q tests/test_api.py
+```
