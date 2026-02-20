@@ -21,14 +21,18 @@ import { enrichmentStatusSchema } from './lesson-enrichment';
  * Includes types that users can trigger from the course viewer UI:
  * - quiz: Interactive quizzes
  * - audio: Lesson narration
+ * - nlm_audio: NotebookLM audio narration (two-stage)
  * - presentation: Slide decks
+ * - nlm_video: NotebookLM video overview (two-stage)
  * - cover: Lesson hero images (16:9 banners)
  * - card: Lesson thumbnails (1:1 square images)
  */
 export const onDemandEnrichmentTypeSchema = z.enum([
   'quiz',
   'audio',
+  'nlm_audio',
   'presentation',
+  'nlm_video',
   'cover',
   'card',
 ]);
@@ -364,18 +368,23 @@ export function isAwaitingSelection(status: string): boolean {
 /**
  * Enrichment types that use two-stage generation (draft → selection → final)
  *
- * Currently empty - all types use single-stage flow:
- * - cover/banner: switched to single-stage (user selects style in UI before generation)
- * - video/presentation: may add two-stage in future if needed
+ * Two-stage flow:
+ *   pending -> draft_generating -> draft_ready -> generating -> completed/failed
  *
- * @note When this array is empty, TwoStageEnrichmentType resolves to `never`
- * and isTwoStageType() always returns false. This is intentional.
+ * - video: Standard video generation with draft script review
+ * - presentation: Slide deck with draft outline review
+ * - nlm_audio: NotebookLM audio narration (bridge generates draft, user confirms)
+ * - nlm_video: NotebookLM video overview (bridge generates draft, user confirms)
  */
-export const TWO_STAGE_ENRICHMENT_TYPES = [] as const;
+export const TWO_STAGE_ENRICHMENT_TYPES = [
+  'video',
+  'presentation',
+  'nlm_audio',
+  'nlm_video',
+] as const;
 
 /**
  * Type for two-stage enrichment types.
- * Currently `never` since no types use two-stage flow.
  */
 export type TwoStageEnrichmentType = (typeof TWO_STAGE_ENRICHMENT_TYPES)[number];
 
@@ -383,7 +392,7 @@ export type TwoStageEnrichmentType = (typeof TWO_STAGE_ENRICHMENT_TYPES)[number]
  * Check if enrichment type uses two-stage generation
  *
  * @param type - Enrichment type to check
- * @returns Always false (no types currently use two-stage flow)
+ * @returns True if type uses draft -> final two-stage flow
  */
 export function isTwoStageType(type: string): type is TwoStageEnrichmentType {
   return (TWO_STAGE_ENRICHMENT_TYPES as readonly string[]).includes(type);

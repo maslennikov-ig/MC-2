@@ -21,7 +21,9 @@ import {
  */
 export type EnrichmentType =
   | 'video'
+  | 'nlm_video'
   | 'audio'
+  | 'nlm_audio'
   | 'presentation'
   | 'quiz'
   | 'document'
@@ -156,6 +158,28 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
     labelRu: 'Декоративный баннер',
     twoStage: false,
     order: 7,
+  },
+  nlm_audio: {
+    icon: Headphones,
+    color: 'text-purple-500 dark:text-purple-400',
+    colorClass: 'text-purple-500 dark:text-purple-400',
+    bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+    bgClass: 'bg-purple-100 dark:bg-purple-900/30',
+    label: 'NLM Audio',
+    labelRu: 'NLM Аудио',
+    twoStage: true,
+    order: 8,
+  },
+  nlm_video: {
+    icon: Video,
+    color: 'text-red-500 dark:text-red-400',
+    colorClass: 'text-red-500 dark:text-red-400',
+    bgColor: 'bg-red-100 dark:bg-red-900/30',
+    bgClass: 'bg-red-100 dark:bg-red-900/30',
+    label: 'NLM Video',
+    labelRu: 'NLM Видео',
+    twoStage: true,
+    order: 9,
   },
 }
 

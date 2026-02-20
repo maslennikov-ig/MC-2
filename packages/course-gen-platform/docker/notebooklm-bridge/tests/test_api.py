@@ -121,3 +121,23 @@ def test_success_video_generation_returns_contract_shape(client: TestClient) -> 
     assert payload["extension"] == "mp4"
     assert payload["duration_seconds"] == 42.0
     assert payload["metadata"]["provider"] == "mock"
+
+
+def test_extra_fields_rejected_by_model(client: TestClient) -> None:
+    """Ensure extra fields are rejected (extra='forbid').
+
+    This guards against contract mismatches where the TS client sends
+    fields that the Python model does not expect.
+    """
+    response = client.post(
+        "/artifacts/generate-audio",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "lesson_title": "Lesson 1",
+            "script": "hello",
+            "language": "en",
+            "unexpected_field": "should fail",
+        },
+    )
+
+    assert response.status_code == 422

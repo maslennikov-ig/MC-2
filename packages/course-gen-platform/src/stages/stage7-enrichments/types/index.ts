@@ -15,11 +15,9 @@ import type {
 
 /**
  * Stage 7 enrichment type union.
- *
- * NLM types are included here to support backend integration while shared-type
- * enum changes propagate across all packages.
+ * Now identical to EnrichmentType since nlm_audio/nlm_video are in shared-types.
  */
-export type Stage7EnrichmentType = EnrichmentType | 'nlm_audio' | 'nlm_video';
+export type Stage7EnrichmentType = EnrichmentType;
 
 /**
  * Stage 7 job input structure

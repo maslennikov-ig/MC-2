@@ -22,7 +22,9 @@ import { enrichmentContentSchema, enrichmentMetadataSchema } from './enrichment-
  */
 export const enrichmentTypeSchema = z.enum([
   'video',
+  'nlm_video', // NotebookLM-generated video overview (two-stage)
   'audio',
+  'nlm_audio', // NotebookLM-generated audio narration (two-stage)
   'presentation',
   'quiz',
   'document',
@@ -291,7 +293,13 @@ export function isEnrichmentSummary(value: unknown): value is EnrichmentSummary 
  */
 export function requiresAsset(type: EnrichmentType): boolean {
   return (
-    type === 'audio' || type === 'video' || type === 'cover' || type === 'card' || type === 'banner'
+    type === 'audio' ||
+    type === 'nlm_audio' ||
+    type === 'video' ||
+    type === 'nlm_video' ||
+    type === 'cover' ||
+    type === 'card' ||
+    type === 'banner'
   );
 }
 
@@ -315,7 +323,9 @@ export function getDefaultEnrichmentTitle(
 ): string {
   const titles: Record<EnrichmentType, Record<'en' | 'ru', string>> = {
     video: { en: 'Video Lecture', ru: 'Видео-лекция' },
+    nlm_video: { en: 'NLM Video Overview', ru: 'NLM Видео-обзор' },
     audio: { en: 'Audio Narration', ru: 'Аудио-озвучка' },
+    nlm_audio: { en: 'NLM Audio Narration', ru: 'NLM Аудио-озвучка' },
     presentation: { en: 'Presentation Slides', ru: 'Презентация' },
     quiz: { en: 'Knowledge Check Quiz', ru: 'Проверочный тест' },
     document: { en: 'Downloadable Document', ru: 'Документ для скачивания' },
