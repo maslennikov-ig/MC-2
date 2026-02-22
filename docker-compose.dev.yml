@@ -17,7 +17,14 @@ services:
     env_file:
       - .env.dev
     environment:
-      - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-/app/secrets/notebooklm/storage_state.json}
+      - NOTEBOOKLM_AUTH_JSON=${NOTEBOOKLM_AUTH_JSON:-}
+      - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-}
+      - NOTEBOOKLM_HOME=${NOTEBOOKLM_HOME:-/app/secrets/notebooklm}
+      - NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS=${NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS:-3600}
+      - NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS=${NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS:-3600}
+      - NOTEBOOKLM_HTTP_TIMEOUT_SECONDS=${NOTEBOOKLM_HTTP_TIMEOUT_SECONDS:-60}
+      - NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT=${NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT:-12}
+      - NOTEBOOKLM_LOG_LEVEL=${NOTEBOOKLM_LOG_LEVEL:-INFO}
     volumes:
       - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:ro
     healthcheck:
@@ -97,6 +104,7 @@ services:
       - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
       - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge-dev:8000
+      - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
       - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
@@ -243,6 +251,7 @@ services:
       - ENRICHMENTS_LOCAL_PATH=/app/data/enrichments
       - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
       - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge-dev:8000
+      - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
       - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev

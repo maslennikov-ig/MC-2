@@ -6,7 +6,6 @@ const {
   mockVerifyLessonAccess,
   mockGetNextOrderIndex,
   mockCheckExistingEnrichment,
-  mockFindReusableEnrichment,
   mockSupabaseFrom,
   mockSupabaseUpdate,
   mockSupabaseUpdateEq,
@@ -17,7 +16,6 @@ const {
   mockVerifyLessonAccess: vi.fn(),
   mockGetNextOrderIndex: vi.fn(),
   mockCheckExistingEnrichment: vi.fn(),
-  mockFindReusableEnrichment: vi.fn(),
   mockSupabaseFrom: vi.fn(),
   mockSupabaseUpdate: vi.fn(),
   mockSupabaseUpdateEq: vi.fn(),
@@ -52,7 +50,6 @@ vi.mock('@/server/routers/enrichment/helpers', () => ({
   verifyLessonAccess: mockVerifyLessonAccess,
   getNextOrderIndex: mockGetNextOrderIndex,
   checkExistingEnrichment: mockCheckExistingEnrichment,
-  findReusableEnrichment: mockFindReusableEnrichment,
   isTwoStageType: (type: string) => type === 'video' || type === 'presentation',
   shouldReuseLegacyNlmDraft: (type: string, status: string | undefined) =>
     (type === 'nlm_audio' || type === 'nlm_video') &&
@@ -64,10 +61,10 @@ vi.mock('@/stages/stage7-enrichments/factory', () => ({
   addEnrichmentJob: mockAddEnrichmentJob,
 }));
 
-import { generateOnDemand } from '../../../src/server/routers/enrichment/procedures/generate-on-demand';
+import { create } from '../../../src/server/routers/enrichment/procedures/create';
 
 const testRouter = router({
-  generateOnDemand,
+  create,
 });
 
 function createAuthenticatedContext(): Context {
@@ -81,19 +78,22 @@ function createAuthenticatedContext(): Context {
   };
 }
 
-describe('generateOnDemand', () => {
+describe('create', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockVerifyLessonAccess.mockResolvedValue({
       id: '550e8400-e29b-41d4-a716-446655440000',
-      course_id: 'course-123',
+      course_id: '550e8400-e29b-41d4-a716-446655440001',
       title: 'Test Lesson',
     });
 
-    mockGetNextOrderIndex.mockResolvedValue(1);
-    mockCheckExistingEnrichment.mockResolvedValue({ exists: false });
-    mockFindReusableEnrichment.mockResolvedValue(null);
+    mockGetNextOrderIndex.mockResolvedValue(3);
+    mockCheckExistingEnrichment.mockResolvedValue({
+      exists: true,
+      enrichmentId: '550e8400-e29b-41d4-a716-446655440099',
+      status: 'draft_generating',
+    });
 
     mockSupabaseFrom.mockReturnValue({
       update: mockSupabaseUpdate,
@@ -111,62 +111,16 @@ describe('generateOnDemand', () => {
     mockAddEnrichmentJob.mockResolvedValue({ id: 'job-123' });
   });
 
-  it('enqueues nlm_audio as single-stage (isDraftPhase=false)', async () => {
+  it('resets and reuses legacy NLM draft enrichment instead of creating a new row', async () => {
     const caller = testRouter.createCaller(createAuthenticatedContext());
 
-    await caller.generateOnDemand({
+    const result = await caller.create({
       lessonId: '550e8400-e29b-41d4-a716-446655440000',
       enrichmentType: 'nlm_audio',
       settings: { nlm_audio_format: 'brief' },
     });
 
-    expect(mockAddEnrichmentJob).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        enrichmentType: 'nlm_audio',
-        isDraftPhase: false,
-      }),
-      expect.objectContaining({
-        jobId: expect.stringMatching(/^enrich-ondemand-/),
-      })
-    );
-  });
-
-  it('keeps presentation as two-stage enqueue (isDraftPhase=true)', async () => {
-    const caller = testRouter.createCaller(createAuthenticatedContext());
-
-    await caller.generateOnDemand({
-      lessonId: '550e8400-e29b-41d4-a716-446655440000',
-      enrichmentType: 'presentation',
-      settings: { slideCount: 8 },
-    });
-
-    expect(mockAddEnrichmentJob).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        enrichmentType: 'presentation',
-        isDraftPhase: true,
-      }),
-      expect.anything()
-    );
-  });
-
-  it('reuses legacy NLM draft enrichment instead of throwing CONFLICT', async () => {
-    mockCheckExistingEnrichment.mockResolvedValueOnce({
-      exists: true,
-      enrichmentId: 'legacy-nlm-enrichment',
-      status: 'draft_ready',
-    });
-
-    const caller = testRouter.createCaller(createAuthenticatedContext());
-
-    const result = await caller.generateOnDemand({
-      lessonId: '550e8400-e29b-41d4-a716-446655440000',
-      enrichmentType: 'nlm_video',
-      settings: { nlm_video_format: 'brief' },
-    });
-
-    expect(result.enrichmentId).toBe('legacy-nlm-enrichment');
+    expect(result.enrichmentId).toBe('550e8400-e29b-41d4-a716-446655440099');
 
     expect(mockSupabaseUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -175,18 +129,19 @@ describe('generateOnDemand', () => {
         asset_id: null,
       })
     );
+    expect(mockSupabaseUpdateEq).toHaveBeenCalledWith('id', '550e8400-e29b-41d4-a716-446655440099');
 
-    expect(mockSupabaseUpdateEq).toHaveBeenCalledWith('id', 'legacy-nlm-enrichment');
+    expect(mockSupabaseInsert).not.toHaveBeenCalled();
 
     expect(mockAddEnrichmentJob).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        enrichmentId: 'legacy-nlm-enrichment',
-        enrichmentType: 'nlm_video',
+        enrichmentId: '550e8400-e29b-41d4-a716-446655440099',
+        enrichmentType: 'nlm_audio',
         isDraftPhase: false,
       }),
       expect.objectContaining({
-        jobId: expect.stringMatching(/^enrich-ondemand-legacy-nlm-enrichment-/),
+        jobId: 'enrich-550e8400-e29b-41d4-a716-446655440099',
       })
     );
   });

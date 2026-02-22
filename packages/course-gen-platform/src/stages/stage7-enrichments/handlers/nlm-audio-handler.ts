@@ -2,9 +2,9 @@
  * NotebookLM Audio Enrichment Handler
  * @module stages/stage7-enrichments/handlers/nlm-audio-handler
  *
- * Two-stage flow:
- * - Phase 1: Prepare editable narration draft from lesson content
- * - Phase 2: Generate final audio via NotebookLM bridge service
+ * Single-stage flow:
+ * - Internally prepares narration draft from lesson content
+ * - Immediately generates final audio via NotebookLM bridge service
  */
 
 import { logger } from '@/shared/logger';
@@ -20,12 +20,19 @@ import {
 } from '../prompts/audio-prompt';
 import { getLessonContent } from '../services/database-service';
 import {
+  isNotebookLMTaskFailedStatus,
+  isNotebookLMTaskSuccessfulStatus,
   notebookLmBridgeClient,
   type NotebookLMAudioFormatPreset,
   type NotebookLMAudioLengthPreset,
-  type NotebookLMSourceInput,
 } from '../services/notebooklm-bridge-client';
 import type { DraftResult, EnrichmentHandlerInput, GenerateResult } from '../types';
+import {
+  buildNotebookLMSources,
+  isStringInSet,
+  resolveNlmDurationGuidance,
+  resolveSourceStrategy,
+} from './nlm-shared';
 
 interface NlmAudioDraft {
   type: 'nlm_audio_draft';
@@ -36,9 +43,6 @@ interface NlmAudioDraft {
   duration_seconds: number;
 }
 
-type NlmSourceStrategy = 'script_only' | 'raw_only' | 'hybrid';
-
-const NLM_SOURCE_STRATEGIES: NlmSourceStrategy[] = ['script_only', 'raw_only', 'hybrid'];
 const NLM_AUDIO_FORMAT_PRESETS: NotebookLMAudioFormatPreset[] = [
   'deep_dive',
   'brief',
@@ -46,9 +50,9 @@ const NLM_AUDIO_FORMAT_PRESETS: NotebookLMAudioFormatPreset[] = [
   'debate',
 ];
 const NLM_AUDIO_LENGTH_PRESETS: NotebookLMAudioLengthPreset[] = ['short', 'default', 'long'];
-const NLM_DEFAULT_SOURCE_STRATEGY: NlmSourceStrategy = 'hybrid';
 const NLM_DEFAULT_AUDIO_FORMAT: NotebookLMAudioFormatPreset = 'deep_dive';
 const NLM_DEFAULT_AUDIO_LENGTH: NotebookLMAudioLengthPreset = 'default';
+const NLM_ASYNC_MODE_POLL = 'poll';
 
 function normalizeDraft(input: unknown): NlmAudioDraft {
   if (!input || typeof input !== 'object') {
@@ -101,18 +105,6 @@ function resolveSpeed(rawSpeed: unknown): number {
   return 1.0;
 }
 
-function isStringInSet<T extends string>(value: unknown, allowedValues: readonly T[]): value is T {
-  return typeof value === 'string' && allowedValues.includes(value as T);
-}
-
-function resolveSourceStrategy(settings: Record<string, unknown>): NlmSourceStrategy {
-  const strategy = settings.nlm_source_strategy;
-  if (isStringInSet(strategy, NLM_SOURCE_STRATEGIES)) {
-    return strategy;
-  }
-  return NLM_DEFAULT_SOURCE_STRATEGY;
-}
-
 function resolveAudioFormatPreset(settings: Record<string, unknown>): NotebookLMAudioFormatPreset {
   const preset = settings.nlm_audio_format;
   if (isStringInSet(preset, NLM_AUDIO_FORMAT_PRESETS)) {
@@ -121,89 +113,40 @@ function resolveAudioFormatPreset(settings: Record<string, unknown>): NotebookLM
   return NLM_DEFAULT_AUDIO_FORMAT;
 }
 
-function resolveAudioLengthPreset(settings: Record<string, unknown>): NotebookLMAudioLengthPreset {
-  const preset = settings.nlm_audio_length;
-  if (isStringInSet(preset, NLM_AUDIO_LENGTH_PRESETS)) {
-    return preset;
+function inferAudioLengthFromTarget(targetMinutes: number): NotebookLMAudioLengthPreset {
+  if (targetMinutes <= 4) {
+    return 'short';
+  }
+  if (targetMinutes >= 7) {
+    return 'long';
   }
   return NLM_DEFAULT_AUDIO_LENGTH;
 }
 
-function buildObjectivesAndMetadataSource(
-  input: EnrichmentHandlerInput
-): NotebookLMSourceInput | null {
-  const { enrichmentContext } = input;
-  const objectives = enrichmentContext.lesson.objectives ?? [];
-
-  const lines: string[] = [
-    `Course: ${enrichmentContext.course.title}`,
-    `Lesson: ${enrichmentContext.lesson.title}`,
-  ];
-
-  if (objectives.length > 0) {
-    lines.push('Learning objectives:');
-    for (const objective of objectives) {
-      lines.push(`- ${objective}`);
-    }
+function resolveAudioLengthPreset(
+  settings: Record<string, unknown>,
+  targetMinutes: number
+): NotebookLMAudioLengthPreset {
+  const preset = settings.nlm_audio_length;
+  if (isStringInSet(preset, NLM_AUDIO_LENGTH_PRESETS)) {
+    return preset;
   }
-
-  const content = lines.join('\n').trim();
-  if (!content) {
-    return null;
-  }
-
-  return {
-    title: 'Lesson Objectives & Metadata',
-    content,
-  };
+  return inferAudioLengthFromTarget(targetMinutes);
 }
 
-function buildNotebookLMSources(params: {
-  strategy: NlmSourceStrategy;
-  script: string;
-  rawLessonContent: string | null;
-  input: EnrichmentHandlerInput;
-}): NotebookLMSourceInput[] {
-  const scriptSource: NotebookLMSourceInput = {
-    title: 'Narration Draft Script',
-    content: params.script,
-  };
+function resolveNlmAsyncMode(settings: Record<string, unknown>): string | null {
+  const value = settings.__nlm_async_mode;
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null;
+}
 
-  const rawSource: NotebookLMSourceInput | null =
-    params.rawLessonContent && params.rawLessonContent.trim()
-      ? {
-          title: 'Raw Lesson Content',
-          content: params.rawLessonContent.trim(),
-        }
-      : null;
+function resolveBridgeTaskId(settings: Record<string, unknown>): string | null {
+  const value = settings.__nlm_bridge_task_id;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
 
-  const objectivesSource = buildObjectivesAndMetadataSource(params.input);
-  const sources: NotebookLMSourceInput[] = [];
-
-  if (params.strategy === 'script_only') {
-    sources.push(scriptSource);
-  } else if (params.strategy === 'raw_only') {
-    if (rawSource) {
-      sources.push(rawSource);
-    }
-    if (objectivesSource) {
-      sources.push(objectivesSource);
-    }
-  } else {
-    sources.push(scriptSource);
-    if (rawSource) {
-      sources.push(rawSource);
-    }
-    if (objectivesSource) {
-      sources.push(objectivesSource);
-    }
-  }
-
-  if (sources.length === 0) {
-    sources.push(scriptSource);
-  }
-
-  return sources;
+function resolvePollAttempt(settings: Record<string, unknown>): number {
+  const value = settings.__nlm_poll_attempt;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
@@ -294,24 +237,149 @@ async function generateFinal(
   }
 
   const sourceStrategy = resolveSourceStrategy(settings);
+  const durationGuidance = resolveNlmDurationGuidance(enrichmentContext.lesson.duration_minutes);
   const audioFormatPreset = resolveAudioFormatPreset(settings);
-  const audioLengthPreset = resolveAudioLengthPreset(settings);
+  const audioLengthPreset = resolveAudioLengthPreset(settings, durationGuidance.targetMinutes);
+  const asyncMode = resolveNlmAsyncMode(settings);
+  const bridgeTaskId = resolveBridgeTaskId(settings);
+  const pollAttempt = resolvePollAttempt(settings);
   const sources = buildNotebookLMSources({
     strategy: sourceStrategy,
-    script: normalizedDraft.script,
+    scriptContent: normalizedDraft.script,
+    scriptTitle: 'Narration Draft Script',
     rawLessonContent,
     input,
   });
+  let bridgeResult:
+    | Awaited<ReturnType<typeof notebookLmBridgeClient.getTaskMedia>>
+    | Awaited<ReturnType<typeof notebookLmBridgeClient.startAudio>>['immediateMedia'];
+  let bridgeStartMetadata: Record<string, unknown> | undefined;
 
-  const bridgeResult = await notebookLmBridgeClient.generateAudio({
-    lessonTitle: enrichmentContext.lesson.title,
-    script: normalizedDraft.script,
-    language,
-    voice: normalizedDraft.voice_id,
-    sources,
-    audioFormat: audioFormatPreset,
-    audioLength: audioLengthPreset,
-  });
+  if (asyncMode === NLM_ASYNC_MODE_POLL) {
+    if (!bridgeTaskId) {
+      throw new Error('NotebookLM audio poll mode requires bridge task id');
+    }
+
+    const status = await notebookLmBridgeClient.getTaskStatus(bridgeTaskId, 'audio');
+
+    if (isNotebookLMTaskFailedStatus(status.status)) {
+      throw new Error(
+        `NotebookLM bridge task failed (taskId=${bridgeTaskId}, status=${status.status})`
+      );
+    }
+
+    if (!isNotebookLMTaskSuccessfulStatus(status.status)) {
+      const durationMs = Date.now() - startTime;
+      const deferredContent: AudioEnrichmentContent = {
+        type: 'audio',
+        voice_id: normalizedDraft.voice_id,
+        script: normalizedDraft.script,
+        duration_seconds:
+          normalizedDraft.duration_seconds > 0 ? normalizedDraft.duration_seconds : 1,
+        format: normalizedDraft.format as TTSFormat,
+      };
+
+      return {
+        content: deferredContent,
+        metadata: {
+          generated_at: new Date().toISOString(),
+          generation_duration_ms: (draft.metadata.durationMs || 0) + durationMs,
+          total_tokens: draft.metadata.tokensUsed,
+          estimated_cost_usd: 0,
+          model_used: draft.metadata.modelUsed || 'notebooklm-bridge',
+          quality_score: 1.0,
+          retry_attempts: 0,
+          additional_info: {
+            bridge: 'notebooklm',
+            source_strategy_used: sourceStrategy,
+            source_count: sources.length,
+            audio_format_preset: audioFormatPreset,
+            audio_length_preset: audioLengthPreset,
+            duration_target_minutes: durationGuidance.targetMinutes,
+            duration_range_min_minutes: durationGuidance.minMinutes,
+            duration_range_max_minutes: durationGuidance.maxMinutes,
+            bridge_task_id: bridgeTaskId,
+            bridge_task_status: status.status,
+            bridge_poll_attempt: pollAttempt,
+            bridge_response: status.responseMetadata,
+          },
+        },
+        deferredTask: {
+          provider: 'notebooklm-bridge',
+          mediaType: 'audio',
+          taskId: bridgeTaskId,
+          status: status.status,
+          responseMetadata: status.responseMetadata,
+        },
+      };
+    }
+
+    bridgeResult = await notebookLmBridgeClient.getTaskMedia(bridgeTaskId, 'audio');
+  } else {
+    const start = await notebookLmBridgeClient.startAudio({
+      lessonTitle: enrichmentContext.lesson.title,
+      script: normalizedDraft.script,
+      language,
+      courseId: enrichmentContext.course.id,
+      voice: normalizedDraft.voice_id,
+      sources,
+      audioFormat: audioFormatPreset,
+      audioLength: audioLengthPreset,
+      targetDurationMinutes: durationGuidance.targetMinutes,
+      durationRangeMinMinutes: durationGuidance.minMinutes,
+      durationRangeMaxMinutes: durationGuidance.maxMinutes,
+    });
+
+    bridgeStartMetadata = start.responseMetadata;
+
+    if (!start.immediateMedia) {
+      const durationMs = Date.now() - startTime;
+      const deferredContent: AudioEnrichmentContent = {
+        type: 'audio',
+        voice_id: normalizedDraft.voice_id,
+        script: normalizedDraft.script,
+        duration_seconds:
+          normalizedDraft.duration_seconds > 0 ? normalizedDraft.duration_seconds : 1,
+        format: normalizedDraft.format as TTSFormat,
+      };
+
+      return {
+        content: deferredContent,
+        metadata: {
+          generated_at: new Date().toISOString(),
+          generation_duration_ms: (draft.metadata.durationMs || 0) + durationMs,
+          total_tokens: draft.metadata.tokensUsed,
+          estimated_cost_usd: 0,
+          model_used: draft.metadata.modelUsed || 'notebooklm-bridge',
+          quality_score: 1.0,
+          retry_attempts: 0,
+          additional_info: {
+            bridge: 'notebooklm',
+            source_strategy_used: sourceStrategy,
+            source_count: sources.length,
+            audio_format_preset: audioFormatPreset,
+            audio_length_preset: audioLengthPreset,
+            duration_target_minutes: durationGuidance.targetMinutes,
+            duration_range_min_minutes: durationGuidance.minMinutes,
+            duration_range_max_minutes: durationGuidance.maxMinutes,
+            bridge_task_id: start.taskId,
+            bridge_task_status: start.status,
+            bridge_poll_attempt: pollAttempt,
+            bridge_response: start.responseMetadata,
+          },
+        },
+        deferredTask: {
+          provider: 'notebooklm-bridge',
+          mediaType: 'audio',
+          taskId: start.taskId,
+          status: start.status,
+          responseMetadata: start.responseMetadata,
+        },
+      };
+    }
+
+    bridgeResult = start.immediateMedia;
+  }
 
   const durationSeconds =
     bridgeResult.durationSeconds && bridgeResult.durationSeconds > 0
@@ -345,7 +413,11 @@ async function generateFinal(
       source_count: sources.length,
       audio_format_preset: audioFormatPreset,
       audio_length_preset: audioLengthPreset,
+      duration_target_minutes: durationGuidance.targetMinutes,
+      duration_range_min_minutes: durationGuidance.minMinutes,
+      duration_range_max_minutes: durationGuidance.maxMinutes,
       bridge_response: bridgeResult.responseMetadata,
+      bridge_start_response: bridgeStartMetadata,
     },
   };
 
@@ -364,7 +436,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
 }
 
 export const nlmAudioHandler: EnrichmentHandler = {
-  generationFlow: 'two-stage',
+  generationFlow: 'single-stage',
   generateDraft,
   generateFinal,
   generate,

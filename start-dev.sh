@@ -67,8 +67,11 @@ echo -e "${BLUE}📝 Logs: $LOGS_DIR${NC}"
 # NOTEBOOKLM BRIDGE (OPTIONAL LOCAL SERVICE)
 # =============================================================================
 NLM_BRIDGE_CONTAINER="megacampus-notebooklm-bridge-local"
-NLM_BRIDGE_IMAGE="ghcr.io/maslennikov-ig/mc-2/notebooklm-bridge:develop"
+NLM_BRIDGE_IMAGE="megacampus/notebooklm-bridge-local:dev"
 NLM_BRIDGE_PORT="8010"
+NLM_BRIDGE_BUILD_CONTEXT="$SCRIPT_DIR/packages/course-gen-platform/docker/notebooklm-bridge"
+NLM_BRIDGE_CACHE_DIR="$SCRIPT_DIR/.cache/notebooklm-bridge"
+NLM_BRIDGE_HASH_FILE="$NLM_BRIDGE_CACHE_DIR/context.sha256"
 NLM_BRIDGE_WAS_RUNNING=false
 NLM_BRIDGE_STARTED_BY_SCRIPT=false
 
@@ -81,6 +84,21 @@ read_env_value() {
     grep -E "^${key}=" "$file" 2>/dev/null | tail -1 | cut -d= -f2-
 }
 
+compute_bridge_context_hash() {
+    local context_dir="$1"
+    (
+        cd "$context_dir" || exit 1
+        find . -type f \
+            ! -path './.git/*' \
+            ! -path './__pycache__/*' \
+            ! -path './.pytest_cache/*' \
+            ! -name '*.pyc' \
+            -print0 \
+        | sort -z \
+        | xargs -0 sha256sum
+    ) | sha256sum | awk '{print $1}'
+}
+
 echo -e "\n${YELLOW}🎧 Starting local NotebookLM bridge...${NC}"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -88,16 +106,36 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 1
 fi
 
+if [ ! -d "$NLM_BRIDGE_BUILD_CONTEXT" ]; then
+    echo -e "${RED}❌ NotebookLM bridge build context not found: $NLM_BRIDGE_BUILD_CONTEXT${NC}"
+    exit 1
+fi
+
+if ! command -v sha256sum >/dev/null 2>&1; then
+    echo -e "${RED}❌ sha256sum not found. Cannot detect NotebookLM bridge changes.${NC}"
+    exit 1
+fi
+
 COURSE_ENV_FILE="$SCRIPT_DIR/packages/course-gen-platform/.env"
 BRIDGE_TOKEN="${NOTEBOOKLM_BRIDGE_TOKEN:-$(read_env_value NOTEBOOKLM_BRIDGE_TOKEN "$COURSE_ENV_FILE")}"
+AUTH_JSON="${NOTEBOOKLM_AUTH_JSON:-$(read_env_value NOTEBOOKLM_AUTH_JSON "$COURSE_ENV_FILE")}"
 STORAGE_STATE_DIR="${NOTEBOOKLM_STORAGE_STATE_DIR:-$(read_env_value NOTEBOOKLM_STORAGE_STATE_DIR "$COURSE_ENV_FILE")}"
 STORAGE_PATH="${NOTEBOOKLM_STORAGE_PATH:-$(read_env_value NOTEBOOKLM_STORAGE_PATH "$COURSE_ENV_FILE")}"
 
-if [ -z "$STORAGE_STATE_DIR" ]; then
-    STORAGE_STATE_DIR="$SCRIPT_DIR/secrets/notebooklm"
+USE_AUTH_JSON=false
+if [ -n "$AUTH_JSON" ]; then
+    USE_AUTH_JSON=true
 fi
-if [ -z "$STORAGE_PATH" ]; then
-    STORAGE_PATH="/app/secrets/notebooklm/storage_state.json"
+
+if [ "$USE_AUTH_JSON" != "true" ]; then
+    if [ -z "$STORAGE_STATE_DIR" ]; then
+        STORAGE_STATE_DIR="$SCRIPT_DIR/secrets/notebooklm"
+    fi
+    if [ -z "$STORAGE_PATH" ]; then
+        STORAGE_PATH="/app/secrets/notebooklm/storage_state.json"
+    fi
+    STORAGE_FILENAME="$(basename "$STORAGE_PATH")"
+    LOCAL_STORAGE_STATE_FILE="$STORAGE_STATE_DIR/$STORAGE_FILENAME"
 fi
 
 if [ -z "$BRIDGE_TOKEN" ]; then
@@ -107,13 +145,125 @@ if [ -z "$BRIDGE_TOKEN" ]; then
     exit 1
 fi
 
-mkdir -p "$STORAGE_STATE_DIR"
+mkdir -p "$NLM_BRIDGE_CACHE_DIR"
+
+if [ "$USE_AUTH_JSON" = "true" ]; then
+    if [ -n "$STORAGE_PATH" ]; then
+        echo -e "${YELLOW}⚠️  NOTEBOOKLM_STORAGE_PATH is set but will be ignored because NOTEBOOKLM_AUTH_JSON is provided.${NC}"
+    fi
+    echo -e "   ✅ Using NOTEBOOKLM_AUTH_JSON for NotebookLM bridge auth."
+else
+    mkdir -p "$STORAGE_STATE_DIR"
+
+    if [ ! -f "$LOCAL_STORAGE_STATE_FILE" ]; then
+        echo -e "${RED}❌ NotebookLM auth storage file not found: $LOCAL_STORAGE_STATE_FILE${NC}"
+        echo -e "${YELLOW}   Run login first:${NC}"
+        echo -e "${YELLOW}   notebooklm --storage $LOCAL_STORAGE_STATE_FILE login${NC}"
+        exit 1
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo -e "${RED}❌ python3 not found. Cannot validate NotebookLM auth storage.${NC}"
+        exit 1
+    fi
+
+    STORAGE_VALIDATION_RESULT="$(python3 - "$LOCAL_STORAGE_STATE_FILE" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+
+try:
+    with open(path, "r", encoding="utf-8") as file:
+        payload = json.load(file)
+except Exception as error:
+    print(f"Invalid storage_state.json: {error}")
+    raise SystemExit(1)
+
+cookies = payload.get("cookies")
+if not isinstance(cookies, list):
+    print("Invalid storage_state.json: missing top-level 'cookies' array")
+    raise SystemExit(1)
+
+cookie_names = sorted(
+    {
+        str(cookie.get("name"))
+        for cookie in cookies
+        if isinstance(cookie, dict) and cookie.get("name")
+    }
+)
+
+if "SID" not in cookie_names:
+    preview = ", ".join(cookie_names[:8]) if cookie_names else "(none)"
+    print(f"Missing required NotebookLM cookie 'SID'. Found: {preview}")
+    raise SystemExit(1)
+
+print("ok")
+PY
+    )"
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌ NotebookLM auth storage is invalid: $STORAGE_VALIDATION_RESULT${NC}"
+        echo -e "${YELLOW}   Re-run login with the same storage path:${NC}"
+        echo -e "${YELLOW}   notebooklm --storage $LOCAL_STORAGE_STATE_FILE login${NC}"
+        exit 1
+    fi
+fi
 
 # Ensure API/worker always use local bridge in full dev mode
 export NOTEBOOKLM_BRIDGE_URL="http://127.0.0.1:${NLM_BRIDGE_PORT}"
 export NOTEBOOKLM_BRIDGE_TOKEN="$BRIDGE_TOKEN"
-export NOTEBOOKLM_STORAGE_STATE_DIR="$STORAGE_STATE_DIR"
-export NOTEBOOKLM_STORAGE_PATH="$STORAGE_PATH"
+export NOTEBOOKLM_BRIDGE_TIMEOUT_MS="${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}"
+export NOTEBOOKLM_BRIDGE_POLL_REQUEST_TIMEOUT_MS="${NOTEBOOKLM_BRIDGE_POLL_REQUEST_TIMEOUT_MS:-30000}"
+export NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS="${NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS:-3600}"
+export NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS="${NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS:-3600}"
+export NOTEBOOKLM_HTTP_TIMEOUT_SECONDS="${NOTEBOOKLM_HTTP_TIMEOUT_SECONDS:-60}"
+export NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT="${NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT:-12}"
+export NOTEBOOKLM_LOG_LEVEL="${NOTEBOOKLM_LOG_LEVEL:-INFO}"
+if [ "$USE_AUTH_JSON" = "true" ]; then
+    export NOTEBOOKLM_AUTH_JSON="$AUTH_JSON"
+    unset NOTEBOOKLM_STORAGE_STATE_DIR
+    export NOTEBOOKLM_STORAGE_PATH=""
+else
+    unset NOTEBOOKLM_AUTH_JSON
+    export NOTEBOOKLM_STORAGE_STATE_DIR="$STORAGE_STATE_DIR"
+    export NOTEBOOKLM_STORAGE_PATH="$STORAGE_PATH"
+fi
+
+# Enable full local enrichments storage mode by default (audio/video/images)
+export USE_LOCAL_STORAGE="${USE_LOCAL_STORAGE:-true}"
+if [ "$USE_LOCAL_STORAGE" = "true" ] || [ "$USE_LOCAL_STORAGE" = "1" ]; then
+    export ENRICHMENTS_LOCAL_PATH="${ENRICHMENTS_LOCAL_PATH:-$SCRIPT_DIR/data/enrichments}"
+    export ENRICHMENTS_PUBLIC_URL="${ENRICHMENTS_PUBLIC_URL:-/storage/enrichments}"
+    export ENRICHMENTS_PUBLIC_BASE_URL="${ENRICHMENTS_PUBLIC_BASE_URL:-http://127.0.0.1:3456}"
+    mkdir -p "$ENRICHMENTS_LOCAL_PATH"
+    echo -e "   ✅ Local enrichments storage enabled: $ENRICHMENTS_LOCAL_PATH"
+fi
+
+# Build local bridge image only when context changes (or image is missing).
+CURRENT_BRIDGE_HASH="$(compute_bridge_context_hash "$NLM_BRIDGE_BUILD_CONTEXT")"
+CACHED_BRIDGE_HASH="$(cat "$NLM_BRIDGE_HASH_FILE" 2>/dev/null || true)"
+LOCAL_BRIDGE_IMAGE_ID="$(docker image inspect "$NLM_BRIDGE_IMAGE" --format '{{.Id}}' 2>/dev/null || true)"
+
+if [ -z "$LOCAL_BRIDGE_IMAGE_ID" ] || [ "$CURRENT_BRIDGE_HASH" != "$CACHED_BRIDGE_HASH" ]; then
+    echo -e "   🔨 Building local NotebookLM bridge image..."
+    if ! docker build -t "$NLM_BRIDGE_IMAGE" "$NLM_BRIDGE_BUILD_CONTEXT" >/dev/null; then
+        echo -e "${RED}❌ Failed to build local NotebookLM bridge image.${NC}"
+        exit 1
+    fi
+    echo "$CURRENT_BRIDGE_HASH" > "$NLM_BRIDGE_HASH_FILE"
+else
+    echo -e "   ✅ NotebookLM bridge image unchanged (build skipped)."
+fi
+
+DESIRED_BRIDGE_IMAGE_ID="$(docker image inspect "$NLM_BRIDGE_IMAGE" --format '{{.Id}}' 2>/dev/null || true)"
+EXISTING_BRIDGE_IMAGE_ID="$(docker inspect "$NLM_BRIDGE_CONTAINER" --format '{{.Image}}' 2>/dev/null || true)"
+
+# Recreate container when image changed (keeps runtime in sync with local code).
+if [ -n "$EXISTING_BRIDGE_IMAGE_ID" ] && [ -n "$DESIRED_BRIDGE_IMAGE_ID" ] && [ "$EXISTING_BRIDGE_IMAGE_ID" != "$DESIRED_BRIDGE_IMAGE_ID" ]; then
+    echo -e "   ♻️  Recreating NotebookLM bridge container (image updated)..."
+    docker rm -f "$NLM_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
+fi
 
 if [ "$(docker ps -q -f name=^/${NLM_BRIDGE_CONTAINER}$)" ]; then
     NLM_BRIDGE_WAS_RUNNING=true
@@ -124,13 +274,30 @@ elif [ "$(docker ps -aq -f name=^/${NLM_BRIDGE_CONTAINER}$)" ]; then
     NLM_BRIDGE_STARTED_BY_SCRIPT=true
 else
     echo -e "   ✨ Creating NotebookLM bridge container..."
-    docker run -d \
-        --name "$NLM_BRIDGE_CONTAINER" \
-        -p "127.0.0.1:${NLM_BRIDGE_PORT}:8000" \
-        -e "NOTEBOOKLM_BRIDGE_TOKEN=$BRIDGE_TOKEN" \
-        -e "NOTEBOOKLM_STORAGE_PATH=$STORAGE_PATH" \
-        -v "$STORAGE_STATE_DIR:/app/secrets/notebooklm:ro" \
-        "$NLM_BRIDGE_IMAGE" >/dev/null
+    docker_run_args=(
+        -d
+        --name "$NLM_BRIDGE_CONTAINER"
+        -p "127.0.0.1:${NLM_BRIDGE_PORT}:8000"
+        -e "NOTEBOOKLM_BRIDGE_TOKEN=$BRIDGE_TOKEN"
+        -e "NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS=$NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS"
+        -e "NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS=$NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS"
+        -e "NOTEBOOKLM_HTTP_TIMEOUT_SECONDS=$NOTEBOOKLM_HTTP_TIMEOUT_SECONDS"
+        -e "NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT=$NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT"
+        -e "NOTEBOOKLM_LOG_LEVEL=$NOTEBOOKLM_LOG_LEVEL"
+    )
+    if [ "$USE_AUTH_JSON" = "true" ]; then
+        docker_run_args+=(
+            -e "NOTEBOOKLM_AUTH_JSON=$AUTH_JSON"
+            -e "NOTEBOOKLM_STORAGE_PATH="
+        )
+    else
+        docker_run_args+=(
+            -e "NOTEBOOKLM_STORAGE_PATH=$STORAGE_PATH"
+            -e "NOTEBOOKLM_HOME=/app/secrets/notebooklm"
+            -v "$STORAGE_STATE_DIR:/app/secrets/notebooklm:ro"
+        )
+    fi
+    docker run "${docker_run_args[@]}" "$NLM_BRIDGE_IMAGE" >/dev/null
     NLM_BRIDGE_STARTED_BY_SCRIPT=true
 fi
 
@@ -138,6 +305,18 @@ if ! curl -sSf "http://127.0.0.1:${NLM_BRIDGE_PORT}/health" >/dev/null 2>&1; the
     echo -e "${YELLOW}⚠️  NotebookLM bridge started but health endpoint is not ready yet.${NC}"
 else
     echo -e "   ${GREEN}✅ NotebookLM bridge healthy at http://127.0.0.1:${NLM_BRIDGE_PORT}${NC}"
+fi
+
+# Sanity check for schema compatibility (required by NLM hybrid source flow).
+BRIDGE_SCHEMA_KEYS="$(docker exec "$NLM_BRIDGE_CONTAINER" sh -lc "python - <<'PY'
+from app.models import MediaGenerationRequest
+print(' '.join(MediaGenerationRequest.model_json_schema().get('properties', {}).keys()))
+PY" 2>/dev/null || true)"
+
+if [[ "$BRIDGE_SCHEMA_KEYS" != *"sources"* ]]; then
+    echo -e "${RED}❌ NotebookLM bridge schema is outdated (missing 'sources').${NC}"
+    echo -e "${YELLOW}   Rebuild failed or stale image is still running. Please re-run start-dev.sh.${NC}"
+    exit 1
 fi
 
 # =============================================================================

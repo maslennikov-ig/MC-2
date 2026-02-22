@@ -37,8 +37,8 @@ type EnrichmentType =
   | 'nlm_video'
   | 'cover'
   | 'card'
-type AudioDraftContent = Omit<AudioEnrichmentContent, 'type'> & { type: 'audio' | 'nlm_audio' }
-type VideoDraftContent = Omit<VideoEnrichmentContent, 'type'> & { type: 'video' | 'nlm_video' }
+type AudioDraftContent = AudioEnrichmentContent
+type VideoDraftContent = VideoEnrichmentContent
 
 // Draft preview configuration
 const PREVIEW_SLIDE_COUNT = 3
@@ -116,16 +116,14 @@ const PLACEHOLDER_CONFIG: Record<
   },
 }
 
-const NO_OPTIONS_TYPES: ReadonlySet<EnrichmentType> = new Set(['video', 'nlm_audio', 'nlm_video'])
+const NO_OPTIONS_TYPES: ReadonlySet<EnrichmentType> = new Set(['video', 'nlm_video'])
 
 function isAudioDraftContent(content: unknown): content is AudioDraftContent {
   return (
     typeof content === 'object' &&
     content !== null &&
-    'type' in content &&
-    (((content as Record<string, unknown>).type === 'audio' &&
-      typeof (content as Record<string, unknown>).script === 'string') ||
-      (content as Record<string, unknown>).type === 'nlm_audio')
+    (content as Record<string, unknown>).type === 'audio' &&
+    typeof (content as Record<string, unknown>).script === 'string'
   )
 }
 
@@ -133,9 +131,8 @@ function isVideoDraftContent(content: unknown): content is VideoDraftContent {
   return (
     typeof content === 'object' &&
     content !== null &&
-    'type' in content &&
-    ((content as Record<string, unknown>).type === 'video' ||
-      (content as Record<string, unknown>).type === 'nlm_video')
+    (content as Record<string, unknown>).type === 'video' &&
+    typeof (content as Record<string, unknown>).script === 'string'
   )
 }
 
@@ -160,6 +157,7 @@ export function UnifiedEnrichmentCard({
   const [audioSpeed, setAudioSpeed] = useState('normal')
   const [presentationSlides, setPresentationSlides] = useState('8')
   const [presentationTheme, setPresentationTheme] = useState('light')
+  const [nlmAudioFormat, setNlmAudioFormat] = useState<'deep_dive' | 'debate'>('deep_dive')
 
   // Options state for cover, card images
   const [imageStyle, setImageStyle] = useState('realistic')
@@ -213,7 +211,7 @@ export function UnifiedEnrichmentCard({
       }
     }
 
-    // For audio (including nlm_audio): show script preview
+    // For audio: show script preview
     if (isAudioDraftContent(rawContent)) {
       const content = rawContent
       const scriptPreview = content.script?.slice(0, PREVIEW_SCRIPT_LENGTH) || ''
@@ -226,7 +224,7 @@ export function UnifiedEnrichmentCard({
       }
     }
 
-    // For video (including nlm_video): show script preview
+    // For video: show script preview
     if (isVideoDraftContent(rawContent)) {
       const content = rawContent
       const scriptPreview = content.script?.slice(0, PREVIEW_SCRIPT_LENGTH) || ''
@@ -272,6 +270,9 @@ export function UnifiedEnrichmentCard({
           speed: audioSpeed,
         }
       case 'nlm_audio':
+        return {
+          nlm_audio_format: nlmAudioFormat,
+        }
       case 'nlm_video':
       case 'video':
         return {}
@@ -296,6 +297,7 @@ export function UnifiedEnrichmentCard({
     quizDifficulty,
     audioVoice,
     audioSpeed,
+    nlmAudioFormat,
     presentationSlides,
     presentationTheme,
     imageStyle,
@@ -386,7 +388,11 @@ export function UnifiedEnrichmentCard({
           isGenerating,
         }
       case 'nlm_audio':
-        return { type: 'nlm_audio' as const }
+        return {
+          type: 'nlm_audio' as const,
+          nlmAudioFormat,
+          setNlmAudioFormat,
+        }
       case 'video':
         return { type: 'video' as const }
       case 'nlm_video':
@@ -400,6 +406,7 @@ export function UnifiedEnrichmentCard({
     quizDifficulty,
     audioVoice,
     audioSpeed,
+    nlmAudioFormat,
     presentationSlides,
     presentationTheme,
     hasImage,

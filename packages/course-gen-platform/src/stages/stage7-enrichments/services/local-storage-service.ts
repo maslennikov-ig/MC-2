@@ -41,9 +41,9 @@ const STORAGE_BASE = process.env.ENRICHMENTS_LOCAL_PATH || '/app/data/enrichment
 const PUBLIC_URL = process.env.ENRICHMENTS_PUBLIC_URL || '/storage/enrichments';
 
 /**
- * Maximum file size in bytes (50MB for images - should be plenty)
+ * Maximum file size in bytes (100MB for media assets)
  */
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 
 /**
  * Minimum free disk space required before writes (500MB)
@@ -53,7 +53,19 @@ const MIN_FREE_SPACE_BYTES = 500 * 1024 * 1024;
 /**
  * Allowed file extensions (whitelist)
  */
-const ALLOWED_EXTENSIONS = ['webp', 'png', 'jpg', 'jpeg'] as const;
+const ALLOWED_EXTENSIONS = ['webp', 'png', 'jpg', 'jpeg', 'mp3', 'mp4'] as const;
+
+/**
+ * MIME type lookup by extension
+ */
+const MIME_TYPES_BY_EXTENSION: Record<string, string> = {
+  webp: 'image/webp',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+};
 
 /**
  * UUID v4 regex for validation
@@ -245,11 +257,13 @@ export async function uploadEnrichmentAssetLocal(
   buffer: Buffer,
   extension = 'webp'
 ): Promise<string> {
+  const normalizedExtension = extension.toLowerCase();
+
   // Validate all inputs
   validatePathComponent(courseId, 'courseId');
   validatePathComponent(lessonId, 'lessonId');
   validatePathComponent(enrichmentId, 'enrichmentId');
-  validateExtension(extension);
+  validateExtension(normalizedExtension);
 
   // Validate file size
   if (buffer.length > MAX_FILE_SIZE_BYTES) {
@@ -258,7 +272,7 @@ export async function uploadEnrichmentAssetLocal(
 
   // Build paths
   const dirPath = path.join(STORAGE_BASE, courseId, lessonId);
-  const fileName = `${enrichmentId}.${extension}`;
+  const fileName = `${enrichmentId}.${normalizedExtension}`;
   const filePath = path.join(dirPath, fileName);
   const storagePath = `${courseId}/${lessonId}/${fileName}`;
 
@@ -307,9 +321,11 @@ export async function uploadCourseCardLocal(
   buffer: Buffer,
   extension = 'webp'
 ): Promise<string> {
+  const normalizedExtension = extension.toLowerCase();
+
   // Validate inputs
   validatePathComponent(courseId, 'courseId');
-  validateExtension(extension);
+  validateExtension(normalizedExtension);
 
   // Validate file size
   if (buffer.length > MAX_FILE_SIZE_BYTES) {
@@ -318,7 +334,7 @@ export async function uploadCourseCardLocal(
 
   // Build paths
   const dirPath = path.join(STORAGE_BASE, courseId);
-  const fileName = `card.${extension}`;
+  const fileName = `card.${normalizedExtension}`;
   const filePath = path.join(dirPath, fileName);
   const storagePath = `${courseId}/${fileName}`;
 
@@ -368,8 +384,11 @@ export async function uploadCourseCardLocal(
  * ```
  */
 export function buildPublicUrl(storagePath: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ai.megacampus.ru';
-  return `${baseUrl}${PUBLIC_URL}/${storagePath}`;
+  const configuredBaseUrl =
+    process.env.ENRICHMENTS_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  const baseUrl = (configuredBaseUrl || 'https://ai.megacampus.ru').replace(/\/+$/, '');
+  const normalizedPath = storagePath.replace(/^\/+/, '');
+  return `${baseUrl}${PUBLIC_URL}/${normalizedPath}`;
 }
 
 /**
@@ -465,17 +484,11 @@ export async function getAssetMetadataLocal(storagePath: string): Promise<{
     const stats = await fs.stat(filePath);
 
     // Determine MIME type from extension
-    const ext = path.extname(storagePath).toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      '.webp': 'image/webp',
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-    };
+    const ext = path.extname(storagePath).toLowerCase().replace(/^\./, '');
 
     return {
       size: stats.size,
-      mimeType: mimeTypes[ext] || 'application/octet-stream',
+      mimeType: MIME_TYPES_BY_EXTENSION[ext] || 'application/octet-stream',
       lastModified: stats.mtime.toISOString(),
     };
   } catch {

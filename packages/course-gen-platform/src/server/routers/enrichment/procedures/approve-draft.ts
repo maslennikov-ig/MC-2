@@ -92,7 +92,7 @@ export const approveDraft = protectedProcedure
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Approve draft is only applicable to two-stage enrichments (video, presentation, nlm_audio, nlm_video), not '${enrichment.enrichment_type}'.`,
+          message: `Approve draft is only applicable to two-stage enrichments (video, presentation), not '${enrichment.enrichment_type}'.`,
         });
       }
 
@@ -114,8 +114,11 @@ export const approveDraft = protectedProcedure
       }
 
       // Step 3.5: Validate that draft content exists
-      const draftContent = enrichment.content?.draft;
-      if (!draftContent) {
+      // Draft is stored directly in `content` for true two-stage flows.
+      const draftContent = enrichment.content;
+      const draftRecord = draftContent && typeof draftContent === 'object' ? draftContent : null;
+
+      if (!draftRecord || (Object.keys(draftRecord).length === 0 && !draftRecord.draft)) {
         logger.error(
           {
             requestId,

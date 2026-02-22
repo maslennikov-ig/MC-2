@@ -10,7 +10,13 @@ import { nanoid } from 'nanoid';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { createEnrichmentInputSchema } from '../schemas';
-import { verifyLessonAccess, getNextOrderIndex, isTwoStageType } from '../helpers';
+import {
+  verifyLessonAccess,
+  getNextOrderIndex,
+  isTwoStageType,
+  checkExistingEnrichment,
+  shouldReuseLegacyNlmDraft,
+} from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { createStage7Queue, addEnrichmentJob } from '../../../../stages/stage7-enrichments/factory';
 import type { Stage7JobInput } from '../../../../stages/stage7-enrichments/types';
@@ -88,51 +94,96 @@ export const create = protectedProcedure
         requestId
       );
 
-      // Step 2: Get next order index
-      const orderIndex = await getNextOrderIndex(lessonId);
+      // Step 2: Detect legacy NLM rows stuck in draft statuses from old two-stage flow
+      const existing = await checkExistingEnrichment(lessonId, enrichmentType, requestId);
+      const reusableLegacyId =
+        shouldReuseLegacyNlmDraft(enrichmentType, existing.status) && existing.enrichmentId
+          ? existing.enrichmentId
+          : null;
 
       // Step 3: Determine initial status (two-stage types start with draft generation)
       const initialStatus = isTwoStageType(enrichmentType) ? 'pending' : 'pending';
 
-      // Step 4: Insert enrichment record
+      // Step 4: Reuse legacy NLM draft row or insert a new enrichment record
       const supabase = getSupabaseAdmin();
-      const { error: insertError } = await supabase.from('lesson_enrichments').insert({
-        id: enrichmentId,
-        lesson_id: lessonId,
-        course_id: lesson.course_id,
-        enrichment_type: enrichmentType,
-        order_index: orderIndex,
-        title: title || null,
-        content: null,
-        asset_id: null,
-        status: initialStatus,
-        generation_attempt: 0,
-        error_message: null,
-        error_details: null,
-        metadata: {},
-      });
+      let finalEnrichmentId: string = enrichmentId;
+      let orderIndex: number | null = null;
 
-      if (insertError) {
-        logger.error(
-          {
-            requestId,
-            enrichmentId,
-            lessonId,
-            error: insertError.message,
-          },
-          'Failed to insert enrichment record'
-        );
+      if (reusableLegacyId) {
+        const { error: updateError } = await supabase
+          .from('lesson_enrichments')
+          .update({
+            status: initialStatus,
+            title: title || null,
+            content: null,
+            asset_id: null,
+            generation_attempt: 0,
+            error_message: null,
+            error_details: null,
+            metadata: {},
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', reusableLegacyId);
 
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to create enrichment record',
+        if (updateError) {
+          logger.error(
+            {
+              requestId,
+              enrichmentId: reusableLegacyId,
+              lessonId,
+              error: updateError.message,
+            },
+            'Failed to reset legacy NLM enrichment'
+          );
+
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create enrichment record',
+          });
+        }
+
+        finalEnrichmentId = reusableLegacyId;
+      } else {
+        orderIndex = await getNextOrderIndex(lessonId);
+
+        const { error: insertError } = await supabase.from('lesson_enrichments').insert({
+          id: enrichmentId,
+          lesson_id: lessonId,
+          course_id: lesson.course_id,
+          enrichment_type: enrichmentType,
+          order_index: orderIndex,
+          title: title || null,
+          content: null,
+          asset_id: null,
+          status: initialStatus,
+          generation_attempt: 0,
+          error_message: null,
+          error_details: null,
+          metadata: {},
         });
+
+        if (insertError) {
+          logger.error(
+            {
+              requestId,
+              enrichmentId,
+              lessonId,
+              error: insertError.message,
+            },
+            'Failed to insert enrichment record'
+          );
+
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create enrichment record',
+          });
+        }
       }
 
       // Step 5: Enqueue BullMQ job
       const queue = getQueue();
       const jobInput: Stage7JobInput = {
-        enrichmentId,
+        enrichmentId: finalEnrichmentId,
         enrichmentType,
         lessonId,
         courseId: lesson.course_id,
@@ -143,24 +194,25 @@ export const create = protectedProcedure
       };
 
       const job = await addEnrichmentJob(queue, jobInput, {
-        jobId: `enrich-${enrichmentId}`,
+        jobId: `enrich-${finalEnrichmentId}`,
       });
 
       logger.info(
         {
           requestId,
-          enrichmentId,
+          enrichmentId: finalEnrichmentId,
           lessonId,
           enrichmentType,
           jobId: job.id,
           orderIndex,
+          reused: !!reusableLegacyId,
         },
         'Enrichment created and job enqueued'
       );
 
       return {
         success: true,
-        enrichmentId,
+        enrichmentId: finalEnrichmentId,
         status: initialStatus as 'pending',
         jobId: job.id,
       };

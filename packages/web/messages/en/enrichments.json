@@ -135,6 +135,12 @@
       "speedFast": "Fast",
       "format": "Format"
     },
+    "nlmAudio": {
+      "title": "NLM Audio Settings",
+      "format": "Narration Format",
+      "formatDeepDive": "Deep explanation",
+      "formatDebate": "Two-host debate"
+    },
     "video": {
       "title": "Video Settings",
       "voice": "Voice",
@@ -346,6 +352,10 @@
   },
   "generate": "Generate",
   "generating": "Generating...",
+  "longGeneration": {
+    "remaining": "Time left: {remaining} / {total}",
+    "elapsed": "Elapsed: {elapsed}"
+  },
   "options": "Options",
   "cancel": "Cancel",
   "retry": "Retry",

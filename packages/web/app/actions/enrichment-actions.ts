@@ -605,23 +605,41 @@ export async function getEnrichment(input: GetEnrichmentInput): Promise<GetEnric
       return { success: false, error: 'Enrichment not found' }
     }
 
-    // Get signed URL for asset if it exists
+    // Get playback URL / signed URL for asset if it exists
     let assetUrl: string | null = null
     if (enrichment.asset_id) {
-      // Get the asset file path
-      const { data: asset } = await supabase
-        .from('assets')
-        .select('file_path')
-        .eq('id', enrichment.asset_id)
-        .single()
+      const playbackTypes = ['audio', 'video', 'nlm_audio', 'nlm_video']
+      const isPlaybackType = playbackTypes.includes(enrichment.enrichment_type)
 
-      if (asset?.file_path) {
-        // Create signed URL (valid for 1 hour)
-        const { data: signedUrlData } = await supabase.storage
-          .from('course-assets')
-          .createSignedUrl(asset.file_path, 3600)
+      if (isPlaybackType && enrichment.status === 'completed') {
+        try {
+          const client = await getServerTrpcClient()
+          const playbackResult = await client.enrichment.getPlaybackUrl.query({
+            enrichmentId: enrichment.id,
+          })
+          assetUrl = playbackResult.url
+        } catch (playbackError) {
+          logger.warn('[getEnrichment] Failed to resolve playback URL', {
+            enrichmentId: enrichment.id,
+            type: enrichment.enrichment_type,
+            error: playbackError instanceof Error ? playbackError.message : String(playbackError),
+          })
+        }
+      } else {
+        // Non-playback assets still use direct signed URL lookup
+        const { data: asset } = await supabase
+          .from('assets')
+          .select('file_path')
+          .eq('id', enrichment.asset_id)
+          .single()
 
-        assetUrl = signedUrlData?.signedUrl || null
+        if (asset?.file_path) {
+          const { data: signedUrlData } = await supabase.storage
+            .from('course-assets')
+            .createSignedUrl(asset.file_path, 3600)
+
+          assetUrl = signedUrlData?.signedUrl || null
+        }
       }
     }
 

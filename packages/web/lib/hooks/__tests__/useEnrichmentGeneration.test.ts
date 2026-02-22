@@ -183,12 +183,42 @@ describe('useEnrichmentGeneration', () => {
       expect(result.current.isGenerating('quiz')).toBe(true)
 
       const enrichment = result.current.generating.get('quiz')
-      expect(enrichment).toEqual({
-        enrichmentId: 'test-enrichment-id',
-        type: 'quiz',
-        progress: 0,
-        currentStep: 'queued',
+      expect(enrichment).toEqual(
+        expect.objectContaining({
+          enrichmentId: 'test-enrichment-id',
+          type: 'quiz',
+          progress: 0,
+          currentStep: 'queued',
+        })
+      )
+      expect(enrichment?.startedAtMs).toEqual(expect.any(Number))
+      expect(enrichment?.maxDurationMs).toBeUndefined()
+
+      unmount()
+    })
+
+    it('should set 60-minute max duration for NLM media generation', async () => {
+      mockMutateGenerate.mockResolvedValueOnce({
+        ...mockGenerateResponse,
+        enrichmentId: 'test-nlm-enrichment-id',
       })
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
+
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+        })
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('nlm_audio')
+      })
+
+      const enrichment = result.current.generating.get('nlm_audio')
+      expect(enrichment).toBeDefined()
+      expect(enrichment?.maxDurationMs).toBe(60 * 60 * 1000)
+      expect(enrichment?.startedAtMs).toEqual(expect.any(Number))
 
       unmount()
     })
@@ -312,7 +342,7 @@ describe('useEnrichmentGeneration', () => {
       unmount()
     })
 
-    it('should default settings to empty object if not provided', async () => {
+    it('should omit settings when not provided', async () => {
       mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
       mockQueryStatus.mockResolvedValue(mockStatusPending)
 
@@ -331,7 +361,7 @@ describe('useEnrichmentGeneration', () => {
         {
           lessonId: 'lesson-123',
           enrichmentType: 'audio',
-          settings: {},
+          settings: undefined,
         },
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
@@ -624,6 +654,35 @@ describe('useEnrichmentGeneration', () => {
       })
 
       // Should still be generating (not stopped after single error - backoff recovery)
+      expect(result.current.generating.has('quiz')).toBe(true)
+
+      unmount()
+    })
+
+    it('should ignore abort-like polling errors from transport layer', async () => {
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockRejectedValue(new TRPCClientError('signal is aborted without reason'))
+
+      const onError = vi.fn()
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+          pollingInterval: 50,
+          onError,
+        })
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('quiz')
+      })
+
+      // Wait long enough to exceed MAX_POLL_FAILURES if aborts were treated as real failures.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      })
+
+      expect(onError).not.toHaveBeenCalled()
       expect(result.current.generating.has('quiz')).toBe(true)
 
       unmount()

@@ -42,7 +42,7 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
     ) {
       void getEnrichmentPlaybackUrl(enrichment).then(setPlaybackUrl)
     }
-  }, [isActive, enrichment.asset_id, enrichment.status, type])
+  }, [isActive, enrichment.id, enrichment.status, type])
 
   const getContentPreview = () => {
     const content = enrichment.content
