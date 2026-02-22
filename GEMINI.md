@@ -1,29 +1,36 @@
-# megacampus2 Development Guidelines
+# Project Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-11-27
+## Orchestration
 
-## Active Technologies
+Uses **Gastown** (`gt`) + **Beads** (`bd`). Global tools at `~/gt/`.
 
-- TypeScript 5.x, React 19, Next.js 15 + Framer Motion (animations), Tailwind CSS 4 (styling), Lucide React (icons), Supabase Client (realtime) (012-celestial-redesign)
+Multi-runtime: `claude` (default), `codex`, `gemini` — all subscription-based.
 
-## Project Structure
+## Workflow
 
-```text
-src/
-tests/
+```bash
+bd ready                              # Find work
+bd update <id> --status in_progress   # Claim
+# ... work ...
+bd close <id> --reason "Done"         # Close
+git commit -m "..." && git push       # Ship
 ```
 
-## Commands
+## Stack
 
-npm test && npm run lint
+Next.js 15, TypeScript 5.x strict, tRPC, BullMQ, Supabase, pnpm workspaces.
 
-## Code Style
+Packages: `web`, `course-gen-platform`, `shared-types`.
 
-TypeScript 5.x, React 19, Next.js 15: Follow standard conventions
+## Rules
 
-## Recent Changes
+- `pnpm type-check && pnpm build` before commit
+- Import types from `@megacampus/shared-types` only
+- Never hardcode credentials
+- Work on `develop`, push = auto-deploy to dev.ai.megacampus.ru
 
-- 012-celestial-redesign: Added TypeScript 5.x, React 19, Next.js 15 + Framer Motion (animations), Tailwind CSS 4 (styling), Lucide React (icons), Supabase Client (realtime)
+## Session End
 
-<!-- MANUAL ADDITIONS START -->
-<!-- MANUAL ADDITIONS END -->
+```bash
+git status && git add <files> && git commit -m "..." && git push
+```
