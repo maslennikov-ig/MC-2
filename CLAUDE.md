@@ -2,83 +2,88 @@
 
 > **IMPORTANT**: This file overrides default Claude Code behavior. Follow strictly.
 
-## Main Pattern: You Are The Orchestrator
+## Multi-Agent Orchestration with Gastown
+
+This project uses **Gastown** (`gt`) for multi-agent orchestration and **Beads** (`bd`) for issue tracking. Both are global tools — installed once, shared across all projects.
+
+### Architecture
+
+```
+~/gt/                        Global Town workspace
+├── mayor/                   AI coordinator (all projects)
+├── deacon/                  Background supervisor daemon
+└── mc2/                     This project (rig)
+    ├── polecats/            AI worker agents (Claude/Codex/Gemini)
+    ├── crew/me/             Human workspace
+    └── refinery/            Auto merge queue
+```
+
+### Multi-Runtime Agents
+
+Three subscription-based runtimes, no API billing:
+
+| Agent           | Runtime          | Use for                        |
+| --------------- | ---------------- | ------------------------------ |
+| `claude-opus`   | Claude Code      | Architecture, complex logic    |
+| `claude-sonnet` | Claude Code      | Routine fixes, tests           |
+| `codex-53`      | OpenAI Codex 5.3 | A/B test on complex tasks      |
+| `gemini-pro`    | Google Gemini    | Token-heavy tasks, large files |
 
 ### Core Rules
 
-**1. GATHER CONTEXT FIRST (MANDATORY)**
+**1. GATHER CONTEXT FIRST** — Read code, search patterns, check commits. NEVER implement blindly.
 
-- Read existing code, search patterns, check recent commits
-- NEVER delegate or implement blindly
+**2. VERIFY** — Never trust agent output without verification:
 
-**2. DELEGATE TO SUBAGENTS**
+- Read modified files (`Read` tool)
+- Run `pnpm type-check && pnpm build`
+- Check for regressions
 
-- Provide complete context (code, paths, patterns)
-- **NEVER TRUST SUBAGENT REPORTS** — always verify yourself:
-  - Read modified files (`Read` tool)
-  - Run type-check (`pnpm type-check`)
-  - Run build if needed (`pnpm build`)
-  - Check for regressions
-- Re-delegate if incorrect
-
-**3. EXECUTE DIRECTLY** — Only for: single-line fixes, simple imports, minimal configs
-
-**4. TRACK PROGRESS** — TodoWrite: in_progress BEFORE, completed AFTER verification
-
-**5. COMMIT** — `/push patch` after each task
-
-**6. EXECUTION PATTERN**
-
-```
-1. Read task → 2. Gather context → 3. Delegate/execute
-4. VERIFY (never skip) → 5. Re-delegate if needed
-6. TodoWrite completed → 7. /push patch → 8. Next task
-```
-
-**7. CONTRADICTIONS** — Gather context, analyze patterns. Ask user only if truly ambiguous (~10%).
-
-**8. TYPESCRIPT ERRORS** — Re-delegate to same agent OR `typescript-types-specialist`
-
-**9. /push — NEVER DISCARD CHANGES**
+**3. /push — NEVER DISCARD CHANGES**
 
 - **FORBIDDEN**: `git reset`, `git checkout --`, `git stash` during `/push`
 - **ALWAYS** commit all uncommitted changes or ASK user first
 
 ---
 
-## Task Management with Beads
+## Task Management with Beads + Gastown
 
-> Constitution v1.2.0: All work MUST be tracked in Beads.
+> Constitution v2.0: All work tracked in Beads, orchestrated by Gastown.
 
 ### Session Workflow
 
 ```bash
-# SESSION START (auto via hooks)
-# bd prime runs automatically → injects context
-
 # FIND WORK
 bd ready                          # Available tasks (no blockers)
-bd ready --label frontend         # Only frontend tasks
-bd list --unlocked                # Tasks not locked by other terminals
+gt convoy list                    # Active convoys across rigs
 bd show <id>                      # Task details
 
-# WORK
-bd update <id> --status in_progress   # Acquires exclusive lock
+# WORK (single agent)
+bd update <id> --status in_progress
 # ... do the work ...
-bd close <id> --reason "Done"         # Releases lock
+bd close <id> --reason "Done"
+
+# WORK (parallel agents via Gastown)
+gt convoy create "Sprint" mc2-xxx mc2-yyy mc2-zzz --notify --human
+gt sling mc2-xxx mc2 --agent claude-opus
+gt sling mc2-yyy mc2 --agent codex-53
+gt sling mc2-zzz mc2 --agent gemini-pro
+gt convoy list                    # Monitor progress
 
 # SESSION END
 git add . && git commit -m "..." && git push
 ```
 
-### Multi-Terminal Work
+### Multi-Agent Work
 
-When working in multiple terminals simultaneously:
+Gastown manages parallel agents automatically:
 
-- Each terminal acquires **exclusive lock** via `bd update --status in_progress`
-- Lock auto-releases after 30min inactivity
-- **Rule**: Each terminal works on DIFFERENT issues
-- Find unlocked: `bd list --unlocked`
+- Mayor coordinates, Polecats execute, Refinery merges
+- Each polecat works in isolated git worktree — no conflicts
+- Witness monitors health, respawns crashed agents
+- `gt agents` — list active agents
+- `gt convoy status` — track batch progress
+- `gt dashboard` — web monitoring panel
 
 ### Branches & Environments
 
@@ -186,6 +191,8 @@ git push                          # → dev.ai.megacampus.ru
 - MCP server: project `diqooqbuchsliypgwksu`
 - Migrations: `packages/course-gen-platform/supabase/migrations/`
 - Two admin clients by design (different runtimes): `course-gen-platform/src/shared/supabase/admin.ts` (Node.js) and `web/lib/supabase-admin.ts` (Next.js)
+
+**Course lookup by short code**: User sends codes like `BRA-1467` — this is `courses.generation_code`. Query: `SELECT id, title FROM courses WHERE generation_code = 'BRA-1467'`. Use `generation_trace` table (join via `lesson_id`) to see which LLM model generated each lesson (`model_used`, `stage`, `phase`, `step_name`).
 
 **Single Source of Truth** (NEVER duplicate, always import from `@megacampus/shared-types`):
 
