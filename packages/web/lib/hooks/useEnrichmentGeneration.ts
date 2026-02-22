@@ -10,11 +10,34 @@ import type { OnDemandEnrichmentType, GenerationStep } from '@megacampus/shared-
 const DEFAULT_POLLING_INTERVAL = 2000 // 2 seconds
 const MAX_POLL_FAILURES = 5
 const MAX_BACKOFF_INTERVAL = 10000 // 10 seconds
+const NLM_MAX_GENERATION_DURATION_MS = 60 * 60 * 1000 // 60 minutes
 
 // Optimistic UI prefix for temporary IDs before API response
 const OPTIMISTIC_ID_PREFIX = 'optimistic-'
+const NLM_LONG_RUNNING_TYPES: ReadonlySet<OnDemandEnrichmentType> = new Set([
+  'nlm_audio',
+  'nlm_video',
+])
 
 const log = createLogger({ hook: 'useEnrichmentGeneration' })
+
+function getMaxDurationForType(type: OnDemandEnrichmentType): number | undefined {
+  if (NLM_LONG_RUNNING_TYPES.has(type)) {
+    return NLM_MAX_GENERATION_DURATION_MS
+  }
+  return undefined
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const normalizedMessage = error.message.toLowerCase()
+    if (error.name === 'AbortError') return true
+    if (normalizedMessage.includes('signal is aborted')) return true
+    if (normalizedMessage.includes('operation was aborted')) return true
+  }
+
+  return false
+}
 
 interface UseEnrichmentGenerationOptions {
   lessonId: string
@@ -33,6 +56,8 @@ export interface GeneratingEnrichment {
   type: OnDemandEnrichmentType
   progress: number
   currentStep?: GenerationStep | FrontendOnlyStep
+  startedAtMs: number
+  maxDurationMs?: number
 }
 
 interface GenerateOnDemandResponse {
@@ -240,7 +265,7 @@ export function useEnrichmentGeneration({
           }
         } catch (error) {
           // Ignore abort errors
-          if (error instanceof Error && error.name === 'AbortError') {
+          if (isAbortLikeError(error)) {
             return
           }
 
@@ -300,6 +325,8 @@ export function useEnrichmentGeneration({
 
       // OPTIMISTIC UPDATE: Immediately show loading state with temporary ID
       const optimisticId = `${OPTIMISTIC_ID_PREFIX}${type}-${Date.now()}`
+      const generationStartedAtMs = Date.now()
+      const maxDurationMs = getMaxDurationForType(type)
       if (mountedRef.current) {
         setGenerating((prev) => {
           const next = new Map(prev)
@@ -308,6 +335,8 @@ export function useEnrichmentGeneration({
             type,
             progress: 0,
             currentStep: 'queued',
+            startedAtMs: generationStartedAtMs,
+            maxDurationMs,
           })
           return next
         })
@@ -347,11 +376,14 @@ export function useEnrichmentGeneration({
         if (mountedRef.current) {
           setGenerating((prev) => {
             const next = new Map(prev)
+            const previous = next.get(type)
             next.set(type, {
               enrichmentId: data.enrichmentId,
               type,
               progress: 0,
               currentStep: 'queued',
+              startedAtMs: previous?.startedAtMs ?? generationStartedAtMs,
+              maxDurationMs: previous?.maxDurationMs ?? maxDurationMs,
             })
             return next
           })
@@ -365,7 +397,7 @@ export function useEnrichmentGeneration({
         abortControllersRef.current.delete(`generate-${type}`)
 
         // Ignore abort errors
-        if (error instanceof Error && error.name === 'AbortError') {
+        if (isAbortLikeError(error)) {
           return null
         }
 
@@ -423,6 +455,10 @@ export function useEnrichmentGeneration({
         const client = getBrowserTrpcClient()
         await client.enrichment.cancel.mutate({ enrichmentId: gen.enrichmentId })
       } catch (error) {
+        if (isAbortLikeError(error)) {
+          return
+        }
+
         log.error('Cancel error:', error)
 
         if (error instanceof TRPCClientError) {
@@ -490,7 +526,7 @@ export function useEnrichmentGeneration({
    * ```
    */
   const resumeGeneration = useCallback(
-    (enrichmentId: string, type: OnDemandEnrichmentType) => {
+    (enrichmentId: string, type: OnDemandEnrichmentType, startedAtMs?: number) => {
       // Guard: Don't resume if already tracking this type
       if (generating.has(type)) {
         log.warn('Already tracking generation for type:', type)
@@ -503,6 +539,11 @@ export function useEnrichmentGeneration({
         return
       }
 
+      const parsedStartedAtMs =
+        typeof startedAtMs === 'number' && Number.isFinite(startedAtMs) && startedAtMs > 0
+          ? startedAtMs
+          : Date.now()
+
       // Add to generating state with unknown progress (-1 means "syncing")
       // Real progress will be fetched on first poll
       setGenerating((prev) => {
@@ -512,6 +553,8 @@ export function useEnrichmentGeneration({
           type,
           progress: -1, // -1 indicates "loading progress", not actual 0%
           currentStep: 'syncing',
+          startedAtMs: parsedStartedAtMs,
+          maxDurationMs: getMaxDurationForType(type),
         })
         return next
       })

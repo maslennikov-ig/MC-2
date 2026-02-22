@@ -459,19 +459,53 @@ export async function findReusableEnrichment(
  * to proceed to final generation:
  * - video: Script draft → user approves → video generation
  * - presentation: Outline draft → user approves → slides generation
- * - nlm_audio: Script draft → user approves → NotebookLM audio generation
- * - nlm_video: Script draft → user approves → NotebookLM video generation
  *
  * @param enrichmentType - Type of enrichment
  * @returns True if type uses draft -> final flow
  */
 export function isTwoStageType(enrichmentType: string): boolean {
-  return (
-    enrichmentType === 'video' ||
-    enrichmentType === 'presentation' ||
-    enrichmentType === 'nlm_audio' ||
-    enrichmentType === 'nlm_video'
-  );
+  return enrichmentType === 'video' || enrichmentType === 'presentation';
+}
+
+/**
+ * NotebookLM enrichment types that were previously implemented as two-stage.
+ *
+ * These types now run as single-stage, but existing rows may still be stuck in
+ * legacy draft statuses from earlier deployments.
+ */
+const LEGACY_NLM_TYPES = ['nlm_audio', 'nlm_video'] as const;
+
+/**
+ * Legacy draft statuses used by the old NLM two-stage flow.
+ */
+const LEGACY_NLM_DRAFT_STATUSES = ['draft_generating', 'draft_ready'] as const;
+
+/**
+ * Check whether enrichment type is a legacy NotebookLM type.
+ */
+export function isLegacyNlmType(
+  enrichmentType: string
+): enrichmentType is (typeof LEGACY_NLM_TYPES)[number] {
+  return (LEGACY_NLM_TYPES as readonly string[]).includes(enrichmentType);
+}
+
+/**
+ * Check whether status is one of the legacy NLM draft statuses.
+ */
+export function isLegacyNlmDraftStatus(
+  status: string
+): status is (typeof LEGACY_NLM_DRAFT_STATUSES)[number] {
+  return (LEGACY_NLM_DRAFT_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Check if an enrichment should be reset/reused for legacy NLM compatibility.
+ */
+export function shouldReuseLegacyNlmDraft(
+  enrichmentType: string,
+  status: string | undefined
+): boolean {
+  return !!status && isLegacyNlmType(enrichmentType) && isLegacyNlmDraftStatus(status);
 }
 
 /**

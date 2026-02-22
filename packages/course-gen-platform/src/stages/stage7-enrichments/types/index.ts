@@ -19,6 +19,16 @@ import type {
  */
 export type Stage7EnrichmentType = EnrichmentType;
 
+export type NotebookLMMediaType = 'audio' | 'video';
+
+export interface Stage7NlmAsyncState {
+  taskId: string;
+  mediaType: NotebookLMMediaType;
+  pollAttempt: number;
+  startedAt: string;
+  draft: DraftResult;
+}
+
 /**
  * Stage 7 job input structure
  * Contains enrichment specification and context for generation
@@ -47,6 +57,9 @@ export interface Stage7JobInput {
 
   /** Whether this is a draft phase generation (two-stage types) */
   isDraftPhase?: boolean;
+
+  /** Detached async state for NotebookLM polling jobs */
+  nlmAsyncState?: Stage7NlmAsyncState;
 }
 
 /**
@@ -101,6 +114,8 @@ export interface Stage7ProgressUpdate {
     | 'init'
     | 'fetching_context'
     | 'generating'
+    | 'pending_async'
+    | 'polling_async'
     | 'draft_ready'
     | 'uploading'
     | 'validating'
@@ -155,6 +170,8 @@ export interface EnrichmentWithContext {
     title: string;
     content: string | null;
     course_id: string;
+    /** Planned lesson duration in minutes (from Stage 5 lessons.duration_minutes) */
+    duration_minutes?: number | null;
     /** Lesson objectives from Stage 5 (used for keyword extraction) */
     objectives: string[] | null;
   };
@@ -227,6 +244,15 @@ export interface GenerateResult {
 
   /** Generation metadata */
   metadata: EnrichmentMetadata;
+
+  /** Deferred task descriptor for detached async media generation */
+  deferredTask?: {
+    provider: 'notebooklm-bridge';
+    mediaType: NotebookLMMediaType;
+    taskId: string;
+    status: string;
+    responseMetadata?: Record<string, unknown>;
+  };
 }
 
 /**

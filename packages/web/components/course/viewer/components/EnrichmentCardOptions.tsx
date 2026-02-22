@@ -66,6 +66,8 @@ interface VideoOptionsProps {
 
 interface NlmAudioOptionsProps {
   type: 'nlm_audio'
+  nlmAudioFormat: 'deep_dive' | 'debate'
+  setNlmAudioFormat: (value: 'deep_dive' | 'debate') => void
 }
 
 interface NlmVideoOptionsProps {
@@ -89,8 +91,32 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
   const t = useTranslations('enrichments')
 
   // Video has no options
-  if (props.type === 'video' || props.type === 'nlm_audio' || props.type === 'nlm_video') {
+  if (props.type === 'video' || props.type === 'nlm_video') {
     return null
+  }
+
+  // NLM audio options
+  if (props.type === 'nlm_audio') {
+    const { nlmAudioFormat, setNlmAudioFormat } = props
+    return (
+      <div className="space-y-3 pt-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmAudio.format')}</label>
+          <Select
+            value={nlmAudioFormat}
+            onValueChange={(value) => setNlmAudioFormat(value as 'deep_dive' | 'debate')}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="deep_dive">{t('forms.nlmAudio.formatDeepDive')}</SelectItem>
+              <SelectItem value="debate">{t('forms.nlmAudio.formatDebate')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )
   }
 
   // Image types (cover/card)

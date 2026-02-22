@@ -12,6 +12,17 @@ const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'dev'
 const VERSION_STORAGE_KEY = 'megacampus-app-version'
 const CACHE_PREFIX = 'megacampus-'
 
+function isAbortLikeError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const normalizedMessage = error.message.toLowerCase()
+    if (error.name === 'AbortError') return true
+    if (normalizedMessage.includes('signal is aborted')) return true
+    if (normalizedMessage.includes('operation was aborted')) return true
+  }
+
+  return false
+}
+
 /**
  * Immediately clear outdated caches on page load (before React hydration)
  * This helps prevent 502 errors by cleaning stale caches early
@@ -27,12 +38,12 @@ if (typeof window !== 'undefined' && 'caches' in window) {
         // Delete caches from old versions (they start with megacampus- but not current version)
         if (cacheName.startsWith(CACHE_PREFIX) && !cacheName.startsWith(expectedCachePrefix)) {
           logger.info(`[SW Manager] Deleting outdated cache: ${cacheName}`)
-          caches.delete(cacheName)
+          void caches.delete(cacheName)
         }
         // Also delete workbox precache caches that might have stale content
         if (cacheName.includes('workbox-precache') || cacheName.includes('next-static')) {
           logger.info(`[SW Manager] Deleting precache: ${cacheName}`)
-          caches.delete(cacheName)
+          void caches.delete(cacheName)
         }
       })
     })
@@ -136,7 +147,7 @@ export function ServiceWorkerManager() {
 
     if (savedVersion !== APP_VERSION) {
       // Version changed - clear caches
-      handleVersionMismatch(savedVersion)
+      void handleVersionMismatch(savedVersion)
     } else {
       logger.devLog(`[SW Manager] Version unchanged: ${APP_VERSION}`)
     }
@@ -179,7 +190,7 @@ export function ServiceWorkerManager() {
   const setupSWListener = useCallback(() => {
     if (!('serviceWorker' in navigator)) return
 
-    navigator.serviceWorker.ready.then((registration) => {
+    void navigator.serviceWorker.ready.then((registration) => {
       // Listen for new SW installations
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing
@@ -226,7 +237,7 @@ export function ServiceWorkerManager() {
         filename.includes('_next/static')
       ) {
         logger.error('[SW Manager] Detected stale cache error, clearing...')
-        clearAllCaches().then(() => {
+        void clearAllCaches().then(() => {
           localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION)
           window.location.reload()
         })
@@ -280,6 +291,10 @@ export function ServiceWorkerManager() {
 
         return response
       } catch (error: unknown) {
+        if (isAbortLikeError(error)) {
+          throw error
+        }
+
         logger.error('[SW Manager] Fetch interceptor error', {
           error: error instanceof Error ? error.message : String(error),
         })

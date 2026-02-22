@@ -117,7 +117,7 @@ describe('EnrichmentsPanel', () => {
     expect(mockStartGeneration).not.toHaveBeenCalledWith('video', { source: 'test' })
   })
 
-  it('passes draft_ready nlm enrichments into unified placeholder cards', () => {
+  it('shows NLM placeholders for legacy draft statuses to allow restart', () => {
     const draftReadyNlmAudio = makeEnrichment({
       id: 'nlm-audio-draft',
       enrichment_type: 'nlm_audio' as any,
@@ -128,19 +128,29 @@ describe('EnrichmentsPanel', () => {
         duration_seconds: 60,
       },
     })
+    const draftReadyNlmVideo = makeEnrichment({
+      id: 'nlm-video-draft',
+      enrichment_type: 'nlm_video' as any,
+      status: 'draft_generating',
+      content: {
+        type: 'nlm_video',
+        script: 'Video draft script',
+        estimated_duration_seconds: 120,
+      },
+    })
 
     render(
       <EnrichmentsPanel
-        enrichments={[draftReadyNlmAudio]}
+        enrichments={[draftReadyNlmAudio, draftReadyNlmVideo]}
         lessonId="lesson-1"
         courseId="course-1"
         onRefreshEnrichments={vi.fn()}
       />
     )
 
-    expect(screen.getByTestId('placeholder-nlm_audio')).toHaveAttribute(
-      'data-existing-id',
-      'nlm-audio-draft'
-    )
+    expect(screen.queryByTestId('card-nlm-audio-draft')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('card-nlm-video-draft')).not.toBeInTheDocument()
+    expect(screen.getByTestId('placeholder-nlm_audio')).toBeInTheDocument()
+    expect(screen.getByTestId('placeholder-nlm_video')).toBeInTheDocument()
   })
 })

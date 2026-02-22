@@ -21,9 +21,9 @@ import { enrichmentStatusSchema } from './lesson-enrichment';
  * Includes types that users can trigger from the course viewer UI:
  * - quiz: Interactive quizzes
  * - audio: Lesson narration
- * - nlm_audio: NotebookLM audio narration (two-stage)
+ * - nlm_audio: NotebookLM audio narration
  * - presentation: Slide decks
- * - nlm_video: NotebookLM video overview (two-stage)
+ * - nlm_video: NotebookLM video overview
  * - cover: Lesson hero images (16:9 banners)
  * - card: Lesson thumbnails (1:1 square images)
  */
@@ -462,7 +462,7 @@ export function isProgressBarStatus(status: string): status is ProgressBarStatus
  * Check if status is awaiting user selection (draft_ready)
  *
  * When this returns true, the UI should show variant selection component
- * instead of progress bar. Applies to two-stage enrichments (cover, banner, video, presentation).
+ * instead of progress bar. Applies to two-stage enrichments (video, presentation).
  *
  * @param status - Current enrichment status
  * @returns True if user needs to select a variant
@@ -479,15 +479,8 @@ export function isAwaitingSelection(status: string): boolean {
  *
  * - video: Standard video generation with draft script review
  * - presentation: Slide deck with draft outline review
- * - nlm_audio: NotebookLM audio narration (bridge generates draft, user confirms)
- * - nlm_video: NotebookLM video overview (bridge generates draft, user confirms)
  */
-export const TWO_STAGE_ENRICHMENT_TYPES = [
-  'video',
-  'presentation',
-  'nlm_audio',
-  'nlm_video',
-] as const;
+export const TWO_STAGE_ENRICHMENT_TYPES = ['video', 'presentation'] as const;
 
 /**
  * Type for two-stage enrichment types.

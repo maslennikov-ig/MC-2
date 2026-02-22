@@ -26,9 +26,14 @@ type NlmEnrichmentType = 'nlm_audio' | 'nlm_video'
 type ViewerOnDemandType = OnDemandEnrichmentType | NlmEnrichmentType
 
 const NLM_ENRICHMENT_TYPES = new Set<NlmEnrichmentType>(['nlm_audio', 'nlm_video'])
+const LEGACY_NLM_DRAFT_STATUSES = new Set(['draft_ready', 'draft_generating'])
 
 function isNlmType(type: string): type is NlmEnrichmentType {
   return NLM_ENRICHMENT_TYPES.has(type as NlmEnrichmentType)
+}
+
+function isLegacyNlmDraftStatus(status: string): boolean {
+  return LEGACY_NLM_DRAFT_STATUSES.has(status)
 }
 
 function isViewerOnDemandType(type: string): type is ViewerOnDemandType {
@@ -144,7 +149,9 @@ export function EnrichmentsPanel({
       toast.info(t('viewer.resumingGeneration', { count: activeEnrichments.length }))
     }
     activeEnrichments.forEach((enrichment) => {
-      resumeGeneration(enrichment.id, enrichment.enrichment_type)
+      const parsedCreatedAt = Date.parse(enrichment.created_at ?? '')
+      const startedAtMs = Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined
+      resumeGeneration(enrichment.id, enrichment.enrichment_type, startedAtMs)
       resumedTypesRef.current.add(enrichment.enrichment_type)
     })
 
@@ -222,7 +229,7 @@ export function EnrichmentsPanel({
 
       {/* NLM Video Section */}
       {groupedEnrichments.nlm_video
-        ?.filter((enrichment) => enrichment.status !== 'draft_ready')
+        ?.filter((enrichment) => !isLegacyNlmDraftStatus(enrichment.status))
         .map((enrichment) => (
           <EnrichmentErrorBoundary
             key={enrichment.id}
@@ -258,7 +265,7 @@ export function EnrichmentsPanel({
 
       {/* NLM Audio Section */}
       {groupedEnrichments.nlm_audio
-        ?.filter((enrichment) => enrichment.status !== 'draft_ready')
+        ?.filter((enrichment) => !isLegacyNlmDraftStatus(enrichment.status))
         .map((enrichment) => (
           <EnrichmentErrorBoundary
             key={enrichment.id}
@@ -338,10 +345,13 @@ export function EnrichmentsPanel({
             return true
           }
 
-          // Two-stage nlm flow: keep placeholder visible when only draft_ready items exist
+          // Legacy compatibility:
+          // Old NLM two-stage rows could remain in draft statuses.
+          // Show placeholder so user can start a new single-stage run
+          // (backend will reuse/reset the legacy row).
           if (isNlmType(type)) {
-            return groupedEnrichments[type].every(
-              (enrichment) => enrichment.status === 'draft_ready'
+            return groupedEnrichments[type].every((enrichment) =>
+              isLegacyNlmDraftStatus(enrichment.status)
             )
           }
 
@@ -351,16 +361,13 @@ export function EnrichmentsPanel({
           const generatingProgress = getProgress(type)
           const isImageType = IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')
 
-          // Find existing enrichment for:
-          // - Image types: always (they have existingEnrichment logic for regeneration)
-          // - Non-image types with draft_ready status: to show draft preview
-          // For 'card' type: exclude course-card (title='course-card') - only show lesson cards
+          // For image types: pass existing enrichment to support preview/regeneration.
+          // For 'card' type: exclude course-card (title='course-card') - only show lesson cards.
           const existingEnrichment = isImageType
             ? enrichments.find(
                 (e) => e.enrichment_type === type && (type !== 'card' || e.title !== 'course-card')
               ) || null
-            : enrichments.find((e) => e.enrichment_type === type && e.status === 'draft_ready') ||
-              null
+            : null
 
           // Show generating card if generation is in progress
           if (typeIsGenerating && generatingProgress) {
@@ -370,6 +377,8 @@ export function EnrichmentsPanel({
                 type={type}
                 progress={generatingProgress.progress}
                 currentStep={generatingProgress.currentStep || t('generating')}
+                startedAtMs={generatingProgress.startedAtMs}
+                maxDurationMs={generatingProgress.maxDurationMs}
                 onCancel={() => void cancelGeneration(type)}
               />
             )
@@ -389,7 +398,7 @@ export function EnrichmentsPanel({
                 if (type === 'video') {
                   return
                 }
-                void startGeneration(type as OnDemandEnrichmentType, settings)
+                void startGeneration(type, settings)
               }}
               disabled={type === 'video' || !lessonId}
               isGenerating={typeIsGenerating}

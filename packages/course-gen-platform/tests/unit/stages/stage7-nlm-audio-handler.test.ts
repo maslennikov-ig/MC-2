@@ -4,10 +4,14 @@ import type {
   EnrichmentHandlerInput,
 } from '../../../src/stages/stage7-enrichments/types';
 
-const { mockGenerateAudio, mockGetLessonContent } = vi.hoisted(() => ({
-  mockGenerateAudio: vi.fn(),
-  mockGetLessonContent: vi.fn(),
-}));
+const { mockStartAudio, mockGetTaskStatus, mockGetTaskMedia, mockGetLessonContent } = vi.hoisted(
+  () => ({
+    mockStartAudio: vi.fn(),
+    mockGetTaskStatus: vi.fn(),
+    mockGetTaskMedia: vi.fn(),
+    mockGetLessonContent: vi.fn(),
+  })
+);
 
 vi.mock('@/shared/logger', () => {
   const mockLogger = {
@@ -22,8 +26,12 @@ vi.mock('@/shared/logger', () => {
 });
 
 vi.mock('../../../src/stages/stage7-enrichments/services/notebooklm-bridge-client', () => ({
+  isNotebookLMTaskFailedStatus: (status: string) => ['failed', 'error', 'timeout'].includes(status),
+  isNotebookLMTaskSuccessfulStatus: (status: string) => ['completed', 'success'].includes(status),
   notebookLmBridgeClient: {
-    generateAudio: mockGenerateAudio,
+    startAudio: mockStartAudio,
+    getTaskStatus: mockGetTaskStatus,
+    getTaskMedia: mockGetTaskMedia,
   },
 }));
 
@@ -33,7 +41,10 @@ vi.mock('../../../src/stages/stage7-enrichments/services/database-service', () =
 
 import { nlmAudioHandler } from '../../../src/stages/stage7-enrichments/handlers/nlm-audio-handler';
 
-function createInput(settings: Record<string, unknown> = {}): EnrichmentHandlerInput {
+function createInput(
+  settings: Record<string, unknown> = {},
+  lessonDurationMinutes?: number | null
+): EnrichmentHandlerInput {
   return {
     enrichmentContext: {
       enrichment: {
@@ -58,6 +69,7 @@ function createInput(settings: Record<string, unknown> = {}): EnrichmentHandlerI
         title: 'Lesson Title',
         content: null,
         course_id: 'course-1',
+        duration_minutes: lessonDurationMinutes ?? null,
         objectives: ['Understand source strategy', 'Compare presets'],
       },
       course: {
@@ -92,7 +104,12 @@ describe('stage7 nlm audio handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetLessonContent.mockResolvedValue('# Raw Lesson\n\nLesson body');
-    mockGenerateAudio.mockResolvedValue({
+    mockStartAudio.mockResolvedValue({
+      taskId: 'task-audio-1',
+      status: 'queued',
+      responseMetadata: { provider: 'mock-bridge' },
+    });
+    mockGetTaskMedia.mockResolvedValue({
       buffer: Buffer.from('audio-bytes'),
       mimeType: 'audio/mpeg',
       extension: 'mp3',
@@ -101,24 +118,37 @@ describe('stage7 nlm audio handler', () => {
     });
   });
 
-  it('builds hybrid source bundle with default audio presets', async () => {
+  it('builds hybrid source bundle with default audio presets and returns detached task', async () => {
     const result = await nlmAudioHandler.generateFinal!(createInput(), createDraft());
 
-    expect(mockGenerateAudio).toHaveBeenCalledTimes(1);
+    expect(mockStartAudio).toHaveBeenCalledTimes(1);
+    expect(mockGetTaskStatus).not.toHaveBeenCalled();
+    expect(mockGetTaskMedia).not.toHaveBeenCalled();
 
-    const request = mockGenerateAudio.mock.calls[0][0];
+    const request = mockStartAudio.mock.calls[0][0];
+    expect(request.courseId).toBe('course-1');
     expect(request.audioFormat).toBe('deep_dive');
     expect(request.audioLength).toBe('default');
+    expect(request.targetDurationMinutes).toBe(5);
+    expect(request.durationRangeMinMinutes).toBe(4);
+    expect(request.durationRangeMaxMinutes).toBe(7);
     expect(request.sources).toHaveLength(3);
     expect(request.sources[0].content).toContain('Narration script body');
     expect(request.sources[1].content).toContain('Raw Lesson');
     expect(request.sources[2].content).toContain('Understand source strategy');
+
+    expect(result.deferredTask).toBeDefined();
+    expect(result.deferredTask?.taskId).toBe('task-audio-1');
+    expect(result.deferredTask?.mediaType).toBe('audio');
 
     const additionalInfo = result.metadata.additional_info as Record<string, unknown>;
     expect(additionalInfo.source_strategy_used).toBe('hybrid');
     expect(additionalInfo.source_count).toBe(3);
     expect(additionalInfo.audio_format_preset).toBe('deep_dive');
     expect(additionalInfo.audio_length_preset).toBe('default');
+    expect(additionalInfo.duration_target_minutes).toBe(5);
+    expect(additionalInfo.duration_range_min_minutes).toBe(4);
+    expect(additionalInfo.duration_range_max_minutes).toBe(7);
   });
 
   it('respects script-only source strategy and explicit audio presets', async () => {
@@ -130,7 +160,7 @@ describe('stage7 nlm audio handler', () => {
 
     const result = await nlmAudioHandler.generateFinal!(input, createDraft());
 
-    const request = mockGenerateAudio.mock.calls[0][0];
+    const request = mockStartAudio.mock.calls[0][0];
     expect(request.audioFormat).toBe('brief');
     expect(request.audioLength).toBe('short');
     expect(request.sources).toHaveLength(1);
@@ -141,5 +171,77 @@ describe('stage7 nlm audio handler', () => {
     expect(additionalInfo.source_count).toBe(1);
     expect(additionalInfo.audio_format_preset).toBe('brief');
     expect(additionalInfo.audio_length_preset).toBe('short');
+  });
+
+  it('infers short audio length for short lessons when preset is not explicitly set', async () => {
+    await nlmAudioHandler.generateFinal!(createInput({}, 4), createDraft());
+
+    const request = mockStartAudio.mock.calls[0][0];
+    expect(request.audioLength).toBe('short');
+    expect(request.targetDurationMinutes).toBe(4);
+    expect(request.durationRangeMinMinutes).toBe(4);
+    expect(request.durationRangeMaxMinutes).toBe(7);
+  });
+
+  it('returns deferred task in poll mode when bridge task is still running', async () => {
+    mockGetTaskStatus.mockResolvedValueOnce({
+      taskId: 'task-audio-1',
+      status: 'in_progress',
+      responseMetadata: { progress: 50 },
+    });
+
+    const result = await nlmAudioHandler.generateFinal!(
+      createInput({
+        __nlm_async_mode: 'poll',
+        __nlm_bridge_task_id: 'task-audio-1',
+        __nlm_poll_attempt: 2,
+      }),
+      createDraft()
+    );
+
+    expect(mockGetTaskStatus).toHaveBeenCalledWith('task-audio-1', 'audio');
+    expect(result.deferredTask?.taskId).toBe('task-audio-1');
+    expect(result.deferredTask?.status).toBe('in_progress');
+    expect(mockStartAudio).not.toHaveBeenCalled();
+    expect(mockGetTaskMedia).not.toHaveBeenCalled();
+  });
+
+  it('fetches final media in poll mode when bridge task is completed', async () => {
+    mockGetTaskStatus.mockResolvedValueOnce({
+      taskId: 'task-audio-1',
+      status: 'completed',
+      responseMetadata: { progress: 100 },
+    });
+
+    const result = await nlmAudioHandler.generateFinal!(
+      createInput({
+        __nlm_async_mode: 'poll',
+        __nlm_bridge_task_id: 'task-audio-1',
+      }),
+      createDraft()
+    );
+
+    expect(mockGetTaskStatus).toHaveBeenCalledWith('task-audio-1', 'audio');
+    expect(mockGetTaskMedia).toHaveBeenCalledWith('task-audio-1', 'audio');
+    expect(result.deferredTask).toBeUndefined();
+    expect(result.assetBuffer?.equals(Buffer.from('audio-bytes'))).toBe(true);
+  });
+
+  it('surfaces bridge failed status in poll mode for stage7 retry strategy', async () => {
+    mockGetTaskStatus.mockResolvedValueOnce({
+      taskId: 'task-audio-1',
+      status: 'failed',
+      responseMetadata: { detail: 'generation failed' },
+    });
+
+    await expect(
+      nlmAudioHandler.generateFinal!(
+        createInput({
+          __nlm_async_mode: 'poll',
+          __nlm_bridge_task_id: 'task-audio-1',
+        }),
+        createDraft()
+      )
+    ).rejects.toThrow(/task failed/i);
   });
 });

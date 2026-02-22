@@ -8,7 +8,9 @@
 
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
+import { randomUUID } from 'crypto';
 import type {
+  EnrichmentType,
   EnrichmentStatus,
   EnrichmentContent,
   EnrichmentMetadata,
@@ -42,7 +44,7 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
     // Include objectives for keyword extraction in cover generation
     const { data: lesson, error: lessonError } = await supabaseAdmin
       .from('lessons')
-      .select('id, title, objectives')
+      .select('id, title, objectives, duration_minutes')
       .eq('id', enrichment.lesson_id)
       .single();
 
@@ -110,6 +112,8 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
         title: lesson.title,
         content: lessonContent,
         course_id: enrichment.course_id, // Use from enrichment (denormalized)
+        duration_minutes:
+          typeof lesson.duration_minutes === 'number' ? lesson.duration_minutes : null,
         objectives: lesson.objectives ?? null,
       },
       course: {
@@ -131,6 +135,82 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
       'Error fetching enrichment with context'
     );
     return null;
+  }
+}
+
+export interface NotebookLMAsyncMetadataState {
+  taskId: string;
+  mediaType: 'audio' | 'video';
+  status: string;
+  pollAttempt: number;
+  startedAt: string;
+  lastPolledAt: string;
+  responseMetadata?: Record<string, unknown>;
+}
+
+function createMinimalEnrichmentMetadata(): EnrichmentMetadata {
+  return {
+    generated_at: new Date().toISOString(),
+    generation_duration_ms: 0,
+    estimated_cost_usd: 0,
+    retry_attempts: 0,
+  };
+}
+
+/**
+ * Persist NotebookLM async bridge state in enrichment metadata.additional_info.
+ *
+ * This keeps detached polling state durable across worker restarts.
+ */
+export async function saveNotebookLMAsyncMetadataState(
+  enrichmentId: string,
+  existingMetadata: EnrichmentMetadata | null,
+  state: NotebookLMAsyncMetadataState
+): Promise<void> {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  const baseMetadata: EnrichmentMetadata = existingMetadata
+    ? {
+        ...existingMetadata,
+        generated_at: existingMetadata.generated_at ?? new Date().toISOString(),
+        generation_duration_ms: existingMetadata.generation_duration_ms ?? 0,
+        estimated_cost_usd: existingMetadata.estimated_cost_usd ?? 0,
+        retry_attempts: existingMetadata.retry_attempts ?? 0,
+      }
+    : createMinimalEnrichmentMetadata();
+
+  const additionalInfo = {
+    ...(baseMetadata.additional_info ?? {}),
+    notebooklm_async_state: {
+      task_id: state.taskId,
+      media_type: state.mediaType,
+      status: state.status,
+      poll_attempt: state.pollAttempt,
+      started_at: state.startedAt,
+      last_polled_at: state.lastPolledAt,
+      response_metadata: state.responseMetadata,
+    },
+  };
+
+  const nextMetadata: EnrichmentMetadata = {
+    ...baseMetadata,
+    additional_info: additionalInfo,
+  };
+
+  const { error } = await supabaseAdmin
+    .from('lesson_enrichments')
+    .update({
+      metadata: JSON.parse(JSON.stringify(nextMetadata)) as Json,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', enrichmentId);
+
+  if (error) {
+    logger.error(
+      { enrichmentId, error: error.message, taskId: state.taskId, mediaType: state.mediaType },
+      'Failed to persist NotebookLM async metadata state'
+    );
+    throw error;
   }
 }
 
@@ -289,6 +369,127 @@ export async function linkEnrichmentAsset(enrichmentId: string, assetId: string)
         error: error instanceof Error ? error.message : String(error),
       },
       'Error linking enrichment asset'
+    );
+    throw error;
+  }
+}
+
+export interface UpsertAssetAndLinkInput {
+  enrichmentId: string;
+  courseId: string;
+  lessonId: string;
+  enrichmentType: EnrichmentType;
+  storagePath: string;
+  mimeType: string;
+  extension: string;
+  fileSizeBytes: number;
+  publicUrl?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Upsert media asset row and link lesson enrichment to assets.id UUID.
+ *
+ * This ensures lesson_enrichments.asset_id always stores a UUID FK, never a storage path.
+ *
+ * @param input - Asset + enrichment linkage payload
+ * @returns Asset UUID linked to lesson_enrichments.asset_id
+ */
+export async function upsertAssetAndLinkEnrichment(
+  input: UpsertAssetAndLinkInput
+): Promise<string> {
+  const supabaseAdmin = getSupabaseAdmin();
+  const {
+    enrichmentId,
+    courseId,
+    lessonId,
+    enrichmentType,
+    storagePath,
+    mimeType,
+    extension,
+    fileSizeBytes,
+    publicUrl = null,
+    metadata,
+  } = input;
+
+  try {
+    const { data: enrichment, error: enrichmentError } = await supabaseAdmin
+      .from('lesson_enrichments')
+      .select('asset_id')
+      .eq('id', enrichmentId)
+      .single();
+
+    if (enrichmentError || !enrichment) {
+      logger.error(
+        { enrichmentId, error: enrichmentError?.message },
+        'Failed to fetch enrichment before asset upsert'
+      );
+      throw new Error(`Failed to fetch enrichment: ${enrichmentError?.message ?? 'not found'}`);
+    }
+
+    const assetId = enrichment.asset_id ?? randomUUID();
+    const now = new Date().toISOString();
+    const normalizedExtension = extension.toLowerCase().replace(/^\./, '');
+    const filename = storagePath.split('/').pop() ?? `${enrichmentId}.${normalizedExtension}`;
+    const mergedMetadata = {
+      extension: normalizedExtension,
+      storage_path: storagePath,
+      ...metadata,
+    };
+
+    const { error: upsertError } = await supabaseAdmin.from('assets').upsert(
+      {
+        id: assetId,
+        course_id: courseId,
+        lesson_id: lessonId,
+        asset_type: enrichmentType,
+        file_path: storagePath,
+        filename,
+        mime_type: mimeType,
+        size_bytes: fileSizeBytes,
+        file_size_bytes: fileSizeBytes,
+        url: publicUrl,
+        metadata: JSON.parse(JSON.stringify(mergedMetadata)) as Json,
+        updated_at: now,
+      },
+      { onConflict: 'id' }
+    );
+
+    if (upsertError) {
+      logger.error(
+        {
+          enrichmentId,
+          assetId,
+          storagePath,
+          error: upsertError.message,
+        },
+        'Failed to upsert asset row'
+      );
+      throw upsertError;
+    }
+
+    await linkEnrichmentAsset(enrichmentId, assetId);
+
+    logger.info(
+      {
+        enrichmentId,
+        assetId,
+        storagePath,
+        mimeType,
+        fileSizeBytes,
+      },
+      'Asset upserted and enrichment linked'
+    );
+
+    return assetId;
+  } catch (error) {
+    logger.error(
+      {
+        enrichmentId,
+        storagePath,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Error upserting asset and linking enrichment'
     );
     throw error;
   }

@@ -30,7 +30,7 @@ function getQueue() {
 /**
  * Regenerate draft for two-stage enrichments
  *
- * Purpose: Resets a two-stage enrichment (video/presentation/nlm_audio/nlm_video) to regenerate
+ * Purpose: Resets a two-stage enrichment (video/presentation) to regenerate
  * the draft phase. Only applicable to enrichment types that use the
  * draft -> final generation flow.
  *
@@ -95,7 +95,7 @@ export const regenerateDraft = protectedProcedure
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Regenerate draft is only applicable to two-stage enrichments (video, presentation, nlm_audio, nlm_video), not '${enrichment.enrichment_type}'.`,
+          message: `Regenerate draft is only applicable to two-stage enrichments (video, presentation), not '${enrichment.enrichment_type}'.`,
         });
       }
 

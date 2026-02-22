@@ -23,7 +23,7 @@ vi.mock('@megacampus/shared-types', () => ({
 }))
 
 vi.mock('next-intl', () => ({
-  useTranslations: vi.fn(() => (key: string) => {
+  useTranslations: vi.fn(() => (key: string, values?: Record<string, string | number>) => {
     const translations: Record<string, string> = {
       'placeholder.quiz.title': 'Quiz',
       'placeholder.audio.title': 'Audio',
@@ -34,9 +34,21 @@ vi.mock('next-intl', () => ({
       'images.cover.title': 'Cover',
       'images.card.title': 'Card',
       generating: 'Generating...',
+      'longGeneration.remaining': 'Time left: {remaining} / {total}',
+      'longGeneration.elapsed': 'Elapsed: {elapsed}',
       cancel: 'Cancel',
     }
-    return translations[key] || key
+    const template = translations[key] || key
+    if (!values) {
+      return template
+    }
+
+    return template.replace(/\{([^}]+)\}/g, (_match, token: string) => {
+      if (!(token in values)) {
+        return `{${token}}`
+      }
+      return String(values[token])
+    })
   }),
 }))
 
@@ -137,14 +149,15 @@ describe('EnrichmentGeneratingCard', () => {
   })
 
   describe('Progress display with StagedProgress', () => {
-    it('should pass smooth progress to StagedProgress', () => {
+    it('should pass stage-normalized progress to StagedProgress', () => {
       mockSmoothProgress.progress = 75
 
       render(<EnrichmentGeneratingCard {...defaultProps} progress={70} />)
 
       const stagedProgress = screen.getByTestId('staged-progress')
       expect(stagedProgress).toBeInTheDocument()
-      expect(stagedProgress.textContent).toContain('75%')
+      // generating step normalizes global 75% to stage-local 50%
+      expect(stagedProgress.textContent).toContain('50%')
     })
 
     it('should render indeterminate bar when syncing (progress === -1)', () => {
@@ -182,14 +195,14 @@ describe('EnrichmentGeneratingCard', () => {
       expect(stagedProgress.querySelector('[data-is-complete="true"]')).toBeInTheDocument()
     })
 
-    it('should call useSmoothProgress with correct params', () => {
+    it('should call useSmoothProgress with stage-bounded milestone for generating step', () => {
       render(<EnrichmentGeneratingCard {...defaultProps} progress={60} />)
 
       expect(useSmoothProgress).toHaveBeenCalledWith({
         targetProgress: 60,
         isComplete: false,
         enableAsymptoticCrawl: true,
-        nextMilestone: 50,
+        nextMilestone: 75,
         crawlDelay: 3000,
         crawlIncrement: 0.15,
       })
@@ -309,6 +322,74 @@ describe('EnrichmentGeneratingCard', () => {
         status: 'queued',
         interval: 5000,
       })
+    })
+  })
+
+  describe('Long-running countdown', () => {
+    it('uses time-based smooth progress for nlm_audio', () => {
+      const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(61_000)
+
+      render(
+        <EnrichmentGeneratingCard
+          {...defaultProps}
+          type="nlm_audio"
+          startedAtMs={1_000}
+          maxDurationMs={60 * 60 * 1000}
+        />
+      )
+
+      // Long-running NLM mode uses SmoothProgress (not staged progress)
+      expect(screen.queryByTestId('staged-progress')).not.toBeInTheDocument()
+      // Decelerating ease-out curve shows faster initial movement than linear mode
+      expect(screen.getByText('3%')).toBeInTheDocument()
+
+      dateNowSpy.mockRestore()
+    })
+
+    it('jumps to 100% immediately when long-running nlm_audio is completed', () => {
+      render(
+        <EnrichmentGeneratingCard
+          {...defaultProps}
+          type="nlm_audio"
+          progress={100}
+          startedAtMs={1_000}
+          maxDurationMs={60 * 60 * 1000}
+        />
+      )
+
+      expect(screen.queryByTestId('staged-progress')).not.toBeInTheDocument()
+      expect(screen.getByText('100%')).toBeInTheDocument()
+    })
+
+    it('renders 60-minute countdown details for nlm_audio', () => {
+      const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(61_000)
+
+      render(
+        <EnrichmentGeneratingCard
+          {...defaultProps}
+          type="nlm_audio"
+          startedAtMs={1_000}
+          maxDurationMs={60 * 60 * 1000}
+        />
+      )
+
+      expect(screen.getByText('Time left: 59:00 / 60:00')).toBeInTheDocument()
+      expect(screen.getByText('Elapsed: 01:00')).toBeInTheDocument()
+
+      dateNowSpy.mockRestore()
+    })
+
+    it('does not render countdown for non-NLM enrichment types', () => {
+      render(
+        <EnrichmentGeneratingCard
+          {...defaultProps}
+          type="quiz"
+          startedAtMs={1_000}
+          maxDurationMs={60 * 60 * 1000}
+        />
+      )
+
+      expect(screen.queryByText(/Time left:/)).not.toBeInTheDocument()
     })
   })
 

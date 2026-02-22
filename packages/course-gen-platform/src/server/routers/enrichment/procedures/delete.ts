@@ -10,9 +10,9 @@ import { nanoid } from 'nanoid';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { deleteEnrichmentInputSchema } from '../schemas';
-import { verifyEnrichmentAccess, buildAssetPath } from '../helpers';
+import { verifyEnrichmentAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
-import { deleteEnrichmentAsset } from '../../../../stages/stage7-enrichments/services/storage-service';
+import { deleteEnrichmentAsset } from '../../../../stages/stage7-enrichments/services/unified-storage-service';
 import { logger } from '../../../../shared/logger/index.js';
 
 /**
@@ -66,40 +66,40 @@ export const deleteEnrichment = protectedProcedure
         requestId
       );
 
-      // Step 2: Delete asset from storage
-      // Some enrichments use asset_id, others (like cover) store files directly
-      const extensionMap: Record<string, string> = {
-        audio: 'mp3',
-        video: 'mp4',
-        cover: 'webp',
-        presentation: 'pptx',
-        document: 'pdf',
-      };
-      const extension = extensionMap[enrichment.enrichment_type];
-
-      // Try to delete storage file if we know the extension
-      if (extension) {
+      // Step 2: Delete asset file from storage when linked
+      const supabase = getSupabaseAdmin();
+      if (enrichment.asset_id) {
         try {
-          const assetPath = buildAssetPath(
-            enrichment.course_id,
-            enrichment.lesson_id,
-            enrichmentId,
-            extension
-          );
+          const { data: asset, error: assetError } = await supabase
+            .from('assets')
+            .select('file_path')
+            .eq('id', enrichment.asset_id)
+            .single();
 
-          await deleteEnrichmentAsset(assetPath);
+          if (assetError) {
+            logger.warn(
+              {
+                requestId,
+                enrichmentId,
+                assetId: enrichment.asset_id,
+                error: assetError.message,
+              },
+              'Failed to resolve asset file path for deletion'
+            );
+          } else if (asset?.file_path) {
+            await deleteEnrichmentAsset(asset.file_path);
 
-          logger.info(
-            {
-              requestId,
-              enrichmentId,
-              assetPath,
-            },
-            'Enrichment asset deleted from storage'
-          );
+            logger.info(
+              {
+                requestId,
+                enrichmentId,
+                assetPath: asset.file_path,
+              },
+              'Enrichment asset deleted from storage'
+            );
+          }
         } catch (storageError) {
           // Log but don't fail - continue with database deletion
-          // File may not exist (e.g., enrichment failed before upload)
           logger.warn(
             {
               requestId,
@@ -113,7 +113,6 @@ export const deleteEnrichment = protectedProcedure
       }
 
       // Step 3: Delete enrichment record from database
-      const supabase = getSupabaseAdmin();
       const { error: deleteError } = await supabase
         .from('lesson_enrichments')
         .delete()

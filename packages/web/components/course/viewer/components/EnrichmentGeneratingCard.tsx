@@ -9,6 +9,7 @@ import { useSmoothProgress } from '@/lib/hooks/useSmoothProgress'
 import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
 import { getNextMilestone } from '@megacampus/shared-types'
 import { StagedProgress } from '@/components/ui/staged-progress'
+import { SmoothProgress } from '@/components/ui/smooth-progress'
 import { cn } from '@/lib/utils'
 
 type EnrichmentType =
@@ -77,10 +78,88 @@ const GENERATION_STAGES = [
   { id: 'save', label: 'Сохранение' },
 ]
 
+const LONG_RUNNING_PROGRESS_CAP = 95
+const LONG_RUNNING_EASING_POWER = 2.2
+
+function clampProgress(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
+
+function getDeceleratingLongRunningProgress(elapsedMs: number, maxDurationMs: number): number {
+  if (maxDurationMs <= 0) return 0
+
+  const ratio = Math.min(Math.max(elapsedMs / maxDurationMs, 0), 1)
+  // Ease-out curve: faster at start, then increasingly slower near completion.
+  const easedRatio = 1 - Math.pow(1 - ratio, LONG_RUNNING_EASING_POWER)
+
+  return clampProgress(easedRatio * LONG_RUNNING_PROGRESS_CAP)
+}
+
+/**
+ * Convert global generation progress (0-100) to progress within current stage (0-100).
+ *
+ * StagedProgress expects per-stage progress, but backend/status polling gives global progress.
+ * Without this normalization, stage transitions can jump visually above 50% too early.
+ */
+function toStageProgress(currentStep: string, globalProgress: number): number {
+  const progress = clampProgress(globalProgress)
+
+  switch (currentStep) {
+    case 'queued':
+    case 'syncing':
+    case 'analyzing_content':
+      // Stage 0 (prepare): map global 0-50 → stage 0-100
+      return clampProgress(progress * 2)
+    case 'generating':
+      // Stage 1 (generate): map global 50-100 → stage 0-100
+      return clampProgress((progress - 50) * 2)
+    case 'uploading_assets':
+    case 'finalizing':
+      // Stage 2 (save/finalize): map global 75-100 → stage 0-100
+      return clampProgress((progress - 75) * 4)
+    default:
+      return progress
+  }
+}
+
+/**
+ * Return the upper global-progress boundary for the current UI stage.
+ *
+ * This keeps asymptotic crawl within the active stage so the staged progress
+ * bar doesn't visually jump into the next stage before `currentStep` changes.
+ */
+function getStageMilestone(currentStep: string, globalProgress: number): number {
+  const progress = clampProgress(globalProgress)
+
+  switch (currentStep) {
+    case 'queued':
+    case 'syncing':
+    case 'analyzing_content':
+      return 50
+    case 'generating':
+      return 75
+    case 'uploading_assets':
+    case 'finalizing':
+      return 100
+    default:
+      return getNextMilestone(progress)
+  }
+}
+
+function formatDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds))
+  const minutes = Math.floor(safeSeconds / 60)
+  const remainingSeconds = safeSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
+}
+
 interface EnrichmentGeneratingCardProps {
   type: EnrichmentType
   progress: number
   currentStep: string
+  startedAtMs?: number
+  maxDurationMs?: number
   onCancel: () => void
 }
 
@@ -88,6 +167,8 @@ export function EnrichmentGeneratingCard({
   type,
   progress,
   currentStep,
+  startedAtMs,
+  maxDurationMs,
   onCancel,
 }: EnrichmentGeneratingCardProps) {
   const t = useTranslations('enrichments')
@@ -99,11 +180,11 @@ export function EnrichmentGeneratingCard({
 
   // Map backend step to stage index
   const stageIndex =
-    currentStep === 'queued' || currentStep === 'syncing'
+    currentStep === 'queued' || currentStep === 'syncing' || currentStep === 'analyzing_content'
       ? 0
       : currentStep === 'generating'
         ? 1
-        : currentStep === 'finalizing'
+        : currentStep === 'finalizing' || currentStep === 'uploading_assets'
           ? 2
           : 1
 
@@ -113,10 +194,12 @@ export function EnrichmentGeneratingCard({
     targetProgress: isSyncing ? 0 : progress,
     isComplete: progress >= 100,
     enableAsymptoticCrawl: true,
-    nextMilestone: getNextMilestone(isSyncing ? 0 : progress),
+    nextMilestone: getStageMilestone(currentStep, isSyncing ? 0 : progress),
     crawlDelay: 3000,
     crawlIncrement: 0.15,
   })
+
+  const stagedProgress = toStageProgress(currentStep, isSyncing ? 0 : smoothProgress)
 
   // Map type to specific status for rotating messages
   const getRotatingStatus = () => {
@@ -154,6 +237,70 @@ export function EnrichmentGeneratingCard({
     status: getRotatingStatus(),
     interval: 5000,
   })
+
+  const shouldShowLongRunningCountdown =
+    (type === 'nlm_audio' || type === 'nlm_video') &&
+    typeof startedAtMs === 'number' &&
+    Number.isFinite(startedAtMs) &&
+    startedAtMs > 0 &&
+    typeof maxDurationMs === 'number' &&
+    Number.isFinite(maxDurationMs) &&
+    maxDurationMs > 0
+
+  const [nowMs, setNowMs] = React.useState(() => Date.now())
+
+  React.useEffect(() => {
+    if (!shouldShowLongRunningCountdown) {
+      return
+    }
+
+    setNowMs(Date.now())
+    const interval = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [shouldShowLongRunningCountdown])
+
+  const countdownMetrics = React.useMemo(() => {
+    if (!shouldShowLongRunningCountdown || !startedAtMs || !maxDurationMs) {
+      return null
+    }
+
+    const elapsedMs = Math.max(0, nowMs - startedAtMs)
+    const clampedElapsedMs = Math.min(elapsedMs, maxDurationMs)
+    const remainingMs = Math.max(0, maxDurationMs - elapsedMs)
+
+    return {
+      elapsedLabel: formatDuration(clampedElapsedMs / 1000),
+      remainingLabel: formatDuration(remainingMs / 1000),
+      totalLabel: formatDuration(maxDurationMs / 1000),
+    }
+  }, [maxDurationMs, nowMs, shouldShowLongRunningCountdown, startedAtMs])
+
+  // For long-running NLM enrichments, progress should feel continuously alive.
+  // We use an ease-out timeline: faster in the beginning, then gradually slower.
+  // On real completion, UI still jumps to 100% immediately.
+  const longRunningProgress = React.useMemo(() => {
+    if (!shouldShowLongRunningCountdown || !startedAtMs || !maxDurationMs) {
+      return null
+    }
+
+    if (progress >= 100) {
+      return 100
+    }
+
+    const elapsedMs = Math.max(0, nowMs - startedAtMs)
+    return getDeceleratingLongRunningProgress(elapsedMs, maxDurationMs)
+  }, [maxDurationMs, nowMs, progress, shouldShowLongRunningCountdown, startedAtMs])
+
+  const shouldUseLongRunningProgressBar =
+    shouldShowLongRunningCountdown &&
+    (type === 'nlm_audio' || type === 'nlm_video') &&
+    !isSyncing &&
+    longRunningProgress !== null
 
   const getTitle = () => {
     switch (type) {
@@ -223,11 +370,13 @@ export function EnrichmentGeneratingCard({
                   }}
                 />
               </div>
+            ) : shouldUseLongRunningProgressBar ? (
+              <SmoothProgress value={longRunningProgress} variant="gradient" showPercentage />
             ) : (
               <StagedProgress
                 stages={GENERATION_STAGES}
                 currentStageIndex={stageIndex}
-                stageProgress={smoothProgress}
+                stageProgress={stagedProgress}
                 isComplete={progress >= 100}
               />
             )}
@@ -254,6 +403,21 @@ export function EnrichmentGeneratingCard({
           <p className="text-muted-foreground text-sm transition-opacity duration-300">
             {statusMessage}
           </p>
+          {countdownMetrics && (
+            <div className="bg-muted/50 space-y-1 rounded-md border px-3 py-2">
+              <p className="text-foreground text-sm font-medium">
+                {t('longGeneration.remaining', {
+                  remaining: countdownMetrics.remainingLabel,
+                  total: countdownMetrics.totalLabel,
+                })}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {t('longGeneration.elapsed', {
+                  elapsed: countdownMetrics.elapsedLabel,
+                })}
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end">
             <Button

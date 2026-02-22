@@ -19,28 +19,42 @@ API/worker call it through the existing TypeScript client using:
   - Generate it locally (for example `openssl rand -hex 32`) and set the same value in:
     - bridge service env (`NOTEBOOKLM_BRIDGE_TOKEN`)
     - API/worker env (`NOTEBOOKLM_BRIDGE_TOKEN`)
+- `NOTEBOOKLM_AUTH_JSON`
+  - Preferred auth mode for dev/stage/prod.
+  - Set to the raw `storage_state.json` JSON payload (usually from secret manager).
+  - Keep `NOTEBOOKLM_STORAGE_PATH` empty when this is set.
+  - Empty value is treated as disabled (bridge falls back to file mode).
 - `NOTEBOOKLM_STORAGE_STATE_DIR`
-  - Host directory that contains `storage_state.json` for `notebooklm-py`.
+  - Local file fallback: host directory that contains `storage_state.json` for `notebooklm-py`.
   - Mounted read-only into bridge container as `/app/secrets/notebooklm`.
 - `NOTEBOOKLM_STORAGE_PATH`
-  - In-container path to auth state JSON, default `/app/secrets/notebooklm/storage_state.json`.
+  - Optional file fallback path in-container.
+  - If set, bridge client initialization will prefer this path.
+- `NOTEBOOKLM_HOME`
+  - File fallback directory, default `/app/secrets/notebooklm`.
+  - Used when `NOTEBOOKLM_STORAGE_PATH` is empty.
 
 ## Upstream NotebookLM Auth State
 
-Before running bridge, create browser auth state file:
+Preferred for dev/stage/prod: set `NOTEBOOKLM_AUTH_JSON` with the browser auth payload.
+You can still generate it via `notebooklm` CLI:
 
 ```bash
 mkdir -p ./secrets/notebooklm
 notebooklm --storage ./secrets/notebooklm/storage_state.json login
+export NOTEBOOKLM_AUTH_JSON="$(cat ./secrets/notebooklm/storage_state.json)"
 ```
 
-If this file expires, run the login command again to refresh it.
+Local file fallback is also supported using `NOTEBOOKLM_STORAGE_STATE_DIR` +
+`NOTEBOOKLM_STORAGE_PATH`. If file auth expires, run the login command again to
+refresh it.
 
 ## Local Run (Dev Compose)
 
 1. Add bridge vars to `.env.dev` (copy placeholders from `.env.production.example` / `.env.example`).
    - Set `NOTEBOOKLM_BRIDGE_TOKEN`.
-   - Set `NOTEBOOKLM_STORAGE_STATE_DIR` (default `./secrets/notebooklm`).
+   - Preferred: set `NOTEBOOKLM_AUTH_JSON` and leave `NOTEBOOKLM_STORAGE_PATH` empty.
+   - Local file fallback: set `NOTEBOOKLM_STORAGE_STATE_DIR` (default `./secrets/notebooklm`).
 2. Start services:
 
 ```bash

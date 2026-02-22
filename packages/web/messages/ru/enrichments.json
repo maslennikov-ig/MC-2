@@ -135,6 +135,12 @@
       "speedFast": "Быстро",
       "format": "Формат"
     },
+    "nlmAudio": {
+      "title": "Настройки NLM-аудио",
+      "format": "Формат подачи",
+      "formatDeepDive": "Глубокое объяснение",
+      "formatDebate": "Диалог двух ведущих (дебаты)"
+    },
     "video": {
       "title": "Настройки видео",
       "voice": "Голос",
@@ -346,6 +352,10 @@
   },
   "generate": "Сгенерировать",
   "generating": "Генерация...",
+  "longGeneration": {
+    "remaining": "Осталось: {remaining} / {total}",
+    "elapsed": "Прошло: {elapsed}"
+  },
   "options": "Опции",
   "cancel": "Отменить",
   "retry": "Повторить",
