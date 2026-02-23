@@ -1,13 +1,71 @@
-# Gastown: полный справочник команд
+# Gastown: рабочий гайд + справочник команд
+
+## Твои 5 команд на каждый день
+
+| Команда                   | Что делает                 |
+| ------------------------- | -------------------------- |
+| `/work "описание задачи"` | Отдать задачу AI-агенту    |
+| `/status`                 | Посмотреть, что происходит |
+| `bd ready`                | Найти доступные задачи     |
+| `gt dashboard --open`     | Веб-панель мониторинга     |
+| `git push`                | Задеплоить на Dev          |
+
+> Всё остальное ниже — для продвинутых сценариев. Для повседневной работы хватит этих 5.
+
+---
+
+## Как это работает (архитектура)
+
+```
+Ты (человек)
+  │
+  ├─ /work "Fix login bug"     ← Даёшь задачу через Claude Code
+  │    │
+  │    ├─ bd create (bead)      ← Создаётся задача в Beads
+  │    └─ gt sling PREFIX-xxx RIG  ← Отправляется в Gastown
+  │         │
+  │         └─ Daemon (автоматически)
+  │              ├─ Spawns Polecat (AI-воркер в изолированном worktree)
+  │              ├─ Polecat: branch → implement → test → commit → gt done
+  │              ├─ Refinery: merge queue → develop
+  │              └─ Witness: мониторинг здоровья polecat'ов
+  │
+  ├─ /status                    ← Смотришь прогресс
+  └─ git push                   ← Деплоишь на Dev
+```
+
+### Что запускается автоматически
+
+Всё управляется **одним** systemd-сервисом `gastown-daemon`. При старте WSL:
+
+| Компонент    | Управление             | Функция                                        |
+| ------------ | ---------------------- | ---------------------------------------------- |
+| **Daemon**   | systemd (auto-start)   | Главный процесс, запускает всё остальное       |
+| **Dolt**     | Daemon (child process) | SQL-база для Beads, health-check каждые 30 сек |
+| **Deacon**   | Daemon patrol (5 мин)  | Мониторинг здоровья всей системы               |
+| **Witness**  | Daemon patrol (5 мин)  | Мониторинг polecat'ов per rig                  |
+| **Refinery** | Daemon patrol (5 мин)  | Merge queue — автомерж готовой работы          |
+| **Mayor**    | Boot triage            | Координатор работ                              |
+
+**Ничего не нужно запускать руками.** Всё стартует автоматически.
+
+---
 
 ## Быстрый старт
 
-```bash
-# Найти работу
-bd ready                              # Задачи без блокеров
-gt ready                              # То же, но по всему Town
+### Отдать задачу AI-агенту (основной способ)
 
-# Взять задачу и запустить агента
+```bash
+/work Fix the login validation bug          # Claude (по умолчанию)
+/work --agent codex Refactor auth module    # Конкретный рантайм
+/work --ab Optimize database queries        # A/B тест: Claude + Codex
+/work --all Implement dark mode             # Все 3 рантайма параллельно
+```
+
+### Ручной запуск (продвинутый)
+
+```bash
+bd ready                              # Найти задачи без блокеров
 gt sling mc2-xxx mc2 --agent claude   # Запустить polecat на задаче
 gt convoy list                        # Посмотреть прогресс
 gt dashboard --open                   # Веб-панель мониторинга
@@ -151,22 +209,24 @@ gt peek <polecat-name>                            # Подсмотреть вы�
 
 ## 4. Сервисы и инфраструктура
 
+> Dolt управляется демоном автоматически. **Не запускай `gt dolt start` вручную.**
+
 ```bash
+# Запуск/остановка всего
 gt up                                      # Запустить все сервисы
 gt down                                    # Остановить все
 gt shutdown                                # Полный shutdown с cleanup
-gt start                                   # Запустить Gas Town / crew
 
+# Статус
 gt daemon status                           # Статус daemon'а
-gt daemon restart                          # Перезапуск daemon'а
 gt daemon logs                             # Логи daemon'а
-
-gt dolt status                             # Статус Dolt SQL сервера
-gt dolt start                              # Запустить Dolt
-gt dolt stop                               # Остановить Dolt
-
+gt dolt status                             # Статус Dolt (запущен daemon'ом)
 gt boot status                             # Boot watchdog
-gt boot triage                             # Ручной triage
+
+# Systemd (низкоуровневый доступ)
+systemctl --user status gastown-daemon     # Статус systemd-сервиса
+systemctl --user restart gastown-daemon    # Перезапуск
+systemctl --user stop gastown-daemon       # Остановка
 ```
 
 ---
@@ -327,3 +387,115 @@ gt patrol run code-review --vars "scope=packages/web,topic=auth"
 ```bash
 gt escalate mc2-xxx --severity critical    # Mayor + email + SMS
 ```
+
+---
+
+## 10. Обновление (upgrade)
+
+```bash
+/upgrade all    # Обновить Gastown + Beads (безопасно, с проверками)
+/upgrade gt     # Только Gastown
+/upgrade bd     # Только Beads
+```
+
+Slash command `/upgrade` автоматически:
+
+1. Сохраняет текущие версии и конфигурацию
+2. Останавливает daemon
+3. Обновляет бинарники
+4. Проверяет что systemd-сервис не потерял PATH
+5. Проверяет что `daemon.json` сохранил `dolt_server` конфиг
+6. Запускает daemon и прогоняет `gt doctor --fix`
+
+**Что может сломаться при обновлении:**
+
+| Риск                            | Симптом                                    | Решение                                 |
+| ------------------------------- | ------------------------------------------ | --------------------------------------- |
+| Systemd service перезаписан     | `gt`, `bd`, `dolt` not found in PATH       | Добавить Environment="PATH=..." обратно |
+| daemon.json потерял dolt_server | Dolt не запускается, beads не работают     | Добавить `dolt_server` секцию обратно   |
+| Формулы устарели                | `gt doctor` ⚠ formulas outdated           | `gt doctor --fix`                       |
+| Версии несовместимы             | `bd activity` errors, convoy watcher crash | Обновить оба: и gt, и bd                |
+
+---
+
+## 11. Подключение нового проекта
+
+Одна команда — и проект подключён к Gastown:
+
+```bash
+cd /path/to/project
+/onboard
+```
+
+**Что делает `/onboard`:**
+
+1. `gt rig add <name> <path>` — провизия (bare repo, Dolt DB, beads, agents)
+2. Обновляет `daemon.json` (witness + refinery patrols)
+3. Перезапускает демон
+4. Запускает `gt doctor --fix`
+5. Копирует slash-команды из orchestrator-kit
+6. Добавляет Gastown-секцию в CLAUDE.md проекта
+
+**Source of truth**: `/home/me/code/claude-code-orchestrator-kit/`
+
+- Универсальные rig-aware команды: `/work`, `/status`, `/upgrade`, `/onboard`
+- Агенты, скиллы, MCP-конфиги
+
+**Конвенция**: имя рига = basename git-корня проекта.
+
+```
+/home/me/code/helixa  →  rig "helixa"
+/home/me/code/mc2     →  rig "mc2"
+```
+
+---
+
+## 12. Troubleshooting
+
+### "Beads operations fail" / "Dolt server unreachable"
+
+Dolt управляется демоном. Проверь демон:
+
+```bash
+gt daemon status                           # Демон запущен?
+gt dolt status                             # Dolt запущен?
+systemctl --user restart gastown-daemon    # Перезапустить всё
+```
+
+### "Deacon in crash loop" / Агенты не запускаются
+
+```bash
+# Сбросить backoff-состояние deacon'а
+echo '{"agents":{}}' > ~/gt/daemon/restart_state.json
+systemctl --user restart gastown-daemon
+```
+
+### Doctor показывает ошибки
+
+```bash
+gt doctor --fix --rig mc2                  # Автоисправление
+gt doctor --rig mc2 -v                     # Подробности (что именно сломано)
+```
+
+### Polecat завис / не отвечает
+
+```bash
+gt peek mc2/<polecat-name>                 # Посмотреть, что делает
+gt polecat nuke <name>                     # Принудительно убить
+gt witness restart mc2                     # Перезапустить witness (сам найдёт зависших)
+```
+
+### После перезагрузки WSL
+
+**Ничего делать не нужно.** Daemon запускается автоматически через systemd (`loginctl enable-linger` включён). Он сам поднимет Dolt, Boot, Witness, Refinery, Deacon.
+
+Проверить: `gt daemon status && gt dolt status`
+
+### Ключевые файлы конфигурации
+
+| Файл                                                 | Что настраивает                     |
+| ---------------------------------------------------- | ----------------------------------- |
+| `~/gt/mayor/daemon.json`                             | Daemon patrols + Dolt server config |
+| `~/.local/share/systemd/user/gastown-daemon.service` | Systemd сервис                      |
+| `~/gt/daemon/daemon.log`                             | Логи демона                         |
+| `~/gt/daemon/restart_state.json`                     | Состояние backoff агентов           |

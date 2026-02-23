@@ -2,32 +2,26 @@
 
 > **IMPORTANT**: This file overrides default Claude Code behavior. Follow strictly.
 
+## Quick Start: Gastown + Beads
+
+| Command                      | What it does          |
+| ---------------------------- | --------------------- |
+| `/work "task description"`   | Give task to AI agent |
+| `/work --agent codex "task"` | Use specific runtime  |
+| `/status`                    | See what's happening  |
+| `bd ready`                   | Find available tasks  |
+| `gt dashboard --open`        | Visual monitoring     |
+| `git push`                   | Ship to Dev           |
+
+> Everything below is reference. For daily work, these 6 commands are enough.
+
+---
+
 ## Multi-Agent Orchestration with Gastown
 
-This project uses **Gastown** (`gt`) for multi-agent orchestration and **Beads** (`bd`) for issue tracking. Both are global tools — installed once, shared across all projects.
+This project uses **Gastown** (`gt`) for multi-agent orchestration and **Beads** (`bd`) for issue tracking. Global tools at `~/gt/`.
 
-### Architecture
-
-```
-~/gt/                        Global Town workspace
-├── mayor/                   AI coordinator (all projects)
-├── deacon/                  Background supervisor daemon
-└── mc2/                     This project (rig)
-    ├── polecats/            AI worker agents (Claude/Codex/Gemini)
-    ├── crew/me/             Human workspace
-    └── refinery/            Auto merge queue
-```
-
-### Multi-Runtime Agents
-
-Three subscription-based runtimes, no API billing:
-
-| Agent           | Runtime          | Use for                        |
-| --------------- | ---------------- | ------------------------------ |
-| `claude-opus`   | Claude Code      | Architecture, complex logic    |
-| `claude-sonnet` | Claude Code      | Routine fixes, tests           |
-| `codex-53`      | OpenAI Codex 5.3 | A/B test on complex tasks      |
-| `gemini-pro`    | Google Gemini    | Token-heavy tasks, large files |
+Runtimes: `claude` (default), `codex`, `gemini` — all subscription-based, no API billing.
 
 ### Core Rules
 
@@ -48,27 +42,27 @@ Three subscription-based runtimes, no API billing:
 
 ## Task Management with Beads + Gastown
 
-> Constitution v2.0: All work tracked in Beads, orchestrated by Gastown.
+> All work tracked in Beads, orchestrated by Gastown.
 
 ### Session Workflow
 
 ```bash
 # FIND WORK
 bd ready                          # Available tasks (no blockers)
-gt convoy list                    # Active convoys across rigs
-bd show <id>                      # Task details
 
-# WORK (single agent)
+# GIVE TASK TO AGENT (preferred — via /work slash command)
+/work Fix the login validation bug
+/work --agent codex Refactor auth module
+
+# MANUAL WORK (do it yourself)
 bd update <id> --status in_progress
 # ... do the work ...
 bd close <id> --reason "Done"
 
-# WORK (parallel agents via Gastown)
-gt convoy create "Sprint" mc2-xxx mc2-yyy mc2-zzz --notify --human
-gt sling mc2-xxx mc2 --agent claude-opus
-gt sling mc2-yyy mc2 --agent codex-53
-gt sling mc2-zzz mc2 --agent gemini-pro
-gt convoy list                    # Monitor progress
+# CHECK STATUS
+/status                           # Unified view
+gt convoy list                    # Active convoys
+gt dashboard --open               # Web panel
 
 # SESSION END
 git add . && git commit -m "..." && git push
@@ -81,9 +75,6 @@ Gastown manages parallel agents automatically:
 - Mayor coordinates, Polecats execute, Refinery merges
 - Each polecat works in isolated git worktree — no conflicts
 - Witness monitors health, respawns crashed agents
-- `gt agents` — list active agents
-- `gt convoy status` — track batch progress
-- `gt dashboard` — web monitoring panel
 
 ### Branches & Environments
 
@@ -148,6 +139,27 @@ git push                          # → dev.ai.megacampus.ru
 | Exploration          | Beads wisp      | `bd mol wisp exploration`                            |
 | Code review          | Patrol          | `bd patrol run code-review --vars "scope=X,topic=Y"` |
 | Health check         | Patrol          | `bd patrol run health-check`                         |
+
+### Infrastructure (Self-Managed)
+
+All services auto-start on boot via systemd. **No manual intervention needed.**
+
+- **Daemon** (`gastown-daemon.service`): Manages Dolt, heartbeats, patrols
+- **Dolt**: Managed internally by daemon via `dolt_server` config in `~/gt/mayor/daemon.json`
+- **Witness**: Monitors polecat health per rig (auto-spawned by daemon)
+- **Refinery**: Merge queue processor (auto-spawned by daemon)
+- **Deacon**: Health orchestrator (auto-spawned by daemon)
+
+If something breaks:
+
+```bash
+gt doctor --fix --rig mc2     # Diagnose and auto-fix
+gt daemon logs                # Check daemon logs
+systemctl --user status gastown-daemon  # Service status
+systemctl --user restart gastown-daemon # Restart everything
+```
+
+**NEVER start Dolt manually** (`gt dolt start`) — daemon manages it with health checks every 30s.
 
 ### Automation
 
