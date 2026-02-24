@@ -2,6 +2,35 @@
 
 _Released on 2025-12-26_
 
+## v0.31.0
+
+_Released on 2026-02-24_
+
+### ✨ New Features
+
+- Telegram notifications, lesson materials switcher, and media player improvements
+- Universalize Gastown commands and add /onboard
+- **stage7**: Harden NLM pipeline with local media storage, async lifecycle, and recovery
+- **stage7**: Harden NLM audio/video generation pipeline
+- **enrichments**: Add nlm audio/video generation via notebooklm bridge
+- **course-gen-platform**: Add notebooklm bridge FastAPI service
+- **admin**: Add generation trace audit page
+
+### 🐛 Bug Fixes
+
+- Add data/secrets to gitignore and fix lint errors in scripts/tests
+- **release**: Exclude .venv and .gemini/tmp from package.json discovery and gitignore
+- **analysis**: Handle forceRestart in active stage4 states
+- **enrichments**: Add nlm types to ordered arrays in generation-graph
+- **enrichments**: Resolve nlm audio/video contract and type issues
+- **CI/CD**: Build notebooklm-bridge image for deploy
+- **stage6**: Add deterministic markdown table remediation
+- **web**: Normalize malformed markdown tables
+
+---
+
+_This release was automatically generated from 21 commits._
+
 ## v0.30.11
 
 _Released on 2026-02-20_

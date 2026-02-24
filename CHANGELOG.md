@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-02-24
+
+### Added
+
+- telegram notifications, lesson materials switcher, and media player improvements (6d3fc26f)
+- universalize Gastown commands and add /onboard (efd0299d)
+- **stage7**: harden NLM pipeline with local media storage, async lifecycle, and recovery (515a4be0)
+- **stage7**: harden NLM audio/video generation pipeline (0e312599)
+- **enrichments**: add nlm audio/video generation via notebooklm bridge (b2b88294)
+- **course-gen-platform**: add notebooklm bridge FastAPI service (35f2696d)
+- **admin**: add generation trace audit page (086e0dd6)
+
+### Fixed
+
+- add data/secrets to gitignore and fix lint errors in scripts/tests (7bf94132)
+- **release**: exclude .venv and .gemini/tmp from package.json discovery and gitignore (93782443)
+- **analysis**: handle forceRestart in active stage4 states (4e9ae01f)
+- **enrichments**: add nlm types to ordered arrays in generation-graph (95570d8f)
+- **enrichments**: resolve nlm audio/video contract and type issues (05031c95)
+- **ci**: build notebooklm-bridge image for deploy (b70e1ca3)
+- **stage6**: add deterministic markdown table remediation (4a623e72)
+- **web**: normalize malformed markdown tables (e2a904bd)
+
+### Other
+
+- update Gemini and Codex instruction files with Gastown workflow (fe79fcb0)
+- expand Gastown cheatsheet into comprehensive command reference (39401ec9)
+- add Gastown analysis and update CLAUDE.md for multi-agent orchestration (9716ae4f)
+- **dev**: make start-dev always run local notebooklm bridge (d2fbeb15)
+- **dev**: add optional local notebooklm bridge to start-dev (79800965)
+- **infra**: wire notebooklm bridge configs and runbook (d60e7237)
+
 ## [0.30.11] - 2026-02-20
 
 ### Fixed
