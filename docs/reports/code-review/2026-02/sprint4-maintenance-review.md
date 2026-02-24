@@ -63,6 +63,7 @@ Comprehensive code review completed for Sprint 4 (Maintenance) changes from audi
 - **Recommendation**: Add integration test that validates storage path format consistency between `storage-service.ts` (line 35) and the trigger pattern.
 
 **Example Test**:
+
 ```typescript
 // tests/integration/storage-cleanup-trigger.test.ts
 describe('Storage cleanup trigger', () => {
@@ -103,6 +104,7 @@ describe('Storage cleanup trigger', () => {
 #### Version Changes Analysis
 
 **Backend (packages/course-gen-platform/package.json)**:
+
 - `openai`: ^6.13.0 → ^6.18.0 (5 minor versions)
   - ✅ Minor version bump, no breaking changes expected
   - ✅ Uses caret range, allows patches
@@ -117,6 +119,7 @@ describe('Storage cleanup trigger', () => {
   - ✅ Aligns with @langchain/core update
 
 **Frontend (packages/web/package.json)**:
+
 - `framer-motion`: ^12.23.26 → ^12.33.0 (10 minor versions)
   - ✅ Minor version bump within v12.x
   - ✅ Framer Motion v12 is stable, no breaking changes in minors
@@ -139,6 +142,7 @@ describe('Storage cleanup trigger', () => {
 **File**: `packages/web/next.config.ts:230`
 
 **Before**:
+
 ```typescript
 experimental: {
   optimizePackageImports: ['lucide-react'],
@@ -146,6 +150,7 @@ experimental: {
 ```
 
 **After**:
+
 ```typescript
 experimental: {
   optimizePackageImports: ['lucide-react', 'date-fns', '@radix-ui/react-icons'],
@@ -170,6 +175,7 @@ experimental: {
 #### Best Practice Alignment
 
 Pattern follows Next.js 15 recommendations:
+
 - **Reference**: [Next.js optimizePackageImports docs](https://nextjs.org/docs/app/api-reference/next-config-js/optimizePackageImports)
 - **Typical candidates**: Icon libraries, date utilities, UI component libraries
 - **All three packages match recommended patterns**
@@ -193,6 +199,7 @@ SET search_path = public, storage
 ```
 
 **Analysis**:
+
 - ✅ **SECURITY DEFINER necessary**: storage.objects table is owned by postgres, requires elevated privileges
 - ✅ **search_path hardcoded**: Prevents search path injection attacks
 - ✅ **No user input**: All values from OLD record (system-controlled)
@@ -210,6 +217,7 @@ END;
 ```
 
 **Analysis**:
+
 - ✅ **Non-blocking**: Errors logged but don't prevent course deletion
 - ✅ **Detailed logging**: Includes courseId, error message, and SQLSTATE
 - ✅ **Correct pattern**: Course deletion is primary operation, storage cleanup is secondary
@@ -225,6 +233,7 @@ CREATE TRIGGER trg_cleanup_course_storage
 ```
 
 **Analysis**:
+
 - ✅ **BEFORE DELETE correct**: Runs before CASCADE deletes child rows
 - ✅ **Access to OLD record**: Can still query related data if needed (though not used currently)
 - ✅ **FOR EACH ROW**: Handles both single deletes and bulk operations
@@ -235,23 +244,27 @@ CREATE TRIGGER trg_cleanup_course_storage
 **Pattern**: `{courseId}/%`
 
 **Storage layout from code** (`storage-service.ts:35`):
+
 ```typescript
 const storagePath = `${courseId}/${lessonId}/${enrichmentId}.${extension}`;
 ```
 
 **Pattern matching**:
+
 - ✅ Course card: `{courseId}/course-card/card.webp` → MATCHES
 - ✅ Lesson enrichments: `{courseId}/{lessonId}/{enrichmentId}.webp` → MATCHES
 - ✅ Future assets: `{courseId}/...` → MATCHES
 - ✅ Other courses: `{otherCourseId}/...` → NO MATCH (correct isolation)
 
 **Potential issues**:
+
 - ⚠️ If storage path format changes to include organization prefix (e.g., `{orgId}/{courseId}/...`), trigger won't match
 - ⚠️ No test validates path format consistency
 
 ##### CASCADE Dependencies
 
 **From initial_schema.sql**:
+
 ```sql
 sections: course_id REFERENCES courses(id) ON DELETE CASCADE
 lessons: section_id REFERENCES sections(id) ON DELETE CASCADE
@@ -260,11 +273,13 @@ file_catalog: course_id REFERENCES courses(id) ON DELETE CASCADE
 ```
 
 **Trigger execution order**:
+
 1. BEFORE DELETE trigger fires → deletes storage files
 2. DELETE executes → removes course row
 3. CASCADE fires → removes sections, lessons, lesson_content, file_catalog
 
 **Analysis**:
+
 - ✅ Storage cleanup happens BEFORE CASCADE
 - ✅ No dependency on child tables (trigger uses courseId only)
 - ✅ Child rows still exist during trigger execution (if needed in future)
@@ -283,6 +298,7 @@ file_catalog: course_id REFERENCES courses(id) ON DELETE CASCADE
 #### Findings Summary
 
 From commit message:
+
 - **Production code**: 161 `as any` (34 web, 127 backend)
 - **Test files**: 210 `as any`
 - **@ts-ignore**: 0 (all cleaned up from previous sprints)
@@ -304,6 +320,7 @@ From commit message:
    - Dynamic job data (`job.data as any`)
 
 2. **Create type guard utilities**:
+
    ```typescript
    // Good pattern to replace `as any`
    function isCourseRow(data: unknown): data is Tables<'courses'> {
@@ -346,6 +363,7 @@ pnpm-lock.yaml                             (+750 -139)
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 Scope: 5 of 6 workspace projects
 packages/shared-logger type-check: Done
@@ -358,6 +376,7 @@ packages/web type-check: Done
 **Exit Code**: 0
 
 **Analysis**:
+
 - ✅ All packages type-check successfully
 - ✅ Dependency updates didn't introduce type errors
 - ✅ No breaking changes in updated packages
@@ -369,6 +388,7 @@ packages/web type-check: Done
 **Status**: ✅ ASSUMED PASSED (type-check passed, no build config changes)
 
 **Reasoning**:
+
 - Type check passed (build prerequisite)
 - No code changes (only deps and config)
 - Next.js optimizePackageImports is purely additive
@@ -442,17 +462,21 @@ All findings are documentation/improvement suggestions, not blockers.
 ## References
 
 **OpenAI SDK**:
+
 - [openai-node changelog](https://github.com/openai/openai-node/blob/master/CHANGELOG.md)
 - [npm package](https://www.npmjs.com/package/openai)
 
 **LangChain**:
+
 - [@langchain/core releases](https://github.com/langchain-ai/langchainjs/releases)
 - [LangChain changelog](https://docs.langchain.com/oss/javascript/releases/changelog)
 
 **Next.js Performance**:
+
 - [optimizePackageImports docs](https://nextjs.org/docs/app/api-reference/next-config-js/optimizePackageImports)
 
 **Supabase Triggers**:
+
 - [SECURITY DEFINER best practices](https://supabase.com/docs/guides/database/postgres/triggers)
 - [Storage management](https://supabase.com/docs/guides/storage)
 
@@ -463,6 +487,7 @@ All findings are documentation/improvement suggestions, not blockers.
 ✅ Sprint 4 changes meet quality standards. All tasks correctly implemented with proper security measures. Ready for merge and deployment.
 
 **Summary by Task**:
+
 - **Task 13 (Dependencies)**: ✅ Safe minor/patch updates, no breaking changes
 - **Task 14 (Performance)**: ✅ Correctly configured, expected 10-15% bundle size reduction
 - **Task 15 (Storage Trigger)**: ✅ Secure SECURITY DEFINER pattern, proper error handling, correct timing
