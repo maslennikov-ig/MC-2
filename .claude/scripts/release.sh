@@ -510,7 +510,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
             log_info "Syncing package.json versions to $TAG_VERSION..."
 
             # Find and update all package.json files
-            find "$PROJECT_ROOT" -name "package.json" -not -path "*/node_modules/*" -print0 | while IFS= read -r -d '' pkg_file; do
+            find "$PROJECT_ROOT" -name "package.json" -not -path "*/node_modules/*" -not -path "*/.venv*" -not -path "*/.gemini/tmp/*" -print0 | while IFS= read -r -d '' pkg_file; do
                 if grep -q "\"version\"" "$pkg_file"; then
                     sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$TAG_VERSION\"/" "$pkg_file"
                     MODIFIED_FILES+=("$pkg_file")
@@ -938,7 +938,9 @@ update_package_files() {
         -not -path "*/.next/*" \
         -not -path "*/dist/*" \
         -not -path "*/.turbo/*" \
-        -not -path "*/build/*")
+        -not -path "*/build/*" \
+        -not -path "*/.venv*" \
+        -not -path "*/.gemini/tmp/*")
 
     while IFS= read -r pkg; do
         if [ -n "$pkg" ]; then
@@ -1147,7 +1149,9 @@ EOF
         -not -path "*/.next/*" \
         -not -path "*/dist/*" \
         -not -path "*/.turbo/*" \
-        -not -path "*/build/*" | while read -r pkg; do
+        -not -path "*/build/*" \
+        -not -path "*/.venv*" \
+        -not -path "*/.gemini/tmp/*" | while read -r pkg; do
         local rel_path="${pkg#$PROJECT_ROOT/}"
         echo "  ✓ $rel_path"
     done
