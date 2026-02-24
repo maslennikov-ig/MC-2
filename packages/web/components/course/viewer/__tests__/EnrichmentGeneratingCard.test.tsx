@@ -22,6 +22,21 @@ vi.mock('@megacampus/shared-types', () => ({
   getNextMilestone: vi.fn(() => 50),
 }))
 
+vi.mock('@/lib/supabase/browser-client', () => ({
+  useSupabase: vi.fn(() => ({
+    session: null,
+    supabase: {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            single: vi.fn(() => Promise.resolve({ data: { telegram_chat_id: '123' } })),
+          })),
+        })),
+      })),
+    },
+  })),
+}))
+
 vi.mock('next-intl', () => ({
   useTranslations: vi.fn(() => (key: string, values?: Record<string, string | number>) => {
     const translations: Record<string, string> = {
@@ -55,7 +70,7 @@ vi.mock('next-intl', () => ({
 // Mock framer-motion used by StagedProgress
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, jsx, global, ...props }: any) => <div {...props}>{children}</div>,
   },
 }))
 

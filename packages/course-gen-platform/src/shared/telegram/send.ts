@@ -6,6 +6,7 @@
 
 import { logger } from '../logger/index.js';
 import { getStageName } from '@megacampus/shared-types';
+import { getSupabaseAdmin } from '../supabase/admin';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -65,6 +66,113 @@ export async function sendTelegramMessage(
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error({ chatId, error: errorMsg }, 'Failed to send Telegram message');
     return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * Type to readable name mapping for enrichments
+ */
+const ENRICHMENT_TYPE_NAMES: Record<string, string> = {
+  video: 'видео',
+  nlm_video: 'видео',
+  audio: 'аудио',
+  nlm_audio: 'аудио',
+  quiz: 'квиз',
+  presentation: 'презентация',
+  document: 'документ',
+  cover: 'обложка',
+  card: 'карточка',
+};
+
+/**
+ * Notify user that an enrichment generation is ready, checking preferences.
+ */
+export async function notifyEnrichmentReady(params: {
+  courseId: string;
+  lessonId: string;
+  enrichmentType: string;
+}): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+
+    // 1. Get course to find user_id, slug, org_id
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('user_id, slug, organization_id')
+      .eq('id', params.courseId)
+      .single();
+
+    if (courseError || !course) {
+      logger.error(
+        { courseId: params.courseId, courseError },
+        'Failed to fetch course for enrichment notification'
+      );
+      return;
+    }
+
+    // 2. Fetch user's Telegram settings
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('telegram_chat_id, telegram_notifications_enabled')
+      .eq('id', course.user_id)
+      .single();
+
+    if (userError || !user) {
+      logger.error(
+        { userId: course.user_id, userError },
+        'Failed to fetch user for enrichment notification'
+      );
+      return;
+    }
+
+    // 3. Check if we should notify
+    if (!user.telegram_notifications_enabled || !user.telegram_chat_id) {
+      logger.debug(
+        { userId: course.user_id },
+        'Telegram notification skipped: user opted out or no chat_id'
+      );
+      return;
+    }
+
+    // 4. Fetch the organization to construct proper URL
+    let orgSlug = 'org';
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('slug')
+      .eq('id', course.organization_id)
+      .single();
+    if (org) orgSlug = org.slug;
+
+    // 5. Fetch lesson title
+    let lessonTitle = '';
+    const { data: lesson } = await supabase
+      .from('lessons')
+      .select('title')
+      .eq('id', params.lessonId)
+      .single();
+    if (lesson?.title) {
+      lessonTitle = lesson.title;
+    }
+
+    const baseUrl =
+      process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru';
+    // Link to the lesson view
+    const courseUrl = `${baseUrl}/courses/${orgSlug}/${course.slug}/lessons`;
+    const readableType = ENRICHMENT_TYPE_NAMES[params.enrichmentType] || params.enrichmentType;
+    const lessonDisplay = lessonTitle ? ` для урока «${lessonTitle}»` : '';
+
+    const message = `🎉 *Готово!*
+
+Ваш материал (${readableType})${lessonDisplay} успешно сгенерирован.
+
+[Перейти к уроку](${courseUrl})`;
+
+    await sendTelegramMessage(user.telegram_chat_id, message);
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Unhandled error in notifyEnrichmentReady'
+    );
   }
 }
 

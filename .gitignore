@@ -77,3 +77,5 @@ docs/client_secret_*.json
 .gemini/memory.md
 .gemini/memories.md
 .gemini/private/
+
+docs/plans/telegram-notifications-plan.md

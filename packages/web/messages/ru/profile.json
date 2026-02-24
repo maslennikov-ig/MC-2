@@ -107,6 +107,8 @@
     "courseUpdatesDesc": "Обновления ваших курсов",
     "pushNotifications": "Push уведомления",
     "pushNotificationsDesc": "Уведомления в браузере",
+    "telegramNotifications": "Уведомления о готовности",
+    "telegramNotificationsDesc": "Включить/отключить отправку уведомлений в Telegram (требуется привязка)",
     "telegramTitle": "Telegram уведомления",
     "telegramDesc": "Получайте уведомления о статусе генерации курсов в Telegram",
     "telegramAuthRequired": "Необходима авторизация",

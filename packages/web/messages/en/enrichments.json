@@ -363,5 +363,23 @@
   "draftPreview": {
     "slideCount": "{count} slides ready",
     "estimatedDuration": "~{minutes} min video"
+  },
+  "switcher": {
+    "title": "Lesson Materials",
+    "tabs": {
+      "video": "Video",
+      "audio": "Audio",
+      "quiz": "Quiz",
+      "presentation": "Presentation",
+      "document": "Document"
+    },
+    "fallback": {
+      "video": "Video not available",
+      "presentationEmpty": "Presentation is empty",
+      "documentTitle": "Document",
+      "documentDescription": "Additional material for the lesson",
+      "download": "Download",
+      "documentAvailableInPanel": "Document is available for download in the activities panel"
+    }
   }
 }

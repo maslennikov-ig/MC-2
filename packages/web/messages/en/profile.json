@@ -107,6 +107,8 @@
     "courseUpdatesDesc": "Updates for your courses",
     "pushNotifications": "Push Notifications",
     "pushNotificationsDesc": "Browser notifications",
+    "telegramNotifications": "Generation Notifications",
+    "telegramNotificationsDesc": "Enable/disable sending readiness notifications to Telegram",
     "telegramTitle": "Telegram Notifications",
     "telegramDesc": "Receive course generation status notifications in Telegram",
     "telegramAuthRequired": "Authorization required",

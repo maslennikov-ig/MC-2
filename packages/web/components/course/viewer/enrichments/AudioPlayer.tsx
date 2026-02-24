@@ -3,22 +3,10 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { motion } from 'framer-motion'
-import {
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  SkipBack,
-  SkipForward,
-  Loader2,
-  FileText,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react'
+import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Card, CardContent } from '@/components/ui/card'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import type { Database } from '@/types/database.generated'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
@@ -38,11 +26,10 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
   const [volume, setVolume] = useState(0.8)
   const [isMuted, setIsMuted] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(1)
-  const [showScript, setShowScript] = useState(false)
 
   const content = enrichment.content as {
     type: 'audio'
-    script: string
+    script?: string
     duration_seconds: number
     voice_id: string
     format?: string
@@ -53,62 +40,96 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
     if (!audio) return
 
     const handleTimeUpdate = () => setCurrentTime(audio.currentTime)
-    const handleDurationChange = () => setDuration(audio.duration || content?.duration_seconds || 0)
-    const handleEnded = () => setIsPlaying(false)
+    const handleDurationChange = () => {
+      const audioDuration = audio.duration
+      if (audioDuration && audioDuration !== Infinity && !isNaN(audioDuration)) {
+        setDuration(audioDuration)
+      } else if (content?.duration_seconds) {
+        setDuration(content.duration_seconds)
+      } else {
+        setDuration(0)
+      }
+    }
+    const handleEnded = () => {
+      setIsPlaying(false)
+      setCurrentTime(0)
+    }
     const handleLoadStart = () => setIsLoading(true)
     const handleCanPlay = () => setIsLoading(false)
 
     audio.addEventListener('timeupdate', handleTimeUpdate)
     audio.addEventListener('durationchange', handleDurationChange)
+    audio.addEventListener('loadedmetadata', handleDurationChange)
     audio.addEventListener('ended', handleEnded)
     audio.addEventListener('loadstart', handleLoadStart)
     audio.addEventListener('canplay', handleCanPlay)
+    audio.addEventListener('loadeddata', handleCanPlay)
+
+    if (audio.readyState >= 1) {
+      handleDurationChange()
+    }
+    if (audio.readyState >= 3) {
+      handleCanPlay()
+    }
 
     return () => {
-      // Remove event listeners
       audio.removeEventListener('timeupdate', handleTimeUpdate)
       audio.removeEventListener('durationchange', handleDurationChange)
+      audio.removeEventListener('loadedmetadata', handleDurationChange)
       audio.removeEventListener('ended', handleEnded)
       audio.removeEventListener('loadstart', handleLoadStart)
       audio.removeEventListener('canplay', handleCanPlay)
+      audio.removeEventListener('loadeddata', handleCanPlay)
 
-      // CRITICAL: Stop and cleanup audio element
       audio.pause()
       audio.currentTime = 0
-      audio.src = '' // Release media resources
+      audio.src = ''
     }
-  }, [content?.duration_seconds])
+  }, [content?.duration_seconds, playbackUrl])
 
-  // Handle playbackUrl changes - reset state and cleanup
   useEffect(() => {
     const audio = audioRef.current
-    if (!audio || !playbackUrl) return
+    if (!audio || !playbackUrl) {
+      setIsPlaying(false)
+      setCurrentTime(0)
+      setDuration(0)
+      setIsMuted(false)
+      setVolume(0.8)
+      setPlaybackRate(1)
+      return
+    }
 
-    // Reset state when URL changes
     setIsPlaying(false)
     setCurrentTime(0)
+    audio.src = playbackUrl
+    audio.load()
 
     return () => {
       audio.pause()
+      audio.currentTime = 0
+      audio.src = ''
     }
   }, [playbackUrl])
 
   const togglePlay = () => {
     const audio = audioRef.current
     if (!audio) return
+    if (audio.readyState < 2) return
 
     if (isPlaying) {
       audio.pause()
     } else {
-      audio.play()
+      audio.play().catch((e) => console.error('Error playing audio:', e))
     }
     setIsPlaying(!isPlaying)
   }
 
   const handleSeek = (value: number[]) => {
     const audio = audioRef.current
-    if (!audio) return
-    audio.currentTime = (value[0] / 100) * duration
+    if (!audio || !duration) return
+    const seekTime = value[0]
+    audio.currentTime = seekTime
+    setCurrentTime(seekTime)
   }
 
   const handleVolumeChange = (value: number[]) => {
@@ -123,8 +144,16 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
   const toggleMute = () => {
     const audio = audioRef.current
     if (!audio) return
-    audio.muted = !isMuted
-    setIsMuted(!isMuted)
+    const newMutedState = !isMuted
+    audio.muted = newMutedState
+    setIsMuted(newMutedState)
+    if (!newMutedState && volume === 0) {
+      const restoredVolume = 0.5
+      audio.volume = restoredVolume
+      setVolume(restoredVolume)
+    } else if (newMutedState) {
+      audio.volume = 0
+    }
   }
 
   const changePlaybackRate = () => {
@@ -139,7 +168,7 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
 
   const skip = (seconds: number) => {
     const audio = audioRef.current
-    if (!audio) return
+    if (!audio || !duration) return
     audio.currentTime = Math.max(0, Math.min(duration, audio.currentTime + seconds))
   }
 
@@ -148,8 +177,6 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
     const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
-
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
   if (!playbackUrl) {
     return (
@@ -167,14 +194,12 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
       <CardContent className="p-6">
         <audio ref={audioRef} src={playbackUrl} preload="metadata" />
 
-        {/* Main Player Controls */}
         <div className="mb-4 flex items-center gap-4">
-          {/* Play/Pause Button */}
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={togglePlay}
-            disabled={isLoading}
+            disabled={isLoading || !playbackUrl}
             aria-label={isPlaying ? t('viewer.pause') : t('viewer.play')}
             aria-pressed={isPlaying}
             className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg transition-shadow hover:shadow-xl disabled:opacity-50"
@@ -188,12 +213,11 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
             )}
           </motion.button>
 
-          {/* Progress Bar */}
           <div className="flex-1 space-y-1">
             <Slider
-              value={[progress]}
+              value={[currentTime]}
               onValueChange={handleSeek}
-              max={100}
+              max={duration > 0 ? duration : 100}
               step={0.1}
               className="w-full"
               aria-label={t('viewer.audioProgress')}
@@ -206,10 +230,8 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
           </div>
         </div>
 
-        {/* Secondary Controls */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Skip Buttons */}
             <Button
               size="sm"
               variant="ghost"
@@ -227,7 +249,6 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
               <SkipForward className="h-4 w-4" />
             </Button>
 
-            {/* Volume */}
             <Button
               size="sm"
               variant="ghost"
@@ -248,7 +269,6 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Playback Rate */}
             <Button
               size="sm"
               variant="outline"
@@ -257,45 +277,8 @@ export function AudioPlayer({ enrichment, playbackUrl }: AudioPlayerProps) {
             >
               {playbackRate}x
             </Button>
-
-            {/* Script Toggle */}
-            {content?.script && (
-              <Collapsible open={showScript} onOpenChange={setShowScript}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1"
-                    aria-label={
-                      showScript ? t('viewer.hideTranscript') : t('viewer.showTranscript')
-                    }
-                  >
-                    <FileText className="h-4 w-4" />
-                    {t('viewer.transcript')}
-                    {showScript ? (
-                      <ChevronUp className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-              </Collapsible>
-            )}
           </div>
         </div>
-
-        {/* Script Content */}
-        {content?.script && (
-          <Collapsible open={showScript} onOpenChange={setShowScript}>
-            <CollapsibleContent>
-              <div className="mt-4 max-h-60 overflow-y-auto rounded-lg bg-white/50 p-4 dark:bg-gray-900/50">
-                <p className="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                  {content.script}
-                </p>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
       </CardContent>
     </Card>
   )

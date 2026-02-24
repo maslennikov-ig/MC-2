@@ -363,5 +363,23 @@
   "draftPreview": {
     "slideCount": "{count, plural, one {# слайд} few {# слайда} many {# слайдов} other {# слайдов}} готово",
     "estimatedDuration": "~{minutes} мин видео"
+  },
+  "switcher": {
+    "title": "Материалы урока",
+    "tabs": {
+      "video": "Видео",
+      "audio": "Аудио",
+      "quiz": "Квиз",
+      "presentation": "Презентация",
+      "document": "Документ"
+    },
+    "fallback": {
+      "video": "Видео недоступно",
+      "presentationEmpty": "Презентация пока пуста",
+      "documentTitle": "Документ",
+      "documentDescription": "Дополнительный материал к уроку",
+      "download": "Скачать",
+      "documentAvailableInPanel": "Документ доступен для скачивания в панели активностей"
+    }
   }
 }

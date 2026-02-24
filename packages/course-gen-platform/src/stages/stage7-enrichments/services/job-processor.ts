@@ -37,6 +37,7 @@ import {
   getModelForAttempt,
   formatErrorForLogging,
 } from '../retry-strategy';
+import { notifyEnrichmentReady } from '@/shared/telegram/send';
 
 /**
  * Update job progress for streaming
@@ -314,6 +315,11 @@ async function finalizeSuccessfulResult(
     },
     logMessage
   );
+
+  // Send Telegram notification (fire-and-forget)
+  notifyEnrichmentReady({ courseId, lessonId, enrichmentType }).catch(err => {
+    jobLogger.warn({ err: String(err) }, 'Failed to send enrichment notification');
+  });
 
   return {
     enrichmentId,
