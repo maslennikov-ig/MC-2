@@ -64,6 +64,7 @@ Comprehensive code review completed for Sprint 2 (i18n audit remediation) change
 - **Recommendation**: Extract all Russian strings to translation keys
 
 **Hardcoded strings found**:
+
 ```typescript
 // Line 33-40: Hardcoded day names
 { day: 'Пн', hours: 2 },
@@ -103,7 +104,9 @@ Comprehensive code review completed for Sprint 2 (i18n audit remediation) change
 ```
 
 **Required fixes**:
+
 1. Add translation keys to `profile.json`:
+
 ```json
 {
   "statistics": {
@@ -131,16 +134,17 @@ Comprehensive code review completed for Sprint 2 (i18n audit remediation) change
 ```
 
 2. Refactor component to use `useTranslations()`:
+
 ```typescript
-const t = useTranslations('profile.statistics.chartLabels')
+const t = useTranslations('profile.statistics.chartLabels');
 
 const weeklyData = useMemo(() => {
   return [
     { day: t('days.mon'), hours: 2 },
     { day: t('days.tue'), hours: 3 },
     // ... etc
-  ]
-}, [t])
+  ];
+}, [t]);
 ```
 
 #### 2. Hardcoded Russian Status Messages in generation-progress.tsx
@@ -152,6 +156,7 @@ const weeklyData = useMemo(() => {
 - **Recommendation**: Use i18n keys for all status messages
 
 **Problematic code** (lines 66-76):
+
 ```typescript
 const statusMessages: Partial<Record<CourseStatus, string>> = {
   initializing: 'Инициализация создания курса...',
@@ -163,10 +168,11 @@ const statusMessages: Partial<Record<CourseStatus, string>> = {
   completed: 'Курс успешно создан!',
   failed: 'Произошла ошибка при создании курса',
   cancelled: 'Создание курса отменено',
-}
+};
 ```
 
 **Recommended fix**:
+
 ```typescript
 // Replace hardcoded Russian with i18n keys
 const statusMessageKeys: Partial<Record<CourseStatus, string>> = {
@@ -179,12 +185,12 @@ const statusMessageKeys: Partial<Record<CourseStatus, string>> = {
   completed: 'status.completed',
   failed: 'status.failed',
   cancelled: 'status.cancelled',
-}
+};
 
 // Then translate at usage site:
 const statusMessage = statusMessageKeys[initialStatus]
   ? t(statusMessageKeys[initialStatus])
-  : t('status.initializing')
+  : t('status.initializing');
 ```
 
 **Note**: Backward compatibility is already implemented for backend-generated Russian messages (line 91), which is good. This issue is only about the fallback status messages defined in the component.
@@ -202,6 +208,7 @@ const statusMessage = statusMessageKeys[initialStatus]
 - **Recommendation**: Add missing status message keys
 
 **Required additions to generation.json**:
+
 ```json
 {
   "status": {
@@ -229,6 +236,7 @@ const statusMessage = statusMessageKeys[initialStatus]
 - **Recommendation**: Standardize to snake_case or camelCase consistently
 
 **Current state**:
+
 - English: `"progressionLogic": "Progression Logic"` (under `actions`)
 - Russian: (Missing under `actions`, but exists as `progressionLogic` under `analysisResult`)
 
@@ -243,14 +251,16 @@ const statusMessage = statusMessageKeys[initialStatus]
 - **Recommendation**: Add JSDoc comment explaining the backward compatibility pattern
 
 **Current code**:
+
 ```typescript
 const handleCourseUpdate = (payload: { new: Course }) => {
   // ... existing code ...
   // No comment explaining why we check for both Russian and i18n keys
-}
+};
 ```
 
 **Recommended addition**:
+
 ```typescript
 /**
  * Handle realtime course updates from Supabase
@@ -265,7 +275,7 @@ const handleCourseUpdate = (payload: { new: Course }) => {
  */
 const handleCourseUpdate = (payload: { new: Course }) => {
   // ... existing code ...
-}
+};
 ```
 
 #### 6. AccountSettingsSection: Language Change Toast Messages
@@ -279,19 +289,20 @@ const handleCourseUpdate = (payload: { new: Course }) => {
 **Current issue**: Toast fires before locale switch completes, so it uses the old locale's translation.
 
 **Recommended pattern**:
+
 ```typescript
 // Option 1: Hardcode success message in target language
-await setLocale(newLocale)
+await setLocale(newLocale);
 if (newLocale === 'ru') {
-  toast.success('Язык изменён на русский')
+  toast.success('Язык изменён на русский');
 } else {
-  toast.success('Language changed to English')
+  toast.success('Language changed to English');
 }
 
 // Option 2: Use translation keys from NEW locale (requires refetching translations)
-await setLocale(newLocale)
-const newT = await getTranslations('profile.accountSettings')
-toast.success(newT('languageChanged' + newLocale.toUpperCase()))
+await setLocale(newLocale);
+const newT = await getTranslations('profile.accountSettings');
+toast.success(newT('languageChanged' + newLocale.toUpperCase()));
 ```
 
 ---
@@ -307,6 +318,7 @@ toast.success(newT('languageChanged' + newLocale.toUpperCase()))
 - **Recommendation**: Rename one of them or merge if they're the same
 
 **Current duplicates**:
+
 - `actions.progressionLogic`: "Progression Logic"
 - `analysisResult.progressionLogic`: (missing in English, exists in Russian context)
 
@@ -319,6 +331,7 @@ toast.success(newT('languageChanged' + newLocale.toUpperCase()))
 - **Recommendation**: Use next-intl's plural formatting or ICU MessageFormat
 
 **Example issue**:
+
 ```typescript
 // Russian has: lessonWord, lessonsWord, lessonsManyWord
 // English has same keys but doesn't use proper ICU syntax
@@ -334,6 +347,7 @@ toast.success(newT('languageChanged' + newLocale.toUpperCase()))
 ### Files Modified: 15
 
 **Profile page i18n (Task 6)**:
+
 ```
 packages/web/messages/ru/profile.json  (+230 lines)
 packages/web/messages/en/profile.json  (+230 lines)
@@ -349,6 +363,7 @@ packages/web/app/[locale]/profile/components/ChartComponent.tsx  ⚠️ ISSUES
 ```
 
 **Backend validators i18n (Task 7)**:
+
 ```
 packages/course-gen-platform/src/stages/stage4-analysis/utils/validators.ts
 packages/web/messages/ru/generation.json  (~50 new keys)
@@ -357,6 +372,7 @@ packages/web/components/course/generation-progress.tsx  ⚠️ MINOR ISSUES
 ```
 
 **Generation graph refactoring (Task 8)**:
+
 ```
 packages/web/components/generation-monitoring/trace-viewer.tsx
 packages/web/components/generation-graph/OutputTab.tsx
@@ -381,26 +397,28 @@ packages/web/components/generation-graph/SegmentedPillTrack.tsx
    - Error messages with parameter substitution
 
 2. **Backend validators correctly emit i18n keys**:
+
    ```typescript
    // Old (Task 6 audit finding):
-   message: 'Проверка документов...'
+   message: 'Проверка документов...';
 
    // New (Sprint 2 fix):
-   message: 'progress.step_0_start'
+   message: 'progress.step_0_start';
    ```
 
 3. **Profile components use proper next-intl patterns**:
+
    ```typescript
    const t = useTranslations('profile')
    <Label>{t('personalInfo.fullName')}</Label>
    ```
 
 4. **Backward compatibility implemented**:
+
    ```typescript
    // generation-progress.tsx handles both old Russian strings and new i18n keys
-   const message = updatedCourse.generation_status ||
-     statusMessages[updatedCourse.status] ||
-     'Initializing...'
+   const message =
+     updatedCourse.generation_status || statusMessages[updatedCourse.status] || 'Initializing...';
    ```
 
 5. **Refactored graph components from prop drilling to useTranslations()**:
@@ -426,6 +444,7 @@ packages/web/components/generation-graph/SegmentedPillTrack.tsx
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 profile.json (ru vs en):
 - Total keys: 230 (both files)
@@ -449,6 +468,7 @@ generation.json (ru vs en):
 **Status**: ✅ ASSUMED PASS
 
 **Reasoning**:
+
 - All components use proper TypeScript with `useTranslations()` hook
 - Translation keys are string literals (type-safe)
 - No type errors visible in code
@@ -460,6 +480,7 @@ generation.json (ru vs en):
 **Status**: ✅ PASSED (with 1 exception)
 
 **Results**:
+
 - ✅ PersonalInfoSection.tsx: `const t = useTranslations('profile')` (line 35)
 - ✅ AccountSettingsSection.tsx: `const t = useTranslations('profile')` (line 8)
 - ✅ profile-header.tsx: Uses `getTranslations('profile')` server-side
@@ -472,6 +493,7 @@ generation.json (ru vs en):
 **Status**: ❌ FAILED
 
 **Found**:
+
 ```
 packages/web/app/[locale]/profile/components/ChartComponent.tsx:
   Line 33-40: Day names (Пн, Вт, Ср, etc.)
@@ -493,6 +515,7 @@ packages/web/app/[locale]/profile/components/ChartComponent.tsx:
 **Validation**: ⚠️ PARTIAL
 
 **Explanation**:
+
 - ✅ Translation files are well-structured and comprehensive
 - ✅ Profile components (except ChartComponent) properly use i18n
 - ✅ Backend validators correctly emit i18n keys
@@ -511,6 +534,7 @@ packages/web/app/[locale]/profile/components/ChartComponent.tsx:
 **Result**: ✅ ALL KEYS MATCH
 
 **Sections verified**:
+
 - metadata (2 keys)
 - tabs (8 keys)
 - navigation (14 keys)
@@ -529,6 +553,7 @@ packages/web/app/[locale]/profile/components/ChartComponent.tsx:
 - validation (13 keys)
 
 **Sample key verification**:
+
 ```
 ✅ profile.avatar.uploadLabel: ru="Загрузить аватар", en="Upload avatar"
 ✅ profile.validation.nameMin: Both use {count} parameter
@@ -543,11 +568,13 @@ packages/web/app/[locale]/profile/components/ChartComponent.tsx:
 **Result**: ⚠️ MOSTLY MATCH (2 minor issues)
 
 **New sections added in Sprint 2**:
+
 - ✅ progress (19 keys): step_0_start, step_1_start, etc.
 - ✅ errors (5 keys): barrier_failed, insufficient_scope, llm_error, analysis_generic
 - ⚠️ Missing: status section for course-level statuses (8 keys needed)
 
 **Issues found**:
+
 1. `actions.progressionLogic` location differs between ru/en
 2. Missing status keys: initializing, processing_documents, analyzing_task, etc.
 
@@ -558,6 +585,7 @@ packages/web/app/[locale]/profile/components/ChartComponent.tsx:
 ### Pattern: useTranslations() Usage
 
 **✅ Correct implementations**:
+
 ```typescript
 // PersonalInfoSection.tsx
 const t = useTranslations('profile')
@@ -575,6 +603,7 @@ const translatedMessage = message.startsWith('progress.')
 ```
 
 **❌ Incorrect implementation**:
+
 ```typescript
 // ChartComponent.tsx - NO translations used at all
 <div className="text-xs">Завершено</div>  // Hardcoded Russian
@@ -583,6 +612,7 @@ const translatedMessage = message.startsWith('progress.')
 ### Pattern: Parameter Substitution
 
 **✅ Correct usage**:
+
 ```json
 // profile.json
 "avatarAlt": "Avatar of {name}",
@@ -591,35 +621,28 @@ const translatedMessage = message.startsWith('progress.')
 
 ```typescript
 // Component usage
-t('header.avatarAlt', { name: profile.full_name })
-t('personalInfo.bioCharCount', { count: bioLength })
+t('header.avatarAlt', { name: profile.full_name });
+t('personalInfo.bioCharCount', { count: bioLength });
 ```
 
 ### Pattern: Validation Message i18n
 
 **✅ Well-executed**:
+
 ```typescript
 // validation-schemas.ts
 export const createPersonalInfoSchema = (t: (key: string) => string) =>
   z.object({
-    full_name: z
-      .string()
-      .min(2, t('validation.nameMin'))
-      .max(100, t('validation.nameMax')),
-    bio: z
-      .string()
-      .max(500, t('validation.bioMax'))
-      .optional(),
-  })
+    full_name: z.string().min(2, t('validation.nameMin')).max(100, t('validation.nameMax')),
+    bio: z.string().max(500, t('validation.bioMax')).optional(),
+  });
 ```
 
 **Usage**:
+
 ```typescript
-const t = useTranslations('profile')
-const schema = useMemo(
-  () => createPersonalInfoSchema((key) => t(key as never)),
-  [t]
-)
+const t = useTranslations('profile');
+const schema = useMemo(() => createPersonalInfoSchema(key => t(key as never)), [t]);
 ```
 
 ---
