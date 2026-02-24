@@ -1,10 +1,17 @@
 import crypto from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { logger } from '@/lib/logger'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru'
+
+// Create Supabase admin client
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 interface TelegramUpdate {
   update_id: number
@@ -53,6 +60,16 @@ async function sendMessage(
  */
 async function handleStart(chatId: number, firstName: string, languageCode?: string) {
   const isRussian = languageCode === 'ru'
+
+  // Update user in DB if they exist and are connected
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ telegram_notifications_enabled: true })
+    .eq('telegram_chat_id', chatId.toString())
+
+  if (error) {
+    logger.error('Failed to update user notifications state on /start', error)
+  }
 
   const message = isRussian
     ? `👋 Привет, ${firstName}!
@@ -138,18 +155,39 @@ For questions, visit [ai.megacampus.ru](${APP_URL})`
 async function handleStatus(chatId: number, languageCode?: string) {
   const isRussian = languageCode === 'ru'
 
-  // Note: In production, check database for actual connection status
+  // Fetch actual connection status
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('id, telegram_notifications_enabled')
+    .eq('telegram_chat_id', chatId.toString())
+    .single()
+
+  const isConnected = !!user
+  const isEnabled = user?.telegram_notifications_enabled
+
+  const statusInfoRu = isConnected
+    ? `✅ Аккаунт подключен.\nУведомления: ${isEnabled ? 'Включены 🔔' : 'Отключены 🔕'}`
+    : `❌ Аккаунт не подключен.`
+
+  const statusInfoEn = isConnected
+    ? `✅ Account connected.\nNotifications: ${isEnabled ? 'Enabled 🔔' : 'Disabled 🔕'}`
+    : `❌ Account not connected.`
+
   const message = isRussian
     ? `📊 *Статус подключения*
 
 Ваш Chat ID: \`${chatId}\`
 
-Чтобы проверить, подключен ли бот к вашему аккаунту, откройте [профиль на сайте](${APP_URL}/profile) и посмотрите раздел "Telegram уведомления".`
+${statusInfoRu}
+
+Управлять настройками можно в [профиле на сайте](${APP_URL}/profile).`
     : `📊 *Connection Status*
 
 Your Chat ID: \`${chatId}\`
 
-To check if the bot is connected to your account, open your [profile on the website](${APP_URL}/profile) and see the "Telegram notifications" section.`
+${statusInfoEn}
+
+Manage settings in your [profile on the website](${APP_URL}/profile).`
 
   await sendMessage(chatId, message)
 }
@@ -160,21 +198,29 @@ To check if the bot is connected to your account, open your [profile on the webs
 async function handleDisconnect(chatId: number, languageCode?: string) {
   const isRussian = languageCode === 'ru'
 
+  // Update user in DB: ONLY disable notifications, keep chat_id for easy re-enable via /start
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({
+      telegram_notifications_enabled: false,
+    })
+    .eq('telegram_chat_id', chatId.toString())
+
+  if (error) {
+    logger.error('Failed to disable user notifications on /disconnect', error)
+  }
+
   const message = isRussian
     ? `🔌 *Отключение уведомлений*
 
-Чтобы отключить уведомления:
-1. Откройте [профиль на сайте](${APP_URL}/profile)
-2. В разделе "Telegram уведомления" нажмите "Отключить"
+Уведомления отключены.
 
-Бот перестанет отправлять вам сообщения.`
+Чтобы включить уведомления обратно, просто отправьте команду /start или включите их в [профиле на сайте](${APP_URL}/profile).`
     : `🔌 *Disable Notifications*
 
-To disable notifications:
-1. Open your [profile on the website](${APP_URL}/profile)
-2. In the "Telegram notifications" section, click "Disconnect"
+Notifications disabled.
 
-The bot will stop sending you messages.`
+To enable notifications again, simply send the /start command or enable them in your [profile on the website](${APP_URL}/profile).`
 
   await sendMessage(chatId, message)
 }

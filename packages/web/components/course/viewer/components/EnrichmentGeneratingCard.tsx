@@ -11,6 +11,11 @@ import { getNextMilestone } from '@megacampus/shared-types'
 import { StagedProgress } from '@/components/ui/staged-progress'
 import { SmoothProgress } from '@/components/ui/smooth-progress'
 import { cn } from '@/lib/utils'
+import { useSupabase } from '@/lib/supabase/browser-client'
+import {
+  TelegramLoginButton,
+  type TelegramAuthData,
+} from '@/components/telegram/telegram-login-button'
 
 type EnrichmentType =
   | 'quiz'
@@ -175,6 +180,66 @@ export function EnrichmentGeneratingCard({
   const config = ENRICHMENT_CONFIG[type]
   const Icon = config.icon
 
+  const { session, supabase } = useSupabase()
+  const [isTelegramConnected, setIsTelegramConnected] = React.useState<boolean>(false)
+  const [telegramChecked, setTelegramChecked] = React.useState(false)
+
+  // Fetch Telegram connection status
+  React.useEffect(() => {
+    let isMounted = true
+    async function checkTelegram() {
+      if (!session?.user?.id) {
+        if (isMounted) {
+          setIsTelegramConnected(false)
+          setTelegramChecked(true)
+        }
+        return
+      }
+
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('telegram_chat_id')
+          .eq('id', session.user.id)
+          .single()
+
+        if (isMounted) {
+          setIsTelegramConnected(!!data?.telegram_chat_id)
+        }
+      } catch {
+        if (isMounted) setIsTelegramConnected(false)
+      } finally {
+        if (isMounted) setTelegramChecked(true)
+      }
+    }
+    void checkTelegram()
+
+    return () => {
+      isMounted = false
+    }
+  }, [session, supabase])
+
+  const handleTelegramAuth = async (data: TelegramAuthData) => {
+    if (!session?.access_token) return
+
+    try {
+      const response = await fetch('/api/telegram/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (response.ok) {
+        setIsTelegramConnected(true)
+      }
+    } catch {
+      // Ignore errors for now
+    }
+  }
+
   // Check if we're in syncing state (progress === -1 means resuming, waiting for first poll)
   const isSyncing = progress === -1
 
@@ -325,7 +390,7 @@ export function EnrichmentGeneratingCard({
 
   return (
     <>
-      <style jsx>{`
+      <style>{`
         @keyframes shimmer {
           0% {
             transform: translateX(-100%);
@@ -419,7 +484,30 @@ export function EnrichmentGeneratingCard({
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="border-muted/50 mt-6 flex items-center justify-between border-t pt-4">
+            {telegramChecked && !isTelegramConnected ? (
+              <div className="mr-4 flex-1">
+                <p className="text-muted-foreground mb-3 text-sm">
+                  Не хотите ждать? Подключите Telegram, чтобы получить уведомление о готовности.
+                </p>
+                <div className="w-[200px]">
+                  <TelegramLoginButton
+                    botUsername={
+                      process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'ai_megacampus_bot'
+                    }
+                    onAuth={handleTelegramAuth}
+                    size="small"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="mr-4 flex-1">
+                <p className="text-muted-foreground text-xs">
+                  Вы можете безопасно закрыть эту страницу. Мы пришлем уведомление в Telegram, когда
+                  материал будет готов.
+                </p>
+              </div>
+            )}
             <Button
               variant="outline"
               size="sm"

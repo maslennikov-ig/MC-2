@@ -422,6 +422,34 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                 onCheckedChange={(checked) => void onUpdate({ push_notifications: checked })}
               />
             </div>
+
+            <div className="flex items-center justify-between py-4">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <Send className="h-4 w-4 text-[#0088cc]" />
+                  <Label htmlFor="telegram-notifications">
+                    {t('accountSettings.telegramNotifications') || 'Уведомления в Telegram'}
+                  </Label>
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  {t('accountSettings.telegramNotificationsDesc') ||
+                    'Получать сообщения о готовности генерации в Telegram'}
+                </p>
+              </div>
+              <Switch
+                id="telegram-notifications"
+                checked={
+                  'telegram_notifications_enabled' in profile
+                    ? !!profile.telegram_notifications_enabled
+                    : false
+                }
+                onCheckedChange={(checked) =>
+                  void onUpdate({ telegram_notifications_enabled: checked })
+                }
+                disabled={!isTelegramConnected}
+                aria-label="Telegram notifications"
+              />
+            </div>
           </Suspense>
         </div>
       </Card>

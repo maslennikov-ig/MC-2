@@ -342,10 +342,11 @@ const nextConfig: NextConfig = {
   async rewrites() {
     // Only proxy in development - in production nginx serves these files
     if (process.env.NODE_ENV === 'development') {
+      const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
       return [
         {
           source: '/storage/enrichments/:path*',
-          destination: 'https://ai.megacampus.ru/storage/enrichments/:path*',
+          destination: `${backendUrl}/storage/enrichments/:path*`,
         },
       ]
     }
@@ -399,8 +400,8 @@ const nextConfig: NextConfig = {
                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://static.userback.io;
                 font-src 'self' https://fonts.gstatic.com https://static.userback.io;
                 img-src 'self' data: https: blob:;
-                media-src 'self' https://drive.google.com https://*.googleusercontent.com https://*.supabase.co blob: data:;
-                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* ws://*.local:* http://10.* http://192.168.* http://172.16.* http://172.17.* http://172.18.* http://172.19.* http://172.20.* http://172.21.* http://172.22.* http://172.23.* http://172.24.* http://172.25.* http://172.26.* http://172.27.* http://172.28.* http://172.29.* http://172.30.* http://172.31.* https://flow8n.ru https://drive.google.com https://www.react-grab.com https://static.userback.io https://api.userback.io wss://api.userback.io https://events.userback.io;
+                media-src 'self' https://ai.megacampus.ru https://dev.ai.megacampus.ru https://drive.google.com https://*.googleusercontent.com https://*.supabase.co http://localhost:* http://127.0.0.1:* blob: data:;
+                connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* http://localhost:* ws://127.0.0.1:* http://127.0.0.1:* ws://*.local:* http://10.* http://192.168.* http://172.16.* http://172.17.* http://172.18.* http://172.19.* http://172.20.* http://172.21.* http://172.22.* http://172.23.* http://172.24.* http://172.25.* http://172.26.* http://172.27.* http://172.28.* http://172.29.* http://172.30.* http://172.31.* https://flow8n.ru https://drive.google.com https://www.react-grab.com https://static.userback.io https://api.userback.io wss://api.userback.io https://events.userback.io;
                 frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com https://*.userback.io;
                 frame-ancestors 'none';
                 base-uri 'self';
@@ -415,7 +416,7 @@ const nextConfig: NextConfig = {
                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://static.userback.io;
                 font-src 'self' https://fonts.gstatic.com https://static.userback.io;
                 img-src 'self' data: https: blob:;
-                media-src 'self' https://drive.google.com https://*.googleusercontent.com https://*.supabase.co blob: data:;
+                media-src 'self' https://ai.megacampus.ru https://dev.ai.megacampus.ru https://drive.google.com https://*.googleusercontent.com https://*.supabase.co http://localhost:* http://127.0.0.1:* blob: data:;
                 connect-src 'self' https://*.supabase.co wss://*.supabase.co https://flow8n.ru https://drive.google.com https://static.userback.io https://api.userback.io wss://api.userback.io https://events.userback.io;
                 frame-src 'self' https://drive.google.com https://drive.usercontent.google.com https://*.googleusercontent.com https://www.youtube.com https://youtube.com https://*.userback.io;
                 frame-ancestors 'none';

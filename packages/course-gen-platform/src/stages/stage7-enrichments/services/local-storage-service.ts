@@ -386,8 +386,16 @@ export async function uploadCourseCardLocal(
 export function buildPublicUrl(storagePath: string): string {
   const configuredBaseUrl =
     process.env.ENRICHMENTS_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL;
-  const baseUrl = (configuredBaseUrl || 'https://ai.megacampus.ru').replace(/\/+$/, '');
+
   const normalizedPath = storagePath.replace(/^\/+/, '');
+
+  if (process.env.NODE_ENV === 'development' && !configuredBaseUrl) {
+    // In local dev, return a relative URL so the frontend's rewrite proxies it
+    // to the local backend server running on port 3456.
+    return `${PUBLIC_URL}/${normalizedPath}`;
+  }
+
+  const baseUrl = (configuredBaseUrl || 'https://ai.megacampus.ru').replace(/\/+$/, '');
   return `${baseUrl}${PUBLIC_URL}/${normalizedPath}`;
 }
 

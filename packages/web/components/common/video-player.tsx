@@ -4,6 +4,10 @@ import { useRef, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { Rnd } from 'react-rnd'
+import ReactPlayer from 'react-player'
+
+const Player = ReactPlayer as any
+
 import {
   X,
   Minimize2,
@@ -49,7 +53,7 @@ export default function VideoPlayer({
   videoState,
   onVideoStateChange,
 }: VideoPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const playerRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(videoState?.isPlaying || false)
   const [isMuted, setIsMuted] = useState(videoState?.isMuted || false)
@@ -76,72 +80,55 @@ export default function VideoPlayer({
     }
   }, [isFloating, windowSize.width, windowSize.height])
 
-  // Update time and notify parent
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    const updateTime = () => {
-      const newTime = video.currentTime
-      setCurrentTime(newTime)
-      setDuration(video.duration)
-
-      if (onVideoStateChange) {
-        onVideoStateChange({
-          currentTime: newTime,
-          isPlaying: !video.paused,
-          isMuted: video.muted,
-        })
-      }
+  // Callbacks for ReactPlayer
+  const handleProgress = (state: { playedSeconds: number }) => {
+    setCurrentTime(state.playedSeconds)
+    if (onVideoStateChange) {
+      onVideoStateChange({
+        currentTime: state.playedSeconds,
+        isPlaying,
+        isMuted,
+      })
     }
+  }
 
-    const handlePlay = () => {
-      setIsPlaying(true)
-      if (onVideoStateChange) {
-        onVideoStateChange({
-          currentTime: video.currentTime,
-          isPlaying: true,
-          isMuted: video.muted,
-        })
-      }
+  const handleDuration = (d: number) => {
+    setDuration(d)
+  }
+
+  const handlePlay = () => {
+    setIsPlaying(true)
+    if (onVideoStateChange) {
+      onVideoStateChange({
+        currentTime,
+        isPlaying: true,
+        isMuted,
+      })
     }
+  }
 
-    const handlePause = () => {
-      setIsPlaying(false)
-      if (onVideoStateChange) {
-        onVideoStateChange({
-          currentTime: video.currentTime,
-          isPlaying: false,
-          isMuted: video.muted,
-        })
-      }
+  const handlePause = () => {
+    setIsPlaying(false)
+    if (onVideoStateChange) {
+      onVideoStateChange({
+        currentTime,
+        isPlaying: false,
+        isMuted,
+      })
     }
-
-    const handleLoadedMetadata = () => setDuration(video.duration)
-
-    video.addEventListener('timeupdate', updateTime)
-    video.addEventListener('play', handlePlay)
-    video.addEventListener('pause', handlePause)
-    video.addEventListener('loadedmetadata', handleLoadedMetadata)
-
-    return () => {
-      video.removeEventListener('timeupdate', updateTime)
-      video.removeEventListener('play', handlePlay)
-      video.removeEventListener('pause', handlePause)
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
-    }
-  }, [onVideoStateChange])
+  }
 
   // Handle Picture-in-Picture
   const togglePiP = async () => {
-    if (!videoRef.current) return
+    const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
+    if (!videoElement) return
 
     try {
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture()
         setIsPiPActive(false)
       } else {
-        await videoRef.current.requestPictureInPicture()
+        await videoElement.requestPictureInPicture()
         setIsPiPActive(true)
       }
     } catch {
@@ -151,39 +138,35 @@ export default function VideoPlayer({
 
   // Play/Pause toggle
   const togglePlay = () => {
-    if (!videoRef.current) return
-
-    if (isPlaying) {
-      videoRef.current.pause()
-    } else {
-      videoRef.current.play()
-    }
+    // Relying on bounded state; component re-renders will reflect in ReactPlayer
+    setIsPlaying(!isPlaying)
   }
 
   // Mute toggle
   const toggleMute = () => {
-    if (!videoRef.current) return
-
-    videoRef.current.muted = !isMuted
-    setIsMuted(!isMuted)
+    const newMutedState = !isMuted
+    setIsMuted(newMutedState)
 
     if (onVideoStateChange) {
       onVideoStateChange({
-        currentTime: videoRef.current.currentTime,
-        isPlaying: !videoRef.current.paused,
-        isMuted: !isMuted,
+        currentTime,
+        isPlaying,
+        isMuted: newMutedState,
       })
     }
   }
 
   // Fullscreen
   const toggleFullscreen = () => {
-    if (!videoRef.current) return
+    const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
+    let targetElement = containerRef.current as HTMLElement | null
+    if (!targetElement) targetElement = videoElement
+    if (!targetElement) return
 
     if (!document.fullscreenElement) {
-      videoRef.current.requestFullscreen()
+      targetElement.requestFullscreen().catch(() => {})
     } else {
-      document.exitFullscreen()
+      document.exitFullscreen().catch(() => {})
     }
   }
 
@@ -196,15 +179,37 @@ export default function VideoPlayer({
 
   // Create the video element once
   const videoElement = (
-    <video
-      ref={videoRef}
-      src={src}
-      poster={poster}
-      playsInline
-      controls
-      className="h-full w-full object-contain"
-      style={{ display: isHidden ? 'none' : 'block' }}
-    />
+    <div
+      className="relative flex h-full w-full items-center justify-center bg-black [&>div>video]:!object-contain"
+      style={{ display: isHidden ? 'none' : 'flex' }}
+    >
+      <Player
+        ref={playerRef}
+        url={src}
+        playing={isPlaying}
+        muted={isMuted}
+        controls={true}
+        width="100%"
+        height="100%"
+        playsinline
+        config={{
+          file: {
+            attributes: {
+              poster: poster,
+              controlsList: 'nodownload',
+            },
+          },
+        }}
+        onProgress={handleProgress}
+        onDuration={handleDuration}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onError={(e: any) => {
+          console.error('Video loading error:', e)
+        }}
+        style={{ position: 'absolute', top: 0, left: 0 }}
+      />
+    </div>
   )
 
   // Normal mode content
@@ -257,7 +262,7 @@ export default function VideoPlayer({
           <div className="flex items-center gap-2">
             {document.pictureInPictureEnabled && (
               <button
-                onClick={togglePiP}
+                onClick={() => void togglePiP()}
                 className={`p-1 text-white transition-colors hover:text-purple-400 ${isPiPActive ? 'text-purple-400' : ''}`}
                 aria-label="Картинка в картинке"
               >

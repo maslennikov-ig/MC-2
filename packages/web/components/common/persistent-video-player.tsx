@@ -2,6 +2,10 @@
 
 import { useRef, useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import ReactPlayer from 'react-player'
+
+const Player = ReactPlayer as any
+
 import {
   X,
   Minimize2,
@@ -33,7 +37,7 @@ export default function PersistentVideoPlayer({
   mode = 'normal',
   onModeChange,
 }: PersistentVideoPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const playerRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -60,32 +64,22 @@ export default function PersistentVideoPlayer({
     }
   }, [])
 
-  // Update video event listeners
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
+  // Callbacks for ReactPlayer
+  const handleProgress = (state: { playedSeconds: number }) => {
+    setCurrentTime(state.playedSeconds)
+  }
 
-    const updateTime = () => {
-      setCurrentTime(video.currentTime)
-      setDuration(video.duration)
-    }
+  const handleDuration = (d: number) => {
+    setDuration(d)
+  }
 
-    const handlePlay = () => setIsPlaying(true)
-    const handlePause = () => setIsPlaying(false)
-    const handleLoadedMetadata = () => setDuration(video.duration)
+  const handlePlay = () => {
+    setIsPlaying(true)
+  }
 
-    video.addEventListener('timeupdate', updateTime)
-    video.addEventListener('play', handlePlay)
-    video.addEventListener('pause', handlePause)
-    video.addEventListener('loadedmetadata', handleLoadedMetadata)
-
-    return () => {
-      video.removeEventListener('timeupdate', updateTime)
-      video.removeEventListener('play', handlePlay)
-      video.removeEventListener('pause', handlePause)
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
-    }
-  }, [])
+  const handlePause = () => {
+    setIsPlaying(false)
+  }
 
   // Handle dragging with threshold to avoid conflicts with video controls
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -106,9 +100,9 @@ export default function PersistentVideoPlayer({
     })
 
     // Prevent default only if we're not on video controls area
-    const video = videoRef.current
-    if (video) {
-      const rect = video.getBoundingClientRect()
+    const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
+    if (videoElement) {
+      const rect = videoElement.getBoundingClientRect()
       const relativeY = e.clientY - rect.top
       const controlsHeight = 50 // Approximate height of video controls
 
@@ -136,8 +130,9 @@ export default function PersistentVideoPlayer({
         // Add dragging class to prevent video interaction
         if (containerRef.current) {
           containerRef.current.style.pointerEvents = 'none'
-          if (videoRef.current) {
-            videoRef.current.style.pointerEvents = 'none'
+          const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
+          if (videoElement) {
+            videoElement.style.pointerEvents = 'none'
           }
         }
       }
@@ -155,8 +150,9 @@ export default function PersistentVideoPlayer({
       // Restore pointer events
       if (containerRef.current) {
         containerRef.current.style.pointerEvents = 'auto'
-        if (videoRef.current) {
-          videoRef.current.style.pointerEvents = 'auto'
+        const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
+        if (videoElement) {
+          videoElement.style.pointerEvents = 'auto'
         }
       }
     }
@@ -207,37 +203,35 @@ export default function PersistentVideoPlayer({
 
   // Video controls
   const togglePlay = () => {
-    if (!videoRef.current) return
-    if (isPlaying) {
-      videoRef.current.pause()
-    } else {
-      videoRef.current.play()
-    }
+    setIsPlaying(!isPlaying)
   }
 
   const toggleMute = () => {
-    if (!videoRef.current) return
-    videoRef.current.muted = !isMuted
     setIsMuted(!isMuted)
   }
 
   const toggleFullscreen = () => {
-    if (!videoRef.current) return
+    const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
+    let targetElement = containerRef.current as HTMLElement | null
+    if (!targetElement) targetElement = videoElement
+    if (!targetElement) return
+
     if (!document.fullscreenElement) {
-      videoRef.current.requestFullscreen()
+      targetElement.requestFullscreen().catch(() => {})
     } else {
-      document.exitFullscreen()
+      document.exitFullscreen().catch(() => {})
     }
   }
 
   const togglePiP = async () => {
-    if (!videoRef.current) return
+    const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
+    if (!videoElement) return
     try {
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture()
         setIsPiPActive(false)
       } else {
-        await videoRef.current.requestPictureInPicture()
+        await videoElement.requestPictureInPicture()
         setIsPiPActive(true)
       }
     } catch {
@@ -292,17 +286,39 @@ export default function PersistentVideoPlayer({
       transition={{ duration: 0.2 }}
     >
       {/* Video element - always the same one */}
-      <video
-        ref={videoRef}
-        src={src}
-        poster={poster}
-        controls
-        playsInline
-        className="h-full w-full object-contain"
+      <div
+        className="relative flex h-full w-full items-center justify-center bg-black [&>div>video]:!object-contain"
         style={{
           cursor: mode === 'floating' && !dragThresholdMet ? 'move' : 'default',
         }}
-      />
+      >
+        <Player
+          ref={playerRef}
+          url={src}
+          playing={isPlaying}
+          muted={isMuted}
+          controls={true}
+          width="100%"
+          height="100%"
+          playsinline
+          config={{
+            file: {
+              attributes: {
+                poster: poster,
+                controlsList: 'nodownload',
+              },
+            },
+          }}
+          onProgress={handleProgress}
+          onDuration={handleDuration}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onError={(e: any) => {
+            console.error('Video loading error:', e)
+          }}
+          style={{ position: 'absolute', top: 0, left: 0 }}
+        />
+      </div>
 
       {/* Controls for floating mode */}
       {mode === 'floating' && (
@@ -378,7 +394,7 @@ export default function PersistentVideoPlayer({
             <div className="flex items-center gap-2">
               {document.pictureInPictureEnabled && (
                 <button
-                  onClick={togglePiP}
+                  onClick={() => void togglePiP()}
                   className={`p-1 text-white transition-colors hover:text-purple-400 ${isPiPActive ? 'text-purple-400' : ''}`}
                   aria-label="Картинка в картинке"
                 >

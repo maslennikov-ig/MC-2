@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter, usePathname } from '@/src/i18n/navigation'
-import { useTransition } from 'react'
+import { useTransition, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -99,6 +99,11 @@ export function LanguageSwitcher({
   const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   const t = useTranslations('common')
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const CurrentFlag = FLAGS[locale]
 
@@ -118,6 +123,45 @@ export function LanguageSwitcher({
       // 3. Navigate to new locale
       router.replace(pathname, { locale: newLocale })
     })
+  }
+
+  // Prevent hydration mismatch for Radix DropdownMenu by rendering a skeleton placeholder first
+  if (!mounted) {
+    if (variant === 'menu-item') {
+      return (
+        <div
+          className={cn(
+            'flex w-full cursor-pointer items-center justify-between rounded-sm px-3 py-2 opacity-50',
+            className
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-4 w-4 items-center justify-center">
+              <CurrentFlag className="h-4 w-5" />
+            </div>
+            <span>{LANGUAGE_NAMES[locale].native}</span>
+          </div>
+          <ChevronDown className="h-4 w-4 opacity-50" />
+        </div>
+      )
+    }
+
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled
+        className={cn(
+          'min-h-[44px] min-w-[44px] gap-2 opacity-50',
+          darkMode && 'text-white/90',
+          className
+        )}
+      >
+        <CurrentFlag />
+        {!compact && <span className="text-xs font-medium uppercase">{locale}</span>}
+        {showChevron && <ChevronDown className="h-3 w-3 opacity-50" />}
+      </Button>
+    )
   }
 
   // For menu-item variant, render a simpler trigger for embedding
