@@ -82,4 +82,8 @@ docs/client_secret_*.json
 # --- Python Virtual Environments ---
 .venv*/
 
+# --- Local Data & Secrets ---
+data/
+secrets/
+
 docs/plans/telegram-notifications-plan.md
