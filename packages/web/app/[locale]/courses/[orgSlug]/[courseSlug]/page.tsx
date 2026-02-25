@@ -112,6 +112,10 @@ type SectionRow = Database['public']['Tables']['sections']['Row']
 type LessonRow = Database['public']['Tables']['lessons']['Row']
 type AssetRow = Database['public']['Tables']['assets']['Row']
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+
+// Excludes 'metadata' column which can be 27MB+ for NLM enrichments (bridge_response artifact)
+const ENRICHMENT_DISPLAY_COLUMNS =
+  'id, enrichment_type, status, content, lesson_id, course_id, created_at, updated_at, title, order_index, asset_id, error_details, error_message, generated_at, generation_attempt' as const
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 interface CoursePageProps {
@@ -212,7 +216,7 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
       adminSupabase.from('assets').select('*').in('lesson_id', lessonIds),
       adminSupabase
         .from('lesson_enrichments')
-        .select('*')
+        .select(ENRICHMENT_DISPLAY_COLUMNS)
         .in('lesson_id', lessonIds)
         .not('status', 'in', '(failed,cancelled)')
         .order('order_index'),
@@ -225,7 +229,8 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
     ])
 
     assets = assetsResult.data
-    enrichments = enrichmentsResult.data
+    // metadata column excluded from select (can be 27MB+ for NLM types)
+    enrichments = enrichmentsResult.data as EnrichmentRow[] | null
     lessonContents = lessonContentsResult.data
 
     // Log errors but continue with empty lists (graceful degradation)

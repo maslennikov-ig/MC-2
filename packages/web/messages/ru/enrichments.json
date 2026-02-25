@@ -270,6 +270,7 @@
     "confirm": "Удалить",
     "cancel": "Отмена",
     "videoUnavailable": "Видео недоступно",
+    "audioUnavailable": "Аудио недоступно",
     "generationComplete": "Дополнение успешно создано",
     "generationFailed": "Не удалось создать дополнение",
     "resumingGeneration": "Отслеживаем {count, plural, one {# активную генерацию} few {# активные генерации} many {# активных генераций} other {# активные генерации}}..."

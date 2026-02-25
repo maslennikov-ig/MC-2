@@ -270,8 +270,41 @@ export function EnrichmentCard({
       )
     }
 
-    // Audio active: darkened overlay with play/pause + compact controls at bottom
-    if (isActive && isAudioType) {
+    // Audio loading URL: placeholder with spinner
+    if (isAudioType && urlLoading) {
+      return (
+        <>
+          <img
+            src={placeholderImage}
+            alt={enrichment.title || label}
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-white/80" />
+          </div>
+        </>
+      )
+    }
+
+    // Audio URL fetch failed: dimmed placeholder
+    if (isAudioType && urlError) {
+      return (
+        <>
+          <img
+            src={placeholderImage}
+            alt={enrichment.title || label}
+            className="h-full w-full object-cover opacity-50"
+          />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <span className="text-sm text-white/80">{t('viewer.audioUnavailable')}</span>
+          </div>
+        </>
+      )
+    }
+
+    // Audio with URL ready: overlay with play/pause + compact controls (single-click play)
+    if (isAudioType && playbackUrl) {
       return (
         <>
           <img
@@ -397,8 +430,8 @@ export function EnrichmentCard({
 
         {/* Action buttons — always visible at bottom */}
         <div className="mt-auto flex items-center gap-2 pt-3">
-          {/* Play/Close for audio and quiz (video uses Vidstack's built-in controls) */}
-          {(isAudioType || type === 'quiz') && (
+          {/* Start quiz button (video/audio use built-in player controls on the card) */}
+          {type === 'quiz' && (
             <Button size="sm" className="flex-1 gap-2" onClick={onToggle}>
               {isActive ? (
                 <>
@@ -408,7 +441,7 @@ export function EnrichmentCard({
               ) : (
                 <>
                   <Play className="h-4 w-4" />
-                  {type === 'quiz' ? t('viewer.startQuiz') : t('viewer.play')}
+                  {t('viewer.startQuiz')}
                 </>
               )}
             </Button>

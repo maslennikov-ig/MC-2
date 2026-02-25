@@ -270,6 +270,7 @@
     "confirm": "Delete",
     "cancel": "Cancel",
     "videoUnavailable": "Video unavailable",
+    "audioUnavailable": "Audio unavailable",
     "generationComplete": "Enrichment generated successfully",
     "generationFailed": "Failed to generate enrichment",
     "resumingGeneration": "Tracking {count, plural, one {# active generation} other {# active generations}}..."
