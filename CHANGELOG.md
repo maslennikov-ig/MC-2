@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-02-25
+
+### Added
+
+- redesign enrichment cards with unified grid, single-click video, and compact audio overlay (b9365d9a)
+
+### Other
+
+- update docker-compose and deploy scripts (573fa689)
+- fix Windows NTFS compatibility and normalize line endings (070b5743)
+- add cross-platform line ending rules to .gitattributes (d4bb9eac)
+
 ## [0.31.0] - 2026-02-24
 
 ### Added
