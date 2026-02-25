@@ -74,7 +74,11 @@ interface NlmVideoOptionsProps {
   type: 'nlm_video'
 }
 
-export type EnrichmentOptionsProps =
+type BaseOptionsProps = {
+  onSelectOpenChange?: (open: boolean) => void
+}
+
+export type EnrichmentOptionsProps = (
   | QuizOptionsProps
   | AudioOptionsProps
   | PresentationOptionsProps
@@ -82,6 +86,8 @@ export type EnrichmentOptionsProps =
   | VideoOptionsProps
   | NlmAudioOptionsProps
   | NlmVideoOptionsProps
+) &
+  BaseOptionsProps
 
 /**
  * Renders type-specific options for enrichment generation.
@@ -89,6 +95,7 @@ export type EnrichmentOptionsProps =
  */
 export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
   const t = useTranslations('enrichments')
+  const { onSelectOpenChange } = props
 
   // Video has no options
   if (props.type === 'video' || props.type === 'nlm_video') {
@@ -105,6 +112,7 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
           <Select
             value={nlmAudioFormat}
             onValueChange={(value) => setNlmAudioFormat(value as 'deep_dive' | 'debate')}
+            onOpenChange={onSelectOpenChange}
           >
             <SelectTrigger>
               <SelectValue />
@@ -159,7 +167,11 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
       <div className="space-y-3 pt-3">
         <div className="space-y-1.5">
           <LabelWithTooltip label={t('images.style.label')} tooltip={t('images.style.tooltip')} />
-          <Select value={imageStyle} onValueChange={setImageStyle}>
+          <Select
+            value={imageStyle}
+            onValueChange={setImageStyle}
+            onOpenChange={onSelectOpenChange}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -178,7 +190,11 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
             label={t('images.colorScheme.label')}
             tooltip={t('images.colorScheme.tooltip')}
           />
-          <Select value={colorScheme} onValueChange={setColorScheme}>
+          <Select
+            value={colorScheme}
+            onValueChange={setColorScheme}
+            onOpenChange={onSelectOpenChange}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -214,7 +230,11 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
       <div className="space-y-3 pt-3">
         <div className="space-y-1.5">
           <label className="text-sm font-medium">{t('forms.quiz.questionCount')}</label>
-          <Select value={quizQuestions} onValueChange={setQuizQuestions}>
+          <Select
+            value={quizQuestions}
+            onValueChange={setQuizQuestions}
+            onOpenChange={onSelectOpenChange}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -227,7 +247,11 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium">{t('forms.quiz.difficulty')}</label>
-          <Select value={quizDifficulty} onValueChange={setQuizDifficulty}>
+          <Select
+            value={quizDifficulty}
+            onValueChange={setQuizDifficulty}
+            onOpenChange={onSelectOpenChange}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -249,7 +273,11 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
       <div className="space-y-3 pt-3">
         <div className="space-y-1.5">
           <label className="text-sm font-medium">{t('forms.audio.voice')}</label>
-          <Select value={audioVoice} onValueChange={setAudioVoice}>
+          <Select
+            value={audioVoice}
+            onValueChange={setAudioVoice}
+            onOpenChange={onSelectOpenChange}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -262,7 +290,11 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium">{t('forms.audio.speed')}</label>
-          <Select value={audioSpeed} onValueChange={setAudioSpeed}>
+          <Select
+            value={audioSpeed}
+            onValueChange={setAudioSpeed}
+            onOpenChange={onSelectOpenChange}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -285,7 +317,11 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
       <div className="space-y-3 pt-3">
         <div className="space-y-1.5">
           <label className="text-sm font-medium">{t('forms.presentation.slideCount')}</label>
-          <Select value={presentationSlides} onValueChange={setPresentationSlides}>
+          <Select
+            value={presentationSlides}
+            onValueChange={setPresentationSlides}
+            onOpenChange={onSelectOpenChange}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -298,7 +334,11 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium">{t('forms.presentation.theme')}</label>
-          <Select value={presentationTheme} onValueChange={setPresentationTheme}>
+          <Select
+            value={presentationTheme}
+            onValueChange={setPresentationTheme}
+            onOpenChange={onSelectOpenChange}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
