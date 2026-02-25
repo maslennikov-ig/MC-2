@@ -17,6 +17,9 @@ import { ServiceWorkerManager } from '@/components/pwa/ServiceWorkerManager'
 import { InstallPrompt } from '@/components/pwa/InstallPrompt'
 import { ENV } from '@/lib/env'
 import '../globals.css'
+// Vidstack video player default theme
+import '@vidstack/react/player/styles/default/theme.css'
+import '@vidstack/react/player/styles/default/layouts/video.css'
 // KaTeX CSS for math formula rendering
 import 'katex/dist/katex.min.css'
 import '@/components/markdown/styles/katex-overrides.css'

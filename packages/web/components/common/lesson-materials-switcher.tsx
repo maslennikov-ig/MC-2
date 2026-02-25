@@ -153,6 +153,18 @@ export function LessonMaterialsSwitcher({
   if (availableTypes.length === 0) return null
 
   const renderVideo = () => {
+    // Defensive: restore banner if video was somehow hidden
+    if (videoMode === 'hidden') {
+      return (
+        <button
+          onClick={() => setVideoMode('normal')}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/30"
+        >
+          Показать видео
+        </button>
+      )
+    }
+
     // Priority 1: Enrichment
     if (videoEnrichment && videoPlaybackUrl) {
       return (
@@ -162,7 +174,7 @@ export function LessonMaterialsSwitcher({
           className="mb-4 aspect-video w-full"
           mode={videoMode}
           onModeChange={setVideoMode}
-          onClose={() => setVideoMode('hidden')}
+          onClose={() => setVideoMode('normal')}
         />
       )
     }
@@ -172,17 +184,12 @@ export function LessonMaterialsSwitcher({
       let videoUrl = legacyVideoAsset.url || ''
       let isYoutube = false
 
-      if (!videoUrl && legacyVideoAsset.filename) {
-        const uuidPattern =
-          /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.(mp4|webm|mov)$/i
-        if (uuidPattern.test(legacyVideoAsset.filename)) {
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-          videoUrl = supabaseUrl
-            ? `${supabaseUrl}/storage/v1/object/public/videos/${legacyVideoAsset.filename}`
-            : `/api/assets/${legacyVideoAsset.filename}`
-        } else {
-          videoUrl = `/api/assets/filename/${encodeURIComponent(legacyVideoAsset.filename)}`
-        }
+      if (!videoUrl && legacyVideoAsset.file_path) {
+        // Use unified storage path — works for both local dev (Next.js rewrite)
+        // and server (nginx serves /storage/enrichments/)
+        videoUrl = `/storage/enrichments/${legacyVideoAsset.file_path}`
+      } else if (!videoUrl && legacyVideoAsset.filename) {
+        videoUrl = `/api/assets/filename/${encodeURIComponent(legacyVideoAsset.filename)}`
       } else if (videoUrl) {
         if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) isYoutube = true
       }
@@ -217,7 +224,7 @@ export function LessonMaterialsSwitcher({
             className="mb-4 aspect-video w-full"
             mode={videoMode}
             onModeChange={setVideoMode}
-            onClose={() => setVideoMode('hidden')}
+            onClose={() => setVideoMode('normal')}
           />
         )
       }

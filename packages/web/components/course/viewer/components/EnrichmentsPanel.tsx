@@ -208,133 +208,60 @@ export function EnrichmentsPanel({
     {} as Record<EnrichmentType, EnrichmentRow[]>
   )
 
+  // Completed enrichments for grid display (exclude cover/card — handled by UnifiedEnrichmentCard)
+  const completedTypeOrder: Record<string, number> = {
+    video: 0,
+    nlm_video: 1,
+    audio: 2,
+    nlm_audio: 3,
+    presentation: 4,
+    quiz: 5,
+    document: 6,
+  }
+
+  // Statuses that indicate the enrichment is "done" (successfully or not)
+  const GRID_DISPLAY_STATUSES = new Set(['completed', 'failed', 'cancelled'])
+
+  const completedEnrichments = filteredEnrichments
+    .filter((e) => {
+      // Only show enrichments with terminal statuses
+      if (!GRID_DISPLAY_STATUSES.has(e.status)) return false
+      // Exclude image types (handled by UnifiedEnrichmentCard)
+      if (e.enrichment_type === 'cover' || e.enrichment_type === 'card') return false
+      // Exclude legacy NLM draft statuses
+      if (isNlmType(e.enrichment_type) && isLegacyNlmDraftStatus(e.status)) return false
+      return true
+    })
+    .sort((a, b) => {
+      const orderA = completedTypeOrder[a.enrichment_type] ?? 99
+      const orderB = completedTypeOrder[b.enrichment_type] ?? 99
+      return orderA - orderB
+    })
+
   return (
     <div className="space-y-6">
-      {/* Video Section */}
-      {groupedEnrichments.video?.map((enrichment) => (
-        <EnrichmentErrorBoundary
-          key={enrichment.id}
-          enrichmentType={t('viewer.enrichmentTypes.video')}
-          enrichmentId={enrichment.id}
-        >
-          <EnrichmentCard
-            enrichment={enrichment}
-            isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() =>
-              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
-            }
-          />
-        </EnrichmentErrorBoundary>
-      ))}
-
-      {/* NLM Video Section */}
-      {groupedEnrichments.nlm_video
-        ?.filter((enrichment) => !isLegacyNlmDraftStatus(enrichment.status))
-        .map((enrichment) => (
-          <EnrichmentErrorBoundary
-            key={enrichment.id}
-            enrichmentType={t('viewer.enrichmentTypes.nlm_video')}
-            enrichmentId={enrichment.id}
-          >
-            <EnrichmentCard
-              enrichment={enrichment}
-              isActive={activeEnrichmentId === enrichment.id}
-              onToggle={() =>
-                setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
-              }
-            />
-          </EnrichmentErrorBoundary>
-        ))}
-
-      {/* Audio Section */}
-      {groupedEnrichments.audio?.map((enrichment) => (
-        <EnrichmentErrorBoundary
-          key={enrichment.id}
-          enrichmentType={t('viewer.enrichmentTypes.audio')}
-          enrichmentId={enrichment.id}
-        >
-          <EnrichmentCard
-            enrichment={enrichment}
-            isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() =>
-              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
-            }
-          />
-        </EnrichmentErrorBoundary>
-      ))}
-
-      {/* NLM Audio Section */}
-      {groupedEnrichments.nlm_audio
-        ?.filter((enrichment) => !isLegacyNlmDraftStatus(enrichment.status))
-        .map((enrichment) => (
-          <EnrichmentErrorBoundary
-            key={enrichment.id}
-            enrichmentType={t('viewer.enrichmentTypes.nlm_audio')}
-            enrichmentId={enrichment.id}
-          >
-            <EnrichmentCard
-              enrichment={enrichment}
-              isActive={activeEnrichmentId === enrichment.id}
-              onToggle={() =>
-                setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
-              }
-            />
-          </EnrichmentErrorBoundary>
-        ))}
-
-      {/* Presentation Section */}
-      {groupedEnrichments.presentation?.map((enrichment) => (
-        <EnrichmentErrorBoundary
-          key={enrichment.id}
-          enrichmentType={t('viewer.enrichmentTypes.presentation')}
-          enrichmentId={enrichment.id}
-        >
-          <EnrichmentCard
-            enrichment={enrichment}
-            isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() =>
-              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
-            }
-          />
-        </EnrichmentErrorBoundary>
-      ))}
-
-      {/* Quiz Section */}
-      {groupedEnrichments.quiz?.map((enrichment) => (
-        <EnrichmentErrorBoundary
-          key={enrichment.id}
-          enrichmentType={t('viewer.enrichmentTypes.quiz')}
-          enrichmentId={enrichment.id}
-        >
-          <EnrichmentCard
-            enrichment={enrichment}
-            isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() =>
-              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
-            }
-          />
-        </EnrichmentErrorBoundary>
-      ))}
-
-      {/* Document Section */}
-      {groupedEnrichments.document?.map((enrichment) => (
-        <EnrichmentErrorBoundary
-          key={enrichment.id}
-          enrichmentType={t('viewer.enrichmentTypes.document')}
-          enrichmentId={enrichment.id}
-        >
-          <EnrichmentCard
-            enrichment={enrichment}
-            isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() =>
-              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
-            }
-          />
-        </EnrichmentErrorBoundary>
-      ))}
-
-      {/* All Enrichment Cards - Unified Grid */}
+      {/* Unified Grid — completed enrichments first, then placeholders */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {/* Completed enrichments */}
+        {completedEnrichments.map((enrichment) => (
+          <EnrichmentErrorBoundary
+            key={enrichment.id}
+            enrichmentType={t(`viewer.enrichmentTypes.${enrichment.enrichment_type}`)}
+            enrichmentId={enrichment.id}
+          >
+            <EnrichmentCard
+              enrichment={enrichment}
+              isActive={activeEnrichmentId === enrichment.id}
+              onToggle={() =>
+                setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
+              }
+              courseId={courseId}
+              onRefreshEnrichments={onRefreshEnrichments}
+            />
+          </EnrichmentErrorBoundary>
+        ))}
+
+        {/* Placeholder / generating cards */}
         {ALL_PLACEHOLDER_TYPES.filter((type) => {
           // For image types, always show (they have existingEnrichment logic)
           if (IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')) {
