@@ -1,22 +1,13 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import ReactPlayer from 'react-player'
+import { MediaPlayer, MediaProvider, type MediaPlayerInstance, Poster } from '@vidstack/react'
+import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default'
 
-const Player = ReactPlayer as any
-
-import {
-  X,
-  Minimize2,
-  Maximize2,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  Maximize,
-  PictureInPicture2,
-} from 'lucide-react'
+import { Maximize2 } from 'lucide-react'
+import { formatVideoSrc } from './video-utils'
+import { useVidstackTranslations } from '@/hooks/useVidstackTranslations'
 
 interface PersistentVideoPlayerProps {
   src: string
@@ -32,18 +23,15 @@ export default function PersistentVideoPlayer({
   src,
   title,
   poster,
-  onClose,
   className = '',
   mode = 'normal',
   onModeChange,
 }: PersistentVideoPlayerProps) {
-  const playerRef = useRef<any>(null)
+  const playerRef = useRef<MediaPlayerInstance>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
-  const [isPiPActive, setIsPiPActive] = useState(false)
+  const [hasError, setHasError] = useState(false)
+
+  const vidstackTranslations = useVidstackTranslations()
 
   // Floating window position and size
   const [floatingPos, setFloatingPos] = useState({ x: 0, y: 0 })
@@ -64,77 +52,43 @@ export default function PersistentVideoPlayer({
     }
   }, [])
 
-  // Callbacks for ReactPlayer
-  const handleProgress = (state: { playedSeconds: number }) => {
-    setCurrentTime(state.playedSeconds)
-  }
-
-  const handleDuration = (d: number) => {
-    setDuration(d)
-  }
-
-  const handlePlay = () => {
-    setIsPlaying(true)
-  }
-
-  const handlePause = () => {
-    setIsPlaying(false)
-  }
-
   // Handle dragging with threshold to avoid conflicts with video controls
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (mode !== 'floating') return
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (mode !== 'floating') return
 
-    // Don't start drag if clicking on buttons or resize handle
-    if ((e.target as HTMLElement).closest('button')) return
-    if ((e.target as HTMLElement).closest('.resize-handle')) return
+      // Don't start drag if clicking on buttons, controls, or resize handle
+      const target = e.target as HTMLElement
+      if (target.closest('button')) return
+      if (target.closest('.resize-handle')) return
+      if (target.closest('.floating-controls')) return
+      // Don't drag from Vidstack's built-in controls
+      if (target.closest('[data-media-controls]')) return
+      if (target.closest('.vds-controls')) return
 
-    // Allow dragging from anywhere including video, but with a threshold
-    setIsDragging(true)
-    setDragThresholdMet(false)
-    setDragStart({
-      x: e.clientX - floatingPos.x,
-      y: e.clientY - floatingPos.y,
-      startX: e.clientX,
-      startY: e.clientY,
-    })
-
-    // Prevent default only if we're not on video controls area
-    const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
-    if (videoElement) {
-      const rect = videoElement.getBoundingClientRect()
-      const relativeY = e.clientY - rect.top
-      const controlsHeight = 50 // Approximate height of video controls
-
-      // If clicking in the controls area at the bottom, don't prevent default
-      if (relativeY < rect.height - controlsHeight) {
-        e.preventDefault()
-      }
-    }
-  }
+      setIsDragging(true)
+      setDragThresholdMet(false)
+      setDragStart({
+        x: e.clientX - floatingPos.x,
+        y: e.clientY - floatingPos.y,
+        startX: e.clientX,
+        startY: e.clientY,
+      })
+      e.preventDefault()
+    },
+    [mode, floatingPos]
+  )
 
   useEffect(() => {
     if (!isDragging) return
 
     const handleMouseMove = (e: MouseEvent) => {
-      // Check if we've moved enough to consider it a drag (5px threshold)
       if (!dragThresholdMet) {
         const distance = Math.sqrt(
           Math.pow(e.clientX - dragStart.startX, 2) + Math.pow(e.clientY - dragStart.startY, 2)
         )
-
         if (distance < 5) return
-
         setDragThresholdMet(true)
-
-        // Add dragging class to prevent video interaction
-        if (containerRef.current) {
-          containerRef.current.style.pointerEvents = 'none'
-          const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
-          if (videoElement) {
-            videoElement.style.pointerEvents = 'none'
-          }
-        }
       }
 
       setFloatingPos({
@@ -146,15 +100,6 @@ export default function PersistentVideoPlayer({
     const handleMouseUp = () => {
       setIsDragging(false)
       setDragThresholdMet(false)
-
-      // Restore pointer events
-      if (containerRef.current) {
-        containerRef.current.style.pointerEvents = 'auto'
-        const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
-        if (videoElement) {
-          videoElement.style.pointerEvents = 'auto'
-        }
-      }
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -201,50 +146,6 @@ export default function PersistentVideoPlayer({
     }
   }, [isResizing, resizeStart])
 
-  // Video controls
-  const togglePlay = () => {
-    setIsPlaying(!isPlaying)
-  }
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted)
-  }
-
-  const toggleFullscreen = () => {
-    const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
-    let targetElement = containerRef.current as HTMLElement | null
-    if (!targetElement) targetElement = videoElement
-    if (!targetElement) return
-
-    if (!document.fullscreenElement) {
-      targetElement.requestFullscreen().catch(() => {})
-    } else {
-      document.exitFullscreen().catch(() => {})
-    }
-  }
-
-  const togglePiP = async () => {
-    const videoElement = playerRef.current?.getInternalPlayer() as HTMLVideoElement | null
-    if (!videoElement) return
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture()
-        setIsPiPActive(false)
-      } else {
-        await videoElement.requestPictureInPicture()
-        setIsPiPActive(true)
-      }
-    } catch {
-      // Silent error
-    }
-  }
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60)
-    const seconds = Math.floor(time % 60)
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`
-  }
-
   // Determine container styles based on mode
   const getContainerStyles = (): React.CSSProperties => {
     if (mode === 'hidden') {
@@ -285,61 +186,55 @@ export default function PersistentVideoPlayer({
       }}
       transition={{ duration: 0.2 }}
     >
-      {/* Video element - always the same one */}
-      <div
-        className="relative flex h-full w-full items-center justify-center bg-black [&>div>video]:!object-contain"
-        style={{
-          cursor: mode === 'floating' && !dragThresholdMet ? 'move' : 'default',
-        }}
-      >
-        <Player
-          ref={playerRef}
-          url={src}
-          playing={isPlaying}
-          muted={isMuted}
-          controls={true}
-          width="100%"
-          height="100%"
-          playsinline
-          config={{
-            file: {
-              attributes: {
-                poster: poster,
-                controlsList: 'nodownload',
-              },
-            },
-          }}
-          onProgress={handleProgress}
-          onDuration={handleDuration}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onError={(e: any) => {
-            console.error('Video loading error:', e)
-          }}
-          style={{ position: 'absolute', top: 0, left: 0 }}
-        />
+      {/* Video element with built-in Vidstack controls */}
+      <div className="relative h-full w-full bg-black">
+        {hasError ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-sm text-gray-400">Видео недоступно</p>
+            <button
+              onClick={() => setHasError(false)}
+              className="text-xs text-purple-400 transition-colors hover:text-purple-300"
+            >
+              Попробовать снова
+            </button>
+          </div>
+        ) : (
+          <MediaPlayer
+            ref={playerRef}
+            src={formatVideoSrc(src) as any}
+            title={title}
+            playsInline
+            onError={() => setHasError(true)}
+            className="h-full w-full"
+          >
+            <MediaProvider>
+              {poster && <Poster src={poster} alt={title || 'Video poster'} />}
+            </MediaProvider>
+            {/* Built-in Vidstack layout: play/pause, progress, volume, speed, fullscreen, PiP, keyboard shortcuts, gestures */}
+            <DefaultVideoLayout
+              icons={defaultLayoutIcons}
+              translations={vidstackTranslations}
+              playbackRates={[0.5, 0.75, 1, 1.25, 1.5, 2]}
+              seekStep={10}
+            />
+          </MediaPlayer>
+        )}
       </div>
 
-      {/* Controls for floating mode */}
+      {/* Floating mode: restore button + minimize control */}
       {mode === 'floating' && (
         <>
-          <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="absolute top-2 right-2 z-50 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
             {onModeChange && (
               <button
-                onClick={() => onModeChange('normal')}
-                className="rounded-full bg-black/50 p-1.5 text-white/80 backdrop-blur-sm transition-all hover:bg-black/70 hover:text-white"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onModeChange('normal')
+                }}
+                className="rounded-full bg-black/60 p-1.5 text-white/80 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white"
                 aria-label="Вернуть видео в основной вид"
               >
                 <Maximize2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="rounded-full bg-black/50 p-1.5 text-white/80 backdrop-blur-sm transition-all hover:bg-black/70 hover:text-white"
-                aria-label="Закрыть видео"
-              >
-                <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
@@ -354,73 +249,34 @@ export default function PersistentVideoPlayer({
         </>
       )}
 
-      {/* Controls for normal mode */}
-      {mode === 'normal' && (
-        <div className="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 transition-opacity group-hover:opacity-100">
-          <div className="mb-3">
-            <div className="h-1 overflow-hidden rounded-full bg-white/30">
-              <div
-                className="h-full bg-purple-500 transition-all"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
-              />
-            </div>
-            <div className="mt-1 flex justify-between text-xs text-white/80">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={togglePlay}
-                className="p-1 text-white transition-colors hover:text-purple-400"
-                aria-label={isPlaying ? 'Приостановить видео' : 'Воспроизвести видео'}
-              >
-                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-              </button>
-
-              <button
-                onClick={toggleMute}
-                className="p-1 text-white transition-colors hover:text-purple-400"
-                aria-label={isMuted ? 'Включить звук' : 'Отключить звук'}
-              >
-                {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-              </button>
-
-              <span className="ml-2 text-sm text-white">{title || 'Видео урока'}</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {document.pictureInPictureEnabled && (
-                <button
-                  onClick={() => void togglePiP()}
-                  className={`p-1 text-white transition-colors hover:text-purple-400 ${isPiPActive ? 'text-purple-400' : ''}`}
-                  aria-label="Картинка в картинке"
-                >
-                  <PictureInPicture2 className="h-5 w-5" />
-                </button>
-              )}
-
-              {onModeChange && (
-                <button
-                  onClick={() => onModeChange('floating')}
-                  className="p-1 text-white transition-colors hover:text-purple-400"
-                  aria-label="Открыть в плавающем окне"
-                >
-                  <Minimize2 className="h-5 w-5" />
-                </button>
-              )}
-
-              <button
-                onClick={toggleFullscreen}
-                className="p-1 text-white transition-colors hover:text-purple-400"
-                aria-label="Полноэкранный режим"
-              >
-                <Maximize className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
+      {/* Normal mode: minimize button */}
+      {mode === 'normal' && onModeChange && (
+        <div className="absolute top-2 right-2 z-50 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onModeChange('floating')
+            }}
+            className="rounded-full bg-black/60 p-1.5 text-white/80 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white"
+            aria-label="Свернуть в плавающее окно"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="4 14 10 14 10 20" />
+              <polyline points="20 10 14 10 14 4" />
+              <line x1="14" y1="10" x2="21" y2="3" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+          </button>
         </div>
       )}
     </motion.div>
