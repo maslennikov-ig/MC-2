@@ -42,21 +42,28 @@ if ! docker image inspect "$DOCLING_IMAGE" > /dev/null 2>&1; then
     exit 1
 fi
 
-# 4. Ensure infrastructure is running (shared with staging)
+# 4. Ensure data and secrets directories exist
+echo "Ensuring data directories exist..."
+mkdir -p "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
+         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev" \
+         "$BASE_PATH/secrets/notebooklm"
+echo "   Directories ready."
+
+# 5. Ensure infrastructure is running (shared with staging)
 echo "Ensuring infrastructure is running..."
 docker compose -f "$BASE_PATH/docker-compose.infra.yml" up -d
 echo "   Infrastructure ready."
 echo ""
 
-# 4. Pull latest images
+# 6. Pull latest images
 echo "Pulling latest develop images..."
 docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" pull
 
-# 5. Deploy dev containers (do NOT use --remove-orphans, it kills shared infra!)
+# 7. Deploy dev containers (do NOT use --remove-orphans, it kills shared infra!)
 echo "Deploying dev containers..."
 docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" up -d --force-recreate
 
-# 6. Health Check
+# 8. Health Check
 echo "Performing Health Checks..."
 
 # Check API health
@@ -95,7 +102,7 @@ if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
     exit 1
 fi
 
-# 7. Docker Cleanup (prevent disk space exhaustion)
+# 9. Docker Cleanup (prevent disk space exhaustion)
 echo ""
 echo "Cleaning up Docker resources..."
 

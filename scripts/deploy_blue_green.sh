@@ -61,7 +61,8 @@ fi
 # causing EACCES errors in container.
 echo "Ensuring data directories exist with correct permissions..."
 mkdir -p "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
-         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
+         "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev" \
+         "$BASE_PATH/secrets/notebooklm"
 sudo chown -R 1001:1001 "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
                          "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
 echo "   Data directories ready (owner: 1001:1001)."
@@ -180,13 +181,18 @@ docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_CO
 # They must be restarted to pick up new code after each deploy.
 echo "Updating workers with new image..."
 WORKER_COMPOSE="$BASE_PATH/docker-compose.production.yml"
-# Pull latest api image (already pulled by app deploy, but ensure workers see it)
-docker compose -f "$WORKER_COMPOSE" pull worker worker-stage6 worker-stage7 2>/dev/null || true
-# Restart workers one at a time to minimize job processing gaps
-for SVC in worker worker-stage6 worker-stage7; do
+INFRA_COMPOSE="$BASE_PATH/docker-compose.infra.yml"
+# Pull latest api image for stages 1-6 workers
+docker compose -f "$WORKER_COMPOSE" pull worker worker-stage6 2>/dev/null || true
+# Restart stages 1-6 workers one at a time to minimize job processing gaps
+for SVC in worker worker-stage6; do
     echo "   Restarting $SVC..."
     docker compose -f "$WORKER_COMPOSE" up -d --force-recreate --no-deps "$SVC"
 done
+# Stage 7 worker lives in infra.yml (has notebooklm-bridge dependency)
+echo "   Updating worker-stage7 and notebooklm-bridge..."
+docker compose -f "$INFRA_COMPOSE" pull worker-stage7 notebooklm-bridge 2>/dev/null || true
+docker compose -f "$INFRA_COMPOSE" up -d --force-recreate worker-stage7 notebooklm-bridge
 echo "   Workers updated!"
 echo ""
 

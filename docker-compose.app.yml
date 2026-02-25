@@ -60,6 +60,8 @@ services:
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      - NOTEBOOKLM_BRIDGE_URL=http://megacampus-notebooklm-bridge:8000
+      - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
     volumes:
       - ./data/uploads:/app/uploads
     healthcheck:
