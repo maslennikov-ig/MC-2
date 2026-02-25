@@ -149,6 +149,7 @@ export function UnifiedEnrichmentCard({
   const [isHovered, setIsHovered] = useState(false)
   const [isTouched, setIsTouched] = useState(false)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
+  const [isSelectOpen, setIsSelectOpen] = useState(false)
 
   // Options state for quiz, audio, presentation
   const [quizQuestions, setQuizQuestions] = useState('10')
@@ -241,13 +242,14 @@ export function UnifiedEnrichmentCard({
   }, [isDraftReady, existingEnrichment])
 
   // Show reveal panel on hover (desktop) or touch (mobile)
-  const shouldShowPanel = isHovered || isTouched
+  const shouldShowPanel = isHovered || isTouched || isSelectOpen
 
   // Close touch panel when generating starts
   useEffect(() => {
     let isMounted = true
     if (isGenerating && isMounted) {
       setIsTouched(false)
+      setIsSelectOpen(false)
     }
     return () => {
       isMounted = false
@@ -590,7 +592,10 @@ export function UnifiedEnrichmentCard({
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <EnrichmentCardOptions {...getOptionsProps()} />
+                    <EnrichmentCardOptions
+                      {...getOptionsProps()}
+                      onSelectOpenChange={setIsSelectOpen}
+                    />
                   </CollapsibleContent>
                 </Collapsible>
               </motion.div>
