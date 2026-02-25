@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.1
+
+_Released on 2026-02-25_
+
+### ✨ New Features
+
+- Redesign enrichment cards with unified grid, single-click video, and compact audio overlay
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.31.0
 
 _Released on 2026-02-24_
