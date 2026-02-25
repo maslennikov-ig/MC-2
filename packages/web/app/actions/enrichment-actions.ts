@@ -731,12 +731,15 @@ export async function getLessonEnrichments(
       return { success: false, error: 'Unauthorized' }
     }
 
-    // Fetch enrichments (only completed status for viewer)
+    // Fetch enrichments for the lesson (match SSR filter: exclude only failed/cancelled)
+    // Excludes 'metadata' column which can be 27MB+ for NLM types (bridge_response artifact)
+    const ENRICHMENT_DISPLAY_COLUMNS =
+      'id, enrichment_type, status, content, lesson_id, course_id, created_at, updated_at, title, order_index, asset_id, error_details, error_message, generated_at, generation_attempt' as const
     const { data: enrichments, error } = await supabase
       .from('lesson_enrichments')
-      .select('*')
+      .select(ENRICHMENT_DISPLAY_COLUMNS)
       .eq('lesson_id', input.lessonId)
-      .eq('status', 'completed')
+      .not('status', 'in', '(failed,cancelled)')
       .order('order_index', { ascending: true })
 
     if (error) {
@@ -744,7 +747,9 @@ export async function getLessonEnrichments(
       return { success: false, error: 'Failed to fetch enrichments' }
     }
 
-    return { success: true, enrichments: enrichments || [] }
+    // metadata excluded from select — cast is safe since frontend never accesses it
+    type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+    return { success: true, enrichments: (enrichments as EnrichmentRow[]) || [] }
   } catch (error) {
     logger.error('[getLessonEnrichments] Unexpected error', {
       error: error instanceof Error ? error.message : String(error),

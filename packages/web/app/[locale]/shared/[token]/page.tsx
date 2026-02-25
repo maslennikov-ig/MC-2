@@ -180,9 +180,12 @@ export default async function SharedCoursePage({ params }: PageProps) {
   if (flatLessons.length > 0) {
     const lessonIds = flatLessons.map((l) => l.id)
     const adminSupabase = getAdminClient()
+    // Excludes 'metadata' column which can be 27MB+ for NLM types
+    const ENRICHMENT_DISPLAY_COLUMNS =
+      'id, enrichment_type, status, content, lesson_id, course_id, created_at, updated_at, title, order_index, asset_id, error_details, error_message, generated_at, generation_attempt' as const
     const { data: enrichments, error: enrichmentsError } = await adminSupabase
       .from('lesson_enrichments')
-      .select('*')
+      .select(ENRICHMENT_DISPLAY_COLUMNS)
       .in('lesson_id', lessonIds)
       .eq('status', 'completed')
       .order('order_index')
@@ -194,7 +197,7 @@ export default async function SharedCoursePage({ params }: PageProps) {
         error: enrichmentsError.message,
       })
     } else {
-      enrichmentsByLessonId = groupEnrichmentsByLessonId(enrichments)
+      enrichmentsByLessonId = groupEnrichmentsByLessonId(enrichments as EnrichmentRow[])
     }
   }
 

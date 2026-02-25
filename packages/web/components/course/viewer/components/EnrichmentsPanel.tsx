@@ -79,7 +79,8 @@ export function EnrichmentsPanel({
   const handleGenerationComplete = useCallback(
     (_enrichmentId: string) => {
       toast.success(t('viewer.generationComplete'))
-      onRefreshEnrichments?.()
+      // Small delay to allow DB write propagation before refetch
+      setTimeout(() => onRefreshEnrichments?.(), 500)
     },
     [t, onRefreshEnrichments]
   )
@@ -165,6 +166,19 @@ export function EnrichmentsPanel({
       }
     })
   }, [enrichments, resumeGeneration, t])
+
+  // Auto-clear recentlyCompleted for types that now have completed enrichment data
+  // This ensures non-image types (audio, quiz, etc.) don't stay in skeleton state
+  useEffect(() => {
+    ALL_PLACEHOLDER_TYPES.forEach((type) => {
+      if (
+        isRecentlyCompleted(type) &&
+        enrichments.some((e) => e.enrichment_type === type && e.status === 'completed')
+      ) {
+        clearRecentlyCompleted(type)
+      }
+    })
+  }, [enrichments, isRecentlyCompleted, clearRecentlyCompleted])
 
   // Filter out cover type - it's displayed as hero banner in lesson content
   const filteredEnrichments = enrichments.filter((e) => (e.enrichment_type as string) !== 'cover')
