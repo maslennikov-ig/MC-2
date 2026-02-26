@@ -1,151 +1,117 @@
-# Fix: Video generation state lost on page navigation
+# Fix: Audio playback and Media tab broken on Dev server
 
 ## Context
 
-When the user starts NLM video generation, navigates away from the lesson page, and then returns, the UI shows the "Generate" button again instead of showing the in-progress generation state. The generation IS still running on the backend (visible in NotebookLM), but the frontend fails to resume tracking it.
+On the Dev server (dev.ai.megacampus.ru), three issues exist:
 
-This affects ALL enrichment types (audio, quiz, presentation, nlm_video, etc.), not just video.
+1. **Audio in lesson content**: infinite "loading audio" spinner, never plays
+2. **Media tab**: enrichment cards show briefly as loading, then appear without play buttons
+3. **Video in lesson content**: works fine (accidentally, via legacy fallback)
 
-**Verified**: React docs confirm effects run in definition order after render. Next.js docs confirm page re-open triggers full SSR → hydration → mount from scratch (SSR data is fresh, not stale).
+Everything works locally because local dev uses Supabase Storage (not local filesystem).
 
-## Root Cause: Two Bugs
+## Root Cause: Missing `USE_LOCAL_STORAGE` on API container
 
-### Bug 1: Stale data guard blocks resume on fresh page load
+**Verified via SSH to server.**
 
-**File**: `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx:122-139`
+In `docker-compose.dev.yml`:
 
-Full effect execution order on mount (hooks fire first, then component effects):
+- `worker-stage7-dev` has `USE_LOCAL_STORAGE=true` → saves enrichment files to local filesystem
+- `api-dev` does **NOT** have `USE_LOCAL_STORAGE` → defaults to `false` → tries Supabase signed URLs
 
-1. **Hook Effect A** (hook line 126): `mountedRef = true` `[deps: []]`
-2. **Hook Effect B** (hook line 143): `setGenerating(new Map())` — resets state `[deps: [lessonId]]`
-3. **Panel Effect C** (panel line 122): `isInitialLoadRef = true`, `lessonSwitchTimeRef = Date.now()` `[deps: [lessonId]]`
-4. **Panel Effect D** (panel line 129): resume logic — checks stale guard `[deps: [enrichments, resumeGeneration, t]]`
+When the browser calls `getPlaybackUrl` tRPC endpoint:
 
-Effect C sets `lessonSwitchTimeRef = Date.now()` (T0). Then Effect D: `timeSinceSwitch = Date.now() - T0` ≈ 0ms → `< 100` → **skipped**. Since SSR enrichments data never changes, no dependency triggers a re-run → resume NEVER fires.
+1. `api-dev` receives the request
+2. `useLocalStorage()` returns `false` (env var not set)
+3. Calls `getSignedUrl(assetPath)` → Supabase Storage → file doesn't exist there → throws error
+4. Returns `{ url: null }` to the client
+5. Client shows no play button (video/audio)
 
-The stale guard is correct for SPA lesson switching (avoids stale cached data), but wrong for fresh page loads where SSR data IS fresh.
+**Why video works in lesson content tab despite this:**
 
-### Bug 2: Placeholder filter excludes types with active enrichment records
+`LessonMaterialsSwitcher` has a legacy asset fallback (lines 189-237) that bypasses the API entirely. It reads `asset.file_path` from SSR data and constructs a direct URL:
 
-**File**: `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx:279-300`
+```
+/storage/enrichments/${legacyVideoAsset.file_path}
+```
 
-The `ALL_PLACEHOLDER_TYPES.filter(...)` decides which types get placeholder/generating cards:
+Browser resolves this to `https://dev.ai.megacampus.ru/storage/enrichments/...` → nginx serves the file from disk. No API server involved.
 
-- Image types: always shown
-- Other types: shown only when `!groupedEnrichments[type]` (NO enrichment record exists)
-- NLM types: shown only when all records have legacy draft statuses
-
-When the user returns to the page, the enrichment record EXISTS in the DB with status `pending`/`generating`. So `groupedEnrichments['nlm_video']` exists → filter returns `false` → type excluded from the loop → `EnrichmentGeneratingCard` **never renders**.
-
-The enrichment is also NOT shown in `completedEnrichments` grid (line 237-253) because `GRID_DISPLAY_STATUSES` only includes `completed`, `failed`, `cancelled`.
-
-**Result**: The enrichment is in a "dead zone" — invisible to both grids. Both bugs must be fixed together.
+Audio has no such fallback → depends entirely on the broken `getPlaybackUrl` API path → infinite loader.
 
 ## Fix Plan
 
-### Step 1: Fix Bug 1 — Distinguish first mount from SPA navigation
+### Step 1: Add `USE_LOCAL_STORAGE` to `api-dev` service (root cause fix)
 
-**File**: `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx`
+**File**: `docker-compose.dev.yml` (on server at `/opt/megacampus/docker-compose.dev.yml`)
+**Also in repo**: `deploy/docker/docker-compose.dev.yml` (if exists) or create from server copy
 
-Two changes:
+Add to `api-dev.environment`:
 
-**a)** Change `isInitialLoadRef` initialization from `true` to `false`:
-
-```typescript
-const isInitialLoadRef = useRef(false); // was: useRef(true)
+```yaml
+api-dev:
+  environment:
+    # ... existing vars ...
+    # Local storage for enrichment playback URLs (must match worker-stage7-dev)
+    - USE_LOCAL_STORAGE=true
+    - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
+    - ENRICHMENTS_PUBLIC_BASE_URL=https://dev.ai.megacampus.ru
 ```
 
-**b)** Add `isFirstMountRef` to skip the lessonId effect on first mount (SSR data is fresh):
+The API server doesn't need a volume mount for enrichments — it only builds the public URL. Nginx serves the actual files.
+
+### Step 2: Add `USE_LOCAL_STORAGE` to production API services
+
+Check `docker-compose.production.yml` / blue/green configs — if production also uses local storage, the API services need the same env vars. Otherwise the same bug exists on staging.
+
+**Files to check on server**:
+
+- `/opt/megacampus/docker-compose.production.yml`
+- `/opt/megacampus/docker-compose.app.yml`
+
+### Step 3: AudioPlayer — add `error` event listener (code robustness)
+
+**File**: `packages/web/components/course/viewer/enrichments/AudioPlayer.tsx`
+
+Currently: no `error` event listener on `<audio>`. If source fails → `loadstart` fires (spinner on) → `canplay` never fires → spinner forever.
+
+Fix:
+
+1. Add `hasError` state
+2. Add `error` event listener → `setIsLoading(false); setHasError(true)`
+3. Reset `hasError` when `playbackUrl` changes
+4. Show error UI instead of infinite loader when `hasError` is true
+
+### Step 4: EnrichmentCard — proper "unavailable" state (code robustness)
+
+**File**: `packages/web/components/course/viewer/components/EnrichmentCard.tsx`
+
+Currently: when `getPlaybackUrl` returns null, `playbackUrl` stays null, `urlLoading` becomes false, card falls to default placeholder — no play button, no error message.
+
+Fix: When URL fetch completes and `playbackUrl` is null → set `urlError = true` so the existing error UI renders ("Video unavailable" / "Audio unavailable").
+
+In the `useEffect` (line 88-98):
 
 ```typescript
-const isFirstMountRef = useRef(true);
-
-// Reset state when lessonId changes (SPA lesson switch only, not first mount)
-useEffect(() => {
-  if (isFirstMountRef.current) {
-    isFirstMountRef.current = false;
-    return; // First mount: SSR data is fresh, no stale guard needed
-  }
-  resumedTypesRef.current.clear();
-  isInitialLoadRef.current = true;
-  lessonSwitchTimeRef.current = Date.now();
-}, [lessonId]);
+.then((url) => {
+  setPlaybackUrl(url)
+  if (!url) setUrlError(true)  // null URL = unavailable
+})
 ```
-
-**Result on fresh page load**: `isInitialLoadRef` stays `false` → stale guard not entered → resume effect runs immediately.
-**Result on SPA lesson switch**: lessonId effect sets `isInitialLoadRef = true` → stale guard activates → waits for fresh data refetch (150ms, via course-viewer-enhanced.tsx:110).
-
-### Step 2: Fix Bug 2 — Include active-status enrichments in placeholder filter
-
-**File**: `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx`
-
-Add an active generation status check to the filter (before the NLM legacy check):
-
-```typescript
-ALL_PLACEHOLDER_TYPES.filter(type => {
-  if (IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')) return true;
-  if (!groupedEnrichments[type]) return true;
-
-  // NEW: Show placeholder/generating card for enrichments with active generation status
-  // This ensures EnrichmentGeneratingCard renders during resume after page navigation
-  if (groupedEnrichments[type].some(e => isActiveGenerationStatus(e.status))) return true;
-
-  if (isNlmType(type)) {
-    return groupedEnrichments[type].every(enrichment => isLegacyNlmDraftStatus(enrichment.status));
-  }
-  return false;
-});
-```
-
-### Step 3: Show syncing state before resume hook fires
-
-**File**: `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx`
-
-Inside the placeholder card render, also detect enrichments with active status directly (to cover the brief window before the resume hook fires):
-
-```typescript
-// Inside the .map() callback, around line 314:
-const activeEnrichmentForType = groupedEnrichments[type]?.find(
-  (e) => isActiveGenerationStatus(e.status) && isEnrichmentOnDemand(e)
-)
-
-if (typeIsGenerating && generatingProgress) {
-  return <EnrichmentGeneratingCard ... />
-}
-
-// NEW: Show syncing card for enrichments with active DB status even before hook resumes
-if (activeEnrichmentForType) {
-  const parsedCreatedAt = Date.parse(activeEnrichmentForType.created_at ?? '')
-  return (
-    <EnrichmentGeneratingCard
-      key={type}
-      type={type}
-      progress={-1}
-      currentStep="syncing"
-      startedAtMs={Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined}
-      maxDurationMs={NLM_ENRICHMENT_TYPES.has(type as NlmEnrichmentType) ? 60 * 60 * 1000 : undefined}
-      onCancel={() => void cancelGeneration(type)}
-    />
-  )
-}
-
-return <UnifiedEnrichmentCard ... />
-```
-
-Note: Step 3 acts as an immediate visual fallback — the user sees "syncing" instantly on page load,
-then once the resume effect fires and polling starts, the real progress takes over via the `typeIsGenerating` branch.
 
 ## Files to Modify
 
-1. `packages/web/components/course/viewer/components/EnrichmentsPanel.tsx` — all three fixes (single file, ~15 lines changed)
+1. `docker-compose.dev.yml` (on server) — Add USE_LOCAL_STORAGE to api-dev (Step 1)
+2. Production docker-compose (on server) — Add USE_LOCAL_STORAGE to API services (Step 2)
+3. `packages/web/components/course/viewer/enrichments/AudioPlayer.tsx` — Error handling (Step 3)
+4. `packages/web/components/course/viewer/components/EnrichmentCard.tsx` — Null URL → error state (Step 4)
 
 ## Verification
 
-1. Start NLM video generation for a lesson
-2. Navigate away from the page (close tab or navigate to another page)
-3. Reopen/navigate back to the lesson page -> go to Media tab
-4. **Expected**: EnrichmentGeneratingCard shows with syncing/progress state
-5. Wait for polling to start -> progress updates should appear
-6. Also test: switching between lessons within the same page (SPA navigation) still works correctly
-7. Run type-check: `pnpm type-check`
-8. Run build: `pnpm build`
+1. SSH to server, add env vars to `api-dev`, restart: `docker compose -f docker-compose.dev.yml restart api-dev`
+2. Test on `dev.ai.megacampus.ru`: open a lesson with audio/video enrichments
+3. **Audio in content tab**: should play (not infinite loader)
+4. **Media tab**: should show play buttons on completed enrichments
+5. **Video in content tab**: should still work (now via main path, not fallback)
+6. Deploy code fixes → `pnpm type-check && pnpm build`
+7. Verify AudioPlayer shows error state when source is broken (not infinite loader)

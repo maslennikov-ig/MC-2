@@ -45,6 +45,7 @@ coverage/
 # --- Agent/Tool Configurations ---
 # We WANT to commit agent commands and configs, but not their temp work folders
 .gemini/tmp/
+.agent/
 
 # We WANT to commit shared Claude configs, but not local user settings
 .claude/settings.local.json

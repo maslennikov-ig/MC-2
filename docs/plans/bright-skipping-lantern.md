@@ -1,164 +1,265 @@
-# Plan: Phase 3 — Redis Cache (Консервативный вариант)
+# Plan: Phase 3b — Redis Read-Side Cache для Stage 3/4
 
 ## Context
 
-Phase 1+2 выполнены: DB 391→153 MB, egress оптимизирован. Phase 3 добавляет Redis cache-aside на стороне **записи** для ускорения последующих стейджей. **Read paths НЕ трогаем** — если Redis пуст, всё работает как раньше через Supabase.
+Phase 3 (write-side caching) выполнена: Stage 2 записывает `markdown_content` и `processed_content` в Redis при обработке файлов. Кэш **уже прогрет** к моменту запуска Stage 3/4, но Stage 3/4 всё ещё читают контент из Supabase — это **70-80% egress** пайплайна.
 
-## Scope (Консервативный)
+**Цель**: Подключить Redis read-side в Stage 3/4, чтобы при тёплом кэше контент файлов не загружался из Supabase.
 
-- **Write-side only**: Stage 2 кэширует `markdown_content` и `processed_content` в Redis при записи в file_catalog
-- **Stage 6+7 lesson markdown**: Stage 6 кэширует markdown в Redis, Stage 7 пробует Redis первым (fallback на metadata как раньше)
-- **markdownContent остаётся в metadata** (backward compat, убрать позже)
-- **Stage 3, Stage 4 НЕ трогаем** — читают из Supabase как раньше. Redis-оптимизацию чтения добавим позже.
+**Гарантия безопасности**: Redis miss → Supabase fallback. Если Redis пуст, поведение идентично текущему.
 
 ---
 
-## Task A: Создать file-content-cache.ts + обновить cleanup
+## Оценка эффекта на Supabase egress
 
-**Тип**: делаю сам
-**Файлы**:
+| Stage                    | Что читает                                             | Payload per course    | С Redis cache      |
+| ------------------------ | ------------------------------------------------------ | --------------------- | ------------------ |
+| Stage 3 (classification) | `processed_content` + `markdown_content` per file      | **10-50 MB**          | ~0 (metadata only) |
+| Stage 4 (budget)         | `processed_content` all + `markdown_content` full_text | **5-20 MB**           | ~0 (metadata only) |
+| Stage 7 (enrichments)    | `lesson_contents`                                      | ~5-10 MB              | ~0 (уже сделано)   |
+| **Итого**                |                                                        | **20-80 MB / course** | **~0 MB / course** |
 
-- `packages/course-gen-platform/src/shared/cache/file-content-cache.ts` — **NEW**
-- `packages/course-gen-platform/src/shared/cleanup/redis-cleanup.ts` — add 2 patterns (line 76-80)
+---
 
-### API модуля:
+## Task E: Добавить `getCachedFileProcessedContent()` в cache module
+
+**Файл**: `packages/course-gen-platform/src/shared/cache/file-content-cache.ts`
+
+Добавить read-функцию для `processed_content` (write уже есть — `cacheFileProcessedContent`):
 
 ```typescript
-// Write (fire-and-forget, never throw)
-cacheFileMarkdown(courseId, fileId, content): Promise<void>
-cacheFileProcessedContent(courseId, fileId, content): Promise<void>
-cacheLessonMarkdown(courseId, lessonId, content): Promise<void>
-
-// Read (return null on miss/error)
-getCachedFileMarkdown(courseId, fileId): Promise<string | null>
-getCachedLessonMarkdown(courseId, lessonId): Promise<string | null>
-```
-
-Redis keys: `file_cache:{courseId}:{fileId}:markdown`, `file_cache:{courseId}:{fileId}:processed`, `lesson_md:{courseId}:{lessonId}`. TTL = 4h.
-
-Используем raw `getRedisClient()` с `setex`/`get` (строки, не JSON) — данные уже строки.
-
-### Cleanup
-
-Добавить в `cleanupRedisForCourse()` (line 76-80):
-
-```
-`file_cache:${courseId}:*`
-`lesson_md:${courseId}:*`
+export async function getCachedFileProcessedContent(
+  courseId: string,
+  fileId: string
+): Promise<string | null> {
+  try {
+    const redis = getRedisClient();
+    return await redis.get(fileProcessedKey(courseId, fileId));
+  } catch (error) {
+    logger.debug(
+      { courseId, fileId, error: error instanceof Error ? error.message : String(error) },
+      '[FileContentCache] Failed to read cached file processed content (non-fatal)'
+    );
+    return null;
+  }
+}
 ```
 
 ---
 
-## Task B: Stage 2 — кэшировать file_catalog при записи
+## Task F: Stage 3 — Redis cache-aside в `fetchFileMetadata()`
 
-**Тип**: subagent
-**Файлы** (все в `packages/course-gen-platform/src/stages/stage2-document-processing/`):
+**Файл**: `packages/course-gen-platform/src/stages/stage3-classification/phases/phase-classification.ts`
 
-### B1. `orchestrator-helpers.ts` — `storeProcessedDocument()` (line 159)
+### F1. `fetchFileMetadata()` (line 544)
 
-- Добавить `courseId: string` как 3-й параметр
-- After successful Supabase UPDATE (line 172): `void cacheFileMarkdown(courseId, fileId, processingResult.markdown)`
-- Import: `import { cacheFileMarkdown } from '../../shared/cache/file-content-cache'`
+Добавить `courseId: string` как 3-й параметр. Перед Supabase query — попытаться получить контент из Redis:
 
-### B2. `orchestrator.ts` (line 79) — caller
+```typescript
+async function fetchFileMetadata(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  fileIds: string[],
+  courseId: string
+): Promise<FileMetadata[]> {
+  // Step 1: Try Redis for content (processed_content preferred, fallback to markdown)
+  const contentMap = new Map<string, string>();
+  await Promise.all(
+    fileIds.map(async fid => {
+      const cached =
+        (await getCachedFileProcessedContent(courseId, fid)) ||
+        (await getCachedFileMarkdown(courseId, fid));
+      if (cached) contentMap.set(fid, cached);
+    })
+  );
 
-- `storeProcessedDocument(fileId, processingResult)` → `storeProcessedDocument(fileId, processingResult, context.courseId)`
-- `context.courseId` доступен (line 60)
+  const allCached = contentMap.size === fileIds.length;
 
-### B3. `phases/phase-6-summarization-helpers.ts` — `storeSummary()` (line 378) + `storeFullText()` (line 462)
+  // Step 2: Query Supabase — skip content fields when ALL files cached
+  const { data, error } = await supabase
+    .from('file_catalog')
+    .select(
+      allCached
+        ? 'id, filename, generated_title, original_name, mime_type, file_size, summary_metadata'
+        : 'id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata'
+    )
+    .in('id', fileIds);
 
-- `storeSummary()`: Добавить `courseId: string` как 1-й параметр. After Supabase UPDATE (line 420): `void cacheFileProcessedContent(courseId, fileId, summary)`
-- `storeFullText()`: Аналогично. After UPDATE (line 495): `void cacheFileProcessedContent(courseId, fileId, fullText)`
-- Import: `import { cacheFileProcessedContent } from '../../shared/cache/file-content-cache'`
+  // ... error handling as before ...
 
-### B4. `phases/phase-6-summarization.ts` — 5 callers
+  return data.map(file => {
+    // Use cached content if available, else Supabase content
+    const content =
+      contentMap.get(file.id) || file.processed_content || file.markdown_content || '';
+    // ... rest of transform unchanged ...
+  });
+}
+```
 
-- Line 252: `storeFullText(` → `storeFullText(courseId, `
-- Line 382: `storeFullText(` → `storeFullText(courseId, `
-- Line 459: `storeSummary(` → `storeSummary(courseId, `
-- Line 512: `storeSummary(` → `storeSummary(courseId, `
-- Line 549: `storeFullText(` → `storeFullText(courseId, `
-- `courseId` доступен через параметры всех функций (thread from `executePhase6Summarization()` line 143)
+**Логика**:
+
+- Тёплый кэш (95% случаев): 1 light Supabase query (metadata only, ~1KB/file) + Redis reads. **Экономия: 10-50 MB egress.**
+- Холодный кэш: Полный Supabase query как раньше + нулевой overhead от Redis misses.
+- Частичный кэш: Полный query (безопасный fallback), но cached content используется для hit-файлов.
+
+### F2. Callers — передать `courseId`
+
+| Место вызова                         | Строка | `courseId` доступен?  |
+| ------------------------------------ | ------ | --------------------- |
+| `executeComparativeClassification()` | 239    | Да — параметр функции |
+| `executeDocumentClassification()`    | 447    | Да — параметр функции |
+
+Оба вызова: `fetchFileMetadata(supabase, fileIds)` → `fetchFileMetadata(supabase, fileIds, courseId)`
+
+Import: `import { getCachedFileProcessedContent, getCachedFileMarkdown } from '../../../shared/cache/file-content-cache';`
 
 ---
 
-## Task C: Stage 6 — кэшировать lesson markdown в Redis
+## Task G: Stage 4 — Redis cache-aside в `fetchDocumentSummaries()` и `fetchFullTextDocuments()`
 
-**Тип**: subagent
-**Файл**: `packages/course-gen-platform/src/stages/stage6-lesson-content/services/database-service.ts`
+**Файл**: `packages/course-gen-platform/src/stages/stage4-analysis/handler-helpers.ts`
 
-### C1. `saveLessonContent()` (line 221)
+### G1. `fetchDocumentSummaries()` (line 330)
 
-- **Line 263** (`markdownContent: extractContentMarkdown(...)`) — **ОСТАВИТЬ** в metadata (backward compat)
-- **Before insert**: extract markdown в переменную: `const markdown = extractContentMarkdown(result.lessonContent, language)`
-- **Use in metadata**: `markdownContent: markdown` (вместо inline call)
-- **After successful insert**: `void cacheLessonMarkdown(courseId, lessonUuid, markdown)`
-- Import: `import { cacheLessonMarkdown } from '../../../shared/cache/file-content-cache'`
+Разделить на два шага: metadata query (light) + content from Redis with Supabase fallback:
 
-### C2. `handlePartialSuccess()` (line 29)
+```typescript
+async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummaryResult[]> {
+  const supabase = getSupabaseAdmin();
 
-- **Line 53** — аналогично: extract → cache → keep in metadata
+  // Step 1: Light metadata query (no processed_content)
+  const { data: documents } = await supabase
+    .from('file_catalog')
+    .select('id, original_name, filename, summary_metadata, priority')
+    .eq('course_id', courseId)
+    .eq('vector_status', 'indexed')
+    .not('processed_content', 'is', null);
 
----
+  if (!documents || documents.length === 0) return [];
 
-## Task D: Stage 7 — читать markdown из Redis первым
+  // Step 2: Get processed_content from Redis
+  const contentMap = new Map<string, string>();
+  await Promise.all(
+    documents.map(async doc => {
+      const cached = await getCachedFileProcessedContent(courseId, doc.id);
+      if (cached) contentMap.set(doc.id, cached);
+    })
+  );
 
-**Тип**: subagent
-**Файлы** (все в `packages/course-gen-platform/src/stages/stage7-enrichments/`):
+  // Step 3: For cache misses, batch-fetch content from Supabase
+  const missedIds = documents.filter(d => !contentMap.has(d.id)).map(d => d.id);
+  if (missedIds.length > 0) {
+    const { data: contentData } = await supabase
+      .from('file_catalog')
+      .select('id, processed_content')
+      .in('id', missedIds);
+    for (const d of contentData || []) {
+      if (d.processed_content) contentMap.set(d.id, d.processed_content);
+    }
+  }
 
-### D1. `services/database-service.ts` — `getLessonContent()` (line 606)
+  // Step 4: Build results using contentMap
+  return documents.map(doc => {
+    const processedContent = contentMap.get(doc.id) || '';
+    // ... rest of transform uses processedContent instead of doc.processed_content
+  });
+}
+```
 
-- Добавить `courseId?: string` как 2-й опциональный параметр
-- Before Supabase query: `if (courseId) { const cached = await getCachedLessonMarkdown(courseId, lessonId); if (cached) return cached; }`
-- Existing logic (metadata.markdownContent → JSON.stringify) остаётся как fallback
-- Import: `import { getCachedLessonMarkdown } from '../../../shared/cache/file-content-cache'`
+**Логика**: Тёплый кэш = 1 light query. Холодный = 2 queries (same total data). Штраф: ~5ms round trip.
 
-### D2. Stage 7 handlers — 11 call sites
+### G2. `fetchFullTextDocuments()` (line 362)
 
-Все вызовы `getLessonContent(lesson.id)` → `getLessonContent(lesson.id, enrichmentContext.course.id)`
+Добавить `courseId: string` как 2-й параметр. Redis first, Supabase for misses:
 
-| Файл                                | Строка   |
-| ----------------------------------- | -------- |
-| `handlers/card-handler.ts`          | 128      |
-| `handlers/audio-handler.ts`         | 156      |
-| `handlers/quiz-handler.ts`          | 159      |
-| `handlers/video-handler.ts`         | 166      |
-| `handlers/nlm-audio-handler.ts`     | 185, 248 |
-| `handlers/presentation-handler.ts`  | 206, 377 |
-| `handlers/nlm-video-handler.ts`     | 243      |
-| `handlers/cover-handler-helpers.ts` | 206      |
+```typescript
+async function fetchFullTextDocuments(
+  documentIds: string[],
+  courseId: string
+): Promise<Map<string, string>> {
+  if (documentIds.length === 0) return new Map();
 
-Все handlers имеют `enrichmentContext.course.id` доступным рядом с вызовом.
+  // Try Redis first
+  const map = new Map<string, string>();
+  await Promise.all(
+    documentIds.map(async id => {
+      const cached = await getCachedFileMarkdown(courseId, id);
+      if (cached) map.set(id, cached);
+    })
+  );
+
+  // Fetch remaining from Supabase
+  const missedIds = documentIds.filter(id => !map.has(id));
+  if (missedIds.length > 0) {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from('file_catalog')
+      .select('id, markdown_content')
+      .in('id', missedIds)
+      .not('markdown_content', 'is', null);
+    for (const doc of data || []) {
+      if (doc.markdown_content) map.set(doc.id, doc.markdown_content);
+    }
+  }
+
+  return map;
+}
+```
+
+### G3. `resolveDocumentContent()` (line 387) — caller
+
+Добавить `courseId: string` как 3-й параметр, передать в `fetchFullTextDocuments`:
+
+```typescript
+export async function resolveDocumentContent(
+  allocation: Stage4BudgetAllocation,
+  documents: DocumentSummaryResult[],
+  courseId: string
+): Promise<DocumentSummaryResult[]> {
+  // ...
+  const fullTextMap = await fetchFullTextDocuments(fullTextIds, courseId);
+  // ... rest unchanged
+}
+```
+
+### G4. Caller в `orchestrator-helpers.ts` (line 216)
+
+```typescript
+resolvedDocumentSummaries = await resolveDocumentContent(
+  budgetAllocation,
+  originalDocumentSummaries,
+  courseId // ← добавить (courseId доступен на line 195)
+);
+```
+
+Import: `import { getCachedFileProcessedContent, getCachedFileMarkdown } from '../../shared/cache/file-content-cache';`
 
 ---
 
 ## Порядок выполнения
 
 ```
-1. Task A (я сам)    → file-content-cache.ts + cleanup
-2. Task B (agent)    → Stage 2 write caching         ─┐ параллельно
-   Task C (agent)    → Stage 6 lesson markdown cache  ─┘
-   Task D (agent)    → Stage 7 Redis read
-3. Verify            → pnpm type-check && pnpm build
+1. Task E (сам)     → getCachedFileProcessedContent в cache module
+2. Task F (agent)   → Stage 3 read-side cache    ─┐ параллельно
+   Task G (agent)   → Stage 4 read-side cache    ─┘
+3. Verify           → pnpm type-check && pnpm build
 4. Commit + push
 ```
-
-Task B и C можно параллельно (разные stage dirs). Task D зависит от Task A (cache module).
 
 ---
 
 ## Верификация
 
 1. `pnpm type-check && pnpm build` — компиляция
-2. `redis-cli KEYS "file_cache:*"` во время генерации — ключи появляются
-3. `redis-cli KEYS "lesson_md:*"` после Stage 6 — lesson markdown закэширован
-4. Stage 7 enrichments работают (quiz/audio/video)
-5. Старые lesson_contents (с markdownContent в metadata) читаются корректно
+2. Запустить генерацию курса → проверить в логах:
+   - Stage 3: `Loaded file for classification` — contentLength > 0 (контент получен из Redis)
+   - Stage 4: docs processed (content из Redis, metadata из Supabase)
+3. `redis-cli DBSIZE` до и после — ключи `file_cache:*` уже должны существовать (прогреты Stage 2)
+4. Ретест: остановить Redis → генерация всё равно работает (Supabase fallback)
 
 ---
 
 ## Что НЕ входит в scope
 
-- Stage 3/4 read-side optimization (позже, после стабилизации кэша)
-- Удаление markdownContent из metadata (позже, когда убедимся в стабильности Redis)
-- Batch Redis operations (mget) — не нужны в write-only подходе
+- `mget` batch operations (per-file `get` достаточно для 20-100 файлов, ~1-5ms total)
+- Stage 5/6 file_catalog reads (не найдены в коде — используют data от предыдущих stages)
+- Удаление `markdownContent` из lesson_contents metadata (backward compat)
