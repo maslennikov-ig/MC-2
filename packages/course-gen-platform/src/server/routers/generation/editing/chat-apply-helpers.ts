@@ -32,6 +32,7 @@ import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-au
 import { applySurgicalOperations } from './surgical-operations';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 // ============================================================================
 // Types
@@ -296,9 +297,8 @@ export async function applyLessonPatchProposal(
     .eq('id', courseId)
     .single();
 
-  if (lessonCourseError || !lessonCourse) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-  }
+  throwOnSupabaseError(lessonCourseError, 'Course', { requestId, courseId });
+  if (!lessonCourse) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
   assertCourseAccess(buildAuthContext(user), lessonCourse, 'apply proposal');
 

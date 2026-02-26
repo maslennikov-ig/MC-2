@@ -9,6 +9,7 @@
 import { TRPCError } from '@trpc/server';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 import type { EnrichmentStatus, EnrichmentType } from '@megacampus/shared-types';
 
 /**
@@ -52,31 +53,8 @@ export async function verifyEnrichmentAccess(
     .eq('id', enrichmentId)
     .single();
 
-  if (error) {
-    // PGRST116 = "JSON object requested, multiple (or no) rows returned" — row genuinely missing
-    if (error.code === 'PGRST116') {
-      logger.warn({ requestId, enrichmentId, userId, error }, 'Enrichment not found');
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Enrichment not found' });
-    }
-
-    // Network/transient error (e.g. TypeError: fetch failed during server restart)
-    // Must NOT be classified as NOT_FOUND — frontend uses that to stop polling permanently
-    logger.error(
-      { requestId, enrichmentId, userId, error },
-      'Enrichment lookup failed (transient)'
-    );
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Temporary error checking enrichment',
-    });
-  }
-
-  // With .single(), when error is null enrichment is guaranteed non-null.
-  // Safety net for future refactors that may switch to .maybeSingle().
-  if (!enrichment) {
-    logger.warn({ requestId, enrichmentId, userId }, 'Enrichment not found');
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Enrichment not found' });
-  }
+  throwOnSupabaseError(error, 'Enrichment', { requestId, enrichmentId, userId });
+  if (!enrichment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Enrichment not found' });
 
   // Verify course access
   const { data: course, error: courseError } = await supabase
@@ -85,31 +63,13 @@ export async function verifyEnrichmentAccess(
     .eq('id', enrichment.course_id)
     .single();
 
-  if (courseError) {
-    if (courseError.code === 'PGRST116') {
-      logger.warn(
-        { requestId, enrichmentId, courseId: enrichment.course_id, userId, error: courseError },
-        'Course not found for enrichment'
-      );
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-    }
-    logger.error(
-      { requestId, enrichmentId, courseId: enrichment.course_id, userId, error: courseError },
-      'Course lookup failed (transient)'
-    );
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Temporary error checking course access',
-    });
-  }
-
-  if (!course) {
-    logger.warn(
-      { requestId, enrichmentId, courseId: enrichment.course_id, userId },
-      'Course not found for enrichment'
-    );
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-  }
+  throwOnSupabaseError(courseError, 'Course', {
+    requestId,
+    enrichmentId,
+    courseId: enrichment.course_id,
+    userId,
+  });
+  if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
@@ -170,22 +130,8 @@ export async function verifyCourseAccess(
     .eq('id', courseId)
     .single();
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      logger.warn({ requestId, courseId, userId, error }, 'Course not found');
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-    }
-    logger.error({ requestId, courseId, userId, error }, 'Course lookup failed (transient)');
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Temporary error checking course',
-    });
-  }
-
-  if (!course) {
-    logger.warn({ requestId, courseId, userId }, 'Course not found');
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-  }
+  throwOnSupabaseError(error, 'Course', { requestId, courseId, userId });
+  if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
@@ -247,22 +193,8 @@ export async function verifyLessonAccess(
     .eq('id', lessonId)
     .single();
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      logger.warn({ requestId, lessonId, userId, error }, 'Lesson not found');
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
-    }
-    logger.error({ requestId, lessonId, userId, error }, 'Lesson lookup failed (transient)');
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Temporary error checking lesson',
-    });
-  }
-
-  if (!lesson) {
-    logger.warn({ requestId, lessonId, userId }, 'Lesson not found');
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
-  }
+  throwOnSupabaseError(error, 'Lesson', { requestId, lessonId, userId });
+  if (!lesson) throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
 
   // TypeScript: sections is a single object due to !inner join
   const section = lesson.sections as unknown as {

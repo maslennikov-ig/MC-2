@@ -15,6 +15,7 @@ import { createModelConfigService } from '../../../../shared/llm/model-config-se
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import { getElementAtPath } from '../_shared/helpers';
 import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
 
@@ -35,8 +36,8 @@ async function fetchAndValidateCourse(
     .eq('id', courseId)
     .single();
 
-  if (courseError || !course) {
-    logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
+  throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+  if (!course) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Course not found',

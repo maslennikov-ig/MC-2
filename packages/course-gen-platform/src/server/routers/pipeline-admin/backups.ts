@@ -17,6 +17,7 @@ import type { Database } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 // Type aliases for Database tables
 type PipelineGlobalSetting = Database['public']['Tables']['pipeline_global_settings']['Row'];
@@ -149,7 +150,8 @@ export const backupsRouter = router({
           .eq('id', input.backupId)
           .single();
 
-        if (error || !backup) {
+        throwOnSupabaseError(error, 'Backup', { backupId: input.backupId });
+        if (!backup) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Backup not found' });
         }
 

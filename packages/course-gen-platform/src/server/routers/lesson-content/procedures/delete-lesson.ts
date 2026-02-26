@@ -11,6 +11,7 @@ import { deleteLessonInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 /**
  * Delete a lesson and all related data
@@ -95,19 +96,14 @@ export const deleteLesson = protectedProcedure
           .eq('order_index', lessonNum)
           .single();
 
-        if (lessonError || !lessonData) {
-          logger.warn(
-            {
-              requestId,
-              courseId,
-              lessonId,
-              sectionNum,
-              lessonNum,
-              error: lessonError?.message,
-            },
-            'Lesson not found by section.lesson format'
-          );
-
+        throwOnSupabaseError(lessonError, 'Lesson', {
+          requestId,
+          courseId,
+          lessonId,
+          sectionNum,
+          lessonNum,
+        });
+        if (!lessonData) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: `Lesson ${lessonId} not found`,
@@ -124,17 +120,8 @@ export const deleteLesson = protectedProcedure
           .eq('sections.course_id', courseId)
           .single();
 
-        if (lessonError || !lessonData) {
-          logger.warn(
-            {
-              requestId,
-              courseId,
-              lessonId,
-              error: lessonError?.message,
-            },
-            'Lesson not found by UUID'
-          );
-
+        throwOnSupabaseError(lessonError, 'Lesson', { requestId, courseId, lessonId });
+        if (!lessonData) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: `Lesson ${lessonId} not found`,

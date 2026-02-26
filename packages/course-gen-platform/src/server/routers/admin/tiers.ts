@@ -19,6 +19,7 @@ import { superadminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 import {
   refreshCache as refreshTierCache,
   clearCache as clearTierCache,
@@ -244,7 +245,8 @@ export const tiersRouter = router({
           .eq('tier_key', input.tierKey)
           .single();
 
-        if (fetchError || !existingData) {
+        throwOnSupabaseError(fetchError, 'Tier settings', { tierKey: input.tierKey });
+        if (!existingData) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: ErrorMessages.notFound('Tier settings', input.tierKey),
@@ -397,7 +399,8 @@ export const tiersRouter = router({
           .eq('tier_key', tierKey)
           .single();
 
-        if (fetchError || !existingData) {
+        throwOnSupabaseError(fetchError, 'Tier settings', { tierKey });
+        if (!existingData) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: ErrorMessages.notFound('Tier settings', tierKey),

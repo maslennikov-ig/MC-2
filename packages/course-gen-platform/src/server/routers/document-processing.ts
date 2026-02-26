@@ -24,6 +24,7 @@ import { protectedProcedure } from '../middleware/auth';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { createRateLimiter } from '../middleware/rate-limit.js';
+import { throwOnSupabaseError } from '../utils/supabase-query-guard';
 import { nanoid } from 'nanoid';
 import { addJob } from '../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
@@ -74,17 +75,8 @@ async function verifyCourseAccess(
     .eq('id', courseId)
     .single();
 
-  if (error || !course) {
-    logger.warn(
-      {
-        requestId,
-        courseId,
-        userId,
-        error,
-      },
-      'Course not found'
-    );
-
+  throwOnSupabaseError(error, 'Course', { requestId, courseId, userId });
+  if (!course) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Course not found',
@@ -198,17 +190,8 @@ export const documentProcessingRouter = router({
           .eq('id', fileId)
           .single();
 
-        if (fileError || !file) {
-          logger.warn(
-            {
-              requestId,
-              fileId,
-              courseId,
-              error: fileError,
-            },
-            'Document not found'
-          );
-
+        throwOnSupabaseError(fileError, 'Document', { requestId, fileId, courseId });
+        if (!file) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Document not found',

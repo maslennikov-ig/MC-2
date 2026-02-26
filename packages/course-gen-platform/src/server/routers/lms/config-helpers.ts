@@ -16,6 +16,7 @@ import { lmsLogger } from '../../../integrations/lms/logger';
 import { createLMSAdapter } from '../../../integrations/lms';
 import { verifyOrganizationAccess, requireAdmin } from './helpers';
 import { testConnectionWithTimeout, updateConnectionTestResult } from './config-connection-helpers';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 const CONNECTION_TEST_TIMEOUT = 10000;
 
@@ -223,8 +224,9 @@ export async function handleGetConfig(
     .eq('id', configId)
     .single();
 
-  if (error || !config) {
-    lmsLogger.debug({ requestId, configId, error }, 'LMS configuration not found');
+  throwOnSupabaseError(error, 'LMS configuration', { requestId, configId });
+  if (!config) {
+    lmsLogger.debug({ requestId, configId }, 'LMS configuration not found');
     return null;
   }
 
@@ -313,8 +315,12 @@ export async function handleCreateConfig(
     .select('id, name, created_at')
     .single();
 
-  if (createError || !config) {
-    lmsLogger.error({ requestId, error: createError }, 'Failed to create LMS configuration');
+  throwOnSupabaseError(createError, 'LMS configuration', {
+    requestId,
+    organizationId: input.organization_id,
+    configName: input.name,
+  });
+  if (!config) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to create LMS configuration',
@@ -374,8 +380,8 @@ export async function handleUpdateConfig(
     .eq('id', configId)
     .single();
 
-  if (fetchError || !config) {
-    lmsLogger.warn({ requestId, configId, error: fetchError }, 'LMS configuration not found');
+  throwOnSupabaseError(fetchError, 'LMS configuration', { requestId, configId });
+  if (!config) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'LMS configuration not found',
@@ -433,11 +439,8 @@ export async function handleUpdateConfig(
     .select('id, updated_at')
     .single();
 
-  if (updateError || !updated) {
-    lmsLogger.error(
-      { requestId, configId, error: updateError },
-      'Failed to update LMS configuration'
-    );
+  throwOnSupabaseError(updateError, 'LMS configuration', { requestId, configId });
+  if (!updated) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to update LMS configuration',
@@ -509,11 +512,8 @@ export async function handleTestConnection(
     .eq('organization_id', organizationId)
     .single();
 
-  if (configError || !config) {
-    lmsLogger.warn(
-      { requestId, configId, organizationId, error: configError },
-      'LMS configuration not found'
-    );
+  throwOnSupabaseError(configError, 'LMS configuration', { requestId, configId, organizationId });
+  if (!config) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'LMS configuration not found or access denied',
@@ -603,8 +603,8 @@ export async function handleDeleteConfig(
     .eq('id', configId)
     .single();
 
-  if (fetchError || !config) {
-    lmsLogger.warn({ requestId, configId, error: fetchError }, 'LMS configuration not found');
+  throwOnSupabaseError(fetchError, 'LMS configuration', { requestId, configId });
+  if (!config) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'LMS configuration not found',

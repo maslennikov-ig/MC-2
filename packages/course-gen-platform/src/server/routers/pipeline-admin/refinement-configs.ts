@@ -26,6 +26,7 @@ import {
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 // Table name constant (created by migration 20251211140000_add_refinement_config_table)
 const REFINEMENT_CONFIG_TABLE = 'refinement_config' as const;
@@ -192,7 +193,8 @@ export const refinementConfigsRouter = router({
           .eq('id', input.id)
           .single();
 
-        if (fetchError || !currentConfig) {
+        throwOnSupabaseError(fetchError, 'Refinement configuration', { configId: input.id });
+        if (!currentConfig) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Refinement configuration not found',
@@ -270,10 +272,14 @@ export const refinementConfigsRouter = router({
           .select('*, users:created_by(email)')
           .single();
 
-        if (insertError || !insertedConfig) {
+        throwOnSupabaseError(insertError, 'Refinement configuration', {
+          configId: input.id,
+          operationMode: currentConfig.operation_mode,
+        });
+        if (!insertedConfig) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: `Failed to insert new config version: ${insertError?.message}`,
+            message: 'Failed to insert new config version',
           });
         }
 
@@ -438,7 +444,11 @@ export const refinementConfigsRouter = router({
           .eq('version', input.targetVersion)
           .single();
 
-        if (fetchError || !targetConfig) {
+        throwOnSupabaseError(fetchError, 'Refinement configuration version', {
+          operationMode: input.operationMode,
+          targetVersion: input.targetVersion,
+        });
+        if (!targetConfig) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: `Version ${input.targetVersion} not found for mode ${input.operationMode}`,
@@ -455,7 +465,10 @@ export const refinementConfigsRouter = router({
           .eq('is_active', true)
           .single();
 
-        if (currentError || !currentActive) {
+        throwOnSupabaseError(currentError, 'Active refinement configuration', {
+          operationMode: input.operationMode,
+        });
+        if (!currentActive) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'No active config found to deactivate',
@@ -500,10 +513,14 @@ export const refinementConfigsRouter = router({
           .select('*, users:created_by(email)')
           .single();
 
-        if (insertError || !insertedConfig) {
+        throwOnSupabaseError(insertError, 'Refinement configuration', {
+          operationMode: input.operationMode,
+          targetVersion: input.targetVersion,
+        });
+        if (!insertedConfig) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: `Failed to insert reverted config: ${insertError?.message}`,
+            message: 'Failed to insert reverted config',
           });
         }
 
@@ -637,10 +654,13 @@ export const refinementConfigsRouter = router({
           .select('*, users:created_by(email)')
           .single();
 
-        if (insertError || !insertedConfig) {
+        throwOnSupabaseError(insertError, 'Refinement configuration', {
+          operationMode: input.operationMode,
+        });
+        if (!insertedConfig) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: `Failed to insert default config: ${insertError?.message}`,
+            message: 'Failed to insert default config',
           });
         }
 

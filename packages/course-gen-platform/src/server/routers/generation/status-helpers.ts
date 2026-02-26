@@ -4,6 +4,7 @@ import { JobType } from '@megacampus/shared-types';
 import { TRPCError } from '@trpc/server';
 import { addJob } from '../../../orchestrator/queue';
 import { logger } from '../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 import { isValidStyle } from '@megacampus/shared-types/style-prompts';
 import type { CourseSettings } from './_shared/types';
 
@@ -165,7 +166,8 @@ export async function fetchCourseWithMetadata(
     .eq('id', courseId)
     .single();
 
-  if (courseError || !course) {
+  throwOnSupabaseError(courseError, 'Course', { courseId });
+  if (!course) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Course not found',

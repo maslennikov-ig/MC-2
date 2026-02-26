@@ -18,6 +18,7 @@ import { logger } from '../../../shared/logger/index.js';
 import type { Database } from '@megacampus/shared-types';
 import { assertCourseAccess, buildAuthContext } from '../../helpers/course-authorization';
 import { handleGetStatus, handleApproveStage } from './status-helpers';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 export const statusRouter = router({
   /**
@@ -93,9 +94,8 @@ export const statusRouter = router({
         .eq('id', courseId)
         .single();
 
-      if (error || !course) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-      }
+      throwOnSupabaseError(error, 'Course', { courseId, userId });
+      if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
       // Check authorization: superadmin/admin/owner can approve
       assertCourseAccess(buildAuthContext(ctx.user!), course, 'approve stage');

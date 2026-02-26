@@ -34,6 +34,7 @@ import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { lmsLogger } from '../../../integrations/lms/logger';
 import { nanoid } from 'nanoid';
 import { handlePublishCourse } from './publish-helpers';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 /**
  * Publish Router
@@ -227,8 +228,8 @@ export const publishRouter = router({
           .eq('id', job_id)
           .single();
 
-        if (jobError || !job) {
-          lmsLogger.warn({ requestId, jobId: job_id, error: jobError }, 'Job not found');
+        throwOnSupabaseError(jobError, 'Import job', { requestId, jobId: job_id });
+        if (!job) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Import job not found',
@@ -373,8 +374,8 @@ export const publishRouter = router({
           .eq('id', jobId)
           .single();
 
-        if (jobError || !job) {
-          lmsLogger.warn({ requestId, jobId, error: jobError }, 'Job not found');
+        throwOnSupabaseError(jobError, 'Import job', { requestId, jobId });
+        if (!job) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Import job not found',
