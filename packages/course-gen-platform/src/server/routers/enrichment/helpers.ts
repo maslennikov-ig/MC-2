@@ -52,21 +52,28 @@ export async function verifyEnrichmentAccess(
     .eq('id', enrichmentId)
     .single();
 
-  if (error || !enrichment) {
-    logger.warn(
-      {
-        requestId,
-        enrichmentId,
-        userId,
-        error,
-      },
-      'Enrichment not found'
-    );
+  if (error) {
+    // PGRST116 = "JSON object requested, multiple (or no) rows returned" — row genuinely missing
+    if (error.code === 'PGRST116') {
+      logger.warn({ requestId, enrichmentId, userId, error }, 'Enrichment not found');
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Enrichment not found' });
+    }
 
+    // Network/transient error (e.g. TypeError: fetch failed during server restart)
+    // Must NOT be classified as NOT_FOUND — frontend uses that to stop polling permanently
+    logger.error(
+      { requestId, enrichmentId, userId, error },
+      'Enrichment lookup failed (transient)'
+    );
     throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Enrichment not found',
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Temporary error checking enrichment',
     });
+  }
+
+  if (!enrichment) {
+    logger.warn({ requestId, enrichmentId, userId }, 'Enrichment not found');
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Enrichment not found' });
   }
 
   // Verify course access
