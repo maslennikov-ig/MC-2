@@ -203,7 +203,7 @@ const STATUS_MESSAGES: Record<string, string[]> = {
     'Финализируем квиз...',
   ],
 
-  // Audio/narration generation
+  // Audio/narration generation (short, for non-NLM audio)
   audio_generating: [
     'Генерируем аудио...',
     'Синтезируем голос...',
@@ -214,6 +214,28 @@ const STATUS_MESSAGES: Record<string, string[]> = {
     'Проверяем произношение...',
     'Оптимизируем качество звука...',
     'Финальная обработка аудио...',
+  ],
+
+  // NLM Audio generation (~30 min, 18 messages, progress-based)
+  nlm_audio_generating: [
+    'Подготавливаем текст для озвучки...',
+    'Анализируем структуру урока...',
+    'Определяем интонационную модель...',
+    'Отправляем данные в нейросеть...',
+    'Синтезируем голос нейросетью...',
+    'Генерация речи — процесс небыстрый...',
+    'Обрабатываем фрагменты аудио...',
+    'Нейросеть работает над произношением...',
+    'Склеиваем аудиофрагменты...',
+    'Добавляем естественные паузы...',
+    'Нормализуем громкость...',
+    'Улучшаем качество звука...',
+    'Проверяем плавность переходов...',
+    'Финальная обработка аудио...',
+    'Кодируем в финальный формат...',
+    'Проверяем качество результата...',
+    'Сохраняем аудиофайл...',
+    'Почти готово, завершаем...',
   ],
 
   // Presentation generation
@@ -229,7 +251,7 @@ const STATUS_MESSAGES: Record<string, string[]> = {
     'Финализируем слайды...',
   ],
 
-  // Video script generation
+  // Video script generation (short, for non-NLM video)
   video_generating: [
     'Создаём видеосценарий...',
     'Продумываем структуру...',
@@ -241,6 +263,28 @@ const STATUS_MESSAGES: Record<string, string[]> = {
     'Проверяем хронометраж...',
     'Оптимизируем подачу...',
     'Финализируем сценарий...',
+  ],
+
+  // NLM Video generation (~60 min, 18 messages, progress-based)
+  nlm_video_generating: [
+    'Анализируем контент для видео...',
+    'Создаём сценарий видеоурока...',
+    'Подбираем визуальный ряд...',
+    'Отправляем данные в нейросеть...',
+    'Генерируем графику и анимации...',
+    'Синтезируем голос для озвучки...',
+    'Рендерим видеофрагменты...',
+    'Нейросеть создаёт визуальные эффекты...',
+    'Монтируем видеоряд...',
+    'Накладываем озвучку на видео...',
+    'Синхронизируем аудио и видео...',
+    'Добавляем субтитры и пояснения...',
+    'Настраиваем переходы между сценами...',
+    'Финальная обработка видео...',
+    'Кодируем в финальный формат...',
+    'Сжимаем без потери качества...',
+    'Проверяем воспроизведение...',
+    'Почти готово, завершаем обработку...',
   ],
 }
 
@@ -346,6 +390,26 @@ export function useRotatingStatusMessage({
     totalMessages: messages.length,
     isLastMessage,
   }
+}
+
+/**
+ * Get a status message based on progress percentage (0-95).
+ * Used for NLM long-running types where messages should track progress,
+ * not time intervals.
+ *
+ * Since progress follows an ease-out curve, early messages change fast
+ * and late messages stay longer — matching the user's perception.
+ */
+const PROGRESS_CAP_FOR_MESSAGES = 95
+
+export function getMessageByProgress(statusKey: string, progress: number): string {
+  const messages = STATUS_MESSAGES[statusKey] || DEFAULT_MESSAGES
+  if (messages.length === 0) return ''
+  if (progress <= 0) return messages[0]
+
+  const normalized = Math.min(progress, PROGRESS_CAP_FOR_MESSAGES) / PROGRESS_CAP_FOR_MESSAGES
+  const index = Math.floor(normalized * (messages.length - 1))
+  return messages[Math.min(index, messages.length - 1)]
 }
 
 export default useRotatingStatusMessage

@@ -10,22 +10,22 @@ import type { OnDemandEnrichmentType, GenerationStep } from '@megacampus/shared-
 const DEFAULT_POLLING_INTERVAL = 2000 // 2 seconds
 const MAX_POLL_FAILURES = 5
 const MAX_BACKOFF_INTERVAL = 10000 // 10 seconds
-const NLM_MAX_GENERATION_DURATION_MS = 60 * 60 * 1000 // 60 minutes
+const NLM_AUDIO_MAX_DURATION_MS = 60 * 60 * 1000 // 60 minutes
+const NLM_VIDEO_MAX_DURATION_MS = 60 * 60 * 1000 // 60 minutes
 
 // Optimistic UI prefix for temporary IDs before API response
 const OPTIMISTIC_ID_PREFIX = 'optimistic-'
-const NLM_LONG_RUNNING_TYPES: ReadonlySet<OnDemandEnrichmentType> = new Set([
-  'nlm_audio',
-  'nlm_video',
-])
-
 const log = createLogger({ hook: 'useEnrichmentGeneration' })
 
-function getMaxDurationForType(type: OnDemandEnrichmentType): number | undefined {
-  if (NLM_LONG_RUNNING_TYPES.has(type)) {
-    return NLM_MAX_GENERATION_DURATION_MS
+export function getMaxDurationForType(type: OnDemandEnrichmentType): number | undefined {
+  switch (type) {
+    case 'nlm_audio':
+      return NLM_AUDIO_MAX_DURATION_MS
+    case 'nlm_video':
+      return NLM_VIDEO_MAX_DURATION_MS
+    default:
+      return undefined
   }
-  return undefined
 }
 
 function isAbortLikeError(error: unknown): boolean {

@@ -6,7 +6,10 @@ import { Video, Headphones, Presentation, HelpCircle, Image } from 'lucide-react
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useSmoothProgress } from '@/lib/hooks/useSmoothProgress'
-import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
+import {
+  useRotatingStatusMessage,
+  getMessageByProgress,
+} from '@/lib/hooks/useRotatingStatusMessage'
 import { getNextMilestone } from '@megacampus/shared-types'
 import { StagedProgress } from '@/components/ui/staged-progress'
 import { SmoothProgress } from '@/components/ui/smooth-progress'
@@ -85,6 +88,8 @@ const GENERATION_STAGES = [
 
 const LONG_RUNNING_PROGRESS_CAP = 95
 const LONG_RUNNING_EASING_POWER = 2.2
+const EXTENSION_STEP_MS = 10 * 60 * 1000 // 10-min extensions when timer expires
+const ABSOLUTE_MAX_DURATION_MS = 3 * 60 * 60 * 1000 // 3-hour hard cap
 
 function clampProgress(value: number): number {
   if (!Number.isFinite(value)) return 0
@@ -282,13 +287,15 @@ export function EnrichmentGeneratingCard({
         case 'quiz':
           return 'quiz_generating'
         case 'audio':
-        case 'nlm_audio':
           return 'audio_generating'
+        case 'nlm_audio':
+          return 'nlm_audio_generating'
         case 'presentation':
           return 'presentation_generating'
         case 'video':
-        case 'nlm_video':
           return 'video_generating'
+        case 'nlm_video':
+          return 'nlm_video_generating'
         default:
           return 'generating'
       }
@@ -296,12 +303,6 @@ export function EnrichmentGeneratingCard({
     // For other states (queued, finalizing, etc.) use as-is
     return currentStep
   }
-
-  // Rotating status messages
-  const { message: statusMessage } = useRotatingStatusMessage({
-    status: getRotatingStatus(),
-    interval: 5000,
-  })
 
   const shouldShowLongRunningCountdown =
     (type === 'nlm_audio' || type === 'nlm_video') &&
@@ -329,27 +330,37 @@ export function EnrichmentGeneratingCard({
     }
   }, [shouldShowLongRunningCountdown])
 
+  // Auto-extend duration in 10-min steps when timer expires (up to 3h hard cap).
+  // Generation should never appear to "time out" — the UI keeps waiting.
+  const effectiveMaxDuration = React.useMemo(() => {
+    if (!maxDurationMs || !startedAtMs) return maxDurationMs
+    const elapsedMs = Math.max(0, nowMs - startedAtMs)
+    if (elapsedMs <= maxDurationMs) return maxDurationMs
+    const extensions = Math.ceil((elapsedMs - maxDurationMs) / EXTENSION_STEP_MS)
+    return Math.min(maxDurationMs + extensions * EXTENSION_STEP_MS, ABSOLUTE_MAX_DURATION_MS)
+  }, [maxDurationMs, startedAtMs, nowMs])
+
   const countdownMetrics = React.useMemo(() => {
-    if (!shouldShowLongRunningCountdown || !startedAtMs || !maxDurationMs) {
+    if (!shouldShowLongRunningCountdown || !startedAtMs || !effectiveMaxDuration) {
       return null
     }
 
     const elapsedMs = Math.max(0, nowMs - startedAtMs)
-    const clampedElapsedMs = Math.min(elapsedMs, maxDurationMs)
-    const remainingMs = Math.max(0, maxDurationMs - elapsedMs)
+    const clampedElapsedMs = Math.min(elapsedMs, effectiveMaxDuration)
+    const remainingMs = Math.max(0, effectiveMaxDuration - elapsedMs)
 
     return {
       elapsedLabel: formatDuration(clampedElapsedMs / 1000),
       remainingLabel: formatDuration(remainingMs / 1000),
-      totalLabel: formatDuration(maxDurationMs / 1000),
+      totalLabel: formatDuration(effectiveMaxDuration / 1000),
     }
-  }, [maxDurationMs, nowMs, shouldShowLongRunningCountdown, startedAtMs])
+  }, [effectiveMaxDuration, nowMs, shouldShowLongRunningCountdown, startedAtMs])
 
   // For long-running NLM enrichments, progress should feel continuously alive.
   // We use an ease-out timeline: faster in the beginning, then gradually slower.
   // On real completion, UI still jumps to 100% immediately.
   const longRunningProgress = React.useMemo(() => {
-    if (!shouldShowLongRunningCountdown || !startedAtMs || !maxDurationMs) {
+    if (!shouldShowLongRunningCountdown || !startedAtMs || !effectiveMaxDuration) {
       return null
     }
 
@@ -358,14 +369,27 @@ export function EnrichmentGeneratingCard({
     }
 
     const elapsedMs = Math.max(0, nowMs - startedAtMs)
-    return getDeceleratingLongRunningProgress(elapsedMs, maxDurationMs)
-  }, [maxDurationMs, nowMs, progress, shouldShowLongRunningCountdown, startedAtMs])
+    return getDeceleratingLongRunningProgress(elapsedMs, effectiveMaxDuration)
+  }, [effectiveMaxDuration, nowMs, progress, shouldShowLongRunningCountdown, startedAtMs])
 
   const shouldUseLongRunningProgressBar =
     shouldShowLongRunningCountdown &&
     (type === 'nlm_audio' || type === 'nlm_video') &&
     !isSyncing &&
     longRunningProgress !== null
+
+  // Rotating status messages (time-based for non-NLM, disabled for NLM)
+  const { message: rotatingMessage } = useRotatingStatusMessage({
+    status: getRotatingStatus(),
+    interval: 5000,
+    enabled: !shouldUseLongRunningProgressBar,
+  })
+
+  // For NLM types: pick message based on progress percentage, not time
+  const statusMessage =
+    shouldUseLongRunningProgressBar && longRunningProgress !== null
+      ? getMessageByProgress(getRotatingStatus(), longRunningProgress)
+      : rotatingMessage
 
   const getTitle = () => {
     switch (type) {
