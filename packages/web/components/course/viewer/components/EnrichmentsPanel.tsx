@@ -115,11 +115,18 @@ export function EnrichmentsPanel({
   const resumedTypesRef = useRef(new Set<string>())
 
   // Track if we just switched lessons to avoid acting on stale cached data
-  const isInitialLoadRef = useRef(true)
+  const isInitialLoadRef = useRef(false)
   const lessonSwitchTimeRef = useRef<number>(0)
 
-  // Reset state when lessonId changes (user navigates to different lesson)
+  // Distinguish first mount (SSR data is fresh) from SPA lesson switch (data may be stale)
+  const isFirstMountRef = useRef(true)
+
+  // Reset state when lessonId changes (SPA lesson switch only, not first mount)
   useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false
+      return // First mount: SSR data is fresh, no stale guard needed
+    }
     resumedTypesRef.current.clear()
     isInitialLoadRef.current = true
     lessonSwitchTimeRef.current = Date.now()
@@ -286,6 +293,12 @@ export function EnrichmentsPanel({
             return true
           }
 
+          // Show placeholder/generating card for enrichments with active generation status
+          // (pending, draft_generating, draft_ready, generating) — enables resume after page navigation
+          if (groupedEnrichments[type].some((e) => isActiveGenerationStatus(e.status))) {
+            return true
+          }
+
           // Legacy compatibility:
           // Old NLM two-stage rows could remain in draft statuses.
           // Show placeholder so user can start a new single-stage run
@@ -310,7 +323,7 @@ export function EnrichmentsPanel({
               ) || null
             : null
 
-          // Show generating card if generation is in progress
+          // Show generating card if generation is in progress (hook is tracking it)
           if (typeIsGenerating && generatingProgress) {
             return (
               <EnrichmentGeneratingCard
@@ -320,6 +333,28 @@ export function EnrichmentsPanel({
                 currentStep={generatingProgress.currentStep || t('generating')}
                 startedAtMs={generatingProgress.startedAtMs}
                 maxDurationMs={generatingProgress.maxDurationMs}
+                onCancel={() => void cancelGeneration(type)}
+              />
+            )
+          }
+
+          // Show syncing card for enrichments with active DB status even before hook resumes polling.
+          // This provides immediate visual feedback on page load while resume effect kicks in.
+          const activeEnrichmentForType = groupedEnrichments[type]?.find(
+            (e) => isActiveGenerationStatus(e.status) && isEnrichmentOnDemand(e)
+          )
+          if (activeEnrichmentForType) {
+            const parsedCreatedAt = Date.parse(activeEnrichmentForType.created_at ?? '')
+            return (
+              <EnrichmentGeneratingCard
+                key={type}
+                type={type}
+                progress={-1}
+                currentStep="syncing"
+                startedAtMs={Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined}
+                maxDurationMs={
+                  NLM_ENRICHMENT_TYPES.has(type as NlmEnrichmentType) ? 60 * 60 * 1000 : undefined
+                }
                 onCancel={() => void cancelGeneration(type)}
               />
             )
