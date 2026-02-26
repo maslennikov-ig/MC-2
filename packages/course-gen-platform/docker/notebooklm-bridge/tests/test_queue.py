@@ -734,9 +734,11 @@ def test_recovery_prefers_completed_audio_artifact_near_request_start(
     asyncio.run(run_scenario())
 
 
-def test_recovery_falls_back_to_latest_completed_video_artifact_when_no_nearby_candidate(
+def test_recovery_refuses_fallback_when_no_nearby_or_task_id_match(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """When all candidates are outside the time window and don't match task_id,
+    recovery must return None and the original error must propagate."""
     async def run_scenario() -> None:
         fake_client = FakeNotebookLMClient()
         fake_client.artifacts.poll_error = RuntimeError("poll transport failure")
@@ -777,14 +779,11 @@ def test_recovery_falls_back_to_latest_completed_video_artifact_when_no_nearby_c
             language="en",
             course_id="course-123",
         )
-        result = await generator.generate_video_overview(request)
 
-        assert result.media_bytes == b"video:vid-latest"
-        assert result.metadata is not None
-        assert result.metadata["recovered_from_artifact"] is True
-        assert result.metadata["recovery_selected_artifact_id"] == "vid-latest"
-        assert result.metadata["recovery_strategy"] == "latest_same_type"
-        assert fake_client.artifacts.downloaded_video_ids == ["vid-latest"]
+        with pytest.raises(Exception):
+            await generator.generate_video_overview(request)
+
+        assert fake_client.artifacts.downloaded_video_ids == []
 
     asyncio.run(run_scenario())
 

@@ -1,165 +1,185 @@
-# Plan: Single-Click Video Playback & Audio Active Overlay
+# Plan: Fix NLM Bridge Returning Identical Audio for Different Lessons + Stop Metadata Bloat
 
 ## Context
 
-After the enrichment card redesign (mc2-n23gt), video playback requires **two clicks**: (1) our Play button activates the card and fetches the URL, (2) Vidstack's built-in play button starts the video. Audio cards show no visual feedback on the image area when playing. The user wants:
+Two bugs discovered during enrichment card fix work:
 
-- Video: single-click play, or show the player immediately with poster
-- Audio: darkening overlay with play/pause icon on the image area
+1. **Identical audio** (Beads `mc2-qhne2`, P2): NLM audio generation returns the same MP3 file for different lessons in the same course. DB evidence confirms lesson 2's enrichment has `"status": "recovered_from_completed_artifact"` — the bridge's proactive recovery grabbed lesson 1's artifact instead of waiting for lesson 2's own generation.
 
-## Approach
+2. **Metadata bloat** (Beads `mc2-wmify`, P1): Each NLM enrichment stores ~28MB in `metadata.additional_info.bridge_response` (full bridge HTTP response including base64 audio in `artifact` field). 5 enrichments = 73MB of metadata in PostgreSQL.
 
-### Video: Pre-fetch URL + Vidstack with Poster
+### DB Evidence (course `840b6319`)
 
-1. Fetch `playbackUrl` **eagerly on mount** (not on click) for completed video enrichments
-2. When URL available: render `MediaPlayer` with `<Poster>` (placeholder image) in the image area — Vidstack shows its native big play button
-3. When URL loading: placeholder image + spinner overlay
-4. **Remove** our custom Play/Close button for video types — Vidstack has its own controls
-5. Single click → video plays
+| Enrichment | Lesson                | Task ID     | Status                                | File Size                     |
+| ---------- | --------------------- | ----------- | ------------------------------------- | ----------------------------- |
+| `dc0512a7` | lesson 1 (`21dbaab8`) | `988763...` | completed                             | 21,150,364 bytes              |
+| `aae6315e` | lesson 2 (`fecbf78b`) | `067f6d...` | **recovered_from_completed_artifact** | 21,150,364 bytes (identical!) |
 
-**Why not autoplay?** Browser autoplay policies require a user gesture in the same synchronous call stack. The async URL fetch breaks the gesture chain. Pre-fetch + native Vidstack play button is reliable.
+Both MP3 files: same MD5 `45b6e7b1f0e705fc5eddc71e7928d6b5`. Different scripts, different task IDs, but identical output.
 
-**Pre-fetch cost:** 0-2 video enrichments per lesson. Signed URL fetch is cheap (DB lookup + URL signing). Already precedented in `lesson-materials-switcher.tsx`.
+## Root Cause Analysis
 
-### Audio: Darkening overlay synced with AudioPlayer state
+### Bug 1: Recovery grabs wrong artifact
 
-1. Add `onPlayingChange` callback prop to `AudioPlayer` — fires when internal `isPlaying` changes
-2. Add `togglePlayRef` prop to `AudioPlayer` — exposes `togglePlay()` for external control
-3. In `EnrichmentCard`: track `isAudioPlaying` state from callback
-4. When active: render dark overlay on image area with animated play/pause icon
-5. Clicking overlay toggles play/pause via ref
+**File:** `docker/notebooklm-bridge/app/generator.py`
+
+The bridge reuses one NotebookLM notebook per course (keyed by `course_id`). When generation times out or polls fail, `_select_recovery_artifact()` (line ~1311) has a 3-tier fallback:
+
+1. `matches_task_id` — artifact_id matches the task_id from `generate_audio()` call
+2. `near_request_start` — artifact created within `request_started_at ± 45s`
+3. **`latest_same_type`** — grabs `sorted_candidates[0]` (newest completed artifact from the ENTIRE notebook)
+
+Tier 3 is the bug: it picks ANY completed audio artifact from the shared course notebook, including artifacts from previous lessons. Additionally, old sources are never cleaned up — the notebook accumulates sources from every lesson ever generated.
+
+### Bug 2: Metadata bloat
+
+**File:** `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/nlm-audio-handler.ts` (lines 304, 368, 419)
+
+`bridge_response: start.responseMetadata` saves the full bridge HTTP response including `artifact.audio_base64` (the entire MP3 as base64). This is ~28MB per enrichment. The frontend never reads `metadata` column (confirmed — excluded from all queries via `ENRICHMENT_DISPLAY_COLUMNS`).
+
+Same pattern in `nlm-video-handler.ts` (lines ~300, 365, 414).
+
+## Fix Strategy
+
+### Fix 1: Prevent recovery from grabbing wrong artifact (CRITICAL)
+
+**File:** `docker/notebooklm-bridge/app/generator.py`
+
+**Change A**: In `_select_recovery_artifact()` — remove the `latest_same_type` fallback. If neither `matches_task_id` nor `near_request_start` succeeds, return `None` (let the error propagate, triggering a retry at the mc2 level).
+
+```python
+# BEFORE (line ~1391):
+else:
+    selected = sorted_candidates[0]
+    strategy = "latest_same_type"
+
+# AFTER:
+else:
+    # No safe match found — refuse to return a potentially wrong artifact
+    logger.warning(
+        "Recovery: no artifact matched task_id or time window, refusing fallback",
+        extra={"task_id": task_id, "notebook_id": notebook_id,
+               "candidate_count": len(sorted_candidates)},
+    )
+    return None
+```
+
+**Change B**: Tighten the time-window check — only accept artifacts created AFTER `request_started_at` (remove backwards skew for safety):
+
+```python
+# BEFORE:
+selection_threshold_ts = request_start_ts - self._RECOVERY_START_TIME_SKEW_SECONDS  # -45s
+
+# AFTER: only forward — artifact must have been created after we started
+selection_threshold_ts = request_start_ts
+```
+
+### Fix 2: Source accumulation — known limitation, mitigated
+
+**File:** `docker/notebooklm-bridge/app/generator.py`
+
+`notebooklm-py` does NOT expose `sources.list()` or `sources.delete()` (confirmed: `FakeSourcesAPI` in tests only has `add_text` + `wait_for_sources`). Sources accumulate in the shared notebook across lessons.
+
+**Mitigation**: The `generate_audio()` call already passes `source_ids=source_ids` (line 441) with only the current lesson's source IDs. NotebookLM should scope generation to those sources. Combined with Fix 1 (no wrong artifact recovery), this is acceptable.
+
+**Future improvement** (when `notebooklm-py` adds source management): Clean old sources before adding new ones, or periodically delete and recreate the notebook.
+
+### Fix 3: Stop saving full bridge_response in metadata
+
+**File:** `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/nlm-audio-handler.ts`
+
+Replace `bridge_response: start.responseMetadata` with a minimal summary (no base64 audio, no full transcript):
+
+```typescript
+// Helper function to extract only essential metadata from bridge response
+function extractBridgeMetadataSummary(responseMetadata: Record<string, unknown> | undefined) {
+  if (!responseMetadata) return undefined;
+  const artifact = responseMetadata.artifact as Record<string, unknown> | undefined;
+  const meta = artifact?.metadata as Record<string, unknown> | undefined;
+  return {
+    task_id: responseMetadata.task_id,
+    status: responseMetadata.status,
+    error: responseMetadata.error,
+    artifact_duration_seconds: artifact?.duration_seconds,
+    artifact_mime_type: artifact?.mime_type,
+    artifact_extension: artifact?.extension,
+    notebook_id: meta?.notebook_id,
+    artifact_id: meta?.artifact_id,
+    recovery_status: meta?.status, // e.g. "recovered_from_completed_artifact"
+    source_count: meta?.source_count,
+  };
+}
+```
+
+Apply in all 3 places where `bridge_response` is saved (lines ~304, ~368, ~419):
+
+```typescript
+// BEFORE:
+bridge_response: start.responseMetadata,
+
+// AFTER:
+bridge_response: extractBridgeMetadataSummary(start.responseMetadata),
+```
+
+**Same change for `nlm-video-handler.ts`** (lines ~300, ~365, ~414).
+
+### Fix 4: Migration to clean existing bloated metadata
+
+**File:** New migration in `packages/course-gen-platform/supabase/migrations/`
+
+```sql
+-- Clean up bloated bridge_response from existing enrichments
+-- Removes artifact.audio_base64, artifact.segments, artifact.transcript etc.
+-- Keeps only essential tracking fields
+UPDATE lesson_enrichments
+SET metadata = jsonb_set(
+  metadata,
+  '{additional_info,bridge_response}',
+  jsonb_build_object(
+    'task_id', metadata->'additional_info'->'bridge_response'->>'task_id',
+    'status', metadata->'additional_info'->'bridge_response'->>'status',
+    'artifact_duration_seconds', metadata->'additional_info'->'bridge_response'->'artifact'->>'duration_seconds',
+    'notebook_id', metadata->'additional_info'->'bridge_response'->'artifact'->'metadata'->>'notebook_id',
+    'artifact_id', metadata->'additional_info'->'bridge_response'->'artifact'->'metadata'->>'artifact_id',
+    'recovery_status', metadata->'additional_info'->'bridge_response'->'artifact'->'metadata'->>'status'
+  )
+)
+WHERE enrichment_type IN ('nlm_audio', 'nlm_video')
+  AND metadata->'additional_info'->'bridge_response' IS NOT NULL
+  AND pg_column_size(metadata) > 100000;  -- only rows with bloated metadata (>100KB)
+```
+
+Expected savings: ~73MB freed for existing data. Future enrichments save ~28MB per NLM enrichment.
 
 ## Files to Modify
 
-| File                                                                  | Change                                                                                     |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `packages/web/components/course/viewer/components/EnrichmentCard.tsx` | Pre-fetch URL on mount, Vidstack+Poster for video, audio overlay, remove video Play button |
-| `packages/web/components/course/viewer/enrichments/AudioPlayer.tsx`   | Add `onPlayingChange` + `togglePlayRef` props                                              |
-
-## Implementation Steps
-
-### Step 1: AudioPlayer — add state sync props
-
-In `AudioPlayer.tsx`:
-
-- Add optional props: `onPlayingChange?: (isPlaying: boolean) => void`, `togglePlayRef?: React.MutableRefObject<(() => void) | null>`
-- In `togglePlay()` (line 114): call `onPlayingChange?.(newState)` after state change
-- In `handleEnded` (line 53): call `onPlayingChange?.(false)`
-- Expose `togglePlay` via `togglePlayRef.current = togglePlay` in a useEffect
-- Both props optional — backward compatible, no other callers affected
-
-### Step 2: EnrichmentCard — pre-fetch URL on mount
-
-Replace the current lazy fetch (line 101-105):
-
-```tsx
-// BEFORE: gated by isActive
-useEffect(() => {
-  if (isActive && (isAudioType || isVideoType) && enrichment.status === 'completed') {
-    void getEnrichmentPlaybackUrl(enrichment).then(setPlaybackUrl)
-  }
-}, [isActive, ...])
-
-// AFTER: eager fetch on mount
-useEffect(() => {
-  if ((isAudioType || isVideoType) && enrichment.status === 'completed') {
-    setUrlLoading(true)
-    getEnrichmentPlaybackUrl(enrichment)
-      .then(setPlaybackUrl)
-      .catch(() => setUrlError(true))
-      .finally(() => setUrlLoading(false))
-  }
-}, [enrichment.id, enrichment.status, isAudioType, isVideoType])
-```
-
-Add new state: `urlLoading`, `urlError`.
-
-### Step 3: EnrichmentCard — video image area with Vidstack + Poster
-
-Replace the image area rendering (lines 230-254):
-
-```tsx
-{isVideoType && playbackUrl ? (
-  // Always-visible Vidstack player with poster
-  <MediaPlayer src={formatVideoSrc(playbackUrl)} playsInline className="h-full w-full">
-    <MediaProvider>
-      <Poster src={placeholderImage} alt={enrichment.title || label} />
-    </MediaProvider>
-    <DefaultVideoLayout ... />
-  </MediaPlayer>
-) : isVideoType && urlLoading ? (
-  // Loading: placeholder + spinner
-  <> <img src={placeholderImage} ... /> <Loader2 spinner overlay /> </>
-) : isActive && isAudioType ? (
-  // Audio active: darkened overlay with play/pause
-  <> <img ... /> <dark overlay + animated play/pause icon /> </>
-) : (
-  // Default: placeholder image
-  <> <img ... /> <gradient overlay /> </>
-)}
-```
-
-Import `Poster` from `@vidstack/react` (add to existing import line 16).
-
-### Step 4: EnrichmentCard — audio overlay
-
-Add state + ref:
-
-```tsx
-const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-const audioToggleRef = useRef<(() => void) | null>(null);
-```
-
-Reset when deactivated:
-
-```tsx
-useEffect(() => {
-  if (!isActive) setIsAudioPlaying(false);
-}, [isActive]);
-```
-
-Overlay in image area (when `isActive && isAudioType`):
-
-- `bg-black/40` darkening overlay
-- Centered circle with `Play`/`Pause` icon (animated via `motion.div`)
-- Click → `audioToggleRef.current?.()`
-- Add `Pause` to lucide imports
-
-Pass to AudioPlayer:
-
-```tsx
-<AudioPlayer
-  enrichment={enrichment}
-  playbackUrl={playbackUrl ?? undefined}
-  onPlayingChange={setIsAudioPlaying}
-  togglePlayRef={audioToggleRef}
-/>
-```
-
-### Step 5: Remove Play/Close button for video types
-
-Change line 311 condition from `isPlayableType` to `(isAudioType || type === 'quiz')`.
-
-Video cards rely entirely on Vidstack's built-in controls.
+| File                                                                                       | Change                                                                                       | Priority      |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------- |
+| `docker/notebooklm-bridge/app/generator.py` (~line 1390)                                   | Remove `latest_same_type` fallback in `_select_recovery_artifact()`; change to `return None` | P0 (critical) |
+| `docker/notebooklm-bridge/app/generator.py` (~line 1322)                                   | Tighten time window: remove backward skew (`- _RECOVERY_START_TIME_SKEW_SECONDS`)            | P0            |
+| `docker/notebooklm-bridge/tests/test_queue.py` (~line 786)                                 | Update test expecting `latest_same_type` → expect `None` return                              | P0            |
+| `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/nlm-audio-handler.ts` | Add `extractBridgeMetadataSummary()`, use in all 3 `bridge_response` saves                   | P1            |
+| `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/nlm-video-handler.ts` | Same `extractBridgeMetadataSummary()` treatment                                              | P1            |
+| `packages/course-gen-platform/supabase/migrations/`                                        | SQL migration to shrink existing bloated rows                                                | P1            |
 
 ## Edge Cases
 
-| Case                            | Handling                                                                           |
-| ------------------------------- | ---------------------------------------------------------------------------------- |
-| URL fetch fails                 | Show placeholder image, no player. Regenerate button still works                   |
-| URL fetch slow                  | `urlLoading` state shows spinner over placeholder                                  |
-| Signed URL expires (1hr)        | Vidstack `onError` triggers — rare edge case, follow-up if needed                  |
-| Audio deactivated while playing | AudioPlayer unmounts → cleanup pauses audio → `isAudioPlaying` reset via useEffect |
-| Multiple video enrichments      | Max 2 per lesson, pre-fetch cost negligible                                        |
+| Case                                                | Handling                                                                                                                      |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Recovery finds no matching artifact                 | Returns `None` → error propagates → mc2 retries the enrichment generation                                                     |
+| Source accumulation in shared notebook              | Mitigated: `source_ids` passed to `generate_audio()` scopes generation; `notebooklm-py` lacks source deletion API             |
+| Notebook deleted externally                         | `_resolve_notebook()` already handles this — creates new one                                                                  |
+| First lesson in course (no prior artifacts)         | Recovery has no candidates → returns `None` → same as before, triggers retry                                                  |
+| Concurrent generation (different courses)           | Per-course mutex (`_course_generation_slot`) prevents concurrent same-course — no issue                                       |
+| Happy path (no recovery needed)                     | Artifact downloaded by `status.task_id` — always correct, no change needed                                                    |
+| Migration on production data                        | Safe — only modifies `metadata` JSON, doesn't touch audio files. `pg_column_size > 100KB` guard prevents touching normal rows |
+| Test `test_queue.py:786` expects `latest_same_type` | Update test: recovery should return `None` when no task_id/time-window match                                                  |
 
 ## Verification
 
-1. `pnpm type-check` — no errors
-2. `pnpm build` — successful
-3. Visual check:
-   - Video card shows Vidstack player with poster immediately (no click needed)
-   - Click Vidstack play button → video plays (single click)
-   - Audio card: click Play → image darkens with play/pause overlay
-   - Audio overlay icon syncs with AudioPlayer state
-   - Regenerate/Delete still work on all card types
-   - Quiz/Presentation/Document cards unaffected
+1. **Bridge fix**: Generate NLM audio for lesson 1, then lesson 2 in same course → verify different MP3 files (different `md5sum`)
+2. **Bridge tests**: `cd docker/notebooklm-bridge && pytest tests/test_queue.py` — all pass
+3. **Metadata fix**: Generate new NLM audio → check `pg_column_size(metadata)` is < 10KB (not 28MB)
+4. **Migration**: Run on staging → `SELECT id, pg_column_size(metadata) FROM lesson_enrichments WHERE enrichment_type = 'nlm_audio'` → all < 100KB
+5. **Type-check & build**: `pnpm type-check && pnpm build` passes for `course-gen-platform`
+6. **Recovery still works**: If actual generation times out, recovery correctly finds the right artifact (created after request start) or fails gracefully

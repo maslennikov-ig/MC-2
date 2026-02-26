@@ -1319,7 +1319,8 @@ class NotebookLMMediaGenerator(MediaGenerator):
         recovery_reason: str,
     ) -> RecoverySelection | None:
         request_start_ts = request_started_at.timestamp()
-        selection_threshold_ts = request_start_ts - self._RECOVERY_START_TIME_SKEW_SECONDS
+        # Only accept artifacts created AFTER we started the request (no backward skew)
+        selection_threshold_ts = request_start_ts
         candidates: list[dict[str, Any]] = []
 
         for artifact in artifacts:
@@ -1388,8 +1389,21 @@ class NotebookLMMediaGenerator(MediaGenerator):
             selected = time_window_matches[0]
             strategy = "created_near_request_start"
         else:
-            selected = sorted_candidates[0]
-            strategy = "latest_same_type"
+            logger.warning(
+                "NotebookLM recovery: no artifact matched task_id or time window, refusing fallback: media=%s notebook=%s task=%s candidates=%s",
+                media_type,
+                notebook_id[:8],
+                task_id,
+                len(sorted_candidates),
+                extra={
+                    "media_type": media_type,
+                    "notebook_id_prefix": notebook_id[:8],
+                    "task_id": task_id,
+                    "recovery_reason": recovery_reason,
+                    "candidate_count": len(sorted_candidates),
+                },
+            )
+            return None
 
         logger.info(
             "NotebookLM recovery selected candidate: media=%s notebook=%s task=%s selected=%s strategy=%s candidates=%s time_window_matches=%s task_id_matches=%s",
