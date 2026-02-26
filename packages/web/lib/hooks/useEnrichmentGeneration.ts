@@ -269,29 +269,34 @@ export function useEnrichmentGeneration({
             return
           }
 
-          log.error('Poll error:', error)
+          // Distinguish permanent (NOT_FOUND = enrichment deleted) from transient errors
+          // (server restart, network issue). Only permanent errors count toward stop limit.
+          const isNotFound = error instanceof TRPCClientError && error.data?.code === 'NOT_FOUND'
 
-          const failures = (pollFailuresRef.current.get(type) || 0) + 1
-          pollFailuresRef.current.set(type, failures)
+          if (isNotFound) {
+            log.error('Poll error (enrichment not found):', error)
 
-          if (failures >= MAX_POLL_FAILURES) {
-            // Stop polling after too many failures
-            stopPolling(type)
+            const failures = (pollFailuresRef.current.get(type) || 0) + 1
+            pollFailuresRef.current.set(type, failures)
 
-            setGenerating((prev) => {
-              const next = new Map(prev)
-              next.delete(type)
-              return next
-            })
+            if (failures >= MAX_POLL_FAILURES) {
+              stopPolling(type)
 
-            // #8 fix: Context-aware error message
-            const errorMessage = isResume
-              ? `Failed to resume ${type} generation. The enrichment may have been deleted or completed.`
-              : 'Lost connection to server. Please refresh and try again.'
-            onError?.(errorMessage)
+              setGenerating((prev) => {
+                const next = new Map(prev)
+                next.delete(type)
+                return next
+              })
+
+              const errorMessage = isResume
+                ? `Failed to resume ${type} generation. The enrichment may have been deleted or completed.`
+                : 'Lost connection to server. Please refresh and try again.'
+              onError?.(errorMessage)
+            }
           } else {
-            // Multiplicative backoff (1.5x per failure, capped at MAX_BACKOFF_INTERVAL)
-            currentInterval = Math.min(currentInterval * 1.5, MAX_BACKOFF_INTERVAL)
+            // Transient error (server restart, network) — backoff but keep retrying indefinitely
+            log.warn('Poll error (transient, will retry):', error)
+            currentInterval = Math.min(currentInterval * 2, MAX_BACKOFF_INTERVAL)
           }
         }
       }
