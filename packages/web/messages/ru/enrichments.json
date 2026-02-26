@@ -447,7 +447,11 @@
       "documentTitle": "Документ",
       "documentDescription": "Дополнительный материал к уроку",
       "download": "Скачать",
-      "documentAvailableInPanel": "Документ доступен для скачивания в панели активностей"
+      "documentAvailableInPanel": "Документ доступен для скачивания в панели активностей",
+      "showVideo": "Показать видео"
+    },
+    "slides": {
+      "defaultTitle": "Слайд {number}"
     }
   }
 }

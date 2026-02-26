@@ -1,4 +1,7 @@
+'use client'
+
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft,
@@ -10,8 +13,8 @@ import {
   Layers,
   Film,
 } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import LessonContent from '@/components/common/lesson-content'
-import ContentFormatSwitcher from '@/components/common/content-format-switcher'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -20,6 +23,15 @@ import { Database } from '@/types/database.generated'
 import { StructurePanel } from './StructurePanel'
 import { EnrichmentsPanel } from './EnrichmentsPanel'
 import type { LessonContentRow } from '../types'
+
+const ContentFormatSwitcher = dynamic(() => import('@/components/common/content-format-switcher'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex min-h-[400px] items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600" />
+    </div>
+  ),
+})
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -88,6 +100,7 @@ export function LessonView({
   onRefreshEnrichments,
   courseLanguage,
 }: LessonViewProps) {
+  const t = useTranslations('course.viewer')
   const nextLessonData =
     currentIndex < totalLessonsOrdered - 1
       ? {
@@ -109,7 +122,7 @@ export function LessonView({
                 variant="secondary"
                 className="border-purple-300 bg-purple-100 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/20 dark:text-purple-300"
               >
-                Урок {currentLesson.lesson_number}
+                {t('lessonBadge', { number: currentLesson.lesson_number ?? '' })}
               </Badge>
               <Button
                 onClick={() => onMarkComplete(currentLesson.id)}
@@ -147,7 +160,7 @@ export function LessonView({
               <div className="ml-4 border-l border-gray-200 pl-4 dark:border-gray-700">
                 <Button onClick={onExitFocus} variant="ghost" size="sm">
                   <X className="h-4 w-4" />
-                  <span className="ml-2 hidden sm:inline">Выйти</span>
+                  <span className="ml-2 hidden sm:inline">{t('exitFocus')}</span>
                 </Button>
               </div>
             </div>
@@ -176,7 +189,7 @@ export function LessonView({
                 className="flex items-center gap-2 rounded-full bg-purple-600/90 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-sm"
               >
                 <ChevronLeft className="h-4 w-4" />
-                <span>Свайп для навигации</span>
+                <span>{t('swipeHint')}</span>
                 <ChevronRight className="h-4 w-4" />
               </motion.div>
             </motion.div>
@@ -203,7 +216,7 @@ export function LessonView({
               >
                 <ChevronLeft className="h-4 w-4" />
                 <div className="text-left">
-                  <div className="text-xs text-gray-500 dark:text-white/60">Предыдущий урок</div>
+                  <div className="text-xs text-gray-500 dark:text-white/60">{t('prevLesson')}</div>
                   {currentIndex > 0 && (
                     <div className="text-sm font-medium">
                       {allLessonsOrdered[currentIndex - 1].title}
@@ -219,7 +232,7 @@ export function LessonView({
                 className="flex items-center gap-2"
               >
                 <div className="text-right">
-                  <div className="text-xs text-gray-500 dark:text-white/60">Следующий урок</div>
+                  <div className="text-xs text-gray-500 dark:text-white/60">{t('nextLesson')}</div>
                   {currentIndex < totalLessonsOrdered - 1 && (
                     <div className="text-sm font-medium">
                       {allLessonsOrdered[currentIndex + 1].title}
@@ -237,11 +250,11 @@ export function LessonView({
             <span>
               <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs dark:bg-gray-800">←</kbd> /{' '}
               <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs dark:bg-gray-800">→</kbd>{' '}
-              Навигация
+              {t('keyboardNav')}
             </span>
             <span>
               <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs dark:bg-gray-800">Esc</kbd>{' '}
-              Выход
+              {t('keyboardExit')}
             </span>
           </div>
         </div>
@@ -258,21 +271,21 @@ export function LessonView({
             className="rounded-none border-b-2 border-transparent px-6 py-3 text-gray-600 data-[state=active]:border-purple-600 data-[state=active]:bg-transparent data-[state=active]:text-purple-700 dark:text-white/70 dark:data-[state=active]:border-purple-500 dark:data-[state=active]:text-purple-300"
           >
             <BookOpen className="mr-2 h-4 w-4" />
-            Содержание
+            {t('tabs.content')}
           </TabsTrigger>
           <TabsTrigger
             value="structure"
             className="rounded-none border-b-2 border-transparent px-6 py-3 text-gray-600 data-[state=active]:border-purple-600 data-[state=active]:bg-transparent data-[state=active]:text-purple-700 dark:text-white/70 dark:data-[state=active]:border-purple-500 dark:data-[state=active]:text-purple-300"
           >
             <Layers className="mr-2 h-4 w-4" />
-            Структура курса
+            {t('tabs.structure')}
           </TabsTrigger>
           <TabsTrigger
             value="enrichments"
             className="rounded-none border-b-2 border-transparent px-6 py-3 text-gray-600 data-[state=active]:border-purple-600 data-[state=active]:bg-transparent data-[state=active]:text-purple-700 dark:text-white/70 dark:data-[state=active]:border-purple-500 dark:data-[state=active]:text-purple-300"
           >
             <Film className="mr-2 h-4 w-4" />
-            Медиа
+            {t('tabs.media')}
             {enrichments && enrichments.filter((e) => e.enrichment_type !== 'cover').length > 0 && (
               <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
                 {enrichments.filter((e) => e.enrichment_type !== 'cover').length}

@@ -447,7 +447,11 @@
       "documentTitle": "Document",
       "documentDescription": "Additional material for the lesson",
       "download": "Download",
-      "documentAvailableInPanel": "Document is available for download in the activities panel"
+      "documentAvailableInPanel": "Document is available for download in the activities panel",
+      "showVideo": "Show video"
+    },
+    "slides": {
+      "defaultTitle": "Slide {number}"
     }
   }
 }
