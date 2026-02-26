@@ -38,6 +38,10 @@ import { createModelConfigService } from '../../../shared/llm/model-config-servi
 import { cache as redisCache } from '../../../shared/cache/redis';
 import { createHash } from 'crypto';
 import { formatFileSize } from '@megacampus/shared-utils';
+import {
+  getCachedFileProcessedContent,
+  getCachedFileMarkdown,
+} from '../../../shared/cache/file-content-cache';
 
 // ============================================================================
 // LLM Response Schema
@@ -236,7 +240,7 @@ export async function executeDocumentClassificationComparative(
 
   // Step 1: Fetch file metadata for all documents
   logger.debug({ courseId, fileIds }, 'Fetching file metadata for comparative classification');
-  const fileMetadataList = await fetchFileMetadata(supabase, fileIds);
+  const fileMetadataList = await fetchFileMetadata(supabase, fileIds, courseId);
 
   if (fileMetadataList.length === 0) {
     logger.warn({ courseId, fileIds }, 'No file metadata found');
@@ -444,7 +448,7 @@ export async function executeDocumentClassification(
 
   // Step 1: Fetch file metadata for all documents
   logger.debug({ courseId, fileIds }, 'Fetching file metadata');
-  const fileMetadataList = await fetchFileMetadata(supabase, fileIds);
+  const fileMetadataList = await fetchFileMetadata(supabase, fileIds, courseId);
 
   if (fileMetadataList.length === 0) {
     logger.warn({ courseId, fileIds }, 'No file metadata found');
@@ -543,14 +547,42 @@ export async function executeDocumentClassification(
  */
 async function fetchFileMetadata(
   supabase: ReturnType<typeof getSupabaseAdmin>,
-  fileIds: string[]
+  fileIds: string[],
+  courseId: string
 ): Promise<FileMetadata[]> {
-  const { data, error } = await supabase
-    .from('file_catalog')
-    .select(
-      'id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata'
-    )
-    .in('id', fileIds);
+  // Step 1: Try Redis for content (processed_content preferred, fallback to markdown)
+  const contentMap = new Map<string, string>();
+  await Promise.all(
+    fileIds.map(async fid => {
+      const cached =
+        (await getCachedFileProcessedContent(courseId, fid)) ||
+        (await getCachedFileMarkdown(courseId, fid));
+      if (cached) contentMap.set(fid, cached);
+    })
+  );
+
+  const allCached = contentMap.size === fileIds.length;
+
+  logger.debug(
+    { courseId, fileCount: fileIds.length, cachedCount: contentMap.size, allCached },
+    'Redis cache-aside check for file content'
+  );
+
+  // Step 2: Query Supabase — omit large content columns when ALL files are cached.
+  // When allCached=true we skip processed_content and markdown_content to save egress.
+  // The cast is needed because Supabase's PostgREST type parser requires a literal
+  // string for .select() — we use `as any` only for the dynamic path.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const baseQuery = supabase.from('file_catalog') as any;
+  const { data, error } = await (
+    allCached
+      ? baseQuery.select(
+          'id, filename, generated_title, original_name, mime_type, file_size, summary_metadata'
+        )
+      : baseQuery.select(
+          'id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata'
+        )
+  ).in('id', fileIds);
 
   if (error) {
     logger.error({ error, fileIds }, 'Failed to fetch file metadata');
@@ -561,9 +593,11 @@ async function fetchFileMetadata(
     return [];
   }
 
-  return data.map(file => {
-    // Use processed_content (summary) if available, fallback to markdown_content
-    const content = file.processed_content || file.markdown_content || '';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any[]).map((file: Record<string, any>) => {
+    // Use cached content if available, else Supabase content
+    const content =
+      contentMap.get(file.id) || file.processed_content || file.markdown_content || '';
 
     // Get summary tokens from metadata, or estimate if not available
     const metadata = file.summary_metadata as { summary_tokens?: number } | null;
@@ -573,10 +607,11 @@ async function fetchFileMetadata(
     logger.debug(
       {
         fileId: file.id,
-        hasProcessedContent: !!file.processed_content,
+        hasProcessedContent: contentMap.has(file.id) || !!file.processed_content,
         hasGeneratedTitle: !!file.generated_title,
         summaryTokens,
         contentLength: content.length,
+        cacheHit: contentMap.has(file.id),
       },
       'Loaded file for classification'
     );

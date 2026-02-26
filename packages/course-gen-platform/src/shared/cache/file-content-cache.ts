@@ -120,6 +120,25 @@ export async function getCachedFileMarkdown(
 }
 
 /**
+ * Get cached file processed content (Stage 3/4 read)
+ */
+export async function getCachedFileProcessedContent(
+  courseId: string,
+  fileId: string
+): Promise<string | null> {
+  try {
+    const redis = getRedisClient();
+    return await redis.get(fileProcessedKey(courseId, fileId));
+  } catch (error) {
+    logger.debug(
+      { courseId, fileId, error: error instanceof Error ? error.message : String(error) },
+      '[FileContentCache] Failed to read cached file processed content (non-fatal)'
+    );
+    return null;
+  }
+}
+
+/**
  * Get cached lesson markdown content (Stage 7 read)
  */
 export async function getCachedLessonMarkdown(
