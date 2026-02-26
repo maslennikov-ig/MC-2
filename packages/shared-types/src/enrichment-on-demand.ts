@@ -21,14 +21,18 @@ import { enrichmentStatusSchema } from './lesson-enrichment';
  * Includes types that users can trigger from the course viewer UI:
  * - quiz: Interactive quizzes
  * - audio: Lesson narration
+ * - nlm_audio: NotebookLM audio narration
  * - presentation: Slide decks
+ * - nlm_video: NotebookLM video overview
  * - cover: Lesson hero images (16:9 banners)
  * - card: Lesson thumbnails (1:1 square images)
  */
 export const onDemandEnrichmentTypeSchema = z.enum([
   'quiz',
   'audio',
+  'nlm_audio',
   'presentation',
+  'nlm_video',
   'cover',
   'card',
 ]);
@@ -85,6 +89,74 @@ export const onDemandAudioSettingsSchema = z.object({
 export type OnDemandAudioSettings = z.infer<typeof onDemandAudioSettingsSchema>;
 
 /**
+ * Source strategy for NotebookLM enrichments.
+ */
+export const onDemandNlmSourceStrategySchema = z.enum(['script_only', 'raw_only', 'hybrid']);
+export type OnDemandNlmSourceStrategy = z.infer<typeof onDemandNlmSourceStrategySchema>;
+
+/**
+ * NotebookLM audio settings for on-demand API.
+ *
+ * Includes draft-shaping hints and final artifact presets.
+ */
+export const onDemandNlmAudioSettingsSchema = z.object({
+  /** Optional draft voice hint */
+  voice: z.string().optional(),
+
+  /** Optional draft speed hint */
+  speed: z.union([z.number().min(0.25).max(4), z.enum(['slow', 'normal', 'fast'])]).optional(),
+
+  /** Source strategy used for NotebookLM generation */
+  nlm_source_strategy: onDemandNlmSourceStrategySchema.optional(),
+
+  /** NotebookLM audio format preset */
+  nlm_audio_format: z.enum(['deep_dive', 'brief', 'critique', 'debate']).optional(),
+
+  /** NotebookLM audio length preset */
+  nlm_audio_length: z.enum(['short', 'default', 'long']).optional(),
+});
+export type OnDemandNlmAudioSettings = z.infer<typeof onDemandNlmAudioSettingsSchema>;
+
+/**
+ * NotebookLM video settings for on-demand API.
+ *
+ * Includes draft script hints and final artifact presets.
+ */
+export const onDemandNlmVideoSettingsSchema = z.object({
+  /** Optional draft tone hint */
+  tone: z.enum(['professional', 'conversational', 'energetic']).optional(),
+
+  /** Optional draft pacing hint */
+  pacing: z.enum(['slow', 'moderate', 'fast']).optional(),
+
+  /** Optional avatar identifier */
+  avatar_id: z.string().optional(),
+
+  /** Source strategy used for NotebookLM generation */
+  nlm_source_strategy: onDemandNlmSourceStrategySchema.optional(),
+
+  /** NotebookLM video format preset */
+  nlm_video_format: z.enum(['explainer', 'brief']).optional(),
+
+  /** NotebookLM video style preset */
+  nlm_video_style: z
+    .enum([
+      'auto_select',
+      'custom',
+      'classic',
+      'whiteboard',
+      'kawaii',
+      'anime',
+      'watercolor',
+      'retro_print',
+      'heritage',
+      'paper_craft',
+    ])
+    .optional(),
+});
+export type OnDemandNlmVideoSettings = z.infer<typeof onDemandNlmVideoSettingsSchema>;
+
+/**
  * Simplified presentation settings for on-demand API
  *
  * User-facing settings for presentation generation requests.
@@ -139,6 +211,8 @@ export type OnDemandImageSettings = z.infer<typeof onDemandImageSettingsSchema>;
  * the internal worker settings in enrichment-settings.ts
  */
 export type OnDemandEnrichmentSettings =
+  | OnDemandNlmAudioSettings
+  | OnDemandNlmVideoSettings
   | OnDemandQuizSettings
   | OnDemandAudioSettings
   | OnDemandPresentationSettings
@@ -175,23 +249,59 @@ export type GenerationStep = z.infer<typeof generationStepSchema>;
  * };
  * ```
  */
-export const generateOnDemandInputSchema = z.object({
-  /** Target lesson UUID */
-  lessonId: z.string().uuid('Invalid lesson ID'),
+const lessonIdInputSchema = z.string().uuid('Invalid lesson ID');
 
-  /** Type of enrichment to generate */
-  enrichmentType: onDemandEnrichmentTypeSchema,
-
-  /** Optional type-specific generation settings */
-  settings: z
-    .union([
-      onDemandQuizSettingsSchema,
-      onDemandAudioSettingsSchema,
-      onDemandPresentationSettingsSchema,
-      onDemandImageSettingsSchema,
-    ])
-    .optional(),
+const onDemandQuizInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('quiz'),
+  settings: onDemandQuizSettingsSchema.optional(),
 });
+
+const onDemandAudioInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('audio'),
+  settings: onDemandAudioSettingsSchema.optional(),
+});
+
+const onDemandNlmAudioInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('nlm_audio'),
+  settings: onDemandNlmAudioSettingsSchema.optional(),
+});
+
+const onDemandPresentationInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('presentation'),
+  settings: onDemandPresentationSettingsSchema.optional(),
+});
+
+const onDemandNlmVideoInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('nlm_video'),
+  settings: onDemandNlmVideoSettingsSchema.optional(),
+});
+
+const onDemandCoverInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('cover'),
+  settings: onDemandImageSettingsSchema.optional(),
+});
+
+const onDemandCardInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('card'),
+  settings: onDemandImageSettingsSchema.optional(),
+});
+
+export const generateOnDemandInputSchema = z.discriminatedUnion('enrichmentType', [
+  onDemandQuizInputSchema,
+  onDemandAudioInputSchema,
+  onDemandNlmAudioInputSchema,
+  onDemandPresentationInputSchema,
+  onDemandNlmVideoInputSchema,
+  onDemandCoverInputSchema,
+  onDemandCardInputSchema,
+]);
 export type GenerateOnDemandInput = z.infer<typeof generateOnDemandInputSchema>;
 
 /**
@@ -352,7 +462,7 @@ export function isProgressBarStatus(status: string): status is ProgressBarStatus
  * Check if status is awaiting user selection (draft_ready)
  *
  * When this returns true, the UI should show variant selection component
- * instead of progress bar. Applies to two-stage enrichments (cover, banner, video, presentation).
+ * instead of progress bar. Applies to two-stage enrichments (video, presentation).
  *
  * @param status - Current enrichment status
  * @returns True if user needs to select a variant
@@ -364,18 +474,16 @@ export function isAwaitingSelection(status: string): boolean {
 /**
  * Enrichment types that use two-stage generation (draft → selection → final)
  *
- * Currently empty - all types use single-stage flow:
- * - cover/banner: switched to single-stage (user selects style in UI before generation)
- * - video/presentation: may add two-stage in future if needed
+ * Two-stage flow:
+ *   pending -> draft_generating -> draft_ready -> generating -> completed/failed
  *
- * @note When this array is empty, TwoStageEnrichmentType resolves to `never`
- * and isTwoStageType() always returns false. This is intentional.
+ * - video: Standard video generation with draft script review
+ * - presentation: Slide deck with draft outline review
  */
-export const TWO_STAGE_ENRICHMENT_TYPES = [] as const;
+export const TWO_STAGE_ENRICHMENT_TYPES = ['video', 'presentation'] as const;
 
 /**
  * Type for two-stage enrichment types.
- * Currently `never` since no types use two-stage flow.
  */
 export type TwoStageEnrichmentType = (typeof TWO_STAGE_ENRICHMENT_TYPES)[number];
 
@@ -383,7 +491,7 @@ export type TwoStageEnrichmentType = (typeof TWO_STAGE_ENRICHMENT_TYPES)[number]
  * Check if enrichment type uses two-stage generation
  *
  * @param type - Enrichment type to check
- * @returns Always false (no types currently use two-stage flow)
+ * @returns True if type uses draft -> final two-stage flow
  */
 export function isTwoStageType(type: string): type is TwoStageEnrichmentType {
   return (TWO_STAGE_ENRICHMENT_TYPES as readonly string[]).includes(type);

@@ -1,10 +1,12 @@
 {
   "name": "megacampus-monorepo",
-  "version": "0.30.10",
+  "version": "0.31.6",
   "private": true,
   "description": "MegaCampusAI - Stage 0: Foundation Infrastructure",
   "scripts": {
     "dev": "pnpm --filter course-gen-platform dev",
+    "nlm:preflight": "bash ./scripts/nlm-preflight.sh",
+    "nlm:stage7-preflight": "bash ./scripts/nlm-stage7-preflight.sh",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:unit": "pnpm -r --filter @megacampus/course-gen-platform --filter @megacampus/shared-types test:unit",
@@ -54,7 +56,8 @@
       "lodash": ">=4.17.23",
       "lodash-es": ">=4.17.23",
       "diff": ">=5.2.2",
-      "zustand": ">=5.0.0"
+      "zustand": ">=5.0.0",
+      "shiki": "^3.19.0"
     }
   },
   "dependencies": {

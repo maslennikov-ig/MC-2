@@ -7,6 +7,52 @@ services:
   # DEV APPLICATION SERVICES
   # ============================================
 
+  # NotebookLM Bridge (Dev) - Stage 7 audio/video generation backend
+  notebooklm-bridge-dev:
+    image: ghcr.io/maslennikov-ig/mc-2/notebooklm-bridge:develop
+    container_name: megacampus-notebooklm-bridge-dev
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8010:8000'
+    env_file:
+      - .env.dev
+    environment:
+      # NOTEBOOKLM_AUTH_JSON passed via env_file when set (must NOT be empty string)
+      - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-/app/secrets/notebooklm/storage_state.json}
+      - NOTEBOOKLM_HOME=${NOTEBOOKLM_HOME:-/app/secrets/notebooklm}
+      - NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS=${NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS:-10800}
+      - NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS=${NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS:-10800}
+      - NOTEBOOKLM_HTTP_TIMEOUT_SECONDS=${NOTEBOOKLM_HTTP_TIMEOUT_SECONDS:-60}
+      - NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT=${NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT:-12}
+      - NOTEBOOKLM_LOG_LEVEL=${NOTEBOOKLM_LOG_LEVEL:-INFO}
+      # Route NotebookLM traffic through bobabuh SOCKS5 proxy (geo-bypass)
+      - HTTPS_PROXY=socks5h://172.19.0.1:1080
+      - HTTP_PROXY=socks5h://172.19.0.1:1080
+    volumes:
+      - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:ro
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import socket; s=socket.socket(); s.connect((''localhost'', 8000)); s.close()" || exit 1',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
   # Next.js Web Application (Dev)
   web-dev:
     image: ghcr.io/maslennikov-ig/mc-2/web:develop
@@ -60,6 +106,8 @@ services:
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge-dev:8000
+      - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
       - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
@@ -67,6 +115,10 @@ services:
       - BULLMQ_QUEUE_NAME=course-generation-dev
       - BULLMQ_STAGE6_QUEUE_NAME=stage6-lesson-content-dev
       - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
+      # Local storage for enrichment playback URLs (must match worker-stage7-dev)
+      - USE_LOCAL_STORAGE=true
+      - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
+      - ENRICHMENTS_PUBLIC_BASE_URL=https://dev.ai.megacampus.ru
     volumes:
       - ./data/uploads-dev:/app/uploads
     healthcheck:
@@ -83,6 +135,9 @@ services:
       start_period: 30s
     networks:
       - megacampus
+    depends_on:
+      notebooklm-bridge-dev:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -202,6 +257,8 @@ services:
       # Local storage for enrichment assets
       - ENRICHMENTS_LOCAL_PATH=/app/data/enrichments
       - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
+      - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge-dev:8000
+      - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
       - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
@@ -213,6 +270,8 @@ services:
       - megacampus
     depends_on:
       api-dev:
+        condition: service_healthy
+      notebooklm-bridge-dev:
         condition: service_healthy
     deploy:
       resources:

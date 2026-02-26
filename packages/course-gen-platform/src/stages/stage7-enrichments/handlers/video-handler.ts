@@ -93,6 +93,14 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
   return ['Master the concepts presented in this lesson'];
 }
 
+function parseOptionalDurationMinutes(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+
+  return Math.round(value);
+}
+
 /**
  * Parse and validate LLM response as video script output
  *
@@ -155,7 +163,10 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
   );
 
   // Fetch lesson content from lesson_contents table
-  const lessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  const lessonContent = await getLessonContent(
+    enrichmentContext.lesson.id,
+    enrichmentContext.course.id
+  );
   if (!lessonContent) {
     throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
   }
@@ -167,6 +178,9 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
   const videoSettings: VideoScriptSettings = {
     tone: (settings.tone as VideoScriptSettings['tone']) || 'conversational',
     pacing: (settings.pacing as VideoScriptSettings['pacing']) || 'moderate',
+    targetDurationMinutes: parseOptionalDurationMinutes(settings.target_duration_minutes),
+    durationRangeMinMinutes: parseOptionalDurationMinutes(settings.duration_range_min_minutes),
+    durationRangeMaxMinutes: parseOptionalDurationMinutes(settings.duration_range_max_minutes),
   };
 
   // Extract learning objectives from lesson content

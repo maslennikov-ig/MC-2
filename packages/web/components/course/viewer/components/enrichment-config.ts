@@ -3,18 +3,22 @@ import { Video, Headphones, Presentation, HelpCircle, FileText, Image } from 'lu
 export type EnrichmentType =
   | 'video'
   | 'audio'
+  | 'nlm_audio'
+  | 'nlm_video'
   | 'presentation'
   | 'quiz'
   | 'document'
   | 'cover'
   | 'card'
 
-export const PLACEHOLDER_TYPES: ('quiz' | 'audio' | 'presentation' | 'video')[] = [
-  'quiz',
-  'audio',
-  'presentation',
-  'video',
-]
+export const PLACEHOLDER_TYPES: (
+  | 'quiz'
+  | 'audio'
+  | 'presentation'
+  | 'video'
+  | 'nlm_audio'
+  | 'nlm_video'
+)[] = ['quiz', 'audio', 'presentation', 'video', 'nlm_audio', 'nlm_video']
 
 // Image types
 // - cover: 16:9 hero banner for lesson header
@@ -25,6 +29,8 @@ export const IMAGE_PLACEHOLDER_TYPES: ('cover' | 'card')[] = ['cover', 'card']
 export type GeneratableEnrichmentType =
   | 'quiz'
   | 'audio'
+  | 'nlm_audio'
+  | 'nlm_video'
   | 'presentation'
   | 'video'
   | 'cover'
@@ -36,8 +42,10 @@ export const ALL_PLACEHOLDER_TYPES: GeneratableEnrichmentType[] = [
   'card',
   'quiz',
   'audio',
+  'nlm_audio',
   'presentation',
   'video',
+  'nlm_video',
 ]
 
 export const ENRICHMENT_CONFIG: Record<
@@ -61,6 +69,12 @@ export const ENRICHMENT_CONFIG: Record<
     bgColor: 'bg-purple-100 dark:bg-purple-900/30',
     labelKey: 'viewer.audioLesson',
   },
+  nlm_audio: {
+    icon: Headphones,
+    color: 'text-purple-500 dark:text-purple-400',
+    bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+    labelKey: 'viewer.nlmAudioLesson',
+  },
   presentation: {
     icon: Presentation,
     color: 'text-orange-500 dark:text-orange-400',
@@ -72,6 +86,12 @@ export const ENRICHMENT_CONFIG: Record<
     color: 'text-green-500 dark:text-green-400',
     bgColor: 'bg-green-100 dark:bg-green-900/30',
     labelKey: 'viewer.quizLabel',
+  },
+  nlm_video: {
+    icon: Video,
+    color: 'text-red-500 dark:text-red-400',
+    bgColor: 'bg-red-100 dark:bg-red-900/30',
+    labelKey: 'viewer.nlmVideoLesson',
   },
   document: {
     icon: FileText,

@@ -201,9 +201,10 @@ export async function extractKeywordsFromLesson(
   lessonId: string,
   objectives: string[] | null,
   enrichmentId: string,
-  context: 'draft' | 'generation'
+  context: 'draft' | 'generation',
+  courseId: string
 ): Promise<KeywordExtractionResult> {
-  const lessonContent = await getLessonContent(lessonId);
+  const lessonContent = await getLessonContent(lessonId, courseId);
 
   if (objectives && objectives.length > 0) {
     const keywords = extractKeywordsFromObjectives(objectives);

@@ -3100,6 +3100,7 @@ export type Database = {
         Returns: string
       }
       generate_problem_id: { Args: never; Returns: string }
+      get_audit_summary: { Args: { p_course_id: string }; Returns: Json }
       get_cleanup_job_monitoring: {
         Args: never
         Returns: {
@@ -3526,6 +3527,8 @@ export type Database = {
         | "cover"
         | "card"
         | "banner"
+        | "nlm_audio"
+        | "nlm_video"
       enrollment_status: "active" | "completed" | "dropped" | "expired"
       generation_stage: "stage4" | "stage5" | "stage6"
       generation_status:
@@ -3747,6 +3750,8 @@ export const Constants = {
         "cover",
         "card",
         "banner",
+        "nlm_audio",
+        "nlm_video",
       ],
       enrollment_status: ["active", "completed", "dropped", "expired"],
       generation_stage: ["stage4", "stage5", "stage6"],

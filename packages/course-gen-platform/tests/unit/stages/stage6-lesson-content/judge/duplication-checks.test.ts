@@ -25,6 +25,7 @@ Error analysis helps prioritize the next improvement step.`;
     expect(result.passed).toBe(true);
     expect(result.duplicatePairs).toHaveLength(0);
     expect(result.overlapPairs).toHaveLength(0);
+    expect(result.introOverlapPairs).toHaveLength(0);
   });
 
   it('should detect near-duplicate section titles', () => {
@@ -58,7 +59,90 @@ Run incident drills quarterly and track MTTR trends to verify reliability gains.
     expect(result.passed).toBe(false);
     expect(result.duplicatePairs).toHaveLength(0);
     expect(result.overlapPairs.length).toBeGreaterThan(0);
+    expect(result.introOverlapPairs).toHaveLength(0);
     expect(result.overlapPairs[0].overlap).toBeGreaterThanOrEqual(0.32);
+  });
+
+  it('should detect high overlap between introduction and later sections', () => {
+    const repeatedIntroCore =
+      'A robust experimentation loop starts by defining a baseline, selecting the primary metric, and setting a strict stopping rule before collecting results. Teams then instrument every step, track confidence intervals, and document assumptions so outcomes remain interpretable under changing traffic patterns. Finally, they pre-register decision criteria and rollback plans to avoid biased conclusions after observing intermediate data.';
+
+    const content = `## Introduction
+${repeatedIntroCore}
+This section frames why disciplined measurement protects product decisions.
+
+## Experiment Design
+${repeatedIntroCore}
+Use guardrail metrics and preplanned checks to keep releases safe.
+
+## Practical Checklist
+Summarize owners, timelines, and release criteria before launching any experiment.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.passed).toBe(false);
+    expect(result.overlapPairs).toHaveLength(0);
+    expect(result.introOverlapPairs.length).toBeGreaterThan(0);
+    expect(result.introOverlapPairs[0].overlap).toBeGreaterThanOrEqual(0.32);
+  });
+
+  it('should recognize localized introduction headers for intro overlap checks', () => {
+    const repeatedIntroCore =
+      'Ein robustes Experimentierverfahren beginnt mit einer klaren Basislinie, einer primären Metrik und einer festen Stoppregel vor dem Start. Teams instrumentieren danach jeden Schritt, beobachten Konfidenzintervalle und dokumentieren Annahmen, damit Ergebnisse unter wechselnder Last interpretierbar bleiben. Anschließend werden Entscheidungsregeln und Rollback-Pläne vorab festgelegt, um verzerrte Entscheidungen nach Zwischenergebnissen zu vermeiden.';
+
+    const content = `## Einführung
+${repeatedIntroCore}
+
+## Experimentdesign
+${repeatedIntroCore}
+
+## Nächste Schritte
+Fasse Verantwortlichkeiten und Testkriterien kompakt zusammen.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.passed).toBe(false);
+    expect(result.overlapPairs).toHaveLength(0);
+    expect(result.introOverlapPairs.length).toBeGreaterThan(0);
+  });
+
+  it('should treat preface before first section as synthetic intro for overlap detection', () => {
+    const repeatedPreface =
+      'A reliable delegation system starts with explicit ownership boundaries, measurable outcomes, and response windows agreed by every participant. Teams then map handoffs, identify escalation paths, and document assumptions so accountability remains stable under pressure. Finally, they align reporting cadence with decision checkpoints to avoid silent drift between intent and execution.';
+
+    const content = `# Delegation Systems
+
+${repeatedPreface}
+
+## Responsibility Matrix
+${repeatedPreface}
+
+## Execution Cadence
+Define check-in points and escalation timelines for cross-functional work.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.passed).toBe(false);
+    expect(result.overlapPairs).toHaveLength(0);
+    expect(result.introOverlapPairs.length).toBeGreaterThan(0);
+    expect(result.introOverlapPairs[0].introTitle).toBe('Preface (before first section)');
+  });
+
+  it('should avoid intro overlap flags when introduction is too short', () => {
+    const repeatedSnippet =
+      'Track assumptions, metrics, and risk controls for every release decision.';
+
+    const content = `## Introduction
+${repeatedSnippet}
+
+## Deployment Controls
+${repeatedSnippet}
+Add rollout gates, telemetry checks, and rollback criteria for production safety.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.introOverlapPairs).toHaveLength(0);
+    expect(result.overlapPairs).toHaveLength(0);
   });
 
   it('should ignore overlap checks for exercise and digest sections', () => {
@@ -74,5 +158,6 @@ ${repeatedTemplate}`;
     const result = checkSectionDuplication(content);
 
     expect(result.overlapPairs).toHaveLength(0);
+    expect(result.introOverlapPairs).toHaveLength(0);
   });
 });

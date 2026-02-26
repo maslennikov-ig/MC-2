@@ -34,6 +34,7 @@ import { protectedProcedure } from '../../middleware/auth';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { lmsLogger } from '../../../integrations/lms/logger';
 import { nanoid } from 'nanoid';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 /**
  * Course Router
@@ -123,8 +124,8 @@ export const courseRouter = router({
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          lmsLogger.warn({ requestId, courseId, error: courseError }, 'Course not found');
+        throwOnSupabaseError(courseError, 'Course', { requestId, courseId });
+        if (!course) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Course not found',
@@ -282,8 +283,8 @@ export const courseRouter = router({
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          lmsLogger.warn({ requestId, courseId, error: courseError }, 'Course not found');
+        throwOnSupabaseError(courseError, 'Course', { requestId, courseId });
+        if (!course) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Course not found',
@@ -309,11 +310,12 @@ export const courseRouter = router({
           .eq('organization_id', organizationId)
           .single();
 
-        if (configError || !config) {
-          lmsLogger.warn(
-            { requestId, lmsConfigId, organizationId, error: configError },
-            'LMS configuration not found'
-          );
+        throwOnSupabaseError(configError, 'LMS configuration', {
+          requestId,
+          lmsConfigId,
+          organizationId,
+        });
+        if (!config) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'LMS configuration not found or access denied',

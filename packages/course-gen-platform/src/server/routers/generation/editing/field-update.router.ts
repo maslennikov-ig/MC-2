@@ -17,6 +17,7 @@ import {
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { assertStableIds, isDualWriteEnabled } from '../../../../shared/course-nodes/feature-flags';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 
@@ -55,13 +56,8 @@ export const fieldUpdateRouter = {
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Course not found',
-          });
-        }
+        throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+        if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         // Check authorization: superadmin/admin/owner can update
         assertCourseAccess(buildAuthContext(ctx.user), course, 'update field');
@@ -243,13 +239,8 @@ export const fieldUpdateRouter = {
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn({ requestId, courseId, error: courseError }, 'Course not found');
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Course not found',
-          });
-        }
+        throwOnSupabaseError(courseError, 'Course', { requestId, courseId });
+        if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         // Check authorization
         assertCourseAccess(buildAuthContext(ctx.user), course, 'check downstream stages');
@@ -331,13 +322,8 @@ export const fieldUpdateRouter = {
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn({ requestId, courseId, error: courseError }, 'Course not found');
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Course not found',
-          });
-        }
+        throwOnSupabaseError(courseError, 'Course', { requestId, courseId });
+        if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         // Check authorization
         assertCourseAccess(buildAuthContext(ctx.user), course, 'delete downstream stages');

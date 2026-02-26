@@ -31,7 +31,5 @@ export {
   classifyError,
   shouldRetryJob,
   handleJobFailure,
-  handleJobStalled,
-  handleJobTimeout,
   ErrorType,
 } from './handlers/error-handler';

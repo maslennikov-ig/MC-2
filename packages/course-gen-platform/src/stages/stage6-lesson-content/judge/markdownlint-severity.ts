@@ -48,6 +48,8 @@ export type MarkdownLintSeverity = 'critical' | 'major' | 'minor';
  * - MD031: Blanks around fenced code - Cramped code blocks harder to read
  * - MD032: Blanks around lists - Cramped lists harder to scan
  * - MD046: Code block style - Inconsistent code block styles (fenced vs indented) reduce consistency
+ * - MD055: Table pipe style - Inconsistent pipe usage can break table parsing/rendering
+ * - MD060: Table column style - Inconsistent table separators degrade rendering consistency
  *
  * **MINOR** - Cosmetic issues, typically auto-fixable by markdownlint:
  * - MD009: Trailing spaces - Auto-fixable, purely cosmetic
@@ -63,6 +65,7 @@ export const RULE_SEVERITY: Record<string, MarkdownLintSeverity> = {
   MD001: 'critical', // heading-increment - Skipping heading levels confuses document structure
   MD025: 'critical', // single-title/single-h1 - Multiple h1 breaks hierarchy
   MD045: 'critical', // no-alt-text - Missing image alt text is accessibility violation
+  MD056: 'critical', // table-column-count - Row/column mismatch can break table rendering
 
   // MAJOR - Formatting issues degrading quality
   MD003: 'major', // heading-style - Inconsistent heading styles (ATX vs Setext)
@@ -71,6 +74,8 @@ export const RULE_SEVERITY: Record<string, MarkdownLintSeverity> = {
   MD031: 'major', // blanks-around-fences - Missing blank lines around fenced code blocks
   MD032: 'major', // blanks-around-lists - Missing blank lines around lists
   MD046: 'major', // code-block-style - Inconsistent code block styles (fenced vs indented)
+  MD055: 'major', // table-pipe-style - Inconsistent pipe style can confuse parsers/renderers
+  MD060: 'major', // table-column-style - Inconsistent column separator style in tables
 
   // MINOR - Cosmetic issues, auto-fixable
   MD009: 'minor', // no-trailing-spaces - Trailing spaces (auto-fixable)

@@ -2,6 +2,8 @@
   "types": {
     "video": "Video",
     "audio": "Audio",
+    "nlm_audio": "NLM Audio",
+    "nlm_video": "NLM Video",
     "presentation": "Presentation",
     "quiz": "Quiz",
     "document": "Document",
@@ -20,6 +22,8 @@
   "typeDescriptions": {
     "video": "AI-generated video lecture based on lesson content",
     "audio": "Text-to-speech narration for convenient listening",
+    "nlm_audio": "Narrated audio generated with NLM flow",
+    "nlm_video": "Narrated video generated with NLM flow",
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
@@ -131,6 +135,31 @@
       "speedFast": "Fast",
       "format": "Format"
     },
+    "nlmAudio": {
+      "title": "NLM Audio Settings",
+      "format": "Narration Format",
+      "formatDeepDive": "Deep explanation",
+      "formatBrief": "Brief overview",
+      "formatCritique": "Critical analysis",
+      "formatDebate": "Two-host debate"
+    },
+    "nlmVideo": {
+      "title": "NLM Video Settings",
+      "format": "Video Format",
+      "formatExplainer": "Explainer",
+      "formatBrief": "Brief overview",
+      "style": "Visual Style",
+      "styleAutoSelect": "Automatic",
+      "styleCustom": "Custom",
+      "styleClassic": "Classic",
+      "styleWhiteboard": "Whiteboard",
+      "styleKawaii": "Kawaii (cute)",
+      "styleAnime": "Anime",
+      "styleWatercolor": "Watercolor",
+      "styleRetroPrint": "Retro print",
+      "styleHeritage": "Heritage",
+      "stylePaperCraft": "Paper craft"
+    },
     "video": {
       "title": "Video Settings",
       "voice": "Voice",
@@ -163,6 +192,8 @@
     "loadError": "Failed to load additional materials. Try refreshing the page.",
     "videoLesson": "Video lesson",
     "audioLesson": "Audio lesson",
+    "nlmAudioLesson": "NLM audio lesson",
+    "nlmVideoLesson": "NLM video lesson",
     "presentationLabel": "Presentation",
     "quizLabel": "Quiz",
     "documentLabel": "Additional reading",
@@ -172,6 +203,8 @@
     "checkKnowledge": "Test your knowledge",
     "audioVersion": "Audio version of lesson",
     "videoVersion": "Video version of lesson",
+    "nlmAudioVersion": "NLM audio version of lesson",
+    "nlmVideoVersion": "NLM video version of lesson",
     "lessonPresentation": "Lesson presentation",
     "additionalMaterials": "Additional materials",
     "play": "Play",
@@ -238,6 +271,8 @@
     "enrichmentTypes": {
       "video": "Video",
       "audio": "Audio",
+      "nlm_audio": "NLM Audio",
+      "nlm_video": "NLM Video",
       "presentation": "Presentation",
       "quiz": "Quiz",
       "document": "Document",
@@ -245,6 +280,16 @@
       "card": "Visual Card",
       "banner": "Decorative Banner"
     },
+    "confirmDeleteTitle": "Delete enrichment?",
+    "confirmDeleteDescription": "This action cannot be undone. The media file will be deleted.",
+    "deleteSuccess": "Enrichment deleted",
+    "deleteFailed": "Failed to delete enrichment",
+    "regenerateSuccess": "Regeneration started",
+    "regenerateFailed": "Failed to start regeneration",
+    "confirm": "Delete",
+    "cancel": "Cancel",
+    "videoUnavailable": "Video unavailable",
+    "audioUnavailable": "Audio unavailable",
     "generationComplete": "Enrichment generated successfully",
     "generationFailed": "Failed to generate enrichment",
     "resumingGeneration": "Tracking {count, plural, one {# active generation} other {# active generations}}..."
@@ -260,6 +305,11 @@
       "description": "Listen to the lesson",
       "estimatedTime": "~30 sec"
     },
+    "nlm_audio": {
+      "title": "NLM Audio",
+      "description": "Draft and generate narrated lesson audio",
+      "estimatedTime": "~45 sec"
+    },
     "presentation": {
       "title": "Presentation",
       "description": "Key slides from the lesson",
@@ -270,6 +320,11 @@
       "description": "AI video lecture",
       "estimatedTime": "Coming Soon",
       "comingSoon": "Coming Soon"
+    },
+    "nlm_video": {
+      "title": "NLM Video",
+      "description": "Draft and generate narrated lesson video",
+      "estimatedTime": "~120 sec"
     }
   },
   "images": {
@@ -326,6 +381,10 @@
   },
   "generate": "Generate",
   "generating": "Generating...",
+  "longGeneration": {
+    "remaining": "Time left: {remaining} / {total}",
+    "elapsed": "Elapsed: {elapsed}"
+  },
   "options": "Options",
   "cancel": "Cancel",
   "retry": "Retry",
@@ -333,5 +392,85 @@
   "draftPreview": {
     "slideCount": "{count} slides ready",
     "estimatedDuration": "~{minutes} min video"
+  },
+  "videoPlayer": {
+    "Play": "Play",
+    "Pause": "Pause",
+    "Replay": "Replay",
+    "Mute": "Mute",
+    "Unmute": "Unmute",
+    "Volume": "Volume",
+    "Seek": "Seek",
+    "Seek Forward": "Seek Forward",
+    "Seek Backward": "Seek Backward",
+    "Enter Fullscreen": "Enter Fullscreen",
+    "Exit Fullscreen": "Exit Fullscreen",
+    "Fullscreen": "Fullscreen",
+    "Enter PiP": "Enter PiP",
+    "Exit PiP": "Exit PiP",
+    "PiP": "PiP",
+    "Settings": "Settings",
+    "Playback": "Playback",
+    "Speed": "Speed",
+    "Quality": "Quality",
+    "Auto": "Auto",
+    "Default": "Default",
+    "Normal": "Normal",
+    "Off": "Off",
+    "Captions": "Captions",
+    "Closed-Captions On": "Closed-Captions On",
+    "Closed-Captions Off": "Closed-Captions Off",
+    "Audio": "Audio",
+    "Download": "Download",
+    "AirPlay": "AirPlay",
+    "Google Cast": "Google Cast",
+    "Disabled": "Disabled",
+    "Connected": "Connected",
+    "Connecting": "Connecting",
+    "Disconnected": "Disconnected",
+    "LIVE": "LIVE",
+    "Skip To Live": "Skip To Live",
+    "Loop": "Loop",
+    "Chapters": "Chapters",
+    "Continue": "Continue",
+    "Announcements": "Announcements",
+    "Accessibility": "Accessibility",
+    "Keyboard Animations": "Keyboard Animations",
+    "Caption Styles": "Caption Styles",
+    "Captions look like this": "Captions look like this",
+    "Font": "Font",
+    "Family": "Family",
+    "Size": "Size",
+    "Color": "Color",
+    "Opacity": "Opacity",
+    "Shadow": "Shadow",
+    "Text": "Text",
+    "Text Background": "Text Background",
+    "Display Background": "Display Background",
+    "Track": "Track",
+    "Reset": "Reset",
+    "Boost": "Boost"
+  },
+  "switcher": {
+    "title": "Lesson Materials",
+    "tabs": {
+      "video": "Video",
+      "audio": "Audio",
+      "quiz": "Quiz",
+      "presentation": "Presentation",
+      "document": "Document"
+    },
+    "fallback": {
+      "video": "Video not available",
+      "presentationEmpty": "Presentation is empty",
+      "documentTitle": "Document",
+      "documentDescription": "Additional material for the lesson",
+      "download": "Download",
+      "documentAvailableInPanel": "Document is available for download in the activities panel",
+      "showVideo": "Show video"
+    },
+    "slides": {
+      "defaultTitle": "Slide {number}"
+    }
   }
 }

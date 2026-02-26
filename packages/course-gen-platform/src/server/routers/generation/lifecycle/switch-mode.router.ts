@@ -15,6 +15,7 @@ import { nanoid } from 'nanoid';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import type { Database } from '@megacampus/shared-types';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 export const switchModeRouter = {
   switchToManualMode: instructorProcedure
@@ -47,10 +48,8 @@ export const switchModeRouter = {
         };
         const typedCourse = course as unknown as CourseWithGenerationMode | null;
 
-        if (courseError || !typedCourse) {
-          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-        }
+        throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+        if (!typedCourse) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         // Step 2: Verify ownership (no-owner courses cannot switch modes)
         if (typedCourse.user_id === null) {

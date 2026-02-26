@@ -95,7 +95,7 @@ export async function createJobStatus(job: Job<JobData>): Promise<void> {
   try {
     // Validate job.name is defined to prevent NOT NULL constraint violation
     if (!job.name) {
-      logger.warn(
+      logger.debug(
         {
           jobId: job.id,
           jobData: job.data,
@@ -112,7 +112,7 @@ export async function createJobStatus(job: Job<JobData>): Promise<void> {
     const organizationId = extractOrganizationId(job.data);
 
     if (!organizationId) {
-      logger.warn(
+      logger.debug(
         {
           jobId: job.id,
           jobData: job.data,
@@ -251,7 +251,7 @@ export async function updateJobStatus(
     }
 
     if (!data || data.length === 0) {
-      logger.warn(
+      logger.debug(
         {
           jobId,
           updates,

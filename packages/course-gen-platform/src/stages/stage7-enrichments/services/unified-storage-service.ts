@@ -38,6 +38,23 @@ import {
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { STORAGE_CONFIG } from '../config';
 
+const EXTENSION_MIME_TYPES: Record<string, string> = {
+  webp: 'image/webp',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+};
+
+function toNormalizedExtension(extension: string): string {
+  return extension.toLowerCase().replace(/^\./, '');
+}
+
+function getMimeTypeForExtension(extension: string): string {
+  return EXTENSION_MIME_TYPES[toNormalizedExtension(extension)] || 'application/octet-stream';
+}
+
 // ============================================================================
 // BACKEND DETECTION
 // ============================================================================
@@ -76,7 +93,8 @@ export function getStorageBackendName(): 'local' | 'supabase' {
  * @param lessonId - Lesson UUID
  * @param enrichmentId - Enrichment UUID
  * @param buffer - File content
- * @param extension - File extension (default: 'webp')
+ * @param mimeOrExtension - Existing API: extension (default 'webp'). Media API: MIME type.
+ * @param extensionArg - Optional extension for media API (when MIME type is passed as arg 5)
  * @returns Storage path (relative for local, full path for Supabase)
  */
 export async function uploadEnrichmentAsset(
@@ -84,27 +102,36 @@ export async function uploadEnrichmentAsset(
   lessonId: string,
   enrichmentId: string,
   buffer: Buffer,
-  extension = 'webp'
+  extension?: string
+): Promise<string>;
+export async function uploadEnrichmentAsset(
+  courseId: string,
+  lessonId: string,
+  enrichmentId: string,
+  buffer: Buffer,
+  mimeType: string,
+  extension: string
+): Promise<string>;
+export async function uploadEnrichmentAsset(
+  courseId: string,
+  lessonId: string,
+  enrichmentId: string,
+  buffer: Buffer,
+  mimeOrExtension: string = 'webp',
+  extensionArg?: string
 ): Promise<string> {
   const backend = getStorageBackendName();
+  const extension = toNormalizedExtension(extensionArg ?? mimeOrExtension);
+  const mimeType = extensionArg ? mimeOrExtension : getMimeTypeForExtension(mimeOrExtension);
 
   logger.debug(
-    { courseId, lessonId, enrichmentId, extension, backend },
+    { courseId, lessonId, enrichmentId, mimeType, extension, backend },
     'Unified storage: uploading enrichment asset'
   );
 
   if (useLocalStorage()) {
     return uploadEnrichmentAssetLocal(courseId, lessonId, enrichmentId, buffer, extension);
   }
-
-  // Supabase requires mimeType
-  const mimeTypes: Record<string, string> = {
-    webp: 'image/webp',
-    png: 'image/png',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-  };
-  const mimeType = mimeTypes[extension] || 'application/octet-stream';
 
   return uploadEnrichmentAssetSupabase(
     courseId,
@@ -132,30 +159,25 @@ export async function uploadCourseCard(
   buffer: Buffer,
   extension = 'webp'
 ): Promise<string> {
+  const normalizedExtension = toNormalizedExtension(extension);
   const backend = getStorageBackendName();
 
-  logger.debug({ courseId, extension, backend }, 'Unified storage: uploading course card');
+  logger.debug(
+    { courseId, extension: normalizedExtension, backend },
+    'Unified storage: uploading course card'
+  );
 
   if (useLocalStorage()) {
-    return uploadCourseCardLocal(courseId, buffer, extension);
+    return uploadCourseCardLocal(courseId, buffer, normalizedExtension);
   }
-
-  // Supabase: use a pseudo-lessonId for course cards
-  const mimeTypes: Record<string, string> = {
-    webp: 'image/webp',
-    png: 'image/png',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-  };
-  const mimeType = mimeTypes[extension] || 'application/octet-stream';
 
   return uploadEnrichmentAssetSupabase(
     courseId,
     'course-card',
     'card',
     buffer,
-    mimeType,
-    extension
+    getMimeTypeForExtension(normalizedExtension),
+    normalizedExtension
   );
 }
 

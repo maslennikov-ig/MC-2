@@ -25,6 +25,7 @@ import {
   isTwoStageType,
   checkExistingEnrichment,
   findReusableEnrichment,
+  shouldReuseLegacyNlmDraft,
 } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { createStage7Queue, addEnrichmentJob } from '../../../../stages/stage7-enrichments/factory';
@@ -111,8 +112,9 @@ export const generateOnDemand = protectedProcedure
 
       // Step 3: Check if enrichment of this type already exists for lesson
       const existing = await checkExistingEnrichment(lessonId, enrichmentType, requestId);
+      const isLegacyNlmDraft = shouldReuseLegacyNlmDraft(enrichmentType, existing.status);
 
-      if (existing.exists) {
+      if (existing.exists && !isLegacyNlmDraft) {
         logger.warn(
           {
             requestId,
@@ -130,9 +132,15 @@ export const generateOnDemand = protectedProcedure
         });
       }
 
-      // Step 4: Check for reusable (cancelled/failed) enrichment
+      // Step 4: Check for reusable enrichment
+      // Priority:
+      // 1) Legacy NLM draft rows (draft_ready/draft_generating) from old two-stage flow
+      // 2) Failed/cancelled rows (existing behavior)
       const supabase = getSupabaseAdmin();
-      const reusableId = await findReusableEnrichment(lessonId, enrichmentType, requestId);
+      const reusableId =
+        isLegacyNlmDraft && existing.enrichmentId
+          ? existing.enrichmentId
+          : await findReusableEnrichment(lessonId, enrichmentType, requestId);
 
       // Step 5: Determine initial status (two-stage types start with draft generation)
       const initialStatus = isTwoStageType(enrichmentType) ? 'pending' : 'pending';
@@ -237,8 +245,10 @@ export const generateOnDemand = protectedProcedure
         isDraftPhase: isTwoStageType(enrichmentType),
       };
 
+      // Use a unique jobId suffix to avoid BullMQ dedupe collisions when
+      // reusing the same enrichment row after previous completed/failed runs.
       const job = await addEnrichmentJob(queue, jobInput, {
-        jobId: `enrich-ondemand-${finalEnrichmentId}`,
+        jobId: `enrich-ondemand-${finalEnrichmentId}-${Date.now()}`,
       });
 
       logger.info(

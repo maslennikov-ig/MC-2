@@ -7,6 +7,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.6] - 2026-02-26
+
+### Other
+
+- update project files (ce0b8a2d)
+
+## [0.31.5] - 2026-02-26
+
+### Added
+
+- **enrichments**: fix audio/video playback + expose NLM format options (f292a138)
+- **pipeline**: add Redis read-side cache for Stage 3/4 file content (27ecea1e)
+- **pipeline**: add Redis cache-aside for file and lesson content (a6c05555)
+
+### Fixed
+
+- **enrichments**: persist generation state across lesson navigation (f17acdfa)
+- **pipeline**: address code review issues in Redis cache-aside (ce1029df)
+- **nginx**: add video/mp4 and audio/mpeg MIME types for enrichment storage (b8ab32d0)
+
+### Other
+
+- add plan files, architecture docs, and gitignore .agent/ (53f3caae)
+- update deployment guide (ae039e79)
+
+## [0.31.4] - 2026-02-26
+
+### Fixed
+
+- **web**: restore enrichment generation state after page navigation (0c960ac6)
+
+## [0.31.3] - 2026-02-26
+
+### Changed
+
+- migrate 48 router files to shared throwOnSupabaseError utility (2529b769)
+- **db**: database health cleanup — reduce size 391→153 MB and optimize egress (2dc55a9d)
+
+### Fixed
+
+- **web**: dynamic import vidstack to prevent intermittent chunk loading errors (78f5bf58)
+- code review follow-ups — proper backoff, PGRST116 guards, regression tests (2cd52755)
+- stop misclassifying network errors as "enrichment not found" during polling (4bc6ddeb)
+
+## [0.31.2] - 2026-02-26
+
+### Fixed
+
+- **nlm-bridge**: strip bloated metadata from bridge responses and harden recovery logic (34714ead)
+- enrichment card transition after generation + audio single-click play + metadata perf (db2e322f)
+- prevent Select dropdown from closing in enrichment card hover panel (b3f850c5)
+
+## [0.31.1] - 2026-02-25
+
+### Added
+
+- redesign enrichment cards with unified grid, single-click video, and compact audio overlay (b9365d9a)
+
+### Other
+
+- update docker-compose and deploy scripts (573fa689)
+- fix Windows NTFS compatibility and normalize line endings (070b5743)
+- add cross-platform line ending rules to .gitattributes (d4bb9eac)
+
+## [0.31.0] - 2026-02-24
+
+### Added
+
+- telegram notifications, lesson materials switcher, and media player improvements (6d3fc26f)
+- universalize Gastown commands and add /onboard (efd0299d)
+- **stage7**: harden NLM pipeline with local media storage, async lifecycle, and recovery (515a4be0)
+- **stage7**: harden NLM audio/video generation pipeline (0e312599)
+- **enrichments**: add nlm audio/video generation via notebooklm bridge (b2b88294)
+- **course-gen-platform**: add notebooklm bridge FastAPI service (35f2696d)
+- **admin**: add generation trace audit page (086e0dd6)
+
+### Fixed
+
+- add data/secrets to gitignore and fix lint errors in scripts/tests (7bf94132)
+- **release**: exclude .venv and .gemini/tmp from package.json discovery and gitignore (93782443)
+- **analysis**: handle forceRestart in active stage4 states (4e9ae01f)
+- **enrichments**: add nlm types to ordered arrays in generation-graph (95570d8f)
+- **enrichments**: resolve nlm audio/video contract and type issues (05031c95)
+- **ci**: build notebooklm-bridge image for deploy (b70e1ca3)
+- **stage6**: add deterministic markdown table remediation (4a623e72)
+- **web**: normalize malformed markdown tables (e2a904bd)
+
+### Other
+
+- update Gemini and Codex instruction files with Gastown workflow (fe79fcb0)
+- expand Gastown cheatsheet into comprehensive command reference (39401ec9)
+- add Gastown analysis and update CLAUDE.md for multi-agent orchestration (9716ae4f)
+- **dev**: make start-dev always run local notebooklm bridge (d2fbeb15)
+- **dev**: add optional local notebooklm bridge to start-dev (79800965)
+- **infra**: wire notebooklm bridge configs and runbook (d60e7237)
+
+## [0.30.11] - 2026-02-20
+
+### Fixed
+
+- **stage6**: improve mermaid diagram remediation pipeline and rendering (f802fe1e)
+- **stage6**: prevent intro-vs-section content duplication in lesson generation (b3f0205d)
+- **logs**: address code review findings — rate limiter bug, logWarningToDb bypass, inconsistent logger (de935b97)
+- **logs**: reduce error log volume with pre-insert filters and double-logging elimination (e53701af)
+- **logs**: fix Job not found auto-mute regex and add Redis/Jina patterns (6c574664)
+
+### Other
+
+- add plans and review reports (ef753f3e)
+- **logs**: remove dead code — dbLog:false, handleJobStalled, handleJobTimeout (759e0dce)
+
 ## [0.30.10] - 2026-02-19
 
 ### Fixed

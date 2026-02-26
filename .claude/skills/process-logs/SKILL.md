@@ -1,7 +1,7 @@
 ---
 name: process-logs
-description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.8.0
+description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved. Checks Axiom/Pino if DB entries are filtered.
+version: 1.9.0
 ---
 
 # Process Error Logs
@@ -110,7 +110,7 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 
 Some errors are **automatically ignored** by the system with status `auto_muted`. These are expected events, NOT bugs.
 
-**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 50):
+**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`, total: 58):
 
 | Pattern                                                   | Reason            | Description                                        |
 | --------------------------------------------------------- | ----------------- | -------------------------------------------------- |
@@ -131,7 +131,7 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Cache directory does not exist`                          | expected_behavior | Cache missing on fresh env, created later          |
 | `ModelConfigBunker.*sync.*fail`                           | external_service  | Network issue, has retry with backoff              |
 | `Invalid status for approval`                             | ui_race_condition | User clicked approve but course progressed         |
-| `Job \d+ not found`                                       | expected_behavior | Frontend polls job status after cleanup            |
+| `Job .+ not found`                                        | expected_behavior | Frontend polls job status after cleanup            |
 | `Failed to log generation trace`                          | expected_behavior | Trace insert failed during pool pressure           |
 | `Patcher.*REJECTED.*truncated`                            | graceful_fallback | Truncated content detected, returns original       |
 | `Preprocessing failed.*using raw`                         | graceful_fallback | Preprocessing failed, using raw LLM output         |
@@ -152,8 +152,10 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Unavailable For Legal Reasons\|content policy violation` | content_policy    | Jina API content policy rejection (PII/legal)      |
 | `Using STALE phase config due to database error`          | graceful_fallback | ModelConfigBunker stale config during DB outage    |
 | `\[Phase 6\] Max retries reached.*best-effort`            | graceful_fallback | Phase 6 summary retries exhausted, best-effort     |
+| `MISCONF Redis.*unable to persist`                        | infrastructure    | Redis RDB/AOF disk issue - infra problem, not app  |
+| `Concurrency limit exceeded`                              | external_service  | Jina API server-side concurrency enforcement       |
 
-**Total rules: 56** (test validates sync with code)
+**Total rules: 58** (test validates sync with code)
 
 **Test environment auto-muting:**
 
@@ -163,6 +165,7 @@ Errors from `NODE_ENV=test` (vitest) are automatically muted at insert time via 
 
 - Skip them in processing — they don't need fixes
 - If you see a pattern that should be auto-muted, add it to `auto-classification.ts`
+- Note: auto-muted patterns are now filtered BEFORE DB insert (pre-insert filter), so most won't appear in error_logs at all. Only errors from `logPermanentFailure()` (canonical path) may still get auto-muted after insert.
 
 **How to add a new auto-mute rule:**
 
@@ -611,3 +614,44 @@ The UI has two views:
 - This ensures grouped view shows correct status
 
 **IMPORTANT:** You don't need to manually handle fingerprint — the trigger does it automatically. Just use the standard `INSERT INTO log_issue_status` by `log_id`.
+
+### Error Logging Architecture (Post-Optimization v1.9)
+
+Error flow after volume optimization:
+
+```
+logger.warn/error()
+    |
+[Proxy Interceptor]
+    ├── Pino → stdout → Axiom  (ALWAYS, no filter)
+    └── writeToErrorLogs()
+          ├── shouldAutoMute() → SKIP if matches auto-mute rules (58 patterns)
+          ├── shouldWriteToDb() → SKIP if rate-limited (>5/min per fingerprint)
+          └── INSERT into error_logs
+
+logPermanentFailure()  (canonical path, bypasses proxy filters)
+    └── INSERT/UPSERT into error_logs → applyAutoMuteStatus()
+```
+
+**Key points:**
+
+- WARN/ERROR always go to Pino/Axiom regardless of DB filters
+- `logPermanentFailure()` is the canonical DB write — NOT affected by pre-insert filter
+- `baseLogger.warn/error()` bypasses proxy entirely (Pino only, no DB)
+- Rate limiter prevents outage floods (max 5 per message per minute)
+
+**If you suspect missing errors in error_logs (filtered by optimization):**
+
+Check Pino/Axiom logs for the full unfiltered stream:
+
+- Axiom dashboard: all WARN/ERROR logs are always captured
+- These are NOT affected by DB-level filtering
+- Use Axiom search when investigating an error that doesn't appear in `/admin/logs`
+- Pino logs to stdout are never filtered — they capture everything
+
+**Files involved in filtering:**
+
+- `src/shared/logger/index.ts` — proxy interceptor + writeToErrorLogs (pre-insert filter)
+- `src/shared/logger/auto-classification.ts` — auto-mute patterns (58 rules)
+- `src/shared/logger/rate-limiter.ts` — per-fingerprint rate limiter
+- `src/shared/logger/error-service.ts` — logPermanentFailure (canonical path, has own auto-mute)

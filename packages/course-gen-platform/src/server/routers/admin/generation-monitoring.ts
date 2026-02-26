@@ -36,7 +36,10 @@ export const generationMonitoringRouter = router({
         const supabase = getSupabaseAdmin();
         let query = supabase
           .from('generation_trace')
-          .select('*', { count: 'exact' })
+          .select(
+            'id, course_id, lesson_id, stage, phase, step_name, model_used, tokens_used, cost_usd, duration_ms, retry_attempt, was_cached, quality_score, temperature, error_data, created_at',
+            { count: 'exact' }
+          )
           .eq('course_id', input.courseId)
           .order('created_at', { ascending: false });
 
@@ -82,12 +85,16 @@ export const generationMonitoringRouter = router({
             .order('changed_at', { ascending: false }),
           supabase
             .from('lessons')
-            .select('*, lesson_contents(*)')
+            .select(
+              'id, title, order_index, lesson_type, status, created_at, lesson_contents(id, status, generation_attempt, created_at)'
+            )
             .eq('course_id', input.courseId)
             .order('order_index', { ascending: true }),
           supabase
             .from('generation_trace')
-            .select('*')
+            .select(
+              'id, stage, phase, step_name, model_used, lesson_id, tokens_used, cost_usd, duration_ms, error_data, retry_attempt, quality_score, created_at'
+            )
             .eq('course_id', input.courseId)
             .order('created_at', { ascending: false })
             .limit(20),
@@ -339,7 +346,11 @@ export const generationMonitoringRouter = router({
           ])
           .optional(),
         language: z.enum(['ru', 'en']).optional(),
-        search: z.string().optional(),
+        search: z
+          .string()
+          .max(100)
+          .regex(/^[a-zA-Z0-9_\-. ]*$/, 'Invalid search characters')
+          .optional(),
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
       })
@@ -377,6 +388,7 @@ export const generationMonitoringRouter = router({
         if (input.language) query = query.eq('language', input.language);
 
         // Enhanced search: search across generation_code and title
+        // Safe: search is Zod-validated against /^[a-zA-Z0-9_\-. ]*$/ regex
         if (input.search) {
           query = query.or(`title.ilike.%${input.search}%,generation_code.ilike.%${input.search}%`);
         }
@@ -432,7 +444,9 @@ export const generationMonitoringRouter = router({
         const supabase = getSupabaseAdmin();
         const { data } = await supabase
           .from('generation_trace')
-          .select('*')
+          .select(
+            'id, course_id, lesson_id, stage, phase, step_name, model_used, tokens_used, cost_usd, duration_ms, retry_attempt, was_cached, quality_score, temperature, error_data, input_data, output_data, created_at'
+          )
           .eq('course_id', input.courseId)
           .order('created_at', { ascending: true });
 
@@ -449,6 +463,231 @@ export const generationMonitoringRouter = router({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to export traces',
+        });
+      }
+    }),
+
+  /**
+   * Get audit summary for a course — aggregated stats, model/stage/lesson breakdowns
+   */
+  getAuditSummary: adminProcedure
+    .input(z.object({ courseId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      try {
+        const supabase = getSupabaseAdmin();
+
+        const [rpcRes, courseRes, lessonsRes, lessonTracesRes] = await Promise.all([
+          supabase.rpc('get_audit_summary', { p_course_id: input.courseId }),
+          supabase
+            .from('courses')
+            .select(
+              'title, generation_status, generation_started_at, generation_completed_at, generation_code'
+            )
+            .eq('id', input.courseId)
+            .single(),
+          supabase
+            .from('lessons')
+            .select('id, title, order_index')
+            .eq('course_id', input.courseId)
+            .order('order_index', { ascending: true }),
+          // Lightweight query for lesson breakdown — only stage_6 with lesson_id
+          supabase
+            .from('generation_trace')
+            .select('lesson_id, model_used, tokens_used, cost_usd, error_data')
+            .eq('course_id', input.courseId)
+            .eq('stage', 'stage_6')
+            .not('lesson_id', 'is', null)
+            .limit(5_000),
+        ]);
+
+        if (courseRes.error) throw courseRes.error;
+        if (rpcRes.error) throw rpcRes.error;
+
+        const rpcData = rpcRes.data as unknown as {
+          totals: {
+            traceCount: number;
+            totalCost: number;
+            totalTokens: number;
+            errorCount: number;
+            retryCount: number;
+          };
+          stageBreakdown: Array<{
+            stage: string;
+            calls: number;
+            tokens: number;
+            cost: number;
+            duration: number;
+            errors: number;
+          }>;
+          modelBreakdown: Array<{ model: string; calls: number; tokens: number; cost: number }>;
+          filterOptions: { stages: string[]; phases: string[]; models: string[] };
+        };
+
+        const lessons = lessonsRes.data || [];
+        const lessonMap = new Map(lessons.map(l => [l.id, l.title]));
+
+        // Per-lesson breakdown from stage_6 traces
+        const lessonTraces = lessonTracesRes.data || [];
+        const lessonAggMap = new Map<
+          string,
+          {
+            lessonTitle: string;
+            calls: number;
+            tokens: number;
+            cost: number;
+            models: Set<string>;
+            errors: number;
+          }
+        >();
+        for (const t of lessonTraces) {
+          const lid = t.lesson_id!;
+          const entry = lessonAggMap.get(lid) || {
+            lessonTitle: lessonMap.get(lid) || lid,
+            calls: 0,
+            tokens: 0,
+            cost: 0,
+            models: new Set<string>(),
+            errors: 0,
+          };
+          entry.calls++;
+          entry.tokens += t.tokens_used || 0;
+          entry.cost += t.cost_usd || 0;
+          if (t.model_used) entry.models.add(t.model_used);
+          if (t.error_data) entry.errors++;
+          lessonAggMap.set(lid, entry);
+        }
+        const lessonBreakdown = Array.from(lessonAggMap.entries()).map(([lessonId, stats]) => ({
+          lessonId,
+          lessonTitle: stats.lessonTitle,
+          calls: stats.calls,
+          tokens: stats.tokens,
+          cost: stats.cost,
+          models: Array.from(stats.models),
+          errors: stats.errors,
+        }));
+
+        // Build lesson filter options from traces that have lesson_id
+        const tracedLessonIds = new Set(
+          lessonTraces.map(t => t.lesson_id).filter(Boolean) as string[]
+        );
+        const lessonsWithTraces = lessons.filter(l => tracedLessonIds.has(l.id));
+
+        return {
+          course: courseRes.data,
+          totals: rpcData.totals,
+          stageBreakdown: rpcData.stageBreakdown,
+          modelBreakdown: rpcData.modelBreakdown,
+          lessonBreakdown,
+          filterOptions: {
+            ...rpcData.filterOptions,
+            lessons: lessonsWithTraces,
+          },
+        };
+      } catch (error) {
+        logger.error({ error, courseId: input.courseId }, 'Failed to fetch audit summary');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch audit summary',
+        });
+      }
+    }),
+
+  /**
+   * Get filtered traces for audit table (lightweight — no large text fields)
+   */
+  getAuditTraces: adminProcedure
+    .input(
+      z.object({
+        courseId: z.string().uuid(),
+        stage: z.string().optional(),
+        phase: z.string().optional(),
+        modelUsed: z.string().optional(),
+        lessonId: z.string().uuid().optional(),
+        hasError: z.boolean().optional(),
+        hasRetry: z.boolean().optional(),
+        search: z
+          .string()
+          .max(100)
+          .regex(/^[a-zA-Z0-9_\-. ]*$/, 'Invalid search characters')
+          .optional(),
+        sortBy: z
+          .enum(['created_at', 'tokens_used', 'cost_usd', 'duration_ms', 'stage', 'model_used'])
+          .default('created_at'),
+        sortOrder: z.enum(['asc', 'desc']).default('desc'),
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const supabase = getSupabaseAdmin();
+
+        let query = supabase
+          .from('generation_trace')
+          .select(
+            'id, stage, phase, step_name, model_used, lesson_id, tokens_used, cost_usd, duration_ms, error_data, retry_attempt, quality_score, temperature, was_cached, created_at',
+            { count: 'exact' }
+          )
+          .eq('course_id', input.courseId)
+          .order(input.sortBy, { ascending: input.sortOrder === 'asc' });
+
+        if (input.stage) query = query.eq('stage', input.stage);
+        if (input.phase) query = query.eq('phase', input.phase);
+        if (input.modelUsed) query = query.eq('model_used', input.modelUsed);
+        if (input.lessonId) query = query.eq('lesson_id', input.lessonId);
+        if (input.hasError) query = query.not('error_data', 'is', null);
+        if (input.hasRetry) query = query.gt('retry_attempt', 0);
+        if (input.search) {
+          query = query.or(`phase.ilike.%${input.search}%,step_name.ilike.%${input.search}%`);
+        }
+
+        query = query.range(input.offset, input.offset + input.limit - 1);
+
+        const { data, count, error } = await query;
+        if (error) throw error;
+
+        return {
+          traces: data || [],
+          totalCount: count || 0,
+        };
+      } catch (error) {
+        logger.error({ error, courseId: input.courseId }, 'Failed to fetch audit traces');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch audit traces',
+        });
+      }
+    }),
+
+  /**
+   * Get full trace detail by ID (for audit detail sheet)
+   */
+  getAuditTraceDetail: adminProcedure
+    .input(
+      z.object({
+        traceId: z.string().uuid(),
+        courseId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const supabase = getSupabaseAdmin();
+        const { data, error } = await supabase
+          .from('generation_trace')
+          .select(
+            'id, stage, phase, step_name, model_used, lesson_id, tokens_used, cost_usd, duration_ms, quality_score, temperature, retry_attempt, was_cached, error_data, input_data, output_data, prompt_text, completion_text, created_at'
+          )
+          .eq('id', input.traceId)
+          .eq('course_id', input.courseId)
+          .single();
+
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        logger.error({ error, traceId: input.traceId }, 'Failed to fetch trace detail');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch trace detail',
         });
       }
     }),

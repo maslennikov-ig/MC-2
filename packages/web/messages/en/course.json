@@ -77,6 +77,18 @@
       "lesson": "Lesson",
       "backToCourses": "Back to courses",
       "navigation": "Course navigation"
+    },
+    "lessonBadge": "Lesson {number}",
+    "exitFocus": "Exit",
+    "swipeHint": "Swipe to navigate",
+    "prevLesson": "Previous lesson",
+    "nextLesson": "Next lesson",
+    "keyboardNav": "Navigation",
+    "keyboardExit": "Exit",
+    "tabs": {
+      "content": "Content",
+      "structure": "Course structure",
+      "media": "Media"
     }
   }
 }

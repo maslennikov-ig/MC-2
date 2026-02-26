@@ -1,27 +1,19 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+// IMPORTANT: This file contains direct @vidstack/react imports (MediaPlayer, MediaProvider).
+// It MUST only be loaded via next/dynamic with { ssr: false } to avoid the
+// media-captions Turbopack chunk error. Do not statically import this file.
+// See: packages/web/components/course/viewer/components/LessonView.tsx
+
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import dynamic from 'next/dynamic'
+import {
+  MediaPlayer,
+  MediaProvider,
+  type MediaPlayerInstance,
+  type PlayerSrc,
+} from '@vidstack/react'
 
-// Define ReactPlayer types locally since react-player doesn't export them properly
-interface ReactPlayerProps {
-  url?: string
-  playing?: boolean
-  volume?: number
-  onPlay?: () => void
-  onPause?: () => void
-  onProgress?: (state: { played: number; playedSeconds: number }) => void
-  onDuration?: (duration: number) => void
-  playbackRate?: number
-  width?: string | number
-  height?: string | number
-  controls?: boolean
-}
-
-const ReactPlayer = dynamic(() => import('react-player'), {
-  ssr: false,
-}) as React.ComponentType<ReactPlayerProps>
 import {
   FileText,
   Play,
@@ -43,6 +35,7 @@ import { cn } from '@/lib/utils'
 import LessonContent from '@/components/common/lesson-content'
 import type { Lesson, Section, Asset } from '@/types/database'
 import type { Database } from '@/types/database.generated'
+import { formatVideoSrc } from './video-utils'
 
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
@@ -58,9 +51,7 @@ interface ContentFormatSwitcherProps {
   lesson: Lesson
   section: Section | undefined
   assets?: Asset[]
-  /** Lesson content from lesson_contents table (Stage 6 generated content) */
   lessonContent?: LessonContentRow
-  /** Enrichments for the current lesson (video, audio, quiz, presentation, document, cover) */
   enrichments?: Array<{ enrichment_type: string; content: unknown; status: string }>
   availableFormats?: {
     video?: string
@@ -68,13 +59,11 @@ interface ContentFormatSwitcherProps {
     presentation?: string
   }
   onFormatChange?: (format: string) => void
-  /** Course content language for localized callout titles */
   courseLanguage?: string
   nextLesson?: {
     title: string
     objectives?: string[] | null
   }
-  /** Callback to navigate to the next lesson */
   onNextLesson?: () => void
 }
 
@@ -99,9 +88,12 @@ export default function ContentFormatSwitcher({
   const [progress, setProgress] = useState(0)
   const [duration, setDuration] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [mediaError, setMediaError] = useState<string | null>(null)
   const [playbackRate, setPlaybackRate] = useState(1)
 
-  // Use actual formats from props, no mock data
+  const videoPlayerRef = useRef<MediaPlayerInstance>(null)
+  const audioPlayerRef = useRef<MediaPlayerInstance>(null)
+
   const mockFormats = {
     video: availableFormats.video || null,
     audio: availableFormats.audio || null,
@@ -144,13 +136,11 @@ export default function ContentFormatSwitcher({
   const availableFormatsCount = formats.filter((f) => f.available).length
 
   useEffect(() => {
-    // Save user preference to localStorage
     localStorage.setItem(`lesson-${lesson.id}-format`, currentFormat)
     onFormatChange?.(currentFormat)
   }, [currentFormat, lesson.id, onFormatChange])
 
   useEffect(() => {
-    // Handle keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
@@ -175,7 +165,6 @@ export default function ContentFormatSwitcher({
   }, [formats])
 
   useEffect(() => {
-    // Restore user preference
     const savedFormat = localStorage.getItem(`lesson-${lesson.id}-format`) as
       | 'text'
       | 'video'
@@ -188,26 +177,43 @@ export default function ContentFormatSwitcher({
   }, [lesson.id, formats])
 
   const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds)) return '0:00'
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   const handleSeek = (value: number[]) => {
-    setProgress(value[0])
-  }
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      void document.documentElement.requestFullscreen()
-      setIsFullscreen(true)
-    } else {
-      void document.exitFullscreen()
-      setIsFullscreen(false)
+    const newProgress = value[0]
+    setProgress(newProgress)
+    const activePlayer = currentFormat === 'video' ? videoPlayerRef.current : audioPlayerRef.current
+    if (activePlayer && duration > 0) {
+      activePlayer.currentTime = (newProgress / 100) * duration
     }
   }
 
-  // Only show switcher if there are alternative formats
+  const toggleFullscreen = async () => {
+    const activePlayer = currentFormat === 'video' ? videoPlayerRef.current : audioPlayerRef.current
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      } else if (activePlayer) {
+        await activePlayer.enterFullscreen()
+        setIsFullscreen(true)
+      }
+    } catch {
+      // Fallback: silent catch for unsupported environments
+    }
+  }
+
+  const handlePlayToggle = () => {
+    const activePlayer = currentFormat === 'video' ? videoPlayerRef.current : audioPlayerRef.current
+    if (activePlayer) {
+      activePlayer.paused = isPlaying
+    }
+  }
+
   if (availableFormatsCount <= 1) {
     return (
       <LessonContent
@@ -225,7 +231,6 @@ export default function ContentFormatSwitcher({
 
   return (
     <div className="w-full">
-      {/* Format Switcher Bar */}
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/95">
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
@@ -254,7 +259,6 @@ export default function ContentFormatSwitcher({
               </div>
             </div>
 
-            {/* Quick info badges */}
             <div className="flex items-center gap-2">
               <Badge
                 variant="secondary"
@@ -273,7 +277,6 @@ export default function ContentFormatSwitcher({
             </div>
           </div>
 
-          {/* Keyboard shortcuts hint */}
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             Быстрый доступ:{' '}
             <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">1</kbd> Текст
@@ -293,7 +296,6 @@ export default function ContentFormatSwitcher({
         </div>
       </div>
 
-      {/* Content Area */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentFormat}
@@ -320,39 +322,58 @@ export default function ContentFormatSwitcher({
             <div className="relative bg-black">
               <div className="mx-auto max-w-7xl px-6 py-8">
                 <div className="aspect-video overflow-hidden rounded-lg bg-gray-900 shadow-2xl">
-                  <ReactPlayer
-                    url={mockFormats.video}
-                    playing={isPlaying}
-                    volume={isMuted ? 0 : volume}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onProgress={({ played }: { played: number; playedSeconds: number }) => {
-                      setProgress(played * 100)
-                    }}
-                    onDuration={(d: number) => setDuration(d)}
-                    playbackRate={playbackRate}
-                    width="100%"
-                    height="100%"
-                    controls={false}
-                  />
+                  <div className="relative h-full w-full">
+                    {mediaError ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
+                        <Play className="h-12 w-12 text-gray-500" />
+                        <p className="text-sm text-gray-400">Видео недоступно</p>
+                        <button
+                          onClick={() => setMediaError(null)}
+                          className="text-xs text-purple-400 transition-colors hover:text-purple-300"
+                        >
+                          Попробовать снова
+                        </button>
+                      </div>
+                    ) : (
+                      <MediaPlayer
+                        ref={videoPlayerRef}
+                        src={formatVideoSrc(mockFormats.video) as PlayerSrc}
+                        paused={!isPlaying}
+                        muted={isMuted}
+                        volume={volume}
+                        playbackRate={playbackRate}
+                        controls={false}
+                        onTimeUpdate={(detail: { currentTime: number }) => {
+                          if (duration > 0) setProgress((detail.currentTime / duration) * 100)
+                        }}
+                        onDurationChange={(d: number) => setDuration(d)}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        onError={(detail: { message: string }) => {
+                          console.warn('Video loading error:', detail.message)
+                          setMediaError(detail.message)
+                        }}
+                        className="absolute inset-0 h-full w-full"
+                      >
+                        <MediaProvider />
+                      </MediaPlayer>
+                    )}
+                  </div>
 
-                  {/* Custom Video Controls */}
                   <div className="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                     <div className="space-y-2">
-                      {/* Progress Bar */}
                       <Slider
                         value={[progress]}
                         onValueChange={handleSeek}
                         max={100}
                         step={0.1}
-                        className="w-full"
+                        className="w-full cursor-pointer"
                       />
 
-                      {/* Controls */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Button
-                            onClick={() => setIsPlaying(!isPlaying)}
+                            onClick={handlePlayToggle}
                             size="sm"
                             variant="ghost"
                             className="text-white hover:bg-white/20"
@@ -365,7 +386,10 @@ export default function ContentFormatSwitcher({
                           </Button>
 
                           <Button
-                            onClick={() => setIsMuted(!isMuted)}
+                            onClick={() => {
+                              setIsMuted(!isMuted)
+                              if (videoPlayerRef.current) videoPlayerRef.current.muted = !isMuted
+                            }}
                             size="sm"
                             variant="ghost"
                             className="text-white hover:bg-white/20"
@@ -380,10 +404,15 @@ export default function ContentFormatSwitcher({
                           <div className="flex items-center gap-2">
                             <Slider
                               value={[volume * 100]}
-                              onValueChange={(v) => setVolume(v[0] / 100)}
+                              onValueChange={(v) => {
+                                const newVolume = v[0] / 100
+                                setVolume(newVolume)
+                                if (videoPlayerRef.current)
+                                  videoPlayerRef.current.volume = newVolume
+                              }}
                               max={100}
                               step={1}
-                              className="w-24"
+                              className="w-24 cursor-pointer"
                             />
                           </div>
 
@@ -395,7 +424,12 @@ export default function ContentFormatSwitcher({
                         <div className="flex items-center gap-2">
                           <select
                             value={playbackRate}
-                            onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+                            onChange={(e) => {
+                              const newRate = parseFloat(e.target.value)
+                              setPlaybackRate(newRate)
+                              if (videoPlayerRef.current)
+                                videoPlayerRef.current.playbackRate = newRate
+                            }}
                             className="rounded border border-white/30 bg-transparent px-2 py-1 text-sm text-white"
                           >
                             <option value="0.5">0.5x</option>
@@ -407,7 +441,7 @@ export default function ContentFormatSwitcher({
                           </select>
 
                           <Button
-                            onClick={toggleFullscreen}
+                            onClick={() => void toggleFullscreen()}
                             size="sm"
                             variant="ghost"
                             className="text-white hover:bg-white/20"
@@ -424,7 +458,6 @@ export default function ContentFormatSwitcher({
                   </div>
                 </div>
 
-                {/* Video Description */}
                 <div className="mt-6 rounded-lg bg-gray-50 p-6 dark:bg-gray-900">
                   <h3 className="mb-2 text-lg font-semibold">Видео урок: {lesson.title}</h3>
                   <p className="text-gray-600 dark:text-gray-400">
@@ -455,29 +488,31 @@ export default function ContentFormatSwitcher({
 
                 <h3 className="mb-4 text-center text-xl font-semibold">{lesson.title}</h3>
 
-                <ReactPlayer
-                  url={mockFormats.audio}
-                  playing={isPlaying}
-                  volume={isMuted ? 0 : volume}
+                <MediaPlayer
+                  ref={audioPlayerRef}
+                  src={mockFormats.audio}
+                  paused={!isPlaying}
+                  muted={isMuted}
+                  volume={volume}
+                  playbackRate={playbackRate}
+                  onTimeUpdate={(detail: { currentTime: number }) => {
+                    if (duration > 0) setProgress((detail.currentTime / duration) * 100)
+                  }}
+                  onDurationChange={(d: number) => setDuration(d)}
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
-                  onProgress={({ played }: { played: number; playedSeconds: number }) =>
-                    setProgress(played * 100)
-                  }
-                  onDuration={(d: number) => setDuration(d)}
-                  playbackRate={playbackRate}
-                  width="0"
-                  height="0"
-                />
+                  className="hidden"
+                >
+                  <MediaProvider />
+                </MediaPlayer>
 
-                {/* Audio Controls */}
                 <div className="space-y-4">
                   <Slider
                     value={[progress]}
                     onValueChange={handleSeek}
                     max={100}
                     step={0.1}
-                    className="w-full"
+                    className="w-full cursor-pointer"
                   />
 
                   <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
@@ -487,7 +522,7 @@ export default function ContentFormatSwitcher({
 
                   <div className="flex items-center justify-center gap-4">
                     <Button
-                      onClick={() => setProgress(Math.max(0, progress - 10))}
+                      onClick={() => handleSeek([Math.max(0, progress - 10)])}
                       size="sm"
                       variant="ghost"
                     >
@@ -495,7 +530,7 @@ export default function ContentFormatSwitcher({
                     </Button>
 
                     <Button
-                      onClick={() => setIsPlaying(!isPlaying)}
+                      onClick={handlePlayToggle}
                       size="lg"
                       className="h-16 w-16 rounded-full bg-purple-600 text-white hover:bg-purple-700"
                     >
@@ -503,7 +538,7 @@ export default function ContentFormatSwitcher({
                     </Button>
 
                     <Button
-                      onClick={() => setProgress(Math.min(100, progress + 10))}
+                      onClick={() => handleSeek([Math.min(100, progress + 10)])}
                       size="sm"
                       variant="ghost"
                     >
@@ -512,21 +547,36 @@ export default function ContentFormatSwitcher({
                   </div>
 
                   <div className="flex items-center justify-center gap-4">
-                    <Button onClick={() => setIsMuted(!isMuted)} size="sm" variant="ghost">
+                    <Button
+                      onClick={() => {
+                        setIsMuted(!isMuted)
+                        if (audioPlayerRef.current) audioPlayerRef.current.muted = !isMuted
+                      }}
+                      size="sm"
+                      variant="ghost"
+                    >
                       {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                     </Button>
 
                     <Slider
                       value={[volume * 100]}
-                      onValueChange={(v) => setVolume(v[0] / 100)}
+                      onValueChange={(v) => {
+                        const newVolume = v[0] / 100
+                        setVolume(newVolume)
+                        if (audioPlayerRef.current) audioPlayerRef.current.volume = newVolume
+                      }}
                       max={100}
                       step={1}
-                      className="w-32"
+                      className="w-32 cursor-pointer"
                     />
 
                     <select
                       value={playbackRate}
-                      onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+                      onChange={(e) => {
+                        const newRate = parseFloat(e.target.value)
+                        setPlaybackRate(newRate)
+                        if (audioPlayerRef.current) audioPlayerRef.current.playbackRate = newRate
+                      }}
                       className="rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800"
                     >
                       <option value="0.5">0.5x</option>
@@ -539,7 +589,6 @@ export default function ContentFormatSwitcher({
                   </div>
                 </div>
 
-                {/* Transcript Link */}
                 <div className="mt-6 text-center">
                   <Button
                     onClick={() => setCurrentFormat('text')}

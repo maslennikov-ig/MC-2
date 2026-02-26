@@ -22,6 +22,7 @@ import { JobData, JobType, JobStatus } from '@megacampus/shared-types';
  * Safe to use in sandboxed processor (worker thread context)
  */
 import logger from '../shared/logger/index.js';
+import { logger as baseLogger } from '@megacampus/shared-logger';
 import { logPermanentFailure } from '../shared/logger/error-service.js';
 import { captureError } from '../shared/sentry/init.js';
 import { testJobHandler } from './handlers/test-handler.js';
@@ -87,7 +88,7 @@ function adaptHandler<T = unknown>(handler: {
       // Token now received as parameter from BullMQ sandboxed processor
       // No need to extract from job object
       if (!token) {
-        logger.warn(
+        baseLogger.debug(
           { jobId: job.id, jobName: job.name },
           'Job token missing - pause/delay functionality disabled for this job'
         );
@@ -329,7 +330,8 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
 
     // Log error in processor context (worker thread) for better debugging
     // Error is then re-thrown so BullMQ can handle retry logic
-    logger.error(
+    // Uses baseLogger to avoid duplicate DB entries — canonical DB write is logPermanentFailure below
+    baseLogger.error(
       {
         jobId: job.id,
         jobType,
@@ -380,7 +382,8 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       });
     } catch (logError) {
       // Don't fail the job if logging fails - just warn
-      logger.warn(
+      // Use baseLogger to avoid recursive DB write attempt when DB is down
+      baseLogger.warn(
         { err: logError, jobId: job.id },
         'Sandboxed processor: Failed to log error to database'
       );

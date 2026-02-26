@@ -92,7 +92,8 @@ async function _generateDraft(input: EnrichmentHandlerInput): Promise<DraftResul
       lesson.id,
       lesson.objectives,
       enrichment.id,
-      'draft'
+      'draft',
+      course.id
     );
 
     // Resolve visual style from user preset or course defaults
@@ -228,7 +229,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       lesson.id,
       lesson.objectives,
       enrichment.id,
-      'generation'
+      'generation',
+      course.id
     );
 
     // Resolve visual style and custom prompt

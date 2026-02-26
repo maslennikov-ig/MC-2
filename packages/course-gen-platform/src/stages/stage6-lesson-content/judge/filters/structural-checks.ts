@@ -5,6 +5,7 @@
 
 import type { FilterCheckResult } from './types';
 import { MERMAID_BLOCK_REGEX } from '../../utils/mermaid-sanitizer';
+import { countMermaidFallbackComments } from '../../utils/mermaid-fallback-marker';
 
 // ============================================================================
 // CONTENT TRUNCATION CHECK (Self-Review Pre-filter)
@@ -137,10 +138,12 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
   mermaidIssues: string[];
   affectedDiagrams: number;
   totalDiagrams: number;
+  fallbackComments: number;
 } {
   const issues: string[] = [];
   let affectedDiagrams = 0;
   let totalDiagrams = 0;
+  const fallbackComments = countMermaidFallbackComments(content);
 
   // Extract all Mermaid blocks
   const mermaidBlocks: string[] = [];
@@ -151,8 +154,17 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
 
   totalDiagrams = mermaidBlocks.length;
 
-  // No Mermaid blocks - return perfect score
-  if (totalDiagrams === 0) {
+  // Fallback comment means Mermaid rendering failed and was manually masked.
+  // Treat this as a critical integrity signal even when no fenced blocks remain.
+  if (fallbackComments > 0) {
+    issues.push(
+      `Detected ${fallbackComments} Mermaid fallback comment(s): diagram could not be rendered`
+    );
+    affectedDiagrams += fallbackComments;
+  }
+
+  // No Mermaid blocks and no fallback comments - return perfect score
+  if (totalDiagrams === 0 && fallbackComments === 0) {
     return {
       passed: true,
       actual: 'no mermaid diagrams',
@@ -160,6 +172,7 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
       mermaidIssues: [],
       affectedDiagrams: 0,
       totalDiagrams: 0,
+      fallbackComments: 0,
     };
   }
 
@@ -212,6 +225,7 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
     mermaidIssues: string[];
     affectedDiagrams: number;
     totalDiagrams: number;
+    fallbackComments: number;
   } = {
     passed,
     actual: issues.length === 0 ? 'all diagrams valid' : `${issues.length} issues`,
@@ -219,6 +233,7 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
     mermaidIssues: issues,
     affectedDiagrams,
     totalDiagrams,
+    fallbackComments,
   };
 
   if (!passed) {
@@ -226,10 +241,14 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
     result.failure = {
       filter: 'mermaidSyntax',
       expected: 'Valid Mermaid syntax',
-      actual: `${issues.length} syntax issues in ${affectedDiagrams}/${totalDiagrams} diagrams`,
-      severity: 'major',
+      actual: `${issues.length} Mermaid integrity issues (${affectedDiagrams} affected items, ${fallbackComments} fallback comments)`,
+      severity: fallbackComments > 0 ? 'critical' : 'major',
     };
-    result.suggestion = `Mermaid syntax issues detected: ${issues.slice(0, 3).join('; ')}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ''}. Fix escaped quotes and ensure proper bracket matching.`;
+    const fallbackHint =
+      fallbackComments > 0
+        ? ' Remove fallback comments by regenerating/fixing the original Mermaid blocks.'
+        : '';
+    result.suggestion = `Mermaid syntax issues detected: ${issues.slice(0, 3).join('; ')}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ''}. Fix escaped quotes and ensure proper bracket matching.${fallbackHint}`;
   }
 
   return result;

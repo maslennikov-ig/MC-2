@@ -44,6 +44,7 @@ import { LmsImportStatusSchema } from '@megacampus/shared-types/lms';
 import type { LmsImportStatus } from '@megacampus/shared-types/lms';
 import { nanoid } from 'nanoid';
 import { verifyOrganizationAccess } from './helpers';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 /**
  * Calculate job duration in milliseconds
@@ -227,11 +228,8 @@ export const historyRouter = router({
             .eq('id', course_id)
             .single();
 
-          if (courseError || !course) {
-            lmsLogger.warn(
-              { requestId, courseId: course_id, error: courseError },
-              'Course not found'
-            );
+          throwOnSupabaseError(courseError, 'Course', { requestId, courseId: course_id });
+          if (!course) {
             throw new TRPCError({
               code: 'NOT_FOUND',
               message: 'Course not found',
@@ -481,8 +479,8 @@ export const historyRouter = router({
           .eq('id', job_id)
           .single();
 
-        if (jobError || !jobRaw) {
-          lmsLogger.warn({ requestId, jobId: job_id, error: jobError }, 'Job not found');
+        throwOnSupabaseError(jobError, 'Import job', { requestId, jobId: job_id });
+        if (!jobRaw) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Import job not found',

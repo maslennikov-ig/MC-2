@@ -6,6 +6,7 @@
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '@/shared/logger';
 import { validateMarkdownStructure, applyMarkdownAutoFixes } from '../markdown-structure-filter';
+import { runTableFixPipeline } from '../../utils/table-fix-pipeline';
 
 import type { HeuristicFilterConfig, HeuristicFilterResult } from './types';
 import { DEFAULT_HEURISTIC_CONFIG, FILTER_WEIGHTS } from './types';
@@ -150,11 +151,12 @@ export function runHeuristicFilters(
   if (densityResult.failure) failures.push(densityResult.failure);
   if (densityResult.suggestion) suggestions.push(densityResult.suggestion);
 
-  // Run markdown structure validation
-  const markdownResult = validateMarkdownStructure(content);
-
-  // Apply auto-fixes for cosmetic issues
-  markdownResult.autoFixedIssues = applyMarkdownAutoFixes(content).fixedRules;
+  // Run deterministic table repair and markdown auto-fixes before markdown validation
+  // so score/failures reflect the normalized version that proceeds through the pipeline.
+  const tableFixResult = runTableFixPipeline(content);
+  const autoFixResult = applyMarkdownAutoFixes(tableFixResult.content);
+  const markdownResult = validateMarkdownStructure(autoFixResult.content);
+  markdownResult.autoFixedIssues = autoFixResult.fixedRules;
 
   // Add markdown score contribution
   weightedScore += markdownResult.score * FILTER_WEIGHTS.markdownStructure;
@@ -283,6 +285,7 @@ export function runHeuristicFilters(
       sectionDuplication: {
         duplicatePairs: duplicationResult.duplicatePairs,
         overlapPairs: duplicationResult.overlapPairs,
+        introOverlapPairs: duplicationResult.introOverlapPairs,
         totalSections: duplicationResult.totalSections,
       },
     },

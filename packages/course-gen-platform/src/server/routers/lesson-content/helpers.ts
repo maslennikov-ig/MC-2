@@ -9,6 +9,7 @@ import { TRPCError } from '@trpc/server';
 import type { Queue } from 'bullmq';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 import type { Language } from '@megacampus/shared-types';
 import type {
   LessonSpecificationV2,
@@ -119,17 +120,8 @@ export async function verifyCourseAccess(
     .eq('id', courseId)
     .single();
 
-  if (error || !course) {
-    logger.warn(
-      {
-        requestId,
-        courseId,
-        userId,
-        error,
-      },
-      'Course not found'
-    );
-
+  throwOnSupabaseError(error, 'Course', { requestId, courseId, userId });
+  if (!course) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Course not found',

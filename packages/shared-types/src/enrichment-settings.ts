@@ -155,6 +155,105 @@ export const videoSettingsSchema = z.object({
 export type VideoSettings = z.infer<typeof videoSettingsSchema>;
 
 // ============================================================================
+// NOTEBOOKLM AUDIO/VIDEO SETTINGS
+// ============================================================================
+
+/**
+ * Source bundle strategy for NotebookLM artifact generation.
+ *
+ * - script_only: use only edited draft script
+ * - raw_only: use lesson raw text/objectives context
+ * - hybrid: combine script + raw context (recommended default)
+ */
+export const nlmSourceStrategySchema = z
+  .enum(['script_only', 'raw_only', 'hybrid'])
+  .default('hybrid');
+export type NlmSourceStrategy = z.infer<typeof nlmSourceStrategySchema>;
+
+/** NotebookLM audio format presets */
+export const nlmAudioFormatSchema = z
+  .enum(['deep_dive', 'brief', 'critique', 'debate'])
+  .default('deep_dive');
+export type NlmAudioFormat = z.infer<typeof nlmAudioFormatSchema>;
+
+/** NotebookLM audio length presets */
+export const nlmAudioLengthSchema = z.enum(['short', 'default', 'long']).default('default');
+export type NlmAudioLength = z.infer<typeof nlmAudioLengthSchema>;
+
+/** NotebookLM video format presets */
+export const nlmVideoFormatSchema = z.enum(['explainer', 'brief']).default('explainer');
+export type NlmVideoFormat = z.infer<typeof nlmVideoFormatSchema>;
+
+/** NotebookLM video style presets */
+export const nlmVideoStyleSchema = z
+  .enum([
+    'auto_select',
+    'custom',
+    'classic',
+    'whiteboard',
+    'kawaii',
+    'anime',
+    'watercolor',
+    'retro_print',
+    'heritage',
+    'paper_craft',
+  ])
+  .default('auto_select');
+export type NlmVideoStyle = z.infer<typeof nlmVideoStyleSchema>;
+
+/**
+ * NotebookLM audio enrichment settings.
+ *
+ * Backward-compatible: voice/speed are optional and used only for draft shaping.
+ */
+export const nlmAudioSettingsSchema = z.object({
+  /** Optional voice for draft preparation (does not force NotebookLM voice model). */
+  voice: z.string().optional(),
+
+  /** Optional draft narration speed hint. */
+  speed: z.union([z.number().min(0.25).max(4.0), z.enum(['slow', 'normal', 'fast'])]).optional(),
+
+  /** Source bundle strategy for final artifact generation. */
+  nlm_source_strategy: nlmSourceStrategySchema.optional(),
+
+  /** NotebookLM audio format preset. */
+  nlm_audio_format: nlmAudioFormatSchema.optional(),
+
+  /** NotebookLM audio length preset. */
+  nlm_audio_length: nlmAudioLengthSchema.optional(),
+});
+export type NlmAudioSettings = z.infer<typeof nlmAudioSettingsSchema>;
+
+/**
+ * NotebookLM video enrichment settings.
+ *
+ * Includes draft script preferences (tone/pacing) and final artifact presets.
+ */
+export const nlmVideoSettingsSchema = z.object({
+  /** Optional avatar for consumers that support avatar rendering in UI workflows. */
+  avatar_id: z.string().optional(),
+
+  /** Include slides synchronized with narration (draft-time hint). */
+  include_slides: z.boolean().default(true),
+
+  /** Draft script tone preference. */
+  tone: z.enum(['professional', 'conversational', 'energetic']).optional(),
+
+  /** Draft script pacing preference. */
+  pacing: z.enum(['slow', 'moderate', 'fast']).optional(),
+
+  /** Source bundle strategy for final artifact generation. */
+  nlm_source_strategy: nlmSourceStrategySchema.optional(),
+
+  /** NotebookLM video format preset. */
+  nlm_video_format: nlmVideoFormatSchema.optional(),
+
+  /** NotebookLM video style preset. */
+  nlm_video_style: nlmVideoStyleSchema.optional(),
+});
+export type NlmVideoSettings = z.infer<typeof nlmVideoSettingsSchema>;
+
+// ============================================================================
 // DOCUMENT SETTINGS (Placeholder)
 // ============================================================================
 
@@ -190,6 +289,8 @@ export const enrichmentSettingsSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('quiz'), settings: quizSettingsSchema }),
   z.object({ type: z.literal('presentation'), settings: presentationSettingsSchema }),
   z.object({ type: z.literal('video'), settings: videoSettingsSchema }),
+  z.object({ type: z.literal('nlm_audio'), settings: nlmAudioSettingsSchema }),
+  z.object({ type: z.literal('nlm_video'), settings: nlmVideoSettingsSchema }),
   z.object({ type: z.literal('document'), settings: documentSettingsSchema }),
 ]);
 
@@ -205,7 +306,7 @@ export type EnrichmentSettings = z.infer<typeof enrichmentSettingsSchema>;
  * @returns Default settings object
  */
 export function getDefaultSettings(
-  type: 'audio' | 'quiz' | 'presentation' | 'video' | 'document'
+  type: 'audio' | 'quiz' | 'presentation' | 'video' | 'nlm_audio' | 'nlm_video' | 'document'
 ): z.infer<typeof enrichmentSettingsSchema>['settings'] {
   switch (type) {
     case 'audio':
@@ -216,6 +317,10 @@ export function getDefaultSettings(
       return presentationSettingsSchema.parse({});
     case 'video':
       return videoSettingsSchema.parse({});
+    case 'nlm_audio':
+      return nlmAudioSettingsSchema.parse({});
+    case 'nlm_video':
+      return nlmVideoSettingsSchema.parse({});
     case 'document':
       return documentSettingsSchema.parse({});
   }

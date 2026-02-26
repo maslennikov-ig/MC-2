@@ -29,6 +29,7 @@ import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
 import type { LessonContentJobData, Language } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { validateLocale } from '@/shared/validation';
 
 type LessonWithContentRow = {
@@ -95,16 +96,8 @@ export const generateMissingContent = protectedProcedure
         .eq('id', courseId)
         .single();
 
-      if (courseError || !course) {
-        logger.error(
-          {
-            requestId,
-            courseId,
-            error: courseError,
-          },
-          'Failed to fetch course structure'
-        );
-
+      throwOnSupabaseError(courseError, 'Course', { requestId, courseId });
+      if (!course) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch course structure',
@@ -245,11 +238,8 @@ export const generateMissingContent = protectedProcedure
             .select('id')
             .single();
 
-          if (sectionError || !newSection) {
-            logger.error(
-              { requestId, courseId, sectionNumber, error: sectionError },
-              'Failed to create section'
-            );
+          throwOnSupabaseError(sectionError, 'Section', { requestId, courseId, sectionNumber });
+          if (!newSection) {
             continue;
           }
 

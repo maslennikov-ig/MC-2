@@ -14,6 +14,7 @@
  */
 
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
+import { cacheFileProcessedContent } from '../../../shared/cache/file-content-cache';
 import {
   hierarchicalChunking,
   type HierarchicalChunkingResult,
@@ -376,6 +377,7 @@ export function extractTitleFromText(text: string, language: string): string {
  * Store summarization result in database
  */
 export async function storeSummary(
+  courseId: string,
   fileId: string,
   summary: string,
   generatedTitle: string,
@@ -424,6 +426,8 @@ export async function storeSummary(
     throw new Error(`Failed to store summary: ${error.message}`);
   }
 
+  void cacheFileProcessedContent(courseId, fileId, summary);
+
   logger.info(
     {
       fileId,
@@ -460,6 +464,7 @@ export async function storeSummary(
  * Store full text (bypass summarization for small documents)
  */
 export async function storeFullText(
+  courseId: string,
   fileId: string,
   fullText: string,
   generatedTitle: string,
@@ -498,6 +503,8 @@ export async function storeFullText(
     logger.error({ fileId, error }, '[Phase 6] Failed to store full text');
     throw new Error(`Failed to store full text: ${error.message}`);
   }
+
+  void cacheFileProcessedContent(courseId, fileId, fullText);
 
   logger.info(
     { fileId, generatedTitle, textLength: fullText.length, estimatedTokens },

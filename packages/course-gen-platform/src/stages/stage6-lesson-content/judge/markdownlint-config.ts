@@ -314,6 +314,24 @@ export const LESSON_MARKDOWNLINT_CONFIG: LessonMarkdownLintConfig = {
    */
   MD032: true,
 
+  /**
+   * MD055: Table pipe style
+   * Keep leading/trailing pipes consistent for stable parser behavior.
+   */
+  MD055: { style: 'leading_and_trailing' },
+
+  /**
+   * MD056: Table column count
+   * Enforce consistent number of columns across header/separator/body rows.
+   */
+  MD056: true,
+
+  /**
+   * MD060: Table column style
+   * Prefer padded cells (`| a | b |`) for readability in generated lessons.
+   */
+  MD060: { style: 'aligned' },
+
   // ============================================================================
   // DISABLED RULES (Reasoning)
   // ============================================================================

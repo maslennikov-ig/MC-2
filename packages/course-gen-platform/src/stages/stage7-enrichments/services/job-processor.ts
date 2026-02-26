@@ -6,31 +6,38 @@
  * Handles single-stage and two-stage enrichment flows.
  */
 
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { logger } from '@/shared/logger';
+import { getRedisClient } from '@/shared/cache/redis';
 import type { EnrichmentStatus } from '@megacampus/shared-types';
 import type {
   Stage7JobInput,
   Stage7JobResult,
   Stage7ProgressUpdate,
   EnrichmentHandlerInput,
+  Stage7EnrichmentType,
+  Stage7NlmAsyncState,
+  GenerateResult,
 } from '../types';
 import {
   getEnrichment,
   updateEnrichmentStatus,
   saveEnrichmentContent,
   saveDraftContent,
-  linkEnrichmentAsset,
   incrementGenerationAttempt,
+  upsertAssetAndLinkEnrichment,
+  saveNotebookLMAsyncMetadataState,
 } from './database-service';
-import { uploadEnrichmentAsset } from './storage-service';
+import { uploadEnrichmentAsset } from './unified-storage-service';
 import { routeEnrichment, isTwoStageEnrichment } from './enrichment-router';
+import { STAGE7_CONFIG } from '../config';
 import {
   shouldRetry,
   getRetryDelay,
   getModelForAttempt,
   formatErrorForLogging,
 } from '../retry-strategy';
+import { notifyEnrichmentReady } from '@/shared/telegram/send';
 
 /**
  * Update job progress for streaming
@@ -61,6 +68,146 @@ async function updateJobProgress(
   }
 }
 
+const MEDIA_DEFAULTS_BY_TYPE: Partial<
+  Record<Stage7EnrichmentType, { mimeType: string; extension: string }>
+> = {
+  audio: { mimeType: 'audio/mpeg', extension: 'mp3' },
+  nlm_audio: { mimeType: 'audio/mpeg', extension: 'mp3' },
+  video: { mimeType: 'video/mp4', extension: 'mp4' },
+  nlm_video: { mimeType: 'video/mp4', extension: 'mp4' },
+};
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+};
+
+const NLM_TYPES: ReadonlySet<Stage7EnrichmentType> = new Set(['nlm_audio', 'nlm_video']);
+const DEFAULT_NLM_POLL_DELAY_MS = 15_000;
+const DEFAULT_NLM_MAX_POLL_DELAY_MS = 60_000;
+const DEFAULT_NLM_MAX_WAIT_MS = 6 * 60 * 60 * 1000;
+
+let stage7PollQueue: Queue<Stage7JobInput, Stage7JobResult> | null = null;
+
+function isNotebookLMType(enrichmentType: Stage7EnrichmentType): boolean {
+  return NLM_TYPES.has(enrichmentType);
+}
+
+function getEnvNumber(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw.trim());
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getNlmPollDelayMs(pollAttempt: number): number {
+  const initial = getEnvNumber('NOTEBOOKLM_STAGE7_POLL_DELAY_MS', DEFAULT_NLM_POLL_DELAY_MS);
+  const maxDelay = getEnvNumber(
+    'NOTEBOOKLM_STAGE7_POLL_MAX_DELAY_MS',
+    DEFAULT_NLM_MAX_POLL_DELAY_MS
+  );
+  const clampedAttempt = Math.max(0, Math.min(pollAttempt, 20));
+  const scaled = Math.round(initial * Math.pow(1.2, clampedAttempt));
+  return Math.max(initial, Math.min(maxDelay, scaled));
+}
+
+function getNlmMaxWaitMs(): number {
+  return getEnvNumber('NOTEBOOKLM_STAGE7_ASYNC_MAX_WAIT_MS', DEFAULT_NLM_MAX_WAIT_MS);
+}
+
+function getStage7PollQueue(): Queue<Stage7JobInput, Stage7JobResult> {
+  if (!stage7PollQueue) {
+    stage7PollQueue = new Queue<Stage7JobInput, Stage7JobResult>(STAGE7_CONFIG.QUEUE_NAME, {
+      connection: getRedisClient(),
+    });
+  }
+
+  return stage7PollQueue;
+}
+
+async function enqueueNlmPollJob(
+  baseInput: Stage7JobInput,
+  state: Stage7NlmAsyncState,
+  delayMs: number
+): Promise<string> {
+  const queue = getStage7PollQueue();
+  const jobId = `enrich-ondemand-${baseInput.enrichmentId}-${state.taskId}-poll-${state.pollAttempt}`;
+
+  const existing = await queue.getJob(jobId);
+  if (existing) {
+    return existing.id ?? jobId;
+  }
+
+  const job = await queue.add(
+    `${baseInput.enrichmentType}-${baseInput.enrichmentId}`,
+    {
+      ...baseInput,
+      isDraftPhase: false,
+      nlmAsyncState: state,
+    },
+    {
+      jobId,
+      delay: Math.max(0, delayMs),
+      attempts: STAGE7_CONFIG.MAX_RETRIES,
+      backoff: {
+        type: 'exponential',
+        delay: STAGE7_CONFIG.RETRY_DELAY_MS,
+      },
+      removeOnComplete: {
+        count: 1000,
+        age: 24 * 60 * 60,
+      },
+      removeOnFail: {
+        count: 5000,
+        age: 7 * 24 * 60 * 60,
+      },
+    }
+  );
+
+  return job.id ?? jobId;
+}
+
+function createCancelledResult(enrichmentId: string, startTime: number): Stage7JobResult {
+  return {
+    enrichmentId,
+    success: true,
+    status: 'cancelled',
+    metrics: {
+      durationMs: Date.now() - startTime,
+    },
+  };
+}
+
+function resolveAssetFormat(
+  enrichmentType: Stage7EnrichmentType,
+  providedMimeType?: string,
+  providedExtension?: string
+): { mimeType: string; extension: string } {
+  const normalizedExtension = providedExtension?.toLowerCase().replace(/^\./, '');
+  const mimeFromExtension = normalizedExtension
+    ? MIME_BY_EXTENSION[normalizedExtension]
+    : undefined;
+
+  if (normalizedExtension && (providedMimeType || mimeFromExtension)) {
+    return {
+      mimeType: providedMimeType ?? mimeFromExtension ?? 'application/octet-stream',
+      extension: normalizedExtension,
+    };
+  }
+
+  const defaults = MEDIA_DEFAULTS_BY_TYPE[enrichmentType];
+  if (!defaults) {
+    throw new Error(
+      `Asset format missing for enrichment type ${enrichmentType}. Provide assetMimeType and assetExtension.`
+    );
+  }
+
+  return {
+    mimeType: providedMimeType ?? defaults.mimeType,
+    extension: normalizedExtension ?? defaults.extension,
+  };
+}
+
 /**
  * Sleep utility for retry delays
  */
@@ -80,6 +227,116 @@ async function checkCancellation(job: Job<Stage7JobInput, Stage7JobResult>): Pro
   }
 }
 
+async function finalizeSuccessfulResult(
+  job: Job<Stage7JobInput, Stage7JobResult>,
+  params: {
+    enrichmentId: string;
+    enrichmentType: Stage7EnrichmentType;
+    courseId: string;
+    lessonId: string;
+    result: GenerateResult;
+    startTime: number;
+    logMessage: string;
+    jobLogger: typeof logger;
+  }
+): Promise<Stage7JobResult> {
+  const {
+    enrichmentId,
+    enrichmentType,
+    courseId,
+    lessonId,
+    result,
+    startTime,
+    logMessage,
+    jobLogger,
+  } = params;
+
+  await updateJobProgress(job, {
+    phase: 'validating',
+    progress: 70,
+    message: 'Validating generated content',
+  });
+
+  let assetId: string | undefined;
+
+  if (result.assetBuffer) {
+    const assetFormat = resolveAssetFormat(
+      enrichmentType,
+      result.assetMimeType,
+      result.assetExtension
+    );
+
+    await updateJobProgress(job, {
+      phase: 'uploading',
+      progress: 85,
+      message: 'Uploading asset to storage',
+    });
+
+    const assetPath = await uploadEnrichmentAsset(
+      courseId,
+      lessonId,
+      enrichmentId,
+      result.assetBuffer,
+      assetFormat.mimeType,
+      assetFormat.extension
+    );
+
+    assetId = await upsertAssetAndLinkEnrichment({
+      enrichmentId,
+      courseId,
+      lessonId,
+      enrichmentType,
+      storagePath: assetPath,
+      mimeType: assetFormat.mimeType,
+      extension: assetFormat.extension,
+      fileSizeBytes: result.assetBuffer.length,
+    });
+
+    jobLogger.info({ assetPath, assetId }, 'Asset uploaded and linked');
+  }
+
+  await saveEnrichmentContent(enrichmentId, result.content, result.metadata);
+
+  await updateJobProgress(job, {
+    phase: 'complete',
+    progress: 100,
+    message: 'Enrichment generation completed',
+  });
+
+  const durationMs = Date.now() - startTime;
+
+  jobLogger.info(
+    {
+      success: true,
+      durationMs,
+      tokensUsed: result.metadata.total_tokens,
+      modelUsed: result.metadata.model_used,
+      qualityScore: result.metadata.quality_score,
+    },
+    logMessage
+  );
+
+  // Send Telegram notification (fire-and-forget)
+  notifyEnrichmentReady({ courseId, lessonId, enrichmentType }).catch(err => {
+    jobLogger.warn({ err: String(err) }, 'Failed to send enrichment notification');
+  });
+
+  return {
+    enrichmentId,
+    success: true,
+    status: 'completed',
+    assetId,
+    content: result.content,
+    metrics: {
+      durationMs,
+      tokensUsed: result.metadata.total_tokens,
+      costUsd: result.metadata.estimated_cost_usd,
+      modelUsed: result.metadata.model_used,
+      qualityScore: result.metadata.quality_score,
+    },
+  };
+}
+
 /**
  * Process a single Stage 7 enrichment job
  *
@@ -96,6 +353,7 @@ export async function processStage7Job(
     courseId,
     settings = {},
     isDraftPhase = false,
+    nlmAsyncState,
   } = job.data;
 
   const startTime = Date.now();
@@ -131,15 +389,51 @@ export async function processStage7Job(
       throw new Error(`Enrichment not found: ${enrichmentId}`);
     }
 
+    if (enrichmentContext.enrichment.status === 'cancelled') {
+      jobLogger.info('Enrichment already cancelled, skipping job');
+      return createCancelledResult(enrichmentId, startTime);
+    }
+
+    if (
+      nlmAsyncState &&
+      isNotebookLMType(enrichmentType) &&
+      (enrichmentContext.enrichment.status === 'completed' ||
+        enrichmentContext.enrichment.status === 'failed')
+    ) {
+      jobLogger.info(
+        {
+          currentStatus: enrichmentContext.enrichment.status,
+        },
+        'Skipping stale NotebookLM poll job because enrichment is already terminal'
+      );
+      return {
+        enrichmentId,
+        success: enrichmentContext.enrichment.status === 'completed',
+        status: enrichmentContext.enrichment.status,
+        metrics: {
+          durationMs: Date.now() - startTime,
+        },
+      };
+    }
+
     // Check for cancellation
     if (await checkCancellation(job)) {
       jobLogger.info('Job cancelled, aborting');
       return createFailedResult(enrichmentId, 'Job cancelled', startTime);
     }
 
-    // Increment generation attempt
-    const attemptNumber = await incrementGenerationAttempt(enrichmentId);
-    jobLogger.debug({ attemptNumber }, 'Generation attempt incremented');
+    const isNlmPollJob = Boolean(nlmAsyncState && isNotebookLMType(enrichmentType));
+
+    // Increment generation attempt only for non-poll jobs.
+    const attemptNumber = isNlmPollJob
+      ? Math.max(enrichmentContext.enrichment.generation_attempt || 1, 1)
+      : await incrementGenerationAttempt(enrichmentId);
+    jobLogger.debug(
+      { attemptNumber, isNlmPollJob },
+      isNlmPollJob
+        ? 'Reusing generation attempt for NLM poll job'
+        : 'Generation attempt incremented'
+    );
 
     // Determine generation phase
     const isTwoStage = isTwoStageEnrichment(enrichmentType);
@@ -164,6 +458,9 @@ export async function processStage7Job(
       settings: {
         ...settings,
         model,
+        __nlm_async_mode: isNlmPollJob ? 'poll' : 'start',
+        __nlm_bridge_task_id: nlmAsyncState?.taskId,
+        __nlm_poll_attempt: nlmAsyncState?.pollAttempt ?? 0,
       },
     };
 
@@ -234,140 +531,114 @@ export async function processStage7Job(
       };
 
       const result = await handler.generateFinal(handlerInput, draftResult);
-
-      await updateJobProgress(job, {
-        phase: 'validating',
-        progress: 70,
-        message: 'Validating generated content',
-      });
-
-      // Handle asset upload for cover images
-      if (result.assetBuffer && result.assetMimeType && result.assetExtension) {
-        await updateJobProgress(job, {
-          phase: 'uploading',
-          progress: 85,
-          message: 'Uploading asset to storage',
-        });
-
-        const assetPath = await uploadEnrichmentAsset(
-          courseId,
-          lessonId,
-          enrichmentId,
-          result.assetBuffer,
-          result.assetMimeType,
-          result.assetExtension
-        );
-
-        await linkEnrichmentAsset(enrichmentId, assetPath);
-
-        jobLogger.info({ assetPath }, 'Asset uploaded and linked');
-      }
-
-      // Save content and mark as completed
-      await saveEnrichmentContent(enrichmentId, result.content, result.metadata);
-
-      await updateJobProgress(job, {
-        phase: 'complete',
-        progress: 100,
-        message: 'Enrichment generation completed',
-      });
-
-      const durationMs = Date.now() - startTime;
-
-      jobLogger.info(
-        {
-          success: true,
-          durationMs,
-          tokensUsed: result.metadata.total_tokens,
-          modelUsed: result.metadata.model_used,
-          qualityScore: result.metadata.quality_score,
-        },
-        'Stage 7 two-stage final generation completed'
-      );
-
-      return {
+      return finalizeSuccessfulResult(job, {
         enrichmentId,
-        success: true,
-        status: 'completed',
-        content: result.content,
-        metrics: {
-          durationMs,
-          tokensUsed: result.metadata.total_tokens,
-          costUsd: result.metadata.estimated_cost_usd,
-          modelUsed: result.metadata.model_used,
-          qualityScore: result.metadata.quality_score,
-        },
-      };
-    }
-
-    // Single-stage generation (fallback for non-two-stage types)
-    jobLogger.info('Generating final enrichment content');
-
-    const result = await handler.generate(handlerInput);
-
-    await updateJobProgress(job, {
-      phase: 'validating',
-      progress: 70,
-      message: 'Validating generated content',
-    });
-
-    // Handle asset upload for audio/video
-    if (result.assetBuffer && result.assetMimeType && result.assetExtension) {
-      await updateJobProgress(job, {
-        phase: 'uploading',
-        progress: 85,
-        message: 'Uploading asset to storage',
-      });
-
-      const assetPath = await uploadEnrichmentAsset(
+        enrichmentType,
         courseId,
         lessonId,
-        enrichmentId,
-        result.assetBuffer,
-        result.assetMimeType,
-        result.assetExtension
-      );
-
-      await linkEnrichmentAsset(enrichmentId, assetPath);
-
-      jobLogger.info({ assetPath }, 'Asset uploaded and linked');
+        result,
+        startTime,
+        logMessage: 'Stage 7 two-stage final generation completed',
+        jobLogger,
+      });
     }
 
-    // Save content and mark as completed
-    await saveEnrichmentContent(enrichmentId, result.content, result.metadata);
+    // Single-stage generation
+    if (isNotebookLMType(enrichmentType) && handler.generateDraft && handler.generateFinal) {
+      const activeDraft = nlmAsyncState?.draft ?? (await handler.generateDraft(handlerInput));
+      const nlmResult = await handler.generateFinal(handlerInput, activeDraft);
 
-    await updateJobProgress(job, {
-      phase: 'complete',
-      progress: 100,
-      message: 'Enrichment generation completed',
-    });
+      if (nlmResult.deferredTask) {
+        const startedAt = nlmAsyncState?.startedAt ?? new Date().toISOString();
+        const elapsedMs = Date.now() - new Date(startedAt).getTime();
+        const maxWaitMs = getNlmMaxWaitMs();
+        if (elapsedMs > maxWaitMs) {
+          throw new Error(
+            `NotebookLM detached async task timed out after ${maxWaitMs}ms (taskId=${nlmResult.deferredTask.taskId})`
+          );
+        }
 
-    const durationMs = Date.now() - startTime;
+        const nextPollAttempt = (nlmAsyncState?.pollAttempt ?? 0) + 1;
+        const nextAsyncState: Stage7NlmAsyncState = {
+          taskId: nlmResult.deferredTask.taskId,
+          mediaType: nlmResult.deferredTask.mediaType,
+          pollAttempt: nextPollAttempt,
+          startedAt,
+          draft: activeDraft,
+        };
 
-    jobLogger.info(
-      {
-        success: true,
-        durationMs,
-        tokensUsed: result.metadata.total_tokens,
-        modelUsed: result.metadata.model_used,
-        qualityScore: result.metadata.quality_score,
-      },
-      'Stage 7 job completed successfully'
-    );
+        await saveNotebookLMAsyncMetadataState(
+          enrichmentId,
+          enrichmentContext.enrichment.metadata,
+          {
+            taskId: nextAsyncState.taskId,
+            mediaType: nextAsyncState.mediaType,
+            status: nlmResult.deferredTask.status,
+            pollAttempt: nextAsyncState.pollAttempt,
+            startedAt: nextAsyncState.startedAt,
+            lastPolledAt: new Date().toISOString(),
+            responseMetadata: nlmResult.deferredTask.responseMetadata,
+          }
+        );
 
-    return {
+        const pollDelayMs = getNlmPollDelayMs(nextPollAttempt);
+        const nextJobId = await enqueueNlmPollJob(job.data, nextAsyncState, pollDelayMs);
+
+        await updateJobProgress(job, {
+          phase: isNlmPollJob ? 'polling_async' : 'pending_async',
+          progress: 55,
+          message: `NotebookLM task ${nlmResult.deferredTask.status}; next poll in ${Math.round(pollDelayMs / 1000)}s`,
+        });
+
+        jobLogger.info(
+          {
+            taskId: nextAsyncState.taskId,
+            mediaType: nextAsyncState.mediaType,
+            pollAttempt: nextAsyncState.pollAttempt,
+            pollDelayMs,
+            nextJobId,
+            taskStatus: nlmResult.deferredTask.status,
+          },
+          'NotebookLM detached task pending, scheduled poll job'
+        );
+
+        return {
+          enrichmentId,
+          success: true,
+          status: 'generating',
+          metrics: {
+            durationMs: Date.now() - startTime,
+            tokensUsed: nlmResult.metadata.total_tokens,
+            costUsd: nlmResult.metadata.estimated_cost_usd,
+            modelUsed: nlmResult.metadata.model_used,
+          },
+        };
+      }
+
+      return finalizeSuccessfulResult(job, {
+        enrichmentId,
+        enrichmentType,
+        courseId,
+        lessonId,
+        result: nlmResult,
+        startTime,
+        logMessage: 'Stage 7 NotebookLM single-stage generation completed',
+        jobLogger,
+      });
+    }
+
+    jobLogger.info('Generating final enrichment content');
+    const result = await handler.generate(handlerInput);
+    return finalizeSuccessfulResult(job, {
       enrichmentId,
-      success: true,
-      status: 'completed',
-      content: result.content,
-      metrics: {
-        durationMs,
-        tokensUsed: result.metadata.total_tokens,
-        costUsd: result.metadata.estimated_cost_usd,
-        modelUsed: result.metadata.model_used,
-        qualityScore: result.metadata.quality_score,
-      },
-    };
+      enrichmentType,
+      courseId,
+      lessonId,
+      result,
+      startTime,
+      logMessage: 'Stage 7 job completed successfully',
+      jobLogger,
+    });
   } catch (error) {
     const errorObj = error instanceof Error ? error : new Error(String(error));
     const durationMs = Date.now() - startTime;

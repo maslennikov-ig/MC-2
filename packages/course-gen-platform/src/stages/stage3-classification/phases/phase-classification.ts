@@ -38,6 +38,10 @@ import { createModelConfigService } from '../../../shared/llm/model-config-servi
 import { cache as redisCache } from '../../../shared/cache/redis';
 import { createHash } from 'crypto';
 import { formatFileSize } from '@megacampus/shared-utils';
+import {
+  getCachedFileProcessedContent,
+  getCachedFileMarkdown,
+} from '../../../shared/cache/file-content-cache';
 
 // ============================================================================
 // LLM Response Schema
@@ -236,7 +240,7 @@ export async function executeDocumentClassificationComparative(
 
   // Step 1: Fetch file metadata for all documents
   logger.debug({ courseId, fileIds }, 'Fetching file metadata for comparative classification');
-  const fileMetadataList = await fetchFileMetadata(supabase, fileIds);
+  const fileMetadataList = await fetchFileMetadata(supabase, fileIds, courseId);
 
   if (fileMetadataList.length === 0) {
     logger.warn({ courseId, fileIds }, 'No file metadata found');
@@ -444,7 +448,7 @@ export async function executeDocumentClassification(
 
   // Step 1: Fetch file metadata for all documents
   logger.debug({ courseId, fileIds }, 'Fetching file metadata');
-  const fileMetadataList = await fetchFileMetadata(supabase, fileIds);
+  const fileMetadataList = await fetchFileMetadata(supabase, fileIds, courseId);
 
   if (fileMetadataList.length === 0) {
     logger.warn({ courseId, fileIds }, 'No file metadata found');
@@ -543,13 +547,38 @@ export async function executeDocumentClassification(
  */
 async function fetchFileMetadata(
   supabase: ReturnType<typeof getSupabaseAdmin>,
-  fileIds: string[]
+  fileIds: string[],
+  courseId: string
 ): Promise<FileMetadata[]> {
+  if (fileIds.length === 0) return [];
+
+  // Step 1: Try Redis for content (processed_content preferred, fallback to markdown)
+  const contentMap = new Map<string, string>();
+  await Promise.all(
+    fileIds.map(async fid => {
+      const cached =
+        (await getCachedFileProcessedContent(courseId, fid)) ||
+        (await getCachedFileMarkdown(courseId, fid));
+      if (cached) contentMap.set(fid, cached);
+    })
+  );
+
+  const missedIds = fileIds.filter(id => !contentMap.has(id));
+
+  logger.debug(
+    {
+      courseId,
+      fileCount: fileIds.length,
+      cacheHits: contentMap.size,
+      cacheMisses: missedIds.length,
+    },
+    'Redis cache-aside check for file content'
+  );
+
+  // Step 2: Query Supabase for metadata (light query, no content columns)
   const { data, error } = await supabase
     .from('file_catalog')
-    .select(
-      'id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata'
-    )
+    .select('id, filename, generated_title, original_name, mime_type, file_size, summary_metadata')
     .in('id', fileIds);
 
   if (error) {
@@ -561,9 +590,27 @@ async function fetchFileMetadata(
     return [];
   }
 
+  // Step 3: For cache misses, batch-fetch content from Supabase
+  if (missedIds.length > 0) {
+    const { data: contentData, error: contentError } = await supabase
+      .from('file_catalog')
+      .select('id, processed_content, markdown_content')
+      .in('id', missedIds);
+    if (contentError) {
+      logger.warn(
+        { courseId, missedIds, error: contentError.message },
+        '[Stage3] Supabase fallback for file content failed — files will have empty content'
+      );
+    }
+    for (const d of contentData || []) {
+      const c = d.processed_content || d.markdown_content || '';
+      if (c) contentMap.set(d.id, c);
+    }
+  }
+
+  // Step 4: Build results
   return data.map(file => {
-    // Use processed_content (summary) if available, fallback to markdown_content
-    const content = file.processed_content || file.markdown_content || '';
+    const content = contentMap.get(file.id) || '';
 
     // Get summary tokens from metadata, or estimate if not available
     const metadata = file.summary_metadata as { summary_tokens?: number } | null;
@@ -573,10 +620,11 @@ async function fetchFileMetadata(
     logger.debug(
       {
         fileId: file.id,
-        hasProcessedContent: !!file.processed_content,
+        hasContent: content.length > 0,
         hasGeneratedTitle: !!file.generated_title,
         summaryTokens,
         contentLength: content.length,
+        cacheHit: contentMap.has(file.id),
       },
       'Loaded file for classification'
     );
@@ -588,7 +636,7 @@ async function fetchFileMetadata(
       original_name: file.original_name ?? null,
       mime_type: file.mime_type,
       file_size: file.file_size,
-      content_preview: content, // Full summary, not truncated
+      content_preview: content,
       summary_tokens: summaryTokens,
     };
   });

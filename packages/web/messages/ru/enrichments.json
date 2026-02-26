@@ -2,6 +2,8 @@
   "types": {
     "video": "Видео",
     "audio": "Аудио",
+    "nlm_audio": "NLM-аудио",
+    "nlm_video": "NLM-видео",
     "presentation": "Презентация",
     "quiz": "Тест",
     "document": "Документ",
@@ -20,6 +22,8 @@
   "typeDescriptions": {
     "video": "AI-сгенерированная видео-лекция на основе материала урока",
     "audio": "Озвучка текста урока для удобного прослушивания",
+    "nlm_audio": "Озвучка урока через NLM-пайплайн",
+    "nlm_video": "Видео урока через NLM-пайплайн",
     "presentation": "Слайды презентации для визуального сопровождения",
     "quiz": "Проверочный тест для закрепления материала",
     "document": "Дополнительный документ для скачивания",
@@ -131,6 +135,31 @@
       "speedFast": "Быстро",
       "format": "Формат"
     },
+    "nlmAudio": {
+      "title": "Настройки NLM-аудио",
+      "format": "Формат подачи",
+      "formatDeepDive": "Глубокое объяснение",
+      "formatBrief": "Краткий обзор",
+      "formatCritique": "Критический разбор",
+      "formatDebate": "Диалог двух ведущих (дебаты)"
+    },
+    "nlmVideo": {
+      "title": "Настройки NLM-видео",
+      "format": "Формат видео",
+      "formatExplainer": "Объяснение",
+      "formatBrief": "Краткий обзор",
+      "style": "Визуальный стиль",
+      "styleAutoSelect": "Автоматически",
+      "styleCustom": "Пользовательский",
+      "styleClassic": "Классический",
+      "styleWhiteboard": "Доска",
+      "styleKawaii": "Кавай (милый)",
+      "styleAnime": "Аниме",
+      "styleWatercolor": "Акварель",
+      "styleRetroPrint": "Ретро-печать",
+      "styleHeritage": "Наследие (классика)",
+      "stylePaperCraft": "Бумажное ремесло"
+    },
     "video": {
       "title": "Настройки видео",
       "voice": "Голос",
@@ -163,6 +192,8 @@
     "loadError": "Не удалось загрузить дополнительные материалы. Попробуйте обновить страницу.",
     "videoLesson": "Видеолекция",
     "audioLesson": "Аудиоурок",
+    "nlmAudioLesson": "NLM-аудиоурок",
+    "nlmVideoLesson": "NLM-видеоурок",
     "presentationLabel": "Презентация",
     "quizLabel": "Тест",
     "documentLabel": "Дополнительное чтение",
@@ -172,6 +203,8 @@
     "checkKnowledge": "Проверьте свои знания",
     "audioVersion": "Аудио версия урока",
     "videoVersion": "Видео версия урока",
+    "nlmAudioVersion": "NLM-аудио версия урока",
+    "nlmVideoVersion": "NLM-видео версия урока",
     "lessonPresentation": "Презентация к уроку",
     "additionalMaterials": "Дополнительные материалы",
     "play": "Воспроизвести",
@@ -238,6 +271,8 @@
     "enrichmentTypes": {
       "video": "Видео",
       "audio": "Аудио",
+      "nlm_audio": "NLM-аудио",
+      "nlm_video": "NLM-видео",
       "presentation": "Презентация",
       "quiz": "Тест",
       "document": "Документ",
@@ -245,6 +280,16 @@
       "card": "Карточка",
       "banner": "Декоративный баннер"
     },
+    "confirmDeleteTitle": "Удалить дополнение?",
+    "confirmDeleteDescription": "Это действие нельзя отменить. Медиафайл будет удалён.",
+    "deleteSuccess": "Дополнение удалено",
+    "deleteFailed": "Не удалось удалить дополнение",
+    "regenerateSuccess": "Перегенерация запущена",
+    "regenerateFailed": "Не удалось запустить перегенерацию",
+    "confirm": "Удалить",
+    "cancel": "Отмена",
+    "videoUnavailable": "Видео недоступно",
+    "audioUnavailable": "Аудио недоступно",
     "generationComplete": "Дополнение успешно создано",
     "generationFailed": "Не удалось создать дополнение",
     "resumingGeneration": "Отслеживаем {count, plural, one {# активную генерацию} few {# активные генерации} many {# активных генераций} other {# активные генерации}}..."
@@ -260,6 +305,11 @@
       "description": "Прослушайте урок",
       "estimatedTime": "~30 сек"
     },
+    "nlm_audio": {
+      "title": "NLM-аудио",
+      "description": "Подготовьте черновик и сгенерируйте озвучку урока",
+      "estimatedTime": "~45 сек"
+    },
     "presentation": {
       "title": "Презентация",
       "description": "Ключевые слайды урока",
@@ -270,6 +320,11 @@
       "description": "AI видеолекция",
       "estimatedTime": "Скоро",
       "comingSoon": "Скоро"
+    },
+    "nlm_video": {
+      "title": "NLM-видео",
+      "description": "Подготовьте черновик и сгенерируйте видео урока",
+      "estimatedTime": "~120 сек"
     }
   },
   "images": {
@@ -326,6 +381,10 @@
   },
   "generate": "Сгенерировать",
   "generating": "Генерация...",
+  "longGeneration": {
+    "remaining": "Осталось: {remaining} / {total}",
+    "elapsed": "Прошло: {elapsed}"
+  },
   "options": "Опции",
   "cancel": "Отменить",
   "retry": "Повторить",
@@ -333,5 +392,85 @@
   "draftPreview": {
     "slideCount": "{count, plural, one {# слайд} few {# слайда} many {# слайдов} other {# слайдов}} готово",
     "estimatedDuration": "~{minutes} мин видео"
+  },
+  "videoPlayer": {
+    "Play": "Воспроизвести",
+    "Pause": "Пауза",
+    "Replay": "Повторить",
+    "Mute": "Выключить звук",
+    "Unmute": "Включить звук",
+    "Volume": "Громкость",
+    "Seek": "Перемотка",
+    "Seek Forward": "Вперёд",
+    "Seek Backward": "Назад",
+    "Enter Fullscreen": "На весь экран",
+    "Exit Fullscreen": "Выйти из полноэкранного режима",
+    "Fullscreen": "Полноэкранный режим",
+    "Enter PiP": "Картинка в картинке",
+    "Exit PiP": "Выйти из «Картинка в картинке»",
+    "PiP": "Картинка в картинке",
+    "Settings": "Настройки",
+    "Playback": "Воспроизведение",
+    "Speed": "Скорость",
+    "Quality": "Качество",
+    "Auto": "Авто",
+    "Default": "По умолчанию",
+    "Normal": "Обычная",
+    "Off": "Выкл",
+    "Captions": "Субтитры",
+    "Closed-Captions On": "Субтитры включены",
+    "Closed-Captions Off": "Субтитры выключены",
+    "Audio": "Аудио",
+    "Download": "Скачать",
+    "AirPlay": "AirPlay",
+    "Google Cast": "Google Cast",
+    "Disabled": "Отключено",
+    "Connected": "Подключено",
+    "Connecting": "Подключение",
+    "Disconnected": "Отключено",
+    "LIVE": "ПРЯМОЙ ЭФИР",
+    "Skip To Live": "Перейти к эфиру",
+    "Loop": "Повтор",
+    "Chapters": "Главы",
+    "Continue": "Продолжить",
+    "Announcements": "Объявления",
+    "Accessibility": "Специальные возможности",
+    "Keyboard Animations": "Анимации клавиатуры",
+    "Caption Styles": "Стиль субтитров",
+    "Captions look like this": "Так выглядят субтитры",
+    "Font": "Шрифт",
+    "Family": "Семейство",
+    "Size": "Размер",
+    "Color": "Цвет",
+    "Opacity": "Прозрачность",
+    "Shadow": "Тень",
+    "Text": "Текст",
+    "Text Background": "Фон текста",
+    "Display Background": "Фон области",
+    "Track": "Дорожка",
+    "Reset": "Сбросить",
+    "Boost": "Усиление"
+  },
+  "switcher": {
+    "title": "Материалы урока",
+    "tabs": {
+      "video": "Видео",
+      "audio": "Аудио",
+      "quiz": "Квиз",
+      "presentation": "Презентация",
+      "document": "Документ"
+    },
+    "fallback": {
+      "video": "Видео недоступно",
+      "presentationEmpty": "Презентация пока пуста",
+      "documentTitle": "Документ",
+      "documentDescription": "Дополнительный материал к уроку",
+      "download": "Скачать",
+      "documentAvailableInPanel": "Документ доступен для скачивания в панели активностей",
+      "showVideo": "Показать видео"
+    },
+    "slides": {
+      "defaultTitle": "Слайд {number}"
+    }
   }
 }

@@ -207,40 +207,56 @@ async function checkRedis(): Promise<ServiceStatus> {
 
 /**
  * Check Docling MCP document processing service
- * Uses tools/list method which is standard MCP protocol
+ *
+ * Two-tier strategy:
+ * 1. GET /health — available via nginx proxy in production/dev
+ * 2. POST to MCP endpoint — fallback for local dev without nginx;
+ *    handles SSE (text/event-stream) responses from Streamable HTTP transport
  */
 async function checkDoclingMcp(): Promise<ServiceStatus> {
   const startTime = Date.now()
   const lastCheck = new Date().toISOString()
 
-  // Try internal Docker URL first
-  const internalUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp'
-  const fallbackUrl = 'http://localhost:8000/mcp'
+  const mcpUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp'
+  const fallbackMcpUrl = 'http://localhost:8000/mcp'
 
+  // Derive /health URL from MCP URL (replace /mcp path with /health)
+  const deriveHealthUrl = (url: string) => url.replace(/\/mcp$/, '/health')
+
+  // --- Tier 1: Try /health endpoint (nginx proxy provides this in production) ---
+  try {
+    const healthResponse = await fetchWithTimeout(deriveHealthUrl(mcpUrl), { method: 'GET' })
+
+    if (healthResponse.ok) {
+      return {
+        name: 'Docling MCP',
+        status: 'healthy',
+        responseTime: Date.now() - startTime,
+        lastCheck,
+      }
+    }
+  } catch {
+    // /health not available (e.g., local dev without nginx proxy) — continue to Tier 2
+  }
+
+  // --- Tier 2: POST to MCP endpoint with SSE-aware response handling ---
   try {
     let response: Response | null = null
-    let usedUrl = internalUrl
 
-    // Use tools/list - standard MCP method that should always be available
     const mcpRequest = { jsonrpc: '2.0', method: 'tools/list', id: 1 }
-
-    // MCP SDK requires Accept header with both application/json and text/event-stream
-    // Without this header, the server returns HTTP 406 Not Acceptable
     const mcpHeaders = {
       'Content-Type': 'application/json',
       Accept: 'application/json, text/event-stream',
     }
 
     try {
-      response = await fetchWithTimeout(internalUrl, {
+      response = await fetchWithTimeout(mcpUrl, {
         method: 'POST',
         headers: mcpHeaders,
         body: JSON.stringify(mcpRequest),
       })
     } catch {
-      // Try fallback URL
-      usedUrl = fallbackUrl
-      response = await fetchWithTimeout(fallbackUrl, {
+      response = await fetchWithTimeout(fallbackMcpUrl, {
         method: 'POST',
         headers: mcpHeaders,
         body: JSON.stringify(mcpRequest),
@@ -248,53 +264,48 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
     }
 
     const responseTime = Date.now() - startTime
+    const contentType = response.headers.get('content-type') || ''
 
-    // Try to parse JSON response regardless of HTTP status
-    // MCP servers may return HTTP 400 with valid JSON-RPC error for session-related issues
+    // SSE response = MCP Streamable HTTP transport is working correctly
+    if (contentType.includes('text/event-stream')) {
+      return {
+        name: 'Docling MCP',
+        status: 'healthy',
+        responseTime,
+        message: 'MCP streaming transport active',
+        lastCheck,
+      }
+    }
+
+    // Try to parse JSON-RPC response
     try {
       const data = await response.json()
 
-      // Valid JSON-RPC response has either result or error
       if (data.jsonrpc === '2.0' && (data.result !== undefined || data.error !== undefined)) {
-        // Check if it's a session-related error (expected for stateless health check)
-        const isSessionError = data.error?.message?.toLowerCase().includes('session')
-
-        if (data.result !== undefined || isSessionError) {
-          // Service is healthy: either returned tools or requires session (expected behavior)
-          const toolCount = data.result?.tools?.length
-          return {
-            name: 'Docling MCP',
-            status: 'healthy',
-            responseTime,
-            message:
-              toolCount !== undefined
-                ? `${toolCount} tool(s) available`
-                : isSessionError
-                  ? 'MCP protocol responding (session required)'
-                  : `Service responding at ${usedUrl.includes('docling-mcp:8000') ? 'internal' : 'external'} URL`,
-            lastCheck,
-          }
-        }
-
-        // Other JSON-RPC errors indicate the service is working but may have issues
+        const toolCount = data.result?.tools?.length
         return {
           name: 'Docling MCP',
           status: 'healthy',
           responseTime,
-          message: `MCP responding: ${data.error?.message || 'OK'}`,
+          message:
+            toolCount !== undefined
+              ? `${toolCount} tool(s) available`
+              : `MCP responding: ${data.error?.message || 'OK'}`,
           lastCheck,
         }
       }
     } catch {
-      // JSON parse failed - check HTTP status
-      if (response.ok) {
-        return {
-          name: 'Docling MCP',
-          status: 'degraded',
-          responseTime,
-          message: 'Invalid JSON-RPC response',
-          lastCheck,
-        }
+      // JSON parse failed — but server responded
+    }
+
+    // Server responded with unexpected format but is reachable
+    if (response.ok || response.status === 400 || response.status === 405) {
+      return {
+        name: 'Docling MCP',
+        status: 'healthy',
+        responseTime,
+        message: `MCP server responding (HTTP ${response.status})`,
+        lastCheck,
       }
     }
 

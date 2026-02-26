@@ -3,6 +3,7 @@ import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { regenerateSections } from '../utils/section-regenerator';
 import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
+import { runTableFixPipeline } from '../utils/table-fix-pipeline';
 import { validateGeneratedContent } from './generator/generator-content';
 
 /**
@@ -63,6 +64,7 @@ export async function sectionRegeneratorNode(
         : result.modelsUsed.length === 1
           ? result.modelsUsed[0]
           : result.modelsUsed.join(', ');
+    const noOpSections = result.noOpSections ?? [];
 
     // Log trace at completion
     await logTrace({
@@ -78,6 +80,7 @@ export async function sectionRegeneratorNode(
         success: result.success,
         regeneratedSections: result.regeneratedSections,
         failedSections: result.failedSections,
+        noOpSections,
         modelsUsed: result.modelsUsed,
         tokensUsed: result.tokensUsed,
       },
@@ -86,11 +89,40 @@ export async function sectionRegeneratorNode(
       durationMs,
     });
 
+    if (noOpSections.length > 0) {
+      logger.warn(
+        {
+          lessonId: state.lessonSpec.lesson_id,
+          noOpSections,
+          failedSections: result.failedSections,
+        },
+        'Section regenerator: Detected no-op section regeneration'
+      );
+
+      await logTrace({
+        courseId: state.courseId,
+        lessonId: state.lessonUuid || undefined,
+        stage: 'stage_6',
+        phase: 'section_regenerator',
+        stepName: 'section_regen_noop',
+        inputData: {
+          lessonLabel: state.lessonSpec.lesson_id,
+          sectionsToRegenerate,
+        },
+        outputData: {
+          noOpSections,
+          failedSections: result.failedSections,
+        },
+        durationMs,
+      });
+    }
+
     if (!result.success) {
       logger.warn(
         {
           lessonId: state.lessonSpec.lesson_id,
           failedSections: result.failedSections,
+          noOpSections,
           errorMessage: result.errorMessage,
         },
         'Section regenerator: Some sections failed, proceeding with partial result'
@@ -120,6 +152,29 @@ export async function sectionRegeneratorNode(
           error: error instanceof Error ? error.message : String(error),
         },
         'Section regenerator: Mermaid fix pipeline failed, using original content'
+      );
+    }
+
+    // Run table-fix pipeline on regenerated content (deterministic markdown table recovery)
+    try {
+      const tableResult = runTableFixPipeline(finalContent);
+      if (tableResult.modified) {
+        logger.debug(
+          {
+            lessonId: state.lessonSpec.lesson_id,
+            metrics: tableResult.metrics,
+          },
+          'Section regenerator: Table fix pipeline applied to regenerated content'
+        );
+        finalContent = tableResult.content;
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          lessonId: state.lessonSpec.lesson_id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Section regenerator: Table fix pipeline failed, using content from previous step'
       );
     }
 

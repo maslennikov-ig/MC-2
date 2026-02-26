@@ -69,9 +69,19 @@ const MOCK_SVG_STATE_DIAGRAM = `<svg xmlns="http://www.w3.org/2000/svg" viewBox=
 /**
  * SVG with mindmap-node text
  */
-const MOCK_SVG_MINDMAP = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+const _MOCK_SVG_MINDMAP = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <g class="mindmap-node"><rect fill="#ececff" /><text fill="#333">Topic</text></g>
 </svg>`
+
+/**
+ * SVG without renderable graph content (defs-only)
+ */
+const MOCK_SVG_DEFS_ONLY = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+  <defs><path id="p" d="M0 0 L10 10" /></defs>
+</svg>`
+
+const MERMAID_FALLBACK_MARKDOWN =
+  '<!-- Mermaid flowchart could not be rendered. Please review manually. -->'
 
 describe('MermaidDirect', () => {
   beforeEach(() => {
@@ -217,7 +227,10 @@ describe('MermaidDirect', () => {
     })
 
     it('should set container innerHTML to returned SVG', async () => {
-      mockRender.mockResolvedValue({ svg: '<svg>Test SVG</svg>', bindFunctions: undefined })
+      mockRender.mockResolvedValue({
+        svg: '<svg><text>Test SVG</text></svg>',
+        bindFunctions: undefined,
+      })
       const { container } = render(<MermaidDirect chart="graph TD\n  A-->B" />)
 
       await waitFor(() => {
@@ -233,9 +246,7 @@ describe('MermaidDirect', () => {
       const { container } = render(<MermaidDirect chart="graph TD\n  A-->B" />)
 
       await waitFor(() => {
-        expect(mockBindFunctions).toHaveBeenCalledWith(
-          container.querySelector('.mermaid-diagram')
-        )
+        expect(mockBindFunctions).toHaveBeenCalledWith(container.querySelector('.mermaid-diagram'))
       })
     })
   })
@@ -260,6 +271,67 @@ describe('MermaidDirect', () => {
   })
 
   describe('Error handling', () => {
+    it('should render backend Mermaid fallback markdown as readable text without error UI', async () => {
+      const onRenderFailed = vi.fn()
+      window.addEventListener('mermaid-render-failed', onRenderFailed as EventListener)
+
+      render(<MermaidDirect chart={MERMAID_FALLBACK_MARKDOWN} />)
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Mermaid flowchart could not be rendered. Please review manually.')
+        ).toBeInTheDocument()
+      })
+
+      expect(screen.queryByText('Diagram Error')).not.toBeInTheDocument()
+      expect(mockRender).not.toHaveBeenCalled()
+      expect(onRenderFailed).not.toHaveBeenCalled()
+
+      window.removeEventListener('mermaid-render-failed', onRenderFailed as EventListener)
+    })
+
+    it('should show error UI when mermaid.render() returns empty SVG payload', async () => {
+      mockRender.mockResolvedValue({ svg: '', bindFunctions: undefined })
+      render(<MermaidDirect chart="graph TD\n  A-->B" />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Diagram Error')).toBeInTheDocument()
+        expect(screen.getByText('Mermaid render returned empty SVG')).toBeInTheDocument()
+      })
+    })
+
+    it('should show error UI when SVG has no renderable graph content', async () => {
+      mockRender.mockResolvedValue({ svg: MOCK_SVG_DEFS_ONLY, bindFunctions: undefined })
+      render(<MermaidDirect chart="graph TD\n  A-->B" />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Diagram Error')).toBeInTheDocument()
+        expect(
+          screen.getByText('Mermaid rendered empty SVG without graph content')
+        ).toBeInTheDocument()
+      })
+    })
+
+    it('should emit mermaid-render-failed event with diagnostic detail', async () => {
+      const onRenderFailed = vi.fn()
+      window.addEventListener('mermaid-render-failed', onRenderFailed as EventListener)
+
+      mockRender.mockRejectedValue(new Error('Parse error'))
+      render(<MermaidDirect chart="invalid diagram" />)
+
+      await waitFor(() => {
+        expect(onRenderFailed).toHaveBeenCalledTimes(1)
+      })
+
+      const [event] = onRenderFailed.mock.calls[0]
+      expect(event.detail).toMatchObject({
+        message: 'Parse error',
+      })
+      expect(event.detail.chartSnippet).toContain('invalid diagram')
+
+      window.removeEventListener('mermaid-render-failed', onRenderFailed as EventListener)
+    })
+
     it('should show error UI when mermaid.render() rejects with Error', async () => {
       mockRender.mockRejectedValue(new Error('Syntax error in diagram'))
       render(<MermaidDirect chart="invalid syntax" />)
@@ -390,7 +462,7 @@ describe('MermaidDirect', () => {
       expect(firstCall.themeVariables.primaryColor).toBe('#e0f2fe') // Light mode
 
       // Toggle dark mode
-      await act(async () => {
+      act(() => {
         document.documentElement.classList.add('dark')
       })
 
@@ -408,7 +480,7 @@ describe('MermaidDirect', () => {
       const originalMutationObserver = global.MutationObserver
 
       global.MutationObserver = class MockMutationObserver {
-        constructor(callback: MutationCallback) {
+        constructor(_callback: MutationCallback) {
           // Call original behavior if needed
         }
         observe() {}
@@ -606,9 +678,9 @@ describe('MermaidDirect', () => {
       })
 
       // First call takes longer
-      mockRender.mockImplementationOnce(() => firstRenderPromise)
+      mockRender.mockImplementationOnce(() => firstRenderPromise as any)
       // Second call resolves faster
-      mockRender.mockImplementationOnce(() => secondRenderPromise)
+      mockRender.mockImplementationOnce(() => secondRenderPromise as any)
 
       const { container, rerender } = render(<MermaidDirect chart="graph TD\n  A-->B" />)
 
@@ -616,14 +688,17 @@ describe('MermaidDirect', () => {
       rerender(<MermaidDirect chart="graph TD\n  X-->Y" />)
 
       // Resolve second render first (faster)
-      resolveSecondRender!({ svg: '<svg>Second render</svg>', bindFunctions: undefined })
+      resolveSecondRender!({
+        svg: '<svg><text>Second render</text></svg>',
+        bindFunctions: undefined,
+      })
 
       await waitFor(() => {
         expect(container.querySelector('.mermaid-diagram')?.innerHTML).toContain('Second render')
       })
 
       // Now resolve first render (stale)
-      resolveFirstRender!({ svg: '<svg>First render</svg>', bindFunctions: undefined })
+      resolveFirstRender!({ svg: '<svg><text>First render</text></svg>', bindFunctions: undefined })
 
       // Wait a bit to ensure stale render doesn't override
       await act(async () => {

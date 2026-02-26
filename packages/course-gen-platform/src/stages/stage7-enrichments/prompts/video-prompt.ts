@@ -83,6 +83,15 @@ export interface VideoScriptSettings {
 
   /** Pacing of the video narration */
   pacing?: VideoPacing;
+
+  /** Preferred target duration in minutes (soft target) */
+  targetDurationMinutes?: number;
+
+  /** Preferred lower duration bound in minutes (soft range) */
+  durationRangeMinMinutes?: number;
+
+  /** Preferred upper duration bound in minutes (soft range) */
+  durationRangeMaxMinutes?: number;
 }
 
 /**
@@ -317,10 +326,11 @@ Add buffer time for:
 - Code examples: +5-10 seconds for viewer processing
 - Diagrams: +3-5 seconds for comprehension
 
-Total video should typically be:
-- Short lessons: 5-8 minutes
-- Standard lessons: 8-15 minutes
-- In-depth lessons: 15-25 minutes
+Duration targeting rules:
+- If <SETTINGS> contains target/range values, treat them as primary constraints.
+- Keep the script coherent if exact timing is not possible.
+- Never abruptly cut off the ending to force timing.
+- If no explicit target/range is provided, use your best pedagogical judgement.
 
 # Output Format
 
@@ -387,7 +397,13 @@ export function buildVideoScriptUserMessage(params: VideoScriptParams): string {
     stylePrompt,
   } = params;
 
-  const { tone = 'conversational', pacing = 'moderate' } = settings;
+  const {
+    tone = 'conversational',
+    pacing = 'moderate',
+    targetDurationMinutes,
+    durationRangeMinMinutes,
+    durationRangeMaxMinutes,
+  } = settings;
 
   // Format learning objectives
   const objectivesText = lessonObjectives.map((obj, idx) => `${idx + 1}. ${obj}`).join('\n');
@@ -396,6 +412,21 @@ export function buildVideoScriptUserMessage(params: VideoScriptParams): string {
   const styleSection = stylePrompt
     ? `\n\n<STYLE>\n${sanitizeForPrompt(stylePrompt)}\n</STYLE>`
     : '';
+
+  const durationLines: string[] = [];
+  if (typeof targetDurationMinutes === 'number' && Number.isFinite(targetDurationMinutes)) {
+    durationLines.push(`Target Duration Minutes: ${Math.round(targetDurationMinutes)}`);
+  }
+  if (
+    typeof durationRangeMinMinutes === 'number' &&
+    Number.isFinite(durationRangeMinMinutes) &&
+    typeof durationRangeMaxMinutes === 'number' &&
+    Number.isFinite(durationRangeMaxMinutes)
+  ) {
+    durationLines.push(
+      `Preferred Duration Range Minutes: ${Math.round(durationRangeMinMinutes)}-${Math.round(durationRangeMaxMinutes)}`
+    );
+  }
 
   return `<LESSON_TITLE>
 ${sanitizeForPrompt(lessonTitle)}
@@ -416,6 +447,7 @@ ${sanitizeForPrompt(language)}
 <SETTINGS>
 Tone: ${tone}
 Pacing: ${pacing}
+${sanitizeForPrompt(durationLines.join('\n'))}
 </SETTINGS>${styleSection}`;
 }
 

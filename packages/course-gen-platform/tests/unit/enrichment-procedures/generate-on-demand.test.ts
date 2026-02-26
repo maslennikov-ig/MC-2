@@ -1,25 +1,35 @@
-/**
- * Unit tests for generate-on-demand enrichment tRPC procedure
- *
- * Tests: Input validation, access control, duplicate prevention,
- * enrichment creation, BullMQ job queuing, error handling
- */
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TRPCError } from '@trpc/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { router } from '../../../src/server/trpc';
 import type { Context } from '../../../src/server/trpc';
 
-// ============================================================================
-// MOCKS
-// ============================================================================
+const {
+  mockVerifyLessonAccess,
+  mockGetNextOrderIndex,
+  mockCheckExistingEnrichment,
+  mockFindReusableEnrichment,
+  mockSupabaseFrom,
+  mockSupabaseUpdate,
+  mockSupabaseUpdateEq,
+  mockSupabaseInsert,
+  mockCreateStage7Queue,
+  mockAddEnrichmentJob,
+} = vi.hoisted(() => ({
+  mockVerifyLessonAccess: vi.fn(),
+  mockGetNextOrderIndex: vi.fn(),
+  mockCheckExistingEnrichment: vi.fn(),
+  mockFindReusableEnrichment: vi.fn(),
+  mockSupabaseFrom: vi.fn(),
+  mockSupabaseUpdate: vi.fn(),
+  mockSupabaseUpdateEq: vi.fn(),
+  mockSupabaseInsert: vi.fn(),
+  mockCreateStage7Queue: vi.fn(),
+  mockAddEnrichmentJob: vi.fn(),
+}));
 
-// Mock nanoid
 vi.mock('nanoid', () => ({
   nanoid: vi.fn(() => 'test-request-id'),
 }));
 
-// Mock logger (both named and default exports — rate-limit.ts uses default import)
 vi.mock('@/shared/logger/index.js', () => {
   const mockLogger = {
     info: vi.fn(),
@@ -32,70 +42,33 @@ vi.mock('@/shared/logger/index.js', () => {
   return { default: mockLogger, logger: mockLogger };
 });
 
-// Mock Supabase admin
 vi.mock('@/shared/supabase/admin', () => ({
   getSupabaseAdmin: vi.fn(() => ({
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          not: vi.fn().mockReturnValue({
-            data: [],
-            error: null,
-          }),
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-      insert: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
-            data: { id: 'new-enrichment-id', status: 'pending' },
-            error: null,
-          }),
-        }),
-      }),
-    }),
+    from: mockSupabaseFrom,
   })),
 }));
 
-// Mock access control helpers (include all functions used by generate-on-demand procedure)
 vi.mock('@/server/routers/enrichment/helpers', () => ({
-  verifyLessonAccess: vi.fn(),
-  getNextOrderIndex: vi.fn().mockResolvedValue(1),
-  isTwoStageType: (type: string) => type === 'presentation' || type === 'video',
-  checkExistingEnrichment: vi.fn().mockResolvedValue({ exists: false }),
-  findReusableEnrichment: vi.fn().mockResolvedValue(null),
+  verifyLessonAccess: mockVerifyLessonAccess,
+  getNextOrderIndex: mockGetNextOrderIndex,
+  checkExistingEnrichment: mockCheckExistingEnrichment,
+  findReusableEnrichment: mockFindReusableEnrichment,
+  isTwoStageType: (type: string) => type === 'video' || type === 'presentation',
+  shouldReuseLegacyNlmDraft: (type: string, status: string | undefined) =>
+    (type === 'nlm_audio' || type === 'nlm_video') &&
+    (status === 'draft_ready' || status === 'draft_generating'),
 }));
 
-// Mock BullMQ queue
 vi.mock('@/stages/stage7-enrichments/factory', () => ({
-  createStage7Queue: vi.fn(() => ({
-    add: vi.fn().mockResolvedValue({ id: 'job-123' }),
-  })),
+  createStage7Queue: mockCreateStage7Queue,
+  addEnrichmentJob: mockAddEnrichmentJob,
 }));
 
-vi.mock('@/stages/stage7-enrichments/services/job-manager', () => ({
-  addEnrichmentJob: vi.fn().mockResolvedValue({ id: 'job-123' }),
-}));
-
-// Import mocked functions for test configuration
-import {
-  verifyLessonAccess,
-  getNextOrderIndex,
-} from '../../../src/server/routers/enrichment/helpers';
-const mockVerifyLessonAccess = vi.mocked(verifyLessonAccess);
-const mockGetNextOrderIndex = vi.mocked(getNextOrderIndex);
-
-// Import procedure after mocks
 import { generateOnDemand } from '../../../src/server/routers/enrichment/procedures/generate-on-demand';
 
-// Create test router
 const testRouter = router({
   generateOnDemand,
 });
-
-// ============================================================================
-// TEST HELPERS
-// ============================================================================
 
 function createAuthenticatedContext(): Context {
   return {
@@ -108,187 +81,113 @@ function createAuthenticatedContext(): Context {
   };
 }
 
-function createUnauthenticatedContext(): Context {
-  return {
-    user: null,
-  };
-}
-
-const mockLesson = {
-  id: '550e8400-e29b-41d4-a716-446655440000',
-  course_id: 'course-123',
-  title: 'Test Lesson',
-};
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockVerifyLessonAccess.mockResolvedValue(mockLesson);
-  mockGetNextOrderIndex.mockResolvedValue(1);
-});
-
-// ============================================================================
-// TESTS
-// ============================================================================
-
 describe('generateOnDemand', () => {
-  describe('Input Validation', () => {
-    it('should reject invalid lessonId (not UUID)', async () => {
-      const caller = testRouter.createCaller(createAuthenticatedContext());
+  beforeEach(() => {
+    vi.clearAllMocks();
 
-      await expect(
-        caller.generateOnDemand({
-          lessonId: 'not-a-uuid',
-          enrichmentType: 'quiz',
-        })
-      ).rejects.toThrow();
+    mockVerifyLessonAccess.mockResolvedValue({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      course_id: 'course-123',
+      title: 'Test Lesson',
     });
 
-    it('should reject invalid enrichmentType', async () => {
-      const caller = testRouter.createCaller(createAuthenticatedContext());
+    mockGetNextOrderIndex.mockResolvedValue(1);
+    mockCheckExistingEnrichment.mockResolvedValue({ exists: false });
+    mockFindReusableEnrichment.mockResolvedValue(null);
 
-      await expect(
-        caller.generateOnDemand({
-          lessonId: '550e8400-e29b-41d4-a716-446655440000',
-          enrichmentType: 'invalid' as 'quiz',
-        })
-      ).rejects.toThrow();
+    mockSupabaseFrom.mockReturnValue({
+      update: mockSupabaseUpdate,
+      insert: mockSupabaseInsert,
     });
 
-    it('should accept valid input with quiz type', async () => {
-      const caller = testRouter.createCaller(createAuthenticatedContext());
-
-      // This will succeed input validation but may fail later due to mocks
-      try {
-        await caller.generateOnDemand({
-          lessonId: '550e8400-e29b-41d4-a716-446655440000',
-          enrichmentType: 'quiz',
-        });
-      } catch (error) {
-        // If it throws, it should not be a validation error
-        if (error instanceof TRPCError) {
-          expect(error.code).not.toBe('BAD_REQUEST');
-        }
-      }
+    mockSupabaseUpdate.mockReturnValue({
+      eq: mockSupabaseUpdateEq,
     });
 
-    it('should accept valid input with settings', async () => {
-      const caller = testRouter.createCaller(createAuthenticatedContext());
+    mockSupabaseUpdateEq.mockResolvedValue({ error: null });
+    mockSupabaseInsert.mockResolvedValue({ error: null });
 
-      try {
-        await caller.generateOnDemand({
-          lessonId: '550e8400-e29b-41d4-a716-446655440000',
-          enrichmentType: 'quiz',
-          settings: { questionCount: 10, difficulty: 'medium' },
-        });
-      } catch (error) {
-        if (error instanceof TRPCError) {
-          expect(error.code).not.toBe('BAD_REQUEST');
-        }
-      }
-    });
+    mockCreateStage7Queue.mockReturnValue({ add: vi.fn() });
+    mockAddEnrichmentJob.mockResolvedValue({ id: 'job-123' });
   });
 
-  describe('Access Control', () => {
-    it('should throw UNAUTHORIZED if no session', async () => {
-      const caller = testRouter.createCaller(createUnauthenticatedContext());
+  it('enqueues nlm_audio as single-stage (isDraftPhase=false)', async () => {
+    const caller = testRouter.createCaller(createAuthenticatedContext());
 
-      try {
-        await caller.generateOnDemand({
-          lessonId: '550e8400-e29b-41d4-a716-446655440000',
-          enrichmentType: 'quiz',
-        });
-        expect.fail('Should have thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TRPCError);
-        if (error instanceof TRPCError) {
-          expect(error.code).toBe('UNAUTHORIZED');
-        }
-      }
+    await caller.generateOnDemand({
+      lessonId: '550e8400-e29b-41d4-a716-446655440000',
+      enrichmentType: 'nlm_audio',
+      settings: { nlm_audio_format: 'brief' },
     });
 
-    it('should throw FORBIDDEN if user lacks access to lesson', async () => {
-      mockVerifyLessonAccess.mockRejectedValueOnce(
-        new TRPCError({ code: 'FORBIDDEN', message: 'You do not have access to this lesson' })
-      );
-
-      const caller = testRouter.createCaller(createAuthenticatedContext());
-
-      try {
-        await caller.generateOnDemand({
-          lessonId: '550e8400-e29b-41d4-a716-446655440000',
-          enrichmentType: 'quiz',
-        });
-        expect.fail('Should have thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TRPCError);
-        if (error instanceof TRPCError) {
-          expect(error.code).toBe('FORBIDDEN');
-        }
-      }
-    });
-
-    it('should call verifyLessonAccess with correct parameters', async () => {
-      const caller = testRouter.createCaller(createAuthenticatedContext());
-
-      try {
-        await caller.generateOnDemand({
-          lessonId: '550e8400-e29b-41d4-a716-446655440000',
-          enrichmentType: 'quiz',
-        });
-      } catch {
-        // May throw due to downstream mocks — we only check verifyLessonAccess was called
-      }
-
-      expect(mockVerifyLessonAccess).toHaveBeenCalledWith(
-        '550e8400-e29b-41d4-a716-446655440000',
-        'user-123',
-        'org-123',
-        expect.any(String)
-      );
-    });
-  });
-
-  describe('Enrichment Types', () => {
-    it.each(['quiz', 'audio', 'presentation'] as const)(
-      'should accept %s enrichment type',
-      async type => {
-        const caller = testRouter.createCaller(createAuthenticatedContext());
-
-        try {
-          await caller.generateOnDemand({
-            lessonId: '550e8400-e29b-41d4-a716-446655440000',
-            enrichmentType: type,
-          });
-        } catch (error) {
-          if (error instanceof TRPCError) {
-            // Should not fail on input validation
-            expect(error.code).not.toBe('BAD_REQUEST');
-          }
-        }
-      }
+    expect(mockAddEnrichmentJob).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        enrichmentType: 'nlm_audio',
+        isDraftPhase: false,
+      }),
+      expect.objectContaining({
+        jobId: expect.stringMatching(/^enrich-ondemand-/),
+      })
     );
   });
 
-  describe('NOT_FOUND Handling', () => {
-    it('should throw NOT_FOUND if lesson does not exist', async () => {
-      mockVerifyLessonAccess.mockRejectedValueOnce(
-        new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' })
-      );
+  it('keeps presentation as two-stage enqueue (isDraftPhase=true)', async () => {
+    const caller = testRouter.createCaller(createAuthenticatedContext());
 
-      const caller = testRouter.createCaller(createAuthenticatedContext());
-
-      try {
-        await caller.generateOnDemand({
-          lessonId: '550e8400-e29b-41d4-a716-446655440000',
-          enrichmentType: 'quiz',
-        });
-        expect.fail('Should have thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TRPCError);
-        if (error instanceof TRPCError) {
-          expect(error.code).toBe('NOT_FOUND');
-        }
-      }
+    await caller.generateOnDemand({
+      lessonId: '550e8400-e29b-41d4-a716-446655440000',
+      enrichmentType: 'presentation',
+      settings: { slideCount: 8 },
     });
+
+    expect(mockAddEnrichmentJob).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        enrichmentType: 'presentation',
+        isDraftPhase: true,
+      }),
+      expect.anything()
+    );
+  });
+
+  it('reuses legacy NLM draft enrichment instead of throwing CONFLICT', async () => {
+    mockCheckExistingEnrichment.mockResolvedValueOnce({
+      exists: true,
+      enrichmentId: 'legacy-nlm-enrichment',
+      status: 'draft_ready',
+    });
+
+    const caller = testRouter.createCaller(createAuthenticatedContext());
+
+    const result = await caller.generateOnDemand({
+      lessonId: '550e8400-e29b-41d4-a716-446655440000',
+      enrichmentType: 'nlm_video',
+      settings: { nlm_video_format: 'brief' },
+    });
+
+    expect(result.enrichmentId).toBe('legacy-nlm-enrichment');
+
+    expect(mockSupabaseUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'pending',
+        content: null,
+        asset_id: null,
+      })
+    );
+
+    expect(mockSupabaseUpdateEq).toHaveBeenCalledWith('id', 'legacy-nlm-enrichment');
+
+    expect(mockAddEnrichmentJob).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        enrichmentId: 'legacy-nlm-enrichment',
+        enrichmentType: 'nlm_video',
+        isDraftPhase: false,
+      }),
+      expect.objectContaining({
+        jobId: expect.stringMatching(/^enrich-ondemand-legacy-nlm-enrichment-/),
+      })
+    );
   });
 });

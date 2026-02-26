@@ -74,11 +74,13 @@ Comprehensive code review completed for Sprint 3 audit remediation tasks. All qu
 **Status**: ✅ PASSED
 
 **Changes Verified**:
+
 - Root `package.json`: `"typescript": "^5.9.3"` ✅
 - `packages/shared-logger/package.json`: `"typescript": "^5.9.3"` ✅
 - `packages/trpc-client-sdk/package.json`: `"typescript": "^5.9.3"` ✅
 
 **Verification**:
+
 ```bash
 pnpm type-check
 ```
@@ -86,6 +88,7 @@ pnpm type-check
 **Result**: All packages type-check successfully with TypeScript 5.9.3
 
 **Files Reviewed**:
+
 - `/home/me/code/mc2/package.json`
 - `/home/me/code/mc2/packages/shared-logger/package.json`
 - `/home/me/code/mc2/packages/trpc-client-sdk/package.json`
@@ -101,6 +104,7 @@ pnpm type-check
 #### 1. Environment Configuration Files
 
 **`packages/web/lib/env-client.ts`** ✅
+
 - Exports `BACKEND_URL` and `TRPC_URL` for client-side use
 - Properly handles NEXT_PUBLIC_COURSEGEN_BACKEND_URL
 - Smart fallback logic:
@@ -110,6 +114,7 @@ pnpm type-check
 - Development fallback in line 37 is **acceptable** (env default)
 
 **`packages/web/lib/env.ts`** ✅
+
 - Exports `ENV.COURSEGEN_BACKEND_URL` for server-side use
 - Provides `getTrpcUrl()` helper
 - Development fallback in line 35 is **acceptable** (env default)
@@ -121,11 +126,12 @@ pnpm type-check
 
 ```typescript
 // Correct pattern in all server files:
-const backendUrl = ENV.COURSEGEN_BACKEND_URL
-const endpoint = `${backendUrl}/trpc/...`
+const backendUrl = ENV.COURSEGEN_BACKEND_URL;
+const endpoint = `${backendUrl}/trpc/...`;
 ```
 
 **Files Verified**:
+
 - `app/actions/courses.ts` (line 92) ✅
 - `app/api/trpc/[...path]/route.ts` (line 18) ✅
 - `app/api/admin/health/route.ts` (4 occurrences) ✅
@@ -144,23 +150,26 @@ const endpoint = `${backendUrl}/trpc/...`
 **Verified Pattern**: All use imports from `@/lib/env-client` ✅
 
 **`packages/web/hooks/useAutoCard.ts`** ✅
+
 ```typescript
-import { TRPC_URL } from '@/lib/env-client'
+import { TRPC_URL } from '@/lib/env-client';
 // Line 162: fetch(`${TRPC_URL}/enrichment.getAutoCard?...`)
 // Line 234: fetch(`${TRPC_URL}/enrichment.regenerateAutoCard`)
 ```
 
 **`packages/web/lib/hooks/useEnrichmentGeneration.ts`** ✅
+
 ```typescript
-import { TRPC_URL } from '@/lib/env-client'
+import { TRPC_URL } from '@/lib/env-client';
 // Line 220: fetch(`${TRPC_URL}/enrichment.getGenerationStatus?...`)
 // Line 388: fetch(`${TRPC_URL}/enrichment.generateOnDemand`)
 // Line 519: fetch(`${TRPC_URL}/enrichment.cancel`)
 ```
 
 **`packages/web/lib/trpc/client.ts`** ✅
+
 ```typescript
-import { BACKEND_URL } from '@/lib/env-client'
+import { BACKEND_URL } from '@/lib/env-client';
 // Line 288: `${BACKEND_URL}/trpc/clarifying.isEnabled?...`
 // Line 305: `${BACKEND_URL}/trpc/clarifying.getQuestions?...`
 // Line 322: `${BACKEND_URL}/trpc/clarifying.getProgress?...`
@@ -171,8 +180,9 @@ import { BACKEND_URL } from '@/lib/env-client'
 ```
 
 **`packages/web/components/course/CourseVisualsManager.tsx`** ✅
+
 ```typescript
-import { BACKEND_URL } from '@/lib/env-client'
+import { BACKEND_URL } from '@/lib/env-client';
 // Line 113: fetch(`${BACKEND_URL}/trpc/enrichment.getGenerationStatus?...`)
 // Line 171: fetch(`${BACKEND_URL}/trpc/${endpoint}`)
 ```
@@ -182,6 +192,7 @@ import { BACKEND_URL } from '@/lib/env-client'
 #### 4. CORS Configuration
 
 **`packages/web/lib/cors.ts`** ✅
+
 - All 8 occurrences of hardcoded URLs replaced with `ENV.NEXT_PUBLIC_APP_URL`
 - Lines 28, 36, 44, 54, 64, 95, 214, 225: All use `ENV.NEXT_PUBLIC_APP_URL`
 - Properly handles development vs production origins
@@ -189,6 +200,7 @@ import { BACKEND_URL } from '@/lib/env-client'
 #### 5. Remaining localhost References
 
 **Verified as Acceptable**:
+
 - `env-client.ts` line 37: Development fallback ✅
 - `env.ts` lines 34-35: Development fallbacks ✅
 - Test files: Not in production code ✅
@@ -196,6 +208,7 @@ import { BACKEND_URL } from '@/lib/env-client'
 - README/docs: Documentation only ✅
 
 **Grep Results**:
+
 ```
 localhost:3456 found in:
 - env-client.ts (fallback)
@@ -218,6 +231,7 @@ All acceptable - no hardcoded production URLs
 **File**: `packages/web/lib/trpc/client.ts`
 
 **Verification**:
+
 - ✅ File is 705 lines (previously ~800 lines)
 - ✅ No legacy `export const trpc = {...}` wrapper found
 - ✅ No `invalidateQueryCache()` function found
@@ -225,6 +239,7 @@ All acceptable - no hardcoded production URLs
 - ✅ All exports are TanStack Query hooks (modern pattern)
 
 **Current Exports** (verified):
+
 ```typescript
 // Query hooks
 export function useClarifyingIsEnabled(...)
@@ -261,6 +276,7 @@ export interface ClarifyingQuestion {...}
 **File**: `package.json` (root)
 
 **Verification**:
+
 ```json
 "pnpm": {
   "overrides": {
@@ -282,9 +298,13 @@ export interface ClarifyingQuestion {...}
 ```
 
 **pnpm-lock.yaml Verification**:
+
 ```yaml
 /zustand@5.0.9(@types/react@19.2.7)(immer@11.0.1)(react@19.2.3):
-  resolution: {integrity: sha512-ALBtUj0AfjJt3uNRQoL1tL2tMvj6Gp/6e39dnfT6uzpelGru8v1tPOGBzayOWbPJvujM8JojDk3E1LxeFisBNg==}
+  resolution:
+    {
+      integrity: sha512-ALBtUj0AfjJt3uNRQoL1tL2tMvj6Gp/6e39dnfT6uzpelGru8v1tPOGBzayOWbPJvujM8JojDk3E1LxeFisBNg==,
+    }
 ```
 
 **Result**: Only `zustand@5.0.9` present in lockfile. Dual version issue resolved. ✅
@@ -320,13 +340,14 @@ export interface ClarifyingQuestion {...}
    - Separates service role key access via `getServerEnv()`
 
 3. **Usage Pattern**:
+
    ```typescript
    // Client components
-   import { TRPC_URL } from '@/lib/env-client'
+   import { TRPC_URL } from '@/lib/env-client';
 
    // Server actions/routes
-   import { ENV } from '@/lib/env'
-   const url = ENV.COURSEGEN_BACKEND_URL
+   import { ENV } from '@/lib/env';
+   const url = ENV.COURSEGEN_BACKEND_URL;
    ```
 
 **Security**: ✅ Service role key properly isolated in `getServerEnv()` (not exposed to client)
@@ -388,12 +409,14 @@ app/api/courses/[orgSlug]/[courseSlug]/delete/route.ts (ENV.COURSEGEN_BACKEND_UR
 ### Notable Changes
 
 **Environment Abstraction**:
+
 - Created centralized env-client.ts for client-side config
 - Standardized all server-side code to use ENV.COURSEGEN_BACKEND_URL
 - Removed 19+ hardcoded localhost:3456 references
 - CORS config now uses ENV.NEXT_PUBLIC_APP_URL consistently
 
 **Dependency Cleanup**:
+
 - Removed 96 lines of deprecated tRPC wrapper code
 - Resolved zustand dual version conflict via pnpm overrides
 - Standardized TypeScript to 5.9.3 across all packages
@@ -409,6 +432,7 @@ app/api/courses/[orgSlug]/[courseSlug]/delete/route.ts (ENV.COURSEGEN_BACKEND_UR
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 > megacampus-monorepo@0.28.62 type-check /home/me/code/mc2
 > pnpm -r type-check
@@ -507,12 +531,14 @@ All code quality improvements verified. No regressions detected. Type system con
 **Purpose**: Client-safe environment variables for browser components
 
 **Key Features**:
+
 1. No server-side imports (safe for client components)
 2. Smart fallback logic for different access patterns
 3. LAN detection via `window.location.hostname`
 4. Clear documentation of fallback behavior
 
 **Code Quality**: ✅ EXCELLENT
+
 - Well-documented with JSDoc comments
 - Type-safe exports
 - Defensive checks for window undefined (SSR-safe)
@@ -525,12 +551,14 @@ All code quality improvements verified. No regressions detected. Type system con
 **Purpose**: Server-side environment variables with validation
 
 **Key Features**:
+
 1. `server-only` guard prevents client access
 2. Singleton pattern with lazy validation
 3. Production validation enforces required vars
 4. Service role key isolated via `getServerEnv()`
 
 **Code Quality**: ✅ EXCELLENT
+
 - Strong encapsulation via class
 - Type-safe interface
 - Environment-aware validation
@@ -545,6 +573,7 @@ All code quality improvements verified. No regressions detected. Type system con
 **Changes**: Removed lines 706-800 (legacy wrapper)
 
 **Current State**: ✅ CLEAN
+
 - Pure TanStack Query hooks
 - Proper query key factory pattern
 - Automatic cache invalidation
@@ -560,12 +589,14 @@ All code quality improvements verified. No regressions detected. Type system con
 **Changes**: 8 hardcoded URLs → `ENV.NEXT_PUBLIC_APP_URL`
 
 **Current State**: ✅ SECURE
+
 - No hardcoded origins
 - Proper environment-based origin lists
 - Development vs production separation
 - Sensible defaults for unknown routes
 
 **Security Posture**:
+
 - ✅ Strict CORS for admin routes
 - ✅ Relaxed CORS for public read-only endpoints
 - ✅ Dev-only CORS for development
@@ -578,6 +609,7 @@ All code quality improvements verified. No regressions detected. Type system con
 **Change**: Added `"zustand": ">=5.0.0"` to pnpm.overrides
 
 **Current State**: ✅ RESOLVED
+
 - Lockfile shows single version: 5.0.9
 - No dual version conflicts
 - Proper peer dependency resolution
@@ -595,18 +627,20 @@ All code quality improvements verified. No regressions detected. Type system con
 **Status**: ✅ SECURE
 
 **Analysis**:
+
 1. Client-side code uses `NEXT_PUBLIC_*` vars (safe for browser)
 2. Server-side code uses `ENV.COURSEGEN_BACKEND_URL` (server-only)
 3. Service role key isolated via `getServerEnv()` with runtime guard
 4. No sensitive values in client bundle
 
 **Verified Patterns**:
+
 ```typescript
 // Client (safe)
-import { BACKEND_URL } from '@/lib/env-client'
+import { BACKEND_URL } from '@/lib/env-client';
 
 // Server (safe)
-import { ENV } from '@/lib/env' // with 'server-only' guard
+import { ENV } from '@/lib/env'; // with 'server-only' guard
 ```
 
 ### CORS Configuration
@@ -614,6 +648,7 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 **Status**: ✅ SECURE
 
 **Analysis**:
+
 1. Production origins explicitly allowlisted
 2. No wildcard (`*`) origins in production
 3. Admin routes use strict CORS
@@ -626,6 +661,7 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 **Status**: ✅ CLEAN
 
 **Analysis**:
+
 - No API keys in code
 - No database credentials
 - No auth tokens
@@ -640,6 +676,7 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 ### Bundle Size Impact
 
 **Analysis**: Changes do not affect bundle size
+
 - Removed 96 lines of dead code (slight reduction)
 - Added env-client.ts (~40 lines, minimal impact)
 - IIFE in env-client.ts executes once at import
@@ -649,6 +686,7 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 ### Runtime Performance
 
 **Analysis**: No performance regressions
+
 - Env variable reads cached in constants
 - No dynamic lookups at runtime
 - CORS config uses Map lookups (O(1))
@@ -671,26 +709,31 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 ### Manual Verification Checklist
 
 ✅ **Server-side API routes**:
+
 - All use `ENV.COURSEGEN_BACKEND_URL`
 - No hardcoded localhost URLs
 - Type-check passes
 
 ✅ **Client-side hooks**:
+
 - All use `TRPC_URL` from env-client
 - No hardcoded localhost URLs
 - Proper fallback logic
 
 ✅ **CORS middleware**:
+
 - Uses `ENV.NEXT_PUBLIC_APP_URL`
 - Development/production separation works
 - No hardcoded origins
 
 ✅ **tRPC client**:
+
 - Legacy code removed cleanly
 - Modern hooks functional
 - No orphaned references
 
 ✅ **Zustand**:
+
 - Single version in lockfile
 - No peer dependency warnings
 - Type-check passes
@@ -707,6 +750,7 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 **Risk Level**: 🟢 LOW
 
 **Rationale**:
+
 1. Environment variable refactoring is low-risk (compile-time safe)
 2. Legacy code removal has no consumers (dead code)
 3. Zustand override is pnpm-managed (safe)
@@ -722,6 +766,7 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 ### Maintainability: ✅ EXCELLENT
 
 **Improvements**:
+
 - Centralized environment configuration (single source of truth)
 - Removed technical debt (legacy tRPC wrapper)
 - Consistent TypeScript version (easier debugging)
@@ -732,6 +777,7 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 ### Readability: ✅ EXCELLENT
 
 **Strengths**:
+
 - Well-documented env fallback logic
 - Clear JSDoc comments in env-client.ts
 - Descriptive variable names
@@ -742,11 +788,13 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 ### Testability: ✅ GOOD
 
 **Current State**:
+
 - Environment logic is testable (pure functions)
 - Env-client.ts has SSR-safe checks
 - CORS config is unit-testable
 
 **Improvement Opportunity**:
+
 - Add E2E test for LAN access pattern
 - Add unit test for env fallback logic
 
@@ -755,6 +803,7 @@ import { ENV } from '@/lib/env' // with 'server-only' guard
 ### Security: ✅ EXCELLENT
 
 **Strengths**:
+
 - Service role key properly isolated
 - CORS correctly configured
 - No hardcoded secrets
@@ -782,11 +831,13 @@ All four tasks completed successfully with zero regressions:
 **Code meets quality standards. Ready for merge.**
 
 **Recommendations**:
+
 1. Consider runtime validation for COURSEGEN_BACKEND_URL in production
 2. Add E2E test for LAN access pattern in env-client.ts
 3. Document the smart fallback logic for future maintainers
 
 **Overall Assessment**: High-quality refactoring with strong attention to:
+
 - Type safety
 - Security best practices
 - Environment variable management

@@ -10,11 +10,34 @@ import type { OnDemandEnrichmentType, GenerationStep } from '@megacampus/shared-
 const DEFAULT_POLLING_INTERVAL = 2000 // 2 seconds
 const MAX_POLL_FAILURES = 5
 const MAX_BACKOFF_INTERVAL = 10000 // 10 seconds
+const NLM_AUDIO_MAX_DURATION_MS = 60 * 60 * 1000 // 60 minutes
+const NLM_VIDEO_MAX_DURATION_MS = 60 * 60 * 1000 // 60 minutes
 
 // Optimistic UI prefix for temporary IDs before API response
 const OPTIMISTIC_ID_PREFIX = 'optimistic-'
-
 const log = createLogger({ hook: 'useEnrichmentGeneration' })
+
+export function getMaxDurationForType(type: OnDemandEnrichmentType): number | undefined {
+  switch (type) {
+    case 'nlm_audio':
+      return NLM_AUDIO_MAX_DURATION_MS
+    case 'nlm_video':
+      return NLM_VIDEO_MAX_DURATION_MS
+    default:
+      return undefined
+  }
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const normalizedMessage = error.message.toLowerCase()
+    if (error.name === 'AbortError') return true
+    if (normalizedMessage.includes('signal is aborted')) return true
+    if (normalizedMessage.includes('operation was aborted')) return true
+  }
+
+  return false
+}
 
 interface UseEnrichmentGenerationOptions {
   lessonId: string
@@ -33,6 +56,8 @@ export interface GeneratingEnrichment {
   type: OnDemandEnrichmentType
   progress: number
   currentStep?: GenerationStep | FrontendOnlyStep
+  startedAtMs: number
+  maxDurationMs?: number
 }
 
 interface GenerateOnDemandResponse {
@@ -107,8 +132,8 @@ export function useEnrichmentGeneration({
       abortControllersRef.current.forEach((controller) => controller.abort())
       abortControllersRef.current.clear()
 
-      // Clear all polling intervals
-      pollingIntervalsRef.current.forEach((interval) => clearInterval(interval))
+      // Clear all polling timeouts
+      pollingIntervalsRef.current.forEach((handle) => clearTimeout(handle))
       pollingIntervalsRef.current.clear()
     }
   }, [])
@@ -119,7 +144,7 @@ export function useEnrichmentGeneration({
     // Clear all polling and abort controllers
     abortControllersRef.current.forEach((controller) => controller.abort())
     abortControllersRef.current.clear()
-    pollingIntervalsRef.current.forEach((interval) => clearInterval(interval))
+    pollingIntervalsRef.current.forEach((handle) => clearTimeout(handle))
     pollingIntervalsRef.current.clear()
     pollFailuresRef.current.clear()
 
@@ -132,9 +157,9 @@ export function useEnrichmentGeneration({
    * Stop polling and cleanup for a specific type
    */
   const stopPolling = useCallback((type: string) => {
-    const interval = pollingIntervalsRef.current.get(type)
-    if (interval) {
-      clearInterval(interval)
+    const handle = pollingIntervalsRef.current.get(type)
+    if (handle) {
+      clearTimeout(handle)
       pollingIntervalsRef.current.delete(type)
     }
 
@@ -240,41 +265,55 @@ export function useEnrichmentGeneration({
           }
         } catch (error) {
           // Ignore abort errors
-          if (error instanceof Error && error.name === 'AbortError') {
+          if (isAbortLikeError(error)) {
             return
           }
 
-          log.error('Poll error:', error)
+          // Distinguish permanent (NOT_FOUND = enrichment deleted) from transient errors
+          // (server restart, network issue). Only permanent errors count toward stop limit.
+          const isNotFound = error instanceof TRPCClientError && error.data?.code === 'NOT_FOUND'
 
-          const failures = (pollFailuresRef.current.get(type) || 0) + 1
-          pollFailuresRef.current.set(type, failures)
+          if (isNotFound) {
+            log.error('Poll error (enrichment not found):', error)
 
-          if (failures >= MAX_POLL_FAILURES) {
-            // Stop polling after too many failures
-            stopPolling(type)
+            const failures = (pollFailuresRef.current.get(type) || 0) + 1
+            pollFailuresRef.current.set(type, failures)
 
-            setGenerating((prev) => {
-              const next = new Map(prev)
-              next.delete(type)
-              return next
-            })
+            if (failures >= MAX_POLL_FAILURES) {
+              stopPolling(type)
 
-            // #8 fix: Context-aware error message
-            const errorMessage = isResume
-              ? `Failed to resume ${type} generation. The enrichment may have been deleted or completed.`
-              : 'Lost connection to server. Please refresh and try again.'
-            onError?.(errorMessage)
+              setGenerating((prev) => {
+                const next = new Map(prev)
+                next.delete(type)
+                return next
+              })
+
+              const errorMessage = isResume
+                ? `Failed to resume ${type} generation. The enrichment may have been deleted or completed.`
+                : 'Lost connection to server. Please refresh and try again.'
+              onError?.(errorMessage)
+            }
           } else {
-            // Multiplicative backoff (1.5x per failure, capped at MAX_BACKOFF_INTERVAL)
-            currentInterval = Math.min(currentInterval * 1.5, MAX_BACKOFF_INTERVAL)
+            // Transient error (server restart, network) — backoff but keep retrying indefinitely
+            log.warn('Poll error (transient, will retry):', error)
+            currentInterval = Math.min(currentInterval * 2, MAX_BACKOFF_INTERVAL)
           }
         }
       }
 
-      // Poll immediately, then at configured interval
-      void pollStatus()
-      const interval = setInterval(() => void pollStatus(), currentInterval)
-      pollingIntervalsRef.current.set(type, interval)
+      // Schedule next poll after current one completes.
+      // Uses recursive setTimeout (not setInterval) so that currentInterval
+      // mutations from backoff logic are applied to each subsequent delay.
+      const scheduleNext = () => {
+        if (!mountedRef.current) return
+        const handle = setTimeout(() => {
+          void pollStatus().then(scheduleNext)
+        }, currentInterval)
+        pollingIntervalsRef.current.set(type, handle)
+      }
+
+      // Poll immediately, then schedule recursively
+      void pollStatus().then(scheduleNext)
     },
     [pollingInterval, onComplete, onError, stopPolling]
   )
@@ -300,6 +339,8 @@ export function useEnrichmentGeneration({
 
       // OPTIMISTIC UPDATE: Immediately show loading state with temporary ID
       const optimisticId = `${OPTIMISTIC_ID_PREFIX}${type}-${Date.now()}`
+      const generationStartedAtMs = Date.now()
+      const maxDurationMs = getMaxDurationForType(type)
       if (mountedRef.current) {
         setGenerating((prev) => {
           const next = new Map(prev)
@@ -308,6 +349,8 @@ export function useEnrichmentGeneration({
             type,
             progress: 0,
             currentStep: 'queued',
+            startedAtMs: generationStartedAtMs,
+            maxDurationMs,
           })
           return next
         })
@@ -320,7 +363,11 @@ export function useEnrichmentGeneration({
       try {
         const client = getBrowserTrpcClient()
         const data = (await client.enrichment.generateOnDemand.mutate(
-          { lessonId, enrichmentType: type, settings: settings || {} },
+          {
+            lessonId,
+            enrichmentType: type,
+            settings: settings && Object.keys(settings).length > 0 ? settings : undefined,
+          },
           { signal: controller.signal }
         )) as GenerateOnDemandResponse | undefined
 
@@ -343,11 +390,14 @@ export function useEnrichmentGeneration({
         if (mountedRef.current) {
           setGenerating((prev) => {
             const next = new Map(prev)
+            const previous = next.get(type)
             next.set(type, {
               enrichmentId: data.enrichmentId,
               type,
               progress: 0,
               currentStep: 'queued',
+              startedAtMs: previous?.startedAtMs ?? generationStartedAtMs,
+              maxDurationMs: previous?.maxDurationMs ?? maxDurationMs,
             })
             return next
           })
@@ -361,7 +411,7 @@ export function useEnrichmentGeneration({
         abortControllersRef.current.delete(`generate-${type}`)
 
         // Ignore abort errors
-        if (error instanceof Error && error.name === 'AbortError') {
+        if (isAbortLikeError(error)) {
           return null
         }
 
@@ -419,6 +469,10 @@ export function useEnrichmentGeneration({
         const client = getBrowserTrpcClient()
         await client.enrichment.cancel.mutate({ enrichmentId: gen.enrichmentId })
       } catch (error) {
+        if (isAbortLikeError(error)) {
+          return
+        }
+
         log.error('Cancel error:', error)
 
         if (error instanceof TRPCClientError) {
@@ -486,7 +540,7 @@ export function useEnrichmentGeneration({
    * ```
    */
   const resumeGeneration = useCallback(
-    (enrichmentId: string, type: OnDemandEnrichmentType) => {
+    (enrichmentId: string, type: OnDemandEnrichmentType, startedAtMs?: number) => {
       // Guard: Don't resume if already tracking this type
       if (generating.has(type)) {
         log.warn('Already tracking generation for type:', type)
@@ -499,6 +553,11 @@ export function useEnrichmentGeneration({
         return
       }
 
+      const parsedStartedAtMs =
+        typeof startedAtMs === 'number' && Number.isFinite(startedAtMs) && startedAtMs > 0
+          ? startedAtMs
+          : Date.now()
+
       // Add to generating state with unknown progress (-1 means "syncing")
       // Real progress will be fetched on first poll
       setGenerating((prev) => {
@@ -508,6 +567,8 @@ export function useEnrichmentGeneration({
           type,
           progress: -1, // -1 indicates "loading progress", not actual 0%
           currentStep: 'syncing',
+          startedAtMs: parsedStartedAtMs,
+          maxDurationMs: getMaxDurationForType(type),
         })
         return next
       })

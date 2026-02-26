@@ -23,6 +23,7 @@ import { onDemandImageSettingsSchema } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { triggerAllLessonCards } from '../../../../stages/stage7-enrichments/services/auto-card-trigger';
 import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 /**
  * Generate card images for all lessons in a course
@@ -88,17 +89,12 @@ export const generateBatchCards = protectedProcedure
         .eq('organization_id', currentUser.organizationId)
         .single();
 
-      if (courseError || !course) {
-        logger.warn(
-          {
-            courseId,
-            userId: currentUser.id,
-            organizationId: currentUser.organizationId,
-            error: courseError?.message,
-          },
-          'Course not found or access denied for batch card generation'
-        );
-
+      throwOnSupabaseError(courseError, 'Course', {
+        courseId,
+        userId: currentUser.id,
+        organizationId: currentUser.organizationId,
+      });
+      if (!course) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Course not found or access denied',

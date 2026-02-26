@@ -22,6 +22,24 @@
  * ...
  */
 
+import { CONTENT_LABELS } from '@megacampus/shared-types';
+
+function normalizeTitleForMatch(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const INTRODUCTION_TITLES = new Set(
+  Object.values(CONTENT_LABELS).map(labels => normalizeTitleForMatch(labels.introduction))
+);
+
+const SUMMARY_TITLES = new Set(
+  Object.values(CONTENT_LABELS).map(labels => normalizeTitleForMatch(labels.summary))
+);
+
 /**
  * Parsed section from markdown content
  */
@@ -48,6 +66,36 @@ export interface ParsedMarkdown {
   sections: ParsedSection[];
   /** Original lines for reconstruction */
   lines: string[];
+}
+
+function isIntroductionTitle(title: string): boolean {
+  const normalized = normalizeTitleForMatch(title);
+  if (INTRODUCTION_TITLES.has(normalized) || normalized === 'intro') {
+    return true;
+  }
+  for (const introTitle of INTRODUCTION_TITLES) {
+    if (normalized.startsWith(`${introTitle} `)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isSummaryTitle(title: string): boolean {
+  const normalized = normalizeTitleForMatch(title);
+  if (SUMMARY_TITLES.has(normalized)) {
+    return true;
+  }
+  for (const summaryTitle of SUMMARY_TITLES) {
+    if (normalized.startsWith(`${summaryTitle} `)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasNonWhitespace(lines: string[]): boolean {
+  return lines.some(line => line.trim().length > 0);
 }
 
 /**
@@ -79,13 +127,32 @@ export function parseMarkdownSections(markdown: string): ParsedMarkdown {
     }
   }
 
+  // Treat pre-H2 preface as a synthetic introduction when no explicit intro header exists
+  const hasExplicitIntroduction = sectionHeaders.some(header => isIntroductionTitle(header.title));
+  const firstSectionHeaderIndex =
+    sectionHeaders.length > 0 ? sectionHeaders[0].index : lines.length;
+  const prefaceStartIndex = titleLineIndex >= 0 ? titleLineIndex + 1 : 0;
+  const prefaceLines = lines.slice(prefaceStartIndex, firstSectionHeaderIndex);
+  const hasPrefaceContent = hasNonWhitespace(prefaceLines);
+
+  if (!hasExplicitIntroduction && hasPrefaceContent) {
+    sections.push({
+      id: 'introduction',
+      title: 'Introduction',
+      content: prefaceLines.join('\n'),
+      startLine: prefaceStartIndex,
+      endLine: firstSectionHeaderIndex,
+    });
+  }
+
   // Build sections from headers
   for (let i = 0; i < sectionHeaders.length; i++) {
     const current = sectionHeaders[i];
     const nextIndex = i + 1 < sectionHeaders.length ? sectionHeaders[i + 1].index : lines.length;
 
     // Generate section ID from title
-    const id = generateSectionId(current.title, i);
+    const syntheticIntroOffset = hasExplicitIntroduction ? 0 : hasPrefaceContent ? 1 : 0;
+    const id = generateSectionId(current.title, i + syntheticIntroOffset);
 
     // Extract content (from header to next header or end)
     const sectionLines = lines.slice(current.index, nextIndex);
@@ -117,17 +184,11 @@ export function parseMarkdownSections(markdown: string): ParsedMarkdown {
  * @returns Section ID
  */
 function generateSectionId(title: string, index: number): string {
-  const lowerTitle = title.toLowerCase();
-
   // Handle common section names
-  if (lowerTitle.includes('introduction') || lowerTitle.includes('введение')) {
+  if (isIntroductionTitle(title)) {
     return 'introduction';
   }
-  if (
-    lowerTitle.includes('summary') ||
-    lowerTitle.includes('итог') ||
-    lowerTitle.includes('заключение')
-  ) {
+  if (isSummaryTitle(title)) {
     return 'summary';
   }
 
@@ -154,24 +215,30 @@ export function mergeSectionIntoMarkdown(
   newContent: string
 ): string {
   const section = parsed.sections.find(s => s.id === sectionId);
-  if (!section) {
-    // Section not found, return original
-    return parsed.lines.join('\n');
-  }
-
-  // Build new content by replacing lines
   const newLines = [...parsed.lines];
-
-  // Calculate how many lines to remove (from startLine to endLine-1)
-  const removeCount = section.endLine - section.startLine;
-
-  // Split new content into lines
   const newContentLines = newContent.split('\n');
 
-  // Replace the section
-  newLines.splice(section.startLine, removeCount, ...newContentLines);
+  if (section) {
+    // Replace existing section
+    const removeCount = section.endLine - section.startLine;
+    newLines.splice(section.startLine, removeCount, ...newContentLines);
+    return newLines.join('\n');
+  }
 
-  return newLines.join('\n');
+  // Special case: allow insertion of introduction when no explicit intro section exists
+  if (sectionId === 'introduction') {
+    let insertIndex = parsed.lines.findIndex(line => /^##\s+/.test(line));
+    if (insertIndex < 0) {
+      insertIndex = parsed.lines.length;
+    }
+
+    newLines.splice(insertIndex, 0, ...newContentLines);
+
+    return newLines.join('\n');
+  }
+
+  // Section not found and not insertable, return original
+  return parsed.lines.join('\n');
 }
 
 /**

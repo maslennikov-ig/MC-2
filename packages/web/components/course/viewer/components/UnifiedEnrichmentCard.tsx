@@ -19,15 +19,29 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import type { Database } from '@/types/database.generated'
 import {
   isEnrichmentContentType,
+  type AudioEnrichmentContent,
   type PresentationEnrichmentContent,
   type VideoEnrichmentContent,
+  type NlmAudioFormat,
+  type NlmVideoFormat,
+  type NlmVideoStyle,
 } from '@megacampus/shared-types'
 import { cn } from '@/lib/utils'
 import { EnrichmentCardImage } from './EnrichmentCardImage'
 import { EnrichmentCardOptions, getOptionsSectionTitle } from './EnrichmentCardOptions'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
-type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video' | 'cover' | 'card'
+type EnrichmentType =
+  | 'quiz'
+  | 'audio'
+  | 'nlm_audio'
+  | 'presentation'
+  | 'video'
+  | 'nlm_video'
+  | 'cover'
+  | 'card'
+type AudioDraftContent = AudioEnrichmentContent
+type VideoDraftContent = VideoEnrichmentContent
 
 // Draft preview configuration
 const PREVIEW_SLIDE_COUNT = 3
@@ -51,46 +65,88 @@ const PLACEHOLDER_CONFIG: Record<
   {
     image: string
     color: string
-    badgeText: string
+    /** i18n key for badge text, or literal string for non-translatable values like aspect ratios */
+    badgeKey: string | null
+    badgeLiteral: string | null
     icon: React.ElementType
   }
 > = {
   quiz: {
     image: '/placeholders/Quiz.webp',
     color: 'text-green-500 dark:text-green-400',
-    badgeText: '~45 сек',
+    badgeKey: 'placeholder.quiz.estimatedTime',
+    badgeLiteral: null,
     icon: HelpCircle,
   },
   audio: {
     image: '/placeholders/Audio.webp',
     color: 'text-purple-500 dark:text-purple-400',
-    badgeText: '~30 сек',
+    badgeKey: 'placeholder.audio.estimatedTime',
+    badgeLiteral: null,
+    icon: Headphones,
+  },
+  nlm_audio: {
+    image: '/placeholders/Audio.webp',
+    color: 'text-purple-500 dark:text-purple-400',
+    badgeKey: 'placeholder.nlm_audio.estimatedTime',
+    badgeLiteral: null,
     icon: Headphones,
   },
   presentation: {
     image: '/placeholders/Presentation.webp',
     color: 'text-orange-500 dark:text-orange-400',
-    badgeText: '~90 сек',
+    badgeKey: 'placeholder.presentation.estimatedTime',
+    badgeLiteral: null,
     icon: Presentation,
   },
   video: {
     image: '/placeholders/Video.webp',
     color: 'text-red-500 dark:text-red-400',
-    badgeText: 'Скоро',
+    badgeKey: 'placeholder.video.estimatedTime',
+    badgeLiteral: null,
+    icon: Video,
+  },
+  nlm_video: {
+    image: '/placeholders/Video.webp',
+    color: 'text-red-500 dark:text-red-400',
+    badgeKey: 'placeholder.nlm_video.estimatedTime',
+    badgeLiteral: null,
     icon: Video,
   },
   cover: {
     image: '/placeholders/Cover.webp',
     color: 'text-cyan-500 dark:text-cyan-400',
-    badgeText: '21:9',
+    badgeKey: null,
+    badgeLiteral: '21:9',
     icon: ImageIcon,
   },
   card: {
     image: '/placeholders/Card.webp',
     color: 'text-indigo-500 dark:text-indigo-400',
-    badgeText: '1:1',
+    badgeKey: null,
+    badgeLiteral: '1:1',
     icon: ImageIcon,
   },
+}
+
+const NO_OPTIONS_TYPES: ReadonlySet<EnrichmentType> = new Set(['video'])
+
+function isAudioDraftContent(content: unknown): content is AudioDraftContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    (content as Record<string, unknown>).type === 'audio' &&
+    typeof (content as Record<string, unknown>).script === 'string'
+  )
+}
+
+function isVideoDraftContent(content: unknown): content is VideoDraftContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    (content as Record<string, unknown>).type === 'video' &&
+    typeof (content as Record<string, unknown>).script === 'string'
+  )
 }
 
 export function UnifiedEnrichmentCard({
@@ -106,6 +162,7 @@ export function UnifiedEnrichmentCard({
   const [isHovered, setIsHovered] = useState(false)
   const [isTouched, setIsTouched] = useState(false)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
+  const [isSelectOpen, setIsSelectOpen] = useState(false)
 
   // Options state for quiz, audio, presentation
   const [quizQuestions, setQuizQuestions] = useState('10')
@@ -114,6 +171,9 @@ export function UnifiedEnrichmentCard({
   const [audioSpeed, setAudioSpeed] = useState('normal')
   const [presentationSlides, setPresentationSlides] = useState('8')
   const [presentationTheme, setPresentationTheme] = useState('light')
+  const [nlmAudioFormat, setNlmAudioFormat] = useState<NlmAudioFormat>('deep_dive')
+  const [nlmVideoFormat, setNlmVideoFormat] = useState<NlmVideoFormat>('explainer')
+  const [nlmVideoStyle, setNlmVideoStyle] = useState<NlmVideoStyle>('auto_select')
 
   // Options state for cover, card images
   const [imageStyle, setImageStyle] = useState('realistic')
@@ -150,7 +210,7 @@ export function UnifiedEnrichmentCard({
   // Check if enrichment is in draft_ready status (two-stage generation)
   const isDraftReady = existingEnrichment?.status === 'draft_ready'
 
-  // Extract draft content for display (presentation slides or video script)
+  // Extract draft content for display (presentation, audio script, or video script)
   const draftContent = useMemo(() => {
     if (!isDraftReady || !existingEnrichment?.content) return null
 
@@ -167,9 +227,22 @@ export function UnifiedEnrichmentCard({
       }
     }
 
+    // For audio: show script preview
+    if (isAudioDraftContent(rawContent)) {
+      const content = rawContent
+      const scriptPreview = content.script?.slice(0, PREVIEW_SCRIPT_LENGTH) || ''
+      return {
+        type: 'audio' as const,
+        scriptPreview:
+          scriptPreview +
+          (content.script && content.script.length > PREVIEW_SCRIPT_LENGTH ? '...' : ''),
+        estimatedDuration: content.duration_seconds,
+      }
+    }
+
     // For video: show script preview
-    if (isEnrichmentContentType(rawContent, 'video')) {
-      const content = rawContent as VideoEnrichmentContent
+    if (isVideoDraftContent(rawContent)) {
+      const content = rawContent
       const scriptPreview = content.script?.slice(0, PREVIEW_SCRIPT_LENGTH) || ''
       return {
         type: 'video' as const,
@@ -184,13 +257,14 @@ export function UnifiedEnrichmentCard({
   }, [isDraftReady, existingEnrichment])
 
   // Show reveal panel on hover (desktop) or touch (mobile)
-  const shouldShowPanel = isHovered || isTouched
+  const shouldShowPanel = isHovered || isTouched || isSelectOpen
 
   // Close touch panel when generating starts
   useEffect(() => {
     let isMounted = true
     if (isGenerating && isMounted) {
       setIsTouched(false)
+      setIsSelectOpen(false)
     }
     return () => {
       isMounted = false
@@ -212,6 +286,17 @@ export function UnifiedEnrichmentCard({
           voice: audioVoice,
           speed: audioSpeed,
         }
+      case 'nlm_audio':
+        return {
+          nlm_audio_format: nlmAudioFormat,
+        }
+      case 'nlm_video':
+        return {
+          nlm_video_format: nlmVideoFormat,
+          nlm_video_style: nlmVideoStyle,
+        }
+      case 'video':
+        return {}
       case 'presentation':
         return {
           slideCount: parseInt(presentationSlides, 10),
@@ -233,6 +318,9 @@ export function UnifiedEnrichmentCard({
     quizDifficulty,
     audioVoice,
     audioSpeed,
+    nlmAudioFormat,
+    nlmVideoFormat,
+    nlmVideoStyle,
     presentationSlides,
     presentationTheme,
     imageStyle,
@@ -322,8 +410,22 @@ export function UnifiedEnrichmentCard({
           disabled,
           isGenerating,
         }
+      case 'nlm_audio':
+        return {
+          type: 'nlm_audio' as const,
+          nlmAudioFormat,
+          setNlmAudioFormat,
+        }
       case 'video':
         return { type: 'video' as const }
+      case 'nlm_video':
+        return {
+          type: 'nlm_video' as const,
+          nlmVideoFormat,
+          setNlmVideoFormat,
+          nlmVideoStyle,
+          setNlmVideoStyle,
+        }
       default:
         return { type: 'video' as const }
     }
@@ -333,6 +435,9 @@ export function UnifiedEnrichmentCard({
     quizDifficulty,
     audioVoice,
     audioSpeed,
+    nlmAudioFormat,
+    nlmVideoFormat,
+    nlmVideoStyle,
     presentationSlides,
     presentationTheme,
     hasImage,
@@ -366,7 +471,11 @@ export function UnifiedEnrichmentCard({
         altText={altText || getTitle()}
         hasImage={hasImage}
         shouldShowPanel={shouldShowPanel}
-        badgeText={config.badgeText}
+        badgeText={
+          config.badgeKey
+            ? t(config.badgeKey as Parameters<typeof t>[0])
+            : (config.badgeLiteral ?? '')
+        }
         BadgeIcon={Icon}
         badgeColor={config.color}
         aspectRatio={type === 'cover' ? 'cinematic' : 'square'}
@@ -421,6 +530,21 @@ export function UnifiedEnrichmentCard({
                     )}
                   </ul>
                 )}
+              </div>
+            )}
+
+            {draftContent.type === 'audio' && (
+              <div className="space-y-1 text-sm">
+                {draftContent.estimatedDuration && (
+                  <p className="font-medium text-amber-800 dark:text-amber-200">
+                    {t('draftPreview.estimatedDuration', {
+                      minutes: Math.ceil(draftContent.estimatedDuration / 60),
+                    })}
+                  </p>
+                )}
+                <p className="line-clamp-3 text-amber-700 dark:text-amber-300">
+                  {draftContent.scriptPreview}
+                </p>
               </div>
             )}
 
@@ -479,7 +603,7 @@ export function UnifiedEnrichmentCard({
             </motion.p>
 
             {/* Options Collapsible - delegated to subcomponent */}
-            {type !== 'video' && (
+            {!NO_OPTIONS_TYPES.has(type) && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -501,7 +625,10 @@ export function UnifiedEnrichmentCard({
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <EnrichmentCardOptions {...getOptionsProps()} />
+                    <EnrichmentCardOptions
+                      {...getOptionsProps()}
+                      onSelectOpenChange={setIsSelectOpen}
+                    />
                   </CollapsibleContent>
                 </Collapsible>
               </motion.div>

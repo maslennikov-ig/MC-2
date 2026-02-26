@@ -361,7 +361,10 @@ Write a COMPLETE lesson for a {{durationMinutes}}-minute reading session.
 Target: approximately {{targetWordCount}} words total (excluding exercises and digest).
 
 STRUCTURE (use ## headers for each section):
-1. ## {{introductionHeader}} — Hook ({{hookStrategy}}) + motivating context for the topic (100-150 words). IMPORTANT: Do NOT list or preview learning objectives — they are displayed separately in the UI above the lesson content.
+1. Intro block MUST start with this exact header line: ## {{introductionHeader}}
+   Then write a short hook ({{hookStrategy}}) + motivating context in 2 short paragraphs (target 80-140 words, hard max 170 words).
+   IMPORTANT: Do NOT list or preview learning objectives — they are displayed separately in the UI above the lesson content.
+   Intro anti-teaser rule: do NOT mention "next lesson/next section", do NOT preview later techniques/topics, and do NOT enumerate later sections.
 2. Content sections (one ## header per topic from sections_to_cover).
    All sections combined should be approximately {{sectionsWordBudget}} words.
    Each section should be focused and proportional. Never pre-summarize later sections.
@@ -393,6 +396,7 @@ CRITICAL RULES:
 - Include at least 1 visual element (diagram, table, or callout) in the lesson.
 - DO NOT start sections with "As we discussed..." or "In the previous section..." patterns.
 - VALIDATE reference material relevance BEFORE using (see rag_validation).
+- Intro must be self-contained: no "next lesson/next section" teasers and no previews of later sections/topics.
 - INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
   - Reference previous lesson naturally if context is given
   - Do NOT re-explain terms from terms_already_defined

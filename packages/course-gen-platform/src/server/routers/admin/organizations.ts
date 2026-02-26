@@ -12,6 +12,7 @@ import { adminProcedure, superadminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcrypt';
 import { listOrganizationsInputSchema } from './shared/schemas';
@@ -308,7 +309,8 @@ export const organizationsRouter = router({
           .eq('id', input.organizationId)
           .single();
 
-        if (orgError || !org) {
+        throwOnSupabaseError(orgError, 'Organization', { organizationId: input.organizationId });
+        if (!org) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Organization not found',
@@ -429,13 +431,11 @@ export const organizationsRouter = router({
           .select()
           .single();
 
-        if (orgError || !org) {
+        throwOnSupabaseError(orgError, 'Organization', { name: input.name, tier: input.tier });
+        if (!org) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError(
-              'Organization creation',
-              orgError?.message || 'Unknown error'
-            ),
+            message: ErrorMessages.databaseError('Organization creation', 'Unknown error'),
           });
         }
 
@@ -558,7 +558,8 @@ export const organizationsRouter = router({
           .eq('id', input.organizationId)
           .single();
 
-        if (fetchError || !existingOrg) {
+        throwOnSupabaseError(fetchError, 'Organization', { organizationId: input.organizationId });
+        if (!existingOrg) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Organization not found',
@@ -573,13 +574,11 @@ export const organizationsRouter = router({
           .select()
           .single();
 
-        if (updateError || !org) {
+        throwOnSupabaseError(updateError, 'Organization', { organizationId: input.organizationId });
+        if (!org) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError(
-              'Organization update',
-              updateError?.message || 'Unknown error'
-            ),
+            message: ErrorMessages.databaseError('Organization update', 'Unknown error'),
           });
         }
 

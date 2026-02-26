@@ -25,6 +25,7 @@ import { protectedProcedure } from '../middleware/auth';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { createRateLimiter } from '../middleware/rate-limit.js';
+import { throwOnSupabaseError } from '../utils/supabase-query-guard';
 import { nanoid } from 'nanoid';
 
 // Import Stage 3 document classification functions
@@ -102,17 +103,8 @@ async function verifyCourseAccess(
     .eq('organization_id', organizationId)
     .single();
 
-  if (error || !course) {
-    logger.warn(
-      {
-        requestId,
-        courseId,
-        organizationId,
-        error,
-      },
-      'Course not found or access denied'
-    );
-
+  throwOnSupabaseError(error, 'Course', { requestId, courseId, organizationId });
+  if (!course) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Course not found or access denied',

@@ -6,6 +6,65 @@ import mermaid from 'mermaid'
 import { cn } from '@/lib/utils'
 import type { MermaidDiagramProps } from '../types'
 
+const MERMAID_RENDER_FAILURE_EVENT = 'mermaid-render-failed'
+const MERMAID_FALLBACK_COMMENT_REGEX =
+  /^\s*<!--\s*(Mermaid\s+[^>]*could not be rendered\.\s*Please review manually\.)\s*-->\s*$/i
+const MERMAID_FALLBACK_PLAIN_TEXT_REGEX =
+  /^\s*(Mermaid\s+.+?could not be rendered\.\s*Please review manually\.)\s*$/i
+
+type MermaidRenderFailedDetail = {
+  message: string
+  chartSnippet: string
+}
+
+function getChartSnippet(chart: string, maxLength = 240): string {
+  const normalized = chart.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+  return `${normalized.slice(0, maxLength)}...`
+}
+
+function emitMermaidRenderFailed(detail: MermaidRenderFailedDetail): void {
+  if (typeof window === 'undefined') return
+
+  window.dispatchEvent(
+    new CustomEvent<MermaidRenderFailedDetail>(MERMAID_RENDER_FAILURE_EVENT, {
+      detail,
+    })
+  )
+}
+
+function getMermaidFallbackMessage(chart: string): string | null {
+  const commentMatch = chart.match(MERMAID_FALLBACK_COMMENT_REGEX)
+  if (commentMatch) {
+    return commentMatch[1].replace(/\s+/g, ' ').trim()
+  }
+
+  const plainTextMatch = chart.match(MERMAID_FALLBACK_PLAIN_TEXT_REGEX)
+  if (plainTextMatch) {
+    return plainTextMatch[1].replace(/\s+/g, ' ').trim()
+  }
+
+  return null
+}
+
+function hasRenderableGraphContent(container: HTMLElement): boolean {
+  const svg = container.querySelector('svg')
+  if (!svg) return false
+
+  const nodes = svg.querySelectorAll(
+    'path, rect, circle, ellipse, polygon, line, text, foreignObject'
+  )
+  for (const node of nodes) {
+    if (!node.closest('defs')) {
+      return true
+    }
+  }
+
+  return false
+}
+
 /**
  * Theme colors for dark mode
  */
@@ -470,10 +529,9 @@ const lightThemeVariables = {
 export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const fallbackMessage = getMermaidFallbackMessage(chart)
   const [isDark, setIsDark] = useState(() =>
-    typeof document !== 'undefined'
-      ? document.documentElement.classList.contains('dark')
-      : false
+    typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : false
   )
   const uniqueId = useId().replace(/:/g, '-') // React's useId returns colons which aren't valid in IDs
   const renderCountRef = useRef(0) // Prevents race conditions between concurrent renders
@@ -496,7 +554,15 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
 
   // Render diagram
   useEffect(() => {
-    if (!containerRef.current || !chart?.trim()) return
+    if (!containerRef.current) return
+
+    if (fallbackMessage) {
+      containerRef.current.innerHTML = ''
+      setError(null)
+      return
+    }
+
+    if (!chart?.trim()) return
 
     // Increment render counter to track the current render.
     // If a new render starts before this one completes, the stale render
@@ -526,6 +592,10 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
         const renderId = `mermaid-${uniqueId}-${currentRender}`
         const { svg, bindFunctions } = await mermaid.render(renderId, chart.trim())
 
+        if (!svg || !svg.includes('<svg')) {
+          throw new Error('Mermaid render returned empty SVG')
+        }
+
         // Skip if a newer render has started while we were awaiting
         if (currentRender !== renderCountRef.current) return
 
@@ -543,29 +613,37 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
           if (bindFunctions) {
             bindFunctions(containerRef.current)
           }
+
+          if (!hasRenderableGraphContent(containerRef.current)) {
+            containerRef.current.innerHTML = ''
+            throw new Error('Mermaid rendered empty SVG without graph content')
+          }
         }
 
         setError(null)
       } catch (err) {
         // Skip error handling if a newer render has started
         if (currentRender !== renderCountRef.current) return
+
+        const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
+
         console.error('Mermaid rendering error:', err)
-        setError(err instanceof Error ? err.message : 'Failed to render diagram')
+        setError(errorMessage)
+        emitMermaidRenderFailed({
+          message: errorMessage,
+          chartSnippet: getChartSnippet(chart),
+        })
       }
     }
 
-    renderDiagram()
-  }, [chart, isDark, uniqueId])
+    void renderDiagram()
+  }, [chart, fallbackMessage, isDark, uniqueId])
 
   return (
     <figure
-      className={cn(
-        error ? 'mermaid-error' : 'mermaid-container',
-        'not-prose my-6',
-        className
-      )}
-      role={error ? undefined : 'img'}
-      aria-label={error ? undefined : ariaLabel || 'Mermaid diagram'}
+      className={cn(error ? 'mermaid-error' : 'mermaid-container', 'not-prose my-6', className)}
+      role={error || fallbackMessage ? undefined : 'img'}
+      aria-label={error || fallbackMessage ? undefined : ariaLabel || 'Mermaid diagram'}
     >
       {error && (
         <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
@@ -576,11 +654,16 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
           </pre>
         </div>
       )}
+      {fallbackMessage && !error && (
+        <div className="bg-muted/40 border-border rounded-lg border border-dashed p-4">
+          <div className="text-muted-foreground text-sm">{fallbackMessage}</div>
+        </div>
+      )}
       <div
         ref={containerRef}
         className={cn(
           'mermaid-diagram bg-card border-border flex justify-center overflow-x-auto rounded-lg border p-4',
-          error && 'hidden'
+          (error || fallbackMessage) && 'hidden'
         )}
       />
     </figure>

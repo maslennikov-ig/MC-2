@@ -2,7 +2,7 @@
  * Regenerate Draft Procedure
  * @module server/routers/enrichment/procedures/regenerate-draft
  *
- * Regenerates the draft phase for two-stage enrichments (video/presentation).
+ * Regenerates the draft phase for two-stage enrichments.
  */
 
 import { TRPCError } from '@trpc/server';
@@ -95,7 +95,7 @@ export const regenerateDraft = protectedProcedure
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Regenerate draft is only applicable to video and presentation enrichments, not '${enrichment.enrichment_type}'.`,
+          message: `Regenerate draft is only applicable to two-stage enrichments (video, presentation), not '${enrichment.enrichment_type}'.`,
         });
       }
 

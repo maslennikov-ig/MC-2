@@ -20,6 +20,7 @@ import { lmsLogger } from '../../../integrations/lms/logger';
 import { createLMSAdapter } from '../../../integrations/lms';
 import { mapCourseToInput } from '../../../integrations/lms/course-mapper';
 import { nanoid } from 'nanoid';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 /**
  * Publish course input type
@@ -169,8 +170,8 @@ async function verifyCourseOwnership(
     .eq('id', courseId)
     .single();
 
-  if (courseError || !course) {
-    lmsLogger.warn({ requestId, courseId, error: courseError }, 'Course not found');
+  throwOnSupabaseError(courseError, 'Course', { requestId, courseId });
+  if (!course) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Course not found',
@@ -205,11 +206,12 @@ async function fetchAndValidateLMSConfig(
     .eq('organization_id', organizationId)
     .single();
 
-  if (configError || !config) {
-    lmsLogger.warn(
-      { requestId, lmsConfigId, organizationId, error: configError },
-      'LMS configuration not found'
-    );
+  throwOnSupabaseError(configError, 'LMS configuration', {
+    requestId,
+    lmsConfigId,
+    organizationId,
+  });
+  if (!config) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'LMS configuration not found or access denied',

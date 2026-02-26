@@ -156,7 +156,10 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   );
 
   // Fetch lesson content from lesson_contents table
-  const lessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  const lessonContent = await getLessonContent(
+    enrichmentContext.lesson.id,
+    enrichmentContext.course.id
+  );
   if (!lessonContent) {
     throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
   }

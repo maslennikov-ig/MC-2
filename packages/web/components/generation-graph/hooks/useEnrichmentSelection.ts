@@ -29,11 +29,14 @@ export interface EnrichmentSelectionState {
 const ALL_ENRICHMENT_TYPES: EnrichmentType[] = [
   'quiz',
   'video',
+  'nlm_video',
   'audio',
+  'nlm_audio',
   'presentation',
   'document',
   'cover',
   'card',
+  'banner',
 ]
 
 /**
@@ -67,7 +70,9 @@ export function useEnrichmentSelection(
       cover: 0,
       quiz: 0,
       video: 0,
+      nlm_video: 0,
       audio: 0,
+      nlm_audio: 0,
       presentation: 0,
       document: 0,
       card: 0,

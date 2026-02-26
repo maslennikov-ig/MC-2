@@ -11,6 +11,7 @@ import { getLessonContentInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 /**
  * Get lesson content
@@ -75,17 +76,14 @@ export const getLessonContent = protectedProcedure
           .eq('order_index', lessonNum)
           .single();
 
-        if (lessonError || !lessonData) {
-          logger.debug(
-            {
-              requestId,
-              courseId,
-              lessonId,
-              sectionNum,
-              lessonNum,
-            },
-            'Lesson not found by section.lesson format'
-          );
+        throwOnSupabaseError(lessonError, 'Lesson', {
+          requestId,
+          courseId,
+          lessonId,
+          sectionNum,
+          lessonNum,
+        });
+        if (!lessonData) {
           return null;
         }
 

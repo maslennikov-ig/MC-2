@@ -45,6 +45,7 @@ coverage/
 # --- Agent/Tool Configurations ---
 # We WANT to commit agent commands and configs, but not their temp work folders
 .gemini/tmp/
+.agent/
 
 # We WANT to commit shared Claude configs, but not local user settings
 .claude/settings.local.json
@@ -77,3 +78,13 @@ docs/client_secret_*.json
 .gemini/memory.md
 .gemini/memories.md
 .gemini/private/
+.gemini/tmp/
+
+# --- Python Virtual Environments ---
+.venv*/
+
+# --- Local Data & Secrets ---
+data/
+secrets/
+
+docs/plans/telegram-notifications-plan.md

@@ -1,4 +1,7 @@
 {
+  "general": {
+    "retryFetchErrors": true
+  },
   "hooks": {
     "PreCompress": [
       {

@@ -25,6 +25,7 @@ import {
   buildDocumentSummaries,
 } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 export const generateRouter = {
   generate: instructorProcedure
@@ -45,10 +46,8 @@ export const generateRouter = {
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-        }
+        throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+        if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         assertCourseAccess(buildAuthContext(currentUser), course, 'generate course');
 

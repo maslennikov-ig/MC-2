@@ -124,14 +124,19 @@ export const cancel = protectedProcedure
       // Step 4: Attempt to remove job from BullMQ queue
       try {
         const queue = getQueue();
-        const jobId = `enrich-${enrichmentId}`;
+        const candidateJobIds = [`enrich-ondemand-${enrichmentId}`, `enrich-${enrichmentId}`];
 
-        // Try to get and remove the job
-        const job = await queue.getJob(jobId);
-        if (job) {
+        let removed = false;
+
+        // Prefer exact id lookup for on-demand (current) and legacy id formats.
+        for (const jobId of candidateJobIds) {
+          const job = await queue.getJob(jobId);
+          if (!job) continue;
+
           const state = await job.getState();
           if (state === 'waiting' || state === 'delayed') {
             await job.remove();
+            removed = true;
             logger.info(
               {
                 requestId,
@@ -152,10 +157,15 @@ export const cancel = protectedProcedure
               'Job already active, cannot remove from queue'
             );
           }
-        } else {
-          // Also try with retry attempt suffix
+          break;
+        }
+
+        if (!removed) {
+          // Fallback: scan waiting/delayed jobs for retry-suffixed ids.
           const jobs = await queue.getJobs(['waiting', 'delayed']);
-          const matchingJob = jobs.find(j => j.id?.startsWith(`enrich-${enrichmentId}`));
+          const matchingJob = jobs.find(j =>
+            candidateJobIds.some(prefix => j.id?.startsWith(prefix))
+          );
           if (matchingJob) {
             await matchingJob.remove();
             logger.info(

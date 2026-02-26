@@ -108,6 +108,47 @@ services:
         max-size: '10m'
         max-file: '3'
 
+  # NotebookLM Bridge for Stage 7 NLM audio/video generation
+  notebooklm-bridge:
+    image: ghcr.io/maslennikov-ig/mc-2/notebooklm-bridge:latest
+    container_name: megacampus-notebooklm-bridge
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      - NOTEBOOKLM_AUTH_JSON=${NOTEBOOKLM_AUTH_JSON:-}
+      - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-}
+      - NOTEBOOKLM_HOME=${NOTEBOOKLM_HOME:-/app/secrets/notebooklm}
+      - NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS=${NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS:-3600}
+      - NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS=${NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS:-3600}
+      - NOTEBOOKLM_HTTP_TIMEOUT_SECONDS=${NOTEBOOKLM_HTTP_TIMEOUT_SECONDS:-60}
+      - NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT=${NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT:-12}
+      - NOTEBOOKLM_LOG_LEVEL=${NOTEBOOKLM_LOG_LEVEL:-INFO}
+    volumes:
+      - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:ro
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import socket; s=socket.socket(); s.connect((''localhost'', 8000)); s.close()" || exit 1',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
   # ============================================
   # APPLICATION SERVICES
   # ============================================
@@ -168,8 +209,14 @@ services:
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
+      - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge:8000
+      - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
+      # Local storage for enrichment playback URLs (must match worker-stage7)
+      - USE_LOCAL_STORAGE=true
+      - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
+      - ENRICHMENTS_PUBLIC_BASE_URL=${NEXT_PUBLIC_SITE_URL:-https://ai.megacampus.ru}
     volumes:
       - ./data/uploads:/app/uploads
     healthcheck:
@@ -190,6 +237,8 @@ services:
       redis:
         condition: service_healthy
       docling-mcp-internal:
+        condition: service_healthy
+      notebooklm-bridge:
         condition: service_healthy
     deploy:
       resources:
@@ -312,6 +361,8 @@ services:
       # Local storage for enrichment assets (migrated from Supabase Storage)
       - ENRICHMENTS_LOCAL_PATH=/app/data/enrichments
       - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
+      - NOTEBOOKLM_BRIDGE_URL=http://notebooklm-bridge:8000
+      - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
     volumes:
@@ -324,6 +375,8 @@ services:
       redis:
         condition: service_healthy
       api:
+        condition: service_healthy
+      notebooklm-bridge:
         condition: service_healthy
     deploy:
       resources:

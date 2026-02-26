@@ -31,6 +31,7 @@ import {
 } from '../utils/billing-helpers';
 import { logger } from '../../shared/logger/index.js';
 import { ErrorMessages } from '../utils/error-messages.js';
+import { throwOnSupabaseError } from '../utils/supabase-query-guard';
 
 /**
  * Billing router
@@ -100,7 +101,8 @@ export const billingRouter = router({
         .eq('id', organizationId)
         .single();
 
-      if (orgError || !org) {
+      throwOnSupabaseError(orgError, 'Organization', { organizationId });
+      if (!org) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: ErrorMessages.organizationNotFound(organizationId),
@@ -229,7 +231,8 @@ export const billingRouter = router({
         .eq('id', organizationId)
         .single();
 
-      if (orgError || !org) {
+      throwOnSupabaseError(orgError, 'Organization', { organizationId });
+      if (!org) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: ErrorMessages.organizationNotFound(organizationId),

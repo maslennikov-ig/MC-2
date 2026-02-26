@@ -84,7 +84,7 @@ export const updateDraft = protectedProcedure
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Update draft is only applicable to video and presentation enrichments, not '${enrichment.enrichment_type}'.`,
+          message: `Update draft is only applicable to two-stage enrichments (video, presentation), not '${enrichment.enrichment_type}'.`,
         });
       }
 

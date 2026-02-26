@@ -215,7 +215,8 @@ export async function initializeAnalysis(job: StructureAnalysisJob): Promise<Ana
     const { resolveDocumentContent } = await import('./handler-helpers');
     resolvedDocumentSummaries = await resolveDocumentContent(
       budgetAllocation,
-      originalDocumentSummaries
+      originalDocumentSummaries,
+      courseId
     );
     orchestrationLogger.info(
       {

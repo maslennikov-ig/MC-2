@@ -12,6 +12,7 @@ import { superadminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcrypt';
 
@@ -106,7 +107,8 @@ export const apiKeysRouter = router({
           .eq('id', input.keyId)
           .single();
 
-        if (fetchError || !key) {
+        throwOnSupabaseError(fetchError, 'API key', { keyId: input.keyId });
+        if (!key) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'API key not found',

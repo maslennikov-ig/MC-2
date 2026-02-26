@@ -6,15 +6,15 @@
  * Handles transient errors, rate limits, and model fallback.
  */
 
-import type { EnrichmentType } from '@megacampus/shared-types';
 import { STAGE7_CONFIG, MODEL_CONFIG } from './config';
+import type { Stage7EnrichmentType } from './types';
 
 /**
  * Retry context for decision making
  */
 export interface RetryContext {
   /** Type of enrichment being generated */
-  enrichmentType: EnrichmentType;
+  enrichmentType: Stage7EnrichmentType;
 
   /** Current attempt number (1-based) */
   attempt: number;
@@ -226,7 +226,10 @@ export function getFallbackModel(ctx: RetryContext): string | null {
  * @param attempt - Current attempt number (1-based)
  * @returns Model name to use
  */
-export function getModelForAttempt(enrichmentType: EnrichmentType, attempt: number): string | null {
+export function getModelForAttempt(
+  enrichmentType: Stage7EnrichmentType,
+  attempt: number
+): string | null {
   // Only LLM-based enrichments need model selection
   if (enrichmentType !== 'quiz' && enrichmentType !== 'presentation') {
     return null;

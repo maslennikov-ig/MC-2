@@ -69,14 +69,16 @@ Comprehensive code review completed for Sprint 1 (Security & Quick Wins) from th
 - **Recommendation**: Either restore the dependency (if VAPID key generation is still needed) or delete/update the script
 
 **Current code**:
+
 ```javascript
 // packages/web/scripts/generate-vapid-keys.js
-import webpush from 'web-push'  // ← Dependency removed from package.json
+import webpush from 'web-push'; // ← Dependency removed from package.json
 
-const vapidKeys = webpush.generateVAPIDKeys()
+const vapidKeys = webpush.generateVAPIDKeys();
 ```
 
 **Recommended action**:
+
 ```bash
 # Option 1: If web push is still planned
 pnpm --filter @megacampus/web add -D web-push @types/web-push
@@ -98,9 +100,10 @@ rm packages/web/scripts/generate-vapid-keys.js
 - **Recommendation**: Add JSDoc comment explaining import order requirement
 
 **Recommended addition**:
+
 ```typescript
 // SECURITY: Must be first import - throws runtime error if imported client-side
-import 'server-only'
+import 'server-only';
 
 // Environment variables validation and configuration
 // ...
@@ -115,15 +118,18 @@ import 'server-only'
 - **Recommendation**: Document which N8N variables are still active and why
 
 **Still Active (Correct)**:
+
 - `N8N_WEBHOOK_SECRET` - used in `packages/web/app/api/webhooks/coursegen/route.ts`
 - `N8N_CANCEL_WEBHOOK_URL` - used in `packages/web/app/api/courses/[orgSlug]/[courseSlug]/cancel/route.ts`
 
 **Removed (Correct)**:
+
 - ❌ `N8N_WEBHOOK_URL` - cleaned from lib/env.ts, lib/debug.ts, health/route.ts
 - ❌ `N8N_API_URL` - cleaned from .env.example
 - ❌ `N8N_API_KEY` - cleaned from .env.example
 
 **Recommended action**: Add comment in .env.example explaining N8N variable strategy:
+
 ```bash
 # N8N Webhook Integration
 # N8N_WEBHOOK_SECRET - Secret for verifying webhook authenticity (coursegen status updates)
@@ -141,6 +147,7 @@ import 'server-only'
 - **Recommendation**: Clarify that while benchmark metadata is non-sensitive, the sample data is sensitive
 
 **Current**:
+
 ```sql
 -- Issue: mc2-hs97 - RLS USING(true) audit found three benchmark tables with SELECT
 --        policies defaulting to public role. While the data is non-sensitive, the
@@ -150,6 +157,7 @@ import 'server-only'
 ```
 
 **Suggested refinement**:
+
 ```sql
 -- Issue: mc2-hs97 - RLS USING(true) audit found three benchmark tables with SELECT
 --        policies defaulting to public role. While benchmark metadata (model names,
@@ -166,17 +174,20 @@ import 'server-only'
 ### Task 1: Add server-only Imports ✅ PASSED
 
 **Files Modified**: 3
+
 - ✅ `packages/web/lib/env.ts` - Contains `SUPABASE_SERVICE_ROLE_KEY`
 - ✅ `packages/web/lib/supabase-admin.ts` - Server Supabase admin client
 - ✅ `packages/web/lib/redis-client.ts` - ioredis (Node.js only)
 
 **Verification**:
+
 ```typescript
 // All three files correctly have 'server-only' as first import
-import 'server-only'  // ✅ Line 1 in all three files
+import 'server-only'; // ✅ Line 1 in all three files
 ```
 
 **Security Impact**: ✅ EXCELLENT
+
 - Prevents accidental client-side bundling of sensitive credentials
 - Runtime error thrown if imported in client components
 - Service role key properly isolated
@@ -190,6 +201,7 @@ import 'server-only'  // ✅ Line 1 in all three files
 **Migration**: `20260208085355_tighten_benchmark_rls_to_authenticated.sql`
 
 **Tables Modified**: 3
+
 1. ✅ `llm_model_benchmarks` - policy: `benchmarks_read_all` → `benchmarks_read_authenticated`
 2. ✅ `llm_benchmark_runs` - policy: `benchmark_runs_read_all` → `benchmark_runs_read_authenticated`
 3. ✅ `llm_benchmark_samples` - policy: `samples_read_all` → `samples_read_authenticated`
@@ -197,6 +209,7 @@ import 'server-only'  // ✅ Line 1 in all three files
 **SQL Verification**:
 
 **Before** (Original Policies):
+
 ```sql
 -- From 20260128201300_create_benchmark_tables.sql
 CREATE POLICY benchmarks_read_all ON llm_model_benchmarks
@@ -214,6 +227,7 @@ CREATE POLICY samples_read_all ON llm_benchmark_samples
 ```
 
 **After** (New Migration):
+
 ```sql
 -- 20260208085355_tighten_benchmark_rls_to_authenticated.sql
 
@@ -237,6 +251,7 @@ CREATE POLICY samples_read_authenticated ON llm_benchmark_samples
 ```
 
 **Security Impact**: ✅ EXCELLENT
+
 - Removes anonymous access to benchmark data
 - Protects sensitive prompts and generated content in `llm_benchmark_samples`
 - Follows principle of least privilege
@@ -250,16 +265,17 @@ CREATE POLICY samples_read_authenticated ON llm_benchmark_samples
 
 **Files Deleted**: 6
 
-| File | Verified Deleted | References Found |
-|------|-----------------|------------------|
-| `packages/course-gen-platform/supabase/migrations/20251125120000_fix_lesson_contents_refinement.sql.obsolete` | ✅ YES | ✅ None |
-| `packages/course-gen-platform/tests/integration/document-processing-worker.test.ts.backup` | ✅ YES | ✅ None |
-| `packages/course-gen-platform/tests/integration/stage4-minimum-lesson-constraint.test.ts.DISABLED` | ✅ YES | ✅ None |
-| `packages/course-gen-platform/tests/integration/course-structure.test.ts.skip` | ✅ YES | ✅ None |
-| `packages/web/components/generation-graph/panels/stage6/dashboard/Stage6ControlTower.example.tsx` | ✅ YES | ✅ None |
-| `packages/web/lib/web-push.ts` | ✅ YES | ⚠️ See dependency issue |
+| File                                                                                                          | Verified Deleted | References Found        |
+| ------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------- |
+| `packages/course-gen-platform/supabase/migrations/20251125120000_fix_lesson_contents_refinement.sql.obsolete` | ✅ YES           | ✅ None                 |
+| `packages/course-gen-platform/tests/integration/document-processing-worker.test.ts.backup`                    | ✅ YES           | ✅ None                 |
+| `packages/course-gen-platform/tests/integration/stage4-minimum-lesson-constraint.test.ts.DISABLED`            | ✅ YES           | ✅ None                 |
+| `packages/course-gen-platform/tests/integration/course-structure.test.ts.skip`                                | ✅ YES           | ✅ None                 |
+| `packages/web/components/generation-graph/panels/stage6/dashboard/Stage6ControlTower.example.tsx`             | ✅ YES           | ✅ None                 |
+| `packages/web/lib/web-push.ts`                                                                                | ✅ YES           | ⚠️ See dependency issue |
 
 **Verification**:
+
 ```bash
 # All 6 files confirmed deleted
 $ test -f packages/web/lib/web-push.ts
@@ -274,6 +290,7 @@ $ grep -r "obsolete\|DISABLED\|backup.*test" packages/course-gen-platform/tests/
 ```
 
 **Impact**: ✅ EXCELLENT
+
 - Reduces codebase noise
 - Prevents confusion about which files are active
 - Removes misleading backup/example code
@@ -297,6 +314,7 @@ total 28
 ```
 
 **File Organization**: ✅ EXCELLENT
+
 - Scripts now properly organized under `scripts/maintenance/`
 - Follows project convention
 - Easier to find and maintain
@@ -309,12 +327,14 @@ total 28
 #### 5a. Dependency Removal from package.json ✅ PASSED
 
 **Dependencies Removed from packages/web/package.json**:
+
 - ✅ `@googleapis/drive` - not found in package.json
 - ✅ `bcryptjs` - not found in package.json
 - ✅ `web-push` - not found in package.json
 - ✅ `@types/web-push` - not found in package.json
 
 **Verification**:
+
 ```bash
 $ grep -E "(web-push|@googleapis/drive|bcryptjs|@types/web-push)" packages/web/package.json
 # Returns: no matches ✅
@@ -336,14 +356,17 @@ OLD_DELETED ✅
 #### 5c. N8N Environment Variable Cleanup ✅ PASSED
 
 **Removed from .env.example**:
+
 - ✅ `N8N_API_URL` - confirmed removed
 - ✅ `N8N_API_KEY` - confirmed removed
 
 **Still Active (Correctly Preserved)**:
+
 - ✅ `N8N_WEBHOOK_SECRET` - used in `app/api/webhooks/coursegen/route.ts`
 - ✅ `N8N_CANCEL_WEBHOOK_URL` - used in `app/api/courses/[orgSlug]/[courseSlug]/cancel/route.ts`
 
 **Removed from Code**:
+
 - ✅ `N8N_WEBHOOK_URL` cleaned from:
   - `packages/web/lib/env.ts`
   - `packages/web/lib/debug.ts`
@@ -372,6 +395,7 @@ OLD_DELETED ✅
 **Status**: ✅ PASSED
 
 **Output**:
+
 ```
 > @megacampus/web@0.28.62 type-check /home/me/code/mc2/packages/web
 > tsc --noEmit
@@ -410,29 +434,31 @@ All critical checks pass. The codebase is buildable and type-safe after Sprint 1
 - Runtime enforcement via 'server-only' package
 
 **Before**:
+
 ```typescript
 // packages/web/lib/env.ts (VULNERABLE)
 export const ENV = {
-  SUPABASE_SERVICE_ROLE_KEY: env.get('SUPABASE_SERVICE_ROLE_KEY'),  // ❌ Exposed to client
-}
+  SUPABASE_SERVICE_ROLE_KEY: env.get('SUPABASE_SERVICE_ROLE_KEY'), // ❌ Exposed to client
+};
 ```
 
 **After**:
+
 ```typescript
 // packages/web/lib/env.ts (SECURE)
-import 'server-only'  // ✅ Runtime protection
+import 'server-only'; // ✅ Runtime protection
 
 export const ENV = {
   // SUPABASE_SERVICE_ROLE_KEY removed from client-accessible exports
-}
+};
 
 export function getServerEnv() {
   if (typeof window !== 'undefined') {
-    throw new Error('getServerEnv() called on client side')  // ✅ Extra runtime check
+    throw new Error('getServerEnv() called on client side'); // ✅ Extra runtime check
   }
   return {
     SUPABASE_SERVICE_ROLE_KEY: env.get('SUPABASE_SERVICE_ROLE_KEY'),
-  }
+  };
 }
 ```
 
@@ -445,10 +471,12 @@ export function getServerEnv() {
 - Follows principle of least privilege
 
 **Attack Vector Closed**:
+
 - **Before**: Anonymous users could read all benchmark data including prompts
 - **After**: Only authenticated users can access benchmark data
 
 **Data Protected**:
+
 - `llm_benchmark_samples.input_prompt` - Test prompts (potentially sensitive)
 - `llm_benchmark_samples.generated_content` - Full LLM outputs
 - `llm_benchmark_samples.heuristic_result` - Internal scoring details
@@ -462,6 +490,7 @@ export function getServerEnv() {
 - Reduces codebase complexity
 
 **Files with Potential Security Risk**:
+
 - `web-push.ts` - Removed (prevented accidental credential exposure)
 - `.obsolete` migration - Removed (prevented confusion about active schema)
 
@@ -474,6 +503,7 @@ export function getServerEnv() {
 Sprint 1 changes are security and cleanup focused. No performance regressions expected.
 
 **Neutral Changes**:
+
 - ✅ `import 'server-only'` - No runtime overhead (build-time check)
 - ✅ RLS policy changes - Same USING(true) condition, just different role
 - ✅ Dead file deletion - Improves build times slightly (fewer files to scan)
@@ -524,6 +554,7 @@ Moved:
 **Risk**: Could break client components that accidentally import these modules
 
 **Analysis**: ✅ LOW RISK
+
 - All three files are server-only by design
 - No client-side usage detected in codebase
 - Next.js build would fail if client components imported these (good!)
@@ -535,6 +566,7 @@ Moved:
 **Risk**: Could break existing queries from anonymous users
 
 **Analysis**: ✅ NO RISK
+
 - Benchmark tables are admin/internal tools only
 - No public-facing UI queries these tables
 - All usage is from authenticated admin users
@@ -546,6 +578,7 @@ Moved:
 **Risk**: Could break imports if files are still referenced
 
 **Analysis**: ✅ NO RISK
+
 - Grep search confirms no remaining references
 - All deleted files were explicitly marked as dead (.obsolete, .backup, etc.)
 
@@ -556,6 +589,7 @@ Moved:
 **Risk**: Could break code that imports removed dependencies
 
 **Analysis**: ⚠️ MINOR RISK
+
 - `web-push` still imported in `generate-vapid-keys.js`
 - Script will fail if executed
 - See Medium Issue #1
@@ -639,17 +673,20 @@ Based on Sprint 1 success, proceed to:
 ✅ **Sprint 1 Code Review: PASSED with Minor Recommendations**
 
 **Security**: ✅ EXCELLENT
+
 - All 3 P1 security fixes correctly implemented
 - No security regressions detected
 - Service role key properly protected
 
 **Code Quality**: ✅ GOOD
+
 - Dead code properly removed
 - File organization improved
 - Type-check passes
 - Build expected to pass
 
 **Issues**: ⚠️ 4 MINOR
+
 - 3 medium priority (web-push, comments, documentation)
 - 1 low priority (migration comment refinement)
 

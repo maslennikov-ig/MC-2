@@ -125,7 +125,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   // Fetch lesson content from lesson_contents table (for lesson cards)
   let lessonContent: string | null = null;
   if (!isCourseCard) {
-    lessonContent = await getLessonContent(lesson.id);
+    lessonContent = await getLessonContent(lesson.id, enrichmentContext.course.id);
   }
 
   // Log debug if using fallback detection (not a warning - this is normal behavior)

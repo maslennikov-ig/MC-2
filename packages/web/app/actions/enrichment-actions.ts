@@ -605,23 +605,41 @@ export async function getEnrichment(input: GetEnrichmentInput): Promise<GetEnric
       return { success: false, error: 'Enrichment not found' }
     }
 
-    // Get signed URL for asset if it exists
+    // Get playback URL / signed URL for asset if it exists
     let assetUrl: string | null = null
     if (enrichment.asset_id) {
-      // Get the asset file path
-      const { data: asset } = await supabase
-        .from('assets')
-        .select('file_path')
-        .eq('id', enrichment.asset_id)
-        .single()
+      const playbackTypes = ['audio', 'video', 'nlm_audio', 'nlm_video']
+      const isPlaybackType = playbackTypes.includes(enrichment.enrichment_type)
 
-      if (asset?.file_path) {
-        // Create signed URL (valid for 1 hour)
-        const { data: signedUrlData } = await supabase.storage
-          .from('course-assets')
-          .createSignedUrl(asset.file_path, 3600)
+      if (isPlaybackType && enrichment.status === 'completed') {
+        try {
+          const client = await getServerTrpcClient()
+          const playbackResult = await client.enrichment.getPlaybackUrl.query({
+            enrichmentId: enrichment.id,
+          })
+          assetUrl = playbackResult.url
+        } catch (playbackError) {
+          logger.warn('[getEnrichment] Failed to resolve playback URL', {
+            enrichmentId: enrichment.id,
+            type: enrichment.enrichment_type,
+            error: playbackError instanceof Error ? playbackError.message : String(playbackError),
+          })
+        }
+      } else {
+        // Non-playback assets still use direct signed URL lookup
+        const { data: asset } = await supabase
+          .from('assets')
+          .select('file_path')
+          .eq('id', enrichment.asset_id)
+          .single()
 
-        assetUrl = signedUrlData?.signedUrl || null
+        if (asset?.file_path) {
+          const { data: signedUrlData } = await supabase.storage
+            .from('course-assets')
+            .createSignedUrl(asset.file_path, 3600)
+
+          assetUrl = signedUrlData?.signedUrl || null
+        }
       }
     }
 
@@ -713,12 +731,15 @@ export async function getLessonEnrichments(
       return { success: false, error: 'Unauthorized' }
     }
 
-    // Fetch enrichments (only completed status for viewer)
+    // Fetch enrichments for the lesson (match SSR filter: exclude only failed/cancelled)
+    // Excludes 'metadata' column which can be 27MB+ for NLM types (bridge_response artifact)
+    const ENRICHMENT_DISPLAY_COLUMNS =
+      'id, enrichment_type, status, content, lesson_id, course_id, created_at, updated_at, title, order_index, asset_id, error_details, error_message, generated_at, generation_attempt' as const
     const { data: enrichments, error } = await supabase
       .from('lesson_enrichments')
-      .select('*')
+      .select(ENRICHMENT_DISPLAY_COLUMNS)
       .eq('lesson_id', input.lessonId)
-      .eq('status', 'completed')
+      .not('status', 'in', '(failed,cancelled)')
       .order('order_index', { ascending: true })
 
     if (error) {
@@ -726,7 +747,9 @@ export async function getLessonEnrichments(
       return { success: false, error: 'Failed to fetch enrichments' }
     }
 
-    return { success: true, enrichments: enrichments || [] }
+    // metadata excluded from select — cast is safe since frontend never accesses it
+    type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+    return { success: true, enrichments: (enrichments as EnrichmentRow[]) || [] }
   } catch (error) {
     logger.error('[getLessonEnrichments] Unexpected error', {
       error: error instanceof Error ? error.message : String(error),

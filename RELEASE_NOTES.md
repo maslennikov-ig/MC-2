@@ -2,6 +2,136 @@
 
 _Released on 2025-12-26_
 
+## v0.31.6
+
+_Released on 2026-02-26_
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.31.5
+
+_Released on 2026-02-26_
+
+### ✨ New Features
+
+- **enrichments**: Fix audio/video playback + expose NLM format options
+- **pipeline**: Add Redis read-side cache for Stage 3/4 file content
+- **pipeline**: Add Redis cache-aside for file and lesson content
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Persist generation state across lesson navigation
+- **pipeline**: Address code review issues in Redis cache-aside
+- **nginx**: Add video/mp4 and audio/mpeg MIME types for enrichment storage
+
+---
+
+_This release was automatically generated from 8 commits._
+
+## v0.31.4
+
+_Released on 2026-02-26_
+
+### 🐛 Bug Fixes
+
+- **web**: Restore enrichment generation state after page navigation
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.31.3
+
+_Released on 2026-02-26_
+
+### 🔧 Improvements
+
+- **Database**: Database health cleanup — reduce size 391→153 MB and optimize egress
+- Migrate 48 router files to shared throwOnSupabaseError utility
+
+### 🐛 Bug Fixes
+
+- **web**: Dynamic import vidstack to prevent intermittent chunk loading errors
+- Code review follow-ups — proper backoff, PGRST116 guards, regression tests
+- Stop misclassifying network errors as "enrichment not found" during polling
+
+---
+
+_This release was automatically generated from 5 commits._
+
+## v0.31.2
+
+_Released on 2026-02-26_
+
+### 🐛 Bug Fixes
+
+- **nlm-bridge**: Strip bloated metadata from bridge responses and harden recovery logic
+- Enrichment card transition after generation + audio single-click play + metadata perf
+- Prevent Select dropdown from closing in enrichment card hover panel
+
+---
+
+_This release was automatically generated from 3 commits._
+
+## v0.31.1
+
+_Released on 2026-02-25_
+
+### ✨ New Features
+
+- Redesign enrichment cards with unified grid, single-click video, and compact audio overlay
+
+---
+
+_This release was automatically generated from 4 commits._
+
+## v0.31.0
+
+_Released on 2026-02-24_
+
+### ✨ New Features
+
+- Telegram notifications, lesson materials switcher, and media player improvements
+- Universalize Gastown commands and add /onboard
+- **stage7**: Harden NLM pipeline with local media storage, async lifecycle, and recovery
+- **stage7**: Harden NLM audio/video generation pipeline
+- **enrichments**: Add nlm audio/video generation via notebooklm bridge
+- **course-gen-platform**: Add notebooklm bridge FastAPI service
+- **admin**: Add generation trace audit page
+
+### 🐛 Bug Fixes
+
+- Add data/secrets to gitignore and fix lint errors in scripts/tests
+- **release**: Exclude .venv and .gemini/tmp from package.json discovery and gitignore
+- **analysis**: Handle forceRestart in active stage4 states
+- **enrichments**: Add nlm types to ordered arrays in generation-graph
+- **enrichments**: Resolve nlm audio/video contract and type issues
+- **CI/CD**: Build notebooklm-bridge image for deploy
+- **stage6**: Add deterministic markdown table remediation
+- **web**: Normalize malformed markdown tables
+
+---
+
+_This release was automatically generated from 21 commits._
+
+## v0.30.11
+
+_Released on 2026-02-20_
+
+### 🐛 Bug Fixes
+
+- **stage6**: Improve mermaid diagram remediation pipeline and rendering
+- **stage6**: Prevent intro-vs-section content duplication in lesson generation
+- **logs**: Address code review findings — rate limiter bug, logWarningToDb bypass, inconsistent logger
+- **logs**: Reduce error log volume with pre-insert filters and double-logging elimination
+- **logs**: Fix Job not found auto-mute regex and add Redis/Jina patterns
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.30.10
 
 _Released on 2026-02-19_

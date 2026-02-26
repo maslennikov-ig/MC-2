@@ -2,83 +2,79 @@
 
 > **IMPORTANT**: This file overrides default Claude Code behavior. Follow strictly.
 
-## Main Pattern: You Are The Orchestrator
+## Quick Start: Gastown + Beads
+
+| Command                      | What it does          |
+| ---------------------------- | --------------------- |
+| `/work "task description"`   | Give task to AI agent |
+| `/work --agent codex "task"` | Use specific runtime  |
+| `/status`                    | See what's happening  |
+| `bd ready`                   | Find available tasks  |
+| `gt dashboard --open`        | Visual monitoring     |
+| `git push`                   | Ship to Dev           |
+
+> Everything below is reference. For daily work, these 6 commands are enough.
+
+---
+
+## Multi-Agent Orchestration with Gastown
+
+This project uses **Gastown** (`gt`) for multi-agent orchestration and **Beads** (`bd`) for issue tracking. Global tools at `~/gt/`.
+
+Runtimes: `claude` (default), `codex`, `gemini` — all subscription-based, no API billing.
 
 ### Core Rules
 
-**1. GATHER CONTEXT FIRST (MANDATORY)**
+**1. GATHER CONTEXT FIRST** — Read code, search patterns, check commits. NEVER implement blindly.
 
-- Read existing code, search patterns, check recent commits
-- NEVER delegate or implement blindly
+**2. VERIFY** — Never trust agent output without verification:
 
-**2. DELEGATE TO SUBAGENTS**
+- Read modified files (`Read` tool)
+- Run `pnpm type-check && pnpm build`
+- Check for regressions
 
-- Provide complete context (code, paths, patterns)
-- **NEVER TRUST SUBAGENT REPORTS** — always verify yourself:
-  - Read modified files (`Read` tool)
-  - Run type-check (`pnpm type-check`)
-  - Run build if needed (`pnpm build`)
-  - Check for regressions
-- Re-delegate if incorrect
-
-**3. EXECUTE DIRECTLY** — Only for: single-line fixes, simple imports, minimal configs
-
-**4. TRACK PROGRESS** — TodoWrite: in_progress BEFORE, completed AFTER verification
-
-**5. COMMIT** — `/push patch` after each task
-
-**6. EXECUTION PATTERN**
-
-```
-1. Read task → 2. Gather context → 3. Delegate/execute
-4. VERIFY (never skip) → 5. Re-delegate if needed
-6. TodoWrite completed → 7. /push patch → 8. Next task
-```
-
-**7. CONTRADICTIONS** — Gather context, analyze patterns. Ask user only if truly ambiguous (~10%).
-
-**8. TYPESCRIPT ERRORS** — Re-delegate to same agent OR `typescript-types-specialist`
-
-**9. /push — NEVER DISCARD CHANGES**
+**3. /push — NEVER DISCARD CHANGES**
 
 - **FORBIDDEN**: `git reset`, `git checkout --`, `git stash` during `/push`
 - **ALWAYS** commit all uncommitted changes or ASK user first
 
 ---
 
-## Task Management with Beads
+## Task Management with Beads + Gastown
 
-> Constitution v1.2.0: All work MUST be tracked in Beads.
+> All work tracked in Beads, orchestrated by Gastown.
 
 ### Session Workflow
 
 ```bash
-# SESSION START (auto via hooks)
-# bd prime runs automatically → injects context
-
 # FIND WORK
 bd ready                          # Available tasks (no blockers)
-bd ready --label frontend         # Only frontend tasks
-bd list --unlocked                # Tasks not locked by other terminals
-bd show <id>                      # Task details
 
-# WORK
-bd update <id> --status in_progress   # Acquires exclusive lock
+# GIVE TASK TO AGENT (preferred — via /work slash command)
+/work Fix the login validation bug
+/work --agent codex Refactor auth module
+
+# MANUAL WORK (do it yourself)
+bd update <id> --status in_progress
 # ... do the work ...
-bd close <id> --reason "Done"         # Releases lock
+bd close <id> --reason "Done"
+
+# CHECK STATUS
+/status                           # Unified view
+gt convoy list                    # Active convoys
+gt dashboard --open               # Web panel
 
 # SESSION END
 git add . && git commit -m "..." && git push
 ```
 
-### Multi-Terminal Work
+### Multi-Agent Work
 
-When working in multiple terminals simultaneously:
+Gastown manages parallel agents automatically:
 
-- Each terminal acquires **exclusive lock** via `bd update --status in_progress`
-- Lock auto-releases after 30min inactivity
-- **Rule**: Each terminal works on DIFFERENT issues
-- Find unlocked: `bd list --unlocked`
+- Mayor coordinates, Polecats execute, Refinery merges
+- Each polecat works in isolated git worktree — no conflicts
+- Witness monitors health, respawns crashed agents
 
 ### Branches & Environments
 
@@ -144,6 +140,27 @@ git push                          # → dev.ai.megacampus.ru
 | Code review          | Patrol          | `bd patrol run code-review --vars "scope=X,topic=Y"` |
 | Health check         | Patrol          | `bd patrol run health-check`                         |
 
+### Infrastructure (Self-Managed)
+
+All services auto-start on boot via systemd. **No manual intervention needed.**
+
+- **Daemon** (`gastown-daemon.service`): Manages Dolt, heartbeats, patrols
+- **Dolt**: Managed internally by daemon via `dolt_server` config in `~/gt/mayor/daemon.json`
+- **Witness**: Monitors polecat health per rig (auto-spawned by daemon)
+- **Refinery**: Merge queue processor (auto-spawned by daemon)
+- **Deacon**: Health orchestrator (auto-spawned by daemon)
+
+If something breaks:
+
+```bash
+gt doctor --fix --rig mc2     # Diagnose and auto-fix
+gt daemon logs                # Check daemon logs
+systemctl --user status gastown-daemon  # Service status
+systemctl --user restart gastown-daemon # Restart everything
+```
+
+**NEVER start Dolt manually** (`gt dolt start`) — daemon manages it with health checks every 30s.
+
 ### Automation
 
 - **Daemon auto-sync**: Enabled (auto-commit, auto-push, auto-pull for beads)
@@ -186,6 +203,8 @@ git push                          # → dev.ai.megacampus.ru
 - MCP server: project `diqooqbuchsliypgwksu`
 - Migrations: `packages/course-gen-platform/supabase/migrations/`
 - Two admin clients by design (different runtimes): `course-gen-platform/src/shared/supabase/admin.ts` (Node.js) and `web/lib/supabase-admin.ts` (Next.js)
+
+**Course lookup by short code**: User sends codes like `BRA-1467` — this is `courses.generation_code`. Query: `SELECT id, title FROM courses WHERE generation_code = 'BRA-1467'`. Use `generation_trace` table (join via `lesson_id`) to see which LLM model generated each lesson (`model_used`, `stage`, `phase`, `step_name`).
 
 **Single Source of Truth** (NEVER duplicate, always import from `@megacampus/shared-types`):
 

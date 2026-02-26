@@ -9,6 +9,7 @@
 import { TRPCError } from '@trpc/server';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 import type { EnrichmentStatus, EnrichmentType } from '@megacampus/shared-types';
 
 /**
@@ -52,22 +53,8 @@ export async function verifyEnrichmentAccess(
     .eq('id', enrichmentId)
     .single();
 
-  if (error || !enrichment) {
-    logger.warn(
-      {
-        requestId,
-        enrichmentId,
-        userId,
-        error,
-      },
-      'Enrichment not found'
-    );
-
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Enrichment not found',
-    });
-  }
+  throwOnSupabaseError(error, 'Enrichment', { requestId, enrichmentId, userId });
+  if (!enrichment) throw new TRPCError({ code: 'NOT_FOUND', message: 'Enrichment not found' });
 
   // Verify course access
   const { data: course, error: courseError } = await supabase
@@ -76,23 +63,13 @@ export async function verifyEnrichmentAccess(
     .eq('id', enrichment.course_id)
     .single();
 
-  if (courseError || !course) {
-    logger.warn(
-      {
-        requestId,
-        enrichmentId,
-        courseId: enrichment.course_id,
-        userId,
-        error: courseError,
-      },
-      'Course not found for enrichment'
-    );
-
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Course not found',
-    });
-  }
+  throwOnSupabaseError(courseError, 'Course', {
+    requestId,
+    enrichmentId,
+    courseId: enrichment.course_id,
+    userId,
+  });
+  if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
@@ -153,22 +130,8 @@ export async function verifyCourseAccess(
     .eq('id', courseId)
     .single();
 
-  if (error || !course) {
-    logger.warn(
-      {
-        requestId,
-        courseId,
-        userId,
-        error,
-      },
-      'Course not found'
-    );
-
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Course not found',
-    });
-  }
+  throwOnSupabaseError(error, 'Course', { requestId, courseId, userId });
+  if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
@@ -230,22 +193,8 @@ export async function verifyLessonAccess(
     .eq('id', lessonId)
     .single();
 
-  if (error || !lesson) {
-    logger.warn(
-      {
-        requestId,
-        lessonId,
-        userId,
-        error,
-      },
-      'Lesson not found'
-    );
-
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Lesson not found',
-    });
-  }
+  throwOnSupabaseError(error, 'Lesson', { requestId, lessonId, userId });
+  if (!lesson) throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
 
   // TypeScript: sections is a single object due to !inner join
   const section = lesson.sections as unknown as {
@@ -459,13 +408,53 @@ export async function findReusableEnrichment(
  * to proceed to final generation:
  * - video: Script draft → user approves → video generation
  * - presentation: Outline draft → user approves → slides generation
- * - cover/banner: Prompt variants → user selects → image generation
  *
  * @param enrichmentType - Type of enrichment
  * @returns True if type uses draft -> final flow
  */
 export function isTwoStageType(enrichmentType: string): boolean {
   return enrichmentType === 'video' || enrichmentType === 'presentation';
+}
+
+/**
+ * NotebookLM enrichment types that were previously implemented as two-stage.
+ *
+ * These types now run as single-stage, but existing rows may still be stuck in
+ * legacy draft statuses from earlier deployments.
+ */
+const LEGACY_NLM_TYPES = ['nlm_audio', 'nlm_video'] as const;
+
+/**
+ * Legacy draft statuses used by the old NLM two-stage flow.
+ */
+const LEGACY_NLM_DRAFT_STATUSES = ['draft_generating', 'draft_ready'] as const;
+
+/**
+ * Check whether enrichment type is a legacy NotebookLM type.
+ */
+export function isLegacyNlmType(
+  enrichmentType: string
+): enrichmentType is (typeof LEGACY_NLM_TYPES)[number] {
+  return (LEGACY_NLM_TYPES as readonly string[]).includes(enrichmentType);
+}
+
+/**
+ * Check whether status is one of the legacy NLM draft statuses.
+ */
+export function isLegacyNlmDraftStatus(
+  status: string
+): status is (typeof LEGACY_NLM_DRAFT_STATUSES)[number] {
+  return (LEGACY_NLM_DRAFT_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Check if an enrichment should be reset/reused for legacy NLM compatibility.
+ */
+export function shouldReuseLegacyNlmDraft(
+  enrichmentType: string,
+  status: string | undefined
+): boolean {
+  return !!status && isLegacyNlmType(enrichmentType) && isLegacyNlmDraftStatus(status);
 }
 
 /**

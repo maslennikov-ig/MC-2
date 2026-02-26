@@ -71,6 +71,7 @@ describe('AUTO_MUTE_RULES documentation sync', () => {
         'graceful_fallback',
         'ui_race_condition',
         'content_policy',
+        'infrastructure',
       ];
       expect(KNOWN_CATEGORIES).toContain(rule.reason);
     }

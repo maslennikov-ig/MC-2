@@ -7,12 +7,18 @@
  */
 
 import { logger } from '@/shared/logger';
-import type { EnrichmentType } from '@megacampus/shared-types';
-import type { EnrichmentHandlerInput, DraftResult, GenerateResult } from '../types';
+import type {
+  EnrichmentHandlerInput,
+  DraftResult,
+  GenerateResult,
+  Stage7EnrichmentType,
+} from '../types';
 import {
   quizHandler,
   videoHandler,
   audioHandler,
+  nlmAudioHandler,
+  nlmVideoHandler,
   presentationHandler,
   coverHandler,
   cardHandler,
@@ -99,11 +105,13 @@ const documentHandler: EnrichmentHandler = {
 /**
  * Handler registry
  */
-const handlers: Record<EnrichmentType, EnrichmentHandler> = {
+const handlers: Record<Stage7EnrichmentType, EnrichmentHandler> = {
   quiz: quizHandler,
   audio: audioHandler,
+  nlm_audio: nlmAudioHandler,
   presentation: presentationHandler,
   video: videoHandler,
+  nlm_video: nlmVideoHandler,
   document: documentHandler,
   cover: coverHandler,
   card: cardHandler,
@@ -118,7 +126,7 @@ const handlers: Record<EnrichmentType, EnrichmentHandler> = {
  * @param type - Enrichment type
  * @returns Handler for the enrichment type
  */
-export function routeEnrichment(type: EnrichmentType): EnrichmentHandler {
+export function routeEnrichment(type: Stage7EnrichmentType): EnrichmentHandler {
   const handler = handlers[type];
 
   if (!handler) {
@@ -134,7 +142,7 @@ export function routeEnrichment(type: EnrichmentType): EnrichmentHandler {
  * @param type - Enrichment type
  * @returns True if two-stage flow
  */
-export function isTwoStageEnrichment(type: EnrichmentType): boolean {
+export function isTwoStageEnrichment(type: Stage7EnrichmentType): boolean {
   const handler = handlers[type];
   return handler?.generationFlow === 'two-stage';
 }
@@ -144,6 +152,6 @@ export function isTwoStageEnrichment(type: EnrichmentType): boolean {
  *
  * @returns Array of registered enrichment types
  */
-export function getRegisteredTypes(): EnrichmentType[] {
-  return Object.keys(handlers) as EnrichmentType[];
+export function getRegisteredTypes(): Stage7EnrichmentType[] {
+  return Object.keys(handlers) as Stage7EnrichmentType[];
 }

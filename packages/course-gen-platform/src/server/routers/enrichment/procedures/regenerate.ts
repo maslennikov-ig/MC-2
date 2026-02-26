@@ -11,7 +11,12 @@ import { nanoid } from 'nanoid';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { regenerateEnrichmentInputSchema } from '../schemas';
-import { verifyEnrichmentAccess, isTwoStageType, buildAssetPath } from '../helpers';
+import {
+  verifyEnrichmentAccess,
+  isTwoStageType,
+  buildAssetPath,
+  shouldReuseLegacyNlmDraft,
+} from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { createStage7Queue, addEnrichmentJob } from '../../../../stages/stage7-enrichments/factory';
 import { deleteEnrichmentAsset } from '../../../../stages/stage7-enrichments/services/storage-service';
@@ -32,7 +37,9 @@ function getQueue() {
 // Extension map for storage cleanup
 const EXTENSION_MAP: Record<string, string> = {
   audio: 'mp3',
+  nlm_audio: 'mp3',
   video: 'mp4',
+  nlm_video: 'mp4',
   cover: 'webp',
   banner: 'webp',
   card: 'webp',
@@ -94,7 +101,13 @@ export const regenerate = protectedProcedure
       );
 
       // Step 2: Check if enrichment can be regenerated
-      const allowedStatuses = ['failed', 'cancelled', 'completed', 'generating'];
+      const isLegacyNlmDraft = shouldReuseLegacyNlmDraft(
+        enrichment.enrichment_type,
+        enrichment.status
+      );
+      const allowedStatuses = isLegacyNlmDraft
+        ? ['failed', 'cancelled', 'completed', 'generating', 'draft_ready', 'draft_generating']
+        : ['failed', 'cancelled', 'completed', 'generating'];
       if (!allowedStatuses.includes(enrichment.status)) {
         logger.warn(
           {
@@ -175,10 +188,10 @@ export const regenerate = protectedProcedure
         updated_at: new Date().toISOString(),
       };
 
-      // Clear content and draft_content when regenerating completed enrichments
-      if (enrichment.status === 'completed') {
+      // Clear generated content when regenerating completed enrichments
+      // and legacy NLM rows stuck in draft statuses from old two-stage flow.
+      if (enrichment.status === 'completed' || isLegacyNlmDraft) {
         updateData.content = null;
-        updateData.draft_content = null;
       }
 
       const { error: updateError } = await supabase

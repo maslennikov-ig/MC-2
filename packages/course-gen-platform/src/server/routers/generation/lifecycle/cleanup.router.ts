@@ -14,6 +14,7 @@ import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { cleanupCourseResources } from '../../../../shared/cleanup';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 export const cleanupRouter = {
   cleanupCourse: instructorProcedure
@@ -34,13 +35,8 @@ export const cleanupRouter = {
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn(
-            { requestId, userId, courseId, error: courseError },
-            'Course not found for cleanup'
-          );
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-        }
+        throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+        if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         // Step 2: Check permissions (owner, org admin, superadmin, or no-owner course)
         // Note: Custom authorization required because cleanup allows no-owner courses

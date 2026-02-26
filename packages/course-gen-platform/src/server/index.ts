@@ -61,6 +61,7 @@ import 'dotenv/config';
 import { initSentry } from '../shared/sentry/init.js';
 initSentry();
 import { setMaxListeners } from 'events';
+import path from 'path';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 
@@ -348,6 +349,33 @@ app.get('/', (_req: Request, res: Response) => {
     },
   });
 });
+
+/**
+ * Local enrichments static files (audio/video/images)
+ *
+ * Enabled only when USE_LOCAL_STORAGE=true. This allows browser playback of
+ * locally generated media without routing through Supabase Storage.
+ */
+if (process.env.USE_LOCAL_STORAGE === 'true' || process.env.USE_LOCAL_STORAGE === '1') {
+  const enrichmentsLocalPath = process.env.ENRICHMENTS_LOCAL_PATH || '/app/data/enrichments';
+  app.use(
+    '/storage/enrichments',
+    express.static(enrichmentsLocalPath, {
+      index: false,
+      fallthrough: false,
+      etag: true,
+      maxAge: IS_PRODUCTION ? '1h' : 0,
+    })
+  );
+
+  logger.info(
+    {
+      route: '/storage/enrichments',
+      enrichmentsLocalPath: path.resolve(enrichmentsLocalPath),
+    },
+    'Local enrichments static route enabled'
+  );
+}
 
 /**
  * tRPC Middleware

@@ -1,34 +1,31 @@
-import { createClient } from '@/lib/supabase/client'
+import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 
 /**
- * Get a signed playback URL for an enrichment's audio asset
- * @param enrichment - The lesson enrichment with asset_id and status
- * @returns Signed URL valid for 1 hour, or null if asset not available
+ * Get playback URL for an enrichment media asset
+ * @param enrichment - The lesson enrichment with ID and status
+ * @returns Playback URL (signed URL for Supabase, public URL for local storage)
  */
 export async function getEnrichmentPlaybackUrl(enrichment: {
-  asset_id?: string | null
+  id: string
   status: string
 }): Promise<string | null> {
-  // Only return URL for completed enrichments with asset_id
-  if (enrichment.status !== 'completed' || !enrichment.asset_id) {
+  // Only return URL for completed enrichments
+  if (enrichment.status !== 'completed') {
     return null
   }
 
-  const supabase = createClient()
-
-  // Get asset file_path from database
-  const { data: asset } = await supabase
-    .from('assets')
-    .select('file_path')
-    .eq('id', enrichment.asset_id)
-    .single()
-
-  if (!asset?.file_path) return null
-
-  // Create signed URL with 1 hour expiry
-  const { data } = await supabase.storage
-    .from('course-assets')
-    .createSignedUrl(asset.file_path, 3600)
-
-  return data?.signedUrl || null
+  try {
+    const client = getBrowserTrpcClient()
+    const result = await client.enrichment.getPlaybackUrl.query({
+      enrichmentId: enrichment.id,
+    })
+    return result.url
+  } catch (error) {
+    console.error(
+      '[storage-helpers] Failed to get playback URL for enrichment',
+      enrichment.id,
+      error
+    )
+    return null
+  }
 }

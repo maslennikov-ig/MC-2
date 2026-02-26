@@ -40,7 +40,9 @@ export function LogsRealtimeProvider({ children }: { children: ReactNode }) {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const channelRef = useRef<RealtimeChannel | null>(null)
 
-  // Subscribe to both error_logs and generation_trace INSERT events
+  // Subscribe to error_logs INSERT events for live notification
+  // generation_trace removed: each INSERT sent full row (10-500 KB prompt_text/completion_text),
+  // then client filtered by error_data — use audit polling instead
   useEffect(() => {
     if (isLoading || !session) {
       log('Waiting for auth before setting up subscription')
@@ -66,22 +68,6 @@ export function LogsRealtimeProvider({ children }: { children: ReactNode }) {
         (payload) => {
           log('New error_log received:', payload.new)
           setHasNewLogs(true)
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'generation_trace',
-        },
-        (payload) => {
-          // Only notify if trace has error_data (failed trace)
-          const record = payload.new as Record<string, unknown>
-          if (record && record.error_data) {
-            log('New failed generation_trace received:', payload.new)
-            setHasNewLogs(true)
-          }
         }
       )
       .subscribe((status) => {
