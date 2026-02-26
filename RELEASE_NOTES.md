@@ -2,6 +2,25 @@
 
 _Released on 2025-12-26_
 
+## v0.31.3
+
+_Released on 2026-02-26_
+
+### 🔧 Improvements
+
+- **Database**: Database health cleanup — reduce size 391→153 MB and optimize egress
+- Migrate 48 router files to shared throwOnSupabaseError utility
+
+### 🐛 Bug Fixes
+
+- **web**: Dynamic import vidstack to prevent intermittent chunk loading errors
+- Code review follow-ups — proper backoff, PGRST116 guards, regression tests
+- Stop misclassifying network errors as "enrichment not found" during polling
+
+---
+
+_This release was automatically generated from 5 commits._
+
 ## v0.31.2
 
 _Released on 2026-02-26_
