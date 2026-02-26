@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.5] - 2026-02-26
+
+### Added
+
+- **enrichments**: fix audio/video playback + expose NLM format options (f292a138)
+- **pipeline**: add Redis read-side cache for Stage 3/4 file content (27ecea1e)
+- **pipeline**: add Redis cache-aside for file and lesson content (a6c05555)
+
+### Fixed
+
+- **enrichments**: persist generation state across lesson navigation (f17acdfa)
+- **pipeline**: address code review issues in Redis cache-aside (ce1029df)
+- **nginx**: add video/mp4 and audio/mpeg MIME types for enrichment storage (b8ab32d0)
+
+### Other
+
+- add plan files, architecture docs, and gitignore .agent/ (53f3caae)
+- update deployment guide (ae039e79)
+
 ## [0.31.4] - 2026-02-26
 
 ### Fixed
