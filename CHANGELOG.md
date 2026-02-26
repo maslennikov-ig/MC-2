@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.3] - 2026-02-26
+
+### Changed
+
+- migrate 48 router files to shared throwOnSupabaseError utility (2529b769)
+- **db**: database health cleanup — reduce size 391→153 MB and optimize egress (2dc55a9d)
+
+### Fixed
+
+- **web**: dynamic import vidstack to prevent intermittent chunk loading errors (78f5bf58)
+- code review follow-ups — proper backoff, PGRST116 guards, regression tests (2cd52755)
+- stop misclassifying network errors as "enrichment not found" during polling (4bc6ddeb)
+
 ## [0.31.2] - 2026-02-26
 
 ### Fixed
