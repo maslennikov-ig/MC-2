@@ -76,7 +76,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 3: Store results in database (30%)
     await job.updateProgress(30);
-    await storeProcessedDocument(fileId, processingResult);
+    await storeProcessedDocument(fileId, processingResult, courseId);
 
     // Phase 4: Update vector_status to 'indexing' (35%)
     await job.updateProgress(35);

@@ -240,7 +240,10 @@ async function generateFinal(
   let rawLessonContent: string | null = null;
 
   try {
-    rawLessonContent = await getLessonContent(enrichmentContext.lesson.id);
+    rawLessonContent = await getLessonContent(
+      enrichmentContext.lesson.id,
+      enrichmentContext.course.id
+    );
   } catch (error) {
     logger.warn(
       {

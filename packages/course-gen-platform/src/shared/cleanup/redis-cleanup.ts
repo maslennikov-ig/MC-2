@@ -77,6 +77,8 @@ export async function cleanupRedisForCourse(courseId: string): Promise<RedisClea
     `idempotency:generation-${courseId}-*`,
     `rag:${courseId}:*`,
     `doc_class:v*:${courseId}:*`,
+    `file_cache:${courseId}:*`,
+    `lesson_md:${courseId}:*`,
   ];
 
   logger.info(
