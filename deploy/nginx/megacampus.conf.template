@@ -93,8 +93,14 @@ server {
         # Enable ETag for conditional requests
         etag on;
 
-        types { image/webp webp; image/png png; image/jpeg jpeg jpg; }
-        default_type image/webp;
+        types {
+            image/webp  webp;
+            image/png   png;
+            image/jpeg  jpeg jpg;
+            video/mp4   mp4;
+            audio/mpeg  mp3;
+        }
+        default_type application/octet-stream;
         try_files $uri =404;
     }
 
