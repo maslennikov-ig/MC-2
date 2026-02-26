@@ -2,6 +2,26 @@
 
 _Released on 2025-12-26_
 
+## v0.31.5
+
+_Released on 2026-02-26_
+
+### ✨ New Features
+
+- **enrichments**: Fix audio/video playback + expose NLM format options
+- **pipeline**: Add Redis read-side cache for Stage 3/4 file content
+- **pipeline**: Add Redis cache-aside for file and lesson content
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Persist generation state across lesson navigation
+- **pipeline**: Address code review issues in Redis cache-aside
+- **nginx**: Add video/mp4 and audio/mpeg MIME types for enrichment storage
+
+---
+
+_This release was automatically generated from 8 commits._
+
 ## v0.31.4
 
 _Released on 2026-02-26_
