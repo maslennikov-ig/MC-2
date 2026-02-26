@@ -53,6 +53,26 @@ const NLM_DEFAULT_VIDEO_FORMAT: NotebookLMVideoFormatPreset = 'explainer';
 const NLM_DEFAULT_VIDEO_STYLE: NotebookLMVideoStylePreset = 'auto_select';
 const NLM_ASYNC_MODE_POLL = 'poll';
 
+function extractBridgeMetadataSummary(
+  responseMetadata: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (!responseMetadata) return undefined;
+  const artifact = responseMetadata.artifact as Record<string, unknown> | undefined;
+  const meta = artifact?.metadata as Record<string, unknown> | undefined;
+  return {
+    task_id: responseMetadata.task_id,
+    status: responseMetadata.status,
+    error: responseMetadata.error,
+    artifact_duration_seconds: artifact?.duration_seconds,
+    artifact_mime_type: artifact?.mime_type,
+    artifact_extension: artifact?.extension,
+    notebook_id: meta?.notebook_id,
+    artifact_id: meta?.artifact_id,
+    recovery_status: meta?.status,
+    source_count: meta?.source_count,
+  };
+}
+
 function buildFullScript(scriptOutput: VideoScriptOutput): string {
   const scriptParts: string[] = [];
 
@@ -297,7 +317,7 @@ async function generateFinal(
             bridge_task_id: bridgeTaskId,
             bridge_task_status: status.status,
             bridge_poll_attempt: pollAttempt,
-            bridge_response: status.responseMetadata,
+            bridge_response: extractBridgeMetadataSummary(status.responseMetadata),
           },
         },
         deferredTask: {
@@ -362,7 +382,7 @@ async function generateFinal(
             bridge_task_id: start.taskId,
             bridge_task_status: start.status,
             bridge_poll_attempt: pollAttempt,
-            bridge_response: start.responseMetadata,
+            bridge_response: extractBridgeMetadataSummary(start.responseMetadata),
           },
         },
         deferredTask: {
@@ -411,8 +431,8 @@ async function generateFinal(
       duration_range_max_minutes: durationGuidance.maxMinutes,
       mime_type: bridgeResult.mimeType,
       format: bridgeResult.extension,
-      bridge_response: bridgeResult.responseMetadata,
-      bridge_start_response: bridgeStartMetadata,
+      bridge_response: extractBridgeMetadataSummary(bridgeResult.responseMetadata),
+      bridge_start_response: extractBridgeMetadataSummary(bridgeStartMetadata),
     },
   };
 
