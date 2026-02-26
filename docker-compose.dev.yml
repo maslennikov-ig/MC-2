@@ -17,14 +17,17 @@ services:
     env_file:
       - .env.dev
     environment:
-      - NOTEBOOKLM_AUTH_JSON=${NOTEBOOKLM_AUTH_JSON:-}
-      - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-}
+      # NOTEBOOKLM_AUTH_JSON passed via env_file when set (must NOT be empty string)
+      - NOTEBOOKLM_STORAGE_PATH=${NOTEBOOKLM_STORAGE_PATH:-/app/secrets/notebooklm/storage_state.json}
       - NOTEBOOKLM_HOME=${NOTEBOOKLM_HOME:-/app/secrets/notebooklm}
       - NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS=${NOTEBOOKLM_GENERATION_TIMEOUT_SECONDS:-3600}
       - NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS=${NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS:-3600}
       - NOTEBOOKLM_HTTP_TIMEOUT_SECONDS=${NOTEBOOKLM_HTTP_TIMEOUT_SECONDS:-60}
       - NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT=${NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT:-12}
       - NOTEBOOKLM_LOG_LEVEL=${NOTEBOOKLM_LOG_LEVEL:-INFO}
+      # Route NotebookLM traffic through bobabuh SOCKS5 proxy (geo-bypass)
+      - HTTPS_PROXY=socks5h://172.19.0.1:1080
+      - HTTP_PROXY=socks5h://172.19.0.1:1080
     volumes:
       - ${NOTEBOOKLM_STORAGE_STATE_DIR:-./secrets/notebooklm}:/app/secrets/notebooklm:ro
     healthcheck:
@@ -112,6 +115,10 @@ services:
       - BULLMQ_QUEUE_NAME=course-generation-dev
       - BULLMQ_STAGE6_QUEUE_NAME=stage6-lesson-content-dev
       - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
+      # Local storage for enrichment playback URLs (must match worker-stage7-dev)
+      - USE_LOCAL_STORAGE=true
+      - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
+      - ENRICHMENTS_PUBLIC_BASE_URL=https://dev.ai.megacampus.ru
     volumes:
       - ./data/uploads-dev:/app/uploads
     healthcheck:

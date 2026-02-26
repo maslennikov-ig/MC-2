@@ -22,6 +22,9 @@ import {
   type AudioEnrichmentContent,
   type PresentationEnrichmentContent,
   type VideoEnrichmentContent,
+  type NlmAudioFormat,
+  type NlmVideoFormat,
+  type NlmVideoStyle,
 } from '@megacampus/shared-types'
 import { cn } from '@/lib/utils'
 import { EnrichmentCardImage } from './EnrichmentCardImage'
@@ -62,61 +65,71 @@ const PLACEHOLDER_CONFIG: Record<
   {
     image: string
     color: string
-    badgeText: string
+    /** i18n key for badge text, or literal string for non-translatable values like aspect ratios */
+    badgeKey: string | null
+    badgeLiteral: string | null
     icon: React.ElementType
   }
 > = {
   quiz: {
     image: '/placeholders/Quiz.webp',
     color: 'text-green-500 dark:text-green-400',
-    badgeText: '~45 сек',
+    badgeKey: 'placeholder.quiz.estimatedTime',
+    badgeLiteral: null,
     icon: HelpCircle,
   },
   audio: {
     image: '/placeholders/Audio.webp',
     color: 'text-purple-500 dark:text-purple-400',
-    badgeText: '~30 сек',
+    badgeKey: 'placeholder.audio.estimatedTime',
+    badgeLiteral: null,
     icon: Headphones,
   },
   nlm_audio: {
     image: '/placeholders/Audio.webp',
     color: 'text-purple-500 dark:text-purple-400',
-    badgeText: '~30 сек',
+    badgeKey: 'placeholder.nlm_audio.estimatedTime',
+    badgeLiteral: null,
     icon: Headphones,
   },
   presentation: {
     image: '/placeholders/Presentation.webp',
     color: 'text-orange-500 dark:text-orange-400',
-    badgeText: '~90 сек',
+    badgeKey: 'placeholder.presentation.estimatedTime',
+    badgeLiteral: null,
     icon: Presentation,
   },
   video: {
     image: '/placeholders/Video.webp',
     color: 'text-red-500 dark:text-red-400',
-    badgeText: 'Скоро',
+    badgeKey: 'placeholder.video.estimatedTime',
+    badgeLiteral: null,
     icon: Video,
   },
   nlm_video: {
     image: '/placeholders/Video.webp',
     color: 'text-red-500 dark:text-red-400',
-    badgeText: '~120 сек',
+    badgeKey: 'placeholder.nlm_video.estimatedTime',
+    badgeLiteral: null,
     icon: Video,
   },
   cover: {
     image: '/placeholders/Cover.webp',
     color: 'text-cyan-500 dark:text-cyan-400',
-    badgeText: '21:9',
+    badgeKey: null,
+    badgeLiteral: '21:9',
     icon: ImageIcon,
   },
   card: {
     image: '/placeholders/Card.webp',
     color: 'text-indigo-500 dark:text-indigo-400',
-    badgeText: '1:1',
+    badgeKey: null,
+    badgeLiteral: '1:1',
     icon: ImageIcon,
   },
 }
 
-const NO_OPTIONS_TYPES: ReadonlySet<EnrichmentType> = new Set(['video', 'nlm_video'])
+const NO_OPTIONS_TYPES: ReadonlySet<EnrichmentType> = new Set(['video'])
 
 function isAudioDraftContent(content: unknown): content is AudioDraftContent {
   return (
@@ -158,7 +171,9 @@ export function UnifiedEnrichmentCard({
   const [audioSpeed, setAudioSpeed] = useState('normal')
   const [presentationSlides, setPresentationSlides] = useState('8')
   const [presentationTheme, setPresentationTheme] = useState('light')
-  const [nlmAudioFormat, setNlmAudioFormat] = useState<'deep_dive' | 'debate'>('deep_dive')
+  const [nlmAudioFormat, setNlmAudioFormat] = useState<NlmAudioFormat>('deep_dive')
+  const [nlmVideoFormat, setNlmVideoFormat] = useState<NlmVideoFormat>('explainer')
+  const [nlmVideoStyle, setNlmVideoStyle] = useState<NlmVideoStyle>('auto_select')
 
   // Options state for cover, card images
   const [imageStyle, setImageStyle] = useState('realistic')
@@ -276,6 +291,10 @@ export function UnifiedEnrichmentCard({
           nlm_audio_format: nlmAudioFormat,
         }
       case 'nlm_video':
+        return {
+          nlm_video_format: nlmVideoFormat,
+          nlm_video_style: nlmVideoStyle,
+        }
       case 'video':
         return {}
       case 'presentation':
@@ -300,6 +319,8 @@ export function UnifiedEnrichmentCard({
     audioVoice,
     audioSpeed,
     nlmAudioFormat,
+    nlmVideoFormat,
+    nlmVideoStyle,
     presentationSlides,
     presentationTheme,
     imageStyle,
@@ -398,7 +419,13 @@ export function UnifiedEnrichmentCard({
       case 'video':
         return { type: 'video' as const }
       case 'nlm_video':
-        return { type: 'nlm_video' as const }
+        return {
+          type: 'nlm_video' as const,
+          nlmVideoFormat,
+          setNlmVideoFormat,
+          nlmVideoStyle,
+          setNlmVideoStyle,
+        }
       default:
         return { type: 'video' as const }
     }
@@ -409,6 +436,8 @@ export function UnifiedEnrichmentCard({
     audioVoice,
     audioSpeed,
     nlmAudioFormat,
+    nlmVideoFormat,
+    nlmVideoStyle,
     presentationSlides,
     presentationTheme,
     hasImage,
@@ -442,7 +471,11 @@ export function UnifiedEnrichmentCard({
         altText={altText || getTitle()}
         hasImage={hasImage}
         shouldShowPanel={shouldShowPanel}
-        badgeText={config.badgeText}
+        badgeText={
+          config.badgeKey
+            ? t(config.badgeKey as Parameters<typeof t>[0])
+            : (config.badgeLiteral ?? '')
+        }
         BadgeIcon={Icon}
         badgeColor={config.color}
         aspectRatio={type === 'cover' ? 'cinematic' : 'square'}

@@ -3,7 +3,17 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { motion } from 'framer-motion'
-import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Loader2 } from 'lucide-react'
+import {
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  SkipBack,
+  SkipForward,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,6 +26,7 @@ interface AudioPlayerProps {
   playbackUrl?: string
   onPlayingChange?: (isPlaying: boolean) => void
   togglePlayRef?: React.MutableRefObject<(() => void) | null>
+  /** Slim overlay controls without play/pause button. Play/pause must be driven externally via togglePlayRef. */
   compact?: boolean
 }
 
@@ -35,6 +46,7 @@ export function AudioPlayer({
   const [volume, setVolume] = useState(0.8)
   const [isMuted, setIsMuted] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(1)
+  const [hasError, setHasError] = useState(false)
 
   // H4: Ref-based isPlaying to avoid stale closures in togglePlay
   const isPlayingRef = useRef(isPlaying)
@@ -78,6 +90,10 @@ export function AudioPlayer({
     }
     const handleLoadStart = () => setIsLoading(true)
     const handleCanPlay = () => setIsLoading(false)
+    const handleError = () => {
+      setIsLoading(false)
+      setHasError(true)
+    }
 
     audio.addEventListener('timeupdate', handleTimeUpdate)
     audio.addEventListener('durationchange', handleDurationChange)
@@ -86,6 +102,7 @@ export function AudioPlayer({
     audio.addEventListener('loadstart', handleLoadStart)
     audio.addEventListener('canplay', handleCanPlay)
     audio.addEventListener('loadeddata', handleCanPlay)
+    audio.addEventListener('error', handleError)
 
     if (audio.readyState >= 1) {
       handleDurationChange()
@@ -102,6 +119,7 @@ export function AudioPlayer({
       audio.removeEventListener('loadstart', handleLoadStart)
       audio.removeEventListener('canplay', handleCanPlay)
       audio.removeEventListener('loadeddata', handleCanPlay)
+      audio.removeEventListener('error', handleError)
 
       audio.pause()
       audio.currentTime = 0
@@ -120,11 +138,13 @@ export function AudioPlayer({
       setIsMuted(false)
       setVolume(0.8)
       setPlaybackRate(1)
+      setHasError(false)
       return
     }
 
     setIsPlaying(false)
     setCurrentTime(0)
+    setHasError(false)
     audio.src = playbackUrl
     audio.load()
 
@@ -187,13 +207,6 @@ export function AudioPlayer({
     const newMutedState = !isMuted
     audio.muted = newMutedState
     setIsMuted(newMutedState)
-    if (!newMutedState && volume === 0) {
-      const restoredVolume = 0.5
-      audio.volume = restoredVolume
-      setVolume(restoredVolume)
-    } else if (newMutedState) {
-      audio.volume = 0
-    }
   }
 
   const changePlaybackRate = () => {
@@ -216,6 +229,47 @@ export function AudioPlayer({
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  if (hasError) {
+    const handleRetry = () => {
+      setHasError(false)
+      const audio = audioRef.current
+      if (audio && playbackUrl) {
+        audio.src = playbackUrl
+        audio.load()
+      }
+    }
+
+    if (compact) {
+      return (
+        <div className="flex items-center justify-center gap-2 px-3 py-2">
+          <AlertCircle className="h-4 w-4 text-red-400" />
+          <span className="text-xs text-white/80">{t('viewer.audioUnavailable')}</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleRetry}
+            className="h-6 px-2 text-xs text-white/80 hover:bg-white/20 hover:text-white"
+          >
+            <RefreshCw className="mr-1 h-3 w-3" />
+            {t('retry')}
+          </Button>
+        </div>
+      )
+    }
+    return (
+      <Card className="border-red-200 bg-red-50 dark:border-red-800/30 dark:bg-red-900/20">
+        <CardContent className="flex items-center justify-center gap-3 py-6">
+          <AlertCircle className="h-6 w-6 text-red-500" />
+          <span className="text-gray-600 dark:text-gray-400">{t('viewer.audioUnavailable')}</span>
+          <Button size="sm" variant="outline" onClick={handleRetry}>
+            <RefreshCw className="mr-1 h-4 w-4" />
+            {t('retry')}
+          </Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   if (!playbackUrl) {

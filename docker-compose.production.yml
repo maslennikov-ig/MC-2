@@ -213,6 +213,10 @@ services:
       - NOTEBOOKLM_BRIDGE_TIMEOUT_MS=${NOTEBOOKLM_BRIDGE_TIMEOUT_MS:-3600000}
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
+      # Local storage for enrichment playback URLs (must match worker-stage7)
+      - USE_LOCAL_STORAGE=true
+      - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
+      - ENRICHMENTS_PUBLIC_BASE_URL=${NEXT_PUBLIC_SITE_URL:-https://ai.megacampus.ru}
     volumes:
       - ./data/uploads:/app/uploads
     healthcheck:

@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { useTranslations } from 'next-intl'
+import type { NlmAudioFormat, NlmVideoFormat, NlmVideoStyle } from '@megacampus/shared-types'
 import { RefreshCw } from 'lucide-react'
 import {
   Select,
@@ -66,12 +67,16 @@ interface VideoOptionsProps {
 
 interface NlmAudioOptionsProps {
   type: 'nlm_audio'
-  nlmAudioFormat: 'deep_dive' | 'debate'
-  setNlmAudioFormat: (value: 'deep_dive' | 'debate') => void
+  nlmAudioFormat: NlmAudioFormat
+  setNlmAudioFormat: (value: NlmAudioFormat) => void
 }
 
 interface NlmVideoOptionsProps {
   type: 'nlm_video'
+  nlmVideoFormat: NlmVideoFormat
+  setNlmVideoFormat: (value: NlmVideoFormat) => void
+  nlmVideoStyle: NlmVideoStyle
+  setNlmVideoStyle: (value: NlmVideoStyle) => void
 }
 
 type BaseOptionsProps = {
@@ -98,8 +103,57 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
   const { onSelectOpenChange } = props
 
   // Video has no options
-  if (props.type === 'video' || props.type === 'nlm_video') {
+  if (props.type === 'video') {
     return null
+  }
+
+  // NLM video options
+  if (props.type === 'nlm_video') {
+    const { nlmVideoFormat, setNlmVideoFormat, nlmVideoStyle, setNlmVideoStyle } = props
+    return (
+      <div className="space-y-3 pt-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmVideo.format')}</label>
+          <Select
+            value={nlmVideoFormat}
+            onValueChange={(value) => setNlmVideoFormat(value as NlmVideoFormat)}
+            onOpenChange={onSelectOpenChange}
+          >
+            <SelectTrigger aria-label={t('forms.nlmVideo.format')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="explainer">{t('forms.nlmVideo.formatExplainer')}</SelectItem>
+              <SelectItem value="brief">{t('forms.nlmVideo.formatBrief')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmVideo.style')}</label>
+          <Select
+            value={nlmVideoStyle}
+            onValueChange={(value) => setNlmVideoStyle(value as NlmVideoStyle)}
+            onOpenChange={onSelectOpenChange}
+          >
+            <SelectTrigger aria-label={t('forms.nlmVideo.style')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto_select">{t('forms.nlmVideo.styleAutoSelect')}</SelectItem>
+              <SelectItem value="custom">{t('forms.nlmVideo.styleCustom')}</SelectItem>
+              <SelectItem value="classic">{t('forms.nlmVideo.styleClassic')}</SelectItem>
+              <SelectItem value="whiteboard">{t('forms.nlmVideo.styleWhiteboard')}</SelectItem>
+              <SelectItem value="kawaii">{t('forms.nlmVideo.styleKawaii')}</SelectItem>
+              <SelectItem value="anime">{t('forms.nlmVideo.styleAnime')}</SelectItem>
+              <SelectItem value="watercolor">{t('forms.nlmVideo.styleWatercolor')}</SelectItem>
+              <SelectItem value="retro_print">{t('forms.nlmVideo.styleRetroPrint')}</SelectItem>
+              <SelectItem value="heritage">{t('forms.nlmVideo.styleHeritage')}</SelectItem>
+              <SelectItem value="paper_craft">{t('forms.nlmVideo.stylePaperCraft')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )
   }
 
   // NLM audio options
@@ -111,14 +165,16 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
           <label className="text-sm font-medium">{t('forms.nlmAudio.format')}</label>
           <Select
             value={nlmAudioFormat}
-            onValueChange={(value) => setNlmAudioFormat(value as 'deep_dive' | 'debate')}
+            onValueChange={(value) => setNlmAudioFormat(value as NlmAudioFormat)}
             onOpenChange={onSelectOpenChange}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t('forms.nlmAudio.format')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="deep_dive">{t('forms.nlmAudio.formatDeepDive')}</SelectItem>
+              <SelectItem value="brief">{t('forms.nlmAudio.formatBrief')}</SelectItem>
+              <SelectItem value="critique">{t('forms.nlmAudio.formatCritique')}</SelectItem>
               <SelectItem value="debate">{t('forms.nlmAudio.formatDebate')}</SelectItem>
             </SelectContent>
           </Select>
@@ -235,7 +291,7 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
             onValueChange={setQuizQuestions}
             onOpenChange={onSelectOpenChange}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t('forms.quiz.questionCount')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -252,7 +308,7 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
             onValueChange={setQuizDifficulty}
             onOpenChange={onSelectOpenChange}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t('forms.quiz.difficulty')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -278,7 +334,7 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
             onValueChange={setAudioVoice}
             onOpenChange={onSelectOpenChange}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t('forms.audio.voice')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -295,7 +351,7 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
             onValueChange={setAudioSpeed}
             onOpenChange={onSelectOpenChange}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t('forms.audio.speed')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -322,7 +378,7 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
             onValueChange={setPresentationSlides}
             onOpenChange={onSelectOpenChange}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t('forms.presentation.slideCount')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -339,7 +395,7 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
             onValueChange={setPresentationTheme}
             onOpenChange={onSelectOpenChange}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t('forms.presentation.theme')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

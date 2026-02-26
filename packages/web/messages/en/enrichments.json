@@ -139,7 +139,26 @@
       "title": "NLM Audio Settings",
       "format": "Narration Format",
       "formatDeepDive": "Deep explanation",
+      "formatBrief": "Brief overview",
+      "formatCritique": "Critical analysis",
       "formatDebate": "Two-host debate"
+    },
+    "nlmVideo": {
+      "title": "NLM Video Settings",
+      "format": "Video Format",
+      "formatExplainer": "Explainer",
+      "formatBrief": "Brief overview",
+      "style": "Visual Style",
+      "styleAutoSelect": "Automatic",
+      "styleCustom": "Custom",
+      "styleClassic": "Classic",
+      "styleWhiteboard": "Whiteboard",
+      "styleKawaii": "Kawaii (cute)",
+      "styleAnime": "Anime",
+      "styleWatercolor": "Watercolor",
+      "styleRetroPrint": "Retro print",
+      "styleHeritage": "Heritage",
+      "stylePaperCraft": "Paper craft"
     },
     "video": {
       "title": "Video Settings",
