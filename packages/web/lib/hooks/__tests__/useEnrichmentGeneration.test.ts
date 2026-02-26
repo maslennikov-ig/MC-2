@@ -687,6 +687,117 @@ describe('useEnrichmentGeneration', () => {
 
       unmount()
     })
+
+    it('should stop polling after MAX_POLL_FAILURES NOT_FOUND errors', async () => {
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+
+      // Always reject with NOT_FOUND (permanent failure)
+      const notFoundError = new TRPCClientError('Enrichment not found', {
+        result: {
+          error: { data: { code: 'NOT_FOUND' }, message: 'Enrichment not found', shape: null },
+        },
+      })
+      mockQueryStatus.mockRejectedValue(notFoundError)
+
+      const onError = vi.fn()
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+          pollingInterval: 50,
+          onError,
+        })
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('quiz')
+      })
+
+      // Wait for 5 NOT_FOUND failures to accumulate (5 polls × ~50ms each + buffer)
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 600))
+      })
+
+      // After MAX_POLL_FAILURES (5) NOT_FOUND errors: onError is called and generating is cleared
+      expect(onError).toHaveBeenCalled()
+      expect(result.current.generating.has('quiz')).toBe(false)
+
+      unmount()
+    })
+
+    it('should NOT stop polling on transient server errors', async () => {
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+
+      // Always reject with a plain Error (transient failure — not a TRPCClientError)
+      mockQueryStatus.mockRejectedValue(new Error('fetch failed'))
+
+      const onError = vi.fn()
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+          pollingInterval: 50,
+          onError,
+        })
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('quiz')
+      })
+
+      // Wait well beyond the 5-failure threshold (which would have stopped NOT_FOUND errors)
+      // Transient errors back off exponentially but never trigger the permanent stop
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 600))
+      })
+
+      // Transient errors must NOT call onError and must NOT clear generating state
+      expect(onError).not.toHaveBeenCalled()
+      expect(result.current.generating.has('quiz')).toBe(true)
+
+      unmount()
+    })
+
+    it('should NOT count INTERNAL_SERVER_ERROR as permanent failure', async () => {
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+
+      // Always reject with INTERNAL_SERVER_ERROR — this is a TRPCClientError but NOT NOT_FOUND
+      const internalError = new TRPCClientError('Internal server error', {
+        result: {
+          error: {
+            data: { code: 'INTERNAL_SERVER_ERROR' },
+            message: 'Internal server error',
+            shape: null,
+          },
+        },
+      })
+      mockQueryStatus.mockRejectedValue(internalError)
+
+      const onError = vi.fn()
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+          pollingInterval: 50,
+          onError,
+        })
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('quiz')
+      })
+
+      // Wait beyond the NOT_FOUND threshold to confirm no permanent stop is triggered
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 600))
+      })
+
+      // INTERNAL_SERVER_ERROR is a transient error: polling continues, onError is never called
+      expect(onError).not.toHaveBeenCalled()
+      expect(result.current.generating.has('quiz')).toBe(true)
+
+      unmount()
+    })
   })
 
   // ===========================================================================
