@@ -9,6 +9,7 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { randomUUID } from 'crypto';
+import { getCachedLessonMarkdown } from '../../../shared/cache/file-content-cache';
 import type {
   EnrichmentType,
   EnrichmentStatus,
@@ -603,8 +604,16 @@ export async function saveDraftContent(
  * @param lessonId - Lesson UUID
  * @returns Lesson content string or null
  */
-export async function getLessonContent(lessonId: string): Promise<string | null> {
+export async function getLessonContent(lessonId: string, courseId: string): Promise<string | null> {
   const supabaseAdmin = getSupabaseAdmin();
+
+  // Try Redis cache first (populated by Stage 6)
+  const cached = await getCachedLessonMarkdown(courseId, lessonId);
+  if (cached) {
+    logger.debug({ lessonId, courseId }, 'getLessonContent: Redis cache hit');
+    return cached;
+  }
+  logger.debug({ lessonId, courseId }, 'getLessonContent: cache miss, falling back to DB');
 
   try {
     // Try lesson_contents table first (Stage 6 output)

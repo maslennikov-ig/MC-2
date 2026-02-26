@@ -182,7 +182,10 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     'NLM audio handler: generating draft'
   );
 
-  const lessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  const lessonContent = await getLessonContent(
+    enrichmentContext.lesson.id,
+    enrichmentContext.course.id
+  );
   if (!lessonContent) {
     throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
   }
@@ -245,7 +248,10 @@ async function generateFinal(
   let rawLessonContent: string | null = null;
 
   try {
-    rawLessonContent = await getLessonContent(enrichmentContext.lesson.id);
+    rawLessonContent = await getLessonContent(
+      enrichmentContext.lesson.id,
+      enrichmentContext.course.id
+    );
   } catch (error) {
     logger.warn(
       {

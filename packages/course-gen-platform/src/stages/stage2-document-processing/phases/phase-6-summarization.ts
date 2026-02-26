@@ -182,6 +182,7 @@ export async function executePhase6Summarization(
   // Step 4: Check if should bypass summarization (small documents)
   if (estimatedTokens < DEFAULT_NO_SUMMARY_THRESHOLD) {
     return await handleSmallDocument(
+      courseId,
       fileId,
       extractedText,
       titleLanguage,
@@ -232,6 +233,7 @@ export async function executePhase6Summarization(
 
 /** Handle small documents by storing full text without summarization */
 async function handleSmallDocument(
+  courseId: string,
   fileId: string,
   extractedText: string,
   titleLanguage: string,
@@ -250,6 +252,7 @@ async function handleSmallDocument(
 
   options?.onProgress?.(90, 'Storing full text');
   const result = await storeFullText(
+    courseId,
     fileId,
     extractedText,
     generatedTitle,
@@ -308,6 +311,7 @@ async function executeSummarizationWithRetry(
       // If quality passed, store and return
       if (attemptResult.qualityCheck.quality_check_passed) {
         return await handleQualityPassed(
+          courseId,
           fileId,
           attemptResult,
           titleLanguage,
@@ -360,6 +364,7 @@ async function executeSummarizationWithRetry(
 
       if (currentAttempt >= maxRetries) {
         return await handleAllAttemptsFailed(
+          courseId,
           fileId,
           extractedText,
           titleLanguage,
@@ -380,6 +385,7 @@ async function executeSummarizationWithRetry(
   logger.error({ fileId }, '[Phase 6] Unexpected retry loop exit, falling back to full text');
   const fallbackTitle = await generateDocumentTitle(extractedText, titleLanguage);
   return await storeFullText(
+    courseId,
     fileId,
     extractedText,
     fallbackTitle,
@@ -440,6 +446,7 @@ async function loadRetryConfig(
 
 /** Handle successful quality validation - store summary and return */
 async function handleQualityPassed(
+  courseId: string,
   fileId: string,
   attemptResult: SummarizationAttemptResult,
   titleLanguage: string,
@@ -457,6 +464,7 @@ async function handleQualityPassed(
 
   options?.onProgress?.(progressBase + 15, 'Storing summary');
   const result = await storeSummary(
+    courseId,
     fileId,
     chunkingResult.summary,
     generatedTitle,
@@ -510,6 +518,7 @@ async function handleMaxRetriesReached(
 
   options?.onProgress?.(progressBase + 15, 'Storing best-effort summary');
   return await storeSummary(
+    courseId,
     fileId,
     chunkingResult.summary,
     generatedTitle,
@@ -528,6 +537,7 @@ async function handleMaxRetriesReached(
 
 /** Handle all attempts failed - fall back to full text */
 async function handleAllAttemptsFailed(
+  courseId: string,
   fileId: string,
   extractedText: string,
   titleLanguage: string,
@@ -547,6 +557,7 @@ async function handleAllAttemptsFailed(
 
   options?.onProgress?.(90, 'Storing full text (fallback)');
   return await storeFullText(
+    courseId,
     fileId,
     extractedText,
     generatedTitle,

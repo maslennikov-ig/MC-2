@@ -4,6 +4,7 @@ import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
 import { notifyCourseCompletion } from '@/shared/notifications/course-notifications';
 import type { Stage6Output } from '../orchestrator';
 import { extractContentMarkdown } from './content-utils';
+import { cacheLessonMarkdown } from '../../../shared/cache/file-content-cache';
 import type { SanityCheckResult } from '../utils/sanity-check';
 import {
   LessonUUID,
@@ -43,6 +44,7 @@ export async function handlePartialSuccess(
   try {
     // Save partial content to lesson_contents table (not lessons table)
     // Serialize content to convert Date objects to strings (LessonContent has Date fields)
+    const markdown = extractContentMarkdown(result.lessonContent, language);
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
@@ -50,7 +52,7 @@ export async function handlePartialSuccess(
       status: 'review_required', // Mark as partial success requiring review
       metadata: JSON.parse(
         JSON.stringify({
-          markdownContent: extractContentMarkdown(result.lessonContent, language),
+          markdownContent: markdown,
           partial: true,
           errors: result.errors,
           modelUsed: result.metrics.modelUsed,
@@ -240,6 +242,7 @@ export async function saveLessonContent(
       return;
     }
 
+    const markdown = extractContentMarkdown(result.lessonContent, language);
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
@@ -260,7 +263,7 @@ export async function saveLessonContent(
           regenerationMode: result.metrics.regenerationMode ?? null,
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
-          markdownContent: extractContentMarkdown(result.lessonContent, language),
+          markdownContent: markdown,
           sanityCheck: sanityResult
             ? {
                 passed: sanityResult.ok,
@@ -289,6 +292,10 @@ export async function saveLessonContent(
         'Failed to persist lesson content to database (content available in job result)'
       );
     } else {
+      // Cache lesson markdown in Redis for Stage 7 fast access
+      if (lessonUuid) {
+        void cacheLessonMarkdown(courseId, lessonUuid, markdown);
+      }
       logger.info(
         {
           courseId,

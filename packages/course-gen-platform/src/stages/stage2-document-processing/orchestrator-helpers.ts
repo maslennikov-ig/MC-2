@@ -16,6 +16,7 @@ import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator, type Locale } from '../../shared/i18n';
+import { cacheFileMarkdown } from '../../shared/cache/file-content-cache';
 
 // Re-export PhaseContext for backward compatibility
 export type { PhaseContext } from './orchestrator-phase-helpers';
@@ -158,7 +159,8 @@ export async function getFileMetadata(fileId: string): Promise<{
  */
 export async function storeProcessedDocument(
   fileId: string,
-  processingResult: DocumentProcessingResult
+  processingResult: DocumentProcessingResult,
+  courseId: string
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
 
@@ -175,6 +177,8 @@ export async function storeProcessedDocument(
     logger.error({ err: error, fileId }, 'Failed to store processed document');
     throw new Error(`Failed to store processed document: ${error.message}`);
   }
+
+  void cacheFileMarkdown(courseId, fileId, processingResult.markdown);
 
   logger.info(
     {
