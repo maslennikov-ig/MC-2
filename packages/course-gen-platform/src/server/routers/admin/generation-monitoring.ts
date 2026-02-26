@@ -36,7 +36,10 @@ export const generationMonitoringRouter = router({
         const supabase = getSupabaseAdmin();
         let query = supabase
           .from('generation_trace')
-          .select('*', { count: 'exact' })
+          .select(
+            'id, course_id, lesson_id, stage, phase, step_name, model_used, tokens_used, cost_usd, duration_ms, retry_attempt, was_cached, quality_score, temperature, error_data, created_at',
+            { count: 'exact' }
+          )
           .eq('course_id', input.courseId)
           .order('created_at', { ascending: false });
 
@@ -82,12 +85,16 @@ export const generationMonitoringRouter = router({
             .order('changed_at', { ascending: false }),
           supabase
             .from('lessons')
-            .select('*, lesson_contents(*)')
+            .select(
+              'id, title, order_index, lesson_type, status, created_at, lesson_contents(id, status, generation_attempt, created_at)'
+            )
             .eq('course_id', input.courseId)
             .order('order_index', { ascending: true }),
           supabase
             .from('generation_trace')
-            .select('*')
+            .select(
+              'id, stage, phase, step_name, model_used, lesson_id, tokens_used, cost_usd, duration_ms, error_data, retry_attempt, quality_score, created_at'
+            )
             .eq('course_id', input.courseId)
             .order('created_at', { ascending: false })
             .limit(20),
@@ -437,7 +444,9 @@ export const generationMonitoringRouter = router({
         const supabase = getSupabaseAdmin();
         const { data } = await supabase
           .from('generation_trace')
-          .select('*')
+          .select(
+            'id, course_id, lesson_id, stage, phase, step_name, model_used, tokens_used, cost_usd, duration_ms, retry_attempt, was_cached, quality_score, temperature, error_data, input_data, output_data, created_at'
+          )
           .eq('course_id', input.courseId)
           .order('created_at', { ascending: true });
 
