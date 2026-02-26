@@ -6,7 +6,7 @@ import type { Database } from '@/types/database.generated'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
-const mockStartGeneration = vi.fn()
+const mockStartGeneration = vi.fn().mockResolvedValue(null)
 const mockCancelGeneration = vi.fn()
 const mockResumeGeneration = vi.fn()
 const mockIsGenerating = vi.fn(() => false)
@@ -34,6 +34,7 @@ vi.mock('@/lib/hooks/useEnrichmentGeneration', () => ({
     isRecentlyCompleted: vi.fn(() => false),
     clearRecentlyCompleted: vi.fn(),
   })),
+  getMaxDurationForType: vi.fn(() => undefined),
 }))
 
 vi.mock('@megacampus/shared-types', () => ({

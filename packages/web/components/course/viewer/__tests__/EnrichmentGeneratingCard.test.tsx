@@ -16,6 +16,7 @@ const mockStatusMessage = {
 }
 vi.mock('@/lib/hooks/useRotatingStatusMessage', () => ({
   useRotatingStatusMessage: vi.fn(() => mockStatusMessage),
+  getMessageByProgress: vi.fn(() => 'Генерируем контент...'),
 }))
 
 vi.mock('@megacampus/shared-types', () => ({
@@ -249,6 +250,7 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'syncing',
         interval: 5000,
+        enabled: true,
       })
     })
 
@@ -258,6 +260,7 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'quiz_generating',
         interval: 5000,
+        enabled: true,
       })
     })
 
@@ -267,17 +270,19 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'audio_generating',
         interval: 5000,
+        enabled: true,
       })
     })
 
-    it('should call useRotatingStatusMessage with "audio_generating" for nlm_audio type', () => {
+    it('should call useRotatingStatusMessage with "nlm_audio_generating" for nlm_audio type', () => {
       render(
         <EnrichmentGeneratingCard {...defaultProps} type="nlm_audio" currentStep="generating" />
       )
 
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
-        status: 'audio_generating',
+        status: 'nlm_audio_generating',
         interval: 5000,
+        enabled: true,
       })
     })
 
@@ -287,17 +292,19 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'video_generating',
         interval: 5000,
+        enabled: true,
       })
     })
 
-    it('should call useRotatingStatusMessage with "video_generating" for nlm_video type', () => {
+    it('should call useRotatingStatusMessage with "nlm_video_generating" for nlm_video type', () => {
       render(
         <EnrichmentGeneratingCard {...defaultProps} type="nlm_video" currentStep="generating" />
       )
 
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
-        status: 'video_generating',
+        status: 'nlm_video_generating',
         interval: 5000,
+        enabled: true,
       })
     })
 
@@ -309,6 +316,7 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'presentation_generating',
         interval: 5000,
+        enabled: true,
       })
     })
 
@@ -318,6 +326,7 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'cover_generating',
         interval: 5000,
+        enabled: true,
       })
     })
 
@@ -327,6 +336,7 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'cover_generating',
         interval: 5000,
+        enabled: true,
       })
     })
 
@@ -336,6 +346,7 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'queued',
         interval: 5000,
+        enabled: true,
       })
     })
   })
@@ -617,6 +628,7 @@ describe('EnrichmentGeneratingCard', () => {
       expect(useRotatingStatusMessage).toHaveBeenCalledWith({
         status: 'syncing',
         interval: 5000,
+        enabled: true,
       })
     })
 

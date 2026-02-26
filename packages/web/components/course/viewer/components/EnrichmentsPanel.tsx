@@ -7,7 +7,7 @@ import { FileText, AlertTriangle } from 'lucide-react'
 import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
 import { UnifiedEnrichmentCard } from './UnifiedEnrichmentCard'
 import { EnrichmentGeneratingCard } from './EnrichmentGeneratingCard'
-import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
+import { useEnrichmentGeneration, getMaxDurationForType } from '@/lib/hooks/useEnrichmentGeneration'
 import type { Database } from '@/types/database.generated'
 import { EnrichmentCard } from './EnrichmentCard'
 import {
@@ -51,7 +51,7 @@ function isEnrichmentOnDemand(
 }
 
 interface EnrichmentsPanelProps {
-  enrichments: EnrichmentRow[]
+  enrichments?: EnrichmentRow[]
   /** Error message if enrichments failed to load */
   enrichmentsLoadError?: string
   /** Whether enrichments are being loaded/refetched */
@@ -73,6 +73,7 @@ export function EnrichmentsPanel({
   onRefreshEnrichments,
 }: EnrichmentsPanelProps) {
   const t = useTranslations('enrichments')
+  const safeEnrichments = enrichments ?? []
   const [activeEnrichmentId, setActiveEnrichmentId] = useState<string | null>(null)
 
   // Handle generation completion
@@ -114,12 +115,14 @@ export function EnrichmentsPanel({
   // Only ONE enrichment per type is supported at a time
   const resumedTypesRef = useRef(new Set<string>())
 
-  // Track if we just switched lessons to avoid acting on stale cached data
-  const isInitialLoadRef = useRef(false)
-  const lessonSwitchTimeRef = useRef<number>(0)
-
   // Distinguish first mount (SSR data is fresh) from SPA lesson switch (data may be stale)
   const isFirstMountRef = useRef(true)
+
+  // Reference-based stale guard: snapshot enrichments on lesson switch,
+  // skip resume until fresh data arrives (different reference)
+  const staleEnrichmentsRef = useRef<EnrichmentRow[] | undefined | null>(null)
+  const enrichmentsLiveRef = useRef(enrichments)
+  enrichmentsLiveRef.current = enrichments
 
   // Reset state when lessonId changes (SPA lesson switch only, not first mount)
   useEffect(() => {
@@ -128,26 +131,20 @@ export function EnrichmentsPanel({
       return // First mount: SSR data is fresh, no stale guard needed
     }
     resumedTypesRef.current.clear()
-    isInitialLoadRef.current = true
-    lessonSwitchTimeRef.current = Date.now()
+    staleEnrichmentsRef.current = enrichmentsLiveRef.current
   }, [lessonId])
 
   // Resume polling for active enrichments on mount and when new active enrichments appear
   useEffect(() => {
-    // Skip if this is the initial render after lesson switch
-    // Wait for fresh data to arrive (avoid acting on stale cache)
-    if (isInitialLoadRef.current) {
-      isInitialLoadRef.current = false
-      // If data arrived very quickly after lesson switch, it might be stale cache
-      // Wait a bit before trusting it
-      const timeSinceSwitch = Date.now() - lessonSwitchTimeRef.current
-      if (timeSinceSwitch < 100) {
-        return // Skip this render, wait for fresh data
-      }
+    // Reference-based stale guard: skip resume until enrichments reference changes
+    // (indicates fresh data from refetch, not stale cache)
+    if (staleEnrichmentsRef.current !== null) {
+      if (enrichments === staleEnrichmentsRef.current) return
+      staleEnrichmentsRef.current = null
     }
 
     // Find enrichments that need resuming (active + on-demand + type not yet resumed)
-    const activeEnrichments = enrichments
+    const activeEnrichments = (enrichments ?? [])
       .filter((e) => isActiveGenerationStatus(e.status))
       .filter(isEnrichmentOnDemand)
       .filter((e) => !resumedTypesRef.current.has(e.enrichment_type))
@@ -165,7 +162,9 @@ export function EnrichmentsPanel({
 
     // Cleanup: remove types for enrichments that are no longer active
     const currentActiveTypes = new Set<string>(
-      enrichments.filter((e) => isActiveGenerationStatus(e.status)).map((e) => e.enrichment_type)
+      (enrichments ?? [])
+        .filter((e) => isActiveGenerationStatus(e.status))
+        .map((e) => e.enrichment_type)
     )
     resumedTypesRef.current.forEach((type) => {
       if (!currentActiveTypes.has(type)) {
@@ -180,7 +179,7 @@ export function EnrichmentsPanel({
     ALL_PLACEHOLDER_TYPES.forEach((type) => {
       if (
         isRecentlyCompleted(type) &&
-        enrichments.some((e) => e.enrichment_type === type && e.status === 'completed')
+        safeEnrichments.some((e) => e.enrichment_type === type && e.status === 'completed')
       ) {
         clearRecentlyCompleted(type)
       }
@@ -188,7 +187,9 @@ export function EnrichmentsPanel({
   }, [enrichments, isRecentlyCompleted, clearRecentlyCompleted])
 
   // Filter out cover type - it's displayed as hero banner in lesson content
-  const filteredEnrichments = enrichments.filter((e) => (e.enrichment_type as string) !== 'cover')
+  const filteredEnrichments = safeEnrichments.filter(
+    (e) => (e.enrichment_type as string) !== 'cover'
+  )
 
   // Show error banner if there was a load error
   if (enrichmentsLoadError) {
@@ -318,7 +319,7 @@ export function EnrichmentsPanel({
           // For image types: pass existing enrichment to support preview/regeneration.
           // For 'card' type: exclude course-card (title='course-card') - only show lesson cards.
           const existingEnrichment = isImageType
-            ? enrichments.find(
+            ? safeEnrichments.find(
                 (e) => e.enrichment_type === type && (type !== 'card' || e.title !== 'course-card')
               ) || null
             : null
@@ -343,7 +344,10 @@ export function EnrichmentsPanel({
           const activeEnrichmentForType = groupedEnrichments[type]?.find(
             (e) => isActiveGenerationStatus(e.status) && isEnrichmentOnDemand(e)
           )
-          if (activeEnrichmentForType) {
+          if (
+            activeEnrichmentForType &&
+            !(isNlmType(type) && isLegacyNlmDraftStatus(activeEnrichmentForType.status))
+          ) {
             const parsedCreatedAt = Date.parse(activeEnrichmentForType.created_at ?? '')
             return (
               <EnrichmentGeneratingCard
@@ -353,7 +357,9 @@ export function EnrichmentsPanel({
                 currentStep="syncing"
                 startedAtMs={Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined}
                 maxDurationMs={
-                  NLM_ENRICHMENT_TYPES.has(type as NlmEnrichmentType) ? 60 * 60 * 1000 : undefined
+                  NLM_ENRICHMENT_TYPES.has(type as NlmEnrichmentType)
+                    ? getMaxDurationForType(type as OnDemandEnrichmentType)
+                    : undefined
                 }
                 onCancel={() => void cancelGeneration(type)}
               />
@@ -374,7 +380,9 @@ export function EnrichmentsPanel({
                 if (type === 'video') {
                   return
                 }
-                void startGeneration(type, settings)
+                void startGeneration(type, settings).then((enrichmentId) => {
+                  if (enrichmentId) onRefreshEnrichments?.()
+                })
               }}
               disabled={type === 'video' || !lessonId}
               isGenerating={typeIsGenerating}

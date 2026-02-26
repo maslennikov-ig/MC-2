@@ -331,7 +331,7 @@ export function LessonView({
 
       <TabsContent value="enrichments" className="mt-0 p-6">
         <EnrichmentsPanel
-          enrichments={enrichments || []}
+          enrichments={enrichments}
           enrichmentsLoadError={enrichmentsLoadError}
           isLoading={isEnrichmentsLoading}
           lessonId={currentLesson.id}

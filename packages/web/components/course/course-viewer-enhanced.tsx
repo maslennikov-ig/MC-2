@@ -107,10 +107,7 @@ export default function CourseViewerEnhanced({
     if (prevLessonId === undefined) return undefined
 
     if (prevLessonId !== currentLessonId && currentLessonId) {
-      const timeoutId = setTimeout(() => {
-        void refreshEnrichments()
-      }, 150)
-      return () => clearTimeout(timeoutId)
+      void refreshEnrichments()
     }
     return undefined
   }, [currentLessonId, prevLessonId, refreshEnrichments])
@@ -263,7 +260,9 @@ export default function CourseViewerEnhanced({
                 onMarkComplete={markLessonComplete}
                 onExitFocus={() => setFocusMode(false)}
                 onRefreshEnrichments={() => void refreshEnrichments()}
-                courseLanguage={(course.request_data?.language as string) || course.language || 'ru'}
+                courseLanguage={
+                  (course.request_data?.language as string) || course.language || 'ru'
+                }
               />
             ) : (
               <div className="flex h-full items-center justify-center">
