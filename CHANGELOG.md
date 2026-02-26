@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.2] - 2026-02-26
+
+### Fixed
+
+- **nlm-bridge**: strip bloated metadata from bridge responses and harden recovery logic (34714ead)
+- enrichment card transition after generation + audio single-click play + metadata perf (db2e322f)
+- prevent Select dropdown from closing in enrichment card hover panel (b3f850c5)
+
 ## [0.31.1] - 2026-02-25
 
 ### Added

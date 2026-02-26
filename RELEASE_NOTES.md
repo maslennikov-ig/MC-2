@@ -2,6 +2,20 @@
 
 _Released on 2025-12-26_
 
+## v0.31.2
+
+_Released on 2026-02-26_
+
+### 🐛 Bug Fixes
+
+- **nlm-bridge**: Strip bloated metadata from bridge responses and harden recovery logic
+- Enrichment card transition after generation + audio single-click play + metadata perf
+- Prevent Select dropdown from closing in enrichment card hover panel
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.31.1
 
 _Released on 2026-02-25_
