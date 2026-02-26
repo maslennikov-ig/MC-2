@@ -31,8 +31,8 @@ import {
 } from '@/shared/errors';
 import type { Stage4BudgetAllocation } from './phases/stage4-budget-allocator';
 import {
-  getCachedFileProcessedContent,
-  getCachedFileMarkdown,
+  getCachedFileProcessedContentBatch,
+  getCachedFileMarkdownBatch,
 } from '../../shared/cache/file-content-cache';
 
 // ============================================================================
@@ -334,7 +334,9 @@ async function fetchCourseMetadata(courseId: string): Promise<{
 async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummaryResult[]> {
   const supabase = getSupabaseAdmin();
 
-  // Step 1: Light metadata query (no processed_content — save Supabase egress)
+  // Step 1: Light metadata query (no processed_content — save Supabase egress).
+  // processed_content is intentionally excluded from SELECT to save egress;
+  // the NOT NULL filter still applies at the DB level (WHERE is independent of SELECT).
   const { data: documents } = await supabase
     .from('file_catalog')
     .select('id, original_name, filename, summary_metadata, priority')
@@ -344,22 +346,34 @@ async function fetchDocumentSummaries(courseId: string): Promise<DocumentSummary
 
   if (!documents || documents.length === 0) return [];
 
-  // Step 2: Get processed_content from Redis cache
-  const contentMap = new Map<string, string>();
-  await Promise.all(
-    documents.map(async doc => {
-      const cached = await getCachedFileProcessedContent(courseId, doc.id);
-      if (cached) contentMap.set(doc.id, cached);
-    })
-  );
+  // Step 2: Get processed_content from Redis cache (single mget round-trip)
+  const docIds = documents.map(d => d.id);
+  const contentMap = await getCachedFileProcessedContentBatch(courseId, docIds);
 
   // Step 3: For cache misses, batch-fetch content from Supabase
   const missedIds = documents.filter(d => !contentMap.has(d.id)).map(d => d.id);
+
+  logger.debug(
+    {
+      courseId,
+      documentCount: documents.length,
+      cacheHits: contentMap.size,
+      cacheMisses: missedIds.length,
+    },
+    '[Stage4] Redis cache-aside for processed_content'
+  );
+
   if (missedIds.length > 0) {
-    const { data: contentData } = await supabase
+    const { data: contentData, error: contentError } = await supabase
       .from('file_catalog')
       .select('id, processed_content')
       .in('id', missedIds);
+    if (contentError) {
+      logger.warn(
+        { courseId, missedIds, error: contentError.message },
+        '[Stage4] Supabase fallback for processed_content failed — documents will have empty content'
+      );
+    }
     for (const d of contentData || []) {
       if (d.processed_content) contentMap.set(d.id, d.processed_content);
     }
@@ -395,24 +409,24 @@ async function fetchFullTextDocuments(
 ): Promise<Map<string, string>> {
   if (documentIds.length === 0) return new Map();
 
-  // Try Redis first
-  const map = new Map<string, string>();
-  await Promise.all(
-    documentIds.map(async id => {
-      const cached = await getCachedFileMarkdown(courseId, id);
-      if (cached) map.set(id, cached);
-    })
-  );
+  // Try Redis first (single mget round-trip)
+  const map = await getCachedFileMarkdownBatch(courseId, documentIds);
 
   // Fetch remaining from Supabase
   const missedIds = documentIds.filter(id => !map.has(id));
   if (missedIds.length > 0) {
     const supabase = getSupabaseAdmin();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('file_catalog')
       .select('id, markdown_content')
       .in('id', missedIds)
       .not('markdown_content', 'is', null);
+    if (error) {
+      logger.warn(
+        { courseId, missedIds, error: error.message },
+        '[Stage4] Supabase fallback for markdown_content failed'
+      );
+    }
     for (const doc of data || []) {
       if (doc.markdown_content) map.set(doc.id, doc.markdown_content);
     }
