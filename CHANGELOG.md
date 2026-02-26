@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.4] - 2026-02-26
+
+### Fixed
+
+- **web**: restore enrichment generation state after page navigation (0c960ac6)
+
 ## [0.31.3] - 2026-02-26
 
 ### Changed
