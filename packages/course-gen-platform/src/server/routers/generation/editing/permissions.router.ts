@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { instructorProcedure } from '../../../procedures';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { canUserEditCourse } from '../_shared/helpers';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 export const permissionsRouter = {
   getEditPermissions: instructorProcedure
@@ -25,7 +26,8 @@ export const permissionsRouter = {
         .eq('id', courseId)
         .single();
 
-      if (error || !course) {
+      throwOnSupabaseError(error, 'Course', { courseId, userId: user.id });
+      if (!course) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Course not found',

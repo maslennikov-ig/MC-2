@@ -21,6 +21,7 @@ import type { PromptTemplate } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 // =============================================================================
 // Prompts Router
@@ -145,7 +146,8 @@ export const promptsRouter = router({
           .eq('id', input.id)
           .single();
 
-        if (error || !data) {
+        throwOnSupabaseError(error, 'Prompt template', { promptId: input.id });
+        if (!data) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Prompt template not found',
@@ -247,7 +249,8 @@ export const promptsRouter = router({
           .eq('id', input.id)
           .single();
 
-        if (fetchError || !currentPrompt) {
+        throwOnSupabaseError(fetchError, 'Prompt template', { promptId: input.id });
+        if (!currentPrompt) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Prompt template not found',
@@ -318,10 +321,15 @@ export const promptsRouter = router({
           .select('*, users:created_by(email)')
           .single();
 
-        if (insertError || !insertedPrompt) {
+        throwOnSupabaseError(insertError, 'Prompt template', {
+          promptId: input.id,
+          stage: currentPrompt.stage,
+          promptKey: currentPrompt.prompt_key,
+        });
+        if (!insertedPrompt) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: `Failed to insert new prompt version: ${insertError?.message}`,
+            message: 'Failed to insert new prompt version',
           });
         }
 
@@ -515,7 +523,12 @@ export const promptsRouter = router({
           .eq('version', input.targetVersion)
           .single();
 
-        if (fetchError || !targetPrompt) {
+        throwOnSupabaseError(fetchError, 'Prompt template version', {
+          stage: input.stage,
+          promptKey: input.promptKey,
+          targetVersion: input.targetVersion,
+        });
+        if (!targetPrompt) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: `Version ${input.targetVersion} not found for ${input.stage}/${input.promptKey}`,
@@ -531,7 +544,11 @@ export const promptsRouter = router({
           .eq('is_active', true)
           .single();
 
-        if (currentError || !currentActive) {
+        throwOnSupabaseError(currentError, 'Active prompt template', {
+          stage: input.stage,
+          promptKey: input.promptKey,
+        });
+        if (!currentActive) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'No active prompt found to deactivate',
@@ -582,10 +599,15 @@ export const promptsRouter = router({
           .select('*, users:created_by(email)')
           .single();
 
-        if (insertError || !insertedPrompt) {
+        throwOnSupabaseError(insertError, 'Prompt template', {
+          stage: input.stage,
+          promptKey: input.promptKey,
+          targetVersion: input.targetVersion,
+        });
+        if (!insertedPrompt) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: `Failed to insert reverted prompt: ${insertError?.message}`,
+            message: 'Failed to insert reverted prompt',
           });
         }
 

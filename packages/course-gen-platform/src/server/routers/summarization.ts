@@ -23,6 +23,7 @@ import { router } from '../trpc';
 import { protectedProcedure } from '../middleware/auth';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import type { SummaryMetadata } from '@megacampus/shared-types';
+import { throwOnSupabaseError } from '../utils/supabase-query-guard';
 
 /**
  * Input schema for getCostAnalytics endpoint
@@ -274,7 +275,11 @@ export const summarizationRouter = router({
         .eq('organization_id', ctx.user.organizationId)
         .single();
 
-      if (courseError || !course) {
+      throwOnSupabaseError(courseError, 'Course', {
+        courseId: input.course_id,
+        organizationId: ctx.user.organizationId,
+      });
+      if (!course) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Course not found or access denied',
@@ -368,7 +373,11 @@ export const summarizationRouter = router({
         .eq('organization_id', ctx.user.organizationId)
         .single();
 
-      if (error || !file) {
+      throwOnSupabaseError(error, 'File', {
+        fileId: input.file_id,
+        organizationId: ctx.user.organizationId,
+      });
+      if (!file) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'File not found or access denied',

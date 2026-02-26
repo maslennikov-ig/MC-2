@@ -10,6 +10,7 @@ import { TRPCError } from '@trpc/server';
 import { instructorProcedure } from '../../../procedures';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 /**
  * Type for course edit records returned from the database
@@ -64,7 +65,8 @@ export const editHistoryRouter = {
         .eq('id', courseId)
         .single();
 
-      if (courseError || !course) {
+      throwOnSupabaseError(courseError, 'Course', { courseId });
+      if (!course) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Course not found',

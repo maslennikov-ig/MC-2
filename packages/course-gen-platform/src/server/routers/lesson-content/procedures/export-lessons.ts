@@ -12,6 +12,7 @@ import { exportLessonsInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { getContentLabels, validateLanguageCode } from '@megacampus/shared-types';
 
 /**
@@ -166,11 +167,8 @@ export const exportLessons = protectedProcedure
         .eq('order_index', moduleNumber)
         .single();
 
-      if (sectionError || !section) {
-        logger.warn(
-          { requestId, courseId, moduleNumber, error: sectionError?.message },
-          'Module not found'
-        );
+      throwOnSupabaseError(sectionError, 'Module', { requestId, courseId, moduleNumber });
+      if (!section) {
         throw new TRPCError({ code: 'NOT_FOUND', message: `Module ${moduleNumber} not found` });
       }
 

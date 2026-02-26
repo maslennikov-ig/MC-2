@@ -15,6 +15,7 @@ import { nanoid } from 'nanoid';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { removeJobsByCourseId } from '../../../../orchestrator/queue';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 export const cancelRouter = {
   cancelGeneration: instructorProcedure
@@ -34,9 +35,8 @@ export const cancelRouter = {
           .eq('id', courseId)
           .single();
 
-        if (fetchError || !course) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-        }
+        throwOnSupabaseError(fetchError, 'Course', { requestId, courseId, userId });
+        if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         assertCourseAccess(buildAuthContext(ctx.user!), course, 'cancel generation');
 

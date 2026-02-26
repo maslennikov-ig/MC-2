@@ -17,6 +17,7 @@ import { TRPCError } from '@trpc/server';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { ClarifyingQuestionRow, UserAnswerValue, Database } from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../utils/supabase-query-guard';
 
 // Re-export approve-and-proceed helpers so the router can import from one place
 export {
@@ -87,9 +88,8 @@ export async function verifyCourseAccess(
     .eq('id', courseId)
     .single();
 
-  if (error || !course) {
-    logger.warn({ requestId, courseId, userId, error }, 'Course not found');
-
+  throwOnSupabaseError(error, 'Course', { requestId, courseId, userId });
+  if (!course) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Course not found',
@@ -144,9 +144,8 @@ export async function verifyQuestionAccess(
     .eq('id', questionId)
     .single();
 
-  if (error || !question) {
-    logger.warn({ requestId, questionId, userId, error }, 'Question not found');
-
+  throwOnSupabaseError(error, 'Question', { requestId, questionId, userId });
+  if (!question) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Question not found',

@@ -23,6 +23,7 @@ import { workerReadiness, getReadinessFromRedis } from '../../../../orchestrator
 import { logTrace } from '../../../../shared/trace-logger';
 import { validateLocale } from '@/shared/validation';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import * as path from 'path';
 
 export const initiateRouter = {
@@ -46,10 +47,8 @@ export const initiateRouter = {
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-        }
+        throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+        if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         assertCourseAccess(buildAuthContext(currentUser), course, 'initiate generation');
 

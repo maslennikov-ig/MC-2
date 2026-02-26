@@ -25,6 +25,7 @@ import { contextCacheManager } from '../../../../shared/regeneration/context-cac
 import { setNestedValue } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { assertStableIds } from '../../../../shared/course-nodes/feature-flags';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
 import { writeCourseNodes } from '../../../../shared/course-nodes/writer';
 import { ensureStableIdsAndSchemaVersionInMemory } from '../../../../stages/stage5-generation/utils/course-structure-editor';
@@ -53,13 +54,8 @@ export const regenerationRouter = {
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Course not found',
-          });
-        }
+        throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+        if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         // Check authorization: superadmin/admin/owner can regenerate
         assertCourseAccess(buildAuthContext(ctx.user), course, 'regenerate block');

@@ -12,6 +12,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@megacampus/shared-types';
 import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 import type { LogType, LogStatus, LogDetails } from './logs-schemas';
 
 // ============================================================================
@@ -387,7 +388,8 @@ export async function fetchErrorLogById(
     .eq('id', logId)
     .single();
 
-  if (error || !log) {
+  throwOnSupabaseError(error, 'Error log', { logId });
+  if (!log) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: ErrorMessages.notFound('Error log', logId),
@@ -472,7 +474,8 @@ export async function fetchGenerationTraceById(
     .eq('id', logId)
     .single();
 
-  if (error || !log) {
+  throwOnSupabaseError(error, 'Generation trace', { logId });
+  if (!log) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: ErrorMessages.notFound('Generation trace', logId),

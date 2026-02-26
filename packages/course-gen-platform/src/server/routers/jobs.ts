@@ -10,6 +10,7 @@ import { TRPCError } from '@trpc/server';
 import { router } from '../trpc';
 import { protectedProcedure } from '../middleware/auth';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
+import { throwOnSupabaseError } from '../utils/supabase-query-guard';
 
 /**
  * Jobs router
@@ -57,7 +58,8 @@ export const jobsRouter = router({
         .single();
 
       // Job not found
-      if (queryError || !jobStatus) {
+      throwOnSupabaseError(queryError, 'Job', { jobId, userId: currentUser.id });
+      if (!jobStatus) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: `Job ${jobId} not found`,
@@ -152,7 +154,8 @@ export const jobsRouter = router({
         .single();
 
       // Job not found
-      if (error || !jobStatus) {
+      throwOnSupabaseError(error, 'Job', { jobId, userId: currentUser.id });
+      if (!jobStatus) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: `Job ${jobId} not found`,

@@ -17,6 +17,7 @@ import { instructorProcedure } from '../procedures';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { createRateLimiter } from '../middleware/rate-limit.js';
+import { throwOnSupabaseError } from '../utils/supabase-query-guard';
 import { nanoid } from 'nanoid';
 import { ConcurrencyTracker } from '../../shared/concurrency/tracker';
 import { SectionRegenerationService } from '../../stages/stage5-generation/utils/section-regeneration-service';
@@ -146,8 +147,8 @@ export const regenerationRouter = router({
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
+        throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+        if (!course) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
         }
 
@@ -359,7 +360,8 @@ export const regenerationRouter = router({
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
+        throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+        if (!course) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
         }
 

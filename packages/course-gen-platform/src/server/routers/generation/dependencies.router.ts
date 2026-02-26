@@ -32,6 +32,7 @@ import {
 import { resolveStructure } from '../../../shared/course-nodes/structure-resolver';
 import { writeCourseNodes } from '../../../shared/course-nodes/writer';
 import { assertStableIds } from '../../../shared/course-nodes/feature-flags';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 export const dependenciesRouter = router({
   /**
@@ -72,11 +73,8 @@ export const dependenciesRouter = router({
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn(
-            { userId, courseId, error: courseError },
-            'Course not found in getBlockDependencies'
-          );
+        throwOnSupabaseError(courseError, 'Course', { userId, courseId });
+        if (!course) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Course not found',
@@ -247,11 +245,8 @@ export const dependenciesRouter = router({
           .eq('id', courseId)
           .single();
 
-        if (courseError || !course) {
-          logger.warn(
-            { userId, courseId, error: courseError },
-            'Course not found in cascadeUpdate'
-          );
+        throwOnSupabaseError(courseError, 'Course', { userId, courseId });
+        if (!course) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Course not found',

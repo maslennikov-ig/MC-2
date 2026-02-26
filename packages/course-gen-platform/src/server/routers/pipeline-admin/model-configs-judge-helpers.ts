@@ -11,6 +11,7 @@ import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
 import { getOpenRouterModels } from '../../../services/openrouter-models';
+import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
 
 // =============================================================================
 // Types
@@ -255,7 +256,8 @@ export async function handleUpdateJudgeConfig(
     .eq('id', input.id)
     .single();
 
-  if (fetchError || !currentConfig) {
+  throwOnSupabaseError(fetchError, 'Judge configuration', { configId: input.id });
+  if (!currentConfig) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Judge configuration not found',
@@ -285,10 +287,11 @@ export async function handleUpdateJudgeConfig(
     .select('*')
     .single();
 
-  if (updateError || !updatedConfig) {
+  throwOnSupabaseError(updateError, 'Judge configuration', { configId: input.id });
+  if (!updatedConfig) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: `Failed to update judge config: ${updateError?.message}`,
+      message: 'Failed to update judge config',
     });
   }
 

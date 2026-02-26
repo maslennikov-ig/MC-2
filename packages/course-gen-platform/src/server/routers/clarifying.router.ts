@@ -28,6 +28,7 @@ import { createRateLimiter } from '../middleware/rate-limit.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../utils/supabase-query-guard';
 
 import {
   CLARIFYING_RATE_LIMITS,
@@ -420,11 +421,8 @@ export const clarifyingRouter = router({
           .select('id, course_id, status, suggested_answers')
           .in('id', questionIds);
 
-        if (fetchError || !questions) {
-          logger.error(
-            { requestId, error: fetchError?.message },
-            'Failed to fetch questions for batch submission'
-          );
+        throwOnSupabaseError(fetchError, 'Questions', { requestId });
+        if (!questions) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to fetch questions',

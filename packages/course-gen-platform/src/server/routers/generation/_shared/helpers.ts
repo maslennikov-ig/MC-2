@@ -8,6 +8,7 @@ import { TRPCError } from '@trpc/server';
 import { isValidStyle } from '@megacampus/shared-types/style-prompts';
 import { ConcurrencyTracker } from '../../../../shared/concurrency/tracker';
 import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import type { ConcurrencyCheckResult, NormalizedTier, CourseSettings } from './types';
 
 // Re-export from shared utility (single source of truth)
@@ -265,10 +266,11 @@ export async function buildStage5JobInput(
     .eq('id', courseId)
     .single();
 
-  if (fullCourseError || !fullCourse) {
+  throwOnSupabaseError(fullCourseError, 'Course', { requestId, courseId, userId });
+  if (!fullCourse) {
     throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to fetch course data',
+      code: 'NOT_FOUND',
+      message: 'Course not found',
     });
   }
 

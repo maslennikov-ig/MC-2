@@ -52,6 +52,7 @@ import {
 import { executeIntentClassificationFlow, executeFullRegenerate } from './chat-intent-flow';
 import { resolveStructure } from '../../../../shared/course-nodes/structure-resolver';
 import { getElementAtPath, isLessonPath } from '../../../../shared/intent';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 // ============================================================================
 // Rate Limiting Configuration
@@ -275,13 +276,9 @@ async function executeChatMutation(
     .eq('id', courseId)
     .single();
 
-  if (courseError || !course) {
-    logger.warn(
-      { requestId, userId, courseId, error: courseError },
-      'Course not found or access denied'
-    );
+  throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+  if (!course)
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found or access denied' });
-  }
 
   // Block chat during active generation phases
   assertGenerationNotActive(course.generation_status, requestId, courseId);
@@ -425,10 +422,8 @@ async function executeApplyProposal(
     .eq('id', courseId)
     .single();
 
-  if (courseError || !course) {
-    logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-  }
+  throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+  if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
   // Check authorization: superadmin/admin/owner can apply proposals
   assertCourseAccess(
@@ -671,10 +666,8 @@ async function executeApplyDirectAction(
     .eq('id', courseId)
     .single();
 
-  if (courseError || !course) {
-    logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
-  }
+  throwOnSupabaseError(courseError, 'Course', { requestId, userId, courseId });
+  if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
   // Check authorization
   assertCourseAccess(
