@@ -132,8 +132,8 @@ export function useEnrichmentGeneration({
       abortControllersRef.current.forEach((controller) => controller.abort())
       abortControllersRef.current.clear()
 
-      // Clear all polling intervals
-      pollingIntervalsRef.current.forEach((interval) => clearInterval(interval))
+      // Clear all polling timeouts
+      pollingIntervalsRef.current.forEach((handle) => clearTimeout(handle))
       pollingIntervalsRef.current.clear()
     }
   }, [])
@@ -144,7 +144,7 @@ export function useEnrichmentGeneration({
     // Clear all polling and abort controllers
     abortControllersRef.current.forEach((controller) => controller.abort())
     abortControllersRef.current.clear()
-    pollingIntervalsRef.current.forEach((interval) => clearInterval(interval))
+    pollingIntervalsRef.current.forEach((handle) => clearTimeout(handle))
     pollingIntervalsRef.current.clear()
     pollFailuresRef.current.clear()
 
@@ -157,9 +157,9 @@ export function useEnrichmentGeneration({
    * Stop polling and cleanup for a specific type
    */
   const stopPolling = useCallback((type: string) => {
-    const interval = pollingIntervalsRef.current.get(type)
-    if (interval) {
-      clearInterval(interval)
+    const handle = pollingIntervalsRef.current.get(type)
+    if (handle) {
+      clearTimeout(handle)
       pollingIntervalsRef.current.delete(type)
     }
 
@@ -301,10 +301,19 @@ export function useEnrichmentGeneration({
         }
       }
 
-      // Poll immediately, then at configured interval
-      void pollStatus()
-      const interval = setInterval(() => void pollStatus(), currentInterval)
-      pollingIntervalsRef.current.set(type, interval)
+      // Schedule next poll after current one completes.
+      // Uses recursive setTimeout (not setInterval) so that currentInterval
+      // mutations from backoff logic are applied to each subsequent delay.
+      const scheduleNext = () => {
+        if (!mountedRef.current) return
+        const handle = setTimeout(() => {
+          void pollStatus().then(scheduleNext)
+        }, currentInterval)
+        pollingIntervalsRef.current.set(type, handle)
+      }
+
+      // Poll immediately, then schedule recursively
+      void pollStatus().then(scheduleNext)
     },
     [pollingInterval, onComplete, onError, stopPolling]
   )
