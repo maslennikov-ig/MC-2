@@ -225,6 +225,8 @@ class NotebookLMMediaGenerator(MediaGenerator):
         """Wire NOTEBOOKLM_AUTH_JSON for notebooklm-py JSON-first auth."""
         auth_json_value = (self._settings.notebooklm_auth_json or "").strip()
         if not auth_json_value:
+            # Remove empty env var so notebooklm-py doesn't treat it as invalid
+            os.environ.pop("NOTEBOOKLM_AUTH_JSON", None)
             return
 
         os.environ["NOTEBOOKLM_AUTH_JSON"] = auth_json_value

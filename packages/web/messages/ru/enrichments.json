@@ -139,7 +139,26 @@
       "title": "Настройки NLM-аудио",
       "format": "Формат подачи",
       "formatDeepDive": "Глубокое объяснение",
+      "formatBrief": "Краткий обзор",
+      "formatCritique": "Критический разбор",
       "formatDebate": "Диалог двух ведущих (дебаты)"
+    },
+    "nlmVideo": {
+      "title": "Настройки NLM-видео",
+      "format": "Формат видео",
+      "formatExplainer": "Объяснение",
+      "formatBrief": "Краткий обзор",
+      "style": "Визуальный стиль",
+      "styleAutoSelect": "Автоматически",
+      "styleCustom": "Пользовательский",
+      "styleClassic": "Классический",
+      "styleWhiteboard": "Доска",
+      "styleKawaii": "Кавай (милый)",
+      "styleAnime": "Аниме",
+      "styleWatercolor": "Акварель",
+      "styleRetroPrint": "Ретро-печать",
+      "styleHeritage": "Наследие (классика)",
+      "stylePaperCraft": "Бумажное ремесло"
     },
     "video": {
       "title": "Настройки видео",

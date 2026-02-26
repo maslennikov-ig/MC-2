@@ -20,7 +20,12 @@ export async function getEnrichmentPlaybackUrl(enrichment: {
       enrichmentId: enrichment.id,
     })
     return result.url
-  } catch {
+  } catch (error) {
+    console.error(
+      '[storage-helpers] Failed to get playback URL for enrichment',
+      enrichment.id,
+      error
+    )
     return null
   }
 }

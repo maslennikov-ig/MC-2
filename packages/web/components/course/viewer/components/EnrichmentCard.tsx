@@ -85,13 +85,29 @@ export function EnrichmentCard({
   const isVideoType = type === 'video' || type === 'nlm_video'
   const isAudioType = type === 'audio' || type === 'nlm_audio'
 
+  const handleRetryUrl = () => {
+    setUrlError(false)
+    setUrlLoading(true)
+    setPlaybackUrl(null)
+    getEnrichmentPlaybackUrl(enrichment)
+      .then((url) => {
+        setPlaybackUrl(url)
+        if (!url) setUrlError(true)
+      })
+      .catch(() => setUrlError(true))
+      .finally(() => setUrlLoading(false))
+  }
+
   // Pre-fetch playback URL eagerly on mount for video/audio enrichments
   useEffect(() => {
     if ((isAudioType || isVideoType) && enrichment.status === 'completed') {
       setUrlLoading(true)
       setUrlError(false)
       getEnrichmentPlaybackUrl(enrichment)
-        .then(setPlaybackUrl)
+        .then((url) => {
+          setPlaybackUrl(url)
+          if (!url) setUrlError(true)
+        })
         .catch(() => setUrlError(true))
         .finally(() => setUrlLoading(false))
     }
@@ -254,6 +270,18 @@ export function EnrichmentCard({
           />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <span className="text-sm text-white/80">{t('viewer.videoUnavailable')}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleRetryUrl()
+              }}
+              className="text-white/80 hover:bg-white/20 hover:text-white"
+            >
+              <RefreshCw className="mr-1 h-4 w-4" />
+              {t('retry')}
+            </Button>
           </div>
         </>
       )
@@ -287,6 +315,18 @@ export function EnrichmentCard({
           />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <span className="text-sm text-white/80">{t('viewer.audioUnavailable')}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleRetryUrl()
+              }}
+              className="text-white/80 hover:bg-white/20 hover:text-white"
+            >
+              <RefreshCw className="mr-1 h-4 w-4" />
+              {t('retry')}
+            </Button>
           </div>
         </>
       )
