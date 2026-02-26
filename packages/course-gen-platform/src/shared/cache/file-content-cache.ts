@@ -156,3 +156,59 @@ export async function getCachedLessonMarkdown(
     return null;
   }
 }
+
+// ============================================================================
+// BATCH READ (mget — single Redis round-trip for multiple keys)
+// ============================================================================
+
+/**
+ * Batch-read cached file processed content for multiple files (Stage 3/4)
+ */
+export async function getCachedFileProcessedContentBatch(
+  courseId: string,
+  fileIds: string[]
+): Promise<Map<string, string>> {
+  if (fileIds.length === 0) return new Map();
+  try {
+    const redis = getRedisClient();
+    const keys = fileIds.map(id => fileProcessedKey(courseId, id));
+    const values = await redis.mget(...keys);
+    const result = new Map<string, string>();
+    values.forEach((val, idx) => {
+      if (val) result.set(fileIds[idx], val);
+    });
+    return result;
+  } catch (error) {
+    logger.debug(
+      { courseId, error: error instanceof Error ? error.message : String(error) },
+      '[FileContentCache] mget batch read for processed content failed (non-fatal)'
+    );
+    return new Map();
+  }
+}
+
+/**
+ * Batch-read cached file markdown content for multiple files (Stage 4)
+ */
+export async function getCachedFileMarkdownBatch(
+  courseId: string,
+  fileIds: string[]
+): Promise<Map<string, string>> {
+  if (fileIds.length === 0) return new Map();
+  try {
+    const redis = getRedisClient();
+    const keys = fileIds.map(id => fileMarkdownKey(courseId, id));
+    const values = await redis.mget(...keys);
+    const result = new Map<string, string>();
+    values.forEach((val, idx) => {
+      if (val) result.set(fileIds[idx], val);
+    });
+    return result;
+  } catch (error) {
+    logger.debug(
+      { courseId, error: error instanceof Error ? error.message : String(error) },
+      '[FileContentCache] mget batch read for markdown failed (non-fatal)'
+    );
+    return new Map();
+  }
+}

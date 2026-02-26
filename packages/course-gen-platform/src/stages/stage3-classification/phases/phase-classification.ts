@@ -550,6 +550,8 @@ async function fetchFileMetadata(
   fileIds: string[],
   courseId: string
 ): Promise<FileMetadata[]> {
+  if (fileIds.length === 0) return [];
+
   // Step 1: Try Redis for content (processed_content preferred, fallback to markdown)
   const contentMap = new Map<string, string>();
   await Promise.all(
@@ -561,28 +563,23 @@ async function fetchFileMetadata(
     })
   );
 
-  const allCached = contentMap.size === fileIds.length;
+  const missedIds = fileIds.filter(id => !contentMap.has(id));
 
   logger.debug(
-    { courseId, fileCount: fileIds.length, cachedCount: contentMap.size, allCached },
+    {
+      courseId,
+      fileCount: fileIds.length,
+      cacheHits: contentMap.size,
+      cacheMisses: missedIds.length,
+    },
     'Redis cache-aside check for file content'
   );
 
-  // Step 2: Query Supabase — omit large content columns when ALL files are cached.
-  // When allCached=true we skip processed_content and markdown_content to save egress.
-  // The cast is needed because Supabase's PostgREST type parser requires a literal
-  // string for .select() — we use `as any` only for the dynamic path.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const baseQuery = supabase.from('file_catalog') as any;
-  const { data, error } = await (
-    allCached
-      ? baseQuery.select(
-          'id, filename, generated_title, original_name, mime_type, file_size, summary_metadata'
-        )
-      : baseQuery.select(
-          'id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata'
-        )
-  ).in('id', fileIds);
+  // Step 2: Query Supabase for metadata (light query, no content columns)
+  const { data, error } = await supabase
+    .from('file_catalog')
+    .select('id, filename, generated_title, original_name, mime_type, file_size, summary_metadata')
+    .in('id', fileIds);
 
   if (error) {
     logger.error({ error, fileIds }, 'Failed to fetch file metadata');
@@ -593,11 +590,27 @@ async function fetchFileMetadata(
     return [];
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data as any[]).map((file: Record<string, any>) => {
-    // Use cached content if available, else Supabase content
-    const content =
-      contentMap.get(file.id) || file.processed_content || file.markdown_content || '';
+  // Step 3: For cache misses, batch-fetch content from Supabase
+  if (missedIds.length > 0) {
+    const { data: contentData, error: contentError } = await supabase
+      .from('file_catalog')
+      .select('id, processed_content, markdown_content')
+      .in('id', missedIds);
+    if (contentError) {
+      logger.warn(
+        { courseId, missedIds, error: contentError.message },
+        '[Stage3] Supabase fallback for file content failed — files will have empty content'
+      );
+    }
+    for (const d of contentData || []) {
+      const c = d.processed_content || d.markdown_content || '';
+      if (c) contentMap.set(d.id, c);
+    }
+  }
+
+  // Step 4: Build results
+  return data.map(file => {
+    const content = contentMap.get(file.id) || '';
 
     // Get summary tokens from metadata, or estimate if not available
     const metadata = file.summary_metadata as { summary_tokens?: number } | null;
@@ -607,7 +620,7 @@ async function fetchFileMetadata(
     logger.debug(
       {
         fileId: file.id,
-        hasProcessedContent: contentMap.has(file.id) || !!file.processed_content,
+        hasContent: content.length > 0,
         hasGeneratedTitle: !!file.generated_title,
         summaryTokens,
         contentLength: content.length,
@@ -623,7 +636,7 @@ async function fetchFileMetadata(
       original_name: file.original_name ?? null,
       mime_type: file.mime_type,
       file_size: file.file_size,
-      content_preview: content, // Full summary, not truncated
+      content_preview: content,
       summary_tokens: summaryTokens,
     };
   });
