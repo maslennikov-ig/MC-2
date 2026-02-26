@@ -5,8 +5,7 @@ import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, Pause, X, RefreshCw, Trash2, Loader2, ExternalLink, Download } from 'lucide-react'
 import { toast } from 'sonner'
-import { MediaPlayer, MediaProvider, Poster } from '@vidstack/react'
-import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default'
+import dynamic from 'next/dynamic'
 import { AudioPlayer } from '../enrichments/AudioPlayer'
 import { QuizPlayer } from '../enrichments/QuizPlayer'
 import { Button } from '@/components/ui/button'
@@ -32,9 +31,12 @@ import {
 } from './enrichment-type-guards'
 import { getEnrichmentPlaybackUrl } from '@/lib/helpers/storage-helpers'
 import { deleteEnrichment, regenerateEnrichment } from '@/app/actions/enrichment-actions'
-import { formatVideoSrc } from '@/components/common/video-utils'
-import { useVidstackTranslations } from '@/hooks/useVidstackTranslations'
 import { cn } from '@/lib/utils'
+
+const EnrichmentVideoPlayer = dynamic(() => import('./EnrichmentVideoPlayer'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse bg-gray-200 dark:bg-slate-700" />,
+})
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -51,7 +53,9 @@ const PLACEHOLDER_IMAGES: Record<string, string> = {
 
 interface EnrichmentCardProps {
   enrichment: EnrichmentRow
+  /** Whether the enrichment content is expanded (used by quiz to show inline player) */
   isActive: boolean
+  /** Toggle enrichment content visibility (used by quiz start/close button) */
   onToggle: () => void
   courseId?: string
   onRefreshEnrichments?: () => void
@@ -65,7 +69,6 @@ export function EnrichmentCard({
   onRefreshEnrichments,
 }: EnrichmentCardProps) {
   const t = useTranslations('enrichments')
-  const vidstackTranslations = useVidstackTranslations()
   const type = enrichment.enrichment_type as EnrichmentType
   const config = ENRICHMENT_CONFIG[type]
   const Icon = config.icon
@@ -214,26 +217,12 @@ export function EnrichmentCard({
     // Video with URL ready: show Vidstack player with Poster (single-click play)
     if (isVideoType && playbackUrl) {
       return (
-        <MediaPlayer
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Vidstack PlayerSrc union includes RemotionSrc which makes narrow casts impossible
-          src={formatVideoSrc(playbackUrl) as any}
-          playsInline
-          className="h-full w-full"
-        >
-          <MediaProvider>
-            <Poster
-              className="absolute inset-0 block h-full w-full opacity-0 transition-opacity data-[visible]:opacity-100 [&>img]:h-full [&>img]:w-full [&>img]:object-cover"
-              src={placeholderImage}
-              alt={enrichment.title || label}
-            />
-          </MediaProvider>
-          <DefaultVideoLayout
-            icons={defaultLayoutIcons}
-            translations={vidstackTranslations}
-            playbackRates={[0.5, 0.75, 1, 1.25, 1.5, 2]}
-            seekStep={10}
-          />
-        </MediaPlayer>
+        <EnrichmentVideoPlayer
+          src={playbackUrl}
+          poster={placeholderImage}
+          alt={enrichment.title || label}
+          onError={() => setUrlError(true)}
+        />
       )
     }
 

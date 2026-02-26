@@ -1,8 +1,19 @@
 'use client'
 
+// IMPORTANT: This file contains direct @vidstack/react imports (MediaPlayer, MediaProvider).
+// It MUST only be loaded via next/dynamic with { ssr: false } to avoid the
+// media-captions Turbopack chunk error. Do not statically import this file.
+// See: packages/web/components/common/lesson-materials-switcher.tsx
+
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { MediaPlayer, MediaProvider, type MediaPlayerInstance, Poster } from '@vidstack/react'
+import {
+  MediaPlayer,
+  MediaProvider,
+  type MediaPlayerInstance,
+  Poster,
+  type PlayerSrc,
+} from '@vidstack/react'
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default'
 
 import { Maximize2 } from 'lucide-react'
@@ -201,7 +212,7 @@ export default function PersistentVideoPlayer({
         ) : (
           <MediaPlayer
             ref={playerRef}
-            src={formatVideoSrc(src) as any}
+            src={formatVideoSrc(src) as PlayerSrc}
             title={title}
             playsInline
             onError={() => setHasError(true)}

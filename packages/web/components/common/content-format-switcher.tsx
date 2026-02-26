@@ -1,8 +1,18 @@
 'use client'
 
+// IMPORTANT: This file contains direct @vidstack/react imports (MediaPlayer, MediaProvider).
+// It MUST only be loaded via next/dynamic with { ssr: false } to avoid the
+// media-captions Turbopack chunk error. Do not statically import this file.
+// See: packages/web/components/course/viewer/components/LessonView.tsx
+
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/react'
+import {
+  MediaPlayer,
+  MediaProvider,
+  type MediaPlayerInstance,
+  type PlayerSrc,
+} from '@vidstack/react'
 
 import {
   FileText,
@@ -327,7 +337,7 @@ export default function ContentFormatSwitcher({
                     ) : (
                       <MediaPlayer
                         ref={videoPlayerRef}
-                        src={formatVideoSrc(mockFormats.video) as any}
+                        src={formatVideoSrc(mockFormats.video) as PlayerSrc}
                         paused={!isPlaying}
                         muted={isMuted}
                         volume={volume}

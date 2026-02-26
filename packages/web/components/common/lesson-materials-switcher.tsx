@@ -12,7 +12,14 @@ import {
   Download,
 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import PersistentVideoPlayer from './persistent-video-player'
+import dynamic from 'next/dynamic'
+
+const PersistentVideoPlayer = dynamic(() => import('./persistent-video-player'), {
+  ssr: false,
+  loading: () => (
+    <div className="mb-4 aspect-video w-full animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700" />
+  ),
+})
 import { AudioPlayer } from '@/components/course/viewer/enrichments/AudioPlayer'
 import { QuizPlayer } from '@/components/course/viewer/enrichments/QuizPlayer'
 import { getEnrichmentPlaybackUrl } from '@/lib/helpers/storage-helpers'
@@ -160,7 +167,7 @@ export function LessonMaterialsSwitcher({
           onClick={() => setVideoMode('normal')}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-800/30 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/30"
         >
-          Показать видео
+          {t('fallback.showVideo')}
         </button>
       )
     }
@@ -272,7 +279,9 @@ export function LessonMaterialsSwitcher({
       <div className="space-y-4">
         {slides.map((slide, idx: number) => (
           <div key={idx} className="rounded-lg border bg-white p-4 shadow-sm dark:bg-gray-800">
-            <h3 className="mb-2 text-lg font-semibold">{slide.title || `Слайд ${idx + 1}`}</h3>
+            <h3 className="mb-2 text-lg font-semibold">
+              {slide.title || t('slides.defaultTitle', { number: idx + 1 })}
+            </h3>
             <div className="prose dark:prose-invert text-sm">{slide.content || slide.text}</div>
             {slide.speaker_notes && (
               <div className="mt-4 rounded border-l-4 border-purple-500 bg-gray-50 p-3 text-xs italic dark:bg-gray-900">
