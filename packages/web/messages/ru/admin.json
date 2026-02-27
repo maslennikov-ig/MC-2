@@ -291,6 +291,8 @@
       "workerDesc": "Фоновые задачи",
       "workerStage7": "Обогащения",
       "workerStage7Desc": "Генерация медиа",
+      "notebookLMBridge": "NLM Bridge",
+      "notebookLMBridgeDesc": "Аудио/видео генерация",
       "supabase": "База данных",
       "supabaseDesc": "PostgreSQL + Auth",
       "qdrant": "Qdrant",

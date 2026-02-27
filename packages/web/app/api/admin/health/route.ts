@@ -645,6 +645,83 @@ async function checkQdrant(): Promise<ServiceStatus> {
 }
 
 /**
+ * Check NotebookLM Bridge health
+ * Verifies the bridge service is running, auth is configured, and proxy is active
+ */
+async function checkNotebookLMBridge(): Promise<ServiceStatus> {
+  const startTime = Date.now()
+  const lastCheck = new Date().toISOString()
+
+  // Try Stage, Dev, and local URLs in order
+  const urls = [
+    'http://notebooklm-bridge:8000/health',
+    'http://notebooklm-bridge-dev:8000/health',
+    'http://localhost:8010/health',
+  ]
+
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(url, {}, 3000)
+      const responseTime = Date.now() - startTime
+
+      if (response.ok) {
+        const data = await response.json()
+        const checks: { name: string; passed: boolean; message?: string }[] = data.checks || []
+        const failedChecks = checks.filter((c) => !c.passed)
+        const activeTasks: number = data.active_tasks ?? 0
+        const proxyConfigured: boolean = data.proxy_configured ?? false
+
+        // Determine status based on checks
+        let status: 'healthy' | 'degraded' | 'error' = 'healthy'
+        const messageParts: string[] = []
+
+        if (failedChecks.length > 0) {
+          status = 'degraded'
+          messageParts.push(failedChecks.map((c) => c.message || c.name).join('; '))
+        }
+
+        if (proxyConfigured) {
+          messageParts.push('SOCKS proxy active')
+        }
+        if (activeTasks > 0) {
+          messageParts.push(`${activeTasks} active task(s)`)
+        }
+        if (messageParts.length === 0) {
+          messageParts.push(`Mode: ${data.mode || 'unknown'}`)
+        }
+
+        return {
+          name: 'NotebookLM Bridge',
+          status,
+          responseTime,
+          message: messageParts.join(' | '),
+          lastCheck,
+        }
+      }
+
+      return {
+        name: 'NotebookLM Bridge',
+        status: 'degraded',
+        responseTime,
+        message: `HTTP ${response.status}: ${response.statusText}`,
+        lastCheck,
+      }
+    } catch {
+      // Try next URL
+      continue
+    }
+  }
+
+  return {
+    name: 'NotebookLM Bridge',
+    status: 'error',
+    responseTime: Date.now() - startTime,
+    message: 'Connection failed (all URLs)',
+    lastCheck,
+  }
+}
+
+/**
  * Check Mermaid Pipeline health via API Server
  * Verifies the regex sanitizer, validator, and full pipeline orchestration
  */
@@ -708,6 +785,7 @@ async function checkMermaidPipeline(): Promise<ServiceStatus> {
  * - Redis (via API Server)
  * - Docling MCP (document processing)
  * - Qdrant (vector database)
+ * - NotebookLM Bridge (audio/video generation)
  * - Mermaid Pipeline (diagram syntax fixer)
  */
 export async function GET(
@@ -752,6 +830,7 @@ export async function GET(
       qdrantStatus,
       workerStatus,
       workerStage7Status,
+      notebookLMBridgeStatus,
       telegramStatus,
       mermaidPipelineStatus,
     ] = await Promise.allSettled([
@@ -762,6 +841,7 @@ export async function GET(
       checkQdrant(),
       checkWorkerReadiness(),
       checkWorkerStage7Readiness(),
+      checkNotebookLMBridge(),
       checkTelegramBot(),
       checkMermaidPipeline(),
     ])
@@ -826,6 +906,15 @@ export async function GET(
         ? workerStage7Status.value
         : {
             name: 'Worker Stage 7',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
+      notebookLMBridgeStatus.status === 'fulfilled'
+        ? notebookLMBridgeStatus.value
+        : {
+            name: 'NotebookLM Bridge',
             status: 'error' as const,
             responseTime: 0,
             message: 'Check failed',

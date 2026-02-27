@@ -76,10 +76,19 @@ class MediaGenerationRequest(BaseModel):
         return self
 
 
+class HealthCheckDetail(BaseModel):
+    name: str
+    passed: bool
+    message: str | None = None
+
+
 class HealthResponse(BaseModel):
     status: str
     service: str
     mode: str
+    checks: list[HealthCheckDetail] = Field(default_factory=list)
+    active_tasks: int = 0
+    proxy_configured: bool = False
 
 
 class AudioGenerationResponse(BaseModel):

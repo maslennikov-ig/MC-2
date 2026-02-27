@@ -291,6 +291,8 @@
       "workerDesc": "Background jobs",
       "workerStage7": "Enrichments",
       "workerStage7Desc": "Media generation",
+      "notebookLMBridge": "NotebookLM Bridge",
+      "notebookLMBridgeDesc": "Audio/video generation",
       "supabase": "Database",
       "supabaseDesc": "PostgreSQL + Auth",
       "qdrant": "Qdrant",
