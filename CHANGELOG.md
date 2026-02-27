@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.7] - 2026-02-27
+
+### Added
+
+- **bridge**: allow parallel audio + video generation per course (9912059d)
+- **admin**: add NotebookLM Bridge health check to admin dashboard (2c6a1cf1)
+
+### Fixed
+
+- **web**: stabilize media UX in course viewer (220cf7bd)
+- **admin**: log fallback URL in bridge health check (I5) (0838478a)
+- **admin**: address code review issues for bridge health check (0bf5a123)
+- **bridge**: add SOCKS5 proxy and fix config for Stage bridge (73f07326)
+
 ## [0.31.6] - 2026-02-26
 
 ### Other
