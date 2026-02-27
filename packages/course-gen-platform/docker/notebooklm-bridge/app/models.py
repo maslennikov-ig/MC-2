@@ -77,18 +77,21 @@ class MediaGenerationRequest(BaseModel):
 
 
 class HealthCheckDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     passed: bool
     message: str | None = None
 
 
 class HealthResponse(BaseModel):
-    status: str
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["ok", "degraded"]
     service: str
     mode: str
     checks: list[HealthCheckDetail] = Field(default_factory=list)
     active_tasks: int = 0
-    proxy_configured: bool = False
 
 
 class AudioGenerationResponse(BaseModel):
