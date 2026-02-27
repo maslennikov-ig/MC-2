@@ -100,10 +100,8 @@ export const AUTO_GENERATED_ENRICHMENT_TYPES = ['cover', 'card'] as const;
  */
 export const ON_DEMAND_ENRICHMENT_TYPES = [
   'quiz',
-  'audio',
   'nlm_audio',
   'presentation',
-  'video',
   'nlm_video',
   'banner',
 ] as const;

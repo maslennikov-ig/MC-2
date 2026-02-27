@@ -13,16 +13,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
-import {
-  Layers,
-  Video,
-  HelpCircle,
-  Volume2,
-  Presentation,
-  AlertCircle,
-  ImageIcon,
-  PanelTop,
-} from 'lucide-react'
+import { Layers, HelpCircle, Presentation, AlertCircle, ImageIcon, PanelTop } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
@@ -68,9 +59,7 @@ function EnrichmentAddGrid({ onSelect }: { onSelect: (type: CreateEnrichmentType
   }> = [
     { type: 'cover', icon: ImageIcon, labelKey: 'cover', colorClass: 'text-cyan-500' },
     { type: 'banner', icon: PanelTop, labelKey: 'banner', colorClass: 'text-rose-500' },
-    { type: 'video', icon: Video, labelKey: 'video', colorClass: 'text-blue-500' },
     { type: 'quiz', icon: HelpCircle, labelKey: 'quiz', colorClass: 'text-purple-500' },
-    { type: 'audio', icon: Volume2, labelKey: 'audio', colorClass: 'text-green-500' },
     {
       type: 'presentation',
       icon: Presentation,
@@ -82,7 +71,7 @@ function EnrichmentAddGrid({ onSelect }: { onSelect: (type: CreateEnrichmentType
   return (
     <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900/50">
       <p className="text-muted-foreground mb-2 px-1 text-xs">{t('inspector.addEnrichment')}</p>
-      <div className="grid grid-cols-6 gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         {enrichmentTypes.map(({ type, icon: Icon, labelKey, colorClass }) => (
           <button
             key={type}
@@ -209,22 +198,10 @@ function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) =
           testId="discovery-card-cover"
         />
         <DiscoveryCard
-          icon={Video}
-          title={t('types.video')}
-          onClick={() => onAddClick('video')}
-          testId="discovery-card-video"
-        />
-        <DiscoveryCard
           icon={HelpCircle}
           title={t('types.quiz')}
           onClick={() => onAddClick('quiz')}
           testId="discovery-card-quiz"
-        />
-        <DiscoveryCard
-          icon={Volume2}
-          title={t('types.audio')}
-          onClick={() => onAddClick('audio')}
-          testId="discovery-card-audio"
         />
         <DiscoveryCard
           icon={Presentation}
