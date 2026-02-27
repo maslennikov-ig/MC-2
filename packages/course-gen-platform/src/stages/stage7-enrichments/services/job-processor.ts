@@ -94,7 +94,7 @@ const NLM_TYPES: ReadonlySet<Stage7EnrichmentType> = new Set([
 ]);
 const DEFAULT_NLM_POLL_DELAY_MS = 15_000;
 const DEFAULT_NLM_MAX_POLL_DELAY_MS = 60_000;
-const DEFAULT_NLM_MAX_WAIT_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_NLM_MAX_WAIT_MS = 76 * 60 * 60 * 1000; // 76h: covers 72h queue wait + 3h generation + 1h buffer
 
 let stage7PollQueue: Queue<Stage7JobInput, Stage7JobResult> | null = null;
 
