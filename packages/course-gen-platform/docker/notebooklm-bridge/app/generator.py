@@ -524,7 +524,12 @@ class NotebookLMMediaGenerator(MediaGenerator):
         if task_id:
             wait_for_completion = getattr(client.artifacts, "wait_for_completion", None)
             if callable(wait_for_completion):
-                await wait_for_completion(notebook_id, task_id)
+                await wait_for_completion(
+                    notebook_id,
+                    task_id,
+                    timeout=int(self._settings.notebooklm_generation_timeout_seconds),
+                    poll_interval=int(self._settings.notebooklm_poll_interval_seconds),
+                )
 
         # Download the report
         download_report = getattr(client.artifacts, "download_report", None)
@@ -617,7 +622,12 @@ class NotebookLMMediaGenerator(MediaGenerator):
         if task_id:
             wait_for_completion = getattr(client.artifacts, "wait_for_completion", None)
             if callable(wait_for_completion):
-                await wait_for_completion(notebook_id, task_id)
+                await wait_for_completion(
+                    notebook_id,
+                    task_id,
+                    timeout=int(self._settings.notebooklm_generation_timeout_seconds),
+                    poll_interval=int(self._settings.notebooklm_poll_interval_seconds),
+                )
 
         # Download flashcards
         download_flashcards = getattr(client.artifacts, "download_flashcards", None)
@@ -778,7 +788,12 @@ class NotebookLMMediaGenerator(MediaGenerator):
         if task_id:
             wait_for_completion = getattr(client.artifacts, "wait_for_completion", None)
             if callable(wait_for_completion):
-                await wait_for_completion(notebook_id, task_id)
+                await wait_for_completion(
+                    notebook_id,
+                    task_id,
+                    timeout=int(self._settings.notebooklm_generation_timeout_seconds),
+                    poll_interval=int(self._settings.notebooklm_poll_interval_seconds),
+                )
 
         # Download infographic (PNG image)
         download_infographic = getattr(client.artifacts, "download_infographic", None)
