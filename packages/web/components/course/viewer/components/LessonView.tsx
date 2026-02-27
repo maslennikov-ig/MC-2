@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -34,6 +35,7 @@ const ContentFormatSwitcher = dynamic(() => import('@/components/common/content-
 })
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+type ViewerTab = 'content' | 'structure' | 'enrichments'
 
 interface LessonViewProps {
   currentLesson: Lesson
@@ -101,6 +103,24 @@ export function LessonView({
   courseLanguage,
 }: LessonViewProps) {
   const t = useTranslations('course.viewer')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const tabParam = searchParams.get('tab')
+  const activeTab: ViewerTab =
+    tabParam === 'structure' || tabParam === 'enrichments' ? tabParam : 'content'
+
+  const handleTabChange = (nextTab: string) => {
+    const normalizedTab: ViewerTab =
+      nextTab === 'structure' || nextTab === 'enrichments' ? nextTab : 'content'
+    if (normalizedTab === activeTab) return
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', normalizedTab)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
   const nextLessonData =
     currentIndex < totalLessonsOrdered - 1
       ? {
@@ -263,7 +283,7 @@ export function LessonView({
   }
 
   return (
-    <Tabs defaultValue="content" className="w-full">
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <div className="sticky top-0 z-10 border-b border-gray-200/60 bg-white backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/70">
         <TabsList className="h-auto w-full justify-start rounded-none bg-transparent p-0">
           <TabsTrigger

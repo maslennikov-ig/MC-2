@@ -75,11 +75,29 @@ export function EnrichmentsPanel({
   const t = useTranslations('enrichments')
   const safeEnrichments = enrichments ?? []
   const [activeEnrichmentId, setActiveEnrichmentId] = useState<string | null>(null)
+  const completedToastsRef = useRef<Set<string>>(new Set())
+  const toastTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+
+  // Cleanup toast dedup timers on unmount
+  useEffect(() => {
+    return () => {
+      toastTimersRef.current.forEach((timer) => clearTimeout(timer))
+      toastTimersRef.current.clear()
+    }
+  }, [])
 
   // Handle generation completion
   const handleGenerationComplete = useCallback(
-    (_enrichmentId: string) => {
-      toast.success(t('viewer.generationComplete'))
+    (enrichmentId: string) => {
+      if (!completedToastsRef.current.has(enrichmentId)) {
+        toast.success(t('viewer.generationComplete'))
+        completedToastsRef.current.add(enrichmentId)
+        const timer = setTimeout(() => {
+          completedToastsRef.current.delete(enrichmentId)
+          toastTimersRef.current.delete(enrichmentId)
+        }, 5000)
+        toastTimersRef.current.set(enrichmentId, timer)
+      }
       // Small delay to allow DB write propagation before refetch
       setTimeout(() => onRefreshEnrichments?.(), 500)
     },
@@ -110,68 +128,48 @@ export function EnrichmentsPanel({
     onError: handleGenerationError,
   })
 
-  // Track resumed enrichment TYPES (not IDs) to prevent duplicate resumes
-  // Fixes race condition: when enrichment ID changes but type is same, prevent double resume
-  // Only ONE enrichment per type is supported at a time
-  const resumedTypesRef = useRef(new Set<string>())
-
-  // Distinguish first mount (SSR data is fresh) from SPA lesson switch (data may be stale)
-  const isFirstMountRef = useRef(true)
-
-  // Reference-based stale guard: snapshot enrichments on lesson switch,
-  // skip resume until fresh data arrives (different reference)
-  const staleEnrichmentsRef = useRef<EnrichmentRow[] | undefined | null>(null)
-  const enrichmentsLiveRef = useRef(enrichments)
-  enrichmentsLiveRef.current = enrichments
-
-  // Reset state when lessonId changes (SPA lesson switch only, not first mount)
-  useEffect(() => {
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false
-      return // First mount: SSR data is fresh, no stale guard needed
-    }
-    resumedTypesRef.current.clear()
-    staleEnrichmentsRef.current = enrichmentsLiveRef.current
-  }, [lessonId])
+  // Track resumed enrichment keys (lessonId:type) to prevent duplicate resumes
+  const resumedKeysRef = useRef(new Set<string>())
 
   // Resume polling for active enrichments on mount and when new active enrichments appear
   useEffect(() => {
-    // Reference-based stale guard: skip resume until enrichments reference changes
-    // (indicates fresh data from refetch, not stale cache)
-    if (staleEnrichmentsRef.current !== null) {
-      if (enrichments === staleEnrichmentsRef.current) return
-      staleEnrichmentsRef.current = null
-    }
+    if (!lessonId) return
 
-    // Find enrichments that need resuming (active + on-demand + type not yet resumed)
+    // Find enrichments that need resuming (active + on-demand + lesson/type not yet resumed)
     const activeEnrichments = (enrichments ?? [])
       .filter((e) => isActiveGenerationStatus(e.status))
       .filter(isEnrichmentOnDemand)
-      .filter((e) => !resumedTypesRef.current.has(e.enrichment_type))
+      .filter((e) => !resumedKeysRef.current.has(`${lessonId}:${e.enrichment_type}`))
 
     // Resume polling for each new active enrichment
-    if (activeEnrichments.length > 0) {
-      toast.info(t('viewer.resumingGeneration', { count: activeEnrichments.length }))
-    }
     activeEnrichments.forEach((enrichment) => {
       const parsedCreatedAt = Date.parse(enrichment.created_at ?? '')
       const startedAtMs = Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined
       resumeGeneration(enrichment.id, enrichment.enrichment_type, startedAtMs)
-      resumedTypesRef.current.add(enrichment.enrichment_type)
+      resumedKeysRef.current.add(`${lessonId}:${enrichment.enrichment_type}`)
     })
 
-    // Cleanup: remove types for enrichments that are no longer active
-    const currentActiveTypes = new Set<string>(
+    // Cleanup: remove stale keys
+    // 1. Remove keys for other lessons (they are no longer visible)
+    // 2. Remove keys for current lesson's enrichments that are no longer active
+    const currentActiveKeys = new Set<string>(
       (enrichments ?? [])
         .filter((e) => isActiveGenerationStatus(e.status))
-        .map((e) => e.enrichment_type)
+        .map((e) => `${lessonId}:${e.enrichment_type}`)
     )
-    resumedTypesRef.current.forEach((type) => {
-      if (!currentActiveTypes.has(type)) {
-        resumedTypesRef.current.delete(type)
+
+    resumedKeysRef.current.forEach((key) => {
+      // Remove keys for other lessons entirely
+      if (!key.startsWith(`${lessonId}:`)) {
+        resumedKeysRef.current.delete(key)
+        return
+      }
+      // Remove keys for current lesson enrichments that are no longer active
+      if (!currentActiveKeys.has(key)) {
+        resumedKeysRef.current.delete(key)
       }
     })
-  }, [enrichments, resumeGeneration, t])
+  }, [enrichments, lessonId, resumeGeneration])
 
   // Auto-clear recentlyCompleted for types that now have completed enrichment data
   // This ensures non-image types (audio, quiz, etc.) don't stay in skeleton state

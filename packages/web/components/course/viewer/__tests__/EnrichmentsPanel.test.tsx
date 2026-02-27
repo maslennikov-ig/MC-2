@@ -11,6 +11,11 @@ const mockCancelGeneration = vi.fn()
 const mockResumeGeneration = vi.fn()
 const mockIsGenerating = vi.fn(() => false)
 const mockGetProgress = vi.fn(() => undefined)
+const toastMocks = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+}))
 
 vi.mock('next-intl', () => ({
   useTranslations: vi.fn(() => (key: string) => key),
@@ -18,9 +23,9 @@ vi.mock('next-intl', () => ({
 
 vi.mock('sonner', () => ({
   toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
+    success: toastMocks.success,
+    error: toastMocks.error,
+    info: toastMocks.info,
   },
 }))
 
@@ -153,5 +158,26 @@ describe('EnrichmentsPanel', () => {
     expect(screen.queryByTestId('card-nlm-video-draft')).not.toBeInTheDocument()
     expect(screen.getByTestId('placeholder-nlm_audio')).toBeInTheDocument()
     expect(screen.getByTestId('placeholder-nlm_video')).toBeInTheDocument()
+  })
+
+  it('resumes active generation without showing info toast spam', () => {
+    const activeQuiz = makeEnrichment({
+      id: 'quiz-active',
+      enrichment_type: 'quiz',
+      status: 'generating',
+      created_at: '2026-02-27T10:00:00.000Z',
+    })
+
+    render(
+      <EnrichmentsPanel
+        enrichments={[activeQuiz]}
+        lessonId="lesson-1"
+        courseId="course-1"
+        onRefreshEnrichments={vi.fn()}
+      />
+    )
+
+    expect(mockResumeGeneration).toHaveBeenCalledWith('quiz-active', 'quiz', expect.any(Number))
+    expect(toastMocks.info).not.toHaveBeenCalled()
   })
 })
