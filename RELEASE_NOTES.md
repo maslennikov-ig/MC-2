@@ -2,6 +2,26 @@
 
 _Released on 2025-12-26_
 
+## v0.31.7
+
+_Released on 2026-02-27_
+
+### ✨ New Features
+
+- **bridge**: Allow parallel audio + video generation per course
+- **admin**: Add NotebookLM Bridge health check to admin dashboard
+
+### 🐛 Bug Fixes
+
+- **web**: Stabilize media UX in course viewer
+- **admin**: Log fallback URL in bridge health check (I5)
+- **admin**: Address code review issues for bridge health check
+- **bridge**: Add SOCKS5 proxy and fix config for Stage bridge
+
+---
+
+_This release was automatically generated from 6 commits._
+
 ## v0.31.6
 
 _Released on 2026-02-26_
