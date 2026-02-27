@@ -661,10 +661,15 @@ async function checkNotebookLMBridge(): Promise<ServiceStatus> {
     'http://localhost:8010/health',
   ]
 
-  for (const url of urls) {
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i]
     try {
       const response = await fetchWithTimeout(url, {}, 3000)
       const responseTime = Date.now() - startTime
+
+      if (i > 0) {
+        logger.info('NotebookLM Bridge health: responded via fallback URL', { url, attempt: i + 1 })
+      }
 
       if (response.ok) {
         const data = await response.json()
