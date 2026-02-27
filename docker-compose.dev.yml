@@ -265,7 +265,7 @@ services:
     volumes:
       - ./data/uploads-dev:/app/uploads
       # Local enrichment storage (covers, cards) - served by nginx
-      - ./data/enrichments-dev:/app/data/enrichments
+      - ./data/enrichments:/app/data/enrichments
     networks:
       - megacampus
     depends_on:
