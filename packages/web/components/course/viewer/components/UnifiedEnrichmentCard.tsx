@@ -12,6 +12,9 @@ import {
   ChevronDown,
   Loader2,
   RefreshCw,
+  BookOpen,
+  Layers,
+  Network,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -40,6 +43,10 @@ type EnrichmentType =
   | 'nlm_video'
   | 'cover'
   | 'card'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 type AudioDraftContent = AudioEnrichmentContent
 type VideoDraftContent = VideoEnrichmentContent
 
@@ -127,6 +134,34 @@ const PLACEHOLDER_CONFIG: Record<
     badgeLiteral: '1:1',
     icon: ImageIcon,
   },
+  nlm_study_guide: {
+    image: '/placeholders/Quiz.webp',
+    color: 'text-emerald-500 dark:text-emerald-400',
+    badgeKey: 'placeholder.nlm_study_guide.estimatedTime',
+    badgeLiteral: null,
+    icon: BookOpen,
+  },
+  nlm_flashcards: {
+    image: '/placeholders/Quiz.webp',
+    color: 'text-amber-500 dark:text-amber-400',
+    badgeKey: 'placeholder.nlm_flashcards.estimatedTime',
+    badgeLiteral: null,
+    icon: Layers,
+  },
+  nlm_mind_map: {
+    image: '/placeholders/Presentation.webp',
+    color: 'text-sky-500 dark:text-sky-400',
+    badgeKey: 'placeholder.nlm_mind_map.estimatedTime',
+    badgeLiteral: null,
+    icon: Network,
+  },
+  nlm_infographic: {
+    image: '/placeholders/Cover.webp',
+    color: 'text-rose-500 dark:text-rose-400',
+    badgeKey: 'placeholder.nlm_infographic.estimatedTime',
+    badgeLiteral: null,
+    icon: ImageIcon,
+  },
 }
 
 const NO_OPTIONS_TYPES: ReadonlySet<EnrichmentType> = new Set(['video'])
@@ -174,6 +209,28 @@ export function UnifiedEnrichmentCard({
   const [nlmAudioFormat, setNlmAudioFormat] = useState<NlmAudioFormat>('deep_dive')
   const [nlmVideoFormat, setNlmVideoFormat] = useState<NlmVideoFormat>('explainer')
   const [nlmVideoStyle, setNlmVideoStyle] = useState<NlmVideoStyle>('auto_select')
+
+  // Options state for NLM study guide
+  const [studyGuideDetailLevel, setStudyGuideDetailLevel] = useState<
+    'brief' | 'standard' | 'comprehensive'
+  >('standard')
+
+  // Options state for NLM flashcards
+  const [flashcardsCardCount, setFlashcardsCardCount] = useState('15')
+  const [flashcardsDifficulty, setFlashcardsDifficulty] = useState<'easy' | 'medium' | 'hard'>(
+    'medium'
+  )
+
+  // Options state for NLM mind map
+  const [mindMapDepth, setMindMapDepth] = useState<'shallow' | 'standard' | 'deep'>('standard')
+
+  // Options state for NLM infographic
+  const [infographicOrientation, setInfographicOrientation] = useState<'portrait' | 'landscape'>(
+    'portrait'
+  )
+  const [infographicDetailLevel, setInfographicDetailLevel] = useState<'overview' | 'detailed'>(
+    'detailed'
+  )
 
   // Options state for cover, card images
   const [imageStyle, setImageStyle] = useState('realistic')
@@ -309,6 +366,24 @@ export function UnifiedEnrichmentCard({
           colorScheme,
           customPrompt: customPrompt.trim() || undefined,
         }
+      case 'nlm_study_guide':
+        return {
+          detail_level: studyGuideDetailLevel,
+        }
+      case 'nlm_flashcards':
+        return {
+          card_count: parseInt(flashcardsCardCount, 10),
+          difficulty: flashcardsDifficulty,
+        }
+      case 'nlm_mind_map':
+        return {
+          depth: mindMapDepth,
+        }
+      case 'nlm_infographic':
+        return {
+          orientation: infographicOrientation,
+          detail_level: infographicDetailLevel,
+        }
       default:
         return {}
     }
@@ -326,6 +401,12 @@ export function UnifiedEnrichmentCard({
     imageStyle,
     colorScheme,
     customPrompt,
+    studyGuideDetailLevel,
+    flashcardsCardCount,
+    flashcardsDifficulty,
+    mindMapDepth,
+    infographicOrientation,
+    infographicDetailLevel,
   ])
 
   const handleGenerate = useCallback(() => {
@@ -426,6 +507,34 @@ export function UnifiedEnrichmentCard({
           nlmVideoStyle,
           setNlmVideoStyle,
         }
+      case 'nlm_study_guide':
+        return {
+          type: 'nlm_study_guide' as const,
+          studyGuideDetailLevel,
+          setStudyGuideDetailLevel,
+        }
+      case 'nlm_flashcards':
+        return {
+          type: 'nlm_flashcards' as const,
+          flashcardsCardCount,
+          setFlashcardsCardCount,
+          flashcardsDifficulty,
+          setFlashcardsDifficulty,
+        }
+      case 'nlm_mind_map':
+        return {
+          type: 'nlm_mind_map' as const,
+          mindMapDepth,
+          setMindMapDepth,
+        }
+      case 'nlm_infographic':
+        return {
+          type: 'nlm_infographic' as const,
+          infographicOrientation,
+          setInfographicOrientation,
+          infographicDetailLevel,
+          setInfographicDetailLevel,
+        }
       default:
         return { type: 'video' as const }
     }
@@ -446,6 +555,12 @@ export function UnifiedEnrichmentCard({
     customPrompt,
     disabled,
     isGenerating,
+    studyGuideDetailLevel,
+    flashcardsCardCount,
+    flashcardsDifficulty,
+    mindMapDepth,
+    infographicOrientation,
+    infographicDetailLevel,
   ])
 
   return (

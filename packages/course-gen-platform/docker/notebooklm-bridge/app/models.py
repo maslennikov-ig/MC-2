@@ -40,6 +40,12 @@ class MediaGenerationRequest(BaseModel):
     audio_length: str | None = Field(default=None, max_length=64)
     video_format: str | None = Field(default=None, max_length=64)
     video_style: str | None = Field(default=None, max_length=64)
+    report_format: str | None = Field(default=None, max_length=64)
+    flashcard_difficulty: str | None = Field(default=None, max_length=64)
+    flashcard_count: int | None = Field(default=None, ge=5, le=50)
+    mind_map_depth: int | None = Field(default=None, ge=2, le=5)
+    infographic_orientation: str | None = Field(default=None, max_length=64)
+    infographic_detail: str | None = Field(default=None, max_length=64)
 
     @field_validator(
         "lesson_title",
@@ -51,6 +57,10 @@ class MediaGenerationRequest(BaseModel):
         "audio_length",
         "video_format",
         "video_style",
+        "report_format",
+        "flashcard_difficulty",
+        "infographic_orientation",
+        "infographic_detail",
         mode="before",
     )
     @classmethod
@@ -111,7 +121,7 @@ class VideoGenerationResponse(BaseModel):
 
 
 TaskStatus = Literal["queued", "in_progress", "completed", "failed"]
-MediaType = Literal["audio", "video"]
+MediaType = Literal["audio", "video", "study_guide", "flashcards", "mind_map", "infographic"]
 
 
 class MediaGenerationTaskStartResponse(BaseModel):
@@ -143,4 +153,33 @@ class VideoGenerationTaskResultResponse(BaseModel):
     media_type: Literal["video"]
     status: TaskStatus
     artifact: VideoGenerationResponse | None = None
+    error: str | None = None
+
+
+class TextGenerationResponse(BaseModel):
+    content: str
+    content_type: str  # "text/markdown" or "application/json"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class InfographicGenerationResponse(BaseModel):
+    image_base64: str
+    mime_type: str = "image/png"
+    extension: str = "png"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class TextGenerationTaskResultResponse(BaseModel):
+    task_id: str
+    media_type: MediaType
+    status: TaskStatus
+    artifact: TextGenerationResponse | None = None
+    error: str | None = None
+
+
+class InfographicGenerationTaskResultResponse(BaseModel):
+    task_id: str
+    media_type: Literal["infographic"]
+    status: TaskStatus
+    artifact: InfographicGenerationResponse | None = None
     error: str | None = None

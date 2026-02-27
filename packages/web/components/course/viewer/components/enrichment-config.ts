@@ -1,4 +1,15 @@
-import { Video, Headphones, Presentation, HelpCircle, FileText, Image } from 'lucide-react'
+import {
+  Video,
+  Headphones,
+  Presentation,
+  HelpCircle,
+  FileText,
+  Image,
+  BookOpen,
+  Layers,
+  Network,
+  ImageIcon,
+} from 'lucide-react'
 
 export type EnrichmentType =
   | 'video'
@@ -10,6 +21,10 @@ export type EnrichmentType =
   | 'document'
   | 'cover'
   | 'card'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 
 export const PLACEHOLDER_TYPES: (
   | 'quiz'
@@ -18,7 +33,22 @@ export const PLACEHOLDER_TYPES: (
   | 'video'
   | 'nlm_audio'
   | 'nlm_video'
-)[] = ['quiz', 'audio', 'presentation', 'video', 'nlm_audio', 'nlm_video']
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
+)[] = [
+  'quiz',
+  'audio',
+  'presentation',
+  'video',
+  'nlm_audio',
+  'nlm_video',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
+]
 
 // Image types
 // - cover: 16:9 hero banner for lesson header
@@ -35,6 +65,10 @@ export type GeneratableEnrichmentType =
   | 'video'
   | 'cover'
   | 'card'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 
 // All placeholder types in unified order for single grid display
 export const ALL_PLACEHOLDER_TYPES: GeneratableEnrichmentType[] = [
@@ -46,6 +80,10 @@ export const ALL_PLACEHOLDER_TYPES: GeneratableEnrichmentType[] = [
   'presentation',
   'video',
   'nlm_video',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
 ]
 
 export const ENRICHMENT_CONFIG: Record<
@@ -110,5 +148,29 @@ export const ENRICHMENT_CONFIG: Record<
     color: 'text-indigo-500 dark:text-indigo-400',
     bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
     labelKey: 'viewer.enrichmentTypes.card',
+  },
+  nlm_study_guide: {
+    icon: BookOpen,
+    color: 'text-emerald-500 dark:text-emerald-400',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+    labelKey: 'viewer.enrichmentTypes.nlm_study_guide',
+  },
+  nlm_flashcards: {
+    icon: Layers,
+    color: 'text-amber-500 dark:text-amber-400',
+    bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+    labelKey: 'viewer.enrichmentTypes.nlm_flashcards',
+  },
+  nlm_mind_map: {
+    icon: Network,
+    color: 'text-sky-500 dark:text-sky-400',
+    bgColor: 'bg-sky-100 dark:bg-sky-900/30',
+    labelKey: 'viewer.enrichmentTypes.nlm_mind_map',
+  },
+  nlm_infographic: {
+    icon: ImageIcon,
+    color: 'text-rose-500 dark:text-rose-400',
+    bgColor: 'bg-rose-100 dark:bg-rose-900/30',
+    labelKey: 'viewer.enrichmentTypes.nlm_infographic',
   },
 }

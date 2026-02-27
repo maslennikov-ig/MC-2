@@ -3529,6 +3529,10 @@ export type Database = {
         | "banner"
         | "nlm_audio"
         | "nlm_video"
+        | "nlm_study_guide"
+        | "nlm_flashcards"
+        | "nlm_mind_map"
+        | "nlm_infographic"
       enrollment_status: "active" | "completed" | "dropped" | "expired"
       generation_stage: "stage4" | "stage5" | "stage6"
       generation_status:
@@ -3752,6 +3756,10 @@ export const Constants = {
         "banner",
         "nlm_audio",
         "nlm_video",
+        "nlm_study_guide",
+        "nlm_flashcards",
+        "nlm_mind_map",
+        "nlm_infographic",
       ],
       enrollment_status: ["active", "completed", "dropped", "expired"],
       generation_stage: ["stage4", "stage5", "stage6"],
@@ -3829,3 +3837,4 @@ export const Constants = {
     },
   },
 } as const
+

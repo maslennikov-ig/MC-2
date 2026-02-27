@@ -22,6 +22,10 @@ import {
   presentationHandler,
   coverHandler,
   cardHandler,
+  nlmStudyGuideHandler,
+  nlmFlashcardsHandler,
+  nlmMindMapHandler,
+  nlmInfographicHandler,
 } from '../handlers';
 
 /**
@@ -118,6 +122,10 @@ const handlers: Record<Stage7EnrichmentType, EnrichmentHandler> = {
   // Banner uses coverHandler since they're both decorative images (16:9 hero banners)
   // The only difference is banner is manually triggered, cover is auto-triggered
   banner: coverHandler,
+  nlm_study_guide: nlmStudyGuideHandler,
+  nlm_flashcards: nlmFlashcardsHandler,
+  nlm_mind_map: nlmMindMapHandler,
+  nlm_infographic: nlmInfographicHandler,
 };
 
 /**

@@ -21,7 +21,7 @@ from .models import MediaGenerationRequest
 
 logger = logging.getLogger("notebooklm_bridge.generator")
 
-MediaType = Literal["audio", "video"]
+MediaType = Literal["audio", "video", "study_guide", "flashcards", "mind_map", "infographic"]
 
 
 class MediaGenerationError(RuntimeError):
@@ -204,6 +204,18 @@ class MediaGenerator(Protocol):
     async def generate_video_overview(self, request: MediaGenerationRequest) -> GenerationResult:
         ...
 
+    async def generate_study_guide(self, request: MediaGenerationRequest) -> GenerationResult:
+        ...
+
+    async def generate_flashcards(self, request: MediaGenerationRequest) -> GenerationResult:
+        ...
+
+    async def generate_mind_map(self, request: MediaGenerationRequest) -> GenerationResult:
+        ...
+
+    async def generate_infographic(self, request: MediaGenerationRequest) -> GenerationResult:
+        ...
+
 
 class NotebookLMMediaGenerator(MediaGenerator):
     _RECOVERY_START_TIME_SKEW_SECONDS = 45.0
@@ -265,6 +277,572 @@ class NotebookLMMediaGenerator(MediaGenerator):
 
     async def generate_video_overview(self, request: MediaGenerationRequest) -> GenerationResult:
         return await self._generate("video", request)
+
+    async def generate_study_guide(self, request: MediaGenerationRequest) -> GenerationResult:
+        return await self._generate_text_artifact("study_guide", request)
+
+    async def generate_flashcards(self, request: MediaGenerationRequest) -> GenerationResult:
+        return await self._generate_text_artifact("flashcards", request)
+
+    async def generate_mind_map(self, request: MediaGenerationRequest) -> GenerationResult:
+        return await self._generate_text_artifact("mind_map", request)
+
+    async def generate_infographic(self, request: MediaGenerationRequest) -> GenerationResult:
+        return await self._generate_text_artifact("infographic", request)
+
+    async def _generate_text_artifact(
+        self,
+        media_type: MediaType,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Generate a text-based or image artifact (study_guide, flashcards, mind_map, infographic).
+
+        Follows the same notebook-creation and source-adding pattern as audio/video,
+        but calls the corresponding notebooklm-py artifacts API for each type.
+        """
+        if self._settings.notebooklm_generation_mode == "fallback":
+            return self._fallback_text_result(media_type, request, "forced_fallback_mode")
+
+        course_id = self._normalize_course_id(request.course_id)
+        try:
+            async with self._course_generation_slot(
+                media_type=media_type,
+                course_id=course_id,
+            ):
+                async with self._global_queue.slot(media_type):
+                    return await self._generate_text_with_notebooklm(media_type, request)
+        except MediaGenerationTimeoutError as error:
+            if not self._settings.notebooklm_allow_fallback:
+                raise
+            logger.warning(
+                "NotebookLM %s generation timed out; returning fallback artifact",
+                media_type,
+                extra={"media_type": media_type},
+            )
+            return self._fallback_text_result(media_type, request, type(error).__name__)
+        except Exception as error:
+            if not self._settings.notebooklm_allow_fallback:
+                if isinstance(error, MediaGenerationError):
+                    raise
+                error_message = str(error).strip() or "NotebookLM generation failed"
+                raise MediaGenerationError(error_message) from error
+
+            logger.warning(
+                "NotebookLM %s generation failed; returning fallback artifact",
+                media_type,
+                extra={"media_type": media_type, "error_type": type(error).__name__},
+            )
+            return self._fallback_text_result(media_type, request, type(error).__name__)
+
+    async def _generate_text_with_notebooklm(
+        self,
+        media_type: MediaType,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Core implementation for text-based artifact generation via notebooklm-py."""
+        notebooklm_module = self._import_notebooklm_module()
+        client = await self._create_client()
+        loop = asyncio.get_running_loop()
+        request_started_at = loop.time()
+        source_pairs = self._resolve_sources(request)
+        source_char_count = sum(len(content) for _, content in source_pairs)
+        source_titles = [title for title, _ in source_pairs]
+
+        logger.info(
+            "NotebookLM text artifact generation started: media=%s lesson=%s lang=%s sources=%s",
+            media_type,
+            request.lesson_title,
+            request.language,
+            len(source_pairs),
+            extra={
+                "media_type": media_type,
+                "lesson_title": request.lesson_title,
+                "language": request.language,
+                "source_count": len(source_pairs),
+                "source_titles": source_titles,
+                "source_char_count": source_char_count,
+            },
+        )
+
+        async with client:
+            notebook = await self._resolve_notebook(
+                client=client,
+                request=request,
+            )
+            notebook_id = notebook.notebook_id
+
+            try:
+                # Add sources
+                source_ids: list[str] = []
+                for index, (title, content) in enumerate(source_pairs, start=1):
+                    source = await client.sources.add_text(
+                        notebook_id=notebook_id,
+                        title=title,
+                        content=content,
+                    )
+                    source_ids.append(source.id)
+                    logger.info(
+                        "NotebookLM source added: media=%s notebook=%s idx=%s/%s source=%s",
+                        media_type,
+                        notebook_id[:8],
+                        index,
+                        len(source_pairs),
+                        source.id[:8],
+                        extra={
+                            "media_type": media_type,
+                            "notebook_id_prefix": notebook_id[:8],
+                            "source_index": index,
+                            "source_count": len(source_pairs),
+                            "source_id_prefix": source.id[:8],
+                        },
+                    )
+
+                # Wait for sources to be ready
+                await self._wait_for_sources_ready(
+                    client=client,
+                    notebook_id=notebook_id,
+                    source_ids=source_ids,
+                )
+
+                # Generate the artifact based on type
+                result = await self._dispatch_text_artifact_generation(
+                    client=client,
+                    notebooklm_module=notebooklm_module,
+                    notebook_id=notebook_id,
+                    source_ids=source_ids,
+                    media_type=media_type,
+                    request=request,
+                )
+
+                total_duration_ms = round((loop.time() - request_started_at) * 1000, 2)
+                metadata: dict[str, Any] = {
+                    "provider": "notebooklm-py",
+                    "mode": self._settings.notebooklm_generation_mode,
+                    "notebook_id": notebook_id,
+                    "course_id": notebook.course_id,
+                    "notebook_reused": not notebook.is_ephemeral,
+                    "source_ids": source_ids,
+                    "source_count": len(source_ids),
+                    "source_titles": source_titles,
+                    "total_duration_ms": total_duration_ms,
+                    "source_char_count": source_char_count,
+                    "language": request.language,
+                }
+
+                logger.info(
+                    "NotebookLM text artifact completed: media=%s notebook=%s size=%s total_ms=%s",
+                    media_type,
+                    notebook_id[:8],
+                    len(result.media_bytes),
+                    total_duration_ms,
+                    extra={
+                        "media_type": media_type,
+                        "notebook_id_prefix": notebook_id[:8],
+                        "artifact_size_bytes": len(result.media_bytes),
+                        "total_duration_ms": total_duration_ms,
+                    },
+                )
+
+                return GenerationResult(
+                    media_bytes=result.media_bytes,
+                    mime_type=result.mime_type,
+                    extension=result.extension,
+                    duration_seconds=None,
+                    metadata=metadata,
+                )
+            finally:
+                if notebook.is_ephemeral:
+                    try:
+                        await client.notebooks.delete(notebook_id)
+                    except Exception:
+                        logger.warning(
+                            "NotebookLM cleanup failed for temporary notebook",
+                            extra={"notebook_id_prefix": notebook_id[:8]},
+                        )
+
+    async def _dispatch_text_artifact_generation(
+        self,
+        *,
+        client: Any,
+        notebooklm_module: Any,
+        notebook_id: str,
+        source_ids: list[str],
+        media_type: MediaType,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Dispatch to the correct notebooklm-py artifact generation method."""
+        if media_type == "study_guide":
+            return await self._generate_study_guide_artifact(
+                client, notebooklm_module, notebook_id, request,
+            )
+        elif media_type == "flashcards":
+            return await self._generate_flashcards_artifact(
+                client, notebooklm_module, notebook_id, request,
+            )
+        elif media_type == "mind_map":
+            return await self._generate_mind_map_artifact(
+                client, notebooklm_module, notebook_id, request,
+            )
+        elif media_type == "infographic":
+            return await self._generate_infographic_artifact(
+                client, notebooklm_module, notebook_id, request,
+            )
+        else:
+            raise MediaGenerationError(f"Unsupported text artifact type: {media_type}")
+
+    async def _generate_study_guide_artifact(
+        self,
+        client: Any,
+        notebooklm_module: Any,
+        notebook_id: str,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Generate a study guide artifact via notebooklm-py."""
+        generate_report = getattr(client.artifacts, "generate_report", None)
+        if not callable(generate_report):
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.generate_report; "
+                "study_guide generation is not available with this version"
+            )
+
+        kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+        report_format = request.report_format or "study_guide"
+        # Try passing format if the method accepts it
+        try:
+            status = await generate_report(**kwargs, format=report_format)
+        except TypeError:
+            # Fallback: method may not accept format kwarg
+            status = await generate_report(**kwargs)
+
+        if hasattr(status, "is_failed") and status.is_failed:
+            raise MediaGenerationError(
+                getattr(status, "error", None) or "NotebookLM rejected study_guide generation"
+            )
+
+        # Wait for completion if the result has a task_id
+        task_id = getattr(status, "task_id", None)
+        if task_id:
+            wait_for_completion = getattr(client.artifacts, "wait_for_completion", None)
+            if callable(wait_for_completion):
+                await wait_for_completion(notebook_id, task_id)
+
+        # Download the report
+        download_report = getattr(client.artifacts, "download_report", None)
+        if callable(download_report):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".md") as tmp_file:
+                tmp_path = Path(tmp_file.name)
+            try:
+                dl_kwargs: dict[str, Any] = {
+                    "notebook_id": notebook_id,
+                    "output_path": str(tmp_path),
+                }
+                if task_id:
+                    dl_kwargs["artifact_id"] = task_id
+                await download_report(**dl_kwargs)
+                content_text = tmp_path.read_text(encoding="utf-8")
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        else:
+            # Fallback: try to get content from status
+            content_text = getattr(status, "content", None) or getattr(status, "text", "")
+            if not content_text:
+                raise MediaGenerationError(
+                    "notebooklm-py does not expose artifacts.download_report and "
+                    "status did not contain content"
+                )
+
+        if not content_text:
+            raise MediaGenerationError("NotebookLM returned empty study_guide artifact")
+
+        return GenerationResult(
+            media_bytes=content_text.encode("utf-8"),
+            mime_type="text/markdown",
+            extension="md",
+            duration_seconds=None,
+            metadata={"report_format": report_format},
+        )
+
+    async def _generate_flashcards_artifact(
+        self,
+        client: Any,
+        notebooklm_module: Any,
+        notebook_id: str,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Generate flashcards artifact via notebooklm-py."""
+        generate_flashcards = getattr(client.artifacts, "generate_flashcards", None)
+        if not callable(generate_flashcards):
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.generate_flashcards; "
+                "flashcards generation is not available with this version"
+            )
+
+        kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+        if request.flashcard_difficulty:
+            kwargs["difficulty"] = request.flashcard_difficulty
+        if request.flashcard_count:
+            kwargs["quantity"] = request.flashcard_count
+
+        try:
+            status = await generate_flashcards(**kwargs)
+        except TypeError:
+            # Fallback: method may not accept extra kwargs
+            status = await generate_flashcards(notebook_id=notebook_id)
+
+        if hasattr(status, "is_failed") and status.is_failed:
+            raise MediaGenerationError(
+                getattr(status, "error", None) or "NotebookLM rejected flashcards generation"
+            )
+
+        # Wait for completion if the result has a task_id
+        task_id = getattr(status, "task_id", None)
+        if task_id:
+            wait_for_completion = getattr(client.artifacts, "wait_for_completion", None)
+            if callable(wait_for_completion):
+                await wait_for_completion(notebook_id, task_id)
+
+        # Download flashcards
+        download_flashcards = getattr(client.artifacts, "download_flashcards", None)
+        if callable(download_flashcards):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp_file:
+                tmp_path = Path(tmp_file.name)
+            try:
+                dl_kwargs: dict[str, Any] = {
+                    "notebook_id": notebook_id,
+                    "output_path": str(tmp_path),
+                }
+                if task_id:
+                    dl_kwargs["artifact_id"] = task_id
+                # Try passing format='json'
+                try:
+                    await download_flashcards(**dl_kwargs, format="json")
+                except TypeError:
+                    await download_flashcards(**dl_kwargs)
+                content_text = tmp_path.read_text(encoding="utf-8")
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        else:
+            content_text = getattr(status, "content", None) or getattr(status, "text", "")
+            if not content_text:
+                raise MediaGenerationError(
+                    "notebooklm-py does not expose artifacts.download_flashcards and "
+                    "status did not contain content"
+                )
+
+        if not content_text:
+            raise MediaGenerationError("NotebookLM returned empty flashcards artifact")
+
+        return GenerationResult(
+            media_bytes=content_text.encode("utf-8"),
+            mime_type="application/json",
+            extension="json",
+            duration_seconds=None,
+            metadata={
+                "flashcard_difficulty": request.flashcard_difficulty,
+                "flashcard_count": request.flashcard_count,
+            },
+        )
+
+    async def _generate_mind_map_artifact(
+        self,
+        client: Any,
+        notebooklm_module: Any,
+        notebook_id: str,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Generate mind map artifact via notebooklm-py.
+
+        Note: mind_map generation in notebooklm-py is synchronous (no wait needed).
+        """
+        generate_mind_map = getattr(client.artifacts, "generate_mind_map", None)
+        if not callable(generate_mind_map):
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.generate_mind_map; "
+                "mind_map generation is not available with this version"
+            )
+
+        kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+        if request.mind_map_depth:
+            kwargs["depth"] = request.mind_map_depth
+
+        try:
+            status = await generate_mind_map(**kwargs)
+        except TypeError:
+            status = await generate_mind_map(notebook_id=notebook_id)
+
+        if hasattr(status, "is_failed") and status.is_failed:
+            raise MediaGenerationError(
+                getattr(status, "error", None) or "NotebookLM rejected mind_map generation"
+            )
+
+        # Download mind map (synchronous — no wait_for_completion needed)
+        download_mind_map = getattr(client.artifacts, "download_mind_map", None)
+        if callable(download_mind_map):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp_file:
+                tmp_path = Path(tmp_file.name)
+            try:
+                dl_kwargs: dict[str, Any] = {"notebook_id": notebook_id, "output_path": str(tmp_path)}
+                task_id = getattr(status, "task_id", None)
+                if task_id:
+                    dl_kwargs["artifact_id"] = task_id
+                await download_mind_map(**dl_kwargs)
+                content_text = tmp_path.read_text(encoding="utf-8")
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        else:
+            content_text = getattr(status, "content", None) or getattr(status, "text", "")
+            if not content_text:
+                raise MediaGenerationError(
+                    "notebooklm-py does not expose artifacts.download_mind_map and "
+                    "status did not contain content"
+                )
+
+        if not content_text:
+            raise MediaGenerationError("NotebookLM returned empty mind_map artifact")
+
+        return GenerationResult(
+            media_bytes=content_text.encode("utf-8"),
+            mime_type="application/json",
+            extension="json",
+            duration_seconds=None,
+            metadata={"mind_map_depth": request.mind_map_depth},
+        )
+
+    async def _generate_infographic_artifact(
+        self,
+        client: Any,
+        notebooklm_module: Any,
+        notebook_id: str,
+        request: MediaGenerationRequest,
+    ) -> GenerationResult:
+        """Generate infographic artifact via notebooklm-py."""
+        generate_infographic = getattr(client.artifacts, "generate_infographic", None)
+        if not callable(generate_infographic):
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.generate_infographic; "
+                "infographic generation is not available with this version"
+            )
+
+        kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+        if request.infographic_orientation:
+            kwargs["orientation"] = request.infographic_orientation
+        if request.infographic_detail:
+            kwargs["detail_level"] = request.infographic_detail
+
+        try:
+            status = await generate_infographic(**kwargs)
+        except TypeError:
+            status = await generate_infographic(notebook_id=notebook_id)
+
+        if hasattr(status, "is_failed") and status.is_failed:
+            raise MediaGenerationError(
+                getattr(status, "error", None) or "NotebookLM rejected infographic generation"
+            )
+
+        # Wait for completion
+        task_id = getattr(status, "task_id", None)
+        if task_id:
+            wait_for_completion = getattr(client.artifacts, "wait_for_completion", None)
+            if callable(wait_for_completion):
+                await wait_for_completion(notebook_id, task_id)
+
+        # Download infographic (PNG image)
+        download_infographic = getattr(client.artifacts, "download_infographic", None)
+        if callable(download_infographic):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+                tmp_path = Path(tmp_file.name)
+            try:
+                dl_kwargs: dict[str, Any] = {
+                    "notebook_id": notebook_id,
+                    "output_path": str(tmp_path),
+                }
+                if task_id:
+                    dl_kwargs["artifact_id"] = task_id
+                await download_infographic(**dl_kwargs)
+                png_bytes = tmp_path.read_bytes()
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        else:
+            raise MediaGenerationError(
+                "notebooklm-py does not expose artifacts.download_infographic"
+            )
+
+        if not png_bytes:
+            raise MediaGenerationError("NotebookLM returned empty infographic artifact")
+
+        return GenerationResult(
+            media_bytes=png_bytes,
+            mime_type="image/png",
+            extension="png",
+            duration_seconds=None,
+            metadata={
+                "infographic_orientation": request.infographic_orientation,
+                "infographic_detail": request.infographic_detail,
+            },
+        )
+
+    def _fallback_text_result(
+        self,
+        media_type: MediaType,
+        request: MediaGenerationRequest,
+        reason: str,
+    ) -> GenerationResult:
+        """Return a fallback result for text-based artifact types."""
+        if media_type == "infographic":
+            # Return a minimal 1x1 transparent PNG as fallback
+            import struct
+            import zlib
+
+            def _minimal_png() -> bytes:
+                signature = b"\x89PNG\r\n\x1a\n"
+                ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+                ihdr_crc = zlib.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF
+                ihdr = struct.pack(">I", 13) + b"IHDR" + ihdr_data + struct.pack(">I", ihdr_crc)
+                raw_data = b"\x00\x00\x00\x00"
+                compressed = zlib.compress(raw_data)
+                idat_crc = zlib.crc32(b"IDAT" + compressed) & 0xFFFFFFFF
+                idat = struct.pack(">I", len(compressed)) + b"IDAT" + compressed + struct.pack(">I", idat_crc)
+                iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
+                iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
+                return signature + ihdr + idat + iend
+
+            media_bytes = _minimal_png()
+            mime_type = "image/png"
+            extension = "png"
+        elif media_type == "flashcards" or media_type == "mind_map":
+            import json as _json
+
+            fallback_content = _json.dumps(
+                {"fallback": True, "reason": reason, "media_type": media_type},
+                ensure_ascii=False,
+            )
+            media_bytes = fallback_content.encode("utf-8")
+            mime_type = "application/json"
+            extension = "json"
+        else:
+            # study_guide → markdown
+            fallback_content = f"# Fallback {media_type}\n\nGeneration unavailable: {reason}\n"
+            media_bytes = fallback_content.encode("utf-8")
+            mime_type = "text/markdown"
+            extension = "md"
+
+        metadata = {
+            "provider": "fallback",
+            "mode": self._settings.notebooklm_generation_mode,
+            "reason": reason,
+            "generated_at": datetime.now(UTC).isoformat(),
+            "placeholder": True,
+            "language": request.language,
+            "source_count": len(request.sources) if request.sources else 1,
+        }
+
+        return GenerationResult(
+            media_bytes=media_bytes,
+            mime_type=mime_type,
+            extension=extension,
+            duration_seconds=None,
+            metadata=metadata,
+        )
 
     async def _generate(
         self,

@@ -17,7 +17,11 @@
     "project": "Проект",
     "discussion": "Обсуждение",
     "reading": "Чтение",
-    "exercise": "Упражнение"
+    "exercise": "Упражнение",
+    "nlm_study_guide": "Учебный план",
+    "nlm_flashcards": "Карточки",
+    "nlm_mind_map": "Карта знаний",
+    "nlm_infographic": "Инфографика"
   },
   "typeDescriptions": {
     "video": "AI-сгенерированная видео-лекция на основе материала урока",
@@ -29,7 +33,11 @@
     "document": "Дополнительный документ для скачивания",
     "cover": "Премиум-обложка 21:9 для шапки страницы урока (ручная генерация)",
     "card": "AI-миниатюра 1:1 для каталога курсов и навигации (автоматическая)",
-    "banner": "Декоративный заголовок, создаваемый вручную для дополнительной красоты"
+    "banner": "Декоративный заголовок, создаваемый вручную для дополнительной красоты",
+    "nlm_study_guide": "Подробное учебное пособие, сгенерированное NotebookLM",
+    "nlm_flashcards": "Интерактивные карточки для запоминания с интервальным повторением",
+    "nlm_mind_map": "Визуальная карта знаний по понятиям и связям урока",
+    "nlm_infographic": "Визуальная инфографика с ключевыми тезисами урока"
   },
   "status": {
     "pending": "В очереди",
@@ -178,6 +186,37 @@
       "themeColorful": "Красочная",
       "maxSlides": "Максимум слайдов",
       "includeSpeakerNotes": "Заметки докладчика"
+    },
+    "nlmStudyGuide": {
+      "title": "Настройки учебного плана",
+      "detailLevel": "Уровень детализации",
+      "detailBrief": "Краткий",
+      "detailStandard": "Стандартный",
+      "detailComprehensive": "Подробный"
+    },
+    "nlmFlashcards": {
+      "title": "Настройки карточек",
+      "difficulty": "Сложность",
+      "difficultyEasy": "Лёгкий",
+      "difficultyMedium": "Средний",
+      "difficultyHard": "Сложный",
+      "cardCount": "Количество карточек"
+    },
+    "nlmMindMap": {
+      "title": "Настройки карты знаний",
+      "depth": "Глубина карты",
+      "depthShallow": "Поверхностная",
+      "depthStandard": "Стандартная",
+      "depthDeep": "Глубокая"
+    },
+    "nlmInfographic": {
+      "title": "Настройки инфографики",
+      "orientation": "Ориентация",
+      "orientationPortrait": "Портретная",
+      "orientationLandscape": "Альбомная",
+      "detailLevel": "Уровень детализации",
+      "detailOverview": "Обзорный",
+      "detailDetailed": "Подробный"
     }
   },
   "comingSoon": "Скоро",
@@ -278,7 +317,58 @@
       "document": "Документ",
       "cover": "Обложка",
       "card": "Карточка",
-      "banner": "Декоративный баннер"
+      "banner": "Декоративный баннер",
+      "nlm_study_guide": "Учебный план",
+      "nlm_flashcards": "Карточки",
+      "nlm_mind_map": "Карта знаний",
+      "nlm_infographic": "Инфографика"
+    },
+    "studyGuide": {
+      "description": "Подробный учебный план по уроку",
+      "open": "Читать план",
+      "readFull": "Читать полностью",
+      "title": "Учебный план",
+      "tableOfContents": "Содержание",
+      "wordCount": "{count} слов"
+    },
+    "flashcards": {
+      "description": "Интерактивные карточки для запоминания",
+      "start": "Начать",
+      "cardOf": "Карточка {current} из {total}",
+      "front": "Вопрос",
+      "back": "Ответ",
+      "tapToFlip": "Нажмите, чтобы увидеть ответ",
+      "flipCard": "Перевернуть карточку",
+      "know": "Знаю",
+      "dontKnow": "Ещё учу",
+      "summary": "Сессия завершена",
+      "total": "Всего",
+      "known": "Знаю",
+      "unknown": "Учу",
+      "score": "Результат",
+      "restart": "Начать заново",
+      "finish": "Завершить",
+      "shuffle": "Перемешать",
+      "cardCount": "{count} карточек"
+    },
+    "mindMap": {
+      "description": "Визуальная карта знаний по уроку",
+      "view": "Смотреть карту",
+      "viewFull": "Открыть полностью",
+      "title": "Карта знаний",
+      "nodeCount": "{count} узлов",
+      "depth": "Глубина {depth}",
+      "previewHint": "{count} основных тем"
+    },
+    "infographic": {
+      "description": "Визуальная инфографика по уроку",
+      "open": "Смотреть",
+      "zoom": "Масштаб",
+      "title": "Инфографика",
+      "zoomIn": "Увеличить",
+      "zoomOut": "Уменьшить",
+      "zoomReset": "Сбросить масштаб",
+      "defaultAlt": "Инфографика урока"
     },
     "confirmDeleteTitle": "Удалить дополнение?",
     "confirmDeleteDescription": "Это действие нельзя отменить. Медиафайл будет удалён.",
@@ -325,6 +415,26 @@
       "title": "NLM-видео",
       "description": "Подготовьте черновик и сгенерируйте видео урока",
       "estimatedTime": "~120 сек"
+    },
+    "nlm_study_guide": {
+      "title": "Учебный план",
+      "description": "Подробный учебный план через NotebookLM",
+      "estimatedTime": "~60 сек"
+    },
+    "nlm_flashcards": {
+      "title": "Карточки",
+      "description": "Интерактивные карточки через NotebookLM",
+      "estimatedTime": "~60 сек"
+    },
+    "nlm_mind_map": {
+      "title": "Карта знаний",
+      "description": "Визуальная карта знаний через NotebookLM",
+      "estimatedTime": "~30 сек"
+    },
+    "nlm_infographic": {
+      "title": "Инфографика",
+      "description": "Визуальная инфографика через NotebookLM",
+      "estimatedTime": "~90 сек"
     }
   },
   "images": {

@@ -23,6 +23,10 @@ type EnrichmentType =
   | 'nlm_video'
   | 'cover'
   | 'card'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 
 interface QuizOptionsProps {
   type: 'quiz'
@@ -79,6 +83,34 @@ interface NlmVideoOptionsProps {
   setNlmVideoStyle: (value: NlmVideoStyle) => void
 }
 
+interface NlmStudyGuideOptionsProps {
+  type: 'nlm_study_guide'
+  studyGuideDetailLevel: 'brief' | 'standard' | 'comprehensive'
+  setStudyGuideDetailLevel: (value: 'brief' | 'standard' | 'comprehensive') => void
+}
+
+interface NlmFlashcardsOptionsProps {
+  type: 'nlm_flashcards'
+  flashcardsCardCount: string
+  setFlashcardsCardCount: (value: string) => void
+  flashcardsDifficulty: 'easy' | 'medium' | 'hard'
+  setFlashcardsDifficulty: (value: 'easy' | 'medium' | 'hard') => void
+}
+
+interface NlmMindMapOptionsProps {
+  type: 'nlm_mind_map'
+  mindMapDepth: 'shallow' | 'standard' | 'deep'
+  setMindMapDepth: (value: 'shallow' | 'standard' | 'deep') => void
+}
+
+interface NlmInfographicOptionsProps {
+  type: 'nlm_infographic'
+  infographicOrientation: 'portrait' | 'landscape'
+  setInfographicOrientation: (value: 'portrait' | 'landscape') => void
+  infographicDetailLevel: 'overview' | 'detailed'
+  setInfographicDetailLevel: (value: 'overview' | 'detailed') => void
+}
+
 type BaseOptionsProps = {
   onSelectOpenChange?: (open: boolean) => void
 }
@@ -91,6 +123,10 @@ export type EnrichmentOptionsProps = (
   | VideoOptionsProps
   | NlmAudioOptionsProps
   | NlmVideoOptionsProps
+  | NlmStudyGuideOptionsProps
+  | NlmFlashcardsOptionsProps
+  | NlmMindMapOptionsProps
+  | NlmInfographicOptionsProps
 ) &
   BaseOptionsProps
 
@@ -358,6 +394,163 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
               <SelectItem value="slow">{t('forms.audio.speedSlow')}</SelectItem>
               <SelectItem value="normal">{t('forms.audio.speedNormal')}</SelectItem>
               <SelectItem value="fast">{t('forms.audio.speedFast')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )
+  }
+
+  // NLM Study Guide options
+  if (props.type === 'nlm_study_guide') {
+    const { studyGuideDetailLevel, setStudyGuideDetailLevel } = props
+    return (
+      <div className="space-y-3 pt-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmStudyGuide.detailLevel')}</label>
+          <Select
+            value={studyGuideDetailLevel}
+            onValueChange={(value) =>
+              setStudyGuideDetailLevel(value as 'brief' | 'standard' | 'comprehensive')
+            }
+            onOpenChange={onSelectOpenChange}
+          >
+            <SelectTrigger aria-label={t('forms.nlmStudyGuide.detailLevel')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="brief">{t('forms.nlmStudyGuide.detailBrief')}</SelectItem>
+              <SelectItem value="standard">{t('forms.nlmStudyGuide.detailStandard')}</SelectItem>
+              <SelectItem value="comprehensive">
+                {t('forms.nlmStudyGuide.detailComprehensive')}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )
+  }
+
+  // NLM Flashcards options
+  if (props.type === 'nlm_flashcards') {
+    const {
+      flashcardsCardCount,
+      setFlashcardsCardCount,
+      flashcardsDifficulty,
+      setFlashcardsDifficulty,
+    } = props
+    return (
+      <div className="space-y-3 pt-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmFlashcards.cardCount')}</label>
+          <Select
+            value={flashcardsCardCount}
+            onValueChange={setFlashcardsCardCount}
+            onOpenChange={onSelectOpenChange}
+          >
+            <SelectTrigger aria-label={t('forms.nlmFlashcards.cardCount')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="15">15</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="30">30</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmFlashcards.difficulty')}</label>
+          <Select
+            value={flashcardsDifficulty}
+            onValueChange={(value) => setFlashcardsDifficulty(value as 'easy' | 'medium' | 'hard')}
+            onOpenChange={onSelectOpenChange}
+          >
+            <SelectTrigger aria-label={t('forms.nlmFlashcards.difficulty')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="easy">{t('forms.quiz.difficultyEasy')}</SelectItem>
+              <SelectItem value="medium">{t('forms.quiz.difficultyMedium')}</SelectItem>
+              <SelectItem value="hard">{t('forms.quiz.difficultyHard')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )
+  }
+
+  // NLM Mind Map options
+  if (props.type === 'nlm_mind_map') {
+    const { mindMapDepth, setMindMapDepth } = props
+    return (
+      <div className="space-y-3 pt-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmMindMap.depth')}</label>
+          <Select
+            value={mindMapDepth}
+            onValueChange={(value) => setMindMapDepth(value as 'shallow' | 'standard' | 'deep')}
+            onOpenChange={onSelectOpenChange}
+          >
+            <SelectTrigger aria-label={t('forms.nlmMindMap.depth')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shallow">{t('forms.nlmMindMap.depthShallow')}</SelectItem>
+              <SelectItem value="standard">{t('forms.nlmMindMap.depthStandard')}</SelectItem>
+              <SelectItem value="deep">{t('forms.nlmMindMap.depthDeep')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )
+  }
+
+  // NLM Infographic options
+  if (props.type === 'nlm_infographic') {
+    const {
+      infographicOrientation,
+      setInfographicOrientation,
+      infographicDetailLevel,
+      setInfographicDetailLevel,
+    } = props
+    return (
+      <div className="space-y-3 pt-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmInfographic.orientation')}</label>
+          <Select
+            value={infographicOrientation}
+            onValueChange={(value) => setInfographicOrientation(value as 'portrait' | 'landscape')}
+            onOpenChange={onSelectOpenChange}
+          >
+            <SelectTrigger aria-label={t('forms.nlmInfographic.orientation')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="portrait">
+                {t('forms.nlmInfographic.orientationPortrait')}
+              </SelectItem>
+              <SelectItem value="landscape">
+                {t('forms.nlmInfographic.orientationLandscape')}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">{t('forms.nlmInfographic.detailLevel')}</label>
+          <Select
+            value={infographicDetailLevel}
+            onValueChange={(value) => setInfographicDetailLevel(value as 'overview' | 'detailed')}
+            onOpenChange={onSelectOpenChange}
+          >
+            <SelectTrigger aria-label={t('forms.nlmInfographic.detailLevel')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="overview">{t('forms.nlmInfographic.detailOverview')}</SelectItem>
+              <SelectItem value="detailed">{t('forms.nlmInfographic.detailDetailed')}</SelectItem>
             </SelectContent>
           </Select>
         </div>

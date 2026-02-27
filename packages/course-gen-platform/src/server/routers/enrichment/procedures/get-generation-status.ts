@@ -21,7 +21,7 @@ import {
   statusToProgress,
   statusToStep,
 } from '@megacampus/shared-types';
-import { verifyEnrichmentAccess } from '../helpers';
+import { extractNlmGenerationStartedAtMs, verifyEnrichmentAccess } from '../helpers';
 import { logger } from '../../../../shared/logger/index.js';
 
 /**
@@ -88,6 +88,10 @@ export const getGenerationStatus = protectedProcedure
       // Step 2: Map status to progress and step
       const progress = statusToProgress(status);
       const currentStep = statusToStep(status);
+      const generationStartedAtMs = extractNlmGenerationStartedAtMs(
+        enrichment.enrichment_type,
+        enrichment.metadata
+      );
 
       // Step 3: Get error message if failed
       let error: string | undefined;
@@ -134,6 +138,7 @@ export const getGenerationStatus = protectedProcedure
         currentStep,
         estimatedTimeRemaining,
         error,
+        generationStartedAtMs,
       };
     } catch (error) {
       // Re-throw tRPC errors as-is

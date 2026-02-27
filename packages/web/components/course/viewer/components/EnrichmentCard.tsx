@@ -3,11 +3,28 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, Pause, X, RefreshCw, Trash2, Loader2, ExternalLink, Download } from 'lucide-react'
+import {
+  Play,
+  Pause,
+  X,
+  RefreshCw,
+  Trash2,
+  Loader2,
+  ExternalLink,
+  Download,
+  BookOpen,
+  Layers,
+  Network,
+  ZoomIn,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import dynamic from 'next/dynamic'
 import { AudioPlayer } from '../enrichments/AudioPlayer'
 import { QuizPlayer } from '../enrichments/QuizPlayer'
+import { StudyGuideViewer } from '../enrichments/StudyGuideViewer'
+import { FlashcardViewer } from '../enrichments/FlashcardViewer'
+import { MindMapViewer } from '../enrichments/MindMapViewer'
+import { InfographicViewer } from '../enrichments/InfographicViewer'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -28,6 +45,10 @@ import {
   isAudioContent,
   isPresentationContent,
   isVideoContent,
+  isStudyGuideContent,
+  isFlashcardsContent,
+  isMindMapContent,
+  isInfographicContent,
 } from './enrichment-type-guards'
 import { getEnrichmentPlaybackUrl } from '@/lib/helpers/storage-helpers'
 import { deleteEnrichment, regenerateEnrichment } from '@/app/actions/enrichment-actions'
@@ -49,6 +70,10 @@ const PLACEHOLDER_IMAGES: Record<string, string> = {
   video: '/placeholders/Video.webp',
   nlm_video: '/placeholders/Video.webp',
   document: '/placeholders/Presentation.webp',
+  nlm_study_guide: '/placeholders/Quiz.webp',
+  nlm_flashcards: '/placeholders/Quiz.webp',
+  nlm_mind_map: '/placeholders/Presentation.webp',
+  nlm_infographic: '/placeholders/Cover.webp',
 }
 
 interface EnrichmentCardProps {
@@ -158,6 +183,31 @@ export function EnrichmentCard({
           }
           return null
         }
+        case 'nlm_study_guide': {
+          if (isStudyGuideContent(content)) {
+            return content.word_count
+              ? t('viewer.studyGuide.wordCount', { count: content.word_count })
+              : null
+          }
+          return null
+        }
+        case 'nlm_flashcards': {
+          if (isFlashcardsContent(content)) {
+            return t('viewer.flashcards.cardCount', { count: content.total_cards })
+          }
+          return null
+        }
+        case 'nlm_mind_map': {
+          if (isMindMapContent(content)) {
+            return content.total_nodes
+              ? t('viewer.mindMap.nodeCount', { count: content.total_nodes })
+              : null
+          }
+          return null
+        }
+        case 'nlm_infographic': {
+          return null
+        }
         default:
           return null
       }
@@ -182,6 +232,14 @@ export function EnrichmentCard({
         return 'viewer.lessonPresentation'
       case 'document':
         return 'viewer.additionalMaterials'
+      case 'nlm_study_guide':
+        return 'viewer.studyGuide.description'
+      case 'nlm_flashcards':
+        return 'viewer.flashcards.description'
+      case 'nlm_mind_map':
+        return 'viewer.mindMap.description'
+      case 'nlm_infographic':
+        return 'viewer.infographic.description'
       default:
         return 'viewer.additionalMaterials'
     }
@@ -457,6 +515,34 @@ export function EnrichmentCard({
           </div>
         )}
 
+        {/* Study Guide viewer when active */}
+        {isActive && type === 'nlm_study_guide' && isStudyGuideContent(enrichment.content) && (
+          <div className="mt-3">
+            <StudyGuideViewer content={enrichment.content} />
+          </div>
+        )}
+
+        {/* Flashcard viewer when active */}
+        {isActive && type === 'nlm_flashcards' && isFlashcardsContent(enrichment.content) && (
+          <div className="mt-3">
+            <FlashcardViewer content={enrichment.content} enrichmentId={enrichment.id} />
+          </div>
+        )}
+
+        {/* Mind Map viewer when active */}
+        {isActive && type === 'nlm_mind_map' && isMindMapContent(enrichment.content) && (
+          <div className="mt-3">
+            <MindMapViewer content={enrichment.content} />
+          </div>
+        )}
+
+        {/* Infographic: show thumbnail always when content is available */}
+        {type === 'nlm_infographic' && isInfographicContent(enrichment.content) && (
+          <div className="mt-3">
+            <InfographicViewer content={enrichment.content} />
+          </div>
+        )}
+
         {/* Action buttons — always visible at bottom */}
         <div className="mt-auto flex items-center gap-2 pt-3">
           {/* Start quiz button (video/audio use built-in player controls on the card) */}
@@ -489,6 +575,65 @@ export function EnrichmentCard({
             <Button size="sm" variant="outline" className="flex-1 gap-2">
               <Download className="h-4 w-4" />
               {t('viewer.download')}
+            </Button>
+          )}
+
+          {/* Study Guide: open/close toggle */}
+          {type === 'nlm_study_guide' && (
+            <Button size="sm" className="flex-1 gap-2" onClick={onToggle}>
+              {isActive ? (
+                <>
+                  <X className="h-4 w-4" />
+                  {t('viewer.close')}
+                </>
+              ) : (
+                <>
+                  <BookOpen className="h-4 w-4" />
+                  {t('viewer.studyGuide.open')}
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Flashcards: start/close toggle */}
+          {type === 'nlm_flashcards' && (
+            <Button size="sm" className="flex-1 gap-2" onClick={onToggle}>
+              {isActive ? (
+                <>
+                  <X className="h-4 w-4" />
+                  {t('viewer.close')}
+                </>
+              ) : (
+                <>
+                  <Layers className="h-4 w-4" />
+                  {t('viewer.flashcards.start')}
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Mind Map: view/close toggle */}
+          {type === 'nlm_mind_map' && (
+            <Button size="sm" className="flex-1 gap-2" onClick={onToggle}>
+              {isActive ? (
+                <>
+                  <X className="h-4 w-4" />
+                  {t('viewer.close')}
+                </>
+              ) : (
+                <>
+                  <Network className="h-4 w-4" />
+                  {t('viewer.mindMap.view')}
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Infographic: zoom toggle */}
+          {type === 'nlm_infographic' && isInfographicContent(enrichment.content) && (
+            <Button size="sm" variant="outline" className="flex-1 gap-2" onClick={onToggle}>
+              <ZoomIn className="h-4 w-4" />
+              {t('viewer.infographic.zoom')}
             </Button>
           )}
 

@@ -17,6 +17,14 @@ const MAX_GENERATING_ENTRIES = 50 // Safety cap for allGenerating Map
 // Optimistic UI prefix for temporary IDs before API response
 const OPTIMISTIC_ID_PREFIX = 'optimistic-'
 const log = createLogger({ hook: 'useEnrichmentGeneration' })
+const NLM_TIMER_DELAY_TYPES: ReadonlySet<OnDemandEnrichmentType> = new Set([
+  'nlm_audio',
+  'nlm_video',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
+])
 
 export function getMaxDurationForType(type: OnDemandEnrichmentType): number | undefined {
   switch (type) {
@@ -44,6 +52,17 @@ function getGenerationKey(lessonId: string, type: string): string {
   return `${lessonId}:${type}`
 }
 
+function isNlmMediaType(type: OnDemandEnrichmentType): boolean {
+  return NLM_TIMER_DELAY_TYPES.has(type)
+}
+
+function parsePositiveTimestampMs(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return undefined
+  }
+  return value
+}
+
 interface UseEnrichmentGenerationOptions {
   lessonId: string
   courseId: string
@@ -61,7 +80,7 @@ export interface GeneratingEnrichment {
   type: OnDemandEnrichmentType
   progress: number
   currentStep?: GenerationStep | FrontendOnlyStep
-  startedAtMs: number
+  startedAtMs?: number
   maxDurationMs?: number
 }
 
@@ -75,6 +94,7 @@ interface GenerationStatusResponse {
   status: string
   progress: number
   currentStep?: GenerationStep
+  generationStartedAtMs?: number
   estimatedTimeRemaining?: number
   error?: string
 }
@@ -145,7 +165,9 @@ export function useEnrichmentGeneration({
         const bIsCurrent = b[0].startsWith(currentPrefix)
         if (aIsCurrent && !bIsCurrent) return 1 // keep current lesson last
         if (!aIsCurrent && bIsCurrent) return -1
-        return a[1].startedAtMs - b[1].startedAtMs
+        const aStartedAtMs = parsePositiveTimestampMs(a[1].startedAtMs) ?? 0
+        const bStartedAtMs = parsePositiveTimestampMs(b[1].startedAtMs) ?? 0
+        return aStartedAtMs - bStartedAtMs
       })
       // Keep only the last MAX_GENERATING_ENTRIES entries
       const trimmed = entries.slice(entries.length - MAX_GENERATING_ENTRIES)
@@ -293,10 +315,23 @@ export function useEnrichmentGeneration({
               const next = new Map(prev)
               const current = next.get(generationKey)
               if (current) {
+                const backendStartedAtMs = parsePositiveTimestampMs(status.generationStartedAtMs)
+                const isEnteringGenerating =
+                  status.currentStep === 'generating' && current.currentStep !== 'generating'
+                let nextStartedAtMs = current.startedAtMs
+
+                if (isEnteringGenerating) {
+                  nextStartedAtMs =
+                    backendStartedAtMs ??
+                    parsePositiveTimestampMs(current.startedAtMs) ??
+                    Date.now()
+                }
+
                 next.set(generationKey, {
                   ...current,
                   progress: status.progress,
                   currentStep: status.currentStep,
+                  startedAtMs: nextStartedAtMs,
                 })
               }
               return next
@@ -386,7 +421,8 @@ export function useEnrichmentGeneration({
 
       // OPTIMISTIC UPDATE: Immediately show loading state with temporary ID
       const optimisticId = `${OPTIMISTIC_ID_PREFIX}${type}-${Date.now()}`
-      const generationStartedAtMs = Date.now()
+      const shouldDelayTimerStart = isNlmMediaType(type)
+      const generationStartedAtMs = shouldDelayTimerStart ? undefined : Date.now()
       const maxDurationMs = getMaxDurationForType(type)
       if (mountedRef.current) {
         setAllGenerating((prev) => {
@@ -412,7 +448,8 @@ export function useEnrichmentGeneration({
         const data = (await client.enrichment.generateOnDemand.mutate(
           {
             lessonId: currentLessonId,
-            enrichmentType: type,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            enrichmentType: type as any,
             settings: settings && Object.keys(settings).length > 0 ? settings : undefined,
           },
           { signal: controller.signal }
@@ -617,9 +654,7 @@ export function useEnrichmentGeneration({
       }
 
       const parsedStartedAtMs =
-        typeof startedAtMs === 'number' && Number.isFinite(startedAtMs) && startedAtMs > 0
-          ? startedAtMs
-          : Date.now()
+        parsePositiveTimestampMs(startedAtMs) ?? (isNlmMediaType(type) ? undefined : Date.now())
 
       // Add to generating state with unknown progress (-1 means "syncing")
       // Real progress will be fetched on first poll
