@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         alias="NOTEBOOKLM_PROACTIVE_RECOVERY_INTERVAL_SECONDS",
     )
     notebooklm_global_generation_concurrency: int = Field(
-        default=2,
+        default=4,
         ge=1,
         alias="NOTEBOOKLM_GLOBAL_GENERATION_CONCURRENCY",
     )
