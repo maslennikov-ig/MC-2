@@ -70,8 +70,12 @@ export function FlashcardViewer({ content, enrichmentId }: FlashcardViewerProps)
           currentIndex: number
           isFinished: boolean
         }
-        setKnownIds(new Set<string>(parsed.known))
-        setUnknownIds(new Set<string>(parsed.unknown))
+        // Validate loaded IDs against current cards to handle regeneration
+        const currentCardIds = new Set(content.cards.map((c) => c.id))
+        const validKnown = (parsed.known || []).filter((id: string) => currentCardIds.has(id))
+        const validUnknown = (parsed.unknown || []).filter((id: string) => currentCardIds.has(id))
+        setKnownIds(new Set<string>(validKnown))
+        setUnknownIds(new Set<string>(validUnknown))
         setCurrentIndex(Math.min(parsed.currentIndex, content.cards.length - 1))
         setIsFinished(parsed.isFinished)
       }

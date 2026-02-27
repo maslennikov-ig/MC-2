@@ -368,11 +368,11 @@ export function UnifiedEnrichmentCard({
         }
       case 'nlm_study_guide':
         return {
-          detail_level: studyGuideDetailLevel,
+          detailLevel: studyGuideDetailLevel,
         }
       case 'nlm_flashcards':
         return {
-          card_count: parseInt(flashcardsCardCount, 10),
+          cardCount: parseInt(flashcardsCardCount, 10),
           difficulty: flashcardsDifficulty,
         }
       case 'nlm_mind_map':
@@ -382,7 +382,7 @@ export function UnifiedEnrichmentCard({
       case 'nlm_infographic':
         return {
           orientation: infographicOrientation,
-          detail_level: infographicDetailLevel,
+          detailLevel: infographicDetailLevel,
         }
       default:
         return {}

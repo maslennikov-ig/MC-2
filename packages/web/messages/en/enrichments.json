@@ -358,7 +358,10 @@
       "title": "Mind Map",
       "nodeCount": "{count} nodes",
       "depth": "Depth {depth}",
-      "previewHint": "{count} top-level topics"
+      "previewHint": "{count} top-level topics",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "zoomReset": "Reset zoom"
     },
     "infographic": {
       "description": "Visual infographic summary of this lesson",

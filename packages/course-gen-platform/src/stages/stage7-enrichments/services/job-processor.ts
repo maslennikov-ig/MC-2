@@ -638,6 +638,67 @@ export async function processStage7Job(
 
     jobLogger.info('Generating final enrichment content');
     const result = await handler.generate(handlerInput);
+
+    // Handle deferred async task from single-stage handlers (e.g. NLM text/image artifacts)
+    if (result.deferredTask) {
+      const startedAt = nlmAsyncState?.startedAt ?? new Date().toISOString();
+      const elapsedMs = Date.now() - new Date(startedAt).getTime();
+      const maxWaitMs = getNlmMaxWaitMs();
+      if (elapsedMs > maxWaitMs) {
+        throw new Error(
+          `NotebookLM detached async task timed out after ${maxWaitMs}ms (taskId=${result.deferredTask.taskId})`
+        );
+      }
+
+      const nextPollAttempt = (nlmAsyncState?.pollAttempt ?? 0) + 1;
+      const nextAsyncState: Stage7NlmAsyncState = {
+        taskId: result.deferredTask.taskId,
+        mediaType: result.deferredTask.mediaType,
+        pollAttempt: nextPollAttempt,
+        startedAt,
+      };
+
+      await saveNotebookLMAsyncMetadataState(enrichmentId, enrichmentContext.enrichment.metadata, {
+        taskId: nextAsyncState.taskId,
+        mediaType: nextAsyncState.mediaType,
+        status: result.deferredTask.status,
+        pollAttempt: nextAsyncState.pollAttempt,
+        startedAt: nextAsyncState.startedAt,
+        lastPolledAt: new Date().toISOString(),
+        responseMetadata: result.deferredTask.responseMetadata,
+      });
+
+      const pollDelayMs = getNlmPollDelayMs(nextPollAttempt);
+      const nextJobId = await enqueueNlmPollJob(job.data, nextAsyncState, pollDelayMs);
+
+      await updateJobProgress(job, {
+        phase: isNlmPollJob ? 'polling_async' : 'pending_async',
+        progress: 55,
+        message: `NotebookLM task ${result.deferredTask.status}; next poll in ${Math.round(pollDelayMs / 1000)}s`,
+      });
+
+      jobLogger.info(
+        {
+          taskId: nextAsyncState.taskId,
+          mediaType: nextAsyncState.mediaType,
+          pollAttempt: nextAsyncState.pollAttempt,
+          pollDelayMs,
+          nextJobId,
+          taskStatus: result.deferredTask.status,
+        },
+        'Single-stage handler returned deferred task, scheduled poll job'
+      );
+
+      return {
+        enrichmentId,
+        success: true,
+        status: 'generating',
+        metrics: {
+          durationMs: Date.now() - startTime,
+        },
+      };
+    }
+
     return finalizeSuccessfulResult(job, {
       enrichmentId,
       enrichmentType,

@@ -358,7 +358,10 @@
       "title": "Карта знаний",
       "nodeCount": "{count} узлов",
       "depth": "Глубина {depth}",
-      "previewHint": "{count} основных тем"
+      "previewHint": "{count} основных тем",
+      "zoomIn": "Увеличить",
+      "zoomOut": "Уменьшить",
+      "zoomReset": "Сбросить масштаб"
     },
     "infographic": {
       "description": "Визуальная инфографика по уроку",

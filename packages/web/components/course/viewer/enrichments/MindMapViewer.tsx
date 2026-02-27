@@ -218,7 +218,7 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
                   className="h-7 w-7"
                   onClick={handleZoomOut}
                   disabled={zoomLevel <= 0.5}
-                  aria-label={t('viewer.infographic.zoomOut')}
+                  aria-label={t('viewer.mindMap.zoomOut')}
                 >
                   <ZoomOut className="h-4 w-4" />
                 </Button>
@@ -231,7 +231,7 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
                   className="h-7 w-7"
                   onClick={handleZoomIn}
                   disabled={zoomLevel >= 2}
-                  aria-label={t('viewer.infographic.zoomIn')}
+                  aria-label={t('viewer.mindMap.zoomIn')}
                 >
                   <ZoomIn className="h-4 w-4" />
                 </Button>
@@ -240,7 +240,7 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
                   size="icon"
                   className="h-7 w-7"
                   onClick={handleZoomReset}
-                  aria-label={t('viewer.infographic.zoomReset')}
+                  aria-label={t('viewer.mindMap.zoomReset')}
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
@@ -262,7 +262,7 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
                 transition: 'transform 0.2s ease',
               }}
             >
-              <MindMapTreeNode node={content.root} depth={0} />
+              <MindMapTreeNode node={content.root} depth={0} maxDepth={10} />
             </div>
           </div>
         </DialogContent>

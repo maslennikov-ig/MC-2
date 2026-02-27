@@ -2,9 +2,9 @@
  * NotebookLM Mind Map Enrichment Handler
  * @module stages/stage7-enrichments/handlers/nlm-mind-map-handler
  *
- * Single-stage flow:
- * - Fetches lesson content and builds source bundle
- * - Generates mind map (hierarchical JSON) via NotebookLM bridge
+ * Single-stage flow with poll-mode support:
+ * - Start mode: fetches lesson content → generates mind map via bridge
+ * - Poll mode: checks bridge task status → fetches result when ready
  * - Parses and validates tree structure, stores in JSONB
  */
 
@@ -14,7 +14,16 @@ import type { EnrichmentHandler } from '../services/enrichment-router';
 import { getLessonContent } from '../services/database-service';
 import { notebookLmBridgeClient } from '../services/notebooklm-bridge-client';
 import type { EnrichmentHandlerInput, GenerateResult } from '../types';
-import { buildNotebookLMSources, resolveSourceStrategy } from './nlm-shared';
+import {
+  buildNotebookLMSources,
+  resolveSourceStrategy,
+  resolveNlmAsyncMode,
+  resolveBridgeTaskId,
+  checkBridgeTaskStatus,
+  fetchBridgeTaskMedia,
+} from './nlm-shared';
+
+const MAX_TREE_DEPTH = 10;
 
 interface RawMindMapNode {
   label?: string;
@@ -25,7 +34,10 @@ interface RawMindMapNode {
   description?: string;
 }
 
-function normalizeMindMapNode(raw: RawMindMapNode): {
+function normalizeMindMapNode(
+  raw: RawMindMapNode,
+  currentDepth = 0
+): {
   label: string;
   children?: ReturnType<typeof normalizeMindMapNode>[];
   description?: string;
@@ -45,10 +57,11 @@ function normalizeMindMapNode(raw: RawMindMapNode): {
     result.description = raw.description.trim();
   }
 
-  if (Array.isArray(raw.children) && raw.children.length > 0) {
+  // Truncate at MAX_TREE_DEPTH to prevent unbounded recursion
+  if (currentDepth < MAX_TREE_DEPTH && Array.isArray(raw.children) && raw.children.length > 0) {
     result.children = raw.children
       .filter((c): c is RawMindMapNode => c && typeof c === 'object')
-      .map(normalizeMindMapNode);
+      .map(c => normalizeMindMapNode(c, currentDepth + 1));
   }
 
   return result;
@@ -86,17 +99,88 @@ function parseMindMapJson(raw: string): RawMindMapNode {
 
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     const obj = parsed as Record<string, unknown>;
-    // Check if root is nested under a key
     for (const key of ['root', 'tree', 'mindmap', 'mind_map', 'data']) {
       if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
         return obj[key] as RawMindMapNode;
       }
     }
-    // The object itself is the root
     return obj as unknown as RawMindMapNode;
   }
 
   throw new Error('NotebookLM bridge mind map response is not a valid tree object');
+}
+
+function buildDeferredResult(
+  taskId: string,
+  taskStatus: string,
+  responseMetadata: Record<string, unknown> | undefined,
+  durationMs: number,
+  lessonTitle: string,
+  extra: Record<string, unknown>
+): GenerateResult {
+  return {
+    content: {
+      type: 'nlm_mind_map',
+      root: { label: lessonTitle },
+    } as MindMapEnrichmentContent,
+    metadata: {
+      generated_at: new Date().toISOString(),
+      generation_duration_ms: durationMs,
+      estimated_cost_usd: 0,
+      model_used: 'notebooklm-bridge',
+      quality_score: 1.0,
+      retry_attempts: 0,
+      additional_info: {
+        bridge: 'notebooklm',
+        bridge_task_id: taskId,
+        bridge_task_status: taskStatus,
+        ...extra,
+      },
+    },
+    deferredTask: {
+      provider: 'notebooklm-bridge',
+      mediaType: 'mind_map',
+      taskId,
+      status: taskStatus,
+      responseMetadata,
+    },
+  };
+}
+
+function parseMindMapResult(
+  rawMedia: { textContent?: string; buffer: Buffer },
+  durationMs: number,
+  extra: Record<string, unknown>
+): GenerateResult {
+  const rawJson = rawMedia.textContent ?? rawMedia.buffer.toString('utf-8');
+  const rawRoot = parseMindMapJson(rawJson);
+  const root = normalizeMindMapNode(rawRoot);
+  const totalNodes = countNodes(root as { children?: { label: string }[] });
+  const treeDepth = maxDepth(root as { children?: { label: string }[] });
+
+  const content: MindMapEnrichmentContent = {
+    type: 'nlm_mind_map',
+    root,
+    total_nodes: totalNodes,
+    max_depth: treeDepth,
+  };
+
+  const metadata: EnrichmentMetadata = {
+    generated_at: new Date().toISOString(),
+    generation_duration_ms: durationMs,
+    estimated_cost_usd: 0,
+    model_used: 'notebooklm-bridge',
+    quality_score: 1.0,
+    retry_attempts: 0,
+    additional_info: {
+      bridge: 'notebooklm',
+      total_nodes: totalNodes,
+      max_depth: treeDepth,
+      ...extra,
+    },
+  };
+
+  return { content, metadata };
 }
 
 async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
@@ -112,6 +196,33 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     'NLM mind map handler: generating'
   );
 
+  // Poll mode: check existing bridge task
+  const asyncMode = resolveNlmAsyncMode(settings);
+  const bridgeTaskId = resolveBridgeTaskId(settings);
+
+  if (asyncMode === 'poll' && bridgeTaskId) {
+    const poll = await checkBridgeTaskStatus(bridgeTaskId, 'mind_map');
+    const durationMs = Date.now() - startTime;
+
+    if (!poll.completed) {
+      return buildDeferredResult(
+        bridgeTaskId,
+        poll.status.status,
+        poll.status.responseMetadata,
+        durationMs,
+        enrichmentContext.lesson.title,
+        { poll_mode: true }
+      );
+    }
+
+    const media = await fetchBridgeTaskMedia(bridgeTaskId, 'mind_map');
+    return parseMindMapResult(media, durationMs, {
+      poll_mode: true,
+      bridge_task_id: bridgeTaskId,
+    });
+  }
+
+  // Start mode: initiate new generation
   const lessonContent = await getLessonContent(
     enrichmentContext.lesson.id,
     enrichmentContext.course.id
@@ -125,7 +236,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   const sources = buildNotebookLMSources({
     strategy: sourceStrategy,
     scriptContent: lessonContent,
-    scriptTitle: 'Lesson Content',
+    scriptTitle: enrichmentContext.lesson.title,
     rawLessonContent: lessonContent,
     input,
   });
@@ -144,73 +255,22 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
 
   if (!start.immediateMedia) {
     const durationMs = Date.now() - startTime;
-    const deferredContent: MindMapEnrichmentContent = {
-      type: 'nlm_mind_map',
-      root: { label: enrichmentContext.lesson.title },
-    };
-
-    return {
-      content: deferredContent,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        generation_duration_ms: durationMs,
-        estimated_cost_usd: 0,
-        model_used: 'notebooklm-bridge',
-        quality_score: 1.0,
-        retry_attempts: 0,
-        additional_info: {
-          bridge: 'notebooklm',
-          source_strategy_used: sourceStrategy,
-          source_count: sources.length,
-          depth,
-          bridge_task_id: start.taskId,
-          bridge_task_status: start.status,
-        },
-      },
-      deferredTask: {
-        provider: 'notebooklm-bridge',
-        mediaType: 'mind_map',
-        taskId: start.taskId,
-        status: start.status,
-        responseMetadata: start.responseMetadata,
-      },
-    };
+    return buildDeferredResult(
+      start.taskId,
+      start.status,
+      start.responseMetadata,
+      durationMs,
+      enrichmentContext.lesson.title,
+      { source_strategy_used: sourceStrategy, source_count: sources.length, depth }
+    );
   }
 
-  const bridgeResult = start.immediateMedia;
-  const rawJson = bridgeResult.textContent ?? bridgeResult.buffer.toString('utf-8');
-  const rawRoot = parseMindMapJson(rawJson);
-  const root = normalizeMindMapNode(rawRoot);
-  const totalNodes = countNodes(root as { children?: { label: string }[] });
-  const treeDepth = maxDepth(root as { children?: { label: string }[] });
-
-  const content: MindMapEnrichmentContent = {
-    type: 'nlm_mind_map',
-    root,
-    total_nodes: totalNodes,
-    max_depth: treeDepth,
-  };
-
   const durationMs = Date.now() - startTime;
-
-  const metadata: EnrichmentMetadata = {
-    generated_at: new Date().toISOString(),
-    generation_duration_ms: durationMs,
-    estimated_cost_usd: 0,
-    model_used: 'notebooklm-bridge',
-    quality_score: 1.0,
-    retry_attempts: 0,
-    additional_info: {
-      bridge: 'notebooklm',
-      source_strategy_used: sourceStrategy,
-      source_count: sources.length,
-      depth,
-      total_nodes: totalNodes,
-      max_depth: treeDepth,
-    },
-  };
-
-  return { content, metadata };
+  return parseMindMapResult(start.immediateMedia, durationMs, {
+    source_strategy_used: sourceStrategy,
+    source_count: sources.length,
+    depth,
+  });
 }
 
 export const nlmMindMapHandler: EnrichmentHandler = {
