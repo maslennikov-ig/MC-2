@@ -173,7 +173,7 @@ export type NlmSourceStrategy = z.infer<typeof nlmSourceStrategySchema>;
 /** NotebookLM audio format presets */
 export const nlmAudioFormatSchema = z
   .enum(['deep_dive', 'brief', 'critique', 'debate'])
-  .default('deep_dive');
+  .default('debate');
 export type NlmAudioFormat = z.infer<typeof nlmAudioFormatSchema>;
 
 /** NotebookLM audio length presets */

@@ -50,7 +50,7 @@ const NLM_AUDIO_FORMAT_PRESETS: NotebookLMAudioFormatPreset[] = [
   'debate',
 ];
 const NLM_AUDIO_LENGTH_PRESETS: NotebookLMAudioLengthPreset[] = ['short', 'default', 'long'];
-const NLM_DEFAULT_AUDIO_FORMAT: NotebookLMAudioFormatPreset = 'deep_dive';
+const NLM_DEFAULT_AUDIO_FORMAT: NotebookLMAudioFormatPreset = 'debate';
 const NLM_DEFAULT_AUDIO_LENGTH: NotebookLMAudioLengthPreset = 'default';
 const NLM_ASYNC_MODE_POLL = 'poll';
 
