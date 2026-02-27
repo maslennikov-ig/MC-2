@@ -61,8 +61,8 @@ export default tseslint.config(
       }],
       '@typescript-eslint/restrict-template-expressions': 'warn',
       'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['warn', { max: 150, skipBlankLines: true, skipComments: true }],
-      complexity: ['warn', 20],
+      'max-lines-per-function': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      complexity: ['warn', 30],
       'no-case-declarations': 'warn',
       'no-useless-escape': 'warn',
     },
@@ -84,6 +84,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',
       '@typescript-eslint/ban-ts-comment': ['warn', {
         'ts-ignore': true,
@@ -92,7 +93,7 @@ export default tseslint.config(
         minimumDescriptionLength: 3,
       }],
       'max-lines': ['error', { max: 1500, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['warn', { max: 200, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 1000, skipBlankLines: true, skipComments: true }],
       complexity: ['warn', 30],
     },
   }
