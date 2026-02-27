@@ -24,6 +24,7 @@ from .generator import (
 from .models import (
     AudioGenerationResponse,
     AudioGenerationTaskResultResponse,
+    HealthCheckDetail,
     HealthResponse,
     MediaGenerationRequest,
     MediaGenerationTaskStartResponse,
@@ -288,10 +289,61 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def health(
         resolved_settings: Annotated[Settings, Depends(get_settings)],
     ) -> HealthResponse:
+        import pathlib
+
+        checks: list[HealthCheckDetail] = []
+
+        # Check auth source availability
+        if resolved_settings.notebooklm_auth_json:
+            checks.append(HealthCheckDetail(
+                name="auth_json", passed=True, message="Inline JSON configured",
+            ))
+        elif resolved_settings.notebooklm_storage_path:
+            p = pathlib.Path(resolved_settings.notebooklm_storage_path)
+            if p.is_file():
+                size_kb = p.stat().st_size / 1024
+                checks.append(HealthCheckDetail(
+                    name="auth_file", passed=True,
+                    message=f"{p.name} ({size_kb:.0f} KB)",
+                ))
+            else:
+                checks.append(HealthCheckDetail(
+                    name="auth_file", passed=False,
+                    message=f"Not found: {p}",
+                ))
+        else:
+            checks.append(HealthCheckDetail(
+                name="auth", passed=False, message="No auth configured",
+            ))
+
+        # Check SOCKS proxy configuration
+        proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+        proxy_configured = bool(proxy_url)
+        if proxy_configured:
+            checks.append(HealthCheckDetail(
+                name="proxy", passed=True, message=proxy_url,
+            ))
+        else:
+            checks.append(HealthCheckDetail(
+                name="proxy", passed=False, message="No proxy configured",
+            ))
+
+        # Count active tasks
+        async with task_store._lock:
+            active = sum(
+                1 for t in task_store._tasks.values()
+                if t.status in {"queued", "in_progress"}
+            )
+
+        overall = "ok" if all(c.passed for c in checks) else "degraded"
+
         return HealthResponse(
-            status="ok",
+            status=overall,
             service="notebooklm-bridge",
             mode=resolved_settings.notebooklm_generation_mode,
+            checks=checks,
+            active_tasks=active,
+            proxy_configured=proxy_configured,
         )
 
     @app.post(

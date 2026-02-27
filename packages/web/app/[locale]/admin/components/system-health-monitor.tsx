@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   HelpCircle,
   Send,
+  Mic,
 } from 'lucide-react'
 
 // Types
@@ -79,6 +80,7 @@ const SERVICE_CONFIG: Record<string, { key: string; icon: React.ElementType }> =
   Qdrant: { key: 'qdrant', icon: Search },
   Worker: { key: 'worker', icon: Cog },
   'Worker Stage 7': { key: 'workerStage7', icon: Cog },
+  'NotebookLM Bridge': { key: 'notebookLMBridge', icon: Mic },
   'Telegram Bot': { key: 'telegram', icon: Send },
   'Mermaid Pipeline': { key: 'mermaid', icon: Cog },
 }
@@ -111,6 +113,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     | 'api'
     | 'worker'
     | 'workerStage7'
+    | 'notebookLMBridge'
     | 'supabase'
     | 'qdrant'
     | 'telegram'
@@ -124,6 +127,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     api: t('services.api'),
     worker: t('services.worker'),
     workerStage7: t('services.workerStage7'),
+    notebookLMBridge: t('services.notebookLMBridge'),
     supabase: t('services.supabase'),
     qdrant: t('services.qdrant'),
     telegram: t('services.telegram'),
@@ -136,6 +140,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     api: t('services.apiDesc'),
     worker: t('services.workerDesc'),
     workerStage7: t('services.workerStage7Desc'),
+    notebookLMBridge: t('services.notebookLMBridgeDesc'),
     supabase: t('services.supabaseDesc'),
     qdrant: t('services.qdrantDesc'),
     telegram: t('services.telegramDesc'),
@@ -233,7 +238,7 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
 
   // Initial fetch
   useEffect(() => {
-    fetchHealth()
+    void fetchHealth()
   }, [fetchHealth])
 
   // Auto-refresh countdown
@@ -243,7 +248,7 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          fetchHealth()
+          void fetchHealth()
           return autoRefreshInterval
         }
         return prev - 1
@@ -260,7 +265,7 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
         <div className="animate-pulse space-y-4">
           <div className="h-6 w-1/3 rounded bg-gray-200 dark:bg-gray-700" />
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
-            {Array.from({ length: 9 }).map((_, i) => (
+            {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="h-28 rounded-xl bg-gray-200 dark:bg-gray-700" />
             ))}
           </div>
