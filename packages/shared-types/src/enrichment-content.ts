@@ -680,6 +680,83 @@ export const mindMapEnrichmentContentSchema = z.object({
 
 export type MindMapEnrichmentContent = z.infer<typeof mindMapEnrichmentContentSchema>;
 
+/** Maximum allowed depth for mind map trees (prevents stack overflow during Zod z.lazy() validation) */
+export const MIND_MAP_MAX_DEPTH = 50;
+
+/**
+ * Iteratively computes the maximum depth of a mind map tree using BFS.
+ * Does NOT use recursion — safe for any nesting level.
+ */
+function getMindMapDepthIterative(root: unknown): number {
+  if (!root || typeof root !== 'object') return 0;
+
+  const queue: Array<[unknown, number]> = [[root, 1]];
+  let maxFound = 0;
+
+  while (queue.length > 0) {
+    const [node, depth] = queue.shift()!;
+    if (!node || typeof node !== 'object') continue;
+
+    maxFound = Math.max(maxFound, depth);
+
+    const children = (node as Record<string, unknown>)['children'];
+    if (Array.isArray(children)) {
+      for (const child of children) {
+        queue.push([child, depth + 1]);
+      }
+    }
+  }
+
+  return maxFound;
+}
+
+/**
+ * Strict mind map schema with iterative depth validation.
+ *
+ * Use for validating untrusted/LLM-generated input. The base
+ * `mindMapEnrichmentContentSchema` stays a plain ZodObject
+ * for discriminated union compatibility.
+ */
+export const mindMapEnrichmentContentStrictSchema = mindMapEnrichmentContentSchema.superRefine(
+  (data, ctx) => {
+    const depth = getMindMapDepthIterative(data.root);
+    if (depth > MIND_MAP_MAX_DEPTH) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Mind map tree exceeds maximum depth of ${MIND_MAP_MAX_DEPTH} (found: ${depth})`,
+        path: ['root'],
+      });
+    }
+  }
+);
+
+/**
+ * Validates mind map enrichment content with depth safety.
+ *
+ * Performs iterative BFS depth check BEFORE z.lazy() recursion
+ * to prevent stack overflow on pathological input.
+ */
+export function validateMindMapContent(data: unknown) {
+  // Fast iterative pre-check — catches dangerous input before z.lazy() recursion
+  if (data && typeof data === 'object' && 'root' in data) {
+    const depth = getMindMapDepthIterative((data as Record<string, unknown>)['root']);
+    if (depth > MIND_MAP_MAX_DEPTH) {
+      return {
+        success: false as const,
+        error: new z.ZodError([
+          {
+            code: z.ZodIssueCode.custom,
+            message: `Mind map tree exceeds maximum depth of ${MIND_MAP_MAX_DEPTH} (found: ${depth})`,
+            path: ['root'],
+          },
+        ]),
+      };
+    }
+  }
+
+  return mindMapEnrichmentContentStrictSchema.safeParse(data);
+}
+
 // ============================================================================
 // NLM INFOGRAPHIC ENRICHMENT CONTENT
 // ============================================================================
