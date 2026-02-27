@@ -60,10 +60,10 @@ fi
 # Without this, directories created by Docker daemon get root:root ownership,
 # causing EACCES errors in container.
 echo "Ensuring data directories exist with correct permissions..."
-mkdir -p "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
+mkdir -p "$BASE_PATH/data/enrichments" \
          "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev" \
          "$BASE_PATH/secrets/notebooklm"
-sudo chown -R 1001:1001 "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
+sudo chown -R 1001:1001 "$BASE_PATH/data/enrichments" \
                          "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev"
 echo "   Data directories ready (owner: 1001:1001)."
 echo ""

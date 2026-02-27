@@ -293,7 +293,7 @@ ssh megacampus-prod "bash /opt/megacampus/scripts/rollback_blue_green.sh"
 ### Key Nginx Features
 
 - **Enrichments**: `/storage/enrichments/` → `alias /opt/megacampus/data/enrichments/` with rate limiting (50r/s, burst 100)
-  - Dev serves from `/opt/megacampus/data/enrichments-dev/`
+  - Dev serves from the same `/opt/megacampus/data/enrichments/` (shared with staging)
 - **API**: `/api/trpc/` rewritten to `/trpc/$1`, proxied to API upstream, 300s timeout
 - **Bull Board**: `/admin/queues` IP-whitelisted (127.0.0.1, 95.81.98.230, 185.200.177.180, 80.74.28.160)
 - **SSL**: Let's Encrypt, TLSv1.2 + TLSv1.3
@@ -370,7 +370,6 @@ Containers run as UID 1001 (nodejs). If enrichments fail to save:
 
 ```bash
 chown -R 1001:1001 /opt/megacampus/data/enrichments
-chown -R 1001:1001 /opt/megacampus/data/enrichments-dev
 ```
 
 ## Local Development
@@ -416,18 +415,18 @@ Dev runs alongside staging on the same server with isolated resources.
 
 ### Key Differences from Staging
 
-| Resource        | Staging                             | Dev                         |
-| --------------- | ----------------------------------- | --------------------------- |
-| Compose file    | `app.yml` + `infra.yml`             | `docker-compose.dev.yml`    |
-| Uploads dir     | `./data/uploads`                    | `./data/uploads-dev`        |
-| Enrichments dir | `./data/enrichments`                | `./data/enrichments-dev`    |
-| BullMQ main     | `course-generation`                 | `course-generation-dev`     |
-| BullMQ stage6   | `stage6-lesson-content`             | `stage6-lesson-content-dev` |
-| BullMQ stage7   | `stage7-enrichments`                | `stage7-enrichments-dev`    |
-| Ports           | 3001/4001 (blue), 3002/4002 (green) | 3010/4010                   |
-| NLM bridge port | internal only                       | 8010                        |
-| Docker images   | `:latest`                           | `:develop`                  |
-| Workers         | 3 separate containers               | 3 separate containers       |
+| Resource        | Staging                             | Dev                           |
+| --------------- | ----------------------------------- | ----------------------------- |
+| Compose file    | `app.yml` + `infra.yml`             | `docker-compose.dev.yml`      |
+| Uploads dir     | `./data/uploads`                    | `./data/uploads-dev`          |
+| Enrichments dir | `./data/enrichments`                | `./data/enrichments` (shared) |
+| BullMQ main     | `course-generation`                 | `course-generation-dev`       |
+| BullMQ stage6   | `stage6-lesson-content`             | `stage6-lesson-content-dev`   |
+| BullMQ stage7   | `stage7-enrichments`                | `stage7-enrichments-dev`      |
+| Ports           | 3001/4001 (blue), 3002/4002 (green) | 3010/4010                     |
+| NLM bridge port | internal only                       | 8010                          |
+| Docker images   | `:latest`                           | `:develop`                    |
+| Workers         | 3 separate containers               | 3 separate containers         |
 
 ### Shared Infrastructure
 
