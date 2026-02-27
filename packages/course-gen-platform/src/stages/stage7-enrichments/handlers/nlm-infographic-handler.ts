@@ -15,8 +15,7 @@ import { getLessonContent } from '../services/database-service';
 import { notebookLmBridgeClient } from '../services/notebooklm-bridge-client';
 import type { EnrichmentHandlerInput, GenerateResult } from '../types';
 import {
-  buildNotebookLMSources,
-  resolveSourceStrategy,
+  buildStandardSources,
   resolveNlmAsyncMode,
   resolveBridgeTaskId,
   checkBridgeTaskStatus,
@@ -143,15 +142,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
   }
 
-  const language = enrichmentContext.course.language || 'en';
-  const sourceStrategy = resolveSourceStrategy(settings);
-  const sources = buildNotebookLMSources({
-    strategy: sourceStrategy,
-    scriptContent: lessonContent,
-    scriptTitle: enrichmentContext.lesson.title,
-    rawLessonContent: lessonContent,
-    input,
-  });
+  const { language, sources, sourceStrategy } = buildStandardSources(
+    lessonContent,
+    settings,
+    input
+  );
 
   // Read camelCase keys from validated on-demand schema
   const orientation = typeof settings.orientation === 'string' ? settings.orientation : 'portrait';

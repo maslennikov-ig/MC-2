@@ -626,6 +626,12 @@ export const flashcardsEnrichmentContentSchema = z.object({
   total_cards: z.number().int().positive(),
 });
 
+/** Strict schema with cross-field validation (use for handler output validation) */
+export const flashcardsEnrichmentContentStrictSchema = flashcardsEnrichmentContentSchema.refine(
+  data => data.total_cards === data.cards.length,
+  { message: 'total_cards must equal cards.length', path: ['total_cards'] }
+);
+
 export type FlashcardsEnrichmentContent = z.infer<typeof flashcardsEnrichmentContentSchema>;
 
 // ============================================================================

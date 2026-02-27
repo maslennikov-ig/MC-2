@@ -149,6 +149,33 @@ export function buildNotebookLMSources(params: {
 }
 
 // ────────────────────────────────────────────────────────────────
+// Standard source-building helper (DRY across all NLM handlers)
+// ────────────────────────────────────────────────────────────────
+
+export interface StandardSourcesResult {
+  language: string;
+  sources: NotebookLMSourceInput[];
+  sourceStrategy: NlmSourceStrategy;
+}
+
+export function buildStandardSources(
+  lessonContent: string,
+  settings: Record<string, unknown>,
+  input: EnrichmentHandlerInput
+): StandardSourcesResult {
+  const language = input.enrichmentContext.course.language || 'en';
+  const sourceStrategy = resolveSourceStrategy(settings);
+  const sources = buildNotebookLMSources({
+    strategy: sourceStrategy,
+    scriptContent: lessonContent,
+    scriptTitle: input.enrichmentContext.lesson.title,
+    rawLessonContent: lessonContent,
+    input,
+  });
+  return { language, sources, sourceStrategy };
+}
+
+// ────────────────────────────────────────────────────────────────
 // Poll-mode helpers for single-stage NLM handlers
 // ────────────────────────────────────────────────────────────────
 
