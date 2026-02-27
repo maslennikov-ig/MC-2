@@ -135,28 +135,28 @@ const PLACEHOLDER_CONFIG: Record<
     icon: ImageIcon,
   },
   nlm_study_guide: {
-    image: '/placeholders/Quiz.webp',
+    image: '/placeholders/StudyGuide.webp',
     color: 'text-emerald-500 dark:text-emerald-400',
     badgeKey: 'placeholder.nlm_study_guide.estimatedTime',
     badgeLiteral: null,
     icon: BookOpen,
   },
   nlm_flashcards: {
-    image: '/placeholders/Quiz.webp',
+    image: '/placeholders/Flashcards.webp',
     color: 'text-amber-500 dark:text-amber-400',
     badgeKey: 'placeholder.nlm_flashcards.estimatedTime',
     badgeLiteral: null,
     icon: Layers,
   },
   nlm_mind_map: {
-    image: '/placeholders/Presentation.webp',
+    image: '/placeholders/MindMap.webp',
     color: 'text-sky-500 dark:text-sky-400',
     badgeKey: 'placeholder.nlm_mind_map.estimatedTime',
     badgeLiteral: null,
     icon: Network,
   },
   nlm_infographic: {
-    image: '/placeholders/Cover.webp',
+    image: '/placeholders/Infographic.webp',
     color: 'text-rose-500 dark:text-rose-400',
     badgeKey: 'placeholder.nlm_infographic.estimatedTime',
     badgeLiteral: null,
@@ -206,7 +206,7 @@ export function UnifiedEnrichmentCard({
   const [audioSpeed, setAudioSpeed] = useState('normal')
   const [presentationSlides, setPresentationSlides] = useState('8')
   const [presentationTheme, setPresentationTheme] = useState('light')
-  const [nlmAudioFormat, setNlmAudioFormat] = useState<NlmAudioFormat>('deep_dive')
+  const [nlmAudioFormat, setNlmAudioFormat] = useState<NlmAudioFormat>('debate')
   const [nlmVideoFormat, setNlmVideoFormat] = useState<NlmVideoFormat>('explainer')
   const [nlmVideoStyle, setNlmVideoStyle] = useState<NlmVideoStyle>('auto_select')
 
