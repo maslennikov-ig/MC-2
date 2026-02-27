@@ -478,6 +478,75 @@ describe('useEnrichmentGeneration', () => {
   // ===========================================================================
 
   describe('polling', () => {
+    it('should call the latest onComplete callback after rerender', async () => {
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
+        .mockResolvedValueOnce(mockStatusCompleted)
+
+      const initialOnComplete = vi.fn()
+      const latestOnComplete = vi.fn()
+
+      const { result, rerender, unmount } = renderHook(
+        ({ onComplete }) =>
+          useEnrichmentGeneration({
+            lessonId: 'lesson-123',
+            courseId: 'course-123',
+            pollingInterval: 100,
+            onComplete,
+          }),
+        {
+          initialProps: { onComplete: initialOnComplete },
+        }
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('quiz')
+      })
+
+      rerender({ onComplete: latestOnComplete })
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+      })
+
+      expect(initialOnComplete).not.toHaveBeenCalled()
+      expect(latestOnComplete).toHaveBeenCalledWith('test-enrichment-id')
+
+      unmount()
+    })
+
+    it('should preserve generation state when switching lessons and returning back', async () => {
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
+
+      const { result, rerender, unmount } = renderHook(
+        ({ lessonId }) =>
+          useEnrichmentGeneration({
+            lessonId,
+            courseId: 'course-123',
+            pollingInterval: 100,
+          }),
+        {
+          initialProps: { lessonId: 'lesson-123' },
+        }
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('quiz')
+      })
+
+      expect(result.current.isGenerating('quiz')).toBe(true)
+
+      rerender({ lessonId: 'lesson-456' })
+      expect(result.current.isGenerating('quiz')).toBe(false)
+
+      rerender({ lessonId: 'lesson-123' })
+      expect(result.current.isGenerating('quiz')).toBe(true)
+
+      unmount()
+    })
+
     it('should start polling immediately after generation starts', async () => {
       mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
       mockQueryStatus.mockResolvedValue(mockStatusPending)

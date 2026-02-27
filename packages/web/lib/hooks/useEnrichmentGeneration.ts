@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { TRPCClientError } from '@trpc/client'
 import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 import { createLogger } from '@/lib/client-logger'
@@ -12,6 +12,7 @@ const MAX_POLL_FAILURES = 5
 const MAX_BACKOFF_INTERVAL = 10000 // 10 seconds
 const NLM_AUDIO_MAX_DURATION_MS = 60 * 60 * 1000 // 60 minutes
 const NLM_VIDEO_MAX_DURATION_MS = 60 * 60 * 1000 // 60 minutes
+const MAX_GENERATING_ENTRIES = 50 // Safety cap for allGenerating Map
 
 // Optimistic UI prefix for temporary IDs before API response
 const OPTIMISTIC_ID_PREFIX = 'optimistic-'
@@ -37,6 +38,10 @@ function isAbortLikeError(error: unknown): boolean {
   }
 
   return false
+}
+
+function getGenerationKey(lessonId: string, type: string): string {
+  return `${lessonId}:${type}`
 }
 
 interface UseEnrichmentGenerationOptions {
@@ -104,8 +109,8 @@ export function useEnrichmentGeneration({
   onComplete,
   onError,
 }: UseEnrichmentGenerationOptions) {
-  // State for currently generating enrichments (by type)
-  const [generating, setGenerating] = useState<Map<string, GeneratingEnrichment>>(new Map())
+  // State for currently generating enrichments (keyed by lessonId:type)
+  const [allGenerating, setAllGenerating] = useState<Map<string, GeneratingEnrichment>>(new Map())
 
   // Track types that just completed generation (for showing skeleton instead of placeholder)
   // This bridges the gap between generation complete and data refetch
@@ -113,6 +118,10 @@ export function useEnrichmentGeneration({
 
   // Track mounted state to prevent state updates after unmount
   const mountedRef = useRef(true)
+  const lessonIdRef = useRef(lessonId)
+  const onCompleteRef = useRef(onComplete)
+  const onErrorRef = useRef(onError)
+  const generatingRef = useRef(allGenerating)
 
   // Track polling intervals by type
   const pollingIntervalsRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
@@ -122,6 +131,44 @@ export function useEnrichmentGeneration({
 
   // Track poll failure counts for exponential backoff
   const pollFailuresRef = useRef<Map<string, number>>(new Map())
+
+  // Evict stale entries from allGenerating when it exceeds safety cap.
+  // Keeps entries for the current lesson, removes oldest entries first.
+  const evictStaleEntries = useCallback(
+    (map: Map<string, GeneratingEnrichment>): Map<string, GeneratingEnrichment> => {
+      if (map.size <= MAX_GENERATING_ENTRIES) return map
+      const currentPrefix = `${lessonIdRef.current}:`
+      const entries = [...map.entries()]
+      // Sort by startedAtMs ascending (oldest first), but keep current lesson entries
+      entries.sort((a, b) => {
+        const aIsCurrent = a[0].startsWith(currentPrefix)
+        const bIsCurrent = b[0].startsWith(currentPrefix)
+        if (aIsCurrent && !bIsCurrent) return 1 // keep current lesson last
+        if (!aIsCurrent && bIsCurrent) return -1
+        return a[1].startedAtMs - b[1].startedAtMs
+      })
+      // Keep only the last MAX_GENERATING_ENTRIES entries
+      const trimmed = entries.slice(entries.length - MAX_GENERATING_ENTRIES)
+      return new Map(trimmed)
+    },
+    []
+  )
+
+  useEffect(() => {
+    lessonIdRef.current = lessonId
+  }, [lessonId])
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
+
+  useEffect(() => {
+    onErrorRef.current = onError
+  }, [onError])
+
+  useEffect(() => {
+    generatingRef.current = allGenerating
+  }, [allGenerating])
 
   useEffect(() => {
     mountedRef.current = true
@@ -138,46 +185,31 @@ export function useEnrichmentGeneration({
     }
   }, [])
 
-  // Reset state when lessonId changes (user navigates to different lesson)
-  // This prevents generation state from "leaking" between lessons
-  useEffect(() => {
-    // Clear all polling and abort controllers
-    abortControllersRef.current.forEach((controller) => controller.abort())
-    abortControllersRef.current.clear()
-    pollingIntervalsRef.current.forEach((handle) => clearTimeout(handle))
-    pollingIntervalsRef.current.clear()
-    pollFailuresRef.current.clear()
-
-    // Reset generating state
-    setGenerating(new Map())
-    setRecentlyCompleted(new Set())
-  }, [lessonId])
-
   /**
    * Stop polling and cleanup for a specific type
    */
-  const stopPolling = useCallback((type: string) => {
-    const handle = pollingIntervalsRef.current.get(type)
+  const stopPolling = useCallback((generationKey: string) => {
+    const handle = pollingIntervalsRef.current.get(generationKey)
     if (handle) {
       clearTimeout(handle)
-      pollingIntervalsRef.current.delete(type)
+      pollingIntervalsRef.current.delete(generationKey)
     }
 
     // Clean up polling-phase controller
-    const controller = abortControllersRef.current.get(type)
+    const controller = abortControllersRef.current.get(generationKey)
     if (controller) {
       controller.abort()
-      abortControllersRef.current.delete(type)
+      abortControllersRef.current.delete(generationKey)
     }
 
     // Clean up generate-phase controller (prevents memory leak in optimistic phase)
-    const generateController = abortControllersRef.current.get(`generate-${type}`)
+    const generateController = abortControllersRef.current.get(`generate-${generationKey}`)
     if (generateController) {
       generateController.abort()
-      abortControllersRef.current.delete(`generate-${type}`)
+      abortControllersRef.current.delete(`generate-${generationKey}`)
     }
 
-    pollFailuresRef.current.delete(type)
+    pollFailuresRef.current.delete(generationKey)
   }, [])
 
   /**
@@ -187,18 +219,25 @@ export function useEnrichmentGeneration({
    * @param isResume - If true, this is a resume after page reload (affects error messages)
    */
   const startPolling = useCallback(
-    (type: OnDemandEnrichmentType, enrichmentId: string, isResume = false) => {
+    (
+      type: OnDemandEnrichmentType,
+      enrichmentId: string,
+      isResume = false,
+      targetLessonId = lessonIdRef.current
+    ) => {
       // Guard: Don't start polling if unmounted
       if (!mountedRef.current) {
         log.warn('Attempted to start polling after unmount')
         return
       }
 
+      const generationKey = getGenerationKey(targetLessonId, type)
+
       // Clear existing interval for this type if any
-      stopPolling(type)
+      stopPolling(generationKey)
 
       // Reset failure count
-      pollFailuresRef.current.set(type, 0)
+      pollFailuresRef.current.set(generationKey, 0)
 
       let currentInterval = pollingInterval
 
@@ -207,7 +246,7 @@ export function useEnrichmentGeneration({
 
         // Create new AbortController for this poll
         const controller = new AbortController()
-        abortControllersRef.current.set(type, controller)
+        abortControllersRef.current.set(generationKey, controller)
 
         try {
           const client = getBrowserTrpcClient()
@@ -219,42 +258,42 @@ export function useEnrichmentGeneration({
           if (!status || !mountedRef.current) return
 
           // Reset failure count on success
-          pollFailuresRef.current.set(type, 0)
+          pollFailuresRef.current.set(generationKey, 0)
           currentInterval = pollingInterval
 
           if (status.status === 'completed') {
-            stopPolling(type)
+            stopPolling(generationKey)
 
-            setGenerating((prev) => {
+            setAllGenerating((prev) => {
               const next = new Map(prev)
-              next.delete(type)
+              next.delete(generationKey)
               return next
             })
 
             // Mark as recently completed to show skeleton instead of placeholder
             // while data is being refetched
-            setRecentlyCompleted((prev) => new Set(prev).add(type))
+            setRecentlyCompleted((prev) => new Set(prev).add(generationKey))
 
-            onComplete?.(enrichmentId)
+            onCompleteRef.current?.(enrichmentId)
           } else if (status.status === 'failed' || status.status === 'cancelled') {
-            stopPolling(type)
+            stopPolling(generationKey)
 
-            setGenerating((prev) => {
+            setAllGenerating((prev) => {
               const next = new Map(prev)
-              next.delete(type)
+              next.delete(generationKey)
               return next
             })
 
             if (status.status === 'failed') {
-              onError?.(status.error || 'Generation failed')
+              onErrorRef.current?.(status.error || 'Generation failed')
             }
           } else {
             // Update progress
-            setGenerating((prev) => {
+            setAllGenerating((prev) => {
               const next = new Map(prev)
-              const current = next.get(type)
+              const current = next.get(generationKey)
               if (current) {
-                next.set(type, {
+                next.set(generationKey, {
                   ...current,
                   progress: status.progress,
                   currentStep: status.currentStep,
@@ -276,22 +315,22 @@ export function useEnrichmentGeneration({
           if (isNotFound) {
             log.error('Poll error (enrichment not found):', error)
 
-            const failures = (pollFailuresRef.current.get(type) || 0) + 1
-            pollFailuresRef.current.set(type, failures)
+            const failures = (pollFailuresRef.current.get(generationKey) || 0) + 1
+            pollFailuresRef.current.set(generationKey, failures)
 
             if (failures >= MAX_POLL_FAILURES) {
-              stopPolling(type)
+              stopPolling(generationKey)
 
-              setGenerating((prev) => {
+              setAllGenerating((prev) => {
                 const next = new Map(prev)
-                next.delete(type)
+                next.delete(generationKey)
                 return next
               })
 
               const errorMessage = isResume
                 ? `Failed to resume ${type} generation. The enrichment may have been deleted or completed.`
                 : 'Lost connection to server. Please refresh and try again.'
-              onError?.(errorMessage)
+              onErrorRef.current?.(errorMessage)
             }
           } else {
             // Transient error (server restart, network) — backoff but keep retrying indefinitely
@@ -309,13 +348,13 @@ export function useEnrichmentGeneration({
         const handle = setTimeout(() => {
           void pollStatus().then(scheduleNext)
         }, currentInterval)
-        pollingIntervalsRef.current.set(type, handle)
+        pollingIntervalsRef.current.set(generationKey, handle)
       }
 
       // Poll immediately, then schedule recursively
       void pollStatus().then(scheduleNext)
     },
-    [pollingInterval, onComplete, onError, stopPolling]
+    [pollingInterval, stopPolling]
   )
 
   /**
@@ -331,8 +370,16 @@ export function useEnrichmentGeneration({
       type: OnDemandEnrichmentType,
       settings?: Record<string, unknown>
     ): Promise<string | null> => {
+      const currentLessonId = lessonIdRef.current
+      if (!currentLessonId) {
+        onErrorRef.current?.('Lesson is required to start generation')
+        return null
+      }
+
+      const generationKey = getGenerationKey(currentLessonId, type)
+
       // Guard: Prevent concurrent generation for same type
-      if (generating.has(type)) {
+      if (generatingRef.current.has(generationKey)) {
         log.warn('Generation already in progress for type:', type)
         return null
       }
@@ -342,9 +389,9 @@ export function useEnrichmentGeneration({
       const generationStartedAtMs = Date.now()
       const maxDurationMs = getMaxDurationForType(type)
       if (mountedRef.current) {
-        setGenerating((prev) => {
+        setAllGenerating((prev) => {
           const next = new Map(prev)
-          next.set(type, {
+          next.set(generationKey, {
             enrichmentId: optimisticId,
             type,
             progress: 0,
@@ -352,46 +399,46 @@ export function useEnrichmentGeneration({
             startedAtMs: generationStartedAtMs,
             maxDurationMs,
           })
-          return next
+          return evictStaleEntries(next)
         })
       }
 
       // Create AbortController for this request
       const controller = new AbortController()
-      abortControllersRef.current.set(`generate-${type}`, controller)
+      abortControllersRef.current.set(`generate-${generationKey}`, controller)
 
       try {
         const client = getBrowserTrpcClient()
         const data = (await client.enrichment.generateOnDemand.mutate(
           {
-            lessonId,
+            lessonId: currentLessonId,
             enrichmentType: type,
             settings: settings && Object.keys(settings).length > 0 ? settings : undefined,
           },
           { signal: controller.signal }
         )) as GenerateOnDemandResponse | undefined
 
-        abortControllersRef.current.delete(`generate-${type}`)
+        abortControllersRef.current.delete(`generate-${generationKey}`)
 
         if (!data?.enrichmentId) {
           // ROLLBACK: Remove optimistic state on invalid response
           if (mountedRef.current) {
-            setGenerating((prev) => {
+            setAllGenerating((prev) => {
               const next = new Map(prev)
-              next.delete(type)
+              next.delete(generationKey)
               return next
             })
           }
-          onError?.('Invalid response from server')
+          onErrorRef.current?.('Invalid response from server')
           return null
         }
 
         // UPDATE: Replace optimistic ID with real enrichmentId
         if (mountedRef.current) {
-          setGenerating((prev) => {
+          setAllGenerating((prev) => {
             const next = new Map(prev)
-            const previous = next.get(type)
-            next.set(type, {
+            const previous = next.get(generationKey)
+            next.set(generationKey, {
               enrichmentId: data.enrichmentId,
               type,
               progress: 0,
@@ -404,11 +451,11 @@ export function useEnrichmentGeneration({
         }
 
         // Start polling for this enrichment
-        startPolling(type, data.enrichmentId)
+        startPolling(type, data.enrichmentId, false, currentLessonId)
 
         return data.enrichmentId
       } catch (error) {
-        abortControllersRef.current.delete(`generate-${type}`)
+        abortControllersRef.current.delete(`generate-${generationKey}`)
 
         // Ignore abort errors
         if (isAbortLikeError(error)) {
@@ -417,9 +464,9 @@ export function useEnrichmentGeneration({
 
         // ROLLBACK: Remove optimistic state on error
         if (mountedRef.current) {
-          setGenerating((prev) => {
+          setAllGenerating((prev) => {
             const next = new Map(prev)
-            next.delete(type)
+            next.delete(generationKey)
             return next
           })
         }
@@ -427,14 +474,16 @@ export function useEnrichmentGeneration({
         log.error('Error:', error)
 
         if (error instanceof TRPCClientError) {
-          onError?.(error.message)
+          onErrorRef.current?.(error.message)
         } else {
-          onError?.(error instanceof Error ? error.message : 'Failed to start generation')
+          onErrorRef.current?.(
+            error instanceof Error ? error.message : 'Failed to start generation'
+          )
         }
         return null
       }
     },
-    [lessonId, onError, generating, startPolling]
+    [startPolling, evictStaleEntries]
   )
 
   /**
@@ -445,19 +494,20 @@ export function useEnrichmentGeneration({
    */
   const cancelGeneration = useCallback(
     async (type: string) => {
-      const gen = generating.get(type)
+      const generationKey = getGenerationKey(lessonIdRef.current, type)
+      const gen = generatingRef.current.get(generationKey)
       if (!gen) return
 
       // Stop polling immediately
-      stopPolling(type)
+      stopPolling(generationKey)
 
       // Check if still in optimistic phase (no backend job exists yet)
       if (gen.enrichmentId.startsWith(OPTIMISTIC_ID_PREFIX)) {
         // Only clean up frontend state - no backend call needed
         if (mountedRef.current) {
-          setGenerating((prev) => {
+          setAllGenerating((prev) => {
             const next = new Map(prev)
-            next.delete(type)
+            next.delete(generationKey)
             return next
           })
         }
@@ -478,32 +528,42 @@ export function useEnrichmentGeneration({
         if (error instanceof TRPCClientError) {
           // Surface permission errors to the user
           if (error.message.includes('permission') || error.message.includes('forbidden')) {
-            onError?.('You do not have permission to cancel this generation')
+            onErrorRef.current?.('You do not have permission to cancel this generation')
           }
         }
       }
 
       // Always remove from UI regardless of backend response
       if (mountedRef.current) {
-        setGenerating((prev) => {
+        setAllGenerating((prev) => {
           const next = new Map(prev)
-          next.delete(type)
+          next.delete(generationKey)
           return next
         })
       }
     },
-    [generating, onError, stopPolling]
+    [stopPolling]
   )
 
   /**
    * Check if a specific type is currently generating
    */
-  const isGenerating = useCallback((type: string) => generating.has(type), [generating])
+  const isGenerating = useCallback(
+    (type: string) => {
+      return allGenerating.has(getGenerationKey(lessonIdRef.current, type))
+    },
+    [allGenerating]
+  )
 
   /**
    * Get progress info for a specific type
    */
-  const getProgress = useCallback((type: string) => generating.get(type), [generating])
+  const getProgress = useCallback(
+    (type: string) => {
+      return allGenerating.get(getGenerationKey(lessonIdRef.current, type))
+    },
+    [allGenerating]
+  )
 
   /**
    * Resume generation polling for an existing enrichment
@@ -541,8 +601,11 @@ export function useEnrichmentGeneration({
    */
   const resumeGeneration = useCallback(
     (enrichmentId: string, type: OnDemandEnrichmentType, startedAtMs?: number) => {
+      const currentLessonId = lessonIdRef.current
+      const generationKey = getGenerationKey(currentLessonId, type)
+
       // Guard: Don't resume if already tracking this type
-      if (generating.has(type)) {
+      if (generatingRef.current.has(generationKey)) {
         log.warn('Already tracking generation for type:', type)
         return
       }
@@ -560,9 +623,9 @@ export function useEnrichmentGeneration({
 
       // Add to generating state with unknown progress (-1 means "syncing")
       // Real progress will be fetched on first poll
-      setGenerating((prev) => {
+      setAllGenerating((prev) => {
         const next = new Map(prev)
-        next.set(type, {
+        next.set(generationKey, {
           enrichmentId,
           type,
           progress: -1, // -1 indicates "loading progress", not actual 0%
@@ -570,13 +633,13 @@ export function useEnrichmentGeneration({
           startedAtMs: parsedStartedAtMs,
           maxDurationMs: getMaxDurationForType(type),
         })
-        return next
+        return evictStaleEntries(next)
       })
 
       // Start polling for this enrichment (isResume = true for context-aware errors)
-      startPolling(type, enrichmentId, true)
+      startPolling(type, enrichmentId, true, currentLessonId)
     },
-    [generating, startPolling]
+    [startPolling, evictStaleEntries]
   )
 
   /**
@@ -584,7 +647,7 @@ export function useEnrichmentGeneration({
    * Used to show skeleton instead of placeholder while data refetches
    */
   const isRecentlyCompleted = useCallback(
-    (type: string): boolean => recentlyCompleted.has(type),
+    (type: string): boolean => recentlyCompleted.has(getGenerationKey(lessonIdRef.current, type)),
     [recentlyCompleted]
   )
 
@@ -593,12 +656,26 @@ export function useEnrichmentGeneration({
    * Called by parent component when new data arrives with the image
    */
   const clearRecentlyCompleted = useCallback((type: string) => {
+    const completedKey = getGenerationKey(lessonIdRef.current, type)
     setRecentlyCompleted((prev) => {
       const next = new Set(prev)
-      next.delete(type)
+      next.delete(completedKey)
       return next
     })
   }, [])
+
+  const generating = useMemo(() => {
+    const currentLessonGenerating = new Map<string, GeneratingEnrichment>()
+    const lessonPrefix = `${lessonId}:`
+
+    allGenerating.forEach((value, key) => {
+      if (key.startsWith(lessonPrefix)) {
+        currentLessonGenerating.set(value.type, value)
+      }
+    })
+
+    return currentLessonGenerating
+  }, [allGenerating, lessonId])
 
   return {
     generating,
