@@ -2,9 +2,9 @@
  * NotebookLM Study Guide Enrichment Handler
  * @module stages/stage7-enrichments/handlers/nlm-study-guide-handler
  *
- * Single-stage flow:
- * - Fetches lesson content and builds source bundle
- * - Generates study guide (Markdown) via NotebookLM bridge
+ * Single-stage flow with poll-mode support:
+ * - Start mode: fetches lesson content → generates study guide via bridge
+ * - Poll mode: checks bridge task status → fetches result when ready
  * - Stores inline in JSONB content column (no asset upload)
  */
 
@@ -14,7 +14,78 @@ import type { EnrichmentHandler } from '../services/enrichment-router';
 import { getLessonContent } from '../services/database-service';
 import { notebookLmBridgeClient } from '../services/notebooklm-bridge-client';
 import type { EnrichmentHandlerInput, GenerateResult } from '../types';
-import { buildNotebookLMSources, resolveSourceStrategy } from './nlm-shared';
+import {
+  buildNotebookLMSources,
+  resolveSourceStrategy,
+  resolveNlmAsyncMode,
+  resolveBridgeTaskId,
+  checkBridgeTaskStatus,
+  fetchBridgeTaskMedia,
+} from './nlm-shared';
+
+function buildDeferredResult(
+  taskId: string,
+  taskStatus: string,
+  responseMetadata: Record<string, unknown> | undefined,
+  durationMs: number,
+  extra: Record<string, unknown>
+): GenerateResult {
+  return {
+    content: { type: 'nlm_study_guide', markdown: '' } as StudyGuideEnrichmentContent,
+    metadata: {
+      generated_at: new Date().toISOString(),
+      generation_duration_ms: durationMs,
+      estimated_cost_usd: 0,
+      model_used: 'notebooklm-bridge',
+      quality_score: 1.0,
+      retry_attempts: 0,
+      additional_info: {
+        bridge: 'notebooklm',
+        bridge_task_id: taskId,
+        bridge_task_status: taskStatus,
+        ...extra,
+      },
+    },
+    deferredTask: {
+      provider: 'notebooklm-bridge',
+      mediaType: 'study_guide',
+      taskId,
+      status: taskStatus,
+      responseMetadata,
+    },
+  };
+}
+
+function parseMarkdownResult(
+  rawMedia: { textContent?: string; buffer: Buffer },
+  durationMs: number,
+  extra: Record<string, unknown>
+): GenerateResult {
+  const markdownContent = rawMedia.textContent ?? rawMedia.buffer.toString('utf-8');
+  const wordCount = markdownContent.split(/\s+/).filter(Boolean).length;
+
+  const content: StudyGuideEnrichmentContent = {
+    type: 'nlm_study_guide',
+    markdown: markdownContent,
+    word_count: wordCount,
+  };
+
+  const metadata: EnrichmentMetadata = {
+    generated_at: new Date().toISOString(),
+    generation_duration_ms: durationMs,
+    estimated_cost_usd: 0,
+    model_used: 'notebooklm-bridge',
+    quality_score: 1.0,
+    retry_attempts: 0,
+    additional_info: {
+      bridge: 'notebooklm',
+      word_count: wordCount,
+      ...extra,
+    },
+  };
+
+  return { content, metadata };
+}
 
 async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
   const { enrichmentContext, settings } = input;
@@ -29,6 +100,32 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     'NLM study guide handler: generating'
   );
 
+  // Poll mode: check existing bridge task
+  const asyncMode = resolveNlmAsyncMode(settings);
+  const bridgeTaskId = resolveBridgeTaskId(settings);
+
+  if (asyncMode === 'poll' && bridgeTaskId) {
+    const poll = await checkBridgeTaskStatus(bridgeTaskId, 'study_guide');
+    const durationMs = Date.now() - startTime;
+
+    if (!poll.completed) {
+      return buildDeferredResult(
+        bridgeTaskId,
+        poll.status.status,
+        poll.status.responseMetadata,
+        durationMs,
+        { poll_mode: true }
+      );
+    }
+
+    const media = await fetchBridgeTaskMedia(bridgeTaskId, 'study_guide');
+    return parseMarkdownResult(media, durationMs, {
+      poll_mode: true,
+      bridge_task_id: bridgeTaskId,
+    });
+  }
+
+  // Start mode: initiate new generation
   const lessonContent = await getLessonContent(
     enrichmentContext.lesson.id,
     enrichmentContext.course.id
@@ -42,13 +139,13 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   const sources = buildNotebookLMSources({
     strategy: sourceStrategy,
     scriptContent: lessonContent,
-    scriptTitle: 'Lesson Content',
+    scriptTitle: enrichmentContext.lesson.title,
     rawLessonContent: lessonContent,
     input,
   });
 
-  const detailLevel =
-    typeof settings.detail_level === 'string' ? settings.detail_level : 'standard';
+  // Read camelCase key from validated on-demand schema
+  const detailLevel = typeof settings.detailLevel === 'string' ? settings.detailLevel : 'standard';
 
   const start = await notebookLmBridgeClient.startStudyGuide({
     lessonTitle: enrichmentContext.lesson.title,
@@ -60,70 +157,20 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   });
 
   if (!start.immediateMedia) {
-    // Deferred — return with task info for polling
     const durationMs = Date.now() - startTime;
-    const deferredContent: StudyGuideEnrichmentContent = {
-      type: 'nlm_study_guide',
-      markdown: '',
-    };
-
-    return {
-      content: deferredContent,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        generation_duration_ms: durationMs,
-        estimated_cost_usd: 0,
-        model_used: 'notebooklm-bridge',
-        quality_score: 1.0,
-        retry_attempts: 0,
-        additional_info: {
-          bridge: 'notebooklm',
-          source_strategy_used: sourceStrategy,
-          source_count: sources.length,
-          detail_level: detailLevel,
-          bridge_task_id: start.taskId,
-          bridge_task_status: start.status,
-        },
-      },
-      deferredTask: {
-        provider: 'notebooklm-bridge',
-        mediaType: 'study_guide',
-        taskId: start.taskId,
-        status: start.status,
-        responseMetadata: start.responseMetadata,
-      },
-    };
-  }
-
-  const bridgeResult = start.immediateMedia;
-  const markdownContent = bridgeResult.textContent ?? bridgeResult.buffer.toString('utf-8');
-  const wordCount = markdownContent.split(/\s+/).filter(Boolean).length;
-
-  const content: StudyGuideEnrichmentContent = {
-    type: 'nlm_study_guide',
-    markdown: markdownContent,
-    word_count: wordCount,
-  };
-
-  const durationMs = Date.now() - startTime;
-
-  const metadata: EnrichmentMetadata = {
-    generated_at: new Date().toISOString(),
-    generation_duration_ms: durationMs,
-    estimated_cost_usd: 0,
-    model_used: 'notebooklm-bridge',
-    quality_score: 1.0,
-    retry_attempts: 0,
-    additional_info: {
-      bridge: 'notebooklm',
+    return buildDeferredResult(start.taskId, start.status, start.responseMetadata, durationMs, {
       source_strategy_used: sourceStrategy,
       source_count: sources.length,
       detail_level: detailLevel,
-      word_count: wordCount,
-    },
-  };
+    });
+  }
 
-  return { content, metadata };
+  const durationMs = Date.now() - startTime;
+  return parseMarkdownResult(start.immediateMedia, durationMs, {
+    source_strategy_used: sourceStrategy,
+    source_count: sources.length,
+    detail_level: detailLevel,
+  });
 }
 
 export const nlmStudyGuideHandler: EnrichmentHandler = {

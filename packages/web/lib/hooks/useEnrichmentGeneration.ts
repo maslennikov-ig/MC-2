@@ -32,6 +32,12 @@ export function getMaxDurationForType(type: OnDemandEnrichmentType): number | un
       return NLM_AUDIO_MAX_DURATION_MS
     case 'nlm_video':
       return NLM_VIDEO_MAX_DURATION_MS
+    case 'nlm_study_guide':
+    case 'nlm_flashcards':
+    case 'nlm_mind_map':
+      return 5 * 60 * 1000 // 5 minutes
+    case 'nlm_infographic':
+      return 10 * 60 * 1000 // 10 minutes
     default:
       return undefined
   }

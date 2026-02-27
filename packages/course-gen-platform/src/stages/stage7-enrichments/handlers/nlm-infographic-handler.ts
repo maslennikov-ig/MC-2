@@ -2,9 +2,9 @@
  * NotebookLM Infographic Enrichment Handler
  * @module stages/stage7-enrichments/handlers/nlm-infographic-handler
  *
- * Single-stage flow:
- * - Fetches lesson content and builds source bundle
- * - Generates infographic (PNG) via NotebookLM bridge
+ * Single-stage flow with poll-mode support:
+ * - Start mode: fetches lesson content → generates infographic via bridge
+ * - Poll mode: checks bridge task status → fetches result when ready
  * - Returns binary buffer for Supabase Storage upload (like audio/video)
  */
 
@@ -14,7 +14,87 @@ import type { EnrichmentHandler } from '../services/enrichment-router';
 import { getLessonContent } from '../services/database-service';
 import { notebookLmBridgeClient } from '../services/notebooklm-bridge-client';
 import type { EnrichmentHandlerInput, GenerateResult } from '../types';
-import { buildNotebookLMSources, resolveSourceStrategy } from './nlm-shared';
+import {
+  buildNotebookLMSources,
+  resolveSourceStrategy,
+  resolveNlmAsyncMode,
+  resolveBridgeTaskId,
+  checkBridgeTaskStatus,
+  fetchBridgeTaskMedia,
+} from './nlm-shared';
+
+function buildDeferredResult(
+  taskId: string,
+  taskStatus: string,
+  responseMetadata: Record<string, unknown> | undefined,
+  durationMs: number,
+  extra: Record<string, unknown>
+): GenerateResult {
+  return {
+    content: {
+      type: 'nlm_infographic',
+      imageUrl: '',
+      format: 'png',
+    } as InfographicEnrichmentContent,
+    metadata: {
+      generated_at: new Date().toISOString(),
+      generation_duration_ms: durationMs,
+      estimated_cost_usd: 0,
+      model_used: 'notebooklm-bridge',
+      quality_score: 1.0,
+      retry_attempts: 0,
+      additional_info: {
+        bridge: 'notebooklm',
+        bridge_task_id: taskId,
+        bridge_task_status: taskStatus,
+        ...extra,
+      },
+    },
+    deferredTask: {
+      provider: 'notebooklm-bridge',
+      mediaType: 'infographic',
+      taskId,
+      status: taskStatus,
+      responseMetadata,
+    },
+  };
+}
+
+function buildInfographicResult(
+  bridgeResult: { buffer: Buffer; mimeType: string; extension: string },
+  durationMs: number,
+  extra: Record<string, unknown>
+): GenerateResult {
+  const content: InfographicEnrichmentContent = {
+    type: 'nlm_infographic',
+    imageUrl: '', // Will be set by job-processor after Supabase Storage upload
+    format: 'png',
+    file_size_bytes: bridgeResult.buffer.length,
+  };
+
+  const metadata: EnrichmentMetadata = {
+    generated_at: new Date().toISOString(),
+    generation_duration_ms: durationMs,
+    estimated_cost_usd: 0,
+    model_used: 'notebooklm-bridge',
+    quality_score: 1.0,
+    retry_attempts: 0,
+    additional_info: {
+      bridge: 'notebooklm',
+      mime_type: bridgeResult.mimeType,
+      file_size_bytes: bridgeResult.buffer.length,
+      ...extra,
+    },
+  };
+
+  return {
+    content,
+    metadata,
+    assetBuffer: bridgeResult.buffer,
+    assetMimeType: bridgeResult.mimeType,
+    assetExtension: bridgeResult.extension,
+  };
+}
 
 async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
   const { enrichmentContext, settings } = input;
@@ -29,6 +109,32 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     'NLM infographic handler: generating'
   );
 
+  // Poll mode: check existing bridge task
+  const asyncMode = resolveNlmAsyncMode(settings);
+  const bridgeTaskId = resolveBridgeTaskId(settings);
+
+  if (asyncMode === 'poll' && bridgeTaskId) {
+    const poll = await checkBridgeTaskStatus(bridgeTaskId, 'infographic');
+    const durationMs = Date.now() - startTime;
+
+    if (!poll.completed) {
+      return buildDeferredResult(
+        bridgeTaskId,
+        poll.status.status,
+        poll.status.responseMetadata,
+        durationMs,
+        { poll_mode: true }
+      );
+    }
+
+    const media = await fetchBridgeTaskMedia(bridgeTaskId, 'infographic');
+    return buildInfographicResult(media, durationMs, {
+      poll_mode: true,
+      bridge_task_id: bridgeTaskId,
+    });
+  }
+
+  // Start mode: initiate new generation
   const lessonContent = await getLessonContent(
     enrichmentContext.lesson.id,
     enrichmentContext.course.id
@@ -42,14 +148,14 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   const sources = buildNotebookLMSources({
     strategy: sourceStrategy,
     scriptContent: lessonContent,
-    scriptTitle: 'Lesson Content',
+    scriptTitle: enrichmentContext.lesson.title,
     rawLessonContent: lessonContent,
     input,
   });
 
+  // Read camelCase keys from validated on-demand schema
   const orientation = typeof settings.orientation === 'string' ? settings.orientation : 'portrait';
-  const detailLevel =
-    typeof settings.detail_level === 'string' ? settings.detail_level : 'detailed';
+  const detailLevel = typeof settings.detailLevel === 'string' ? settings.detailLevel : 'detailed';
 
   const start = await notebookLmBridgeClient.startInfographic({
     lessonTitle: enrichmentContext.lesson.title,
@@ -63,77 +169,21 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
 
   if (!start.immediateMedia) {
     const durationMs = Date.now() - startTime;
-    const deferredContent: InfographicEnrichmentContent = {
-      type: 'nlm_infographic',
-      imageUrl: '',
-      format: 'png',
-    };
-
-    return {
-      content: deferredContent,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        generation_duration_ms: durationMs,
-        estimated_cost_usd: 0,
-        model_used: 'notebooklm-bridge',
-        quality_score: 1.0,
-        retry_attempts: 0,
-        additional_info: {
-          bridge: 'notebooklm',
-          source_strategy_used: sourceStrategy,
-          source_count: sources.length,
-          orientation,
-          detail_level: detailLevel,
-          bridge_task_id: start.taskId,
-          bridge_task_status: start.status,
-        },
-      },
-      deferredTask: {
-        provider: 'notebooklm-bridge',
-        mediaType: 'infographic',
-        taskId: start.taskId,
-        status: start.status,
-        responseMetadata: start.responseMetadata,
-      },
-    };
-  }
-
-  const bridgeResult = start.immediateMedia;
-
-  const content: InfographicEnrichmentContent = {
-    type: 'nlm_infographic',
-    imageUrl: '', // Will be set by job-processor after Supabase Storage upload
-    format: 'png',
-    file_size_bytes: bridgeResult.buffer.length,
-  };
-
-  const durationMs = Date.now() - startTime;
-
-  const metadata: EnrichmentMetadata = {
-    generated_at: new Date().toISOString(),
-    generation_duration_ms: durationMs,
-    estimated_cost_usd: 0,
-    model_used: 'notebooklm-bridge',
-    quality_score: 1.0,
-    retry_attempts: 0,
-    additional_info: {
-      bridge: 'notebooklm',
+    return buildDeferredResult(start.taskId, start.status, start.responseMetadata, durationMs, {
       source_strategy_used: sourceStrategy,
       source_count: sources.length,
       orientation,
       detail_level: detailLevel,
-      mime_type: bridgeResult.mimeType,
-      file_size_bytes: bridgeResult.buffer.length,
-    },
-  };
+    });
+  }
 
-  return {
-    content,
-    metadata,
-    assetBuffer: bridgeResult.buffer,
-    assetMimeType: bridgeResult.mimeType,
-    assetExtension: bridgeResult.extension,
-  };
+  const durationMs = Date.now() - startTime;
+  return buildInfographicResult(start.immediateMedia, durationMs, {
+    source_strategy_used: sourceStrategy,
+    source_count: sources.length,
+    orientation,
+    detail_level: detailLevel,
+  });
 }
 
 export const nlmInfographicHandler: EnrichmentHandler = {

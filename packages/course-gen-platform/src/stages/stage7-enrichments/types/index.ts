@@ -32,7 +32,8 @@ export interface Stage7NlmAsyncState {
   mediaType: NotebookLMMediaType;
   pollAttempt: number;
   startedAt: string;
-  draft: DraftResult;
+  /** Draft content for two-stage handlers; absent for single-stage NLM handlers */
+  draft?: DraftResult;
 }
 
 /**

@@ -66,7 +66,8 @@ export function isStudyGuideContent(content: unknown): content is StudyGuideEnri
     'type' in content &&
     (content as Record<string, unknown>).type === 'nlm_study_guide' &&
     'markdown' in content &&
-    typeof (content as Record<string, unknown>).markdown === 'string'
+    typeof (content as Record<string, unknown>).markdown === 'string' &&
+    ((content as Record<string, unknown>).markdown as string).length > 0
   )
 }
 
@@ -77,7 +78,8 @@ export function isFlashcardsContent(content: unknown): content is FlashcardsEnri
     'type' in content &&
     (content as Record<string, unknown>).type === 'nlm_flashcards' &&
     'cards' in content &&
-    Array.isArray((content as Record<string, unknown>).cards)
+    Array.isArray((content as Record<string, unknown>).cards) &&
+    ((content as Record<string, unknown>).cards as unknown[]).length > 0
   )
 }
 
@@ -88,7 +90,8 @@ export function isMindMapContent(content: unknown): content is MindMapEnrichment
     'type' in content &&
     (content as Record<string, unknown>).type === 'nlm_mind_map' &&
     'root' in content &&
-    typeof (content as Record<string, unknown>).root === 'object'
+    typeof (content as Record<string, unknown>).root === 'object' &&
+    (content as Record<string, unknown>).root !== null
   )
 }
 
@@ -99,6 +102,7 @@ export function isInfographicContent(content: unknown): content is InfographicEn
     'type' in content &&
     (content as Record<string, unknown>).type === 'nlm_infographic' &&
     'imageUrl' in content &&
-    typeof (content as Record<string, unknown>).imageUrl === 'string'
+    typeof (content as Record<string, unknown>).imageUrl === 'string' &&
+    (content as Record<string, unknown>).imageUrl !== ''
   )
 }
