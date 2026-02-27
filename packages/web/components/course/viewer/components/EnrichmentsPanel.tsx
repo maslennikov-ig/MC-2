@@ -22,10 +22,23 @@ import {
 } from '@megacampus/shared-types'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
-type NlmEnrichmentType = 'nlm_audio' | 'nlm_video'
+type NlmEnrichmentType =
+  | 'nlm_audio'
+  | 'nlm_video'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 type ViewerOnDemandType = OnDemandEnrichmentType | NlmEnrichmentType
 
-const NLM_ENRICHMENT_TYPES = new Set<NlmEnrichmentType>(['nlm_audio', 'nlm_video'])
+const NLM_ENRICHMENT_TYPES = new Set<NlmEnrichmentType>([
+  'nlm_audio',
+  'nlm_video',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
+])
 const LEGACY_NLM_DRAFT_STATUSES = new Set(['draft_ready', 'draft_generating'])
 
 function isNlmType(type: string): type is NlmEnrichmentType {
@@ -38,6 +51,48 @@ function isLegacyNlmDraftStatus(status: string): boolean {
 
 function isViewerOnDemandType(type: string): type is ViewerOnDemandType {
   return isOnDemandType(type) || isNlmType(type)
+}
+
+function parseDateToMs(value: string | null | undefined): number | undefined {
+  const parsed = Date.parse(value ?? '')
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined
+  }
+  return value as Record<string, unknown>
+}
+
+function parseMetadataStartedAtMs(metadata: unknown): number | undefined {
+  const metadataRecord = asRecord(metadata)
+  if (!metadataRecord) return undefined
+
+  const additionalInfo = asRecord(metadataRecord.additional_info)
+  const notebookLmAsyncState = asRecord(additionalInfo?.notebooklm_async_state)
+  const nestedStartedAt = notebookLmAsyncState?.started_at
+  const topLevelStartedAt = metadataRecord.started_at
+  const startedAt = nestedStartedAt ?? topLevelStartedAt
+  if (typeof startedAt === 'number' && Number.isFinite(startedAt) && startedAt > 0) {
+    return startedAt
+  }
+
+  if (typeof startedAt === 'string') {
+    return parseDateToMs(startedAt)
+  }
+
+  return undefined
+}
+
+function getStartedAtMsForResume(
+  enrichment: EnrichmentRow & { enrichment_type: ViewerOnDemandType }
+): number | undefined {
+  if (isNlmType(enrichment.enrichment_type)) {
+    return parseMetadataStartedAtMs(enrichment.metadata)
+  }
+
+  return parseDateToMs(enrichment.created_at)
 }
 
 /**
@@ -143,8 +198,7 @@ export function EnrichmentsPanel({
 
     // Resume polling for each new active enrichment
     activeEnrichments.forEach((enrichment) => {
-      const parsedCreatedAt = Date.parse(enrichment.created_at ?? '')
-      const startedAtMs = Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined
+      const startedAtMs = getStartedAtMsForResume(enrichment)
       resumeGeneration(enrichment.id, enrichment.enrichment_type, startedAtMs)
       resumedKeysRef.current.add(`${lessonId}:${enrichment.enrichment_type}`)
     })
@@ -236,7 +290,11 @@ export function EnrichmentsPanel({
     nlm_audio: 3,
     presentation: 4,
     quiz: 5,
-    document: 6,
+    nlm_study_guide: 6,
+    nlm_flashcards: 7,
+    nlm_mind_map: 8,
+    nlm_infographic: 9,
+    document: 10,
   }
 
   // Statuses that indicate the enrichment is "done" (successfully or not)
@@ -339,21 +397,24 @@ export function EnrichmentsPanel({
 
           // Show syncing card for enrichments with active DB status even before hook resumes polling.
           // This provides immediate visual feedback on page load while resume effect kicks in.
-          const activeEnrichmentForType = groupedEnrichments[type]?.find(
-            (e) => isActiveGenerationStatus(e.status) && isEnrichmentOnDemand(e)
+          const activeEnrichmentForType = groupedEnrichments[type]?.find((e) =>
+            isActiveGenerationStatus(e.status)
           )
+          const activeOnDemandEnrichmentForType =
+            activeEnrichmentForType && isEnrichmentOnDemand(activeEnrichmentForType)
+              ? activeEnrichmentForType
+              : undefined
           if (
-            activeEnrichmentForType &&
-            !(isNlmType(type) && isLegacyNlmDraftStatus(activeEnrichmentForType.status))
+            activeOnDemandEnrichmentForType &&
+            !(isNlmType(type) && isLegacyNlmDraftStatus(activeOnDemandEnrichmentForType.status))
           ) {
-            const parsedCreatedAt = Date.parse(activeEnrichmentForType.created_at ?? '')
             return (
               <EnrichmentGeneratingCard
                 key={type}
                 type={type}
                 progress={-1}
                 currentStep="syncing"
-                startedAtMs={Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined}
+                startedAtMs={getStartedAtMsForResume(activeOnDemandEnrichmentForType)}
                 maxDurationMs={
                   NLM_ENRICHMENT_TYPES.has(type as NlmEnrichmentType)
                     ? getMaxDurationForType(type as OnDemandEnrichmentType)

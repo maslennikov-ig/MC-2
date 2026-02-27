@@ -35,6 +35,10 @@ export const onDemandEnrichmentTypeSchema = z.enum([
   'nlm_video',
   'cover',
   'card',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
 ]);
 export type OnDemandEnrichmentType = z.infer<typeof onDemandEnrichmentTypeSchema>;
 
@@ -205,6 +209,60 @@ export const onDemandImageSettingsSchema = z.object({
 export type OnDemandImageSettings = z.infer<typeof onDemandImageSettingsSchema>;
 
 /**
+ * NotebookLM study guide settings for on-demand API.
+ */
+export const onDemandNlmStudyGuideSettingsSchema = z.object({
+  /** Detail level for the study guide */
+  detailLevel: z.enum(['brief', 'standard', 'comprehensive']).default('standard'),
+
+  /** Source strategy used for NotebookLM generation */
+  nlm_source_strategy: onDemandNlmSourceStrategySchema.optional(),
+});
+export type OnDemandNlmStudyGuideSettings = z.infer<typeof onDemandNlmStudyGuideSettingsSchema>;
+
+/**
+ * NotebookLM flashcards settings for on-demand API.
+ */
+export const onDemandNlmFlashcardsSettingsSchema = z.object({
+  /** Number of flashcards to generate (5-50) */
+  cardCount: z.number().int().min(5).max(50).default(15),
+
+  /** Difficulty level for flashcards */
+  difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
+
+  /** Source strategy used for NotebookLM generation */
+  nlm_source_strategy: onDemandNlmSourceStrategySchema.optional(),
+});
+export type OnDemandNlmFlashcardsSettings = z.infer<typeof onDemandNlmFlashcardsSettingsSchema>;
+
+/**
+ * NotebookLM mind map settings for on-demand API.
+ */
+export const onDemandNlmMindMapSettingsSchema = z.object({
+  /** Mind map tree depth */
+  depth: z.enum(['shallow', 'standard', 'deep']).default('standard'),
+
+  /** Source strategy used for NotebookLM generation */
+  nlm_source_strategy: onDemandNlmSourceStrategySchema.optional(),
+});
+export type OnDemandNlmMindMapSettings = z.infer<typeof onDemandNlmMindMapSettingsSchema>;
+
+/**
+ * NotebookLM infographic settings for on-demand API.
+ */
+export const onDemandNlmInfographicSettingsSchema = z.object({
+  /** Infographic orientation */
+  orientation: z.enum(['portrait', 'landscape']).default('portrait'),
+
+  /** Detail level */
+  detailLevel: z.enum(['overview', 'detailed']).default('detailed'),
+
+  /** Source strategy used for NotebookLM generation */
+  nlm_source_strategy: onDemandNlmSourceStrategySchema.optional(),
+});
+export type OnDemandNlmInfographicSettings = z.infer<typeof onDemandNlmInfographicSettingsSchema>;
+
+/**
  * Union type for all on-demand enrichment settings
  *
  * These are simplified, user-facing settings that differ from
@@ -216,7 +274,11 @@ export type OnDemandEnrichmentSettings =
   | OnDemandQuizSettings
   | OnDemandAudioSettings
   | OnDemandPresentationSettings
-  | OnDemandImageSettings;
+  | OnDemandImageSettings
+  | OnDemandNlmStudyGuideSettings
+  | OnDemandNlmFlashcardsSettings
+  | OnDemandNlmMindMapSettings
+  | OnDemandNlmInfographicSettings;
 
 /**
  * Generation steps for progress tracking in UI
@@ -293,6 +355,30 @@ const onDemandCardInputSchema = z.object({
   settings: onDemandImageSettingsSchema.optional(),
 });
 
+const onDemandNlmStudyGuideInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('nlm_study_guide'),
+  settings: onDemandNlmStudyGuideSettingsSchema.optional(),
+});
+
+const onDemandNlmFlashcardsInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('nlm_flashcards'),
+  settings: onDemandNlmFlashcardsSettingsSchema.optional(),
+});
+
+const onDemandNlmMindMapInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('nlm_mind_map'),
+  settings: onDemandNlmMindMapSettingsSchema.optional(),
+});
+
+const onDemandNlmInfographicInputSchema = z.object({
+  lessonId: lessonIdInputSchema,
+  enrichmentType: z.literal('nlm_infographic'),
+  settings: onDemandNlmInfographicSettingsSchema.optional(),
+});
+
 export const generateOnDemandInputSchema = z.discriminatedUnion('enrichmentType', [
   onDemandQuizInputSchema,
   onDemandAudioInputSchema,
@@ -301,6 +387,10 @@ export const generateOnDemandInputSchema = z.discriminatedUnion('enrichmentType'
   onDemandNlmVideoInputSchema,
   onDemandCoverInputSchema,
   onDemandCardInputSchema,
+  onDemandNlmStudyGuideInputSchema,
+  onDemandNlmFlashcardsInputSchema,
+  onDemandNlmMindMapInputSchema,
+  onDemandNlmInfographicInputSchema,
 ]);
 export type GenerateOnDemandInput = z.infer<typeof generateOnDemandInputSchema>;
 
@@ -355,6 +445,9 @@ export const generationStatusResponseSchema = z.object({
 
   /** Error message if status is 'failed' */
   error: z.string().optional(),
+
+  /** NotebookLM async generation start time in Unix milliseconds */
+  generationStartedAtMs: z.number().int().optional(),
 });
 export type GenerationStatusResponse = z.infer<typeof generationStatusResponseSchema>;
 

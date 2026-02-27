@@ -15,6 +15,7 @@ export { nlmVideoHandler } from './nlm-video-handler';
 export { presentationHandler } from './presentation-handler';
 export { coverHandler } from './cover-handler';
 export { cardHandler } from './card-handler';
-
-// Future handlers to be added:
-// export { documentHandler } from './document-handler';
+export { nlmStudyGuideHandler } from './nlm-study-guide-handler';
+export { nlmFlashcardsHandler } from './nlm-flashcards-handler';
+export { nlmMindMapHandler } from './nlm-mind-map-handler';
+export { nlmInfographicHandler } from './nlm-infographic-handler';

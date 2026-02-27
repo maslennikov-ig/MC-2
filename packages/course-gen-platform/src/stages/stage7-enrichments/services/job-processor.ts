@@ -75,14 +75,23 @@ const MEDIA_DEFAULTS_BY_TYPE: Partial<
   nlm_audio: { mimeType: 'audio/mpeg', extension: 'mp3' },
   video: { mimeType: 'video/mp4', extension: 'mp4' },
   nlm_video: { mimeType: 'video/mp4', extension: 'mp4' },
+  nlm_infographic: { mimeType: 'image/png', extension: 'png' },
 };
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   mp3: 'audio/mpeg',
   mp4: 'video/mp4',
+  png: 'image/png',
 };
 
-const NLM_TYPES: ReadonlySet<Stage7EnrichmentType> = new Set(['nlm_audio', 'nlm_video']);
+const NLM_TYPES: ReadonlySet<Stage7EnrichmentType> = new Set([
+  'nlm_audio',
+  'nlm_video',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
+]);
 const DEFAULT_NLM_POLL_DELAY_MS = 15_000;
 const DEFAULT_NLM_MAX_POLL_DELAY_MS = 60_000;
 const DEFAULT_NLM_MAX_WAIT_MS = 6 * 60 * 60 * 1000;

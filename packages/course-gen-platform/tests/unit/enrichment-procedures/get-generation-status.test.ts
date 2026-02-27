@@ -51,9 +51,16 @@ vi.mock('@/shared/supabase/admin', () => ({
 }));
 
 // Mock access control helper - use hoisted mock
-vi.mock('@/server/routers/enrichment/helpers', () => ({
-  verifyEnrichmentAccess: vi.fn(),
-}));
+vi.mock('@/server/routers/enrichment/helpers', async () => {
+  const actual = await vi.importActual<
+    typeof import('../../../src/server/routers/enrichment/helpers')
+  >('../../../src/server/routers/enrichment/helpers');
+
+  return {
+    ...actual,
+    verifyEnrichmentAccess: vi.fn(),
+  };
+});
 
 // Import the mocked function for test configuration
 import { verifyEnrichmentAccess } from '../../../src/server/routers/enrichment/helpers';
@@ -100,6 +107,7 @@ const mockEnrichment = {
   asset_id: null,
   generation_attempt: 0,
   content: null,
+  metadata: null,
 };
 
 beforeEach(() => {
@@ -353,6 +361,95 @@ describe('getGenerationStatus', () => {
       expect(result).toHaveProperty('currentStep');
       // estimatedTimeRemaining is optional but should be present for generating
       expect(result).toHaveProperty('estimatedTimeRemaining');
+    });
+  });
+
+  describe('NotebookLM generation start timestamp', () => {
+    it.each(['nlm_audio', 'nlm_video'] as const)(
+      'should return generationStartedAtMs for %s when started_at is valid ISO',
+      async enrichmentType => {
+        const startedAt = '2026-02-20T11:22:33.456Z';
+
+        mockVerifyEnrichmentAccess.mockResolvedValueOnce({
+          ...mockEnrichment,
+          enrichment_type: enrichmentType,
+          metadata: {
+            additional_info: {
+              notebooklm_async_state: {
+                started_at: startedAt,
+              },
+            },
+          },
+        });
+
+        const caller = testRouter.createCaller(createAuthenticatedContext());
+        const result = await caller.getGenerationStatus({
+          enrichmentId: '550e8400-e29b-41d4-a716-446655440000',
+        });
+
+        expect(result.generationStartedAtMs).toBe(new Date(startedAt).getTime());
+      }
+    );
+
+    it('should not return generationStartedAtMs when notebooklm_async_state is missing', async () => {
+      mockVerifyEnrichmentAccess.mockResolvedValueOnce({
+        ...mockEnrichment,
+        enrichment_type: 'nlm_audio',
+        metadata: {
+          additional_info: {},
+        },
+      });
+
+      const caller = testRouter.createCaller(createAuthenticatedContext());
+      const result = await caller.getGenerationStatus({
+        enrichmentId: '550e8400-e29b-41d4-a716-446655440000',
+      });
+
+      expect(result.generationStartedAtMs).toBeUndefined();
+    });
+
+    it('should not return generationStartedAtMs when started_at is invalid', async () => {
+      mockVerifyEnrichmentAccess.mockResolvedValueOnce({
+        ...mockEnrichment,
+        enrichment_type: 'nlm_audio',
+        metadata: {
+          additional_info: {
+            notebooklm_async_state: {
+              started_at: 'not-a-date',
+            },
+          },
+        },
+      });
+
+      const caller = testRouter.createCaller(createAuthenticatedContext());
+      const result = await caller.getGenerationStatus({
+        enrichmentId: '550e8400-e29b-41d4-a716-446655440000',
+      });
+
+      expect(result.generationStartedAtMs).toBeUndefined();
+    });
+
+    it('should not return generationStartedAtMs for non-NLM enrichment types', async () => {
+      const startedAt = '2026-02-20T11:22:33.456Z';
+
+      mockVerifyEnrichmentAccess.mockResolvedValueOnce({
+        ...mockEnrichment,
+        enrichment_type: 'quiz',
+        metadata: {
+          additional_info: {
+            notebooklm_async_state: {
+              started_at: startedAt,
+            },
+          },
+        },
+      });
+
+      const caller = testRouter.createCaller(createAuthenticatedContext());
+      const result = await caller.getGenerationStatus({
+        enrichmentId: '550e8400-e29b-41d4-a716-446655440000',
+      });
+
+      expect(result.generationStartedAtMs).toBeUndefined();
     });
   });
 });

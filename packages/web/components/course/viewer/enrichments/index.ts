@@ -12,3 +12,7 @@
 export { QuizPlayer } from './QuizPlayer'
 export { AudioPlayer } from './AudioPlayer'
 export { EnrichmentErrorBoundary } from './EnrichmentErrorBoundary'
+export { StudyGuideViewer } from './StudyGuideViewer'
+export { FlashcardViewer } from './FlashcardViewer'
+export { MindMapViewer } from './MindMapViewer'
+export { InfographicViewer } from './InfographicViewer'

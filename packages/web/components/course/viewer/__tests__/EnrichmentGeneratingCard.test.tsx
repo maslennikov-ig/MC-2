@@ -352,6 +352,21 @@ describe('EnrichmentGeneratingCard', () => {
   })
 
   describe('Long-running countdown', () => {
+    it('does not activate long-running countdown while nlm_audio is queued', () => {
+      render(
+        <EnrichmentGeneratingCard
+          {...defaultProps}
+          type="nlm_audio"
+          currentStep="queued"
+          startedAtMs={1_000}
+          maxDurationMs={60 * 60 * 1000}
+        />
+      )
+
+      expect(screen.getByTestId('staged-progress')).toBeInTheDocument()
+      expect(screen.queryByText(/Time left:/)).not.toBeInTheDocument()
+    })
+
     it('uses time-based smooth progress for nlm_audio', () => {
       const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(61_000)
 
