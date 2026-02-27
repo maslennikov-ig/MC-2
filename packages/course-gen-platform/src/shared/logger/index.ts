@@ -75,7 +75,16 @@ async function writeToErrorLogs(
   try {
     // Pre-insert filter: skip DB write for auto-muted errors
     // These errors are already logged to Pino/Axiom via the original logger call
-    const autoMuteResult = shouldAutoMute(message);
+    // Pass context.message and errorDetails.message so tRPC wrapper errors are caught too
+    const contextMessage =
+      (context.message as string | undefined) ||
+      ((context.errorDetails as Record<string, unknown> | undefined)?.message as
+        | string
+        | undefined);
+    const autoMuteResult = shouldAutoMute(
+      message,
+      contextMessage ? { message: contextMessage } : undefined
+    );
     if (autoMuteResult.mute) {
       return;
     }

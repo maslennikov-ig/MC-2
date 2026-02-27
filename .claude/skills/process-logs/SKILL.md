@@ -154,8 +154,14 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `\[Phase 6\] Max retries reached.*best-effort`            | graceful_fallback | Phase 6 summary retries exhausted, best-effort     |
 | `MISCONF Redis.*unable to persist`                        | infrastructure    | Redis RDB/AOF disk issue - infra problem, not app  |
 | `Concurrency limit exceeded`                              | external_service  | Jina API server-side concurrency enforcement       |
+| `getaddrinfo EAI_AGAIN`                                   | infrastructure    | DNS resolution failure during deploy/restart       |
+| `Course not ready.*generation`                            | expected_behavior | Frontend polls after course completed or not ready |
 
-**Total rules: 58** (test validates sync with code)
+**Total rules: 60** (test validates sync with code)
+
+**Metadata-aware matching (v1.10):**
+
+`shouldAutoMute()` now accepts optional `context?: { message?: string }` parameter. For tRPC errors where `error_message` is generic ("tRPC error"), the actual error from `metadata.message` is also checked against all patterns. This catches ~2000+ errors per week that previously slipped through.
 
 **Test environment auto-muting:**
 

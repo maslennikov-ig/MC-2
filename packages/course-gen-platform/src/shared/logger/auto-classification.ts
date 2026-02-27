@@ -434,6 +434,20 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description:
       'Phase 6 summary generation exhausted retries, using best-effort result - non-blocking fallback',
   },
+
+  // === DNS Resolution Failures ===
+  {
+    pattern: /getaddrinfo EAI_AGAIN/i,
+    reason: 'infrastructure',
+    description: 'DNS resolution failure during deploy/restart',
+  },
+
+  // === Frontend Polling Race Conditions ===
+  {
+    pattern: /Course not ready.*generation/i,
+    reason: 'expected_behavior',
+    description: 'Frontend polls after course already completed or not yet ready',
+  },
 ];
 
 export interface AutoMuteResult {
@@ -449,6 +463,7 @@ export interface AutoMuteResult {
  * Check if an error message matches any auto-mute rules
  *
  * @param errorMessage - The error message to check
+ * @param context - Optional context with additional message (e.g. from tRPC metadata)
  * @returns AutoMuteResult indicating if error should be auto-muted
  *
  * @example
@@ -458,9 +473,16 @@ export interface AutoMuteResult {
  *
  * const result2 = shouldAutoMute('Database constraint violation');
  * // { mute: false }
+ *
+ * // tRPC errors: actual details are in metadata.message
+ * const result3 = shouldAutoMute('tRPC error', { message: 'Job stage6:abc not found' });
+ * // { mute: true, reason: 'expected_behavior', description: 'Frontend polls job status...' }
  * ```
  */
-export function shouldAutoMute(errorMessage: string): AutoMuteResult {
+export function shouldAutoMute(
+  errorMessage: string,
+  context?: { message?: string }
+): AutoMuteResult {
   // Guard against null/undefined/non-string input
   if (!errorMessage || typeof errorMessage !== 'string') {
     return { mute: false };
@@ -475,5 +497,21 @@ export function shouldAutoMute(errorMessage: string): AutoMuteResult {
       };
     }
   }
+
+  // If no match on errorMessage and context.message exists, check that too
+  // This catches tRPC errors where error_message is generic (e.g. "tRPC error")
+  // but the actual details are in metadata.message
+  if (context?.message && typeof context.message === 'string') {
+    for (const rule of AUTO_MUTE_RULES) {
+      if (rule.pattern.test(context.message)) {
+        return {
+          mute: true,
+          reason: rule.reason,
+          description: rule.description,
+        };
+      }
+    }
+  }
+
   return { mute: false };
 }
