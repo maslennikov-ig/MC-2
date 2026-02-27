@@ -22,7 +22,8 @@ import {
   fetchBridgeTaskMedia,
 } from './nlm-shared';
 
-const MAX_TREE_DEPTH = 10;
+/** Depth threshold for logging a warning (not a hard limit) */
+const DEPTH_WARNING_THRESHOLD = 20;
 
 interface RawMindMapNode {
   label?: string;
@@ -33,34 +34,28 @@ interface RawMindMapNode {
   description?: string;
 }
 
-function normalizeMindMapNode(
-  raw: RawMindMapNode,
-  currentDepth = 0
-): {
+type NormalizedNode = {
   label: string;
-  children?: ReturnType<typeof normalizeMindMapNode>[];
+  children?: NormalizedNode[];
   description?: string;
-} {
+};
+
+function normalizeMindMapNode(raw: RawMindMapNode): NormalizedNode {
   const label = (raw.label || raw.name || raw.title || raw.text || '').trim();
   if (!label) {
     return { label: 'Untitled' };
   }
 
-  const result: {
-    label: string;
-    children?: ReturnType<typeof normalizeMindMapNode>[];
-    description?: string;
-  } = { label };
+  const result: NormalizedNode = { label };
 
   if (raw.description && typeof raw.description === 'string') {
     result.description = raw.description.trim();
   }
 
-  // Truncate at MAX_TREE_DEPTH to prevent unbounded recursion
-  if (currentDepth < MAX_TREE_DEPTH && Array.isArray(raw.children) && raw.children.length > 0) {
+  if (Array.isArray(raw.children) && raw.children.length > 0) {
     result.children = raw.children
       .filter((c): c is RawMindMapNode => c && typeof c === 'object')
-      .map(c => normalizeMindMapNode(c, currentDepth + 1));
+      .map(c => normalizeMindMapNode(c));
   }
 
   return result;
@@ -156,6 +151,13 @@ function parseMindMapResult(
   const root = normalizeMindMapNode(rawRoot);
   const totalNodes = countNodes(root as { children?: { label: string }[] });
   const treeDepth = maxDepth(root as { children?: { label: string }[] });
+
+  if (treeDepth > DEPTH_WARNING_THRESHOLD) {
+    logger.warn(
+      { treeDepth, totalNodes, threshold: DEPTH_WARNING_THRESHOLD },
+      'NLM mind map: tree depth exceeds warning threshold'
+    );
+  }
 
   const content: MindMapEnrichmentContent = {
     type: 'nlm_mind_map',

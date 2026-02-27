@@ -262,7 +262,7 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
                 transition: 'transform 0.2s ease',
               }}
             >
-              <MindMapTreeNode node={content.root} depth={0} maxDepth={10} />
+              <MindMapTreeNode node={content.root} depth={0} />
             </div>
           </div>
         </DialogContent>
