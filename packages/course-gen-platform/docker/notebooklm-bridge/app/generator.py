@@ -739,12 +739,17 @@ class NotebookLMMediaGenerator(MediaGenerator):
         course_id = (raw_course_id or "").strip()
         return course_id or None
 
-    async def _get_or_create_course_generation_lock(self, course_id: str) -> asyncio.Lock:
+    async def _get_or_create_course_generation_lock(
+        self, course_id: str, media_type: MediaType,
+    ) -> asyncio.Lock:
+        # Key per (course, media_type) allows audio + video to run in parallel
+        # while serializing same-type generations (e.g. two audios) for safety.
+        lock_key = f"{course_id}:{media_type}"
         async with self._course_generation_locks_lock:
-            lock = self._course_generation_locks.get(course_id)
+            lock = self._course_generation_locks.get(lock_key)
             if lock is None:
                 lock = asyncio.Lock()
-                self._course_generation_locks[course_id] = lock
+                self._course_generation_locks[lock_key] = lock
             return lock
 
     @asynccontextmanager
@@ -758,7 +763,7 @@ class NotebookLMMediaGenerator(MediaGenerator):
             yield
             return
 
-        lock = await self._get_or_create_course_generation_lock(course_id)
+        lock = await self._get_or_create_course_generation_lock(course_id, media_type)
         loop = asyncio.get_running_loop()
         queued_at = loop.time()
 
