@@ -652,7 +652,9 @@ async function checkNotebookLMBridge(): Promise<ServiceStatus> {
   const startTime = Date.now()
   const lastCheck = new Date().toISOString()
 
-  // Try Stage, Dev, and local URLs in order
+  // Try Stage, Dev, and local URLs in order.
+  // First reachable bridge is authoritative — if it returns non-OK,
+  // that's a real issue, not a reason to try the next URL.
   const urls = [
     'http://notebooklm-bridge:8000/health',
     'http://notebooklm-bridge-dev:8000/health',
@@ -669,7 +671,10 @@ async function checkNotebookLMBridge(): Promise<ServiceStatus> {
         const checks: { name: string; passed: boolean; message?: string }[] = data.checks || []
         const failedChecks = checks.filter((c) => !c.passed)
         const activeTasks: number = data.active_tasks ?? 0
-        const proxyConfigured: boolean = data.proxy_configured ?? false
+
+        // Derive proxy status from checks array
+        const proxyCheck = checks.find((c) => c.name === 'proxy')
+        const proxyActive = proxyCheck?.passed ?? false
 
         // Determine status based on checks
         let status: 'healthy' | 'degraded' | 'error' = 'healthy'
@@ -680,7 +685,7 @@ async function checkNotebookLMBridge(): Promise<ServiceStatus> {
           messageParts.push(failedChecks.map((c) => c.message || c.name).join('; '))
         }
 
-        if (proxyConfigured) {
+        if (proxyActive) {
           messageParts.push('SOCKS proxy active')
         }
         if (activeTasks > 0) {
@@ -699,6 +704,7 @@ async function checkNotebookLMBridge(): Promise<ServiceStatus> {
         }
       }
 
+      // Reachable but unhealthy — authoritative result, don't try other URLs
       return {
         name: 'NotebookLM Bridge',
         status: 'degraded',
@@ -707,7 +713,7 @@ async function checkNotebookLMBridge(): Promise<ServiceStatus> {
         lastCheck,
       }
     } catch {
-      // Try next URL
+      // Network-level failure — try next URL
       continue
     }
   }
@@ -966,7 +972,9 @@ export async function GET(
     })
 
     // Always return 200, status is in the body
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    })
   } catch (error) {
     logger.error('Admin health check failed', { error })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -4,10 +4,12 @@ import asyncio
 import base64
 import logging
 import os
+import pathlib
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -254,6 +256,15 @@ class _AsyncTaskStore:
             task.result = result
             task.updated_at = datetime.now(UTC)
 
+    async def count_active_tasks(self) -> int:
+        now = datetime.now(UTC)
+        async with self._lock:
+            self._prune_locked(now)
+            return sum(
+                1 for t in self._tasks.values()
+                if t.status in {"queued", "in_progress"}
+            )
+
     def _prune_locked(self, now: datetime) -> None:
         stale_ids = [
             task_id
@@ -289,8 +300,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def health(
         resolved_settings: Annotated[Settings, Depends(get_settings)],
     ) -> HealthResponse:
-        import pathlib
-
         checks: list[HealthCheckDetail] = []
 
         # Check auth source availability
@@ -316,26 +325,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 name="auth", passed=False, message="No auth configured",
             ))
 
-        # Check SOCKS proxy configuration
+        # Check SOCKS proxy configuration (redact credentials)
         proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
-        proxy_configured = bool(proxy_url)
-        if proxy_configured:
+        if proxy_url:
+            try:
+                parsed = urlparse(proxy_url)
+                redacted = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+            except Exception:
+                redacted = "(configured)"
             checks.append(HealthCheckDetail(
-                name="proxy", passed=True, message=proxy_url,
+                name="proxy", passed=True, message=redacted,
             ))
         else:
             checks.append(HealthCheckDetail(
                 name="proxy", passed=False, message="No proxy configured",
             ))
 
-        # Count active tasks
-        async with task_store._lock:
-            active = sum(
-                1 for t in task_store._tasks.values()
-                if t.status in {"queued", "in_progress"}
-            )
+        # Count active tasks via public API
+        active = await task_store.count_active_tasks()
 
-        overall = "ok" if all(c.passed for c in checks) else "degraded"
+        overall: Literal["ok", "degraded"] = (
+            "ok" if all(c.passed for c in checks) else "degraded"
+        )
 
         return HealthResponse(
             status=overall,
@@ -343,7 +354,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             mode=resolved_settings.notebooklm_generation_mode,
             checks=checks,
             active_tasks=active,
-            proxy_configured=proxy_configured,
         )
 
     @app.post(

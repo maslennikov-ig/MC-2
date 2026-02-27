@@ -185,10 +185,14 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
         </p>
       )}
 
-      {/* Error Message (if any) */}
-      {service.message && service.status === 'error' && (
+      {/* Error/Degraded Message */}
+      {service.message && (service.status === 'error' || service.status === 'degraded') && (
         <p
-          className="mt-2 line-clamp-2 text-xs text-red-600 dark:text-red-400"
+          className={`mt-2 line-clamp-2 text-xs ${
+            service.status === 'error'
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-yellow-600 dark:text-yellow-400'
+          }`}
           title={service.message}
         >
           {service.message}
