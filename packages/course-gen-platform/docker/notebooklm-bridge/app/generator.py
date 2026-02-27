@@ -578,10 +578,28 @@ class NotebookLMMediaGenerator(MediaGenerator):
             )
 
         kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+
+        # Convert raw str/int to notebooklm-py enums (library expects enum.value internally)
         if request.flashcard_difficulty:
-            kwargs["difficulty"] = request.flashcard_difficulty
+            difficulty_enum = self._resolve_enum_option(
+                notebooklm_module,
+                enum_name="QuizDifficulty",
+                raw_value=request.flashcard_difficulty,
+                field_name="flashcard_difficulty",
+            )
+            if difficulty_enum is not None:
+                kwargs["difficulty"] = difficulty_enum
         if request.flashcard_count:
-            kwargs["quantity"] = request.flashcard_count
+            # QuizQuantity uses named members (FEWER=1, STANDARD=2), not raw int counts.
+            # Map: count <= 10 → FEWER, count > 10 → STANDARD.  Skip if enum absent.
+            QuizQuantity = getattr(notebooklm_module, "QuizQuantity", None)
+            if QuizQuantity is not None:
+                fewer = getattr(QuizQuantity, "FEWER", None)
+                standard = getattr(QuizQuantity, "STANDARD", None)
+                if request.flashcard_count <= 10 and fewer is not None:
+                    kwargs["quantity"] = fewer
+                elif standard is not None:
+                    kwargs["quantity"] = standard
 
         try:
             status = await generate_flashcards(**kwargs)
@@ -724,10 +742,26 @@ class NotebookLMMediaGenerator(MediaGenerator):
             )
 
         kwargs: dict[str, Any] = {"notebook_id": notebook_id}
+
+        # Convert raw str to notebooklm-py enums (library expects enum.value internally)
         if request.infographic_orientation:
-            kwargs["orientation"] = request.infographic_orientation
+            orientation_enum = self._resolve_enum_option(
+                notebooklm_module,
+                enum_name="InfographicOrientation",
+                raw_value=request.infographic_orientation,
+                field_name="infographic_orientation",
+            )
+            if orientation_enum is not None:
+                kwargs["orientation"] = orientation_enum
         if request.infographic_detail:
-            kwargs["detail_level"] = request.infographic_detail
+            detail_enum = self._resolve_enum_option(
+                notebooklm_module,
+                enum_name="InfographicDetail",
+                raw_value=request.infographic_detail,
+                field_name="infographic_detail",
+            )
+            if detail_enum is not None:
+                kwargs["detail_level"] = detail_enum
 
         try:
             status = await generate_infographic(**kwargs)
