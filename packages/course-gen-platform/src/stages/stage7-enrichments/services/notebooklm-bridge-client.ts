@@ -435,6 +435,7 @@ function hasEmbeddedMediaPayload(payload: Record<string, unknown>): boolean {
     getStringValue(payload, [
       'audio_base64',
       'video_base64',
+      'image_base64',
       'file_base64',
       'base64',
       'base64_data',
@@ -450,6 +451,7 @@ function parseMediaPayload(
   const base64Value = getStringValue(payload, [
     'audio_base64',
     'video_base64',
+    'image_base64',
     'file_base64',
     'base64',
     'base64_data',
