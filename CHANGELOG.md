@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.9] - 2026-02-28
+
+### Added
+
+- **enrichments**: hide audio, video, presentation, quiz from UI (ba0498c3)
+
 ## [0.31.8] - 2026-02-28
 
 ### Added
