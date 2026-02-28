@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { useLocale } from 'next-intl'
-import { Video, HelpCircle, Headphones, Presentation, FileText, Sparkles } from 'lucide-react'
+import { HelpCircle, Presentation, FileText, Sparkles } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import type { CreateEnrichmentType } from '../../../stores/enrichment-inspector-store'
@@ -42,36 +42,6 @@ const ENRICHMENT_CARDS: EnrichmentCardInfo[] = [
         'Разные типы вопросов',
         'Покрытие таксономии Блума',
       ],
-    },
-  },
-  {
-    type: 'video',
-    icon: <Video className="h-6 w-6" />,
-    title: { en: 'Video Script', ru: 'Сценарий видео' },
-    description: {
-      en: 'Generate a video script from lesson content',
-      ru: 'Сгенерируйте сценарий видео из содержимого урока',
-    },
-    benefits: {
-      en: ['Professional script structure', 'Review before finalizing', 'Edit and regenerate'],
-      ru: [
-        'Профессиональная структура сценария',
-        'Просмотр перед финализацией',
-        'Редактирование и регенерация',
-      ],
-    },
-  },
-  {
-    type: 'podcast',
-    icon: <Headphones className="h-6 w-6" />,
-    title: { en: 'Audio Narration', ru: 'Аудио нарратив' },
-    description: {
-      en: 'Create audio narration for mobile learning',
-      ru: 'Создайте аудио-версию для мобильного обучения',
-    },
-    benefits: {
-      en: ['Multiple voice options', 'Adjustable speed', 'Accessibility support'],
-      ru: ['Разные голоса на выбор', 'Настраиваемая скорость', 'Поддержка доступности'],
     },
   },
   {
