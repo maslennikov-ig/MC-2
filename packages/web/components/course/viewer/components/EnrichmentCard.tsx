@@ -70,10 +70,10 @@ const PLACEHOLDER_IMAGES: Record<string, string> = {
   video: '/placeholders/Video.webp',
   nlm_video: '/placeholders/Video.webp',
   document: '/placeholders/Presentation.webp',
-  nlm_study_guide: '/placeholders/Quiz.webp',
-  nlm_flashcards: '/placeholders/Quiz.webp',
-  nlm_mind_map: '/placeholders/Presentation.webp',
-  nlm_infographic: '/placeholders/Cover.webp',
+  nlm_study_guide: '/placeholders/StudyGuide.webp',
+  nlm_flashcards: '/placeholders/Flashcards.webp',
+  nlm_mind_map: '/placeholders/MindMap.webp',
+  nlm_infographic: '/placeholders/Infographic.webp',
 }
 
 interface EnrichmentCardProps {
