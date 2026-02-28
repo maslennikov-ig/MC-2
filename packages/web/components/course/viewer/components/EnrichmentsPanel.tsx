@@ -122,7 +122,7 @@ interface EnrichmentsPanelProps {
 export function EnrichmentsPanel({
   enrichments,
   enrichmentsLoadError,
-  isLoading: _isLoading,
+  isLoading,
   lessonId,
   courseId,
   onRefreshEnrichments,
@@ -255,6 +255,22 @@ export function EnrichmentsPanel({
     )
   }
 
+  // Show loading skeleton while enrichments are being fetched
+  if (isLoading && !enrichments) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="min-h-[480px] animate-pulse rounded-2xl border border-gray-200 bg-gray-100 dark:border-slate-800 dark:bg-slate-800"
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   // Show empty state only if no enrichments AND no ability to generate (no lessonId)
   // If lessonId exists, we show placeholder cards for generation even if no enrichments
   if ((!filteredEnrichments || filteredEnrichments.length === 0) && !lessonId) {
@@ -306,6 +322,8 @@ export function EnrichmentsPanel({
       if (!GRID_DISPLAY_STATUSES.has(e.status)) return false
       // Exclude image types (handled by UnifiedEnrichmentCard)
       if (e.enrichment_type === 'cover' || e.enrichment_type === 'card') return false
+      // Hide nlm_study_guide from UI (temporarily disabled)
+      if ((e.enrichment_type as string) === 'nlm_study_guide') return false
       // Exclude legacy NLM draft statuses
       if (isNlmType(e.enrichment_type) && isLegacyNlmDraftStatus(e.status)) return false
       return true
