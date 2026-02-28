@@ -27,27 +27,13 @@ export type EnrichmentType =
   | 'nlm_infographic'
 
 export const PLACEHOLDER_TYPES: (
-  | 'quiz'
-  | 'audio'
-  | 'presentation'
-  | 'video'
   | 'nlm_audio'
   | 'nlm_video'
   | 'nlm_study_guide'
   | 'nlm_flashcards'
   | 'nlm_mind_map'
   | 'nlm_infographic'
-)[] = [
-  'quiz',
-  'audio',
-  'presentation',
-  'video',
-  'nlm_audio',
-  'nlm_video',
-  'nlm_flashcards',
-  'nlm_mind_map',
-  'nlm_infographic',
-]
+)[] = ['nlm_audio', 'nlm_video', 'nlm_flashcards', 'nlm_mind_map', 'nlm_infographic']
 
 // Image types
 // - cover: 16:9 hero banner for lesson header
@@ -73,11 +59,7 @@ export type GeneratableEnrichmentType =
 export const ALL_PLACEHOLDER_TYPES: GeneratableEnrichmentType[] = [
   'cover',
   'card',
-  'quiz',
-  'audio',
   'nlm_audio',
-  'presentation',
-  'video',
   'nlm_video',
   'nlm_flashcards',
   'nlm_mind_map',

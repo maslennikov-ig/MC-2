@@ -85,9 +85,7 @@ export function LessonMaterialsSwitcher({
   const isType = (e: LessonMaterialEnrichment, typeStr: string) => e.enrichment_type === typeStr
 
   // 1. Video
-  const videoEnrichment = completedEnrichments.find(
-    (e) => isType(e, 'video') || isType(e, 'nlm_video')
-  )
+  const videoEnrichment = completedEnrichments.find((e) => isType(e, 'nlm_video'))
   const legacyVideoAsset = assets.find((a) => {
     if (a.filename) {
       const exts = ['.mp4', '.webm', '.ogg', '.avi', '.mov']
@@ -108,20 +106,18 @@ export function LessonMaterialsSwitcher({
   const hasVideo = !!videoEnrichment || !!legacyVideoAsset
 
   // 2. Audio
-  const audioEnrichment = completedEnrichments.find(
-    (e) => isType(e, 'audio') || isType(e, 'nlm_audio')
-  )
+  const audioEnrichment = completedEnrichments.find((e) => isType(e, 'nlm_audio'))
   const hasAudio = !!audioEnrichment
 
   // 3. Quiz
-  const quizEnrichment = completedEnrichments.find((e) => isType(e, 'quiz') && !!e.content)
-  const hasQuiz = !!quizEnrichment
+  // Quiz temporarily hidden from UI
+  const quizEnrichment = completedEnrichments.find(() => false)
+  const hasQuiz = false
 
   // 4. Presentation
-  const presentationEnrichment = completedEnrichments.find(
-    (e) => isType(e, 'presentation') && !!e.content
-  )
-  const hasPresentation = !!presentationEnrichment
+  // Presentation temporarily hidden from UI
+  const presentationEnrichment = completedEnrichments.find(() => false)
+  const hasPresentation = false
 
   // 5. Document
   const documentEnrichment = completedEnrichments.find((e) => isType(e, 'document') && !!e.content)
