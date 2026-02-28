@@ -127,11 +127,11 @@ export function LessonMaterialsSwitcher({
   const documentEnrichment = completedEnrichments.find((e) => isType(e, 'document') && !!e.content)
   const hasDocument = !!documentEnrichment
 
-  // 6. Study Guide
+  // 6. Study Guide (temporarily hidden from UI — lookup kept for future re-enable)
   const studyGuideEnrichment = completedEnrichments.find(
     (e) => isType(e, 'nlm_study_guide') && !!e.content
   )
-  const hasStudyGuide = !!studyGuideEnrichment
+  const hasStudyGuide = false // temporarily hidden
 
   // 7. Flashcards
   const flashcardsEnrichment = completedEnrichments.find(
