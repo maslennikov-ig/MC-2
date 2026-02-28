@@ -381,12 +381,17 @@ class Stage5GenerationHandler {
       schema_version: 2 as const,
     };
 
-    // Save structure
+    // Save structure + sync LLM-generated title/description back to courses table
+    // This ensures courses.title matches the target language even when user input was in a different language
     const { error: structureError } = await supabaseAdmin
       .from('courses')
       .update({
         course_structure: structureWithIds,
         generation_metadata: result.generation_metadata,
+        ...(structureWithIds.course_title ? { title: structureWithIds.course_title } : {}),
+        ...(structureWithIds.course_description
+          ? { course_description: structureWithIds.course_description }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', courseId);
