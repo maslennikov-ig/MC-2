@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
-import { Network, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { Network, ChevronRight, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -14,6 +15,16 @@ import {
 } from '@/components/ui/dialog'
 import type { MindMapEnrichmentContent, MindMapNode } from '@megacampus/shared-types'
 import { cn } from '@/lib/utils'
+import { toMarkmapNode } from '@/lib/helpers/mindmap-transform'
+
+const MarkmapRenderer = dynamic(() => import('./MarkmapRenderer'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
+    </div>
+  ),
+})
 
 interface MindMapViewerProps {
   content: MindMapEnrichmentContent
@@ -56,13 +67,21 @@ interface MindMapTreeNodeProps {
   node: MindMapNode
   depth: number
   maxDepth?: number
+  expandLabel?: string
+  collapseLabel?: string
 }
 
 /**
  * Recursive tree node renderer
  * Uses simple indented tree layout for lightweight display.
  */
-function MindMapTreeNode({ node, depth, maxDepth }: MindMapTreeNodeProps) {
+function MindMapTreeNode({
+  node,
+  depth,
+  maxDepth,
+  expandLabel,
+  collapseLabel,
+}: MindMapTreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(depth < 2)
   const colors = getDepthColor(depth)
   const hasChildren = node.children && node.children.length > 0
@@ -81,7 +100,7 @@ function MindMapTreeNode({ node, depth, maxDepth }: MindMapTreeNodeProps) {
           <button
             onClick={() => setIsExpanded((prev) => !prev)}
             className="mt-0.5 shrink-0 rounded p-0.5 hover:bg-gray-100 dark:hover:bg-gray-800"
-            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+            aria-label={isExpanded ? (collapseLabel ?? 'Collapse') : (expandLabel ?? 'Expand')}
           >
             <ChevronRight
               className={cn(
@@ -122,7 +141,14 @@ function MindMapTreeNode({ node, depth, maxDepth }: MindMapTreeNodeProps) {
       {isExpanded && !isDepthCapped && hasChildren && (
         <div>
           {node.children!.map((child, index) => (
-            <MindMapTreeNode key={index} node={child} depth={depth + 1} maxDepth={maxDepth} />
+            <MindMapTreeNode
+              key={`${child.label}-${index}`}
+              node={child}
+              depth={depth + 1}
+              maxDepth={maxDepth}
+              expandLabel={expandLabel}
+              collapseLabel={collapseLabel}
+            />
           ))}
         </div>
       )}
@@ -133,27 +159,16 @@ function MindMapTreeNode({ node, depth, maxDepth }: MindMapTreeNodeProps) {
 /**
  * MindMapViewer
  *
- * Renders a NotebookLM mind map as an interactive collapsible tree.
+ * Renders a NotebookLM mind map with:
  * - Compact preview (2 levels) in card context
- * - Full tree in Dialog with zoom controls
+ * - Full interactive markmap in Dialog (zoom, pan, fold/unfold)
  * - Dark mode support
  */
 export function MindMapViewer({ content }: MindMapViewerProps) {
   const t = useTranslations('enrichments')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [zoomLevel, setZoomLevel] = useState(1)
 
-  const handleZoomIn = useCallback(() => {
-    setZoomLevel((prev) => Math.min(prev + 0.2, 2))
-  }, [])
-
-  const handleZoomOut = useCallback(() => {
-    setZoomLevel((prev) => Math.max(prev - 0.2, 0.5))
-  }, [])
-
-  const handleZoomReset = useCallback(() => {
-    setZoomLevel(1)
-  }, [])
+  const markmapData = useMemo(() => toMarkmapNode(content.root), [content.root])
 
   // Count first-level children for badge
   const topLevelChildrenCount = content.root.children?.length ?? 0
@@ -162,7 +177,13 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
     <>
       {/* Compact preview: root + 2 levels */}
       <div className="overflow-hidden rounded-lg border border-sky-200 bg-sky-50/50 p-3 dark:border-sky-800/30 dark:bg-sky-900/10">
-        <MindMapTreeNode node={content.root} depth={0} maxDepth={2} />
+        <MindMapTreeNode
+          node={content.root}
+          depth={0}
+          maxDepth={2}
+          expandLabel={t('viewer.mindMap.expand')}
+          collapseLabel={t('viewer.mindMap.collapse')}
+        />
         {topLevelChildrenCount > 0 && (
           <p className="text-muted-foreground mt-2 text-xs">
             {t('viewer.mindMap.previewHint', { count: topLevelChildrenCount })}
@@ -173,7 +194,7 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
       {/* Footer: stats + view full button */}
       <div className="mt-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {content.total_nodes && (
+          {content.total_nodes != null && (
             <Badge
               variant="outline"
               className="border-sky-300 text-sky-700 dark:border-sky-700 dark:text-sky-300"
@@ -182,7 +203,7 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
               {t('viewer.mindMap.nodeCount', { count: content.total_nodes })}
             </Badge>
           )}
-          {content.max_depth && (
+          {content.max_depth != null && (
             <Badge
               variant="outline"
               className="border-sky-200 text-sky-600 dark:border-sky-800 dark:text-sky-400"
@@ -201,70 +222,33 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
         </Button>
       </div>
 
-      {/* Full-screen dialog */}
+      {/* Full-screen dialog with interactive markmap */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
+        <DialogContent className="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden">
           <DialogHeader className="shrink-0 border-b pb-3">
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
                 <Network className="h-5 w-5 text-sky-500" />
                 {t('viewer.mindMap.title')}
               </DialogTitle>
-              <div className="flex items-center gap-1">
-                {/* Zoom controls */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={handleZoomOut}
-                  disabled={zoomLevel <= 0.5}
-                  aria-label={t('viewer.mindMap.zoomOut')}
-                >
-                  <ZoomOut className="h-4 w-4" />
+              <DialogClose asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">{t('viewer.close')}</span>
                 </Button>
-                <span className="text-muted-foreground w-12 text-center text-xs">
-                  {Math.round(zoomLevel * 100)}%
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={handleZoomIn}
-                  disabled={zoomLevel >= 2}
-                  aria-label={t('viewer.mindMap.zoomIn')}
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={handleZoomReset}
-                  aria-label={t('viewer.mindMap.zoomReset')}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-                <DialogClose asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">{t('viewer.close')}</span>
-                  </Button>
-                </DialogClose>
-              </div>
+              </DialogClose>
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-auto py-4">
-            <div
-              style={{
-                transform: `scale(${zoomLevel})`,
-                transformOrigin: 'top left',
-                transition: 'transform 0.2s ease',
-              }}
-            >
-              <MindMapTreeNode node={content.root} depth={0} />
-            </div>
+          <div className="min-h-[60vh] flex-1">
+            {isDialogOpen && (
+              <MarkmapRenderer data={markmapData} fitToViewLabel={t('viewer.mindMap.fitToView')} />
+            )}
           </div>
+
+          <p className="text-muted-foreground shrink-0 border-t pt-2 text-center text-xs">
+            {t('viewer.mindMap.interactionHint')}
+          </p>
         </DialogContent>
       </Dialog>
     </>

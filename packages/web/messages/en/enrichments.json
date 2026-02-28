@@ -359,9 +359,10 @@
       "nodeCount": "{count} nodes",
       "depth": "Depth {depth}",
       "previewHint": "{count} top-level topics",
-      "zoomIn": "Zoom in",
-      "zoomOut": "Zoom out",
-      "zoomReset": "Reset zoom"
+      "fitToView": "Fit to view",
+      "interactionHint": "Scroll to zoom, drag to pan, click nodes to expand/collapse",
+      "expand": "Expand node",
+      "collapse": "Collapse node"
     },
     "infographic": {
       "description": "Visual infographic summary of this lesson",
