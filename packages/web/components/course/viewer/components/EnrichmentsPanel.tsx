@@ -255,7 +255,7 @@ export function EnrichmentsPanel({
     )
   }
 
-  // Show loading skeleton while enrichments are being fetched
+  // Show skeleton on initial load only; during refetch stale data is shown instead
   if (isLoading && !enrichments) {
     return (
       <div className="space-y-6">
@@ -324,6 +324,8 @@ export function EnrichmentsPanel({
       if (e.enrichment_type === 'cover' || e.enrichment_type === 'card') return false
       // Hide nlm_study_guide from UI (temporarily disabled)
       if ((e.enrichment_type as string) === 'nlm_study_guide') return false
+      // Hide regular audio/video/presentation/quiz (temporarily, NLM variants remain)
+      if (['audio', 'video', 'presentation', 'quiz'].includes(e.enrichment_type)) return false
       // Exclude legacy NLM draft statuses
       if (isNlmType(e.enrichment_type) && isLegacyNlmDraftStatus(e.status)) return false
       return true
