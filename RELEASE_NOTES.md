@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.10
+
+_Released on 2026-02-28_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Translate course title to target language in Stage 5
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.31.9
 
 _Released on 2026-02-28_
