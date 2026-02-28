@@ -612,6 +612,7 @@ ${schemaDescription}
 3. Target audience must clearly define who will benefit from this course
 4. Assessment strategy must align with pedagogical approach and learning outcomes
 5. All text fields must be coherent and professionally written
+6. ALL generated text (course_title, course_description, learning_outcomes, course_tags, etc.) MUST be written in the **Target Language** (${language}). Even if the input Course Title is in a different language, translate and adapt it to the target language.
 
 **Output Format**: Valid JSON only, no markdown, no explanations.
 `;
@@ -747,16 +748,22 @@ ${schemaDescription}
     // Alignment: Check match with input requirements
     let alignmentScore = 1.0; // Start optimistic
 
-    // Check title matches - only for English content
-    // For multilingual, the LLM legitimately generates localized titles
-    // (e.g., input "E2E Test Course" with language="ru" → "Полный курс по...")
+    // Check title matches - skip when input language differs from target language
+    // For cross-language scenarios, the LLM legitimately translates the title
+    // (e.g., input "Как стать счастливым" with language="en" → "How to Become Happy")
+    const inputTitle = input.frontend_parameters.course_title || '';
+    const inputHasCyrillic = /[\u0400-\u04FF]/.test(inputTitle);
+    const inputHasLatin = /[a-zA-Z]/.test(inputTitle);
+    const isCrossLanguage =
+      (inputHasCyrillic && language !== 'ru') ||
+      (inputHasLatin && !inputHasCyrillic && language === 'ru');
+
     if (
+      !isCrossLanguage &&
       language === 'en' &&
       metadata.course_title &&
-      input.frontend_parameters.course_title &&
-      !metadata.course_title
-        .toLowerCase()
-        .includes(input.frontend_parameters.course_title.toLowerCase().substring(0, 10))
+      inputTitle &&
+      !metadata.course_title.toLowerCase().includes(inputTitle.toLowerCase().substring(0, 10))
     ) {
       alignmentScore -= 0.3;
     }
