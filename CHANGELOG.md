@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.8] - 2026-02-28
+
+### Added
+
+- **enrichments**: replace MindMapViewer with interactive markmap-view (0300dd19)
+- **enrichments**: temporarily hide nlm_study_guide from UI (dfa093ad)
+- **enrichments**: hide regular audio/video from UI, keep NLM variants only (c191b5d9)
+- **web**: add unique placeholder images for 4 new NLM enrichment types (7f0ab042)
+- **enrichments**: add 4 new NotebookLM enrichment types (6612daa0)
+
+### Changed
+
+- **enrichments**: extract buildStandardSources helper and add flashcards strict schema (b0e18c00)
+
+### Fixed
+
+- **enrichments**: use correct placeholder images for NLM enrichment types (6b1c8ce1)
+- **enrichments**: remove audio/video from remaining UI components (a34adeb0)
+- **enrichments**: add image_base64 to bridge media payload detection (d365ba9c)
+- **logger**: enhance auto-mute to check metadata.message for tRPC errors (f513042b)
+- **enrichments**: pass explicit timeout to wait_for_completion for 3 NLM artifact types (fa44afcb)
+- **enrichments**: increase NLM queue wait timeout to 72h and async polling to 76h (91ca8bc4)
+- **enrichments**: resolve NLM bridge failures and add enrichment types to materials switcher (0d028cac)
+- **enrichments**: change NLM audio default format from deep_dive to debate (5272824f)
+- **mind-map**: remove content truncation, add iterative depth-safe validation (83e59648)
+- **enrichments**: address code review findings for NLM enrichment types (a56958ce)
+- **infra**: share enrichments storage between Dev and Staging (0d48627f)
+- **lint**: raise eslint function size and complexity limits (96003381)
+
 ## [0.31.7] - 2026-02-27
 
 ### Added
