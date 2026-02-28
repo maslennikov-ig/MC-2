@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.9
+
+_Released on 2026-02-28_
+
+### ✨ New Features
+
+- **enrichments**: Hide audio, video, presentation, quiz from UI
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.31.8
 
 _Released on 2026-02-28_
