@@ -22,6 +22,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import type { QuizEnrichmentContent, QuizQuestion } from '@megacampus/shared-types'
 
@@ -40,7 +41,12 @@ const QUIZ_STORAGE_KEY = (id: string) => `quiz_progress_${id}`
 interface QuizState {
   /** Current question index (0-based) */
   currentQuestionIndex: number
-  /** User's answers: questionId -> answer */
+  /** User's answers: questionId -> answer value
+   * - multiple_choice: option ID string (e.g., "a")
+   * - multi_select: sorted comma-joined option IDs (e.g., "a,c,e")
+   * - true_false: boolean
+   * - short_answer: string (disabled, never populated)
+   */
   answers: Record<string, string | boolean>
   /** Whether quiz is submitted */
   isSubmitted: boolean
@@ -53,6 +59,40 @@ interface QuizState {
 }
 
 /** Default initial state for quiz */
+/** Compute whether a user's answer is correct for a given question */
+function computeIsCorrect(
+  question: QuizQuestion,
+  userAnswer: string | boolean | undefined
+): boolean {
+  const correctAnswer = question.correct_answer
+  if (question.type === 'multi_select') {
+    const userArr = String(userAnswer || '')
+      .split(',')
+      .filter(Boolean)
+      .sort()
+    let correctArr: string[]
+    if (Array.isArray(correctAnswer)) {
+      correctArr = [...correctAnswer].map(String).sort()
+    } else if (typeof correctAnswer === 'string' && correctAnswer.length > 0) {
+      correctArr = correctAnswer.split(',').filter(Boolean).sort()
+    } else {
+      console.warn(
+        '[QuizPlayer] multi_select correct_answer has unexpected type:',
+        typeof correctAnswer,
+        correctAnswer
+      )
+      correctArr = []
+    }
+    return JSON.stringify(userArr) === JSON.stringify(correctArr)
+  }
+  if (question.type === 'multiple_choice') return String(userAnswer) === String(correctAnswer)
+  if (question.type === 'true_false') return Boolean(userAnswer) === Boolean(correctAnswer)
+  if (question.type === 'short_answer') {
+    return String(userAnswer).toLowerCase().trim() === String(correctAnswer).toLowerCase().trim()
+  }
+  return false
+}
+
 const defaultState: QuizState = {
   currentQuestionIndex: 0,
   answers: {},
@@ -124,6 +164,8 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
   }, [state, enrichmentId])
 
   // Shuffle questions only once on mount using useState initializer
+  // Note: sort(() => Math.random() - 0.5) is a biased shuffle (not Fisher-Yates),
+  // but acceptable for quiz randomization where perfect uniformity is not critical.
   const [questions] = useState(() => {
     if (content.shuffle_questions) {
       return [...content.questions].sort(() => Math.random() - 0.5)
@@ -222,45 +264,8 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
     let earnedPoints = 0
 
     questions.forEach((question) => {
-      const userAnswer = state.answers[question.id]
-      const correctAnswer = question.correct_answer
-
       totalScore += question.points
-
-      // Check if answer is correct
-      let isCorrect = false
-
-      if (question.type === 'multi_select') {
-        // For multi_select: compare sorted arrays
-        const userArr = String(userAnswer || '')
-          .split(',')
-          .filter(Boolean)
-          .sort()
-        let correctArr: string[]
-        if (Array.isArray(correctAnswer)) {
-          correctArr = [...correctAnswer].map(String).sort()
-        } else if (typeof correctAnswer === 'string' && correctAnswer.length > 0) {
-          correctArr = correctAnswer.split(',').filter(Boolean).sort()
-        } else {
-          console.warn(
-            '[QuizPlayer] multi_select correct_answer has unexpected type:',
-            typeof correctAnswer,
-            correctAnswer
-          )
-          correctArr = []
-        }
-        isCorrect = JSON.stringify(userArr) === JSON.stringify(correctArr)
-      } else if (question.type === 'multiple_choice') {
-        isCorrect = String(userAnswer) === String(correctAnswer)
-      } else if (question.type === 'true_false') {
-        isCorrect = Boolean(userAnswer) === Boolean(correctAnswer)
-      } else if (question.type === 'short_answer') {
-        // Case-insensitive comparison for short answer
-        isCorrect =
-          String(userAnswer).toLowerCase().trim() === String(correctAnswer).toLowerCase().trim()
-      }
-
-      if (isCorrect) {
+      if (computeIsCorrect(question, state.answers[question.id])) {
         earnedPoints += question.points
       }
     })
@@ -358,38 +363,7 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
   // Check if answer is correct (only for submitted state)
   const isAnswerCorrect = (question: QuizQuestion) => {
     if (!state.isSubmitted) return null
-
-    const userAnswer = state.answers[question.id]
-    const correctAnswer = question.correct_answer
-
-    if (question.type === 'multi_select') {
-      const userArr = String(userAnswer || '')
-        .split(',')
-        .filter(Boolean)
-        .sort()
-      let correctArr: string[]
-      if (Array.isArray(question.correct_answer)) {
-        correctArr = [...question.correct_answer].map(String).sort()
-      } else if (
-        typeof question.correct_answer === 'string' &&
-        question.correct_answer.length > 0
-      ) {
-        correctArr = question.correct_answer.split(',').filter(Boolean).sort()
-      } else {
-        correctArr = []
-      }
-      return JSON.stringify(userArr) === JSON.stringify(correctArr)
-    }
-
-    if (question.type === 'multiple_choice') {
-      return String(userAnswer) === String(correctAnswer)
-    } else if (question.type === 'true_false') {
-      return Boolean(userAnswer) === Boolean(correctAnswer)
-    } else if (question.type === 'short_answer') {
-      return String(userAnswer).toLowerCase().trim() === String(correctAnswer).toLowerCase().trim()
-    }
-
-    return false
+    return computeIsCorrect(question, state.answers[question.id])
   }
 
   // Results Summary View
@@ -775,8 +749,8 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
               {currentQuestion.type === 'short_answer' && (
                 <div className="relative">
                   <div className="pointer-events-none opacity-50">
-                    <textarea
-                      className="min-h-[100px] w-full rounded-lg border p-3"
+                    <Textarea
+                      className="min-h-[100px]"
                       placeholder={t('viewer.enterAnswer')}
                       disabled
                     />
