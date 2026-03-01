@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Card } from '@/components/ui/card'
 import { BookOpen, CheckCircle, GraduationCap, Sparkles } from 'lucide-react'
 
@@ -20,50 +21,49 @@ interface CourseStatisticsProps {
 
 export function CourseStatistics({ statistics, compact = false }: CourseStatisticsProps) {
   const { totalCount, completedCount, totalLessons } = statistics
+  const t = useTranslations('common.catalog.statistics')
 
-  // Компактная версия - только ключевые метрики в одну строку
   if (compact) {
     return (
       <div className="mb-6 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
         <div className="flex items-center gap-1.5">
           <BookOpen className="h-4 w-4" />
           <span className="font-medium">{totalCount}</span>
-          <span>курсов</span>
+          <span>{t('courses')}</span>
         </div>
         <div className="h-4 w-px bg-gray-300 dark:bg-gray-700" />
         <div className="flex items-center gap-1.5">
           <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
           <span className="font-medium">{completedCount}</span>
-          <span>завершено</span>
+          <span>{t('completedLabel')}</span>
         </div>
         <div className="h-4 w-px bg-gray-300 dark:bg-gray-700" />
         <div className="flex items-center gap-1.5">
           <GraduationCap className="h-4 w-4" />
           <span className="font-medium">{totalLessons}</span>
-          <span>уроков</span>
+          <span>{t('lessonsLabel')}</span>
         </div>
       </div>
     )
   }
 
-  // Минималистичная карточная версия - только важные метрики
   const statsData = [
     {
-      label: 'Всего курсов',
+      label: t('totalCourses'),
       value: totalCount,
       icon: BookOpen,
       color: 'text-purple-600 dark:text-purple-400',
       bgColor: 'bg-purple-100 dark:bg-purple-500/10',
     },
     {
-      label: 'Завершено',
+      label: t('completed'),
       value: completedCount,
       icon: CheckCircle,
       color: 'text-green-600 dark:text-green-400',
       bgColor: 'bg-green-100 dark:bg-green-500/10',
     },
     {
-      label: 'Всего уроков',
+      label: t('totalLessons'),
       value: totalLessons,
       icon: GraduationCap,
       color: 'text-blue-600 dark:text-blue-400',
@@ -73,15 +73,13 @@ export function CourseStatistics({ statistics, compact = false }: CourseStatisti
 
   return (
     <div className="mb-6">
-      {/* Компактный заголовок со значком */}
       <div className="mb-3 flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
         <span className="text-xs font-medium tracking-wider text-gray-600 uppercase dark:text-gray-400">
-          Ваша статистика
+          {t('title')}
         </span>
       </div>
 
-      {/* Компактная сетка 1x3 */}
       <div className="grid grid-cols-3 gap-3">
         {statsData.map((stat, index) => (
           <Card

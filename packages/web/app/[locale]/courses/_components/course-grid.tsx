@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { CourseCard } from './course-card'
 import { Button } from '@/components/ui/button'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -38,6 +39,8 @@ export function CourseGrid({
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const authModal = useAuthModal()
+  const t = useTranslations('common.catalog')
+  const tc = useTranslations('common')
   const [loadingMore, setLoadingMore] = useState(false)
   const [displayedCourses, setDisplayedCourses] = useState(initialCourses)
   const [currentLoadedPage, setCurrentLoadedPage] = useState(currentPage)
@@ -118,10 +121,10 @@ export function CourseGrid({
             {loadingMore ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Загрузка...
+                {tc('loading')}
               </>
             ) : (
-              'Загрузить еще'
+              t('loadMore')
             )}
           </Button>
         </div>
@@ -131,33 +134,31 @@ export function CourseGrid({
       {displayedCourses.length === 0 && (
         <div className="py-12 text-center">
           <div className="mx-auto max-w-md rounded-lg border border-gray-200 bg-white p-12 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
-            <p className="mb-4 text-lg text-gray-600 dark:text-gray-400">Курсы не найдены</p>
+            <p className="mb-4 text-lg text-gray-600 dark:text-gray-400">{t('noCoursesFound')}</p>
             {user ? (
               <Button
                 onClick={() => router.push('/create')}
                 className="!rounded-full bg-purple-600 px-6 text-white hover:bg-purple-700"
               >
-                Создать первый курс
+                {t('createFirstCourse')}
               </Button>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Начните создавать курсы с помощью AI
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t('startCreating')}</p>
                 <Button
                   onClick={() => authModal.open('register', { returnTo: pathname })}
                   className="!rounded-full bg-gradient-to-r from-purple-600 to-blue-600 px-6 text-white shadow-lg transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl"
                 >
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Зарегистрироваться бесплатно
+                  {t('registerFree')}
                 </Button>
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Уже есть аккаунт?{' '}
+                  {t('alreadyHaveAccount')}{' '}
                   <button
                     onClick={() => authModal.open('login', { returnTo: pathname })}
                     className="font-medium text-purple-600 hover:underline dark:text-purple-400"
                   >
-                    Войти
+                    {tc('auth.signIn')}
                   </button>
                 </p>
               </div>

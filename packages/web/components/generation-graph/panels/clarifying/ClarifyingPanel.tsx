@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import DOMPurify from 'isomorphic-dompurify'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
@@ -95,21 +96,21 @@ function parseUserAnswer(raw: unknown): { currentAnswer?: string; currentAnswers
 // MEDIUM-006 fix: Error boundary fallback
 function ClarifyingErrorFallback({ courseId: _courseId }: { courseId: string }) {
   // _courseId available for future error reporting
+  const t = useTranslations('generation.clarifying')
   return (
     <Card className="p-6">
       <div className="space-y-4 text-center">
         <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
-        <h3 className="text-lg font-semibold">Ошибка загрузки вопросов</h3>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          Не удалось отобразить вопросы для курса. Попробуйте обновить страницу.
-        </p>
-        <Button onClick={() => window.location.reload()}>Обновить страницу</Button>
+        <h3 className="text-lg font-semibold">{t('errorLoadingQuestions')}</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">{t('errorLoadingDescription')}</p>
+        <Button onClick={() => window.location.reload()}>{t('refreshPage')}</Button>
       </div>
     </Card>
   )
 }
 
 export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: ClarifyingPanelProps) {
+  const t = useTranslations('generation.clarifying')
   // tRPC utils for cache invalidation
   const utils = trpc.useUtils()
 
@@ -384,8 +385,8 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
         await invalidateAndRefetch()
       })
       .catch((error: Error) => {
-        toast.error('Не удалось сохранить ответ', {
-          description: error.message || 'Попробуйте ещё раз',
+        toast.error(t('saveError'), {
+          description: error.message || t('tryAgain'),
         })
       })
       .finally(() => {
@@ -413,8 +414,8 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
         await invalidateAndRefetch()
       })
       .catch((error: Error) => {
-        toast.error('Не удалось пропустить вопрос', {
-          description: error.message || 'Попробуйте ещё раз',
+        toast.error(t('skipError'), {
+          description: error.message || t('tryAgain'),
         })
       })
       .finally(() => {
@@ -460,18 +461,18 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
 
       // Show feedback
       if (result.failedIds.length > 0) {
-        toast.warning('Некоторые ответы не сохранены', {
-          description: `Сохранено ${result.successCount} из ${submissions.length} ответов`,
+        toast.warning(t('someNotSaved'), {
+          description: t('savedCount', { success: result.successCount, total: submissions.length }),
         })
       } else {
-        toast.success('Все рекомендации приняты', {
-          description: `Сохранено ${result.successCount} ответов`,
+        toast.success(t('allRecommendationsAccepted'), {
+          description: t('savedAnswers', { count: result.successCount }),
         })
       }
     } catch (error) {
       console.error('Failed to submit batch answers:', error)
-      toast.error('Ошибка при автоматическом ответе', {
-        description: (error as Error).message || 'Попробуйте ещё раз',
+      toast.error(t('autoAnswerError'), {
+        description: (error as Error).message || t('tryAgain'),
       })
     }
   }
@@ -483,8 +484,8 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
         onComplete?.()
       })
       .catch((error: Error) => {
-        toast.error('Не удалось продолжить генерацию', {
-          description: error.message || 'Убедитесь, что все обязательные вопросы отвечены',
+        toast.error(t('continueError'), {
+          description: error.message || t('answerRequiredQuestions'),
         })
       })
   }
@@ -521,7 +522,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 <CardTitle className="text-lg">
-                  {readOnly ? 'Ответы на вопросы' : 'Уточняющие вопросы'}
+                  {readOnly ? t('titleReadOnly') : t('title')}
                 </CardTitle>
               </div>
               {isComplete && (
@@ -531,7 +532,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                   className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"
                 >
                   <CheckCircle2 className="h-5 w-5" />
-                  <span className="text-sm font-medium">Все вопросы отвечены!</span>
+                  <span className="text-sm font-medium">{t('allQuestionsAnswered')}</span>
                 </motion.div>
               )}
             </div>
@@ -548,7 +549,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
               disabled={submitAnswerMutation.isPending || submitMultipleAnswersMutation.isPending}
             >
               <Sparkles className="h-3.5 w-3.5" />
-              Принять все рекомендации
+              {t('acceptAllRecommendations')}
             </Button>
           </div>
         )}

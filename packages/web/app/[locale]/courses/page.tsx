@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { Suspense } from 'react'
-import { setRequestLocale } from 'next-intl/server'
+import { setRequestLocale, getTranslations } from 'next-intl/server'
 import { Locale } from '@/src/i18n/config'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { getCourses, getCoursesStatistics, checkFavorites, getCourseCovers } from './actions'
@@ -14,24 +14,31 @@ import { CourseStatistics } from './_components/course-statistics'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
-export const metadata: Metadata = {
-  title: 'Каталог курсов',
-  description:
-    'Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта. Найдите подходящий курс по вашей тематике и уровню сложности.',
-  keywords: ['каталог курсов', 'онлайн обучение', 'курсы AI', 'образовательные программы'],
-  openGraph: {
-    title: 'Каталог курсов | MegaCampusAI',
-    description: 'Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта',
-    url: '/courses',
-    type: 'website',
-  },
-  twitter: {
-    title: 'Каталог курсов | MegaCampusAI',
-    description: 'Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта',
-  },
-  alternates: {
-    canonical: '/courses',
-  },
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'common.catalog' })
+  return {
+    title: t('title'),
+    description: t('metaDescription'),
+    keywords: t('metaKeywords').split(', '),
+    openGraph: {
+      title: `${t('title')} | MegaCampusAI`,
+      description: t('metaDescription'),
+      url: '/courses',
+      type: 'website',
+    },
+    twitter: {
+      title: `${t('title')} | MegaCampusAI`,
+      description: t('metaDescription'),
+    },
+    alternates: {
+      canonical: '/courses',
+    },
+  }
 }
 
 interface PageProps {
@@ -49,6 +56,7 @@ interface PageProps {
 export default async function CoursesPage({ params, searchParams }: PageProps) {
   const { locale } = await params
   setRequestLocale(locale) // Enable static rendering
+  const t = await getTranslations('common.catalog')
 
   const searchParamsResolved = await searchParams
   const user = await getCurrentUser()
@@ -94,10 +102,10 @@ export default async function CoursesPage({ params, searchParams }: PageProps) {
           {/* Page title */}
           <div className="mb-6 text-center">
             <h1 className="mb-2 text-4xl font-bold text-gray-900 transition-colors duration-200 dark:text-white">
-              Каталог курсов
+              {t('title')}
             </h1>
             <p className="text-gray-600 transition-colors duration-200 dark:text-gray-400">
-              Изучайте курсы, созданные с помощью искусственного интеллекта
+              {t('description')}
             </p>
           </div>
 

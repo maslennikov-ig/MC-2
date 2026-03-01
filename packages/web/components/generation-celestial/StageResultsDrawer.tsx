@@ -13,6 +13,7 @@ import { PrioritizationView } from '@/components/generation-graph/panels/output/
 import ActivityLog from '@/app/[locale]/courses/[orgSlug]/[courseSlug]/generating/ActivityLog'
 import { ActivityEntry } from '@/types/course-generation'
 import { STAGE_CONFIG } from './utils'
+import { useTranslations } from 'next-intl'
 
 interface StageResultsDrawerProps {
   isOpen: boolean
@@ -29,9 +30,10 @@ export function StageResultsDrawer({
   stageNumber,
   activityLog,
 }: StageResultsDrawerProps) {
+  const t = useTranslations('generation.drawer')
   const stageName = stageNumber
     ? Object.values(STAGE_CONFIG).find((s) => s.number === stageNumber)?.name
-    : 'Детали этапа'
+    : t('stageDetails')
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -42,9 +44,7 @@ export function StageResultsDrawer({
         <div className="border-b border-gray-800 p-6">
           <SheetHeader>
             <SheetTitle className="text-purple-400">{stageName}</SheetTitle>
-            <SheetDescription className="text-gray-400">
-              Просмотр сгенерированного контента и логов.
-            </SheetDescription>
+            <SheetDescription className="text-gray-400">{t('viewContentAndLogs')}</SheetDescription>
           </SheetHeader>
         </div>
 
@@ -55,13 +55,13 @@ export function StageResultsDrawer({
                 value="results"
                 className="flex-1 text-gray-400 data-[state=active]:bg-purple-900/20 data-[state=active]:text-purple-400"
               >
-                Результаты
+                {t('results')}
               </TabsTrigger>
               <TabsTrigger
                 value="activity"
                 className="flex-1 text-gray-400 data-[state=active]:bg-blue-900/20 data-[state=active]:text-blue-400"
               >
-                Журнал активности
+                {t('activityLog')}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -73,7 +73,7 @@ export function StageResultsDrawer({
               ) : stageNumber ? (
                 <StageResultsPreview courseId={courseId} stage={stageNumber} />
               ) : (
-                <div className="py-8 text-center text-gray-500">Этап не выбран</div>
+                <div className="py-8 text-center text-gray-500">{t('stageNotSelected')}</div>
               )}
             </TabsContent>
 

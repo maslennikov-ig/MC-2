@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Link } from '@/src/i18n/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,7 @@ interface AuthStatusProps {
 export function AuthStatus({ user }: AuthStatusProps) {
   const { open } = useAuthModal()
   const router = useRouter()
+  const t = useTranslations('common.nav')
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -51,14 +53,14 @@ export function AuthStatus({ user }: AuthStatusProps) {
           onClick={() => open('login')}
           className="text-gray-300 hover:bg-slate-800 hover:text-white"
         >
-          Войти
+          {t('signIn')}
         </Button>
         <Button
           variant="default"
           onClick={() => open('register')}
           className="bg-purple-600 text-white hover:bg-purple-700"
         >
-          Регистрация
+          {t('register')}
         </Button>
       </div>
     )
@@ -90,7 +92,7 @@ export function AuthStatus({ user }: AuthStatusProps) {
       <DropdownMenuContent align="end" className="w-56 border-slate-700 bg-slate-900">
         <div className="flex items-center justify-start gap-2 p-2">
           <div className="flex flex-col space-y-1 leading-none">
-            <p className="font-medium text-white">{user.name || 'Пользователь'}</p>
+            <p className="font-medium text-white">{user.name || t('user')}</p>
             <p className="w-[200px] truncate text-sm text-gray-400">{user.email}</p>
           </div>
         </div>
@@ -102,7 +104,7 @@ export function AuthStatus({ user }: AuthStatusProps) {
             className="cursor-pointer text-gray-300 hover:bg-slate-800 hover:text-white"
           >
             <BookOpen className="mr-2 h-4 w-4" />
-            Все курсы
+            {t('allCourses')}
           </Link>
         </DropdownMenuItem>
         {user.role === 'superadmin' && (
@@ -112,17 +114,17 @@ export function AuthStatus({ user }: AuthStatusProps) {
               className="cursor-pointer text-gray-300 hover:bg-slate-800 hover:text-white"
             >
               <Settings className="mr-2 h-4 w-4" />
-              Управление курсами
+              {t('manageCourses')}
             </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onClick={handleSignOut}
+          onClick={() => void handleSignOut()}
           className="cursor-pointer text-red-600 focus:text-red-600"
         >
           <LogOut className="mr-2 h-4 w-4" />
-          Выйти
+          {t('signOut')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
