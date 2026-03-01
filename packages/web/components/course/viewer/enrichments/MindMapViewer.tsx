@@ -6,20 +6,14 @@ import dynamic from 'next/dynamic'
 import { Network, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogClose } from '@/components/ui/dialog'
 import type { MindMapEnrichmentContent } from '@megacampus/shared-types'
 import { toMarkmapNode } from '@/lib/helpers/mindmap-transform'
 
 const MarkmapRenderer = dynamic(() => import('./MarkmapRenderer'), {
   ssr: false,
   loading: () => (
-    <div className="flex min-h-[280px] items-center justify-center">
+    <div className="flex aspect-video items-center justify-center">
       <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
     </div>
   ),
@@ -45,9 +39,9 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
 
   return (
     <>
-      {/* Inline markmap preview */}
+      {/* Inline markmap preview (same aspect ratio as video player) */}
       <div className="overflow-hidden rounded-lg border border-sky-200 bg-sky-50/50 dark:border-sky-800/30 dark:bg-sky-900/10">
-        <MarkmapRenderer data={markmapData} className="h-[280px]" />
+        <MarkmapRenderer data={markmapData} className="aspect-video" />
       </div>
 
       {/* Footer: stats + view full button */}
@@ -81,25 +75,23 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
         </Button>
       </div>
 
-      {/* Full-screen dialog with interactive markmap */}
+      {/* Fullscreen dialog with interactive markmap */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden">
-          <DialogHeader className="shrink-0 border-b pb-3">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2">
-                <Network className="h-5 w-5 text-sky-500" />
-                {t('viewer.mindMap.title')}
-              </DialogTitle>
-              <DialogClose asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">{t('viewer.close')}</span>
-                </Button>
-              </DialogClose>
-            </div>
-          </DialogHeader>
+        <DialogContent className="flex h-screen max-h-screen w-screen max-w-none flex-col gap-0 rounded-none border-0 p-0">
+          <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
+            <DialogTitle className="flex items-center gap-2 text-sm font-medium">
+              <Network className="h-4 w-4 text-sky-500" />
+              {t('viewer.mindMap.title')}
+            </DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <X className="h-4 w-4" />
+                <span className="sr-only">{t('viewer.close')}</span>
+              </Button>
+            </DialogClose>
+          </div>
 
-          <div className="relative h-[60vh] shrink-0">
+          <div className="relative min-h-0 flex-1">
             {isDialogOpen && (
               <MarkmapRenderer
                 data={markmapData}
@@ -109,7 +101,7 @@ export function MindMapViewer({ content }: MindMapViewerProps) {
             )}
           </div>
 
-          <p className="text-muted-foreground shrink-0 border-t pt-2 text-center text-xs">
+          <p className="text-muted-foreground shrink-0 border-t px-4 py-1.5 text-center text-xs">
             {t('viewer.mindMap.interactionHint')}
           </p>
         </DialogContent>
