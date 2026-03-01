@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useEffect } from 'react'
-import { useLocale } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { Loader2, AlertCircle, RotateCcw, Check, Trash2, FileQuestion } from 'lucide-react'
 import { toast } from 'sonner'
 import { sanitizeErrorMessage } from '@/lib/utils/sanitize-error'
@@ -161,7 +161,15 @@ function useEnrichmentDetail(enrichmentId: string): DataState & { refetch: () =>
           }
           break
         case 'document':
-          // Document type not yet supported in preview, treat as not found
+        case 'banner':
+        case 'card':
+        case 'nlm_audio':
+        case 'nlm_video':
+        case 'nlm_study_guide':
+        case 'nlm_flashcards':
+        case 'nlm_mind_map':
+        case 'nlm_infographic':
+          // These types don't have dedicated preview components yet
           setState({ status: 'not_found' })
           return
         default:
@@ -194,36 +202,31 @@ function LoadingState() {
 }
 
 function NotFoundState() {
-  const locale = useLocale()
+  const t = useTranslations('enrichments')
   return (
     <div className="flex h-full flex-col items-center justify-center p-8 text-center">
       <FileQuestion className="text-muted-foreground mb-4 h-12 w-12" />
-      <h3 className="mb-2 text-lg font-medium">
-        {locale === 'ru' ? 'Обогащение не найдено' : 'Enrichment Not Found'}
-      </h3>
-      <p className="text-muted-foreground text-sm">
-        {locale === 'ru'
-          ? 'Это обогащение могло быть удалено или перемещено.'
-          : 'This enrichment may have been deleted or moved.'}
-      </p>
+      <h3 className="mb-2 text-lg font-medium">{t('inspector.notFound')}</h3>
+      <p className="text-muted-foreground text-sm">{t('inspector.notFoundDescription')}</p>
     </div>
   )
 }
 
 function ErrorState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  const t = useTranslations('enrichments')
   const locale = useLocale()
   return (
     <div className="flex h-full flex-col items-center justify-center p-8 text-center">
       <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
       <h3 className="mb-2 text-lg font-medium text-red-700 dark:text-red-400">
-        {locale === 'ru' ? 'Ошибка генерации' : 'Generation Error'}
+        {t('inspector.generationError')}
       </h3>
       <p className="text-muted-foreground mb-4 max-w-md text-sm">
         {sanitizeErrorMessage(error, { locale })}
       </p>
       <Button onClick={onRetry}>
         <RotateCcw className="mr-2 h-4 w-4" />
-        {locale === 'ru' ? 'Повторить' : 'Retry'}
+        {t('inspector.retry')}
       </Button>
     </div>
   )
@@ -237,7 +240,7 @@ interface ActionBarProps {
 }
 
 function ActionBar({ enrichment, onDelete, onRegenerate, onApprove }: ActionBarProps) {
-  const locale = useLocale()
+  const t = useTranslations('enrichments')
 
   // Different actions based on status
   const showApprove = enrichment.status === 'draft_ready'
@@ -250,22 +253,17 @@ function ActionBar({ enrichment, onDelete, onRegenerate, onApprove }: ActionBarP
         {showApprove && (
           <Button onClick={onApprove} className="flex-1">
             <Check className="mr-2 h-4 w-4" />
-            {locale === 'ru' ? 'Одобрить' : 'Approve'}
+            {t('actions.approve')}
           </Button>
         )}
         {showRegenerate && (
           <Button variant="outline" onClick={onRegenerate}>
             <RotateCcw className="mr-2 h-4 w-4" />
-            {locale === 'ru' ? 'Переделать' : 'Regenerate'}
+            {t('actions.regenerate')}
           </Button>
         )}
         {showDelete && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onDelete}
-            aria-label={locale === 'ru' ? 'Удалить' : 'Delete'}
-          >
+          <Button variant="ghost" size="icon" onClick={onDelete} aria-label={t('actions.delete')}>
             <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
         )}
@@ -344,16 +342,30 @@ interface CoverPreviewHandlers {
  * Renders the appropriate preview component based on enrichment type.
  * Uses discriminated union pattern for type-safe rendering.
  */
-function renderPreview(enrichment: EnrichmentData, coverHandlers?: CoverPreviewHandlers, courseLanguage?: string | null) {
+function renderPreview(
+  enrichment: EnrichmentData,
+  coverHandlers?: CoverPreviewHandlers,
+  courseLanguage?: string | null
+) {
   switch (enrichment.type) {
     case 'quiz':
       return <QuizPreview enrichment={toQuizPreviewProps(enrichment)} />
     case 'video':
-      return <VideoScriptPanel enrichment={toVideoPreviewProps(enrichment)} language={courseLanguage ?? undefined} />
+      return (
+        <VideoScriptPanel
+          enrichment={toVideoPreviewProps(enrichment)}
+          language={courseLanguage ?? undefined}
+        />
+      )
     case 'audio':
       return <AudioPreview enrichment={toAudioPreviewProps(enrichment)} />
     case 'presentation':
-      return <PresentationPreview enrichment={toPresentationPreviewProps(enrichment)} language={courseLanguage ?? undefined} />
+      return (
+        <PresentationPreview
+          enrichment={toPresentationPreviewProps(enrichment)}
+          language={courseLanguage ?? undefined}
+        />
+      )
     case 'cover':
       return (
         <CoverPreview
@@ -373,7 +385,7 @@ function renderPreview(enrichment: EnrichmentData, coverHandlers?: CoverPreviewH
 }
 
 export function DetailView({ enrichmentId, className }: DetailViewProps) {
-  const locale = useLocale()
+  const t = useTranslations('enrichments')
   const { courseInfo } = useStaticGraph()
   const goBack = useEnrichmentInspectorStore((s) => s.goBack)
 
@@ -386,27 +398,23 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
   // tRPC mutations for delete and regenerate
   const deleteMutation = trpc.enrichment.delete.useMutation({
     onSuccess: () => {
-      toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted')
+      toast.success(t('inspector.deleteSuccess'))
       setShowDeleteDialog(false)
       goBack()
     },
     onError: (error) => {
-      toast.error(
-        locale === 'ru'
-          ? `Не удалось удалить: ${error.message}`
-          : `Failed to delete: ${error.message}`
-      )
+      toast.error(`${t('errors.deleteFailed')}: ${error.message}`)
     },
   })
 
   const regenerateMutation = trpc.enrichment.regenerate.useMutation({
     onSuccess: () => {
-      toast.success(locale === 'ru' ? 'Перегенерация запущена' : 'Regeneration started')
+      toast.success(t('viewer.regenerateSuccess'))
       // Refetch to show updated status
       dataState.refetch()
     },
     onError: (error) => {
-      toast.error(locale === 'ru' ? `Ошибка: ${error.message}` : `Error: ${error.message}`)
+      toast.error(`${t('viewer.regenerateFailed')}: ${error.message}`)
     },
   })
 
@@ -420,12 +428,12 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
 
   const handleDeleteConfirm = useCallback(() => {
     if (!courseInfo?.id) {
-      toast.error(locale === 'ru' ? 'Курс не найден' : 'Course not found')
+      toast.error(t('inspector.courseNotFound'))
       return
     }
 
     deleteMutation.mutate({ enrichmentId })
-  }, [enrichmentId, courseInfo?.id, locale, deleteMutation])
+  }, [enrichmentId, courseInfo?.id, t, deleteMutation])
 
   const handleDeleteCancel = useCallback(() => {
     setShowDeleteDialog(false)
@@ -434,17 +442,17 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
   // Handle regenerate action
   const handleRegenerate = useCallback(() => {
     if (!courseInfo?.id) {
-      toast.error(locale === 'ru' ? 'Курс не найден' : 'Course not found')
+      toast.error(t('inspector.courseNotFound'))
       return
     }
 
     regenerateMutation.mutate({ enrichmentId })
-  }, [enrichmentId, courseInfo?.id, locale, regenerateMutation])
+  }, [enrichmentId, courseInfo?.id, t, regenerateMutation])
 
   // Handle approve action (Coming soon for non-cover types)
   const handleApprove = useCallback(() => {
-    toast.info(locale === 'ru' ? 'Скоро будет доступно' : 'Coming soon')
-  }, [locale])
+    toast.info(t('inspector.approveComingSoon'))
+  }, [t])
 
   // Render based on data state
   const renderContent = () => {

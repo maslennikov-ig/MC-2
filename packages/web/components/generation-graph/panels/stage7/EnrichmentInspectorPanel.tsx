@@ -9,6 +9,7 @@
  * - root: List of enrichments for a lesson
  * - create: Form to create new enrichment
  * - detail: Enrichment detail view
+ * - batch: Batch enrichment creation view
  *
  * @module components/generation-graph/panels/stage7/EnrichmentInspectorPanel
  */
@@ -32,7 +33,7 @@ import {
 import { RootView } from './views/RootView'
 import { EnrichmentInspectorErrorBoundary } from './EnrichmentInspectorErrorBoundary'
 import { DiscardChangesDialog, useDiscardDialog } from './components/DiscardChangesDialog'
-import type { CreateViewProps } from './views/CreateView'
+import type { CreateableEnrichmentType } from './forms/enrichment-form-config'
 
 // Lazy load heavy views to reduce initial bundle
 const CreateViewLazy = lazy(() =>
@@ -41,32 +42,9 @@ const CreateViewLazy = lazy(() =>
 const DetailViewLazy = lazy(() =>
   import('./views/DetailView').then((m) => ({ default: m.DetailView }))
 )
-
-/**
- * CreateView supported types - subset of CreateEnrichmentType
- * Maps store types to CreateView types where applicable
- */
-type SupportedCreateType = CreateViewProps['type']
-const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'presentation', 'cover'])
-
-/**
- * Map CreateEnrichmentType to CreateView type if supported
- * Returns null for unsupported types
- */
-function mapToCreateViewType(type: CreateEnrichmentType): SupportedCreateType | null {
-  // Direct mappings
-  if (SUPPORTED_CREATE_TYPES.has(type)) {
-    return type as SupportedCreateType
-  }
-  // Alias mappings for backward compatibility with store types
-  if (type === 'podcast') {
-    return 'audio'
-  }
-  if (type === 'mindmap') {
-    return 'presentation'
-  }
-  return null
-}
+const BatchCreateViewLazy = lazy(() =>
+  import('./views/BatchCreateView').then((m) => ({ default: m.BatchCreateView }))
+)
 
 /**
  * Props for EnrichmentInspectorPanel
@@ -97,9 +75,14 @@ function InspectorHeader({
   const t = useTranslations('enrichments')
 
   // Build title based on view
-  let title = t(`inspector.views.${view}`)
+  let title = t(`inspector.views.${view}` as Parameters<typeof t>[0])
   if (view === 'create' && createType) {
-    title = `${t('inspector.createPrefix')} ${t(`types.${createType}`)}`
+    title = `${t('inspector.createPrefix')} ${t(`types.${createType}` as Parameters<typeof t>[0])}`
+  }
+  if (view === 'batch') {
+    title = createType
+      ? `${t('inspector.batchPrefix')} ${t(`types.${createType}` as Parameters<typeof t>[0])}`
+      : `${t('inspector.batchPrefix')} ${t('batch.title')}`
   }
 
   return (
@@ -132,17 +115,6 @@ function ViewLoadingSpinner() {
   return (
     <div className="flex h-full items-center justify-center">
       <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
-    </div>
-  )
-}
-
-/**
- * Placeholder for unsupported create types (forms not yet implemented)
- */
-function UnsupportedCreateTypePlaceholder({ type }: { type: string }) {
-  return (
-    <div className="text-muted-foreground flex h-full items-center justify-center p-4 text-sm">
-      Form for &quot;{type}&quot; coming soon
     </div>
   )
 }
@@ -192,17 +164,18 @@ export function EnrichmentInspectorPanel({ lessonId, className }: EnrichmentInsp
         return <RootView lessonId={lessonId} />
       case 'create': {
         if (!createType) return null
-        const mappedType = mapToCreateViewType(createType)
-        if (mappedType) {
-          return (
-            <Suspense fallback={<ViewLoadingSpinner />}>
-              <CreateViewLazy type={mappedType} lessonId={lessonId} />
-            </Suspense>
-          )
-        }
-        // Fallback for unsupported types
-        return <UnsupportedCreateTypePlaceholder type={createType} />
+        return (
+          <Suspense fallback={<ViewLoadingSpinner />}>
+            <CreateViewLazy type={createType} lessonId={lessonId} />
+          </Suspense>
+        )
       }
+      case 'batch':
+        return (
+          <Suspense fallback={<ViewLoadingSpinner />}>
+            <BatchCreateViewLazy initialType={createType as CreateableEnrichmentType | undefined} />
+          </Suspense>
+        )
       case 'detail':
         return selectedEnrichmentId ? (
           <Suspense fallback={<ViewLoadingSpinner />}>
@@ -236,10 +209,7 @@ export function EnrichmentInspectorPanel({ lessonId, className }: EnrichmentInsp
       <DiscardChangesDialog
         open={showDialog}
         onOpenChange={(open) => !open && handleCancel()}
-        onConfirm={() => {
-          handleConfirm()
-          goBack()
-        }}
+        onConfirm={handleConfirm}
         onCancel={handleCancel}
       />
     </EnrichmentInspectorErrorBoundary>

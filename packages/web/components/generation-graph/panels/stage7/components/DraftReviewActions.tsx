@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { Check, RotateCcw, Pencil, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -23,20 +23,6 @@ export interface DraftReviewActionsProps {
  *
  * Provides Approve, Regenerate, and Edit actions based on current state.
  * Shows different actions when in edit mode vs view mode.
- *
- * @example
- * ```tsx
- * <DraftReviewActions
- *   isEditing={review.isEditing}
- *   isApproving={approval.isApproving}
- *   hasEdits={review.hasEdits}
- *   onApprove={handleApprove}
- *   onRegenerate={handleRegenerate}
- *   onStartEdit={review.startEditing}
- *   onCancelEdit={review.cancelEditing}
- *   onSaveEdit={handleSaveEdit}
- * />
- * ```
  */
 export function DraftReviewActions({
   isEditing,
@@ -49,25 +35,18 @@ export function DraftReviewActions({
   onSaveEdit,
   className,
 }: DraftReviewActionsProps) {
-  const locale = useLocale()
-
-  const approveLabel = locale === 'ru' ? 'Одобрить' : 'Approve'
-  const regenerateLabel = locale === 'ru' ? 'Переделать' : 'Regenerate'
-  const editLabel = locale === 'ru' ? 'Редактировать' : 'Edit'
-  const cancelLabel = locale === 'ru' ? 'Отмена' : 'Cancel'
-  const saveLabel = locale === 'ru' ? 'Сохранить' : 'Save'
-  const approvingLabel = locale === 'ru' ? 'Одобрение...' : 'Approving...'
+  const t = useTranslations('enrichments')
 
   // Edit mode actions
   if (isEditing) {
     return (
       <div className={cn('flex gap-2', className)}>
         <Button variant="outline" onClick={onCancelEdit} className="flex-1">
-          {cancelLabel}
+          {t('draft.cancel')}
         </Button>
         <Button onClick={onSaveEdit} disabled={!hasEdits} className="flex-1">
           <Check className="mr-2 h-4 w-4" />
-          {saveLabel}
+          {t('draft.save')}
         </Button>
       </div>
     )
@@ -78,22 +57,22 @@ export function DraftReviewActions({
     <div className={cn('flex gap-2', className)}>
       <Button variant="outline" onClick={onStartEdit}>
         <Pencil className="mr-2 h-4 w-4" />
-        {editLabel}
+        {t('draft.edit')}
       </Button>
       <Button variant="outline" onClick={onRegenerate}>
         <RotateCcw className="mr-2 h-4 w-4" />
-        {regenerateLabel}
+        {t('draft.regenerate')}
       </Button>
       <Button onClick={onApprove} disabled={isApproving} className="flex-1">
         {isApproving ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {approvingLabel}
+            {t('draft.approving')}
           </>
         ) : (
           <>
             <Check className="mr-2 h-4 w-4" />
-            {approveLabel}
+            {t('draft.approve')}
           </>
         )}
       </Button>
@@ -117,10 +96,7 @@ export function DraftActionBar({
   isApproving?: boolean
   className?: string
 }) {
-  const locale = useLocale()
-
-  const approveLabel = locale === 'ru' ? 'Одобрить' : 'Approve'
-  const regenerateLabel = locale === 'ru' ? 'Переделать' : 'Regenerate'
+  const t = useTranslations('enrichments')
 
   return (
     <div className={cn('flex gap-2 border-t bg-white p-4 dark:bg-slate-950', className)}>
@@ -131,14 +107,14 @@ export function DraftActionBar({
           ) : (
             <Check className="mr-2 h-4 w-4" />
           )}
-          {approveLabel}
+          {t('draft.approve')}
         </Button>
       )}
 
       {(status === 'completed' || status === 'failed') && onRegenerate && (
         <Button variant="outline" onClick={onRegenerate}>
           <RotateCcw className="mr-2 h-4 w-4" />
-          {regenerateLabel}
+          {t('draft.regenerate')}
         </Button>
       )}
     </div>
