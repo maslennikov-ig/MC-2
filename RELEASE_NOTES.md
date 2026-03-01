@@ -2,6 +2,27 @@
 
 _Released on 2025-12-26_
 
+## v0.31.14
+
+_Released on 2026-03-01_
+
+### ✨ New Features
+
+- **quiz**: Unhide quiz enrichment with multi-select, andragogy, and renamed to Квиз
+
+### 🐛 Bug Fixes
+
+- **quiz**: Address remaining code review findings (CR-003,007,008,011,015)
+- **i18n**: Propagate locale to STAGE_CONFIG and downstream components
+- **i18n**: Convert ContentPreviewPanel and LessonMatrix to useTranslations
+- **i18n**: Fix remaining hardcoded Russian strings missed in initial pass
+- **i18n**: Replace hardcoded Russian strings in generation panel components
+- **i18n**: Replace hardcoded Russian in catalog, workflow stages, and clarifying questions
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.31.13
 
 _Released on 2026-03-01_
