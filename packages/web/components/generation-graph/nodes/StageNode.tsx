@@ -89,7 +89,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
       className={`relative min-w-[180px] rounded-lg border transition-all duration-300 ${getNodeStatusStyles(currentStatus, 'stage')} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
       data-testid={`node-${id}`}
       data-node-status={currentStatus}
-      aria-label={`Этап ${data.stageNumber}: ${stageName}, статус: ${t(`status.${currentStatus}`)}`}
+      aria-label={`${t('drawer.stageLabel', { number: data.stageNumber })}: ${stageName}, ${t(`status.${currentStatus}`)}`}
       role="button"
       tabIndex={0}
     >
@@ -154,7 +154,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
                 : 'text-slate-500 dark:text-slate-400'
             }`}
           >
-            Этап {data.stageNumber}
+            {t('drawer.stageLabel', { number: data.stageNumber })}
           </span>
           <span
             className={`text-sm font-semibold ${

@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Link } from '@/src/i18n/navigation'
 import { Home, Plus, Sparkles } from 'lucide-react'
 import Logo from '@/components/common/logo'
@@ -15,6 +16,7 @@ export function CoursesHeader() {
   const isAuthenticated = !!session
   const authModal = useAuthModal()
   const pathname = usePathname()
+  const t = useTranslations('common.nav')
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur-sm transition-colors duration-200 dark:border-slate-800 dark:bg-slate-950/90">
@@ -30,7 +32,7 @@ export function CoursesHeader() {
               className="group flex min-h-[42px] items-center gap-2 rounded-full border border-gray-300 bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-400 hover:bg-gray-200 hover:text-gray-900 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/50 dark:text-gray-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
             >
               <Home className="h-4 w-4 text-gray-500 transition-colors group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-white" />
-              <span>На главную</span>
+              <span>{t('goHome')}</span>
             </Link>
             {isAuthenticated === true ? (
               <Link
@@ -38,7 +40,7 @@ export function CoursesHeader() {
                 className="group flex min-h-[42px] items-center gap-2 rounded-full border border-purple-300 bg-gradient-to-r from-purple-100 to-blue-100 px-4 py-2.5 text-sm font-medium text-purple-700 shadow-sm transition-all duration-200 hover:border-purple-400 hover:from-purple-200 hover:to-blue-200 hover:text-purple-900 hover:shadow-md dark:border-purple-500/20 dark:from-purple-600/10 dark:to-blue-600/10 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:from-purple-600/20 dark:hover:to-blue-600/20 dark:hover:text-white"
               >
                 <Plus className="h-4 w-4 text-purple-600 transition-colors group-hover:text-purple-700 dark:text-purple-400 dark:group-hover:text-purple-300" />
-                <span>Создать курс</span>
+                <span>{t('createCourse')}</span>
               </Link>
             ) : isAuthenticated === false ? (
               <Button
@@ -46,7 +48,7 @@ export function CoursesHeader() {
                 className="flex min-h-[42px] items-center gap-2 !rounded-full border border-purple-300 bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl dark:border-purple-500/20"
               >
                 <Sparkles className="h-4 w-4" />
-                <span>Начать бесплатно</span>
+                <span>{t('startFree')}</span>
               </Button>
             ) : null}
           </nav>

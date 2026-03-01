@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -38,6 +39,7 @@ export function WizardNavigation({
   onSkip,
   isComplete = false,
 }: WizardNavigationProps) {
+  const t = useTranslations('generation.clarifying.nav')
   const isFirstQuestion = currentIndex === 0
   const isLastQuestion = currentIndex === totalQuestions - 1
 
@@ -54,10 +56,10 @@ export function WizardNavigation({
             {isProcessing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Обработка...
+                {t('processing')}
               </>
             ) : (
-              'Продолжить генерацию'
+              t('continueGeneration')
             )}
           </Button>
         )
@@ -71,7 +73,7 @@ export function WizardNavigation({
             className="min-h-[44px] min-w-[44px]"
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
-            <span className="hidden sm:inline">Назад</span>
+            <span className="hidden sm:inline">{t('back')}</span>
           </Button>
 
           {/* Mobile dots indicator */}
@@ -99,10 +101,10 @@ export function WizardNavigation({
                 size="sm"
                 onClick={onSkip}
                 disabled={isProcessing}
-                aria-label="Пропустить текущий вопрос"
+                aria-label={t('skipAria')}
                 className="min-h-[44px] px-4 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               >
-                Пропустить
+                {t('skip')}
               </Button>
             )}
             <Button
@@ -111,7 +113,7 @@ export function WizardNavigation({
               disabled={isLastQuestion}
               className="min-h-[44px] min-w-[44px]"
             >
-              <span className="hidden sm:inline">Далее</span>
+              <span className="hidden sm:inline">{t('next')}</span>
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
