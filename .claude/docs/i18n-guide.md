@@ -4,15 +4,15 @@
 
 ## Quick Reference
 
-| Item       | Location                                |
-| ---------- | --------------------------------------- |
-| Config     | `src/i18n/config.ts`                    |
-| Routing    | `src/i18n/routing.ts`                   |
-| Navigation | `src/i18n/navigation.ts`                |
-| Request    | `src/i18n/request.ts`                   |
-| Messages   | `messages/{locale}/{namespace}.json`    |
-| Types      | `types/i18n.d.ts`                       |
-| Locales    | `ru` (default), `en`                    |
+| Item       | Location                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| Config     | `src/i18n/config.ts`                                                                         |
+| Routing    | `src/i18n/routing.ts`                                                                        |
+| Navigation | `src/i18n/navigation.ts`                                                                     |
+| Request    | `src/i18n/request.ts`                                                                        |
+| Messages   | `messages/{locale}/{namespace}.json`                                                         |
+| Types      | `types/i18n.d.ts`                                                                            |
+| Locales    | `ru` (default), `en`                                                                         |
 | Namespaces | `common`, `admin`, `generation`, `auth`, `enrichments`, `course`, `organizations`, `profile` |
 
 ## Architecture
@@ -181,7 +181,17 @@ async function MyPage() {
 1. Add to `src/i18n/config.ts`:
 
 ```ts
-export const namespaces = ['common', 'admin', 'generation', 'auth', 'enrichments', 'course', 'organizations', 'profile', 'NEW_NS'] as const;
+export const namespaces = [
+  'common',
+  'admin',
+  'generation',
+  'auth',
+  'enrichments',
+  'course',
+  'organizations',
+  'profile',
+  'NEW_NS',
+] as const;
 ```
 
 2. Create JSON files:
@@ -311,7 +321,7 @@ function MyForm() {
 Use the `LanguageSwitcher` component for UI locale switching:
 
 ```tsx
-import { LanguageSwitcher } from '@/components/language-switcher';
+import { LanguageSwitcher } from '@/components/common/language-switcher';
 
 // In header/navigation
 <LanguageSwitcher />;
@@ -614,19 +624,19 @@ This is a **third i18n system**, separate from frontend next-intl (UI language) 
 
 ### Quick Reference
 
-| Item            | Location                                     |
-| --------------- | -------------------------------------------- |
-| Labels          | `packages/shared-types/src/common-enums.ts`  |
-| Languages       | 19 (en, ru, es, fr, de, zh, ja, ko, ar, pt, it, nl, sv, pl, tr, hi, th, vi, id) |
-| Accessor        | `getContentLabels(languageCode)`             |
-| Usage           | Markdown callout titles, content section labels |
+| Item      | Location                                                                        |
+| --------- | ------------------------------------------------------------------------------- |
+| Labels    | `packages/shared-types/src/common-enums.ts`                                     |
+| Languages | 19 (en, ru, es, fr, de, zh, ja, ko, ar, pt, it, nl, sv, pl, tr, hi, th, vi, id) |
+| Accessor  | `getContentLabels(languageCode)`                                                |
+| Usage     | Markdown callout titles, content section labels                                 |
 
 ### How It Works
 
 ```typescript
-import { getContentLabels } from '@megacampus/shared-types'
+import { getContentLabels } from '@megacampus/shared-types';
 
-const labels = getContentLabels('ru')
+const labels = getContentLabels('ru');
 // labels.calloutTip → 'Совет'
 // labels.calloutWarning → 'Внимание'
 // labels.sectionIntroduction → 'Введение'

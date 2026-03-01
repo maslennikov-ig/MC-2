@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Clock, TrendingUp, Target, Award, Sparkles, BookOpen, CheckCircle2 } from 'lucide-react'
 import { SmoothProgress } from '@/components/ui/smooth-progress'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 interface LessonProgressCardProps {
   completedCount: number
@@ -21,29 +22,30 @@ export default function LessonProgressCard({
   className,
   compact = false,
 }: LessonProgressCardProps) {
+  const t = useTranslations('course.progress')
   const progressPercentage = totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0
   const isCompleted = completedCount === totalLessons && totalLessons > 0
 
   const formatTime = (minutes: number) => {
     if (minutes < 60) {
-      return `${minutes} мин`
+      return t('timeMinutes', { minutes })
     }
     const hours = Math.floor(minutes / 60)
     const mins = minutes % 60
-    return mins > 0 ? `${hours}ч ${mins}мин` : `${hours}ч`
+    return mins > 0 ? t('timeHoursMinutes', { hours, minutes: mins }) : t('timeHours', { hours })
   }
 
   // Achievement milestones
   const getMilestone = () => {
     if (progressPercentage === 0) return null
     if (progressPercentage >= 100)
-      return { icon: Award, text: 'Курс завершён!', color: 'text-yellow-500' }
+      return { icon: Award, text: t('courseCompleted'), color: 'text-yellow-500' }
     if (progressPercentage >= 75)
-      return { icon: TrendingUp, text: 'Почти у цели!', color: 'text-purple-500' }
+      return { icon: TrendingUp, text: t('almostThere'), color: 'text-purple-500' }
     if (progressPercentage >= 50)
-      return { icon: Target, text: 'Половина пройдена', color: 'text-blue-500' }
+      return { icon: Target, text: t('halfWay'), color: 'text-blue-500' }
     if (progressPercentage >= 25)
-      return { icon: Sparkles, text: 'Отличное начало', color: 'text-green-500' }
+      return { icon: Sparkles, text: t('greatStart'), color: 'text-green-500' }
     return null
   }
 
@@ -65,7 +67,9 @@ export default function LessonProgressCard({
         )}
       >
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-semibold text-gray-900 dark:text-white">Прогресс</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white">
+            {t('compact')}
+          </span>
           <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
             {Math.round(progressPercentage)}%
           </span>
@@ -85,9 +89,7 @@ export default function LessonProgressCard({
         </div>
 
         <div className="mt-2 flex justify-between text-xs text-gray-600 dark:text-gray-400">
-          <span>
-            {completedCount}/{totalLessons} уроков
-          </span>
+          <span>{t('lessonsCount', { completed: completedCount, total: totalLessons })}</span>
           {remainingMinutes > 0 && (
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
@@ -132,7 +134,7 @@ export default function LessonProgressCard({
             <div className="rounded-lg bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-2 dark:from-purple-400/30 dark:to-blue-400/30">
               <BookOpen className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Прогресс курса</h3>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">{t('title')}</h3>
           </div>
 
           {milestone && (
@@ -178,12 +180,16 @@ export default function LessonProgressCard({
           {/* Stats */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Пройдено</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t('completed')}
+              </span>
               <div className="flex items-baseline gap-1">
                 <span className="text-lg font-bold text-gray-900 dark:text-white">
                   {completedCount}
                 </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">из {totalLessons}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {t('of', { total: totalLessons })}
+                </span>
               </div>
             </div>
 
@@ -205,7 +211,7 @@ export default function LessonProgressCard({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                   <Clock className="h-4 w-4" />
-                  <span className="text-sm font-medium">Осталось времени</span>
+                  <span className="text-sm font-medium">{t('timeRemaining')}</span>
                 </div>
                 <span className="text-sm font-bold text-gray-900 dark:text-white">
                   {formatTime(remainingMinutes)}
@@ -233,14 +239,10 @@ export default function LessonProgressCard({
             className="mt-4 rounded-lg bg-gradient-to-r from-purple-50/50 to-blue-50/50 p-3 dark:from-purple-900/20 dark:to-blue-900/20"
           >
             <p className="text-center text-xs text-gray-600 dark:text-gray-400">
-              {progressPercentage < 25 && 'Отличное начало! Продолжайте в том же духе 🚀'}
-              {progressPercentage >= 25 &&
-                progressPercentage < 50 &&
-                'Вы делаете успехи! Так держать 💪'}
-              {progressPercentage >= 50 &&
-                progressPercentage < 75 &&
-                'Уже больше половины! Вы молодец 🌟'}
-              {progressPercentage >= 75 && 'Почти у цели! Ещё немного 🎯'}
+              {progressPercentage < 25 && t('motivational.start')}
+              {progressPercentage >= 25 && progressPercentage < 50 && t('motivational.quarter')}
+              {progressPercentage >= 50 && progressPercentage < 75 && t('motivational.half')}
+              {progressPercentage >= 75 && t('motivational.almost')}
             </p>
           </motion.div>
         )}

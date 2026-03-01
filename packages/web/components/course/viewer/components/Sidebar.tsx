@@ -104,6 +104,7 @@ export function Sidebar({
   onSelectLesson,
 }: SidebarProps) {
   const t = useTranslations('course.viewer')
+  const tLesson = useTranslations('course.lesson')
 
   const sidebarContent = (isMobile = false) => (
     <div className="h-full overflow-y-auto">
@@ -118,7 +119,7 @@ export function Sidebar({
             ) : (
               <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
             )}
-            <span className="text-sm">{isMobile ? 'К каталогу' : 'К каталогу'}</span>
+            <span className="text-sm">{t('backToCatalog')}</span>
           </Link>
           <div className="flex items-center gap-1">
             {!readOnly && (
@@ -139,7 +140,7 @@ export function Sidebar({
                       </Link>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Конструктор курса</TooltipContent>
+                  <TooltipContent>{t('constructorTooltip')}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             )}
@@ -149,7 +150,7 @@ export function Sidebar({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                title="Скрыть боковую панель"
+                title={t('hideSidebar')}
               >
                 <PanelLeftClose className="h-4 w-4" />
               </Button>
@@ -222,7 +223,7 @@ export function Sidebar({
                   />
                   <Layers className="h-4 w-4 text-gray-600 dark:text-white/60" />
                   <span className="text-sm font-semibold text-gray-800 dark:text-white/85">
-                    Модуль {section.section_number}: {section.title}
+                    {t('section')} {section.section_number}: {section.title}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -277,7 +278,9 @@ export function Sidebar({
                               </div>
                               <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500 dark:text-white/50">
                                 <Clock className="h-3 w-3" />
-                                <span>{lesson.duration_minutes} мин</span>
+                                <span>
+                                  {tLesson('duration', { minutes: lesson.duration_minutes ?? 0 })}
+                                </span>
                               </div>
                             </div>
                           </button>
