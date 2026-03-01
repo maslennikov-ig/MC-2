@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.13] - 2026-03-01
+
+### Fixed
+
+- **i18n**: replace hardcoded Russian strings with i18n keys across 12+ components (f3df93fc)
+
+### Other
+
+- update docs (701e4ee1)
+
 ## [0.31.12] - 2026-03-01
 
 ### Added

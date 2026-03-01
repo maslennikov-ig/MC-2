@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.13
+
+_Released on 2026-03-01_
+
+### 🐛 Bug Fixes
+
+- **i18n**: Replace hardcoded Russian strings with i18n keys across 12+ components
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.12
 
 _Released on 2026-03-01_
