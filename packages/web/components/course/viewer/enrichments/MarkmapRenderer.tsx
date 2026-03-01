@@ -7,6 +7,7 @@ import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import { Maximize2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AUTO_FOLD_DEPTH } from '@/lib/helpers/mindmap-transform'
+import { cn } from '@/lib/utils'
 
 const LIGHT_COLORS = [
   '#2563eb', // blue-600
@@ -33,9 +34,10 @@ const DARK_COLORS = [
 interface MarkmapRendererProps {
   data: IPureNode
   fitToViewLabel?: string
+  className?: string
 }
 
-export function MarkmapRenderer({ data, fitToViewLabel }: MarkmapRendererProps) {
+export function MarkmapRenderer({ data, fitToViewLabel, className }: MarkmapRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const mmRef = useRef<Markmap | null>(null)
   const { resolvedTheme, mounted } = useThemeSync()
@@ -108,26 +110,28 @@ export function MarkmapRenderer({ data, fitToViewLabel }: MarkmapRendererProps) 
 
   if (!mounted) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className={cn('flex items-center justify-center', className ?? 'min-h-[60vh]')}>
         <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     )
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div className={cn('relative', className)}>
       <svg
         ref={svgRef}
-        className="h-full w-full"
+        className="absolute inset-0 h-full w-full"
         style={{
           color: isDark ? '#e2e8f0' : '#1e293b',
+          touchAction: 'none',
         }}
+        onWheel={(e) => e.stopPropagation()}
       />
       {fitToViewLabel && (
         <Button
           variant="outline"
           size="sm"
-          className="absolute right-3 bottom-3 gap-1.5 opacity-80 hover:opacity-100"
+          className="absolute right-3 bottom-3 z-10 gap-1.5 opacity-80 hover:opacity-100"
           onClick={handleFit}
         >
           <Maximize2 className="h-3.5 w-3.5" />
