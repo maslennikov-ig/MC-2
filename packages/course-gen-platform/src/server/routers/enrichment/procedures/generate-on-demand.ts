@@ -73,7 +73,7 @@ function getQueue() {
  * ```
  */
 export const generateOnDemand = protectedProcedure
-  .use(createRateLimiter({ requests: 5, window: 60 })) // 5 generations per minute
+  .use(createRateLimiter({ requests: 60, window: 60 })) // 60 generations per minute (queued via BullMQ)
   .input(generateOnDemandInputSchema)
   .mutation(async ({ ctx, input }) => {
     const { lessonId, enrichmentType, settings } = input;

@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/web",
-  "version": "0.31.6",
+  "version": "0.31.13",
   "private": true,
   "type": "module",
   "scripts": {
@@ -99,6 +99,8 @@
     "isomorphic-dompurify": "^2.34.0",
     "json-diff-kit": "^1.0.34",
     "lucide-react": "~0.563.0",
+    "markmap-common": "^0.18.9",
+    "markmap-view": "^0.18.12",
     "mermaid": "^11.4",
     "nanoid": "^5.1.6",
     "next": "15.5.12",

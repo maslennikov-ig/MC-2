@@ -10,6 +10,9 @@ import {
   Presentation,
   FileText,
   Download,
+  Network,
+  Layers,
+  ImageIcon,
 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import dynamic from 'next/dynamic'
@@ -26,7 +29,17 @@ import { getEnrichmentPlaybackUrl } from '@/lib/helpers/storage-helpers'
 import { Button } from '@/components/ui/button'
 import type { Database } from '@/types/database.generated'
 import type { Asset, Lesson } from '@/types/database'
-import type { QuizEnrichmentContent } from '@megacampus/shared-types'
+import type {
+  QuizEnrichmentContent,
+  StudyGuideEnrichmentContent,
+  FlashcardsEnrichmentContent,
+  MindMapEnrichmentContent,
+  InfographicEnrichmentContent,
+} from '@megacampus/shared-types'
+import { StudyGuideViewer } from '@/components/course/viewer/enrichments/StudyGuideViewer'
+import { FlashcardViewer } from '@/components/course/viewer/enrichments/FlashcardViewer'
+import { MindMapViewer } from '@/components/course/viewer/enrichments/MindMapViewer'
+import { InfographicViewer } from '@/components/course/viewer/enrichments/InfographicViewer'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -43,7 +56,16 @@ interface LessonMaterialsSwitcherProps {
   enrichments?: LessonMaterialEnrichment[]
 }
 
-type MaterialType = 'video' | 'audio' | 'quiz' | 'presentation' | 'document'
+type MaterialType =
+  | 'video'
+  | 'audio'
+  | 'quiz'
+  | 'presentation'
+  | 'document'
+  | 'study_guide'
+  | 'flashcards'
+  | 'mind_map'
+  | 'infographic'
 
 export function LessonMaterialsSwitcher({
   lesson,
@@ -63,9 +85,7 @@ export function LessonMaterialsSwitcher({
   const isType = (e: LessonMaterialEnrichment, typeStr: string) => e.enrichment_type === typeStr
 
   // 1. Video
-  const videoEnrichment = completedEnrichments.find(
-    (e) => isType(e, 'video') || isType(e, 'nlm_video')
-  )
+  const videoEnrichment = completedEnrichments.find((e) => isType(e, 'nlm_video'))
   const legacyVideoAsset = assets.find((a) => {
     if (a.filename) {
       const exts = ['.mp4', '.webm', '.ogg', '.avi', '.mov']
@@ -86,24 +106,46 @@ export function LessonMaterialsSwitcher({
   const hasVideo = !!videoEnrichment || !!legacyVideoAsset
 
   // 2. Audio
-  const audioEnrichment = completedEnrichments.find(
-    (e) => isType(e, 'audio') || isType(e, 'nlm_audio')
-  )
+  const audioEnrichment = completedEnrichments.find((e) => isType(e, 'nlm_audio'))
   const hasAudio = !!audioEnrichment
 
   // 3. Quiz
-  const quizEnrichment = completedEnrichments.find((e) => isType(e, 'quiz') && !!e.content)
-  const hasQuiz = !!quizEnrichment
+  // Quiz temporarily hidden from UI
+  const quizEnrichment = completedEnrichments.find(() => false)
+  const hasQuiz = false
 
   // 4. Presentation
-  const presentationEnrichment = completedEnrichments.find(
-    (e) => isType(e, 'presentation') && !!e.content
-  )
-  const hasPresentation = !!presentationEnrichment
+  // Presentation temporarily hidden from UI
+  const presentationEnrichment = completedEnrichments.find(() => false)
+  const hasPresentation = false
 
   // 5. Document
   const documentEnrichment = completedEnrichments.find((e) => isType(e, 'document') && !!e.content)
   const hasDocument = !!documentEnrichment
+
+  // 6. Study Guide (temporarily hidden from UI — lookup kept for future re-enable)
+  const studyGuideEnrichment = completedEnrichments.find(
+    (e) => isType(e, 'nlm_study_guide') && !!e.content
+  )
+  const hasStudyGuide = false // temporarily hidden
+
+  // 7. Flashcards
+  const flashcardsEnrichment = completedEnrichments.find(
+    (e) => isType(e, 'nlm_flashcards') && !!e.content
+  )
+  const hasFlashcards = !!flashcardsEnrichment
+
+  // 8. Mind Map
+  const mindMapEnrichment = completedEnrichments.find(
+    (e) => isType(e, 'nlm_mind_map') && !!e.content
+  )
+  const hasMindMap = !!mindMapEnrichment
+
+  // 9. Infographic
+  const infographicEnrichment = completedEnrichments.find(
+    (e) => isType(e, 'nlm_infographic') && !!e.content
+  )
+  const hasInfographic = !!infographicEnrichment
 
   // Determine available tabs
   const availableTypes: MaterialType[] = []
@@ -112,6 +154,10 @@ export function LessonMaterialsSwitcher({
   if (hasQuiz) availableTypes.push('quiz')
   if (hasPresentation) availableTypes.push('presentation')
   if (hasDocument) availableTypes.push('document')
+  if (hasStudyGuide) availableTypes.push('study_guide')
+  if (hasFlashcards) availableTypes.push('flashcards')
+  if (hasMindMap) availableTypes.push('mind_map')
+  if (hasInfographic) availableTypes.push('infographic')
 
   // Set default active tab to the first available
   const [activeTab, setActiveTab] = useState<MaterialType | ''>('')
@@ -330,12 +376,45 @@ export function LessonMaterialsSwitcher({
     )
   }
 
+  const renderStudyGuide = () => {
+    if (!studyGuideEnrichment?.content) return null
+    return (
+      <StudyGuideViewer content={studyGuideEnrichment.content as StudyGuideEnrichmentContent} />
+    )
+  }
+
+  const renderFlashcards = () => {
+    if (!flashcardsEnrichment?.content || !flashcardsEnrichment?.id) return null
+    return (
+      <FlashcardViewer
+        content={flashcardsEnrichment.content as FlashcardsEnrichmentContent}
+        enrichmentId={flashcardsEnrichment.id}
+      />
+    )
+  }
+
+  const renderMindMap = () => {
+    if (!mindMapEnrichment?.content) return null
+    return <MindMapViewer content={mindMapEnrichment.content as MindMapEnrichmentContent} />
+  }
+
+  const renderInfographic = () => {
+    if (!infographicEnrichment?.content) return null
+    return (
+      <InfographicViewer content={infographicEnrichment.content as InfographicEnrichmentContent} />
+    )
+  }
+
   const tabIcons: Record<MaterialType, React.ReactNode> = {
     video: <Film className="h-4 w-4" />,
     audio: <Headphones className="h-4 w-4" />,
     quiz: <HelpCircle className="h-4 w-4" />,
     presentation: <Presentation className="h-4 w-4" />,
     document: <FileText className="h-4 w-4" />,
+    study_guide: <BookOpen className="h-4 w-4" />,
+    flashcards: <Layers className="h-4 w-4" />,
+    mind_map: <Network className="h-4 w-4" />,
+    infographic: <ImageIcon className="h-4 w-4" />,
   }
 
   // If only 1 type available, render it directly without tabs
@@ -353,6 +432,10 @@ export function LessonMaterialsSwitcher({
           {type === 'quiz' && renderQuiz()}
           {type === 'presentation' && renderPresentation()}
           {type === 'document' && renderDocument()}
+          {type === 'study_guide' && renderStudyGuide()}
+          {type === 'flashcards' && renderFlashcards()}
+          {type === 'mind_map' && renderMindMap()}
+          {type === 'infographic' && renderInfographic()}
         </div>
       </div>
     )
@@ -410,6 +493,42 @@ export function LessonMaterialsSwitcher({
         {availableTypes.includes('document') && (
           <TabsContent value="document" className="mt-0" data-testid="material-content-document">
             {renderDocument()}
+          </TabsContent>
+        )}
+
+        {availableTypes.includes('study_guide') && (
+          <TabsContent
+            value="study_guide"
+            className="mt-0"
+            data-testid="material-content-study_guide"
+          >
+            {renderStudyGuide()}
+          </TabsContent>
+        )}
+
+        {availableTypes.includes('flashcards') && (
+          <TabsContent
+            value="flashcards"
+            className="mt-0"
+            data-testid="material-content-flashcards"
+          >
+            {renderFlashcards()}
+          </TabsContent>
+        )}
+
+        {availableTypes.includes('mind_map') && (
+          <TabsContent value="mind_map" className="mt-0" data-testid="material-content-mind_map">
+            {renderMindMap()}
+          </TabsContent>
+        )}
+
+        {availableTypes.includes('infographic') && (
+          <TabsContent
+            value="infographic"
+            className="mt-0"
+            data-testid="material-content-infographic"
+          >
+            {renderInfographic()}
           </TabsContent>
         )}
       </Tabs>

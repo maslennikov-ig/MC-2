@@ -2,6 +2,121 @@
 
 _Released on 2025-12-26_
 
+## v0.31.13
+
+_Released on 2026-03-01_
+
+### 🐛 Bug Fixes
+
+- **i18n**: Replace hardcoded Russian strings with i18n keys across 12+ components
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.31.12
+
+_Released on 2026-03-01_
+
+### ✨ New Features
+
+- **Interface**: Update enrichments UI, course cards, header and viewer improvements
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.31.11
+
+_Released on 2026-03-01_
+
+### ✨ New Features
+
+- **viewer**: Remove max-width constraints so lesson content fills available space
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.31.10
+
+_Released on 2026-02-28_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Translate course title to target language in Stage 5
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.31.9
+
+_Released on 2026-02-28_
+
+### ✨ New Features
+
+- **enrichments**: Hide audio, video, presentation, quiz from UI
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.31.8
+
+_Released on 2026-02-28_
+
+### ✨ New Features
+
+- **enrichments**: Replace MindMapViewer with interactive markmap-view
+- **enrichments**: Temporarily hide nlm_study_guide from UI
+- **enrichments**: Hide regular audio/video from UI, keep NLM variants only
+- **web**: Add unique placeholder images for 4 new NLM enrichment types
+- **enrichments**: Add 4 new NotebookLM enrichment types
+
+### 🔧 Improvements
+
+- **enrichments**: Extract buildStandardSources helper and add flashcards strict schema
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Use correct placeholder images for NLM enrichment types
+- **enrichments**: Remove audio/video from remaining UI components
+- **enrichments**: Add image_base64 to bridge media payload detection
+- **logger**: Enhance auto-mute to check metadata.message for tRPC errors
+- **enrichments**: Pass explicit timeout to wait_for_completion for 3 NLM artifact types
+- **enrichments**: Increase NLM queue wait timeout to 72h and async polling to 76h
+- **enrichments**: Resolve NLM bridge failures and add enrichment types to materials switcher
+- **enrichments**: Change NLM audio default format from deep_dive to debate
+- **mind-map**: Remove content truncation, add iterative depth-safe validation
+- **enrichments**: Address code review findings for NLM enrichment types
+- **infra**: Share enrichments storage between Dev and Staging
+- **lint**: Raise eslint function size and complexity limits
+
+---
+
+_This release was automatically generated from 18 commits._
+
+## v0.31.7
+
+_Released on 2026-02-27_
+
+### ✨ New Features
+
+- **bridge**: Allow parallel audio + video generation per course
+- **admin**: Add NotebookLM Bridge health check to admin dashboard
+
+### 🐛 Bug Fixes
+
+- **web**: Stabilize media UX in course viewer
+- **admin**: Log fallback URL in bridge health check (I5)
+- **admin**: Address code review issues for bridge health check
+- **bridge**: Add SOCKS5 proxy and fix config for Stage bridge
+
+---
+
+_This release was automatically generated from 6 commits._
+
 ## v0.31.6
 
 _Released on 2026-02-26_

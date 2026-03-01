@@ -43,7 +43,12 @@
       "title": "Something Went Wrong",
       "message": "An unexpected error occurred. Please try again.",
       "tryAgain": "Try Again",
-      "errorDetails": "Error Details (dev mode)"
+      "errorDetails": "Error Details (dev mode)",
+      "componentUnavailable": "This component is temporarily unavailable",
+      "refreshPage": "Refresh Page",
+      "videoUnavailable": "Video player unavailable",
+      "contentUnavailable": "Content temporarily unavailable",
+      "refresh": "Refresh"
     },
     "unauthorized": {
       "title": "Authorization Required",
@@ -127,5 +132,34 @@
     "model": "Model",
     "notFound": "Card not generated yet",
     "cancelledMessage": "Generation was cancelled"
+  },
+  "hero": {
+    "badge": "A new era of education with AI",
+    "title1": "MegaCampusAI",
+    "title2": "create",
+    "title3": "courses in one click",
+    "description": "Automated educational course generation system. Upload documents, get full-featured courses with video, audio and tests in minutes.",
+    "viewCourses": "View Courses",
+    "createCourse": "Create Course",
+    "startFree": "Start for Free",
+    "signIn": "Sign In",
+    "exploreExamples": "or explore example courses →"
+  },
+  "nav": {
+    "catalog": "Catalog",
+    "createCourse": "Create Course",
+    "exampleCourses": "Example Courses",
+    "examples": "Examples",
+    "catalogAria": "View available courses",
+    "createCourseAria": "Create a new course",
+    "examplesAria": "View example courses",
+    "home": "Home",
+    "myCourses": "My Courses",
+    "myCoursesAria": "View all courses",
+    "homeAria": "Return to home page",
+    "mainMenu": "Main menu",
+    "navigation": "Navigation",
+    "deleteCourse": "Delete course",
+    "courseConstructor": "Course Constructor"
   }
 }

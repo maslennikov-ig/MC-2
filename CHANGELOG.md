@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.13] - 2026-03-01
+
+### Fixed
+
+- **i18n**: replace hardcoded Russian strings with i18n keys across 12+ components (f3df93fc)
+
+### Other
+
+- update docs (701e4ee1)
+
+## [0.31.12] - 2026-03-01
+
+### Added
+
+- **ui**: update enrichments UI, course cards, header and viewer improvements (f0b7363c)
+
+## [0.31.11] - 2026-03-01
+
+### Added
+
+- **viewer**: remove max-width constraints so lesson content fills available space (180a9ee4)
+
+## [0.31.10] - 2026-02-28
+
+### Fixed
+
+- **pipeline**: translate course title to target language in Stage 5 (92891dae)
+
+## [0.31.9] - 2026-02-28
+
+### Added
+
+- **enrichments**: hide audio, video, presentation, quiz from UI (ba0498c3)
+
+## [0.31.8] - 2026-02-28
+
+### Added
+
+- **enrichments**: replace MindMapViewer with interactive markmap-view (0300dd19)
+- **enrichments**: temporarily hide nlm_study_guide from UI (dfa093ad)
+- **enrichments**: hide regular audio/video from UI, keep NLM variants only (c191b5d9)
+- **web**: add unique placeholder images for 4 new NLM enrichment types (7f0ab042)
+- **enrichments**: add 4 new NotebookLM enrichment types (6612daa0)
+
+### Changed
+
+- **enrichments**: extract buildStandardSources helper and add flashcards strict schema (b0e18c00)
+
+### Fixed
+
+- **enrichments**: use correct placeholder images for NLM enrichment types (6b1c8ce1)
+- **enrichments**: remove audio/video from remaining UI components (a34adeb0)
+- **enrichments**: add image_base64 to bridge media payload detection (d365ba9c)
+- **logger**: enhance auto-mute to check metadata.message for tRPC errors (f513042b)
+- **enrichments**: pass explicit timeout to wait_for_completion for 3 NLM artifact types (fa44afcb)
+- **enrichments**: increase NLM queue wait timeout to 72h and async polling to 76h (91ca8bc4)
+- **enrichments**: resolve NLM bridge failures and add enrichment types to materials switcher (0d028cac)
+- **enrichments**: change NLM audio default format from deep_dive to debate (5272824f)
+- **mind-map**: remove content truncation, add iterative depth-safe validation (83e59648)
+- **enrichments**: address code review findings for NLM enrichment types (a56958ce)
+- **infra**: share enrichments storage between Dev and Staging (0d48627f)
+- **lint**: raise eslint function size and complexity limits (96003381)
+
+## [0.31.7] - 2026-02-27
+
+### Added
+
+- **bridge**: allow parallel audio + video generation per course (9912059d)
+- **admin**: add NotebookLM Bridge health check to admin dashboard (2c6a1cf1)
+
+### Fixed
+
+- **web**: stabilize media UX in course viewer (220cf7bd)
+- **admin**: log fallback URL in bridge health check (I5) (0838478a)
+- **admin**: address code review issues for bridge health check (0bf5a123)
+- **bridge**: add SOCKS5 proxy and fix config for Stage bridge (73f07326)
+
 ## [0.31.6] - 2026-02-26
 
 ### Other

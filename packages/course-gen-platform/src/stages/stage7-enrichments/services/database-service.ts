@@ -141,7 +141,7 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
 
 export interface NotebookLMAsyncMetadataState {
   taskId: string;
-  mediaType: 'audio' | 'video';
+  mediaType: 'audio' | 'video' | 'study_guide' | 'flashcards' | 'mind_map' | 'infographic';
   status: string;
   pollAttempt: number;
   startedAt: string;

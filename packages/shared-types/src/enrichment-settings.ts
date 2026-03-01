@@ -173,7 +173,7 @@ export type NlmSourceStrategy = z.infer<typeof nlmSourceStrategySchema>;
 /** NotebookLM audio format presets */
 export const nlmAudioFormatSchema = z
   .enum(['deep_dive', 'brief', 'critique', 'debate'])
-  .default('deep_dive');
+  .default('debate');
 export type NlmAudioFormat = z.infer<typeof nlmAudioFormatSchema>;
 
 /** NotebookLM audio length presets */
@@ -254,6 +254,84 @@ export const nlmVideoSettingsSchema = z.object({
 export type NlmVideoSettings = z.infer<typeof nlmVideoSettingsSchema>;
 
 // ============================================================================
+// NOTEBOOKLM STUDY GUIDE SETTINGS
+// ============================================================================
+
+/**
+ * NotebookLM study guide enrichment settings.
+ *
+ * Controls study guide generation parameters.
+ */
+export const nlmStudyGuideSettingsSchema = z.object({
+  /** Source bundle strategy for NotebookLM generation. */
+  nlm_source_strategy: nlmSourceStrategySchema.optional(),
+
+  /** Detail level for the study guide. */
+  detail_level: z.enum(['brief', 'standard', 'comprehensive']).default('standard'),
+});
+export type NlmStudyGuideSettings = z.infer<typeof nlmStudyGuideSettingsSchema>;
+
+// ============================================================================
+// NOTEBOOKLM FLASHCARDS SETTINGS
+// ============================================================================
+
+/**
+ * NotebookLM flashcards enrichment settings.
+ *
+ * Controls flashcard generation parameters (difficulty, count).
+ */
+export const nlmFlashcardsSettingsSchema = z.object({
+  /** Source bundle strategy for NotebookLM generation. */
+  nlm_source_strategy: nlmSourceStrategySchema.optional(),
+
+  /** Difficulty level for flashcards. */
+  difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
+
+  /** Number of flashcards to generate. */
+  card_count: z.number().int().min(5).max(50).default(15),
+});
+export type NlmFlashcardsSettings = z.infer<typeof nlmFlashcardsSettingsSchema>;
+
+// ============================================================================
+// NOTEBOOKLM MIND MAP SETTINGS
+// ============================================================================
+
+/**
+ * NotebookLM mind map enrichment settings.
+ *
+ * Controls mind map tree depth.
+ */
+export const nlmMindMapSettingsSchema = z.object({
+  /** Source bundle strategy for NotebookLM generation. */
+  nlm_source_strategy: nlmSourceStrategySchema.optional(),
+
+  /** Depth of the mind map tree. */
+  depth: z.enum(['shallow', 'standard', 'deep']).default('standard'),
+});
+export type NlmMindMapSettings = z.infer<typeof nlmMindMapSettingsSchema>;
+
+// ============================================================================
+// NOTEBOOKLM INFOGRAPHIC SETTINGS
+// ============================================================================
+
+/**
+ * NotebookLM infographic enrichment settings.
+ *
+ * Controls infographic orientation and detail level.
+ */
+export const nlmInfographicSettingsSchema = z.object({
+  /** Source bundle strategy for NotebookLM generation. */
+  nlm_source_strategy: nlmSourceStrategySchema.optional(),
+
+  /** Infographic orientation. */
+  orientation: z.enum(['portrait', 'landscape']).default('portrait'),
+
+  /** Detail level for the infographic. */
+  detail_level: z.enum(['overview', 'detailed']).default('detailed'),
+});
+export type NlmInfographicSettings = z.infer<typeof nlmInfographicSettingsSchema>;
+
+// ============================================================================
 // DOCUMENT SETTINGS (Placeholder)
 // ============================================================================
 
@@ -292,6 +370,10 @@ export const enrichmentSettingsSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('nlm_audio'), settings: nlmAudioSettingsSchema }),
   z.object({ type: z.literal('nlm_video'), settings: nlmVideoSettingsSchema }),
   z.object({ type: z.literal('document'), settings: documentSettingsSchema }),
+  z.object({ type: z.literal('nlm_study_guide'), settings: nlmStudyGuideSettingsSchema }),
+  z.object({ type: z.literal('nlm_flashcards'), settings: nlmFlashcardsSettingsSchema }),
+  z.object({ type: z.literal('nlm_mind_map'), settings: nlmMindMapSettingsSchema }),
+  z.object({ type: z.literal('nlm_infographic'), settings: nlmInfographicSettingsSchema }),
 ]);
 
 export type EnrichmentSettings = z.infer<typeof enrichmentSettingsSchema>;
@@ -306,7 +388,18 @@ export type EnrichmentSettings = z.infer<typeof enrichmentSettingsSchema>;
  * @returns Default settings object
  */
 export function getDefaultSettings(
-  type: 'audio' | 'quiz' | 'presentation' | 'video' | 'nlm_audio' | 'nlm_video' | 'document'
+  type:
+    | 'audio'
+    | 'quiz'
+    | 'presentation'
+    | 'video'
+    | 'nlm_audio'
+    | 'nlm_video'
+    | 'document'
+    | 'nlm_study_guide'
+    | 'nlm_flashcards'
+    | 'nlm_mind_map'
+    | 'nlm_infographic'
 ): z.infer<typeof enrichmentSettingsSchema>['settings'] {
   switch (type) {
     case 'audio':
@@ -323,6 +416,14 @@ export function getDefaultSettings(
       return nlmVideoSettingsSchema.parse({});
     case 'document':
       return documentSettingsSchema.parse({});
+    case 'nlm_study_guide':
+      return nlmStudyGuideSettingsSchema.parse({});
+    case 'nlm_flashcards':
+      return nlmFlashcardsSettingsSchema.parse({});
+    case 'nlm_mind_map':
+      return nlmMindMapSettingsSchema.parse({});
+    case 'nlm_infographic':
+      return nlmInfographicSettingsSchema.parse({});
   }
 }
 

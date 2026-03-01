@@ -645,6 +645,94 @@ async function checkQdrant(): Promise<ServiceStatus> {
 }
 
 /**
+ * Check NotebookLM Bridge health
+ * Verifies the bridge service is running, auth is configured, and proxy is active
+ */
+async function checkNotebookLMBridge(): Promise<ServiceStatus> {
+  const startTime = Date.now()
+  const lastCheck = new Date().toISOString()
+
+  // Try Stage, Dev, and local URLs in order.
+  // First reachable bridge is authoritative — if it returns non-OK,
+  // that's a real issue, not a reason to try the next URL.
+  const urls = [
+    'http://notebooklm-bridge:8000/health',
+    'http://notebooklm-bridge-dev:8000/health',
+    'http://localhost:8010/health',
+  ]
+
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i]
+    try {
+      const response = await fetchWithTimeout(url, {}, 3000)
+      const responseTime = Date.now() - startTime
+
+      if (i > 0) {
+        logger.info('NotebookLM Bridge health: responded via fallback URL', { url, attempt: i + 1 })
+      }
+
+      if (response.ok) {
+        const data = await response.json()
+        const checks: { name: string; passed: boolean; message?: string }[] = data.checks || []
+        const failedChecks = checks.filter((c) => !c.passed)
+        const activeTasks: number = data.active_tasks ?? 0
+
+        // Derive proxy status from checks array
+        const proxyCheck = checks.find((c) => c.name === 'proxy')
+        const proxyActive = proxyCheck?.passed ?? false
+
+        // Determine status based on checks
+        let status: 'healthy' | 'degraded' | 'error' = 'healthy'
+        const messageParts: string[] = []
+
+        if (failedChecks.length > 0) {
+          status = 'degraded'
+          messageParts.push(failedChecks.map((c) => c.message || c.name).join('; '))
+        }
+
+        if (proxyActive) {
+          messageParts.push('SOCKS proxy active')
+        }
+        if (activeTasks > 0) {
+          messageParts.push(`${activeTasks} active task(s)`)
+        }
+        if (messageParts.length === 0) {
+          messageParts.push(`Mode: ${data.mode || 'unknown'}`)
+        }
+
+        return {
+          name: 'NotebookLM Bridge',
+          status,
+          responseTime,
+          message: messageParts.join(' | '),
+          lastCheck,
+        }
+      }
+
+      // Reachable but unhealthy — authoritative result, don't try other URLs
+      return {
+        name: 'NotebookLM Bridge',
+        status: 'degraded',
+        responseTime,
+        message: `HTTP ${response.status}: ${response.statusText}`,
+        lastCheck,
+      }
+    } catch {
+      // Network-level failure — try next URL
+      continue
+    }
+  }
+
+  return {
+    name: 'NotebookLM Bridge',
+    status: 'error',
+    responseTime: Date.now() - startTime,
+    message: 'Connection failed (all URLs)',
+    lastCheck,
+  }
+}
+
+/**
  * Check Mermaid Pipeline health via API Server
  * Verifies the regex sanitizer, validator, and full pipeline orchestration
  */
@@ -708,6 +796,7 @@ async function checkMermaidPipeline(): Promise<ServiceStatus> {
  * - Redis (via API Server)
  * - Docling MCP (document processing)
  * - Qdrant (vector database)
+ * - NotebookLM Bridge (audio/video generation)
  * - Mermaid Pipeline (diagram syntax fixer)
  */
 export async function GET(
@@ -752,6 +841,7 @@ export async function GET(
       qdrantStatus,
       workerStatus,
       workerStage7Status,
+      notebookLMBridgeStatus,
       telegramStatus,
       mermaidPipelineStatus,
     ] = await Promise.allSettled([
@@ -762,6 +852,7 @@ export async function GET(
       checkQdrant(),
       checkWorkerReadiness(),
       checkWorkerStage7Readiness(),
+      checkNotebookLMBridge(),
       checkTelegramBot(),
       checkMermaidPipeline(),
     ])
@@ -831,6 +922,15 @@ export async function GET(
             message: 'Check failed',
             lastCheck: new Date().toISOString(),
           },
+      notebookLMBridgeStatus.status === 'fulfilled'
+        ? notebookLMBridgeStatus.value
+        : {
+            name: 'NotebookLM Bridge',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
       telegramStatus.status === 'fulfilled'
         ? telegramStatus.value
         : {
@@ -877,7 +977,9 @@ export async function GET(
     })
 
     // Always return 200, status is in the body
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    })
   } catch (error) {
     logger.error('Admin health check failed', { error })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

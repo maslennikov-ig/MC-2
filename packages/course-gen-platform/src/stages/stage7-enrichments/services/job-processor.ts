@@ -75,17 +75,26 @@ const MEDIA_DEFAULTS_BY_TYPE: Partial<
   nlm_audio: { mimeType: 'audio/mpeg', extension: 'mp3' },
   video: { mimeType: 'video/mp4', extension: 'mp4' },
   nlm_video: { mimeType: 'video/mp4', extension: 'mp4' },
+  nlm_infographic: { mimeType: 'image/png', extension: 'png' },
 };
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   mp3: 'audio/mpeg',
   mp4: 'video/mp4',
+  png: 'image/png',
 };
 
-const NLM_TYPES: ReadonlySet<Stage7EnrichmentType> = new Set(['nlm_audio', 'nlm_video']);
+const NLM_TYPES: ReadonlySet<Stage7EnrichmentType> = new Set([
+  'nlm_audio',
+  'nlm_video',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
+]);
 const DEFAULT_NLM_POLL_DELAY_MS = 15_000;
 const DEFAULT_NLM_MAX_POLL_DELAY_MS = 60_000;
-const DEFAULT_NLM_MAX_WAIT_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_NLM_MAX_WAIT_MS = 76 * 60 * 60 * 1000; // 76h: covers 72h queue wait + 3h generation + 1h buffer
 
 let stage7PollQueue: Queue<Stage7JobInput, Stage7JobResult> | null = null;
 
@@ -629,6 +638,67 @@ export async function processStage7Job(
 
     jobLogger.info('Generating final enrichment content');
     const result = await handler.generate(handlerInput);
+
+    // Handle deferred async task from single-stage handlers (e.g. NLM text/image artifacts)
+    if (result.deferredTask) {
+      const startedAt = nlmAsyncState?.startedAt ?? new Date().toISOString();
+      const elapsedMs = Date.now() - new Date(startedAt).getTime();
+      const maxWaitMs = getNlmMaxWaitMs();
+      if (elapsedMs > maxWaitMs) {
+        throw new Error(
+          `NotebookLM detached async task timed out after ${maxWaitMs}ms (taskId=${result.deferredTask.taskId})`
+        );
+      }
+
+      const nextPollAttempt = (nlmAsyncState?.pollAttempt ?? 0) + 1;
+      const nextAsyncState: Stage7NlmAsyncState = {
+        taskId: result.deferredTask.taskId,
+        mediaType: result.deferredTask.mediaType,
+        pollAttempt: nextPollAttempt,
+        startedAt,
+      };
+
+      await saveNotebookLMAsyncMetadataState(enrichmentId, enrichmentContext.enrichment.metadata, {
+        taskId: nextAsyncState.taskId,
+        mediaType: nextAsyncState.mediaType,
+        status: result.deferredTask.status,
+        pollAttempt: nextAsyncState.pollAttempt,
+        startedAt: nextAsyncState.startedAt,
+        lastPolledAt: new Date().toISOString(),
+        responseMetadata: result.deferredTask.responseMetadata,
+      });
+
+      const pollDelayMs = getNlmPollDelayMs(nextPollAttempt);
+      const nextJobId = await enqueueNlmPollJob(job.data, nextAsyncState, pollDelayMs);
+
+      await updateJobProgress(job, {
+        phase: isNlmPollJob ? 'polling_async' : 'pending_async',
+        progress: 55,
+        message: `NotebookLM task ${result.deferredTask.status}; next poll in ${Math.round(pollDelayMs / 1000)}s`,
+      });
+
+      jobLogger.info(
+        {
+          taskId: nextAsyncState.taskId,
+          mediaType: nextAsyncState.mediaType,
+          pollAttempt: nextAsyncState.pollAttempt,
+          pollDelayMs,
+          nextJobId,
+          taskStatus: result.deferredTask.status,
+        },
+        'Single-stage handler returned deferred task, scheduled poll job'
+      );
+
+      return {
+        enrichmentId,
+        success: true,
+        status: 'generating',
+        metrics: {
+          durationMs: Date.now() - startTime,
+        },
+      };
+    }
+
     return finalizeSuccessfulResult(job, {
       enrichmentId,
       enrichmentType,

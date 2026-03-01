@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import type { Course, Section, Lesson } from '@/types/database'
 import { getLessonLabel } from '@/lib/course-data-utils'
 import { BREAKPOINTS } from '@/lib/constants/breakpoints'
@@ -38,7 +38,6 @@ export function useViewerState(
   const hasInitializedRef = useRef(false)
   const lastSyncedLabelRef = useRef<string | null>(null)
 
-  const router = useRouter()
   const pathname = usePathname()
   const { user: authUser } = useAuth()
 
@@ -192,7 +191,7 @@ export function useViewerState(
       }
     }
 
-    fetchServerProgress()
+    void fetchServerProgress()
 
     return () => {
       cancelled = true
@@ -241,7 +240,7 @@ export function useViewerState(
     if (lastSyncedLabelRef.current !== label) {
       const params = new URLSearchParams(window.location.search)
       params.set('lesson', label)
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      window.history.replaceState(null, '', `${pathname}?${params.toString()}`)
       lastSyncedLabelRef.current = label
     }
   }, [currentLessonId, lessons, sections, pathname])
@@ -321,7 +320,7 @@ export function useViewerState(
         }
 
         // Async sync to server (fire and forget)
-        syncProgressToServer(lessonId, isCompleting ? 'mark_complete' : 'mark_incomplete')
+        void syncProgressToServer(lessonId, isCompleting ? 'mark_complete' : 'mark_incomplete')
 
         return next
       })

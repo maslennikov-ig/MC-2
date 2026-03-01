@@ -37,6 +37,10 @@ const ALL_ENRICHMENT_TYPES: EnrichmentType[] = [
   'cover',
   'card',
   'banner',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
 ]
 
 /**
@@ -77,6 +81,10 @@ export function useEnrichmentSelection(
       document: 0,
       card: 0,
       banner: 0,
+      nlm_study_guide: 0,
+      nlm_flashcards: 0,
+      nlm_mind_map: 0,
+      nlm_infographic: 0,
     }
 
     for (const enrichment of items) {

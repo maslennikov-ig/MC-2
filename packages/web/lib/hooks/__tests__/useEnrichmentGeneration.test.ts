@@ -197,7 +197,7 @@ describe('useEnrichmentGeneration', () => {
       unmount()
     })
 
-    it('should set 60-minute max duration for NLM media generation', async () => {
+    it('should set 60-minute max duration for NLM media generation without starting timer in queued state', async () => {
       mockMutateGenerate.mockResolvedValueOnce({
         ...mockGenerateResponse,
         enrichmentId: 'test-nlm-enrichment-id',
@@ -218,7 +218,7 @@ describe('useEnrichmentGeneration', () => {
       const enrichment = result.current.generating.get('nlm_audio')
       expect(enrichment).toBeDefined()
       expect(enrichment?.maxDurationMs).toBe(60 * 60 * 1000)
-      expect(enrichment?.startedAtMs).toEqual(expect.any(Number))
+      expect(enrichment?.startedAtMs).toBeUndefined()
 
       unmount()
     })
@@ -478,6 +478,174 @@ describe('useEnrichmentGeneration', () => {
   // ===========================================================================
 
   describe('polling', () => {
+    it('should keep startedAtMs undefined when resuming NLM without explicit timestamp before generating', () => {
+      mockQueryStatus.mockImplementation(() => new Promise(() => {}))
+
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+          pollingInterval: 50,
+        })
+      )
+
+      act(() => {
+        result.current.resumeGeneration('existing-nlm-enrichment-id', 'nlm_audio')
+      })
+
+      const enrichment = result.current.generating.get('nlm_audio')
+      expect(enrichment).toBeDefined()
+      expect(enrichment?.startedAtMs).toBeUndefined()
+
+      unmount()
+    })
+
+    it('should set startedAtMs from backend timestamp only when entering generating for NLM', async () => {
+      const backendStartedAtMs = 1_700_000_000_000
+      mockMutateGenerate.mockResolvedValueOnce({
+        ...mockGenerateResponse,
+        enrichmentId: 'test-nlm-enrichment-id',
+      })
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
+        .mockResolvedValueOnce({
+          ...mockStatusGenerating,
+          generationStartedAtMs: backendStartedAtMs,
+        })
+        .mockResolvedValue({
+          ...mockStatusGenerating,
+          generationStartedAtMs: backendStartedAtMs + 30_000,
+        })
+
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+          pollingInterval: 50,
+        })
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('nlm_audio')
+      })
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 250))
+      })
+
+      const enrichment = result.current.generating.get('nlm_audio')
+      expect(enrichment).toBeDefined()
+      expect(enrichment?.currentStep).toBe('generating')
+      expect(enrichment?.startedAtMs).toBe(backendStartedAtMs)
+
+      unmount()
+    })
+
+    it('should fallback to Date.now only once when entering generating without backend timestamp', async () => {
+      const nowSpy = vi.spyOn(Date, 'now')
+      nowSpy.mockReturnValueOnce(111_000).mockReturnValue(222_000)
+
+      mockQueryStatus.mockResolvedValueOnce(mockStatusGenerating).mockResolvedValue({
+        ...mockStatusGenerating,
+        progress: 80,
+      })
+
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+          pollingInterval: 50,
+        })
+      )
+
+      try {
+        act(() => {
+          result.current.resumeGeneration('existing-nlm-enrichment-id', 'nlm_audio')
+        })
+
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        })
+
+        const enrichment = result.current.generating.get('nlm_audio')
+        expect(enrichment).toBeDefined()
+        expect(enrichment?.currentStep).toBe('generating')
+        expect(enrichment?.startedAtMs).toBe(111_000)
+      } finally {
+        nowSpy.mockRestore()
+        unmount()
+      }
+    })
+
+    it('should call the latest onComplete callback after rerender', async () => {
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus
+        .mockResolvedValueOnce(mockStatusPending)
+        .mockResolvedValueOnce(mockStatusCompleted)
+
+      const initialOnComplete = vi.fn()
+      const latestOnComplete = vi.fn()
+
+      const { result, rerender, unmount } = renderHook(
+        ({ onComplete }) =>
+          useEnrichmentGeneration({
+            lessonId: 'lesson-123',
+            courseId: 'course-123',
+            pollingInterval: 100,
+            onComplete,
+          }),
+        {
+          initialProps: { onComplete: initialOnComplete },
+        }
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('quiz')
+      })
+
+      rerender({ onComplete: latestOnComplete })
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+      })
+
+      expect(initialOnComplete).not.toHaveBeenCalled()
+      expect(latestOnComplete).toHaveBeenCalledWith('test-enrichment-id')
+
+      unmount()
+    })
+
+    it('should preserve generation state when switching lessons and returning back', async () => {
+      mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
+      mockQueryStatus.mockResolvedValue(mockStatusPending)
+
+      const { result, rerender, unmount } = renderHook(
+        ({ lessonId }) =>
+          useEnrichmentGeneration({
+            lessonId,
+            courseId: 'course-123',
+            pollingInterval: 100,
+          }),
+        {
+          initialProps: { lessonId: 'lesson-123' },
+        }
+      )
+
+      await act(async () => {
+        await result.current.startGeneration('quiz')
+      })
+
+      expect(result.current.isGenerating('quiz')).toBe(true)
+
+      rerender({ lessonId: 'lesson-456' })
+      expect(result.current.isGenerating('quiz')).toBe(false)
+
+      rerender({ lessonId: 'lesson-123' })
+      expect(result.current.isGenerating('quiz')).toBe(true)
+
+      unmount()
+    })
+
     it('should start polling immediately after generation starts', async () => {
       mockMutateGenerate.mockResolvedValueOnce(mockGenerateResponse)
       mockQueryStatus.mockResolvedValue(mockStatusPending)

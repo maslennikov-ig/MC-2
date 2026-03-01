@@ -22,10 +22,23 @@ import {
 } from '@megacampus/shared-types'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
-type NlmEnrichmentType = 'nlm_audio' | 'nlm_video'
+type NlmEnrichmentType =
+  | 'nlm_audio'
+  | 'nlm_video'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 type ViewerOnDemandType = OnDemandEnrichmentType | NlmEnrichmentType
 
-const NLM_ENRICHMENT_TYPES = new Set<NlmEnrichmentType>(['nlm_audio', 'nlm_video'])
+const NLM_ENRICHMENT_TYPES = new Set<NlmEnrichmentType>([
+  'nlm_audio',
+  'nlm_video',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
+])
 const LEGACY_NLM_DRAFT_STATUSES = new Set(['draft_ready', 'draft_generating'])
 
 function isNlmType(type: string): type is NlmEnrichmentType {
@@ -38,6 +51,48 @@ function isLegacyNlmDraftStatus(status: string): boolean {
 
 function isViewerOnDemandType(type: string): type is ViewerOnDemandType {
   return isOnDemandType(type) || isNlmType(type)
+}
+
+function parseDateToMs(value: string | null | undefined): number | undefined {
+  const parsed = Date.parse(value ?? '')
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined
+  }
+  return value as Record<string, unknown>
+}
+
+function parseMetadataStartedAtMs(metadata: unknown): number | undefined {
+  const metadataRecord = asRecord(metadata)
+  if (!metadataRecord) return undefined
+
+  const additionalInfo = asRecord(metadataRecord.additional_info)
+  const notebookLmAsyncState = asRecord(additionalInfo?.notebooklm_async_state)
+  const nestedStartedAt = notebookLmAsyncState?.started_at
+  const topLevelStartedAt = metadataRecord.started_at
+  const startedAt = nestedStartedAt ?? topLevelStartedAt
+  if (typeof startedAt === 'number' && Number.isFinite(startedAt) && startedAt > 0) {
+    return startedAt
+  }
+
+  if (typeof startedAt === 'string') {
+    return parseDateToMs(startedAt)
+  }
+
+  return undefined
+}
+
+function getStartedAtMsForResume(
+  enrichment: EnrichmentRow & { enrichment_type: ViewerOnDemandType }
+): number | undefined {
+  if (isNlmType(enrichment.enrichment_type)) {
+    return parseMetadataStartedAtMs(enrichment.metadata)
+  }
+
+  return parseDateToMs(enrichment.created_at)
 }
 
 /**
@@ -67,7 +122,7 @@ interface EnrichmentsPanelProps {
 export function EnrichmentsPanel({
   enrichments,
   enrichmentsLoadError,
-  isLoading: _isLoading,
+  isLoading,
   lessonId,
   courseId,
   onRefreshEnrichments,
@@ -75,11 +130,29 @@ export function EnrichmentsPanel({
   const t = useTranslations('enrichments')
   const safeEnrichments = enrichments ?? []
   const [activeEnrichmentId, setActiveEnrichmentId] = useState<string | null>(null)
+  const completedToastsRef = useRef<Set<string>>(new Set())
+  const toastTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+
+  // Cleanup toast dedup timers on unmount
+  useEffect(() => {
+    return () => {
+      toastTimersRef.current.forEach((timer) => clearTimeout(timer))
+      toastTimersRef.current.clear()
+    }
+  }, [])
 
   // Handle generation completion
   const handleGenerationComplete = useCallback(
-    (_enrichmentId: string) => {
-      toast.success(t('viewer.generationComplete'))
+    (enrichmentId: string) => {
+      if (!completedToastsRef.current.has(enrichmentId)) {
+        toast.success(t('viewer.generationComplete'))
+        completedToastsRef.current.add(enrichmentId)
+        const timer = setTimeout(() => {
+          completedToastsRef.current.delete(enrichmentId)
+          toastTimersRef.current.delete(enrichmentId)
+        }, 5000)
+        toastTimersRef.current.set(enrichmentId, timer)
+      }
       // Small delay to allow DB write propagation before refetch
       setTimeout(() => onRefreshEnrichments?.(), 500)
     },
@@ -110,68 +183,47 @@ export function EnrichmentsPanel({
     onError: handleGenerationError,
   })
 
-  // Track resumed enrichment TYPES (not IDs) to prevent duplicate resumes
-  // Fixes race condition: when enrichment ID changes but type is same, prevent double resume
-  // Only ONE enrichment per type is supported at a time
-  const resumedTypesRef = useRef(new Set<string>())
-
-  // Distinguish first mount (SSR data is fresh) from SPA lesson switch (data may be stale)
-  const isFirstMountRef = useRef(true)
-
-  // Reference-based stale guard: snapshot enrichments on lesson switch,
-  // skip resume until fresh data arrives (different reference)
-  const staleEnrichmentsRef = useRef<EnrichmentRow[] | undefined | null>(null)
-  const enrichmentsLiveRef = useRef(enrichments)
-  enrichmentsLiveRef.current = enrichments
-
-  // Reset state when lessonId changes (SPA lesson switch only, not first mount)
-  useEffect(() => {
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false
-      return // First mount: SSR data is fresh, no stale guard needed
-    }
-    resumedTypesRef.current.clear()
-    staleEnrichmentsRef.current = enrichmentsLiveRef.current
-  }, [lessonId])
+  // Track resumed enrichment keys (lessonId:type) to prevent duplicate resumes
+  const resumedKeysRef = useRef(new Set<string>())
 
   // Resume polling for active enrichments on mount and when new active enrichments appear
   useEffect(() => {
-    // Reference-based stale guard: skip resume until enrichments reference changes
-    // (indicates fresh data from refetch, not stale cache)
-    if (staleEnrichmentsRef.current !== null) {
-      if (enrichments === staleEnrichmentsRef.current) return
-      staleEnrichmentsRef.current = null
-    }
+    if (!lessonId) return
 
-    // Find enrichments that need resuming (active + on-demand + type not yet resumed)
+    // Find enrichments that need resuming (active + on-demand + lesson/type not yet resumed)
     const activeEnrichments = (enrichments ?? [])
       .filter((e) => isActiveGenerationStatus(e.status))
       .filter(isEnrichmentOnDemand)
-      .filter((e) => !resumedTypesRef.current.has(e.enrichment_type))
+      .filter((e) => !resumedKeysRef.current.has(`${lessonId}:${e.enrichment_type}`))
 
     // Resume polling for each new active enrichment
-    if (activeEnrichments.length > 0) {
-      toast.info(t('viewer.resumingGeneration', { count: activeEnrichments.length }))
-    }
     activeEnrichments.forEach((enrichment) => {
-      const parsedCreatedAt = Date.parse(enrichment.created_at ?? '')
-      const startedAtMs = Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined
+      const startedAtMs = getStartedAtMsForResume(enrichment)
       resumeGeneration(enrichment.id, enrichment.enrichment_type, startedAtMs)
-      resumedTypesRef.current.add(enrichment.enrichment_type)
+      resumedKeysRef.current.add(`${lessonId}:${enrichment.enrichment_type}`)
     })
 
-    // Cleanup: remove types for enrichments that are no longer active
-    const currentActiveTypes = new Set<string>(
+    // Cleanup: remove stale keys
+    // 1. Remove keys for other lessons (they are no longer visible)
+    // 2. Remove keys for current lesson's enrichments that are no longer active
+    const currentActiveKeys = new Set<string>(
       (enrichments ?? [])
         .filter((e) => isActiveGenerationStatus(e.status))
-        .map((e) => e.enrichment_type)
+        .map((e) => `${lessonId}:${e.enrichment_type}`)
     )
-    resumedTypesRef.current.forEach((type) => {
-      if (!currentActiveTypes.has(type)) {
-        resumedTypesRef.current.delete(type)
+
+    resumedKeysRef.current.forEach((key) => {
+      // Remove keys for other lessons entirely
+      if (!key.startsWith(`${lessonId}:`)) {
+        resumedKeysRef.current.delete(key)
+        return
+      }
+      // Remove keys for current lesson enrichments that are no longer active
+      if (!currentActiveKeys.has(key)) {
+        resumedKeysRef.current.delete(key)
       }
     })
-  }, [enrichments, resumeGeneration, t])
+  }, [enrichments, lessonId, resumeGeneration])
 
   // Auto-clear recentlyCompleted for types that now have completed enrichment data
   // This ensures non-image types (audio, quiz, etc.) don't stay in skeleton state
@@ -198,6 +250,22 @@ export function EnrichmentsPanel({
         <div className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-800/30 dark:bg-orange-900/20">
           <AlertTriangle className="h-5 w-5 flex-shrink-0 text-orange-500" />
           <p className="text-sm text-orange-800 dark:text-orange-200">{t('viewer.loadError')}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show skeleton on initial load only; during refetch stale data is shown instead
+  if (isLoading && !enrichments) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="min-h-[480px] animate-pulse rounded-2xl border border-gray-200 bg-gray-100 dark:border-slate-800 dark:bg-slate-800"
+            />
+          ))}
         </div>
       </div>
     )
@@ -238,7 +306,11 @@ export function EnrichmentsPanel({
     nlm_audio: 3,
     presentation: 4,
     quiz: 5,
-    document: 6,
+    nlm_study_guide: 6,
+    nlm_flashcards: 7,
+    nlm_mind_map: 8,
+    nlm_infographic: 9,
+    document: 10,
   }
 
   // Statuses that indicate the enrichment is "done" (successfully or not)
@@ -250,6 +322,10 @@ export function EnrichmentsPanel({
       if (!GRID_DISPLAY_STATUSES.has(e.status)) return false
       // Exclude image types (handled by UnifiedEnrichmentCard)
       if (e.enrichment_type === 'cover' || e.enrichment_type === 'card') return false
+      // Hide nlm_study_guide from UI (temporarily disabled)
+      if ((e.enrichment_type as string) === 'nlm_study_guide') return false
+      // Hide regular audio/video/presentation/quiz (temporarily, NLM variants remain)
+      if (['audio', 'video', 'presentation', 'quiz'].includes(e.enrichment_type)) return false
       // Exclude legacy NLM draft statuses
       if (isNlmType(e.enrichment_type) && isLegacyNlmDraftStatus(e.status)) return false
       return true
@@ -341,21 +417,24 @@ export function EnrichmentsPanel({
 
           // Show syncing card for enrichments with active DB status even before hook resumes polling.
           // This provides immediate visual feedback on page load while resume effect kicks in.
-          const activeEnrichmentForType = groupedEnrichments[type]?.find(
-            (e) => isActiveGenerationStatus(e.status) && isEnrichmentOnDemand(e)
+          const activeEnrichmentForType = groupedEnrichments[type]?.find((e) =>
+            isActiveGenerationStatus(e.status)
           )
+          const activeOnDemandEnrichmentForType =
+            activeEnrichmentForType && isEnrichmentOnDemand(activeEnrichmentForType)
+              ? activeEnrichmentForType
+              : undefined
           if (
-            activeEnrichmentForType &&
-            !(isNlmType(type) && isLegacyNlmDraftStatus(activeEnrichmentForType.status))
+            activeOnDemandEnrichmentForType &&
+            !(isNlmType(type) && isLegacyNlmDraftStatus(activeOnDemandEnrichmentForType.status))
           ) {
-            const parsedCreatedAt = Date.parse(activeEnrichmentForType.created_at ?? '')
             return (
               <EnrichmentGeneratingCard
                 key={type}
                 type={type}
                 progress={-1}
                 currentStep="syncing"
-                startedAtMs={Number.isFinite(parsedCreatedAt) ? parsedCreatedAt : undefined}
+                startedAtMs={getStartedAtMsForResume(activeOnDemandEnrichmentForType)}
                 maxDurationMs={
                   NLM_ENRICHMENT_TYPES.has(type as NlmEnrichmentType)
                     ? getMaxDurationForType(type as OnDemandEnrichmentType)

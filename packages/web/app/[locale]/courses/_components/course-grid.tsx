@@ -1,6 +1,5 @@
 'use client'
 
-import { motion, AnimatePresence } from 'framer-motion'
 import { CourseCard } from './course-card'
 import { Button } from '@/components/ui/button'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -94,30 +93,16 @@ export function CourseGrid({
     <div>
       {/* Course grid - responsive with fewer columns for wider cards */}
       <div className="mb-8 grid auto-rows-fr grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        <AnimatePresence mode="popLayout">
-          {displayedCourses.map((course, index) => (
-            <motion.div
-              key={course.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{
-                duration: 0.3,
-                delay: index * 0.05,
-                ease: 'easeOut',
-              }}
-              layout
-            >
-              <CourseCard
-                course={course}
-                user={user || null}
-                canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
-                isFavorited={course.isFavorited}
-                index={index}
-              />
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {displayedCourses.map((course, index) => (
+          <CourseCard
+            key={course.id}
+            course={course}
+            user={user || null}
+            canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
+            isFavorited={course.isFavorited}
+            index={index}
+          />
+        ))}
       </div>
 
       {/* Load More Button */}

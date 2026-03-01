@@ -127,7 +127,7 @@ describe('stage7 nlm audio handler', () => {
 
     const request = mockStartAudio.mock.calls[0][0];
     expect(request.courseId).toBe('course-1');
-    expect(request.audioFormat).toBe('deep_dive');
+    expect(request.audioFormat).toBe('debate');
     expect(request.audioLength).toBe('default');
     expect(request.targetDurationMinutes).toBe(5);
     expect(request.durationRangeMinMinutes).toBe(4);
@@ -144,7 +144,7 @@ describe('stage7 nlm audio handler', () => {
     const additionalInfo = result.metadata.additional_info as Record<string, unknown>;
     expect(additionalInfo.source_strategy_used).toBe('hybrid');
     expect(additionalInfo.source_count).toBe(3);
-    expect(additionalInfo.audio_format_preset).toBe('deep_dive');
+    expect(additionalInfo.audio_format_preset).toBe('debate');
     expect(additionalInfo.audio_length_preset).toBe('default');
     expect(additionalInfo.duration_target_minutes).toBe(5);
     expect(additionalInfo.duration_range_min_minutes).toBe(4);

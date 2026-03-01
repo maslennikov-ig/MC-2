@@ -1,6 +1,5 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import { BookOpen, Play, CheckCircle2, Clock } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
@@ -110,11 +109,7 @@ export function LessonCard({
   const activeMediaBadges = enrichments ? mediaBadges.filter((badge) => enrichments[badge.key]) : []
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.3 }}
+    <div
       onClick={onClick}
       className={cn(
         'group relative cursor-pointer overflow-hidden rounded-xl',
@@ -123,6 +118,7 @@ export function LessonCard({
         'dark:border-slate-800 dark:bg-slate-900 dark:shadow-lg dark:hover:shadow-xl',
         'hover:border-purple-300/60 dark:hover:border-purple-600/40',
         'focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:outline-none',
+        'hover:-translate-y-0.5',
         className
       )}
       tabIndex={0}
@@ -226,6 +222,6 @@ export function LessonCard({
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }

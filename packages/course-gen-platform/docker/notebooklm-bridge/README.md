@@ -130,7 +130,7 @@ Environment variables:
 - `NOTEBOOKLM_POLL_INTERVAL_SECONDS` (default `2`)
 - `NOTEBOOKLM_POLL_HTTP_TIMEOUT_SECONDS` (timeout for a single `poll_status` RPC call, default `8`)
 - `NOTEBOOKLM_POLL_ERROR_RETRY_LIMIT` (transient poll error retries before fail, default `12`)
-- `NOTEBOOKLM_GLOBAL_GENERATION_CONCURRENCY` (default `2`)
+- `NOTEBOOKLM_GLOBAL_GENERATION_CONCURRENCY` (default `4`)
 - `NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS` (default `3600`)
 - `NOTEBOOKLM_ALLOW_FALLBACK` (default `false`)
 - `NOTEBOOKLM_AUTH_JSON` (optional, preferred for dev/stage/prod; raw `storage_state.json` payload; empty value is ignored)
@@ -145,6 +145,9 @@ Behavior:
 - Audio + video generation requests share one in-process queue. Starts are capped by
   `NOTEBOOKLM_GLOBAL_GENERATION_CONCURRENCY`; requests waiting longer than
   `NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS` fail with a timeout.
+- Per-course locking is keyed by `(course_id, media_type)`: audio and video for the
+  same course can run in parallel, but two audios (or two videos) for the same course
+  are serialized to prevent recovery artifact crossover.
 
 ## Authentication Prerequisite
 

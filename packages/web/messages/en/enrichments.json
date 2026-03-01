@@ -2,8 +2,8 @@
   "types": {
     "video": "Video",
     "audio": "Audio",
-    "nlm_audio": "NLM Audio",
-    "nlm_video": "NLM Video",
+    "nlm_audio": "Audio Lesson",
+    "nlm_video": "Video Lesson",
     "presentation": "Presentation",
     "quiz": "Quiz",
     "document": "Document",
@@ -17,19 +17,27 @@
     "project": "Project",
     "discussion": "Discussion",
     "reading": "Reading",
-    "exercise": "Exercise"
+    "exercise": "Exercise",
+    "nlm_study_guide": "Study Guide",
+    "nlm_flashcards": "Flashcards",
+    "nlm_mind_map": "Mind Map",
+    "nlm_infographic": "Infographic"
   },
   "typeDescriptions": {
     "video": "AI-generated video lecture based on lesson content",
     "audio": "Text-to-speech narration for convenient listening",
-    "nlm_audio": "Narrated audio generated with NLM flow",
-    "nlm_video": "Narrated video generated with NLM flow",
+    "nlm_audio": "Narrated audio lesson",
+    "nlm_video": "Narrated video lesson",
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
     "cover": "Premium 21:9 cinematic hero banner for lesson page header (manual generation)",
     "card": "AI-generated 1:1 thumbnail for course catalog and navigation (automatic)",
-    "banner": "Manually created decorative header image for extra visual appeal"
+    "banner": "Manually created decorative header image for extra visual appeal",
+    "nlm_study_guide": "Comprehensive study guide with key concepts and summaries",
+    "nlm_flashcards": "Interactive flashcards for spaced repetition learning",
+    "nlm_mind_map": "Visual mind map of lesson concepts and relationships",
+    "nlm_infographic": "Visual infographic summarizing key lesson points"
   },
   "status": {
     "pending": "Pending",
@@ -178,6 +186,37 @@
       "themeColorful": "Colorful",
       "maxSlides": "Maximum Slides",
       "includeSpeakerNotes": "Include Speaker Notes"
+    },
+    "nlmStudyGuide": {
+      "title": "Study Guide Settings",
+      "detailLevel": "Detail Level",
+      "detailBrief": "Brief",
+      "detailStandard": "Standard",
+      "detailComprehensive": "Comprehensive"
+    },
+    "nlmFlashcards": {
+      "title": "Flashcards Settings",
+      "difficulty": "Difficulty",
+      "difficultyEasy": "Easy",
+      "difficultyMedium": "Medium",
+      "difficultyHard": "Hard",
+      "cardCount": "Number of Cards"
+    },
+    "nlmMindMap": {
+      "title": "Mind Map Settings",
+      "depth": "Map Depth",
+      "depthShallow": "Shallow",
+      "depthStandard": "Standard",
+      "depthDeep": "Deep"
+    },
+    "nlmInfographic": {
+      "title": "Infographic Settings",
+      "orientation": "Orientation",
+      "orientationPortrait": "Portrait",
+      "orientationLandscape": "Landscape",
+      "detailLevel": "Detail Level",
+      "detailOverview": "Overview",
+      "detailDetailed": "Detailed"
     }
   },
   "comingSoon": "Coming Soon",
@@ -192,8 +231,8 @@
     "loadError": "Failed to load additional materials. Try refreshing the page.",
     "videoLesson": "Video lesson",
     "audioLesson": "Audio lesson",
-    "nlmAudioLesson": "NLM audio lesson",
-    "nlmVideoLesson": "NLM video lesson",
+    "nlmAudioLesson": "Audio lesson",
+    "nlmVideoLesson": "Video lesson",
     "presentationLabel": "Presentation",
     "quizLabel": "Quiz",
     "documentLabel": "Additional reading",
@@ -278,7 +317,62 @@
       "document": "Document",
       "cover": "Hero Image",
       "card": "Visual Card",
-      "banner": "Decorative Banner"
+      "banner": "Decorative Banner",
+      "nlm_study_guide": "Study Guide",
+      "nlm_flashcards": "Flashcards",
+      "nlm_mind_map": "Mind Map",
+      "nlm_infographic": "Infographic"
+    },
+    "studyGuide": {
+      "description": "Comprehensive study guide for this lesson",
+      "open": "Read Guide",
+      "readFull": "Read Full",
+      "title": "Study Guide",
+      "tableOfContents": "Table of Contents",
+      "wordCount": "{count} words"
+    },
+    "flashcards": {
+      "description": "Interactive flashcard deck for memorization",
+      "start": "Start",
+      "cardOf": "Card {current} of {total}",
+      "front": "Question",
+      "back": "Answer",
+      "tapToFlip": "Tap to reveal answer",
+      "flipCard": "Flip card",
+      "know": "Know it",
+      "dontKnow": "Still learning",
+      "summary": "Session Complete",
+      "total": "Total",
+      "known": "Known",
+      "unknown": "Learning",
+      "score": "Score",
+      "restart": "Start Over",
+      "finish": "Finish",
+      "shuffle": "Shuffle",
+      "cardCount": "{count} cards"
+    },
+    "mindMap": {
+      "description": "Visual knowledge map for this lesson",
+      "view": "View Map",
+      "viewFull": "View Full Map",
+      "title": "Mind Map",
+      "nodeCount": "{count} nodes",
+      "depth": "Depth {depth}",
+      "previewHint": "{count} top-level topics",
+      "fitToView": "Fit to view",
+      "interactionHint": "Scroll to zoom, drag to pan, click nodes to expand/collapse",
+      "expand": "Expand node",
+      "collapse": "Collapse node"
+    },
+    "infographic": {
+      "description": "Visual infographic summary of this lesson",
+      "open": "View",
+      "zoom": "Zoom",
+      "title": "Infographic",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "zoomReset": "Reset zoom",
+      "defaultAlt": "Lesson infographic"
     },
     "confirmDeleteTitle": "Delete enrichment?",
     "confirmDeleteDescription": "This action cannot be undone. The media file will be deleted.",
@@ -306,7 +400,7 @@
       "estimatedTime": "~30 sec"
     },
     "nlm_audio": {
-      "title": "NLM Audio",
+      "title": "Audio Lesson",
       "description": "Draft and generate narrated lesson audio",
       "estimatedTime": "~45 sec"
     },
@@ -322,9 +416,29 @@
       "comingSoon": "Coming Soon"
     },
     "nlm_video": {
-      "title": "NLM Video",
+      "title": "Video Lesson",
       "description": "Draft and generate narrated lesson video",
       "estimatedTime": "~120 sec"
+    },
+    "nlm_study_guide": {
+      "title": "Study Guide",
+      "description": "Comprehensive study guide for the lesson",
+      "estimatedTime": "~60 sec"
+    },
+    "nlm_flashcards": {
+      "title": "Flashcards",
+      "description": "Interactive flashcard deck for memorization",
+      "estimatedTime": "~60 sec"
+    },
+    "nlm_mind_map": {
+      "title": "Mind Map",
+      "description": "Visual knowledge map of lesson concepts",
+      "estimatedTime": "~30 sec"
+    },
+    "nlm_infographic": {
+      "title": "Infographic",
+      "description": "Visual infographic with key takeaways",
+      "estimatedTime": "~90 sec"
     }
   },
   "images": {
@@ -458,7 +572,11 @@
       "audio": "Audio",
       "quiz": "Quiz",
       "presentation": "Presentation",
-      "document": "Document"
+      "document": "Document",
+      "study_guide": "Study Guide",
+      "flashcards": "Flashcards",
+      "mind_map": "Mind Map",
+      "infographic": "Infographic"
     },
     "fallback": {
       "video": "Video not available",

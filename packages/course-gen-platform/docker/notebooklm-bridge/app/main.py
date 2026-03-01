@@ -4,10 +4,12 @@ import asyncio
 import base64
 import logging
 import os
+import pathlib
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -24,10 +26,15 @@ from .generator import (
 from .models import (
     AudioGenerationResponse,
     AudioGenerationTaskResultResponse,
+    HealthCheckDetail,
     HealthResponse,
+    InfographicGenerationResponse,
+    InfographicGenerationTaskResultResponse,
     MediaGenerationRequest,
     MediaGenerationTaskStartResponse,
     MediaGenerationTaskStatusResponse,
+    TextGenerationResponse,
+    TextGenerationTaskResultResponse,
     VideoGenerationResponse,
     VideoGenerationTaskResultResponse,
 )
@@ -35,7 +42,7 @@ from .models import (
 logger = logging.getLogger("notebooklm_bridge.api")
 
 TaskStatus = Literal["queued", "in_progress", "completed", "failed"]
-TaskMediaType = Literal["audio", "video"]
+TaskMediaType = Literal["audio", "video", "study_guide", "flashcards", "mind_map", "infographic"]
 
 
 def _configure_bridge_logging() -> None:
@@ -90,6 +97,23 @@ def _build_video_response(result: GenerationResult) -> VideoGenerationResponse:
         mime_type=result.mime_type,
         extension=result.extension,
         duration_seconds=result.duration_seconds,
+        metadata=result.metadata or {},
+    )
+
+
+def _build_text_response(result: GenerationResult, media_type: str) -> TextGenerationResponse:
+    return TextGenerationResponse(
+        content=result.media_bytes.decode("utf-8"),
+        content_type=result.mime_type,
+        metadata=result.metadata or {},
+    )
+
+
+def _build_infographic_response(result: GenerationResult) -> InfographicGenerationResponse:
+    return InfographicGenerationResponse(
+        image_base64=base64.b64encode(result.media_bytes).decode("ascii"),
+        mime_type=result.mime_type,
+        extension=result.extension,
         metadata=result.metadata or {},
     )
 
@@ -181,8 +205,18 @@ class _AsyncTaskStore:
         try:
             if media_type == "audio":
                 result = await generator.generate_audio(request)
-            else:
+            elif media_type == "video":
                 result = await generator.generate_video_overview(request)
+            elif media_type == "study_guide":
+                result = await generator.generate_study_guide(request)
+            elif media_type == "flashcards":
+                result = await generator.generate_flashcards(request)
+            elif media_type == "mind_map":
+                result = await generator.generate_mind_map(request)
+            elif media_type == "infographic":
+                result = await generator.generate_infographic(request)
+            else:
+                raise MediaGenerationError(f"Unsupported media type: {media_type}")
         except MediaGenerationError as error:
             error_message = str(error).strip() or "generation failed"
             await self._mark_failed(task_id, error_message)
@@ -253,6 +287,15 @@ class _AsyncTaskStore:
             task.result = result
             task.updated_at = datetime.now(UTC)
 
+    async def count_active_tasks(self) -> int:
+        now = datetime.now(UTC)
+        async with self._lock:
+            self._prune_locked(now)
+            return sum(
+                1 for t in self._tasks.values()
+                if t.status in {"queued", "in_progress"}
+            )
+
     def _prune_locked(self, now: datetime) -> None:
         stale_ids = [
             task_id
@@ -288,10 +331,60 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def health(
         resolved_settings: Annotated[Settings, Depends(get_settings)],
     ) -> HealthResponse:
+        checks: list[HealthCheckDetail] = []
+
+        # Check auth source availability
+        if resolved_settings.notebooklm_auth_json:
+            checks.append(HealthCheckDetail(
+                name="auth_json", passed=True, message="Inline JSON configured",
+            ))
+        elif resolved_settings.notebooklm_storage_path:
+            p = pathlib.Path(resolved_settings.notebooklm_storage_path)
+            if p.is_file():
+                size_kb = p.stat().st_size / 1024
+                checks.append(HealthCheckDetail(
+                    name="auth_file", passed=True,
+                    message=f"{p.name} ({size_kb:.0f} KB)",
+                ))
+            else:
+                checks.append(HealthCheckDetail(
+                    name="auth_file", passed=False,
+                    message=f"Not found: {p}",
+                ))
+        else:
+            checks.append(HealthCheckDetail(
+                name="auth", passed=False, message="No auth configured",
+            ))
+
+        # Check SOCKS proxy configuration (redact credentials)
+        proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+        if proxy_url:
+            try:
+                parsed = urlparse(proxy_url)
+                redacted = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+            except Exception:
+                redacted = "(configured)"
+            checks.append(HealthCheckDetail(
+                name="proxy", passed=True, message=redacted,
+            ))
+        else:
+            checks.append(HealthCheckDetail(
+                name="proxy", passed=False, message="No proxy configured",
+            ))
+
+        # Count active tasks via public API
+        active = await task_store.count_active_tasks()
+
+        overall: Literal["ok", "degraded"] = (
+            "ok" if all(c.passed for c in checks) else "degraded"
+        )
+
         return HealthResponse(
-            status="ok",
+            status=overall,
             service="notebooklm-bridge",
             mode=resolved_settings.notebooklm_generation_mode,
+            checks=checks,
+            active_tasks=active,
         )
 
     @app.post(
@@ -471,6 +564,302 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return VideoGenerationTaskResultResponse(
             task_id=task.task_id,
             media_type="video",
+            status=task.status,
+            artifact=artifact,
+            error=task.error,
+        )
+
+    # ── Study Guide endpoints ──────────────────────────────────────────
+
+    @app.post(
+        "/artifacts/study-guide/start",
+        response_model=MediaGenerationTaskStartResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def start_study_guide_generation(
+        request: MediaGenerationRequest,
+        generator: Annotated[MediaGenerator, Depends(get_media_generator)],
+    ) -> MediaGenerationTaskStartResponse:
+        task = await task_store.start_task(
+            media_type="study_guide",
+            request=request,
+            generator=generator,
+        )
+        return MediaGenerationTaskStartResponse(
+            task_id=task.task_id,
+            media_type="study_guide",
+            status="queued",
+            created_at=task.created_at,
+        )
+
+    @app.get(
+        "/artifacts/study-guide/{task_id}/status",
+        response_model=MediaGenerationTaskStatusResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_study_guide_generation_status(task_id: str) -> MediaGenerationTaskStatusResponse:
+        task = await _resolve_task(task_id=task_id, media_type="study_guide")
+        logger.info(
+            "Bridge task status read: media=study_guide task=%s status=%s",
+            task_id,
+            task.status,
+            extra={"media_type": "study_guide", "task_id": task_id, "status": task.status},
+        )
+        return MediaGenerationTaskStatusResponse(
+            task_id=task.task_id,
+            media_type="study_guide",
+            status=task.status,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            error=task.error,
+        )
+
+    @app.get(
+        "/artifacts/study-guide/{task_id}/result",
+        response_model=TextGenerationTaskResultResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_study_guide_generation_result(task_id: str) -> TextGenerationTaskResultResponse:
+        task = await _resolve_task(task_id=task_id, media_type="study_guide")
+        artifact = _build_text_response(task.result, "study_guide") if task.result else None
+        logger.info(
+            "Bridge task result read: media=study_guide task=%s status=%s has_artifact=%s",
+            task_id,
+            task.status,
+            bool(artifact),
+            extra={
+                "media_type": "study_guide",
+                "task_id": task_id,
+                "status": task.status,
+                "has_artifact": bool(artifact),
+            },
+        )
+        return TextGenerationTaskResultResponse(
+            task_id=task.task_id,
+            media_type="study_guide",
+            status=task.status,
+            artifact=artifact,
+            error=task.error,
+        )
+
+    # ── Flashcards endpoints ───────────────────────────────────────────
+
+    @app.post(
+        "/artifacts/flashcards/start",
+        response_model=MediaGenerationTaskStartResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def start_flashcards_generation(
+        request: MediaGenerationRequest,
+        generator: Annotated[MediaGenerator, Depends(get_media_generator)],
+    ) -> MediaGenerationTaskStartResponse:
+        task = await task_store.start_task(
+            media_type="flashcards",
+            request=request,
+            generator=generator,
+        )
+        return MediaGenerationTaskStartResponse(
+            task_id=task.task_id,
+            media_type="flashcards",
+            status="queued",
+            created_at=task.created_at,
+        )
+
+    @app.get(
+        "/artifacts/flashcards/{task_id}/status",
+        response_model=MediaGenerationTaskStatusResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_flashcards_generation_status(task_id: str) -> MediaGenerationTaskStatusResponse:
+        task = await _resolve_task(task_id=task_id, media_type="flashcards")
+        logger.info(
+            "Bridge task status read: media=flashcards task=%s status=%s",
+            task_id,
+            task.status,
+            extra={"media_type": "flashcards", "task_id": task_id, "status": task.status},
+        )
+        return MediaGenerationTaskStatusResponse(
+            task_id=task.task_id,
+            media_type="flashcards",
+            status=task.status,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            error=task.error,
+        )
+
+    @app.get(
+        "/artifacts/flashcards/{task_id}/result",
+        response_model=TextGenerationTaskResultResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_flashcards_generation_result(task_id: str) -> TextGenerationTaskResultResponse:
+        task = await _resolve_task(task_id=task_id, media_type="flashcards")
+        artifact = _build_text_response(task.result, "flashcards") if task.result else None
+        logger.info(
+            "Bridge task result read: media=flashcards task=%s status=%s has_artifact=%s",
+            task_id,
+            task.status,
+            bool(artifact),
+            extra={
+                "media_type": "flashcards",
+                "task_id": task_id,
+                "status": task.status,
+                "has_artifact": bool(artifact),
+            },
+        )
+        return TextGenerationTaskResultResponse(
+            task_id=task.task_id,
+            media_type="flashcards",
+            status=task.status,
+            artifact=artifact,
+            error=task.error,
+        )
+
+    # ── Mind Map endpoints ─────────────────────────────────────────────
+
+    @app.post(
+        "/artifacts/mind-map/start",
+        response_model=MediaGenerationTaskStartResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def start_mind_map_generation(
+        request: MediaGenerationRequest,
+        generator: Annotated[MediaGenerator, Depends(get_media_generator)],
+    ) -> MediaGenerationTaskStartResponse:
+        task = await task_store.start_task(
+            media_type="mind_map",
+            request=request,
+            generator=generator,
+        )
+        return MediaGenerationTaskStartResponse(
+            task_id=task.task_id,
+            media_type="mind_map",
+            status="queued",
+            created_at=task.created_at,
+        )
+
+    @app.get(
+        "/artifacts/mind-map/{task_id}/status",
+        response_model=MediaGenerationTaskStatusResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_mind_map_generation_status(task_id: str) -> MediaGenerationTaskStatusResponse:
+        task = await _resolve_task(task_id=task_id, media_type="mind_map")
+        logger.info(
+            "Bridge task status read: media=mind_map task=%s status=%s",
+            task_id,
+            task.status,
+            extra={"media_type": "mind_map", "task_id": task_id, "status": task.status},
+        )
+        return MediaGenerationTaskStatusResponse(
+            task_id=task.task_id,
+            media_type="mind_map",
+            status=task.status,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            error=task.error,
+        )
+
+    @app.get(
+        "/artifacts/mind-map/{task_id}/result",
+        response_model=TextGenerationTaskResultResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_mind_map_generation_result(task_id: str) -> TextGenerationTaskResultResponse:
+        task = await _resolve_task(task_id=task_id, media_type="mind_map")
+        artifact = _build_text_response(task.result, "mind_map") if task.result else None
+        logger.info(
+            "Bridge task result read: media=mind_map task=%s status=%s has_artifact=%s",
+            task_id,
+            task.status,
+            bool(artifact),
+            extra={
+                "media_type": "mind_map",
+                "task_id": task_id,
+                "status": task.status,
+                "has_artifact": bool(artifact),
+            },
+        )
+        return TextGenerationTaskResultResponse(
+            task_id=task.task_id,
+            media_type="mind_map",
+            status=task.status,
+            artifact=artifact,
+            error=task.error,
+        )
+
+    # ── Infographic endpoints ──────────────────────────────────────────
+
+    @app.post(
+        "/artifacts/infographic/start",
+        response_model=MediaGenerationTaskStartResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def start_infographic_generation(
+        request: MediaGenerationRequest,
+        generator: Annotated[MediaGenerator, Depends(get_media_generator)],
+    ) -> MediaGenerationTaskStartResponse:
+        task = await task_store.start_task(
+            media_type="infographic",
+            request=request,
+            generator=generator,
+        )
+        return MediaGenerationTaskStartResponse(
+            task_id=task.task_id,
+            media_type="infographic",
+            status="queued",
+            created_at=task.created_at,
+        )
+
+    @app.get(
+        "/artifacts/infographic/{task_id}/status",
+        response_model=MediaGenerationTaskStatusResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_infographic_generation_status(task_id: str) -> MediaGenerationTaskStatusResponse:
+        task = await _resolve_task(task_id=task_id, media_type="infographic")
+        logger.info(
+            "Bridge task status read: media=infographic task=%s status=%s",
+            task_id,
+            task.status,
+            extra={"media_type": "infographic", "task_id": task_id, "status": task.status},
+        )
+        return MediaGenerationTaskStatusResponse(
+            task_id=task.task_id,
+            media_type="infographic",
+            status=task.status,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            error=task.error,
+        )
+
+    @app.get(
+        "/artifacts/infographic/{task_id}/result",
+        response_model=InfographicGenerationTaskResultResponse,
+        dependencies=[Depends(require_bearer_token)],
+    )
+    async def get_infographic_generation_result(task_id: str) -> InfographicGenerationTaskResultResponse:
+        task = await _resolve_task(task_id=task_id, media_type="infographic")
+        artifact = _build_infographic_response(task.result) if task.result else None
+        logger.info(
+            "Bridge task result read: media=infographic task=%s status=%s has_artifact=%s",
+            task_id,
+            task.status,
+            bool(artifact),
+            extra={
+                "media_type": "infographic",
+                "task_id": task_id,
+                "status": task.status,
+                "has_artifact": bool(artifact),
+            },
+        )
+        return InfographicGenerationTaskResultResponse(
+            task_id=task.task_id,
+            media_type="infographic",
             status=task.status,
             artifact=artifact,
             error=task.error,

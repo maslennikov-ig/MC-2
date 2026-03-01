@@ -44,7 +44,7 @@ fi
 
 # 4. Ensure data and secrets directories exist
 echo "Ensuring data directories exist..."
-mkdir -p "$BASE_PATH/data/enrichments" "$BASE_PATH/data/enrichments-dev" \
+mkdir -p "$BASE_PATH/data/enrichments" \
          "$BASE_PATH/data/uploads" "$BASE_PATH/data/uploads-dev" \
          "$BASE_PATH/secrets/notebooklm"
 echo "   Directories ready."

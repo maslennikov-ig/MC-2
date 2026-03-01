@@ -13,6 +13,10 @@ import {
   FileText,
   Image,
   PanelTop,
+  BookOpen,
+  Layers,
+  Network,
+  ImageIcon,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -30,6 +34,10 @@ export type EnrichmentType =
   | 'cover'
   | 'card'
   | 'banner'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 
 /**
  * Enrichment status (matches database enum)
@@ -165,8 +173,8 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
     colorClass: 'text-purple-500 dark:text-purple-400',
     bgColor: 'bg-purple-100 dark:bg-purple-900/30',
     bgClass: 'bg-purple-100 dark:bg-purple-900/30',
-    label: 'NLM Audio',
-    labelRu: 'NLM Аудио',
+    label: 'Audio Lesson',
+    labelRu: 'Аудиоурок',
     twoStage: true,
     order: 8,
   },
@@ -176,10 +184,54 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
     colorClass: 'text-red-500 dark:text-red-400',
     bgColor: 'bg-red-100 dark:bg-red-900/30',
     bgClass: 'bg-red-100 dark:bg-red-900/30',
-    label: 'NLM Video',
-    labelRu: 'NLM Видео',
+    label: 'Video Lesson',
+    labelRu: 'Видеоурок',
     twoStage: true,
     order: 9,
+  },
+  nlm_study_guide: {
+    icon: BookOpen,
+    color: 'text-emerald-500 dark:text-emerald-400',
+    colorClass: 'text-emerald-500 dark:text-emerald-400',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+    bgClass: 'bg-emerald-100 dark:bg-emerald-900/30',
+    label: 'Study Guide',
+    labelRu: 'Учебный план',
+    twoStage: false,
+    order: 10,
+  },
+  nlm_flashcards: {
+    icon: Layers,
+    color: 'text-amber-500 dark:text-amber-400',
+    colorClass: 'text-amber-500 dark:text-amber-400',
+    bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+    bgClass: 'bg-amber-100 dark:bg-amber-900/30',
+    label: 'Flashcards',
+    labelRu: 'Карточки',
+    twoStage: false,
+    order: 11,
+  },
+  nlm_mind_map: {
+    icon: Network,
+    color: 'text-sky-500 dark:text-sky-400',
+    colorClass: 'text-sky-500 dark:text-sky-400',
+    bgColor: 'bg-sky-100 dark:bg-sky-900/30',
+    bgClass: 'bg-sky-100 dark:bg-sky-900/30',
+    label: 'Mind Map',
+    labelRu: 'Карта знаний',
+    twoStage: false,
+    order: 12,
+  },
+  nlm_infographic: {
+    icon: ImageIcon,
+    color: 'text-rose-500 dark:text-rose-400',
+    colorClass: 'text-rose-500 dark:text-rose-400',
+    bgColor: 'bg-rose-100 dark:bg-rose-900/30',
+    bgClass: 'bg-rose-100 dark:bg-rose-900/30',
+    label: 'Infographic',
+    labelRu: 'Инфографика',
+    twoStage: false,
+    order: 13,
   },
 }
 
@@ -301,4 +353,8 @@ export const ENRICHMENT_TYPES_ORDERED: EnrichmentType[] = [
   'banner',
   'nlm_audio',
   'nlm_video',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'nlm_mind_map',
+  'nlm_infographic',
 ]

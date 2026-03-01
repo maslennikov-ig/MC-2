@@ -19,14 +19,21 @@ import type {
  */
 export type Stage7EnrichmentType = EnrichmentType;
 
-export type NotebookLMMediaType = 'audio' | 'video';
+export type NotebookLMMediaType =
+  | 'audio'
+  | 'video'
+  | 'study_guide'
+  | 'flashcards'
+  | 'mind_map'
+  | 'infographic';
 
 export interface Stage7NlmAsyncState {
   taskId: string;
   mediaType: NotebookLMMediaType;
   pollAttempt: number;
   startedAt: string;
-  draft: DraftResult;
+  /** Draft content for two-stage handlers; absent for single-stage NLM handlers */
+  draft?: DraftResult;
 }
 
 /**

@@ -43,10 +43,10 @@ vi.mock('next-intl', () => ({
     const translations: Record<string, string> = {
       'placeholder.quiz.title': 'Quiz',
       'placeholder.audio.title': 'Audio',
-      'placeholder.nlm_audio.title': 'NLM Audio',
+      'placeholder.nlm_audio.title': 'Audio Lesson',
       'placeholder.presentation.title': 'Presentation',
       'placeholder.video.title': 'Video',
-      'placeholder.nlm_video.title': 'NLM Video',
+      'placeholder.nlm_video.title': 'Video Lesson',
       'images.cover.title': 'Cover',
       'images.card.title': 'Card',
       generating: 'Generating...',
@@ -136,7 +136,7 @@ describe('EnrichmentGeneratingCard', () => {
     it('should render correctly with nlm_audio type', () => {
       render(<EnrichmentGeneratingCard {...defaultProps} type="nlm_audio" />)
 
-      expect(screen.getByText('NLM Audio - Generating...')).toBeInTheDocument()
+      expect(screen.getByText('Audio Lesson - Generating...')).toBeInTheDocument()
     })
 
     it('should render correctly with video type', () => {
@@ -148,7 +148,7 @@ describe('EnrichmentGeneratingCard', () => {
     it('should render correctly with nlm_video type', () => {
       render(<EnrichmentGeneratingCard {...defaultProps} type="nlm_video" />)
 
-      expect(screen.getByText('NLM Video - Generating...')).toBeInTheDocument()
+      expect(screen.getByText('Video Lesson - Generating...')).toBeInTheDocument()
     })
 
     it('should render correctly with cover type', () => {
@@ -352,6 +352,21 @@ describe('EnrichmentGeneratingCard', () => {
   })
 
   describe('Long-running countdown', () => {
+    it('does not activate long-running countdown while nlm_audio is queued', () => {
+      render(
+        <EnrichmentGeneratingCard
+          {...defaultProps}
+          type="nlm_audio"
+          currentStep="queued"
+          startedAtMs={1_000}
+          maxDurationMs={60 * 60 * 1000}
+        />
+      )
+
+      expect(screen.getByTestId('staged-progress')).toBeInTheDocument()
+      expect(screen.queryByText(/Time left:/)).not.toBeInTheDocument()
+    })
+
     it('uses time-based smooth progress for nlm_audio', () => {
       const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(61_000)
 

@@ -62,12 +62,12 @@ class Settings(BaseSettings):
         alias="NOTEBOOKLM_PROACTIVE_RECOVERY_INTERVAL_SECONDS",
     )
     notebooklm_global_generation_concurrency: int = Field(
-        default=2,
+        default=4,
         ge=1,
         alias="NOTEBOOKLM_GLOBAL_GENERATION_CONCURRENCY",
     )
     notebooklm_queue_wait_timeout_seconds: float = Field(
-        default=3600.0,
+        default=259200.0,  # 72 hours — supports large batch runs (100+ enrichments)
         gt=0,
         alias="NOTEBOOKLM_QUEUE_WAIT_TIMEOUT_SECONDS",
     )

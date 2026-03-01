@@ -17,6 +17,7 @@ import {
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default'
 
 import { Maximize2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { formatVideoSrc } from './video-utils'
 import { useVidstackTranslations } from '@/hooks/useVidstackTranslations'
 
@@ -42,6 +43,7 @@ export default function PersistentVideoPlayer({
   const containerRef = useRef<HTMLDivElement>(null)
   const [hasError, setHasError] = useState(false)
 
+  const t = useTranslations('course.content')
   const vidstackTranslations = useVidstackTranslations()
 
   // Floating window position and size
@@ -201,12 +203,12 @@ export default function PersistentVideoPlayer({
       <div className="relative h-full w-full bg-black">
         {hasError ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center">
-            <p className="text-sm text-gray-400">Видео недоступно</p>
+            <p className="text-sm text-gray-400">{t('videoUnavailable')}</p>
             <button
               onClick={() => setHasError(false)}
               className="text-xs text-purple-400 transition-colors hover:text-purple-300"
             >
-              Попробовать снова
+              {t('tryAgain')}
             </button>
           </div>
         ) : (
@@ -243,7 +245,7 @@ export default function PersistentVideoPlayer({
                   onModeChange('normal')
                 }}
                 className="rounded-full bg-black/60 p-1.5 text-white/80 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white"
-                aria-label="Вернуть видео в основной вид"
+                aria-label={t('restoreVideo')}
               >
                 <Maximize2 className="h-3.5 w-3.5" />
               </button>
@@ -269,7 +271,7 @@ export default function PersistentVideoPlayer({
               onModeChange('floating')
             }}
             className="rounded-full bg-black/60 p-1.5 text-white/80 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white"
-            aria-label="Свернуть в плавающее окно"
+            aria-label={t('minimizeVideo')}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -40,6 +40,7 @@ export async function verifyEnrichmentAccess(
   asset_id: string | null;
   generation_attempt: number;
   content: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
   updated_at: string;
 }> {
   const supabase = getSupabaseAdmin();
@@ -48,7 +49,7 @@ export async function verifyEnrichmentAccess(
   const { data: enrichment, error } = await supabase
     .from('lesson_enrichments')
     .select(
-      'id, lesson_id, course_id, enrichment_type, status, order_index, asset_id, generation_attempt, content, updated_at'
+      'id, lesson_id, course_id, enrichment_type, status, order_index, asset_id, generation_attempt, content, metadata, updated_at'
     )
     .eq('id', enrichmentId)
     .single();
@@ -102,6 +103,7 @@ export async function verifyEnrichmentAccess(
     asset_id: enrichment.asset_id,
     generation_attempt: enrichment.generation_attempt ?? 0,
     content: enrichment.content as Record<string, unknown> | null,
+    metadata: enrichment.metadata as Record<string, unknown> | null,
     updated_at: enrichment.updated_at ?? new Date().toISOString(),
   };
 }
@@ -436,6 +438,39 @@ export function isLegacyNlmType(
   enrichmentType: string
 ): enrichmentType is (typeof LEGACY_NLM_TYPES)[number] {
   return (LEGACY_NLM_TYPES as readonly string[]).includes(enrichmentType);
+}
+
+function asObjectRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+/**
+ * Extract NotebookLM async generation start timestamp from enrichment metadata.
+ *
+ * Reads metadata.additional_info.notebooklm_async_state.started_at and parses
+ * ISO 8601 to Unix milliseconds when valid.
+ */
+export function extractNlmGenerationStartedAtMs(
+  enrichmentType: string,
+  metadata: Record<string, unknown> | null | undefined
+): number | undefined {
+  if (!isLegacyNlmType(enrichmentType)) {
+    return undefined;
+  }
+
+  const additionalInfo = asObjectRecord(metadata?.['additional_info']);
+  const notebookLmAsyncState = asObjectRecord(additionalInfo?.['notebooklm_async_state']);
+  const startedAt = notebookLmAsyncState?.['started_at'];
+
+  if (typeof startedAt !== 'string') {
+    return undefined;
+  }
+
+  const startedAtMs = Date.parse(startedAt);
+  return Number.isFinite(startedAtMs) ? startedAtMs : undefined;
 }
 
 /**

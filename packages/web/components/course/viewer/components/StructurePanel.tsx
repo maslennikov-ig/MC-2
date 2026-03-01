@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, BookOpen, Clock, Circle, Layers } from 'lucide-react'
@@ -30,16 +31,17 @@ export function StructurePanel({
   progressPercentage,
   onSelectLesson,
 }: StructurePanelProps) {
+  const t = useTranslations('course')
   return (
     <div className="mx-auto max-w-6xl">
       <Card className="border-purple-300 bg-gradient-to-br from-purple-50 to-blue-50 shadow-sm dark:border-gray-700 dark:from-gray-900 dark:to-gray-800">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gray-800 dark:text-white/90">
             <Layers className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            Структура курса
+            {t('viewer.tabs.structure')}
           </CardTitle>
           <CardDescription className="text-gray-500 dark:text-white/60">
-            Полный обзор всех модулей и уроков курса
+            {t('viewer.structureDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -85,7 +87,10 @@ export function StructurePanel({
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-sm text-gray-600 dark:text-white/60">
-                          {sectionCompleted}/{sectionLessons.length} уроков
+                          {t('viewer.lessonsProgress', {
+                            completed: sectionCompleted,
+                            total: sectionLessons.length,
+                          })}
                         </div>
                         {sectionCompleted === sectionLessons.length &&
                           sectionLessons.length > 0 && (
@@ -138,13 +143,15 @@ export function StructurePanel({
                               </div>
                               <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-white/50">
                                 <Clock className="h-3 w-3" />
-                                <span>{lesson.duration_minutes} мин</span>
+                                <span>
+                                  {t('lesson.duration', { minutes: lesson.duration_minutes ?? 0 })}
+                                </span>
                                 {isCurrent && (
                                   <Badge
                                     variant="default"
                                     className="ml-2 bg-purple-600 px-1.5 py-0 text-xs text-white"
                                   >
-                                    Текущий
+                                    {t('viewer.current')}
                                   </Badge>
                                 )}
                               </div>
@@ -163,15 +170,15 @@ export function StructurePanel({
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-600 dark:text-white/60">
-                  Общий прогресс курса
+                  {t('viewer.overallProgress')}
                 </p>
                 <p className="text-2xl font-bold text-gray-800 dark:text-white/90">
-                  {completedCount} из {totalLessons} уроков
+                  {t('viewer.lessonsCompleted', { completed: completedCount, total: totalLessons })}
                 </p>
               </div>
               <div className="space-y-1 text-right">
                 <p className="text-sm font-medium text-gray-600 dark:text-white/60">
-                  Осталось времени
+                  {t('viewer.timeRemaining')}
                 </p>
                 <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                   {remainingTime}

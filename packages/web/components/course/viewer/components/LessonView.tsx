@@ -1,6 +1,7 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -34,6 +35,7 @@ const ContentFormatSwitcher = dynamic(() => import('@/components/common/content-
 })
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+type ViewerTab = 'content' | 'structure' | 'enrichments'
 
 interface LessonViewProps {
   currentLesson: Lesson
@@ -101,6 +103,27 @@ export function LessonView({
   courseLanguage,
 }: LessonViewProps) {
   const t = useTranslations('course.viewer')
+  const pathname = usePathname()
+
+  // Local tab state initialized from URL (no router needed)
+  const [activeTab, setActiveTab] = useState<ViewerTab>(() => {
+    if (typeof window === 'undefined') return 'content'
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    return tab === 'structure' || tab === 'enrichments' ? tab : 'content'
+  })
+
+  const handleTabChange = (nextTab: string) => {
+    const normalizedTab: ViewerTab =
+      nextTab === 'structure' || nextTab === 'enrichments' ? nextTab : 'content'
+    if (normalizedTab === activeTab) return
+
+    setActiveTab(normalizedTab)
+    const params = new URLSearchParams(window.location.search)
+    params.set('tab', normalizedTab)
+    window.history.replaceState(null, '', `${pathname}?${params.toString()}`)
+  }
+
   const nextLessonData =
     currentIndex < totalLessonsOrdered - 1
       ? {
@@ -113,7 +136,7 @@ export function LessonView({
     return (
       <div className="min-h-screen bg-white dark:bg-gray-950">
         <div className="sticky top-0 z-20 border-b border-gray-200/50 bg-white/95 backdrop-blur-sm dark:border-gray-800/50 dark:bg-gray-900/95">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+          <div className="flex items-center justify-between px-6 py-3">
             <div className="flex items-center gap-4">
               <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
                 {currentLesson.title}
@@ -173,7 +196,7 @@ export function LessonView({
           </div>
         </div>
 
-        <div className="relative mx-auto max-w-6xl px-6 py-12" {...swipeHandlers}>
+        <div className="relative px-6 py-12" {...swipeHandlers}>
           <AnimatePresence>
             <motion.div
               initial={{ opacity: 0 }}
@@ -263,7 +286,7 @@ export function LessonView({
   }
 
   return (
-    <Tabs defaultValue="content" className="w-full">
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <div className="sticky top-0 z-10 border-b border-gray-200/60 bg-white backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/70">
         <TabsList className="h-auto w-full justify-start rounded-none bg-transparent p-0">
           <TabsTrigger
@@ -295,7 +318,7 @@ export function LessonView({
         </TabsList>
       </div>
 
-      <TabsContent value="content" className="mt-0">
+      <TabsContent value="content" forceMount className="mt-0 data-[state=inactive]:hidden">
         <ContentFormatSwitcher
           lesson={currentLesson}
           section={currentSection}
@@ -314,7 +337,7 @@ export function LessonView({
         />
       </TabsContent>
 
-      <TabsContent value="structure" className="mt-0 p-6">
+      <TabsContent value="structure" forceMount className="mt-0 p-6 data-[state=inactive]:hidden">
         <StructurePanel
           sections={sections}
           lessonsBySection={lessonsBySection}
@@ -329,7 +352,7 @@ export function LessonView({
         />
       </TabsContent>
 
-      <TabsContent value="enrichments" className="mt-0 p-6">
+      <TabsContent value="enrichments" forceMount className="mt-0 p-6 data-[state=inactive]:hidden">
         <EnrichmentsPanel
           enrichments={enrichments}
           enrichmentsLoadError={enrichmentsLoadError}

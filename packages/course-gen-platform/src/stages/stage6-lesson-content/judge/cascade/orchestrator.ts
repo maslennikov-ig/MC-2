@@ -198,7 +198,7 @@ export async function executeCascadeEvaluation(
         accuracyScore: factualVerificationResult.overallAccuracyScore,
         minRequired: finalConfig.minFactualAccuracyScore,
         contradictedClaims: factualVerificationResult.contradictedClaims,
-        flaggedSentences: factualVerificationResult.flaggedSentences.slice(0, 3),
+        flaggedSentences: factualVerificationResult.flaggedSentences?.slice(0, 3) ?? [],
       });
 
       return {

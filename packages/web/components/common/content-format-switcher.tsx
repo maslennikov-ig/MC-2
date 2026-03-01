@@ -6,6 +6,7 @@
 // See: packages/web/components/course/viewer/components/LessonView.tsx
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MediaPlayer,
@@ -41,7 +42,6 @@ type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 interface ContentFormat {
   type: 'text' | 'video' | 'audio' | 'presentation'
-  label: string
   icon: React.ReactNode
   available: boolean
   url?: string
@@ -79,6 +79,9 @@ export default function ContentFormatSwitcher({
   nextLesson,
   onNextLesson,
 }: ContentFormatSwitcherProps) {
+  const t = useTranslations('course.content')
+  const tLesson = useTranslations('course.lesson')
+
   const [currentFormat, setCurrentFormat] = useState<'text' | 'video' | 'audio' | 'presentation'>(
     'text'
   )
@@ -104,27 +107,23 @@ export default function ContentFormatSwitcher({
     () => [
       {
         type: 'text',
-        label: 'Текст',
         icon: <FileText className="h-4 w-4" />,
         available: true,
       },
       {
         type: 'video',
-        label: 'Видео',
         icon: <Play className="h-4 w-4" />,
         available: !!mockFormats.video,
         url: mockFormats.video || undefined,
       },
       {
         type: 'audio',
-        label: 'Аудио',
         icon: <Headphones className="h-4 w-4" />,
         available: !!mockFormats.audio,
         url: mockFormats.audio || undefined,
       },
       {
         type: 'presentation',
-        label: 'Презентация',
         icon: <Presentation className="h-4 w-4" />,
         available: !!mockFormats.presentation,
         url: mockFormats.presentation || undefined,
@@ -235,7 +234,9 @@ export default function ContentFormatSwitcher({
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Формат:</span>
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                {t('format')}
+              </span>
               <div className="flex items-center gap-2">
                 {formats.map((format) => (
                   <Button
@@ -253,7 +254,7 @@ export default function ContentFormatSwitcher({
                     )}
                   >
                     {format.icon}
-                    <span className="hidden sm:inline">{format.label}</span>
+                    <span className="hidden sm:inline">{t(format.type)}</span>
                   </Button>
                 ))}
               </div>
@@ -264,32 +265,34 @@ export default function ContentFormatSwitcher({
                 variant="secondary"
                 className="bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
               >
-                {availableFormatsCount} формата
+                {t('formatCount', { count: availableFormatsCount })}
               </Badge>
               {currentFormat !== 'text' && (
                 <Badge
                   variant="secondary"
                   className="bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
                 >
-                  {lesson.duration_minutes} мин
+                  {tLesson('duration', { minutes: lesson.duration_minutes ?? 0 })}
                 </Badge>
               )}
             </div>
           </div>
 
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Быстрый доступ:{' '}
-            <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">1</kbd> Текст
+            {t('quickAccess')}{' '}
+            <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">1</kbd> {t('text')}
             {formats[1].available && (
               <>
                 {' '}
-                • <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">2</kbd> Видео
+                • <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">2</kbd>{' '}
+                {t('video')}
               </>
             )}
             {formats[2].available && (
               <>
                 {' '}
-                • <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">3</kbd> Аудио
+                • <kbd className="rounded bg-gray-100 px-1 py-0.5 dark:bg-gray-800">3</kbd>{' '}
+                {t('audio')}
               </>
             )}
           </div>
@@ -320,18 +323,18 @@ export default function ContentFormatSwitcher({
 
           {currentFormat === 'video' && mockFormats.video && (
             <div className="relative bg-black">
-              <div className="mx-auto max-w-7xl px-6 py-8">
+              <div className="px-6 py-8">
                 <div className="aspect-video overflow-hidden rounded-lg bg-gray-900 shadow-2xl">
                   <div className="relative h-full w-full">
                     {mediaError ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
                         <Play className="h-12 w-12 text-gray-500" />
-                        <p className="text-sm text-gray-400">Видео недоступно</p>
+                        <p className="text-sm text-gray-400">{t('videoUnavailable')}</p>
                         <button
                           onClick={() => setMediaError(null)}
                           className="text-xs text-purple-400 transition-colors hover:text-purple-300"
                         >
-                          Попробовать снова
+                          {t('tryAgain')}
                         </button>
                       </div>
                     ) : (
@@ -459,9 +462,11 @@ export default function ContentFormatSwitcher({
                 </div>
 
                 <div className="mt-6 rounded-lg bg-gray-50 p-6 dark:bg-gray-900">
-                  <h3 className="mb-2 text-lg font-semibold">Видео урок: {lesson.title}</h3>
+                  <h3 className="mb-2 text-lg font-semibold">
+                    {t('videoLesson', { title: lesson.title })}
+                  </h3>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Продолжительность: {lesson.duration_minutes} минут
+                    {t('videoDuration', { minutes: lesson.duration_minutes ?? 0 })}
                   </p>
                 </div>
               </div>
@@ -469,7 +474,7 @@ export default function ContentFormatSwitcher({
           )}
 
           {currentFormat === 'audio' && mockFormats.audio && (
-            <div className="mx-auto max-w-4xl px-6 py-8">
+            <div className="px-6 py-8">
               <div className="rounded-lg bg-gradient-to-br from-purple-100 to-blue-100 p-8 shadow-lg dark:from-gray-800 dark:to-gray-900">
                 <div className="mb-6 flex items-center justify-center">
                   <div className="relative">
@@ -597,7 +602,7 @@ export default function ContentFormatSwitcher({
                     className="gap-2"
                   >
                     <FileText className="h-4 w-4" />
-                    Читать текстовую версию
+                    {t('readTextVersion')}
                   </Button>
                 </div>
               </div>
@@ -605,14 +610,14 @@ export default function ContentFormatSwitcher({
           )}
 
           {currentFormat === 'presentation' && mockFormats.presentation && (
-            <div className="mx-auto max-w-6xl px-6 py-8">
+            <div className="px-6 py-8">
               <div className="rounded-lg bg-gray-100 p-8 text-center dark:bg-gray-800">
                 <Presentation className="mx-auto mb-4 h-16 w-16 text-gray-400" />
-                <h3 className="mb-2 text-xl font-semibold">Презентация к уроку</h3>
+                <h3 className="mb-2 text-xl font-semibold">{t('lessonPresentation')}</h3>
                 <p className="mb-6 text-gray-600 dark:text-gray-400">{lesson.title}</p>
                 <Button className="gap-2">
                   <Download className="h-4 w-4" />
-                  Скачать презентацию
+                  {t('downloadPresentation')}
                 </Button>
               </div>
             </div>

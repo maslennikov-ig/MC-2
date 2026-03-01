@@ -2,7 +2,17 @@
 
 import React from 'react'
 import { useTranslations } from 'next-intl'
-import { Video, Headphones, Presentation, HelpCircle, Image } from 'lucide-react'
+import {
+  Video,
+  Headphones,
+  Presentation,
+  HelpCircle,
+  Image,
+  BookOpen,
+  Layers,
+  Network,
+  ImageIcon,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useSmoothProgress } from '@/lib/hooks/useSmoothProgress'
@@ -29,6 +39,10 @@ type EnrichmentType =
   | 'nlm_video'
   | 'cover'
   | 'card'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 
 const ENRICHMENT_CONFIG: Record<
   EnrichmentType,
@@ -77,6 +91,26 @@ const ENRICHMENT_CONFIG: Record<
     icon: Video,
     color: 'text-red-500 dark:text-red-400',
     bgColor: 'bg-red-100 dark:bg-red-900/30',
+  },
+  nlm_study_guide: {
+    icon: BookOpen,
+    color: 'text-emerald-500 dark:text-emerald-400',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+  },
+  nlm_flashcards: {
+    icon: Layers,
+    color: 'text-amber-500 dark:text-amber-400',
+    bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+  },
+  nlm_mind_map: {
+    icon: Network,
+    color: 'text-sky-500 dark:text-sky-400',
+    bgColor: 'bg-sky-100 dark:bg-sky-900/30',
+  },
+  nlm_infographic: {
+    icon: ImageIcon,
+    color: 'text-rose-500 dark:text-rose-400',
+    bgColor: 'bg-rose-100 dark:bg-rose-900/30',
   },
 }
 
@@ -296,6 +330,14 @@ export function EnrichmentGeneratingCard({
           return 'video_generating'
         case 'nlm_video':
           return 'nlm_video_generating'
+        case 'nlm_study_guide':
+          return 'nlm_study_guide_generating'
+        case 'nlm_flashcards':
+          return 'nlm_flashcards_generating'
+        case 'nlm_mind_map':
+          return 'nlm_mind_map_generating'
+        case 'nlm_infographic':
+          return 'nlm_infographic_generating'
         default:
           return 'generating'
       }
@@ -305,7 +347,13 @@ export function EnrichmentGeneratingCard({
   }
 
   const shouldShowLongRunningCountdown =
-    (type === 'nlm_audio' || type === 'nlm_video') &&
+    (type === 'nlm_audio' ||
+      type === 'nlm_video' ||
+      type === 'nlm_study_guide' ||
+      type === 'nlm_flashcards' ||
+      type === 'nlm_mind_map' ||
+      type === 'nlm_infographic') &&
+    currentStep === 'generating' &&
     typeof startedAtMs === 'number' &&
     Number.isFinite(startedAtMs) &&
     startedAtMs > 0 &&
@@ -374,7 +422,12 @@ export function EnrichmentGeneratingCard({
 
   const shouldUseLongRunningProgressBar =
     shouldShowLongRunningCountdown &&
-    (type === 'nlm_audio' || type === 'nlm_video') &&
+    (type === 'nlm_audio' ||
+      type === 'nlm_video' ||
+      type === 'nlm_study_guide' ||
+      type === 'nlm_flashcards' ||
+      type === 'nlm_mind_map' ||
+      type === 'nlm_infographic') &&
     !isSyncing &&
     longRunningProgress !== null
 
@@ -409,6 +462,14 @@ export function EnrichmentGeneratingCard({
         return t('images.cover.title')
       case 'card':
         return t('images.card.title')
+      case 'nlm_study_guide':
+        return t('placeholder.nlm_study_guide.title')
+      case 'nlm_flashcards':
+        return t('placeholder.nlm_flashcards.title')
+      case 'nlm_mind_map':
+        return t('placeholder.nlm_mind_map.title')
+      case 'nlm_infographic':
+        return t('placeholder.nlm_infographic.title')
     }
   }
 

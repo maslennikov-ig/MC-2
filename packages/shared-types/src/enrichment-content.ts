@@ -554,6 +554,247 @@ export const bannerEnrichmentContentSchema = z.object({
 export type BannerEnrichmentContent = z.infer<typeof bannerEnrichmentContentSchema>;
 
 // ============================================================================
+// NLM STUDY GUIDE ENRICHMENT CONTENT
+// ============================================================================
+
+/**
+ * Study guide enrichment content (NotebookLM-generated Markdown)
+ *
+ * Comprehensive study guide stored inline as Markdown text.
+ * Generated via NotebookLM's report feature (format: study_guide).
+ */
+export const studyGuideEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('nlm_study_guide'),
+
+  /** Markdown content of the study guide */
+  markdown: z.string().min(10).max(200_000),
+
+  /** Approximate word count */
+  word_count: z.number().int().positive().optional(),
+
+  /** Structured sections (parsed from Markdown, optional) */
+  sections: z
+    .array(
+      z.object({
+        title: z.string(),
+        content: z.string(),
+      })
+    )
+    .optional(),
+});
+
+export type StudyGuideEnrichmentContent = z.infer<typeof studyGuideEnrichmentContentSchema>;
+
+// ============================================================================
+// NLM FLASHCARDS ENRICHMENT CONTENT
+// ============================================================================
+
+/**
+ * Flashcard item schema
+ */
+export const flashcardItemSchema = z.object({
+  /** Unique card identifier */
+  id: z.string(),
+
+  /** Front side text (question/term) */
+  front: z.string().min(1),
+
+  /** Back side text (answer/definition) */
+  back: z.string().min(1),
+
+  /** Optional difficulty level */
+  difficulty: questionDifficultySchema.optional(),
+});
+
+export type FlashcardItem = z.infer<typeof flashcardItemSchema>;
+
+/**
+ * Flashcards enrichment content (NotebookLM-generated Q&A pairs)
+ *
+ * Interactive flashcard deck stored inline as JSON.
+ * Generated via NotebookLM's flashcard feature.
+ */
+export const flashcardsEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('nlm_flashcards'),
+
+  /** Array of flashcard Q&A pairs */
+  cards: z.array(flashcardItemSchema).min(1).max(100),
+
+  /** Total number of cards */
+  total_cards: z.number().int().positive(),
+});
+
+/** Strict schema with cross-field validation (use for handler output validation) */
+export const flashcardsEnrichmentContentStrictSchema = flashcardsEnrichmentContentSchema.refine(
+  data => data.total_cards === data.cards.length,
+  { message: 'total_cards must equal cards.length', path: ['total_cards'] }
+);
+
+export type FlashcardsEnrichmentContent = z.infer<typeof flashcardsEnrichmentContentSchema>;
+
+// ============================================================================
+// NLM MIND MAP ENRICHMENT CONTENT
+// ============================================================================
+
+/**
+ * Mind map node (recursive tree structure)
+ */
+export interface MindMapNode {
+  /** Node label text */
+  label: string;
+  /** Child nodes */
+  children?: MindMapNode[];
+  /** Optional description text */
+  description?: string;
+}
+
+export const mindMapNodeSchema: z.ZodType<MindMapNode> = z.lazy(() =>
+  z.object({
+    label: z.string().min(1),
+    children: z.array(mindMapNodeSchema).optional(),
+    description: z.string().optional(),
+  })
+);
+
+/**
+ * Mind map enrichment content (NotebookLM-generated hierarchical JSON)
+ *
+ * Hierarchical knowledge map stored inline as JSON.
+ * Generated via NotebookLM's mind map feature (synchronous).
+ */
+export const mindMapEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('nlm_mind_map'),
+
+  /** Root node of the mind map tree */
+  root: mindMapNodeSchema,
+
+  /** Total number of nodes in the tree */
+  total_nodes: z.number().int().positive().optional(),
+
+  /** Maximum depth of the tree */
+  max_depth: z.number().int().positive().optional(),
+});
+
+export type MindMapEnrichmentContent = z.infer<typeof mindMapEnrichmentContentSchema>;
+
+/** Maximum allowed depth for mind map trees (prevents stack overflow during Zod z.lazy() validation) */
+export const MIND_MAP_MAX_DEPTH = 50;
+
+/**
+ * Iteratively computes the maximum depth of a mind map tree using BFS.
+ * Does NOT use recursion — safe for any nesting level.
+ */
+function getMindMapDepthIterative(root: unknown): number {
+  if (!root || typeof root !== 'object') return 0;
+
+  const queue: Array<[unknown, number]> = [[root, 1]];
+  let maxFound = 0;
+
+  while (queue.length > 0) {
+    const [node, depth] = queue.shift()!;
+    if (!node || typeof node !== 'object') continue;
+
+    maxFound = Math.max(maxFound, depth);
+
+    const children = (node as Record<string, unknown>)['children'];
+    if (Array.isArray(children)) {
+      for (const child of children) {
+        queue.push([child, depth + 1]);
+      }
+    }
+  }
+
+  return maxFound;
+}
+
+/**
+ * Strict mind map schema with iterative depth validation.
+ *
+ * Use for validating untrusted/LLM-generated input. The base
+ * `mindMapEnrichmentContentSchema` stays a plain ZodObject
+ * for discriminated union compatibility.
+ */
+export const mindMapEnrichmentContentStrictSchema = mindMapEnrichmentContentSchema.superRefine(
+  (data, ctx) => {
+    const depth = getMindMapDepthIterative(data.root);
+    if (depth > MIND_MAP_MAX_DEPTH) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Mind map tree exceeds maximum depth of ${MIND_MAP_MAX_DEPTH} (found: ${depth})`,
+        path: ['root'],
+      });
+    }
+  }
+);
+
+/**
+ * Validates mind map enrichment content with depth safety.
+ *
+ * Performs iterative BFS depth check BEFORE z.lazy() recursion
+ * to prevent stack overflow on pathological input.
+ */
+export function validateMindMapContent(data: unknown) {
+  // Fast iterative pre-check — catches dangerous input before z.lazy() recursion
+  if (data && typeof data === 'object' && 'root' in data) {
+    const depth = getMindMapDepthIterative((data as Record<string, unknown>)['root']);
+    if (depth > MIND_MAP_MAX_DEPTH) {
+      return {
+        success: false as const,
+        error: new z.ZodError([
+          {
+            code: z.ZodIssueCode.custom,
+            message: `Mind map tree exceeds maximum depth of ${MIND_MAP_MAX_DEPTH} (found: ${depth})`,
+            path: ['root'],
+          },
+        ]),
+      };
+    }
+  }
+
+  return mindMapEnrichmentContentStrictSchema.safeParse(data);
+}
+
+// ============================================================================
+// NLM INFOGRAPHIC ENRICHMENT CONTENT
+// ============================================================================
+
+/**
+ * Infographic enrichment content (NotebookLM-generated PNG image)
+ *
+ * Visual infographic stored in Supabase Storage (like cover/card).
+ * Generated via NotebookLM's infographic feature.
+ */
+export const infographicEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('nlm_infographic'),
+
+  /** Generated image URL (Supabase Storage public URL) */
+  imageUrl: z.string().url(),
+
+  /** Alt text for accessibility */
+  altText: z.string().optional(),
+
+  /** Image dimensions */
+  dimensions: z
+    .object({
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+    })
+    .optional(),
+
+  /** Image format */
+  format: z.enum(['png', 'jpeg', 'webp']).default('png'),
+
+  /** File size in bytes */
+  file_size_bytes: z.number().int().positive().optional(),
+});
+
+export type InfographicEnrichmentContent = z.infer<typeof infographicEnrichmentContentSchema>;
+
+// ============================================================================
 // DISCRIMINATED UNION OF ALL CONTENT TYPES
 // ============================================================================
 
@@ -572,6 +813,10 @@ export const enrichmentContentSchema = z.discriminatedUnion('type', [
   coverEnrichmentContentSchema,
   cardEnrichmentContentSchema,
   bannerEnrichmentContentSchema,
+  studyGuideEnrichmentContentSchema,
+  flashcardsEnrichmentContentSchema,
+  mindMapEnrichmentContentSchema,
+  infographicEnrichmentContentSchema,
 ]);
 
 export type EnrichmentContent = z.infer<typeof enrichmentContentSchema>;

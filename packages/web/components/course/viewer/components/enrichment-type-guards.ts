@@ -2,6 +2,10 @@ import type {
   QuizEnrichmentContent,
   PresentationEnrichmentContent,
   AudioEnrichmentContent,
+  StudyGuideEnrichmentContent,
+  FlashcardsEnrichmentContent,
+  MindMapEnrichmentContent,
+  InfographicEnrichmentContent,
 } from '@megacampus/shared-types/enrichment-content'
 
 type AudioLikeContent = Omit<AudioEnrichmentContent, 'type'> & { type: 'audio' | 'nlm_audio' }
@@ -52,5 +56,53 @@ export function isVideoContent(content: unknown): content is VideoLikeContent {
     'type' in content &&
     ((content as Record<string, unknown>).type === 'video' ||
       (content as Record<string, unknown>).type === 'nlm_video')
+  )
+}
+
+export function isStudyGuideContent(content: unknown): content is StudyGuideEnrichmentContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    (content as Record<string, unknown>).type === 'nlm_study_guide' &&
+    'markdown' in content &&
+    typeof (content as Record<string, unknown>).markdown === 'string' &&
+    ((content as Record<string, unknown>).markdown as string).length > 0
+  )
+}
+
+export function isFlashcardsContent(content: unknown): content is FlashcardsEnrichmentContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    (content as Record<string, unknown>).type === 'nlm_flashcards' &&
+    'cards' in content &&
+    Array.isArray((content as Record<string, unknown>).cards) &&
+    ((content as Record<string, unknown>).cards as unknown[]).length > 0
+  )
+}
+
+export function isMindMapContent(content: unknown): content is MindMapEnrichmentContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    (content as Record<string, unknown>).type === 'nlm_mind_map' &&
+    'root' in content &&
+    typeof (content as Record<string, unknown>).root === 'object' &&
+    (content as Record<string, unknown>).root !== null
+  )
+}
+
+export function isInfographicContent(content: unknown): content is InfographicEnrichmentContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    (content as Record<string, unknown>).type === 'nlm_infographic' &&
+    'imageUrl' in content &&
+    typeof (content as Record<string, unknown>).imageUrl === 'string' &&
+    (content as Record<string, unknown>).imageUrl !== ''
   )
 }

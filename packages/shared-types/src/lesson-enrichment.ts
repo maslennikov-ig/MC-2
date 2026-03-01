@@ -31,6 +31,10 @@ export const enrichmentTypeSchema = z.enum([
   'cover', // Auto-generated lesson hero image (after Stage 5)
   'card', // Auto-generated thumbnail (lesson card after Stage 6, course card after Stage 5)
   'banner', // Manually created decorative header image
+  'nlm_study_guide', // NotebookLM-generated study guide (Markdown)
+  'nlm_flashcards', // NotebookLM-generated flashcards (JSON Q&A pairs)
+  'nlm_mind_map', // NotebookLM-generated mind map (hierarchical JSON)
+  'nlm_infographic', // NotebookLM-generated infographic (PNG image)
 ]);
 
 export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
@@ -299,7 +303,8 @@ export function requiresAsset(type: EnrichmentType): boolean {
     type === 'nlm_video' ||
     type === 'cover' ||
     type === 'card' ||
-    type === 'banner'
+    type === 'banner' ||
+    type === 'nlm_infographic'
   );
 }
 
@@ -332,6 +337,10 @@ export function getDefaultEnrichmentTitle(
     cover: { en: 'Lesson Cover', ru: 'Обложка урока' },
     card: { en: 'Visual Card', ru: 'Визуальная карточка' },
     banner: { en: 'Decorative Banner', ru: 'Декоративный баннер' },
+    nlm_study_guide: { en: 'Study Guide', ru: 'Учебное пособие' },
+    nlm_flashcards: { en: 'Flashcards', ru: 'Карточки для запоминания' },
+    nlm_mind_map: { en: 'Mind Map', ru: 'Карта знаний' },
+    nlm_infographic: { en: 'Infographic', ru: 'Инфографика' },
   };
 
   return titles[type][locale];

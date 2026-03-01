@@ -23,6 +23,19 @@ const AUDIO_TASK_STATUS_DEFAULT_PATH = '/artifacts/generate-audio/{taskId}/statu
 const VIDEO_TASK_STATUS_DEFAULT_PATH = '/video/generate-overview/{taskId}/status';
 const AUDIO_TASK_RESULT_DEFAULT_PATH = '/artifacts/generate-audio/{taskId}/result';
 const VIDEO_TASK_RESULT_DEFAULT_PATH = '/video/generate-overview/{taskId}/result';
+
+const STUDY_GUIDE_START_DEFAULT_PATH = '/artifacts/study-guide/start';
+const STUDY_GUIDE_TASK_STATUS_DEFAULT_PATH = '/artifacts/study-guide/{taskId}/status';
+const STUDY_GUIDE_TASK_RESULT_DEFAULT_PATH = '/artifacts/study-guide/{taskId}/result';
+const FLASHCARDS_START_DEFAULT_PATH = '/artifacts/flashcards/start';
+const FLASHCARDS_TASK_STATUS_DEFAULT_PATH = '/artifacts/flashcards/{taskId}/status';
+const FLASHCARDS_TASK_RESULT_DEFAULT_PATH = '/artifacts/flashcards/{taskId}/result';
+const MIND_MAP_START_DEFAULT_PATH = '/artifacts/mind-map/start';
+const MIND_MAP_TASK_STATUS_DEFAULT_PATH = '/artifacts/mind-map/{taskId}/status';
+const MIND_MAP_TASK_RESULT_DEFAULT_PATH = '/artifacts/mind-map/{taskId}/result';
+const INFOGRAPHIC_START_DEFAULT_PATH = '/artifacts/infographic/start';
+const INFOGRAPHIC_TASK_STATUS_DEFAULT_PATH = '/artifacts/infographic/{taskId}/status';
+const INFOGRAPHIC_TASK_RESULT_DEFAULT_PATH = '/artifacts/infographic/{taskId}/result';
 const INLINE_TASK_ID = 'inline-result';
 
 const SUCCESS_TASK_STATUSES = new Set([
@@ -84,6 +97,12 @@ export interface NotebookLMBridgeGenerateRequest {
   audioLength?: NotebookLMAudioLengthPreset;
   videoFormat?: NotebookLMVideoFormatPreset;
   videoStyle?: NotebookLMVideoStylePreset;
+  reportFormat?: string;
+  flashcardDifficulty?: string;
+  flashcardCount?: number;
+  mindMapDepth?: number;
+  infographicOrientation?: string;
+  infographicDetail?: string;
 }
 
 export interface NotebookLMBridgeMediaResult {
@@ -92,6 +111,8 @@ export interface NotebookLMBridgeMediaResult {
   extension: string;
   durationSeconds?: number;
   responseMetadata?: Record<string, unknown>;
+  /** Text content for text-based artifacts (study_guide, flashcards, mind_map) */
+  textContent?: string;
 }
 
 export interface NotebookLMBridgeWaitOptions {
@@ -136,10 +157,28 @@ interface NotebookLMBridgeConfig {
   videoTaskStatusPath: string;
   audioTaskResultPath: string;
   videoTaskResultPath: string;
+  studyGuideStartPath: string;
+  studyGuideTaskStatusPath: string;
+  studyGuideTaskResultPath: string;
+  flashcardsStartPath: string;
+  flashcardsTaskStatusPath: string;
+  flashcardsTaskResultPath: string;
+  mindMapStartPath: string;
+  mindMapTaskStatusPath: string;
+  mindMapTaskResultPath: string;
+  infographicStartPath: string;
+  infographicTaskStatusPath: string;
+  infographicTaskResultPath: string;
   defaultWaitOptions: NotebookLMBridgeWaitOptions;
 }
 
-type NotebookLMBridgeMediaType = 'audio' | 'video';
+type NotebookLMBridgeMediaType =
+  | 'audio'
+  | 'video'
+  | 'study_guide'
+  | 'flashcards'
+  | 'mind_map'
+  | 'infographic';
 
 function normalizePath(pathValue: string, fallback: string): string {
   const trimmed = pathValue.trim();
@@ -264,6 +303,18 @@ function getBridgeConfig(): NotebookLMBridgeConfig {
       process.env.NOTEBOOKLM_BRIDGE_VIDEO_TASK_RESULT_PATH ?? legacyTaskResultPath,
       VIDEO_TASK_RESULT_DEFAULT_PATH
     ),
+    studyGuideStartPath: normalizePath('', STUDY_GUIDE_START_DEFAULT_PATH),
+    studyGuideTaskStatusPath: normalizePath('', STUDY_GUIDE_TASK_STATUS_DEFAULT_PATH),
+    studyGuideTaskResultPath: normalizePath('', STUDY_GUIDE_TASK_RESULT_DEFAULT_PATH),
+    flashcardsStartPath: normalizePath('', FLASHCARDS_START_DEFAULT_PATH),
+    flashcardsTaskStatusPath: normalizePath('', FLASHCARDS_TASK_STATUS_DEFAULT_PATH),
+    flashcardsTaskResultPath: normalizePath('', FLASHCARDS_TASK_RESULT_DEFAULT_PATH),
+    mindMapStartPath: normalizePath('', MIND_MAP_START_DEFAULT_PATH),
+    mindMapTaskStatusPath: normalizePath('', MIND_MAP_TASK_STATUS_DEFAULT_PATH),
+    mindMapTaskResultPath: normalizePath('', MIND_MAP_TASK_RESULT_DEFAULT_PATH),
+    infographicStartPath: normalizePath('', INFOGRAPHIC_START_DEFAULT_PATH),
+    infographicTaskStatusPath: normalizePath('', INFOGRAPHIC_TASK_STATUS_DEFAULT_PATH),
+    infographicTaskResultPath: normalizePath('', INFOGRAPHIC_TASK_RESULT_DEFAULT_PATH),
     defaultWaitOptions: {
       timeoutMs: parsePositiveNumber(process.env.NOTEBOOKLM_BRIDGE_TASK_TIMEOUT_MS, timeoutMs),
       initialPollDelayMs,
@@ -329,6 +380,11 @@ function extensionFromMimeType(mimeType: string): string {
   if (normalized === 'audio/flac') return 'flac';
   if (normalized === 'video/mp4') return 'mp4';
   if (normalized === 'video/webm') return 'webm';
+  if (normalized === 'text/markdown') return 'md';
+  if (normalized === 'application/json') return 'json';
+  if (normalized === 'image/png') return 'png';
+  if (normalized === 'image/jpeg') return 'jpg';
+  if (normalized === 'image/webp') return 'webp';
   return 'bin';
 }
 
@@ -379,6 +435,7 @@ function hasEmbeddedMediaPayload(payload: Record<string, unknown>): boolean {
     getStringValue(payload, [
       'audio_base64',
       'video_base64',
+      'image_base64',
       'file_base64',
       'base64',
       'base64_data',
@@ -394,6 +451,7 @@ function parseMediaPayload(
   const base64Value = getStringValue(payload, [
     'audio_base64',
     'video_base64',
+    'image_base64',
     'file_base64',
     'base64',
     'base64_data',
@@ -430,6 +488,35 @@ function parseMediaPayload(
     extension,
     durationSeconds: getDurationSeconds(payload),
   };
+}
+
+function isTextMediaType(mediaType: NotebookLMBridgeMediaType): boolean {
+  return mediaType === 'study_guide' || mediaType === 'flashcards' || mediaType === 'mind_map';
+}
+
+function parseTextPayload(
+  payload: Record<string, unknown>,
+  defaults: MediaDefaults
+): NotebookLMBridgeMediaResult | null {
+  const candidates = getMediaPayloadCandidates(payload);
+
+  for (const candidate of candidates) {
+    const content = getStringValue(candidate, ['content', 'text', 'markdown', 'data']);
+    if (content) {
+      const buffer = Buffer.from(content, 'utf-8');
+      const mimeType =
+        getStringValue(candidate, ['content_type', 'contentType', 'mime_type', 'mimeType']) ??
+        defaults.mimeType;
+      return {
+        buffer,
+        mimeType,
+        extension: extensionFromMimeType(mimeType),
+        textContent: content,
+      };
+    }
+  }
+
+  return null;
 }
 
 function extractDownloadUrl(payload: Record<string, unknown>): string | null {
@@ -470,17 +557,19 @@ function extractTaskProgress(payload: Record<string, unknown>): number | undefin
 }
 
 function getMediaDefaults(mediaType: NotebookLMBridgeMediaType): MediaDefaults {
-  if (mediaType === 'audio') {
-    return {
-      mimeType: 'audio/mpeg',
-      extension: 'mp3',
-    };
+  switch (mediaType) {
+    case 'audio':
+      return { mimeType: 'audio/mpeg', extension: 'mp3' };
+    case 'video':
+      return { mimeType: 'video/mp4', extension: 'mp4' };
+    case 'study_guide':
+      return { mimeType: 'text/markdown', extension: 'md' };
+    case 'flashcards':
+    case 'mind_map':
+      return { mimeType: 'application/json', extension: 'json' };
+    case 'infographic':
+      return { mimeType: 'image/png', extension: 'png' };
   }
-
-  return {
-    mimeType: 'video/mp4',
-    extension: 'mp4',
-  };
 }
 
 function isSuccessfulTaskStatus(status: string): boolean {
@@ -803,6 +892,12 @@ export class NotebookLMBridgeClient {
       duration_range_min_minutes: request.durationRangeMinMinutes,
       duration_range_max_minutes: request.durationRangeMaxMinutes,
       sources: sources.length > 0 ? sources : undefined,
+      report_format: request.reportFormat,
+      flashcard_difficulty: request.flashcardDifficulty,
+      flashcard_count: request.flashcardCount,
+      mind_map_depth: request.mindMapDepth,
+      infographic_orientation: request.infographicOrientation,
+      infographic_detail: request.infographicDetail,
     };
   }
 
@@ -842,8 +937,20 @@ export class NotebookLMBridgeClient {
   private async resolveMediaFromTaskResult(
     taskResult: NotebookLMBridgeTaskResult,
     defaults: MediaDefaults,
-    config: NotebookLMBridgeConfig
+    config: NotebookLMBridgeConfig,
+    mediaType?: NotebookLMBridgeMediaType
   ): Promise<NotebookLMBridgeMediaResult> {
+    // For text-based artifacts, try text parsing first
+    if (mediaType && isTextMediaType(mediaType)) {
+      const textResult = parseTextPayload(taskResult.payload, defaults);
+      if (textResult) {
+        return {
+          ...textResult,
+          responseMetadata: taskResult.payload,
+        };
+      }
+    }
+
     const candidates = getMediaPayloadCandidates(taskResult.payload);
 
     for (const candidate of candidates) {
@@ -942,13 +1049,52 @@ export class NotebookLMBridgeClient {
     return this.parseStartResponse(payload, getMediaDefaults('video'));
   }
 
+  private getTaskStatusPath(
+    config: NotebookLMBridgeConfig,
+    mediaType: NotebookLMBridgeMediaType
+  ): string {
+    switch (mediaType) {
+      case 'audio':
+        return config.audioTaskStatusPath;
+      case 'video':
+        return config.videoTaskStatusPath;
+      case 'study_guide':
+        return config.studyGuideTaskStatusPath;
+      case 'flashcards':
+        return config.flashcardsTaskStatusPath;
+      case 'mind_map':
+        return config.mindMapTaskStatusPath;
+      case 'infographic':
+        return config.infographicTaskStatusPath;
+    }
+  }
+
+  private getTaskResultPath(
+    config: NotebookLMBridgeConfig,
+    mediaType: NotebookLMBridgeMediaType
+  ): string {
+    switch (mediaType) {
+      case 'audio':
+        return config.audioTaskResultPath;
+      case 'video':
+        return config.videoTaskResultPath;
+      case 'study_guide':
+        return config.studyGuideTaskResultPath;
+      case 'flashcards':
+        return config.flashcardsTaskResultPath;
+      case 'mind_map':
+        return config.mindMapTaskResultPath;
+      case 'infographic':
+        return config.infographicTaskResultPath;
+    }
+  }
+
   async getTaskStatus(
     taskId: string,
     mediaType: NotebookLMBridgeMediaType
   ): Promise<NotebookLMBridgeTaskStatusResult> {
     const config = getOrCreateBridgeConfig();
-    const pathValue =
-      mediaType === 'audio' ? config.audioTaskStatusPath : config.videoTaskStatusPath;
+    const pathValue = this.getTaskStatusPath(config, mediaType);
     const target = resolveTaskPath(pathValue, taskId);
 
     const payload = target.body
@@ -968,8 +1114,7 @@ export class NotebookLMBridgeClient {
     mediaType: NotebookLMBridgeMediaType
   ): Promise<NotebookLMBridgeTaskResult> {
     const config = getOrCreateBridgeConfig();
-    const pathValue =
-      mediaType === 'audio' ? config.audioTaskResultPath : config.videoTaskResultPath;
+    const pathValue = this.getTaskResultPath(config, mediaType);
     const target = resolveTaskPath(pathValue, taskId);
 
     const payload = target.body
@@ -991,7 +1136,7 @@ export class NotebookLMBridgeClient {
     const config = getOrCreateBridgeConfig();
     const defaults = getMediaDefaults(mediaType);
     const taskResult = await this.getTaskResult(taskId, mediaType);
-    return this.resolveMediaFromTaskResult(taskResult, defaults, config);
+    return this.resolveMediaFromTaskResult(taskResult, defaults, config, mediaType);
   }
 
   async waitForTaskMedia(
@@ -1049,7 +1194,7 @@ export class NotebookLMBridgeClient {
     }
 
     const taskResult = await this.getTaskResult(taskId, mediaType);
-    const media = await this.resolveMediaFromTaskResult(taskResult, defaults, config);
+    const media = await this.resolveMediaFromTaskResult(taskResult, defaults, config, mediaType);
 
     return {
       ...media,
@@ -1060,6 +1205,100 @@ export class NotebookLMBridgeClient {
         task_result: taskResult.payload,
       },
     };
+  }
+
+  private async startArtifact(
+    request: NotebookLMBridgeGenerateRequest,
+    mediaType: NotebookLMBridgeMediaType,
+    startPath: string
+  ): Promise<NotebookLMBridgeTaskStartResult> {
+    const config = getOrCreateBridgeConfig();
+    const sources = normalizeSources(request.sources);
+    const body = this.buildRequestBody(request, sources);
+    const payload = await postToBridge(startPath, body, config);
+    return this.parseStartResponse(payload, getMediaDefaults(mediaType));
+  }
+
+  async startStudyGuide(
+    request: NotebookLMBridgeGenerateRequest
+  ): Promise<NotebookLMBridgeTaskStartResult> {
+    const config = getOrCreateBridgeConfig();
+    return this.startArtifact(request, 'study_guide', config.studyGuideStartPath);
+  }
+
+  async startFlashcards(
+    request: NotebookLMBridgeGenerateRequest
+  ): Promise<NotebookLMBridgeTaskStartResult> {
+    const config = getOrCreateBridgeConfig();
+    return this.startArtifact(request, 'flashcards', config.flashcardsStartPath);
+  }
+
+  async startMindMap(
+    request: NotebookLMBridgeGenerateRequest
+  ): Promise<NotebookLMBridgeTaskStartResult> {
+    const config = getOrCreateBridgeConfig();
+    return this.startArtifact(request, 'mind_map', config.mindMapStartPath);
+  }
+
+  async startInfographic(
+    request: NotebookLMBridgeGenerateRequest
+  ): Promise<NotebookLMBridgeTaskStartResult> {
+    const config = getOrCreateBridgeConfig();
+    return this.startArtifact(request, 'infographic', config.infographicStartPath);
+  }
+
+  private async generateArtifact(
+    request: NotebookLMBridgeGenerateRequest,
+    mediaType: NotebookLMBridgeMediaType,
+    startFn: (req: NotebookLMBridgeGenerateRequest) => Promise<NotebookLMBridgeTaskStartResult>,
+    waitOptions?: NotebookLMBridgeWaitOptionsInput
+  ): Promise<NotebookLMBridgeMediaResult> {
+    const start = await startFn.call(this, request);
+    if (start.immediateMedia) {
+      return start.immediateMedia;
+    }
+
+    const media = await this.waitForTaskMedia(start.taskId, mediaType, waitOptions);
+    return {
+      ...media,
+      responseMetadata: {
+        start: start.responseMetadata,
+        wait: media.responseMetadata,
+      },
+    };
+  }
+
+  async generateStudyGuide(
+    request: NotebookLMBridgeGenerateRequest,
+    waitOptions?: NotebookLMBridgeWaitOptionsInput
+  ): Promise<NotebookLMBridgeMediaResult> {
+    return this.generateArtifact(request, 'study_guide', r => this.startStudyGuide(r), waitOptions);
+  }
+
+  async generateFlashcards(
+    request: NotebookLMBridgeGenerateRequest,
+    waitOptions?: NotebookLMBridgeWaitOptionsInput
+  ): Promise<NotebookLMBridgeMediaResult> {
+    return this.generateArtifact(request, 'flashcards', r => this.startFlashcards(r), waitOptions);
+  }
+
+  async generateMindMap(
+    request: NotebookLMBridgeGenerateRequest,
+    waitOptions?: NotebookLMBridgeWaitOptionsInput
+  ): Promise<NotebookLMBridgeMediaResult> {
+    return this.generateArtifact(request, 'mind_map', r => this.startMindMap(r), waitOptions);
+  }
+
+  async generateInfographic(
+    request: NotebookLMBridgeGenerateRequest,
+    waitOptions?: NotebookLMBridgeWaitOptionsInput
+  ): Promise<NotebookLMBridgeMediaResult> {
+    return this.generateArtifact(
+      request,
+      'infographic',
+      r => this.startInfographic(r),
+      waitOptions
+    );
   }
 
   async generateAudio(
@@ -1113,6 +1352,10 @@ export function isNotebookLMBridgeConfigured(): boolean {
 export function getNotebookLMBridgeEndpointSummary(): {
   audioEndpoint: string;
   videoEndpoint: string;
+  studyGuideEndpoint: string;
+  flashcardsEndpoint: string;
+  mindMapEndpoint: string;
+  infographicEndpoint: string;
 } | null {
   if (!isNotebookLMBridgeConfigured()) {
     return null;
@@ -1123,6 +1366,10 @@ export function getNotebookLMBridgeEndpointSummary(): {
     return {
       audioEndpoint: `${config.baseUrl}${config.audioStartPath}`,
       videoEndpoint: `${config.baseUrl}${config.videoStartPath}`,
+      studyGuideEndpoint: `${config.baseUrl}${config.studyGuideStartPath}`,
+      flashcardsEndpoint: `${config.baseUrl}${config.flashcardsStartPath}`,
+      mindMapEndpoint: `${config.baseUrl}${config.mindMapStartPath}`,
+      infographicEndpoint: `${config.baseUrl}${config.infographicStartPath}`,
     };
   } catch (error) {
     logger.warn(

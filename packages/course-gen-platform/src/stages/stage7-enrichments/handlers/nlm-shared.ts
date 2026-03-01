@@ -1,12 +1,21 @@
 /**
- * Shared utilities for NotebookLM enrichment handlers (audio & video).
+ * Shared utilities for NotebookLM enrichment handlers.
  * @module stages/stage7-enrichments/handlers/nlm-shared
  *
- * Extracted to avoid duplication between nlm-audio-handler and nlm-video-handler.
+ * Extracted to avoid duplication between NLM handlers.
  */
 
-import type { NotebookLMSourceInput } from '../services/notebooklm-bridge-client';
+import type {
+  NotebookLMSourceInput,
+  NotebookLMBridgeTaskStatusResult,
+} from '../services/notebooklm-bridge-client';
+import {
+  isNotebookLMTaskFailedStatus,
+  isNotebookLMTaskSuccessfulStatus,
+  notebookLmBridgeClient,
+} from '../services/notebooklm-bridge-client';
 import type { EnrichmentHandlerInput } from '../types';
+import type { NotebookLMMediaType } from '../types';
 
 export type NlmSourceStrategy = 'script_only' | 'raw_only' | 'hybrid';
 
@@ -137,4 +146,82 @@ export function buildNotebookLMSources(params: {
   }
 
   return sources;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Standard source-building helper (DRY across all NLM handlers)
+// ────────────────────────────────────────────────────────────────
+
+export interface StandardSourcesResult {
+  language: string;
+  sources: NotebookLMSourceInput[];
+  sourceStrategy: NlmSourceStrategy;
+}
+
+export function buildStandardSources(
+  lessonContent: string,
+  settings: Record<string, unknown>,
+  input: EnrichmentHandlerInput
+): StandardSourcesResult {
+  const language = input.enrichmentContext.course.language || 'en';
+  const sourceStrategy = resolveSourceStrategy(settings);
+  const sources = buildNotebookLMSources({
+    strategy: sourceStrategy,
+    scriptContent: lessonContent,
+    scriptTitle: input.enrichmentContext.lesson.title,
+    rawLessonContent: lessonContent,
+    input,
+  });
+  return { language, sources, sourceStrategy };
+}
+
+// ────────────────────────────────────────────────────────────────
+// Poll-mode helpers for single-stage NLM handlers
+// ────────────────────────────────────────────────────────────────
+
+export function resolveNlmAsyncMode(settings: Record<string, unknown>): string | null {
+  const value = settings.__nlm_async_mode;
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null;
+}
+
+export function resolveBridgeTaskId(settings: Record<string, unknown>): string | null {
+  const value = settings.__nlm_bridge_task_id;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+export interface PollCheckResult {
+  /** True if task completed (result available), false if still in progress */
+  completed: boolean;
+  /** Bridge task status response (always present) */
+  status: NotebookLMBridgeTaskStatusResult;
+}
+
+/**
+ * Check NLM bridge task status for poll-mode handlers.
+ * Throws on failure; returns completed=false when still in progress.
+ */
+export async function checkBridgeTaskStatus(
+  bridgeTaskId: string,
+  mediaType: NotebookLMMediaType
+): Promise<PollCheckResult> {
+  const status = await notebookLmBridgeClient.getTaskStatus(bridgeTaskId, mediaType);
+
+  if (isNotebookLMTaskFailedStatus(status.status)) {
+    throw new Error(
+      `NotebookLM bridge task failed (taskId=${bridgeTaskId}, status=${status.status})`
+    );
+  }
+
+  if (!isNotebookLMTaskSuccessfulStatus(status.status)) {
+    return { completed: false, status };
+  }
+
+  return { completed: true, status };
+}
+
+/**
+ * Fetch completed task media from the NLM bridge.
+ */
+export async function fetchBridgeTaskMedia(bridgeTaskId: string, mediaType: NotebookLMMediaType) {
+  return notebookLmBridgeClient.getTaskMedia(bridgeTaskId, mediaType);
 }
