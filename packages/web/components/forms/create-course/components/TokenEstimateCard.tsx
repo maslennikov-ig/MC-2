@@ -129,7 +129,9 @@ export function TokenEstimateCard({
               <div className="flex items-center justify-between text-slate-600 dark:text-white/60">
                 <span className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4" />
-                  Генерация {isAutoMode ? `~${effectiveLessons}` : effectiveLessons} уроков
+                  {isAutoMode
+                    ? t('generatingLessonsAuto', { count: effectiveLessons })
+                    : t('generatingLessons', { count: effectiveLessons })}
                 </span>
                 <span>{formatTokens(stage6Tokens)}</span>
               </div>

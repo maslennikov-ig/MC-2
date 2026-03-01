@@ -126,7 +126,7 @@ export function ContentPreviewPanel({
               <ErrorBoundary
                 fallback={
                   <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-                    Ошибка отображения контента
+                    {t.contentRenderError}
                   </div>
                 }
               >
@@ -134,7 +134,7 @@ export function ContentPreviewPanel({
               </ErrorBoundary>
             ) : (
               <p className="text-muted-foreground py-8 text-center text-sm">
-                Контент урока недоступен
+                {t.contentUnavailable}
               </p>
             )}
           </div>
@@ -147,7 +147,7 @@ export function ContentPreviewPanel({
         <ScrollArea className="h-full">
           <div className="space-y-3 p-6">
             <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-xs">Исходный текст в формате Markdown</p>
+              <p className="text-muted-foreground text-xs">{t.markdownSource}</p>
               {rawMarkdown && (
                 <Button
                   variant="outline"
@@ -162,7 +162,7 @@ export function ContentPreviewPanel({
               )}
             </div>
             <pre className="overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-xs whitespace-pre-wrap text-slate-50 dark:bg-slate-950">
-              {rawMarkdown || 'Markdown контент недоступен'}
+              {rawMarkdown || t.markdownUnavailable}
             </pre>
           </div>
         </ScrollArea>
@@ -177,7 +177,7 @@ export function ContentPreviewPanel({
               <JsonViewer data={metadata} title={t.lessonMetadata} defaultExpanded={false} />
             ) : (
               <p className="text-muted-foreground py-8 text-center text-sm">
-                Метаданные недоступны
+                {t.metadataUnavailable}
               </p>
             )}
           </div>
@@ -264,7 +264,7 @@ export function ContentPreviewPanel({
           {content && (
             <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
               <p className="mb-2 text-xs font-medium text-blue-700 dark:text-blue-300">
-                Предварительный просмотр (генерация продолжается)
+                {t.previewInProgress}
               </p>
               <div className="text-foreground text-sm">
                 {content.introduction && <p className="mb-2 opacity-80">{content.introduction}</p>}
