@@ -4,6 +4,7 @@ import React, { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Hash, FileText, BarChart3, BookOpen, Info } from 'lucide-react'
 import { estimateTokens, formatTokens, type TokenEstimate } from '@megacampus/shared-types'
+import { useTranslations } from 'next-intl'
 
 interface CostPreviewCardProps {
   documentCount: number
@@ -18,6 +19,8 @@ export function CostPreviewCard({
   hasDocuments,
   isVisible,
 }: CostPreviewCardProps) {
+  const t = useTranslations('generation.costPreview')
+
   // Use the shared token estimation service
   const estimate: TokenEstimate = useMemo(
     () => estimateTokens({ documentCount, estimatedLessons, hasDocuments }),
@@ -44,9 +47,7 @@ export function CostPreviewCard({
             {/* Header */}
             <div className="mb-4 flex items-center gap-2">
               <Hash className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              <span className="font-medium text-slate-900 dark:text-white">
-                Ориентировочное количество токенов
-              </span>
+              <span className="font-medium text-slate-900 dark:text-white">{t('title')}</span>
             </div>
 
             {/* Total Tokens */}
@@ -62,7 +63,7 @@ export function CostPreviewCard({
                 <div className="flex items-center justify-between text-slate-600 dark:text-white/60">
                   <span className="flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    Обработка {documentCount} документов
+                    {t('processingDocs', { count: documentCount })}
                   </span>
                   <span>{formatTokens(stage2Tokens)}</span>
                 </div>
@@ -71,7 +72,7 @@ export function CostPreviewCard({
               <div className="flex items-center justify-between text-slate-600 dark:text-white/60">
                 <span className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
-                  Анализ и структура
+                  {t('analysisStructure')}
                 </span>
                 <span>{formatTokens(stage4Tokens + stage5Tokens)}</span>
               </div>
@@ -79,7 +80,7 @@ export function CostPreviewCard({
               <div className="flex items-center justify-between text-slate-600 dark:text-white/60">
                 <span className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4" />
-                  Генерация {estimatedLessons} уроков
+                  {t('generatingLessons', { count: estimatedLessons })}
                 </span>
                 <span>{formatTokens(stage6Tokens)}</span>
               </div>
@@ -88,9 +89,7 @@ export function CostPreviewCard({
             {/* Info */}
             <div className="mt-4 flex items-start gap-2 border-t border-purple-200/50 pt-3 dark:border-purple-800/50">
               <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-              <p className="text-xs text-slate-500 dark:text-white/40">
-                Точное количество токенов зависит от сложности темы и объёма материалов.
-              </p>
+              <p className="text-xs text-slate-500 dark:text-white/40">{t('infoExact')}</p>
             </div>
           </div>
         </motion.div>

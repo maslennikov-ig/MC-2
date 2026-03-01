@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { Target, Clock, CheckCircle, ArrowRight } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 import { MarkdownRendererFull } from '@/components/markdown'
 import type { Lesson, Section, Asset } from '@/types/database'
@@ -44,6 +44,7 @@ export default function LessonContent({
   onNextLesson,
 }: LessonContentProps) {
   const t = useTranslations('course')
+  const locale = useLocale()
 
   // Parse the lesson content - prefer lessonContent from lesson_contents table
   // Fallback to lesson.content or lesson.content_text for legacy support
@@ -112,7 +113,11 @@ export default function LessonContent({
     <div key={lesson.id} className="px-6 py-8 lg:px-10">
       {/* Cover Hero Image - Displayed at the top if exists, with overlay containing lesson info */}
       {coverImageUrl && (
-        <EnrichmentErrorBoundary enrichmentType="Lesson Cover" enrichmentId={lesson.id}>
+        <EnrichmentErrorBoundary
+          enrichmentType="Lesson Cover"
+          enrichmentId={lesson.id}
+          locale={locale}
+        >
           <div className="mb-6">
             <LessonCoverHero
               imageUrl={coverImageUrl}

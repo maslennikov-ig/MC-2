@@ -99,7 +99,37 @@
     "overallProgress": "Общий прогресс курса",
     "timeRemaining": "Осталось времени",
     "lessonsCompleted": "{completed} из {total} уроков",
-    "backToCatalog": "К каталогу"
+    "backToCatalog": "К каталогу",
+    "fab": {
+      "title": "Генерировать контент с ИИ",
+      "tooltipTitle": "Генерация контента",
+      "tooltipDesc": "Создать материалы с ИИ"
+    },
+    "enrichmentError": {
+      "loadFailed": "Не удалось загрузить {type}",
+      "displayError": "Произошла ошибка при отображении материала",
+      "retry": "Попробовать снова"
+    },
+    "enrichmentStages": {
+      "prepare": "Подготовка",
+      "generate": "Генерация",
+      "save": "Сохранение"
+    },
+    "module": "Модуль {number}: {title}",
+    "readingTime": "{minutes} мин",
+    "activities": {
+      "title": "Практические задания",
+      "description": "Выполните эти задания для закрепления материала",
+      "defaultTitle": "Задание",
+      "caseStudy": "Кейс",
+      "practice": "Практика",
+      "quiz": "Тест",
+      "reflection": "Рефлексия",
+      "progress": "Прогресс заданий",
+      "completed": "выполнено",
+      "completedCount": "{completed} из {total} выполнено",
+      "noActivities": "Для этого урока нет практических заданий"
+    }
   },
   "content": {
     "format": "Формат:",

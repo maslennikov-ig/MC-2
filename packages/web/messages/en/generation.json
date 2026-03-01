@@ -19,10 +19,9 @@
     "processing": "Processing..."
   },
   "errors": {
-    "barrier_failed": "Document processing incomplete - manual intervention required",
-    "insufficient_scope": "Insufficient scope for minimum 10 lessons - broaden the topic",
-    "llm_error": "LLM processing error - contact support",
-    "analysis_generic": "Error analyzing course"
+    "connectionLost": "Connection lost",
+    "reconnecting": "Reconnecting...",
+    "retryFailed": "Retry failed"
   },
   "stages": {
     "stage_1": "Course Initialization",
@@ -213,11 +212,6 @@
       "button": "Generate content",
       "message": "Generate content for new lessons"
     }
-  },
-  "errors": {
-    "connectionLost": "Connection lost",
-    "reconnecting": "Reconnecting...",
-    "retryFailed": "Retry failed"
   },
   "retry": {
     "confirmTitle": "Confirm Retry",
@@ -1328,5 +1322,86 @@
     "buttonGoToCourse": "Go to Course",
     "realtimeConnected": "Realtime connected",
     "pollingFallback": "Using polling (fallback mode)"
+  },
+  "costPreview": {
+    "title": "Estimated Token Count",
+    "processingDocs": "Processing {count, plural, one {# document} other {# documents}}",
+    "analysisStructure": "Analysis and structure",
+    "generatingLessons": "Generating {count, plural, one {# lesson} other {# lessons}}",
+    "generatingLessonsAuto": "Generating ~{count, plural, one {# lesson} other {# lessons}}",
+    "infoExact": "Exact token count depends on topic complexity and material volume.",
+    "infoEstimate": "Estimate for an average course. Exact count depends on topic and materials."
+  },
+  "prioritization": {
+    "document": "Document",
+    "size": "Size",
+    "priority": "Priority",
+    "distribution": "Distribution:",
+    "file": "File",
+    "rationale": "Classification rationale",
+    "docsNotFound": "No documents found",
+    "loadError": "Failed to load documents",
+    "loadErrorGeneric": "An error occurred while loading documents",
+    "priorityChanged": "Priority changed to \"{priority}\"",
+    "nowCore": "\"{newDoc}\" is now core. \"{oldDoc}\" changed to \"Important\".",
+    "updateError": "Failed to update priority",
+    "unexpectedError": "An unexpected error occurred",
+    "approved": "Prioritization confirmed. Moving to next stage...",
+    "approveError": "Failed to confirm prioritization",
+    "selectCore": "Select one core document to continue",
+    "confirmAndContinue": "Confirm and continue",
+    "completed": "Prioritization completed",
+    "replaceCore": "Replace core document?",
+    "replaceCoreDesc": "There can be only one core document. The previous one will be changed to \"Important\".",
+    "currentCore": "Currently core:",
+    "newCore": "New core:",
+    "replace": "Replace",
+    "cancel": "Cancel",
+    "switching": "Switching...",
+    "selectValue": "Select a value"
+  },
+  "contentPreview": {
+    "generationError": "Generation error",
+    "contentDisplayError": "Content display error",
+    "contentUnavailable": "Lesson content unavailable",
+    "rawMarkdownLabel": "Raw text in Markdown format",
+    "copy": "Copy",
+    "markdownUnavailable": "Markdown content unavailable",
+    "lessonMetadata": "Lesson metadata",
+    "metadataUnavailable": "Metadata unavailable",
+    "errorOccurred": "An error occurred during content generation",
+    "technicalDetails": "Technical details",
+    "pendingGeneration": "Waiting for generation...",
+    "generatingContent": "Generating content...",
+    "previewInProgress": "Preview (generation in progress)",
+    "tabPreview": "Preview",
+    "tabMetadata": "Metadata",
+    "regenerating": "Regenerating...",
+    "regenerate": "Regenerate",
+    "edit": "Edit",
+    "approving": "Approving...",
+    "approve": "Approve"
+  },
+  "lessonMatrix": {
+    "prioritize": "Prioritize",
+    "pause": "Pause",
+    "preview": "Preview",
+    "retry": "Retry",
+    "title": "Title",
+    "quality": "Quality",
+    "action": "Action",
+    "totalLessons": "Total: {count} lessons",
+    "avgQuality": "Average quality: {quality}"
+  },
+  "automaticMode": {
+    "title": "Automatic generation",
+    "subtitle": "You can close the page — we'll notify you when ready",
+    "pause": "Pause",
+    "cancel": "Cancel",
+    "generationPaused": "Generation paused",
+    "resume": "Resume",
+    "switching": "Switching...",
+    "manualMode": "Manual mode",
+    "manualModeHint": "In manual mode you can review and edit results at each stage."
   }
 }

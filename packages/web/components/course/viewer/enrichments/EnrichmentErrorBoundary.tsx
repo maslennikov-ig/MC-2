@@ -9,6 +9,7 @@ interface Props {
   children: React.ReactNode
   enrichmentType: string
   enrichmentId?: string
+  locale?: 'ru' | 'en'
 }
 
 interface State {
@@ -42,6 +43,20 @@ export class EnrichmentErrorBoundary extends React.Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const translations = {
+        ru: {
+          loadFailed: 'Не удалось загрузить ' + this.props.enrichmentType,
+          displayError: 'Произошла ошибка при отображении материала',
+          retry: 'Попробовать снова',
+        },
+        en: {
+          loadFailed: 'Failed to load ' + this.props.enrichmentType,
+          displayError: 'An error occurred while displaying the material',
+          retry: 'Try again',
+        },
+      }
+      const t = translations[this.props.locale || 'en']
+
       return (
         <Card className="border-orange-200 bg-orange-50 dark:border-orange-800/30 dark:bg-orange-900/10">
           <CardContent className="py-6">
@@ -50,11 +65,9 @@ export class EnrichmentErrorBoundary extends React.Component<Props, State> {
                 <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div className="flex-1">
-                <p className="font-medium text-orange-800 dark:text-orange-200">
-                  Не удалось загрузить {this.props.enrichmentType}
-                </p>
+                <p className="font-medium text-orange-800 dark:text-orange-200">{t.loadFailed}</p>
                 <p className="mt-1 text-sm text-orange-600 dark:text-orange-300">
-                  Произошла ошибка при отображении материала
+                  {t.displayError}
                 </p>
                 <Button
                   size="sm"
@@ -63,7 +76,7 @@ export class EnrichmentErrorBoundary extends React.Component<Props, State> {
                   onClick={this.handleRetry}
                 >
                   <RefreshCw className="h-4 w-4" />
-                  Попробовать снова
+                  {t.retry}
                 </Button>
               </div>
             </div>

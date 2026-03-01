@@ -10,6 +10,7 @@ import {
   type CourseSize,
   COURSE_SIZE_PRESETS,
 } from '@megacampus/shared-types'
+import { useTranslations } from 'next-intl'
 
 interface TokenEstimateCardProps {
   documentCount: number
@@ -53,6 +54,8 @@ export function TokenEstimateCard({
   hasDocuments,
   isVisible,
 }: TokenEstimateCardProps) {
+  const t = useTranslations('generation.costPreview')
+
   // Calculate effective lessons with proper fallback logic
   const effectiveLessons = useMemo(
     () => getEffectiveLessons(estimatedLessons, courseSize),
@@ -93,9 +96,7 @@ export function TokenEstimateCard({
             {/* Header */}
             <div className="mb-4 flex items-center gap-2">
               <Hash className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              <span className="font-medium text-slate-900 dark:text-white">
-                Ориентировочное количество токенов
-              </span>
+              <span className="font-medium text-slate-900 dark:text-white">{t('title')}</span>
             </div>
 
             {/* Total Tokens */}
@@ -111,7 +112,7 @@ export function TokenEstimateCard({
                 <div className="flex items-center justify-between text-slate-600 dark:text-white/60">
                   <span className="flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    Обработка {documentCount} документов
+                    {t('processingDocs', { count: documentCount })}
                   </span>
                   <span>{formatTokens(stage2Tokens)}</span>
                 </div>
@@ -120,7 +121,7 @@ export function TokenEstimateCard({
               <div className="flex items-center justify-between text-slate-600 dark:text-white/60">
                 <span className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
-                  Анализ и структура
+                  {t('analysisStructure')}
                 </span>
                 <span>{formatTokens(stage4Tokens + stage5Tokens)}</span>
               </div>
@@ -138,9 +139,7 @@ export function TokenEstimateCard({
             <div className="mt-4 flex items-start gap-2 border-t border-purple-200/50 pt-3 dark:border-purple-800/50">
               <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
               <p className="text-xs text-slate-500 dark:text-white/40">
-                {isAutoMode
-                  ? 'Оценка для среднего курса. Точное количество зависит от темы и материалов.'
-                  : 'Точное количество токенов зависит от сложности темы и объёма материалов.'}
+                {isAutoMode ? t('infoEstimate') : t('infoExact')}
               </p>
             </div>
           </div>

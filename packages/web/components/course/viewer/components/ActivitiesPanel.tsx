@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, Activity } from 'lucide-react'
@@ -16,14 +17,16 @@ export function ActivitiesPanel({
   completedActivities,
   onToggleActivity,
 }: ActivitiesPanelProps) {
+  const t = useTranslations('course.viewer.activities')
+
   return (
     <div className="mx-auto max-w-4xl">
       {lesson.activities && lesson.activities.length > 0 ? (
         <Card className="border-purple-300 bg-gradient-to-br from-purple-100 to-blue-100 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
           <CardHeader>
-            <CardTitle className="text-gray-800 dark:text-white/90">Практические задания</CardTitle>
+            <CardTitle className="text-gray-800 dark:text-white/90">{t('title')}</CardTitle>
             <CardDescription className="text-gray-500 dark:text-white/60">
-              Выполните эти задания для закрепления материала
+              {t('description')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -31,7 +34,7 @@ export function ActivitiesPanel({
               {lesson.activities.map((activity, index) => {
                 const isCompleted = completedActivities[lesson.id]?.has(index) || false
                 const activityTitle = isActivityObject(activity)
-                  ? activity.exercise_title || 'Задание'
+                  ? activity.exercise_title || t('defaultTitle')
                   : activity
                 const activityDescription = isActivityObject(activity)
                   ? activity.exercise_description || ''
@@ -67,10 +70,10 @@ export function ActivitiesPanel({
                           variant="secondary"
                           className="mt-2 bg-purple-100 text-xs text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
                         >
-                          {activityType === 'case_study' && 'Кейс'}
-                          {activityType === 'hands_on' && 'Практика'}
-                          {activityType === 'quiz' && 'Тест'}
-                          {activityType === 'reflection' && 'Рефлексия'}
+                          {activityType === 'case_study' && t('caseStudy')}
+                          {activityType === 'hands_on' && t('practice')}
+                          {activityType === 'quiz' && t('quiz')}
+                          {activityType === 'reflection' && t('reflection')}
                         </Badge>
                       )}
                     </div>
@@ -81,10 +84,12 @@ export function ActivitiesPanel({
 
             <div className="mt-6 border-t border-purple-200 pt-6 dark:border-gray-700">
               <div className="mb-2 flex items-center justify-between text-sm text-gray-600 dark:text-white/60">
-                <span>Прогресс заданий</span>
+                <span>{t('progress')}</span>
                 <span>
-                  {completedActivities[lesson.id]?.size || 0} из {lesson.activities.length}{' '}
-                  выполнено
+                  {t('completedCount', {
+                    completed: completedActivities[lesson.id]?.size || 0,
+                    total: lesson.activities.length,
+                  })}
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-purple-100 dark:bg-gray-800">
@@ -102,9 +107,7 @@ export function ActivitiesPanel({
         <Card className="border-purple-300 bg-gradient-to-br from-purple-100 to-blue-100 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
           <CardContent className="py-12 text-center">
             <Activity className="mx-auto mb-4 h-12 w-12 text-gray-400 dark:text-white/40" />
-            <p className="text-gray-600 dark:text-white/60">
-              Для этого урока нет практических заданий
-            </p>
+            <p className="text-gray-600 dark:text-white/60">{t('noActivities')}</p>
           </CardContent>
         </Card>
       )}

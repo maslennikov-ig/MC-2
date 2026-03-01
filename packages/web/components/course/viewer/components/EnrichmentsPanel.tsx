@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { toast } from 'sonner'
 import { FileText, AlertTriangle } from 'lucide-react'
 import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
@@ -128,6 +128,7 @@ export function EnrichmentsPanel({
   onRefreshEnrichments,
 }: EnrichmentsPanelProps) {
   const t = useTranslations('enrichments')
+  const locale = useLocale()
   const safeEnrichments = enrichments ?? []
   const [activeEnrichmentId, setActiveEnrichmentId] = useState<string | null>(null)
   const completedToastsRef = useRef<Set<string>>(new Set())
@@ -346,6 +347,7 @@ export function EnrichmentsPanel({
             key={enrichment.id}
             enrichmentType={t(`viewer.enrichmentTypes.${enrichment.enrichment_type}`)}
             enrichmentId={enrichment.id}
+            locale={locale}
           >
             <EnrichmentCard
               enrichment={enrichment}

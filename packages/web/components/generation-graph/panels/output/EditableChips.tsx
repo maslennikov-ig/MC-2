@@ -38,7 +38,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
   onBlur,
   status = 'idle',
   error,
-  placeholder = 'Добавить...',
+  placeholder,
   maxItems,
   disabled = false,
   className,
@@ -49,6 +49,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
   locale = 'ru',
   onCascadeChange,
 }) => {
+  const resolvedPlaceholder = placeholder ?? (locale === 'ru' ? 'Добавить...' : 'Add...')
   const utils = trpc.useUtils()
   const [inputValue, setInputValue] = useState('')
   const [showInput, setShowInput] = useState(false)
@@ -306,7 +307,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleInputBlur}
-            placeholder={placeholder}
+            placeholder={resolvedPlaceholder}
             autoFocus
             className="h-7 w-32 text-xs"
             aria-label={`${locale === 'ru' ? 'Добавить' : 'Add'} ${label}`}
@@ -320,7 +321,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
             aria-label={`${locale === 'ru' ? 'Добавить элемент' : 'Add item'}`}
           >
             <Plus className="h-3 w-3" />
-            <span>{placeholder}</span>
+            <span>{resolvedPlaceholder}</span>
           </button>
         ) : null}
 
