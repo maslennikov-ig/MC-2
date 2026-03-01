@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { SegmentedPillTrack } from '../stage6/dashboard/SegmentedPillTrack'
 import { Eye, Play, Pause, RotateCw, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 
 /**
  * LessonMatrix - High-density table for lesson list with pipeline status
@@ -101,7 +101,7 @@ function ActionButton({
   isRetrying?: (lessonId: string) => boolean
   isPausing?: boolean
   isResuming?: boolean
-  t: { prioritize: string; pause: string; view: string; retry: string }
+  t: (key: 'prioritize' | 'pause' | 'preview' | 'retry') => string
 }) {
   switch (lesson.status) {
     case 'pending':
@@ -115,7 +115,7 @@ function ActionButton({
             e.stopPropagation()
             onClick('play')
           }}
-          title={t.prioritize}
+          title={t('prioritize')}
           className="h-8 w-8"
         >
           {resumeLoading ? (
@@ -136,7 +136,7 @@ function ActionButton({
             e.stopPropagation()
             onClick('pause')
           }}
-          title={t.pause}
+          title={t('pause')}
           className="h-8 w-8"
         >
           {pauseLoading ? (
@@ -156,7 +156,7 @@ function ActionButton({
             e.stopPropagation()
             onClick('view')
           }}
-          title={t.view}
+          title={t('preview')}
           className="h-8 w-8"
         >
           <Eye className="h-4 w-4" />
@@ -173,7 +173,7 @@ function ActionButton({
             e.stopPropagation()
             onClick('retry')
           }}
-          title={t.retry}
+          title={t('retry')}
           className="h-8 w-8"
         >
           {retryLoading ? (
@@ -212,32 +212,7 @@ export function LessonMatrix({
   isResuming,
   className,
 }: LessonMatrixProps) {
-  const locale = useLocale()
-  const i18n = {
-    ru: {
-      title: 'Название',
-      quality: 'Качество',
-      action: 'Действие',
-      prioritize: 'Приоритезировать',
-      pause: 'Приостановить',
-      view: 'Просмотр',
-      retry: 'Повторить',
-      totalLessons: 'Всего: {count} уроков',
-      avgQuality: 'Среднее качество:',
-    },
-    en: {
-      title: 'Title',
-      quality: 'Quality',
-      action: 'Action',
-      prioritize: 'Prioritize',
-      pause: 'Pause',
-      view: 'View',
-      retry: 'Retry',
-      totalLessons: 'Total: {count} lessons',
-      avgQuality: 'Average quality:',
-    },
-  }
-  const t = i18n[locale]
+  const t = useTranslations('generation.lessonMatrix')
   const summary = useMemo(() => calculateSummary(lessons), [lessons])
 
   return (
@@ -246,10 +221,10 @@ export function LessonMatrix({
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-12 text-center">#</TableHead>
-            <TableHead>{t.title}</TableHead>
+            <TableHead>{t('title')}</TableHead>
             <TableHead className="w-40">Pipeline</TableHead>
-            <TableHead className="w-24 text-center">{t.quality}</TableHead>
-            <TableHead className="w-20 text-center">{t.action}</TableHead>
+            <TableHead className="w-24 text-center">{t('quality')}</TableHead>
+            <TableHead className="w-20 text-center">{t('action')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -292,13 +267,11 @@ export function LessonMatrix({
           <TableRow className="hover:bg-transparent">
             <TableCell colSpan={5} className="text-center">
               <div className="flex items-center justify-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-400">
-                <span>{t.totalLessons.replace('{count}', String(summary.totalLessons))}</span>
+                <span>{t('totalLessons', { count: summary.totalLessons })}</span>
                 {summary.avgQuality !== null && (
                   <>
                     <span className="text-slate-400 dark:text-slate-600">•</span>
-                    <span>
-                      {t.avgQuality} {formatQuality(summary.avgQuality)}
-                    </span>
+                    <span>{t('avgQuality', { quality: formatQuality(summary.avgQuality) })}</span>
                   </>
                 )}
               </div>
