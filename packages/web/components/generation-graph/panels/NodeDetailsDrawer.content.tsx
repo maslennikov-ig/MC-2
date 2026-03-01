@@ -241,7 +241,7 @@ export const StageContent = memo(function StageContent({
           }))}
           selectedPhase={selectedPhaseId}
           onSelectPhase={onSelectPhase}
-          locale="ru"
+          locale={locale}
         />
       )}
 

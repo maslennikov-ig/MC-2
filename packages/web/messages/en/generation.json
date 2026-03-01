@@ -74,7 +74,6 @@
     "noLessonsWithErrors": "No lessons with errors",
     "improveQuality": "Improve Quality",
     "noLowQualityLessons": "No low quality lessons",
-    "progressionLogic": "Progression Logic",
     "approveAllLessonsTitle": "Approve All Lessons?",
     "approveAllLessonsDescription": "You are about to approve",
     "approveAllLessonsWarning": "This action cannot be undone.",
@@ -188,6 +187,7 @@
       "refineTooltip": "Small edits to current content. Fast (~2K tokens)",
       "regenerateTooltip": "Full recreation from scratch. Slower (~20K tokens)"
     },
+    "generationInProgress": "Chat is unavailable during generation. Wait for the stage to complete.",
     "proposal": {
       "suggestedChanges": "Suggested Changes",
       "showDetails": "Show details ({count} changes)",
@@ -282,6 +282,7 @@
     "interactivity": "Interactivity",
     "assessmentApproach": "Assessment Approach",
     "assessmentTypes": "Assessment Types",
+    "progressionLogic": "Progression Logic",
     "tone": "Tone",
     "analogies": "Analogies",
     "noAnalogies": "No analogies",
@@ -522,7 +523,16 @@
     "saveError": "Error",
     "saveErrorTooltip": "Save error",
     "characters": "characters",
-    "regenerateWithAI": "Regenerate with AI"
+    "regenerateWithAI": "Regenerate with AI",
+    "toggleOn": "On",
+    "toggleOff": "Off",
+    "selectPlaceholder": "Select a value",
+    "saveFailedMessage": "Failed to save changes",
+    "addPlaceholder": "Add...",
+    "removeItem": "Remove",
+    "addItem": "Add item",
+    "deleteToRemove": "press Delete to remove",
+    "maxItems": "(max. {max})"
   },
   "stage1": {
     "identity": "Identity",
@@ -1393,16 +1403,5 @@
     "action": "Action",
     "totalLessons": "Total: {count} lessons",
     "avgQuality": "Average quality: {quality}"
-  },
-  "automaticMode": {
-    "title": "Automatic generation",
-    "subtitle": "You can close the page — we'll notify you when ready",
-    "pause": "Pause",
-    "cancel": "Cancel",
-    "generationPaused": "Generation paused",
-    "resume": "Resume",
-    "switching": "Switching...",
-    "manualMode": "Manual mode",
-    "manualModeHint": "In manual mode you can review and edit results at each stage."
   }
 }

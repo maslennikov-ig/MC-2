@@ -384,7 +384,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
             aria-describedby={helpText ? `${fieldId}-help` : undefined}
           />
           <span className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">
-            {value ? (locale === 'ru' ? 'Включено' : 'On') : locale === 'ru' ? 'Выключено' : 'Off'}
+            {value ? t('toggleOn') : t('toggleOff')}
           </span>
         </div>
       )}
@@ -399,11 +399,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
             aria-invalid={hasError}
             aria-errormessage={hasError ? `${fieldId}-error` : undefined}
           >
-            <SelectValue
-              placeholder={
-                placeholder || (locale === 'ru' ? 'Выберите значение' : 'Select a value')
-              }
-            />
+            <SelectValue placeholder={placeholder || t('selectPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (
@@ -425,7 +421,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       {/* Error Message */}
       {hasError && (
         <p id={`${fieldId}-error`} className="text-xs text-red-600" role="alert">
-          {locale === 'ru' ? 'Не удалось сохранить изменения' : 'Failed to save changes'}
+          {t('saveFailedMessage')}
         </p>
       )}
 

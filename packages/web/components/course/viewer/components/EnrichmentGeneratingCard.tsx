@@ -574,9 +574,7 @@ export function EnrichmentGeneratingCard({
           <div className="border-muted/50 mt-6 flex items-center justify-between border-t pt-4">
             {telegramChecked && !isTelegramConnected ? (
               <div className="mr-4 flex-1">
-                <p className="text-muted-foreground mb-3 text-sm">
-                  Не хотите ждать? Подключите Telegram, чтобы получить уведомление о готовности.
-                </p>
+                <p className="text-muted-foreground mb-3 text-sm">{t('telegram.connectPrompt')}</p>
                 <div className="w-[200px]">
                   <TelegramLoginButton
                     botUsername={
@@ -589,10 +587,7 @@ export function EnrichmentGeneratingCard({
               </div>
             ) : (
               <div className="mr-4 flex-1">
-                <p className="text-muted-foreground text-xs">
-                  Вы можете безопасно закрыть эту страницу. Мы пришлем уведомление в Telegram, когда
-                  материал будет готов.
-                </p>
+                <p className="text-muted-foreground text-xs">{t('telegram.safeToClose')}</p>
               </div>
             )}
             <Button

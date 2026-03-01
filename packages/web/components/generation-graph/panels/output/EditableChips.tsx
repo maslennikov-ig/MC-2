@@ -11,6 +11,7 @@ import { updateFieldAction, cascadeUpdateAction } from '@/app/actions/admin-gene
 import { trpc } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
+import { useTranslations } from 'next-intl'
 
 interface EditableChipsProps {
   label: string
@@ -49,7 +50,8 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
   locale = 'ru',
   onCascadeChange,
 }) => {
-  const resolvedPlaceholder = placeholder ?? (locale === 'ru' ? 'Добавить...' : 'Add...')
+  const t = useTranslations('generation.common')
+  const resolvedPlaceholder = placeholder ?? t('addPlaceholder')
   const utils = trpc.useUtils()
   const [inputValue, setInputValue] = useState('')
   const [showInput, setShowInput] = useState(false)
@@ -276,7 +278,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
             }}
             role="option"
             aria-selected={focusedChipIndex === index}
-            aria-label={`${item} - ${locale === 'ru' ? 'нажмите Delete для удаления' : 'press delete to remove'}`}
+            aria-label={`${item} - ${t('deleteToRemove')}`}
             tabIndex={-1}
             onFocus={() => setFocusedChipIndex(index)}
           >
@@ -290,7 +292,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
                 onClick={() => handleRemove(index)}
                 disabled={disabled}
                 className="ml-1 rounded-sm opacity-70 hover:opacity-100 focus:ring-1 focus:ring-slate-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30 dark:focus:ring-slate-500"
-                aria-label={`${locale === 'ru' ? 'Удалить' : 'Remove'} ${item}`}
+                aria-label={`${t('removeItem')} ${item}`}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -310,7 +312,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
             placeholder={resolvedPlaceholder}
             autoFocus
             className="h-7 w-32 text-xs"
-            aria-label={`${locale === 'ru' ? 'Добавить' : 'Add'} ${label}`}
+            aria-label={`${t('addItem')} ${label}`}
             aria-busy={status === 'saving'}
           />
         ) : canAddMore && !disabled ? (
@@ -318,7 +320,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
             type="button"
             onClick={() => setShowInput(true)}
             className="inline-flex items-center gap-1 rounded-md border border-dashed border-slate-300 px-2.5 py-1 text-xs text-slate-500 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-            aria-label={`${locale === 'ru' ? 'Добавить элемент' : 'Add item'}`}
+            aria-label={t('addItem')}
           >
             <Plus className="h-3 w-3" />
             <span>{resolvedPlaceholder}</span>
@@ -327,7 +329,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
 
         {maxItems && items.length >= maxItems && (
           <span className="text-xs text-slate-400 italic dark:text-slate-500" aria-live="polite">
-            {locale === 'ru' ? `(макс. ${maxItems})` : `(max. ${maxItems})`}
+            {t('maxItems', { max: maxItems })}
           </span>
         )}
       </div>
