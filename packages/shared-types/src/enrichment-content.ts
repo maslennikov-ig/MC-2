@@ -92,11 +92,15 @@ export type QuestionDifficulty = z.infer<typeof questionDifficultySchema>;
  * Question types supported in quiz enrichments
  */
 export const quizQuestionTypeSchema = createLLMEnumSchema(
-  ['multiple_choice', 'true_false', 'short_answer'] as const,
+  ['multiple_choice', 'multi_select', 'true_false', 'short_answer'] as const,
   {
     mc: 'multiple_choice',
     'multi-choice': 'multiple_choice',
     'select-one': 'multiple_choice',
+    'multi-select': 'multi_select',
+    'select-many': 'multi_select',
+    checkbox: 'multi_select',
+    'multiple-answer': 'multi_select',
     tf: 'true_false',
     yes_no: 'true_false',
     boolean: 'true_false',
@@ -147,7 +151,7 @@ export const quizQuestionSchema = z.object({
   options: z.array(quizOptionSchema).optional(),
 
   /** Correct answer (string for MC/short answer, boolean for true/false) */
-  correct_answer: z.union([z.string(), z.boolean(), z.number()]),
+  correct_answer: z.union([z.string(), z.boolean(), z.number(), z.array(z.string())]),
 
   /** Explanation of the correct answer */
   explanation: z.string().min(10),
