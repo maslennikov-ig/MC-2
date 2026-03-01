@@ -26,10 +26,12 @@ export type GenerationTrace = {
   created_at: string
 }
 
+export type LocalizedName = { ru: string; en: string }
+
 export interface StageInfo {
   id: string // "stage_1", "stage_2", "stage_3", etc. (frontend numbering)
   number: number // 1, 2, 3, 4, 5 (frontend logical numbering)
-  name: string // Human-readable name
+  name: string // Human-readable name (resolved to current locale)
   status: 'pending' | 'active' | 'completed' | 'error' | 'awaiting'
   progress?: number // 0-100 for active stage
   startedAt?: Date
@@ -38,13 +40,37 @@ export interface StageInfo {
 }
 
 export const STAGE_CONFIG = {
-  stage_0: { number: 0, name: 'Запуск генерации', icon: 'Rocket' as const },
-  stage_1: { number: 1, name: 'Инициализация', icon: 'Upload' as const },
-  stage_2: { number: 2, name: 'Обработка документов', icon: 'FileText' as const },
-  stage_3: { number: 3, name: 'Классификация', icon: 'Tag' as const },
-  stage_4: { number: 4, name: 'Анализ', icon: 'Orbit' as const },
-  stage_5: { number: 5, name: 'Генерация структуры', icon: 'Layers' as const },
-  stage_6: { number: 6, name: 'Генерация контента', icon: 'Globe' as const },
+  stage_0: {
+    number: 0,
+    name: { ru: 'Запуск генерации', en: 'Starting generation' } as const,
+    icon: 'Rocket' as const,
+  },
+  stage_1: {
+    number: 1,
+    name: { ru: 'Инициализация', en: 'Initialization' } as const,
+    icon: 'Upload' as const,
+  },
+  stage_2: {
+    number: 2,
+    name: { ru: 'Обработка документов', en: 'Document processing' } as const,
+    icon: 'FileText' as const,
+  },
+  stage_3: {
+    number: 3,
+    name: { ru: 'Классификация', en: 'Classification' } as const,
+    icon: 'Tag' as const,
+  },
+  stage_4: { number: 4, name: { ru: 'Анализ', en: 'Analysis' } as const, icon: 'Orbit' as const },
+  stage_5: {
+    number: 5,
+    name: { ru: 'Генерация структуры', en: 'Structure generation' } as const,
+    icon: 'Layers' as const,
+  },
+  stage_6: {
+    number: 6,
+    name: { ru: 'Генерация контента', en: 'Content generation' } as const,
+    icon: 'Globe' as const,
+  },
 } as const
 
 export function getStageFromStatus(status: string): number | null {
@@ -74,7 +100,8 @@ export function isAwaitingApproval(status: string): number | null {
 export function buildStagesFromStatus(
   status: string,
   progress: GenerationProgress,
-  traces: GenerationTrace[]
+  traces: GenerationTrace[],
+  locale: 'ru' | 'en' = 'ru'
 ): StageInfo[] {
   const currentStage = getStageFromStatus(status)
   const awaitingStage = isAwaitingApproval(status)
@@ -113,7 +140,7 @@ export function buildStagesFromStatus(
       return {
         id,
         number: config.number,
-        name: config.name,
+        name: config.name[locale],
         status: stageStatus,
         progress: stageStatus === 'active' ? progress.percentage : undefined,
         iconName: config.icon,

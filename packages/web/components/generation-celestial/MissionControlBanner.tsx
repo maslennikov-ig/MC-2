@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
 import {
@@ -83,6 +83,7 @@ export function MissionControlBanner({
   const [isMinimized, setIsMinimized] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const t = useTranslations('generation.missionControl')
+  const locale = useLocale()
 
   // Swipe tracking
   const x = useMotionValue(0)
@@ -128,7 +129,7 @@ export function MissionControlBanner({
 
   // Find stage name safely
   const stageName =
-    Object.values(STAGE_CONFIG).find((s) => s.number === awaitingStage)?.name ||
+    Object.values(STAGE_CONFIG).find((s) => s.number === awaitingStage)?.name[locale] ||
     `Stage ${awaitingStage}`
 
   // Check if this is the initial launch stage
@@ -405,7 +406,7 @@ export function MissionControlBanner({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
-                        onApprove()
+                        void onApprove()
                       }}
                       disabled={isProcessing || !clarifyingProgress?.canProceed}
                       className="h-9 border-0 bg-gradient-to-r from-purple-500 to-indigo-600 px-5 text-sm font-medium text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-600 hover:to-indigo-700"
@@ -425,7 +426,7 @@ export function MissionControlBanner({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
-                        onApprove()
+                        void onApprove()
                       }}
                       disabled={isProcessing}
                       className="h-9 border-0 bg-gradient-to-r from-purple-500 to-indigo-600 px-5 text-sm font-medium text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-600 hover:to-indigo-700"

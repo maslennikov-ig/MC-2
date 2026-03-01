@@ -102,6 +102,9 @@ const translations = {
     visualStyleAesthetic: 'Эстетика',
     visualStyleVisualElements: 'Визуальные элементы',
     visualStyleMood: 'Настроение',
+    loading: 'Загрузка данных анализа...',
+    minutesAbbr: 'мин',
+    specificAnalogies: 'Специфичные аналогии',
   },
   en: {
     classification: 'Course Classification',
@@ -142,6 +145,9 @@ const translations = {
     visualStyleAesthetic: 'Aesthetic',
     visualStyleVisualElements: 'Visual Elements',
     visualStyleMood: 'Mood',
+    loading: 'Loading analysis data...',
+    minutesAbbr: 'min',
+    specificAnalogies: 'Specific analogies',
   },
 }
 
@@ -282,7 +288,7 @@ export const AnalysisResultView = ({
     return (
       <div className="text-muted-foreground flex flex-col items-center justify-center py-8">
         <Skeleton className="mb-4 h-8 w-48" />
-        <p className="text-sm">Загрузка данных анализа...</p>
+        <p className="text-sm">{t.loading}</p>
       </div>
     )
   }
@@ -490,7 +496,7 @@ export const AnalysisResultView = ({
               )}
               <LabeledValue
                 label={t.lessonDuration}
-                value={`${data.recommended_structure.lesson_duration_minutes} мин`}
+                value={`${data.recommended_structure.lesson_duration_minutes} ${t.minutesAbbr}`}
               />
             </div>
             <LabeledValue
@@ -566,7 +572,7 @@ export const AnalysisResultView = ({
                 />
                 {data.generation_guidance.use_analogies && (
                   <EditableChips
-                    label="Специфичные аналогии"
+                    label={t.specificAnalogies}
                     items={data.generation_guidance.specific_analogies || []}
                     onChange={(items) =>
                       handleFieldSave('generation_guidance.specific_analogies', items)
