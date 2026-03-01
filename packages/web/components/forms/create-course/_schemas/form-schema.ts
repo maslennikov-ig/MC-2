@@ -31,7 +31,6 @@ export const formSchema = z
       .optional(),
     lessonDuration: z.number().int().min(3).max(45).optional(),
     learningOutcomes: z.string().optional(),
-    formats: z.array(z.string()).optional(),
 
     // Generation mode fields
     generationMode: z.enum(['automatic', 'semi_automatic']).default('automatic'),

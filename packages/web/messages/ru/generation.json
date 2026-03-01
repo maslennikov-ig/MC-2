@@ -523,7 +523,16 @@
     "saveError": "Ошибка",
     "saveErrorTooltip": "Ошибка сохранения",
     "characters": "символов",
-    "regenerateWithAI": "Перегенерировать с AI"
+    "regenerateWithAI": "Перегенерировать с AI",
+    "toggleOn": "Включено",
+    "toggleOff": "Выключено",
+    "selectPlaceholder": "Выберите значение",
+    "saveFailedMessage": "Не удалось сохранить изменения",
+    "addPlaceholder": "Добавить...",
+    "removeItem": "Удалить",
+    "addItem": "Добавить элемент",
+    "deleteToRemove": "нажмите Delete для удаления",
+    "maxItems": "(макс. {max})"
   },
   "stage1": {
     "identity": "Идентификация",
@@ -1394,16 +1403,5 @@
     "action": "Действие",
     "totalLessons": "Всего: {count} уроков",
     "avgQuality": "Среднее качество: {quality}"
-  },
-  "automaticMode": {
-    "title": "Автоматическая генерация",
-    "subtitle": "Можно закрыть страницу — уведомим по готовности",
-    "pause": "Пауза",
-    "cancel": "Отменить",
-    "generationPaused": "Генерация приостановлена",
-    "resume": "Продолжить",
-    "switching": "Переключение...",
-    "manualMode": "Ручной режим",
-    "manualModeHint": "В ручном режиме вы сможете проверить и изменить результаты каждого этапа."
   }
 }

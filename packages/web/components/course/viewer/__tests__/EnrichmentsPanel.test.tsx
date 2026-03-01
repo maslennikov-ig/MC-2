@@ -1,4 +1,3 @@
-/* eslint-disable */
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -19,6 +18,7 @@ const toastMocks = vi.hoisted(() => ({
 
 vi.mock('next-intl', () => ({
   useTranslations: vi.fn(() => (key: string) => key),
+  useLocale: vi.fn(() => 'ru'),
 }))
 
 vi.mock('sonner', () => ({

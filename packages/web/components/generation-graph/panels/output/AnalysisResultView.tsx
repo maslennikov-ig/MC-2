@@ -105,6 +105,12 @@ const translations = {
     loading: 'Загрузка данных анализа...',
     minutesAbbr: 'мин',
     specificAnalogies: 'Специфичные аналогии',
+    changesSaved: 'Изменения сохранены',
+    changeUndone: 'Изменение отменено',
+    undoFailed: 'Ошибка при отмене',
+    changeRedone: 'Изменение повторено',
+    redoFailed: 'Ошибка при повторе',
+    editCancelled: 'Редактирование отменено',
   },
   en: {
     classification: 'Course Classification',
@@ -148,6 +154,12 @@ const translations = {
     loading: 'Loading analysis data...',
     minutesAbbr: 'min',
     specificAnalogies: 'Specific analogies',
+    changesSaved: 'Changes saved',
+    changeUndone: 'Change undone',
+    undoFailed: 'Failed to undo',
+    changeRedone: 'Change redone',
+    redoFailed: 'Failed to redo',
+    editCancelled: 'Edit cancelled',
   },
 }
 
@@ -195,8 +207,8 @@ export const AnalysisResultView = ({
     if (!canEdit) return
     // Trigger immediate flush of pending changes
     flush()
-    toast.success(locale === 'ru' ? 'Изменения сохранены' : 'Changes saved')
-  }, [canEdit, flush, locale])
+    toast.success(t.changesSaved)
+  }, [canEdit, flush, t])
 
   const handleUndo = useCallback(async () => {
     if (!courseId) return
@@ -212,16 +224,16 @@ export const AnalysisResultView = ({
 
       try {
         await updateFieldAction(entry.courseId, entry.stageId, entry.fieldPath, entry.previousValue)
-        toast.success(locale === 'ru' ? 'Изменение отменено' : 'Change undone')
+        toast.success(t.changeUndone)
 
         // Trigger immediate save to sync UI
         flush()
       } catch (error) {
         console.error('Failed to undo:', error)
-        toast.error(locale === 'ru' ? 'Ошибка при отмене' : 'Failed to undo')
+        toast.error(t.undoFailed)
       }
     }
-  }, [undo, locale, courseId, flush])
+  }, [undo, t, courseId, flush])
 
   const handleRedo = useCallback(async () => {
     if (!courseId) return
@@ -233,24 +245,24 @@ export const AnalysisResultView = ({
     if (entry.stageId === 'stage_4') {
       try {
         await updateFieldAction(entry.courseId, entry.stageId, entry.fieldPath, entry.newValue)
-        toast.success(locale === 'ru' ? 'Изменение повторено' : 'Change redone')
+        toast.success(t.changeRedone)
 
         // Trigger immediate save to sync UI
         flush()
       } catch (error) {
         console.error('Failed to redo:', error)
-        toast.error(locale === 'ru' ? 'Ошибка при повторе' : 'Failed to redo')
+        toast.error(t.redoFailed)
       }
     }
-  }, [redo, locale, courseId, flush])
+  }, [redo, t, courseId, flush])
 
   const handleCancelEdit = useCallback(() => {
     if (!canEdit) return
     // Blur the active element to trigger auto-save flush
     const activeElement = document.activeElement as HTMLElement
     activeElement?.blur()
-    toast.info(locale === 'ru' ? 'Редактирование отменено' : 'Edit cancelled')
-  }, [canEdit, locale])
+    toast.info(t.editCancelled)
+  }, [canEdit, t])
 
   // Register keyboard shortcuts with undo/redo
   // Wrap async handlers to satisfy void return type requirement

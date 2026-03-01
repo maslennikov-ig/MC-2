@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -55,7 +55,6 @@ export function useCreateCourseForm() {
       language: savedPrefs?.language || 'ru',
       contentStrategy: 'auto',
       courseSize: savedPrefs?.courseSize || DEFAULT_COURSE_SIZE,
-      formats: savedPrefs?.formats || ['text'],
       lessonDuration: 5,
       generationMode: savedPrefs?.generationMode || 'automatic',
       notifyOnCompletion: savedPrefs?.notifyOnCompletion ?? true,
@@ -74,8 +73,6 @@ export function useCreateCourseForm() {
 
   const writingStyle = watch('writingStyle')
   const language = watch('language')
-  const rawFormats = watch('formats')
-  const formats = useMemo(() => rawFormats || [], [rawFormats])
   const courseSize = watch('courseSize')
   const generationMode = watch('generationMode')
   const notifyOnCompletion = watch('notifyOnCompletion')
@@ -164,7 +161,7 @@ export function useCreateCourseForm() {
     }
 
     if (mounted) {
-      checkPermissions()
+      void checkPermissions()
     }
   }, [mounted])
 
@@ -212,7 +209,7 @@ export function useCreateCourseForm() {
       }
     }
 
-    initSession()
+    void initSession()
   }, [sessionId, mounted, canCreate])
 
   useEffect(() => {
@@ -257,7 +254,7 @@ export function useCreateCourseForm() {
         })
 
         const supabase = createClient()
-        supabase.auth.getUser().then(({ data: { user } }) => {
+        void supabase.auth.getUser().then(({ data: { user } }) => {
           if (user) {
             if (autoSubmitTimeoutRef.current) {
               clearTimeout(autoSubmitTimeoutRef.current)
@@ -275,7 +272,7 @@ export function useCreateCourseForm() {
         // Failed to restore form data
       }
     } else {
-      loadPreferences()
+      void loadPreferences()
     }
   }, [setValue, getValues])
 
@@ -286,7 +283,6 @@ export function useCreateCourseForm() {
           writingStyle,
           language,
           courseSize,
-          formats,
           generationMode,
           notifyOnCompletion,
           notifyOnError,
@@ -301,20 +297,12 @@ export function useCreateCourseForm() {
     writingStyle,
     language,
     courseSize,
-    formats,
     generationMode,
     notifyOnCompletion,
     notifyOnError,
     notifyOnStageComplete,
     mounted,
   ])
-
-  useEffect(() => {
-    const currentFormats = getValues('formats')
-    if (!currentFormats || currentFormats.length === 0) {
-      setValue('formats', ['text'], { shouldValidate: true })
-    }
-  }, [getValues, setValue])
 
   useEffect(() => {
     // Cleanup function called at unmount
@@ -330,23 +318,6 @@ export function useCreateCourseForm() {
       }
     }
   }, [])
-
-  const toggleFormat = useCallback(
-    (format: string, available: boolean, required?: boolean) => {
-      if (!available || required) return
-      const currentFormats = formats || []
-      if (currentFormats.includes(format)) {
-        setValue(
-          'formats',
-          currentFormats.filter((f) => f !== format),
-          { shouldValidate: true }
-        )
-      } else {
-        setValue('formats', [...currentFormats, format], { shouldValidate: true })
-      }
-    },
-    [formats, setValue]
-  )
 
   const handleFormSubmit = handleSubmit(onSubmit, () => validateAndScrollToError())
 
@@ -365,10 +336,8 @@ export function useCreateCourseForm() {
     handleFormChange,
     handleFormSubmit,
     uploadSingleFile,
-    toggleFormat,
     authModal,
     router,
-    formats,
     workerReadiness,
   }
 }

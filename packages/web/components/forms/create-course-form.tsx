@@ -5,7 +5,6 @@ import { FormProvider } from 'react-hook-form'
 import { Loader2 } from 'lucide-react'
 import { useCreateCourseForm } from './create-course/_hooks/useCreateCourseForm'
 import { BasicInfoSection } from './create-course/components/BasicInfoSection'
-import { FormatsSection } from './create-course/components/FormatsSection'
 import { StyleSection } from './create-course/components/StyleSection'
 import { UploadSection } from './create-course/components/UploadSection'
 import { GenerationSettingsSection } from './create-course/components/GenerationSettingsSection'
@@ -29,9 +28,7 @@ export default function CreateCourseForm() {
     handleFormChange,
     handleFormSubmit,
     uploadSingleFile,
-    toggleFormat,
     authModal,
-    formats,
     workerReadiness,
   } = useCreateCourseForm()
 
@@ -84,8 +81,6 @@ export default function CreateCourseForm() {
           className="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:gap-8"
         >
           <BasicInfoSection onBlur={handleFormChange} />
-
-          <FormatsSection mounted={mounted} toggleFormat={toggleFormat} formats={formats} />
 
           <StyleSection mounted={mounted} reorderedStyles={reorderedStyles} />
 
