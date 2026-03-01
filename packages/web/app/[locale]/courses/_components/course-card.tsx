@@ -227,9 +227,6 @@ export function CourseCard({
     }
 
     checkComplete()
-    const timeoutId = setTimeout(checkComplete, 100)
-
-    return () => clearTimeout(timeoutId)
   }, [coverUrl, hasCover, loadedUrls])
 
   // Safe state updates to prevent memory leaks
@@ -446,7 +443,7 @@ export function CourseCard({
                       className="h-8 w-8 text-gray-400 transition-colors hover:text-red-500"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleDelete()
+                        void handleDelete()
                       }}
                       disabled={isDeleting}
                     >
@@ -504,11 +501,7 @@ export function CourseCard({
 
   return (
     <TooltipProvider>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        whileHover={{ y: -4 }}
-        transition={{ duration: 0.3 }}
+      <div
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleView}
@@ -524,10 +517,11 @@ export function CourseCard({
         aria-describedby={`course-description-${course.id}`}
         className={cn(
           'group relative cursor-pointer overflow-hidden rounded-2xl',
-          'flex min-h-[480px] flex-col transition-shadow duration-300',
+          'flex min-h-[480px] flex-col transition-[box-shadow,transform] duration-300',
           'border border-gray-200 bg-white shadow-md hover:shadow-xl',
           'dark:border-slate-800 dark:bg-slate-900 dark:shadow-lg dark:hover:shadow-2xl',
           'focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:outline-none',
+          'hover:-translate-y-1',
           isDeleting && 'opacity-50'
         )}
       >
@@ -875,7 +869,7 @@ export function CourseCard({
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     </TooltipProvider>
   )
 }

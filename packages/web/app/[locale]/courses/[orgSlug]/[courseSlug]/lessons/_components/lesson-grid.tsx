@@ -1,7 +1,6 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { AnimatePresence, motion } from 'framer-motion'
 import { LessonCard } from './lesson-card'
 import { buildCourseUrl } from '@/lib/helpers/course-urls'
 import type { Database } from '@/types/database.generated'
@@ -47,37 +46,27 @@ export function LessonGrid({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3">
-      <AnimatePresence mode="popLayout">
-        {lessons.map((lesson, index) => {
-          const isCompleted = completedLessons.has(lesson.id)
-          return (
-            <motion.div
-              key={lesson.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3, delay: index * 0.05 }}
-              layout
-            >
-              <LessonCard
-                lesson={{
-                  id: lesson.id,
-                  title: lesson.title,
-                  duration_minutes: lesson.duration_minutes,
-                  order_index: lesson.order_index,
-                }}
-                enrichments={getEnrichmentFlags(enrichments.get(lesson.id))}
-                isCompleted={isCompleted}
-                isUpdating={updatingLessonId === lesson.id}
-                onClick={() =>
-                  router.push(`${buildCourseUrl(orgSlug, courseSlug)}?lesson=${lesson.id}`)
-                }
-                onToggleComplete={onToggleComplete}
-              />
-            </motion.div>
-          )
-        })}
-      </AnimatePresence>
+      {lessons.map((lesson) => {
+        const isCompleted = completedLessons.has(lesson.id)
+        return (
+          <LessonCard
+            key={lesson.id}
+            lesson={{
+              id: lesson.id,
+              title: lesson.title,
+              duration_minutes: lesson.duration_minutes,
+              order_index: lesson.order_index,
+            }}
+            enrichments={getEnrichmentFlags(enrichments.get(lesson.id))}
+            isCompleted={isCompleted}
+            isUpdating={updatingLessonId === lesson.id}
+            onClick={() =>
+              router.push(`${buildCourseUrl(orgSlug, courseSlug)}?lesson=${lesson.id}`)
+            }
+            onToggleComplete={onToggleComplete}
+          />
+        )
+      })}
     </div>
   )
 }

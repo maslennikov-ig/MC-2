@@ -564,19 +564,16 @@ export function UnifiedEnrichmentCard({
   ])
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.3 }}
+    <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleCardClick}
       className={cn(
         'group relative cursor-pointer overflow-hidden rounded-2xl',
-        'flex min-h-[480px] flex-col transition-shadow duration-300',
+        'flex min-h-[480px] flex-col transition-[box-shadow,transform] duration-300',
         'border border-gray-200 bg-white shadow-md hover:shadow-xl',
-        'dark:border-slate-800 dark:bg-slate-900 dark:shadow-lg dark:hover:shadow-2xl'
+        'dark:border-slate-800 dark:bg-slate-900 dark:shadow-lg dark:hover:shadow-2xl',
+        'hover:-translate-y-1'
       )}
     >
       {/* Image Area - delegated to subcomponent */}
@@ -813,6 +810,6 @@ export function UnifiedEnrichmentCard({
           </div>
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

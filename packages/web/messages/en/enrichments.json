@@ -2,8 +2,8 @@
   "types": {
     "video": "Video",
     "audio": "Audio",
-    "nlm_audio": "NLM Audio",
-    "nlm_video": "NLM Video",
+    "nlm_audio": "Audio Lesson",
+    "nlm_video": "Video Lesson",
     "presentation": "Presentation",
     "quiz": "Quiz",
     "document": "Document",
@@ -26,8 +26,8 @@
   "typeDescriptions": {
     "video": "AI-generated video lecture based on lesson content",
     "audio": "Text-to-speech narration for convenient listening",
-    "nlm_audio": "Narrated audio generated with NLM flow",
-    "nlm_video": "Narrated video generated with NLM flow",
+    "nlm_audio": "Narrated audio lesson",
+    "nlm_video": "Narrated video lesson",
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
@@ -231,8 +231,8 @@
     "loadError": "Failed to load additional materials. Try refreshing the page.",
     "videoLesson": "Video lesson",
     "audioLesson": "Audio lesson",
-    "nlmAudioLesson": "NLM audio lesson",
-    "nlmVideoLesson": "NLM video lesson",
+    "nlmAudioLesson": "Audio lesson",
+    "nlmVideoLesson": "Video lesson",
     "presentationLabel": "Presentation",
     "quizLabel": "Quiz",
     "documentLabel": "Additional reading",
@@ -400,7 +400,7 @@
       "estimatedTime": "~30 sec"
     },
     "nlm_audio": {
-      "title": "NLM Audio",
+      "title": "Audio Lesson",
       "description": "Draft and generate narrated lesson audio",
       "estimatedTime": "~45 sec"
     },
@@ -416,7 +416,7 @@
       "comingSoon": "Coming Soon"
     },
     "nlm_video": {
-      "title": "NLM Video",
+      "title": "Video Lesson",
       "description": "Draft and generate narrated lesson video",
       "estimatedTime": "~120 sec"
     },

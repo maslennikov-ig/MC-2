@@ -79,11 +79,7 @@ export function EnrichmentCardImage({
       }
     }
 
-    // Check immediately and after a short delay (for SSR hydration)
     checkComplete()
-    const timeoutId = setTimeout(checkComplete, 100)
-
-    return () => clearTimeout(timeoutId)
   }, [imageUrl, hasImage, loadedUrls])
 
   // Determine current state based on URL
