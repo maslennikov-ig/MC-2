@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { Target, Clock, CheckCircle, ArrowRight } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 import { MarkdownRendererFull } from '@/components/markdown'
 import type { Lesson, Section, Asset } from '@/types/database'
@@ -42,6 +43,8 @@ export default function LessonContent({
   nextLesson,
   onNextLesson,
 }: LessonContentProps) {
+  const t = useTranslations('course')
+
   // Parse the lesson content - prefer lessonContent from lesson_contents table
   // Fallback to lesson.content or lesson.content_text for legacy support
   const { introText, mainContent } = useMemo(() => {
@@ -133,7 +136,7 @@ export default function LessonContent({
               className="mb-2 text-sm font-medium text-purple-400"
               data-section={section.section_number}
             >
-              Модуль {section.section_number}: {section.title}
+              {t('viewer.section')} {section.section_number}: {section.title}
             </div>
           )}
           <h1 className="mb-4 text-3xl font-bold text-gray-900 lg:text-4xl dark:text-white">
@@ -142,7 +145,7 @@ export default function LessonContent({
           <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
             <span className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
-              {lesson.duration_minutes} мин
+              {t('lesson.duration', { minutes: lesson.duration_minutes ?? 0 })}
             </span>
           </div>
         </div>
@@ -154,7 +157,9 @@ export default function LessonContent({
           <div className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/50 p-6 shadow-sm transition-shadow hover:shadow-md dark:border-purple-800/30 dark:from-purple-900/20 dark:to-purple-900/10">
             <div className="mb-4 flex items-center gap-2">
               <Target className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Цели урока</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('lesson.objectives')}
+              </h2>
             </div>
             <ul className="space-y-2">
               {lesson.objectives.map((objective, index) => (
@@ -202,7 +207,7 @@ export default function LessonContent({
                   className="h-5 w-5 text-emerald-600 transition-transform group-hover:translate-x-1 dark:text-emerald-400"
                 />
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  В следующем уроке
+                  {t('lesson.nextLesson')}
                 </h2>
               </div>
               <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">
@@ -227,7 +232,7 @@ export default function LessonContent({
               <div className="mb-3 flex items-center gap-2">
                 <ArrowRight className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  В следующем уроке
+                  {t('lesson.nextLesson')}
                 </h2>
               </div>
               <p className="mb-2 text-base font-medium text-gray-800 dark:text-gray-200">

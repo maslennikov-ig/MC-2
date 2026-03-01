@@ -51,7 +51,9 @@
     "actions": {
       "markComplete": "Отметить как пройденный",
       "markIncomplete": "Отметить как не пройденный"
-    }
+    },
+    "objectives": "Цели урока",
+    "nextLesson": "В следующем уроке"
   },
   "viewer": {
     "showSidebar": "Показать боковую панель",
@@ -89,6 +91,93 @@
       "content": "Содержание",
       "structure": "Структура курса",
       "media": "Медиа"
+    },
+    "hideSidebar": "Скрыть боковую панель",
+    "structureDescription": "Полный обзор всех модулей и уроков курса",
+    "lessonsProgress": "{completed}/{total} уроков",
+    "current": "Текущий",
+    "overallProgress": "Общий прогресс курса",
+    "timeRemaining": "Осталось времени",
+    "lessonsCompleted": "{completed} из {total} уроков",
+    "backToCatalog": "К каталогу"
+  },
+  "content": {
+    "format": "Формат:",
+    "formatCount": "{count, plural, one {# формат} few {# формата} many {# форматов} other {# форматов}}",
+    "quickAccess": "Быстрый доступ:",
+    "text": "Текст",
+    "video": "Видео",
+    "audio": "Аудио",
+    "presentation": "Презентация",
+    "videoUnavailable": "Видео недоступно",
+    "tryAgain": "Попробовать снова",
+    "videoLesson": "Видео урок: {title}",
+    "videoDuration": "Продолжительность: {minutes} минут",
+    "readTextVersion": "Читать текстовую версию",
+    "lessonPresentation": "Презентация к уроку",
+    "downloadPresentation": "Скачать презентацию",
+    "restoreVideo": "Вернуть видео в основной вид",
+    "minimizeVideo": "Свернуть в плавающее окно"
+  },
+  "card": {
+    "open": "Открыть курс",
+    "openAction": "Открыть",
+    "sections": "{count, plural, one {# модуль} few {# модуля} many {# модулей} other {# модулей}}",
+    "lessons": "{count, plural, one {# урок} few {# урока} many {# уроков} other {# уроков}}",
+    "durationHours": "{hours}ч",
+    "generationProgress": "Прогресс генерации",
+    "courseStatus": "Статус курса: ",
+    "difficultyLevel": "Уровень сложности: ",
+    "addToFavorites": "Добавить в избранное",
+    "addedToFavorites": "Добавлено в избранное",
+    "removedFromFavorites": "Удалено из избранного",
+    "signInToFavorite": "Войдите, чтобы добавлять курсы в избранное",
+    "favoriteError": "Не удалось обновить избранное",
+    "visibilityUpdated": "Видимость обновлена",
+    "signInToChangeVisibility": "Войдите, чтобы изменить видимость",
+    "visibilityError": "Не удалось изменить видимость",
+    "deleteConfirm": "Вы уверены, что хотите удалить этот курс?",
+    "deleteSuccess": "Курс \"{title}\" успешно удален",
+    "deleteError": "Ошибка при удалении курса",
+    "coverAlt": "Обложка курса: {title}",
+    "coverLoading": "Загрузка обложки курса",
+    "status": {
+      "draft": "Черновик",
+      "generating": "Генерируется",
+      "processing": "Обрабатывается",
+      "structure_ready": "Структура готова",
+      "completed": "Готов",
+      "failed": "Ошибка",
+      "mixed": "Смешанный"
+    },
+    "difficulty": {
+      "beginner": "Начальный",
+      "intermediate": "Средний",
+      "advanced": "Продвинутый",
+      "master": "Мастер",
+      "expert": "Эксперт",
+      "mixed": "Смешанный"
+    }
+  },
+  "progress": {
+    "title": "Прогресс курса",
+    "compact": "Прогресс",
+    "completed": "Пройдено",
+    "of": "из {total}",
+    "lessonsCount": "{completed}/{total} уроков",
+    "timeRemaining": "Осталось времени",
+    "courseCompleted": "Курс завершён!",
+    "almostThere": "Почти у цели!",
+    "halfWay": "Половина пройдена!",
+    "greatStart": "Отличное начало!",
+    "timeMinutes": "{minutes} мин",
+    "timeHours": "{hours}ч",
+    "timeHoursMinutes": "{hours}ч {minutes}мин",
+    "motivational": {
+      "start": "Отличное начало! Продолжайте в том же духе 🚀",
+      "quarter": "Вы делаете успехи! Так держать 💪",
+      "half": "Уже больше половины! Вы молодец 🌟",
+      "almost": "Почти у цели! Ещё немного 🎯"
     }
   }
 }

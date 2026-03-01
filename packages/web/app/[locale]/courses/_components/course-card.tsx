@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
@@ -70,7 +71,6 @@ interface CourseCardProps {
 
 interface StatusConfig {
   color: string
-  label: string
   icon: React.ComponentType<{ className?: string }>
   pulse?: boolean
 }
@@ -78,72 +78,59 @@ interface StatusConfig {
 const statusConfig: Record<string, StatusConfig> = {
   draft: {
     color: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
-    label: 'Черновик',
     icon: BookOpen,
   },
   generating: {
     color: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    label: 'Генерируется',
     icon: Zap,
     pulse: true,
   },
   processing: {
     color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    label: 'Обрабатывается',
     icon: Settings,
     pulse: true,
   },
   structure_ready: {
     color: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    label: 'Структура готова',
     icon: ClipboardList,
   },
   completed: {
     color: 'bg-green-500/10 text-green-400 border-green-500/20',
-    label: 'Готов',
     icon: CheckCircle,
   },
   failed: {
     color: 'bg-red-500/10 text-red-400 border-red-500/20',
-    label: 'Ошибка',
     icon: AlertCircle,
   },
   mixed: {
     color: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-    label: 'Смешанный',
     icon: Settings,
   },
 }
 
-const difficultyConfig = {
+const difficultyConfig: Record<string, { color: string; icon: React.ReactElement }> = {
   beginner: {
     color: 'bg-green-500/10 text-green-400 border-green-500/20',
-    label: 'Начальный',
     icon: <Award className="h-3 w-3" />,
   },
   intermediate: {
     color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    label: 'Средний',
     icon: <Award className="h-3 w-3" />,
   },
   advanced: {
     color: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-    label: 'Продвинутый',
     icon: <Award className="h-3 w-3" />,
   },
   master: {
     color: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    label: 'Мастер',
     icon: <Award className="h-3 w-3" />,
   },
   expert: {
     color: 'bg-red-500/10 text-red-400 border-red-500/20',
-    label: 'Эксперт',
     icon: <Award className="h-3 w-3" />,
   },
   mixed: {
     color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    label: 'Смешанный',
     icon: <Award className="h-3 w-3" />,
   },
 }
@@ -153,23 +140,19 @@ const visibilityConfig: Record<
   CourseVisibility,
   {
     color: string
-    label: string
     icon: React.ComponentType<{ className?: string }>
   }
 > = {
   private: {
     color: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
-    label: 'Приватный',
     icon: Lock,
   },
   organization: {
     color: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    label: 'Для организации',
     icon: Building2,
   },
   public: {
     color: 'bg-green-500/10 text-green-400 border-green-500/20',
-    label: 'Публичный',
     icon: Globe,
   },
 }
@@ -183,6 +166,8 @@ export function CourseCard({
   index = 0,
 }: CourseCardProps) {
   const router = useRouter()
+  const t = useTranslations('course.card')
+  const tc = useTranslations('common')
   const [isDeleting, setIsDeleting] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   // Use prop if provided, otherwise use course.isFavorited, otherwise false
@@ -265,17 +250,17 @@ export function CourseCard({
   // Use generation_status for display if available, otherwise fall back to course.status
   const displayStatus = course.generation_status || course.status
   const statusInfo = statusConfig[displayStatus as keyof typeof statusConfig] || statusConfig.draft
-  const difficultyInfo = difficultyConfig[course.difficulty as keyof typeof difficultyConfig]
+  const difficultyInfo = difficultyConfig[course.difficulty]
 
   const handleDelete = async () => {
-    if (!confirm('Вы уверены, что хотите удалить этот курс?')) return
+    if (!confirm(t('deleteConfirm'))) return
 
     setIsDeleting(true)
     try {
       const result = await deleteCourse(courseSlug)
-      toast.success(`Курс "${result.deletedTitle}" успешно удален`)
+      toast.success(t('deleteSuccess', { title: result.deletedTitle }))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка при удалении курса')
+      toast.error(error instanceof Error ? error.message : t('deleteError'))
       setIsDeleting(false)
     }
   }
@@ -293,7 +278,7 @@ export function CourseCard({
     e.stopPropagation()
 
     if (!user) {
-      toast.error('Войдите, чтобы добавлять курсы в избранное')
+      toast.error(t('signInToFavorite'))
       return
     }
 
@@ -306,12 +291,12 @@ export function CourseCard({
       if ('success' in result && result.success && 'isFavorited' in result) {
         const isFavoritedValue = result.isFavorited as boolean
         setIsFavorited(isFavoritedValue)
-        toast.success(isFavoritedValue ? 'Добавлено в избранное' : 'Удалено из избранного')
+        toast.success(isFavoritedValue ? t('addedToFavorites') : t('removedFromFavorites'))
       } else {
-        toast.error(result.error || 'Ошибка при обновлении избранного')
+        toast.error(result.error || t('favoriteError'))
       }
     } catch {
-      toast.error('Не удалось обновить избранное')
+      toast.error(t('favoriteError'))
     } finally {
       setIsUpdatingFavorite(false)
     }
@@ -319,7 +304,7 @@ export function CourseCard({
 
   const handleUpdateVisibility = async (newVisibility: CourseVisibility) => {
     if (!user) {
-      toast.error('Войдите, чтобы изменить видимость')
+      toast.error(t('signInToChangeVisibility'))
       return
     }
 
@@ -332,10 +317,10 @@ export function CourseCard({
 
       if (result.success) {
         setVisibility(result.visibility)
-        toast.success('Видимость обновлена')
+        toast.success(t('visibilityUpdated'))
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось изменить видимость')
+      toast.error(error instanceof Error ? error.message : t('visibilityError'))
     } finally {
       setIsUpdatingVisibility(false)
     }
@@ -383,14 +368,16 @@ export function CourseCard({
                       )}
                     >
                       <statusInfo.icon className="mr-1 h-3 w-3" aria-hidden="true" />
-                      <span className="sr-only">Статус курса: </span>
-                      {statusInfo.label}
+                      <span className="sr-only">{t('courseStatus')}</span>
+                      {t(`status.${displayStatus}` as Parameters<typeof t>[0])}
                     </Badge>
                     {difficultyInfo && (
                       <Badge className={cn(difficultyInfo.color, 'border px-2 py-0.5 text-xs')}>
                         {difficultyInfo.icon}
-                        <span className="sr-only">Уровень сложности: </span>
-                        <span className="ml-1">{difficultyInfo.label}</span>
+                        <span className="sr-only">{t('difficultyLevel')}</span>
+                        <span className="ml-1">
+                          {t(`difficulty.${course.difficulty}` as Parameters<typeof t>[0])}
+                        </span>
                       </Badge>
                     )}
                   </div>
@@ -433,7 +420,7 @@ export function CourseCard({
                             <GitBranch className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Конструктор курса</TooltipContent>
+                        <TooltipContent>{tc('nav.courseConstructor')}</TooltipContent>
                       </Tooltip>
                     )}
                   {canDelete && (
@@ -459,15 +446,15 @@ export function CourseCard({
               <div className="flex items-center gap-4 text-xs text-gray-500">
                 <span className="flex items-center gap-1">
                   <BookOpen className="h-3 w-3" />
-                  {sectionsCount} модулей
+                  {t('sections', { count: sectionsCount })}
                 </span>
                 <span className="flex items-center gap-1">
                   <BookOpen className="h-3 w-3" />
-                  {lessonsCount} уроков
+                  {t('lessons', { count: lessonsCount })}
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  {duration}ч
+                  {t('durationHours', { hours: duration })}
                 </span>
               </div>
             </div>
@@ -482,7 +469,7 @@ export function CourseCard({
                 }}
                 tabIndex={-1}
               >
-                Открыть
+                {t('openAction')}
                 <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </div>
@@ -534,7 +521,7 @@ export function CourseCard({
             <>
               {/* Skeleton while loading */}
               {!isImageLoaded && !hasImageError && (
-                <ImageSkeleton gradient aria-label="Загрузка обложки курса" />
+                <ImageSkeleton gradient aria-label={t('coverLoading')} />
               )}
               {/* Error fallback */}
               {hasImageError && (
@@ -546,7 +533,7 @@ export function CourseCard({
               <Image
                 ref={imageRef}
                 src={coverUrl}
-                alt={`Обложка курса: ${course.title}`}
+                alt={t('coverAlt', { title: course.title })}
                 fill
                 loading="eager"
                 unoptimized // External Supabase URLs - skip Next.js optimization for reliable onLoad
@@ -587,14 +574,16 @@ export function CourseCard({
               )}
             >
               <statusInfo.icon className="mr-1 h-3 w-3" aria-hidden="true" />
-              <span className="sr-only">Статус курса: </span>
-              {statusInfo.label}
+              <span className="sr-only">{t('courseStatus')}</span>
+              {t(`status.${displayStatus}` as Parameters<typeof t>[0])}
             </Badge>
             {difficultyInfo && (
               <Badge className={cn('border backdrop-blur-sm', difficultyInfo.color)}>
                 {difficultyInfo.icon}
-                <span className="sr-only">Уровень сложности: </span>
-                <span className="ml-1">{difficultyInfo.label}</span>
+                <span className="sr-only">{t('difficultyLevel')}</span>
+                <span className="ml-1">
+                  {t(`difficulty.${course.difficulty}` as Parameters<typeof t>[0])}
+                </span>
               </Badge>
             )}
           </div>
@@ -615,11 +604,11 @@ export function CourseCard({
           <div className="mt-2 flex items-center gap-4 text-sm text-gray-500 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <BookOpen className="h-4 w-4" />
-              {lessonsCount} уроков
+              {t('lessons', { count: lessonsCount })}
             </span>
             <span className="flex items-center gap-1.5">
               <Clock className="h-4 w-4" />
-              {duration}ч
+              {t('durationHours', { hours: duration })}
             </span>
           </div>
         </div>
@@ -709,7 +698,9 @@ export function CourseCard({
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500 dark:text-slate-400">Прогресс генерации</span>
+                      <span className="text-gray-500 dark:text-slate-400">
+                        {t('generationProgress')}
+                      </span>
                       <span className="font-medium text-purple-500 dark:text-purple-400">
                         {progress}%
                       </span>
@@ -740,7 +731,7 @@ export function CourseCard({
                   }}
                   tabIndex={-1}
                 >
-                  Открыть курс
+                  {t('open')}
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               </motion.div>
@@ -773,7 +764,7 @@ export function CourseCard({
                       />
                     )
                   }
-                  label="Добавить в избранное"
+                  label={t('addToFavorites')}
                   onClick={(e) => void handleToggleFavorite(e)}
                   disabled={isUpdatingFavorite}
                   className="h-7 w-7 text-gray-500 hover:text-purple-500 dark:text-slate-400 dark:hover:text-purple-400"
@@ -811,7 +802,7 @@ export function CourseCard({
                           ) : (
                             <currentVisibility.icon className="h-3 w-3" />
                           )}
-                          <span className="hidden sm:inline">{currentVisibility.label}</span>
+                          <span className="hidden sm:inline">{tc(`visibility.${visibility}`)}</span>
                           <ChevronDown className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -831,7 +822,7 @@ export function CourseCard({
                             )}
                           >
                             <config.icon className="h-4 w-4" />
-                            {config.label}
+                            {tc(`visibility.${key}`)}
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>
@@ -844,7 +835,7 @@ export function CourseCard({
                     user.role === 'superadmin') && (
                     <ActionButtonWithTooltip
                       icon={<GitBranch className="h-3.5 w-3.5" />}
-                      label="Конструктор курса"
+                      label={tc('nav.courseConstructor')}
                       onClick={handleWorkflow}
                       className="h-7 w-7 text-gray-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400"
                     />
@@ -859,7 +850,7 @@ export function CourseCard({
                         <Trash2 className="h-3.5 w-3.5" />
                       )
                     }
-                    label="Удалить курс"
+                    label={tc('nav.deleteCourse')}
                     onClick={() => void handleDelete()}
                     disabled={isDeleting}
                     className="h-7 w-7 text-gray-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400"
