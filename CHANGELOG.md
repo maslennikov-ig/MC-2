@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.12] - 2026-03-01
+
+### Added
+
+- **ui**: update enrichments UI, course cards, header and viewer improvements (f0b7363c)
+
 ## [0.31.11] - 2026-03-01
 
 ### Added
