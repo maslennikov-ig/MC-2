@@ -61,8 +61,8 @@ export type OnDemandEnrichmentType = z.infer<typeof onDemandEnrichmentTypeSchema
  * ```
  */
 export const onDemandQuizSettingsSchema = z.object({
-  /** Number of quiz questions to generate (5-15) */
-  questionCount: z.number().int().min(5).max(15).default(10),
+  /** Number of quiz questions to generate (3-15) */
+  questionCount: z.number().int().min(3).max(15).default(5),
 
   /** Difficulty level for quiz questions */
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),

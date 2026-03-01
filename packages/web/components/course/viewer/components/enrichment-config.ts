@@ -59,6 +59,7 @@ export type GeneratableEnrichmentType =
 export const ALL_PLACEHOLDER_TYPES: GeneratableEnrichmentType[] = [
   'cover',
   'card',
+  'quiz',
   'nlm_audio',
   'nlm_video',
   'nlm_flashcards',

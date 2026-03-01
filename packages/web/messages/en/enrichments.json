@@ -291,6 +291,8 @@
     "false": "False",
     "enterAnswer": "Enter your answer...",
     "shortAnswerHint": "Enter a brief answer",
+    "selectAllCorrect": "Select all correct answers",
+    "shortAnswerComingSoon": "Open-ended questions coming in future updates",
     "questionsLabel": "{count} question(s)",
     "pointsLabel": "{count} points",
     "estimatedTime": "~{count} min",
@@ -492,6 +494,10 @@
     "batchGenerating": "Generating: {completed}/{total}",
     "batchAllComplete": "All {count} images generated successfully",
     "allGenerated": "All covers already generated"
+  },
+  "telegram": {
+    "connectPrompt": "Don't want to wait? Connect Telegram to get notified when it's ready.",
+    "safeToClose": "You can safely close this page. We'll send a notification via Telegram when the material is ready."
   },
   "generate": "Generate",
   "generating": "Generating...",
