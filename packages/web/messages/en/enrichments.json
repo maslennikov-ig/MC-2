@@ -85,17 +85,46 @@
     "views": {
       "root": "Activities",
       "create": "Create",
-      "detail": "Details"
+      "detail": "Details",
+      "batch": "Batch"
     },
+    "createSuccess": "Activity created successfully",
     "createPrefix": "Create",
+    "batchPrefix": "Batch:",
+    "groups": {
+      "images": "Images",
+      "interactive": "Interactive",
+      "audioVideo": "Audio & Video",
+      "aiContent": "AI Content",
+      "other": "Other"
+    },
     "dragToReorder": "Drag to reorder",
     "empty": "No activities yet",
     "emptyDescription": "Add interactive content to make your lesson more engaging",
     "reorderFailed": "Failed to reorder activities",
     "delete": "Delete",
+    "notFound": "Enrichment Not Found",
+    "notFoundDescription": "This enrichment may have been deleted or moved.",
+    "generationError": "Generation Error",
+    "courseNotFound": "Course not found",
+    "approveComingSoon": "Coming soon",
     "deleteConfirmTitle": "Delete Activity?",
     "deleteConfirmDescription": "This action cannot be undone. The activity will be permanently deleted along with all associated data.",
     "deleteSuccess": "Activity deleted"
+  },
+  "discard": {
+    "title": "Discard Changes?",
+    "description": "You have unsaved changes. Are you sure you want to leave?",
+    "stay": "Stay",
+    "confirm": "Discard Changes"
+  },
+  "draft": {
+    "approve": "Approve",
+    "regenerate": "Regenerate",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "approving": "Approving..."
   },
   "twoStage": {
     "draftReady": "Draft ready for review",
@@ -109,7 +138,24 @@
     "generateForAll": "Generate for all lessons",
     "confirmTitle": "Confirm Batch Generation",
     "confirmDescription": "This will create {count} \"{type}\" enrichments",
-    "inProgress": "Generating for {completed} of {total} lessons"
+    "inProgress": "Generating for {completed} of {total} lessons",
+    "selectLessons": "Select Lessons",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "selectedCount": "{count} lessons selected",
+    "alreadyExists": "Already exists",
+    "next": "Next",
+    "back": "Back",
+    "startGeneration": "Start Generation",
+    "cancel": "Cancel",
+    "completed": "Batch generation complete",
+    "done": "Done",
+    "failed": "{count} failed",
+    "settings": "Settings",
+    "lessonSelection": "Lesson Selection",
+    "progress": "Progress",
+    "selectType": "Select type",
+    "step": "Step {current} of {total}"
   },
   "errors": {
     "generationFailed": "Failed to generate enrichment",
@@ -137,6 +183,9 @@
     "audio": {
       "title": "Audio Settings",
       "voice": "Voice",
+      "voiceDefault": "Default",
+      "voiceMale": "Male",
+      "voiceFemale": "Female",
       "speed": "Speed",
       "speedSlow": "Slow",
       "speedNormal": "Normal",
@@ -171,6 +220,12 @@
     "video": {
       "title": "Video Settings",
       "voice": "Voice",
+      "voiceAlloy": "Alloy",
+      "voiceEcho": "Echo",
+      "voiceFable": "Fable",
+      "voiceOnyx": "Onyx",
+      "voiceNova": "Nova",
+      "voiceShimmer": "Shimmer",
       "avatar": "Avatar",
       "resolution": "Resolution",
       "speed": "Speed",
@@ -208,6 +263,20 @@
       "depthShallow": "Shallow",
       "depthStandard": "Standard",
       "depthDeep": "Deep"
+    },
+    "coverBanner": {
+      "title": "Image Settings",
+      "style": "Style",
+      "stylePremium3d": "Cinematic 3D",
+      "styleRealistic": "Realistic",
+      "styleAbstract": "Abstract",
+      "styleMinimalist": "Minimalist",
+      "styleDramatic": "Dramatic",
+      "colorScheme": "Color Scheme",
+      "colorSchemeAuto": "Auto (from course)",
+      "colorSchemeWarm": "Warm tones",
+      "colorSchemeCool": "Cool tones",
+      "colorSchemeMonochrome": "Monochrome"
     },
     "nlmInfographic": {
       "title": "Infographic Settings",

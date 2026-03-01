@@ -12,8 +12,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useTranslations, useLocale } from 'next-intl'
-import { Layers, HelpCircle, Presentation, AlertCircle, ImageIcon, PanelTop } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { Layers, AlertCircle, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
@@ -29,8 +29,12 @@ import { useStaticGraph } from '../../../contexts/StaticGraphContext'
 import { EnrichmentList } from '../components/EnrichmentList'
 import { type EnrichmentListItemData } from '../components/EnrichmentListItem'
 import { reorderEnrichments } from '@/app/actions/enrichment-actions'
-// deleteEnrichment is imported above
 import { logger } from '@/lib/client-logger'
+import { ENRICHMENT_TYPE_CONFIG } from '@/lib/generation-graph/enrichment-config'
+import {
+  CREATEABLE_TYPE_GROUPS,
+  type CreateableEnrichmentType,
+} from '../forms/enrichment-form-config'
 
 /**
  * Props for RootView
@@ -45,49 +49,67 @@ export interface RootViewProps {
 /**
  * EnrichmentAddGrid Component
  *
- * Always-visible grid of buttons to add different enrichment types
- * Better discoverability than dropdown - all options visible at once
+ * Always-visible grouped grid of buttons to add different enrichment types.
+ * Organised into sections with headers from CREATEABLE_TYPE_GROUPS.
+ * Includes a "Batch Generate" button at the bottom.
  */
 function EnrichmentAddGrid({ onSelect }: { onSelect: (type: CreateEnrichmentType) => void }) {
   const t = useTranslations('enrichments')
-
-  const enrichmentTypes: Array<{
-    type: CreateEnrichmentType
-    icon: React.ComponentType<{ className?: string }>
-    labelKey: string
-    colorClass: string
-  }> = [
-    { type: 'cover', icon: ImageIcon, labelKey: 'cover', colorClass: 'text-cyan-500' },
-    { type: 'banner', icon: PanelTop, labelKey: 'banner', colorClass: 'text-rose-500' },
-    { type: 'quiz', icon: HelpCircle, labelKey: 'quiz', colorClass: 'text-purple-500' },
-    {
-      type: 'presentation',
-      icon: Presentation,
-      labelKey: 'presentation',
-      colorClass: 'text-orange-500',
-    },
-  ]
+  const openBatch = useEnrichmentInspectorStore((s) => s.openBatch)
 
   return (
     <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900/50">
       <p className="text-muted-foreground mb-2 px-1 text-xs">{t('inspector.addEnrichment')}</p>
-      <div className="grid grid-cols-4 gap-1.5">
-        {enrichmentTypes.map(({ type, icon: Icon, labelKey, colorClass }) => (
-          <button
-            key={type}
-            onClick={() => onSelect(type)}
-            className={cn(
-              'flex flex-col items-center gap-1 rounded p-2',
-              'hover:bg-white dark:hover:bg-slate-800',
-              'transition-colors'
-            )}
-          >
-            <Icon className={cn('h-4 w-4', colorClass)} />
-            <span className="w-full truncate text-center text-[10px] font-medium">
-              {t(`types.${labelKey}` as Parameters<typeof t>[0])}
-            </span>
-          </button>
+
+      <div className="space-y-3">
+        {CREATEABLE_TYPE_GROUPS.map(({ groupKey, types }) => (
+          <div key={groupKey}>
+            <p className="text-muted-foreground mb-1 px-1 text-[10px] font-semibold tracking-wide uppercase">
+              {t(`inspector.groups.${groupKey}` as Parameters<typeof t>[0])}
+            </p>
+            <div className="grid grid-cols-4 gap-1.5">
+              {types.map((type) => {
+                const config = ENRICHMENT_TYPE_CONFIG[type]
+                if (!config) return null
+                return (
+                  <button
+                    key={type}
+                    onClick={() => onSelect(type as CreateEnrichmentType)}
+                    className={cn(
+                      'flex flex-col items-center gap-1 rounded p-2',
+                      'hover:bg-white dark:hover:bg-slate-800',
+                      'transition-colors'
+                    )}
+                  >
+                    {React.createElement(config.icon, {
+                      className: cn('h-4 w-4', config.colorClass),
+                    })}
+                    <span className="w-full truncate text-center text-[10px] font-medium">
+                      {t(`types.${type}` as Parameters<typeof t>[0])}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         ))}
+      </div>
+
+      {/* Batch generate button */}
+      <div className="mt-3 border-t pt-2">
+        <button
+          onClick={() => openBatch()}
+          className={cn(
+            'flex w-full items-center gap-2 rounded p-2',
+            'hover:bg-white dark:hover:bg-slate-800',
+            'text-muted-foreground hover:text-foreground transition-colors'
+          )}
+        >
+          <Zap className="h-4 w-4" />
+          <span className="text-[10px] font-semibold tracking-wide uppercase">
+            {t('batch.generateForAll')}
+          </span>
+        </button>
       </div>
     </div>
   )
@@ -101,12 +123,14 @@ function EnrichmentAddGrid({ onSelect }: { onSelect: (type: CreateEnrichmentType
 function DiscoveryCard({
   icon: Icon,
   title,
+  colorClass,
   onClick,
   testId,
   ariaLabel,
 }: {
   icon: React.ComponentType<{ className?: string }>
   title: string
+  colorClass: string
   onClick: () => void
   testId?: string
   ariaLabel?: string
@@ -123,11 +147,23 @@ function DiscoveryCard({
         'hover:border-primary/50 transition-colors'
       )}
     >
-      <Icon className="text-muted-foreground h-6 w-6" aria-hidden="true" />
+      <Icon className={cn('h-6 w-6', colorClass)} aria-hidden="true" />
       <span className="text-sm font-medium">{title}</span>
     </button>
   )
 }
+
+/**
+ * Primary enrichment types shown in empty state discovery grid
+ */
+const EMPTY_STATE_PRIMARY_TYPES: CreateableEnrichmentType[] = [
+  'cover',
+  'quiz',
+  'nlm_audio',
+  'presentation',
+  'nlm_study_guide',
+  'nlm_flashcards',
+]
 
 /**
  * LoadingState Component
@@ -175,7 +211,8 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 /**
  * EmptyState Component
  *
- * Shown when lesson has no enrichments yet
+ * Shown when lesson has no enrichments yet.
+ * Displays 6 primary types as discovery cards.
  */
 function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) => void }) {
   const t = useTranslations('enrichments')
@@ -189,26 +226,21 @@ function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) =
       <h3 className="mb-2 text-lg font-medium">{t('inspector.empty')}</h3>
       <p className="text-muted-foreground mb-6 text-sm">{t('inspector.emptyDescription')}</p>
 
-      {/* Discovery cards */}
+      {/* Discovery cards — 6 primary types */}
       <div data-testid="discovery-cards" className="grid w-full max-w-sm grid-cols-2 gap-3">
-        <DiscoveryCard
-          icon={ImageIcon}
-          title={t('types.cover')}
-          onClick={() => onAddClick('cover')}
-          testId="discovery-card-cover"
-        />
-        <DiscoveryCard
-          icon={HelpCircle}
-          title={t('types.quiz')}
-          onClick={() => onAddClick('quiz')}
-          testId="discovery-card-quiz"
-        />
-        <DiscoveryCard
-          icon={Presentation}
-          title={t('types.presentation')}
-          onClick={() => onAddClick('presentation')}
-          testId="discovery-card-presentation"
-        />
+        {EMPTY_STATE_PRIMARY_TYPES.map((type) => {
+          const config = ENRICHMENT_TYPE_CONFIG[type]
+          return (
+            <DiscoveryCard
+              key={type}
+              icon={config.icon}
+              title={t(`types.${type}` as Parameters<typeof t>[0])}
+              colorClass={config.colorClass}
+              onClick={() => onAddClick(type as CreateEnrichmentType)}
+              testId={`discovery-card-${type}`}
+            />
+          )
+        })}
       </div>
     </div>
   )
@@ -497,7 +529,6 @@ function useEnrichmentsByLesson(
  */
 export function RootView({ lessonId, className }: RootViewProps) {
   const t = useTranslations('enrichments')
-  const locale = useLocale()
   const { openCreate, openDetail } = useEnrichmentInspectorStore()
   const { courseInfo } = useStaticGraph()
   const dataState = useEnrichmentsByLesson(lessonId)
@@ -511,7 +542,7 @@ export function RootView({ lessonId, className }: RootViewProps) {
   // tRPC mutation for delete
   const deleteMutation = trpc.enrichment.delete.useMutation({
     onSuccess: () => {
-      toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted')
+      toast.success(t('inspector.deleteSuccess'))
       // Optimistically remove from local state
       if (deleteTarget) {
         setLocalEnrichments((prev) => prev.filter((e) => e.id !== deleteTarget))
@@ -519,11 +550,7 @@ export function RootView({ lessonId, className }: RootViewProps) {
       setDeleteTarget(null)
     },
     onError: (error) => {
-      toast.error(
-        locale === 'ru'
-          ? `Не удалось удалить: ${error.message}`
-          : `Failed to delete: ${error.message}`
-      )
+      toast.error(`${t('errors.deleteFailed')}: ${error.message}`)
     },
   })
 

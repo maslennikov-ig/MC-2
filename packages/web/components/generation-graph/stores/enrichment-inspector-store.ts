@@ -6,16 +6,12 @@ import { immer } from 'zustand/middleware/immer'
 /**
  * Inspector view types for stack navigation
  */
-export type InspectorView = 'root' | 'create' | 'detail'
+export type InspectorView = 'root' | 'create' | 'detail' | 'batch'
 
 /**
- * Enrichment types that can be created
- *
- * Primary types: video, audio, presentation, quiz, document (match database enum)
- * Aliases kept for backward compatibility: podcast (audio), mindmap (presentation), reading (document)
+ * Enrichment types that can be created (matches database enum, excludes card which is auto-generated)
  */
 export type CreateEnrichmentType =
-  // Primary types (match database enum)
   | 'video'
   | 'audio'
   | 'presentation'
@@ -23,15 +19,12 @@ export type CreateEnrichmentType =
   | 'document'
   | 'cover'
   | 'banner'
-  // Legacy aliases (kept for backward compatibility)
-  | 'podcast'
-  | 'mindmap'
-  | 'case_study'
-  | 'flashcards'
-  | 'project'
-  | 'discussion'
-  | 'reading'
-  | 'exercise'
+  | 'nlm_audio'
+  | 'nlm_video'
+  | 'nlm_study_guide'
+  | 'nlm_flashcards'
+  | 'nlm_mind_map'
+  | 'nlm_infographic'
 
 /**
  * Navigation history entry for stack navigation
@@ -116,6 +109,12 @@ interface EnrichmentInspectorState {
    * @param type - Type of enrichment to create, or null to clear
    */
   setPendingCreate: (type: CreateEnrichmentType | null) => void
+
+  /**
+   * Navigate to batch enrichment creation view
+   * @param type - Optional pre-selected enrichment type for batch
+   */
+  openBatch: (type?: CreateEnrichmentType) => void
 }
 
 /**
@@ -206,6 +205,15 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>()(
     setPendingCreate: (type) =>
       set((state) => {
         state.pendingCreateType = type
+      }),
+
+    openBatch: (type) =>
+      set((state) => {
+        if (state.current) {
+          state.history.push(state.current)
+        }
+        state.current = { view: 'batch', createType: type }
+        state.dirty = false
       }),
   }))
 )

@@ -1,16 +1,22 @@
 'use client'
 
 import React from 'react'
-import { useLocale } from 'next-intl'
-import { HelpCircle, Presentation, FileText, Plus, ImageIcon } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import {
+  ENRICHMENT_TYPE_CONFIG,
+  type EnrichmentType,
+} from '@/lib/generation-graph/enrichment-config'
 import type { CreateEnrichmentType } from '../stores/enrichment-inspector-store'
 import type { ActivityType } from '@megacampus/shared-types'
 
 export interface EnrichmentNodeToolbarProps {
   onCreateEnrichment: (type: CreateEnrichmentType) => void
+  /** Callback for the "+" button to show all enrichment types */
+  onShowAllTypes?: () => void
   existingTypes?: CreateEnrichmentType[]
   /** Remaining capacity by type (from tier limits) */
   remainingCapacity?: Record<ActivityType, number>
@@ -20,44 +26,25 @@ export interface EnrichmentNodeToolbarProps {
   className?: string
 }
 
-interface ToolbarButton {
-  type: CreateEnrichmentType
-  icon: React.ReactNode
-  label: { en: string; ru: string }
-  disabled?: boolean
-  comingSoon?: boolean
-}
-
-const TOOLBAR_BUTTONS: ToolbarButton[] = [
-  {
-    type: 'cover',
-    icon: <ImageIcon className="h-4 w-4" />,
-    label: { en: 'Add Cover', ru: 'Добавить обложку' },
-  },
-  {
-    type: 'quiz',
-    icon: <HelpCircle className="h-4 w-4" />,
-    label: { en: 'Add Quiz', ru: 'Добавить тест' },
-  },
-  {
-    type: 'presentation',
-    icon: <Presentation className="h-4 w-4" />,
-    label: { en: 'Add Presentation', ru: 'Добавить презентацию' },
-  },
-  {
-    type: 'document',
-    icon: <FileText className="h-4 w-4" />,
-    label: { en: 'Add Document', ru: 'Добавить документ' },
-    disabled: true,
-    comingSoon: true,
-  },
+/**
+ * Top 5 enrichment types shown in the node toolbar for quick access.
+ * Typed as EnrichmentType[] so they can be safely keyed into ENRICHMENT_TYPE_CONFIG.
+ * Ordered by most commonly used first.
+ */
+const TOOLBAR_TYPES: EnrichmentType[] = [
+  'cover',
+  'quiz',
+  'presentation',
+  'nlm_audio',
+  'nlm_study_guide',
 ]
 
 /**
  * Node toolbar for quick enrichment creation via deep-links
  *
  * Appears when a lesson node is selected, providing quick access
- * to create each enrichment type.
+ * to create each enrichment type. Types and icons are driven by
+ * ENRICHMENT_TYPE_CONFIG — no hardcoded labels.
  *
  * @example
  * ```tsx
@@ -71,13 +58,14 @@ const TOOLBAR_BUTTONS: ToolbarButton[] = [
  */
 export function EnrichmentNodeToolbar({
   onCreateEnrichment,
+  onShowAllTypes,
   existingTypes = [],
   remainingCapacity,
   totalRemaining,
   isCompact = false,
   className,
 }: EnrichmentNodeToolbarProps) {
-  const locale = useLocale()
+  const t = useTranslations('enrichments')
 
   // Check if total limit is reached
   const totalLimitReached = totalRemaining !== undefined && totalRemaining <= 0
@@ -90,19 +78,21 @@ export function EnrichmentNodeToolbar({
           className
         )}
       >
-        {TOOLBAR_BUTTONS.map((btn) => {
-          const hasExisting = existingTypes.includes(btn.type)
-          const activityType = btn.type as ActivityType
+        {TOOLBAR_TYPES.map((type) => {
+          const config = ENRICHMENT_TYPE_CONFIG[type]
+          if (!config) return null
+
+          const createType = type as CreateEnrichmentType
+          const hasExisting = existingTypes.includes(createType)
+          const activityType = type as ActivityType
           const typeRemaining = remainingCapacity?.[activityType]
           const typeLimitReached = typeRemaining !== undefined && typeRemaining <= 0
           const isLimitReached = totalLimitReached || typeLimitReached
-          const isDisabled = btn.disabled || isLimitReached
-          const label = locale === 'ru' ? btn.label.ru : btn.label.en
-          const comingSoonLabel = locale === 'ru' ? '(Скоро)' : '(Coming Soon)'
-          const limitReachedLabel = locale === 'ru' ? '(лимит)' : '(limit reached)'
+          const isDisabled = isLimitReached
+          const label = t(`types.${type}` as Parameters<typeof t>[0])
 
           return (
-            <Tooltip key={btn.type}>
+            <Tooltip key={type}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
@@ -112,24 +102,23 @@ export function EnrichmentNodeToolbar({
                     hasExisting && !isDisabled && 'opacity-50',
                     isDisabled && 'cursor-not-allowed opacity-30'
                   )}
-                  onClick={() => !isDisabled && onCreateEnrichment(btn.type)}
+                  onClick={() => !isDisabled && onCreateEnrichment(createType)}
                   disabled={isDisabled}
                 >
-                  {btn.icon}
+                  {React.createElement(config.icon, { className: 'h-4 w-4' })}
                   {!isCompact && <span className="sr-only ml-1 text-xs">{label}</span>}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
                 {label}
-                {btn.comingSoon && ` ${comingSoonLabel}`}
-                {isLimitReached && ` ${limitReachedLabel}`}
-                {hasExisting && !isLimitReached && ` (${locale === 'ru' ? 'есть' : 'exists'})`}
+                {isLimitReached && ` (${t('inspector.title')})`}
+                {hasExisting && !isLimitReached && ` (${t('assetDock.generating')})`}
               </TooltipContent>
             </Tooltip>
           )
         })}
 
-        {/* Add more button (opens popover) */}
+        {/* Separator + open root view button */}
         <div className="bg-border mx-1 h-6 w-px" />
         <Tooltip>
           <TooltipTrigger asChild>
@@ -137,15 +126,17 @@ export function EnrichmentNodeToolbar({
               variant="ghost"
               size="icon"
               className={cn('h-8 w-8', totalLimitReached && 'cursor-not-allowed opacity-30')}
-              onClick={() => !totalLimitReached && onCreateEnrichment('quiz')} // Default to quiz
+              onClick={() =>
+                !totalLimitReached &&
+                (onShowAllTypes ? onShowAllTypes() : onCreateEnrichment('quiz'))
+              }
               disabled={totalLimitReached}
             >
               <Plus className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">
-            {locale === 'ru' ? 'Добавить активность' : 'Add Activity'}
-            {totalLimitReached && ` (${locale === 'ru' ? 'лимит достигнут' : 'limit reached'})`}
+            {t('inspector.addEnrichment')}
           </TooltipContent>
         </Tooltip>
       </div>
@@ -163,8 +154,7 @@ export function EnrichmentQuickAdd({
   onAdd: () => void
   className?: string
 }) {
-  const locale = useLocale()
-  const label = locale === 'ru' ? 'Добавить активность' : 'Add activity'
+  const t = useTranslations('enrichments')
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -184,7 +174,7 @@ export function EnrichmentQuickAdd({
           </button>
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs">
-          {label}
+          {t('assetDock.addEnrichment')}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

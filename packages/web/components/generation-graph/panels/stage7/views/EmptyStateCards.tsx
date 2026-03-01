@@ -1,10 +1,11 @@
 'use client'
 
 import React from 'react'
-import { useLocale } from 'next-intl'
-import { HelpCircle, Presentation, FileText, Sparkles } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useTranslations } from 'next-intl'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { ENRICHMENT_TYPE_CONFIG } from '@/lib/generation-graph/enrichment-config'
+import type { CreateableEnrichmentType } from '../forms/enrichment-form-config'
 import type { CreateEnrichmentType } from '../../../stores/enrichment-inspector-store'
 
 export interface EmptyStateCardsProps {
@@ -12,124 +13,59 @@ export interface EmptyStateCardsProps {
   className?: string
 }
 
-interface EnrichmentCardInfo {
-  type: CreateEnrichmentType
-  icon: React.ReactNode
-  title: { en: string; ru: string }
-  description: { en: string; ru: string }
-  benefits: { en: string[]; ru: string[] }
-  disabled?: boolean
-  comingSoon?: boolean
-}
-
-const ENRICHMENT_CARDS: EnrichmentCardInfo[] = [
-  {
-    type: 'quiz',
-    icon: <HelpCircle className="h-6 w-6" />,
-    title: { en: 'Quiz', ru: 'Тест' },
-    description: {
-      en: 'Create an interactive quiz to assess student understanding',
-      ru: 'Создайте интерактивный тест для проверки понимания студентов',
-    },
-    benefits: {
-      en: [
-        'Auto-generated questions based on lesson content',
-        'Multiple question types',
-        "Bloom's taxonomy coverage",
-      ],
-      ru: [
-        'Вопросы генерируются автоматически',
-        'Разные типы вопросов',
-        'Покрытие таксономии Блума',
-      ],
-    },
-  },
-  {
-    type: 'mindmap',
-    icon: <Presentation className="h-6 w-6" />,
-    title: { en: 'Presentation', ru: 'Презентация' },
-    description: {
-      en: 'Generate slide presentation from lesson content',
-      ru: 'Сгенерируйте слайды из содержимого урока',
-    },
-    benefits: {
-      en: ['6x6 rule for clarity', 'Speaker notes included', 'Multiple themes'],
-      ru: ['Правило 6x6 для ясности', 'Заметки докладчика', 'Разные темы оформления'],
-    },
-  },
-  {
-    type: 'reading',
-    icon: <FileText className="h-6 w-6" />,
-    title: { en: 'Document', ru: 'Документ' },
-    description: {
-      en: 'Create supplementary reading materials',
-      ru: 'Создайте дополнительные материалы для чтения',
-    },
-    benefits: {
-      en: ['Summary documents', 'Reference materials', 'Study guides'],
-      ru: ['Резюме', 'Справочные материалы', 'Учебные пособия'],
-    },
-    disabled: true,
-    comingSoon: true,
-  },
+/**
+ * Primary enrichment types shown in EmptyStateCards discovery grid.
+ * Ordered by typical instructional flow.
+ */
+const CARD_TYPES: CreateableEnrichmentType[] = [
+  'quiz',
+  'presentation',
+  'nlm_audio',
+  'nlm_study_guide',
+  'nlm_flashcards',
+  'cover',
 ]
 
+/**
+ * Individual enrichment type card for the empty state discovery view
+ */
 function EnrichmentCard({
-  card,
-  locale,
+  type,
   onSelect,
 }: {
-  card: EnrichmentCardInfo
-  locale: string
+  type: CreateableEnrichmentType
   onSelect: () => void
 }) {
-  const title = locale === 'ru' ? card.title.ru : card.title.en
-  const description = locale === 'ru' ? card.description.ru : card.description.en
-  const benefits = locale === 'ru' ? card.benefits.ru : card.benefits.en
+  const t = useTranslations('enrichments')
+  const config = ENRICHMENT_TYPE_CONFIG[type]
+  const title = t(`types.${type}` as Parameters<typeof t>[0])
+  const description = t(`typeDescriptions.${type}` as Parameters<typeof t>[0])
 
   return (
     <Card
       className={cn(
         'group relative cursor-pointer overflow-hidden transition-all duration-200',
-        card.disabled
-          ? 'cursor-not-allowed opacity-60'
-          : 'hover:border-primary/50 hover:-translate-y-0.5 hover:shadow-md'
+        'hover:border-primary/50 hover:-translate-y-0.5 hover:shadow-md'
       )}
-      onClick={card.disabled ? undefined : onSelect}
+      onClick={onSelect}
     >
-      {card.comingSoon && (
-        <div className="absolute top-2 right-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-          {locale === 'ru' ? 'Скоро' : 'Coming Soon'}
-        </div>
-      )}
-
       <CardHeader className="pb-3">
         <div className="flex items-center gap-3">
           <div
             className={cn(
               'rounded-lg p-2',
-              card.disabled
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-primary/10 text-primary group-hover:bg-primary/20'
+              config.bgClass,
+              'transition-opacity group-hover:opacity-80'
             )}
           >
-            {card.icon}
+            {React.createElement(config.icon, {
+              className: cn('h-6 w-6', config.colorClass),
+            })}
           </div>
-          <CardTitle className="text-lg">{title}</CardTitle>
+          <CardTitle className="text-base">{title}</CardTitle>
         </div>
-        <CardDescription className="mt-2">{description}</CardDescription>
+        <CardDescription className="mt-2 text-xs">{description}</CardDescription>
       </CardHeader>
-
-      <CardContent className="pt-0">
-        <ul className="space-y-1">
-          {benefits.map((benefit, idx) => (
-            <li key={idx} className="text-muted-foreground flex items-start gap-2 text-sm">
-              <Sparkles className="text-primary/60 mt-1 h-3 w-3 flex-shrink-0" />
-              <span>{benefit}</span>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
     </Card>
   )
 }
@@ -139,6 +75,7 @@ function EnrichmentCard({
  *
  * Shows a grid of enrichment type cards that users can click
  * to start creating their first enrichment.
+ * Uses config-driven icons, colors, and i18n labels/descriptions.
  *
  * @example
  * ```tsx
@@ -148,28 +85,21 @@ function EnrichmentCard({
  * ```
  */
 export function EmptyStateCards({ onSelectType, className }: EmptyStateCardsProps) {
-  const locale = useLocale()
-
-  const heading = locale === 'ru' ? 'Добавьте обогащения к уроку' : 'Add Enrichments to Lesson'
-  const subheading =
-    locale === 'ru'
-      ? 'Выберите тип обогащения для генерации'
-      : 'Select an enrichment type to generate'
+  const t = useTranslations('enrichments')
 
   return (
     <div className={cn('space-y-6 p-4', className)}>
       <div className="space-y-2 text-center">
-        <h3 className="text-lg font-semibold">{heading}</h3>
-        <p className="text-muted-foreground text-sm">{subheading}</p>
+        <h3 className="text-lg font-semibold">{t('inspector.empty')}</h3>
+        <p className="text-muted-foreground text-sm">{t('inspector.emptyDescription')}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {ENRICHMENT_CARDS.map((card) => (
+        {CARD_TYPES.map((type) => (
           <EnrichmentCard
-            key={card.type}
-            card={card}
-            locale={locale}
-            onSelect={() => onSelectType(card.type)}
+            key={type}
+            type={type}
+            onSelect={() => onSelectType(type as CreateEnrichmentType)}
           />
         ))}
       </div>

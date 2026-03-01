@@ -85,17 +85,46 @@
     "views": {
       "root": "Активности",
       "create": "Создание",
-      "detail": "Детали"
+      "detail": "Детали",
+      "batch": "Массовая генерация"
     },
+    "createSuccess": "Активность успешно создана",
     "createPrefix": "Создание:",
+    "batchPrefix": "Массовое:",
+    "groups": {
+      "images": "Изображения",
+      "interactive": "Интерактив",
+      "audioVideo": "Аудио и видео",
+      "aiContent": "AI-контент",
+      "other": "Прочее"
+    },
     "dragToReorder": "Перетащите для сортировки",
     "empty": "Активности ещё не добавлены",
     "emptyDescription": "Добавьте интерактивный контент, чтобы сделать урок интереснее",
     "reorderFailed": "Не удалось изменить порядок активностей",
     "delete": "Удалить",
+    "notFound": "Обогащение не найдено",
+    "notFoundDescription": "Это обогащение могло быть удалено или перемещено.",
+    "generationError": "Ошибка генерации",
+    "courseNotFound": "Курс не найден",
+    "approveComingSoon": "Скоро будет доступно",
     "deleteConfirmTitle": "Удалить активность?",
     "deleteConfirmDescription": "Это действие нельзя отменить. Активность будет безвозвратно удалена вместе со всеми связанными данными.",
     "deleteSuccess": "Активность удалена"
+  },
+  "discard": {
+    "title": "Отменить изменения?",
+    "description": "У вас есть несохранённые изменения. Вы уверены, что хотите уйти?",
+    "stay": "Остаться",
+    "confirm": "Отменить изменения"
+  },
+  "draft": {
+    "approve": "Одобрить",
+    "regenerate": "Переделать",
+    "edit": "Редактировать",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "approving": "Одобрение..."
   },
   "twoStage": {
     "draftReady": "Черновик готов к проверке",
@@ -109,7 +138,24 @@
     "generateForAll": "Сгенерировать для всех уроков",
     "confirmTitle": "Подтвердите массовую генерацию",
     "confirmDescription": "Будет создано {count} дополнений типа \"{type}\"",
-    "inProgress": "Генерация для {completed} из {total} уроков"
+    "inProgress": "Генерация для {completed} из {total} уроков",
+    "selectLessons": "Выберите уроки",
+    "selectAll": "Выбрать все",
+    "deselectAll": "Снять выделение",
+    "selectedCount": "{count} уроков выбрано",
+    "alreadyExists": "Уже создано",
+    "next": "Далее",
+    "back": "Назад",
+    "startGeneration": "Начать генерацию",
+    "cancel": "Отмена",
+    "completed": "Массовая генерация завершена",
+    "done": "Готово",
+    "failed": "{count} с ошибкой",
+    "settings": "Настройки",
+    "lessonSelection": "Выбор уроков",
+    "progress": "Прогресс",
+    "selectType": "Выберите тип",
+    "step": "Шаг {current} из {total}"
   },
   "errors": {
     "generationFailed": "Не удалось сгенерировать дополнение",
@@ -137,6 +183,9 @@
     "audio": {
       "title": "Настройки аудио",
       "voice": "Голос",
+      "voiceDefault": "По умолчанию",
+      "voiceMale": "Мужской",
+      "voiceFemale": "Женский",
       "speed": "Скорость",
       "speedSlow": "Медленно",
       "speedNormal": "Нормально",
@@ -171,6 +220,12 @@
     "video": {
       "title": "Настройки видео",
       "voice": "Голос",
+      "voiceAlloy": "Alloy",
+      "voiceEcho": "Echo",
+      "voiceFable": "Fable",
+      "voiceOnyx": "Onyx",
+      "voiceNova": "Nova",
+      "voiceShimmer": "Shimmer",
       "avatar": "Аватар",
       "resolution": "Разрешение",
       "speed": "Скорость",
@@ -208,6 +263,20 @@
       "depthShallow": "Поверхностная",
       "depthStandard": "Стандартная",
       "depthDeep": "Глубокая"
+    },
+    "coverBanner": {
+      "title": "Настройки изображения",
+      "style": "Стиль",
+      "stylePremium3d": "Кинематографичный 3D",
+      "styleRealistic": "Реалистичный",
+      "styleAbstract": "Абстрактный",
+      "styleMinimalist": "Минималистичный",
+      "styleDramatic": "Драматичный",
+      "colorScheme": "Цветовая схема",
+      "colorSchemeAuto": "Авто (из курса)",
+      "colorSchemeWarm": "Тёплые тона",
+      "colorSchemeCool": "Холодные тона",
+      "colorSchemeMonochrome": "Монохром"
     },
     "nlmInfographic": {
       "title": "Настройки инфографики",

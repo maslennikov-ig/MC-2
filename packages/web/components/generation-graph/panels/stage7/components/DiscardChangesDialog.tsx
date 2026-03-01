@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { AlertTriangle } from 'lucide-react'
 import {
   AlertDialog,
@@ -43,15 +43,7 @@ export function DiscardChangesDialog({
   onConfirm,
   onCancel,
 }: DiscardChangesDialogProps) {
-  const locale = useLocale()
-
-  const title = locale === 'ru' ? 'Отменить изменения?' : 'Discard Changes?'
-  const description =
-    locale === 'ru'
-      ? 'У вас есть несохраненные изменения. Вы уверены, что хотите покинуть эту страницу? Все изменения будут потеряны.'
-      : 'You have unsaved changes. Are you sure you want to leave this page? All changes will be lost.'
-  const cancelLabel = locale === 'ru' ? 'Остаться' : 'Stay'
-  const confirmLabel = locale === 'ru' ? 'Отменить изменения' : 'Discard Changes'
+  const t = useTranslations('enrichments')
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -61,17 +53,19 @@ export function DiscardChangesDialog({
             <div className="rounded-full bg-amber-100 p-2 dark:bg-amber-900/30">
               <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
-            <AlertDialogTitle>{title}</AlertDialogTitle>
+            <AlertDialogTitle>{t('discard.title')}</AlertDialogTitle>
           </div>
-          <AlertDialogDescription className="pt-2">{description}</AlertDialogDescription>
+          <AlertDialogDescription className="pt-2">
+            {t('discard.description')}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>{t('discard.stay')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
           >
-            {confirmLabel}
+            {t('discard.confirm')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
