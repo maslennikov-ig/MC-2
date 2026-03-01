@@ -42,6 +42,7 @@ import { createClient } from '@/lib/supabase/client'
 import { updateDocumentPriority } from '@/app/actions/courses'
 import { approveStage } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
+import { useTranslations, useLocale } from 'next-intl'
 import {
   type DocumentPriority,
   PRIORITY_CONFIG as SSOT_PRIORITY_CONFIG,
@@ -89,7 +90,7 @@ const PRIORITY_CONFIG = Object.fromEntries(
   ).map(([key, config]) => [
     key,
     {
-      label: config.label.ru,
+      label: config.label,
       icon: config.icon,
       color: config.style.text,
       bgColor: config.style.bg,
@@ -97,7 +98,12 @@ const PRIORITY_CONFIG = Object.fromEntries(
   ])
 ) as Record<
   DocumentPriority,
-  { label: string; icon: typeof SSOT_PRIORITY_CONFIG.CORE.icon; color: string; bgColor: string }
+  {
+    label: { ru: string; en: string }
+    icon: typeof SSOT_PRIORITY_CONFIG.CORE.icon
+    color: string
+    bgColor: string
+  }
 >
 
 export function PrioritizationView({
@@ -107,6 +113,8 @@ export function PrioritizationView({
   autoFocus = false,
   onApproved,
 }: PrioritizationViewProps) {
+  const t = useTranslations('generation.prioritization')
+  const locale = useLocale()
   const [documents, setDocuments] = useState<DocumentWithPriority[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set())
@@ -139,7 +147,7 @@ export function PrioritizationView({
 
         if (error) {
           console.error('[PrioritizationView] Failed to fetch documents:', error)
-          toast.error('Не удалось загрузить документы')
+          toast.error(t('loadError'))
           return
         }
 
@@ -183,7 +191,7 @@ export function PrioritizationView({
         setDocuments(docs)
       } catch (err) {
         console.error('[PrioritizationView] Error:', err)
-        toast.error('Произошла ошибка при загрузке документов')
+        toast.error(t('loadErrorGeneric'))
       } finally {
         setIsLoading(false)
       }
@@ -226,25 +234,30 @@ export function PrioritizationView({
                   original_name: newDoc.originalName,
                   filename: newDoc.filename,
                 })
-              : 'Документ'
+              : t('document')
             const coreDocName = getDocumentDisplayName({
               generated_title: currentCoreDoc.generatedTitle,
               original_name: currentCoreDoc.originalName,
               filename: currentCoreDoc.filename,
             })
             toast.success(
-              `"${truncateDisplayName(newDocName, 30)}" теперь ключевой. "${truncateDisplayName(coreDocName, 30)}" изменен на "Важный".`,
+              t('nowCore', {
+                newDoc: truncateDisplayName(newDocName, 30),
+                oldDoc: truncateDisplayName(coreDocName, 30),
+              }),
               { duration: 5000 }
             )
           } else {
-            toast.success(`Приоритет изменен на "${PRIORITY_CONFIG[newPriority].label}"`)
+            toast.success(
+              t('priorityChanged', { priority: PRIORITY_CONFIG[newPriority].label[locale] })
+            )
           }
         } else {
-          toast.error(result.error || 'Не удалось обновить приоритет')
+          toast.error(result.error || t('updateError'))
         }
       } catch (error) {
         console.error('[PrioritizationView] Error updating priority:', error)
-        toast.error('Произошла непредвиденная ошибка')
+        toast.error(t('unexpectedError'))
       } finally {
         setUpdatingIds((prev) => {
           const next = new Set(prev)
@@ -253,7 +266,7 @@ export function PrioritizationView({
         })
       }
     },
-    [courseId, documents]
+    [courseId, documents, t, locale]
   )
 
   // Handle priority change - show confirmation for CORE replacement
@@ -323,15 +336,15 @@ export function PrioritizationView({
     setIsApproving(true)
     try {
       await approveStage(courseId, 3)
-      toast.success('Приоритизация подтверждена. Переход к следующему этапу...')
+      toast.success(t('approved'))
       onApproved?.()
     } catch (error) {
       console.error('[PrioritizationView] Error approving:', error)
-      toast.error('Не удалось подтвердить приоритизацию')
+      toast.error(t('approveError'))
     } finally {
       setIsApproving(false)
     }
-  }, [courseId, onApproved])
+  }, [courseId, onApproved, t])
 
   // Count by priority
   const counts = {
@@ -351,7 +364,7 @@ export function PrioritizationView({
     return (
       <div className="text-muted-foreground flex flex-col items-center justify-center py-8">
         <FileText className="mb-2 h-8 w-8" />
-        <p className="text-sm font-medium">Документы не найдены</p>
+        <p className="text-sm font-medium">{t('docsNotFound')}</p>
       </div>
     )
   }
@@ -360,7 +373,7 @@ export function PrioritizationView({
     <div className="space-y-4">
       {/* Priority Summary */}
       <div className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-lg p-3">
-        <span className="text-muted-foreground mr-2 text-sm">Распределение:</span>
+        <span className="text-muted-foreground mr-2 text-sm">{t('distribution')}</span>
         {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
           <Badge
             key={key}
@@ -368,7 +381,7 @@ export function PrioritizationView({
             className={`${config.bgColor} ${config.color} border-0`}
           >
             <config.icon className="mr-1 h-3 w-3" />
-            {config.label}: {counts[key as DocumentPriority]}
+            {config.label[locale]}: {counts[key as DocumentPriority]}
           </Badge>
         ))}
       </div>
@@ -378,9 +391,9 @@ export function PrioritizationView({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Документ</TableHead>
-              <TableHead className="w-24 text-center">Размер</TableHead>
-              <TableHead className="w-48 text-right">Приоритет</TableHead>
+              <TableHead>{t('document')}</TableHead>
+              <TableHead className="w-24 text-center">{t('size')}</TableHead>
+              <TableHead className="w-48 text-right">{t('priority')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -439,7 +452,7 @@ export function PrioritizationView({
                                   </p>
                                 )}
                                 <p className="text-muted-foreground text-xs">
-                                  {doc.mimeType || 'Файл'}
+                                  {doc.mimeType || t('file')}
                                 </p>
                               </div>
                             </div>
@@ -453,7 +466,7 @@ export function PrioritizationView({
                                   <ChevronDown
                                     className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                                   />
-                                  <span className="font-medium">Обоснование классификации</span>
+                                  <span className="font-medium">{t('rationale')}</span>
                                 </button>
                                 {isExpanded && (
                                   <div className="bg-muted/30 mt-1.5 rounded-md p-2">
@@ -490,7 +503,7 @@ export function PrioritizationView({
                               <SelectValue>
                                 <div className="flex items-center gap-2">
                                   <PriorityIcon className={`h-4 w-4 ${priorityConfig.color}`} />
-                                  <span>{priorityConfig.label}</span>
+                                  <span>{priorityConfig.label[locale]}</span>
                                 </div>
                               </SelectValue>
                             )}
@@ -500,7 +513,7 @@ export function PrioritizationView({
                               <SelectItem key={key} value={key}>
                                 <div className="flex items-center gap-2">
                                   <config.icon className={`h-4 w-4 ${config.color}`} />
-                                  <span>{config.label}</span>
+                                  <span>{config.label[locale]}</span>
                                 </div>
                               </SelectItem>
                             ))}
@@ -512,7 +525,7 @@ export function PrioritizationView({
                           className={`${priorityConfig.bgColor} ${priorityConfig.color} border-0`}
                         >
                           <PriorityIcon className="mr-1 h-3 w-3" />
-                          {priorityConfig.label}
+                          {priorityConfig.label[locale]}
                         </Badge>
                       )}
                     </TableCell>
@@ -531,9 +544,7 @@ export function PrioritizationView({
           {!hasCore && documents.length > 0 && (
             <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
               <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm text-amber-700 dark:text-amber-300">
-                Выберите один ключевой документ для продолжения
-              </span>
+              <span className="text-sm text-amber-700 dark:text-amber-300">{t('selectCore')}</span>
             </div>
           )}
 
@@ -548,7 +559,7 @@ export function PrioritizationView({
               ) : (
                 <Rocket className="mr-2 h-4 w-4" />
               )}
-              Подтвердить и продолжить
+              {t('confirmAndContinue')}
             </Button>
           </div>
         </div>
@@ -558,7 +569,7 @@ export function PrioritizationView({
       {readOnly && (
         <div className="text-muted-foreground flex items-center justify-center gap-2 py-4">
           <CheckCircle2 className="h-5 w-5 text-green-500" />
-          <span className="text-sm">Приоритизация завершена</span>
+          <span className="text-sm">{t('completed')}</span>
         </div>
       )}
 
@@ -571,17 +582,15 @@ export function PrioritizationView({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
-              <span>Заменить ключевой документ?</span>
+              <span>{t('replaceCore')}</span>
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Может быть только один ключевой документ. Предыдущий будет изменен на «Важный».
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t('replaceCoreDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
 
           {/* Document comparison - custom content outside description */}
           <div className="space-y-3 overflow-hidden text-sm">
             <div className="bg-muted/50 overflow-hidden rounded-lg p-3">
-              <span className="text-muted-foreground text-xs">Сейчас ключевой:</span>
+              <span className="text-muted-foreground text-xs">{t('currentCore')}</span>
               <p
                 className="text-foreground mt-0.5 overflow-hidden font-medium text-ellipsis whitespace-nowrap"
                 title={coreConfirmDialog?.currentCoreDocName}
@@ -590,7 +599,7 @@ export function PrioritizationView({
               </p>
             </div>
             <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
-              <span className="text-xs text-amber-600 dark:text-amber-400">Новый ключевой:</span>
+              <span className="text-xs text-amber-600 dark:text-amber-400">{t('newCore')}</span>
               <p
                 className="mt-0.5 overflow-hidden font-medium text-ellipsis whitespace-nowrap text-amber-700 dark:text-amber-300"
                 title={coreConfirmDialog?.newDocName}
@@ -601,13 +610,13 @@ export function PrioritizationView({
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCoreConfirm}
               className="bg-amber-600 text-white hover:bg-amber-700"
             >
               <Key className="mr-2 h-4 w-4" />
-              Заменить
+              {t('replace')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

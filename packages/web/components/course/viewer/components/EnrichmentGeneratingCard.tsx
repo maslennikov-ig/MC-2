@@ -114,12 +114,6 @@ const ENRICHMENT_CONFIG: Record<
   },
 }
 
-const GENERATION_STAGES = [
-  { id: 'prepare', label: 'Подготовка' },
-  { id: 'generate', label: 'Генерация' },
-  { id: 'save', label: 'Сохранение' },
-]
-
 const LONG_RUNNING_PROGRESS_CAP = 95
 const LONG_RUNNING_EASING_POWER = 2.2
 const EXTENSION_STEP_MS = 10 * 60 * 1000 // 10-min extensions when timer expires
@@ -216,6 +210,14 @@ export function EnrichmentGeneratingCard({
   onCancel,
 }: EnrichmentGeneratingCardProps) {
   const t = useTranslations('enrichments')
+  const tStages = useTranslations('course.viewer.enrichmentStages')
+
+  const generationStages = [
+    { id: 'prepare', label: tStages('prepare') },
+    { id: 'generate', label: tStages('generate') },
+    { id: 'save', label: tStages('save') },
+  ]
+
   const config = ENRICHMENT_CONFIG[type]
   const Icon = config.icon
 
@@ -524,7 +526,7 @@ export function EnrichmentGeneratingCard({
               <SmoothProgress value={longRunningProgress} variant="gradient" showPercentage />
             ) : (
               <StagedProgress
-                stages={GENERATION_STAGES}
+                stages={generationStages}
                 currentStageIndex={stageIndex}
                 stageProgress={stagedProgress}
                 isComplete={progress >= 100}

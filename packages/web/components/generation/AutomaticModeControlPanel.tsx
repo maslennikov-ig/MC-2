@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { Zap, Pause, Play, X, Settings, PauseCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useTranslations } from 'next-intl'
 
 interface AutomaticModeControlPanelProps {
   status: string
@@ -23,6 +24,7 @@ export function AutomaticModeControlPanel({
   onCancel,
   onSwitchToManual,
 }: AutomaticModeControlPanelProps) {
+  const t = useTranslations('generation.missionControl.automatic')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const terminalStatuses = ['completed', 'failed', 'cancelled']
@@ -58,12 +60,8 @@ export function AutomaticModeControlPanel({
                   <span className="absolute -top-1 -right-1 h-2 w-2 animate-ping rounded-full bg-yellow-400" />
                 </div>
                 <div>
-                  <span className="font-medium text-slate-900 dark:text-white">
-                    Автоматическая генерация
-                  </span>
-                  <p className="text-sm text-slate-500 dark:text-white/50">
-                    Можно закрыть страницу — уведомим по готовности
-                  </p>
+                  <span className="font-medium text-slate-900 dark:text-white">{t('title')}</span>
+                  <p className="text-sm text-slate-500 dark:text-white/50">{t('hint')}</p>
                 </div>
               </div>
 
@@ -104,7 +102,7 @@ export function AutomaticModeControlPanel({
               <div className="flex items-center gap-3">
                 <PauseCircle className="h-5 w-5 text-amber-500" />
                 <span className="font-medium text-slate-900 dark:text-white">
-                  Генерация приостановлена
+                  {t('titlePaused')}
                 </span>
               </div>
 
@@ -130,7 +128,7 @@ export function AutomaticModeControlPanel({
                   {actionLoading === 'manual' ? (
                     <>
                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      Переключение...
+                      {t('switching')}
                     </>
                   ) : (
                     <>
@@ -154,9 +152,7 @@ export function AutomaticModeControlPanel({
                 </Button>
               </div>
 
-              <p className="text-muted-foreground text-sm">
-                В ручном режиме вы сможете проверить и изменить результаты каждого этапа.
-              </p>
+              <p className="text-muted-foreground text-sm">{t('manualModeHint')}</p>
             </div>
           )}
         </CardContent>

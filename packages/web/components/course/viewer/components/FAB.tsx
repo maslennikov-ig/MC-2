@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 interface FABProps {
   showFab: boolean
@@ -8,6 +9,8 @@ interface FABProps {
 }
 
 export function FAB({ showFab, onOpenPanel }: FABProps) {
+  const t = useTranslations('course.viewer.fab')
+
   return (
     <motion.div
       initial={{ scale: 0, opacity: 0 }}
@@ -26,49 +29,32 @@ export function FAB({ showFab, onOpenPanel }: FABProps) {
         className="group relative overflow-visible rounded-full bg-gradient-to-r from-purple-600 to-blue-600 p-4 text-white shadow-lg backdrop-blur-sm transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl"
         whileHover={{ scale: 1.1, rotate: 90 }}
         whileTap={{ scale: 0.95 }}
-        title="Генерировать контент с ИИ"
+        title={t('title')}
       >
         <Sparkles className="relative z-10 h-6 w-6" />
-
         <motion.span
           className="absolute -inset-1 rounded-full bg-purple-600"
           initial={{ scale: 1, opacity: 0.75 }}
-          animate={{
-            scale: [1, 2, 1],
-            opacity: [0.75, 0, 0.75],
-          }}
-          transition={{
-            duration: 1,
-            times: [0, 0.75, 1],
-            repeat: 2,
-            repeatDelay: 0.2,
-          }}
+          animate={{ scale: [1, 2, 1], opacity: [0.75, 0, 0.75] }}
+          transition={{ duration: 1, times: [0, 0.75, 1], repeat: 2, repeatDelay: 0.2 }}
         />
         <motion.span
           className="absolute -inset-1 rounded-full bg-purple-600 opacity-0 group-hover:opacity-75"
-          animate={{
-            scale: [1, 2],
-            opacity: [0, 0],
-          }}
+          animate={{ scale: [1, 2], opacity: [0, 0] }}
           whileHover={{
             scale: [1, 2],
             opacity: [0.75, 0],
-            transition: {
-              duration: 1,
-              repeat: Infinity,
-              repeatDelay: 0.2,
-            },
+            transition: { duration: 1, repeat: Infinity, repeatDelay: 0.2 },
           }}
         />
-
         <motion.div
           initial={{ opacity: 0, x: 10 }}
           whileHover={{ opacity: 1, x: 0 }}
           className="pointer-events-none absolute top-1/2 right-full mr-3 -translate-y-1/2"
         >
           <div className="rounded-lg bg-gray-900 px-3 py-2 text-sm whitespace-nowrap text-white shadow-lg">
-            <div className="font-semibold">Генерация контента</div>
-            <div className="mt-0.5 text-xs text-gray-300">Создать материалы с ИИ</div>
+            <div className="font-semibold">{t('tooltipTitle')}</div>
+            <div className="mt-0.5 text-xs text-gray-300">{t('tooltipDesc')}</div>
             <div className="absolute top-1/2 -right-1 h-2 w-2 -translate-y-1/2 rotate-45 bg-gray-900" />
           </div>
         </motion.div>

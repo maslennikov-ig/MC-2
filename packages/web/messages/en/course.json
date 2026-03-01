@@ -99,7 +99,37 @@
     "overallProgress": "Overall course progress",
     "timeRemaining": "Time remaining",
     "lessonsCompleted": "{completed} of {total} lessons",
-    "backToCatalog": "Back to catalog"
+    "backToCatalog": "Back to catalog",
+    "fab": {
+      "title": "Generate content with AI",
+      "tooltipTitle": "Content generation",
+      "tooltipDesc": "Create materials with AI"
+    },
+    "enrichmentError": {
+      "loadFailed": "Failed to load {type}",
+      "displayError": "An error occurred while displaying the material",
+      "retry": "Try again"
+    },
+    "enrichmentStages": {
+      "prepare": "Preparation",
+      "generate": "Generation",
+      "save": "Saving"
+    },
+    "module": "Module {number}: {title}",
+    "readingTime": "{minutes} min",
+    "activities": {
+      "title": "Practical exercises",
+      "description": "Complete these exercises to reinforce the material",
+      "defaultTitle": "Exercise",
+      "caseStudy": "Case Study",
+      "practice": "Practice",
+      "quiz": "Quiz",
+      "reflection": "Reflection",
+      "progress": "Exercise progress",
+      "completed": "completed",
+      "completedCount": "{completed} of {total} completed",
+      "noActivities": "No practical exercises for this lesson"
+    }
   },
   "content": {
     "format": "Format:",

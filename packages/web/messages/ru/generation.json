@@ -19,10 +19,9 @@
     "processing": "Обработка..."
   },
   "errors": {
-    "barrier_failed": "Обработка документов не завершена - требуется ручное вмешательство",
-    "insufficient_scope": "Недостаточный объем для минимума 10 уроков - расширьте тему",
-    "llm_error": "Ошибка обработки LLM - обратитесь в поддержку",
-    "analysis_generic": "Ошибка при анализе курса"
+    "connectionLost": "Соединение потеряно",
+    "reconnecting": "Переподключение...",
+    "retryFailed": "Не удалось повторить"
   },
   "stages": {
     "stage_1": "Инициализация курса",
@@ -213,11 +212,6 @@
       "button": "Сгенерировать контент",
       "message": "Сгенерируй контент для новых уроков"
     }
-  },
-  "errors": {
-    "connectionLost": "Соединение потеряно",
-    "reconnecting": "Переподключение...",
-    "retryFailed": "Не удалось повторить"
   },
   "retry": {
     "confirmTitle": "Подтвердить повтор",
@@ -1329,5 +1323,86 @@
     "buttonGoToCourse": "Перейти к курсу",
     "realtimeConnected": "Realtime подключен",
     "pollingFallback": "Используется polling (резервный режим)"
+  },
+  "costPreview": {
+    "title": "Ориентировочное количество токенов",
+    "processingDocs": "Обработка {count, plural, one {# документа} few {# документов} other {# документов}}",
+    "analysisStructure": "Анализ и структура",
+    "generatingLessons": "Генерация {count, plural, one {# урока} few {# уроков} other {# уроков}}",
+    "generatingLessonsAuto": "Генерация ~{count, plural, one {# урока} few {# уроков} other {# уроков}}",
+    "infoExact": "Точное количество токенов зависит от сложности темы и объёма материалов.",
+    "infoEstimate": "Оценка для среднего курса. Точное количество зависит от темы и материалов."
+  },
+  "prioritization": {
+    "document": "Документ",
+    "size": "Размер",
+    "priority": "Приоритет",
+    "distribution": "Распределение:",
+    "file": "Файл",
+    "rationale": "Обоснование классификации",
+    "docsNotFound": "Документы не найдены",
+    "loadError": "Не удалось загрузить документы",
+    "loadErrorGeneric": "Произошла ошибка при загрузке документов",
+    "priorityChanged": "Приоритет изменен на \"{priority}\"",
+    "nowCore": "\"{newDoc}\" теперь ключевой. \"{oldDoc}\" изменен на \"Важный\".",
+    "updateError": "Не удалось обновить приоритет",
+    "unexpectedError": "Произошла непредвиденная ошибка",
+    "approved": "Приоритизация подтверждена. Переход к следующему этапу...",
+    "approveError": "Не удалось подтвердить приоритизацию",
+    "selectCore": "Выберите один ключевой документ для продолжения",
+    "confirmAndContinue": "Подтвердить и продолжить",
+    "completed": "Приоритизация завершена",
+    "replaceCore": "Заменить ключевой документ?",
+    "replaceCoreDesc": "Может быть только один ключевой документ. Предыдущий будет изменен на «Важный».",
+    "currentCore": "Сейчас ключевой:",
+    "newCore": "Новый ключевой:",
+    "replace": "Заменить",
+    "cancel": "Отмена",
+    "switching": "Переключение...",
+    "selectValue": "Выберите значение"
+  },
+  "contentPreview": {
+    "generationError": "Ошибка генерации",
+    "contentDisplayError": "Ошибка отображения контента",
+    "contentUnavailable": "Контент урока недоступен",
+    "rawMarkdownLabel": "Исходный текст в формате Markdown",
+    "copy": "Скопировать",
+    "markdownUnavailable": "Markdown контент недоступен",
+    "lessonMetadata": "Метаданные урока",
+    "metadataUnavailable": "Метаданные недоступны",
+    "errorOccurred": "Произошла ошибка при генерации контента",
+    "technicalDetails": "Технические детали",
+    "pendingGeneration": "Ожидание генерации...",
+    "generatingContent": "Генерация контента...",
+    "previewInProgress": "Предварительный просмотр (генерация продолжается)",
+    "tabPreview": "Просмотр",
+    "tabMetadata": "Метаданные",
+    "regenerating": "Переделывается...",
+    "regenerate": "Переделать",
+    "edit": "Редактировать",
+    "approving": "Одобрение...",
+    "approve": "Одобрить"
+  },
+  "lessonMatrix": {
+    "prioritize": "Приоритезировать",
+    "pause": "Приостановить",
+    "preview": "Просмотр",
+    "retry": "Повторить",
+    "title": "Название",
+    "quality": "Качество",
+    "action": "Действие",
+    "totalLessons": "Всего: {count} уроков",
+    "avgQuality": "Среднее качество: {quality}"
+  },
+  "automaticMode": {
+    "title": "Автоматическая генерация",
+    "subtitle": "Можно закрыть страницу — уведомим по готовности",
+    "pause": "Пауза",
+    "cancel": "Отменить",
+    "generationPaused": "Генерация приостановлена",
+    "resume": "Продолжить",
+    "switching": "Переключение...",
+    "manualMode": "Ручной режим",
+    "manualModeHint": "В ручном режиме вы сможете проверить и изменить результаты каждого этапа."
   }
 }
