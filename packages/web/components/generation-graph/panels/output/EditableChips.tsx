@@ -327,7 +327,7 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
 
         {maxItems && items.length >= maxItems && (
           <span className="text-xs text-slate-400 italic dark:text-slate-500" aria-live="polite">
-            (макс. {maxItems})
+            {locale === 'ru' ? `(макс. ${maxItems})` : `(max. ${maxItems})`}
           </span>
         )}
       </div>

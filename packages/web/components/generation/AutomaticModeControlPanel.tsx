@@ -77,7 +77,7 @@ export function AutomaticModeControlPanel({
                   ) : (
                     <Pause className="mr-1 h-4 w-4" />
                   )}
-                  Пауза
+                  {t('pause')}
                 </Button>
                 <Button
                   variant="destructive"
@@ -90,7 +90,7 @@ export function AutomaticModeControlPanel({
                   ) : (
                     <X className="mr-1 h-4 w-4" />
                   )}
-                  Отменить
+                  {t('cancel')}
                 </Button>
               </div>
             </div>
@@ -117,7 +117,7 @@ export function AutomaticModeControlPanel({
                   ) : (
                     <Play className="mr-1 h-4 w-4" />
                   )}
-                  Продолжить
+                  {t('resume')}
                 </Button>
 
                 <Button
@@ -133,7 +133,7 @@ export function AutomaticModeControlPanel({
                   ) : (
                     <>
                       <Settings className="mr-1 h-4 w-4" />
-                      Ручной режим
+                      {t('manualMode')}
                     </>
                   )}
                 </Button>
@@ -148,7 +148,7 @@ export function AutomaticModeControlPanel({
                   ) : (
                     <X className="mr-1 h-4 w-4" />
                   )}
-                  Отменить
+                  {t('cancel')}
                 </Button>
               </div>
 
