@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.31.15
+
+_Released on 2026-03-01_
+
+### ✨ New Features
+
+- **enrichments**: Refactor enrichment system with all 14 types, batch UI, and i18n
+
+### 🐛 Bug Fixes
+
+- **web**: Update 12 source file(s), update 2 test(s), +1 more
+- **mind-map**: Unify display to markmap SVG and fix interactivity in dialog
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.31.14
 
 _Released on 2026-03-01_

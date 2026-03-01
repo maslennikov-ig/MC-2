@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.15] - 2026-03-01
+
+### Added
+
+- **enrichments**: refactor enrichment system with all 14 types, batch UI, and i18n (c5770308)
+
+### Fixed
+
+- **web**: update 12 source file(s), update 2 test(s), +1 more (662f0ce4)
+- **mind-map**: unify display to markmap SVG and fix interactivity in dialog (faa8ea62)
+
 ## [0.31.14] - 2026-03-01
 
 ### Added
