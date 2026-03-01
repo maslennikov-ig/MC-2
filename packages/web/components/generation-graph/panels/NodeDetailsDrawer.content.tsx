@@ -1,6 +1,6 @@
 import React, { memo } from 'react'
 import dynamic from 'next/dynamic'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ApprovalControls } from '../controls/ApprovalControls'
 import { InputTab } from './InputTab'
@@ -144,6 +144,7 @@ export const StageContent = memo(function StageContent({
   onDeselectNode,
 }: StageContentProps) {
   const t = useTranslations('generation')
+  const locale = useLocale()
   const data = selectedNode?.data
   const isDocumentNode = selectedNode?.type === 'document'
   const isEndNode = selectedNode?.type === 'end'
@@ -271,7 +272,10 @@ export const StageContent = memo(function StageContent({
 
         <TabsContent value="input" className="mt-4 space-y-4" data-testid="content-input">
           {data?.stageNumber === 1 ? (
-            <Stage1InputTab inputData={displayData?.inputData as Stage1InputData | undefined} />
+            <Stage1InputTab
+              inputData={displayData?.inputData as Stage1InputData | undefined}
+              locale={locale}
+            />
           ) : isDocumentNode ? (
             <Stage2InputTab documentId={documentId} inputData={displayData?.inputData} />
           ) : data?.stageNumber === 3 ? (
@@ -280,9 +284,14 @@ export const StageContent = memo(function StageContent({
             <Stage4InputTab
               courseId={courseId}
               inputData={displayData?.inputData as Stage4InputData | undefined}
+              locale={locale}
             />
           ) : data?.stageNumber === 5 ? (
-            <Stage5InputTab courseId={courseId} inputData={displayData?.inputData} />
+            <Stage5InputTab
+              courseId={courseId}
+              inputData={displayData?.inputData}
+              locale={locale}
+            />
           ) : (
             <InputTab inputData={displayData?.inputData} />
           )}
@@ -315,6 +324,7 @@ export const StageContent = memo(function StageContent({
               status={
                 displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined
               }
+              locale={locale}
             />
           ) : data?.stageNumber === 5 ? (
             <Stage5ProcessTab
@@ -325,6 +335,7 @@ export const StageContent = memo(function StageContent({
               outputData={displayData?.outputData}
               processingTimeMs={displayData?.duration}
               totalTokens={displayData?.tokens}
+              locale={locale}
             />
           ) : (
             <ProcessTab
@@ -344,6 +355,7 @@ export const StageContent = memo(function StageContent({
             <Stage1OutputTab
               outputData={displayData?.outputData as Stage1OutputData | undefined}
               courseId={courseId}
+              locale={locale}
             />
           ) : isDocumentNode ? (
             <Stage2OutputTab
@@ -366,12 +378,14 @@ export const StageContent = memo(function StageContent({
               readOnly={readOnly || (isAdmin && !isAwaitingApproval)}
               autoFocus={autoOpened}
               onApproved={onStageApproved}
+              locale={locale}
             />
           ) : data?.stageNumber === 5 ? (
             <Stage5OutputTab
               courseId={courseId}
               outputData={displayData?.outputData}
               editable={canEdit}
+              locale={locale}
             />
           ) : (
             <OutputTab
@@ -384,6 +398,7 @@ export const StageContent = memo(function StageContent({
               onApproved={onDeselectNode}
               nodeType={selectedNode?.type}
               isLoading={false}
+              locale={locale}
             />
           )}
         </TabsContent>
@@ -395,6 +410,7 @@ export const StageContent = memo(function StageContent({
               courseId={courseId}
               inputData={data?.inputData as Stage1InputData | undefined}
               outputData={data?.outputData as Stage1OutputData | undefined}
+              locale={locale}
             />
           ) : isDocumentNode ? (
             <Stage2ActivityTab
@@ -405,9 +421,9 @@ export const StageContent = memo(function StageContent({
           ) : data?.stageNumber === 3 ? (
             <Stage3ActivityTab nodeId={selectedNodeId} courseId={courseId} />
           ) : data?.stageNumber === 4 ? (
-            <Stage4ActivityTab nodeId={selectedNodeId} courseId={courseId} />
+            <Stage4ActivityTab nodeId={selectedNodeId} courseId={courseId} locale={locale} />
           ) : data?.stageNumber === 5 ? (
-            <Stage5ActivityTab nodeId={selectedNodeId} courseId={courseId} />
+            <Stage5ActivityTab nodeId={selectedNodeId} courseId={courseId} locale={locale} />
           ) : (
             <ActivityTab nodeId={selectedNodeId} />
           )}

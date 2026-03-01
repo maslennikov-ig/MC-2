@@ -13,7 +13,7 @@ import { PrioritizationView } from '@/components/generation-graph/panels/output/
 import ActivityLog from '@/app/[locale]/courses/[orgSlug]/[courseSlug]/generating/ActivityLog'
 import { ActivityEntry } from '@/types/course-generation'
 import { STAGE_CONFIG } from './utils'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 
 interface StageResultsDrawerProps {
   isOpen: boolean
@@ -31,8 +31,9 @@ export function StageResultsDrawer({
   activityLog,
 }: StageResultsDrawerProps) {
   const t = useTranslations('generation.drawer')
+  const locale = useLocale()
   const stageName = stageNumber
-    ? Object.values(STAGE_CONFIG).find((s) => s.number === stageNumber)?.name
+    ? Object.values(STAGE_CONFIG).find((s) => s.number === stageNumber)?.name[locale]
     : t('stageDetails')
 
   return (
