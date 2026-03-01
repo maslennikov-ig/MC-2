@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic'
 import { CreateHeader } from './_components/create-header'
 import ShaderBackground from '@/components/layouts/shader-background'
 import CreateMetadata from '@/components/common/create-metadata'
-import { motion } from 'framer-motion'
 import { Sparkles, Zap, BookOpen, Video } from 'lucide-react'
 
 // Dynamic import for heavy form component with loading state
@@ -24,39 +23,20 @@ export default function CreatePageClient() {
       <CreateHeader />
 
       <main className="relative z-10 container mx-auto px-4 pb-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
+        <div>
           {/* Hero Section */}
           <div className="mx-auto mb-12 max-w-4xl text-center">
-            <motion.h1
-              className="mb-6 text-4xl font-bold text-white md:text-5xl"
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-            >
+            <h1 className="mb-6 text-4xl font-bold text-white md:text-5xl">
               Создайте свой курс за минуты
-            </motion.h1>
+            </h1>
 
-            <motion.p
-              className="mx-auto mb-8 max-w-2xl text-lg text-gray-300"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
-            >
+            <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-300">
               Используйте искусственный интеллект для автоматической генерации профессионального
               образовательного контента
-            </motion.p>
+            </p>
 
             {/* Features */}
-            <motion.div
-              className="mx-auto mb-12 grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.6 }}
-            >
+            <div className="mx-auto mb-12 grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="flex items-center justify-center gap-2 text-purple-300">
                 <Zap className="h-5 w-5" />
                 <span className="text-sm">Быстрая генерация</span>
@@ -69,16 +49,11 @@ export default function CreatePageClient() {
                 <Video className="h-5 w-5" />
                 <span className="text-sm">Мультимедиа поддержка</span>
               </div>
-            </motion.div>
+            </div>
           </div>
 
           {/* Form Card */}
-          <motion.div
-            className="mx-auto max-w-2xl"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.8, duration: 0.6 }}
-          >
+          <div className="mx-auto max-w-2xl">
             <div className="relative">
               {/* Decorative elements */}
               <div className="absolute -top-4 -left-4 h-24 w-24 rounded-full bg-purple-500/20 blur-xl" />
@@ -93,8 +68,8 @@ export default function CreatePageClient() {
                 <CreateCourseForm />
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       </main>
     </ShaderBackground>
   )

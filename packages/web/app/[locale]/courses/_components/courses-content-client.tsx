@@ -16,6 +16,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 interface User {
   id: string
   email?: string
@@ -45,14 +46,14 @@ interface CoursesContentClientProps {
 export function CoursesContentClient({ coursesData, user, params }: CoursesContentClientProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(params.view || 'grid')
   const [loadingMore, setLoadingMore] = useState(false)
+  const router = useRouter()
 
   const isSuperAdmin = user?.role === 'superadmin'
 
   const handlePageChange = (page: number) => {
     const searchParams = new URLSearchParams(window.location.search)
     searchParams.set('page', page.toString())
-    window.history.pushState(null, '', `?${searchParams.toString()}`)
-    window.location.reload()
+    router.replace(`?${searchParams.toString()}`)
   }
 
   const handleLoadMore = () => {
@@ -174,12 +175,8 @@ export function CoursesContentClient({ coursesData, user, params }: CoursesConte
 
   return (
     <>
-      {/* Enhanced Statistics with animations */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
+      {/* Statistics */}
+      <div>
         <CourseStatistics
           statistics={{
             totalCount: coursesData.totalCount || 0,
@@ -220,14 +217,10 @@ export function CoursesContentClient({ coursesData, user, params }: CoursesConte
             ),
           }}
         />
-      </motion.div>
+      </div>
 
-      {/* Improved Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-      >
+      {/* Filters */}
+      <div>
         <CoursesFiltersImproved
           initialSearch={params.search}
           initialStatus={params.status}
@@ -237,9 +230,9 @@ export function CoursesContentClient({ coursesData, user, params }: CoursesConte
           viewMode={viewMode}
           onViewModeChange={setViewMode}
         />
-      </motion.div>
+      </div>
 
-      {/* Course grid/list with improved animations */}
+      {/* Course grid/list with view transition */}
       <AnimatePresence mode="wait">
         {viewMode === 'grid' ? (
           <motion.div
@@ -250,27 +243,14 @@ export function CoursesContentClient({ coursesData, user, params }: CoursesConte
             transition={{ duration: 0.3 }}
             className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
           >
-            {(coursesData.courses as CourseWithOrg[]).map((course, index) => (
-              <motion.div
+            {(coursesData.courses as CourseWithOrg[]).map((course) => (
+              <CourseCard
                 key={course.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{
-                  duration: 0.3,
-                  delay: index * 0.03,
-                  ease: [0.43, 0.13, 0.23, 0.96],
-                }}
-                layout
-                whileHover={{ y: -5 }}
-              >
-                <CourseCard
-                  course={course}
-                  user={user}
-                  canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
-                  viewMode="grid"
-                />
-              </motion.div>
+                course={course}
+                user={user}
+                canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
+                viewMode="grid"
+              />
             ))}
           </motion.div>
         ) : (
@@ -282,38 +262,22 @@ export function CoursesContentClient({ coursesData, user, params }: CoursesConte
             transition={{ duration: 0.3 }}
             className="space-y-4"
           >
-            {(coursesData.courses as CourseWithOrg[]).map((course, index) => (
-              <motion.div
+            {(coursesData.courses as CourseWithOrg[]).map((course) => (
+              <CourseCard
                 key={course.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{
-                  duration: 0.3,
-                  delay: index * 0.05,
-                  ease: [0.43, 0.13, 0.23, 0.96],
-                }}
-                whileHover={{ x: 5 }}
-              >
-                <CourseCard
-                  course={course}
-                  user={user}
-                  canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
-                  viewMode="list"
-                />
-              </motion.div>
+                course={course}
+                user={user}
+                canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
+                viewMode="list"
+              />
             ))}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Empty state with animation */}
+      {/* Empty state */}
       {coursesData.courses.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="py-16 text-center"
-        >
+        <div className="py-16 text-center">
           <div className="mx-auto max-w-md rounded-2xl border border-slate-800 bg-slate-900/50 p-16 backdrop-blur-sm">
             <Filter className="mx-auto mb-4 h-16 w-16 text-gray-500" />
             <h3 className="mb-2 text-xl font-semibold text-white">Курсы не найдены</h3>
@@ -321,22 +285,18 @@ export function CoursesContentClient({ coursesData, user, params }: CoursesConte
               Попробуйте изменить фильтры или создайте свой первый курс
             </p>
             <Button
-              onClick={() => (window.location.href = '/create')}
+              onClick={() => router.push('/create')}
               className="bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700"
             >
               Создать курс
             </Button>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* Improved pagination or load more */}
+      {/* Pagination or load more */}
       {coursesData.totalPages > 1 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
+        <div>
           {coursesData.hasMore ? (
             <div className="mt-12 flex justify-center">
               <Button
@@ -361,16 +321,11 @@ export function CoursesContentClient({ coursesData, user, params }: CoursesConte
           ) : (
             renderPagination()
           )}
-        </motion.div>
+        </div>
       )}
 
       {/* Quick stats footer */}
-      <motion.div
-        className="mt-16 border-t border-slate-800 py-8"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
-      >
+      <div className="mt-16 border-t border-slate-800 py-8">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-gray-500">
             <div className="flex items-center gap-2">
@@ -392,7 +347,7 @@ export function CoursesContentClient({ coursesData, user, params }: CoursesConte
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
     </>
   )
 }

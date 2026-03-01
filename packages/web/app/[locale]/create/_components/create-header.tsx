@@ -1,7 +1,7 @@
 'use client'
 
 import { Link } from '@/src/i18n/navigation'
-import { motion } from 'framer-motion'
+
 import { Home, BookOpen } from 'lucide-react'
 import Logo from '@/components/common/logo'
 import AuthButton from '@/components/common/auth-button'
@@ -12,12 +12,7 @@ export function CreateHeader() {
   const isAuthenticated = !!session
 
   return (
-    <motion.header
-      className="relative z-20 flex items-center justify-between p-4 sm:p-6 lg:p-8"
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
-    >
+    <header className="relative z-20 flex items-center justify-between p-4 sm:p-6 lg:p-8">
       {/* Logo */}
       <div className="sm:hidden">
         <Logo variant="compact" size="sm" forceWhite={true} />
@@ -61,6 +56,6 @@ export function CreateHeader() {
 
       {/* Auth Button */}
       <AuthButton darkMode={true} />
-    </motion.header>
+    </header>
   )
 }
