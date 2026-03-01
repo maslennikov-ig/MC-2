@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.11
+
+_Released on 2026-03-01_
+
+### ✨ New Features
+
+- **viewer**: Remove max-width constraints so lesson content fills available space
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.31.10
 
 _Released on 2026-02-28_
