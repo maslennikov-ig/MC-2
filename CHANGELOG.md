@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.11] - 2026-03-01
+
+### Added
+
+- **viewer**: remove max-width constraints so lesson content fills available space (180a9ee4)
+
 ## [0.31.10] - 2026-02-28
 
 ### Fixed
