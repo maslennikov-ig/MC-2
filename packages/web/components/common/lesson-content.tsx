@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { motion } from 'framer-motion'
 import { Target, Clock, CheckCircle, ArrowRight } from 'lucide-react'
 
 import { MarkdownRendererFull } from '@/components/markdown'
@@ -107,13 +106,7 @@ export default function LessonContent({
   }, [enrichments])
 
   return (
-    <motion.div
-      key={lesson.id}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      className="mx-auto max-w-7xl px-6 py-8 lg:px-10 xl:max-w-[90rem]"
-    >
+    <div key={lesson.id} className="px-6 py-8 lg:px-10">
       {/* Cover Hero Image - Displayed at the top if exists, with overlay containing lesson info */}
       {coverImageUrl && (
         <EnrichmentErrorBoundary enrichmentType="Lesson Cover" enrichmentId={lesson.id}>
@@ -257,6 +250,6 @@ export default function LessonContent({
           )}
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

@@ -320,7 +320,7 @@ export default function ContentFormatSwitcher({
 
           {currentFormat === 'video' && mockFormats.video && (
             <div className="relative bg-black">
-              <div className="mx-auto max-w-7xl px-6 py-8">
+              <div className="px-6 py-8">
                 <div className="aspect-video overflow-hidden rounded-lg bg-gray-900 shadow-2xl">
                   <div className="relative h-full w-full">
                     {mediaError ? (
@@ -469,7 +469,7 @@ export default function ContentFormatSwitcher({
           )}
 
           {currentFormat === 'audio' && mockFormats.audio && (
-            <div className="mx-auto max-w-4xl px-6 py-8">
+            <div className="px-6 py-8">
               <div className="rounded-lg bg-gradient-to-br from-purple-100 to-blue-100 p-8 shadow-lg dark:from-gray-800 dark:to-gray-900">
                 <div className="mb-6 flex items-center justify-center">
                   <div className="relative">
@@ -605,7 +605,7 @@ export default function ContentFormatSwitcher({
           )}
 
           {currentFormat === 'presentation' && mockFormats.presentation && (
-            <div className="mx-auto max-w-6xl px-6 py-8">
+            <div className="px-6 py-8">
               <div className="rounded-lg bg-gray-100 p-8 text-center dark:bg-gray-800">
                 <Presentation className="mx-auto mb-4 h-16 w-16 text-gray-400" />
                 <h3 className="mb-2 text-xl font-semibold">Презентация к уроку</h3>
