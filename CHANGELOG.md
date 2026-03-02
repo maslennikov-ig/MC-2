@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.17] - 2026-03-02
+
+### Added
+
+- **flashcards**: redesign FlashcardViewer UI with fullscreen study mode (1d57148c)
+
 ## [0.31.16] - 2026-03-02
 
 ### Fixed
