@@ -404,6 +404,7 @@
     },
     "flashcards": {
       "description": "Interactive flashcard deck for memorization",
+      "title": "Flashcards",
       "start": "Start",
       "cardOf": "Card {current} of {total}",
       "front": "Question",
@@ -420,7 +421,14 @@
       "restart": "Start Over",
       "finish": "Finish",
       "shuffle": "Shuffle",
-      "cardCount": "{count} cards"
+      "cardCount": "{count, plural, one {# card} other {# cards}}",
+      "enterFullscreen": "Study Mode",
+      "exitFullscreen": "Exit Study Mode",
+      "previousCard": "Previous card",
+      "nextCard": "Next card",
+      "fullscreenHint": "Arrow keys to navigate \u00b7 Space to flip \u00b7 Esc to exit",
+      "greatJob": "Excellent work! You know most of the material.",
+      "keepPracticing": "Keep practicing to improve your score."
     },
     "mindMap": {
       "description": "Visual knowledge map for this lesson",
