@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.17
+
+_Released on 2026-03-02_
+
+### ✨ New Features
+
+- **flashcards**: Redesign FlashcardViewer UI with fullscreen study mode
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.31.16
 
 _Released on 2026-03-02_
