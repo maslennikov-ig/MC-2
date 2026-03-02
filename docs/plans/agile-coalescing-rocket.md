@@ -1,154 +1,125 @@
-# Mind Map: Unify Display + Fix Interactivity
+# Mind Map: Fix Fullscreen + Shared State + Fold Depth
 
 ## Context
 
-Mind map enrichment has **два стиля отображения**:
+После предыдущего PR (v0.31.15) майнд-карта использует единый markmap SVG. Осталось 3 проблемы:
 
-1. **Inline preview** (Lesson Materials tab, EnrichmentCard) — CSS-дерево (`MindMapTreeNode`), maxDepth=2
-2. **View Full Map** (Dialog) — SVG markmap через `MarkmapRenderer` (markmap-view@0.18.12)
-
-Пользователь хочет: **один стиль** (markmap SVG) везде. Плюс dialog полностью неинтерактивен — zoom, pan, click не работают.
-
-## Root Cause
-
-| Баг               | Причина                                                                                                                              | Файл                          |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
-| Всё раскрыто      | `AUTO_FOLD_DEPTH=3` → `initialExpandLevel:3` раскрывает уровни 0-3, fold только на 4+                                                | `mindmap-transform.ts:8`      |
-| Сильно отдалено   | Много раскрытых нод + `autoFit:true` → zoom out, чтобы вместить всё                                                                  | Следствие #1                  |
-| Zoom не работает  | SVG `h-full w-full` внутри flex-контейнера Dialog — CSS `height:100%` не резолвится от flex-computed height → SVG имеет 0 event area | `MarkmapRenderer.tsx:119-125` |
-| Клики не работают | Та же причина — D3 zoom/click handlers привязаны к SVG, 0-height SVG не получает pointer events                                      | `MarkmapRenderer.tsx:119-125` |
-| Два стиля         | `MindMapViewer` показывает CSS-tree preview + кнопку "View Full Map" для Dialog                                                      | `MindMapViewer.tsx:78-157`    |
+1. **Два крестика** в fullscreen — `DialogContent` (`dialog.tsx:48`) ВСЕГДА рендерит свой `<DialogPrimitive.Close>` (absolute top-4 right-4). Плюс наш `DialogClose` в header MindMapViewer. Итого два X.
+2. **Состояние не сохраняется** — `{isDialogOpen && <MarkmapRenderer>}` создаёт НОВЫЙ экземпляр при каждом открытии fullscreen. Развёрнутые ветки и зум теряются.
+3. **Слишком свёрнута** — `AUTO_FOLD_DEPTH=1` → `initialExpandLevel:1` → видно только root с collapsed children. Нужно: root + первый уровень веток раскрыт, level 2+ свёрнут.
 
 ## Plan
 
-### Task 1: Fix fold depth — `mindmap-transform.ts`
+### Task 1: CSS fullscreen вместо Dialog — `MindMapViewer.tsx`
 
-**File:** `packages/web/lib/helpers/mindmap-transform.ts`
+**Ключевое решение**: заменить Radix Dialog на CSS-based fullscreen toggle.
 
-```diff
-- export const AUTO_FOLD_DEPTH = 3
-+ export const AUTO_FOLD_DEPTH = 1
-```
+- ОДИН экземпляр `MarkmapRenderer`, всегда mounted
+- `isFullscreen` state переключает CSS (`fixed inset-0 z-50`)
+- fold/zoom state сохраняется (тот же SVG DOM, тот же markmap instance)
+- Нет Dialog → нет дублирующего крестика (только наш)
 
-Эффект: `initialExpandLevel:1` раскрывает root + level 1. `payload.fold:1` на depth>1 сворачивает level 2+. Меньше нод видно → `autoFit` не zoom out так сильно.
+**Удалить**: все Dialog импорты, `isDialogOpen` state
 
-### Task 2: Fix SVG sizing + interactivity — `MarkmapRenderer.tsx`
-
-**File:** `packages/web/components/course/viewer/enrichments/MarkmapRenderer.tsx`
-
-1. Добавить `className` prop для контейнера (разная высота inline vs dialog)
-2. SVG: `absolute inset-0` вместо `h-full w-full` (надёжное позиционирование)
-3. Добавить `touchAction: 'none'` на SVG (touch events для мобильных)
-4. Добавить `onWheel` stopPropagation (предотвратить scroll dialog при zoom)
-5. Not-mounted skeleton: использовать `className` вместо hardcoded `min-h-[60vh]`
-6. Добавить import `cn` from `@/lib/utils`
+**Новая структура**:
 
 ```tsx
-// Interface
-interface MarkmapRendererProps {
-  data: IPureNode
-  fitToViewLabel?: string
-  className?: string
-}
+const [isFullscreen, setIsFullscreen] = useState(false);
 
-// Not-mounted branch
-if (!mounted) {
-  return (
-    <div className={cn('flex items-center justify-center', className ?? 'min-h-[60vh]')}>
-      <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
-    </div>
-  )
-}
-
-// Mounted JSX
-<div className={cn('relative', className)}>
-  <svg
-    ref={svgRef}
-    className="absolute inset-0 h-full w-full"
-    style={{ color: isDark ? '#e2e8f0' : '#1e293b', touchAction: 'none' }}
-    onWheel={(e) => e.stopPropagation()}
-  />
-  {fitToViewLabel && <Button .../>}
-</div>
-```
-
-### Task 3: Unify display — `MindMapViewer.tsx`
-
-**File:** `packages/web/components/course/viewer/enrichments/MindMapViewer.tsx`
-
-**Удалить:**
-
-- `MindMapTreeNode` component (lines 78-157)
-- `DEPTH_COLORS` array, `getDepthColor`, `MindMapTreeNodeProps` (lines 34-72)
-- Import `ChevronRight` из lucide-react
-- `topLevelChildrenCount` variable
-
-**Заменить inline preview:**
-
-```tsx
-{
-  /* Было: CSS tree + previewHint */
-}
-{
-  /* Стало: Inline markmap */
-}
-<div className="overflow-hidden rounded-lg border border-sky-200 bg-sky-50/50 dark:border-sky-800/30 dark:bg-sky-900/10">
-  <MarkmapRenderer data={markmapData} className="h-[280px]" />
-</div>;
-```
-
-**Fix dialog container:**
-
-```diff
-- <div className="min-h-[60vh] flex-1">
-+ <div className="relative h-[60vh] shrink-0">
-    {isDialogOpen && (
-      <MarkmapRenderer
-        data={markmapData}
-        fitToViewLabel={t('viewer.mindMap.fitToView')}
-+       className="h-full"
-      />
+return (
+  <>
+    {/* Backdrop */}
+    {isFullscreen && (
+      <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setIsFullscreen(false)} />
     )}
-  </div>
+
+    <div
+      className={isFullscreen ? 'fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-900' : ''}
+    >
+      {/* Header — only fullscreen */}
+      {isFullscreen && (
+        <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
+          <span>...</span>
+          <Button onClick={() => setIsFullscreen(false)}>
+            <X />
+          </Button>
+        </div>
+      )}
+
+      {/* ONE MarkmapRenderer — always mounted, className switches */}
+      <div className={isFullscreen ? 'min-h-0 flex-1' : 'overflow-hidden rounded-lg border ...'}>
+        <MarkmapRenderer
+          data={markmapData}
+          className={isFullscreen ? 'h-full' : 'aspect-video'}
+          fitToViewLabel={t('viewer.mindMap.fitToView')}
+        />
+      </div>
+
+      {/* Hint — only fullscreen */}
+      {isFullscreen && <p className="...">...</p>}
+    </div>
+
+    {/* Stats + button — only when NOT fullscreen */}
+    {!isFullscreen && (
+      <div className="mt-3 ...">
+        <Badge>...</Badge>
+        <Button onClick={() => setIsFullscreen(true)}>View Full Map</Button>
+      </div>
+    )}
+  </>
+);
 ```
 
-**Fix loading skeleton:**
+### Task 2: ResizeObserver для auto-fit — `MarkmapRenderer.tsx`
+
+При inline → fullscreen контейнер резко меняет размер. Markmap не перерисовывается автоматически.
+
+Добавить Effect 4 (ResizeObserver):
+
+```tsx
+// Effect 4: Re-fit on container resize (e.g. inline ↔ fullscreen toggle)
+useEffect(() => {
+  const container = svgRef.current?.parentElement;
+  if (!container) return;
+
+  const ro = new ResizeObserver(() => {
+    void mmRef.current?.fit();
+  });
+  ro.observe(container);
+  return () => ro.disconnect();
+}, [mounted]);
+```
+
+### Task 3: Fold depth `1 → 2` — `mindmap-transform.ts`
 
 ```diff
-  const MarkmapRenderer = dynamic(() => import('./MarkmapRenderer'), {
-    ssr: false,
-    loading: () => (
--     <div className="flex min-h-[60vh] items-center justify-center">
-+     <div className="flex min-h-[280px] items-center justify-center">
+- export const AUTO_FOLD_DEPTH = 1
++ export const AUTO_FOLD_DEPTH = 2
 ```
 
-**Сохранить:** Dialog, stats badges, "View Full Map" button, DialogHeader/Footer.
+Эффект:
 
-### Файлы БЕЗ изменений
+- `initialExpandLevel: 2` → root + level 1 раскрыты (ветки первого уровня видны)
+- `payload.fold: 1` на `depth > 2` → level 2+ показаны как свёрнутые кружки
+- Видно: root → ветки первого уровня → кликабельные точки для level 2+
 
-- `EnrichmentCard.tsx` — рендерит `<MindMapViewer>`, работает автоматически
-- `lesson-materials-switcher.tsx` — рендерит `<MindMapViewer>`, работает автоматически
-- i18n JSON — неиспользуемые ключи (`previewHint`, `expand`, `collapse`) можно удалить позже
+## Files
+
+| Файл                                                                    | Изменение                                     |
+| ----------------------------------------------------------------------- | --------------------------------------------- |
+| `packages/web/components/course/viewer/enrichments/MindMapViewer.tsx`   | Dialog → CSS fullscreen, один MarkmapRenderer |
+| `packages/web/components/course/viewer/enrichments/MarkmapRenderer.tsx` | + ResizeObserver (Effect 4)                   |
+| `packages/web/lib/helpers/mindmap-transform.ts`                         | `AUTO_FOLD_DEPTH: 1 → 2`                      |
 
 ## Verification
 
 ```bash
-# 1. Type-check
-pnpm --filter web type-check
-
-# 2. Build
-pnpm --filter web build
-
-# 3. Visual testing — open course viewer with mind map enrichment
-# - Lesson Materials tab: should show markmap SVG (not CSS tree)
-# - EnrichmentCard "View Map": should show markmap SVG (not CSS tree)
-# - "View Full Map" dialog: nodes collapsed (only root+level1), zoom works, click to expand works
-# - Both inline and dialog: dark mode theme switch works
-
-# 4. Check for regressions
-pnpm --filter web test
+pnpm --filter web type-check && pnpm --filter web build
 ```
 
-## Beads
+Визуально:
 
-Create issue `mind-map-unify-fix` with tasks for each file change.
+- Inline: root + level 1 раскрыт, level 2+ свёрнут
+- Развернуть ветки → "View Full Map" → состояние сохранено
+- Fullscreen — ОДИН крестик (наш), zoom/click работают
+- Закрыть fullscreen → состояние веток сохраняется
