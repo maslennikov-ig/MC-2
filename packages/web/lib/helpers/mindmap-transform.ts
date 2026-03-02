@@ -5,7 +5,7 @@ import type { MindMapNode } from '@megacampus/shared-types'
  * Nodes deeper than this level are pre-folded for a cleaner initial view.
  * Keep in sync with `initialExpandLevel` in MarkmapRenderer.
  */
-export const AUTO_FOLD_DEPTH = 1
+export const AUTO_FOLD_DEPTH = 2
 
 const ESCAPE_MAP: Record<string, string> = {
   '&': '&amp;',

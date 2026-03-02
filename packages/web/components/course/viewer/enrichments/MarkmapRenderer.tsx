@@ -108,6 +108,19 @@ export function MarkmapRenderer({ data, fitToViewLabel, className }: MarkmapRend
     void mm.renderData()
   }, [isDark])
 
+  // Effect 4: Re-fit on container resize (e.g. inline ↔ fullscreen toggle)
+  useEffect(() => {
+    if (!mounted) return
+    const container = svgRef.current?.parentElement
+    if (!container) return
+
+    const ro = new ResizeObserver(() => {
+      void mmRef.current?.fit()
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [mounted])
+
   if (!mounted) {
     return (
       <div className={cn('flex items-center justify-center', className ?? 'min-h-[60vh]')}>
