@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.31.16
+
+_Released on 2026-03-02_
+
+### 🐛 Bug Fixes
+
+- **mind-map**: CSS fullscreen with shared state, fix fold depth, remove duplicate close button
+- **mind-map**: Match video aspect ratio for inline preview, fullscreen for View Full Map
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.15
 
 _Released on 2026-03-01_

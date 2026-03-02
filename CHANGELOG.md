@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.16] - 2026-03-02
+
+### Fixed
+
+- **mind-map**: CSS fullscreen with shared state, fix fold depth, remove duplicate close button (f6a4bc57)
+- **mind-map**: match video aspect ratio for inline preview, fullscreen for View Full Map (7569a300)
+
 ## [0.31.15] - 2026-03-01
 
 ### Added
