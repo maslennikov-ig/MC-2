@@ -331,9 +331,10 @@ export function EnrichmentCardOptions(props: EnrichmentOptionsProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="3">3</SelectItem>
               <SelectItem value="5">5</SelectItem>
+              <SelectItem value="7">7</SelectItem>
               <SelectItem value="10">10</SelectItem>
-              <SelectItem value="15">15</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -23,6 +23,12 @@ const createEnrichmentSchema = z.object({
     'cover',
     'card',
     'banner',
+    'nlm_audio',
+    'nlm_video',
+    'nlm_study_guide',
+    'nlm_flashcards',
+    'nlm_mind_map',
+    'nlm_infographic',
   ]),
   settings: z.record(z.unknown()).optional(),
 })
@@ -50,6 +56,12 @@ export interface CreateEnrichmentInput {
     | 'cover'
     | 'card'
     | 'banner'
+    | 'nlm_audio'
+    | 'nlm_video'
+    | 'nlm_study_guide'
+    | 'nlm_flashcards'
+    | 'nlm_mind_map'
+    | 'nlm_infographic'
   settings?: Record<string, unknown>
 }
 
@@ -524,6 +536,12 @@ export interface GetEnrichmentResult {
       | 'cover'
       | 'card'
       | 'banner'
+      | 'nlm_audio'
+      | 'nlm_video'
+      | 'nlm_study_guide'
+      | 'nlm_flashcards'
+      | 'nlm_mind_map'
+      | 'nlm_infographic'
     status:
       | 'pending'
       | 'draft_generating'

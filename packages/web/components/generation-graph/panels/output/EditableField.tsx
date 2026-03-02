@@ -74,7 +74,8 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   onCascadeChange,
 }) => {
   const utils = trpc.useUtils()
-  const { label, type, placeholder, helpText, min, max, options } = config
+  const { label: rawLabel, type, placeholder, helpText, min, max, options } = config
+  const label = typeof rawLabel === 'string' ? rawLabel : rawLabel[locale]
   const [localValue, setLocalValue] = useState<string>(
     value !== null && value !== undefined ? String(value as string | number | boolean) : ''
   )
@@ -383,7 +384,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
             aria-describedby={helpText ? `${fieldId}-help` : undefined}
           />
           <span className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">
-            {value ? 'Включено' : 'Выключено'}
+            {value ? t('toggleOn') : t('toggleOff')}
           </span>
         </div>
       )}
@@ -398,7 +399,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
             aria-invalid={hasError}
             aria-errormessage={hasError ? `${fieldId}-error` : undefined}
           >
-            <SelectValue placeholder={placeholder || 'Выберите значение'} />
+            <SelectValue placeholder={placeholder || t('selectPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (
@@ -420,7 +421,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       {/* Error Message */}
       {hasError && (
         <p id={`${fieldId}-error`} className="text-xs text-red-600" role="alert">
-          Не удалось сохранить изменения
+          {t('saveFailedMessage')}
         </p>
       )}
 
@@ -479,7 +480,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
           }}
           onConfirm={(action) => void handleCascadeConfirm(action)}
           affectedCount={affectedCount}
-          fieldLabel={config.label}
+          fieldLabel={label}
           fieldPath={config.path}
           locale={locale}
         />

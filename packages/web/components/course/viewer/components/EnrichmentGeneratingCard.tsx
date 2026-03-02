@@ -114,12 +114,6 @@ const ENRICHMENT_CONFIG: Record<
   },
 }
 
-const GENERATION_STAGES = [
-  { id: 'prepare', label: 'Подготовка' },
-  { id: 'generate', label: 'Генерация' },
-  { id: 'save', label: 'Сохранение' },
-]
-
 const LONG_RUNNING_PROGRESS_CAP = 95
 const LONG_RUNNING_EASING_POWER = 2.2
 const EXTENSION_STEP_MS = 10 * 60 * 1000 // 10-min extensions when timer expires
@@ -216,6 +210,14 @@ export function EnrichmentGeneratingCard({
   onCancel,
 }: EnrichmentGeneratingCardProps) {
   const t = useTranslations('enrichments')
+  const tStages = useTranslations('course.viewer.enrichmentStages')
+
+  const generationStages = [
+    { id: 'prepare', label: tStages('prepare') },
+    { id: 'generate', label: tStages('generate') },
+    { id: 'save', label: tStages('save') },
+  ]
+
   const config = ENRICHMENT_CONFIG[type]
   const Icon = config.icon
 
@@ -524,7 +526,7 @@ export function EnrichmentGeneratingCard({
               <SmoothProgress value={longRunningProgress} variant="gradient" showPercentage />
             ) : (
               <StagedProgress
-                stages={GENERATION_STAGES}
+                stages={generationStages}
                 currentStageIndex={stageIndex}
                 stageProgress={stagedProgress}
                 isComplete={progress >= 100}
@@ -572,9 +574,7 @@ export function EnrichmentGeneratingCard({
           <div className="border-muted/50 mt-6 flex items-center justify-between border-t pt-4">
             {telegramChecked && !isTelegramConnected ? (
               <div className="mr-4 flex-1">
-                <p className="text-muted-foreground mb-3 text-sm">
-                  Не хотите ждать? Подключите Telegram, чтобы получить уведомление о готовности.
-                </p>
+                <p className="text-muted-foreground mb-3 text-sm">{t('telegram.connectPrompt')}</p>
                 <div className="w-[200px]">
                   <TelegramLoginButton
                     botUsername={
@@ -587,10 +587,7 @@ export function EnrichmentGeneratingCard({
               </div>
             ) : (
               <div className="mr-4 flex-1">
-                <p className="text-muted-foreground text-xs">
-                  Вы можете безопасно закрыть эту страницу. Мы пришлем уведомление в Telegram, когда
-                  материал будет готов.
-                </p>
+                <p className="text-muted-foreground text-xs">{t('telegram.safeToClose')}</p>
               </div>
             )}
             <Button

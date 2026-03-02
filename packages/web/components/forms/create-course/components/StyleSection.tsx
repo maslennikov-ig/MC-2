@@ -29,7 +29,7 @@ export function StyleSection({ mounted, reorderedStyles }: StyleSectionProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.3 }}
+      transition={{ duration: 0.5, delay: 0.2 }}
       className="rounded-2xl border border-slate-200 bg-white/90 p-4 backdrop-blur-xl sm:p-6 md:p-8 xl:col-span-1 dark:border-white/10 dark:bg-black/70"
     >
       <h2

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.17] - 2026-03-02
+
+### Added
+
+- **flashcards**: redesign FlashcardViewer UI with fullscreen study mode (1d57148c)
+
+## [0.31.16] - 2026-03-02
+
+### Fixed
+
+- **mind-map**: CSS fullscreen with shared state, fix fold depth, remove duplicate close button (f6a4bc57)
+- **mind-map**: match video aspect ratio for inline preview, fullscreen for View Full Map (7569a300)
+
+## [0.31.15] - 2026-03-01
+
+### Added
+
+- **enrichments**: refactor enrichment system with all 14 types, batch UI, and i18n (c5770308)
+
+### Fixed
+
+- **web**: update 12 source file(s), update 2 test(s), +1 more (662f0ce4)
+- **mind-map**: unify display to markmap SVG and fix interactivity in dialog (faa8ea62)
+
+## [0.31.14] - 2026-03-01
+
+### Added
+
+- **quiz**: unhide quiz enrichment with multi-select, andragogy, and renamed to Квиз (7c96c1df)
+
+### Fixed
+
+- **quiz**: address remaining code review findings (CR-003,007,008,011,015) (b9f0160b)
+- **i18n**: propagate locale to STAGE_CONFIG and downstream components (d73ad142)
+- **i18n**: convert ContentPreviewPanel and LessonMatrix to useTranslations (ec0e6293)
+- **i18n**: fix remaining hardcoded Russian strings missed in initial pass (cc0234d5)
+- **i18n**: replace hardcoded Russian strings in generation panel components (046fcfdc)
+- **i18n**: replace hardcoded Russian in catalog, workflow stages, and clarifying questions (b1d7e03e)
+
 ## [0.31.13] - 2026-03-01
 
 ### Fixed

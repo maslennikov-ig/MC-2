@@ -200,7 +200,7 @@ export function UnifiedEnrichmentCard({
   const [isSelectOpen, setIsSelectOpen] = useState(false)
 
   // Options state for quiz, audio, presentation
-  const [quizQuestions, setQuizQuestions] = useState('10')
+  const [quizQuestions, setQuizQuestions] = useState('5')
   const [quizDifficulty, setQuizDifficulty] = useState('medium')
   const [audioVoice, setAudioVoice] = useState('default')
   const [audioSpeed, setAudioSpeed] = useState('normal')

@@ -119,9 +119,7 @@ export function useSubmitCourse({
         formData.append('notify_on_error', String(data.notifyOnError ?? true))
         formData.append('notify_on_stage_complete', String(data.notifyOnStageComplete ?? false))
 
-        if (data.formats && data.formats.length > 0) {
-          data.formats.forEach((format) => formData.append('output_formats', format))
-        }
+        formData.append('output_formats', 'text')
 
         if (data.estimatedLessons)
           formData.append('estimated_lessons', data.estimatedLessons.toString())

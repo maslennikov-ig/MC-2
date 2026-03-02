@@ -160,6 +160,73 @@
     "mainMenu": "Main menu",
     "navigation": "Navigation",
     "deleteCourse": "Delete course",
-    "courseConstructor": "Course Constructor"
+    "courseConstructor": "Course Constructor",
+    "goHome": "Go to Home",
+    "startFree": "Start for Free",
+    "signIn": "Sign In",
+    "register": "Register",
+    "signOut": "Sign Out",
+    "user": "User",
+    "allCourses": "All Courses",
+    "manageCourses": "Manage Courses"
+  },
+  "catalog": {
+    "title": "Course Catalog",
+    "description": "Explore courses created with artificial intelligence",
+    "metaDescription": "Browse all available courses created with artificial intelligence. Find the right course for your topic and skill level.",
+    "metaKeywords": "course catalog, online learning, AI courses, educational programs",
+    "searchPlaceholder": "Search courses...",
+    "filterByStatus": "Filter by status",
+    "filterByDifficulty": "Filter by difficulty",
+    "sortCourses": "Sort courses",
+    "allStatuses": "All statuses",
+    "anyDifficulty": "Any difficulty",
+    "sort": "Sort",
+    "favorites": "Favorites",
+    "resultsCount": "{count} of {total}",
+    "status": {
+      "draft": "Draft",
+      "generating": "Generating",
+      "completed": "Completed",
+      "failed": "Error"
+    },
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced",
+      "master": "Master",
+      "expert": "Expert",
+      "mixed": "Mixed"
+    },
+    "sortOptions": {
+      "created_desc": "Newest first",
+      "created_asc": "Oldest first",
+      "title_asc": "Title (A-Z)",
+      "title_desc": "Title (Z-A)",
+      "lessons_desc": "Most lessons",
+      "lessons_asc": "Fewest lessons",
+      "difficulty_asc": "Difficulty ↑",
+      "difficulty_desc": "Difficulty ↓"
+    },
+    "loadMore": "Load More",
+    "noCoursesFound": "No courses found",
+    "createFirstCourse": "Create your first course",
+    "startCreating": "Start creating courses with AI",
+    "registerFree": "Register for Free",
+    "alreadyHaveAccount": "Already have an account?",
+    "statistics": {
+      "title": "Your Statistics",
+      "totalCourses": "Total Courses",
+      "completed": "Completed",
+      "totalLessons": "Total Lessons",
+      "courses": "courses",
+      "completedLabel": "completed",
+      "lessonsLabel": "lessons"
+    }
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "register": "Register",
+    "signOut": "Sign Out"
   }
 }

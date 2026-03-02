@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useTransition, useCallback, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,6 +34,8 @@ export function CoursesFilters({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
+  const t = useTranslations('common.catalog')
+  const tc = useTranslations('common')
   const [search, setSearch] = useState(initialSearch)
   // Prevent hydration mismatch: Radix UI Select generates different IDs on server vs client
   const [mounted, setMounted] = useState(false)
@@ -84,7 +87,7 @@ export function CoursesFilters({
         <div className="relative max-w-md flex-1">
           <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400 dark:text-gray-500" />
           <Input
-            placeholder="Поиск курсов..."
+            placeholder={t('searchPlaceholder')}
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="border-gray-300 bg-white pr-10 pl-10 text-gray-900 transition-colors duration-200 placeholder:text-gray-500 focus:border-purple-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-purple-500"
@@ -112,40 +115,40 @@ export function CoursesFilters({
           >
             <SelectTrigger
               className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-200 sm:w-[180px] dark:border-slate-700 dark:bg-slate-900/50 dark:text-white"
-              aria-label="Фильтр по статусу"
+              aria-label={t('filterByStatus')}
             >
-              <SelectValue placeholder="Все статусы" />
+              <SelectValue placeholder={t('allStatuses')} />
             </SelectTrigger>
             <SelectContent className="border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
               <SelectItem
                 value="all"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Все статусы
+                {t('allStatuses')}
               </SelectItem>
               <SelectItem
                 value="draft"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Черновик
+                {t('status.draft')}
               </SelectItem>
               <SelectItem
                 value="generating"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Генерируется
+                {t('status.generating')}
               </SelectItem>
               <SelectItem
                 value="completed"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Завершен
+                {t('status.completed')}
               </SelectItem>
               <SelectItem
                 value="failed"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Ошибка
+                {t('status.failed')}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -162,52 +165,52 @@ export function CoursesFilters({
           >
             <SelectTrigger
               className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-200 sm:w-[180px] dark:border-slate-700 dark:bg-slate-900/50 dark:text-white"
-              aria-label="Фильтр по сложности"
+              aria-label={t('filterByDifficulty')}
             >
-              <SelectValue placeholder="Любая сложность" />
+              <SelectValue placeholder={t('anyDifficulty')} />
             </SelectTrigger>
             <SelectContent className="border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
               <SelectItem
                 value="all"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Любая сложность
+                {t('anyDifficulty')}
               </SelectItem>
               <SelectItem
                 value="beginner"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Начальный
+                {t('difficulty.beginner')}
               </SelectItem>
               <SelectItem
                 value="intermediate"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Средний
+                {t('difficulty.intermediate')}
               </SelectItem>
               <SelectItem
                 value="advanced"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Продвинутый
+                {t('difficulty.advanced')}
               </SelectItem>
               <SelectItem
                 value="master"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Мастер
+                {t('difficulty.master')}
               </SelectItem>
               <SelectItem
                 value="expert"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Эксперт
+                {t('difficulty.expert')}
               </SelectItem>
               <SelectItem
                 value="mixed"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Смешанный
+                {t('difficulty.mixed')}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -224,59 +227,59 @@ export function CoursesFilters({
           >
             <SelectTrigger
               className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-200 sm:w-[200px] dark:border-slate-700 dark:bg-slate-900/50 dark:text-white"
-              aria-label="Сортировка курсов"
+              aria-label={t('sortCourses')}
             >
               <ArrowUpDown className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Сортировка" />
+              <SelectValue placeholder={t('sort')} />
             </SelectTrigger>
             <SelectContent className="border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
               <SelectItem
                 value="created_desc"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Сначала новые
+                {t('sortOptions.created_desc')}
               </SelectItem>
               <SelectItem
                 value="created_asc"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Сначала старые
+                {t('sortOptions.created_asc')}
               </SelectItem>
               <SelectItem
                 value="title_asc"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                По названию (А-Я)
+                {t('sortOptions.title_asc')}
               </SelectItem>
               <SelectItem
                 value="title_desc"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                По названию (Я-А)
+                {t('sortOptions.title_desc')}
               </SelectItem>
               <SelectItem
                 value="lessons_desc"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Больше уроков
+                {t('sortOptions.lessons_desc')}
               </SelectItem>
               <SelectItem
                 value="lessons_asc"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Меньше уроков
+                {t('sortOptions.lessons_asc')}
               </SelectItem>
               <SelectItem
                 value="difficulty_asc"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Сложность ↑
+                {t('sortOptions.difficulty_asc')}
               </SelectItem>
               <SelectItem
                 value="difficulty_desc"
                 className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-800"
               >
-                Сложность ↓
+                {t('sortOptions.difficulty_desc')}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -296,13 +299,13 @@ export function CoursesFilters({
           <Heart
             className={`mr-2 h-4 w-4 ${searchParams.get('favorites') === 'true' ? 'fill-red-500 text-red-500' : ''}`}
           />
-          Избранные
+          {t('favorites')}
         </Button>
 
         {/* Results counter */}
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600 transition-colors duration-200 dark:text-gray-400">
-            {totalCount} из {totalCount}
+            {t('resultsCount', { count: totalCount, total: totalCount })}
           </span>
         </div>
       </div>
@@ -310,7 +313,7 @@ export function CoursesFilters({
       {/* Loading indicator */}
       {isPending && (
         <div className="text-sm text-gray-600 transition-colors duration-200 dark:text-gray-400">
-          Загрузка...
+          {tc('loading')}
         </div>
       )}
     </div>

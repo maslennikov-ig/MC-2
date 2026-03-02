@@ -160,6 +160,73 @@
     "mainMenu": "Главное меню",
     "navigation": "Навигация",
     "deleteCourse": "Удалить курс",
-    "courseConstructor": "Конструктор курса"
+    "courseConstructor": "Конструктор курса",
+    "goHome": "На главную",
+    "startFree": "Начать бесплатно",
+    "signIn": "Войти",
+    "register": "Регистрация",
+    "signOut": "Выйти",
+    "user": "Пользователь",
+    "allCourses": "Все курсы",
+    "manageCourses": "Управление курсами"
+  },
+  "catalog": {
+    "title": "Каталог курсов",
+    "description": "Изучайте курсы, созданные с помощью искусственного интеллекта",
+    "metaDescription": "Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта. Найдите подходящий курс по вашей тематике и уровню сложности.",
+    "metaKeywords": "каталог курсов, онлайн обучение, курсы AI, образовательные программы",
+    "searchPlaceholder": "Поиск курсов...",
+    "filterByStatus": "Фильтр по статусу",
+    "filterByDifficulty": "Фильтр по сложности",
+    "sortCourses": "Сортировка курсов",
+    "allStatuses": "Все статусы",
+    "anyDifficulty": "Любая сложность",
+    "sort": "Сортировка",
+    "favorites": "Избранные",
+    "resultsCount": "{count} из {total}",
+    "status": {
+      "draft": "Черновик",
+      "generating": "Генерируется",
+      "completed": "Завершен",
+      "failed": "Ошибка"
+    },
+    "difficulty": {
+      "beginner": "Начальный",
+      "intermediate": "Средний",
+      "advanced": "Продвинутый",
+      "master": "Мастер",
+      "expert": "Эксперт",
+      "mixed": "Смешанный"
+    },
+    "sortOptions": {
+      "created_desc": "Сначала новые",
+      "created_asc": "Сначала старые",
+      "title_asc": "По названию (А-Я)",
+      "title_desc": "По названию (Я-А)",
+      "lessons_desc": "Больше уроков",
+      "lessons_asc": "Меньше уроков",
+      "difficulty_asc": "Сложность ↑",
+      "difficulty_desc": "Сложность ↓"
+    },
+    "loadMore": "Загрузить еще",
+    "noCoursesFound": "Курсы не найдены",
+    "createFirstCourse": "Создать первый курс",
+    "startCreating": "Начните создавать курсы с помощью AI",
+    "registerFree": "Зарегистрироваться бесплатно",
+    "alreadyHaveAccount": "Уже есть аккаунт?",
+    "statistics": {
+      "title": "Ваша статистика",
+      "totalCourses": "Всего курсов",
+      "completed": "Завершено",
+      "totalLessons": "Всего уроков",
+      "courses": "курсов",
+      "completedLabel": "завершено",
+      "lessonsLabel": "уроков"
+    }
+  },
+  "auth": {
+    "signIn": "Войти",
+    "register": "Регистрация",
+    "signOut": "Выйти"
   }
 }

@@ -46,9 +46,9 @@ export function useAutoSave(sessionId: string | null, getValues: UseFormGetValue
         language: currentValues.language,
         email: currentValues.email,
         writingStyles: currentValues.writingStyle ? [currentValues.writingStyle] : undefined,
-        outputFormats: currentValues.formats || undefined,
+        outputFormats: ['text'],
       }
-      autoSaveToRedis(draftFormData)
+      void autoSaveToRedis(draftFormData)
     }, 3000)
   }, [autoSaveToRedis, getValues])
 

@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import {
   AlertDialog,
@@ -27,17 +27,6 @@ export interface DeleteConfirmationDialogProps {
  *
  * Warns user that this action cannot be undone before proceeding with deletion.
  * Shows loading state during async delete operation.
- *
- * @example
- * ```tsx
- * <DeleteConfirmationDialog
- *   open={showDeleteDialog}
- *   onOpenChange={setShowDeleteDialog}
- *   onConfirm={handleDelete}
- *   onCancel={() => setShowDeleteDialog(false)}
- *   isDeleting={isDeleting}
- * />
- * ```
  */
 export function DeleteConfirmationDialog({
   open,
@@ -46,16 +35,7 @@ export function DeleteConfirmationDialog({
   onCancel,
   isDeleting = false,
 }: DeleteConfirmationDialogProps) {
-  const locale = useLocale()
-
-  const title = locale === 'ru' ? 'Удалить активность?' : 'Delete Activity?'
-  const description =
-    locale === 'ru'
-      ? 'Это действие нельзя отменить. Активность будет безвозвратно удалена вместе со всеми связанными данными.'
-      : 'This action cannot be undone. The activity will be permanently deleted along with all associated data.'
-  const cancelLabel = locale === 'ru' ? 'Отмена' : 'Cancel'
-  const confirmLabel = locale === 'ru' ? 'Удалить' : 'Delete'
-  const deletingLabel = locale === 'ru' ? 'Удаление...' : 'Deleting...'
+  const t = useTranslations('enrichments')
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -65,13 +45,15 @@ export function DeleteConfirmationDialog({
             <div className="rounded-full bg-red-100 p-2 dark:bg-red-900/30">
               <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
-            <AlertDialogTitle>{title}</AlertDialogTitle>
+            <AlertDialogTitle>{t('inspector.deleteConfirmTitle')}</AlertDialogTitle>
           </div>
-          <AlertDialogDescription className="pt-2">{description}</AlertDialogDescription>
+          <AlertDialogDescription className="pt-2">
+            {t('inspector.deleteConfirmDescription')}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel} disabled={isDeleting}>
-            {cancelLabel}
+            {t('forms.common.cancel')}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
@@ -81,10 +63,10 @@ export function DeleteConfirmationDialog({
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {deletingLabel}
+                {t('inspector.delete')}...
               </>
             ) : (
-              confirmLabel
+              t('inspector.delete')
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -1,12 +1,13 @@
 'use client'
 
 import React from 'react'
-import { useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { ENRICHMENT_TYPE_CONFIG } from '@/lib/generation-graph/enrichment-config'
+import { CREATEABLE_TYPES, type CreateableEnrichmentType } from '../forms/enrichment-form-config'
 import type { CreateEnrichmentType } from '../../../stores/enrichment-inspector-store'
 
 export interface EnrichmentAddPopoverProps {
@@ -15,26 +16,11 @@ export interface EnrichmentAddPopoverProps {
   className?: string
 }
 
-interface EnrichmentTypeOption {
-  type: CreateEnrichmentType
-  configKey: 'quiz' | 'presentation' | 'document' | 'cover' | 'banner'
-  disabled?: boolean
-  comingSoon?: boolean
-}
-
-const ENRICHMENT_OPTIONS: EnrichmentTypeOption[] = [
-  { type: 'cover', configKey: 'cover' },
-  { type: 'banner', configKey: 'banner' },
-  { type: 'quiz', configKey: 'quiz' },
-  { type: 'mindmap', configKey: 'presentation' },
-  { type: 'reading', configKey: 'document', disabled: true, comingSoon: true },
-]
-
 /**
  * Popover for adding new enrichments to a lesson
  *
- * Shows available enrichment types with icons and descriptions.
- * Document type is disabled with "Coming Soon" indicator.
+ * Shows all user-createable enrichment types with icons from ENRICHMENT_TYPE_CONFIG.
+ * Types and labels are fully driven by config — no hardcoded strings.
  *
  * @example
  * ```tsx
@@ -49,11 +35,8 @@ export function EnrichmentAddPopover({
   disabledTypes = [],
   className,
 }: EnrichmentAddPopoverProps) {
-  const locale = useLocale()
+  const t = useTranslations('enrichments')
   const [open, setOpen] = React.useState(false)
-
-  const addLabel = locale === 'ru' ? 'Добавить' : 'Add'
-  const comingSoonLabel = locale === 'ru' ? 'Скоро' : 'Coming Soon'
 
   const handleSelect = (type: CreateEnrichmentType) => {
     onSelect(type)
@@ -65,25 +48,26 @@ export function EnrichmentAddPopover({
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className={className}>
           <Plus className="mr-2 h-4 w-4" />
-          {addLabel}
+          {t('actions.add')}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2" align="end">
         <div className="space-y-1">
-          {ENRICHMENT_OPTIONS.map((option) => {
-            const config = ENRICHMENT_TYPE_CONFIG[option.configKey]
-            const isDisabled = option.disabled || disabledTypes.includes(option.type)
-            const label = locale === 'ru' ? config.labelRu : config.label
+          {CREATEABLE_TYPES.map((type: CreateableEnrichmentType) => {
+            const config = ENRICHMENT_TYPE_CONFIG[type]
+            if (!config) return null
+            const isDisabled = disabledTypes.includes(type as CreateEnrichmentType)
+            const label = t(`types.${type}` as Parameters<typeof t>[0])
 
             return (
               <button
-                key={option.type}
+                key={type}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-md p-2 text-left',
                   'hover:bg-accent transition-colors',
                   isDisabled && 'cursor-not-allowed opacity-50 hover:bg-transparent'
                 )}
-                onClick={() => !isDisabled && handleSelect(option.type)}
+                onClick={() => !isDisabled && handleSelect(type as CreateEnrichmentType)}
                 disabled={isDisabled}
               >
                 <div className={cn('rounded p-1.5', config.bgClass)}>
@@ -93,11 +77,6 @@ export function EnrichmentAddPopover({
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-medium">{label}</div>
-                  {option.comingSoon && (
-                    <div className="text-xs text-amber-600 dark:text-amber-400">
-                      {comingSoonLabel}
-                    </div>
-                  )}
                 </div>
               </button>
             )
@@ -118,13 +97,12 @@ export function EnrichmentAddButton({
   onClick: () => void
   className?: string
 }) {
-  const locale = useLocale()
-  const label = locale === 'ru' ? 'Добавить обогащение' : 'Add Enrichment'
+  const t = useTranslations('enrichments')
 
   return (
     <Button onClick={onClick} className={cn('w-full', className)}>
       <Plus className="mr-2 h-4 w-4" />
-      {label}
+      {t('assetDock.addEnrichment')}
     </Button>
   )
 }

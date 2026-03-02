@@ -2,6 +2,69 @@
 
 _Released on 2025-12-26_
 
+## v0.31.17
+
+_Released on 2026-03-02_
+
+### ✨ New Features
+
+- **flashcards**: Redesign FlashcardViewer UI with fullscreen study mode
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.31.16
+
+_Released on 2026-03-02_
+
+### 🐛 Bug Fixes
+
+- **mind-map**: CSS fullscreen with shared state, fix fold depth, remove duplicate close button
+- **mind-map**: Match video aspect ratio for inline preview, fullscreen for View Full Map
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.31.15
+
+_Released on 2026-03-01_
+
+### ✨ New Features
+
+- **enrichments**: Refactor enrichment system with all 14 types, batch UI, and i18n
+
+### 🐛 Bug Fixes
+
+- **web**: Update 12 source file(s), update 2 test(s), +1 more
+- **mind-map**: Unify display to markmap SVG and fix interactivity in dialog
+
+---
+
+_This release was automatically generated from 3 commits._
+
+## v0.31.14
+
+_Released on 2026-03-01_
+
+### ✨ New Features
+
+- **quiz**: Unhide quiz enrichment with multi-select, andragogy, and renamed to Квиз
+
+### 🐛 Bug Fixes
+
+- **quiz**: Address remaining code review findings (CR-003,007,008,011,015)
+- **i18n**: Propagate locale to STAGE_CONFIG and downstream components
+- **i18n**: Convert ContentPreviewPanel and LessonMatrix to useTranslations
+- **i18n**: Fix remaining hardcoded Russian strings missed in initial pass
+- **i18n**: Replace hardcoded Russian strings in generation panel components
+- **i18n**: Replace hardcoded Russian in catalog, workflow stages, and clarifying questions
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.31.13
 
 _Released on 2026-03-01_

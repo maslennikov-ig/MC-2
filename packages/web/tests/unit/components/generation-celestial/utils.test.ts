@@ -59,5 +59,16 @@ describe('utils', () => {
       expect(stages.find((s) => s.id === 'stage_2')?.status).toBe('awaiting')
       expect(stages.find((s) => s.id === 'stage_3')?.status).toBe('pending')
     })
+
+    it('uses Russian locale by default', () => {
+      const stages = buildStagesFromStatus('analyzing_task', mockProgress, [])
+      expect(stages.find((s) => s.id === 'stage_4')?.name).toBe('Анализ')
+    })
+
+    it('uses English locale when specified', () => {
+      const stages = buildStagesFromStatus('analyzing_task', mockProgress, [], 'en')
+      expect(stages.find((s) => s.id === 'stage_4')?.name).toBe('Analysis')
+      expect(stages.find((s) => s.id === 'stage_5')?.name).toBe('Structure generation')
+    })
   })
 })

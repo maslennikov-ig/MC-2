@@ -19,10 +19,9 @@
     "processing": "Processing..."
   },
   "errors": {
-    "barrier_failed": "Document processing incomplete - manual intervention required",
-    "insufficient_scope": "Insufficient scope for minimum 10 lessons - broaden the topic",
-    "llm_error": "LLM processing error - contact support",
-    "analysis_generic": "Error analyzing course"
+    "connectionLost": "Connection lost",
+    "reconnecting": "Reconnecting...",
+    "retryFailed": "Retry failed"
   },
   "stages": {
     "stage_1": "Course Initialization",
@@ -75,7 +74,6 @@
     "noLessonsWithErrors": "No lessons with errors",
     "improveQuality": "Improve Quality",
     "noLowQualityLessons": "No low quality lessons",
-    "progressionLogic": "Progression Logic",
     "approveAllLessonsTitle": "Approve All Lessons?",
     "approveAllLessonsDescription": "You are about to approve",
     "approveAllLessonsWarning": "This action cannot be undone.",
@@ -89,7 +87,81 @@
     "awaitingMessage": "This stage is waiting for your approval",
     "activity": "Activity",
     "expand": "Expand to full width",
-    "collapse": "Collapse to half width"
+    "collapse": "Collapse to half width",
+    "stageDetails": "Stage Details",
+    "viewContentAndLogs": "View generated content and logs.",
+    "results": "Results",
+    "activityLog": "Activity Log",
+    "stageNotSelected": "Stage not selected",
+    "stageLabel": "Stage {number}"
+  },
+  "clarifying": {
+    "title": "Clarifying Questions",
+    "titleReadOnly": "Question Answers",
+    "questionOf": "Question {current} of {total}",
+    "answered": "Answered: {count}",
+    "priority": {
+      "critical": "Required",
+      "important": "Important",
+      "nice_to_have": "Optional"
+    },
+    "priorityLabel": {
+      "critical": "Required",
+      "important": "Important",
+      "nice_to_have": "Optional"
+    },
+    "questionType": {
+      "open_ended": "Open-ended",
+      "open_endedHelper": "Write a detailed answer",
+      "single_choice": "Single choice",
+      "single_choiceHelper": "Choose one option",
+      "multiple_choice": "Multiple choice",
+      "multiple_choiceHelper": "Choose one or more"
+    },
+    "yourAnswer": "Your answer",
+    "editAnswer": "Edit answer",
+    "suggestedAnswer": "Suggested answer:",
+    "because": "Because: {rationale}",
+    "acceptSuggestion": "Accept suggestion",
+    "adjustAnswer": "Adjust",
+    "or": "or",
+    "yourVariant": "Your variant:",
+    "enterYourAnswer": "Enter your answer...",
+    "enterYourVariant": "Enter your variant...",
+    "enterAdditionalVariant": "Enter an additional variant...",
+    "recommended": "Recommended",
+    "ownVariant": "Own variant",
+    "selected": "Selected: {count} {count, plural, one {option} other {options}}",
+    "additionally": "additionally",
+    "confirmAnswer": "Confirm answer",
+    "confirmChanges": "Confirm changes",
+    "saving": "Saving...",
+    "cancelEdit": "Cancel",
+    "answeredBadge": "Answered",
+    "allQuestionsAnswered": "All questions answered!",
+    "acceptAllRecommendations": "Accept all recommendations",
+    "errorLoadingQuestions": "Error loading questions",
+    "errorLoadingDescription": "Could not display questions for the course. Try refreshing the page.",
+    "refreshPage": "Refresh page",
+    "saveError": "Failed to save answer",
+    "skipError": "Failed to skip question",
+    "tryAgain": "Try again",
+    "someNotSaved": "Some answers were not saved",
+    "savedCount": "Saved {success} of {total} answers",
+    "allRecommendationsAccepted": "All recommendations accepted",
+    "savedAnswers": "Saved {count} answers",
+    "autoAnswerError": "Error during automatic answer",
+    "continueError": "Failed to continue generation",
+    "answerRequiredQuestions": "Make sure all required questions are answered",
+    "nav": {
+      "back": "Back",
+      "next": "Next",
+      "skip": "Skip",
+      "skipAria": "Skip current question",
+      "continueGeneration": "Continue generation",
+      "processing": "Processing..."
+    },
+    "priorityTooltip": "{label}: {answered} of {total}"
   },
   "refinementChat": {
     "buttonTooltip": "Refine result",
@@ -115,6 +187,7 @@
       "refineTooltip": "Small edits to current content. Fast (~2K tokens)",
       "regenerateTooltip": "Full recreation from scratch. Slower (~20K tokens)"
     },
+    "generationInProgress": "Chat is unavailable during generation. Wait for the stage to complete.",
     "proposal": {
       "suggestedChanges": "Suggested Changes",
       "showDetails": "Show details ({count} changes)",
@@ -139,11 +212,6 @@
       "button": "Generate content",
       "message": "Generate content for new lessons"
     }
-  },
-  "errors": {
-    "connectionLost": "Connection lost",
-    "reconnecting": "Reconnecting...",
-    "retryFailed": "Retry failed"
   },
   "retry": {
     "confirmTitle": "Confirm Retry",
@@ -214,6 +282,7 @@
     "interactivity": "Interactivity",
     "assessmentApproach": "Assessment Approach",
     "assessmentTypes": "Assessment Types",
+    "progressionLogic": "Progression Logic",
     "tone": "Tone",
     "analogies": "Analogies",
     "noAnalogies": "No analogies",
@@ -344,7 +413,8 @@
       "resume": "Resume",
       "cancel": "Cancel",
       "manualMode": "Manual Mode",
-      "manualModeHint": "In manual mode you can review and modify results at each stage."
+      "manualModeHint": "In manual mode you can review and modify results at each stage.",
+      "switching": "Switching..."
     },
     "clarifying": {
       "title": "Clarifying Questions",
@@ -453,7 +523,16 @@
     "saveError": "Error",
     "saveErrorTooltip": "Save error",
     "characters": "characters",
-    "regenerateWithAI": "Regenerate with AI"
+    "regenerateWithAI": "Regenerate with AI",
+    "toggleOn": "On",
+    "toggleOff": "Off",
+    "selectPlaceholder": "Select a value",
+    "saveFailedMessage": "Failed to save changes",
+    "addPlaceholder": "Add...",
+    "removeItem": "Remove",
+    "addItem": "Add item",
+    "deleteToRemove": "press Delete to remove",
+    "maxItems": "(max. {max})"
   },
   "stage1": {
     "identity": "Identity",
@@ -1254,5 +1333,75 @@
     "buttonGoToCourse": "Go to Course",
     "realtimeConnected": "Realtime connected",
     "pollingFallback": "Using polling (fallback mode)"
+  },
+  "costPreview": {
+    "title": "Estimated Token Count",
+    "processingDocs": "Processing {count, plural, one {# document} other {# documents}}",
+    "analysisStructure": "Analysis and structure",
+    "generatingLessons": "Generating {count, plural, one {# lesson} other {# lessons}}",
+    "generatingLessonsAuto": "Generating ~{count, plural, one {# lesson} other {# lessons}}",
+    "infoExact": "Exact token count depends on topic complexity and material volume.",
+    "infoEstimate": "Estimate for an average course. Exact count depends on topic and materials."
+  },
+  "prioritization": {
+    "document": "Document",
+    "size": "Size",
+    "priority": "Priority",
+    "distribution": "Distribution:",
+    "file": "File",
+    "rationale": "Classification rationale",
+    "docsNotFound": "No documents found",
+    "loadError": "Failed to load documents",
+    "loadErrorGeneric": "An error occurred while loading documents",
+    "priorityChanged": "Priority changed to \"{priority}\"",
+    "nowCore": "\"{newDoc}\" is now core. \"{oldDoc}\" changed to \"Important\".",
+    "updateError": "Failed to update priority",
+    "unexpectedError": "An unexpected error occurred",
+    "approved": "Prioritization confirmed. Moving to next stage...",
+    "approveError": "Failed to confirm prioritization",
+    "selectCore": "Select one core document to continue",
+    "confirmAndContinue": "Confirm and continue",
+    "completed": "Prioritization completed",
+    "replaceCore": "Replace core document?",
+    "replaceCoreDesc": "There can be only one core document. The previous one will be changed to \"Important\".",
+    "currentCore": "Currently core:",
+    "newCore": "New core:",
+    "replace": "Replace",
+    "cancel": "Cancel",
+    "switching": "Switching...",
+    "selectValue": "Select a value"
+  },
+  "contentPreview": {
+    "generationError": "Generation error",
+    "contentDisplayError": "Content display error",
+    "contentUnavailable": "Lesson content unavailable",
+    "rawMarkdownLabel": "Raw text in Markdown format",
+    "copy": "Copy",
+    "markdownUnavailable": "Markdown content unavailable",
+    "lessonMetadata": "Lesson metadata",
+    "metadataUnavailable": "Metadata unavailable",
+    "errorOccurred": "An error occurred during content generation",
+    "technicalDetails": "Technical details",
+    "pendingGeneration": "Waiting for generation...",
+    "generatingContent": "Generating content...",
+    "previewInProgress": "Preview (generation in progress)",
+    "tabPreview": "Preview",
+    "tabMetadata": "Metadata",
+    "regenerating": "Regenerating...",
+    "regenerate": "Regenerate",
+    "edit": "Edit",
+    "approving": "Approving...",
+    "approve": "Approve"
+  },
+  "lessonMatrix": {
+    "prioritize": "Prioritize",
+    "pause": "Pause",
+    "preview": "Preview",
+    "retry": "Retry",
+    "title": "Title",
+    "quality": "Quality",
+    "action": "Action",
+    "totalLessons": "Total: {count} lessons",
+    "avgQuality": "Average quality: {quality}"
   }
 }

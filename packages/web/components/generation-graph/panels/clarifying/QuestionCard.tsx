@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState, useEffect } from 'react'
 import { usePrevious } from '@/lib/hooks/use-previous'
 import { Card, CardContent } from '@/components/ui/card'
@@ -63,15 +64,12 @@ interface PriorityConfigItem {
   card: string
   badge: string
   icon: typeof AlertCircle
-  label: string
   iconColor: string
 }
 
 interface TypeConfigItem {
   icon: typeof Lightbulb
-  label: string
   color: string
-  helperText: string
 }
 
 const priorityConfig: Record<QuestionPriority, PriorityConfigItem> = {
@@ -79,21 +77,18 @@ const priorityConfig: Record<QuestionPriority, PriorityConfigItem> = {
     card: 'border-l-2 border-l-red-500 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900',
     badge: '',
     icon: AlertCircle,
-    label: 'Обязательный',
     iconColor: 'text-red-500 dark:text-red-400',
   },
   important: {
     card: 'border-l-2 border-l-amber-400 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900',
     badge: '',
     icon: AlertTriangle,
-    label: 'Важный',
     iconColor: 'text-amber-500 dark:text-amber-400',
   },
   nice_to_have: {
     card: 'border-l-2 border-l-slate-300 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900',
     badge: '',
     icon: Info,
-    label: 'Желательный',
     iconColor: 'text-slate-400 dark:text-slate-500',
   },
 }
@@ -101,21 +96,15 @@ const priorityConfig: Record<QuestionPriority, PriorityConfigItem> = {
 const typeConfig: Record<QuestionType, TypeConfigItem> = {
   open: {
     icon: Lightbulb,
-    label: 'Открытый',
     color: 'text-slate-500 dark:text-slate-400',
-    helperText: 'Напишите развёрнутый ответ',
   },
   single_choice: {
     icon: CircleDot,
-    label: 'Выбор одного',
     color: 'text-slate-500 dark:text-slate-400',
-    helperText: 'Выберите один вариант',
   },
   multi_choice: {
     icon: CheckSquare,
-    label: 'Выбор нескольких',
     color: 'text-slate-500 dark:text-slate-400',
-    helperText: 'Выберите один или несколько',
   },
 }
 
@@ -127,6 +116,8 @@ export function QuestionCard({
   isProcessing = false,
   readOnly = false,
 }: QuestionCardProps) {
+  const t = useTranslations('generation.clarifying')
+
   // Determine initial mode based on isAnswered prop (or readOnly)
   // In readOnly mode, always show answered state
   const [mode, setMode] = useState<CardMode>(isAnswered || readOnly ? 'answered' : 'unanswered')
@@ -174,6 +165,18 @@ export function QuestionCard({
   const priorityConf = priorityConfig[question.priority]
   const typeConf = typeConfig[question.type]
   const TypeIcon = typeConf.icon
+
+  // i18n labels resolved inside component (cannot call hooks outside)
+  const typeI18nKey: Record<QuestionType, string> = {
+    open: 'open_ended',
+    single_choice: 'single_choice',
+    multi_choice: 'multiple_choice',
+  }
+  const typeLabel = t(`questionType.${typeI18nKey[question.type]}` as Parameters<typeof t>[0])
+  const typeHelperText = t(
+    `questionType.${typeI18nKey[question.type]}Helper` as Parameters<typeof t>[0]
+  )
+  const priorityLabel = t(`priorityLabel.${question.priority}`)
 
   // Check if confirm button should be enabled
   const hasSelection = (() => {
@@ -364,7 +367,7 @@ export function QuestionCard({
           <div className="mb-2 flex items-center gap-2">
             <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              Ваш ответ
+              {t('yourAnswer')}
             </span>
           </div>
 
@@ -392,7 +395,7 @@ export function QuestionCard({
             className="w-full py-3"
           >
             <Edit2 className="mr-2 h-4 w-4" />
-            Изменить ответ
+            {t('editAnswer')}
           </Button>
         )}
       </motion.div>
@@ -416,13 +419,13 @@ export function QuestionCard({
             <div className="mb-2 flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <span className="text-xs font-medium text-blue-900 dark:text-blue-100">
-                💡 Рекомендуемый ответ:
+                {'\uD83D\uDCA1'} {t('suggestedAnswer')}
               </span>
             </div>
             <p className="mb-2 text-sm text-blue-900 dark:text-blue-100">{suggestedAnswer.text}</p>
             {suggestedAnswer.rationale && (
               <p className="mb-3 text-xs text-blue-700 dark:text-blue-300">
-                Потому что: {suggestedAnswer.rationale}
+                {t('because', { rationale: suggestedAnswer.rationale })}
               </p>
             )}
             <div className="flex gap-2">
@@ -434,7 +437,7 @@ export function QuestionCard({
                 className="py-3"
               >
                 <Check className="mr-1 h-3.5 w-3.5" />
-                Принять рекомендацию
+                {t('acceptSuggestion')}
               </Button>
               <Button
                 size="sm"
@@ -444,7 +447,7 @@ export function QuestionCard({
                 className="py-3"
               >
                 <Edit2 className="mr-1 h-3.5 w-3.5" />
-                Скорректировать
+                {t('adjustAnswer')}
               </Button>
             </div>
           </motion.div>
@@ -454,7 +457,7 @@ export function QuestionCard({
         {suggestedAnswer && (
           <div className="flex items-center gap-2">
             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-            <span className="text-xs text-slate-500 dark:text-slate-400">или</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{t('or')}</span>
             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
           </div>
         )}
@@ -462,12 +465,12 @@ export function QuestionCard({
         {/* Custom Input Section */}
         <div className="space-y-2">
           <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-            ✏️ Ваш вариант:
+            {'\u270F\uFE0F'} {t('yourVariant')}
           </label>
           <Textarea
             value={customText}
             onChange={(e) => handleCustomTextChange(e.target.value)}
-            placeholder="Введите свой ответ..."
+            placeholder={t('enterYourAnswer')}
             className="min-h-[100px]"
             disabled={isProcessing}
           />
@@ -521,7 +524,7 @@ export function QuestionCard({
                         variant="secondary"
                         className="shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
                       >
-                        Рекомендуем
+                        {t('recommended')}
                       </Badge>
                     )}
                   </div>
@@ -539,7 +542,7 @@ export function QuestionCard({
         {/* Custom option divider */}
         <div className="mt-4 flex items-center gap-2">
           <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-          <span className="text-xs text-slate-500 dark:text-slate-400">или</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{t('or')}</span>
           <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
         </div>
 
@@ -568,7 +571,9 @@ export function QuestionCard({
               )}
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Свой вариант</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                {t('ownVariant')}
+              </p>
             </div>
           </div>
         </button>
@@ -579,7 +584,7 @@ export function QuestionCard({
             <Textarea
               value={customText}
               onChange={(e) => setCustomText(e.target.value)}
-              placeholder="Введите свой вариант..."
+              placeholder={t('enterYourVariant')}
               className="min-h-[80px]"
               disabled={isProcessing}
             />
@@ -597,7 +602,7 @@ export function QuestionCard({
       <div className="space-y-2">
         {selectedCount > 0 && (
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-            Выбрано: {selectedCount} {selectedCount === 1 ? 'вариант' : 'вариантов'}
+            {t('selected', { count: selectedCount })}
           </p>
         )}
 
@@ -642,7 +647,7 @@ export function QuestionCard({
                         variant="secondary"
                         className="shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
                       >
-                        Рекомендуем
+                        {t('recommended')}
                       </Badge>
                     )}
                   </div>
@@ -660,7 +665,7 @@ export function QuestionCard({
         {/* Custom option divider */}
         <div className="mt-4 flex items-center gap-2">
           <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-          <span className="text-xs text-slate-500 dark:text-slate-400">дополнительно</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{t('additionally')}</span>
           <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
         </div>
 
@@ -689,7 +694,9 @@ export function QuestionCard({
               )}
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Свой вариант</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                {t('ownVariant')}
+              </p>
             </div>
           </div>
         </button>
@@ -700,7 +707,7 @@ export function QuestionCard({
             <Textarea
               value={customText}
               onChange={(e) => setCustomText(e.target.value)}
-              placeholder="Введите дополнительный вариант..."
+              placeholder={t('enterAdditionalVariant')}
               className="min-h-[80px]"
               disabled={isProcessing}
             />
@@ -715,7 +722,7 @@ export function QuestionCard({
     if (mode === 'answered') return null
 
     const isEditing = mode === 'editing'
-    const confirmLabel = isEditing ? 'Подтвердить изменения' : 'Подтвердить ответ'
+    const confirmLabel = isEditing ? t('confirmChanges') : t('confirmAnswer')
 
     return (
       <div className="flex gap-2">
@@ -728,7 +735,7 @@ export function QuestionCard({
           {isProcessing ? (
             <>
               <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
-              Сохранение...
+              {t('saving')}
             </>
           ) : (
             <>
@@ -747,7 +754,7 @@ export function QuestionCard({
             className="py-3"
           >
             <X className="mr-1 h-4 w-4" />
-            Отмена
+            {t('cancelEdit')}
           </Button>
         )}
       </div>
@@ -771,7 +778,7 @@ export function QuestionCard({
           {/* Type & Priority Header */}
           <div className="mb-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <TypeIcon className="h-4 w-4" />
-            <span>{typeConf.label}</span>
+            <span>{typeLabel}</span>
             <span>•</span>
             <div
               className={cn('h-2 w-2 rounded-full', {
@@ -780,7 +787,7 @@ export function QuestionCard({
                 'bg-slate-300 dark:bg-slate-500': question.priority === 'nice_to_have',
               })}
             />
-            <span>{priorityConf.label}</span>
+            <span>{priorityLabel}</span>
             {question.category && (
               <>
                 <span>•</span>
@@ -790,7 +797,7 @@ export function QuestionCard({
             {isAnswered && mode === 'answered' && (
               <span className="ml-auto flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                 <Check className="h-3 w-3" />
-                Отвечено
+                {t('answeredBadge')}
               </span>
             )}
           </div>
@@ -800,7 +807,7 @@ export function QuestionCard({
             <p className="text-base font-medium text-slate-800 dark:text-slate-100">
               {question.text}
             </p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{typeConf.helperText}</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{typeHelperText}</p>
           </div>
 
           {/* Main Content (Conditional based on mode) */}

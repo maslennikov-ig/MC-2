@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 
@@ -17,15 +18,12 @@ interface WizardProgressProps {
 const priorityDots = {
   critical: {
     color: 'text-red-500 dark:text-red-400',
-    label: 'Обязательные',
   },
   important: {
     color: 'text-amber-400 dark:text-amber-300',
-    label: 'Важные',
   },
   nice_to_have: {
     color: 'text-slate-400 dark:text-slate-500',
-    label: 'Желательные',
   },
 } as const
 
@@ -35,6 +33,7 @@ export function WizardProgress({
   answeredCount,
   priorityCounts,
 }: WizardProgressProps) {
+  const t = useTranslations('generation.clarifying')
   const progress = (answeredCount / totalQuestions) * 100
 
   return (
@@ -42,9 +41,11 @@ export function WizardProgress({
       {/* Main progress line with counters */}
       <div className="mb-2 flex items-center justify-between text-sm">
         <span className="text-slate-600 dark:text-slate-400">
-          Вопрос {currentIndex + 1} из {totalQuestions}
+          {t('questionOf', { current: currentIndex + 1, total: totalQuestions })}
         </span>
-        <span className="text-slate-600 dark:text-slate-400">Отвечено: {answeredCount}</span>
+        <span className="text-slate-600 dark:text-slate-400">
+          {t('answered', { count: answeredCount })}
+        </span>
       </div>
 
       {/* Progress bar */}
@@ -60,7 +61,7 @@ export function WizardProgress({
             <div
               key={priority}
               className="flex items-center gap-1.5"
-              title={`${priorityDots[priority].label}: ${answered} из ${total}`}
+              title={t('priorityTooltip', { label: t(`priority.${priority}`), answered, total })}
             >
               <div className={cn('h-2 w-2 rounded-full', color.replace('text-', 'bg-'))} />
               <span className={cn('font-medium tabular-nums', color)}>

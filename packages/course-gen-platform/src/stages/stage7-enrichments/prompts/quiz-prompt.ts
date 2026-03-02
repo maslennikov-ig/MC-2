@@ -37,7 +37,7 @@ const TOKEN_MULTIPLIERS: Record<string, number> = {
 /**
  * Question type options
  */
-export type QuizQuestionType = 'multiple_choice' | 'true_false' | 'short_answer';
+export type QuizQuestionType = 'multiple_choice' | 'multi_select' | 'true_false' | 'short_answer';
 
 /**
  * Difficulty bias for question generation
@@ -153,8 +153,9 @@ Each question MUST include:
 - **ID**: Unique identifier (e.g., "q1", "q2", "q3")
 - **Type**: One of:
   - \`multiple_choice\`: 3-5 options, one correct answer
+  - \`multi_select\`: 4-6 options, 2+ correct answers (array of IDs)
   - \`true_false\`: Boolean question
-  - \`short_answer\`: Open-ended response (use sparingly)
+  - \`short_answer\`: DISABLED - do not generate
 - **Bloom's Level**: Cognitive level (see taxonomy below)
 - **Difficulty**: \`easy\`, \`medium\`, or \`hard\`
 - **Question Text**: Clear, unambiguous question (10-200 characters)
@@ -164,8 +165,9 @@ Each question MUST include:
   - Make distractors plausible but clearly incorrect
 - **Correct Answer**:
   - For multiple_choice: option ID as string (e.g., "a")
+  - For multi_select: array of option IDs (e.g., ["a", "c", "e"])
   - For true_false: boolean (true or false)
-  - For short_answer: example correct answer as string
+  - For short_answer: DISABLED - do not generate
 - **Explanation**: 1-3 sentences explaining why the answer is correct
 - **Points**: Point value (typically 1-5 points per question)
 
@@ -205,14 +207,48 @@ Distribute questions across AT LEAST 2 cognitive levels:
 - 20-30% Apply (practical skills)
 - 5-10% Analyze (advanced critical thinking)
 
+# Andragogy (Adult Learning) Principles
+
+Design questions following adult education best practices:
+
+## Self-Directed Assessment
+- Frame questions to help learners identify their own knowledge gaps
+- Include reflection-oriented questions ("Based on what you learned, how would YOU approach...")
+
+## Experience-Based & Scenario Questions
+- Connect content to practical, real-world professional scenarios
+- Use case studies, situational prompts: "A colleague asks you to solve X..."
+- Prioritize Apply/Analyze levels for adult relevance
+
+## Immediate Applicability
+- Prioritize questions about concepts with immediate practical value
+- "How would you use this tomorrow?" type questions
+- Avoid purely theoretical questions with no practical connection
+
+## Problem-Centered Approach
+- Frame questions around realistic problems, not abstract recall
+- Use multi_select questions for scenarios with multiple valid approaches
+
+## Motivation Through Competence
+- Start with easier questions to build confidence (progressive difficulty)
+- Write educational explanations focusing on "why this matters" not just correctness
+- Celebrate learning gaps as growth opportunities in explanations
+
 # Question Type Guidelines
 
-## Multiple Choice (Preferred - 60-70% of quiz)
+## Multiple Choice (Preferred - 40-50% of quiz)
 - **Best for**: Assessing knowledge, comprehension, and application
 - **Options**: 3-5 choices (4 is ideal)
 - **Distractors**: Make incorrect options plausible but clearly wrong
 - **Avoid**: "All of the above", "None of the above" (use sparingly)
 - **Tip**: Vary correct answer position (not always "a")
+
+## Multi-Select (20-30% of quiz)
+- Best for: Scenarios with multiple correct approaches/factors
+- Format: Checkbox-style, 2+ correct answers from 4-6 options
+- Use when: "Which of the following factors contribute to X?"
+- Correct answer: Array of option IDs, e.g. ["a", "c", "e"]
+- Scoring: Full points for exact match only
 
 ## True/False (Simple Facts - 20-30% of quiz)
 - **Best for**: Testing factual knowledge at Remember level
@@ -220,11 +256,9 @@ Distribute questions across AT LEAST 2 cognitive levels:
 - **Avoid**: Double negatives, trick questions
 - **Example**: "TypeScript is a superset of JavaScript. (True/False)"
 
-## Short Answer (Use Sparingly - 0-10% of quiz)
-- **Best for**: Testing understanding and application
-- **Provide guidance**: Specify expected answer length/format
-- **Grading**: Requires manual review (less scalable)
-- **Example**: "Explain in 1-2 sentences why X is important."
+## Short Answer (DISABLED - do not generate this type)
+- Currently disabled pending AI-powered answer evaluation
+- Use multiple_choice or multi_select instead
 
 # Difficulty Distribution
 
@@ -335,6 +369,23 @@ Start with { and end with }.
       "correct_answer": "b",
       "explanation": "Approach B is correct because [reasoning]. This aligns with the best practice discussed in section 3.",
       "points": 2
+    },
+    {
+      "id": "q4",
+      "type": "multi_select",
+      "bloom_level": "analyze",
+      "difficulty": "medium",
+      "question": "Which of the following factors contribute to X? (Select all that apply)",
+      "options": [
+        { "id": "a", "text": "Increased network latency" },
+        { "id": "b", "text": "Reduced memory allocation" },
+        { "id": "c", "text": "Cache invalidation overhead" },
+        { "id": "d", "text": "Higher CPU clock speed" },
+        { "id": "e", "text": "Synchronous I/O blocking" }
+      ],
+      "correct_answer": ["a", "c", "e"],
+      "explanation": "Factors A, C, and E all contribute to X because [reasoning]. Factor B relates to Y instead, and Factor D is a common misconception.",
+      "points": 3
     }
   ],
   "passing_score": 70,
@@ -362,7 +413,9 @@ Start with { and end with }.
 - Ensure total points and Bloom coverage are accurate
 - Use proper JSON formatting (no trailing commas, valid escape sequences)
 - Set shuffle_questions and shuffle_options to true by default
-- Passing score defaults to 70% unless specified otherwise`;
+- Passing score defaults to 70% unless specified otherwise
+- Never generate short_answer questions
+- Always include at least 1 multi_select question`;
 }
 
 /**
@@ -386,7 +439,7 @@ export function buildQuizUserMessage(params: QuizPromptParams): string {
   const {
     questionCount,
     difficultyBias = 'balanced',
-    questionTypes = ['multiple_choice', 'true_false', 'short_answer'],
+    questionTypes = ['multiple_choice', 'multi_select', 'true_false'],
     passingScore = 70,
     timeLimitMinutes,
   } = settings;
@@ -394,11 +447,14 @@ export function buildQuizUserMessage(params: QuizPromptParams): string {
   // Format learning objectives
   const objectivesText = lessonObjectives.map((obj, idx) => `${idx + 1}. ${obj}`).join('\n');
 
+  // Filter out short_answer since it is disabled
+  const safeQuestionTypes = questionTypes.filter(t => t !== 'short_answer');
+
   // Format settings
   const settingsText = [
     questionCount ? `Question Count: ${questionCount}` : 'Question Count: 5-10',
     `Difficulty Bias: ${difficultyBias}`,
-    `Question Types: ${questionTypes.join(', ')}`,
+    `Question Types: ${safeQuestionTypes.join(', ')}`,
     `Passing Score: ${passingScore}%`,
     timeLimitMinutes ? `Time Limit: ${timeLimitMinutes} minutes` : 'Time Limit: None',
   ].join('\n');

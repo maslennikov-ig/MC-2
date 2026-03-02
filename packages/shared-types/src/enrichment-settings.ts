@@ -75,9 +75,9 @@ export const quizSettingsSchema = z.object({
 
   /** Question types to include */
   question_types: z
-    .array(z.enum(['multiple_choice', 'true_false', 'short_answer']))
+    .array(z.enum(['multiple_choice', 'multi_select', 'true_false', 'short_answer']))
     .min(1)
-    .default(['multiple_choice', 'true_false']),
+    .default(['multiple_choice', 'multi_select', 'true_false']),
 
   /** Passing score percentage (default: 70%) */
   passing_score: z.number().int().min(0).max(100).default(70),

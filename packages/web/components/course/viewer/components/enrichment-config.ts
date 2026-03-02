@@ -29,7 +29,6 @@ export type EnrichmentType =
 export const PLACEHOLDER_TYPES: (
   | 'nlm_audio'
   | 'nlm_video'
-  | 'nlm_study_guide'
   | 'nlm_flashcards'
   | 'nlm_mind_map'
   | 'nlm_infographic'
@@ -59,6 +58,7 @@ export type GeneratableEnrichmentType =
 export const ALL_PLACEHOLDER_TYPES: GeneratableEnrichmentType[] = [
   'cover',
   'card',
+  'quiz',
   'nlm_audio',
   'nlm_video',
   'nlm_flashcards',

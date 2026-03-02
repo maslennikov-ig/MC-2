@@ -102,6 +102,15 @@ const translations = {
     visualStyleAesthetic: 'Эстетика',
     visualStyleVisualElements: 'Визуальные элементы',
     visualStyleMood: 'Настроение',
+    loading: 'Загрузка данных анализа...',
+    minutesAbbr: 'мин',
+    specificAnalogies: 'Специфичные аналогии',
+    changesSaved: 'Изменения сохранены',
+    changeUndone: 'Изменение отменено',
+    undoFailed: 'Ошибка при отмене',
+    changeRedone: 'Изменение повторено',
+    redoFailed: 'Ошибка при повторе',
+    editCancelled: 'Редактирование отменено',
   },
   en: {
     classification: 'Course Classification',
@@ -142,6 +151,15 @@ const translations = {
     visualStyleAesthetic: 'Aesthetic',
     visualStyleVisualElements: 'Visual Elements',
     visualStyleMood: 'Mood',
+    loading: 'Loading analysis data...',
+    minutesAbbr: 'min',
+    specificAnalogies: 'Specific analogies',
+    changesSaved: 'Changes saved',
+    changeUndone: 'Change undone',
+    undoFailed: 'Failed to undo',
+    changeRedone: 'Change redone',
+    redoFailed: 'Failed to redo',
+    editCancelled: 'Edit cancelled',
   },
 }
 
@@ -189,8 +207,8 @@ export const AnalysisResultView = ({
     if (!canEdit) return
     // Trigger immediate flush of pending changes
     flush()
-    toast.success(locale === 'ru' ? 'Изменения сохранены' : 'Changes saved')
-  }, [canEdit, flush, locale])
+    toast.success(t.changesSaved)
+  }, [canEdit, flush, t])
 
   const handleUndo = useCallback(async () => {
     if (!courseId) return
@@ -206,16 +224,16 @@ export const AnalysisResultView = ({
 
       try {
         await updateFieldAction(entry.courseId, entry.stageId, entry.fieldPath, entry.previousValue)
-        toast.success(locale === 'ru' ? 'Изменение отменено' : 'Change undone')
+        toast.success(t.changeUndone)
 
         // Trigger immediate save to sync UI
         flush()
       } catch (error) {
         console.error('Failed to undo:', error)
-        toast.error(locale === 'ru' ? 'Ошибка при отмене' : 'Failed to undo')
+        toast.error(t.undoFailed)
       }
     }
-  }, [undo, locale, courseId, flush])
+  }, [undo, t, courseId, flush])
 
   const handleRedo = useCallback(async () => {
     if (!courseId) return
@@ -227,24 +245,24 @@ export const AnalysisResultView = ({
     if (entry.stageId === 'stage_4') {
       try {
         await updateFieldAction(entry.courseId, entry.stageId, entry.fieldPath, entry.newValue)
-        toast.success(locale === 'ru' ? 'Изменение повторено' : 'Change redone')
+        toast.success(t.changeRedone)
 
         // Trigger immediate save to sync UI
         flush()
       } catch (error) {
         console.error('Failed to redo:', error)
-        toast.error(locale === 'ru' ? 'Ошибка при повторе' : 'Failed to redo')
+        toast.error(t.redoFailed)
       }
     }
-  }, [redo, locale, courseId, flush])
+  }, [redo, t, courseId, flush])
 
   const handleCancelEdit = useCallback(() => {
     if (!canEdit) return
     // Blur the active element to trigger auto-save flush
     const activeElement = document.activeElement as HTMLElement
     activeElement?.blur()
-    toast.info(locale === 'ru' ? 'Редактирование отменено' : 'Edit cancelled')
-  }, [canEdit, locale])
+    toast.info(t.editCancelled)
+  }, [canEdit, t])
 
   // Register keyboard shortcuts with undo/redo
   // Wrap async handlers to satisfy void return type requirement
@@ -282,7 +300,7 @@ export const AnalysisResultView = ({
     return (
       <div className="text-muted-foreground flex flex-col items-center justify-center py-8">
         <Skeleton className="mb-4 h-8 w-48" />
-        <p className="text-sm">Загрузка данных анализа...</p>
+        <p className="text-sm">{t.loading}</p>
       </div>
     )
   }
@@ -490,7 +508,7 @@ export const AnalysisResultView = ({
               )}
               <LabeledValue
                 label={t.lessonDuration}
-                value={`${data.recommended_structure.lesson_duration_minutes} мин`}
+                value={`${data.recommended_structure.lesson_duration_minutes} ${t.minutesAbbr}`}
               />
             </div>
             <LabeledValue
@@ -566,7 +584,7 @@ export const AnalysisResultView = ({
                 />
                 {data.generation_guidance.use_analogies && (
                   <EditableChips
-                    label="Специфичные аналогии"
+                    label={t.specificAnalogies}
                     items={data.generation_guidance.specific_analogies || []}
                     onChange={(items) =>
                       handleFieldSave('generation_guidance.specific_analogies', items)

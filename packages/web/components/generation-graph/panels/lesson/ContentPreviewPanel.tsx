@@ -17,6 +17,7 @@ import {
   JUDGE_VERDICT_LABELS,
 } from '@megacampus/shared-types'
 import { copyToClipboard } from '@/lib/utils/clipboard'
+import { useTranslations } from 'next-intl'
 
 interface ContentPreviewPanelProps {
   content: LessonContentPreview | null
@@ -50,6 +51,7 @@ export function ContentPreviewPanel({
   className,
   language,
 }: ContentPreviewPanelProps) {
+  const t = useTranslations('generation.contentPreview')
   const [activeTab, setActiveTab] = useState<'preview' | 'markdown' | 'metadata'>('preview')
 
   // Helper: Render error banner (compact version for when content exists)
@@ -57,7 +59,7 @@ export function ContentPreviewPanel({
     <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
       <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-red-700 dark:text-red-400">Ошибка генерации</p>
+        <p className="text-sm font-medium text-red-700 dark:text-red-400">{t('generationError')}</p>
         {errorMessage && (
           <p className="truncate text-xs text-red-600 dark:text-red-400/80" title={errorMessage}>
             {errorMessage}
@@ -77,7 +79,7 @@ export function ContentPreviewPanel({
               <ErrorBoundary
                 fallback={
                   <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-                    Ошибка отображения контента
+                    {t('contentDisplayError')}
                   </div>
                 }
               >
@@ -85,7 +87,7 @@ export function ContentPreviewPanel({
               </ErrorBoundary>
             ) : (
               <p className="text-muted-foreground py-8 text-center text-sm">
-                Контент урока недоступен
+                {t('contentUnavailable')}
               </p>
             )}
           </div>
@@ -98,7 +100,7 @@ export function ContentPreviewPanel({
         <ScrollArea className="h-full">
           <div className="space-y-3 p-6">
             <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-xs">Исходный текст в формате Markdown</p>
+              <p className="text-muted-foreground text-xs">{t('rawMarkdownLabel')}</p>
               {rawMarkdown && (
                 <Button
                   variant="outline"
@@ -108,12 +110,12 @@ export function ContentPreviewPanel({
                   }}
                   className="h-7 text-xs"
                 >
-                  Скопировать
+                  {t('copy')}
                 </Button>
               )}
             </div>
             <pre className="overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-xs whitespace-pre-wrap text-slate-50 dark:bg-slate-950">
-              {rawMarkdown || 'Markdown контент недоступен'}
+              {rawMarkdown || t('markdownUnavailable')}
             </pre>
           </div>
         </ScrollArea>
@@ -125,10 +127,10 @@ export function ContentPreviewPanel({
         <ScrollArea className="h-full">
           <div className="p-6">
             {metadata ? (
-              <JsonViewer data={metadata} title="Метаданные урока" defaultExpanded={false} />
+              <JsonViewer data={metadata} title={t('lessonMetadata')} defaultExpanded={false} />
             ) : (
               <p className="text-muted-foreground py-8 text-center text-sm">
-                Метаданные недоступны
+                {t('metadataUnavailable')}
               </p>
             )}
           </div>
@@ -159,15 +161,15 @@ export function ContentPreviewPanel({
           <AlertCircle className="h-12 w-12 text-red-500" />
           <div>
             <h3 className="mb-2 text-lg font-semibold text-red-700 dark:text-red-400">
-              Ошибка генерации
+              {t('generationError')}
             </h3>
             <p className="text-muted-foreground mb-4 text-sm">
-              {errorMessage || 'Произошла ошибка при генерации контента'}
+              {errorMessage || t('errorOccurred')}
             </p>
             {errorMessage && (
               <details className="text-left">
                 <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
-                  Технические детали
+                  {t('technicalDetails')}
                 </summary>
                 <pre className="mt-2 max-h-40 overflow-auto rounded bg-slate-100 p-3 text-xs dark:bg-slate-800">
                   {errorMessage}
@@ -186,7 +188,7 @@ export function ContentPreviewPanel({
           <div className="text-muted-foreground mb-6 flex items-center justify-center space-x-2">
             <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm">
-              {status === 'pending' ? 'Ожидание генерации...' : 'Генерация контента...'}
+              {status === 'pending' ? t('pendingGeneration') : t('generatingContent')}
             </span>
           </div>
 
@@ -217,7 +219,7 @@ export function ContentPreviewPanel({
           {content && (
             <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
               <p className="mb-2 text-xs font-medium text-blue-700 dark:text-blue-300">
-                Предварительный просмотр (генерация продолжается)
+                {t('previewInProgress')}
               </p>
               <div className="text-foreground text-sm">
                 {content.introduction && <p className="mb-2 opacity-80">{content.introduction}</p>}
@@ -245,9 +247,9 @@ export function ContentPreviewPanel({
       <div className="border-b border-slate-200 px-4 pt-4 dark:border-slate-800">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
           <TabsList>
-            <TabsTrigger value="preview">Просмотр</TabsTrigger>
+            <TabsTrigger value="preview">{t('tabPreview')}</TabsTrigger>
             <TabsTrigger value="markdown">Markdown</TabsTrigger>
-            <TabsTrigger value="metadata">Метаданные</TabsTrigger>
+            <TabsTrigger value="metadata">{t('tabMetadata')}</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -296,12 +298,12 @@ export function ContentPreviewPanel({
                 {isRegenerating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Переделывается...
+                    {t('regenerating')}
                   </>
                 ) : (
                   <>
                     <RotateCcw className="mr-2 h-4 w-4" />
-                    Переделать
+                    {t('regenerate')}
                   </>
                 )}
               </Button>
@@ -313,7 +315,7 @@ export function ContentPreviewPanel({
                 disabled={isApproving || isRegenerating}
               >
                 <Edit3 className="mr-2 h-4 w-4" />
-                Редактировать
+                {t('edit')}
               </Button>
 
               <Button
@@ -325,12 +327,12 @@ export function ContentPreviewPanel({
                 {isApproving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Одобрение...
+                    {t('approving')}
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Одобрить
+                    {t('approve')}
                   </>
                 )}
               </Button>

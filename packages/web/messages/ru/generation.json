@@ -19,10 +19,9 @@
     "processing": "Обработка..."
   },
   "errors": {
-    "barrier_failed": "Обработка документов не завершена - требуется ручное вмешательство",
-    "insufficient_scope": "Недостаточный объем для минимума 10 уроков - расширьте тему",
-    "llm_error": "Ошибка обработки LLM - обратитесь в поддержку",
-    "analysis_generic": "Ошибка при анализе курса"
+    "connectionLost": "Соединение потеряно",
+    "reconnecting": "Переподключение...",
+    "retryFailed": "Не удалось повторить"
   },
   "stages": {
     "stage_1": "Инициализация курса",
@@ -88,7 +87,81 @@
     "awaitingMessage": "Этот этап ожидает вашего подтверждения",
     "activity": "Активность",
     "expand": "Развернуть на всю ширину",
-    "collapse": "Свернуть до половины"
+    "collapse": "Свернуть до половины",
+    "stageDetails": "Детали этапа",
+    "viewContentAndLogs": "Просмотр сгенерированного контента и логов.",
+    "results": "Результаты",
+    "activityLog": "Журнал активности",
+    "stageNotSelected": "Этап не выбран",
+    "stageLabel": "Этап {number}"
+  },
+  "clarifying": {
+    "title": "Уточняющие вопросы",
+    "titleReadOnly": "Ответы на вопросы",
+    "questionOf": "Вопрос {current} из {total}",
+    "answered": "Отвечено: {count}",
+    "priority": {
+      "critical": "Обязательные",
+      "important": "Важные",
+      "nice_to_have": "Желательные"
+    },
+    "priorityLabel": {
+      "critical": "Обязательный",
+      "important": "Важный",
+      "nice_to_have": "Желательный"
+    },
+    "questionType": {
+      "open_ended": "Открытый",
+      "open_endedHelper": "Напишите развёрнутый ответ",
+      "single_choice": "Выбор одного",
+      "single_choiceHelper": "Выберите один вариант",
+      "multiple_choice": "Выбор нескольких",
+      "multiple_choiceHelper": "Выберите один или несколько"
+    },
+    "yourAnswer": "Ваш ответ",
+    "editAnswer": "Изменить ответ",
+    "suggestedAnswer": "Рекомендуемый ответ:",
+    "because": "Потому что: {rationale}",
+    "acceptSuggestion": "Принять рекомендацию",
+    "adjustAnswer": "Скорректировать",
+    "or": "или",
+    "yourVariant": "Ваш вариант:",
+    "enterYourAnswer": "Введите свой ответ...",
+    "enterYourVariant": "Введите свой вариант...",
+    "enterAdditionalVariant": "Введите дополнительный вариант...",
+    "recommended": "Рекомендуем",
+    "ownVariant": "Свой вариант",
+    "selected": "Выбрано: {count} {count, plural, one {вариант} few {варианта} many {вариантов} other {вариантов}}",
+    "additionally": "дополнительно",
+    "confirmAnswer": "Подтвердить ответ",
+    "confirmChanges": "Подтвердить изменения",
+    "saving": "Сохранение...",
+    "cancelEdit": "Отмена",
+    "answeredBadge": "Отвечено",
+    "allQuestionsAnswered": "Все вопросы отвечены!",
+    "acceptAllRecommendations": "Принять все рекомендации",
+    "errorLoadingQuestions": "Ошибка загрузки вопросов",
+    "errorLoadingDescription": "Не удалось отобразить вопросы для курса. Попробуйте обновить страницу.",
+    "refreshPage": "Обновить страницу",
+    "saveError": "Не удалось сохранить ответ",
+    "skipError": "Не удалось пропустить вопрос",
+    "tryAgain": "Попробуйте ещё раз",
+    "someNotSaved": "Некоторые ответы не сохранены",
+    "savedCount": "Сохранено {success} из {total} ответов",
+    "allRecommendationsAccepted": "Все рекомендации приняты",
+    "savedAnswers": "Сохранено {count} ответов",
+    "autoAnswerError": "Ошибка при автоматическом ответе",
+    "continueError": "Не удалось продолжить генерацию",
+    "answerRequiredQuestions": "Убедитесь, что все обязательные вопросы отвечены",
+    "nav": {
+      "back": "Назад",
+      "next": "Далее",
+      "skip": "Пропустить",
+      "skipAria": "Пропустить текущий вопрос",
+      "continueGeneration": "Продолжить генерацию",
+      "processing": "Обработка..."
+    },
+    "priorityTooltip": "{label}: {answered} из {total}"
   },
   "refinementChat": {
     "buttonTooltip": "Уточнить результат",
@@ -139,11 +212,6 @@
       "button": "Сгенерировать контент",
       "message": "Сгенерируй контент для новых уроков"
     }
-  },
-  "errors": {
-    "connectionLost": "Соединение потеряно",
-    "reconnecting": "Переподключение...",
-    "retryFailed": "Не удалось повторить"
   },
   "retry": {
     "confirmTitle": "Подтвердить повтор",
@@ -345,7 +413,8 @@
       "resume": "Продолжить",
       "cancel": "Отменить",
       "manualMode": "Ручной режим",
-      "manualModeHint": "В ручном режиме вы сможете проверить и изменить результаты каждого этапа."
+      "manualModeHint": "В ручном режиме вы сможете проверить и изменить результаты каждого этапа.",
+      "switching": "Переключение..."
     },
     "clarifying": {
       "title": "Уточняющие вопросы",
@@ -454,7 +523,16 @@
     "saveError": "Ошибка",
     "saveErrorTooltip": "Ошибка сохранения",
     "characters": "символов",
-    "regenerateWithAI": "Перегенерировать с AI"
+    "regenerateWithAI": "Перегенерировать с AI",
+    "toggleOn": "Включено",
+    "toggleOff": "Выключено",
+    "selectPlaceholder": "Выберите значение",
+    "saveFailedMessage": "Не удалось сохранить изменения",
+    "addPlaceholder": "Добавить...",
+    "removeItem": "Удалить",
+    "addItem": "Добавить элемент",
+    "deleteToRemove": "нажмите Delete для удаления",
+    "maxItems": "(макс. {max})"
   },
   "stage1": {
     "identity": "Идентификация",
@@ -1255,5 +1333,75 @@
     "buttonGoToCourse": "Перейти к курсу",
     "realtimeConnected": "Realtime подключен",
     "pollingFallback": "Используется polling (резервный режим)"
+  },
+  "costPreview": {
+    "title": "Ориентировочное количество токенов",
+    "processingDocs": "Обработка {count, plural, one {# документа} few {# документов} other {# документов}}",
+    "analysisStructure": "Анализ и структура",
+    "generatingLessons": "Генерация {count, plural, one {# урока} few {# уроков} other {# уроков}}",
+    "generatingLessonsAuto": "Генерация ~{count, plural, one {# урока} few {# уроков} other {# уроков}}",
+    "infoExact": "Точное количество токенов зависит от сложности темы и объёма материалов.",
+    "infoEstimate": "Оценка для среднего курса. Точное количество зависит от темы и материалов."
+  },
+  "prioritization": {
+    "document": "Документ",
+    "size": "Размер",
+    "priority": "Приоритет",
+    "distribution": "Распределение:",
+    "file": "Файл",
+    "rationale": "Обоснование классификации",
+    "docsNotFound": "Документы не найдены",
+    "loadError": "Не удалось загрузить документы",
+    "loadErrorGeneric": "Произошла ошибка при загрузке документов",
+    "priorityChanged": "Приоритет изменен на \"{priority}\"",
+    "nowCore": "\"{newDoc}\" теперь ключевой. \"{oldDoc}\" изменен на \"Важный\".",
+    "updateError": "Не удалось обновить приоритет",
+    "unexpectedError": "Произошла непредвиденная ошибка",
+    "approved": "Приоритизация подтверждена. Переход к следующему этапу...",
+    "approveError": "Не удалось подтвердить приоритизацию",
+    "selectCore": "Выберите один ключевой документ для продолжения",
+    "confirmAndContinue": "Подтвердить и продолжить",
+    "completed": "Приоритизация завершена",
+    "replaceCore": "Заменить ключевой документ?",
+    "replaceCoreDesc": "Может быть только один ключевой документ. Предыдущий будет изменен на «Важный».",
+    "currentCore": "Сейчас ключевой:",
+    "newCore": "Новый ключевой:",
+    "replace": "Заменить",
+    "cancel": "Отмена",
+    "switching": "Переключение...",
+    "selectValue": "Выберите значение"
+  },
+  "contentPreview": {
+    "generationError": "Ошибка генерации",
+    "contentDisplayError": "Ошибка отображения контента",
+    "contentUnavailable": "Контент урока недоступен",
+    "rawMarkdownLabel": "Исходный текст в формате Markdown",
+    "copy": "Скопировать",
+    "markdownUnavailable": "Markdown контент недоступен",
+    "lessonMetadata": "Метаданные урока",
+    "metadataUnavailable": "Метаданные недоступны",
+    "errorOccurred": "Произошла ошибка при генерации контента",
+    "technicalDetails": "Технические детали",
+    "pendingGeneration": "Ожидание генерации...",
+    "generatingContent": "Генерация контента...",
+    "previewInProgress": "Предварительный просмотр (генерация продолжается)",
+    "tabPreview": "Просмотр",
+    "tabMetadata": "Метаданные",
+    "regenerating": "Переделывается...",
+    "regenerate": "Переделать",
+    "edit": "Редактировать",
+    "approving": "Одобрение...",
+    "approve": "Одобрить"
+  },
+  "lessonMatrix": {
+    "prioritize": "Приоритезировать",
+    "pause": "Приостановить",
+    "preview": "Просмотр",
+    "retry": "Повторить",
+    "title": "Название",
+    "quality": "Качество",
+    "action": "Действие",
+    "totalLessons": "Всего: {count} уроков",
+    "avgQuality": "Среднее качество: {quality}"
   }
 }

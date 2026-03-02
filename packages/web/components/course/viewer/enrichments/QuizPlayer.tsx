@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -19,8 +19,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import type { QuizEnrichmentContent, QuizQuestion } from '@megacampus/shared-types'
 
@@ -39,22 +41,64 @@ const QUIZ_STORAGE_KEY = (id: string) => `quiz_progress_${id}`
 interface QuizState {
   /** Current question index (0-based) */
   currentQuestionIndex: number
-  /** User's answers: questionId -> answer */
+  /** User's answers: questionId -> answer value
+   * - multiple_choice: option ID string (e.g., "a")
+   * - multi_select: sorted comma-joined option IDs (e.g., "a,c,e")
+   * - true_false: boolean
+   * - short_answer: string (disabled, never populated)
+   */
   answers: Record<string, string | boolean>
   /** Whether quiz is submitted */
   isSubmitted: boolean
   /** Score achieved */
   score: number
+  /** Total possible score (computed from questions) */
+  totalScore: number
   /** Whether user passed */
   passed: boolean
 }
 
 /** Default initial state for quiz */
+/** Compute whether a user's answer is correct for a given question */
+function computeIsCorrect(
+  question: QuizQuestion,
+  userAnswer: string | boolean | undefined
+): boolean {
+  const correctAnswer = question.correct_answer
+  if (question.type === 'multi_select') {
+    const userArr = String(userAnswer || '')
+      .split(',')
+      .filter(Boolean)
+      .sort()
+    let correctArr: string[]
+    if (Array.isArray(correctAnswer)) {
+      correctArr = [...correctAnswer].map(String).sort()
+    } else if (typeof correctAnswer === 'string' && correctAnswer.length > 0) {
+      correctArr = correctAnswer.split(',').filter(Boolean).sort()
+    } else {
+      console.warn(
+        '[QuizPlayer] multi_select correct_answer has unexpected type:',
+        typeof correctAnswer,
+        correctAnswer
+      )
+      correctArr = []
+    }
+    return JSON.stringify(userArr) === JSON.stringify(correctArr)
+  }
+  if (question.type === 'multiple_choice') return String(userAnswer) === String(correctAnswer)
+  if (question.type === 'true_false') return Boolean(userAnswer) === Boolean(correctAnswer)
+  if (question.type === 'short_answer') {
+    return String(userAnswer).toLowerCase().trim() === String(correctAnswer).toLowerCase().trim()
+  }
+  return false
+}
+
 const defaultState: QuizState = {
   currentQuestionIndex: 0,
   answers: {},
   isSubmitted: false,
   score: 0,
+  totalScore: 0,
   passed: false,
 }
 
@@ -120,6 +164,8 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
   }, [state, enrichmentId])
 
   // Shuffle questions only once on mount using useState initializer
+  // Note: sort(() => Math.random() - 0.5) is a biased shuffle (not Fisher-Yates),
+  // but acceptable for quiz randomization where perfect uniformity is not critical.
   const [questions] = useState(() => {
     if (content.shuffle_questions) {
       return [...content.questions].sort(() => Math.random() - 0.5)
@@ -154,13 +200,15 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
   const isLastQuestion = state.currentQuestionIndex === totalQuestions - 1
   const isFirstQuestion = state.currentQuestionIndex === 0
 
-  // Check if current question is answered
+  // Check if current question is answered (short_answer is disabled, always allow navigation)
   const currentAnswer = state.answers[currentQuestion.id]
-  const isCurrentAnswered = currentAnswer !== undefined && currentAnswer !== ''
+  const isCurrentAnswered =
+    currentQuestion.type === 'short_answer' || (currentAnswer !== undefined && currentAnswer !== '')
 
   // Check if all questions are answered
   const allAnswered = questions.every(
-    (q) => state.answers[q.id] !== undefined && state.answers[q.id] !== ''
+    (q) =>
+      q.type === 'short_answer' || (state.answers[q.id] !== undefined && state.answers[q.id] !== '')
   )
 
   const handleAnswerChange = (questionId: string, answer: string | boolean) => {
@@ -172,6 +220,20 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
       },
     }))
   }
+
+  const toggleMultiSelectOption = useCallback((questionId: string, optionId: string) => {
+    setState((prev) => {
+      const current = String(prev.answers[questionId] || '')
+      const selected = current ? current.split(',') : []
+      const idx = selected.indexOf(optionId)
+      if (idx >= 0) {
+        selected.splice(idx, 1)
+      } else {
+        selected.push(optionId)
+      }
+      return { ...prev, answers: { ...prev.answers, [questionId]: selected.sort().join(',') } }
+    })
+  }, [])
 
   const handleNext = () => {
     if (state.currentQuestionIndex < totalQuestions - 1) {
@@ -202,25 +264,8 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
     let earnedPoints = 0
 
     questions.forEach((question) => {
-      const userAnswer = state.answers[question.id]
-      const correctAnswer = question.correct_answer
-
       totalScore += question.points
-
-      // Check if answer is correct
-      let isCorrect = false
-
-      if (question.type === 'multiple_choice') {
-        isCorrect = String(userAnswer) === String(correctAnswer)
-      } else if (question.type === 'true_false') {
-        isCorrect = Boolean(userAnswer) === Boolean(correctAnswer)
-      } else if (question.type === 'short_answer') {
-        // Case-insensitive comparison for short answer
-        isCorrect =
-          String(userAnswer).toLowerCase().trim() === String(correctAnswer).toLowerCase().trim()
-      }
-
-      if (isCorrect) {
+      if (computeIsCorrect(question, state.answers[question.id])) {
         earnedPoints += question.points
       }
     })
@@ -232,6 +277,7 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
       ...prev,
       isSubmitted: true,
       score: earnedPoints,
+      totalScore,
       passed,
     }))
 
@@ -249,6 +295,7 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
       answers: {},
       isSubmitted: false,
       score: 0,
+      totalScore: 0,
       passed: false,
     })
   }
@@ -316,24 +363,12 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
   // Check if answer is correct (only for submitted state)
   const isAnswerCorrect = (question: QuizQuestion) => {
     if (!state.isSubmitted) return null
-
-    const userAnswer = state.answers[question.id]
-    const correctAnswer = question.correct_answer
-
-    if (question.type === 'multiple_choice') {
-      return String(userAnswer) === String(correctAnswer)
-    } else if (question.type === 'true_false') {
-      return Boolean(userAnswer) === Boolean(correctAnswer)
-    } else if (question.type === 'short_answer') {
-      return String(userAnswer).toLowerCase().trim() === String(correctAnswer).toLowerCase().trim()
-    }
-
-    return false
+    return computeIsCorrect(question, state.answers[question.id])
   }
 
   // Results Summary View
   if (state.isSubmitted) {
-    const scorePercentage = (state.score / content.metadata.total_points) * 100
+    const scorePercentage = state.totalScore > 0 ? (state.score / state.totalScore) * 100 : 0
 
     return (
       <motion.div
@@ -358,8 +393,8 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
               {state.passed ? t('viewer.quizPassed') : t('viewer.quizFailed')}
             </CardTitle>
             <CardDescription className="mt-2 text-lg">
-              {t('viewer.yourResult')}: {state.score} / {content.metadata.total_points}{' '}
-              {t('viewer.points')} ({scorePercentage.toFixed(0)}%)
+              {t('viewer.yourResult')}: {state.score} / {state.totalScore} {t('viewer.points')} (
+              {scorePercentage.toFixed(0)}%)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -427,7 +462,16 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
                               ? question.options?.find(
                                   (opt) => opt.id === state.answers[question.id]
                                 )?.text
-                              : state.answers[question.id]}
+                              : question.type === 'multi_select'
+                                ? String(state.answers[question.id] || '')
+                                    .split(',')
+                                    .filter(Boolean)
+                                    .map(
+                                      (id) => question.options?.find((opt) => opt.id === id)?.text
+                                    )
+                                    .filter(Boolean)
+                                    .join(', ') || '—'
+                                : state.answers[question.id]}
                         </span>
                       </div>
 
@@ -445,7 +489,18 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
                                 ? question.options?.find(
                                     (opt) => opt.id === question.correct_answer
                                   )?.text
-                                : String(question.correct_answer)}
+                                : question.type === 'multi_select'
+                                  ? (Array.isArray(question.correct_answer)
+                                      ? question.correct_answer
+                                      : String(question.correct_answer).split(',').filter(Boolean)
+                                    )
+                                      .map(
+                                        (id: string) =>
+                                          question.options?.find((opt) => opt.id === id)?.text
+                                      )
+                                      .filter(Boolean)
+                                      .join(', ') || '—'
+                                  : String(question.correct_answer)}
                           </span>
                         </div>
                       )}
@@ -599,6 +654,65 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
                 </RadioGroup>
               )}
 
+              {/* Multi Select */}
+              {currentQuestion.type === 'multi_select' && currentQuestion.options && (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground mb-3 text-sm">
+                    {t('viewer.selectAllCorrect')}
+                  </p>
+                  {getShuffledOptions(currentQuestion).map((option) => {
+                    const selectedArr = String(state.answers[currentQuestion.id] || '')
+                      .split(',')
+                      .filter(Boolean)
+                    const isSelected = selectedArr.includes(option.id)
+                    const isReview = state.isSubmitted
+                    const isCorrect = Array.isArray(currentQuestion.correct_answer)
+                      ? currentQuestion.correct_answer.includes(option.id)
+                      : String(currentQuestion.correct_answer).split(',').includes(option.id)
+                    const checkboxId = `quiz-${currentQuestion.id}-opt-${option.id}`
+                    return (
+                      <div
+                        key={option.id}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors',
+                          isSelected &&
+                            !isReview &&
+                            'border-purple-500 bg-purple-50 dark:bg-purple-900/20',
+                          isReview &&
+                            isSelected &&
+                            isCorrect &&
+                            'border-green-500 bg-green-50 dark:bg-green-900/20',
+                          isReview &&
+                            isSelected &&
+                            !isCorrect &&
+                            'border-red-500 bg-red-50 dark:bg-red-900/20',
+                          isReview &&
+                            !isSelected &&
+                            isCorrect &&
+                            'border-green-300 bg-green-50/50 dark:bg-green-900/10',
+                          !isSelected && !isReview && 'hover:bg-muted/50'
+                        )}
+                        onClick={() =>
+                          !isReview && toggleMultiSelectOption(currentQuestion.id, option.id)
+                        }
+                      >
+                        <Checkbox
+                          id={checkboxId}
+                          checked={isSelected}
+                          disabled={isReview}
+                          onCheckedChange={() =>
+                            toggleMultiSelectOption(currentQuestion.id, option.id)
+                          }
+                        />
+                        <Label htmlFor={checkboxId} className="flex-1 cursor-pointer">
+                          {option.text}
+                        </Label>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               {/* True/False */}
               {currentQuestion.type === 'true_false' && (
                 <RadioGroup
@@ -610,14 +724,20 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
                 >
                   <div className="space-y-3">
                     <div className="flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <RadioGroupItem value="true" id="true" />
-                      <Label htmlFor="true" className="flex-1 cursor-pointer text-base">
+                      <RadioGroupItem value="true" id={`${currentQuestion.id}-true`} />
+                      <Label
+                        htmlFor={`${currentQuestion.id}-true`}
+                        className="flex-1 cursor-pointer text-base"
+                      >
                         {t('viewer.true')}
                       </Label>
                     </div>
                     <div className="flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <RadioGroupItem value="false" id="false" />
-                      <Label htmlFor="false" className="flex-1 cursor-pointer text-base">
+                      <RadioGroupItem value="false" id={`${currentQuestion.id}-false`} />
+                      <Label
+                        htmlFor={`${currentQuestion.id}-false`}
+                        className="flex-1 cursor-pointer text-base"
+                      >
                         {t('viewer.false')}
                       </Label>
                     </div>
@@ -627,18 +747,19 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
 
               {/* Short Answer */}
               {currentQuestion.type === 'short_answer' && (
-                <div>
-                  <Input
-                    type="text"
-                    placeholder={t('viewer.enterAnswer')}
-                    value={String(currentAnswer || '')}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                    className="text-base"
-                    aria-label={currentQuestion.question}
-                  />
-                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    {t('viewer.shortAnswerHint')}
-                  </p>
+                <div className="relative">
+                  <div className="pointer-events-none opacity-50">
+                    <Textarea
+                      className="min-h-[100px]"
+                      placeholder={t('viewer.enterAnswer')}
+                      disabled
+                    />
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="bg-muted rounded-full px-3 py-1 text-sm font-medium">
+                      {t('viewer.shortAnswerComingSoon')}
+                    </span>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -674,7 +795,9 @@ export function QuizPlayer({ content, enrichmentId, onComplete }: QuizPlayerProp
 
           {isLastQuestion && (
             <Button
-              onClick={handleSubmit}
+              onClick={() => {
+                void handleSubmit()
+              }}
               disabled={!allAnswered}
               className="gap-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
               aria-label={t('viewer.submitQuiz')}
