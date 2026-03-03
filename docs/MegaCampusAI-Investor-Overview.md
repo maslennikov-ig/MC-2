@@ -14,22 +14,22 @@
 
 ### Key Metrics
 
-| Показатель                    | Значение                                                  |
-| ----------------------------- | --------------------------------------------------------- |
-| Стоимость генерации 1 курса   | **$0.53 — $0.90**                                         |
-| Время генерации полного курса | **3 — 8 минут**                                           |
-| AI-моделей через OpenRouter   | **20+**                                                   |
-| AI-провайдеров                | **12** (Qwen, DeepSeek, Google, OpenAI, Moonshot, xAI...) |
-| Типов обогащающего контента   | **13** (quiz, flashcards, audio, video, mind map...)      |
-| Стилей подачи материала       | **12** (от академического до геймифицированного)          |
-| Языков генерации курсов       | **19**                                                    |
-| Языков интерфейса             | **2** (русский, английский)                               |
-| Собственных исследований      | **64+**                                                   |
-| Академических ссылок          | **50+** (ACL, NeurIPS, ICLR, arXiv)                       |
-| Спецификаций                  | **320+**                                                  |
-| Тестовых файлов               | **302**                                                   |
-| Миграций базы данных          | **232**                                                   |
-| Строк кода TypeScript         | **144,000+**                                              |
+| Показатель                     | Значение                                                  |
+| ------------------------------ | --------------------------------------------------------- |
+| Стоимость генерации 1 курса    | **$0.53 — $0.90**                                         |
+| Время генерации полного курса  | **3 — 8 минут**                                           |
+| AI-моделей через OpenRouter    | **20+**                                                   |
+| AI-провайдеров                 | **12** (Qwen, DeepSeek, Google, OpenAI, Moonshot, xAI...) |
+| Типов дополнительного контента | **13** (quiz, flashcards, audio, video, mind map...)      |
+| Стилей подачи материала        | **12** (от академического до геймифицированного)          |
+| Языков генерации курсов        | **19**                                                    |
+| Языков интерфейса              | **2** (русский, английский)                               |
+| Собственных исследований       | **64+**                                                   |
+| Академических ссылок           | **50+** (ACL, NeurIPS, ICLR, arXiv)                       |
+| Спецификаций                   | **320+**                                                  |
+| Тестовых файлов                | **302**                                                   |
+| Миграций базы данных           | **232**                                                   |
+| Строк кода TypeScript          | **144,000+**                                              |
 
 ---
 
@@ -173,7 +173,7 @@ AI генерирует **от 3 до 50 контекстно-зависимых
 - Quiz, Flashcards, Mind Map, Study Guide, Presentation
 - Audio (OpenAI TTS), Video, Audio Podcast
 - Cover Image, Card, Banner, Infographic
-- Каждый обогащающий тип — отдельный handler с собственными настройками
+- Каждый тип — отдельный генератор с собственными настройками
 
 ---
 
@@ -348,9 +348,9 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 
 ## 6. Content Enrichment: 13 Types of Generated Content
 
-Каждый урок может быть дополнен **13 различными типами** обогащающего контента:
+Каждый урок может быть дополнен **13 различными типами** дополнительного контента:
 
-### Текстовые и интерактивные обогащения
+### Текстовые и интерактивные материалы
 
 | Тип              | Описание                                           | Назначение                             |
 | ---------------- | -------------------------------------------------- | -------------------------------------- |
@@ -360,7 +360,7 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 | **Study Guide**  | Полный учебный гайд (brief/standard/comprehensive) | Конспект для самостоятельного изучения |
 | **Presentation** | Слайды с заметками для спикера (3-30 слайдов)      | Материал для очного обучения           |
 
-### Мультимедийные обогащения
+### Мультимедийные материалы
 
 | Тип                | Описание                                             | Назначение                                |
 | ------------------ | ---------------------------------------------------- | ----------------------------------------- |
@@ -381,7 +381,7 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 
 ### Полное отслеживание генерации
 
-Для каждого обогащения система трекает: время генерации (ms), использованные токены, стоимость (USD), какая модель сгенерировала, quality score, количество retry — полный audit trail.
+Для каждого дополнительного материала система трекает: время генерации (ms), использованные токены, стоимость (USD), какая модель сгенерировала, quality score, количество retry — полный audit trail.
 
 ---
 
@@ -732,7 +732,7 @@ Coverage threshold: 70%. Pre-commit hooks: Husky + lint-staged. Quality gates: l
 | ------------------------------- | -------------------------------- | ---------------------------------------------------- |
 | Coursera / Udemy                | Ручное создание курсов           | AI-генерация за минуты                               |
 | ChatGPT / Gemini                | Генерация текста без структуры   | 7-стадийный pipeline с quality assurance             |
-| AI-генераторы (Synthesia, etc.) | Один тип контента                | 13 типов обогащения                                  |
+| AI-генераторы (Synthesia, etc.) | Один тип контента                | 13 типов дополнительного контента                    |
 | LMS (Moodle, Canvas)            | Платформа без генерации          | Генерация + доставка в одном                         |
 | Простые AI-обёртки              | Single-model, no quality control | 20+ моделей, 3-judge voting, hallucination detection |
 
@@ -751,21 +751,39 @@ Coverage threshold: 70%. Pre-commit hooks: Husky + lint-staged. Quality gates: l
 
 ---
 
-## 17. Roadmap
+## 17. Roadmap: от генерации курсов к AI Operating System
 
-| Stage                       | Status  | Description                                  |
-| --------------------------- | ------- | -------------------------------------------- |
-| Stage 0: Foundation         | Done    | Auth, DB, RLS, Tiers                         |
-| Stage 1: Upload             | Done    | 13 document formats                          |
-| Stage 2: Processing         | Done    | Vectorization + RAG + Reranking              |
-| Stage 3: Classification     | Done    | Document priority ranking                    |
-| Stage 4: Analysis           | Done    | Clarifying Questions + Deep 5-phase analysis |
-| Stage 5: Structure          | Done    | LangGraph course generation                  |
-| Stage 6: Content            | Done    | Lessons + Judge System                       |
-| Stage 7: Enrichments        | Done    | 13 content types                             |
-| Stage 8: Analytics          | Planned | Learning analytics, progress tracking        |
-| Stage 9: LMS Integration    | Planned | Canvas, Moodle export                        |
-| Stage 10: Adaptive Learning | Planned | Personalized learning paths                  |
+### Текущая платформа (Done)
+
+| Stage                   | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| Stage 0: Foundation     | Auth, DB, RLS, Subscription Tiers            |
+| Stage 1: Upload         | 13 форматов документов                       |
+| Stage 2: Processing     | Vectorization + RAG + Reranking              |
+| Stage 3: Classification | Приоритизация документов (Human-in-the-Loop) |
+| Stage 4: Analysis       | Clarifying Questions + Deep 5-phase analysis |
+| Stage 5: Structure      | LangGraph course generation                  |
+| Stage 6: Content        | Lesson generation + Judge System             |
+| Stage 7: Enrichments    | 13 типов дополнительного контента            |
+
+### Ближайшие планы
+
+| Stage                       | Description                                    |
+| --------------------------- | ---------------------------------------------- |
+| Stage 8: Analytics          | Аналитика обучения, прогресс, проседающие темы |
+| Stage 9: LMS Integration    | Экспорт в Canvas, Moodle, Open edX             |
+| Stage 10: Adaptive Learning | Персонализированные траектории                 |
+
+### Стратегическое видение: путь к Helixa AIOS
+
+Генерация курсов — это **точка входа**, а не конечная цель. Следующие шаги:
+
+- **Корпоративная экосистема знаний** — замкнутый цикл: знания сотрудников → верификация руководителем → обновление обучения → ежедневное 20-минутное микрообучение
+- **AI Tutor** — персональный AI-наставник для каждого сотрудника, решающий "Проблему двух сигм" Блума (студент с тьютором показывает результаты на +2σ выше)
+- **Корпоративный граф знаний** — единая карта всех знаний компании из всех источников (документы, совещания, чаты, обучение)
+- **Helixa AIOS** — AI Operating System для бизнеса с 15+ специализированными AI-агентами
+
+Подробнее: **[MegaCampusAI — Strategic Vision & Future Roadmap](./MegaCampusAI-Vision-Future.md)**
 
 ---
 
