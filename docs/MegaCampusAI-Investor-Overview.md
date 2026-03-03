@@ -6,26 +6,30 @@
 
 ## Executive Summary
 
-**MegaCampusAI** — это платформа нового поколения для автоматической генерации образовательных курсов с помощью искусственного интеллекта. Пользователь загружает документы (PDF, DOCX, PPTX, HTML) — и получает полноценный структурированный курс с уроками, квизами, флеш-картами, майнд-картами, аудио-подкастами, презентациями и инфографикой.
+**MegaCampusAI** — это платформа нового поколения для автоматической генерации образовательных курсов с помощью искусственного интеллекта. Пользователь загружает документы (PDF, DOCX, PPTX, XLSX, HTML и другие) или просто задаёт тему — и получает полноценный структурированный курс с уроками, квизами, флеш-картами, майнд-картами, аудио-подкастами, презентациями и инфографикой.
 
-Под капотом — **7-стадийный AI-конвейер** с мультимодельной маршрутизацией, системой судей с голосованием, обнаружением галлюцинаций, RAG-поиском по исходным документам и качеством, основанным на принципах андрагогики и таксономии Блума.
+Под капотом — **7-стадийный AI-конвейер** с мультимодельной маршрутизацией, системой судей с голосованием, обнаружением галлюцинаций, RAG-поиском по исходным документам, нейронным реранкингом и качеством, основанным на принципах андрагогики и таксономии Блума.
+
+Каждое архитектурное решение подкреплено **собственными исследованиями** со ссылками на 50+ рецензируемых научных работ из ведущих конференций (ACL, NeurIPS, ICLR).
 
 ### Key Metrics
 
-| Показатель                         | Значение                                             |
-| ---------------------------------- | ---------------------------------------------------- |
-| Стоимость генерации 1 курса        | **$0.53 — $0.90**                                    |
-| Время генерации полного курса      | **3 — 8 минут**                                      |
-| Количество AI-моделей              | **20+** через OpenRouter                             |
-| Количество AI-провайдеров          | **12** (Qwen, DeepSeek, Google, OpenAI, Moonshot...) |
-| Типов обогащающего контента        | **13** (quiz, flashcards, audio, video, mind map...) |
-| Стилей подачи материала            | **12** (от академического до геймифицированного)     |
-| Поддерживаемых языков (embeddings) | **13** (Jina v3, мультиязычные)                      |
-| Тестовых файлов                    | **302**                                              |
-| Миграций базы данных               | **232**                                              |
-| Исходных TypeScript-файлов         | **1,868**                                            |
-| Строк кода                         | **144,000+**                                         |
-| Спецификаций (design docs)         | **26**                                               |
+| Показатель                    | Значение                                                  |
+| ----------------------------- | --------------------------------------------------------- |
+| Стоимость генерации 1 курса   | **$0.53 — $0.90**                                         |
+| Время генерации полного курса | **3 — 8 минут**                                           |
+| AI-моделей через OpenRouter   | **20+**                                                   |
+| AI-провайдеров                | **12** (Qwen, DeepSeek, Google, OpenAI, Moonshot, xAI...) |
+| Типов обогащающего контента   | **13** (quiz, flashcards, audio, video, mind map...)      |
+| Стилей подачи материала       | **12** (от академического до геймифицированного)          |
+| Языков генерации курсов       | **19**                                                    |
+| Языков интерфейса             | **2** (русский, английский)                               |
+| Собственных исследований      | **64+**                                                   |
+| Академических ссылок          | **50+** (ACL, NeurIPS, ICLR, arXiv)                       |
+| Спецификаций                  | **320+**                                                  |
+| Тестовых файлов               | **302**                                                   |
+| Миграций базы данных          | **232**                                                   |
+| Строк кода TypeScript         | **144,000+**                                              |
 
 ---
 
@@ -47,85 +51,133 @@
 
 ---
 
-## 2. How It Works: 7-Stage AI Pipeline
+## 2. Two Ways to Create a Course
+
+MegaCampusAI поддерживает два принципиально разных подхода к созданию курса:
+
+### С документами (Document-Grounded Generation)
+
+Пользователь загружает свои материалы — лекции, методички, презентации, статьи — и система создаёт курс **на основе именно этих документов**. Каждый урок привязан к конкретным фрагментам исходных материалов через RAG (Retrieval-Augmented Generation). Это гарантирует, что контент точно отражает исходные материалы, а не "выдумывает" информацию.
+
+**Поддерживаемые форматы**: PDF, DOCX, PPTX, XLSX, HTML, Markdown, XML/JATS, PNG, JPG, GIF — **13 форматов** с автоматическим OCR для сканированных документов.
+
+### Без документов (Knowledge-Based Generation)
+
+Пользователь просто задаёт тему — и система генерирует курс из **собственной базы знаний моделей**. Для таких курсов система автоматически выбирает модели с наибольшим количеством параметров и самой широкой картиной мира, чтобы обеспечить максимальную полноту и актуальность информации.
+
+### Два режима генерации
+
+|                 | Автоматический                                                          | Полуавтоматический                                                       |
+| --------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Процесс**     | Система всё делает сама. Пользователь получает уведомление о готовности | Пользователь подтверждает каждый этап, может редактировать результаты AI |
+| **Контроль**    | Минимальный — доверие системе                                           | Полный — утверждение каждой стадии                                       |
+| **Скорость**    | Максимальная (3-8 мин)                                                  | Зависит от пользователя                                                  |
+| **Для кого**    | Быстрая генерация, массовое создание курсов                             | Важен детальный контроль над содержанием                                 |
+| **Уведомления** | Push, Email, Telegram                                                   | Интерактивное взаимодействие в UI                                        |
+
+В полуавтоматическом режиме пользователь может **в любой момент переключиться** с автоматического на ручной контроль — например, поставить генерацию на паузу и продолжить с проверкой каждого этапа.
+
+---
+
+## 3. How It Works: 7-Stage AI Pipeline
 
 Каждый курс проходит через **7 последовательных стадий**, каждая из которых — отдельный инженерный прорыв.
 
 ```
     Upload         Process        Classify        Analyze
   [Stage 1] ──→ [Stage 2] ──→ [Stage 3] ──→ [Stage 4]
-   Document       OCR +          AI ranks       Deep analysis:
-   PDF/DOCX     Markdown +      documents       objectives,
-   PPTX/HTML    Vectorize       by priority     strategy, plan
+   13 форматов   OCR +          AI ranks       Вопросы +
+   PDF/DOCX     Markdown +      documents       Analysis +
+   XLSX/HTML    Vectorize       by priority     Strategy
                  + RAG
        │
        ▼
     Generate        Content        Enrich
   [Stage 5] ──→ [Stage 6] ──→ [Stage 7]
-   Course          Lesson          Quizzes,
-   Structure       Content +       Flashcards,
-   Sections +      Judge System    Audio, Video,
-   Metadata        + Refinement    Mind Maps...
+   Course          Lesson          13 типов:
+   Structure       Content +       Quiz, Audio,
+   19 languages    Judge System    Video, Cards,
+   12 styles       + Refinement    Mind Maps...
 ```
 
-### Stage 1: Document Upload
+### Stage 1: Document Upload & Intake
 
-- **Форматы**: PDF, DOCX, PPTX, HTML, TXT, Markdown
-- OCR для сканированных документов (Tesseract/EasyOCR)
+- **13 форматов документов**: PDF, DOCX, PPTX, XLSX, HTML, Markdown, XML, JATS (научные статьи), PNG, JPG, JPEG, GIF
+- **OCR** для сканированных документов (Tesseract/EasyOCR) — поддержка рукописных и печатных материалов
 - Извлечение изображений с сохранением метаданных
 - Контроль квот по подписке (10 MB — 10 GB)
+- Возможность создания курса **без документов** — только по теме
 
 ### Stage 2: Document Processing & Vectorization
 
-- Конвертация в Markdown через **Docling MCP Server** (8 GB модель)
+- Конвертация в Markdown через продвинутую модель обработки документов (8 GB, поддержка таблиц, формул, структуры)
 - **Иерархическое чанкирование**: Parent (1,500 токенов) → Child (400 токенов) с перекрытием 50 токенов
 - **Jina v3 Embeddings** — 768-мерные мультиязычные векторы
-- Загрузка в **Qdrant** (HNSW-индекс) с BM25 sparse-векторами
+- Загрузка в **Qdrant** (HNSW-индекс) с BM25 sparse-векторами для гибридного поиска
 - **Late Chunking** — сначала эмбеддинг всего документа, потом нарезка (лучшее сохранение контекста)
 
-### Stage 3: Document Classification
+### Stage 3: Document Classification (Human-in-the-Loop)
 
 - AI ранжирует документы по важности: **CORE** (1 документ) → **IMPORTANT** (до 30%) → **SUPPLEMENTARY**
-- Определяет, какие материалы являются ключевыми для курса
+- **Пользователь может изменить приоритеты** — AI предлагает, человек утверждает
 - Позволяет сфокусировать генерацию на самом важном
+- Влияет на распределение бюджетов токенов между документами
 
-### Stage 4: Deep Analysis (5 sub-phases)
+### Stage 4: Deep Analysis & Intelligent Clarification
 
-- **Classification Phase** — определение типа контента
-- **Clarifying Questions** — AI задает уточняющие вопросы (reasoning-модель Kimi K2)
-- **Scope Phase** — определение объема курса
-- **Expert Phase** — глубокий экспертный анализ (reasoning-модель)
-- **Synthesis Phase** — синтез: цели обучения, педагогическая стратегия, план генерации
+Самая интеллектуальная стадия, состоящая из **5 подфаз**:
 
-**Результат**: полная карта курса с Learning Objectives, упражнениями, стилем подачи и RAG-планом.
+**4.1. Classification** — определение типа и области контента
+
+**4.2. Clarifying Questions** — ключевая функция платформы:
+
+AI генерирует **от 3 до 50 контекстно-зависимых вопросов**, которые помогают собрать максимум информации для генерации идеального курса. Каждый вопрос сопровождается:
+
+- **Предлагаемыми вариантами ответов** с обоснованием каждого варианта
+- **Приоритетом**: критический, важный или необязательный
+- **Категорией**: контекст компании, аудитория, ожидаемые результаты, структура контента, фокус, бизнес-цели, практическое применение, ограничения
+
+Вопросы охватывают **8 категорий** — от целевой аудитории до бизнес-целей и ограничений. AI задаёт вопросы, о которых человек мог не задуматься, **расширяя картину мира** и помогая учесть все аспекты будущего курса.
+
+Пользователь может: принять предложенный ответ, модифицировать его или написать свой. Система отслеживает источник каждого ответа (suggested / modified / custom).
+
+**До 3 раундов уточнений** — если AI считает, что собранной информации недостаточно, он генерирует follow-up вопросы.
+
+**4.3. Scope** — определение объёма курса (модули, секции, уроки)
+
+**4.4. Expert Analysis** — глубокий экспертный анализ (reasoning-модель)
+
+**4.5. Synthesis** — синтез: цели обучения, педагогическая стратегия, план генерации
+
+**Результат**: полная карта курса с Learning Objectives, типами упражнений, стилем подачи и RAG-планом. В полуавтоматическом режиме **все результаты редактируемы** — пользователь может поправить любое предложение AI.
 
 ### Stage 5: Course Structure Generation (LangGraph)
 
 - **LangGraph StateGraph** — 4-фазная state machine:
   1. Validation → 2. Metadata Generation → 3. Section Expansion → 4. Quality Assembly
 - **3-уровневая маршрутизация моделей** по сложности секций:
-  - Simple → дешевая модель (Xiaomi MiMo, $0.03/1M)
-  - Normal → reasoning-модель (Kimi K2, $0.55/1M)
-  - Complex → premium-модель (Qwen 3.5 Plus, $0.15/1M)
+  - Simple → экономичная модель (~$0.03/1M tokens)
+  - Normal → reasoning-модель (~$0.55/1M tokens)
+  - Complex → premium-модель (~$0.70/1M tokens, средняя между input/output)
 - **Escalation chain** — при провале качества автоматический переход на более мощную модель
 
 ### Stage 6: Lesson Content Generation + Judge System
 
 - **Параллельная генерация** до 30 уроков одновременно
-- **Каждый урок проходит через систему судей** (подробнее в разделе 4)
+- **Каждый урок проходит через систему судей** (подробнее в разделе 5)
 - **Targeted Refinement** — точечное исправление, а не перегенерация всего текста
 - RAG-контекст из исходных документов для каждого урока
 
 ### Stage 7: Content Enrichment (13 types)
 
 - Quiz, Flashcards, Mind Map, Study Guide, Presentation
-- Audio (OpenAI TTS), Video (NotebookLM)
+- Audio (OpenAI TTS), Video, Audio Podcast
 - Cover Image, Card, Banner, Infographic
 - Каждый обогащающий тип — отдельный handler с собственными настройками
 
 ---
 
-## 3. What Makes Us Different: Andragogy & Bloom's Taxonomy
+## 4. What Makes Us Different: Andragogy & Bloom's Taxonomy
 
 MegaCampusAI — **не просто генератор текста**. Платформа построена на научных принципах обучения взрослых.
 
@@ -141,7 +193,7 @@ MegaCampusAI — **не просто генератор текста**. Плат
 
 ### Таксономия Блума (4 уровня)
 
-Каждый квиз, каждый урок генерируется с учетом когнитивных уровней:
+Каждый квиз, каждый урок генерируется с учётом когнитивных уровней:
 
 ```
                     ┌─────────────┐
@@ -174,13 +226,19 @@ MegaCampusAI — **не просто генератор текста**. Плат
 
 **Пример**: стиль **Gamified** превращает курс в квест с миссиями, уровнями и достижениями. Стиль **Storytelling** — строит нарратив с персонажами и развязкой.
 
+### 19 языков генерации
+
+Курсы генерируются на **19 языках**: русский, английский, китайский, испанский, французский, немецкий, японский, корейский, арабский, португальский, итальянский, турецкий, вьетнамский, тайский, индонезийский, малайский, хинди, бенгальский, польский.
+
+Для каждого языка система хранит локализованные шаблоны учебных элементов (введение, резюме, примеры, упражнения, подсказки) для корректного структурирования контента.
+
 ---
 
-## 4. AI Judge System: Multi-Layer Quality Assurance
+## 5. AI Judge System: Multi-Layer Quality Assurance
 
-Это **не ChatGPT-обертка**. У нас — enterprise-grade система контроля качества, основанная на академических исследованиях.
+Это **не ChatGPT-обёртка**. У нас — enterprise-grade система контроля качества, основанная на академических исследованиях.
 
-### 4.1 Cascading Evaluation (3-Stage Cost Optimization)
+### 5.1 Cascading Evaluation (3-Stage Cost Optimization)
 
 ```
   100% контента
@@ -192,7 +250,7 @@ MegaCampusAI — **не просто генератор текста**. Плат
        │
   ┌────▼─────┐
   │ Stage 2  │  Single Cheap Judge (LOW COST)
-  │ 1 судья  │  Быстрая оценка дешевой моделью
+  │ 1 судья  │  Быстрая оценка дешёвой моделью
   └────┬─────┘  50-70% проходят → публикация
        │
   ┌────▼─────┐
@@ -203,7 +261,7 @@ MegaCampusAI — **не просто генератор текста**. Плат
 
 **Результат**: 67% экономия на оценке без потери качества.
 
-### 4.2 CLEV Voting System (Consensus via Lightweight Efficient Voting)
+### 5.2 CLEV Voting System (Consensus via Lightweight Efficient Voting)
 
 ```
   ┌──────────────┐    ┌──────────────┐
@@ -228,11 +286,11 @@ MegaCampusAI — **не просто генератор текста**. Плат
 
 - **Weighted voting** — веса рассчитываются по исторической точности: `w = 1 / (1 + exp(-accuracy))`
 - **Language-aware bias prevention** — судьи выбираются так, чтобы не совпадать с моделью-генератором
-- **Inter-judge agreement**: Krippendorff's Alpha для статистической надежности
+- **Inter-judge agreement**: Krippendorff's Alpha для статистической надёжности
 
-### 4.3 OSCQR-Based Rubric (6 Criteria)
+### 5.3 OSCQR-Based Rubric (6 Criteria)
 
-| Критерий                     | Вес | Надежность     |
+| Критерий                     | Вес | Надёжность     |
 | ---------------------------- | --- | -------------- |
 | Learning Objective Alignment | 25% | 80-85%         |
 | Pedagogical Structure        | 20% | 85%+           |
@@ -241,7 +299,7 @@ MegaCampusAI — **не просто генератор текста**. Плат
 | Engagement & Examples        | 15% | 80%+           |
 | Completeness                 | 10% | 75-80%         |
 
-### 4.4 Hallucination Detection (Logprob Entropy)
+### 5.4 Hallucination Detection (Logprob Entropy)
 
 ```
 Token Logprobs → Per-token Entropy: H = -Σ(pᵢ × log(pᵢ))
@@ -263,7 +321,7 @@ Verdict: verified / no_evidence / unverified / contradicted
 - **С RAG**: **85%** обнаружение галлюцинаций
 - **Claim extraction** — автоматическое распознавание фактических утверждений (даты, статистика, имена) на русском и английском
 
-### 4.5 Targeted Self-Refinement
+### 5.5 Targeted Self-Refinement
 
 Вместо перегенерации всего урока — **хирургические правки**:
 
@@ -286,64 +344,52 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 - **Oscillation detection** — обнаружение "колебаний" оценки
 - **Hard limits**: max 10 итераций, 300 секунд, 50 LLM-вызовов
 
-### Научная основа Judge System
-
-| Исследование                             | Вклад                                    |
-| ---------------------------------------- | ---------------------------------------- |
-| **Self-Refine** (Madaan et al., 2023)    | Итеративное улучшение → +20% quality     |
-| **LLM-Blender** (Jiang et al., ACL 2023) | Generative fusion → 3.2 vs 3.90 avg rank |
-| **CARE Framework** (OpenReview 2024)     | PGM → +25% vs majority voting            |
-| **Krippendorff's Alpha**                 | Inter-rater reliability                  |
-| **DELIteraTeR** (Grammarly, ACL 2022)    | Span-level targeted editing              |
-
 ---
 
-## 5. Content Enrichment: 13 Types of Generated Content
+## 6. Content Enrichment: 13 Types of Generated Content
 
 Каждый урок может быть дополнен **13 различными типами** обогащающего контента:
 
-### Генерация через LLM (OpenRouter)
+### Текстовые и интерактивные обогащения
 
-| Тип              | Описание                               | Настройки                                    |
-| ---------------- | -------------------------------------- | -------------------------------------------- |
-| **Quiz**         | Интерактивный тест с 3 типами вопросов | 3-20 вопросов, 4 уровня Блума, passing score |
-| **Presentation** | Слайды с заметками для спикера         | 3-30 слайдов, темы, layouts                  |
-| **Audio**        | Озвучка через OpenAI TTS               | 6 голосов, 5 форматов, контроль скорости     |
+| Тип              | Описание                                           | Назначение                             |
+| ---------------- | -------------------------------------------------- | -------------------------------------- |
+| **Quiz**         | Интерактивный тест с 3 типами вопросов             | Проверка усвоения по уровням Блума     |
+| **Flashcards**   | Интерактивные карточки Q&A (5-100 карт)            | Быстрое запоминание ключевых понятий   |
+| **Mind Map**     | Иерархическая карта знаний                         | Визуализация связей между концепциями  |
+| **Study Guide**  | Полный учебный гайд (brief/standard/comprehensive) | Конспект для самостоятельного изучения |
+| **Presentation** | Слайды с заметками для спикера (3-30 слайдов)      | Материал для очного обучения           |
 
-### Генерация через NotebookLM Bridge
+### Мультимедийные обогащения
 
-| Тип                | Описание                        | Форматы                                |
-| ------------------ | ------------------------------- | -------------------------------------- |
-| **Flashcards**     | Интерактивные карточки Q&A      | 5-100 карт, difficulty levels          |
-| **Mind Map**       | Иерархическая карта знаний      | shallow/standard/deep (до 50 уровней)  |
-| **Study Guide**    | Полный учебный гайд в Markdown  | brief/standard/comprehensive           |
-| **Audio Podcast**  | Профессиональная аудио-нарратив | deep_dive/brief/critique/debate        |
-| **Video Overview** | Видео-обзор урока               | explainer/brief, 10+ визуальных стилей |
-| **Infographic**    | Визуальная инфографика (PNG)    | portrait/landscape                     |
+| Тип                | Описание                                             | Назначение                                |
+| ------------------ | ---------------------------------------------------- | ----------------------------------------- |
+| **Audio**          | Озвучка урока (OpenAI TTS, 6 голосов)                | Аудио-версия для обучения на ходу         |
+| **Audio Podcast**  | Профессиональный подкаст (deep_dive/debate/critique) | Углублённый разбор темы в формате диалога |
+| **Video Overview** | Видео-обзор (10+ визуальных стилей)                  | Визуальное резюме урока                   |
+| **Infographic**    | Визуальная инфографика (PNG)                         | Наглядная визуализация ключевых данных    |
 
-### Генерация изображений
+### Автоматическая генерация визуального оформления
 
-| Тип                     | Модель                 | Размер           |
-| ----------------------- | ---------------------- | ---------------- |
-| **Cover** (Hero Banner) | Gemini 2.5 Flash Image | 1280x720 (16:9)  |
-| **Card** (Thumbnail)    | GPT-5 Image Mini       | 1024x1024 (1:1)  |
-| **Banner** (Header)     | Gemini 2.5 Flash Image | 1280x400 (32:10) |
+| Тип        | Назначение                                                   | Размер           |
+| ---------- | ------------------------------------------------------------ | ---------------- |
+| **Cover**  | Обложка урока (Hero Banner) — используется на странице урока | 1280x720 (16:9)  |
+| **Card**   | Карточка курса/урока — используется в каталоге и навигации   | 1024x1024 (1:1)  |
+| **Banner** | Декоративный баннер — заголовок раздела                      | 1280x400 (32:10) |
+
+Обложки и карточки генерируются **автоматически** после создания структуры курса и уроков, обеспечивая визуальную целостность всего курса.
 
 ### Полное отслеживание генерации
 
-Для каждого обогащения системa трекает:
-
-- Время генерации (ms), использованные токены, стоимость (USD)
-- Какая модель сгенерировала, quality score, количество retry
-- Полный audit trail в `generation_trace`
+Для каждого обогащения система трекает: время генерации (ms), использованные токены, стоимость (USD), какая модель сгенерировала, quality score, количество retry — полный audit trail.
 
 ---
 
-## 6. RAG: Grounding in Source Documents
+## 7. RAG: Grounding in Source Documents
 
 Генерация **не на пустом месте** — каждый урок привязан к исходным документам через RAG (Retrieval-Augmented Generation).
 
-### Hybrid Search Architecture
+### Hybrid Search + Neural Reranking
 
 ```
   Query: "Как работает кэширование в Redis?"
@@ -359,34 +405,73 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
     Reciprocal Rank Fusion (RRF)
               │
               ▼
-    Jina Reranker v2 (top-N quality boost)
+    Jina Reranker v2 (neural re-ranking)
               │
               ▼
-    20-30 релевантных чанков для урока
+    Top-N релевантных чанков для урока
 ```
+
+**Jina Reranker v2** — нейронный реранкер, который переоценивает результаты гибридного поиска. В отличие от простого ранжирования по скору, реранкер **читает каждый чанк** и определяет его релевантность запросу с помощью cross-encoder модели. Это повышает качество найденных фрагментов на **15-25%** по метрике nDCG@10 по сравнению с RRF без реранкинга.
 
 - **Hybrid search** — объединение семантического и ключевого поиска
 - **Priority boosting** — +40% для CORE-документов
 - **Redis caching** — 5-минутный TTL, предотвращение дублирования запросов
 - **RAG Context Cache** — предварительная загрузка контекста для Stage 5
+- **20-30 чанков** извлекается для каждого урока для полноты покрытия
 
 ---
 
-## 7. Multi-Model AI Routing: 20+ Models, Smart Selection
+## 8. Model-Agnostic Architecture: Freedom from Vendor Lock-in
 
-### Иерархия маршрутизации (5 уровней)
+### Ключевое преимущество: независимость от провайдеров
+
+MegaCampusAI **не привязан ни к одной конкретной модели**. Все 20+ моделей от 12 провайдеров доступны через единый агрегатор OpenRouter. Это означает:
+
+- **Нет vendor lock-in** — смена модели не требует изменения кода
+- **Мгновенная адаптация** к рынку — новая модель появилась → протестировали → подключили
+- **Оптимальное соотношение цена/качество** — для каждой задачи используется наиболее подходящая модель, а не самая дорогая
+
+### Dedicated AI Model Research Team
+
+В компании работает **выделенная команда по исследованию AI-моделей** (AI Model Optimization Team), которая непрерывно:
+
+- **Тестирует новые модели** по мере их появления на рынке
+- **Проводит A/B-тестирование** на реальных курсах
+- **Обновляет конфигурации** в централизованной базе данных моделей
+- **Оптимизирует стоимость** — находит модели, дающие сравнимое качество по меньшей цене
+
+Благодаря этому платформа генерирует контент **высокого качества**, не прибегая к дорогостоящим проприетарным моделям (Claude Opus, GPT-5 Pro и подобные), стоимость которых в 10-50 раз выше используемых нами альтернатив.
+
+### Централизованная база конфигураций моделей
+
+Все конфигурации хранятся в **единой базе данных** (`llm_model_config`), содержащей **90+ фазных конфигураций** по всем стадиям pipeline. Обновление модели — это изменение одной строки в БД, без деплоя кода.
+
+### Интеллектуальная маршрутизация (5 уровней)
+
+Маршрутизация моделей используется **на каждой стадии pipeline** и учитывает множество факторов:
 
 ```
-  Layer 1: Context Tier ─── ≤80K tokens → Standard | >80K → Extended
+  Layer 1: Context Size ─── ≤80K tokens → Standard | >80K → Extended (1M+ context)
        │
-  Layer 2: Language ──────── Russian → Xiaomi MiMo | Other → xAI Grok
+  Layer 2: Language ──────── Russian → одни модели | Non-Russian → другие модели
        │
-  Layer 3: Importance ────── Simple → $0.03/1M | Normal → $0.55/1M | Complex → $0.15/1M
+  Layer 3: Complexity ────── Simple → $0.03/1M | Normal → $0.55/1M | Complex → $0.70/1M
        │
-  Layer 4: Config Bunker ── Memory → Redis → LKG File → Seed → Database (5 fallback layers)
+  Layer 4: Config Bunker ── 5 уровней отказоустойчивости (Memory → Redis → File → Seed → DB)
        │
-  Layer 5: Quality Gate ─── Score < 0.75? → Retry with stronger model
+  Layer 5: Quality Gate ─── Score < 0.75? → Retry с более мощной моделью
 ```
+
+**Примеры маршрутизации по стадиям:**
+
+- **Stage 3 (Classification)**: дешёвая модель для быстрой классификации
+- **Stage 4 (Clarifying Questions)**: reasoning-модель для глубоких вопросов
+- **Stage 5 (Structure)**: 3-tier routing по сложности секций (simple/normal/complex)
+- **Stage 6 (Content)**: 3-tier routing по сложности уроков + первый модуль всегда на premium
+- **Stage 6 (Judges)**: 3 разные модели-судьи с language-aware bias prevention
+- **Stage 7 (Enrichments)**: специализированные модели для изображений, аудио, квизов
+
+**Стоимость указана как среднее** между ценой за входящие и исходящие токены, что даёт реалистичную оценку расходов.
 
 ### ModelConfig Bunker: 5-Layer Resilience
 
@@ -406,23 +491,75 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
   Emergency Config (guaranteed to work)
 ```
 
-- **Survives**: Redis outage, Database outage, Redis+DB outage simultaneously
-- **Circuit breaker**: Abort sync if >20% invalid configs
-- **Drop detection**: Abort if cache has >10 configs but sync returns <5
+- **Survives**: Redis outage, Database outage, Redis+DB outage одновременно
+- **Circuit breaker**: останавливает sync при >20% невалидных конфигураций
+- **Drop detection**: останавливает sync при подозрительном уменьшении записей
 
 ### Cost Optimization
 
-| Стратегия                                      | Экономия                           |
-| ---------------------------------------------- | ---------------------------------- |
-| Importance-based routing (3 tier)              | 60-70% vs using premium everywhere |
-| CLEV voting (67% 2-judge resolution)           | 67% на judge costs                 |
-| Cascading evaluation (heuristics first)        | 50% на evaluation                  |
-| Provider caching (Anthropic, Gemini, DeepSeek) | 75-90% на repeated prompts         |
-| Optional fields removal                        | 10-15K tokens/course               |
+| Стратегия                               | Экономия                                      |
+| --------------------------------------- | --------------------------------------------- |
+| Complexity-based routing (3 tier)       | 60-70% vs использование premium везде         |
+| CLEV voting (67% 2-judge resolution)    | 67% на judge costs                            |
+| Cascading evaluation (heuristics first) | 50% на evaluation                             |
+| Provider caching (Gemini, DeepSeek)     | 75-90% на repeated prompts                    |
+| Selective use of reasoning models       | Только для задач, требующих глубокого анализа |
 
 ---
 
-## 8. Interactive Frontend Experience
+## 9. Research-Driven Engineering
+
+### 64+ собственных исследований
+
+Каждое архитектурное решение в MegaCampusAI основано на **глубоком исследовании**. В проекте собрана библиотека из 64+ собственных research-документов, охватывающих:
+
+| Направление                         | Кол-во | Примеры                                                                                    |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------------------------ |
+| **Instructional Design & Pedagogy** | 8      | Evidence-Based Pedagogical Architectures, Instructional Design for AI Course Generation    |
+| **RAG & Information Retrieval**     | 12     | RAG vs KAG Analysis, Adaptive RAG Optimization, Reranking Cost Optimization, Hybrid Search |
+| **LLM Orchestration & Routing**     | 8      | Multi-Model Architecture, LLM Parameters Optimization, JSON Repair Strategies              |
+| **Judge & Refinement Systems**      | 6      | Multi-Judge LLM Refinement Design Guide, Judge Strategy Research, CLEV Voting              |
+| **Content Editing & UX**            | 10     | Surgical JSON Editing, User Intent Taxonomy (32 intents), UX Patterns for Workflow Editing |
+| **Infrastructure & Cost**           | 8      | GPU Rental Analysis, Service Worker Research, Markdown Rendering                           |
+| **Document Classification**         | 4      | Fixing LLM Conservative Bias, Classification Prompting Strategies                          |
+| **Multilingual**                    | 3      | Grammar Validation, Self-Hosted RAG for Russian Content                                    |
+
+### 50+ академических ссылок
+
+Наши исследования ссылаются на рецензируемые научные работы:
+
+**Instructional Design:**
+
+- Gagné (1965) — Nine Events of Instruction
+- Bloom (1956), Anderson & Krathwohl (2001) — Taxonomy of Educational Objectives
+- Merrill (2002) — First Principles of Instruction
+- Wiggins & McTighe (2005) — Understanding by Design
+- van Merriënboer (2024) — 4C/ID Complex Learning
+
+**Cognitive Science:**
+
+- Sweller — Cognitive Load Theory
+- Cepeda et al. (2006) — meta-analysis of 839 assessments on spacing effect
+- Roediger & Karpicke (2006) — Testing Effect (+50% retention)
+- Cowan (2001) — Working Memory Capacity (4±1 chunks)
+- Guo, Kim & Rubin (2014) — 6.9M video sessions engagement analysis
+
+**LLM & AI Research (2023-2025):**
+
+- Madaan et al. (NeurIPS 2023) — Self-Refine (+20% quality improvement)
+- Jiang et al. (ACL 2023) — LLM-Blender generative fusion
+- CARE Framework (OpenReview 2024) — +25% vs majority voting
+- RouteLLM (ETH Zurich, ICLR 2025) — 85% cost reduction
+- arXiv:2402.03216 — BGE-M3 multilingual embeddings
+- arXiv:2504.12879 — RusBEIR benchmark validation
+
+### 320+ спецификаций
+
+Каждая функция проходит полный цикл проектирования: исследование → спецификация → реализация → тестирование. В проекте накоплено 320+ спецификаций, охватывающих каждую стадию pipeline.
+
+---
+
+## 10. Interactive Frontend Experience
 
 ### Modern Tech Stack
 
@@ -437,100 +574,56 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 
 ### Интерактивные учебные инструменты
 
-**Flashcard Viewer**:
+**Flashcard Viewer**: анимация переворота карточки, самооценка "знаю/не знаю" с трекингом прогресса, полноэкранный режим, shuffle-режим.
 
-- Анимация переворота карточки (Framer Motion)
-- Самооценка "знаю / не знаю" с трекингом прогресса
-- Полноэкранный режим для фокусированного обучения
-- Shuffle-режим, сохранение прогресса в localStorage
+**Quiz Player**: пошаговый режим, мгновенная обратная связь с объяснениями, бейджи сложности и уровня Блума, подсчёт баллов, повторное прохождение.
 
-**Quiz Player**:
+**Mind Map Viewer**: масштабирование и навигация, полноэкранный режим с сохранением состояния, бейджи количества узлов и глубины.
 
-- Пошаговый режим (один вопрос за раз)
-- Мгновенная обратная связь с объяснениями
-- Бейджи сложности и уровня Блума
-- Подсчет баллов, определение pass/fail
-- Повторное прохождение
-
-**Mind Map Viewer**:
-
-- Масштабирование и навигация
-- Полноэкранный режим с сохранением состояния
-- Бейджи количества узлов и глубины
-
-**Audio Player**:
-
-- Контроль скорости (0.5x — 2x)
-- Прогресс-бар с навигацией
-- Управление громкостью
+**Audio Player**: контроль скорости (0.5x — 2x), прогресс-бар с навигацией.
 
 ### Rich Content Rendering
 
-- Markdown с GitHub Flavored Markdown
-- Syntax highlighting (Shiki)
-- Диаграммы Mermaid (inline)
-- Математика KaTeX
-- Callout-блоки (info/warning/error)
-- Responsive tables
+Markdown (GFM), Syntax Highlighting (Shiki), диаграммы Mermaid, математика KaTeX, callout-блоки, responsive tables.
 
 ### PWA (Progressive Web App)
 
-- Установка как нативное приложение
-- Offline fallback page
-- Push-уведомления
-- Кэширование медиа-контента (аудио, видео, шрифты)
-- **Важно**: JS/CSS НЕ кэшируются (предотвращение 502 после деплоя)
+Установка как нативное приложение, offline fallback, push-уведомления, кэширование медиа-контента.
 
-### Internationalization (i18n)
+### Internationalization
 
-- Полная поддержка **русского** и **английского** языков
-- 8 пространств имен перевода (common, admin, auth, course, enrichments, generation, organizations, profile)
-- `next-intl` с SSR
+- **Интерфейс**: русский и английский (полная локализация, 8 пространств имён)
+- **Генерация курсов**: 19 языков
 
 ---
 
-## 9. Enterprise-Grade Infrastructure
+## 11. Enterprise-Grade Infrastructure
 
 ### Multi-Tenant Architecture (60+ tables)
 
 - **Row-Level Security** — полная изоляция данных между организациями на уровне PostgreSQL
 - **4 роли**: Superadmin → Admin → Instructor → Student
-- **JWT Claims Injection** — кастомный хук обогащает токены ролью и organization_id
-- **RLS Policy Consolidation** — 40 политик → 18 (оптимизация производительности)
+- **232 миграции** — battle-tested schema evolution
 
 ### Subscription Tiers
 
-| Tier         | Storage | Files/Course | Formats                    |
-| ------------ | ------- | ------------ | -------------------------- |
-| **Free**     | 10 MB   | 0            | —                          |
-| **Basic**    | 100 MB  | 1            | TXT, MD                    |
-| **Standard** | 1 GB    | 3            | + PDF, DOCX, PPTX, HTML    |
-| **Premium**  | 10 GB   | 10           | + PNG, JPG, GIF, SVG, WebP |
-
-### Database
-
-- **PostgreSQL 15+** через Supabase
-- **232 миграции** (production-proven schema evolution)
-- **60+ таблиц** (courses, lessons, enrichments, traces, FSM events, audit logs...)
-- **Views** с `security_invoker = true` для безопасного доступа
+| Tier         | Storage | Files/Course | Formats                          |
+| ------------ | ------- | ------------ | -------------------------------- |
+| **Free**     | 10 MB   | 0            | —                                |
+| **Basic**    | 100 MB  | 1            | TXT, MD                          |
+| **Standard** | 1 GB    | 3            | + PDF, DOCX, PPTX, HTML          |
+| **Premium**  | 10 GB   | 10           | + XLSX, PNG, JPG, GIF, SVG, WebP |
 
 ### Full Audit Trail
 
 - **generation_trace** — каждый LLM-вызов: модель, токены, стоимость, duration, quality score
 - **fsm_events** — все переходы состояний генерации
-- **audit_log** — действия пользователей (create/update/delete с before/after values)
+- **audit_log** — действия пользователей с before/after values
 - **error_logs** — ошибки с fingerprinting и deduplication
-
-### Job Queue Infrastructure (BullMQ + Redis)
-
-- **3 выделенных очереди**: main pipeline, Stage 6 (30 concurrent), Stage 7 (enrichments)
-- Retry с exponential backoff
-- Bull Board UI для мониторинга
-- Job persistence и automatic recovery
 
 ---
 
-## 10. DevOps & Deployment
+## 12. DevOps & Deployment
 
 ### Blue/Green Zero-Downtime Deployment
 
@@ -542,10 +635,7 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
      │   Standby: Green│──→ Web :3002 + API :4002
      └─────────────────┘
               │
-         13-step deploy:
-         Pull → Start → Health Check → Switch Nginx → Cleanup
-              │
-         Instant rollback via rollback_blue_green.sh
+         13-step deploy → Health Check → Switch → Instant Rollback
 ```
 
 ### CI/CD Pipeline (9 stages)
@@ -555,11 +645,6 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
      → Build → CI Gate → Docker Build (matrix) → Deploy → [Rollback if fail]
      → Telegram Notification
 ```
-
-- **Matrix Docker builds** — web, api, notebooklm-bridge (parallel)
-- **GHCR** — GitHub Container Registry
-- **Auto-deploy**: develop → Dev, master → Staging
-- **Telegram notifications** о результатах деплоя
 
 ### Testing Infrastructure
 
@@ -574,16 +659,7 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 | **RLS Security**  | 1          | pgTAP                   |
 | **Total**         | **302**    | —                       |
 
-- **Coverage threshold**: 70% (branches, functions, lines, statements)
-- **Pre-commit hooks**: Husky + lint-staged (ESLint + Prettier)
-- **Quality gates**: lint, type-check, build — все обязательные для merge
-
-### Containerization
-
-- **5 Docker-сервисов**: Web, API, Worker, Docling MCP (8 GB), NotebookLM Bridge
-- **Multi-stage builds** — оптимизированные production-образы
-- **Resource limits** — CPU и memory constraints на каждый контейнер
-- **Health checks** — на каждом сервисе (HTTP, socket, redis-cli)
+Coverage threshold: 70%. Pre-commit hooks: Husky + lint-staged. Quality gates: lint, type-check, build.
 
 ### Security
 
@@ -591,31 +667,27 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 | -------------- | ----------------------------------------------------- |
 | XSS Prevention | DOMPurify санитизация всего сгенерированного контента |
 | SQL Injection  | Parameterized queries через Supabase SDK              |
-| CSRF           | JWT + SameSite cookies                                |
 | TLS            | TLSv1.2 + TLSv1.3                                     |
 | Headers        | X-Frame-Options, X-Content-Type-Options, HSTS         |
-| Rate Limiting  | Nginx (50 req/s per IP на enrichments)                |
-| API Keys       | Hashed storage, prefix for identification             |
+| Rate Limiting  | Nginx (50 req/s per IP)                               |
 | Auth           | OAuth (Google, GitHub) + email/password               |
-| Secrets Audit  | `pnpm audit --audit-level=high` в CI                  |
 
 ---
 
-## 11. Multi-Agent Development Orchestration
+## 13. AI-Augmented Development
 
-Разработка ведется с помощью **Gastown** — собственной системы мульти-агентной оркестрации:
+Разработка MegaCampusAI ведётся **классической командой разработчиков**, но с активным использованием AI-инструментов:
 
-- **Mayor** — координатор задач
-- **Polecats** — агенты-исполнители (изолированные git worktrees)
-- **Refinery** — обработчик merge queue
-- **Witness** — мониторинг здоровья агентов
-- **Beads** — git-backed issue tracker с зависимостями между задачами
+- **AI-ассистированная разработка** — Claude Code, Codex и Gemini используются для ускорения написания кода, тестов и документации
+- **Gastown** — собственная система мульти-агентной оркестрации для параллельной разработки фич
+- **Beads** — git-backed issue tracker с зависимостями между задачами и автоматическим восстановлением контекста
+- **Автоматизированные code review** и health checks через AI-агентов
 
-Это позволяет **параллельно разрабатывать** несколько фич без конфликтов.
+Это позволяет **небольшой команде** двигаться со скоростью значительно большего коллектива, сохраняя высокое качество кода (302 теста, 70% coverage threshold, strict TypeScript).
 
 ---
 
-## 12. Observability & Cost Control
+## 14. Observability & Cost Control
 
 ### Per-Course Cost Tracking
 
@@ -638,17 +710,12 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
   └──────────────────────────────────────────┘
 ```
 
-### Structured Logging
-
 - **Pino** — structured JSON logging
 - Каждый LLM-вызов логируется: model, tokens, cost, duration
-- **Axiom integration** (planned) для централизованного анализа
 
 ---
 
-## 13. Admin Panel & Analytics
-
-Полноценная административная панель:
+## 15. Admin Panel
 
 - **Dashboard** — общая статистика (пользователи, курсы, уроки, ошибки)
 - **Generation History** — история генераций с audit trail
@@ -656,87 +723,49 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 - **User Management** — управление пользователями
 - **Error Logs** — просмотр и анализ ошибок
 - **Pricing Configuration** — настройка тарифов
-- **Bull Board** — мониторинг очередей (IP-restricted)
 
 ---
 
-## 14. Technical Architecture Summary
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         MegaCampusAI                                │
-│                                                                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
-│  │  Next.js 15  │  │  tRPC API    │  │  BullMQ Workers (x3)    │  │
-│  │  React 19    │──│  Express     │──│  Main | Stage6 | Stage7  │  │
-│  │  Tailwind 4  │  │  TypeScript  │  │  30 concurrent lessons  │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────────┘  │
-│         │                 │                      │                  │
-│  ┌──────▼─────────────────▼──────────────────────▼──────────────┐  │
-│  │                    Supabase (PostgreSQL 15+)                 │  │
-│  │  60+ tables | 232 migrations | RLS | JWT | OAuth | FSM      │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│         │                 │                      │                  │
-│  ┌──────▼───────┐  ┌──────▼───────┐  ┌──────────▼──────────────┐  │
-│  │  Redis 7     │  │  Qdrant      │  │  OpenRouter (20+ LLMs)  │  │
-│  │  Job Queue   │  │  Vector DB   │  │  12 AI providers        │  │
-│  │  Caching     │  │  RAG Search  │  │  Smart routing          │  │
-│  └──────────────┘  └──────────────┘  └─────────────────────────┘  │
-│                                                                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
-│  │  Docling MCP │  │  NotebookLM  │  │  Jina v3 Embeddings     │  │
-│  │  8 GB model  │  │  Bridge      │  │  768-dim multilingual    │  │
-│  │  PDF/DOCX    │  │  Audio/Video │  │  13 languages            │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────────┘  │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Quality Assurance                                          │   │
-│  │  CLEV Voting (3 judges) | OSCQR Rubric | Bloom's Taxonomy  │   │
-│  │  Hallucination Detection | Targeted Refinement | RAG Check  │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 15. Competitive Advantages
+## 16. Competitive Advantages
 
 | Конкурент                       | Их подход                        | Наше преимущество                                    |
 | ------------------------------- | -------------------------------- | ---------------------------------------------------- |
 | Coursera / Udemy                | Ручное создание курсов           | AI-генерация за минуты                               |
 | ChatGPT / Gemini                | Генерация текста без структуры   | 7-стадийный pipeline с quality assurance             |
-| AI-генераторы (Synthesia, etc.) | Один тип контента (видео)        | 13 типов обогащения                                  |
+| AI-генераторы (Synthesia, etc.) | Один тип контента                | 13 типов обогащения                                  |
 | LMS (Moodle, Canvas)            | Платформа без генерации          | Генерация + доставка в одном                         |
-| Простые AI-обертки              | Single-model, no quality control | 20+ моделей, 3-judge voting, hallucination detection |
+| Простые AI-обёртки              | Single-model, no quality control | 20+ моделей, 3-judge voting, hallucination detection |
 
 ### Что невозможно скопировать за вечер:
 
 1. **7-стадийный pipeline** с LangGraph state machines — 144K строк TypeScript
 2. **CLEV Judge System** с 3 независимыми судьями и Krippendorff's Alpha
 3. **Hallucination detection** через logprob entropy + RAG verification
-4. **5-layer ModelConfig Bunker** — survives Redis+DB outage
-5. **232 миграции** — production-proven database schema
-6. **302 теста** — enterprise-grade quality assurance
-7. **Blue/Green deployment** с auto-rollback
-8. **Multi-agent development** через Gastown
+4. **Neural Reranking** — Jina Reranker v2 для повышения точности RAG
+5. **Clarifying Questions** — интеллектуальная система сбора требований с 3 раундами уточнений
+6. **64+ собственных исследований** со ссылками на 50+ научных работ
+7. **Model-agnostic architecture** — 90+ конфигураций, 5-layer resilience
+8. **19 языков генерации** с локализованными шаблонами
+9. **232 миграции** — production-proven database schema
+10. **302 теста** — enterprise-grade quality assurance
 
 ---
 
-## 16. Roadmap
+## 17. Roadmap
 
-| Stage                       | Status      | Description                           |
-| --------------------------- | ----------- | ------------------------------------- |
-| Stage 0: Foundation         | ✅ Complete | Auth, DB, RLS, Tiers                  |
-| Stage 1: Upload             | ✅ Complete | Multi-format documents                |
-| Stage 2: Processing         | ✅ Complete | Docling + Vectorization + RAG         |
-| Stage 3: Classification     | ✅ Complete | Document priority ranking             |
-| Stage 4: Analysis           | ✅ Complete | Deep 5-phase analysis                 |
-| Stage 5: Structure          | ✅ Complete | LangGraph course generation           |
-| Stage 6: Content            | ✅ Complete | Lessons + Judge System                |
-| Stage 7: Enrichments        | ✅ Complete | 13 content types                      |
-| Stage 8: Analytics          | 🔜 Planned  | Learning analytics, progress tracking |
-| Stage 9: LMS Integration    | 🔜 Planned  | Canvas, Moodle export                 |
-| Stage 10: Adaptive Learning | 🔜 Planned  | Personalized learning paths           |
+| Stage                       | Status  | Description                                  |
+| --------------------------- | ------- | -------------------------------------------- |
+| Stage 0: Foundation         | Done    | Auth, DB, RLS, Tiers                         |
+| Stage 1: Upload             | Done    | 13 document formats                          |
+| Stage 2: Processing         | Done    | Vectorization + RAG + Reranking              |
+| Stage 3: Classification     | Done    | Document priority ranking                    |
+| Stage 4: Analysis           | Done    | Clarifying Questions + Deep 5-phase analysis |
+| Stage 5: Structure          | Done    | LangGraph course generation                  |
+| Stage 6: Content            | Done    | Lessons + Judge System                       |
+| Stage 7: Enrichments        | Done    | 13 content types                             |
+| Stage 8: Analytics          | Planned | Learning analytics, progress tracking        |
+| Stage 9: LMS Integration    | Planned | Canvas, Moodle export                        |
+| Stage 10: Adaptive Learning | Planned | Personalized learning paths                  |
 
 ---
 
@@ -748,4 +777,4 @@ Judge Verdict → Arbiter Consolidation → Refinement Plan
 
 ---
 
-_This document was generated based on actual codebase analysis of 144,000+ lines of TypeScript across 1,868 source files._
+_This document is based on actual codebase analysis of 144,000+ lines of TypeScript, 64+ original research documents, and 320+ specifications._
