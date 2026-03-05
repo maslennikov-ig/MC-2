@@ -29,7 +29,7 @@
 | Спецификаций                   | **320+**                                                  |
 | Автоматизированных тестов      | **6,300+**                                                |
 | Миграций базы данных           | **232**                                                   |
-| Строк кода TypeScript          | **600,000+**                                              |
+| Строк кода (TypeScript + SQL)  | **580,000+**                                              |
 
 ---
 
@@ -648,16 +648,16 @@ Markdown (GFM), Syntax Highlighting (Shiki), диаграммы Mermaid, мат�
 
 ### Testing Infrastructure
 
-| Тип тестов        | Количество | Фреймворк               |
-| ----------------- | ---------- | ----------------------- |
-| **Unit**          | 164        | Vitest                  |
-| **Integration**   | 42         | Vitest + Redis          |
-| **E2E**           | 21         | Playwright (5 browsers) |
-| **Contract**      | 4          | Vitest + Supabase       |
-| **Accessibility** | 3          | Playwright + axe-core   |
-| **Performance**   | 2          | Playwright              |
-| **RLS Security**  | 1          | pgTAP                   |
-| **Total**         | **302**    | —                       |
+| Тип тестов        | Тест-кейсов | Фреймворк               |
+| ----------------- | ----------- | ----------------------- |
+| **Unit**          | 4,600+      | Vitest                  |
+| **Integration**   | 1,435       | Vitest + Redis          |
+| **E2E**           | 185         | Playwright (5 browsers) |
+| **Contract**      | 50+         | Vitest + Supabase       |
+| **Accessibility** | 30+         | Playwright + axe-core   |
+| **Performance**   | 20+         | Playwright              |
+| **RLS Security**  | 10+         | pgTAP                   |
+| **Total**         | **6,300+**  | —                       |
 
 Coverage threshold: 70%. Pre-commit hooks: Husky + lint-staged. Quality gates: lint, type-check, build.
 
@@ -683,7 +683,7 @@ Coverage threshold: 70%. Pre-commit hooks: Husky + lint-staged. Quality gates: l
 - **Beads** — git-backed issue tracker с зависимостями между задачами и автоматическим восстановлением контекста
 - **Автоматизированные code review** и health checks через AI-агентов
 
-Это позволяет **небольшой команде** двигаться со скоростью значительно большего коллектива, сохраняя высокое качество кода (302 теста, 70% coverage threshold, strict TypeScript).
+Это позволяет **небольшой команде** двигаться со скоростью значительно большего коллектива, сохраняя высокое качество кода (6,300+ автоматизированных тестов, 70% coverage threshold, strict TypeScript).
 
 ---
 
@@ -738,7 +738,7 @@ Coverage threshold: 70%. Pre-commit hooks: Husky + lint-staged. Quality gates: l
 
 ### Что невозможно скопировать за вечер:
 
-1. **7-стадийный pipeline** с LangGraph state machines — 144K строк TypeScript
+1. **7-стадийный pipeline** с LangGraph state machines — 580K+ строк кода
 2. **CLEV Judge System** с 3 независимыми судьями и Krippendorff's Alpha
 3. **Hallucination detection** через logprob entropy + RAG verification
 4. **Neural Reranking** — Jina Reranker v2 для повышения точности RAG
@@ -747,7 +747,7 @@ Coverage threshold: 70%. Pre-commit hooks: Husky + lint-staged. Quality gates: l
 7. **Model-agnostic architecture** — 90+ конфигураций, 5-layer resilience
 8. **19 языков генерации** с локализованными шаблонами
 9. **232 миграции** — production-proven database schema
-10. **302 теста** — enterprise-grade quality assurance
+10. **6,300+ автоматизированных тестов** — enterprise-grade quality assurance
 
 ---
 
@@ -795,4 +795,4 @@ Coverage threshold: 70%. Pre-commit hooks: Husky + lint-staged. Quality gates: l
 
 ---
 
-_This document is based on actual codebase analysis of 144,000+ lines of TypeScript, 64+ original research documents, and 320+ specifications._
+_This document is based on actual codebase analysis of 580,000+ lines of code, 64+ original research documents, and 320+ specifications._
