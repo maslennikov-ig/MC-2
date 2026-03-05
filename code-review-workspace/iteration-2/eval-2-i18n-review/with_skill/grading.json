@@ -1,0 +1,26 @@
+{
+  "eval_id": 2,
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Report examines both en and ru files",
+      "passed": true,
+      "evidence": "Both EN and RU analyzed with specific findings in each"
+    },
+    {
+      "text": "Report checks key consistency",
+      "passed": true,
+      "evidence": "Key parity: 551/551 reported, ICU plural coverage compared"
+    },
+    {
+      "text": "Review depth proportional to i18n files",
+      "passed": true,
+      "evidence": "Focused report without over-engineering for JSON files"
+    },
+    {
+      "text": "Report has clear verdict",
+      "passed": true,
+      "evidence": "NEEDS WORK verdict with summary table"
+    }
+  ]
+}

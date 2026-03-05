@@ -1,0 +1,31 @@
+{
+  "eval_id": 3,
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Report specifically examines XSS vectors",
+      "passed": true,
+      "evidence": "Thorough XSS analysis including InfographicViewer img src, StudyGuideViewer markdown rendering, mindmap HTML escaping verification, QuizPlayer text rendering, FlashcardCard text rendering"
+    },
+    {
+      "text": "Report examines React performance patterns",
+      "passed": true,
+      "evidence": "Covered QuizPlayer memoization gaps, FlashcardViewer callback issues, FlashcardDots/Summary memo gaps, AudioPlayer state management, bundle size analysis"
+    },
+    {
+      "text": "Report stays focused on security and performance",
+      "passed": true,
+      "evidence": "Report organized into Security, Performance, and Bundle Size sections — stays focused throughout"
+    },
+    {
+      "text": "Security findings have severity ratings",
+      "passed": true,
+      "evidence": "Uses HIGH/MEDIUM/LOW/INFORMATIONAL severity levels consistently"
+    },
+    {
+      "text": "Findings reference specific code patterns with file:line",
+      "passed": true,
+      "evidence": "Uses absolute file paths with line numbers throughout (e.g., InfographicViewer.tsx Lines: 81, 154)"
+    }
+  ]
+}

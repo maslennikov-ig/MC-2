@@ -1,0 +1,36 @@
+{
+  "skill_name": "code-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the flashcard viewer components that were recently refactored — specifically FlashcardViewer.tsx, FlashcardCard.tsx, FlashcardDots.tsx, and FlashcardSummary.tsx in packages/web/components/course/viewer/enrichments/",
+      "expected_output": "Structured code review report in markdown with issues and improvements categorized by priority, with specific file:line references and actionable recommendations",
+      "files": [
+        "packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx",
+        "packages/web/components/course/viewer/enrichments/FlashcardCard.tsx",
+        "packages/web/components/course/viewer/enrichments/FlashcardDots.tsx",
+        "packages/web/components/course/viewer/enrichments/FlashcardSummary.tsx"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Do a quick code review of my recent changes before I commit — I've been working on the enrichments i18n messages",
+      "expected_output": "Quick review of the i18n message files with any missing keys, inconsistencies between ru/en, or formatting issues flagged",
+      "files": [
+        "packages/web/messages/en/enrichments.json",
+        "packages/web/messages/ru/enrichments.json"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Review packages/web/components/course/viewer/enrichments/ for security and performance issues",
+      "expected_output": "Focused review on security (XSS, unsafe HTML rendering) and performance (React re-renders, memoization, bundle size) with specific findings",
+      "files": [
+        "packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx",
+        "packages/web/components/course/viewer/enrichments/FlashcardCard.tsx",
+        "packages/web/components/course/viewer/enrichments/FlashcardDots.tsx",
+        "packages/web/components/course/viewer/enrichments/FlashcardSummary.tsx"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "skill_name": "code-review",
+  "iteration": 1,
+  "timestamp": "2026-03-04T12:00:00Z",
+  "configurations": [
+    {
+      "name": "with_skill",
+      "description": "Using the code-review skill",
+      "results": {
+        "pass_rate": {
+          "mean": 1.0,
+          "stddev": 0.0,
+          "per_eval": {
+            "eval-1-full-review": { "passed": 7, "total": 7, "rate": 1.0 },
+            "eval-2-i18n-review": { "passed": 4, "total": 4, "rate": 1.0 },
+            "eval-3-security-perf": { "passed": 5, "total": 5, "rate": 1.0 }
+          }
+        },
+        "timing": {
+          "mean_seconds": 199.7,
+          "stddev_seconds": 35.5,
+          "per_eval": {
+            "eval-1-full-review": 159.1,
+            "eval-2-i18n-review": 244.4,
+            "eval-3-security-perf": 195.6
+          }
+        },
+        "tokens": {
+          "mean": 60929,
+          "stddev": 8256,
+          "per_eval": {
+            "eval-1-full-review": 50125,
+            "eval-2-i18n-review": 62590,
+            "eval-3-security-perf": 70072
+          }
+        }
+      }
+    },
+    {
+      "name": "without_skill",
+      "description": "Baseline — no skill loaded",
+      "results": {
+        "pass_rate": {
+          "mean": 0.94,
+          "stddev": 0.1,
+          "per_eval": {
+            "eval-1-full-review": { "passed": 6, "total": 7, "rate": 0.86 },
+            "eval-2-i18n-review": { "passed": 4, "total": 4, "rate": 1.0 },
+            "eval-3-security-perf": { "passed": 5, "total": 5, "rate": 1.0 }
+          }
+        },
+        "timing": {
+          "mean_seconds": 190.9,
+          "stddev_seconds": 5.8,
+          "per_eval": {
+            "eval-1-full-review": 193.6,
+            "eval-2-i18n-review": 182.7,
+            "eval-3-security-perf": 196.6
+          }
+        },
+        "tokens": {
+          "mean": 63359,
+          "stddev": 14175,
+          "per_eval": {
+            "eval-1-full-review": 54214,
+            "eval-2-i18n-review": 52657,
+            "eval-3-security-perf": 83206
+          }
+        }
+      }
+    }
+  ],
+  "delta": {
+    "pass_rate": "+6%",
+    "timing": "+4.6% slower",
+    "tokens": "-3.8% fewer tokens"
+  },
+  "analysis": {
+    "key_findings": [
+      "The skill provides a consistent report template (Summary table, Issues/Improvements separation) that baseline lacks — this is the main structural benefit",
+      "Baseline failed 1 assertion in Eval 1: Issues and Improvements were not separated into distinct sections",
+      "For Eval 2 (i18n) and Eval 3 (security/perf), both approaches passed all assertions equally",
+      "Baseline was slightly faster on average (190.9s vs 199.7s) but used more tokens (63.4K vs 60.9K)",
+      "The skill-guided reports are shorter and more focused; baseline reports tend to be more exploratory and include extra sections (Accessibility Review, Positive Patterns)"
+    ],
+    "non_discriminating_assertions": [
+      "has-file-refs — both approaches consistently reference specific files with line numbers",
+      "has-code-examples — both include multiple code examples",
+      "covers-all-files — both review all specified files",
+      "no-false-positives — both self-correct when a finding is incorrect",
+      "checks-both-locales — both examine both locale files",
+      "xss-check — both thoroughly examine XSS vectors"
+    ],
+    "discriminating_assertions": [
+      "has-structure — skill enforces Summary table + Issues/Improvements separation; baseline merges them"
+    ],
+    "qualitative_observations": [
+      "The with-skill reports follow the template format consistently, making them easier to parse programmatically and convert to Beads tasks",
+      "The without-skill reports are more creative — they add Accessibility Review, Positive Patterns, structural observations that the skill template doesn't call for",
+      "Both approaches find similar core issues (stale closures, React.memo defeated, i18n pluralization bugs)",
+      "The baseline sometimes finds MORE issues because it explores more freely (16 findings vs 14 in Eval 1)"
+    ]
+  }
+}

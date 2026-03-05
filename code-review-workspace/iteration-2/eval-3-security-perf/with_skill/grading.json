@@ -1,0 +1,31 @@
+{
+  "eval_id": 3,
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Report examines XSS vectors",
+      "passed": true,
+      "evidence": "Critical finding about InfographicViewer img src with javascript: URI analysis"
+    },
+    {
+      "text": "Report examines React performance",
+      "passed": true,
+      "evidence": "Covered useCallback, React.memo, QuizPlayer decomposition, bundle size"
+    },
+    {
+      "text": "Report stays focused on security and performance",
+      "passed": true,
+      "evidence": "All findings are security or performance related"
+    },
+    {
+      "text": "Security findings have severity ratings",
+      "passed": true,
+      "evidence": "Critical/High/Medium/Low ratings with evidence"
+    },
+    {
+      "text": "Findings reference specific code with file:line",
+      "passed": true,
+      "evidence": "Every finding has file:line with code context"
+    }
+  ]
+}

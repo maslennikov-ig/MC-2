@@ -1,0 +1,48 @@
+{
+  "eval_id": 1,
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Report has clear sections: Summary, Issues, Improvements",
+      "passed": false,
+      "evidence": "Has Key Findings section but issues and improvements mixed, no separate Improvements section"
+    },
+    {
+      "text": "Findings reference specific files with line numbers",
+      "passed": true,
+      "evidence": "References files with line numbers"
+    },
+    {
+      "text": "Issues categorized by priority",
+      "passed": true,
+      "evidence": "Uses Critical/Medium/Low/Informational but no High category"
+    },
+    {
+      "text": "At least 2 findings include code snippets",
+      "passed": false,
+      "evidence": "Findings mention specific patterns but lack before/after code examples"
+    },
+    {
+      "text": "Report mentions all 4 files",
+      "passed": true,
+      "evidence": "All 4 files listed and reviewed"
+    },
+    { "text": "No false positives", "passed": true, "evidence": "Findings appear accurate" },
+    {
+      "text": "Each finding has actionable recommendation",
+      "passed": false,
+      "evidence": "Describes problems but recommendations are brief and lack code examples"
+    },
+    {
+      "text": "Includes Positive Patterns section",
+      "passed": true,
+      "evidence": "Overall assessment mentions positive aspects"
+    },
+    { "text": "Includes Escalation section", "passed": false, "evidence": "No escalation section" },
+    {
+      "text": "Adapts depth to scope",
+      "passed": true,
+      "evidence": "Thorough review of all 4 files"
+    }
+  ]
+}

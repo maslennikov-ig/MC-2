@@ -1,0 +1,41 @@
+{
+  "eval_id": 1,
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Report has clear sections: Summary, Issues, Improvements",
+      "passed": true,
+      "evidence": "Report has Summary table, Issues (Critical/High/Medium/Low), Improvements (High/Medium/Low) as distinct sections"
+    },
+    {
+      "text": "Findings reference specific files with line numbers (file:line format)",
+      "passed": true,
+      "evidence": "Consistently uses format like 'FlashcardViewer.tsx:106', 'FlashcardViewer.tsx:112-117', 'FlashcardDots.tsx:37'"
+    },
+    {
+      "text": "Issues are categorized by priority (critical/high/medium/low)",
+      "passed": true,
+      "evidence": "Uses Critical/High/Medium/Low hierarchy with counts in summary table"
+    },
+    {
+      "text": "At least 2 findings include code snippets showing before/after or current/recommended",
+      "passed": true,
+      "evidence": "7 out of 8 findings include before/after TypeScript code examples"
+    },
+    {
+      "text": "Report mentions all 4 reviewed files",
+      "passed": true,
+      "evidence": "Files Reviewed table lists all 4 files with line counts plus 5 supporting files"
+    },
+    {
+      "text": "No obviously wrong findings",
+      "passed": true,
+      "evidence": "Finding #6 was self-corrected (retracted as not actually unused). All other findings are accurate based on code analysis."
+    },
+    {
+      "text": "Each finding has an actionable recommendation",
+      "passed": true,
+      "evidence": "Every finding has a concrete Fix section with code snippet or specific action"
+    }
+  ]
+}
