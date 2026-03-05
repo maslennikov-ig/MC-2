@@ -2,6 +2,22 @@
 
 _Released on 2025-12-26_
 
+## v0.31.18
+
+_Released on 2026-03-05_
+
+### ✨ New Features
+
+- **Skills**: Add code-review skill, remove old code-reviewer stubs
+
+### 🔧 Improvements
+
+- **Skills**: Remove code-review-inline orchestrator
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.31.17
 
 _Released on 2026-03-02_
