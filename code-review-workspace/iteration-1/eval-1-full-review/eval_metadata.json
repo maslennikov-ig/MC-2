@@ -1,0 +1,42 @@
+{
+  "eval_id": 1,
+  "eval_name": "full-component-review",
+  "prompt": "Review the flashcard viewer components that were recently refactored — specifically FlashcardViewer.tsx, FlashcardCard.tsx, FlashcardDots.tsx, and FlashcardSummary.tsx in packages/web/components/course/viewer/enrichments/",
+  "assertions": [
+    {
+      "id": "has-structure",
+      "text": "Report has clear sections: Summary, Issues, Improvements",
+      "type": "structure"
+    },
+    {
+      "id": "has-file-refs",
+      "text": "Findings reference specific files with line numbers (file:line format)",
+      "type": "specificity"
+    },
+    {
+      "id": "has-priorities",
+      "text": "Issues are categorized by priority (critical/high/medium/low)",
+      "type": "structure"
+    },
+    {
+      "id": "has-code-examples",
+      "text": "At least 2 findings include code snippets showing before/after or current/recommended",
+      "type": "actionability"
+    },
+    {
+      "id": "covers-all-files",
+      "text": "Report mentions all 4 reviewed files",
+      "type": "coverage"
+    },
+    {
+      "id": "no-false-positives",
+      "text": "No obviously wrong findings (e.g., flagging correct patterns as bugs)",
+      "type": "accuracy"
+    },
+    {
+      "id": "actionable-recs",
+      "text": "Each finding has an actionable recommendation (not just 'consider improving')",
+      "type": "actionability"
+    }
+  ]
+}

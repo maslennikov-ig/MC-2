@@ -1,0 +1,27 @@
+{
+  "eval_id": 2,
+  "eval_name": "quick-i18n-review",
+  "prompt": "Do a quick code review of my recent changes before I commit — I've been working on the enrichments i18n messages",
+  "assertions": [
+    {
+      "id": "checks-both-locales",
+      "text": "Report examines both en and ru message files",
+      "type": "coverage"
+    },
+    {
+      "id": "key-consistency",
+      "text": "Report checks that keys are consistent between en and ru files",
+      "type": "accuracy"
+    },
+    {
+      "id": "proportional-depth",
+      "text": "Review depth is appropriate for i18n files (not overly long for simple JSON)",
+      "type": "proportionality"
+    },
+    {
+      "id": "has-verdict",
+      "text": "Report has a clear verdict or summary of whether the code is ready to commit",
+      "type": "structure"
+    }
+  ]
+}

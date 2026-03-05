@@ -1,0 +1,85 @@
+{
+  "skill_name": "code-review",
+  "iteration": 2,
+  "timestamp": "2026-03-04T14:00:00Z",
+  "configurations": [
+    {
+      "name": "with_skill_v2",
+      "description": "Using improved code-review skill (v2)",
+      "results": {
+        "pass_rate": {
+          "mean": 1.0,
+          "stddev": 0.0,
+          "per_eval": {
+            "eval-1-full-review": { "passed": 10, "total": 10, "rate": 1.0 },
+            "eval-2-i18n-review": { "passed": 4, "total": 4, "rate": 1.0 },
+            "eval-3-security-perf": { "passed": 5, "total": 5, "rate": 1.0 }
+          }
+        },
+        "timing": {
+          "mean_seconds": 178.7,
+          "stddev_seconds": 16.6,
+          "per_eval": {
+            "eval-1-full-review": 155.2,
+            "eval-2-i18n-review": 192.2,
+            "eval-3-security-perf": 188.7
+          }
+        },
+        "tokens": {
+          "mean": 68593,
+          "stddev": 12862,
+          "per_eval": {
+            "eval-1-full-review": 61323,
+            "eval-2-i18n-review": 57225,
+            "eval-3-security-perf": 87231
+          }
+        }
+      }
+    },
+    {
+      "name": "without_skill",
+      "description": "Baseline — no skill",
+      "results": {
+        "pass_rate": {
+          "mean": 0.74,
+          "stddev": 0.22,
+          "per_eval": {
+            "eval-1-full-review": { "passed": 6, "total": 10, "rate": 0.6 },
+            "eval-2-i18n-review": { "passed": 4, "total": 4, "rate": 1.0 },
+            "eval-3-security-perf": { "passed": 5, "total": 5, "rate": 1.0 }
+          }
+        },
+        "timing": {
+          "mean_seconds": 220.4,
+          "stddev_seconds": 20.2,
+          "per_eval": {
+            "eval-1-full-review": 193.0,
+            "eval-2-i18n-review": 235.7,
+            "eval-3-security-perf": 230.6
+          }
+        },
+        "tokens": {
+          "mean": 70749,
+          "stddev": 7559,
+          "per_eval": {
+            "eval-1-full-review": 72854,
+            "eval-2-i18n-review": 60843,
+            "eval-3-security-perf": 78551
+          }
+        }
+      }
+    }
+  ],
+  "delta_vs_baseline": {
+    "pass_rate": "+26% (0.74 → 1.0)",
+    "timing": "-19% faster (220s → 179s)",
+    "tokens": "-3% fewer (70.7K → 68.6K)"
+  },
+  "delta_vs_iteration_1": {
+    "with_skill_pass_rate": "100% → 100% (same, but 10 assertions now vs 7)",
+    "with_skill_timing": "200s → 179s (-10% faster)",
+    "with_skill_tokens": "60.9K → 68.6K (+13% more tokens)",
+    "baseline_pass_rate": "94% → 74% (more discriminating assertions)",
+    "notes": "The gap between skill and baseline WIDENED significantly because v2 adds new criteria (Positive Patterns, Escalation, code examples) that baseline doesn't produce"
+  }
+}

@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "code-review", "runs": [{"id": "eval-1-full-review-with_skill", "prompt": "Review the flashcard viewer components that were recently refactored \u2014 specifically FlashcardViewer.tsx, FlashcardCard.tsx, FlashcardDots.tsx, and FlashcardSummary.tsx in packages/web/components/course/viewer/enrichments/", "eval_id": 1, "outputs": [{"name": "report.md", "type": "text", "content": "# Code Review: Flashcard Viewer Components Refactor\n\n**Date**: 2026-03-04\n**Scope**: Review of flashcard viewer components after refactoring \u2014 FlashcardViewer.tsx (parent orchestrator), FlashcardCard.tsx (flip card), FlashcardDots.tsx (progress dots), FlashcardSummary.tsx (completion screen)\n**Files Reviewed**: 4\n**Lines Changed**: +750 / -0 (full file review, not a diff)\n\n## Summary\n\n| Category | Critical | High | Medium | Low |\n|---|---|---|---|---|\n| Issues | 0 | 2 | 3 | 2 |\n| Improvements | \u2014 | 2 | 3 | 2 |\n| **Total** | **0** | **4** | **6** | **4** |\n\n**Verdict**: NEEDS WORK \u2014 has high-severity issues that should be addressed before this code ships to production.\n\n## Issues\n\n### Critical\n\n_None found._\n\n### High\n\n#### 1. Potential crash when `currentCard` is `undefined` \u2014 card passed to FlashcardCard without guard\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:106`\n- **Problem**: `currentCard` is derived as `cards[currentIndex]` which can be `undefined` if state gets out of sync (e.g., after shuffle resets `cards` but a stale `currentIndex` is still in-flight from a batched setState). The value is passed directly to `<FlashcardCard card={currentCard}>` without a guard. While `FlashcardCard` uses optional chaining (`card?.front`, `card?.back`), the parent component accesses `currentCard.id` at lines 136, 148, 297, and 453 inside `handleKnow`, `handleDontKnow`, inline JSX checks, and those calls are guarded \u2014 but the `onCardFlip` callback at line 237 and the `handleKnow`/`handleDontKnow` early returns only check the card within callbacks. The real risk is a race: if `handleShuffle` sets a new `cards` array while `handleKnow` was already captured in a closure with the old `currentCard`, the `currentCard.id` reference could be stale or point to the wrong card, leading to incorrect progress tracking.\n- **Impact**: Could mark the wrong card as known/unknown after a shuffle, silently corrupting user progress. In an extreme edge case (shuffle reducing `cards` array length while `currentIndex` is at the end), `currentCard` could be `undefined`, crashing the component.\n- **Fix**:\n```typescript\n// Before (line 106)\nconst currentCard = cards[currentIndex]\n\n// After \u2014 add defensive guard and use the card from state at call-time\nconst currentCard = cards[currentIndex]\n\n// And add a guard before the card area render (before line 330):\nif (!currentCard) {\n  setCurrentIndex(0)\n  return null\n}\n```\n\nAdditionally, in `handleKnow` and `handleDontKnow`, read the card from the current state rather than the closure:\n\n```typescript\n// Before (handleKnow, line 133)\nconst handleKnow = useCallback(() => {\n  if (!currentCard) return\n  const newKnown = new Set(knownIds)\n  newKnown.add(currentCard.id)\n  ...\n\n// After \u2014 use functional state setter pattern to avoid stale closure\nconst handleKnow = useCallback(() => {\n  setCards(prevCards => {\n    const card = prevCards[currentIndex]\n    if (!card) return prevCards\n    // ... operate on `card` instead of closure `currentCard`\n    return prevCards\n  })\n  ...\n```\n\n#### 2. `handlePrevious` uses stale closure for boundary check\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:112-117`\n- **Problem**: `handlePrevious` checks `currentIndex > 0` using the closure value but then uses `setCurrentIndex((prev) => prev - 1)` with the functional updater. The guard condition and the state update are operating on potentially different values. If `handlePrevious` is invoked rapidly (keyboard ArrowLeft held down, or swipe gesture triggering multiple times), the closure-captured `currentIndex` might be stale, allowing the functional setter to decrement below 0, producing `cards[-1]` which is `undefined`.\n- **Impact**: Rapid arrow-key presses in fullscreen mode could navigate to index -1, causing `currentCard` to be `undefined` and the component to render blank content or crash.\n- **Fix**:\n```typescript\n// Before\nconst handlePrevious = useCallback(() => {\n  if (currentIndex > 0) {\n    setCurrentIndex((prev) => prev - 1)\n    setIsFlipped(false)\n  }\n}, [currentIndex])\n\n// After \u2014 move the guard inside the functional setter\nconst handlePrevious = useCallback(() => {\n  setCurrentIndex((prev) => {\n    if (prev <= 0) return prev\n    setIsFlipped(false)\n    return prev - 1\n  })\n}, [])\n```\n\nNote: Calling `setIsFlipped` inside `setCurrentIndex`'s updater is technically a side effect in a state updater, which React discourages. A cleaner approach uses `useReducer` to batch index + flip state atomically. But for pragmatic fix, the guard-inside-setter approach prevents the out-of-bounds bug.\n\n### Medium\n\n#### 3. `shuffleArray` has no seed \u2014 results are non-deterministic and untestable\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:33-40`\n- **Problem**: The Fisher-Yates shuffle uses `Math.random()` which cannot be seeded. This makes unit testing impossible (cannot assert a specific shuffle order) and means shuffle behavior is not reproducible.\n- **Impact**: Testing difficulty. Not a runtime bug but blocks test coverage for shuffle-related flows.\n- **Fix**:\n```typescript\n// Recommended \u2014 accept optional random function for testability\nfunction shuffleArray<T>(arr: T[], randomFn = Math.random): T[] {\n  const copy = [...arr]\n  for (let i = copy.length - 1; i > 0; i--) {\n    const j = Math.floor(randomFn() * (i + 1))\n    ;[copy[i], copy[j]] = [copy[j], copy[i]]\n  }\n  return copy\n}\n```\n\n#### 4. `saveProgress` persists on every single card interaction \u2014 no debouncing\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:87-104`\n- **Problem**: `saveProgress` calls `localStorage.setItem` synchronously on every \"Know\" / \"Don't Know\" click and on every card advance. For a 100-card deck, this means 100+ serialization + write calls. While localStorage is fast in modern browsers, this is wasteful and could cause micro-jank on low-end devices (especially with large Sets serialized via `Array.from` + `JSON.stringify`).\n- **Impact**: Minor performance overhead per interaction. On low-end mobile devices this could contribute to frame drops during card transition animations.\n- **Fix**:\n```typescript\n// Recommended \u2014 debounce localStorage writes\nimport { useDebouncedCallback } from 'use-debounce'\n\nconst debouncedSave = useDebouncedCallback(\n  (known: Set<string>, unknown: Set<string>, index: number, finished: boolean) => {\n    try {\n      localStorage.setItem(\n        FLASHCARD_STORAGE_KEY(enrichmentId),\n        JSON.stringify({\n          known: Array.from(known),\n          unknown: Array.from(unknown),\n          currentIndex: index,\n          isFinished: finished,\n        })\n      )\n    } catch { /* ignore */ }\n  },\n  300\n)\n```\n\nAlternatively, save only on unmount and on finish, which would be simpler and more performant.\n\n#### 5. Empty `catch` blocks silently swallow errors without logging\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:81,99,173`\n- **Problem**: Three `catch` blocks catch all errors and do nothing \u2014 no logging, no user feedback, no metrics. If localStorage is full (quota exceeded), the user's progress silently stops persisting with no indication.\n- **Impact**: User could study a 100-card deck, close the tab, and lose all progress without knowing. Difficult to debug in production.\n- **Fix**:\n```typescript\n// Before\ncatch {\n  // Ignore localStorage errors\n}\n\n// After \u2014 at least log for observability\ncatch (error) {\n  console.warn('[FlashcardViewer] localStorage error:', error)\n}\n```\n\n### Low\n\n#### 6. Unused import: `AnimatePresence` imported but could be removed if assessment buttons were refactored\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:5`\n- **Problem**: `AnimatePresence` is imported and used for the self-assessment buttons fade-in, which is correct. However, the same file also imports `motion` and uses it for the swipe wrapper. This is fine \u2014 no actual unused import. _Upon closer inspection, all imports are used._ Retracted.\n\n#### 7. `FlashcardDots` renders raw `<button>` elements without `type=\"button\"`\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardDots.tsx:37`\n- **Problem**: The dot `<button>` elements lack `type=\"button\"`. In some contexts (e.g., if the flashcard viewer were ever placed inside a `<form>`), these buttons would default to `type=\"submit\"` and trigger form submission.\n- **Impact**: Extremely unlikely given current usage context, but it is a defensive HTML best practice to always specify `type=\"button\"` on non-submit buttons.\n- **Fix**:\n```typescript\n// Before\n<button\n  key={card.id}\n  className={cn(...)}\n\n// After\n<button\n  type=\"button\"\n  key={card.id}\n  className={cn(...)}\n```\n\n#### 8. Inline function in JSX creates a new reference on every render\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:237-239`\n- **Problem**: `onCardFlip` is defined as a regular function inside the render body (line 237), creating a new reference every render. This breaks the `React.memo` optimization on `FlashcardCard` since it receives a new `onFlip` prop each time.\n- **Impact**: `FlashcardCard` is wrapped in `React.memo` but the optimization is defeated because `onFlip` changes every render, causing the card to re-render unnecessarily.\n- **Fix**:\n```typescript\n// Before (line 237-239, inside render body)\nconst onCardFlip = () => {\n  if (!isDraggingRef.current) handleFlip()\n}\n\n// After \u2014 wrap in useCallback\nconst onCardFlip = useCallback(() => {\n  if (!isDraggingRef.current) handleFlip()\n}, [handleFlip])\n```\n\n## Improvements\n\n### High\n\n#### 1. FlashcardViewer is a 494-line monolith \u2014 extract state management into a custom hook\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx`\n- **Current**: All state (10 `useState` calls), all callbacks (8 `useCallback` calls), localStorage persistence, keyboard handling, and scroll locking are in a single component function. This makes the component hard to test, hard to reason about, and hard to extend.\n- **Recommended**: Extract the state logic into a `useFlashcardState` custom hook:\n```typescript\n// hooks/useFlashcardState.ts\nexport function useFlashcardState(content: FlashcardsEnrichmentContent, enrichmentId: string) {\n  // All useState, useCallback, useEffect for persistence\n  // Returns: { cards, currentCard, currentIndex, isFlipped, isFinished, ... handlers }\n}\n\n// FlashcardViewer.tsx \u2014 now purely presentational\nexport function FlashcardViewer({ content, enrichmentId }: FlashcardViewerProps) {\n  const state = useFlashcardState(content, enrichmentId)\n  const t = useTranslations('enrichments')\n  // Only JSX rendering, no business logic\n}\n```\n- **Impact**: Enables unit testing of flashcard logic without rendering. Reduces cognitive load. Follows React best practice of separating concerns.\n\n#### 2. No test coverage for any of the four components\n\n- **File**: `packages/web/components/course/viewer/enrichments/Flashcard*.tsx`\n- **Current**: Zero test files found for `FlashcardViewer`, `FlashcardCard`, `FlashcardDots`, or `FlashcardSummary`. These components contain non-trivial logic: progress tracking, localStorage persistence, navigation state machine, keyboard shortcuts, and drag gestures.\n- **Recommended**: Create test files covering at minimum:\n  - Navigation: forward/backward/boundary behavior\n  - Know/Don't Know: correct Set mutations and progress calculation\n  - localStorage: save/restore/reset round-trip\n  - Summary: score calculation (0%, 50%, 100%, edge case: 0 cards)\n  - Keyboard: arrow keys, space, escape\n  - Shuffle: verify all cards are preserved (no duplicates/losses)\n- **Impact**: Critical user-facing feature without any regression protection. Any future refactor could break flashcard progress silently.\n\n### Medium\n\n#### 3. `FlashcardDots` is not memoized \u2014 re-renders on every parent state change\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardDots.tsx:17`\n- **Current**: `FlashcardDots` is a plain function component. It receives `cards`, `currentIndex`, `knownIds`, `unknownIds`, and `onNavigate` as props. Since `knownIds` and `unknownIds` are `Set` objects that get replaced (new Set()) on every know/don't-know action, and `onNavigate` is an inline arrow function, this component re-renders on every interaction.\n- **Recommended**:\n```typescript\n// Wrap in React.memo and stabilize the onNavigate callback in the parent\nexport const FlashcardDots = React.memo(function FlashcardDots({...}: FlashcardDotsProps) {\n  // ...\n})\n```\nCombined with stabilizing `onNavigate` via `useCallback` in the parent:\n```typescript\nconst handleDotNavigate = useCallback((i: number) => {\n  setCurrentIndex(i)\n  setIsFlipped(false)\n}, [])\n```\n- **Impact**: Prevents unnecessary re-renders of up to 30 dot buttons on every card flip and assessment action.\n\n#### 4. `FlashcardSummary` is not memoized \u2014 could benefit from `React.memo`\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardSummary.tsx:31`\n- **Current**: Plain function component receiving primitive props and a callback. While it only renders when `isFinished` is true (so re-renders are less frequent), wrapping it in `React.memo` is cheap insurance.\n- **Recommended**:\n```typescript\nexport const FlashcardSummary = React.memo(function FlashcardSummary({...}: FlashcardSummaryProps) {\n  // ...\n})\n```\n- **Impact**: Minor optimization. Low effort, good practice for consistency with `FlashcardCard` which is already memoized.\n\n#### 5. Hardcoded swipe threshold (80px) does not account for screen size\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:339-340`\n- **Current**: `if (info.offset.x > 80)` and `if (info.offset.x < -80)` use a fixed pixel threshold for swipe navigation. On a 320px-wide mobile screen, 80px is 25% of screen width \u2014 reasonable. On a 2560px-wide desktop, 80px is 3% \u2014 too sensitive, likely to trigger on accidental mouse drags.\n- **Recommended**: Use a percentage of container width or velocity-based detection:\n```typescript\n// Recommended \u2014 use velocity instead of (or combined with) offset\nonDragEnd={(_, info) => {\n  const swipeThreshold = 80\n  const velocityThreshold = 500\n  if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) handlePrevious()\n  else if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) handleNext()\n  requestAnimationFrame(() => { isDraggingRef.current = false })\n}}\n```\n- **Impact**: Better UX on wide screens. Prevents accidental navigation.\n\n### Low\n\n#### 6. `cardsFingerprint` computed on every render \u2014 could be memoized\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:61`\n- **Current**: `const cardsFingerprint = content.cards.map((c) => c.id).join(',')` runs on every render to produce a string used only as a `useEffect` dependency. For 100 cards, this creates a temporary array and a joined string on every render.\n- **Recommended**:\n```typescript\nconst cardsFingerprint = useMemo(\n  () => content.cards.map((c) => c.id).join(','),\n  [content.cards]\n)\n```\n- **Impact**: Negligible performance gain (array map + join is fast), but follows the principle of not doing unnecessary work in render.\n\n#### 7. Magic number 30 in FlashcardDots with no explanation\n\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardDots.tsx:25`\n- **Current**: `if (cards.length > 30) return null` \u2014 silently hides the dots navigation if there are more than 30 cards. The threshold is undocumented and could confuse users who expect to see dot navigation.\n- **Recommended**:\n```typescript\n/** Maximum number of cards for which dot navigation is shown.\n * Beyond this, dots become too small to be useful and hurt layout. */\nconst MAX_DOT_CARDS = 30\n\n// ...\nif (cards.length > MAX_DOT_CARDS) return null\n```\nAlso consider showing a condensed indicator (e.g., \"12/45\") instead of hiding navigation entirely.\n- **Impact**: Readability and discoverability. Users with 31+ card decks lose dot navigation without explanation.\n\n## Validation\n\n- Type Check: SKIPPED (per task instructions)\n- Build: SKIPPED (per task instructions)\n\n## Files Reviewed\n\n| File | Lines |\n|---|---|\n| `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx` | 494 |\n| `packages/web/components/course/viewer/enrichments/FlashcardCard.tsx` | 95 |\n| `packages/web/components/course/viewer/enrichments/FlashcardDots.tsx` | 56 |\n| `packages/web/components/course/viewer/enrichments/FlashcardSummary.tsx` | 105 |\n| **Total** | **750** |\n\n### Supporting files read for context\n\n| File | Purpose |\n|---|---|\n| `packages/shared-types/src/enrichment-content.ts` | Type definitions for `FlashcardItem`, `FlashcardsEnrichmentContent` |\n| `packages/web/components/course/viewer/components/enrichment-type-guards.ts` | Type guard `isFlashcardsContent` used before rendering |\n| `packages/web/components/course/viewer/components/EnrichmentCard.tsx` | Parent consumer of `FlashcardViewer` |\n| `packages/web/components/common/lesson-materials-switcher.tsx` | Alternate parent consumer of `FlashcardViewer` |\n| `packages/web/components/course/viewer/enrichments/index.ts` | Barrel export |\n"}], "grading": {"eval_id": 1, "variant": "with_skill", "expectations": [{"text": "Report has clear sections: Summary, Issues, Improvements", "passed": true, "evidence": "Report has Summary table, Issues (Critical/High/Medium/Low), Improvements (High/Medium/Low) as distinct sections"}, {"text": "Findings reference specific files with line numbers (file:line format)", "passed": true, "evidence": "Consistently uses format like 'FlashcardViewer.tsx:106', 'FlashcardViewer.tsx:112-117', 'FlashcardDots.tsx:37'"}, {"text": "Issues are categorized by priority (critical/high/medium/low)", "passed": true, "evidence": "Uses Critical/High/Medium/Low hierarchy with counts in summary table"}, {"text": "At least 2 findings include code snippets showing before/after or current/recommended", "passed": true, "evidence": "7 out of 8 findings include before/after TypeScript code examples"}, {"text": "Report mentions all 4 reviewed files", "passed": true, "evidence": "Files Reviewed table lists all 4 files with line counts plus 5 supporting files"}, {"text": "No obviously wrong findings", "passed": true, "evidence": "Finding #6 was self-corrected (retracted as not actually unused). All other findings are accurate based on code analysis."}, {"text": "Each finding has an actionable recommendation", "passed": true, "evidence": "Every finding has a concrete Fix section with code snippet or specific action"}]}}, {"id": "eval-1-full-review-without_skill", "prompt": "Review the flashcard viewer components that were recently refactored \u2014 specifically FlashcardViewer.tsx, FlashcardCard.tsx, FlashcardDots.tsx, and FlashcardSummary.tsx in packages/web/components/course/viewer/enrichments/", "eval_id": 1, "outputs": [{"name": "report.md", "type": "text", "content": "# Code Review: Flashcard Viewer Components\n\n**Reviewed files:**\n- `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx` (494 lines)\n- `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardCard.tsx` (95 lines)\n- `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardDots.tsx` (56 lines)\n- `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardSummary.tsx` (105 lines)\n\n**Refactoring commit:** `1d57148c` -- \"feat(flashcards): redesign FlashcardViewer UI with fullscreen study mode\"\n\n**Reviewer:** Claude Opus 4.6\n**Date:** 2026-03-04\n\n---\n\n## Executive Summary\n\nThe flashcard viewer was refactored from a single monolithic component into four well-separated components: a parent orchestrator (`FlashcardViewer`), a flip-card visual (`FlashcardCard`), progress dot indicators (`FlashcardDots`), and a completion summary screen (`FlashcardSummary`). The refactoring adds fullscreen study mode, swipe/keyboard navigation, localStorage persistence, self-assessment tracking, and animated transitions.\n\nOverall the code is well-structured, follows project conventions (shared types, `cn()` utility, `next-intl`, shadcn/ui), and has good accessibility foundations. However, there are several issues ranging from potential runtime bugs to performance concerns and accessibility gaps.\n\n---\n\n## Critical Issues\n\n### 1. `currentCard` can be `undefined` -- potential crash in handlers (FlashcardViewer.tsx, line 106)\n\n```typescript\nconst currentCard = cards[currentIndex]\n```\n\n`currentCard` is derived from `cards[currentIndex]` but `currentIndex` can become out of bounds in race conditions. While `handleKnow` and `handleDontKnow` guard with `if (!currentCard) return`, the `FlashcardCard` component receives `card: FlashcardItem | undefined` and only uses optional chaining (`card?.front`, `card?.back`) -- so the card renders empty content silently rather than showing a meaningful fallback.\n\n**More critically**, the difficulty badge section at line 297-311 uses `currentCard?.difficulty` which is fine, but the `knownIds.has(currentCard.id)` at line 453 does NOT guard against `undefined`:\n\n```typescript\n{currentCard && knownIds.has(currentCard.id) && (\n```\n\nThis is guarded. However, `saveProgress` at line 141 is called with `currentIndex >= totalCards - 1` to determine `finished`, and if `currentIndex` is stale relative to `totalCards`, this could produce incorrect `isFinished` state.\n\n**Recommendation:** Add a guard at the top of the render section (after the `isFinished` check) that returns an error fallback if `currentCard` is undefined when `cards.length > 0`.\n\n### 2. Stale closure in `handleNext` callback dependency chain (FlashcardViewer.tsx, lines 120-131, 133-155)\n\n`handleNext` depends on `knownIds` and `unknownIds` in its `useCallback` dependency array. `handleKnow` and `handleDontKnow` both compute new sets *then* call `handleNext(true)`. However, `handleNext` captures `knownIds` and `unknownIds` at closure time -- not the freshly computed sets passed to `saveProgress`. Currently this is safe because `handleNext` only uses these for the `!skipSave` path, and both callers pass `skipSave=true`. But this is fragile: if someone removes the `skipSave` parameter or refactors these callbacks, the stale closure will cause bugs.\n\n**Recommendation:** Either:\n- Remove `knownIds`/`unknownIds` from `handleNext`'s dependency array and body entirely (they are only needed in the `!skipSave` branch which is only used from the inline Next button click).\n- Or restructure so `handleNext` only handles navigation, with persistence handled separately.\n\n### 3. localStorage persistence uses `content.cards` in effect dependency but is not stable (FlashcardViewer.tsx, line 84)\n\n```typescript\n}, [enrichmentId, cardsFingerprint, content.cards])\n```\n\nThe effect at lines 64-84 depends on `content.cards`, which is derived from props. If the parent re-renders with a new `content` object reference (but same card data), this effect re-runs and reloads from localStorage. This is mostly benign (it reloads the same data), but it triggers unnecessary state updates. The `cardsFingerprint` string should be sufficient without also including `content.cards`.\n\n**Recommendation:** Remove `content.cards` from the dependency array since `cardsFingerprint` already captures the identity. Use a ref or memoized value for the card lookup inside the effect:\n\n```typescript\n}, [enrichmentId, cardsFingerprint])\n```\n\n---\n\n## Major Issues\n\n### 4. Fragment wrapper causes layout issues (FlashcardViewer.tsx, lines 241-493)\n\nThe component returns a React Fragment (`<>...</>`) containing two sibling blocks: the main viewer `<div>` and the fullscreen button `<div>`. This means the parent layout must handle two adjacent children rather than one. In `EnrichmentCard.tsx` (line 524-528) and `lesson-materials-switcher.tsx`, the FlashcardViewer is placed inside `<div className=\"mt-3\">`, so both children are in a block context. This works, but it breaks the implicit contract that a component returns a single root element, and could cause unexpected layout behavior if the parent uses flexbox or grid.\n\n**Recommendation:** Wrap in a single root `<div>` or use the fullscreen button conditionally inside the main `<div>`.\n\n### 5. No test coverage\n\nThere are zero test files for any of the four flashcard components. Given the complexity of state management (navigation, self-assessment, localStorage persistence, shuffle, fullscreen mode), this is a significant gap. The localStorage load/save logic, shuffle, and navigation edge cases (first card, last card, beyond bounds) are all ripe for unit testing.\n\n**Recommendation:** Add unit tests covering:\n- Navigation (next/previous at boundaries)\n- Self-assessment (know/don't know updates sets correctly)\n- localStorage persistence (save and reload)\n- Shuffle (preserves card count, changes order)\n- Summary display conditions\n- Empty cards array edge case\n\n### 6. FlashcardCard does not handle long text content (FlashcardCard.tsx)\n\nBoth front and back faces use `absolute inset-0` positioning with `min-h-[220px]`, but the parent `motion.div` uses `minHeight: '220px'` as an inline style. If a flashcard has very long text, the text will overflow the fixed-height container because the inner divs are absolutely positioned and cannot push the parent to grow.\n\n**Recommendation:** Consider:\n- Adding `overflow-y-auto` to the face divs for very long content\n- Or using a dynamic height approach where the taller face dictates the container height (e.g., render both faces in normal flow but hide with opacity/visibility rather than `absolute`)\n\n### 7. Shuffle does not preserve assessment state correctly (FlashcardViewer.tsx, lines 157-162)\n\nWhen shuffling, the component resets `currentIndex` to 0 but does NOT reset `knownIds`/`unknownIds`. This means the dot indicators and the \"already assessed\" icons will correctly reflect previous assessments (since they use card IDs, not indices). However, the progress percentage (`progressPercent`) is based on `currentIndex`, not on how many cards have been assessed. After shuffling, the user jumps back to card 0, seeing a progress bar that suggests they are at the beginning, even if they have assessed 80% of cards.\n\n**Recommendation:** Consider basing the progress bar on `(knownIds.size + unknownIds.size) / totalCards * 100` rather than `(currentIndex + 1) / totalCards * 100`, at least when assessment mode is active.\n\n---\n\n## Minor Issues\n\n### 8. `isDraggingRef` timing with `requestAnimationFrame` (FlashcardViewer.tsx, lines 341-343)\n\n```typescript\nonDragEnd={(_, info) => {\n  if (info.offset.x > 80) handlePrevious()\n  else if (info.offset.x < -80) handleNext()\n  requestAnimationFrame(() => {\n    isDraggingRef.current = false\n  })\n}}\n```\n\nUsing `requestAnimationFrame` to delay resetting the drag ref is a reasonable heuristic, but it is not guaranteed to fire after the click event from the drag release. This could cause occasional spurious flips after swipe gestures, especially on slower devices.\n\n**Recommendation:** Use a short `setTimeout` (e.g., 100ms) instead of `requestAnimationFrame` for more reliable prevention of post-drag clicks, or use Framer Motion's `onDrag` and `onDragEnd` to set a flag that persists through the synthetic click cycle.\n\n### 9. FlashcardDots silently disappears for 30+ cards (FlashcardDots.tsx, line 25)\n\n```typescript\nif (cards.length > 30) return null\n```\n\nThis is a reasonable performance/UX optimization, but it is invisible to the user. With 31+ cards, the dot navigation simply vanishes with no explanation. Users of large decks lose a navigation feature without knowing why.\n\n**Recommendation:** For 30+ cards, render a compact indicator (e.g., \"Card 15 of 45\") or a mini scrollbar instead of dots.\n\n### 10. Keyboard navigation does not intercept Arrow keys on focusable elements (FlashcardViewer.tsx, lines 182-201)\n\nThe Space/Enter key handler checks for focusable elements (`BUTTON`, `A`, `INPUT`, etc.) and bails out, but the ArrowLeft/ArrowRight handlers do not. If a user is focused on a button and presses ArrowLeft, both the browser's native behavior (moving focus) and the card navigation will fire.\n\n**Recommendation:** Add the same focusable-element check for arrow keys, or use `e.preventDefault()` for arrow keys to prevent dual behavior.\n\n### 11. Hardcoded swipe threshold of 80px (FlashcardViewer.tsx, line 339)\n\n```typescript\nif (info.offset.x > 80) handlePrevious()\nelse if (info.offset.x < -80) handleNext()\n```\n\nThe 80px threshold is absolute, not relative to viewport or card width. On small mobile screens, 80px might be a large portion of the screen, making swipes hard to trigger. On large screens, it might be too easy to trigger accidentally.\n\n**Recommendation:** Use a relative threshold (e.g., 15% of card width) or expose as a constant with a comment explaining the choice.\n\n### 12. `aria-current=\"true\"` should use the proper value (FlashcardDots.tsx, line 50)\n\n```typescript\naria-current={index === currentIndex ? 'true' : undefined}\n```\n\nFor navigation dots, `aria-current=\"step\"` would be more semantically appropriate than `\"true\"`, since the dots represent steps in a sequence.\n\n### 13. Unused `cn` import in FlashcardSummary.tsx (line 8)\n\nThe `cn` utility is imported and used only on lines 49-51 for the trophy background -- this is a legitimate use. No issue here on reflection.\n\n### 14. FlashcardCard `React.memo` effectiveness (FlashcardCard.tsx, line 22)\n\nThe component is wrapped in `React.memo`, but it receives `onFlip` as a prop. In FlashcardViewer, `onCardFlip` is defined as a local function (line 237-239) inside the render body, not wrapped in `useCallback`:\n\n```typescript\nconst onCardFlip = () => {\n  if (!isDraggingRef.current) handleFlip()\n}\n```\n\nThis creates a new function reference every render, defeating `React.memo`. Every time any state changes in FlashcardViewer (e.g., `isFlipped`, `currentIndex`, `knownIds`), the FlashcardCard will re-render despite the memo wrapper.\n\n**Recommendation:** Wrap `onCardFlip` in `useCallback`:\n\n```typescript\nconst onCardFlip = useCallback(() => {\n  if (!isDraggingRef.current) handleFlip()\n}, [handleFlip])\n```\n\n### 15. Body scroll lock does not restore correctly if unmounted while fullscreen (FlashcardViewer.tsx, lines 204-210)\n\n```typescript\nuseEffect(() => {\n  if (!isFullscreen) return\n  document.body.style.overflow = 'hidden'\n  return () => {\n    document.body.style.overflow = ''\n  }\n}, [isFullscreen])\n```\n\nIf the component unmounts while `isFullscreen` is true (e.g., navigating to another page), the cleanup runs and sets `overflow = ''`. This is correct. However, if some other component also sets `document.body.style.overflow`, this cleanup will clobber that value. This is a general problem with direct DOM manipulation in React.\n\n**Recommendation:** Save and restore the previous value:\n\n```typescript\nuseEffect(() => {\n  if (!isFullscreen) return\n  const prev = document.body.style.overflow\n  document.body.style.overflow = 'hidden'\n  return () => { document.body.style.overflow = prev }\n}, [isFullscreen])\n```\n\n### 16. `handleShuffle` toggles shuffle but does not persist shuffle state (FlashcardViewer.tsx, lines 157-162)\n\nWhen a user shuffles and then leaves/returns, the saved localStorage data restores `knownIds`, `unknownIds`, `currentIndex`, and `isFinished`, but NOT the shuffle state or the shuffled card order. The user will see the original card order with a potentially stale `currentIndex` that pointed to a different card in the shuffled deck.\n\n**Recommendation:** Either persist the shuffled card order (or a seed) in localStorage, or reset `currentIndex` to 0 when loading saved progress (which is already done via `Math.min` but should arguably be 0 if shuffle state is lost).\n\n---\n\n## Accessibility Review\n\n### Strengths\n- `role=\"button\"` and `tabIndex={0}` on the card container\n- `onKeyDown` handler for Enter/Space on the card\n- `aria-label` on navigation buttons and card\n- `aria-live=\"polite\"` on the card counter\n- `aria-current` on active dot\n- `sr-only` label for close button in fullscreen\n- Fullscreen hint text for keyboard shortcuts\n\n### Gaps\n- The card flip state change is not announced to screen readers. When flipped, the answer appears but there is no `aria-live` region to announce it. Screen reader users will not know the card flipped.\n- The self-assessment buttons (Know it / Still learning) appear with `AnimatePresence` animation but are not announced.\n- Dot indicators are tiny (8x8px / `h-2 w-2`), below the WCAG minimum touch target of 44x44px. While they have padding from `gap-1.5`, the actual interactive area is very small for touch users.\n- Color-only status indication: dots use green/amber/grey to indicate known/unknown/unassessed, with no shape or pattern difference. This fails WCAG 1.4.1 (Use of Color).\n- The fullscreen overlay backdrop click handler (`onClick={() => setIsFullscreen(false)}`) has no keyboard equivalent beyond the Escape key, which is fine for keyboard users but the backdrop `<div>` is not a focusable or labeled element.\n\n---\n\n## Performance Review\n\n### Strengths\n- `React.memo` on `FlashcardCard` (though defeated by non-memoized callback, see issue #14)\n- Dots hidden for 30+ cards\n- Spring animations use Framer Motion's GPU-accelerated transforms\n\n### Concerns\n- Every state change (flip, navigate, assess) triggers re-render of the entire `FlashcardViewer`, which recalculates all derived values and re-renders all children.\n- `shuffleArray` creates a full copy using Fisher-Yates, which is O(n) -- fine for up to 100 cards.\n- `Set` operations in `handleKnow`/`handleDontKnow` create new Set instances every call. This is correct for immutability but creates garbage for GC on every assessment action.\n- `localStorage.setItem` is synchronous and called on every assessment. For very fast clicking, this could cause jank. Consider debouncing the save.\n\n---\n\n## Code Quality and Style\n\n### Strengths\n- Clean extraction of sub-components with clear interfaces\n- Consistent use of `cn()` for conditional class composition\n- Good JSDoc comments on components and key functions\n- Translation keys are externalized via `next-intl` for both English and Russian\n- `FlashcardSummary` receives labels as a flat object, avoiding translation coupling in the child\n- The `FLASHCARD_STORAGE_KEY` pattern is clean and prevents key collisions\n- Error handling around localStorage operations (try/catch with empty catch blocks)\n- TypeScript types from shared package ensure consistency between backend and frontend\n\n### Concerns\n- `FlashcardViewer` is still 494 lines and manages 8 pieces of state. Consider extracting state management into a custom hook (`useFlashcardSession`).\n- Empty `catch` blocks (lines 81, 99, 173) silently swallow errors. At minimum, add a comment or `console.debug` for development.\n- The `skipSave` parameter on `handleNext` is a code smell -- it couples navigation with persistence. Better to separate these concerns.\n- The `labels` prop pattern used in `FlashcardSummary` is good for decoupling, but inconsistent -- `FlashcardCard` takes individual label props (`tapToFlipLabel`, `flipCardLabel`) instead of a `labels` object. Consider standardizing.\n\n---\n\n## Summary of Findings\n\n| Severity | Count | Key Items |\n|----------|-------|-----------|\n| Critical | 3 | Stale closure risk in handleNext, undefined currentCard edge cases, unnecessary effect re-runs |\n| Major | 4 | Fragment wrapper, no tests, text overflow in cards, misleading progress after shuffle |\n| Minor | 9 | Memo defeated by callback, body scroll restore, swipe threshold, dot accessibility, etc. |\n\n### Top 5 Actionable Items (prioritized)\n\n1. **Add unit tests** for navigation, assessment, localStorage, and shuffle logic\n2. **Wrap `onCardFlip` in `useCallback`** to make `React.memo` on `FlashcardCard` effective\n3. **Extract state into `useFlashcardSession` hook** to reduce FlashcardViewer complexity\n4. **Fix text overflow** in FlashcardCard for long content (add `overflow-y-auto`)\n5. **Add screen reader announcements** for card flip and assessment state changes\n"}], "grading": {"eval_id": 1, "variant": "without_skill", "expectations": [{"text": "Report has clear sections: Summary, Issues, Improvements", "passed": false, "evidence": "Has Executive Summary, Critical/Major/Minor issues, Accessibility Review, Performance Review, Code Quality \u2014 but Issues and Improvements are not separated into distinct sections"}, {"text": "Findings reference specific files with line numbers (file:line format)", "passed": true, "evidence": "Uses format like '(FlashcardViewer.tsx, line 106)' and '(FlashcardViewer.tsx, lines 112-117)' \u2014 slightly different format but includes file:line references"}, {"text": "Issues are categorized by priority (critical/high/medium/low)", "passed": true, "evidence": "Uses Critical/Major/Minor severity levels with counts in summary table"}, {"text": "At least 2 findings include code snippets showing before/after or current/recommended", "passed": true, "evidence": "Multiple findings include code snippets with recommendations"}, {"text": "Report mentions all 4 reviewed files", "passed": true, "evidence": "All 4 files listed in 'Reviewed files' header with line counts"}, {"text": "No obviously wrong findings", "passed": true, "evidence": "Finding #13 was self-corrected. All other findings appear accurate."}, {"text": "Each finding has an actionable recommendation", "passed": true, "evidence": "Most findings have Recommendation sections with specific actions, though some are more prescriptive than others"}]}}, {"id": "eval-2-i18n-review-with_skill", "prompt": "Do a quick code review of my recent changes before I commit \u2014 I've been working on the enrichments i18n messages", "eval_id": 2, "outputs": [{"name": "report.md", "type": "text", "content": "# Code Review: Enrichments i18n Messages\n\n**Date**: 2026-03-04\n**Scope**: i18n translation files for enrichments feature (EN + RU)\n**Files Reviewed**: 2\n**Lines Changed**: +677 / -0 (both files, full review)\n\n## Summary\n\n| Category | Critical | High | Medium | Low |\n|---|---|---|---|---|\n| Issues | 0 | 2 | 3 | 2 |\n| Improvements | -- | 1 | 3 | 2 |\n| **Total** | **0** | **3** | **6** | **4** |\n\n**Verdict**: NEEDS WORK -- has high issues that affect user-facing correctness\n\n## Issues\n\n### Critical\n\nNo critical issues found.\n\n### High\n\n#### 1. EN pluralization uses broken \"(s)\" / \"(ies)\" pattern instead of ICU plural format\n- **File**: `packages/web/messages/en/enrichments.json:67,365,369`\n- **Problem**: Three EN strings use a raw parenthesized plural hack -- `\"{count} activity(ies)\"`, `\"{count} question(s)\"`, `\"{count} point(s)\"` -- instead of proper ICU MessageFormat plurals. This renders literally as \"1 activity(ies)\" in the UI, which looks unprofessional and broken.\n- **Impact**: Users see malformed plurals in the English UI. The RU counterpart for `questionsLabel` and `pointsEarned` correctly uses ICU `{count, plural, ...}`, but EN does not, creating an inconsistency where RU is more correct than EN.\n- **Fix**:\n```json\n// Before\n\"enrichmentCount\": \"{count} activity(ies)\"\n\"questionsLabel\": \"{count} question(s)\"\n\"pointsEarned\": \"{count} point(s)\"\n\n// After\n\"enrichmentCount\": \"{count, plural, one {# activity} other {# activities}}\"\n\"questionsLabel\": \"{count, plural, one {# question} other {# questions}}\"\n\"pointsEarned\": \"{count, plural, one {# point} other {# points}}\"\n```\n\n#### 2. EN uses simple `{count}` placeholder where RU uses ICU plural -- format mismatch\n- **File**: `packages/web/messages/en/enrichments.json:308-309,338,366,591`\n- **Problem**: Six EN strings use a plain `\"{count} slides\"` / `\"{count} questions\"` / `\"{count} points\"` pattern while the corresponding RU strings correctly use `{count, plural, one {...} few {...} many {...} other {...}}`. This means the EN and RU strings use different ICU formatting strategies for the same key. While next-intl can handle both, it creates a maintenance inconsistency where the EN always shows plural form even for count=1 (\"1 slides\", \"1 questions\").\n- **Impact**: \"1 slides\" and \"1 questions\" will display in the English UI. Additionally, the mixed pattern makes future auditing harder.\n- **Fix**:\n```json\n// Before (EN)\n\"questionsCount\": \"{count} questions\"\n\"slidesCount\": \"{count} slides\"\n\"pointsLabel\": \"{count} points\"\n\"slideCount\": \"{count} slides ready\"\n\n// After (EN)\n\"questionsCount\": \"{count, plural, one {# question} other {# questions}}\"\n\"slidesCount\": \"{count, plural, one {# slide} other {# slides}}\"\n\"pointsLabel\": \"{count, plural, one {# point} other {# points}}\"\n\"slideCount\": \"{count, plural, one {# slide ready} other {# slides ready}}\"\n```\n\n### Medium\n\n#### 3. Mixed terminology: \"enrichment\" vs \"activity\" used inconsistently within EN\n- **File**: `packages/web/messages/en/enrichments.json` (multiple locations)\n- **Problem**: The EN file uses two different terms for the same concept. User-facing labels (assetDock, inspector titles, create/delete confirmations) use \"Activity\" while error messages, viewer delete/regenerate messages, and the `inspector.noEnrichments` key itself still say \"enrichment\". This creates a confusing UX where the same object is called different names in different parts of the UI.\n- **Impact**: Users may not realize \"enrichment\" and \"activity\" refer to the same thing. The inspector says \"This lesson has no enrichments yet\" but the add button says \"Add Activity\".\n- **Fix**: Pick one term consistently. Since the UI headings already favor \"Activity\", update the remaining \"enrichment\" references:\n```json\n// Before\n\"noEnrichments\": \"This lesson has no enrichments yet\"\n\"notFound\": \"Enrichment Not Found\"\n\"notFoundDescription\": \"This enrichment may have been deleted or moved.\"\n\"generationFailed\": \"Failed to generate enrichment\"\n\n// After\n\"noEnrichments\": \"No activities yet\"\n\"notFound\": \"Activity Not Found\"\n\"notFoundDescription\": \"This activity may have been deleted or moved.\"\n\"generationFailed\": \"Failed to generate activity\"\n```\nNote: The same inconsistency exists in RU with \"\u043e\u0431\u043e\u0433\u0430\u0449\u0435\u043d\u0438\u0435/\u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435\" vs \"\u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c\".\n\n#### 4. NLM type naming inconsistency between `types` and `viewer.enrichmentTypes`\n- **File**: `packages/web/messages/en/enrichments.json:5-6` vs `packages/web/messages/en/enrichments.json:384-385`\n- **Problem**: `types.nlm_audio` = \"Audio Lesson\" but `viewer.enrichmentTypes.nlm_audio` = \"NLM Audio\". Same for nlm_video: \"Video Lesson\" vs \"NLM Video\". Users see different names for the same enrichment type depending on which UI area they are in. The same issue exists in RU (\"\u0410\u0443\u0434\u0438\u043e\u0443\u0440\u043e\u043a\" vs \"NLM-\u0430\u0443\u0434\u0438\u043e\").\n- **Impact**: Confusing UX. \"NLM Audio\" is a technical internal term that leaks to users.\n- **Fix**:\n```json\n// Before (viewer.enrichmentTypes)\n\"nlm_audio\": \"NLM Audio\"\n\"nlm_video\": \"NLM Video\"\n\n// After (viewer.enrichmentTypes)\n\"nlm_audio\": \"Audio Lesson\"\n\"nlm_video\": \"Video Lesson\"\n```\n\n#### 5. RU `assetDock.enrichmentCount` uses broken \"(\u0435\u0439)\" pattern instead of ICU plural\n- **File**: `packages/web/messages/ru/enrichments.json:67`\n- **Problem**: `\"{count} \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c(\u0435\u0439)\"` -- same broken parenthesized plural as EN but in Russian. This literally renders as \"1 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c(\u0435\u0439)\" or \"5 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c(\u0435\u0439)\" which is grammatically wrong in Russian.\n- **Impact**: Broken Russian grammar in the activity count display.\n- **Fix**:\n```json\n// Before\n\"enrichmentCount\": \"{count} \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c(\u0435\u0439)\"\n\n// After\n\"enrichmentCount\": \"{count, plural, one {# \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c} few {# \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438} many {# \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0435\u0439} other {# \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0435\u0439}}\"\n```\n\n### Low\n\n#### 6. Eight enrichment types in `types` have no corresponding `typeDescriptions` entry\n- **File**: `packages/web/messages/en/enrichments.json:13-20`\n- **Problem**: `podcast`, `mindmap`, `case_study`, `flashcards`, `project`, `discussion`, `reading`, `exercise` all exist in `types` but have no matching key in `typeDescriptions`. If these types are rendered with tooltip/description lookup, they will silently fall back to the key name or show nothing.\n- **Impact**: Low -- these may be placeholder/future types not yet active. But if they are used, descriptions will be missing.\n\n#### 7. Duplicate `cancel` string defined in 5 separate locations\n- **File**: `packages/web/messages/en/enrichments.json:55,125,170,150,463`\n- **Problem**: The word \"Cancel\" is defined in `actions.cancel`, `draft.cancel`, `forms.common.cancel`, `batch.cancel`, and `viewer.cancel`. While this is not a bug, it increases maintenance burden. If the label needs to change (e.g., to \"Never mind\"), all 5 must be updated. Similar duplication exists for \"edit\", \"back\", \"approve\", \"regenerate\", \"download\".\n- **Impact**: Low -- maintenance overhead only.\n\n## Improvements\n\n### High\n\n#### 1. `videoPlayer` keys use space-separated strings instead of camelCase\n- **File**: `packages/web/messages/en/enrichments.json:593-650`\n- **Problem**: The `videoPlayer` section uses 15 keys with spaces in their names (e.g., `\"Enter Fullscreen\"`, `\"Seek Forward\"`, `\"Caption Styles\"`). This is inconsistent with every other section in the file which uses camelCase (`addEnrichment`, `slideCount`, etc.). Space-in-key requires bracket notation access (`t[\"Enter Fullscreen\"]`) rather than dot notation.\n- **Current**:\n```json\n\"Enter Fullscreen\": \"Enter Fullscreen\",\n\"Seek Forward\": \"Seek Forward\"\n```\n- **Recommended**: These likely come from a video player library's expected key format (e.g., Vidstack) and may be required by that library. If so, document this exception with a comment or separate the video player translations into their own namespace. If not library-required, normalize to camelCase:\n```json\n\"enterFullscreen\": \"Enter Fullscreen\",\n\"seekForward\": \"Seek Forward\"\n```\n\n### Medium\n\n#### 2. `types.mindmap` vs `types.nlm_mind_map` inconsistent naming convention\n- **File**: `packages/web/messages/en/enrichments.json:14` vs `packages/web/messages/en/enrichments.json:23`\n- **Problem**: The non-NLM version uses `mindmap` (one word, no separator) while the NLM version uses `nlm_mind_map` (underscored, two words). The display names also differ: \"Mindmap\" vs \"Mind Map\". In RU: \"\u041c\u0430\u0439\u043d\u0434\u043c\u044d\u043f\" vs \"\u041a\u0430\u0440\u0442\u0430 \u0437\u043d\u0430\u043d\u0438\u0439\".\n- **Recommended**: Standardize to `mind_map` and \"Mind Map\" for both, or use a consistent convention.\n\n#### 3. `viewer.nlmAudioVersion` / `viewer.nlmVideoVersion` expose \"NLM\" to users\n- **File**: `packages/web/messages/en/enrichments.json:314-315`\n- **Problem**: `\"NLM audio version of lesson\"` and `\"NLM video version of lesson\"` expose an internal acronym (\"NLM\" = NotebookLM) to end users who won't understand it.\n- **Recommended**:\n```json\n// Before\n\"nlmAudioVersion\": \"NLM audio version of lesson\"\n\"nlmVideoVersion\": \"NLM video version of lesson\"\n\n// After\n\"nlmAudioVersion\": \"Audio version of lesson\"\n\"nlmVideoVersion\": \"Video version of lesson\"\n```\n\n#### 4. `forms.presentation` has redundant near-duplicate keys\n- **File**: `packages/web/messages/en/enrichments.json:238-243`\n- **Problem**: `includeNotes` (\"Include Speaker Notes\") and `includeSpeakerNotes` (\"Include Speaker Notes\") have identical values. `slideCount` (\"Number of Slides\") and `maxSlides` (\"Maximum Slides\") serve a similar purpose. One of each pair is likely unused dead code.\n- **Recommended**: Audit component usage and remove the unused key from each pair.\n\n### Low\n\n#### 5. `viewer.flashcards.cardCount` EN uses only `one/other` plural forms\n- **File**: `packages/web/messages/en/enrichments.json:424`\n- **Problem**: English only needs `one` and `other` forms, so `{count, plural, one {# card} other {# cards}}` is technically correct. However, for consistency with the RU file which uses `one/few/many/other`, it may be worth adding a comment noting this is intentional.\n- **Recommended**: No action needed, this is correct. Noting for completeness.\n\n#### 6. `viewer.resumingGeneration` EN uses only `one/other` while RU uses full plural set\n- **File**: `packages/web/messages/en/enrichments.json:468`\n- **Problem**: Same pattern as above -- correct for English but worth noting the divergence is intentional.\n- **Recommended**: No action needed.\n\n## Validation\n\n- Type Check: SKIPPED (per task instructions)\n- Build: SKIPPED (per task instructions)\n\n## Files Reviewed\n\n| File | Lines |\n|---|---|\n| `packages/web/messages/en/enrichments.json` | 677 |\n| `packages/web/messages/ru/enrichments.json` | 677 |\n\n## Key Metrics\n\n- Total translation keys: 551 (per locale)\n- Key parity: 100% (EN and RU have identical key sets)\n- Placeholder parity: 100% (all `{variable}` placeholders match)\n- ICU plural coverage: RU uses proper plurals everywhere; EN is missing ICU plurals for 7 strings\n- Untranslated strings: 0 (no RU values identical to EN, excluding brand names)\n- Empty values: 0\n- Whitespace issues: 0\n"}], "grading": {"eval_id": 2, "variant": "with_skill", "expectations": [{"text": "Report examines both en and ru message files", "passed": true, "evidence": "Both EN and RU files analyzed, issues found in both locales, Key Metrics section reports 551 keys per locale"}, {"text": "Report checks that keys are consistent between en and ru files", "passed": true, "evidence": "Key parity: 100%, Placeholder parity: 100%, ICU plural coverage comparison between locales"}, {"text": "Review depth is appropriate for i18n files", "passed": true, "evidence": "200-line report for 2 JSON files is proportional \u2014 covers real issues without unnecessary padding"}, {"text": "Report has a clear verdict or summary", "passed": true, "evidence": "Clear 'NEEDS WORK' verdict in Summary table, specific Next Steps section"}]}}, {"id": "eval-2-i18n-review-without_skill", "prompt": "Do a quick code review of my recent changes before I commit \u2014 I've been working on the enrichments i18n messages", "eval_id": 2, "outputs": [{"name": "report.md", "type": "text", "content": "# Code Review: Enrichments i18n Messages\n\n**Files reviewed:**\n- `/home/me/code/mc2/packages/web/messages/en/enrichments.json` (677 lines, 19,530 chars)\n- `/home/me/code/mc2/packages/web/messages/ru/enrichments.json` (677 lines, 20,876 chars)\n\n**Scope:** 551 translation keys across 30 consuming components in `packages/web/`\n\n---\n\n## Summary\n\nOverall, these files are in good shape. Both JSON files are valid, key counts match perfectly (551 keys each), there are no formatting issues (no trailing whitespace, no empty strings, no double spaces), and nesting depth is consistent at 3 levels. The Russian translations are thorough and use proper ICU plural forms where needed.\n\nHowever, there are several issues worth addressing, ranging from bugs that will produce incorrect UI text to inconsistencies that may confuse users or future developers.\n\n---\n\n## Critical Issues\n\n### 1. EN uses parenthetical pseudo-plurals instead of ICU MessageFormat\n\n**Severity:** Bug -- will display literal parenthetical text like \"activity(ies)\" to the user.\n\nThree keys in EN use a non-standard `(ies)`/`(s)` pseudo-plural pattern that next-intl will NOT process as plurals. These will render literally as-is:\n\n| Key | EN value (broken) | RU value (correct ICU) |\n|---|---|---|\n| `assetDock.enrichmentCount` | `{count} activity(ies)` | `{count} \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c(\u0435\u0439)` |\n| `viewer.questionsLabel` | `{count} question(s)` | ICU plural with one/few/many/other |\n| `viewer.pointsEarned` | `{count} point(s)` | ICU plural with one/few/many/other |\n\n**Note:** The RU `assetDock.enrichmentCount` has the same problem -- `{count} \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c(\u0435\u0439)` is also pseudo-plural, not ICU.\n\n**Fix:** Convert to proper ICU MessageFormat:\n```json\n\"enrichmentCount\": \"{count, plural, one {# activity} other {# activities}}\"\n```\n\n### 2. EN missing ICU plurals where RU correctly uses them\n\n**Severity:** Bug (minor in English, but inconsistent behavior between locales).\n\nSix keys use a simple `{count} noun` pattern in EN, while RU correctly uses ICU `{count, plural, ...}`:\n\n| Key | EN (non-ICU) | RU (ICU) |\n|---|---|---|\n| `viewer.questionsCount` | `{count} questions` | `{count, plural, one {# ...} few {...} ...}` |\n| `viewer.slidesCount` | `{count} slides` | ICU plural |\n| `viewer.questionsLabel` | `{count} question(s)` | ICU plural |\n| `viewer.pointsLabel` | `{count} points` | ICU plural |\n| `viewer.pointsEarned` | `{count} point(s)` | ICU plural |\n| `draftPreview.slideCount` | `{count} slides ready` | ICU plural |\n\nIn English this matters less than in Russian (since English only has singular/plural), but \"1 questions\" or \"1 slides\" will render incorrectly. Using ICU `{count, plural, one {# question} other {# questions}}` fixes this.\n\n---\n\n## Medium Issues\n\n### 3. Inconsistent RU terminology for \"enrichment\"\n\n**Severity:** Medium -- confusing UX. Three different Russian words are used for the same concept (\"enrichment\"):\n\n| Russian term | Where used | Count |\n|---|---|---|\n| **\"\u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c\"** (activity) | `assetDock.*`, `inspector.*` (admin panel) | 8 keys |\n| **\"\u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435\"** (supplement) | `errors.*`, `viewer.*` (student-facing) | 7 keys |\n| **\"\u043e\u0431\u043e\u0433\u0430\u0449\u0435\u043d\u0438\u0435\"** (enrichment, literal) | `inspector.notFound`, `inspector.notFoundDescription` | 2 keys |\n\nThe split between \"\u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c\" (admin) and \"\u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435\" (viewer) may be intentional context-dependent terminology, but `inspector.notFound` using \"\u043e\u0431\u043e\u0433\u0430\u0449\u0435\u043d\u0438\u0435\" while the rest of inspector uses \"\u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c\" is clearly inconsistent.\n\n**Recommendation:**\n- Pick one term for the inspector context (likely \"\u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c\" since the rest of inspector uses it).\n- Document the intentional admin vs. viewer terminology split if it is deliberate.\n\n### 4. `types` vs `viewer.enrichmentTypes` naming discrepancy for NLM types\n\n**Severity:** Medium -- user-visible inconsistency.\n\n| Type key | `types.*` | `viewer.enrichmentTypes.*` |\n|---|---|---|\n| `nlm_audio` (EN) | \"Audio Lesson\" | \"NLM Audio\" |\n| `nlm_video` (EN) | \"Video Lesson\" | \"NLM Video\" |\n| `nlm_audio` (RU) | \"\u0410\u0443\u0434\u0438\u043e\u0443\u0440\u043e\u043a\" | \"NLM-\u0430\u0443\u0434\u0438\u043e\" |\n| `nlm_video` (RU) | \"\u0412\u0438\u0434\u0435\u043e\u0443\u0440\u043e\u043a\" | \"NLM-\u0432\u0438\u0434\u0435\u043e\" |\n\nThe `viewer.enrichmentTypes` versions expose the internal \"NLM\" abbreviation to end users, which is meaningless to them. The `types.*` versions (\"Audio Lesson\" / \"Video Lesson\") are more user-friendly.\n\n### 5. Eight types defined in `types` have no `typeDescriptions` entries\n\nThese types exist in `types` but have no description:\n\n- `podcast`, `mindmap`, `case_study`, `flashcards`, `project`, `discussion`, `reading`, `exercise`\n\nThey also have no `placeholder.*` or `viewer.enrichmentTypes.*` entries. If these are planned-but-not-yet-implemented types, consider either:\n- Adding `typeDescriptions` for completeness, or\n- Moving them to a separate `plannedTypes` section to distinguish them from active types.\n\n---\n\n## Low Issues\n\n### 6. Duplicate values that could indicate copy-paste or consolidation opportunity\n\n**EN duplicates:**\n- `types.flashcards` and `types.nlm_flashcards` both = \"Flashcards\"\n- `forms.presentation.includeNotes` and `forms.presentation.includeSpeakerNotes` both = \"Include Speaker Notes\" (likely one is unused)\n- `viewer.videoLesson` and `viewer.nlmVideoLesson` both = \"Video lesson\" (loses the NLM distinction)\n- `viewer.audioLesson` and `viewer.nlmAudioLesson` both = \"Audio lesson\"\n\n**RU duplicates of note:**\n- `videoPlayer.Disabled` and `videoPlayer.Disconnected` both = \"\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e\" -- these have distinct meanings (\"disabled\" vs \"disconnected\") and should use different translations. Suggestion: \"Disconnected\" = \"\u041e\u0442\u0441\u043e\u0435\u0434\u0438\u043d\u0435\u043d\u043e\" or \"\u041d\u0435\u0442 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f\".\n\n### 7. videoPlayer keys use PascalCase with spaces\n\nThe `videoPlayer` section uses keys like `\"Seek Forward\"`, `\"Enter Fullscreen\"`, `\"Closed-Captions On\"`. This is clearly an intentional mapping for the vidstack media player library and is **not a bug**, but worth noting for awareness. These keys follow vidstack's label API, not the project's camelCase convention.\n\n### 8. Minor EN plural inconsistency in `viewer.flashcards.cardCount`\n\nThis key correctly uses ICU plural format:\n```json\n\"cardCount\": \"{count, plural, one {# card} other {# cards}}\"\n```\nBut similar keys like `viewer.questionsCount` do NOT use ICU format. The ICU approach in `cardCount` is correct -- the others should follow the same pattern.\n\n---\n\n## Structural Observations (Informational)\n\n### Key count and organization\n- **551 keys** total in each locale file -- this is a large i18n namespace.\n- **Top-level sections:** `types`, `typeDescriptions`, `status`, `actions`, `assetDock`, `tabs`, `inspector`, `discard`, `draft`, `twoStage`, `batch`, `errors`, `forms`, `comingSoon`, `generationLog`, `viewer`, `placeholder`, `images`, `telegram`, `generate`, `generating`, `longGeneration`, `options`, `cancel`, `retry`, `draftReady`, `draftPreview`, `videoPlayer`, `switcher`\n- The `viewer` section alone is ~170 keys -- it might benefit from being split into a separate namespace if it continues growing.\n\n### Key naming conventions\n- **camelCase:** 258 keys (project convention)\n- **snake_case:** 29 keys (all are enrichment type identifiers like `nlm_audio`, `draft_ready` -- these mirror database enum values, which is correct)\n- **PascalCase/spaces:** 56 keys (all in `videoPlayer` section -- vidstack library mapping)\n\n### Placeholder variables\nAll `{variable}` placeholders match perfectly between EN and RU across all 551 keys. No missing or extra variables.\n\n---\n\n## Recommendations (Priority Order)\n\n1. **Fix EN pseudo-plurals** -- Convert `activity(ies)`, `question(s)`, `point(s)` to proper ICU MessageFormat. Also fix RU `\u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c(\u0435\u0439)`.\n2. **Add ICU plurals to EN** for `questionsCount`, `slidesCount`, `pointsLabel`, `draftPreview.slideCount`.\n3. **Unify RU terminology** -- Replace `inspector.notFound`/`notFoundDescription` \"\u043e\u0431\u043e\u0433\u0430\u0449\u0435\u043d\u0438\u0435\" with \"\u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c\" to match the rest of the inspector section.\n4. **Align `viewer.enrichmentTypes` names** -- Replace \"NLM Audio\"/\"NLM Video\" with \"Audio Lesson\"/\"Video Lesson\" to match `types.*` and hide internal jargon from users.\n5. **Differentiate RU `videoPlayer.Disabled` vs `videoPlayer.Disconnected`** translations.\n6. **Decide on the 8 \"planned\" types** -- add descriptions or separate them from active types.\n7. **Review `forms.presentation` duplicates** -- `includeNotes` vs `includeSpeakerNotes` appear to serve the same purpose.\n\n---\n\n## Verdict\n\n**Mostly good.** The files are well-structured, complete, and maintain perfect key parity between locales. The Russian translations are natural and high-quality with proper ICU plural forms. The main actionable findings are: (1) fix the broken pseudo-plural strings in EN that will render incorrectly in the UI, (2) standardize the Russian terminology for \"enrichment\" across sections, and (3) align NLM type display names across sections to avoid exposing internal jargon.\n"}], "grading": {"eval_id": 2, "variant": "without_skill", "expectations": [{"text": "Report examines both en and ru message files", "passed": true, "evidence": "Both EN and RU analyzed extensively with specific examples from each"}, {"text": "Report checks that keys are consistent between en and ru files", "passed": true, "evidence": "Explicitly reports 551 key parity, checks placeholder consistency, analyzes duplicate values across locales"}, {"text": "Review depth is appropriate for i18n files", "passed": true, "evidence": "161-line report is proportional, includes structural observations section that adds value without bloat"}, {"text": "Report has a clear verdict or summary", "passed": true, "evidence": "Clear 'Mostly good' verdict with prioritized recommendations list"}]}}, {"id": "eval-3-security-perf-with_skill", "prompt": "Review packages/web/components/course/viewer/enrichments/ for security and performance issues", "eval_id": 3, "outputs": [{"name": "report.md", "type": "text", "content": "# Code Review: Enrichments Viewer \u2014 Security & Performance\n\n**Date**: 2026-03-04\n**Scope**: `packages/web/components/course/viewer/enrichments/` \u2014 all 12 source files reviewed for XSS vulnerabilities, unsafe HTML rendering, React re-render performance, memoization gaps, and bundle size concerns.\n**Files Reviewed**: 12\n**Lines Changed**: N/A (full directory review, not a diff)\n\n## Summary\n\n| Category | Critical | High | Medium | Low |\n|---|---|---|---|---|\n| Issues | 0 | 1 | 3 | 2 |\n| Improvements | \u2014 | 3 | 4 | 2 |\n| **Total** | **0** | **4** | **7** | **4** |\n\n**Verdict**: NEEDS WORK \u2014 has high-priority issues and improvements that should be addressed.\n\n## Issues\n\n### Critical\n\nNo critical issues found. The codebase does not use `dangerouslySetInnerHTML`, all markdown is rendered via `react-markdown` (which sanitizes by default), and all user-facing text is rendered as React text nodes (inherently safe from XSS). Image URLs are validated by Zod schema (`z.string().url()`).\n\n### High\n\n#### 1. QuizPlayer localStorage deserialization trusts untrusted shape without validation\n- **File**: `packages/web/components/course/viewer/enrichments/QuizPlayer.tsx:131-143`\n- **Problem**: The quiz state is loaded from `localStorage` via `JSON.parse()` and cast as `QuizState` using a bare type assertion (`as QuizState`). If a malicious script or browser extension manipulates localStorage, the parsed object could have unexpected properties or types (e.g., `answers` could contain objects instead of strings, `currentQuestionIndex` could be negative or NaN), causing runtime crashes or logic bypass. The same pattern exists in `FlashcardViewer.tsx:65-83` but is slightly less severe because it validates card IDs against the current set.\n- **Impact**: An attacker who gains script execution (even limited XSS on the same origin) could manipulate localStorage to: (1) crash the quiz player via unexpected types, (2) forge a passing score by setting `isSubmitted: true` with arbitrary `score`/`totalScore` values (though the code guards against restoring submitted state, the shape itself is not validated), or (3) inject negative `currentQuestionIndex` causing undefined behavior.\n- **Fix**:\n```typescript\n// Before\nconst parsed = JSON.parse(saved) as QuizState\nif (!parsed.isSubmitted) {\n  return parsed\n}\n\n// After \u2014 validate shape before trusting\nconst parsed = JSON.parse(saved)\nif (\n  parsed &&\n  typeof parsed === 'object' &&\n  typeof parsed.currentQuestionIndex === 'number' &&\n  parsed.currentQuestionIndex >= 0 &&\n  parsed.currentQuestionIndex < content.questions.length &&\n  typeof parsed.answers === 'object' &&\n  !parsed.isSubmitted\n) {\n  return {\n    ...defaultState,\n    currentQuestionIndex: parsed.currentQuestionIndex,\n    answers: parsed.answers,\n  }\n}\n```\n\n### Medium\n\n#### 2. InfographicViewer uses raw `<img>` tag instead of `next/image`\n- **File**: `packages/web/components/course/viewer/enrichments/InfographicViewer.tsx:80-85,153-166`\n- **Problem**: Two `<img>` tags render `content.imageUrl` directly. While the URL is Zod-validated as a valid URL (`z.string().url()`), there is no domain allowlist check. A malformed or malicious image URL (e.g., pointing to an external tracking pixel or extremely large image) would be loaded by the browser. Using `next/image` would enforce the configured `remotePatterns` allowlist from `next.config.js` and provide automatic optimization.\n- **Impact**: Potential for SSRF-like image loading from arbitrary domains, missing image optimization (no WebP/AVIF conversion, no responsive srcset, no lazy-loading optimization beyond `loading=\"lazy\"` on the thumbnail), and no protection against oversized images that could cause memory pressure in the browser.\n- **Fix**:\n```typescript\n// Before\n<img\n  src={content.imageUrl}\n  alt={content.altText ?? t('viewer.infographic.defaultAlt')}\n  className=\"h-auto max-h-48 w-full object-contain ...\"\n  loading=\"lazy\"\n/>\n\n// After\nimport Image from 'next/image'\n\n<Image\n  src={content.imageUrl}\n  alt={content.altText ?? t('viewer.infographic.defaultAlt')}\n  width={content.dimensions?.width ?? 800}\n  height={content.dimensions?.height ?? 600}\n  className=\"h-auto max-h-48 w-full object-contain ...\"\n  loading=\"lazy\"\n/>\n```\n\n#### 3. QuizPlayer re-creates handler functions on every render\n- **File**: `packages/web/components/course/viewer/enrichments/QuizPlayer.tsx:214-254,304-361`\n- **Problem**: Several handler functions (`handleAnswerChange`, `handleNext`, `handlePrevious`, `handleRetry`, `getDifficultyColor`, `getBloomColor`, `getDifficultyLabel`, `getBloomLabel`, `isAnswerCorrect`) are declared as plain functions inside the component body, not wrapped in `useCallback` or `useMemo`. While `toggleMultiSelectOption` is correctly memoized, the others are not. Each render creates new function references.\n- **Impact**: These functions are passed as props or used in callbacks. While the performance impact is moderate for a quiz (low re-render frequency), it creates unnecessary work during AnimatePresence transitions and could cause child component re-renders if any of these are passed to memoized children. The `getDifficultyColor`, `getBloomColor`, `getDifficultyLabel`, and `getBloomLabel` helper functions are pure (no dependencies) and should be extracted outside the component entirely.\n- **Fix**:\n```typescript\n// Before (inside component)\nconst getDifficultyColor = (difficulty: string) => {\n  switch (difficulty) { ... }\n}\n\n// After (outside component \u2014 zero cost)\nfunction getDifficultyColor(difficulty: string): string {\n  switch (difficulty) { ... }\n}\n\n// For handlers with state dependencies:\nconst handleAnswerChange = useCallback((questionId: string, answer: string | boolean) => {\n  setState((prev) => ({\n    ...prev,\n    answers: { ...prev.answers, [questionId]: answer },\n  }))\n}, [])\n```\n\n#### 4. MarkmapRenderer Effect 1 dependency array omits `data` and `isDark`\n- **File**: `packages/web/components/course/viewer/enrichments/MarkmapRenderer.tsx:52-90`\n- **Problem**: Effect 1 creates the Markmap instance with `data` and uses `isDark` for initial colors, but the dependency array is `[mounted]`. This is intentional per the comment (\"Data and theme updates are handled by separate effects below\"), and Effects 2 and 3 do handle updates. However, this creates a subtle timing bug: if `data` changes while `mounted` is false (e.g., during SSR hydration), the stale initial data is used when the effect finally fires, and Effect 2 may not run because `mmRef.current` is still null at that point. Also, the React linting rule `react-hooks/exhaustive-deps` would flag this.\n- **Impact**: Low probability in practice because `mounted` typically becomes true before data changes, but this is a correctness concern that could manifest as stale mind map data on initial render in edge cases (e.g., slow hydration + fast data update).\n- **Fix**: Add `data` and `isDark` to the dependency array of Effect 1, or restructure to use a single effect.\n\n### Low\n\n#### 5. FlashcardViewer creates new `onNavigate` callback on every render\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:432-435`\n- **Problem**: The `onNavigate` prop passed to `FlashcardDots` is an inline arrow function `(i) => { setCurrentIndex(i); setIsFlipped(false) }`. This means `FlashcardDots` receives a new function reference on every render, forcing it to re-render even though its content hasn't changed. `FlashcardDots` is not wrapped in `React.memo`, so this isn't currently causing extra renders, but it prevents future memoization.\n- **Impact**: Minor. `FlashcardDots` already returns null for >30 cards, limiting the render cost. But wrapping it in `React.memo` and stabilizing the callback would be a clean optimization.\n\n#### 6. EnrichmentErrorBoundary concatenates `enrichmentType` prop into error message\n- **File**: `packages/web/components/course/viewer/enrichments/EnrichmentErrorBoundary.tsx:48`\n- **Problem**: `'Failed to load ' + this.props.enrichmentType` directly concatenates the prop value into the UI text. Since this is rendered as a React text node (not innerHTML), there is no XSS risk. However, if `enrichmentType` contained unexpected characters (e.g., very long strings), it could cause layout issues.\n- **Impact**: Cosmetic only. No security risk because React escapes text node content.\n\n## Improvements\n\n### High\n\n#### 7. `markmap-view` is a heavy dependency loaded synchronously on import\n- **File**: `packages/web/components/course/viewer/enrichments/MarkmapRenderer.tsx:5`\n- **Problem**: `markmap-view` (and its dependency `d3`) is imported statically at the top of `MarkmapRenderer.tsx`. While `MindMapViewer.tsx` correctly uses `next/dynamic` to lazy-load `MarkmapRenderer`, the `markmap-common` type import in `MarkmapRenderer.tsx` still pulls in the full module at the component level. The `markmap-view` package bundles ~150KB+ (minified) of D3 code.\n- **Impact**: The dynamic import in `MindMapViewer` mitigates the bundle impact for the initial page load. However, if any other component imports `MarkmapRenderer` directly (bypassing `MindMapViewer`), the full D3 bundle would be included in the main chunk. This is well-handled currently but fragile.\n- **Recommended**: Add a comment to `MarkmapRenderer.tsx` warning against direct imports, or make it a private module by removing the default export and only exporting from `MindMapViewer`.\n\n```typescript\n// Current \u2014 default export allows direct import\nexport default MarkmapRenderer\n\n// Recommended \u2014 remove default export, keep it internal\n// Only MindMapViewer.tsx should import this via dynamic()\nexport { MarkmapRenderer }\n```\n\n#### 8. FlashcardDots is not memoized despite receiving stable primitive props\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardDots.tsx`\n- **Problem**: `FlashcardDots` re-renders on every parent state change (card flip, navigation, assessment). The `cards` array, `knownIds` Set, and `unknownIds` Set are reconstructed on most interactions in `FlashcardViewer`. The component renders up to 30 dot buttons.\n- **Impact**: Each parent interaction (flip, know/don't-know) triggers a re-render of all dots. With `React.memo` and stabilized `onNavigate` callback, these re-renders could be eliminated for interactions that don't change the dots' visual state.\n- **Recommended**:\n```typescript\n// Wrap in React.memo (like FlashcardCard already does)\nexport const FlashcardDots = React.memo(function FlashcardDots({ ... }) {\n  ...\n})\n```\n\n#### 9. QuizPlayer component is 830 lines \u2014 should be decomposed\n- **File**: `packages/web/components/course/viewer/enrichments/QuizPlayer.tsx`\n- **Problem**: At 830 lines, `QuizPlayer` is the largest component in this directory and handles: state management, localStorage persistence, score calculation, results view, question rendering (4 types), navigation, and metadata display. This makes it difficult to maintain, test, and optimize. Compare with `FlashcardViewer` which properly decomposed into `FlashcardCard`, `FlashcardDots`, and `FlashcardSummary`.\n- **Impact**: The monolithic structure means every state change re-renders the entire quiz UI. Extracting `QuizResultsView`, `QuestionCard`, and `QuizNavigation` as separate components would enable targeted memoization and reduce cognitive complexity.\n- **Recommended**: Extract sub-components following the FlashcardViewer pattern:\n  - `QuizResultsView` \u2014 the submitted state results summary\n  - `QuizQuestionCard` \u2014 individual question rendering\n  - `QuizNavigation` \u2014 prev/next/submit buttons\n  - Move `getDifficultyColor`, `getBloomColor`, `getDifficultyLabel`, `getBloomLabel` to a shared util file\n\n### Medium\n\n#### 10. `framer-motion` AnimatePresence in FlashcardViewer wraps self-assessment buttons\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:357-390`\n- **Problem**: `AnimatePresence` is used for the know/don't-know buttons that appear after flipping. This is fine for UX, but the `motion.div` with `initial/animate/exit` transitions triggers layout recalculations on every flip. Combined with the `motion.div` drag wrapper (lines 330-344) and `FlashcardCard`'s spring animation, there are 3 concurrent animation layers.\n- **Impact**: On low-end mobile devices, the simultaneous 3D card flip (spring animation) + drag constraints + AnimatePresence fade could cause frame drops. Consider using CSS transitions for the simpler fade-in/out of assessment buttons.\n- **Recommended**: Replace `AnimatePresence` with CSS `transition` + conditional `opacity`/`transform` classes for the assessment buttons.\n\n#### 11. AudioPlayer has multiple sequential state resets in the URL-change effect\n- **File**: `packages/web/components/course/viewer/enrichments/AudioPlayer.tsx:132-158`\n- **Problem**: When `playbackUrl` changes, the effect calls 7 sequential `setState` calls (`setIsPlaying`, `setCurrentTime`, `setDuration`, `setIsMuted`, `setVolume`, `setPlaybackRate`, `setHasError`). React 18 batches these in effects, so they become a single re-render. However, the same effect exists at lines 132-158 AND lines 71-130, both depending on `playbackUrl`, which means two effects run on URL change with overlapping cleanup logic (both pause audio and set `src = ''`).\n- **Impact**: Redundant cleanup when `playbackUrl` changes \u2014 both effects' cleanup functions fire, both calling `audio.pause()`, `audio.currentTime = 0`, `audio.src = ''`, and `onPlayingChangeRef.current?.(false)`. This is harmless but wasteful. Consider consolidating into a single effect.\n- **Recommended**: Merge the two `playbackUrl`-dependent effects into one, or use a `useReducer` for the AudioPlayer state to batch all resets atomically.\n\n#### 12. FlashcardViewer `onCardFlip` is recreated on every render\n- **File**: `packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx:237-239`\n- **Problem**: `onCardFlip` is defined as a plain function inside the render body (not in a `useCallback`). It references `isDraggingRef` (stable ref) and `handleFlip` (memoized callback), so it could safely be wrapped in `useCallback([handleFlip])`. Since it is passed to `FlashcardCard` (which IS `React.memo`'d), this causes unnecessary re-renders of the card component on every parent state change.\n- **Impact**: `FlashcardCard` re-renders on every parent state change (navigation dot click, know/don't-know assessment, shuffle toggle) even when its visual props (`card`, `isFlipped`, `isFullscreen`, labels) haven't changed, because `onFlip` is a new reference each time.\n- **Recommended**:\n```typescript\n// Before\nconst onCardFlip = () => {\n  if (!isDraggingRef.current) handleFlip()\n}\n\n// After\nconst onCardFlip = useCallback(() => {\n  if (!isDraggingRef.current) handleFlip()\n}, [handleFlip])\n```\n\n#### 13. StudyGuideViewer does not memoize MarkdownRendererFull content\n- **File**: `packages/web/components/course/viewer/enrichments/StudyGuideViewer.tsx:69,81,132`\n- **Problem**: `MarkdownRendererFull` is rendered 3 times in the component (section content, preview, and dialog). The `content` prop for the preview and dialog are `content.markdown` (same string), but React will re-render both instances whenever `StudyGuideViewer` re-renders (e.g., when toggling a section or opening the dialog). `MarkdownRendererFull` likely does expensive parsing (remark/rehype pipelines).\n- **Impact**: Opening the dialog triggers a re-render that re-parses the same markdown content. The dialog's `MarkdownRendererFull` with `preset=\"lesson\"` is heavier than the preview's `preset=\"preview\"`.\n- **Recommended**: Wrap `StudyGuideViewer` sections in `React.memo` or memoize the markdown processing result.\n\n### Low\n\n#### 14. QuizPlayer `handleSubmit` uses artificial delay for UX\n- **File**: `packages/web/components/course/viewer/enrichments/QuizPlayer.tsx:259`\n- **Problem**: `await new Promise((resolve) => setTimeout(resolve, 300))` adds a 300ms artificial delay before score calculation. Score calculation is synchronous and instant (simple loop over questions). The `isCalculating` state + loading overlay is shown during this artificial delay.\n- **Impact**: 300ms of unnecessary waiting. The loading overlay may confuse users since the actual computation is instant. If UX feedback is desired, a shorter delay (100ms) or a transition animation would be more appropriate.\n\n#### 15. Unused `content` import type in QuizPlayer\n- **File**: `packages/web/components/course/viewer/enrichments/QuizPlayer.tsx:558`\n- **Problem**: The `content.quiz_title` and `content.instructions` are rendered directly as text nodes in the quiz header. These come from LLM-generated content stored in the database. While React text nodes are XSS-safe, there is no length or content validation \u2014 an extremely long title could break the layout.\n- **Impact**: Cosmetic only. No security risk. Consider adding `line-clamp` CSS classes for very long titles.\n\n## Validation\n\n- Type Check: SKIPPED (per task instructions)\n- Build: SKIPPED (per task instructions)\n\n## Files Reviewed\n\n| File | Lines | Notes |\n|---|---|---|\n| `index.ts` | 18 | Barrel exports, clean |\n| `AudioPlayer.tsx` | 456 | Well-structured, good ref patterns |\n| `EnrichmentErrorBoundary.tsx` | 90 | Class component (required for error boundary), clean |\n| `FlashcardCard.tsx` | 95 | Properly `React.memo`'d |\n| `FlashcardDots.tsx` | 56 | Missing `React.memo` |\n| `FlashcardSummary.tsx` | 105 | Clean, no issues |\n| `FlashcardViewer.tsx` | 494 | Good decomposition, minor callback issues |\n| `InfographicViewer.tsx` | 181 | Uses raw `<img>` instead of `next/image` |\n| `MarkmapRenderer.tsx` | 158 | Heavy dependency, well-isolated via dynamic import |\n| `MindMapViewer.tsx` | 128 | Good use of `useMemo` and `dynamic` |\n| `QuizPlayer.tsx` | 829 | Largest file, needs decomposition |\n| `StudyGuideViewer.tsx` | 139 | Clean, minor memoization gap |\n\n## Security Assessment Summary\n\n**XSS Risk: LOW.** All user/LLM-generated content is rendered as React text nodes or via `react-markdown` (which sanitizes HTML by default). No `dangerouslySetInnerHTML` usage. No raw HTML injection vectors. Image URLs are Zod-validated.\n\n**Unsafe HTML Rendering: NONE.** The `MarkdownRendererFull` component uses `react-markdown` with `remarkGfm`/`rehypeKatex` plugins, which do not allow raw HTML passthrough by default.\n\n**localStorage Trust: MEDIUM CONCERN.** Both QuizPlayer and FlashcardViewer deserialize localStorage data with type assertions rather than runtime validation. FlashcardViewer partially validates (filters card IDs), but QuizPlayer trusts the full shape.\n\n## Performance Assessment Summary\n\n**Re-render Efficiency: MODERATE.** `FlashcardCard` is properly memoized. `FlashcardDots` and `FlashcardSummary` are not. `QuizPlayer` is monolithic with no sub-component memoization. Key callbacks (`onCardFlip` in FlashcardViewer, handlers in QuizPlayer) are not stabilized with `useCallback`.\n\n**Bundle Size: WELL-MANAGED.** The heaviest dependency (`markmap-view` + D3, ~150KB) is correctly code-split via `next/dynamic`. `framer-motion` is tree-shakeable and already a top-level dependency. `lucide-react` uses per-icon imports (tree-shakeable).\n\n**Memoization: PARTIAL.** `useMemo` is used for `markmapData` in MindMapViewer. `useCallback` is used extensively in FlashcardViewer and AudioPlayer. QuizPlayer has significant memoization gaps. Pure helper functions inside QuizPlayer should be extracted to module scope.\n"}], "grading": {"eval_id": 3, "variant": "with_skill", "expectations": [{"text": "Report specifically examines XSS vectors", "passed": true, "evidence": "Explicitly states no dangerouslySetInnerHTML found, checked react-markdown sanitization, analyzed InfographicViewer img src, verified React text node safety"}, {"text": "Report examines React performance patterns", "passed": true, "evidence": "Covered useCallback gaps (onCardFlip, QuizPlayer handlers), React.memo opportunities (FlashcardDots, FlashcardSummary), bundle size analysis, code-splitting via next/dynamic"}, {"text": "Report stays focused on security and performance", "passed": true, "evidence": "15 findings all security or performance related, no general code style issues"}, {"text": "Security findings have severity ratings", "passed": true, "evidence": "Each finding has Critical/High/Medium/Low priority rating"}, {"text": "Findings reference specific code patterns with file:line", "passed": true, "evidence": "Every finding has file path with line numbers (e.g., QuizPlayer.tsx:131-143, FlashcardViewer.tsx:237-239)"}]}}, {"id": "eval-3-security-perf-without_skill", "prompt": "Review packages/web/components/course/viewer/enrichments/ for security and performance issues", "eval_id": 3, "outputs": [{"name": "report.md", "type": "text", "content": "# Security & Performance Code Review: Enrichment Components\n\n**Directory:** `packages/web/components/course/viewer/enrichments/`\n**Review Date:** 2026-03-04\n**Focus Areas:** XSS, unsafe HTML rendering, React re-renders, memoization, bundle size\n\n---\n\n## Executive Summary\n\nThe enrichment components are **generally well-implemented** from a security perspective. No `dangerouslySetInnerHTML` usage exists within the enrichments directory. The most significant finding is a **medium-severity XSS vector in the InfographicViewer** through unvalidated image URLs, along with several performance optimization opportunities around missing memoization and bundle size concerns.\n\n**Severity Counts:**\n- Critical: 0\n- High: 1\n- Medium: 4\n- Low: 6\n- Informational: 4\n\n---\n\n## 1. Security Findings\n\n### 1.1 [HIGH] InfographicViewer: Unvalidated `imageUrl` in `<img src>`\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/InfographicViewer.tsx`\n**Lines:** 81, 154\n\n```tsx\n<img\n  src={content.imageUrl}\n  alt={content.altText ?? t('viewer.infographic.defaultAlt')}\n  ...\n/>\n```\n\n**Issue:** The `content.imageUrl` is rendered directly as an `<img src>` attribute. While the Zod schema (`infographicEnrichmentContentSchema`) validates this as `z.string().url()`, this validation only ensures the string is a valid URL format. It does not restrict the URL protocol or domain.\n\n**Risk Scenarios:**\n- If the schema validation is bypassed (e.g., data loaded from a corrupted JSONB column, or schema evolution leaves stale data), a `javascript:` URI could theoretically be injected. However, modern browsers generally block `javascript:` in `<img src>`.\n- More realistically, an attacker-controlled URL could point to a tracking pixel or an external domain for SSRF-style data exfiltration (IP address, user-agent leakage).\n- No Content Security Policy (CSP) `img-src` restriction was observed to limit image sources.\n\n**Recommendation:**\n- Validate that `imageUrl` begins with `https://` and matches expected Supabase Storage domains before rendering.\n- Use Next.js `<Image>` component with `domains` configuration for allowlisting.\n- Consider a URL allowlist pattern: `content.imageUrl.startsWith('https://your-supabase-project.supabase.co/')`.\n\n---\n\n### 1.2 [MEDIUM] StudyGuideViewer: Markdown Rendering Without Explicit Sanitization\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/StudyGuideViewer.tsx`\n**Lines:** 69, 81, 132\n\n```tsx\n<MarkdownRendererFull content={section.content} preset=\"preview\" />\n<MarkdownRendererFull content={content.markdown} preset=\"preview\" />\n<MarkdownRendererFull content={content.markdown} preset=\"lesson\" />\n```\n\n**Issue:** The `MarkdownRendererFull` component uses `react-markdown` with `remarkGfm` and `rehypeKatex` but does **not** use `rehype-sanitize`. By default, `react-markdown` does NOT render raw HTML from markdown source, which provides baseline safety. However:\n\n1. The `rehypeKatex` plugin processes LaTeX and generates HTML output that is injected into the HAST. A malicious LaTeX expression could potentially exploit KaTeX parsing edge cases.\n2. The `MarkdownRendererFull` renders content from LLM-generated study guides (stored in the `content` JSONB column). While this is not user-generated content in the traditional sense, it is LLM-generated and stored in the database, creating an indirect injection vector if the LLM is prompt-injected.\n\n**Mitigating Factors:**\n- `react-markdown` strips raw HTML by default (no `rehype-raw` plugin is used).\n- The project has a separate `getRehypePluginsUntrusted()` function with `rehype-sanitize` that is available but NOT used by `MarkdownRendererFull`.\n- KaTeX is configured with `strict: 'ignore'` which silences warnings but does not inherently create XSS vectors.\n\n**Recommendation:**\n- Consider adding `rehype-sanitize` to `MarkdownRendererFull` when rendering LLM-generated content, or at minimum document the trust boundary decision.\n- The `preset` parameter could be extended to indicate trust level and conditionally apply sanitization.\n\n---\n\n### 1.3 [MEDIUM] MindMap: XSS-Safe via HTML Escaping (Verified)\n\n**File:** `/home/me/code/mc2/packages/web/lib/helpers/mindmap-transform.ts`\n**Lines:** 10-19, 34-44\n\n```tsx\nfunction escapeHtml(str: string): string {\n  return str.replace(/[&<>\"']/g, (ch) => ESCAPE_MAP[ch] ?? ch)\n}\n\nexport function toMarkmapNode(node: MindMapNode, depth = 0): IPureNode {\n  let content = escapeHtml(node.label)\n  if (node.description) {\n    content += `<br/><small style=\"opacity:0.7\">${escapeHtml(node.description)}</small>`\n  }\n  ...\n}\n```\n\n**Assessment:** This is a POSITIVE finding. The `markmap-view` library renders `content` as `innerHTML`, which would be an XSS vector. The `toMarkmapNode()` function correctly HTML-escapes all LLM-generated text (`label`, `description`) before inserting it into the HTML template. Only safe structural tags (`<br/>`, `<small>`) are added unescaped. The code includes clear security comments explaining the rationale.\n\n**No action required.**\n\n---\n\n### 1.4 [MEDIUM] FlashcardCard: Text Content Rendered as React Children (Safe)\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardCard.tsx`\n**Lines:** 71, 89\n\n```tsx\n<p className=\"...\">{card?.front}</p>\n<p className=\"...\">{card?.back}</p>\n```\n\n**Assessment:** The flashcard front/back text is rendered as React children (`{card?.front}`), which means React automatically escapes the content. This is safe against XSS. No `dangerouslySetInnerHTML` is used.\n\n**No action required.**\n\n---\n\n### 1.5 [LOW] QuizPlayer: Question/Option Text Rendered Safely\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/QuizPlayer.tsx`\n**Lines:** 432, 511, 631, 649\n\n```tsx\n<CardTitle className=\"text-xl\">{currentQuestion.question}</CardTitle>\n...\n<Label htmlFor={option.id} className=\"flex-1 cursor-pointer text-base\">\n  {option.text}\n</Label>\n```\n\n**Assessment:** All quiz question text, option text, and explanation text is rendered as React children. React's JSX rendering automatically escapes HTML entities. This is safe.\n\n**No action required.**\n\n---\n\n### 1.6 [LOW] localStorage Usage Without Size Limits\n\n**Files:**\n- `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx` (lines 66, 90)\n- `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/QuizPlayer.tsx` (lines 132, 160)\n\n```tsx\nconst FLASHCARD_STORAGE_KEY = (id: string) => `flashcard_progress_${id}`\nconst QUIZ_STORAGE_KEY = (id: string) => `quiz_progress_${id}`\n```\n\n**Issue:** Both FlashcardViewer and QuizPlayer persist progress to `localStorage` using keys derived from `enrichmentId`. While the data stored is small (answer state), there is no cleanup mechanism for old entries. Over time, if a user interacts with many enrichments, localStorage could accumulate stale keys.\n\n**Risk:** Minimal. The `enrichmentId` comes from a database UUID, so key injection is unlikely. The `catch` blocks properly suppress errors.\n\n**Recommendation:**\n- Consider adding a TTL-based cleanup mechanism or using `sessionStorage` instead.\n- Add a maximum key count or expiry check.\n\n---\n\n### 1.7 [LOW] EnrichmentErrorBoundary: Error Details Logged to Console\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/EnrichmentErrorBoundary.tsx`\n**Lines:** 30-38\n\n```tsx\ncomponentDidCatch(error: Error, errorInfo: React.ErrorInfo) {\n  console.error('Enrichment error:', {\n    type: this.props.enrichmentType,\n    id: this.props.enrichmentId,\n    error: error.message,\n    stack: error.stack,\n    componentStack: errorInfo.componentStack,\n  })\n}\n```\n\n**Issue:** Error details including stack traces are logged to `console.error`. In production, this exposes internal implementation details to anyone with browser dev tools open.\n\n**Recommendation:**\n- Send errors to a structured error reporting service (e.g., Sentry) instead of console.\n- Suppress detailed stack traces in production builds.\n\n---\n\n## 2. Performance Findings\n\n### 2.1 [MEDIUM] QuizPlayer: Missing Memoization on Expensive Render Helpers\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/QuizPlayer.tsx`\n**Lines:** 304-361\n\n```tsx\nconst getDifficultyColor = (difficulty: string) => { ... }\nconst getBloomColor = (level: string) => { ... }\nconst getDifficultyLabel = (difficulty: string) => { ... }\nconst getBloomLabel = (level: string) => { ... }\n```\n\n**Issue:** These four functions are recreated on every render. While individually lightweight, they are called inside the `questions.map()` loop in the results review section (line 425), multiplying the overhead. The `handleAnswerChange`, `handleNext`, and `handlePrevious` functions (lines 214, 238, 247) are also not wrapped in `useCallback`.\n\n**Recommendation:**\n- Move `getDifficultyColor`, `getBloomColor`, `getDifficultyLabel`, `getBloomLabel` outside the component as pure utility functions (they only depend on their argument and the translation function `t`). For the label functions that use `t`, consider `useMemo` or extracting to a hook.\n- Wrap `handleAnswerChange`, `handleNext`, `handlePrevious` in `useCallback`.\n\n---\n\n### 2.2 [LOW] FlashcardViewer: `onCardFlip` Created on Every Render\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardViewer.tsx`\n**Lines:** 237-239\n\n```tsx\nconst onCardFlip = () => {\n  if (!isDraggingRef.current) handleFlip()\n}\n```\n\n**Issue:** `onCardFlip` is created as a new function reference on every render, which causes the memoized `FlashcardCard` (wrapped in `React.memo`) to receive a new `onFlip` prop and re-render unnecessarily. This defeats the purpose of the `React.memo` wrapper on `FlashcardCard`.\n\n**Recommendation:**\n```tsx\nconst onCardFlip = useCallback(() => {\n  if (!isDraggingRef.current) handleFlip()\n}, [handleFlip])\n```\n\n---\n\n### 2.3 [LOW] FlashcardDots: Not Memoized, Receives Unstable Callback Props\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardDots.tsx`\n\n**Issue:** `FlashcardDots` is a plain function component (not wrapped in `React.memo`). It receives `onNavigate` as an inline arrow function from `FlashcardViewer` (line 432):\n\n```tsx\nonNavigate={(i) => {\n  setCurrentIndex(i)\n  setIsFlipped(false)\n}}\n```\n\nThis inline function creates a new reference on every render, so even if `FlashcardDots` were memoized, it would still re-render. For a component that renders up to 30 button elements, this is a minor concern.\n\n**Recommendation:**\n- Wrap `FlashcardDots` in `React.memo`.\n- Stabilize the `onNavigate` callback with `useCallback`.\n- Similarly, stabilize `cardOfLabel` with `useCallback`.\n\n---\n\n### 2.4 [LOW] FlashcardSummary: Not Memoized\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/FlashcardSummary.tsx`\n\n**Issue:** `FlashcardSummary` accepts simple primitive props and a stable `onReset` callback but is not wrapped in `React.memo`. Since it is rendered in the `isFinished` state, re-renders are less frequent, making this a low-priority optimization.\n\n**Recommendation:** Wrap in `React.memo` for consistency with `FlashcardCard`.\n\n---\n\n### 2.5 [LOW] AudioPlayer: Multiple State Updates Not Batched (Pre-React 18 Pattern)\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/AudioPlayer.tsx`\n**Lines:** 132-158\n\n```tsx\nuseEffect(() => {\n  const audio = audioRef.current\n  if (!audio || !playbackUrl) {\n    setIsPlaying(false)\n    setCurrentTime(0)\n    setDuration(0)\n    setIsMuted(false)\n    setVolume(0.8)\n    setPlaybackRate(1)\n    setHasError(false)\n    return\n  }\n  ...\n}, [playbackUrl])\n```\n\n**Issue:** Seven separate `setState` calls in the same effect. In React 18+, these are automatically batched, so this is not a functional problem. However, the pattern suggests the state could be consolidated into a single `useReducer` for clarity and maintainability.\n\n**Recommendation:** Consider refactoring to `useReducer` with a `RESET` action for cleaner state management.\n\n---\n\n### 2.6 [INFORMATIONAL] InfographicViewer: `useCallback` Wrappers on Simple Setters\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/InfographicViewer.tsx`\n**Lines:** 40-58\n\n```tsx\nconst handleZoomIn = useCallback(() => { setZoomLevel(...) }, [])\nconst handleZoomOut = useCallback(() => { setZoomLevel(...) }, [])\nconst handleZoomReset = useCallback(() => { setZoomLevel(1) }, [])\nconst handleDoubleClick = useCallback(() => { setZoomLevel(...) }, [])\nconst handleOpenDialog = useCallback(() => { ... }, [])\n```\n\n**Assessment:** These `useCallback` wrappers are technically correct but provide marginal benefit since the child components (`Button`, `img`) are native HTML elements that do not implement `React.memo`. The callbacks are stable (empty dependency arrays), so there is no harm, but they add slight code overhead.\n\n**No action required.** This is acceptable defensive coding.\n\n---\n\n## 3. Bundle Size Findings\n\n### 3.1 [MEDIUM] Heavy Dependencies Not Code-Split\n\n**Affected files and dependencies:**\n\n| Component | Heavy Dependencies | Approx. Size (gzipped) |\n|---|---|---|\n| `AudioPlayer.tsx` | `framer-motion` | ~40-50 kB |\n| `FlashcardViewer.tsx` | `framer-motion`, `AnimatePresence` | ~40-50 kB |\n| `FlashcardCard.tsx` | `framer-motion` | (shared) |\n| `FlashcardSummary.tsx` | `framer-motion` | (shared) |\n| `QuizPlayer.tsx` | `framer-motion`, `AnimatePresence` | (shared) |\n| `MarkmapRenderer.tsx` | `markmap-view`, `markmap-common` | ~80-100 kB |\n| `StudyGuideViewer.tsx` | `MarkdownRendererFull` (react-markdown + rehypeKatex + KaTeX CSS) | ~100+ kB |\n\n**Positive Finding:** `MindMapViewer.tsx` correctly uses `next/dynamic` to lazy-load `MarkmapRenderer`:\n\n```tsx\nconst MarkmapRenderer = dynamic(() => import('./MarkmapRenderer'), {\n  ssr: false,\n  loading: () => ( ... ),\n})\n```\n\nThis is the correct pattern for heavy client-only dependencies.\n\n**Issue:** The following heavy components are NOT lazy-loaded:\n1. `QuizPlayer` (31 kB source, imports framer-motion + many UI components)\n2. `StudyGuideViewer` (imports `MarkdownRendererFull` which pulls in react-markdown, remarkGfm, remarkMath, rehypeKatex, and katex CSS)\n3. `AudioPlayer` (15 kB source, imports framer-motion)\n\nAll are exported from `index.ts` and likely imported eagerly by the parent viewer component.\n\n**Recommendation:**\n- Apply the same `next/dynamic` pattern to `QuizPlayer`, `StudyGuideViewer`, and `AudioPlayer` at their import sites.\n- Especially `StudyGuideViewer` which transitively imports KaTeX CSS (~28 kB gzipped) and the full react-markdown pipeline.\n- If `framer-motion` is already used elsewhere in the app bundle, the shared cost is amortized. Verify with `next build --analyze`.\n\n---\n\n### 3.2 [INFORMATIONAL] InfographicViewer: Uses Native `<img>` Instead of Next.js `<Image>`\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/InfographicViewer.tsx`\n**Lines:** 80-85, 153-166\n\n```tsx\n<img\n  src={content.imageUrl}\n  alt={content.altText ?? t('viewer.infographic.defaultAlt')}\n  className=\"h-auto max-h-48 w-full object-contain ...\"\n  loading=\"lazy\"\n/>\n```\n\n**Issue:** Using native `<img>` instead of Next.js `<Image>` means:\n1. No automatic image optimization (WebP/AVIF conversion, responsive srcsets).\n2. No automatic lazy loading with intersection observer (though `loading=\"lazy\"` is used as a fallback).\n3. No layout shift prevention (width/height are not specified).\n\n**Recommendation:**\n- If the image URLs come from Supabase Storage, configure `next.config.js` `remotePatterns` and use `<Image>` for automatic optimization.\n- If URLs are dynamic and cannot be allowlisted, the current approach with `loading=\"lazy\"` is acceptable.\n\n---\n\n### 3.3 [INFORMATIONAL] QuizPlayer: Large Component (830 lines)\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/QuizPlayer.tsx`\n\n**Issue:** At 830 lines and 31 kB, `QuizPlayer` is the largest single component. It contains both the quiz-taking view and the results review view in one file. This makes it harder to tree-shake and increases the initial parse cost.\n\n**Recommendation:**\n- Extract the results summary view (lines 370-535) into a separate `QuizResults.tsx` component.\n- Extract `computeIsCorrect()` and the color/label helper functions into a separate utility file.\n- This would improve code maintainability and could enable lazy-loading the results view.\n\n---\n\n### 3.4 [INFORMATIONAL] MarkmapRenderer: Effect Dependencies May Cause Unnecessary Recreations\n\n**File:** `/home/me/code/mc2/packages/web/components/course/viewer/enrichments/MarkmapRenderer.tsx`\n**Lines:** 52-90\n\n```tsx\n// Effect 1: Create markmap instance on mount\nuseEffect(() => {\n  ...\n  const mm = Markmap.create(svg, { ...opts, autoFit: true }, data)\n  ...\n}, [mounted])  // <-- only depends on `mounted`, not `data` or `isDark`\n```\n\n**Assessment:** The effect dependency design is intentional and documented with comments. Effect 1 creates the instance once, Effect 2 updates data, Effect 3 updates colors. This is a correct optimization pattern that avoids destroying and recreating the markmap instance on every data or theme change.\n\n**No action required.** The pattern is sound.\n\n---\n\n## 4. Summary of Recommendations\n\n### Priority 1 (Address Soon)\n1. **InfographicViewer image URL validation** - Add protocol and domain allowlisting for `content.imageUrl` before rendering in `<img src>`.\n2. **Lazy-load heavy enrichment components** - Apply `next/dynamic` to `QuizPlayer`, `StudyGuideViewer`, and `AudioPlayer` at their import sites.\n\n### Priority 2 (Should Fix)\n3. **FlashcardViewer `onCardFlip`** - Wrap in `useCallback` to preserve `React.memo` effectiveness on `FlashcardCard`.\n4. **QuizPlayer helper functions** - Move pure color/label mappers outside the component; wrap remaining handlers in `useCallback`.\n5. **Consider `rehype-sanitize` for LLM content** - Evaluate adding sanitization to `MarkdownRendererFull` when rendering LLM-generated content (study guide markdown).\n\n### Priority 3 (Nice to Have)\n6. **Memoize `FlashcardDots` and `FlashcardSummary`** with `React.memo`.\n7. **Stabilize inline callbacks** passed to `FlashcardDots` (`onNavigate`, `cardOfLabel`).\n8. **Replace native `<img>` with Next.js `<Image>`** in InfographicViewer for automatic optimization.\n9. **Extract QuizPlayer results view** into a separate component for maintainability.\n10. **Add localStorage cleanup** for stale flashcard/quiz progress entries.\n11. **Replace console.error in error boundary** with structured error reporting.\n\n---\n\n## 5. Positive Patterns Observed\n\nThe codebase demonstrates several security and performance best practices worth noting:\n\n1. **No `dangerouslySetInnerHTML`** anywhere in the enrichments directory.\n2. **Mind map HTML escaping** is thorough with clear security documentation in `mindmap-transform.ts`.\n3. **React children rendering** consistently used for all text content, providing automatic XSS protection.\n4. **`React.memo` on `FlashcardCard`** - correct optimization for an animation-heavy component.\n5. **`useMemo` for `markmapData`** in `MindMapViewer` prevents unnecessary tree transformations.\n6. **`next/dynamic` SSR-disabled import** for `MarkmapRenderer` correctly handles client-only dependencies.\n7. **Stable ref patterns** in `AudioPlayer` (`isPlayingRef`, `onPlayingChangeRef`) to avoid stale closures.\n8. **Error boundary** wrapping enrichment components with graceful fallback UI and retry capability.\n9. **localStorage error handling** with try/catch blocks in both FlashcardViewer and QuizPlayer.\n10. **Keyboard accessibility** implemented across FlashcardCard, FlashcardViewer, InfographicViewer, and AudioPlayer.\n11. **ARIA attributes** used consistently (aria-label, aria-live, aria-valuetext, aria-pressed).\n12. **Mind map depth validation** (`MIND_MAP_MAX_DEPTH = 50`) with iterative BFS prevents stack overflow from malicious deeply-nested trees.\n"}], "grading": {"eval_id": 3, "variant": "without_skill", "expectations": [{"text": "Report specifically examines XSS vectors", "passed": true, "evidence": "Thorough XSS analysis including InfographicViewer img src, StudyGuideViewer markdown rendering, mindmap HTML escaping verification, QuizPlayer text rendering, FlashcardCard text rendering"}, {"text": "Report examines React performance patterns", "passed": true, "evidence": "Covered QuizPlayer memoization gaps, FlashcardViewer callback issues, FlashcardDots/Summary memo gaps, AudioPlayer state management, bundle size analysis"}, {"text": "Report stays focused on security and performance", "passed": true, "evidence": "Report organized into Security, Performance, and Bundle Size sections \u2014 stays focused throughout"}, {"text": "Security findings have severity ratings", "passed": true, "evidence": "Uses HIGH/MEDIUM/LOW/INFORMATIONAL severity levels consistently"}, {"text": "Findings reference specific code patterns with file:line", "passed": true, "evidence": "Uses absolute file paths with line numbers throughout (e.g., InfographicViewer.tsx Lines: 81, 154)"}]}}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"skill_name": "code-review", "iteration": 1, "timestamp": "2026-03-04T12:00:00Z", "configurations": [{"name": "with_skill", "description": "Using the code-review skill", "results": {"pass_rate": {"mean": 1.0, "stddev": 0.0, "per_eval": {"eval-1-full-review": {"passed": 7, "total": 7, "rate": 1.0}, "eval-2-i18n-review": {"passed": 4, "total": 4, "rate": 1.0}, "eval-3-security-perf": {"passed": 5, "total": 5, "rate": 1.0}}}, "timing": {"mean_seconds": 199.7, "stddev_seconds": 35.5, "per_eval": {"eval-1-full-review": 159.1, "eval-2-i18n-review": 244.4, "eval-3-security-perf": 195.6}}, "tokens": {"mean": 60929, "stddev": 8256, "per_eval": {"eval-1-full-review": 50125, "eval-2-i18n-review": 62590, "eval-3-security-perf": 70072}}}}, {"name": "without_skill", "description": "Baseline \u2014 no skill loaded", "results": {"pass_rate": {"mean": 0.94, "stddev": 0.1, "per_eval": {"eval-1-full-review": {"passed": 6, "total": 7, "rate": 0.86}, "eval-2-i18n-review": {"passed": 4, "total": 4, "rate": 1.0}, "eval-3-security-perf": {"passed": 5, "total": 5, "rate": 1.0}}}, "timing": {"mean_seconds": 190.9, "stddev_seconds": 5.8, "per_eval": {"eval-1-full-review": 193.6, "eval-2-i18n-review": 182.7, "eval-3-security-perf": 196.6}}, "tokens": {"mean": 63359, "stddev": 14175, "per_eval": {"eval-1-full-review": 54214, "eval-2-i18n-review": 52657, "eval-3-security-perf": 83206}}}}], "delta": {"pass_rate": "+6%", "timing": "+4.6% slower", "tokens": "-3.8% fewer tokens"}, "analysis": {"key_findings": ["The skill provides a consistent report template (Summary table, Issues/Improvements separation) that baseline lacks \u2014 this is the main structural benefit", "Baseline failed 1 assertion in Eval 1: Issues and Improvements were not separated into distinct sections", "For Eval 2 (i18n) and Eval 3 (security/perf), both approaches passed all assertions equally", "Baseline was slightly faster on average (190.9s vs 199.7s) but used more tokens (63.4K vs 60.9K)", "The skill-guided reports are shorter and more focused; baseline reports tend to be more exploratory and include extra sections (Accessibility Review, Positive Patterns)"], "non_discriminating_assertions": ["has-file-refs \u2014 both approaches consistently reference specific files with line numbers", "has-code-examples \u2014 both include multiple code examples", "covers-all-files \u2014 both review all specified files", "no-false-positives \u2014 both self-correct when a finding is incorrect", "checks-both-locales \u2014 both examine both locale files", "xss-check \u2014 both thoroughly examine XSS vectors"], "discriminating_assertions": ["has-structure \u2014 skill enforces Summary table + Issues/Improvements separation; baseline merges them"], "qualitative_observations": ["The with-skill reports follow the template format consistently, making them easier to parse programmatically and convert to Beads tasks", "The without-skill reports are more creative \u2014 they add Accessibility Review, Positive Patterns, structural observations that the skill template doesn't call for", "Both approaches find similar core issues (stale closures, React.memo defeated, i18n pluralization bugs)", "The baseline sometimes finds MORE issues because it explores more freely (16 findings vs 14 in Eval 1)"]}}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

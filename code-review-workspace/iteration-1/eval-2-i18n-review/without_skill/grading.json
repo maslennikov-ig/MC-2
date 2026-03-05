@@ -1,0 +1,26 @@
+{
+  "eval_id": 2,
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Report examines both en and ru message files",
+      "passed": true,
+      "evidence": "Both EN and RU analyzed extensively with specific examples from each"
+    },
+    {
+      "text": "Report checks that keys are consistent between en and ru files",
+      "passed": true,
+      "evidence": "Explicitly reports 551 key parity, checks placeholder consistency, analyzes duplicate values across locales"
+    },
+    {
+      "text": "Review depth is appropriate for i18n files",
+      "passed": true,
+      "evidence": "161-line report is proportional, includes structural observations section that adds value without bloat"
+    },
+    {
+      "text": "Report has a clear verdict or summary",
+      "passed": true,
+      "evidence": "Clear 'Mostly good' verdict with prioritized recommendations list"
+    }
+  ]
+}

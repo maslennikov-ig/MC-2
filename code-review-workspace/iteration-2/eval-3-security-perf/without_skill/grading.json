@@ -1,0 +1,31 @@
+{
+  "eval_id": 3,
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Report examines XSS vectors",
+      "passed": true,
+      "evidence": "Thorough XSS analysis including markmap d3.html(), InfographicViewer, AudioPlayer"
+    },
+    {
+      "text": "Report examines React performance",
+      "passed": true,
+      "evidence": "Covered memoization gaps, callback instability, Set object recreation"
+    },
+    {
+      "text": "Report stays focused on security and performance",
+      "passed": true,
+      "evidence": "Focused on security, performance, and bundle size"
+    },
+    {
+      "text": "Security findings have severity ratings",
+      "passed": true,
+      "evidence": "HIGH/MEDIUM severity levels used"
+    },
+    {
+      "text": "Findings reference specific code with file:line",
+      "passed": true,
+      "evidence": "References files with line numbers"
+    }
+  ]
+}

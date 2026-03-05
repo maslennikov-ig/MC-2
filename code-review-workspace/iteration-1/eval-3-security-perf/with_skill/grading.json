@@ -1,0 +1,31 @@
+{
+  "eval_id": 3,
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Report specifically examines XSS vectors",
+      "passed": true,
+      "evidence": "Explicitly states no dangerouslySetInnerHTML found, checked react-markdown sanitization, analyzed InfographicViewer img src, verified React text node safety"
+    },
+    {
+      "text": "Report examines React performance patterns",
+      "passed": true,
+      "evidence": "Covered useCallback gaps (onCardFlip, QuizPlayer handlers), React.memo opportunities (FlashcardDots, FlashcardSummary), bundle size analysis, code-splitting via next/dynamic"
+    },
+    {
+      "text": "Report stays focused on security and performance",
+      "passed": true,
+      "evidence": "15 findings all security or performance related, no general code style issues"
+    },
+    {
+      "text": "Security findings have severity ratings",
+      "passed": true,
+      "evidence": "Each finding has Critical/High/Medium/Low priority rating"
+    },
+    {
+      "text": "Findings reference specific code patterns with file:line",
+      "passed": true,
+      "evidence": "Every finding has file path with line numbers (e.g., QuizPlayer.tsx:131-143, FlashcardViewer.tsx:237-239)"
+    }
+  ]
+}
