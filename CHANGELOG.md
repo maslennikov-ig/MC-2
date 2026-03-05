@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.18] - 2026-03-05
+
+### Added
+
+- **skills**: add code-review skill, remove old code-reviewer stubs (3d07abf3)
+
+### Changed
+
+- **skills**: remove code-review-inline orchestrator (ee6e974c)
+
+### Other
+
+- update docs, cleanup 190 file(s) (65a39450)
+- fix generation time, add planned features from catalog (750429d2)
+- add strategic vision document, update investor overview (6e2932b5)
+- update investor overview with comprehensive improvements (d9997312)
+- add investor overview document with full platform analysis (e0d2f9b9)
+
 ## [0.31.17] - 2026-03-02
 
 ### Added
