@@ -7,5 +7,11 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     forceExit: true,
     testTimeout: 30000,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts'],
+      exclude: ['**/*.d.ts'],
+    },
   },
 });

@@ -44,6 +44,13 @@ export default defineConfig({
     ],
     // Allow passing when tests are skipped
     passWithNoTests: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.ts'],
+      exclude: ['**/*.d.ts', '**/node_modules/**', 'src/build/**', 'src/types/**'],
+    },
   },
   resolve: {
     alias: {

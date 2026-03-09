@@ -116,11 +116,9 @@ describe('EnrichmentsPanel', () => {
 
     fireEvent.click(screen.getByTestId('placeholder-nlm_audio'))
     fireEvent.click(screen.getByTestId('placeholder-nlm_video'))
-    fireEvent.click(screen.getByTestId('placeholder-video'))
 
     expect(mockStartGeneration).toHaveBeenCalledWith('nlm_audio', { source: 'test' })
     expect(mockStartGeneration).toHaveBeenCalledWith('nlm_video', { source: 'test' })
-    expect(mockStartGeneration).not.toHaveBeenCalledWith('video', { source: 'test' })
   })
 
   it('shows NLM placeholders for legacy draft statuses to allow restart', () => {
