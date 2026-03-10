@@ -9,7 +9,7 @@
  * - strictMode
  */
 import { describe, it, expect } from 'vitest';
-import { MinimumLessonsValidator } from '@/stages/stage5-generation/validators/minimum-lessons-validator';
+import { MinimumLessonsValidator } from '../../../../../src/stages/stage5-generation/validators/minimum-lessons-validator';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

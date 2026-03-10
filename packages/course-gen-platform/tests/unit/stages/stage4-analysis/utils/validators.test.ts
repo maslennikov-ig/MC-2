@@ -13,7 +13,7 @@ import {
   validateJobInput,
   PROGRESS_MESSAGES,
   PROGRESS_RANGES,
-} from '@/stages/stage4-analysis/utils/validators';
+} from '../../../../../src/stages/stage4-analysis/utils/validators';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // formatErrorMessage
