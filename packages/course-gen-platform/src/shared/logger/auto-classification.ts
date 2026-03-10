@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 58 (no optimization needed)
+ * Current rule count: 59 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -85,9 +85,14 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Generic health check probes - monitoring infrastructure',
   },
   {
-    pattern: /No procedure found on path "health"/i,
+    pattern: /No procedure found on path "health"|No procedure found on path "systemHealth/i,
     reason: 'monitoring_probe',
     description: 'tRPC health endpoint probe - monitoring infrastructure',
+  },
+  {
+    pattern: /\/trpc\/systemHealth.*404/i,
+    reason: 'monitoring_probe',
+    description: 'systemHealth tRPC endpoint probe from admin health dashboard',
   },
 
   // === External Service Issues ===
@@ -216,9 +221,10 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Course without documents - content generated without reference materials',
   },
   {
-    pattern: /Mermaid.*fallback.*used|Mermaid.*fix failed.*using fallback/i,
+    pattern:
+      /Mermaid.*fallback.*used|Mermaid.*fix failed.*using fallback|Mermaid.*remediation.*failed.*fallback|Mermaid.*render integrity failed/i,
     reason: 'graceful_fallback',
-    description: 'Mermaid diagram generation failed - graceful fallback to text description',
+    description: 'Mermaid diagram generation/render failed - graceful fallback to text description',
   },
   {
     pattern: /Invalid job name \(undefined\)/i,
