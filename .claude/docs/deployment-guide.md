@@ -316,6 +316,80 @@ sed -e 's/{{WEB_PORT}}/3001/g' -e 's/{{API_PORT}}/4001/g' -e 's/{{COLOR}}/blue/g
 sudo nginx -t && sudo nginx -s reload
 ```
 
+## Critical Operational Rules
+
+### NEVER use `--remove-orphans` with docker compose
+
+Our architecture uses **multiple compose files** sharing one Docker network (`megacampus-network`). Each compose file sees containers from other files as "orphans". Using `--remove-orphans` on any one file **kills containers from all other files**.
+
+```
+# WRONG — kills Redis, docling, workers:
+docker compose -f docker-compose.app.yml up -d --remove-orphans
+
+# CORRECT:
+docker compose -f docker-compose.app.yml up -d --force-recreate
+```
+
+**Root cause of 2026-03-10 outage**: `--remove-orphans` in `deploy_blue_green.sh` killed Redis on every deployment. API containers lost BullMQ connection and never recovered (ioredis stays in "closed" state).
+
+### NEVER create containers manually via `docker run`
+
+Docker Compose automatically creates **DNS aliases** for each service (e.g., service `api` gets DNS alias `api` in the network). These aliases are used by:
+
+- Health dashboard (`packages/web/app/api/admin/health/route.ts`) to check services
+- Web container's `COURSEGEN_BACKEND_URL=http://api:4000`
+- Workers connecting to `redis:6379`, `docling-mcp:8000`, etc.
+
+Containers created via `docker run` do NOT get these aliases — only the container name is registered as DNS. This breaks inter-service communication.
+
+```bash
+# WRONG — no DNS alias "api", health dashboard breaks:
+docker run --name megacampus-api-blue --network megacampus-network ...
+
+# CORRECT — compose creates DNS alias "api" automatically:
+docker compose -f docker-compose.app.yml --env-file .env.blue up -d api
+```
+
+### Service recovery order matters
+
+If shared infrastructure dies, restart in this order:
+
+```bash
+cd /opt/megacampus
+
+# 1. Infrastructure first (Redis, docling, workers)
+docker compose -f docker-compose.infra.yml up -d
+
+# 2. Then app tier (web, api) — MUST use compose, not docker run
+docker compose -f docker-compose.app.yml --env-file .env.$(cat active_color) up -d
+
+# 3. Then production workers
+docker compose -f docker-compose.production.yml up -d
+
+# 4. Dev environment (if needed)
+docker compose -f docker-compose.dev.yml up -d
+```
+
+### Admin health dashboard dependencies
+
+The health dashboard at `/admin` checks these services via Docker DNS:
+
+| Service           | URL checked                            | Compose file     |
+| ----------------- | -------------------------------------- | ---------------- |
+| API               | `http://api:4000/health`               | `app.yml`        |
+| Redis             | TCP `redis:6379`                       | `infra.yml`      |
+| Docling MCP       | `http://docling-mcp:8000/health`       | `infra.yml`      |
+| NotebookLM Bridge | `http://notebooklm-bridge:8000/health` | `infra.yml`      |
+| Supabase          | External HTTPS                         | Cloud (external) |
+
+If any service shows red, verify: (1) container is running, (2) it was started via **docker compose** (not `docker run`), (3) it's on the `megacampus-network`.
+
+### Docker image registry
+
+All images use `ghcr.io/maslennikov-ig/mc-2/` prefix. The old prefix `ghcr.io/maslennikov-ig/megacampusai/` is deprecated. If image pulls fail with "denied", check and update image names in compose files.
+
+---
+
 ## Troubleshooting
 
 ### Check current active color
@@ -362,6 +436,44 @@ curl -f http://localhost:4002/health  # api green
 # Dev
 curl -f http://localhost:3010      # web dev
 curl -f http://localhost:4010/health  # api dev
+```
+
+### All services red in admin health dashboard
+
+**Symptom**: Admin panel shows all services as unhealthy (red), except database.
+
+**Root causes** (check in order):
+
+1. **API container created via `docker run`** — no DNS alias `api`. Fix: recreate via compose:
+
+   ```bash
+   docker stop megacampus-api-$(cat /opt/megacampus/active_color)
+   docker rm megacampus-api-$(cat /opt/megacampus/active_color)
+   docker compose -f docker-compose.app.yml --env-file .env.$(cat active_color) up -d
+   ```
+
+2. **Shared infrastructure down** (Redis, docling, etc.) — killed by `--remove-orphans` or manual cleanup:
+
+   ```bash
+   docker compose -f docker-compose.infra.yml up -d
+   ```
+
+3. **Network mismatch** — container on wrong Docker network:
+   ```bash
+   docker inspect megacampus-api-blue --format '{{json .NetworkSettings.Networks}}' | python3 -m json.tool
+   # Should show megacampus-network
+   ```
+
+### Redis connection stuck after restart
+
+**Symptom**: API logs show `[ioredis] Unhandled error: connect ECONNREFUSED`. Redis is running but API can't connect.
+
+**Root cause**: ioredis connection pool stays in "closed" state after Redis restart. Simple `docker restart` does not help.
+
+**Fix**: Full recreate of API container:
+
+```bash
+docker compose -f docker-compose.app.yml --env-file .env.$(cat /opt/megacampus/active_color) up -d --force-recreate api
 ```
 
 ### Data directory permissions
