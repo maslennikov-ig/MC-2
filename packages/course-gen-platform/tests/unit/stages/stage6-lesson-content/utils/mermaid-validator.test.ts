@@ -11,8 +11,8 @@ import {
   getValidationSummary,
   getValidationCacheStats,
   clearValidationCache,
-} from '@/stages/stage6-lesson-content/utils/mermaid-validator';
-import type { MermaidValidationResult } from '@/stages/stage6-lesson-content/utils/mermaid-validator';
+} from '../../../../../src/stages/stage6-lesson-content/utils/mermaid-validator';
+import type { MermaidValidationResult } from '../../../../../src/stages/stage6-lesson-content/utils/mermaid-validator';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseMermaidError

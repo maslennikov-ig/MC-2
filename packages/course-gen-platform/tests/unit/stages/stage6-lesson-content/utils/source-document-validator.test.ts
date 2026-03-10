@@ -11,7 +11,7 @@ import {
   validateSourceDocuments,
   hasCoreDocument,
   getSourceDocumentStats,
-} from '@/stages/stage6-lesson-content/utils/source-document-validator';
+} from '../../../../../src/stages/stage6-lesson-content/utils/source-document-validator';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

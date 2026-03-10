@@ -12,7 +12,7 @@
  * - exportMetrics / exportAllMetrics
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import metricsStore, { exportMetrics, exportAllMetrics } from '@/orchestrator/metrics';
+import metricsStore, { exportMetrics, exportAllMetrics } from '../../../src/orchestrator/metrics';
 import { JobType } from '@megacampus/shared-types';
 
 beforeEach(() => {
@@ -309,9 +309,9 @@ describe('MetricsStore — reset', () => {
     metricsStore.recordOutboxBatch(1, 0, 50, 5);
     metricsStore.recordModelFallback('error', 'stage6');
     metricsStore.recordEnrichmentStart('video');
-    
+
     metricsStore.reset();
-    
+
     expect(metricsStore.getMetrics(JobType.STRUCTURE_ANALYSIS)).toBeNull();
     expect(metricsStore.getFSMMetrics().total).toBe(0);
     expect(metricsStore.getOutboxMetrics().batchesProcessed).toBe(0);
@@ -330,7 +330,7 @@ describe('MetricsStore — getAllMetrics', () => {
     metricsStore.recordJobSuccess(JobType.STRUCTURE_ANALYSIS, 100);
     metricsStore.recordJobStart(JobType.LESSON_CONTENT);
     metricsStore.recordJobFailure(JobType.LESSON_CONTENT, 200);
-    
+
     const all = metricsStore.getAllMetrics();
     expect(Object.keys(all)).toHaveLength(2);
   });
