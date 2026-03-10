@@ -33,8 +33,8 @@ function makeCtx(content: string, blockIndex = 0): BlockProcessingContext {
 
 describe('removeEscapedQuotes', () => {
     it('removes escaped quotes and marks as modified', () => {
-        // String.raw keeps backslashes literal so `\"` = one backslash + one quote
-        const ctx = makeCtx(String.raw`A["Node label"]`);
+        // Use explicit double backslash to get a single literal backslash in the string
+        const ctx = makeCtx('A[\\"Node label\\"]');
         const result = removeEscapedQuotes(ctx);
         expect(result.sanitized).not.toContain('\\"');
         expect(result.modified).toBe(true);
@@ -43,7 +43,7 @@ describe('removeEscapedQuotes', () => {
     });
 
     it('counts multiple escaped quotes', () => {
-        const ctx = makeCtx(String.raw`A["a"] --> B["b"]`);
+        const ctx = makeCtx('A[\\"a\\"] --> B[\\"b\\"]');
         const result = removeEscapedQuotes(ctx);
         expect(result.fixes[0].count).toBe(4); // 2 pairs (opening and closing quote per bracket)
     });
