@@ -134,8 +134,8 @@ describe('MinimumLessonsValidator.validateV2Specs', () => {
     const specs = makeV2Specs(['1.1', '1.2', '2.1', '2.2', '2.3']);
     const result = validator.validateV2Specs(specs as any);
     expect(result.sectionBreakdown).toHaveLength(2);
-    const sec1 = result.sectionBreakdown.find(s => s.sectionId === 'section-1');
-    const sec2 = result.sectionBreakdown.find(s => s.sectionId === 'section-2');
+    const sec1 = result.sectionBreakdown.find((s: any) => s.sectionId === 'section-1');
+    const sec2 = result.sectionBreakdown.find((s: any) => s.sectionId === 'section-2');
     expect(sec1?.lessonCount).toBe(2);
     expect(sec2?.lessonCount).toBe(3);
   });
@@ -212,7 +212,7 @@ describe('MinimumLessonsValidator.getRecommendations', () => {
         { sectionId: 'section-2', sectionTitle: 'Main', lessonCount: 4 },
       ],
     });
-    expect(result.some(r => r.includes('"Intro"'))).toBe(true);
+    expect(result.some((r: string) => r.includes('"Intro"'))).toBe(true);
   });
 
   it('warns about empty sections', () => {
@@ -227,6 +227,6 @@ describe('MinimumLessonsValidator.getRecommendations', () => {
         { sectionId: 'section-2', sectionTitle: 'Empty', lessonCount: 0 },
       ],
     });
-    expect(result.some(r => r.includes('no lessons'))).toBe(true);
+    expect(result.some((r: string) => r.includes('no lessons'))).toBe(true);
   });
 });

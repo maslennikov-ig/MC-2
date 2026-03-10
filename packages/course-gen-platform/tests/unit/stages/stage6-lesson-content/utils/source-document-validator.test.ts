@@ -77,7 +77,7 @@ describe('validateSourceDocuments', () => {
   it('warns on supplementary-only documents', () => {
     const docs = [makeDoc('SUPPLEMENTARY')];
     const result = validateSourceDocuments(docs as any, { requireCoreDocument: false });
-    expect(result.warnings.some(w => w.includes('SUPPLEMENTARY'))).toBe(true);
+    expect(result.warnings.some((w: string) => w.includes('SUPPLEMENTARY'))).toBe(true);
   });
 
   it('handles empty documents array', () => {
