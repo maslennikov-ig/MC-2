@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 59 (no optimization needed)
+ * Current rule count: 61 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -58,9 +58,19 @@ export interface AutoMuteRule {
 export const AUTO_MUTE_RULES: AutoMuteRule[] = [
   // === Graceful Shutdown Events ===
   {
-    pattern: /Redis connection (ended|closed)/i,
+    pattern: /Redis connection (ended|closed|error)/i,
     reason: 'graceful_shutdown',
     description: 'Redis disconnects during app restart - normal behavior',
+  },
+  {
+    pattern: /Redis reconnecting/i,
+    reason: 'graceful_shutdown',
+    description: 'Redis reconnection attempts during container restart - transient',
+  },
+  {
+    pattern: /^Queue error$/i,
+    reason: 'infrastructure',
+    description: 'BullMQ queue error during Redis reconnect cycle - transient',
   },
   {
     pattern: /graceful.*shutdown/i,
