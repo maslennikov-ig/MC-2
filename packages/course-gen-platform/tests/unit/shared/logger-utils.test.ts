@@ -7,8 +7,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { detectEnvironment } from '@/shared/logger/utils';
 
 describe('detectEnvironment', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     // Reset all relevant env vars before each test
     vi.stubEnv('NODE_ENV', '');
