@@ -146,7 +146,7 @@ describe('validateJobInput', () => {
     });
 
     it('accepts missing document_summaries (optional field)', () => {
-        const input = { topic: 'AI', language: 'en', lesson_duration_minutes: 30 };
+        const input = { topic: 'Art', language: 'en', lesson_duration_minutes: 30 };
         expect(() => validateJobInput(input)).not.toThrow();
     });
 });
