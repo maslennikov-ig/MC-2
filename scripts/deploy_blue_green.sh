@@ -96,11 +96,13 @@ echo "Cleaning up any leftover $NEW_COLOR containers from previous failed deploy
 docker stop "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
 docker rm -f "megacampus-api-$NEW_COLOR" "megacampus-web-$NEW_COLOR" 2>/dev/null || true
 # Also try compose down for proper cleanup
-docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down --remove-orphans 2>/dev/null || true
+# NOTE: do NOT use --remove-orphans here, it kills shared infra (Redis, docling-mcp)!
+docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down 2>/dev/null || true
 
 echo "Pulling and starting $NEW_COLOR containers..."
 docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" pull
-docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --force-recreate --remove-orphans
+# NOTE: do NOT use --remove-orphans, it kills shared infra containers (Redis, workers, etc.)
+docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --force-recreate
 
 # 8. Health Check (check both web and api)
 echo "Performing Health Checks..."
