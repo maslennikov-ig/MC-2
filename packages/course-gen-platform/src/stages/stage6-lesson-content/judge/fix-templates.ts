@@ -140,7 +140,7 @@ function formatIssues(issues: JudgeIssue[]): string {
  */
 function formatLearningObjectives(lessonSpec: LessonSpecificationV2): string {
   return lessonSpec.learning_objectives
-    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map((lo, i) => `- (${i + 1}) ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 }
 

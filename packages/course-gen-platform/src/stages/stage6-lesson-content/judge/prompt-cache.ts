@@ -625,7 +625,7 @@ export function buildCachedJudgePrompt(
 
   // Build dynamic portion
   const objectives = lessonSpec.learning_objectives
-    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map((lo, i) => `- (${i + 1}) ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 
   const dynamicParts = `## CONTENT TO EVALUATE
