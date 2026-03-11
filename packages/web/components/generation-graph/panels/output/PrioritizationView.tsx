@@ -51,7 +51,7 @@ import {
   getDocumentDisplayName,
   truncateDisplayName,
   formatFileSize,
-} from '@megacampus/shared-utils'
+} from '@/lib/shared-format-utils'
 
 // Re-export type for external usage
 export type { DocumentPriority }

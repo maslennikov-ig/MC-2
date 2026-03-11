@@ -19,7 +19,7 @@ import {
   Cpu,
 } from 'lucide-react'
 import { useTranslations, useLocale } from 'next-intl'
-import { formatDuration } from '@megacampus/shared-utils'
+import { formatDuration } from '@/lib/shared-format-utils'
 import { getTierModelName } from '@/lib/generation-graph/constants'
 import type {
   Stage3ProcessTabProps,

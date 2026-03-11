@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Activity, CheckCircle, DollarSign, Clock } from 'lucide-react'
 import { trpc } from '@/lib/trpc/react'
 import { useTranslations } from 'next-intl'
-import { formatDuration } from '@megacampus/shared-utils'
+import { formatDuration } from '@/lib/shared-format-utils'
 
 /**
  * PipelineStats Component

@@ -27,7 +27,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { formatNumber } from '@megacampus/shared-utils'
+import { formatNumber } from '@/lib/shared-format-utils'
 import { MARKDOWN_TRUNCATE_LIMIT } from '@/lib/generation-graph/format-utils'
 import { useGenerationStore } from '@/stores/useGenerationStore'
 import { getSupabaseClient } from '@/lib/supabase/browser-client'

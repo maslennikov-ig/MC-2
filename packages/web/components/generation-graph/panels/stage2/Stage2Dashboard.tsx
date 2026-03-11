@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { useNodeSelection } from '../../hooks/useNodeSelection'
 import { useTranslations, useLocale } from 'next-intl'
 import { PRIORITY_CONFIG, isValidPriority } from '@/lib/generation-graph/priority-config'
-import { getDocumentDisplayName, truncateDisplayName } from '@megacampus/shared-utils'
+import { getDocumentDisplayName, truncateDisplayName } from '@/lib/shared-format-utils'
 import {
   Loader2,
   AlertCircle,

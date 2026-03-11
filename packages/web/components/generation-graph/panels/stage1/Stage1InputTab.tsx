@@ -26,7 +26,7 @@ import { getLearningStyleByValue } from '@/lib/constants/learning-styles'
 import { useTranslations } from 'next-intl'
 import { getCourseSizeLabels } from '@megacampus/shared-types'
 import type { Stage1InputTabProps, Stage1InputData } from './types'
-import { formatFileSize } from '@megacampus/shared-utils'
+import { formatFileSize } from '@/lib/shared-format-utils'
 
 // ============================================================================
 // HELPERS

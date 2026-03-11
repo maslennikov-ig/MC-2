@@ -20,7 +20,7 @@ import { ru as ruLocale } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { Stage1OutputTabProps, StoragePath } from './types'
-import { formatFileSize } from '@megacampus/shared-utils'
+import { formatFileSize } from '@/lib/shared-format-utils'
 import { copyToClipboard } from '@/lib/utils/clipboard'
 
 // ============================================================================
