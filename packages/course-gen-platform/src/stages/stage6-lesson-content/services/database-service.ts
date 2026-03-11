@@ -4,6 +4,7 @@ import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
 import { notifyCourseCompletion } from '@/shared/notifications/course-notifications';
 import type { Stage6Output } from '../orchestrator';
 import { extractContentMarkdown } from './content-utils';
+import { sanitizeContent } from '../judge/strip-metadata';
 import { cacheLessonMarkdown } from '../../../shared/cache/file-content-cache';
 import type { SanityCheckResult } from '../utils/sanity-check';
 import {
@@ -44,7 +45,8 @@ export async function handlePartialSuccess(
   try {
     // Save partial content to lesson_contents table (not lessons table)
     // Serialize content to convert Date objects to strings (LessonContent has Date fields)
-    const markdown = extractContentMarkdown(result.lessonContent, language);
+    const rawMarkdown = extractContentMarkdown(result.lessonContent, language);
+    const markdown = sanitizeContent(rawMarkdown, { component: 'handlePartialSuccess' });
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
@@ -242,7 +244,8 @@ export async function saveLessonContent(
       return;
     }
 
-    const markdown = extractContentMarkdown(result.lessonContent, language);
+    const rawMarkdown = extractContentMarkdown(result.lessonContent, language);
+    const markdown = sanitizeContent(rawMarkdown, { component: 'saveLessonContent' });
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
