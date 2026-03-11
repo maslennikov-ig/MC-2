@@ -145,6 +145,71 @@ function findNextNonEmptyLine(lines: string[], startFrom: number): number {
   return -1;
 }
 
+// ============================================================================
+// LO-CODE STRIPPING (defense-in-depth)
+// ============================================================================
+
+/**
+ * Pattern matching internal Learning Objective codes in all observed formats:
+ *  1. **LO-X.X-X** —    (bold + trailing punct)
+ *  2. **(LO-X.X-X)**    (bold parens)
+ *  3. (LO-X.X-X):       (parens + colon)
+ *  4. [LO-X.X-X]        (brackets — from prompt format)
+ *  5. LO-X.X-X:         (bare ref with word boundary)
+ *
+ * Captures optional surrounding **, (), [] and trailing separators (—–:,-).
+ */
+const LO_CODE_PATTERN = /\*{0,2}\[?\(?\bLO-\d+\.\d+[-.]?\d*\b\)?\]?\*{0,2}\s*[—–:,\-]?\s*/g;
+
+/**
+ * Strip internal Learning Objective codes from generated content.
+ *
+ * Unlike stripLLMMetadata (trailing-only), this scans the ENTIRE document
+ * because LO-codes can appear inline (headings, paragraphs, exercises).
+ *
+ * @param content - Content potentially containing LO-code references
+ * @returns Cleaned content with LO-codes removed
+ */
+export function stripLOCodes(content: string): string {
+  if (!content) return content;
+  return content.replace(LO_CODE_PATTERN, '');
+}
+
+/**
+ * Strip LO-codes with logging.
+ * Use this wrapper in production code paths for observability.
+ *
+ * @param content - Raw LLM output
+ * @param context - Logging context (sectionId, component name, etc.)
+ * @returns Cleaned content
+ */
+export function stripLOCodesWithLogging(
+  content: string,
+  context: { sectionId?: string; component?: string }
+): string {
+  const cleaned = stripLOCodes(content);
+
+  if (cleaned.length < content.length) {
+    const strippedBytes = content.length - cleaned.length;
+
+    logger.warn(
+      {
+        event: 'lo_codes_stripped',
+        component: context.component || 'unknown',
+        sectionId: context.sectionId,
+        strippedBytes,
+      },
+      `Stripped ${strippedBytes} bytes of LO-code references from output`
+    );
+  }
+
+  return cleaned;
+}
+
+// ============================================================================
+// LOGGING WRAPPERS
+// ============================================================================
+
 /**
  * Strip LLM metadata with logging.
  * Use this wrapper in production code paths for observability.

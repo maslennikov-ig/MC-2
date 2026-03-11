@@ -10,7 +10,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { stripLLMMetadata } from '../../../../src/stages/stage6-lesson-content/judge/strip-metadata';
+import {
+  stripLLMMetadata,
+  stripLOCodes,
+} from '../../../../src/stages/stage6-lesson-content/judge/strip-metadata';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -258,5 +261,125 @@ describe('stripLLMMetadata', () => {
     expect(result).toContain('Try / Catch');
     expect(result).toContain('Custom Errors');
     expect(result).toContain('Always prefer specific error types over generic ones.');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stripLOCodes tests
+// ---------------------------------------------------------------------------
+
+describe('stripLOCodes', () => {
+  it('does not modify clean content without LO-codes', () => {
+    const content = [
+      '# Introduction',
+      '',
+      'This lesson covers key concepts in data analysis.',
+      '',
+      '## Key Takeaways',
+      '',
+      '- Understand the basics',
+      '- Apply in practice',
+    ].join('\n');
+
+    expect(stripLOCodes(content)).toBe(content);
+  });
+
+  it('strips **LO-6.2.2** — from inline text', () => {
+    const input = 'Один из ключевых аспектов **LO-6.2.2** — анализ отчетов';
+    const result = stripLOCodes(input);
+    expect(result).toBe('Один из ключевых аспектов анализ отчетов');
+    expect(result).not.toContain('LO-');
+  });
+
+  it('strips trailing **LO-1.3-2** after text', () => {
+    const input = 'чтобы выполнить **LO-1.3-2**. После прохождения';
+    const result = stripLOCodes(input);
+    expect(result).toBe('чтобы выполнить . После прохождения');
+    expect(result).not.toContain('LO-');
+  });
+
+  it('strips LO-code from heading: #### **1. LO-1.2-1: Построить**', () => {
+    const input = '#### **1. LO-1.2-1: Построить матрицу «Red Bull 6×3»**';
+    const result = stripLOCodes(input);
+    expect(result).toBe('#### **1. Построить матрицу «Red Bull 6×3»**');
+    expect(result).not.toContain('LO-');
+  });
+
+  it('strips **(LO-6.4-3)** in bold parens', () => {
+    const input = 'Упражнение **(LO-6.4-3)** для практики';
+    const result = stripLOCodes(input);
+    expect(result).toBe('Упражнение для практики');
+    expect(result).not.toContain('LO-');
+  });
+
+  it('strips (LO-2.5-2): in parens with colon', () => {
+    const input = '**Уровень «Применить» (LO-2.5-2):** описание';
+    const result = stripLOCodes(input);
+    expect(result).toBe('**Уровень «Применить» ** описание');
+    expect(result).not.toContain('LO-');
+  });
+
+  it('strips [LO-1.2-3] bracket format from prompts', () => {
+    const input = '[LO-1.2-3] Understand basic concepts';
+    const result = stripLOCodes(input);
+    expect(result).toBe('Understand basic concepts');
+    expect(result).not.toContain('LO-');
+  });
+
+  it('strips bare LO-code with word boundary', () => {
+    const input = 'Refer to LO-3.1-2 for more details';
+    const result = stripLOCodes(input);
+    expect(result).toBe('Refer to for more details');
+    expect(result).not.toContain('LO-');
+  });
+
+  it('does not touch words containing LO- as part of another token', () => {
+    const input = 'Use HELLO-1.2.3 for configuration';
+    expect(stripLOCodes(input)).toBe(input);
+  });
+
+  it('is idempotent — running twice yields the same result', () => {
+    const input = 'Check **LO-1.3-2** and (LO-2.5-2): in text';
+    const once = stripLOCodes(input);
+    const twice = stripLOCodes(once);
+    expect(twice).toBe(once);
+    expect(once).not.toContain('LO-');
+  });
+
+  it('handles multiple LO-codes in one document', () => {
+    const input = [
+      '#### **1. LO-1.2-1: Построить матрицу**',
+      '',
+      'Текст с **LO-2.5-2** — пояснение.',
+      '',
+      'Упражнение **(LO-6.4-3)** для практики.',
+    ].join('\n');
+
+    const result = stripLOCodes(input);
+    expect(result).not.toContain('LO-');
+    expect(result).toContain('Построить матрицу');
+    expect(result).toContain('пояснение');
+    expect(result).toContain('для практики');
+  });
+
+  it('handles real DB example from PPG-9154', () => {
+    const input =
+      'Используйте полученные знания, чтобы выполнить **LO-1.3-2**. После прохождения этого урока вы сможете применить метод SHS на практике.';
+    const result = stripLOCodes(input);
+    expect(result).toBe(
+      'Используйте полученные знания, чтобы выполнить . После прохождения этого урока вы сможете применить метод SHS на практике.'
+    );
+    expect(result).not.toContain('LO-');
+  });
+
+  it('handles empty string', () => {
+    expect(stripLOCodes('')).toBe('');
+  });
+
+  it('handles LO-codes with dotted sub-numbering (LO-6.2.2)', () => {
+    const input = '**LO-6.2.2**: Анализ отчетов компании';
+    const result = stripLOCodes(input);
+    expect(result).toBe('Анализ отчетов компании');
+    expect(result).not.toContain('LO-');
   });
 });

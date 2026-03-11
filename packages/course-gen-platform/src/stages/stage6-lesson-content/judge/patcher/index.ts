@@ -39,7 +39,7 @@ import { logger } from '../../../../shared/logger';
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { validateGeneratedContent } from '../../nodes/generator/generator-content';
-import { stripLLMMetadataWithLogging } from '../strip-metadata';
+import { stripLLMMetadataWithLogging, stripLOCodesWithLogging } from '../strip-metadata';
 
 export { buildPatcherPrompt, buildPatcherSystemPrompt } from './patcher-prompt';
 
@@ -199,6 +199,12 @@ export async function executePatch(
 
     // Strip trailing LLM metadata (defense-in-depth)
     patchedContent = stripLLMMetadataWithLogging(patchedContent, {
+      sectionId: input.sectionId,
+      component: 'patcher',
+    });
+
+    // Strip inline LO-code references (defense-in-depth)
+    patchedContent = stripLOCodesWithLogging(patchedContent, {
       sectionId: input.sectionId,
       component: 'patcher',
     });
