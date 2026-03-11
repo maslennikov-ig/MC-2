@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 61 (no optimization needed)
+ * Current rule count: 65 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -132,6 +132,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Zod.*validation failed.*Layer/i,
     reason: 'cascading_repair',
     description: 'Layer 1 validation failed, escalating to Layer 2/3 - expected repair flow',
+  },
+  {
+    pattern: /Zod validation failed.*routing through.*Regenerator/i,
+    reason: 'cascading_repair',
+    description: 'Zod validation failed, routed to UnifiedRegenerator - cascading repair working',
   },
 
   // === Deploy & Startup Events ===
@@ -463,6 +468,25 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Course not ready.*generation/i,
     reason: 'expected_behavior',
     description: 'Frontend polls after course already completed or not yet ready',
+  },
+
+  // === Phase 5 Assembly Fallbacks ===
+  {
+    pattern: /\[Phase5Assembly\].*Using fallback/i,
+    reason: 'graceful_fallback',
+    description: 'Phase 5 assembly field fallback to defaults - LLM values filtered out, expected',
+  },
+
+  // === Outbox Processor Transient Errors ===
+  {
+    pattern: /Failed to fetch pending jobs from outbox/i,
+    reason: 'external_service',
+    description: 'Supabase outbox polling fetch failed - transient network, has retry logic',
+  },
+  {
+    pattern: /Outbox processor error.*retrying/i,
+    reason: 'external_service',
+    description: 'Outbox processor transient error with auto-retry - expected during network blips',
   },
 ];
 
