@@ -313,7 +313,7 @@ Address each issue listed above with targeted improvements:
 
 Provide the complete revised content in markdown format.
 
-CRITICAL: Output ONLY the revised lesson content. Do NOT include any commentary, summary of changes, meta-information, quality checklists, or scores.
+CRITICAL: Output ONLY the revised lesson content. Do NOT include any commentary, summary of changes, meta-information, quality checklists, scores, or learning objective IDs (like LO-1.2-3).
 
 Begin your revised content:`;
 }
@@ -437,7 +437,7 @@ Provide ONLY the sections that need changes, in this format:
 ### [SECTION NAME]
 [Revised section content]
 
-CRITICAL: Do NOT include any commentary, "Changes Made" sections, summary of changes, meta-information, quality checklists, or scores. Output ONLY the section content.
+CRITICAL: Do NOT include any commentary, "Changes Made" sections, summary of changes, meta-information, quality checklists, scores, or learning objective IDs (like LO-1.2-3). Output ONLY the section content.
 
 Begin your targeted fixes:`;
 }
@@ -554,7 +554,7 @@ Provide the complete revised content with:
 1. All improvements from previous iterations preserved
 2. New fixes for current iteration issues
 
-CRITICAL: Output ONLY the revised lesson content. Do NOT include any commentary, summary of changes, meta-information, quality checklists, or scores.
+CRITICAL: Output ONLY the revised lesson content. Do NOT include any commentary, summary of changes, meta-information, quality checklists, scores, or learning objective IDs (like LO-1.2-3).
 
 Begin your refined content:`;
 }

@@ -22,7 +22,7 @@ import { validateGeneratedContent } from '../../nodes/generator/generator-conten
 
 import { buildPatcherSystemPrompt } from '../patcher';
 import { buildCoherencePreservingPrompt } from '../fix-templates';
-import { stripLLMMetadataWithLogging } from '../strip-metadata';
+import { stripLLMMetadataWithLogging, stripLOCodesWithLogging } from '../strip-metadata';
 import { emitEvent } from './events';
 
 /**
@@ -128,6 +128,11 @@ export function parsePatcherResponse(response: { content: string; tokensUsed: nu
 
   // Strip trailing LLM metadata (defense-in-depth)
   patchedContent = stripLLMMetadataWithLogging(patchedContent, {
+    component: 'coherence-patcher',
+  });
+
+  // Strip inline LO-code references (defense-in-depth)
+  patchedContent = stripLOCodesWithLogging(patchedContent, {
     component: 'coherence-patcher',
   });
 
