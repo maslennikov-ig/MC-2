@@ -35,7 +35,7 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 import type { RAGChunk, LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import { LLMClient, type LLMResponse } from '@/shared/llm';
 import { logger } from '@/shared/logger';
-import { safeJSONParse } from '@/shared/utils/json-repair';
+import { safeJSONParse } from '@megacampus/shared-utils';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 
 // ============================================================================

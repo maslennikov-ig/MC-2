@@ -75,7 +75,7 @@ import { setupBullBoardUI, createMetricsRouter } from '../orchestrator/ui';
 import logger from '../shared/logger';
 import { validateEnvironment } from '../shared/config/env-validator';
 import { warmupEmbeddingCache } from '../shared/validation/semantic-matching';
-import { findAvailablePort } from '../shared/utils/find-available-port';
+import { findAvailablePort } from '@megacampus/shared-utils';
 import { registerCleanupHandler, runCleanupHandlers } from '../shared/graceful-shutdown';
 import { closeRedisClient } from '../shared/cache/redis';
 import { closeQueue, stopWorker } from '../orchestrator';

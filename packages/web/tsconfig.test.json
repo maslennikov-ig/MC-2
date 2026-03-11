@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "types": ["vitest/globals"]
+  },
+  "include": ["app/**/*", "components/**/*", "lib/**/*", "tests/**/*", "vitest.setup.ts"],
+  "exclude": ["node_modules", ".next", "playwright-report", "test-results"]
+}

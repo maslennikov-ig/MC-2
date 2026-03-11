@@ -10,12 +10,12 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { stripThinkingTags, extractJSON, safeJSONParse } from '@/shared/utils/json-repair';
-import { fixFieldNames, fixFieldNamesWithLogging } from '@/shared/utils/field-name-fix';
-import { setNestedValue } from '@/shared/utils/nested-value';
-import { retryWithBackoff } from '@/shared/utils/retry';
-import { generateGenerationCode } from '@/shared/utils/generation-code';
-import { ValidationError } from '@/server/errors/typed-errors';
+import { stripThinkingTags, extractJSON, safeJSONParse, JSONRepairError } from '../src/json-repair';
+import { fixFieldNames, fixFieldNamesWithLogging } from '../src/field-name-fix';
+import { setNestedValue } from '../src/nested-value';
+import { retryWithBackoff } from '../src/retry';
+import { generateGenerationCode } from '../src/generation-code';
+// import { ValidationError } from '@/server/errors/typed-errors'; // Commenting out if not used, or we will remove it if we change to generic Error.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // json-repair: stripThinkingTags
@@ -162,7 +162,7 @@ describe('safeJSONParse', () => {
     // Deliberately malformed: multiple conflicting unclosed structures that
     // even jsonrepair cannot reconcile into valid JSON, with null bytes
     const broken = '\0\0\0{{{{{[[[invalid: true, "key": }])}]}';
-    expect(() => safeJSONParse(broken)).toThrow(ValidationError);
+    expect(() => safeJSONParse(broken)).toThrow(JSONRepairError);
   });
 
   it('parses nested objects', () => {
@@ -194,7 +194,7 @@ describe('fixFieldNames', () => {
       courseTitle: 'Course',
       sections: [{ sectionTitle: 'Intro', lessonCount: 3 }],
     };
-    const result = fixFieldNames(input) as any;
+    const result = fixFieldNames(input);
     expect(result.course_title).toBe('Course');
     expect(result.sections[0].section_title).toBe('Intro');
     expect(result.sections[0].lesson_count).toBe(3);
@@ -202,7 +202,7 @@ describe('fixFieldNames', () => {
 
   it('handles arrays of primitives without modification', () => {
     const input = { tags: ['a', 'b', 'c'] };
-    const result = fixFieldNames(input) as any;
+    const result = fixFieldNames(input);
     expect(result.tags).toEqual(['a', 'b', 'c']);
   });
 
@@ -222,7 +222,7 @@ describe('fixFieldNames', () => {
 
   it('handles deeply nested arrays', () => {
     const input = [{ courseTitle: 'A' }, { courseTitle: 'B' }];
-    const result = fixFieldNames(input) as any[];
+    const result = fixFieldNames(input);
     expect(result[0].course_title).toBe('A');
     expect(result[1].course_title).toBe('B');
   });
@@ -234,7 +234,7 @@ describe('fixFieldNames', () => {
 
   it('converts lessonObjectives (explicit mapping)', () => {
     const input = { lessonObjectives: ['learn X', 'understand Y'] };
-    const result = fixFieldNames(input) as any;
+    const result = fixFieldNames(input);
     expect(result.lesson_objectives).toEqual(['learn X', 'understand Y']);
   });
 });

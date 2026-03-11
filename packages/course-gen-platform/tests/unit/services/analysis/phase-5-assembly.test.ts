@@ -15,9 +15,13 @@ import type {
 } from '@megacampus/shared-types/analysis-result';
 
 // Mock sanitize-llm-output to pass through
-vi.mock('@/shared/utils/sanitize-llm-output', () => ({
-  sanitizeLLMOutput: vi.fn((input: string) => input),
-}));
+vi.mock('@megacampus/shared-utils', async importOriginal => {
+  const actual = await importOriginal<typeof import('@megacampus/shared-utils')>();
+  return {
+    ...actual,
+    sanitizeLLMOutput: vi.fn((input: string) => input),
+  };
+});
 
 // Mock logger to reduce noise
 vi.mock('@/shared/logger', () => ({

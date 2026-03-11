@@ -8,13 +8,17 @@
     "paths": {
       "@/*": ["./src/*"],
       "@megacampus/shared-types": ["../shared-types/src"],
-      "@megacampus/shared-types/*": ["../shared-types/src/*"]
+      "@megacampus/shared-types/*": ["../shared-types/src/*"],
+      "@megacampus/shared-logger": ["../shared-logger/src"],
+      "@megacampus/shared-logger/*": ["../shared-logger/src/*"],
+      "@megacampus/shared-utils": ["../shared-utils/src"],
+      "@megacampus/shared-utils/*": ["../shared-utils/src/*"]
     }
   },
   "references": [
-    {
-      "path": "../shared-types"
-    }
+    { "path": "../shared-types" },
+    { "path": "../shared-logger" },
+    { "path": "../shared-utils" }
   ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "tests", "examples", "**/__tests__"]

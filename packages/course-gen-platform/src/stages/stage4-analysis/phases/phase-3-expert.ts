@@ -27,9 +27,9 @@ import type {
 import { estimateTokenCount } from '@megacampus/shared-types';
 import { z } from 'zod';
 import { UnifiedRegenerator } from '@/shared/regeneration';
-import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
+import { zodToPromptSchema } from '@megacampus/shared-utils';
 import { preprocessObject } from '@/shared/validation/preprocessing';
-import { extractJSON } from '@/shared/utils/json-repair';
+import { extractJSON } from '@megacampus/shared-utils';
 import type { AIMessage } from '@langchain/core/messages';
 import { logger } from '@/shared/logger';
 import { createPromptService } from '@/shared/prompts/prompt-service';

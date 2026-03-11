@@ -3,7 +3,7 @@ import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput, Section } from '@megacampus/shared-types';
 import { SectionSchema } from '@megacampus/shared-types/generation-result';
 import { UnifiedRegenerator } from '@/shared/regeneration';
-import { safeJSONParse } from '@/shared/utils/json-repair';
+import { safeJSONParse } from '@megacampus/shared-utils';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { normalizeLanguageCode } from '@megacampus/shared-utils';

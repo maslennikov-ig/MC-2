@@ -2,7 +2,7 @@ import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import { SectionWithoutInjectedFieldsSchema } from '@megacampus/shared-types/generation-result';
 import { DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
-import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
+import { zodToPromptSchema } from '@megacampus/shared-utils';
 import {
   getDifficultyFromAnalysis,
   formatPedagogicalStrategyForPrompt,

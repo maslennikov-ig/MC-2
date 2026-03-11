@@ -18,7 +18,7 @@
  * @module shared/utils/field-name-fix
  */
 
-import logger from '@/shared/logger';
+import { logger } from '@megacampus/shared-logger';
 
 /**
  * Convert camelCase string to snake_case
