@@ -39,6 +39,7 @@ import { logger } from '../../../../shared/logger';
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { validateGeneratedContent } from '../../nodes/generator/generator-content';
+import { stripLLMMetadataWithLogging } from '../strip-metadata';
 
 export { buildPatcherPrompt, buildPatcherSystemPrompt } from './patcher-prompt';
 
@@ -193,8 +194,14 @@ export async function executePatch(
       maxTokens,
       temperature: 0.1,
     });
-    const patchedContent = response.content.trim();
+    let patchedContent = response.content.trim();
     const tokensUsed = response.tokensUsed;
+
+    // Strip trailing LLM metadata (defense-in-depth)
+    patchedContent = stripLLMMetadataWithLogging(patchedContent, {
+      sectionId: input.sectionId,
+      component: 'patcher',
+    });
 
     // CRITICAL: Validate that response doesn't contain prompt template markers
     // This catches LLM hallucination where model returns the prompt structure instead of content
