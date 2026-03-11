@@ -291,11 +291,12 @@ describe('stripLOCodes', () => {
     expect(result).not.toContain('LO-');
   });
 
-  it('strips trailing **LO-1.3-2** after text', () => {
+  it('strips trailing **LO-1.3-2** after text and collapses double spaces', () => {
     const input = 'чтобы выполнить **LO-1.3-2**. После прохождения';
     const result = stripLOCodes(input);
     expect(result).toBe('чтобы выполнить . После прохождения');
     expect(result).not.toContain('LO-');
+    expect(result).not.toContain('  ');
   });
 
   it('strips LO-code from heading: #### **1. LO-1.2-1: Построить**', () => {
@@ -317,6 +318,13 @@ describe('stripLOCodes', () => {
     const result = stripLOCodes(input);
     expect(result).toBe('**Уровень «Применить» ** описание');
     expect(result).not.toContain('LO-');
+  });
+
+  it('collapses whitespace artifacts after stripping', () => {
+    const input = 'выполнить **LO-1.3-2** задание';
+    const result = stripLOCodes(input);
+    expect(result).toBe('выполнить задание');
+    expect(result).not.toContain('  ');
   });
 
   it('strips [LO-1.2-3] bracket format from prompts', () => {
@@ -362,6 +370,22 @@ describe('stripLOCodes', () => {
     expect(result).toContain('для практики');
   });
 
+  it('preserves paragraph breaks when LO-code is at end of line', () => {
+    const input = 'Paragraph about **LO-1.2-3**\n\nNext paragraph starts here.';
+    const result = stripLOCodes(input);
+    expect(result).toContain('\n\n');
+    expect(result).not.toContain('LO-');
+    // Trailing space before \n is acceptable artifact (original: "about **LO**\n\n")
+    expect(result).toBe('Paragraph about \n\nNext paragraph starts here.');
+  });
+
+  it('handles comma-separated LO-codes', () => {
+    const input = 'Objectives LO-1.2-3, LO-4.5-6, and more';
+    const result = stripLOCodes(input);
+    expect(result).not.toContain('LO-');
+    expect(result).toContain('and more');
+  });
+
   it('handles real DB example from PPG-9154', () => {
     const input =
       'Используйте полученные знания, чтобы выполнить **LO-1.3-2**. После прохождения этого урока вы сможете применить метод SHS на практике.';
@@ -370,6 +394,7 @@ describe('stripLOCodes', () => {
       'Используйте полученные знания, чтобы выполнить . После прохождения этого урока вы сможете применить метод SHS на практике.'
     );
     expect(result).not.toContain('LO-');
+    expect(result).not.toContain('  ');
   });
 
   it('handles empty string', () => {
