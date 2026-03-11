@@ -243,3 +243,13 @@ export function stripLLMMetadataWithLogging(
 
   return cleaned;
 }
+
+export function sanitizeContent(
+  content: string,
+  context: { sectionId?: string; component?: string } = { component: 'db-write' }
+): string {
+  if (!content) return content;
+  let result = stripLLMMetadataWithLogging(content, context);
+  result = stripLOCodesWithLogging(result, context);
+  return result;
+}

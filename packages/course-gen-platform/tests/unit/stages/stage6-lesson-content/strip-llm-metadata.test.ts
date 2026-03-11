@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
   stripLLMMetadata,
   stripLOCodes,
+  sanitizeContent,
 } from '../../../../src/stages/stage6-lesson-content/judge/strip-metadata';
 
 // ---------------------------------------------------------------------------
@@ -406,5 +407,34 @@ describe('stripLOCodes', () => {
     const result = stripLOCodes(input);
     expect(result).toBe('Анализ отчетов компании');
     expect(result).not.toContain('LO-');
+  });
+});
+
+describe('sanitizeContent', () => {
+  it('chains LLM metadata stripping and LO-code stripping', () => {
+    const input = [
+      '# Lesson Title',
+      '',
+      'Content with **LO-1.2-3** reference.',
+      '',
+      '## SUMMARY OF CHANGES',
+      '',
+      '- Fixed something',
+    ].join('\n');
+
+    const result = sanitizeContent(input);
+    expect(result).not.toContain('LO-');
+    expect(result).not.toContain('SUMMARY OF CHANGES');
+    expect(result).toContain('# Lesson Title');
+    expect(result).toContain('Content with reference.');
+  });
+
+  it('returns clean content unchanged', () => {
+    const clean = '# Good Content\n\nNo issues here.';
+    expect(sanitizeContent(clean)).toBe(clean);
+  });
+
+  it('handles empty string', () => {
+    expect(sanitizeContent('')).toBe('');
   });
 });
