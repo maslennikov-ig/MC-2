@@ -120,5 +120,11 @@ afterAll(() => {
   // Clear any pending timers (safety net)
   vi.useRealTimers();
 
-  // cleanup complete
+  // Safety net: force exit if process hangs due to orphaned connections/timers.
+  // .unref() ensures this timer alone won't keep the process alive —
+  // it only fires if something ELSE is keeping the process alive.
+  setTimeout(() => {
+    console.warn('⚠️ Unit test process still alive after 5s — forcing exit');
+    process.exit(0);
+  }, 5000).unref();
 });
