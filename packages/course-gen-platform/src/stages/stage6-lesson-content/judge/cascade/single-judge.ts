@@ -9,7 +9,7 @@ import { getContentLabels } from '@megacampus/shared-types';
 import { determineRecommendation } from '@megacampus/shared-types';
 import { LLMClient, type LLMResponse } from '@/shared/llm';
 import { logger } from '@/shared/logger';
-import { safeJSONParse } from '@/shared/utils/json-repair';
+import { safeJSONParse } from '@megacampus/shared-utils';
 import { selectJudgeModels } from '../clev-voter';
 import { DEFAULT_OSCQR_RUBRIC } from '@megacampus/shared-types';
 import type { CascadeEvaluationInput, CascadeConfig, RawJudgeResponse } from './types';

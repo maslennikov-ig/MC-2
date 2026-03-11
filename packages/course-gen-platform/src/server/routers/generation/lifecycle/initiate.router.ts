@@ -18,7 +18,7 @@ import { initiateGenerationInputSchema } from '../_shared/schemas';
 import { TIER_PRIORITY } from '../_shared/constants';
 import { extractTierFromOrg, checkConcurrencyLimits } from '../_shared/helpers';
 import { InitializeFSMCommandHandler } from '../../../../shared/fsm/fsm-initialization-command-handler';
-import { generateGenerationCode } from '../../../../shared/utils/generation-code';
+import { generateGenerationCode } from '@megacampus/shared-utils';
 import { workerReadiness, getReadinessFromRedis } from '../../../../orchestrator/worker-readiness';
 import { logTrace } from '../../../../shared/trace-logger';
 import { validateLocale } from '@/shared/validation';

@@ -14,3 +14,5 @@ export interface ChildLoggerContext {
   stageNumber?: number;
   [key: string]: unknown;
 }
+
+export type LogEnvironment = 'dev' | 'stage' | 'test';

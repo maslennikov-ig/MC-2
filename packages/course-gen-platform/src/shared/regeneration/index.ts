@@ -106,8 +106,8 @@ export {
 } from './context-assembler';
 
 // Re-export shared utilities for backwards compatibility
-export { safeJSONParse, extractJSON } from '@/shared/utils/json-repair';
-export { fixFieldNames, fixFieldNamesWithLogging } from '@/shared/utils/field-name-fix';
+export { safeJSONParse, extractJSON } from '@megacampus/shared-utils';
+export { fixFieldNames, fixFieldNamesWithLogging } from '@megacampus/shared-utils';
 
 // Re-export dependency graph builder (T044)
 export {

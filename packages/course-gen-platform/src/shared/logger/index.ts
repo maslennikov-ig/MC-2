@@ -16,7 +16,7 @@ import {
 import type { Logger } from 'pino';
 import { getSupabaseAdmin } from '../supabase/admin';
 import type { Json } from '@megacampus/shared-types';
-import { detectEnvironment } from './utils';
+import { detectEnvironment } from '@megacampus/shared-logger';
 import { shouldAutoMute } from './auto-classification';
 import { shouldWriteToDb } from './rate-limiter';
 

@@ -1,7 +1,7 @@
 import type { LessonGraphStateType } from '../state';
 import type { LessonContent, LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import { logger } from '@/shared/logger';
-import { safeJSONParse } from '@/shared/utils/json-repair';
+import { safeJSONParse } from '@megacampus/shared-utils';
 import { parseMarkdownContent } from '../utils/markdown-parser';
 
 /**

@@ -24,7 +24,6 @@ import {
   NetworkError,
   RateLimitError,
   OrchestrationFailedError,
-  ValidationFailedError,
   DatabaseError,
   isPipelineInterrupt,
   isPipelineError,
@@ -33,7 +32,7 @@ import {
   getErrorCode,
   classifyPipelineError,
 } from '@/shared/errors/pipeline-errors';
-import { getErrorMessage } from '@/shared/utils/error-formatter';
+import { getErrorMessage } from '@megacampus/shared-utils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Error hierarchy and properties

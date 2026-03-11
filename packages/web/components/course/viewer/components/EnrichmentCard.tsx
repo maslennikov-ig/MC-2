@@ -109,6 +109,7 @@ export function EnrichmentCard({
 
   const isVideoType = type === 'video' || type === 'nlm_video'
   const isAudioType = type === 'audio' || type === 'nlm_audio'
+  const isOverlayType = ['quiz', 'nlm_study_guide', 'nlm_flashcards', 'nlm_mind_map'].includes(type)
 
   const handleRetryUrl = () => {
     setUrlError(false)
@@ -502,38 +503,6 @@ export function EnrichmentCard({
           {t(getDescriptionKey())}
         </p>
 
-        {/* Quiz player when active */}
-        {isActive && type === 'quiz' && isQuizContent(enrichment.content) && (
-          <div className="mt-3">
-            <QuizPlayer
-              content={enrichment.content}
-              enrichmentId={enrichment.id}
-              onComplete={() => {}}
-            />
-          </div>
-        )}
-
-        {/* Study Guide viewer when active */}
-        {isActive && type === 'nlm_study_guide' && isStudyGuideContent(enrichment.content) && (
-          <div className="mt-3">
-            <StudyGuideViewer content={enrichment.content} />
-          </div>
-        )}
-
-        {/* Flashcard viewer when active */}
-        {isActive && type === 'nlm_flashcards' && isFlashcardsContent(enrichment.content) && (
-          <div className="mt-3">
-            <FlashcardViewer content={enrichment.content} enrichmentId={enrichment.id} />
-          </div>
-        )}
-
-        {/* Mind Map viewer when active */}
-        {isActive && type === 'nlm_mind_map' && isMindMapContent(enrichment.content) && (
-          <div className="mt-3">
-            <MindMapViewer content={enrichment.content} />
-          </div>
-        )}
-
         {/* Infographic: show thumbnail always when content is available */}
         {type === 'nlm_infographic' && isInfographicContent(enrichment.content) && (
           <div className="mt-3">
@@ -692,6 +661,52 @@ export function EnrichmentCard({
           )}
         </div>
       </div>
+
+      {/* Full-card overlay for interactive enrichment types */}
+      <AnimatePresence>
+        {isActive && isOverlayType && (
+          <motion.div
+            className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Header: type icon + title + close */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2.5 dark:border-slate-700">
+              <div className="flex items-center gap-2">
+                <Icon className={cn('h-4 w-4', config.color)} />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {enrichment.title || label}
+                </span>
+              </div>
+              <Button size="icon" variant="ghost" onClick={onToggle} className="h-7 w-7">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Scrollable viewer content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {type === 'quiz' && isQuizContent(enrichment.content) && (
+                <QuizPlayer
+                  content={enrichment.content}
+                  enrichmentId={enrichment.id}
+                  onComplete={() => {}}
+                />
+              )}
+              {type === 'nlm_study_guide' && isStudyGuideContent(enrichment.content) && (
+                <StudyGuideViewer content={enrichment.content} />
+              )}
+              {type === 'nlm_flashcards' && isFlashcardsContent(enrichment.content) && (
+                <FlashcardViewer content={enrichment.content} enrichmentId={enrichment.id} />
+              )}
+              {type === 'nlm_mind_map' && isMindMapContent(enrichment.content) && (
+                <MindMapViewer content={enrichment.content} />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

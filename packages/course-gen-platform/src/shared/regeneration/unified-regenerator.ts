@@ -17,8 +17,8 @@
 
 import { z } from 'zod';
 import type { ChatOpenAI } from '@langchain/openai';
-import { safeJSONParse } from '@/shared/utils/json-repair';
-import { fixFieldNames } from '@/shared/utils/field-name-fix';
+import { safeJSONParse } from '@megacampus/shared-utils';
+import { fixFieldNames } from '@megacampus/shared-utils';
 import { critiqueAndRevise } from './layers/layer-2-critique-revise';
 import { regeneratePartialFields } from './layers/layer-3-partial-regen';
 import { escalateToLargerModel, getEscalationChain } from './layers/layer-4-model-escalation';

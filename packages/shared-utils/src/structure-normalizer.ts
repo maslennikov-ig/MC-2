@@ -22,7 +22,7 @@
  * @module shared/utils/structure-normalizer
  */
 
-import logger from '@/shared/logger';
+import { logger } from '@megacampus/shared-logger';
 
 /**
  * Valid course category values

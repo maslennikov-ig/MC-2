@@ -10,8 +10,8 @@
  * @see specs/008-generation-generation-json/research-decisions/rt-005-pragmatic-hybrid-implementation-prompt.md
  */
 
-import { extractJSON, safeJSONParse } from '@/shared/utils/json-repair';
-import { fixFieldNames } from '@/shared/utils/field-name-fix';
+import { extractJSON, safeJSONParse } from '@megacampus/shared-utils';
+import { fixFieldNames } from '@megacampus/shared-utils';
 
 /**
  * Repair strategy used for successful parsing

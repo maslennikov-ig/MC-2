@@ -25,7 +25,7 @@
 import { z } from 'zod';
 import type { ChatOpenAI } from '@langchain/openai';
 import logger from '@/shared/logger';
-import { setNestedValue } from '@/shared/utils/nested-value';
+import { setNestedValue } from '@megacampus/shared-utils';
 
 /**
  * Partial regeneration result

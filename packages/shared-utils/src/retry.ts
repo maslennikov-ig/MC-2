@@ -3,7 +3,7 @@
  * @module utils/retry
  */
 
-import logger from '../logger';
+import { logger } from '@megacampus/shared-logger';
 
 export interface RetryOptions {
   maxRetries: number;

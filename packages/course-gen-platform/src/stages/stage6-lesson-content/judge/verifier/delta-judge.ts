@@ -19,7 +19,7 @@ import type {
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { logger } from '@/shared/logger';
-import { safeJSONParse } from '@/shared/utils/json-repair';
+import { safeJSONParse } from '@megacampus/shared-utils';
 
 /**
  * Build prompt for Delta Judge verification

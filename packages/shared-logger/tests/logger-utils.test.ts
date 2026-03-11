@@ -4,7 +4,7 @@
  * detectEnvironment: maps APP_URL/NODE_ENV to LogEnvironment
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { detectEnvironment } from '../../../src/shared/logger/utils';
+import { detectEnvironment } from '../src/utils';
 
 describe('detectEnvironment', () => {
   beforeEach(() => {

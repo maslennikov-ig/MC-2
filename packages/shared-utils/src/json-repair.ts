@@ -17,8 +17,14 @@
  */
 
 import { jsonrepair } from 'jsonrepair';
-import logger from '@/shared/logger';
-import { ValidationError } from '@/server/errors/typed-errors';
+import { logger } from '@megacampus/shared-logger';
+
+export class JSONRepairError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'JSONRepairError';
+  }
+}
 
 /**
  * Repair strategy used for successful parsing
@@ -419,7 +425,7 @@ export function safeJSONParse(jsonStr: string): unknown {
     'JSON repair failed after all strategies, caller may try markdown fallback'
   );
 
-  throw new ValidationError(
+  throw new JSONRepairError(
     `Failed to parse JSON after repair attempts: ${result.error}. Attempts: ${result.attempts?.join(', ')}`
   );
 }

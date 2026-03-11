@@ -16,7 +16,7 @@
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import logger from '../../shared/logger';
-import { retryWithBackoff } from '../../shared/utils/retry';
+import { retryWithBackoff } from '@megacampus/shared-utils';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
 import {
   buildCompletionRequest,
@@ -389,7 +389,7 @@ Create a summary that someone could use to understand the core content without r
     const pricing: Record<string, { input: number; output: number }> = {
       'openai/gpt-oss-20b': { input: 0.03, output: 0.14 },
       'openai/gpt-oss-120b': { input: 0.04, output: 0.4 },
-      'google/gemini-3-flash-preview': { input: 0.50, output: 3.0 },
+      'google/gemini-3-flash-preview': { input: 0.5, output: 3.0 },
     };
 
     const modelPricing = pricing[model] || { input: 0.05, output: 0.15 }; // Default fallback

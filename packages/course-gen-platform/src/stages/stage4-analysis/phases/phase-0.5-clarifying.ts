@@ -24,7 +24,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logTrace } from '@/shared/trace-logger';
 import logger from '@/shared/logger';
-import { safeJSONParse } from '@/shared/utils/json-repair';
+import { safeJSONParse } from '@megacampus/shared-utils';
 import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
 import { SYSTEM_PROMPT_RESERVE } from './stage4-budget-allocator';
 import { createLLMEnumSchema } from '@megacampus/shared-types';

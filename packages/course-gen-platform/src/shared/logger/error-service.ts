@@ -10,7 +10,7 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import { logger } from './index.js';
 import type { Json } from '@megacampus/shared-types';
 import type { ErrorLog, ErrorSeverity, CreateErrorLogParams } from './types';
-import { detectEnvironment } from './utils';
+import { detectEnvironment } from '@megacampus/shared-logger';
 import { applyAutoMuteStatus, muteTestEnvironmentLog } from './auto-mute-service';
 import { shouldAutoMute } from './auto-classification';
 import { shouldWriteToDb } from './rate-limiter';
