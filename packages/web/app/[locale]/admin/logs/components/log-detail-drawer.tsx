@@ -7,7 +7,7 @@ import { Loader2, Clock, Cpu, DollarSign, FileCode, Save, Copy, Check, Plus } fr
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { formatDuration } from '@megacampus/shared-utils'
+import { formatDuration } from '@/lib/shared-format-utils'
 import { SeverityBadge } from './severity-badge'
 import {
   Select,

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import * as Accordion from '@radix-ui/react-accordion'
 import { cn } from '@/lib/utils'
-import { formatDuration } from '@megacampus/shared-utils'
+import { formatDuration } from '@/lib/shared-format-utils'
 import {
   PipelineNodeState,
   Stage6NodeName,

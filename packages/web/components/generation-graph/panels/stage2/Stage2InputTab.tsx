@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { cn } from '@/lib/utils'
 import { FileText, File, Lock, Check, AlertTriangle, User, Building2, Hash } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { formatFileSize } from '@megacampus/shared-utils'
+import { formatFileSize } from '@/lib/shared-format-utils'
 import { HEAVY_PAYLOAD_THRESHOLD_BYTES } from '@/lib/generation-graph/format-utils'
 import { useGenerationStore } from '@/stores/useGenerationStore'
 import { getSupabaseClient } from '@/lib/supabase/browser-client'

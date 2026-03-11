@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { FileText, Scale, Zap, Trophy, ChevronDown, ChevronUp } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { formatFileSize } from '@megacampus/shared-utils'
+import { formatFileSize } from '@/lib/shared-format-utils'
 import { getSupabaseClient } from '@/lib/supabase/browser-client'
 import type { Stage3InputTabProps, Stage3InputData, Stage3DocumentCandidate } from './types'
 
