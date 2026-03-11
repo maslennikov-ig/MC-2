@@ -1,0 +1,32 @@
+{
+  "eval_id": 3,
+  "eval_name": "security-performance-focused",
+  "prompt": "Review packages/web/components/course/viewer/enrichments/ for security and performance issues",
+  "assertions": [
+    {
+      "id": "xss-check",
+      "text": "Report specifically examines XSS vectors (dangerouslySetInnerHTML, unsanitized user input)",
+      "type": "security"
+    },
+    {
+      "id": "react-perf",
+      "text": "Report examines React performance patterns (useMemo, useCallback, unnecessary re-renders)",
+      "type": "performance"
+    },
+    {
+      "id": "focused-scope",
+      "text": "Report stays focused on security and performance (not general code style)",
+      "type": "focus"
+    },
+    {
+      "id": "has-severity",
+      "text": "Security findings have severity ratings",
+      "type": "structure"
+    },
+    {
+      "id": "specific-findings",
+      "text": "Findings reference specific code patterns with file:line, not generic advice",
+      "type": "specificity"
+    }
+  ]
+}

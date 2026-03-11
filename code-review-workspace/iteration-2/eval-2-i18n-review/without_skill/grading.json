@@ -1,0 +1,26 @@
+{
+  "eval_id": 2,
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Report examines both en and ru files",
+      "passed": true,
+      "evidence": "Both EN and RU analyzed"
+    },
+    {
+      "text": "Report checks key consistency",
+      "passed": true,
+      "evidence": "Key parity checked, placeholder consistency noted"
+    },
+    {
+      "text": "Review depth proportional to i18n files",
+      "passed": true,
+      "evidence": "Reasonable depth for i18n files"
+    },
+    {
+      "text": "Report has clear verdict",
+      "passed": true,
+      "evidence": "Has positive/negative summary"
+    }
+  ]
+}

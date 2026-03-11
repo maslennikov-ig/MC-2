@@ -1,0 +1,56 @@
+{
+  "eval_id": 1,
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Report has clear sections: Summary, Issues, Improvements",
+      "passed": true,
+      "evidence": "Summary table, Issues (High/Medium/Low), Improvements (High/Medium/Low), Positive Patterns, Escalation sections"
+    },
+    {
+      "text": "Findings reference specific files with line numbers",
+      "passed": true,
+      "evidence": "Consistent file:line format throughout (FlashcardViewer.tsx:237, FlashcardDots.tsx:17, etc.)"
+    },
+    {
+      "text": "Issues categorized by priority",
+      "passed": true,
+      "evidence": "High/Medium/Low with counts in summary table"
+    },
+    {
+      "text": "At least 2 findings include code snippets",
+      "passed": true,
+      "evidence": "All 7 findings include concrete code snippets with before/after or recommended"
+    },
+    {
+      "text": "Report mentions all 4 files",
+      "passed": true,
+      "evidence": "All 4 files reviewed with findings in each"
+    },
+    {
+      "text": "No false positives",
+      "passed": true,
+      "evidence": "All findings are accurate and evidence-based"
+    },
+    {
+      "text": "Each finding has actionable recommendation",
+      "passed": true,
+      "evidence": "Every finding has specific Fix or Recommended section with code"
+    },
+    {
+      "text": "Includes Positive Patterns section",
+      "passed": true,
+      "evidence": "4 positive patterns noted: component extraction, defensive localStorage, accessibility, fullscreen mode"
+    },
+    {
+      "text": "Includes Escalation section",
+      "passed": true,
+      "evidence": "Escalation section present, correctly notes no items requiring senior review"
+    },
+    {
+      "text": "Adapts depth to scope",
+      "passed": true,
+      "evidence": "4 files = exhaustive analysis as per skill guidance, report is thorough"
+    }
+  ]
+}

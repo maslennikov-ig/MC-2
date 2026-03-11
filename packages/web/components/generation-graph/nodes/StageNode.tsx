@@ -14,7 +14,7 @@ import { useTranslations } from 'next-intl'
 import { RestartConfirmDialog } from '../controls/RestartConfirmDialog'
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext'
 import { useGenerationStore, type StageId } from '@/stores/useGenerationStore'
-import { formatDuration } from '@megacampus/shared-utils'
+import { formatDuration } from '@/lib/shared-format-utils'
 import { NodeErrorTooltip, NodeErrorPanel, RetryBadge, NodeProgressBar } from '../components/shared'
 
 const StageNode = (props: NodeProps<RFStageNode>) => {

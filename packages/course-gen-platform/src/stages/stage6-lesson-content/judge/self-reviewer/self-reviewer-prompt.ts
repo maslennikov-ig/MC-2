@@ -378,7 +378,7 @@ function formatRAGContext(chunks: RAGChunk[], maxChunks: number): string {
  */
 function formatLessonSpec(spec: LessonSpecificationV2): string {
   const objectives = spec.learning_objectives
-    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map((lo, i) => `- (${i + 1}) ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 
   return `Title: ${spec.title}

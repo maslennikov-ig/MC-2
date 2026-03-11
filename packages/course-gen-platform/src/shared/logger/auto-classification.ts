@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 58 (no optimization needed)
+ * Current rule count: 65 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -58,9 +58,19 @@ export interface AutoMuteRule {
 export const AUTO_MUTE_RULES: AutoMuteRule[] = [
   // === Graceful Shutdown Events ===
   {
-    pattern: /Redis connection (ended|closed)/i,
+    pattern: /Redis connection (ended|closed|error)/i,
     reason: 'graceful_shutdown',
     description: 'Redis disconnects during app restart - normal behavior',
+  },
+  {
+    pattern: /Redis reconnecting/i,
+    reason: 'graceful_shutdown',
+    description: 'Redis reconnection attempts during container restart - transient',
+  },
+  {
+    pattern: /^Queue error$/i,
+    reason: 'infrastructure',
+    description: 'BullMQ queue error during Redis reconnect cycle - transient',
   },
   {
     pattern: /graceful.*shutdown/i,
@@ -85,9 +95,14 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Generic health check probes - monitoring infrastructure',
   },
   {
-    pattern: /No procedure found on path "health"/i,
+    pattern: /No procedure found on path "health"|No procedure found on path "systemHealth/i,
     reason: 'monitoring_probe',
     description: 'tRPC health endpoint probe - monitoring infrastructure',
+  },
+  {
+    pattern: /\/trpc\/systemHealth.*404/i,
+    reason: 'monitoring_probe',
+    description: 'systemHealth tRPC endpoint probe from admin health dashboard',
   },
 
   // === External Service Issues ===
@@ -117,6 +132,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Zod.*validation failed.*Layer/i,
     reason: 'cascading_repair',
     description: 'Layer 1 validation failed, escalating to Layer 2/3 - expected repair flow',
+  },
+  {
+    pattern: /Zod validation failed.*routing through.*Regenerator/i,
+    reason: 'cascading_repair',
+    description: 'Zod validation failed, routed to UnifiedRegenerator - cascading repair working',
   },
 
   // === Deploy & Startup Events ===
@@ -216,9 +236,10 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Course without documents - content generated without reference materials',
   },
   {
-    pattern: /Mermaid.*fallback.*used|Mermaid.*fix failed.*using fallback/i,
+    pattern:
+      /Mermaid.*fallback.*used|Mermaid.*fix failed.*using fallback|Mermaid.*remediation.*failed.*fallback|Mermaid.*render integrity failed/i,
     reason: 'graceful_fallback',
-    description: 'Mermaid diagram generation failed - graceful fallback to text description',
+    description: 'Mermaid diagram generation/render failed - graceful fallback to text description',
   },
   {
     pattern: /Invalid job name \(undefined\)/i,
@@ -447,6 +468,25 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Course not ready.*generation/i,
     reason: 'expected_behavior',
     description: 'Frontend polls after course already completed or not yet ready',
+  },
+
+  // === Phase 5 Assembly Fallbacks ===
+  {
+    pattern: /\[Phase5Assembly\].*Using fallback/i,
+    reason: 'graceful_fallback',
+    description: 'Phase 5 assembly field fallback to defaults - LLM values filtered out, expected',
+  },
+
+  // === Outbox Processor Transient Errors ===
+  {
+    pattern: /Failed to fetch pending jobs from outbox/i,
+    reason: 'external_service',
+    description: 'Supabase outbox polling fetch failed - transient network, has retry logic',
+  },
+  {
+    pattern: /Outbox processor error.*retrying/i,
+    reason: 'external_service',
+    description: 'Outbox processor transient error with auto-retry - expected during network blips',
   },
 ];
 

@@ -1,224 +1,236 @@
 /**
- * Unit tests for Duration Validator
+ * Tests for stage5-generation/validators/duration-validator.ts
  *
- * RT-007 Phase 1: Tests duration proportionality with improvements
- * - Difficulty level multiplier (beginner: 1.0x, intermediate: 1.5x, advanced: 2.0x)
- * - ENGAGEMENT_CAP changed from ERROR to INFO (doesn't block)
- * - MAX duration changed from ERROR to WARNING (allows complex topics)
+ * Pure computation tests:
+ * - calculateExpectedDuration: RT-006 formula with RT-007 difficulty multipliers
+ * - validateDurationProportionality: ERROR/WARNING/INFO severity logic
+ * - Constants: DIFFICULTY_MULTIPLIER, duration constants
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   calculateExpectedDuration,
   validateDurationProportionality,
+  DIFFICULTY_MULTIPLIER,
   MIN_TOPIC_DURATION,
   MAX_TOPIC_DURATION,
   MIN_OBJECTIVE_DURATION,
   MAX_OBJECTIVE_DURATION,
   ENGAGEMENT_CAP,
-  DIFFICULTY_MULTIPLIER,
 } from '@/stages/stage5-generation/validators/duration-validator';
+import { ValidationSeverity } from '@megacampus/shared-types';
 
-describe('Duration Validator - Difficulty Multiplier', () => {
-  // Spy on console methods
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
-  let consoleInfoSpy: ReturnType<typeof vi.spyOn>;
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
 
-  beforeEach(() => {
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+describe('Duration validator constants', () => {
+  it('has expected base constants', () => {
+    expect(MIN_TOPIC_DURATION).toBe(2);
+    expect(MAX_TOPIC_DURATION).toBe(5);
+    expect(MIN_OBJECTIVE_DURATION).toBe(5);
+    expect(MAX_OBJECTIVE_DURATION).toBe(15);
+    expect(ENGAGEMENT_CAP).toBe(6);
   });
 
-  afterEach(() => {
-    consoleWarnSpy.mockRestore();
-    consoleInfoSpy.mockRestore();
+  it('has expected difficulty multipliers', () => {
+    expect(DIFFICULTY_MULTIPLIER.beginner).toBe(1.0);
+    expect(DIFFICULTY_MULTIPLIER.intermediate).toBe(1.5);
+    expect(DIFFICULTY_MULTIPLIER.advanced).toBe(2.0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// calculateExpectedDuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('calculateExpectedDuration', () => {
+  it('calculates correct range for beginner level', () => {
+    // 2 topics, 2 objectives, beginner (1.0x)
+    // min = (2*2 + 2*5) * 1.0 = 4 + 10 = 14
+    // max = (2*5 + 2*15) * 1.0 = 10 + 30 = 40
+    const result = calculateExpectedDuration(2, 2, 'beginner');
+    expect(result.min).toBe(14);
+    expect(result.max).toBe(40);
   });
 
-  describe('calculateExpectedDuration', () => {
-    it('should calculate base duration for intermediate level (default)', () => {
-      const result = calculateExpectedDuration(2, 1);
-
-      // Base: 2×2 + 1×5 = 9, 2×5 + 1×15 = 25
-      // Intermediate multiplier: 1.5x
-      // Expected: 9×1.5 = 13.5 → 14, 25×1.5 = 37.5 → 38
-      expect(result.min).toBe(14);
-      expect(result.max).toBe(38);
-    });
-
-    it('should apply beginner multiplier (1.0x)', () => {
-      const result = calculateExpectedDuration(2, 1, 'beginner');
-
-      // Base: 2×2 + 1×5 = 9, 2×5 + 1×15 = 25
-      // Beginner multiplier: 1.0x
-      expect(result.min).toBe(9);
-      expect(result.max).toBe(25);
-    });
-
-    it('should apply intermediate multiplier (1.5x)', () => {
-      const result = calculateExpectedDuration(2, 1, 'intermediate');
-
-      // Base: 2×2 + 1×5 = 9, 2×5 + 1×15 = 25
-      // Intermediate multiplier: 1.5x
-      expect(result.min).toBe(14); // ceil(9 × 1.5) = 14
-      expect(result.max).toBe(38); // ceil(25 × 1.5) = 38
-    });
-
-    it('should apply advanced multiplier (2.0x)', () => {
-      const result = calculateExpectedDuration(2, 1, 'advanced');
-
-      // Base: 2×2 + 1×5 = 9, 2×5 + 1×15 = 25
-      // Advanced multiplier: 2.0x
-      expect(result.min).toBe(18); // 9 × 2.0 = 18
-      expect(result.max).toBe(50); // 25 × 2.0 = 50
-    });
-
-    it('should handle complex lessons with multiple topics and objectives', () => {
-      const result = calculateExpectedDuration(4, 3, 'advanced');
-
-      // Base: 4×2 + 3×5 = 23, 4×5 + 3×15 = 65
-      // Advanced multiplier: 2.0x
-      expect(result.min).toBe(46); // 23 × 2.0 = 46
-      expect(result.max).toBe(130); // 65 × 2.0 = 130
-    });
+  it('applies intermediate multiplier (1.5x)', () => {
+    // 2 topics, 2 objectives, intermediate (1.5x)
+    // base min = 14, base max = 40
+    // with 1.5x: min = ceil(21) = 21, max = ceil(60) = 60
+    const result = calculateExpectedDuration(2, 2, 'intermediate');
+    expect(result.min).toBe(21);
+    expect(result.max).toBe(60);
   });
 
-  describe('validateDurationProportionality', () => {
-    it('should pass for beginner lesson with correct duration', () => {
-      const lesson = {
-        key_topics: ['Variables', 'Data types'],
-        lesson_objectives: [{ text: 'Define variables' }],
-        estimated_duration_minutes: 9, // 2×2 + 1×5 = 9 (exact min)
-        difficulty_level: 'beginner' as const,
-      };
-
-      const result = validateDurationProportionality(lesson);
-
-      expect(result.passed).toBe(true); // ✅ 9 min OK for beginner
-      expect(result.issues).toBeUndefined();
-    });
-
-    it('should pass for advanced lesson with correct duration', () => {
-      const lesson = {
-        key_topics: ['Metaprogramming', 'Decorators'],
-        lesson_objectives: [{ text: 'Implement decorators' }],
-        estimated_duration_minutes: 18, // (2×2 + 1×5) × 2.0 = 18
-        difficulty_level: 'advanced' as const,
-      };
-
-      const result = validateDurationProportionality(lesson);
-
-      expect(result.passed).toBe(true); // ✅ 18 min OK for advanced
-      expect(result.issues).toBeUndefined();
-    });
-
-    it('should block if duration too short (below MIN)', () => {
-      const lesson = {
-        key_topics: ['Variables', 'Data types'],
-        lesson_objectives: [{ text: 'Define variables' }],
-        estimated_duration_minutes: 5, // Below MIN (9 for beginner)
-        difficulty_level: 'beginner' as const,
-      };
-
-      const result = validateDurationProportionality(lesson);
-
-      expect(result.passed).toBe(false); // ❌ Too short
-      expect(result.issues).toBeDefined();
-      expect(result.issues![0]).toContain('too short');
-      expect(result.issues![0]).toContain('5 min');
-    });
-
-    it('should NOT block if duration exceeds MAX (just warns)', () => {
-      const lesson = {
-        key_topics: ['Variables', 'Data types'],
-        lesson_objectives: [{ text: 'Define variables' }],
-        estimated_duration_minutes: 40, // Above MAX (25 for beginner)
-        difficulty_level: 'beginner' as const,
-      };
-
-      const result = validateDurationProportionality(lesson);
-
-      expect(result.passed).toBe(true); // ✅ NOT blocked (RT-007 change)
-      expect(result.warnings).toBeDefined(); // ⚠️ Returns warnings in ValidationResult
-      expect(result.warnings!.length).toBeGreaterThan(0);
-    });
-
-    it('should NOT block on ENGAGEMENT_CAP (just logs INFO)', () => {
-      const complexLesson = {
-        key_topics: ['Async', 'Promises', 'Event Loop', 'Callbacks'],
-        lesson_objectives: [
-          { text: 'Explain event loop' },
-          { text: 'Implement promises' },
-          { text: 'Debug async errors' },
-        ],
-        estimated_duration_minutes: 35, // Exceeds ENGAGEMENT_CAP (6 min)
-      };
-
-      const result = validateDurationProportionality(complexLesson);
-
-      expect(result.passed).toBe(true); // ✅ NOT blocked (RT-007 change)
-      expect(result.info).toBeDefined(); // ℹ️ Returns info in ValidationResult
-      expect(result.info!.length).toBeGreaterThan(0);
-    });
-
-    it('should default to intermediate if difficulty_level not provided', () => {
-      const lesson = {
-        key_topics: ['Variables', 'Data types'],
-        lesson_objectives: [{ text: 'Define variables' }],
-        estimated_duration_minutes: 14, // Matches intermediate MIN
-        // No difficulty_level provided
-      };
-
-      const result = validateDurationProportionality(lesson);
-
-      expect(result.passed).toBe(true); // ✅ Uses intermediate multiplier (1.5x)
-    });
-
-    it('should handle edge case: minimum viable lesson', () => {
-      const lesson = {
-        key_topics: ['Topic 1', 'Topic 2'], // Min 2 topics
-        lesson_objectives: [{ text: 'Objective 1' }], // Min 1 objective
-        estimated_duration_minutes: 9, // Beginner: 2×2 + 1×5 = 9
-        difficulty_level: 'beginner' as const,
-      };
-
-      const result = validateDurationProportionality(lesson);
-
-      expect(result.passed).toBe(true);
-    });
-
-    it('should handle edge case: complex advanced lesson', () => {
-      const lesson = {
-        key_topics: ['T1', 'T2', 'T3', 'T4', 'T5'], // 5 topics
-        lesson_objectives: [{ text: 'O1' }, { text: 'O2' }, { text: 'O3' }, { text: 'O4' }], // 4 objectives
-        estimated_duration_minutes: 70, // Advanced: (5×2 + 4×5) × 2 = 60, within range
-        difficulty_level: 'advanced' as const,
-      };
-
-      const result = validateDurationProportionality(lesson);
-
-      // Base: 5×2 + 4×5 = 30 min
-      // Advanced multiplier: 30 × 2 = 60 min (MIN)
-      // MAX: (5×5 + 4×15) × 2 = 170 min
-      // 70 min is within range [60, 170]
-      expect(result.passed).toBe(true);
-    });
+  it('applies advanced multiplier (2.0x)', () => {
+    // 2 topics, 2 objectives, advanced (2.0x)
+    // base min = 14 * 2.0 = 28, base max = 40 * 2.0 = 80
+    const result = calculateExpectedDuration(2, 2, 'advanced');
+    expect(result.min).toBe(28);
+    expect(result.max).toBe(80);
   });
 
-  describe('DIFFICULTY_MULTIPLIER constants', () => {
-    it('should have correct multiplier values', () => {
-      expect(DIFFICULTY_MULTIPLIER.beginner).toBe(1.0);
-      expect(DIFFICULTY_MULTIPLIER.intermediate).toBe(1.5);
-      expect(DIFFICULTY_MULTIPLIER.advanced).toBe(2.0);
-    });
+  it('defaults to intermediate when no level specified', () => {
+    const withDefault = calculateExpectedDuration(3, 1);
+    const withExplicit = calculateExpectedDuration(3, 1, 'intermediate');
+    expect(withDefault.min).toBe(withExplicit.min);
+    expect(withDefault.max).toBe(withExplicit.max);
   });
 
-  describe('Duration constants', () => {
-    it('should have correct RT-006 values', () => {
-      expect(MIN_TOPIC_DURATION).toBe(2);
-      expect(MAX_TOPIC_DURATION).toBe(5);
-      expect(MIN_OBJECTIVE_DURATION).toBe(5);
-      expect(MAX_OBJECTIVE_DURATION).toBe(15);
-      expect(ENGAGEMENT_CAP).toBe(6);
+  it('returns larger ranges for more topics', () => {
+    const few = calculateExpectedDuration(1, 1);
+    const many = calculateExpectedDuration(5, 5);
+    expect(many.min).toBeGreaterThan(few.min);
+    expect(many.max).toBeGreaterThan(few.max);
+  });
+
+  it('min is always less than max', () => {
+    for (const difficulty of ['beginner', 'intermediate', 'advanced'] as const) {
+      const result = calculateExpectedDuration(3, 3, difficulty);
+      expect(result.min).toBeLessThan(result.max);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// validateDurationProportionality
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeLesson(overrides: {
+  key_topics?: string[];
+  lesson_objectives?: unknown[];
+  estimated_duration_minutes: number;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
+}) {
+  return {
+    key_topics: overrides.key_topics || ['topic1', 'topic2'],
+    lesson_objectives: overrides.lesson_objectives || ['obj1', 'obj2'],
+    estimated_duration_minutes: overrides.estimated_duration_minutes,
+    difficulty_level: overrides.difficulty_level,
+  };
+}
+
+describe('validateDurationProportionality', () => {
+  it('returns passed=true and INFO for valid duration', () => {
+    // 2 topics, 2 objectives, beginner => min=14, max=40
+    // A duration of 20 min is within range
+    const result = validateDurationProportionality(makeLesson({
+      key_topics: ['t1', 't2'],
+      lesson_objectives: ['o1', 'o2'],
+      estimated_duration_minutes: 20,
+      difficulty_level: 'beginner',
+    }));
+    expect(result.passed).toBe(true);
+    expect(result.severity).toBe(ValidationSeverity.INFO);
+    expect(result.score).toBe(1.0);
+  });
+
+  it('returns ERROR when duration is too short', () => {
+    // 2 topics, 2 objectives, beginner => min=14
+    // A duration of 5 min is too short
+    const result = validateDurationProportionality(makeLesson({
+      key_topics: ['t1', 't2'],
+      lesson_objectives: ['o1', 'o2'],
+      estimated_duration_minutes: 5,
+      difficulty_level: 'beginner',
+    }));
+    expect(result.passed).toBe(false);
+    expect(result.severity).toBe(ValidationSeverity.ERROR);
+    expect(result.issues).toBeDefined();
+    expect(result.issues!.length).toBeGreaterThan(0);
+    expect(result.issues![0]).toContain('too short');
+  });
+
+  it('returns WARNING (passed=true) when duration exceeds max', () => {
+    // 2 topics, 2 objectives, beginner => max=40
+    // A duration of 100 min exceeds max but passes
+    const result = validateDurationProportionality(makeLesson({
+      key_topics: ['t1', 't2'],
+      lesson_objectives: ['o1', 'o2'],
+      estimated_duration_minutes: 100,
+      difficulty_level: 'beginner',
+    }));
+    expect(result.passed).toBe(true);
+    expect(result.severity).toBe(ValidationSeverity.WARNING);
+    expect(result.score).toBe(0.9);
+  });
+
+  it('returns INFO when duration exceeds engagement cap but within max', () => {
+    // 2 topics, 3 objectives, beginner => min=14, max=55
+    // Duration of 10 min > ENGAGEMENT_CAP(6) but within [14, 55]? No, 10 < 14.
+    // Let's use 4 topics, 2 objectives, beginner => min=18, max=50
+    // Duration of 8 min > ENGAGEMENT_CAP(6) but < min(18)?
+    // Actually engagement cap is checked AFTER min/max checks.
+    // So we need duration to be > cap(6) AND within [min, max].
+    // 3 topics, 1 objective => min=ceil((6+5)*1.5)=17, max=ceil((15+15)*1.5)=45
+    // Or beginner: min=(6+5)*1.0=11, max=(15+15)*1.0=30
+    // Duration=8: 8 < 11 (min), so ERROR. Need duration > cap but within range.
+    // Try: 1 topic, 1 objective, beginner => min=7, max=20, cap=6
+    // duration=8: >cap(6) AND within [7,20] → INFO for engagement cap
+    const result = validateDurationProportionality(makeLesson({
+      key_topics: ['t1'],
+      lesson_objectives: ['o1'],
+      estimated_duration_minutes: 8,
+      difficulty_level: 'beginner',
+    }));
+    expect(result.passed).toBe(true);
+    expect(result.severity).toBe(ValidationSeverity.INFO);
+  });
+
+  it('defaults to intermediate difficulty when not specified', () => {
+    const result = validateDurationProportionality({
+      key_topics: ['t1', 't2'],
+      lesson_objectives: ['o1', 'o2'],
+      estimated_duration_minutes: 30,
     });
+    expect(result).toBeDefined();
+    expect(typeof result.passed).toBe('boolean');
+  });
+
+  it('score is proportional for ERROR case', () => {
+    const result = validateDurationProportionality(makeLesson({
+      key_topics: ['t1', 't2'],
+      lesson_objectives: ['o1', 'o2'],
+      estimated_duration_minutes: 7, // half of min (14)
+      difficulty_level: 'beginner',
+    }));
+    expect(result.score).toBeDefined();
+    expect(result.score!).toBeGreaterThan(0);
+    expect(result.score!).toBeLessThan(1);
+  });
+
+  it('includes suggestion in error result', () => {
+    const result = validateDurationProportionality(makeLesson({
+      key_topics: ['t1', 't2'],
+      lesson_objectives: ['o1', 'o2'],
+      estimated_duration_minutes: 5,
+      difficulty_level: 'beginner',
+    }));
+    expect(result.suggestion).toBeDefined();
+    expect(result.suggestion!).toContain('Increase duration');
+  });
+
+  it('includes metadata in result', () => {
+    const result = validateDurationProportionality(makeLesson({
+      estimated_duration_minutes: 20,
+      difficulty_level: 'beginner',
+    }));
+    expect(result.metadata).toBeDefined();
+    expect(result.metadata).toHaveProperty('actual', 20);
+  });
+
+  it('advanced difficulty allows longer durations before ERROR', () => {
+    // Same topic/objectives, advanced multiplier means higher min
+    // 2 topics, 2 objectives, advanced => min=28
+    // So duration 20 is ERROR for advanced but OK for beginner
+    const advancedResult = validateDurationProportionality(makeLesson({
+      key_topics: ['t1', 't2'],
+      lesson_objectives: ['o1', 'o2'],
+      estimated_duration_minutes: 20,
+      difficulty_level: 'advanced',
+    }));
+    expect(advancedResult.passed).toBe(false);
+    expect(advancedResult.severity).toBe(ValidationSeverity.ERROR);
   });
 });

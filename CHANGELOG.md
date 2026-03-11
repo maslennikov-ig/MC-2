@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.19] - 2026-03-11
+
+### Changed
+
+- extract shared utils/logger, enrichment card overlay UX (2d880559)
+
+### Fixed
+
+- **logger**: add auto-mute for Zod→Regenerator, Phase5 fallback, outbox transients (2ecde367)
+- **logger**: add auto-mute for Redis/Queue transient errors during restarts (921fd82a)
+- **logger**: expand auto-mute patterns for Mermaid render failures and systemHealth probes (2c9b4721)
+- **deploy**: remove --remove-orphans that killed Redis on every deploy (2252ea96)
+- **tests**: resolve TS module alias resolution errors in IDE (8a959ac6)
+- **tests**: resolve lint and typescript strict mode errors in new tests (865b5337)
+- **tests**: stabilize test suite — PostCSS import, test assertions, coverage config (708d61cb)
+
+### Other
+
+- add Jina API key rotation guide (1cbc9afc)
+- add critical operational rules to deployment guide + server security audit (a678ab2e)
+- **course-gen-platform**: add comprehensive MetricsStore tests (853 LOC module) (ed89c39a)
+- **course-gen-platform**: add minimum-lessons-validator, mermaid-validator, source-doc-validator, logger-utils tests (9016d116)
+- **course-gen-platform**: add section-utils arbiter + content-utils tests (33661f1f)
+- **course-gen-platform**: add pure tests for text-utils syllable counter and flesch-kincaid (285ee145)
+- **course-gen-platform**: add pure tests for validators and table-fix pipeline (d7d0d57a)
+- **course-gen-platform**: add unit tests for stage5/stage6 pure utilities (16883fb9)
+- **coverage**: fix failing tests + 139 new shared utility tests (ff75ecf1)
+- fix code metrics — 580K+ lines, 6,300+ tests (1df625b0)
+
+## [0.31.18] - 2026-03-05
+
+### Added
+
+- **skills**: add code-review skill, remove old code-reviewer stubs (3d07abf3)
+
+### Changed
+
+- **skills**: remove code-review-inline orchestrator (ee6e974c)
+
+### Other
+
+- update docs, cleanup 190 file(s) (65a39450)
+- fix generation time, add planned features from catalog (750429d2)
+- add strategic vision document, update investor overview (6e2932b5)
+- update investor overview with comprehensive improvements (d9997312)
+- add investor overview document with full platform analysis (e0d2f9b9)
+
 ## [0.31.17] - 2026-03-02
 
 ### Added

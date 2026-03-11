@@ -12,7 +12,7 @@ import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import type { ConcurrencyCheckResult, NormalizedTier, CourseSettings } from './types';
 
 // Re-export from shared utility (single source of truth)
-export { setNestedValue } from '../../../../shared/utils/nested-value';
+export { setNestedValue } from '@megacampus/shared-utils';
 
 /**
  * Normalize field path for validation against whitelist

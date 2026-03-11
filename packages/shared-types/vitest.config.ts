@@ -1,24 +1,22 @@
-import { defineConfig } from 'vitest/config';
+import { mergeConfig, defineConfig } from 'vitest/config';
 import path from 'path';
+import sharedConfig from '../../vitest.shared';
 
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
-    include: ['tests/**/*.test.ts'],
-    // Force exit after tests to prevent CI hanging
-    forceExit: true,
-    testTimeout: 30000,
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      include: ['src/**/*.ts'],
-      exclude: ['src/**/*.d.ts', 'src/database.types.ts'],
+export default mergeConfig(
+  sharedConfig,
+  defineConfig({
+    test: {
+      include: ['tests/**/*.test.ts'],
+      testTimeout: 30000,
+      coverage: {
+        include: ['src/**/*.ts'],
+        exclude: ['src/**/*.d.ts', 'src/database.types.ts'],
+      },
     },
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
     },
-  },
-});
+  })
+);

@@ -43,7 +43,7 @@ interface Phase6Output {
     retry_count: number;
   };
 }
-import { sanitizeLLMOutput } from '../../../shared/utils/sanitize-llm-output';
+import { sanitizeLLMOutput } from '@megacampus/shared-utils';
 import { logger } from '../../../shared/logger';
 
 /**
@@ -248,8 +248,8 @@ export function assembleAnalysisResult(input: Phase5Input): AnalysisResult {
 
     // Deprecated: always empty object for new courses, kept for backward compat
     document_relevance_mapping:
-      (input.phase6_output?.document_relevance_mapping as AnalysisResult['document_relevance_mapping']) ||
-      {},
+      (input.phase6_output
+        ?.document_relevance_mapping as AnalysisResult['document_relevance_mapping']) || {},
 
     // Metadata: Cumulative execution metrics
     metadata: {

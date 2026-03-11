@@ -1,0 +1,41 @@
+{
+  "eval_id": 1,
+  "variant": "without_skill",
+  "expectations": [
+    {
+      "text": "Report has clear sections: Summary, Issues, Improvements",
+      "passed": false,
+      "evidence": "Has Executive Summary, Critical/Major/Minor issues, Accessibility Review, Performance Review, Code Quality — but Issues and Improvements are not separated into distinct sections"
+    },
+    {
+      "text": "Findings reference specific files with line numbers (file:line format)",
+      "passed": true,
+      "evidence": "Uses format like '(FlashcardViewer.tsx, line 106)' and '(FlashcardViewer.tsx, lines 112-117)' — slightly different format but includes file:line references"
+    },
+    {
+      "text": "Issues are categorized by priority (critical/high/medium/low)",
+      "passed": true,
+      "evidence": "Uses Critical/Major/Minor severity levels with counts in summary table"
+    },
+    {
+      "text": "At least 2 findings include code snippets showing before/after or current/recommended",
+      "passed": true,
+      "evidence": "Multiple findings include code snippets with recommendations"
+    },
+    {
+      "text": "Report mentions all 4 reviewed files",
+      "passed": true,
+      "evidence": "All 4 files listed in 'Reviewed files' header with line counts"
+    },
+    {
+      "text": "No obviously wrong findings",
+      "passed": true,
+      "evidence": "Finding #13 was self-corrected. All other findings appear accurate."
+    },
+    {
+      "text": "Each finding has an actionable recommendation",
+      "passed": true,
+      "evidence": "Most findings have Recommendation sections with specific actions, though some are more prescriptive than others"
+    }
+  ]
+}

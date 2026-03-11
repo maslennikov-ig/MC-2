@@ -16,14 +16,16 @@ It has two lines.
 Body section content.`;
 
     const parsed = parseMarkdownSections(markdown);
-    const intro = parsed.sections.find(section => section.id === 'introduction');
-    const firstHeaderIndex = parsed.lines.findIndex(line => /^##\s+/.test(line));
+    const intro = parsed.sections.find((section: { id: string }) => section.id === 'introduction');
+    const firstHeaderIndex = parsed.lines.findIndex((line: string) => /^##\s+/.test(line));
 
     expect(intro).toBeDefined();
     expect(intro?.title).toBe('Introduction');
     expect(intro?.content).toContain('This preface should be treated as intro.');
     expect(intro?.endLine).toBe(firstHeaderIndex);
-    expect(parsed.sections.some(section => section.id === 'section_1')).toBe(true);
+    expect(parsed.sections.some((section: { id: string }) => section.id === 'section_1')).toBe(
+      true
+    );
   });
 
   it('replaces synthetic introduction content during merge', () => {
@@ -56,7 +58,9 @@ Body section content.`;
     const regeneratedIntro = '## Introduction\n\nInserted introduction content.';
     const merged = mergeSectionIntoMarkdown(parsed, 'introduction', regeneratedIntro);
 
-    expect(parsed.sections.some(section => section.id === 'introduction')).toBe(false);
+    expect(parsed.sections.some((section: { id: string }) => section.id === 'introduction')).toBe(
+      false
+    );
     expect(merged).toContain('## Introduction');
     expect(merged).toContain('Inserted introduction content.');
     expect(merged.indexOf('## Introduction')).toBeLessThan(merged.indexOf('## Core Concepts'));

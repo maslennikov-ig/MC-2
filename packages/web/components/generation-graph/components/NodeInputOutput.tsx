@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp, ArrowRight, FileText, Hash, Clock, Cpu, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatNumber } from '@megacampus/shared-utils'
+import { formatNumber } from '@/lib/shared-format-utils'
 
 /**
  * NodeInputOutput - Input/Output summary for pipeline nodes

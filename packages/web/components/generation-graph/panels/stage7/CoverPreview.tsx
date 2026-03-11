@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
 import type { EnrichmentStatus, CoverEnrichmentContent } from '@megacampus/shared-types'
-import { formatFileSize } from '@megacampus/shared-utils'
+import { formatFileSize } from '@/lib/shared-format-utils'
 
 // ============================================================================
 // Types

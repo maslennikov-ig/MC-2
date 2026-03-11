@@ -24,7 +24,7 @@ import {
   type Phase2Input,
   type Phase2Output,
 } from '@megacampus/shared-types/analysis-schemas';
-import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
+import { zodToPromptSchema } from '@megacampus/shared-utils';
 import {
   preprocessRawOutput,
   parseWithRepairCascade,

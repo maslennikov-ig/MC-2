@@ -1,0 +1,26 @@
+{
+  "eval_id": 2,
+  "variant": "with_skill",
+  "expectations": [
+    {
+      "text": "Report examines both en and ru message files",
+      "passed": true,
+      "evidence": "Both EN and RU files analyzed, issues found in both locales, Key Metrics section reports 551 keys per locale"
+    },
+    {
+      "text": "Report checks that keys are consistent between en and ru files",
+      "passed": true,
+      "evidence": "Key parity: 100%, Placeholder parity: 100%, ICU plural coverage comparison between locales"
+    },
+    {
+      "text": "Review depth is appropriate for i18n files",
+      "passed": true,
+      "evidence": "200-line report for 2 JSON files is proportional — covers real issues without unnecessary padding"
+    },
+    {
+      "text": "Report has a clear verdict or summary",
+      "passed": true,
+      "evidence": "Clear 'NEEDS WORK' verdict in Summary table, specific Next Steps section"
+    }
+  ]
+}

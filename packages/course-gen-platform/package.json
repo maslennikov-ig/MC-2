@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/course-gen-platform",
-  "version": "0.31.17",
+  "version": "0.31.19",
   "private": true,
   "type": "module",
   "description": "Main API server for MegaCampusAI course generation platform",
@@ -108,6 +108,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.16.0",
     "@types/tar": "^6.1.13",
+    "@vitest/coverage-v8": "^4.0.15",
     "js-yaml": "^4.1.1",
     "json5": "^2.2.3",
     "nock": "^14.0.10",

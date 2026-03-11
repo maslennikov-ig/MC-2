@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/shared-utils",
-  "version": "0.31.17",
+  "version": "0.31.19",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -12,12 +12,23 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm && tsc --emitDeclarationOnly",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "dependencies": {
+    "@megacampus/shared-logger": "workspace:*",
+    "@megacampus/shared-types": "workspace:*",
+    "@types/jsdom": "^27.0.0",
+    "dompurify": "^3.1.5",
+    "jsdom": "^28.1.0",
+    "jsonrepair": "^3.11.3",
+    "tiktoken": "^1.0.14",
+    "zod": "^3.23.8"
+  },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "tsup": "^8.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.15"

@@ -20,7 +20,7 @@ import {
   BookOpen,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { formatDuration } from '@megacampus/shared-utils'
+import { formatDuration } from '@/lib/shared-format-utils'
 import type {
   Stage5ProcessTabProps,
   Stage5Phase,

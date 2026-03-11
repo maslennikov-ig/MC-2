@@ -63,10 +63,15 @@ vi.mock('@/shared/regeneration', () => ({
   }),
 }));
 
-// Mock JSON repair utilities
-vi.mock('@/shared/utils/json-repair', () => ({
-  extractJSON: vi.fn((input: string) => input),
-}));
+// Mock shared utilities
+vi.mock('@megacampus/shared-utils', async importOriginal => {
+  const actual = await importOriginal<typeof import('@megacampus/shared-utils')>();
+  return {
+    ...actual,
+    extractJSON: vi.fn((input: string) => input),
+    zodToPromptSchema: vi.fn(() => 'mock schema'),
+  };
+});
 
 // Mock preprocessing utilities
 vi.mock('@/shared/validation/preprocessing', () => ({
@@ -78,11 +83,6 @@ vi.mock('@/shared/prompts/prompt-service', () => ({
   createPromptService: vi.fn(() => ({
     renderPrompt: vi.fn().mockReturnValue('Mock prompt text'),
   })),
-}));
-
-// Mock zod-to-prompt-schema
-vi.mock('@/shared/utils/zod-to-prompt-schema', () => ({
-  zodToPromptSchema: vi.fn(() => 'mock schema'),
 }));
 
 // Mock logger

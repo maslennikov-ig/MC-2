@@ -5,8 +5,15 @@
     "rootDir": "./src",
     "declaration": true,
     "declarationMap": true,
-    "incremental": false,
-    "composite": false
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@megacampus/shared-types": ["../shared-types/src"],
+      "@megacampus/shared-types/*": ["../shared-types/src/*"],
+      "@megacampus/shared-logger": ["../shared-logger/src"],
+      "@megacampus/shared-logger/*": ["../shared-logger/src/*"]
+    }
   },
+  "references": [{ "path": "../shared-types" }, { "path": "../shared-logger" }],
   "include": ["src/**/*"]
 }

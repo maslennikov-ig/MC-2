@@ -173,4 +173,5 @@ export function createRequestLogger(requestId: string, userId?: string): Logger 
 export { logger };
 export default logger;
 export type { Logger } from 'pino';
-export type { ChildLoggerContext, LoggerOptions } from './types';
+export type { ChildLoggerContext, LoggerOptions, LogEnvironment } from './types';
+export * from './utils';

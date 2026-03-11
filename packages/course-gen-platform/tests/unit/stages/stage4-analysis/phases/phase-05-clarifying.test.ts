@@ -59,9 +59,13 @@ vi.mock('@/shared/trace-logger', () => ({
 }));
 
 // Mock JSON repair (default: pass-through to JSON.parse)
-vi.mock('@/shared/utils/json-repair', () => ({
-  safeJSONParse: vi.fn((input: string) => JSON.parse(input)),
-}));
+vi.mock('@megacampus/shared-utils', async importOriginal => {
+  const actual = await importOriginal<typeof import('@megacampus/shared-utils')>();
+  return {
+    ...actual,
+    safeJSONParse: vi.fn((input: string) => JSON.parse(input)),
+  };
+});
 
 // Mock logger to suppress output
 vi.mock('@/shared/logger', () => ({
@@ -115,7 +119,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     // Restore default mock implementations (parse failure tests override safeJSONParse)
-    const { safeJSONParse } = await import('@/shared/utils/json-repair');
+    const { safeJSONParse } = await import('@megacampus/shared-utils');
     vi.mocked(safeJSONParse).mockImplementation((input: string) => JSON.parse(input));
   });
 
@@ -226,7 +230,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
   describe('JSON parse failure graceful degradation', () => {
     it('defaults to sufficient with confidence 0.3 on parse failure', async () => {
       const { getModelForPhase } = await import('@/shared/llm/langchain-models');
-      const { safeJSONParse } = await import('@/shared/utils/json-repair');
+      const { safeJSONParse } = await import('@megacampus/shared-utils');
       const mockModel = {
         model: 'openai/gpt-oss-20b',
         invoke: vi.fn().mockResolvedValue({
@@ -247,7 +251,7 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
 
     it('calls logTrace with sufficiency_parse_failure_round_N step', async () => {
       const { getModelForPhase } = await import('@/shared/llm/langchain-models');
-      const { safeJSONParse } = await import('@/shared/utils/json-repair');
+      const { safeJSONParse } = await import('@megacampus/shared-utils');
       const { logTrace } = await import('@/shared/trace-logger');
       const mockModel = {
         model: 'openai/gpt-oss-20b',

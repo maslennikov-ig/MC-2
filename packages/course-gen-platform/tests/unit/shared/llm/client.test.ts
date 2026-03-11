@@ -64,16 +64,20 @@ vi.mock('@/shared/logger', () => ({
   },
 }));
 
-vi.mock('@/shared/utils/retry', () => ({
-  retryWithBackoff: vi.fn(fn => fn()),
-}));
+vi.mock('@megacampus/shared-utils', async importOriginal => {
+  const actual = await importOriginal<typeof import('@megacampus/shared-utils')>();
+  return {
+    ...actual,
+    retryWithBackoff: vi.fn(fn => fn()),
+  };
+});
 
 // Import after mocks are defined
 import { LLMClient, createLLMClient } from '@/shared/llm/client';
 import { getOpenRouterApiKey, getApiKeySync } from '@/shared/services/api-key-service';
 import OpenAI from 'openai';
 import logger from '@/shared/logger';
-import { retryWithBackoff } from '@/shared/utils/retry';
+import { retryWithBackoff } from '@megacampus/shared-utils';
 
 describe('LLMClient', () => {
   beforeEach(() => {

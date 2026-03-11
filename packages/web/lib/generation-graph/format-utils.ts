@@ -1,8 +1,8 @@
 /**
  * Shared constants for Generation Graph components
  *
- * NOTE: formatNumber and formatFileSize have been moved to @megacampus/shared-utils.
- * Import them from '@megacampus/shared-utils' instead.
+ * NOTE: formatNumber and formatFileSize live in @/lib/shared-format-utils.
+ * Import them from '@/lib/shared-format-utils' for client components.
  */
 
 // Constants
