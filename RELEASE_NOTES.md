@@ -2,6 +2,28 @@
 
 _Released on 2025-12-26_
 
+## v0.31.19
+
+_Released on 2026-03-11_
+
+### 🔧 Improvements
+
+- Extract shared utils/logger, enrichment card overlay UX
+
+### 🐛 Bug Fixes
+
+- **logger**: Add auto-mute for Zod→Regenerator, Phase5 fallback, outbox transients
+- **logger**: Add auto-mute for Redis/Queue transient errors during restarts
+- **logger**: Expand auto-mute patterns for Mermaid render failures and systemHealth probes
+- **deploy**: Remove --remove-orphans that killed Redis on every deploy
+- **tests**: Resolve TS module alias resolution errors in IDE
+- **tests**: Resolve lint and typescript strict mode errors in new tests
+- **tests**: Stabilize test suite — PostCSS import, test assertions, coverage config
+
+---
+
+_This release was automatically generated from 18 commits._
+
 ## v0.31.18
 
 _Released on 2026-03-05_
