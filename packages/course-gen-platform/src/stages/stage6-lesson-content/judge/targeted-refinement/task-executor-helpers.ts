@@ -22,6 +22,7 @@ import { validateGeneratedContent } from '../../nodes/generator/generator-conten
 
 import { buildPatcherSystemPrompt } from '../patcher';
 import { buildCoherencePreservingPrompt } from '../fix-templates';
+import { stripLLMMetadataWithLogging } from '../strip-metadata';
 import { emitEvent } from './events';
 
 /**
@@ -119,11 +120,16 @@ export async function executeLlmCall(
  */
 export function parsePatcherResponse(response: { content: string; tokensUsed: number }): string {
   // Basic validation and trimming
-  const patchedContent = response.content.trim();
+  let patchedContent = response.content.trim();
 
   if (!patchedContent) {
     throw new Error('Patcher returned empty content');
   }
+
+  // Strip trailing LLM metadata (defense-in-depth)
+  patchedContent = stripLLMMetadataWithLogging(patchedContent, {
+    component: 'coherence-patcher',
+  });
 
   return patchedContent;
 }

@@ -311,9 +311,9 @@ Address each issue listed above with targeted improvements:
 
 ## OUTPUT FORMAT
 
-Provide the complete revised content in markdown format. Include:
-1. All sections from the original (revised as needed)
-2. Brief comment at the end noting which issues were addressed
+Provide the complete revised content in markdown format.
+
+CRITICAL: Output ONLY the revised lesson content. Do NOT include any commentary, summary of changes, meta-information, quality checklists, or scores.
 
 Begin your revised content:`;
 }
@@ -437,8 +437,7 @@ Provide ONLY the sections that need changes, in this format:
 ### [SECTION NAME]
 [Revised section content]
 
-### Changes Made
-- [Brief note on what was fixed and why]
+CRITICAL: Do NOT include any commentary, "Changes Made" sections, summary of changes, meta-information, quality checklists, or scores. Output ONLY the section content.
 
 Begin your targeted fixes:`;
 }
@@ -554,7 +553,8 @@ Before finalizing, verify:
 Provide the complete revised content with:
 1. All improvements from previous iterations preserved
 2. New fixes for current iteration issues
-3. Summary of changes made in this iteration
+
+CRITICAL: Output ONLY the revised lesson content. Do NOT include any commentary, summary of changes, meta-information, quality checklists, or scores.
 
 Begin your refined content:`;
 }
