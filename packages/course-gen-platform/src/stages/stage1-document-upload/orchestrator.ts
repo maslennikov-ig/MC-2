@@ -14,6 +14,7 @@
 import { logger } from '../../shared/logger/index.js';
 import { logTrace } from '../../shared/trace-logger';
 import { runPhase1Validation, runPhase2Storage, isValidationError, isStorageError } from './phases';
+import { QuotaExceededError } from '../../server/errors/typed-errors';
 import type { Stage1Input, Stage1Output } from './types';
 
 /**
@@ -228,6 +229,11 @@ export class Stage1Orchestrator {
    * Convert phase errors to execution errors
    */
   private convertToExecutionError(error: unknown): Stage1ExecutionError {
+    // Handle quota exceeded errors FIRST (before duck-type checks which would match .code/.message)
+    if (error instanceof QuotaExceededError) {
+      return new Stage1ExecutionError('BAD_REQUEST', error.message);
+    }
+
     // Handle validation errors (Phase 1)
     if (isValidationError(error)) {
       return new Stage1ExecutionError(error.code, error.message);

@@ -41,6 +41,7 @@ import type { Server } from 'http';
 import cors from 'cors';
 import { closeQueue } from '../../src/orchestrator/queue';
 import { getAuthToken, clearTokenCache } from '../helpers/auth-token';
+import { getRedisClient } from '../../src/shared/cache/redis';
 
 // ============================================================================
 // Type Definitions
@@ -300,6 +301,13 @@ describe('Contract: Generation Router', () => {
     // Clean up existing test data
     await cleanupTestFixtures();
 
+    // Reset Redis concurrency counters to prevent stale state from previous runs
+    const redis = getRedisClient();
+    const concurrencyKeys = await redis.keys('concurrency:*');
+    if (concurrencyKeys.length > 0) {
+      await redis.del(...concurrencyKeys);
+    }
+
     // Setup test fixtures (creates orgs, users, courses, AND auth users in DB)
     await setupTestFixtures();
 
@@ -324,6 +332,13 @@ describe('Contract: Generation Router', () => {
   afterEach(async () => {
     // Clean up test jobs after each test
     await cleanupTestJobs();
+
+    // Reset concurrency counters after each test
+    const redis = getRedisClient();
+    const concurrencyKeys = await redis.keys('concurrency:*');
+    if (concurrencyKeys.length > 0) {
+      await redis.del(...concurrencyKeys);
+    }
 
     // Clean up test courses created during test
     if (testCourseIds.length > 0) {

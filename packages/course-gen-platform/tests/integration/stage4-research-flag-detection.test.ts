@@ -127,7 +127,7 @@ async function runAnalysisForTopic(
       user_id: TEST_USERS.instructor1.id,
       title: `Test Course - ${topic}`,
       slug: `test-course-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      generation_status: 'analyzing_task', // Ready for Stage 4 analysis
+      generation_status: 'stage_4_init', // Ready for Stage 4 analysis
       status: 'draft',
     })
     .select()

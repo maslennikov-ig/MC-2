@@ -66,6 +66,7 @@ export async function createTestOrg(tier: SubscriptionTier): Promise<TestOrganiz
     .insert({
       id: orgId,
       name: `Test Org ${tier.toUpperCase()} ${timestamp}`, // Unique name with timestamp
+      slug: `test-org-${tier}-${timestamp}`,
       tier: tier, // Fixed: column is 'tier' not 'subscription_tier'
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

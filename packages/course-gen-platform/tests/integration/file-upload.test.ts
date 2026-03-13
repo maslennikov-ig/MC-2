@@ -50,7 +50,7 @@ interface TestServer {
 interface TestOrganization {
   id: string;
   name: string;
-  tier: 'free' | 'basic_plus' | 'standard' | 'premium';
+  tier: 'free' | 'basic' | 'standard' | 'premium';
   storageQuotaBytes: number;
 }
 
@@ -95,7 +95,7 @@ const TEST_FILE_UPLOAD_ORGS: Record<string, TestOrganization> = {
   basicPlus: {
     id: '00000000-0000-0000-0000-000000000102',
     name: 'Basic Plus Tier Org',
-    tier: 'basic_plus',
+    tier: 'basic',
     storageQuotaBytes: 100 * 1024 * 1024, // 100MB
   },
   standard: {
@@ -113,7 +113,7 @@ const TEST_FILE_UPLOAD_ORGS: Record<string, TestOrganization> = {
   quotaFull: {
     id: '00000000-0000-0000-0000-000000000105',
     name: 'Quota Full Org',
-    tier: 'basic_plus',
+    tier: 'basic',
     storageQuotaBytes: 100 * 1024 * 1024, // 100MB (will set usage to 100MB)
   },
 };
@@ -377,6 +377,7 @@ async function setupTestFixtures(): Promise<void> {
       {
         id: org.id,
         name: org.name,
+        slug: org.name.toLowerCase().replace(/\s+/g, '-'),
         tier: org.tier,
         storage_quota_bytes: org.storageQuotaBytes,
         storage_used_bytes:

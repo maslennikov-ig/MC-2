@@ -40,6 +40,7 @@ beforeAll(async () => {
     .insert({
       name: `Test Org Quota ${Date.now()}`,
       tier: 'free',
+      slug: `test-org-quota-${Date.now()}`,
       storage_quota_bytes: TIER_QUOTAS.free,
       storage_used_bytes: 0,
     })

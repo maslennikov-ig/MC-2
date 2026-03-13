@@ -16,18 +16,19 @@ const uniqueName = (prefix: string) => `${prefix}_${randomUUID().slice(0, 8)}`;
 // Storage quota mappings for tier types
 const tierQuotaMap = {
   free: 10485760, // 10 MB
-  basic_plus: 104857600, // 100 MB
+  basic: 104857600, // 100 MB
   standard: 1073741824, // 1 GB
   premium: 10737418240, // 10 GB
 } as const;
 
 // Helper: Create test organization with correct quota
-async function createTestOrg(tier: 'free' | 'basic_plus' | 'standard' | 'premium' = 'free') {
+async function createTestOrg(tier: 'free' | 'basic' | 'standard' | 'premium' = 'free') {
   const { data, error } = await supabase
     .from('organizations')
     .insert({
       id: randomUUID(),
       name: uniqueName('test_org'),
+      slug: uniqueName('test-org').toLowerCase().replace(/\s+/g, '-'),
       tier,
       storage_quota_bytes: tierQuotaMap[tier],
       storage_used_bytes: 0,
@@ -118,11 +119,11 @@ describe('Database Schema Acceptance Tests', () => {
   });
 
   describe('Test 1: Organizations table enforces tier enum values', () => {
-    it('should accept valid tier values (free, basic_plus, standard, premium)', async () => {
+    it('should accept valid tier values (free, basic, standard, premium)', async () => {
       // Given: Valid tier values with their corresponding storage quotas
       const validTiers = [
         { tier: 'free' as const, quota: 10485760 },
-        { tier: 'basic_plus' as const, quota: 104857600 },
+        { tier: 'basic' as const, quota: 104857600 },
         { tier: 'standard' as const, quota: 1073741824 },
         { tier: 'premium' as const, quota: 10737418240 },
       ];
@@ -134,6 +135,7 @@ describe('Database Schema Acceptance Tests', () => {
           .insert({
             id: randomUUID(),
             name: uniqueName(`org_${tier}`),
+            slug: uniqueName(`org-${tier}`).toLowerCase(),
             tier,
             storage_quota_bytes: quota,
             storage_used_bytes: 0,
@@ -160,6 +162,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_invalid'),
+          slug: uniqueName('org-invalid').toLowerCase(),
           tier: invalidTier,
         })
         .select()
@@ -174,7 +177,7 @@ describe('Database Schema Acceptance Tests', () => {
   describe('Test 2: Organizations table enforces storage quota constraints', () => {
     const tierQuotas = [
       { tier: 'free', quota: 10485760 }, // 10 MB
-      { tier: 'basic_plus', quota: 104857600 }, // 100 MB
+      { tier: 'basic', quota: 104857600 }, // 100 MB
       { tier: 'standard', quota: 1073741824 }, // 1 GB
       { tier: 'premium', quota: 10737418240 }, // 10 GB
     ] as const;
@@ -188,6 +191,7 @@ describe('Database Schema Acceptance Tests', () => {
           .insert({
             id: randomUUID(),
             name: uniqueName(`org_quota_${tier}`),
+            slug: uniqueName(`org-quota-${tier}`).toLowerCase(),
             tier,
             storage_quota_bytes: quota,
             storage_used_bytes: 0,
@@ -210,6 +214,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_storage_check'),
+          slug: uniqueName('org-storage-check').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: tierQuotaMap['free'],
           storage_used_bytes: 0,
@@ -239,6 +244,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_storage_valid'),
+          slug: uniqueName('org-storage-valid').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: tierQuotaMap['free'],
           storage_used_bytes: 0,
@@ -426,6 +432,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: orgName,
+          slug: uniqueName('unique-org-slug').toLowerCase(),
         })
         .select()
         .single();
@@ -438,6 +445,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: orgName,
+          slug: uniqueName('unique-org-slug-2').toLowerCase(),
         })
         .select()
         .single();
@@ -454,6 +462,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_unique_email'),
+          slug: uniqueName('org-unique-email').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -501,6 +510,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_unique_slug'),
+          slug: uniqueName('org-unique-slug').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -565,6 +575,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_slug_1'),
+          slug: uniqueName('org-slug-1').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -577,6 +588,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_slug_2'),
+          slug: uniqueName('org-slug-2').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -658,6 +670,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_enrollment'),
+          slug: uniqueName('org-enrollment').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -746,6 +759,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_negative_storage'),
+          slug: uniqueName('org-negative-storage').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -775,6 +789,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_section_order'),
+          slug: uniqueName('org-section-order').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -861,6 +876,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_lesson_order'),
+          slug: uniqueName('org-lesson-order').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -947,6 +963,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_lesson_duration'),
+          slug: uniqueName('org-lesson-duration').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -1068,6 +1085,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_file_size'),
+          slug: uniqueName('org-file-size').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -1140,6 +1158,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_course_status'),
+          slug: uniqueName('org-course-status').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -1193,6 +1212,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_lesson_type'),
+          slug: uniqueName('org-lesson-type').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,
@@ -1268,6 +1288,7 @@ describe('Database Schema Acceptance Tests', () => {
         .insert({
           id: randomUUID(),
           name: uniqueName('org_enrollment_status'),
+          slug: uniqueName('org-enrollment-status').toLowerCase(),
           tier: 'free',
           storage_quota_bytes: 10485760,
           storage_used_bytes: 0,

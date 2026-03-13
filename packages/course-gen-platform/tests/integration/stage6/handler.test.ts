@@ -23,6 +23,15 @@ import {
   createStage6Worker,
   createStage6Queue,
   HANDLER_CONFIG,
+  MODEL_FALLBACK,
+  detectLanguage,
+  handlePartialSuccess,
+  markForReview,
+  gracefulShutdown,
+  processStage6Job,
+  updateJobProgress,
+  saveLessonContent,
+  processWithFallback,
   type Stage6JobInput,
   type Stage6JobResult,
   type ProgressUpdate,
@@ -124,14 +133,14 @@ async function waitForJobCompletion(
       reject(new Error(`Job ${job.id} timed out after ${timeout}ms`));
     }, timeout);
 
-    queueEvents.on('completed', async ({ jobId, returnvalue }) => {
+    queueEvents.on('completed', ({ jobId, returnvalue }) => {
       if (jobId === job.id) {
         clearTimeout(timer);
         resolve(returnvalue as unknown as Stage6JobResult);
       }
     });
 
-    queueEvents.on('failed', async ({ jobId, failedReason }) => {
+    queueEvents.on('failed', ({ jobId, failedReason }) => {
       if (jobId === job.id) {
         clearTimeout(timer);
         reject(new Error(`Job ${jobId} failed: ${failedReason}`));
@@ -205,7 +214,7 @@ describe('Stage 6 BullMQ Handler Integration', () => {
   let redisVersionInfo: { version: string; major: number; minor: number; patch: number } | null =
     null;
   let shouldSkipTests = false;
-  let testCourseIds: string[] = [];
+  const testCourseIds: string[] = [];
 
   beforeAll(async () => {
     // Check Redis version first
@@ -305,7 +314,7 @@ describe('Stage 6 BullMQ Handler Integration', () => {
   // ==========================================================================
 
   describe('Job Processing', () => {
-    it.skipIf(shouldSkipTests)('should create queue and worker instances', async () => {
+    it.skipIf(shouldSkipTests)('should create queue and worker instances', () => {
       // Verify queue is created
       expect(queue).toBeDefined();
       expect(queue.name).toBe(HANDLER_CONFIG.QUEUE_NAME);
@@ -444,7 +453,7 @@ describe('Stage 6 BullMQ Handler Integration', () => {
       180000
     );
 
-    it.skipIf(shouldSkipTests)('should include expected phases in progress updates', async () => {
+    it.skipIf(shouldSkipTests)('should include expected phases in progress updates', () => {
       // This test verifies the progress update structure without requiring LLM
       const expectedPhases = ['planner', 'expander', 'assembler', 'smoother', 'judge', 'complete'];
 
@@ -464,8 +473,6 @@ describe('Stage 6 BullMQ Handler Integration', () => {
   describe('Model Fallback Retry', () => {
     it.skipIf(shouldSkipTests)('should have correct model fallback configuration', () => {
       // Verify model fallback configuration is properly defined
-      const { MODEL_FALLBACK } = require('../../../src/stages/stage6-lesson-content/handler');
-
       expect(MODEL_FALLBACK).toBeDefined();
       expect(MODEL_FALLBACK.primary).toBeDefined();
       expect(MODEL_FALLBACK.primary.ru).toBeDefined();
@@ -475,9 +482,6 @@ describe('Stage 6 BullMQ Handler Integration', () => {
     });
 
     it.skipIf(shouldSkipTests)('should detect Russian language correctly', () => {
-      // Import detectLanguage function
-      const { detectLanguage } = require('../../../src/stages/stage6-lesson-content/handler');
-
       // Test Russian detection
       expect(detectLanguage(ANALYTICAL_LESSON_SPEC)).toBe('ru');
       expect(detectLanguage(PROCEDURAL_LESSON_SPEC)).toBe('ru');
@@ -525,11 +529,6 @@ describe('Stage 6 BullMQ Handler Integration', () => {
   describe('Partial Success Handling', () => {
     it.skipIf(shouldSkipTests)('should define partial success handling functions', () => {
       // Verify partial success handling is exported
-      const {
-        handlePartialSuccess,
-        markForReview,
-      } = require('../../../src/stages/stage6-lesson-content/handler');
-
       expect(handlePartialSuccess).toBeDefined();
       expect(typeof handlePartialSuccess).toBe('function');
       expect(markForReview).toBeDefined();
@@ -765,33 +764,28 @@ describe('Stage 6 BullMQ Handler Integration', () => {
     });
 
     it.skipIf(shouldSkipTests)('should export all required functions', () => {
-      const handler = require('../../../src/stages/stage6-lesson-content/handler');
-
       // Worker and Queue factories
-      expect(handler.createStage6Worker).toBeDefined();
-      expect(handler.createStage6Queue).toBeDefined();
+      expect(createStage6Worker).toBeDefined();
+      expect(createStage6Queue).toBeDefined();
 
       // Job processor
-      expect(handler.processStage6Job).toBeDefined();
+      expect(processStage6Job).toBeDefined();
 
       // Helper functions
-      expect(handler.updateJobProgress).toBeDefined();
-      expect(handler.saveLessonContent).toBeDefined();
-      expect(handler.processWithFallback).toBeDefined();
-      expect(handler.handlePartialSuccess).toBeDefined();
-      expect(handler.markForReview).toBeDefined();
-      expect(handler.detectLanguage).toBeDefined();
+      expect(updateJobProgress).toBeDefined();
+      expect(saveLessonContent).toBeDefined();
+      expect(processWithFallback).toBeDefined();
+      expect(handlePartialSuccess).toBeDefined();
+      expect(markForReview).toBeDefined();
+      expect(detectLanguage).toBeDefined();
 
       // Graceful shutdown
-      expect(handler.gracefulShutdown).toBeDefined();
+      expect(gracefulShutdown).toBeDefined();
     });
 
     it.skipIf(shouldSkipTests)('should export required types', () => {
-      // Verify types are exported (TypeScript compilation would fail if not)
-      const handler = require('../../../src/stages/stage6-lesson-content/handler');
-
       // HANDLER_CONFIG should be exported
-      expect(handler.HANDLER_CONFIG).toBeDefined();
+      expect(HANDLER_CONFIG).toBeDefined();
     });
   });
 
@@ -865,7 +859,7 @@ describe('Stage 6 BullMQ Handler Integration', () => {
       expect(waitingAfter).toBe(0);
 
       // Resume worker
-      await worker.resume();
+      worker.resume();
     });
 
     it.skipIf(shouldSkipTests)('should support queue obliteration', async () => {
@@ -899,7 +893,7 @@ describe('Stage 6 BullMQ Handler Integration', () => {
       expect(completed).toBe(0);
       expect(failed).toBe(0);
 
-      await worker.resume();
+      worker.resume();
     });
   });
 
@@ -909,8 +903,6 @@ describe('Stage 6 BullMQ Handler Integration', () => {
 
   describe('Graceful Shutdown', () => {
     it.skipIf(shouldSkipTests)('should export graceful shutdown function', () => {
-      const { gracefulShutdown } = require('../../../src/stages/stage6-lesson-content/handler');
-
       expect(gracefulShutdown).toBeDefined();
       expect(typeof gracefulShutdown).toBe('function');
     });
