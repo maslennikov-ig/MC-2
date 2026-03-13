@@ -28,6 +28,9 @@ import { logger as baseLogger } from '@megacampus/shared-logger';
 import { QUEUE_NAME } from './queue';
 import { handleJobFailure } from './handlers/error-handler';
 import type { JobResult } from './handlers/base-handler';
+import { JOB_TYPE_TO_STEP } from './handlers/base-handler';
+import { getSupabaseAdmin } from '../shared/supabase/admin';
+import { getTranslator, type Locale } from '../shared/i18n';
 import {
   createJobStatus,
   markJobActive,
@@ -367,6 +370,47 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         // Regular failure handling
         handleJobFailure(job, error);
 
+        // Safety net: update course generation_status when sandbox crashes.
+        // BaseJobHandler.process() runs in child thread — if it crashes,
+        // generation_status is never updated. This catches that gap.
+        const courseId = job.data?.courseId;
+        const jobType = job.name as JobType;
+        const stepId = JOB_TYPE_TO_STEP[jobType];
+
+        if (courseId && stepId && stepId > 1) {
+          try {
+            const supabase = getSupabaseAdmin();
+            const locale = ((job.data as Record<string, unknown>)?.locale as string) || 'ru';
+            const t = getTranslator(locale as Locale);
+            const message = t(`steps.${stepId}.failed`);
+
+            await supabase.rpc('update_course_progress', {
+              p_course_id: courseId,
+              p_step_id: stepId,
+              p_status: 'failed',
+              p_message: message,
+              p_metadata: {
+                job_id: job.id,
+                worker_type: jobType,
+                error_message: error?.message || 'Unknown sandbox error',
+                safety_net: true,
+              },
+            });
+
+            logger.info(
+              { courseId, stepId, jobType },
+              'Safety net: updated course progress after sandbox failure'
+            );
+          } catch (progressError) {
+            const errMsg =
+              progressError instanceof Error ? progressError.message : String(progressError);
+            logger.error(
+              { courseId, error: errMsg },
+              'Safety net: failed to update course progress'
+            );
+          }
+        }
+
         if (isTestEnvironment) {
           // Await for test/init jobs
           await markJobFailed(job, error);
@@ -384,7 +428,6 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         }
 
         // Clean up in-memory metrics for failed course
-        const courseId = job.data?.courseId;
         if (courseId) {
           costTracker.clearCourse(courseId);
           stageMetricsCollector.clearCourse(courseId);
