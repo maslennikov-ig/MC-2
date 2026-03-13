@@ -237,7 +237,7 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
   },
   {
     pattern:
-      /Mermaid.*fallback.*used|Mermaid.*fix failed.*using fallback|Mermaid.*remediation.*failed.*fallback|Mermaid.*render integrity failed/i,
+      /Mermaid.*fallback.*used|Mermaid.*fix failed.*using fallback|Mermaid.*remediation.*failed.*fallback|Mermaid.*render integrity failed|Mermaid.*still render.invalid/i,
     reason: 'graceful_fallback',
     description: 'Mermaid diagram generation/render failed - graceful fallback to text description',
   },
