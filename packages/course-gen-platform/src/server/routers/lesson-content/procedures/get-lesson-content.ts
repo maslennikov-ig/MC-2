@@ -11,7 +11,6 @@ import { getLessonContentInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
-import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 
 /**
  * Get lesson content
@@ -76,20 +75,42 @@ export const getLessonContent = protectedProcedure
           .eq('order_index', lessonNum)
           .single();
 
-        throwOnSupabaseError(lessonError, 'Lesson', {
-          requestId,
-          courseId,
-          lessonId,
-          sectionNum,
-          lessonNum,
-        });
+        // PGRST116 = no rows found — lesson doesn't exist, return null per contract
+        if (lessonError) {
+          if (lessonError.code === 'PGRST116') {
+            logger.debug(
+              { requestId, courseId, lessonId, sectionNum, lessonNum },
+              'Lesson not found for section.lesson format, returning null'
+            );
+            return null;
+          }
+          // Non-PGRST116 errors (network, transient) are genuine failures
+          logger.error(
+            { requestId, courseId, lessonId, sectionNum, lessonNum, error: lessonError },
+            'Failed to resolve lesson UUID'
+          );
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to resolve lesson',
+          });
+        }
         if (!lessonData) {
           return null;
         }
 
         lessonUuid = lessonData.id;
       } else {
-        // Assume it's already a UUID
+        // Validate UUID format before querying — an invalid UUID would cause
+        // a Postgres type error (not PGRST116), leading to INTERNAL_SERVER_ERROR
+        // instead of the expected null return.
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(lessonId)) {
+          logger.debug(
+            { requestId, courseId, lessonId },
+            'Lesson ID is neither section.lesson format nor valid UUID, returning null'
+          );
+          return null;
+        }
         lessonUuid = lessonId;
       }
 

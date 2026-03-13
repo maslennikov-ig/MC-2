@@ -185,7 +185,7 @@ async function createTestCourse(title: string, topic: string): Promise<string> {
       user_id: TEST_USERS.instructor1.id,
       title,
       slug: `t055-test-${Date.now()}`,
-      generation_status: 'processing_documents',
+      generation_status: 'stage_2_processing',
       generation_progress: {
         steps: [
           { status: 'pending' },

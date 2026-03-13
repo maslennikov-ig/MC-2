@@ -377,6 +377,7 @@ async function setupTestFixtures(): Promise<void> {
       {
         id: org.id,
         name: org.name,
+        slug: org.name.toLowerCase().replace(/\s+/g, '-'),
         tier: org.tier,
         storage_quota_bytes: org.storageQuotaBytes,
         storage_used_bytes:

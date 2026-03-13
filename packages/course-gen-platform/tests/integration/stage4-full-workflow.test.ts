@@ -5,7 +5,7 @@
  * job creation through all 5 phases to final result storage in database.
  *
  * Test Flow:
- * 1. Setup: Create test course with Stage 3 complete status (processing_documents)
+ * 1. Setup: Create test course with Stage 3 complete status (stage_3_complete)
  * 2. Trigger: Add STRUCTURE_ANALYSIS job to BullMQ queue
  * 3. Wait: Poll for job completion using database tracking (max 10 minutes)
  * 4. Verify:
@@ -240,7 +240,7 @@ describe('Stage 4: Full 5-Phase Analysis Workflow (Integration)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - React Hooks',
           slug: `test-course-react-hooks-${Date.now()}`,
-          generation_status: 'processing_documents', // Stage 3 complete
+          generation_status: 'stage_3_complete', // Stage 3 complete
           status: 'draft',
         })
         .select()
@@ -406,7 +406,7 @@ describe('Stage 4: Full 5-Phase Analysis Workflow (Integration)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - Закупки по 44-ФЗ',
           slug: `test-course-russian-${Date.now()}`,
-          generation_status: 'processing_documents',
+          generation_status: 'stage_3_complete',
           status: 'draft',
         })
         .select()
