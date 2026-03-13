@@ -6,6 +6,7 @@ import { config } from 'dotenv';
 import path from 'path';
 import { JSDOM } from 'jsdom';
 import createDOMPurify from 'dompurify';
+import { afterAll } from 'vitest';
 
 // ============================================================================
 // DOM ENVIRONMENT SETUP (Required for mermaid in Node.js)
@@ -47,3 +48,12 @@ console.log(
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   throw new Error('Missing required Supabase environment variables');
 }
+
+// ============================================================================
+// CLEANUP: Close JSDOM to release resources and allow process to exit
+// ============================================================================
+afterAll(() => {
+  if (dom && dom.window) {
+    dom.window.close();
+  }
+});

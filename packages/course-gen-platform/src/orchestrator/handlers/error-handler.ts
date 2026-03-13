@@ -313,6 +313,7 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
   logPermanentFailure({
     organization_id: jobData.organizationId,
     user_id: jobData.userId,
+    course_id: jobData.courseId,
     // Use job_id as problem_id to group related retry errors together
     problem_id: job.id,
     error_message: error instanceof Error ? error.message : String(error),

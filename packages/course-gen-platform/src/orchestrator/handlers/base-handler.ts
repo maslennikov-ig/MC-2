@@ -74,7 +74,7 @@ export interface JobResult {
  *   step 5 → stage_5_* (Structure Generation)
  *   step 6 → finalizing/completed
  */
-const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
+export const JOB_TYPE_TO_STEP: Record<JobType, number | null> = {
   [JobType.TEST_JOB]: null,
   [JobType.DOCUMENT_PROCESSING]: 2, // Stage 2 → RPC step 2
   [JobType.SUMMARY_GENERATION]: 2, // Stage 2 fallback

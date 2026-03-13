@@ -16,7 +16,7 @@ export default mergeConfig(
       setupFiles: ['./tests/setup.ts'],
       globalSetup: ['./tests/global-setup.ts'],
       reporters: ['default', 'hanging-process'],
-      testTimeout: 1200000,
+      testTimeout: 120000,
       hookTimeout: 60000,
       teardownTimeout: 30000,
       fileParallelism: false,
