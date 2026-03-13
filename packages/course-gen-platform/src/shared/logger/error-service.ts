@@ -66,6 +66,8 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
     job_id: params.job_id || null,
     job_type: params.job_type || null,
     metadata: params.metadata || null,
+    course_id: params.course_id || null,
+    lesson_id: params.lesson_id || null,
   };
 
   // Use upsert when problem_id is provided to handle duplicate logging attempts

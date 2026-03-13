@@ -365,6 +365,7 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       await logPermanentFailure({
         organization_id: job.data?.organizationId,
         user_id: job.data?.userId,
+        course_id: job.data?.courseId,
         problem_id: job.id,
         error_message: `[Sandbox] ${errorMessage}`,
         stack_trace: errorStack,
@@ -389,8 +390,19 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       );
     }
 
-    // Re-throw so BullMQ marks job as failed and handles retries
-    throw error;
+    // Re-throw with enumerable properties so BullMQ sandbox serialization
+    // preserves message/stack (errorToJSON uses JSON.stringify which skips
+    // non-enumerable Error properties)
+    const serializableError = new Error(errorMessage);
+    Object.defineProperty(serializableError, 'message', {
+      value: errorMessage,
+      enumerable: true,
+    });
+    Object.defineProperty(serializableError, 'stack', {
+      value: errorStack || serializableError.stack,
+      enumerable: true,
+    });
+    throw serializableError;
   }
 }
 
