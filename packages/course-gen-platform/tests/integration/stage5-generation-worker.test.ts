@@ -246,7 +246,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - E2E Generation Workflow',
           slug: `test-e2e-generation-${Date.now()}`,
-          generation_status: 'analyzing_task', // Stage 4 complete, ready for structure generation
+          generation_status: 'stage_5_init', // Stage 4 complete, ready for structure generation
           status: 'draft',
         })
         .select()
@@ -381,7 +381,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - Title Only',
           slug: `test-title-only-${Date.now()}`,
-          generation_status: 'analyzing_task',
+          generation_status: 'stage_5_init',
           status: 'draft',
         })
         .select()
@@ -470,7 +470,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - Full Analyze Results',
           slug: `test-full-analyze-${Date.now()}`,
-          generation_status: 'analyzing_task',
+          generation_status: 'stage_5_init',
           status: 'draft',
         })
         .select()
@@ -564,7 +564,7 @@ describe('Stage 5: Structure Generation Workflow (Integration)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - RAG Heavy',
           slug: `test-rag-heavy-${Date.now()}`,
-          generation_status: 'analyzing_task',
+          generation_status: 'stage_5_init',
           status: 'draft',
         })
         .select()

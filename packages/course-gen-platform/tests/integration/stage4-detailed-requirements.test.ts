@@ -175,7 +175,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - React Hooks (Minimal)',
           slug: `test-minimal-requirements-${Date.now()}`,
-          generation_status: 'analyzing_task', // Stage 4 ready
+          generation_status: 'stage_4_init', // Stage 4 ready
           status: 'draft',
         })
         .select()
@@ -265,7 +265,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - React Hooks (Detailed)',
           slug: `test-detailed-requirements-${Date.now()}`,
-          generation_status: 'analyzing_task', // Stage 4 ready
+          generation_status: 'stage_4_init', // Stage 4 ready
           status: 'draft',
         })
         .select()
@@ -401,7 +401,7 @@ describe('Stage 4: Detailed Requirements Handling (US3)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - Закупки по 44-ФЗ (Russian)',
           slug: `test-russian-requirements-${Date.now()}`,
-          generation_status: 'analyzing_task', // Stage 4 ready
+          generation_status: 'stage_4_init', // Stage 4 ready
           status: 'draft',
         })
         .select()

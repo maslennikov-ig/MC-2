@@ -20,6 +20,7 @@ async function createTestOrg() {
       name: uniqueName('test_org'),
       slug: uniqueName('test_org_slug'),
       tier: 'free',
+      slug: `test-org-lessons-view-${Date.now()}`,
       storage_quota_bytes: 10485760,
       storage_used_bytes: 0,
     })

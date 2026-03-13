@@ -150,12 +150,15 @@ async function stopTestServer(testServer: TestServer): Promise<void> {
 }
 
 /**
- * Create tRPC client with optional JWT token
+ * Create tRPC client with optional JWT token or API key
  */
-function createTestClient(port: number, token?: string) {
+function createTestClient(port: number, token?: string, apiKey?: string) {
   const headers: Record<string, string> = {};
   if (token) {
     headers.authorization = `Bearer ${token}`;
+  }
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
   }
 
   return createTRPCClient<AppRouter>({
@@ -244,6 +247,10 @@ function cleanupMetricsData(courseId: string): void {
 // Test Suite
 // ============================================================================
 
+// Set METRICS_API_KEY for testing (metrics middleware requires auth)
+const TEST_METRICS_API_KEY = 'test-metrics-api-key-e2e';
+process.env.METRICS_API_KEY = TEST_METRICS_API_KEY;
+
 describe('Metrics tRPC API E2E', () => {
   let testServer: TestServer;
   let serverPort: number;
@@ -323,12 +330,12 @@ describe('Metrics tRPC API E2E', () => {
   }, 60000);
 
   // ============================================================================
-  // PUBLIC METRICS ENDPOINTS (No auth required)
+  // METRICS ENDPOINTS (authenticated via API key)
   // ============================================================================
 
-  describe('Public Metrics Endpoints (no auth required)', () => {
+  describe('Metrics Endpoints (API key auth)', () => {
     it('metrics.getAll - should return all system metrics', async () => {
-      const client = createTestClient(serverPort); // No auth token
+      const client = createTestClient(serverPort, undefined, TEST_METRICS_API_KEY);
 
       const result = await client.metrics.getAll.query();
 
@@ -362,7 +369,7 @@ describe('Metrics tRPC API E2E', () => {
     });
 
     it('metrics.getFSM - should return FSM initialization metrics', async () => {
-      const client = createTestClient(serverPort); // No auth token
+      const client = createTestClient(serverPort, undefined, TEST_METRICS_API_KEY);
 
       const result = await client.metrics.getFSM.query();
 
@@ -381,7 +388,7 @@ describe('Metrics tRPC API E2E', () => {
     });
 
     it('metrics.getOutbox - should return outbox processor metrics and health', async () => {
-      const client = createTestClient(serverPort); // No auth token
+      const client = createTestClient(serverPort, undefined, TEST_METRICS_API_KEY);
 
       const result = await client.metrics.getOutbox.query();
 
@@ -402,7 +409,7 @@ describe('Metrics tRPC API E2E', () => {
     });
 
     it('metrics.getFallbacks - should return defense layer fallback metrics', async () => {
-      const client = createTestClient(serverPort); // No auth token
+      const client = createTestClient(serverPort, undefined, TEST_METRICS_API_KEY);
 
       const result = await client.metrics.getFallbacks.query();
 

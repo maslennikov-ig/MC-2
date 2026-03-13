@@ -208,7 +208,7 @@ describe('Stage 4: Multi-Document Synthesis (US2)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - React Hooks (1 Doc)',
           slug: `test-course-react-hooks-1doc-${Date.now()}`,
-          generation_status: 'processing_documents', // Stage 3 in progress
+          generation_status: 'stage_3_complete', // Stage 3 complete
           status: 'draft',
         })
         .select()
@@ -326,7 +326,7 @@ describe('Stage 4: Multi-Document Synthesis (US2)', () => {
           user_id: TEST_USERS.instructor1.id,
           title: 'Test Course - React Hooks (3 Docs)',
           slug: `test-course-react-hooks-3docs-${Date.now()}`,
-          generation_status: 'processing_documents', // Stage 3 in progress
+          generation_status: 'stage_3_complete', // Stage 3 complete
           status: 'draft',
         })
         .select()
