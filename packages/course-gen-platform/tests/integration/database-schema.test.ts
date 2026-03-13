@@ -16,13 +16,13 @@ const uniqueName = (prefix: string) => `${prefix}_${randomUUID().slice(0, 8)}`;
 // Storage quota mappings for tier types
 const tierQuotaMap = {
   free: 10485760, // 10 MB
-  basic_plus: 104857600, // 100 MB
+  basic: 104857600, // 100 MB
   standard: 1073741824, // 1 GB
   premium: 10737418240, // 10 GB
 } as const;
 
 // Helper: Create test organization with correct quota
-async function createTestOrg(tier: 'free' | 'basic_plus' | 'standard' | 'premium' = 'free') {
+async function createTestOrg(tier: 'free' | 'basic' | 'standard' | 'premium' = 'free') {
   const { data, error } = await supabase
     .from('organizations')
     .insert({
@@ -119,11 +119,11 @@ describe('Database Schema Acceptance Tests', () => {
   });
 
   describe('Test 1: Organizations table enforces tier enum values', () => {
-    it('should accept valid tier values (free, basic_plus, standard, premium)', async () => {
+    it('should accept valid tier values (free, basic, standard, premium)', async () => {
       // Given: Valid tier values with their corresponding storage quotas
       const validTiers = [
         { tier: 'free' as const, quota: 10485760 },
-        { tier: 'basic_plus' as const, quota: 104857600 },
+        { tier: 'basic' as const, quota: 104857600 },
         { tier: 'standard' as const, quota: 1073741824 },
         { tier: 'premium' as const, quota: 10737418240 },
       ];
@@ -177,7 +177,7 @@ describe('Database Schema Acceptance Tests', () => {
   describe('Test 2: Organizations table enforces storage quota constraints', () => {
     const tierQuotas = [
       { tier: 'free', quota: 10485760 }, // 10 MB
-      { tier: 'basic_plus', quota: 104857600 }, // 100 MB
+      { tier: 'basic', quota: 104857600 }, // 100 MB
       { tier: 'standard', quota: 1073741824 }, // 1 GB
       { tier: 'premium', quota: 10737418240 }, // 10 GB
     ] as const;
