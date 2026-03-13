@@ -75,6 +75,32 @@ interface StatusConfig {
   pulse?: boolean
 }
 
+const DISPLAY_STATUSES = new Set([
+  'draft',
+  'generating',
+  'processing',
+  'structure_ready',
+  'completed',
+  'failed',
+  'mixed',
+])
+
+/** Maps raw DB status to one of 7 display statuses for i18n and styling */
+function normalizeDisplayStatus(status: string): string {
+  if (DISPLAY_STATUSES.has(status)) return status
+
+  if (status === 'published' || status === 'archived') return 'completed'
+  if (status === 'pending') return 'draft'
+  if (status === 'cancelled') return 'failed'
+  if (status === 'finalizing') return 'processing'
+
+  if (status.startsWith('stage_2') || status.startsWith('stage_3') || status.startsWith('stage_4'))
+    return 'processing'
+  if (status.startsWith('stage_5') || status.startsWith('stage_6')) return 'generating'
+
+  return 'draft'
+}
+
 const statusConfig: Record<string, StatusConfig> = {
   draft: {
     color: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
@@ -248,8 +274,8 @@ export function CourseCard({
     ? Math.round(course.estimated_completion_minutes / 60)
     : Math.round((lessonsCount * 5) / 60)
   // Use generation_status for display if available, otherwise fall back to course.status
-  const displayStatus = course.generation_status || course.status
-  const statusInfo = statusConfig[displayStatus as keyof typeof statusConfig] || statusConfig.draft
+  const displayStatus = normalizeDisplayStatus(course.generation_status || course.status)
+  const statusInfo = statusConfig[displayStatus]
   const difficultyInfo = difficultyConfig[course.difficulty]
 
   const handleDelete = async () => {
