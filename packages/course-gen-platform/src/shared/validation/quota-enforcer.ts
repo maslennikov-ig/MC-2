@@ -179,6 +179,10 @@ export async function checkQuota(
     .single();
 
   if (error) {
+    // PGRST116 = no rows found → organization doesn't exist
+    if (error.code === 'PGRST116') {
+      throw new Error(`Organization not found: ${organizationId}`);
+    }
     throw new Error(`Failed to fetch organization quota: ${error.message}`);
   }
 
@@ -370,6 +374,9 @@ export async function getQuotaInfo(organizationId: string, userRole?: Role): Pro
     .single();
 
   if (error) {
+    if (error.code === 'PGRST116') {
+      throw new Error(`Organization not found: ${organizationId}`);
+    }
     throw new Error(`Failed to fetch organization info: ${error.message}`);
   }
 
