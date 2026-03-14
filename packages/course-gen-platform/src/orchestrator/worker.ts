@@ -392,7 +392,10 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
               p_metadata: {
                 job_id: job.id,
                 worker_type: jobType,
-                error_message: error?.message || 'Unknown sandbox error',
+                error_message:
+                  error?.message ||
+                  error?.stack?.split('\n')[0] ||
+                  'Worker thread crashed (no error details)',
                 safety_net: true,
               },
             });
