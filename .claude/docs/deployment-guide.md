@@ -476,6 +476,38 @@ curl -f http://localhost:4010/health  # api dev
 docker compose -f docker-compose.app.yml --env-file .env.$(cat /opt/megacampus/active_color) up -d --force-recreate api
 ```
 
+### Docling MCP 502 Bad Gateway
+
+**Symptom**: Admin health dashboard shows Docling MCP as "502 Bad Gateway". Document processing fails silently (empty error messages in error_logs).
+
+**Root cause**: The `megacampus-docling-mcp` nginx proxy caches DNS at startup. If `megacampus-docling-mcp-internal` gets a new IP (after restart/redeploy), nginx sends traffic to the old IP → `connect() failed (111: Connection refused)`.
+
+**Quick fix**:
+
+```bash
+docker restart megacampus-docling-mcp
+```
+
+**Permanent fix**: `nginx-docling-proxy.conf` now uses `resolver 127.0.0.11 valid=30s` + variable-based `proxy_pass` to re-resolve DNS dynamically. Redeploy infra to apply:
+
+```bash
+docker compose -f docker-compose.infra.yml up -d --force-recreate docling-mcp
+```
+
+**Verify**:
+
+```bash
+# From worker container — should return 200
+docker exec megacampus-worker curl -s -o /dev/null -w '%{http_code}' http://megacampus-docling-mcp:8000/health
+
+# Full MCP test — should return JSON-RPC response
+docker exec megacampus-worker curl -s -X POST \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}' \
+  http://megacampus-docling-mcp:8000/mcp
+```
+
 ### Data directory permissions
 
 Containers run as UID 1001 (nodejs). If enrichments fail to save:
