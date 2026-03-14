@@ -275,6 +275,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Unauthenticated tRPC request - 401 is correct response',
   },
   {
+    pattern: /Authentication required.*Bearer token/i,
+    reason: 'expected_behavior',
+    description: 'Unauthenticated API call - 401 is correct response (metadata.message match)',
+  },
+  {
     pattern: /Job .+ not found/i,
     reason: 'expected_behavior',
     description: 'Frontend polls job status after job record cleanup - expected race condition',

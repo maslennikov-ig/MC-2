@@ -220,8 +220,8 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
   const mcpUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp'
   const fallbackMcpUrl = 'http://localhost:8000/mcp'
 
-  // Derive /health URL from MCP URL (replace /mcp path with /health)
-  const deriveHealthUrl = (url: string) => url.replace(/\/mcp$/, '/health')
+  // Derive /health URL from MCP URL (replace /mcp or /sse path with /health)
+  const deriveHealthUrl = (url: string) => url.replace(/\/(mcp|sse)$/, '/health')
 
   // --- Tier 1: Try /health endpoint (nginx proxy provides this in production) ---
   try {
