@@ -52,7 +52,15 @@ vi.mock('@megacampus/shared-types', () => ({
 }))
 
 vi.mock('../components/UnifiedEnrichmentCard', () => ({
-  UnifiedEnrichmentCard: ({ type, existingEnrichment, onGenerate }: any) => (
+  UnifiedEnrichmentCard: ({
+    type,
+    existingEnrichment,
+    onGenerate,
+  }: {
+    type: string
+    existingEnrichment?: { id: string }
+    onGenerate: (arg: { source: string }) => void
+  }) => (
     <button
       data-testid={`placeholder-${type}`}
       data-existing-id={existingEnrichment?.id ?? ''}
@@ -64,15 +72,19 @@ vi.mock('../components/UnifiedEnrichmentCard', () => ({
 }))
 
 vi.mock('../components/EnrichmentGeneratingCard', () => ({
-  EnrichmentGeneratingCard: ({ type }: any) => <div data-testid={`generating-${type}`} />,
+  EnrichmentGeneratingCard: ({ type }: { type: string }) => (
+    <div data-testid={`generating-${type}`} />
+  ),
 }))
 
 vi.mock('../components/EnrichmentCard', () => ({
-  EnrichmentCard: ({ enrichment }: any) => <div data-testid={`card-${enrichment.id}`} />,
+  EnrichmentCard: ({ enrichment }: { enrichment: { id: string } }) => (
+    <div data-testid={`card-${enrichment.id}`} />
+  ),
 }))
 
 vi.mock('../enrichments/EnrichmentErrorBoundary', () => ({
-  EnrichmentErrorBoundary: ({ children }: any) => <>{children}</>,
+  EnrichmentErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 import { EnrichmentsPanel } from '@/components/course/viewer/components/EnrichmentsPanel'
@@ -124,7 +136,7 @@ describe('EnrichmentsPanel', () => {
   it('shows NLM placeholders for legacy draft statuses to allow restart', () => {
     const draftReadyNlmAudio = makeEnrichment({
       id: 'nlm-audio-draft',
-      enrichment_type: 'nlm_audio' as any,
+      enrichment_type: 'nlm_audio' as EnrichmentRow['enrichment_type'],
       status: 'draft_ready',
       content: {
         type: 'nlm_audio',
@@ -134,7 +146,7 @@ describe('EnrichmentsPanel', () => {
     })
     const draftReadyNlmVideo = makeEnrichment({
       id: 'nlm-video-draft',
-      enrichment_type: 'nlm_video' as any,
+      enrichment_type: 'nlm_video' as EnrichmentRow['enrichment_type'],
       status: 'draft_generating',
       content: {
         type: 'nlm_video',

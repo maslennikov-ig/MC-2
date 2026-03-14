@@ -18,7 +18,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { POST as pausePost, GET as pauseGet } from '@/app/api/courses/[orgSlug]/[courseSlug]/pause/route'
+import {
+  POST as pausePost,
+  GET as pauseGet,
+} from '@/app/api/courses/[orgSlug]/[courseSlug]/pause/route'
 import { POST as resumePost } from '@/app/api/courses/[orgSlug]/[courseSlug]/resume/route'
 import { canPauseGeneration, PAUSABLE_STATUSES } from '@megacampus/shared-types'
 
@@ -112,7 +115,7 @@ async function mockCourseLookup(
   } | null
 ) {
   const { getCourseByOrgAndSlug } = await import('@/lib/helpers/organization')
-  ;(getCourseByOrgAndSlug as any).mockResolvedValue(course)
+  ;(getCourseByOrgAndSlug as import('vitest').Mock).mockResolvedValue(course)
 }
 
 describe('Pause/Resume API Endpoints', () => {

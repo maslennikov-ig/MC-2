@@ -15,7 +15,10 @@ const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379'
 /**
  * Get Redis session data for a user
  */
-export async function getRedisSession(userId: string, sessionId: string): Promise<any | null> {
+export async function getRedisSession(
+  userId: string,
+  sessionId: string
+): Promise<Record<string, unknown> | null> {
   const redis = new Redis(redisUrl)
   try {
     const key = `draft:session:${userId}:${sessionId}`
@@ -83,7 +86,7 @@ export async function setRedisSessionTimestamp(
 /**
  * Get draft courses from database
  */
-export async function getDraftCourses(userId: string): Promise<any[]> {
+export async function getDraftCourses(userId: string): Promise<Record<string, unknown>[]> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   const { data, error } = await supabase
@@ -113,7 +116,7 @@ export async function clearDraftCourses(userId: string): Promise<void> {
 /**
  * Trigger cleanup job via Edge Function
  */
-export async function triggerCleanupJob(): Promise<any> {
+export async function triggerCleanupJob(): Promise<unknown> {
   const response = await fetch(`${supabaseUrl}/functions/v1/cleanup-old-drafts`, {
     method: 'POST',
     headers: {
@@ -157,7 +160,7 @@ export async function getCurrentUserId(page: Page): Promise<string> {
 export async function getSessionIdFromPage(page: Page): Promise<string | null> {
   // Wait for session creation and extract from network or localStorage
   const sessionId = await page.evaluate(() => {
-    return (window as any).__draftSessionId || null
+    return (window as typeof window & { __draftSessionId?: string }).__draftSessionId || null
   })
 
   return sessionId

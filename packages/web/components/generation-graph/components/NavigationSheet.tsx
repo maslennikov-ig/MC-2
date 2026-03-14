@@ -99,7 +99,7 @@ export function NavigationSheet({
       }
     }
 
-    fetchRole()
+    void fetchRole()
   }, [user?.id, supabase])
 
   // Generate initials
@@ -143,7 +143,7 @@ export function NavigationSheet({
     onClose()
     // Small delay to ensure sheet closes before navigation
     setTimeout(() => {
-      router.push(href as any)
+      router.push(href as Parameters<typeof router.push>[0])
     }, 50)
   }
 
@@ -225,7 +225,7 @@ export function NavigationSheet({
                   </p>
                   {userRole && userRole !== 'student' && (
                     <RoleBadge
-                      role={userRole as any}
+                      role={userRole as React.ComponentProps<typeof RoleBadge>['role']}
                       className="px-1.5 py-0.5 text-xs"
                       showIcon={userRole === 'superadmin'}
                     />
