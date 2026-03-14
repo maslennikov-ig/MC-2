@@ -126,7 +126,7 @@ describe('course-data-utils', () => {
           { id: 'asset-3', lesson_id: 'lesson-2', asset_type: 'image' },
         ]
 
-        const result = groupAssetsByLessonId(assets as AssetRow[])
+        const result = groupAssetsByLessonId(assets)
 
         expect(Object.keys(result)).toHaveLength(2)
         expect(result['lesson-1']).toHaveLength(2)
@@ -143,7 +143,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = groupAssetsByLessonId(assets as AssetRow[])
+        const result = groupAssetsByLessonId(assets)
 
         expect(result['lesson-1'][0].id).toBe('asset-1')
         expect(result['lesson-1'][0].asset_type).toBe('image')
@@ -158,7 +158,7 @@ describe('course-data-utils', () => {
           { id: 'asset-4', lesson_id: 'lesson-1', asset_type: 'document' },
         ]
 
-        const result = groupAssetsByLessonId(assets as AssetRow[])
+        const result = groupAssetsByLessonId(assets)
 
         expect(result['lesson-1']).toHaveLength(4)
         expect(result['lesson-1'].map((a) => a.id)).toEqual([
@@ -176,7 +176,7 @@ describe('course-data-utils', () => {
           { id: 'asset-3', lesson_id: 'lesson-1', asset_type: 'audio' },
         ]
 
-        const result = groupAssetsByLessonId(assets as AssetRow[])
+        const result = groupAssetsByLessonId(assets)
 
         expect(result['lesson-1'][0].id).toBe('asset-1')
         expect(result['lesson-1'][1].id).toBe('asset-3')
@@ -198,10 +198,10 @@ describe('course-data-utils', () => {
         const assets: Partial<AssetRow>[] = [
           { id: 'asset-1', lesson_id: 'lesson-1', asset_type: 'image' },
           { id: 'asset-2', lesson_id: null, asset_type: 'video' },
-          { id: 'asset-3', asset_type: 'audio' } as any, // no lesson_id field
+          { id: 'asset-3', asset_type: 'audio' } as unknown as AssetRow, // no lesson_id field
         ]
 
-        const result = groupAssetsByLessonId(assets as AssetRow[])
+        const result = groupAssetsByLessonId(assets)
 
         expect(Object.keys(result)).toHaveLength(1)
         expect(result['lesson-1']).toHaveLength(1)
@@ -214,7 +214,7 @@ describe('course-data-utils', () => {
           { id: 'asset-2', lesson_id: undefined, asset_type: 'video' },
         ]
 
-        const result = groupAssetsByLessonId(assets as AssetRow[])
+        const result = groupAssetsByLessonId(assets)
 
         expect(Object.keys(result)).toHaveLength(1)
         expect(result['lesson-1']).toBeDefined()
@@ -226,7 +226,7 @@ describe('course-data-utils', () => {
           { id: 'asset-2', lesson_id: undefined, asset_type: 'video' },
         ]
 
-        const result = groupAssetsByLessonId(assets as AssetRow[])
+        const result = groupAssetsByLessonId(assets)
 
         expect(Object.keys(result)).toHaveLength(0)
         expect(result).toEqual({})
@@ -248,7 +248,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareSectionsForViewer(sections as SectionRow[], null, courseId)
+        const result = prepareSectionsForViewer(sections, null, courseId)
 
         expect(result).toHaveLength(1)
         expect(result[0].id).toBe('section-1')
@@ -267,7 +267,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareSectionsForViewer(sections as SectionRow[], null, courseId)
+        const result = prepareSectionsForViewer(sections, null, courseId)
 
         expect(result[0].section_number).toBe('')
         expect(result[0].order_number).toBeNull()
@@ -285,7 +285,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareSectionsForViewer(sections as SectionRow[], null, courseId)
+        const result = prepareSectionsForViewer(sections, null, courseId)
 
         expect(result[0].title).toBe('Introduction')
         expect(result[0].description).toBe('Section description')
@@ -321,11 +321,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareSectionsForViewer(
-          sections as SectionRow[],
-          lessons as LessonRow[],
-          courseId
-        )
+        const result = prepareSectionsForViewer(sections, lessons, courseId)
 
         expect(result[0].lessons).toHaveLength(2)
         expect(result[1].lessons).toHaveLength(1)
@@ -348,11 +344,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareSectionsForViewer(
-          sections as SectionRow[],
-          lessons as LessonRow[],
-          courseId
-        )
+        const result = prepareSectionsForViewer(sections, lessons, courseId)
 
         expect(result[0].lessons[0].lesson_number).toBe('3')
         expect(result[0].lessons[0].course_id).toBe(courseId)
@@ -373,11 +365,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareSectionsForViewer(
-          sections as SectionRow[],
-          lessons as LessonRow[],
-          courseId
-        )
+        const result = prepareSectionsForViewer(sections, lessons, courseId)
 
         expect(result[0].lessons).toHaveLength(0)
       })
@@ -387,7 +375,7 @@ describe('course-data-utils', () => {
           { id: 'section-1', course_id: courseId, title: 'Section 1', order_index: 1 },
         ]
 
-        const result = prepareSectionsForViewer(sections as SectionRow[], null, courseId)
+        const result = prepareSectionsForViewer(sections, null, courseId)
 
         expect(result[0].lessons).toEqual([])
       })
@@ -414,11 +402,7 @@ describe('course-data-utils', () => {
           { id: 'lesson-4', section_id: 'section-3', title: 'Lesson 3.1', order_index: 1 },
         ]
 
-        const result = prepareSectionsForViewer(
-          sections as SectionRow[],
-          lessons as LessonRow[],
-          courseId
-        )
+        const result = prepareSectionsForViewer(sections, lessons, courseId)
 
         expect(result[0].lessons).toHaveLength(3)
         expect(result[1].lessons).toHaveLength(0)
@@ -441,7 +425,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareLessonsForViewer(lessons as LessonRow[], courseId)
+        const result = prepareLessonsForViewer(lessons, courseId)
 
         expect(result).toHaveLength(1)
         expect(result[0].id).toBe('lesson-1')
@@ -460,7 +444,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareLessonsForViewer(lessons as LessonRow[], courseId)
+        const result = prepareLessonsForViewer(lessons, courseId)
 
         expect(result[0].lesson_number).toBe('')
         expect(result[0].order_number).toBeNull()
@@ -479,7 +463,7 @@ describe('course-data-utils', () => {
           },
         ]
 
-        const result = prepareLessonsForViewer(lessons as LessonRow[], courseId)
+        const result = prepareLessonsForViewer(lessons, courseId)
 
         expect(result[0].title).toBe('Lesson 1')
         expect(result[0].content).toBe('Lesson content')
@@ -496,7 +480,7 @@ describe('course-data-utils', () => {
           { id: 'lesson-3', section_id: 'section-2', title: 'Lesson 3', order_index: 1 },
         ]
 
-        const result = prepareLessonsForViewer(lessons as LessonRow[], courseId)
+        const result = prepareLessonsForViewer(lessons, courseId)
 
         expect(result).toHaveLength(3)
         expect(result[0].lesson_number).toBe('1')
@@ -512,7 +496,7 @@ describe('course-data-utils', () => {
           { id: 'lesson-2', section_id: 'section-1', title: 'Lesson 2', order_index: 2 },
         ]
 
-        const result = prepareLessonsForViewer(lessons as LessonRow[], courseId)
+        const result = prepareLessonsForViewer(lessons, courseId)
 
         expect(result[0].id).toBe('lesson-3')
         expect(result[1].id).toBe('lesson-1')
@@ -538,7 +522,7 @@ describe('course-data-utils', () => {
           { id: 'lesson-3', section_id: 'section-1', title: 'Lesson 3', order_index: null },
         ]
 
-        const result = prepareLessonsForViewer(lessons as LessonRow[], courseId)
+        const result = prepareLessonsForViewer(lessons, courseId)
 
         // order_index: 0 is correctly preserved as '0'
         expect(result[0].lesson_number).toBe('0')

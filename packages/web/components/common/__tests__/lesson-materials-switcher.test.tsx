@@ -9,17 +9,25 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('../persistent-video-player', () => ({
-  default: ({ src, mode }: any) => (
-    <div data-testid="persistent-video-player" data-src={src} data-mode={mode} />
+  default: ({ src, mode }: Record<string, unknown>) => (
+    <div
+      data-testid="persistent-video-player"
+      data-src={src as string}
+      data-mode={mode as string}
+    />
   ),
 }))
 
 vi.mock('@/components/course/viewer/enrichments/AudioPlayer', () => ({
-  AudioPlayer: ({ playbackUrl }: any) => <div data-testid="audio-player" data-src={playbackUrl} />,
+  AudioPlayer: ({ playbackUrl }: Record<string, unknown>) => (
+    <div data-testid="audio-player" data-src={playbackUrl as string} />
+  ),
 }))
 
 vi.mock('@/components/course/viewer/enrichments/QuizPlayer', () => ({
-  QuizPlayer: ({ enrichmentId }: any) => <div data-testid="quiz-player" data-id={enrichmentId} />,
+  QuizPlayer: ({ enrichmentId }: Record<string, unknown>) => (
+    <div data-testid="quiz-player" data-id={enrichmentId as string} />
+  ),
 }))
 
 vi.mock('@/lib/helpers/storage-helpers', () => ({
@@ -29,7 +37,9 @@ vi.mock('@/lib/helpers/storage-helpers', () => ({
 }))
 
 describe('LessonMaterialsSwitcher', () => {
-  const mockLesson = { id: 'lesson-1', title: 'Test Lesson' } as any
+  const mockLesson = { id: 'lesson-1', title: 'Test Lesson' } as React.ComponentProps<
+    typeof LessonMaterialsSwitcher
+  >['lesson']
 
   it('renders nothing when no materials are available', async () => {
     const { container } = render(<LessonMaterialsSwitcher lesson={mockLesson} />)
@@ -41,7 +51,7 @@ describe('LessonMaterialsSwitcher', () => {
       { id: '1', enrichment_type: 'nlm_video', status: 'completed', content: {} },
       { id: '2', enrichment_type: 'nlm_audio', status: 'pending', content: {} }, // should not show
       { id: '3', enrichment_type: 'cover', status: 'completed', content: {} }, // should not show
-    ] as any[]
+    ] as NonNullable<React.ComponentProps<typeof LessonMaterialsSwitcher>['enrichments']>
 
     render(<LessonMaterialsSwitcher lesson={mockLesson} enrichments={enrichments} />)
 
@@ -58,7 +68,7 @@ describe('LessonMaterialsSwitcher', () => {
     const enrichments = [
       { id: '1', enrichment_type: 'nlm_video', status: 'completed', content: {} },
       { id: '2', enrichment_type: 'nlm_audio', status: 'completed', content: {} },
-    ] as any[]
+    ] as NonNullable<React.ComponentProps<typeof LessonMaterialsSwitcher>['enrichments']>
 
     render(<LessonMaterialsSwitcher lesson={mockLesson} enrichments={enrichments} />)
 
@@ -73,7 +83,7 @@ describe('LessonMaterialsSwitcher', () => {
   it('prioritizes nlm_video enrichment and shows playback URL', async () => {
     const enrichments = [
       { id: 'enr-vid-1', enrichment_type: 'nlm_video', status: 'completed', content: {} },
-    ] as any[]
+    ] as NonNullable<React.ComponentProps<typeof LessonMaterialsSwitcher>['enrichments']>
 
     render(<LessonMaterialsSwitcher lesson={mockLesson} enrichments={enrichments} />)
 
@@ -85,7 +95,7 @@ describe('LessonMaterialsSwitcher', () => {
   it('falls back to legacy asset when no nlm_video enrichment is completed', async () => {
     const enrichments = [
       { id: 'enr-vid-1', enrichment_type: 'nlm_video', status: 'pending', content: {} },
-    ] as any[]
+    ] as NonNullable<React.ComponentProps<typeof LessonMaterialsSwitcher>['enrichments']>
     const assets = [
       {
         id: 'asset-vid-1',
@@ -93,7 +103,7 @@ describe('LessonMaterialsSwitcher', () => {
         url: '/api/assets/legacy.mp4',
         metadata: { type: 'video' },
       },
-    ] as any[]
+    ] as NonNullable<React.ComponentProps<typeof LessonMaterialsSwitcher>['assets']>
 
     render(
       <LessonMaterialsSwitcher lesson={mockLesson} enrichments={enrichments} assets={assets} />
@@ -109,7 +119,7 @@ describe('LessonMaterialsSwitcher', () => {
     // Presentation is currently hardcoded as hidden in the component (hasPresentation = false)
     const enrichments = [
       { id: '1', enrichment_type: 'presentation', status: 'completed', content: { slides: [] } },
-    ] as any[]
+    ] as NonNullable<React.ComponentProps<typeof LessonMaterialsSwitcher>['enrichments']>
 
     const { container } = render(
       <LessonMaterialsSwitcher lesson={mockLesson} enrichments={enrichments} />

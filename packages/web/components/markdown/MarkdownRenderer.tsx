@@ -82,11 +82,12 @@ export async function MarkdownRenderer({
   // Select plugins based on trust level
   // Trusted: full feature set without sanitization
   // Untrusted: includes rehype-sanitize for XSS protection
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party next-mdx-remote plugin types are complex
   const remarkPlugins = getRemarkPlugins(config) as any[]
   const rehypePlugins = (
     trusted ? getRehypePluginsTrusted(config) : getRehypePluginsUntrusted(config)
-  ) as any[]
+  ) as // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party next-mdx-remote plugin types are complex
+  any[]
 
   // Build components map based on features
   const mdxComponents: Record<string, React.ComponentType<unknown>> = {}

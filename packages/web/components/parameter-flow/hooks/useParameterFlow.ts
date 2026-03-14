@@ -105,10 +105,17 @@ export function useParameterFlow(courseId: string) {
           filter: `course_id=eq.${courseId}`,
         },
         (payload) => {
-          const trace = payload.new as any
+          const trace = payload.new as {
+            step_name?: string
+            stage: string
+            output_data?: Record<string, unknown>
+            error_data?: unknown
+            input_data?: Record<string, unknown>
+          }
 
           // Only process parameter-related events
           if (
+            !trace.step_name ||
             !['parameter_store', 'parameter_propagate', 'parameter_validate'].includes(
               trace.step_name
             )
@@ -124,7 +131,7 @@ export function useParameterFlow(courseId: string) {
               parameters: trace.output_data
                 ? Object.keys(trace.output_data).map((key) => ({
                     name: key,
-                    value: trace.output_data[key],
+                    value: trace.output_data![key],
                     status: 'completed' as const,
                   }))
                 : prev[stage]?.parameters || [],
