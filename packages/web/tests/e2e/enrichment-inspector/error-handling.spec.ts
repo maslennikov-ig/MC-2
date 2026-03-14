@@ -11,7 +11,6 @@ import { test, expect } from '@playwright/test'
 import { EnrichmentInspectorPage } from './pages/EnrichmentInspectorPage'
 import {
   TEST_COURSES,
-  mockEnrichmentApi,
   mockApiError,
   waitForAnimation,
 } from './fixtures/enrichment-fixtures'
@@ -108,7 +107,7 @@ test.describe('Enrichment Inspector - Error Handling', () => {
     await expect(failedEnrichment).toBeVisible()
 
     // Check for failed status indicator
-    const statusBadge = failedEnrichment.locator(
+    failedEnrichment.locator(
       '[data-testid*="status"], .badge, [class*="badge"]'
     )
 
@@ -119,7 +118,6 @@ test.describe('Enrichment Inspector - Error Handling', () => {
       failedEnrichment.locator('.text-red-500, .text-red-600, .bg-red-100'),
     ]
 
-    let failedStatusFound = false
     for (const indicator of failedIndicators) {
       if (
         await indicator
@@ -127,7 +125,6 @@ test.describe('Enrichment Inspector - Error Handling', () => {
           .isVisible()
           .catch(() => false)
       ) {
-        failedStatusFound = true
         break
       }
     }

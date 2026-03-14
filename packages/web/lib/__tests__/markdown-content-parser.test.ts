@@ -431,7 +431,7 @@ Valid summary.`
     it('should accept content at maximum allowed limits', () => {
       const atLimit = {
         intro: 'a'.repeat(10000),
-        sections: Array.from({ length: 50 }, (_, i) => ({
+        sections: Array.from({ length: 50 }, (_, _i) => ({
           title: 'T'.repeat(500),
           content: 'c'.repeat(100000),
         })),

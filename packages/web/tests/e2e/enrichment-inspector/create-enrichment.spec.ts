@@ -116,7 +116,7 @@ test.describe('Create Enrichment - Quiz Form', () => {
     await inspectorPage.expectView('root')
   })
 
-  test('should cancel quiz creation', async ({ page }) => {
+  test('should cancel quiz creation', async ({ page: _page }) => {
     // Open quiz create view
     await inspectorPage.openCreateView('quiz')
 
@@ -130,7 +130,7 @@ test.describe('Create Enrichment - Quiz Form', () => {
     await inspectorPage.expectView('root')
   })
 
-  test('should navigate back using back button', async ({ page }) => {
+  test('should navigate back using back button', async ({ page: _page }) => {
     // Open quiz create view
     await inspectorPage.openCreateView('quiz')
 
@@ -619,7 +619,7 @@ test.describe('Create Enrichment - Discovery Cards', () => {
     await inspectorPage.navigateToLesson(TEST_COURSE_SLUG, TEST_LESSON_ID)
   })
 
-  test('should display all discovery cards in empty state', async ({ page }) => {
+  test('should display all discovery cards in empty state', async ({ page: _page }) => {
     // Verify empty state with discovery cards
     await inspectorPage.expectEmptyState()
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { presets, getPresetConfig } from '@/components/markdown/presets'
-import type { PresetName, PresetConfig, FeatureFlags } from '@/components/markdown/types'
+import type { PresetName, FeatureFlags } from '@/components/markdown/types'
 
 describe('presets', () => {
   const presetNames: PresetName[] = ['lesson', 'chat', 'preview', 'minimal']
