@@ -105,7 +105,7 @@ vi.mock('@/components/ui/collapsible', () => ({
 }))
 
 vi.mock('@/components/ui/toggle-group', () => ({
-  ToggleGroup: ({ children, value, onValueChange, disabled }: any) => (
+  ToggleGroup: ({ children, value, onValueChange: _onValueChange, disabled }: any) => (
     <div data-testid="toggle-group" data-value={value} aria-disabled={disabled}>
       {children}
     </div>

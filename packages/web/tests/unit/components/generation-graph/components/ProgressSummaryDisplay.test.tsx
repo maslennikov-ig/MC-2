@@ -3,8 +3,6 @@ import { describe, it, expect } from 'vitest'
 import {
   ProgressSummaryDisplay,
   AttemptSummaryCard,
-  type ProgressSummaryDisplayProps,
-  type AttemptSummaryCardProps,
 } from '@/components/generation-graph/components/ProgressSummaryDisplay'
 import type {
   ProgressSummary,
@@ -277,7 +275,7 @@ describe('ProgressSummaryDisplay', () => {
         language: 'en',
       })
 
-      const { container } = render(<ProgressSummaryDisplay progressSummary={summary} />)
+      render(<ProgressSummaryDisplay progressSummary={summary} />)
 
       // Check for emerald/green color classes
       const badge = screen.getByText('Completed')
@@ -291,7 +289,7 @@ describe('ProgressSummaryDisplay', () => {
         language: 'en',
       })
 
-      const { container } = render(<ProgressSummaryDisplay progressSummary={summary} />)
+      render(<ProgressSummaryDisplay progressSummary={summary} />)
 
       const badge = screen.getByText('Failed')
       expect(badge.className).toMatch(/red/)
@@ -304,7 +302,7 @@ describe('ProgressSummaryDisplay', () => {
         language: 'en',
       })
 
-      const { container } = render(<ProgressSummaryDisplay progressSummary={summary} />)
+      render(<ProgressSummaryDisplay progressSummary={summary} />)
 
       const badge = screen.getByText('Fixing')
       expect(badge.className).toMatch(/amber/)
@@ -317,7 +315,7 @@ describe('ProgressSummaryDisplay', () => {
         language: 'en',
       })
 
-      const { container } = render(<ProgressSummaryDisplay progressSummary={summary} />)
+      render(<ProgressSummaryDisplay progressSummary={summary} />)
 
       // Get all elements with "Reviewing" text and find the badge
       const badges = screen.getAllByText('Reviewing')
@@ -333,7 +331,7 @@ describe('ProgressSummaryDisplay', () => {
         language: 'en',
       })
 
-      const { container } = render(<ProgressSummaryDisplay progressSummary={summary} />)
+      render(<ProgressSummaryDisplay progressSummary={summary} />)
 
       // Get all elements with "Generating" text and find the badge
       const badges = screen.getAllByText('Generating')

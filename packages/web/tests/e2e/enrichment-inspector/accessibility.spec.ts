@@ -268,7 +268,7 @@ test.describe('Enrichment Inspector Accessibility', () => {
     }
   })
 
-  test('panel should have proper landmark structure', async ({ page }) => {
+  test('panel should have proper landmark structure', async ({ page: _page }) => {
     await inspectorPage.navigateToLesson('test-course', 'lesson-with-enrichments')
     await inspectorPage.expectPanelVisible()
 
@@ -288,7 +288,6 @@ test.describe('Enrichment Inspector Accessibility', () => {
     // Check header structure
     const header = inspectorPage.header
     if ((await header.count()) > 0) {
-      const headerRole = await header.getAttribute('role')
       const heading = header.locator('h1, h2, h3, [role="heading"]')
 
       // Header should contain a heading
@@ -296,7 +295,7 @@ test.describe('Enrichment Inspector Accessibility', () => {
     }
   })
 
-  test('focus should be managed when navigating views', async ({ page }) => {
+  test('focus should be managed when navigating views', async () => {
     await inspectorPage.navigateToLesson('test-course', 'lesson-1')
     await inspectorPage.expectEmptyState()
 
@@ -305,7 +304,6 @@ test.describe('Enrichment Inspector Accessibility', () => {
 
     // Focus should move to create view
     // Check if focus is within create view
-    const focusedElement = page.locator(':focus')
     const isWithinCreateView = await inspectorPage.createView.locator(':focus').count()
 
     // Focus should be managed (either on heading, first input, or close button)
@@ -324,9 +322,6 @@ test.describe('Enrichment Inspector Accessibility', () => {
     await inspectorPage.navigateToLesson('test-course', 'lesson-with-failed-enrichment')
 
     // Find error elements
-    const errorElements = page.locator(
-      '[role="alert"], [aria-live="assertive"], [aria-live="polite"]'
-    )
     const failedItems = page.locator('[data-enrichment-status="failed"]')
 
     if ((await failedItems.count()) > 0) {

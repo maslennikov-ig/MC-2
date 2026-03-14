@@ -39,7 +39,7 @@ test.describe('Enrichment Inspector - Drag and Drop', () => {
     })
   })
 
-  test('should have accessible drag handles', async ({ page }) => {
+  test('should have accessible drag handles', async () => {
     // Navigate to lesson with enrichments
     await inspectorPage.navigateToLesson(COURSE_SLUG, LESSON_WITH_ENRICHMENTS)
 
@@ -308,7 +308,7 @@ test.describe('Enrichment Inspector - Drag and Drop', () => {
     const firstItem = inspectorPage.listItems.first()
 
     // Get initial styles
-    const initialCursor = await firstHandle.evaluate((el) => window.getComputedStyle(el).cursor)
+    await firstHandle.evaluate((el) => window.getComputedStyle(el).cursor)
 
     // Start drag (mousedown on handle)
     await firstHandle.hover()
@@ -336,7 +336,7 @@ test.describe('Enrichment Inspector - Drag and Drop', () => {
       })
 
       // During drag, item should have visual feedback (e.g., opacity, shadow)
-      const draggingOpacity = await firstItem.evaluate((el) => window.getComputedStyle(el).opacity)
+      await firstItem.evaluate((el) => window.getComputedStyle(el).opacity)
 
       // Drop
       await page.mouse.up()

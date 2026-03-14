@@ -247,17 +247,14 @@ test.describe('Enrichment Inspector Generation Progress', () => {
     if ((await progressBar.count()) > 0) {
       // Get initial progress value
       const initialValue = await progressBar.getAttribute('aria-valuenow')
-      const initialStyle = await progressBar.getAttribute('style')
 
       // Wait for progress update
       await page.waitForTimeout(2000)
 
       // Get updated progress value
       const updatedValue = await progressBar.getAttribute('aria-valuenow')
-      const updatedStyle = await progressBar.getAttribute('style')
 
       // Progress should have increased or style changed
-      const hasChanged = initialValue !== updatedValue || initialStyle !== updatedStyle
 
       // Log for debugging
       console.log(`Progress change: ${initialValue} -> ${updatedValue}`)

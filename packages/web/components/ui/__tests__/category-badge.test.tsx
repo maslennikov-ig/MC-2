@@ -271,13 +271,13 @@ describe('CategoryBadge', () => {
 
   describe('Accessibility', () => {
     it('should render badge with readable text content', () => {
-      const { container } = render(<CategoryBadge category="audience" />)
+      render(<CategoryBadge category="audience" />)
       const badge = screen.getByText('Аудитория')
       expect(badge).toBeVisible()
     })
 
     it('should render unknown badge with readable text', () => {
-      const { container } = render(<CategoryBadge category={null} />)
+      render(<CategoryBadge category={null} />)
       const badge = screen.getByText('unknown')
       expect(badge).toBeVisible()
     })

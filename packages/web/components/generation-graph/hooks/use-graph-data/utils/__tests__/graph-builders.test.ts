@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { buildGraph } from '../graph-builders'
-import { GRAPH_STAGE_CONFIG } from '@/lib/generation-graph/constants'
 
 /**
  * Unit tests for graph-builders.ts
