@@ -113,6 +113,22 @@ export class DoclingClient {
       name: 'megacampus-docling-client',
       version: '1.0.0',
     });
+    this.setupClientErrorHandlers();
+  }
+
+  /**
+   * Set up out-of-band error/close handlers on MCP Client
+   * Prevents uncaught exceptions from transport-level errors (SSE disconnects, parse errors)
+   */
+  private setupClientErrorHandlers(): void {
+    this.client.onerror = error => {
+      logger.error({ err: error }, 'Docling MCP client out-of-band error');
+      this.isConnected = false;
+    };
+    this.client.onclose = () => {
+      logger.warn('Docling MCP client connection closed');
+      this.isConnected = false;
+    };
   }
 
   /**
@@ -148,6 +164,14 @@ export class DoclingClient {
             },
           });
           logger.info({ serverUrl: this.config.serverUrl }, 'Using Streamable HTTP transport');
+        }
+
+        // Prevent unhandled 'error' events on transport from crashing worker thread
+        if (this.transport && typeof (this.transport as any).on === 'function') {
+          (this.transport as any).on('error', (err: Error) => {
+            logger.error({ err }, 'Docling MCP transport error event');
+            this.isConnected = false;
+          });
         }
 
         await this.client.connect(this.transport);
@@ -250,6 +274,7 @@ export class DoclingClient {
       name: 'megacampus-docling-client',
       version: '1.0.0',
     });
+    this.setupClientErrorHandlers();
 
     // Reset transport so connect() creates a new one
     this.transport = null;

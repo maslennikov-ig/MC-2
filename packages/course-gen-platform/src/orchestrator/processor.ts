@@ -231,6 +231,31 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
   };
 }
 
+// Global error handlers for worker thread — capture errors that escape
+// try-catch blocks (e.g., EventEmitter 'error' events from MCP transports).
+// BullMQ's main-base.js also registers these, but it creates a generic Error().
+// Our handler runs first (registered at module load) and captures full details.
+const captureUncaughtError = (type: string) => (err: unknown) => {
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  const errorStack = err instanceof Error ? err.stack : undefined;
+  baseLogger.error(
+    { error: errorMessage, stack: errorStack, type },
+    `Processor: ${type} in worker thread`
+  );
+  logPermanentFailure({
+    organization_id: 'unknown',
+    error_message: `[WorkerThread ${type}] ${errorMessage}`,
+    stack_trace: errorStack,
+    severity: 'CRITICAL',
+    metadata: { source: 'processor_global_handler', type },
+  }).catch(() => {
+    /* ignore */
+  });
+};
+
+process.on('uncaughtException', captureUncaughtError('uncaughtException'));
+process.on('unhandledRejection', captureUncaughtError('unhandledRejection'));
+
 // Run health check on processor load (startup validation)
 // Skip in test environment to avoid side effects
 if (process.env.NODE_ENV !== 'test') {
@@ -390,19 +415,7 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       );
     }
 
-    // Re-throw with enumerable properties so BullMQ sandbox serialization
-    // preserves message/stack (errorToJSON uses JSON.stringify which skips
-    // non-enumerable Error properties)
-    const serializableError = new Error(errorMessage);
-    Object.defineProperty(serializableError, 'message', {
-      value: errorMessage,
-      enumerable: true,
-    });
-    Object.defineProperty(serializableError, 'stack', {
-      value: errorStack || serializableError.stack,
-      enumerable: true,
-    });
-    throw serializableError;
+    throw error;
   }
 }
 
