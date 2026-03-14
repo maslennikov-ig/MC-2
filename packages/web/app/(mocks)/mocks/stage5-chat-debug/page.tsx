@@ -136,7 +136,7 @@ export default function Stage5ChatDebugPage() {
  * Inner component: all hooks (including useRefinement which calls useTranslations)
  * are called inside NextIntlClientProvider context.
  */
-// eslint-disable-next-line max-lines-per-function -- debug page, refactoring not warranted
+ 
 function ChatDebugContent() {
   const [recentCourses, setRecentCourses] = useState<RecentCourse[]>([])
   const [isLoadingList, setIsLoadingList] = useState(false)

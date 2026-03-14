@@ -489,7 +489,7 @@ export async function togglePublishCourse(courseSlug: string, isPublished: boole
  * Get user favorites - returns empty array as user_favorites table doesn't exist
  * Note: User favorites functionality will be implemented when table is added to database schema
  */
-// eslint-disable-next-line @typescript-eslint/require-await -- must be async for 'use server' file
+ 
 export async function getUserFavorites(_userId: string) {
   // user_favorites table doesn't exist in database
   // Return empty array to maintain compatibility
