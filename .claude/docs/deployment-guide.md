@@ -82,7 +82,7 @@ Read at runtime, can be changed without rebuilding:
 | `ENRICHMENTS_PUBLIC_URL`      | Public URL prefix for nginx          | —                               |
 | `ENRICHMENTS_PUBLIC_BASE_URL` | Base domain for absolute URLs        | —                               |
 | `ENRICHMENTS_LOCAL_PATH`      | Local storage path (workers only)    | —                               |
-| `DOCLING_MCP_URL`             | Docling MCP endpoint                 | `http://docling-mcp:8000/sse`   |
+| `DOCLING_MCP_URL`             | Docling MCP endpoint                 | `http://docling-mcp:8000/mcp`   |
 | `NOTEBOOKLM_BRIDGE_URL`       | NotebookLM bridge endpoint           | `http://notebooklm-bridge:8000` |
 | `NOTEBOOKLM_BRIDGE_TOKEN`     | Bearer auth token for bridge         | Required                        |
 | `LOG_LEVEL`                   | Pino log level                       | `info` (prod), `debug` (dev)    |
