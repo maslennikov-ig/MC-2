@@ -137,7 +137,7 @@ export function EnrichmentCard({
         .catch(() => setUrlError(true))
         .finally(() => setUrlLoading(false))
     }
-  }, [enrichment.id, enrichment.status])
+  }, [enrichment, isAudioType, isVideoType])
 
   // Reset audio playing state when deactivated
   useEffect(() => {
@@ -305,6 +305,7 @@ export function EnrichmentCard({
     if (isVideoType && urlLoading) {
       return (
         <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -322,6 +323,7 @@ export function EnrichmentCard({
     if (isVideoType && urlError) {
       return (
         <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -350,6 +352,7 @@ export function EnrichmentCard({
     if (isAudioType && urlLoading) {
       return (
         <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -367,6 +370,7 @@ export function EnrichmentCard({
     if (isAudioType && urlError) {
       return (
         <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -395,6 +399,7 @@ export function EnrichmentCard({
     if (isAudioType && playbackUrl) {
       return (
         <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -443,6 +448,7 @@ export function EnrichmentCard({
     // Default: placeholder image with gradient
     return (
       <>
+        {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
         <img
           src={placeholderImage}
           alt={enrichment.title || label}

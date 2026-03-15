@@ -86,9 +86,12 @@ export function TelegramLoginButton({
     loadWidget()
 
     return () => {
-      // Cleanup
-      if (scriptRef.current && containerRef.current?.contains(scriptRef.current)) {
-        containerRef.current.removeChild(scriptRef.current)
+      // Cleanup: copy refs to local vars for safe cleanup (React ref pattern)
+      const script = scriptRef.current
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- containerRef is a DOM ref (not React state), safe to read in cleanup
+      const containerEl = containerRef.current
+      if (script && containerEl?.contains(script)) {
+        containerEl.removeChild(script)
       }
       scriptRef.current = null
       isLoadingRef.current = false

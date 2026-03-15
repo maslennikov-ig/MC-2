@@ -141,7 +141,8 @@ export async function GET(
           {/* Background */}
           {validCoverUrl ? (
             <>
-              {/* Cover image as background - using native img for ImageResponse */}
+              {/* Cover image as background - using native img for ImageResponse (next/image not supported here) */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires native img */}
               <img
                 src={validCoverUrl}
                 alt=""

@@ -209,7 +209,8 @@ const KnowledgeAtomsGrid = memo<KnowledgeAtomsGridProps>(function KnowledgeAtoms
         value: chunks,
       },
       {
-        icon: <Image className="h-full w-full" />,
+        // eslint-disable-next-line jsx-a11y/alt-text -- Lucide icon, not next/image
+        icon: <Image className="h-full w-full" aria-hidden="true" />,
         label: t('atomVisuals'),
         value: visuals,
       },

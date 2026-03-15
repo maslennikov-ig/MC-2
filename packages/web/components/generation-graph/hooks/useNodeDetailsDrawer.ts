@@ -730,9 +730,7 @@ export function useNodeDetailsDrawer() {
     }
   }, [
     selectedNodeId,
-    displayData?.traceId,
-    displayData?.outputData,
-    displayData?.status,
+    displayData,
     fetchTraceDetails,
   ])
 

@@ -169,6 +169,7 @@ export function LessonMaterialsSwitcher({
     } else if (availableTypes.length === 0) {
       setActiveTab('')
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- availableTypes is derived from stable enrichments props; won't cause loops
   }, [lesson.id, availableTypes.join(',')])
 
   // Fetch URLs for media
@@ -201,7 +202,7 @@ export function LessonMaterialsSwitcher({
     return () => {
       isMounted = false
     }
-  }, [videoEnrichment?.id, audioEnrichment?.id])
+  }, [videoEnrichment?.id, audioEnrichment?.id, videoEnrichment?.status, audioEnrichment?.status])
 
   if (availableTypes.length === 0) return null
 

@@ -175,8 +175,9 @@ export function useParameterFlow(courseId: string) {
     return () => {
       void supabase.removeChannel(channel)
       // Clear all pending timeouts to prevent memory leaks
-      timeoutIds.current.forEach(clearTimeout)
-      timeoutIds.current.clear()
+      const timeouts = timeoutIds
+      timeouts.current.forEach(clearTimeout)
+      timeouts.current.clear()
     }
   }, [courseId, fetchInitialState])
 

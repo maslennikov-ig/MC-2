@@ -99,6 +99,7 @@ export default function ProfilePage() {
 
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
   }, [hasUnsavedChanges])
 
   // Keyboard navigation for tabs
@@ -169,6 +170,7 @@ export default function ProfilePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable; profileTabs recreated each render (adding would cause infinite loop)
   }, [activeTab, showKeyboardHints, router])
 
   // Handle touch gestures for mobile tab navigation (iOS Safari compatible)
@@ -244,6 +246,7 @@ export default function ProfilePage() {
     // Reset touch positions
     setTouchStartX(0)
     setTouchEndX(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
   }, [touchStartX, touchEndX, activeTab])
 
   // Load profile data and preferences
@@ -319,6 +322,7 @@ export default function ProfilePage() {
     if (session?.user && mounted) {
       void loadProfile()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
   }, [session, supabase, mounted, setTheme])
 
   // Avatar upload handler
@@ -446,6 +450,7 @@ export default function ProfilePage() {
         setTimeout(() => setUploadProgress(0), 1000)
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
     [session, supabase, profile]
   )
 

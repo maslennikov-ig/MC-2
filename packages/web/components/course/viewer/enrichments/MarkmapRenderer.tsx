@@ -87,6 +87,7 @@ export function MarkmapRenderer({ data, fitToViewLabel, className }: MarkmapRend
     }
     // Only recreate when SVG becomes available (mounted).
     // Data and theme updates are handled by separate effects below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: data & isDark handled by Effects 2 & 3 to preserve zoom/pan state
   }, [mounted])
 
   // Effect 2: Update data without destroying instance (preserves zoom/pan state)

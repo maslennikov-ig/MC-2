@@ -66,11 +66,14 @@ export function CourseVisualsManager({
 
   // Cleanup on unmount
   useEffect(() => {
+    const coversAbort = coversAbortRef
+    const cardsAbort = cardsAbortRef
+    const pollingInterval = pollingIntervalRef
     return () => {
-      coversAbortRef.current?.abort()
-      cardsAbortRef.current?.abort()
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
+      coversAbort.current?.abort()
+      cardsAbort.current?.abort()
+      if (pollingInterval.current) {
+        clearInterval(pollingInterval.current)
       }
     }
   }, [])
@@ -224,7 +227,8 @@ export function CourseVisualsManager({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Image className="h-5 w-5 text-indigo-500" />
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- Lucide icon, not next/image */}
+                <Image className="h-5 w-5 text-indigo-500" aria-hidden="true" />
                 {tCourse('visuals.courseCard')}
               </CardTitle>
               <CardDescription>{tCourse('visuals.courseCardDescription')}</CardDescription>
@@ -250,7 +254,8 @@ export function CourseVisualsManager({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Image className="h-5 w-5 text-cyan-500" />
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- Lucide icon, not next/image */}
+                <Image className="h-5 w-5 text-cyan-500" aria-hidden="true" />
                 {tCourse('visuals.lessonCovers')}
               </CardTitle>
               <CardDescription>
@@ -340,7 +345,8 @@ export function CourseVisualsManager({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Image className="h-5 w-5 text-indigo-500" />
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- Lucide icon, not next/image */}
+                <Image className="h-5 w-5 text-indigo-500" aria-hidden="true" />
                 {tCourse('visuals.lessonCards')}
               </CardTitle>
               <CardDescription>
