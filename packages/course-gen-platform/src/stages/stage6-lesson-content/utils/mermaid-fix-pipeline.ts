@@ -40,7 +40,7 @@
  * const content = `# Lesson
  * \`\`\`mermaid
  * flowchart TD
- *   A[\\"Start\\"] -> B[\\"Process\\"]
+ *   A[\"Start\"] -> B[\"Process\"]
  * \`\`\`
  * `;
  *
@@ -59,6 +59,13 @@ import { validateMermaidBlockRender } from './mermaid-render-validator';
 // Calling cleanup would break subsequent pipeline calls with "DOMPurify.addHook is not a function".
 // Memory is safe: JSDOM instance is reused via idempotent ensureDOMGlobals().
 import { logger } from '@/shared/logger';
+import { wrapRawMermaidBlocks } from './mermaid-raw-wrapping';
+import {
+  wrapMermaidBlock,
+  simplifyMermaidDiagram,
+  splitMermaidDiagramIntoTwo,
+  generateStructuredFallbackText,
+} from './mermaid-remediation';
 
 // ============================================================================
 // CONSTANTS
@@ -222,253 +229,11 @@ async function validateBlockForPipeline(
 }
 
 // ============================================================================
-// RAW MERMAID BLOCK WRAPPING (Stage 0)
-// ============================================================================
-
-/**
- * Mermaid diagram type keywords — all valid diagram openers
- */
-const MERMAID_KEYWORDS = [
-  'flowchart',
-  'graph',
-  'sequenceDiagram',
-  'classDiagram',
-  'stateDiagram-v2',
-  'stateDiagram',
-  'erDiagram',
-  'journey',
-  'gantt',
-  'pie',
-  'mindmap',
-  'timeline',
-  'gitgraph',
-  'C4Context',
-  'C4Container',
-  'C4Component',
-  'C4Deployment',
-  'sankey-beta',
-  'xychart-beta',
-  'block-beta',
-  'packet-beta',
-] as const;
-
-/**
- * Regex that matches a line starting with a Mermaid keyword (with optional direction suffix)
- * Must be at the start of a line; captures the full keyword line.
- */
-const RAW_MERMAID_KEYWORD_REGEX = new RegExp(
-  `^(${MERMAID_KEYWORDS.join('|')})(?:\\s+(TD|TB|BT|RL|LR))?\\s*$`,
-  'im'
-);
-
-/**
- * Patterns that indicate actual Mermaid syntax (not just normal prose).
- *
- * These patterns are intentionally specific to avoid false positives on
- * educational text that mentions words like "pie", "timeline", "journey",
- * or "section" in ordinary sentences.
- *
- * Design decisions:
- * - `/\[.*?\]|\(.*?\)|\{.*?\}/` removed — too broad (matches markdown links,
- *   checkboxes, any parenthesised text)
- * - `subgraph|end\b` split: require "subgraph <Name>" and "end" alone on a line
- * - `class\s+\w+`, `state\s+`, `section\s+` removed — too common in prose
- * - `/^\s+\w/m` removed — any indented line is too broad
- * - Added `/^\s+\w+[\[\({\|]/m` — indented node followed immediately by a
- *   shape bracket, which is unambiguous Mermaid node syntax
- * - Added `/^\s+\w+\s*-->|^\s+\w+\s*---/m` — indented node with arrow,
- *   specific to flowchart/graph diagrams
- */
-const MERMAID_SYNTAX_PATTERNS: RegExp[] = [
-  /-->|---|-\.->|==>|~~~/, // Mermaid arrows (very specific)
-  /^\s+\w+\s*-->|^\s+\w+\s*---/m, // Indented node with arrow (e.g. "  A --> B")
-  /subgraph\s+\w/i, // "subgraph Name" (not bare "subgraph" or "end")
-  /^\s*end\s*$/m, // "end" alone on a line (Mermaid block closer)
-  /^participant\s+\w/im, // "participant Alice" (sequence diagrams)
-  /^actor\s+\w/im, // "actor User" (sequence diagrams)
-  /"[^"]+"\s*:\s*\d/, // gantt/pie data: "Label" : 42
-  /^\s+\w+[\[\({\|]/m, // Indented node with shape bracket: "  A[text]"
-];
-
-/**
- * Strict patterns for block continuation after empty lines.
- *
- * A subset of MERMAID_SYNTAX_PATTERNS requiring unambiguous Mermaid syntax.
- * Used when scanning forward past an empty line to decide whether the block
- * is still continuing — prose keywords must never trigger continuation.
- */
-const MERMAID_CONTINUATION_PATTERNS: RegExp[] = [
-  /-->|---|-\.->|==>|~~~/, // Mermaid arrows
-  /^\s+\w+\s*-->|^\s+\w+\s*---/m, // Indented node with arrow
-  /^\s*end\s*$/m, // "end" alone on a line
-  /"[^"]+"\s*:\s*\d/, // pie/gantt data
-  /^\s+\w+[\[\({\|]/m, // Indented node with shape bracket
-];
-
-/**
- * Result of wrapping raw Mermaid blocks
- */
-interface WrapRawMermaidResult {
-  content: string;
-  wrappedCount: number;
-}
-
-/**
- * Detect and wrap raw (unfenced) Mermaid blocks in content.
- *
- * Scans the content for lines that look like the start of a Mermaid diagram
- * but are not inside an existing code fence. If the subsequent lines contain
- * recognisable Mermaid syntax the whole block is wrapped in ```mermaid fences.
- *
- * Replacements are applied in reverse order to preserve string indices.
- *
- * @param content - Markdown content to scan
- * @returns Modified content and count of newly wrapped blocks
- */
-function wrapRawMermaidBlocks(content: string): WrapRawMermaidResult {
-  // 1. Identify all existing code-fence regions so we don't double-wrap
-  const codeFenceRegions: Array<{ start: number; end: number }> = [];
-  const codeFenceRegex = /(?:```|~~~)[\s\S]*?(?:```|~~~)/g;
-  let fenceMatch: RegExpExecArray | null;
-  while ((fenceMatch = codeFenceRegex.exec(content)) !== null) {
-    codeFenceRegions.push({
-      start: fenceMatch.index,
-      end: fenceMatch.index + fenceMatch[0].length,
-    });
-  }
-
-  function isInsideCodeFence(index: number): boolean {
-    return codeFenceRegions.some(r => index >= r.start && index < r.end);
-  }
-
-  // 2. Split content into lines, tracking byte offsets for each line start
-  const lines = content.split('\n');
-  const lineOffsets: number[] = [];
-  let offset = 0;
-  for (const line of lines) {
-    lineOffsets.push(offset);
-    offset += line.length + 1; // +1 for '\n'
-  }
-
-  // 3. Find candidate keyword lines
-  const replacements: Array<{ start: number; end: number; wrapped: string }> = [];
-
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx];
-    const lineStart = lineOffsets[lineIdx];
-
-    // Must match Mermaid keyword at start of line
-    if (!RAW_MERMAID_KEYWORD_REGEX.test(line)) {
-      continue;
-    }
-
-    // Must NOT be inside an existing code fence
-    if (isInsideCodeFence(lineStart)) {
-      continue;
-    }
-
-    // 4. Validate the following lines contain actual Mermaid syntax
-    const lookAheadEnd = Math.min(lineIdx + 20, lines.length);
-    const lookAheadLines = lines.slice(lineIdx + 1, lookAheadEnd);
-    const hasMermaidSyntax = MERMAID_SYNTAX_PATTERNS.some(pattern =>
-      lookAheadLines.some(l => pattern.test(l))
-    );
-
-    if (!hasMermaidSyntax) {
-      // Keyword appeared in normal prose — skip
-      continue;
-    }
-
-    // 5. Determine end of the raw block
-    let blockEndLineIdx = lineIdx; // inclusive last line of block
-    const headerRegex = /^#{1,6}\s/;
-
-    for (let scan = lineIdx + 1; scan < lines.length; scan++) {
-      const scanLine = lines[scan];
-
-      // Stop at markdown headings
-      if (headerRegex.test(scanLine)) {
-        break;
-      }
-
-      // Stop at empty line followed by a non-Mermaid-syntax line
-      if (scanLine.trim() === '') {
-        const nextNonEmpty = lines.slice(scan + 1).find(l => l.trim() !== '');
-        if (
-          nextNonEmpty === undefined ||
-          !MERMAID_CONTINUATION_PATTERNS.some(p => p.test(nextNonEmpty))
-        ) {
-          break;
-        }
-      }
-
-      blockEndLineIdx = scan;
-    }
-
-    // 6. Determine character offsets for the block
-    const blockStart = lineOffsets[lineIdx];
-    // End is after the last character of the last block line (before its '\n')
-    const blockEnd = lineOffsets[blockEndLineIdx] + lines[blockEndLineIdx].length;
-
-    // Make sure the block doesn't overlap an existing code fence
-    if (codeFenceRegions.some(r => blockStart < r.end && blockEnd > r.start)) {
-      continue;
-    }
-
-    const rawBlock = content.slice(blockStart, blockEnd);
-    const wrapped = `\`\`\`mermaid\n${rawBlock}\n\`\`\``;
-
-    replacements.push({ start: blockStart, end: blockEnd, wrapped });
-
-    // Skip processed lines to avoid overlapping replacements
-    lineIdx = blockEndLineIdx;
-  }
-
-  if (replacements.length === 0) {
-    return { content, wrappedCount: 0 };
-  }
-
-  // 7. Apply replacements in reverse order
-  let result = content;
-  for (let i = replacements.length - 1; i >= 0; i--) {
-    const { start, end, wrapped } = replacements[i];
-    result = result.slice(0, start) + wrapped + result.slice(end);
-  }
-
-  return { content: result, wrappedCount: replacements.length };
-}
-
-// ============================================================================
 // EXTRACTION HELPERS
 // ============================================================================
 
 /**
  * Extract all Mermaid blocks from content with their positions
- *
- * Parses content to find all ```mermaid code blocks and records their
- * positions for later replacement.
- *
- * @param content - Markdown content to parse
- * @returns Array of Mermaid blocks with position information
- *
- * @example
- * ```typescript
- * const content = `
- * \`\`\`mermaid
- * graph TD; A-->B;
- * \`\`\`
- * Some text
- * \`\`\`mermaid
- * sequenceDiagram
- * \`\`\`
- * `;
- *
- * const blocks = extractMermaidBlocks(content);
- * // [
- * //   { fullMatch: "```mermaid\ngraph TD; A-->B;\n```", code: "graph TD; A-->B;", startIndex: 1, endIndex: 35 },
- * //   { fullMatch: "```mermaid\nsequenceDiagram\n```", code: "sequenceDiagram", startIndex: 46, endIndex: 78 }
- * // ]
- * ```
  */
 function extractMermaidBlocks(content: string): MermaidBlock[] {
   const blocks: MermaidBlock[] = [];
@@ -498,166 +263,6 @@ function extractMermaidBlocks(content: string): MermaidBlock[] {
 }
 
 // ============================================================================
-// ADAPTIVE REMEDIATION HELPERS
-// ============================================================================
-
-const MERMAID_EDGE_PATTERN = /-->|-\.->|==>|---|~~~/;
-const MERMAID_TYPE_PATTERN =
-  /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitgraph|C4Context|C4Container|C4Component|C4Deployment|sankey-beta|xychart-beta|block-beta|packet-beta)\b/i;
-const MERMAID_CONTROL_LINE_PATTERN =
-  /^\s*(?:%%\{.*\}%%|classDef\b|class\b|style\b|linkStyle\b|click\b)/i;
-
-function wrapMermaidBlock(code: string): string {
-  return `\`\`\`mermaid\n${code}\n\`\`\``;
-}
-
-function extractDiagramType(code: string): string {
-  const firstLine = code.split('\n').find(line => line.trim().length > 0) ?? '';
-  const typeMatch = firstLine.match(MERMAID_TYPE_PATTERN);
-  return typeMatch ? typeMatch[1] : 'diagram';
-}
-
-function normalizeSingleArrows(line: string): string {
-  let normalized = '';
-
-  for (let i = 0; i < line.length; i++) {
-    if (line[i] === '-' && line[i + 1] === '>') {
-      const before = i > 0 ? line[i - 1] : '';
-      const after = i + 2 < line.length ? line[i + 2] : '';
-
-      // Keep valid sequence arrows (->>) and existing flow arrows (-->, -.->)
-      const isSequenceArrow = after === '>';
-      const isAlreadyFlowArrow = before === '-' || before === '.';
-      if (!isSequenceArrow && !isAlreadyFlowArrow && after !== '-') {
-        normalized += '-->';
-        i += 1;
-        continue;
-      }
-    }
-
-    normalized += line[i];
-  }
-
-  return normalized;
-}
-
-function simplifyMermaidDiagram(code: string): string {
-  const lines = code
-    .split('\n')
-    .map(line => line.trimEnd())
-    .filter((line, index) => !(index === 0 && line.trim().length === 0));
-
-  if (lines.length === 0) {
-    return code;
-  }
-
-  const [header, ...bodyLines] = lines;
-
-  const simplifiedBody = bodyLines
-    .map(line => line.replace(/<br\s*\/?>/gi, ' '))
-    .map(line => line.replace(/`/g, ''))
-    .map(line => normalizeSingleArrows(line))
-    .filter(line => !MERMAID_CONTROL_LINE_PATTERN.test(line))
-    .map(line => line.replace(/\s{2,}/g, ' ').trimEnd())
-    .filter(line => line.trim().length > 0);
-
-  if (simplifiedBody.length === 0) {
-    return header.trim();
-  }
-
-  return [header.trim(), ...simplifiedBody].join('\n').trim();
-}
-
-function isFlowchartHeader(line: string): boolean {
-  return /^(flowchart|graph)\b/i.test(line.trim());
-}
-
-function isEdgeLine(line: string): boolean {
-  return MERMAID_EDGE_PATTERN.test(line);
-}
-
-function splitMermaidDiagramIntoTwo(
-  code: string
-): { firstDiagram: string; secondDiagram: string } | null {
-  const lines = code
-    .split('\n')
-    .map(line => line.trimEnd())
-    .filter(line => line.trim().length > 0);
-
-  if (lines.length < 3) {
-    return null;
-  }
-
-  const header = lines[0].trim();
-  if (!isFlowchartHeader(header)) {
-    return null;
-  }
-
-  const bodyLines = lines.slice(1).filter(line => !MERMAID_CONTROL_LINE_PATTERN.test(line));
-  const edgeLines = bodyLines.filter(isEdgeLine);
-
-  if (edgeLines.length < 2) {
-    return null;
-  }
-
-  const midpoint = Math.ceil(edgeLines.length / 2);
-  const firstEdges = edgeLines.slice(0, midpoint);
-  const secondEdges = edgeLines.slice(midpoint);
-
-  if (firstEdges.length === 0 || secondEdges.length === 0) {
-    return null;
-  }
-
-  const sharedNodeLines = bodyLines.filter(line => !isEdgeLine(line));
-  const firstDiagram = [header, ...sharedNodeLines, ...firstEdges].join('\n').trim();
-  const secondDiagram = [header, ...sharedNodeLines, ...secondEdges].join('\n').trim();
-
-  return { firstDiagram, secondDiagram };
-}
-
-function extractFallbackSteps(brokenDiagram: string): string[] {
-  const lines = brokenDiagram
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
-
-  const edgeSteps: string[] = [];
-
-  for (const line of lines) {
-    const edgeMatch = line.match(
-      /^([A-Za-z0-9_]+)\s*(?:-->|-\.->|==>|---|~~~|->>)\s*(?:\|[^|]*\|\s*)?([A-Za-z0-9_]+)/
-    );
-    if (edgeMatch) {
-      edgeSteps.push(`${edgeMatch[1]} -> ${edgeMatch[2]}`);
-    }
-  }
-
-  if (edgeSteps.length > 0) {
-    return edgeSteps.slice(0, 6);
-  }
-
-  const textualSteps = lines
-    .slice(1)
-    .map(line => line.replace(/[#*`]/g, '').trim())
-    .filter(line => line.length > 0)
-    .slice(0, 4);
-
-  return textualSteps.length > 0 ? textualSteps : ['No stable flow summary could be extracted.'];
-}
-
-function generateStructuredFallbackText(brokenDiagram: string): string {
-  const diagramType = extractDiagramType(brokenDiagram);
-  const summarySteps = extractFallbackSteps(brokenDiagram);
-
-  return [
-    '**Diagram unavailable (auto-remediated)**',
-    `The original Mermaid ${diagramType} diagram could not be rendered reliably and was converted to a text summary.`,
-    'Key flow:',
-    ...summarySteps.map((step, index) => `${index + 1}. ${step}`),
-  ].join('\n');
-}
-
-// ============================================================================
 // MAIN PIPELINE
 // ============================================================================
 
@@ -674,39 +279,9 @@ function generateStructuredFallbackText(brokenDiagram: string): string {
  *    - split into <= 2 diagrams (flowcharts/graphs)
  *    - structured markdown fallback
  *
- * **Processing flow:**
- * - Extract all Mermaid blocks from content
- * - Process each block through the cascade
- * - Replace blocks in original content with fixed versions
- * - Track detailed metrics for reporting
- *
- * **Edge cases handled:**
- * - No Mermaid blocks → return original content unchanged
- * - All diagrams valid → minimal processing
- * - All diagrams broken → apply fallbacks to prevent rendering errors
- * - LLM budget exhausted → skip LLM fixing for remaining diagrams
- *
- * **Performance:**
- * - Regex fixes are fast (~1ms per diagram)
- * - Validation is moderate (~10ms per diagram)
- * - LLM fixes are slow (~2-5s per diagram)
- * - Total time: O(n) for regex + O(n * k) for LLM where k is LLM fix count
- *
  * @param content - Markdown content with potential Mermaid blocks
  * @param options - Pipeline configuration options
  * @returns Pipeline result with metrics and fixed content
- *
- * @example
- * ```typescript
- * // Standard usage
- * const result = await runMermaidFixPipeline(lessonContent);
- * console.log(`Fixed ${result.metrics.diagramsFixedRegex} diagrams with regex`);
- * console.log(`Fixed ${result.metrics.diagramsFixedLLM} diagrams with LLM`);
- * console.log(`Fallback used for ${result.metrics.diagramsFallback} diagrams`);
- *
- * // Skip LLM for CI/testing
- * const testResult = await runMermaidFixPipeline(content, { skipLLM: true });
- * ```
  */
 export async function runMermaidFixPipeline(
   content: string,
