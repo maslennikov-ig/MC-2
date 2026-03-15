@@ -191,7 +191,6 @@ const ENRICHMENT_ACTIVITIES = [
     labelRu: 'Презентация',
     color: 'text-orange-500',
   },
-  // { key: 'document', icon: FileText, label: 'Document', labelRu: 'Документ', color: 'text-blue-500' }, // TODO: Handler not implemented
 ] as const
 
 /**

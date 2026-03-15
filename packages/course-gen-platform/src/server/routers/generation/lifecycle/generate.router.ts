@@ -207,7 +207,6 @@ export const generateRouter = {
         // Create BullMQ job
         // Note: GenerationJobInput uses snake_case fields while JobData union uses camelCase.
         // BullMQ serializes as JSON — the Stage 5 worker reads GenerationJobInput fields directly.
-        // TODO: Align StructureGenerationJobData schema with GenerationJobInput in bullmq-jobs.ts
         const priority = TIER_PRIORITY[tier] || 1;
         const jobType = JobType.STRUCTURE_GENERATION;
 
