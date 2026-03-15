@@ -10,6 +10,7 @@
  */
 
 import type { GenerationMetadata } from '@megacampus/shared-types/generation-result';
+import { logger } from '@megacampus/shared-logger';
 
 // ============================================================================
 // OPENROUTER PRICING CONFIGURATION
@@ -88,7 +89,7 @@ export const OPENROUTER_PRICING: Record<string, ModelPricing> = {
     outputPricePerMillion: 0.2,
   },
   'google/gemini-3-flash-preview': {
-    inputPricePerMillion: 0.50,
+    inputPricePerMillion: 0.5,
     outputPricePerMillion: 3.0,
   },
   // Legacy Gemini models (kept for historical cost tracking)
@@ -251,7 +252,7 @@ function calculatePhaseCost(modelName: string, totalTokens: number, inputTokens:
   const pricing = OPENROUTER_PRICING[modelName];
 
   if (!pricing) {
-    console.warn(`[cost-calculator] Unknown model: ${modelName}, defaulting to $0 cost`);
+    logger.warn(`[cost-calculator] Unknown model: ${modelName}, defaulting to $0 cost`);
     return 0;
   }
 
