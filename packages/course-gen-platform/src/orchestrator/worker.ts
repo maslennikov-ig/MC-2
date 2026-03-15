@@ -130,10 +130,6 @@ const registeredJobTypes = [
   JobType.STRUCTURE_GENERATION,
   JobType.LESSON_CONTENT,
   JobType.BLOCK_REGENERATION,
-  // TODO (Stage 1+): Register additional handlers
-  // JobType.SUMMARY_GENERATION,
-  // JobType.TEXT_GENERATION,
-  // JobType.FINALIZATION,
 ];
 
 /**
