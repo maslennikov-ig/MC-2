@@ -638,13 +638,13 @@ export function BatchCreateView({ initialType, className }: BatchCreateViewProps
       store.setEnrichmentType(initialType)
       store.setSettings(getDefaultSettings(initialType))
     }
-  }, [initialType])
+  }, [initialType, store])
 
   // Handle type selection (step 1)
   const handleSelectType = useCallback((type: CreateableEnrichmentType) => {
     store.setEnrichmentType(type)
     store.setSettings(getDefaultSettings(type))
-  }, [])
+  }, [store])
 
   // tRPC createBatch mutation
   const createBatchMutation = trpc.enrichment.createBatch.useMutation()

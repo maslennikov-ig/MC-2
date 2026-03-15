@@ -678,10 +678,8 @@ describe('MermaidDirect', () => {
       })
 
       // First call takes longer
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       mockRender.mockImplementationOnce(() => firstRenderPromise)
       // Second call resolves faster
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       mockRender.mockImplementationOnce(() => secondRenderPromise)
 
       const { container, rerender } = render(<MermaidDirect chart="graph TD\n  A-->B" />)

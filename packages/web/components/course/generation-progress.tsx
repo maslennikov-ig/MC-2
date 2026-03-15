@@ -425,6 +425,7 @@ export function GenerationProgress({
         clearTimeout(reconnectTimeout)
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t and tp are stable from next-intl
   }, [courseId, slug, router, status])
 
   // Retry connection
@@ -449,6 +450,7 @@ export function GenerationProgress({
       logger.error('Failed to cancel generation', { error: err })
       toast.error(tp('cancelError'))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tp from next-intl is stable
   }, [courseId, router])
 
   // Pause generation
@@ -474,6 +476,7 @@ export function GenerationProgress({
       setPauseLoading(false)
       setPauseResumeOperation(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tp from next-intl is stable
   }, [slug])
 
   // Resume generation
@@ -499,6 +502,7 @@ export function GenerationProgress({
       setPauseLoading(false)
       setPauseResumeOperation(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tp from next-intl is stable
   }, [slug])
 
   // Copy generation code to clipboard
@@ -507,6 +511,7 @@ export function GenerationProgress({
       void copyToClipboard(generationCode)
       toast.success(tp('codeCopied'))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tp from next-intl is stable
   }, [generationCode])
 
   // Render step item

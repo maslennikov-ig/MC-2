@@ -200,16 +200,18 @@ export function useEnrichmentGeneration({
 
   useEffect(() => {
     mountedRef.current = true
+    const abortControllers = abortControllersRef
+    const pollingIntervals = pollingIntervalsRef
     return () => {
       mountedRef.current = false
 
       // Abort all pending requests
-      abortControllersRef.current.forEach((controller) => controller.abort())
-      abortControllersRef.current.clear()
+      abortControllers.current.forEach((controller) => controller.abort())
+      abortControllers.current.clear()
 
       // Clear all polling timeouts
-      pollingIntervalsRef.current.forEach((handle) => clearTimeout(handle))
-      pollingIntervalsRef.current.clear()
+      pollingIntervals.current.forEach((handle) => clearTimeout(handle))
+      pollingIntervals.current.clear()
     }
   }, [])
 

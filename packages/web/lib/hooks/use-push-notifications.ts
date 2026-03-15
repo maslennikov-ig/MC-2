@@ -26,7 +26,7 @@ function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
   }
 
   // Return the underlying ArrayBuffer for type compatibility
-  return outputArray.buffer as ArrayBuffer
+  return outputArray.buffer
 }
 
 export type NotificationPermission = 'default' | 'granted' | 'denied'
@@ -127,6 +127,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     }
 
     initializeState()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- checkExistingSubscription is defined below but stable (useCallback with [])
   }, [])
 
   /**

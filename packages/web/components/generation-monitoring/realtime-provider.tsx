@@ -386,7 +386,7 @@ export function GenerationRealtimeProvider({
         }
       }
     }
-  }, [courseId, supabase, isLoading, session])
+  }, [courseId, supabase, isLoading, session, fetchTraces])
 
   // Lazy load full trace data for a specific trace (on-demand when user clicks node)
   const fetchTraceDetails = useCallback(

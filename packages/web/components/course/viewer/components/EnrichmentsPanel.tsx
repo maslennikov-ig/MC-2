@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import { toast } from 'sonner'
 import { FileText, AlertTriangle } from 'lucide-react'
@@ -129,16 +129,17 @@ export function EnrichmentsPanel({
 }: EnrichmentsPanelProps) {
   const t = useTranslations('enrichments')
   const locale = useLocale()
-  const safeEnrichments = enrichments ?? []
+  const safeEnrichments = useMemo(() => enrichments ?? [], [enrichments])
   const [activeEnrichmentId, setActiveEnrichmentId] = useState<string | null>(null)
   const completedToastsRef = useRef<Set<string>>(new Set())
   const toastTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   // Cleanup toast dedup timers on unmount
   useEffect(() => {
+    const timers = toastTimersRef
     return () => {
-      toastTimersRef.current.forEach((timer) => clearTimeout(timer))
-      toastTimersRef.current.clear()
+      timers.current.forEach((timer) => clearTimeout(timer))
+      timers.current.clear()
     }
   }, [])
 
@@ -237,7 +238,7 @@ export function EnrichmentsPanel({
         clearRecentlyCompleted(type)
       }
     })
-  }, [enrichments, isRecentlyCompleted, clearRecentlyCompleted])
+  }, [safeEnrichments, isRecentlyCompleted, clearRecentlyCompleted])
 
   // Filter out cover type - it's displayed as hero banner in lesson content
   const filteredEnrichments = safeEnrichments.filter(

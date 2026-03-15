@@ -77,6 +77,7 @@ export function InfographicViewer({ content }: InfographicViewerProps) {
         }}
         aria-label={t('viewer.infographic.open')}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element -- user content with unknown dimensions */}
         <img
           src={content.imageUrl}
           alt={content.altText ?? t('viewer.infographic.defaultAlt')}
@@ -150,6 +151,7 @@ export function InfographicViewer({ content }: InfographicViewerProps) {
             className="flex flex-1 items-start justify-center overflow-auto p-4"
             style={{ touchAction: 'none' }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element -- user content with unknown dimensions */}
             <img
               src={content.imageUrl}
               alt={content.altText ?? t('viewer.infographic.defaultAlt')}

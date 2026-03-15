@@ -198,6 +198,7 @@ export function PrioritizationView({
     }
 
     void fetchDocuments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
   }, [courseId])
 
   // Execute the actual priority change (after confirmation if needed)

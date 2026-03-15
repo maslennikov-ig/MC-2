@@ -9,7 +9,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -65,7 +65,7 @@ export function ModelSelector({ value, onValueChange, label, placeholder }: Mode
   // tRPC query for OpenRouter models
   const { data: modelsData, isLoading } = trpc.pipelineAdmin.listOpenRouterModels.useQuery()
 
-  const models: OpenRouterModel[] = modelsData?.models ?? []
+  const models: OpenRouterModel[] = useMemo(() => modelsData?.models ?? [], [modelsData?.models])
 
   // Apply filters
   const [filteredModels, setFilteredModels] = useState<OpenRouterModel[]>([])

@@ -115,6 +115,7 @@ export default function Stage5ChatDebugPage() {
         setTheme(prevThemeRef.current)
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only effect: force light theme once, restore on unmount
   }, [])
 
   if (!isMounted) {

@@ -327,7 +327,7 @@ export function useAutoCard({
         pollingTimeoutRef.current = null
       }
     }
-  }, [enabled, card?.status, card?.id, scheduleNextPoll])
+  }, [enabled, card, scheduleNextPoll])
 
   return {
     card,

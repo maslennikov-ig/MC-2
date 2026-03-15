@@ -397,16 +397,20 @@ export function MarkdownRendererFull({
       )
     },
 
-    // Image with lazy loading
-    img: ({ src, alt, title }) => (
-      <img
-        src={src}
-        alt={alt || ''}
-        title={title}
-        loading="lazy"
-        className="h-auto max-w-full rounded-lg"
-      />
-    ),
+    // Image with lazy loading (next/image not usable in react-markdown custom components)
+    img: ({ src, alt, title }) => {
+      /* eslint-disable @next/next/no-img-element */
+      return (
+        <img
+          src={src}
+          alt={alt || ''}
+          title={title}
+          loading="lazy"
+          className="h-auto max-w-full rounded-lg"
+        />
+      )
+      /* eslint-enable @next/next/no-img-element */
+    },
 
     // Horizontal rule
     hr: () => <hr className="border-border my-8" />,
