@@ -114,7 +114,7 @@ async function handleGetCourse(
           courseSlug,
           errorCode: 'FETCH_ERROR',
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
       return NextResponse.json({ error: 'Failed to fetch course' }, { status: 500 })
     }
 
@@ -138,7 +138,7 @@ async function handleGetCourse(
         courseSlug,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -163,7 +163,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseSlug,
         errorCode: 'NOT_FOUND_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
     return NextResponse.json({ error: 'Course not found' }, { status: 404 })
   }
 
@@ -238,7 +238,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           courseId: id,
           errorCode: rpcError.code,
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
       return NextResponse.json(
         {
           error: 'Failed to delete course',
@@ -279,7 +279,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseSlug,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
     return NextResponse.json(
       {
         error: 'Internal server error',
@@ -378,7 +378,7 @@ async function handleUpdateCourse(request: NextRequest, user: AuthUser, { params
           courseId: id,
           errorCode: 'UPDATE_ERROR',
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
       return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
     }
 
@@ -398,7 +398,7 @@ async function handleUpdateCourse(request: NextRequest, user: AuthUser, { params
         courseSlug,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

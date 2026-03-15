@@ -9,6 +9,7 @@ import {
 import { TRPCClientError } from '@trpc/client'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { createClient } from '@/lib/supabase/server'
+import { logger } from "@/lib/logger";
 
 /**
  * HTTP status code to user-friendly error message mapping.
@@ -54,7 +55,7 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
   } = await supabase.auth.getUser()
 
   if (!user) {
-    console.warn('[getChatTokenEstimates] No authenticated user')
+    logger.warn('[getChatTokenEstimates] No authenticated user')
     return null
   }
 
@@ -66,17 +67,17 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
     .single()
 
   if (courseError || !course) {
-    console.warn('[getChatTokenEstimates] Course not found or access denied', { courseId })
+    logger.warn('[getChatTokenEstimates] Course not found or access denied', { data: { courseId } })
     return null
   }
 
   // Check ownership (user owns course)
   if (course.user_id !== user.id) {
-    console.warn('[getChatTokenEstimates] User does not own course', {
-      userId: user.id,
-      courseId,
-      courseOwner: course.user_id,
-    })
+    logger.warn('[getChatTokenEstimates] User does not own course', { data: {
+                  userId: user.id,
+                  courseId,
+                  courseOwner: course.user_id,
+                } })
     return null
   }
 
@@ -85,7 +86,7 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
     const result = await client.generation.getChatTokenEstimates.query({ courseId })
     return (result ?? null) as TokenEstimates | null
   } catch (error) {
-    console.warn('[getChatTokenEstimates] Failed to fetch:', error)
+    logger.warn('[getChatTokenEstimates] Failed to fetch:', { data: error })
     return null
   }
 }
@@ -113,7 +114,7 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
     const parseResult = chatResponseSchema.safeParse(result)
 
     if (!parseResult.success) {
-      console.error('[sendChatMessage] Response validation failed:', parseResult.error.issues)
+      logger.error('[sendChatMessage] Response validation failed:', { data: parseResult.error.issues })
       throw new Error('Received invalid response from server. Please try again.')
     }
 
@@ -237,7 +238,7 @@ export async function fetchCourseStructure(courseId: string): Promise<{
   } = await supabase.auth.getUser()
 
   if (!user) {
-    console.warn('[fetchCourseStructure] No authenticated user')
+    logger.warn('[fetchCourseStructure] No authenticated user')
     return null
   }
 
@@ -249,17 +250,17 @@ export async function fetchCourseStructure(courseId: string): Promise<{
     .single()
 
   if (courseError || !course) {
-    console.warn('[fetchCourseStructure] Course not found', { courseId })
+    logger.warn('[fetchCourseStructure] Course not found', { data: { courseId } })
     return null
   }
 
   // Check ownership (user owns course)
   if (course.user_id !== user.id) {
-    console.warn('[fetchCourseStructure] User does not own course', {
-      userId: user.id,
-      courseId,
-      courseOwner: course.user_id,
-    })
+    logger.warn('[fetchCourseStructure] User does not own course', { data: {
+                  userId: user.id,
+                  courseId,
+                  courseOwner: course.user_id,
+                } })
     return null
   }
 
@@ -295,7 +296,7 @@ export async function fetchCourseStructureAdmin(courseId: string): Promise<{
     .single()
 
   if (courseError || !course) {
-    console.warn('[fetchCourseStructureAdmin] Course not found', { courseId })
+    logger.warn('[fetchCourseStructureAdmin] Course not found', { data: { courseId } })
     return null
   }
 

@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
 import { getAdminClient } from '@/lib/supabase/client-factory'
+import { logger } from "@/lib/logger";
 
 // Using nodejs runtime because shared-logger is not edge-compatible
 export const runtime = 'nodejs'
@@ -332,7 +333,7 @@ export async function GET(
       }
     )
   } catch (error) {
-    console.error('Error generating OG image:', error)
+    logger.error('Error generating OG image:', { data: error })
     // Return fallback image instead of error
     return generateFallbackImage()
   }
