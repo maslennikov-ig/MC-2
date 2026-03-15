@@ -146,7 +146,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           filesDeleted: cleanupResult.filesDeleted,
           errors: cleanupResult.errors,
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
     } else {
       logger.info('Course cleanup completed successfully', {
         courseId: id,
@@ -166,7 +166,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
       severity: 'WARNING',
       job_type: 'COURSE_CLEANUP',
       metadata: { courseId: id },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
   }
 
   // Step 2: Atomic database deletion via RPC
@@ -195,7 +195,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
           courseId: id,
           errorCode: rpcError.code,
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
       return NextResponse.json(
         {
@@ -237,7 +237,7 @@ async function handleDeleteCourse(_request: NextRequest, user: AuthUser, { param
         courseId: id,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
     return NextResponse.json(
       {

@@ -2,6 +2,7 @@
 
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { wrapError } from '@/lib/trpc/action-error'
+import { logger } from "@/lib/logger";
 
 // ============================================================================
 // Types (matching backend types)
@@ -160,7 +161,7 @@ export async function listLogsAction(params: ListLogsParams): Promise<LogListRes
     const result = await client.admin.logs.list.query(queryInput)
     return result as LogListResponse
   } catch (error) {
-    console.error('List Logs Server Action Error:', error)
+    logger.error('List Logs Server Action Error:', { data: error })
     throw wrapError(error, 'load logs')
   }
 }
@@ -177,7 +178,7 @@ export async function getLogByIdAction(params: {
     const result = await client.admin.logs.getById.query(params)
     return result as LogDetails
   } catch (error) {
-    console.error('Get Log By ID Server Action Error:', error)
+    logger.error('Get Log By ID Server Action Error:', { data: error })
     throw wrapError(error, 'load log details')
   }
 }
@@ -193,7 +194,7 @@ export async function updateLogStatusAction(
     const result = await client.admin.logs.updateStatus.mutate(params)
     return result as { success: boolean }
   } catch (error) {
-    console.error('Update Log Status Server Action Error:', error)
+    logger.error('Update Log Status Server Action Error:', { data: error })
     throw wrapError(error, 'update log status')
   }
 }
@@ -209,7 +210,7 @@ export async function bulkUpdateLogStatusAction(
     const result = await client.admin.logs.bulkUpdateStatus.mutate(params)
     return result as { success: boolean; updatedCount: number }
   } catch (error) {
-    console.error('Bulk Update Log Status Server Action Error:', error)
+    logger.error('Bulk Update Log Status Server Action Error:', { data: error })
     throw wrapError(error, 'update log statuses')
   }
 }
@@ -238,7 +239,7 @@ export async function listGroupedLogsAction(
     const result = await client.admin.logs.listGrouped.query(queryInput)
     return result as GroupedLogListResponse
   } catch (error) {
-    console.error('List Grouped Logs Server Action Error:', error)
+    logger.error('List Grouped Logs Server Action Error:', { data: error })
     throw wrapError(error, 'load grouped logs')
   }
 }
@@ -258,7 +259,7 @@ export async function getGroupLogsAction(params: GetGroupLogsParams): Promise<Lo
     const result = await client.admin.logs.getGroupLogs.query(queryInput)
     return result as LogListResponse
   } catch (error) {
-    console.error('Get Group Logs Server Action Error:', error)
+    logger.error('Get Group Logs Server Action Error:', { data: error })
     throw wrapError(error, 'load group logs')
   }
 }
@@ -274,7 +275,7 @@ export async function updateGroupStatusAction(
     const result = await client.admin.logs.updateGroupStatus.mutate(params)
     return result as { success: boolean; updatedCount: number }
   } catch (error) {
-    console.error('Update Group Status Server Action Error:', error)
+    logger.error('Update Group Status Server Action Error:', { data: error })
     throw wrapError(error, 'update group status')
   }
 }

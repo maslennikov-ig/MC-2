@@ -167,7 +167,7 @@ export async function GET(
           requestId,
           invitationType: undefined, // List operation - no specific type
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to fetch invitations', requestId },
         { status: 500 }
@@ -241,7 +241,7 @@ export async function GET(
         requestId,
         invitationType: undefined, // List operation - no specific type
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },
@@ -358,7 +358,7 @@ export async function POST(
           requestId,
           invitationType,
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
       return NextResponse.json(
         { error: 'Database error', message: 'Failed to create invitation', requestId },
         { status: 500 }
@@ -426,7 +426,7 @@ export async function POST(
         requestId,
         invitationType: undefined, // Not available in catch block
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
     return NextResponse.json(
       { error: 'Internal server error', message: 'An unexpected error occurred', requestId },

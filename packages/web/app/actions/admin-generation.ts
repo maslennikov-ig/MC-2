@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { toActionError } from '@/lib/trpc/action-error'
 import { ENV } from '@/lib/env'
+import { logger } from "@/lib/logger";
 
 export async function triggerStage6ForLesson(lessonId: string) {
   try {
@@ -184,7 +185,7 @@ export async function cancelGeneration(courseId: string) {
     await client.generation.cancelGeneration.mutate({ courseId })
   } catch (backendError) {
     // Log but don't fail - status already updated
-    console.error('Failed to call backend cancel:', backendError)
+    logger.error('Failed to call backend cancel:', { data: backendError })
   }
 
   revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')

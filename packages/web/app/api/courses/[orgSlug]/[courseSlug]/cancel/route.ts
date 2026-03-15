@@ -141,7 +141,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
           orgSlug,
           courseSlug,
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
       return NextResponse.json({ error: 'Failed to cancel course generation' }, { status: 500 })
     }
@@ -234,7 +234,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
         courseSlug,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
     return NextResponse.json(
       { error: 'An unexpected error occurred while cancelling the course' },
@@ -326,7 +326,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
         courseSlug,
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
     return NextResponse.json({ error: 'Failed to check cancel status' }, { status: 500 })
   }

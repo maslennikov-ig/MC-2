@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
           route: '/api/auth/login',
           errorCode: 'CONFIG_ERROR',
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
       return NextResponse.json({ error: 'Authentication service unavailable' }, { status: 503 })
     }
 
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
           errorCode: 'LOGIN_ERROR',
           authErrorCode: error.code,
         },
-      }).catch((e) => console.error('Log write failed:', e.message))
+      }).catch((e) => logger.error('Log write failed:', { data: e.message }))
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
         route: '/api/auth/login',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

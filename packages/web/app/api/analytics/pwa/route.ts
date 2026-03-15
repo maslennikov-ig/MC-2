@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import type { Json } from '@/types/database.generated'
+import { logger } from "@/lib/logger";
 
 const eventSchema = z.object({
   eventType: z.enum([
@@ -49,13 +50,13 @@ export async function POST(req: NextRequest) {
     })
 
     if (error) {
-      console.error('[PWA Analytics] Insert error:', error)
+      logger.error('[PWA Analytics] Insert error:', { data: error })
       return NextResponse.json({ error: 'Failed to track event' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[PWA Analytics] Error:', error)
+    logger.error('[PWA Analytics] Error:', { data: error })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -139,7 +140,7 @@ export async function GET() {
       breakdown,
     })
   } catch (error) {
-    console.error('[PWA Analytics] GET error:', error)
+    logger.error('[PWA Analytics] GET error:', { data: error })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

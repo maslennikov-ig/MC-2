@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { encoding_for_model } from 'tiktoken';
+import { logger } from '@megacampus/shared-logger';
 
 // Helper interfaces for Zod internals to avoid 'any'
 interface ZodCheck {
@@ -224,7 +225,7 @@ export function estimateSchemaTokens(schemaText: string): number {
     return tokens.length;
   } catch {
     // Fallback to character-based estimation (4 chars ≈ 1 token)
-    console.warn('[estimateSchemaTokens] Tiktoken encoding failed, using fallback estimation');
+    logger.warn('[estimateSchemaTokens] Tiktoken encoding failed, using fallback estimation');
     return Math.ceil(schemaText.length / 4);
   }
 }
