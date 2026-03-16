@@ -2,6 +2,57 @@
 
 _Released on 2025-12-26_
 
+## v0.31.20
+
+_Released on 2026-03-16_
+
+### ✨ New Features
+
+- **stage6**: Add centralized sanitizeContent at DB write layer
+
+### 🔧 Improvements
+
+- **course-gen-platform**: Split 4 files >800 lines into extracted modules (Batch 1)
+- **course-gen-platform**: Split large files to reduce max-lines warnings
+- **course-gen-platform**: Split notebooklm-bridge-client.ts to fix max-lines
+- **course-gen-platform**: Split model-config-bunker.ts to fix max-lines
+- **course-gen-platform**: Split phase-0.5-clarifying.ts to fix max-lines
+- **course-gen-platform**: Split generation-phases.ts to fix max-lines
+- **course-gen-platform**: Split stage6-prompts.ts into individual files
+- Replace console logs with structured logger in web and shared-utils
+- **course-gen-platform**: Replace console logs with structured logger
+- **stage6**: Replace LO-code IDs with numbered format in prompts
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Add barrel index.ts files for split modules
+- **CI/CD**: Fix PostCSS config and mermaid regex breaking CI pipeline
+- **pipeline**: Fix error message propagation + monitoring blind spots
+- **web**: Fix remaining 18 ESLint warnings (no-img-element, alt-text, unused-disable)
+- **web**: Resolve all @typescript-eslint/no-explicit-any warnings (final retry)
+- **web**: Use imported tailwindcss plugin in postcss.config.mjs for Vite 7 compat
+- **web**: Handle /sse endpoint in Docling health check URL derivation
+- **infra**: Prevent Docling proxy DNS caching + add auto-mute rule
+- **worker**: Capture uncaught exceptions in sandbox processor for 9MB DOCX crash
+- **web**: Normalize course status for i18n translation keys
+- **stage1**: Handle QuotaExceededError before duck-type checks in orchestrator
+- **tests**: Fix basic_plus tier enum and PGRST116 handling in quota-enforcer
+- **tests**: Reset Redis concurrency counters in contract generation tests
+- **tests**: Fix multiple test failures across integration, e2e, and contract suites
+- **logger**: Add auto-mute pattern for Mermaid render-invalid warnings
+- **worker**: Preserve error message/stack in BullMQ sandbox serialization
+- **worker**: Add safety net for stuck courses on sandbox crash
+- **CI/CD**: Resolve test timeouts and hanging process issues
+- **web**: Fix PostCSS config and shared-utils barrel import breaking build
+- **shared-logger**: Replace tsup --dts with tsc --emitDeclarationOnly
+- **stage6**: Prevent LO_CODE_PATTERN from consuming newlines
+- **stage6**: Strip LO-code references leaking into lesson content
+- **stage6**: Strip LLM metadata leaking into lesson content
+
+---
+
+_This release was automatically generated from 38 commits._
+
 ## v0.31.19
 
 _Released on 2026-03-11_
