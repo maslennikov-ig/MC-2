@@ -216,7 +216,12 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
   const startTime = Date.now()
   const lastCheck = new Date().toISOString()
 
-  const mcpUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp'
+  // DOCLING_MCP_URL may contain a stale /sse path from env files,
+  // but the server uses streamable-http transport which listens on /mcp.
+  // Extract base URL and always use /mcp for health checks.
+  const rawUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp'
+  const baseUrl = rawUrl.replace(/\/(mcp|sse)\/?$/, '')
+  const mcpUrl = `${baseUrl}/mcp`
   const fallbackMcpUrl = 'http://localhost:8000/mcp'
 
   // Always test the actual MCP endpoint (not just nginx /health which returns 200 without proxying)
@@ -802,7 +807,11 @@ async function checkStuckCourses(): Promise<ServiceStatus> {
     const { data, error } = await supabase
       .from('courses')
       .select('generation_code, generation_status')
-      .not('generation_status', 'in', '("pending","completed","failed","cancelled")')
+      .not(
+        'generation_status',
+        'in',
+        '("pending","completed","failed","cancelled","stage_2_awaiting_approval","stage_3_awaiting_approval","stage_4_awaiting_approval","stage_5_awaiting_approval")'
+      )
       .lt('last_progress_update', twoHoursAgo)
 
     const responseTime = Date.now() - startTime
