@@ -2,6 +2,20 @@
 
 _Released on 2025-12-26_
 
+## v0.31.21
+
+_Released on 2026-03-16_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 11 source file(s)
+- **stage5**: Make lesson materialization idempotent
+- **stage6**: Tighten MERMAID_SYNTAX_PATTERNS to reduce false positives
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.31.20
 
 _Released on 2026-03-16_
