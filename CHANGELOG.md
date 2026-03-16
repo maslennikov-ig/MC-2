@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.21] - 2026-03-16
+
+### Fixed
+
+- **course-gen-platform**: update 11 source file(s) (7050c721)
+- **stage5**: make lesson materialization idempotent (c921511b)
+- **stage6**: tighten MERMAID_SYNTAX_PATTERNS to reduce false positives (bac9096b)
+
 ## [0.31.20] - 2026-03-16
 
 ### Added
