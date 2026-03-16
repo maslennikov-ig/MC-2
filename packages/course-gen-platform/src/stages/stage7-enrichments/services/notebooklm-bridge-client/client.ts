@@ -52,6 +52,7 @@ export class NotebookLMBridgeClient {
       script: request.script,
       language: request.language,
       course_id: request.courseId,
+      lesson_id: request.lessonId,
       voice: request.voice,
       target_duration_minutes: request.targetDurationMinutes,
       duration_range_min_minutes: request.durationRangeMinMinutes,
