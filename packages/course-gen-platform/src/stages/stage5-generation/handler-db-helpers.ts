@@ -189,6 +189,22 @@ export async function materializeSectionsAndLessons(
   let materializedSections = 0;
   let materializedLessons = 0;
 
+  // Idempotency: clear existing sections (and cascading lessons) before inserting the new structure
+  // This prevents duplicating lessons if Stage 5 is re-run (e.g. on retry or regeneration)
+  const { error: deleteError } = await supabaseAdmin
+    .from('sections')
+    .delete()
+    .eq('course_id', courseId);
+
+  if (deleteError) {
+    jobLogger.warn(
+      { courseId, error: deleteError.message },
+      'Failed to clean up existing sections before materialization. Duplicate constraint errors may occur.'
+    );
+  } else {
+    jobLogger.info({ courseId }, 'Cleared existing sections for idempotency');
+  }
+
   // Build section insert payloads
   const sectionPayloads: SectionPayload[] = sanitizedStructure.sections.map(
     (section, sectionIndex) => ({
