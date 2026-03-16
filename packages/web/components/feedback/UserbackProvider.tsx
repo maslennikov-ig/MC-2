@@ -55,6 +55,7 @@ export function UserbackProvider() {
       ubRef.current?.destroy()
       ubRef.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- session?.user object is unstable; using session?.user?.id for stable identity tracking
   }, [session?.user?.id, locale])
 
   useEffect(() => {

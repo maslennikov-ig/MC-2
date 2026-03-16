@@ -406,6 +406,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
   }, [courseId, parsedInputData, locale, retryCount])
 
   // Retry handler

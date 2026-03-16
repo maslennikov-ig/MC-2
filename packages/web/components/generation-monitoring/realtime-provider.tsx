@@ -356,11 +356,11 @@ export function GenerationRealtimeProvider({
       )
       .subscribe((status) => {
         logger.debug('Subscription status', { status })
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison -- Supabase Realtime status is string literal
+         
         if (status === 'SUBSCRIBED') {
           setIsConnected(true)
           logger.debug('Successfully subscribed to realtime channel')
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison -- Supabase Realtime status is string literal
+           
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           setIsConnected(false)
           // Note: CLOSED is normal during React Strict Mode double-invoke in development
@@ -386,7 +386,7 @@ export function GenerationRealtimeProvider({
         }
       }
     }
-  }, [courseId, supabase, isLoading, session])
+  }, [courseId, supabase, isLoading, session, fetchTraces])
 
   // Lazy load full trace data for a specific trace (on-demand when user clicks node)
   const fetchTraceDetails = useCallback(

@@ -8,7 +8,7 @@
  */
 
 import { Job } from 'bullmq';
-import { JobData, JobType, Database } from '@megacampus/shared-types';
+import { JobData, JobType, Database, type Json } from '@megacampus/shared-types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Logger } from 'pino';
 import logger from '../../shared/logger';
@@ -581,16 +581,29 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
       // Get localized message for this step and status
       const message = t(`steps.${stepId}.${status}`);
 
+      // Extract error fields to pass as separate RPC params (not buried in metadata)
+      const errorMsg = metadata?.error_message as string | undefined;
+      const errorDetails = metadata?.error_details as Record<string, unknown> | string | undefined;
+      const { error_message: _em, error_details: _ed, ...restMetadata } = metadata ?? {};
+
       await supabase.rpc('update_course_progress', {
         p_course_id: courseId,
         p_step_id: stepId,
         p_status: status,
         p_message: message,
+        ...(errorMsg ? { p_error_message: errorMsg } : {}),
+        ...(errorDetails
+          ? {
+              p_error_details: (typeof errorDetails === 'string'
+                ? { detail: errorDetails }
+                : errorDetails) as Json,
+            }
+          : {}),
         p_metadata: {
           job_id: jobId,
           worker_type: this.jobType,
-          ...metadata,
-        },
+          ...restMetadata,
+        } as Json,
       });
 
       jobLogger.debug({ courseId, stepId, status }, 'Course progress updated');

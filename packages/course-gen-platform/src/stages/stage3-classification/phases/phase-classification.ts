@@ -4,143 +4,40 @@
  * Classifies uploaded documents by importance for Stage 2 processing.
  * Classification determines token budget allocation in Stage 3.
  *
- * Classification criteria:
- * - HIGH priority (importance_score >= 0.7):
- *   - Primary course material (textbooks, syllabi, main lectures)
- *   - Critical reference documents
- *   - Regulatory/compliance documents
- * - LOW priority (importance_score < 0.7):
- *   - Supplementary presentations
- *   - Additional notes
- *   - Optional references
- *
  * @module stages/stage2-document-processing/phases/phase-classification
  */
 
-import { z } from 'zod';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { createOpenRouterModel } from '../../../shared/llm/langchain-models';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
-import {
-  type DocumentPriority,
-  DocumentPriorityLevelSchema,
-  getPriorityLevel,
-} from '@megacampus/shared-types';
-import { tokenEstimator } from '../../../shared/llm/token-estimator';
+import { type DocumentPriority, getPriorityLevel } from '@megacampus/shared-types';
 import {
   planTournamentClassification,
   executeTournamentClassification,
   type DocumentForClassification,
 } from '../utils/tournament-classification';
-import { createPromptService } from '../../../shared/prompts/prompt-service';
-import { createModelConfigService } from '../../../shared/llm/model-config-service';
 import { cache as redisCache } from '../../../shared/cache/redis';
 import { createHash } from 'crypto';
-import { formatFileSize } from '@megacampus/shared-utils';
 import {
-  getCachedFileProcessedContent,
-  getCachedFileMarkdown,
-} from '../../../shared/cache/file-content-cache';
+  type ClassificationResponse,
+  type ComparativeClassificationResponse,
+  CLASSIFICATION_INPUT_BUDGET,
+  DOC_CLASS_CACHE_TTL,
+  DOC_CLASS_CACHE_PREFIX,
+  DOC_CLASS_CACHE_VERSION,
+} from './classification-types';
+import {
+  fetchFileMetadata,
+  fetchCourseContext,
+  classifyDocument,
+  classifyDocumentsComparatively,
+  storeClassificationResults,
+} from './classification-helpers';
+
+// Re-export types for external consumers
+export type { ClassificationInput } from './classification-types';
 
 // ============================================================================
-// LLM Response Schema
-// ============================================================================
-
-/**
- * Schema for LLM classification response (per document)
- */
-const ClassificationResponseSchema = z.object({
-  importance_score: z
-    .number()
-    .min(0.0)
-    .max(1.0)
-    .describe('Importance score from 0.0 to 1.0. HIGH threshold: >= 0.7'),
-  classification_rationale: z
-    .string()
-    .min(10)
-    .describe('Reasoning for the classification decision'),
-});
-
-type ClassificationResponse = z.infer<typeof ClassificationResponseSchema>;
-
-/**
- * Schema for single document in comparative classification
- */
-const ComparativeDocumentClassificationSchema = z.object({
-  id: z.string().uuid().describe('Document UUID from database'),
-  priority: DocumentPriorityLevelSchema.describe(
-    'Priority level: CORE (exactly 1), IMPORTANT (up to 30%), or SUPPLEMENTARY (remaining)'
-  ),
-  rationale: z
-    .string()
-    .min(10)
-    .describe('Brief explanation of why this document received this priority level'),
-});
-
-/**
- * Schema for comparative classification response from LLM
- */
-const ComparativeClassificationResponseSchema = z.object({
-  classifications: z
-    .array(ComparativeDocumentClassificationSchema)
-    .min(1)
-    .describe('Classification results for all documents'),
-});
-
-type ComparativeClassificationResponse = z.infer<typeof ComparativeClassificationResponseSchema>;
-
-// ============================================================================
-// Input Types
-// ============================================================================
-
-/**
- * File metadata for classification
- */
-interface FileMetadata {
-  id: string;
-  filename: string;
-  /** AI-generated meaningful title from Phase 6 summarization */
-  generated_title: string | null;
-  /** User-provided original filename at upload */
-  original_name: string | null;
-  mime_type: string;
-  file_size: number;
-  content_preview: string;
-  summary_tokens: number;
-}
-
-/**
- * Input for document classification phase
- */
-export interface ClassificationInput {
-  courseId: string;
-  fileIds: string[];
-  organizationId: string;
-  courseTitle?: string;
-  courseDescription?: string;
-}
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/**
- * Classification input token budget
- * If all document summaries exceed this budget, use two-stage tournament classification
- */
-const CLASSIFICATION_INPUT_BUDGET = 100_000; // tokens
-
-/**
- * Redis cache configuration for document classification
- */
-/** TTL for document classification cache. Override via DOC_CLASS_CACHE_TTL env var. */
-const DOC_CLASS_CACHE_TTL = parseInt(process.env.DOC_CLASS_CACHE_TTL || String(86400 * 7), 10); // default: 7 days
-const DOC_CLASS_CACHE_PREFIX = 'doc_class';
-const DOC_CLASS_CACHE_VERSION = 'v1';
-
-// ============================================================================
-// Helper Functions - Cache Key Builder
+// Cache Key Builder
 // ============================================================================
 
 /**
@@ -151,12 +48,6 @@ const DOC_CLASS_CACHE_VERSION = 'v1';
  * - Course context (title + description)
  *
  * Uses SHA-256 hash truncated to 16 hex chars (64 bits of entropy).
- * Birthday paradox: ~4 billion keys for 50% collision probability — safe for cache.
- *
- * @param courseId - Course UUID
- * @param fileIds - Array of file UUIDs
- * @param courseContext - Course title and description
- * @returns Cache key string
  */
 function buildDocClassCacheKey(
   courseId: string,
@@ -173,49 +64,16 @@ function buildDocClassCacheKey(
 }
 
 // ============================================================================
-// Helper Functions - Model Configuration
-// ============================================================================
-
-/**
- * Get model configuration for classification from database
- * Falls back to hardcoded values if database unavailable
- */
-async function getClassificationModelConfig() {
-  const modelConfigService = createModelConfigService();
-  const config = await modelConfigService.getModelForPhase('stage_3_classification');
-  return {
-    modelId: config.modelId,
-    temperature: config.temperature,
-    maxTokens: config.maxTokens,
-  };
-}
-
-// ============================================================================
 // Main Functions
 // ============================================================================
 
 /**
  * Execute document classification phase using COMPARATIVE classification
  *
- * NEW APPROACH: Makes a SINGLE LLM call with ALL documents for comparative ranking.
- * This ensures proper distribution of priority levels:
+ * Makes a SINGLE LLM call with ALL documents for comparative ranking:
  * - Exactly 1 CORE document (most important)
  * - Up to 30% IMPORTANT documents
  * - Remaining SUPPLEMENTARY documents
- *
- * @param courseId - Course UUID
- * @param fileIds - Array of file UUIDs to classify
- * @param organizationId - Organization UUID
- * @returns Array of DocumentPriority results
- *
- * @example
- * ```typescript
- * const priorities = await executeDocumentClassificationComparative(
- *   'course-uuid',
- *   ['file1-uuid', 'file2-uuid'],
- *   'org-uuid'
- * );
- * ```
  */
 export async function executeDocumentClassificationComparative(
   courseId: string,
@@ -308,8 +166,6 @@ export async function executeDocumentClassificationComparative(
         'Using two-stage tournament classification (summaries exceed budget)'
       );
 
-      // Convert FileMetadata to DocumentForClassification
-      // Include generated_title and original_name for meaningful document references
       const documents: DocumentForClassification[] = fileMetadataList.map(f => ({
         id: f.id,
         filename: f.filename,
@@ -321,10 +177,7 @@ export async function executeDocumentClassificationComparative(
         summaryTokens: f.summary_tokens,
       }));
 
-      // Plan tournament
       const plan = planTournamentClassification(documents, CLASSIFICATION_INPUT_BUDGET);
-
-      // Execute tournament
       comparativeResults = await executeTournamentClassification(plan, courseContext);
     } else {
       logger.debug(
@@ -349,34 +202,31 @@ export async function executeDocumentClassificationComparative(
   const now = new Date();
   const documentPriorities: DocumentPriority[] = [];
 
-  // Map comparative priority levels to importance scores
   for (let i = 0; i < comparativeResults.classifications.length; i++) {
     const classification = comparativeResults.classifications[i];
 
-    // Convert DocumentPriorityLevel to importance_score and PriorityLevel
     let importanceScore: number;
 
     switch (classification.priority) {
       case 'CORE':
-        importanceScore = 0.95; // Very high score
+        importanceScore = 0.95;
         break;
       case 'IMPORTANT':
-        importanceScore = 0.75; // Above HIGH threshold (0.7)
+        importanceScore = 0.75;
         break;
       case 'SUPPLEMENTARY':
-        importanceScore = 0.5; // Below HIGH threshold
+        importanceScore = 0.5;
         break;
       default:
-        // This should never happen due to Zod validation
         throw new Error(`Unknown priority level: ${classification.priority as string}`);
     }
 
     documentPriorities.push({
       file_id: classification.id,
       priority: getPriorityLevel(importanceScore),
-      priority_level: classification.priority, // CORE | IMPORTANT | SUPPLEMENTARY
+      priority_level: classification.priority,
       importance_score: importanceScore,
-      order: i + 1, // Already ranked by LLM
+      order: i + 1,
       classification_rationale: `[Comparative] ${classification.rationale}`,
       classified_at: now,
     });
@@ -410,20 +260,6 @@ export async function executeDocumentClassificationComparative(
  *
  * OLD APPROACH: Classifies each document INDEPENDENTLY in a loop.
  * This is kept as a fallback if comparative classification fails.
- *
- * @param courseId - Course UUID
- * @param fileIds - Array of file UUIDs to classify
- * @param organizationId - Organization UUID
- * @returns Array of DocumentPriority results
- *
- * @example
- * ```typescript
- * const priorities = await executeDocumentClassification(
- *   'course-uuid',
- *   ['file1-uuid', 'file2-uuid'],
- *   'org-uuid'
- * );
- * ```
  */
 export async function executeDocumentClassification(
   courseId: string,
@@ -516,8 +352,7 @@ export async function executeDocumentClassification(
     classified_at: now,
   }));
 
-  // Step 6: Store classifications (if document_priorities table exists)
-  // Note: This will be implemented when the table is created via migration
+  // Step 6: Store classifications
   await storeClassificationResults(supabase, courseId, documentPriorities);
 
   logger.info(
@@ -531,463 +366,6 @@ export async function executeDocumentClassification(
   );
 
   return documentPriorities;
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Fetch file metadata from database
- *
- * NEW: Uses processed_content (summary) instead of markdown_content
- * Falls back to markdown_content if processed_content is not available
- *
- * Also fetches generated_title and original_name for meaningful document references
- */
-async function fetchFileMetadata(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  fileIds: string[],
-  courseId: string
-): Promise<FileMetadata[]> {
-  if (fileIds.length === 0) return [];
-
-  // Step 1: Try Redis for content (processed_content preferred, fallback to markdown)
-  const contentMap = new Map<string, string>();
-  await Promise.all(
-    fileIds.map(async fid => {
-      const cached =
-        (await getCachedFileProcessedContent(courseId, fid)) ||
-        (await getCachedFileMarkdown(courseId, fid));
-      if (cached) contentMap.set(fid, cached);
-    })
-  );
-
-  const missedIds = fileIds.filter(id => !contentMap.has(id));
-
-  logger.debug(
-    {
-      courseId,
-      fileCount: fileIds.length,
-      cacheHits: contentMap.size,
-      cacheMisses: missedIds.length,
-    },
-    'Redis cache-aside check for file content'
-  );
-
-  // Step 2: Query Supabase for metadata (light query, no content columns)
-  const { data, error } = await supabase
-    .from('file_catalog')
-    .select('id, filename, generated_title, original_name, mime_type, file_size, summary_metadata')
-    .in('id', fileIds);
-
-  if (error) {
-    logger.error({ error, fileIds }, 'Failed to fetch file metadata');
-    throw new Error(`Failed to fetch file metadata: ${error.message}`);
-  }
-
-  if (!data || data.length === 0) {
-    return [];
-  }
-
-  // Step 3: For cache misses, batch-fetch content from Supabase
-  if (missedIds.length > 0) {
-    const { data: contentData, error: contentError } = await supabase
-      .from('file_catalog')
-      .select('id, processed_content, markdown_content')
-      .in('id', missedIds);
-    if (contentError) {
-      logger.warn(
-        { courseId, missedIds, error: contentError.message },
-        '[Stage3] Supabase fallback for file content failed — files will have empty content'
-      );
-    }
-    for (const d of contentData || []) {
-      const c = d.processed_content || d.markdown_content || '';
-      if (c) contentMap.set(d.id, c);
-    }
-  }
-
-  // Step 4: Build results
-  return data.map(file => {
-    const content = contentMap.get(file.id) || '';
-
-    // Get summary tokens from metadata, or estimate if not available
-    const metadata = file.summary_metadata as { summary_tokens?: number } | null;
-    const summaryTokens =
-      metadata?.summary_tokens || tokenEstimator.estimateTokens(content, detectLanguage(content));
-
-    logger.debug(
-      {
-        fileId: file.id,
-        hasContent: content.length > 0,
-        hasGeneratedTitle: !!file.generated_title,
-        summaryTokens,
-        contentLength: content.length,
-        cacheHit: contentMap.has(file.id),
-      },
-      'Loaded file for classification'
-    );
-
-    return {
-      id: file.id,
-      filename: file.filename,
-      generated_title: file.generated_title ?? null,
-      original_name: file.original_name ?? null,
-      mime_type: file.mime_type,
-      file_size: file.file_size,
-      content_preview: content,
-      summary_tokens: summaryTokens,
-    };
-  });
-}
-
-/**
- * Fetch course context for classification
- */
-async function fetchCourseContext(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  courseId: string
-): Promise<{ title: string; description: string }> {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('title, course_description')
-    .eq('id', courseId)
-    .single();
-
-  if (error) {
-    logger.warn({ error, courseId }, 'Failed to fetch course context');
-    return { title: '', description: '' };
-  }
-
-  return {
-    title: data?.title || '',
-    description: data?.course_description || '',
-  };
-}
-
-/**
- * Classify a single document using LLM
- */
-async function classifyDocument(
-  fileMeta: FileMetadata,
-  courseContext: { title: string; description: string }
-): Promise<ClassificationResponse> {
-  const modelConfig = await getClassificationModelConfig();
-  const model = createOpenRouterModel(
-    modelConfig.modelId,
-    modelConfig.temperature,
-    modelConfig.maxTokens
-  );
-
-  const [systemMsg, humanMsg] = await buildClassificationPrompt(fileMeta, courseContext);
-
-  const response = await model.invoke([systemMsg, humanMsg]);
-  const rawOutput = response.content as string;
-
-  // Parse JSON response
-  let parsed: unknown;
-  try {
-    // Handle potential markdown code block wrapping
-    const jsonStr = extractJsonFromResponse(rawOutput);
-    parsed = JSON.parse(jsonStr);
-  } catch (parseError) {
-    logger.error(
-      {
-        fileId: fileMeta.id,
-        rawOutput,
-        error: parseError instanceof Error ? parseError.message : String(parseError),
-      },
-      'Failed to parse LLM response as JSON'
-    );
-    throw new Error('Failed to parse classification response');
-  }
-
-  // Validate with Zod schema
-  const validated = ClassificationResponseSchema.parse(parsed);
-
-  return validated;
-}
-
-/**
- * Classify ALL documents in a single LLM call using comparative ranking
- *
- * Uses LangChain's withStructuredOutput for reliable JSON parsing
- */
-async function classifyDocumentsComparatively(
-  fileMetadataList: FileMetadata[],
-  courseContext: { title: string; description: string }
-): Promise<ComparativeClassificationResponse> {
-  const modelConfig = await getClassificationModelConfig();
-  const model = createOpenRouterModel(
-    modelConfig.modelId,
-    modelConfig.temperature,
-    modelConfig.maxTokens
-  );
-
-  // Use withStructuredOutput for structured JSON responses
-  const structuredModel = model.withStructuredOutput(ComparativeClassificationResponseSchema);
-
-  const [systemMsg, humanMsg] = await buildComparativeClassificationPrompt(
-    fileMetadataList,
-    courseContext
-  );
-
-  const response = await structuredModel.invoke([systemMsg, humanMsg]);
-
-  // Validate constraints
-  validateComparativeResults(response, fileMetadataList.length);
-
-  return response;
-}
-
-/**
- * Build comparative classification prompt for LLM
- */
-async function buildComparativeClassificationPrompt(
-  fileMetadataList: FileMetadata[],
-  courseContext: { title: string; description: string }
-): Promise<[SystemMessage, HumanMessage]> {
-  const maxImportant = Math.ceil(fileMetadataList.length * 0.3);
-  const promptService = createPromptService();
-
-  // Build document list with previews
-  // Use generated_title when available for meaningful document identification
-  const documentDescriptions = fileMetadataList
-    .map((file, index) => {
-      const hasGeneratedTitle = !!file.generated_title;
-      return `
-[Document ${index + 1}]
-ID: ${file.id}
-${hasGeneratedTitle ? `Title: ${file.generated_title}` : ''}
-Filename: ${file.original_name || file.filename}
-File Type: ${file.mime_type}
-File Size: ${formatFileSize(file.file_size)}
-Content Preview (first 1500 chars):
-${file.content_preview.substring(0, 1500)}${file.content_preview.length > 1500 ? '...[truncated]' : ''}
----`;
-    })
-    .join('\n');
-
-  // Load and render prompt from database (with hardcoded fallback)
-  const systemPromptText = await promptService.renderPrompt('stage3_classification_comparative', {
-    maxImportant: String(maxImportant),
-    totalDocuments: String(fileMetadataList.length),
-    courseTitle: courseContext.title || 'Not specified',
-    courseDescription: courseContext.description || 'Not specified',
-    documentDescriptions: documentDescriptions,
-  });
-
-  const systemMessage = new SystemMessage(systemPromptText);
-
-  const humanMessage =
-    new HumanMessage(`Classify ALL ${fileMetadataList.length} documents comparatively. Remember:
-- Exactly 1 CORE document
-- Maximum ${maxImportant} IMPORTANT documents
-- Remaining documents are SUPPLEMENTARY`);
-
-  return [systemMessage, humanMessage];
-}
-
-/**
- * Validate comparative classification results against constraints
- */
-function validateComparativeResults(
-  results: ComparativeClassificationResponse,
-  expectedCount: number
-): void {
-  const { classifications } = results;
-
-  // Check count matches
-  if (classifications.length !== expectedCount) {
-    throw new Error(`Expected ${expectedCount} classifications, got ${classifications.length}`);
-  }
-
-  // Count priority levels
-  const coreCount = classifications.filter(c => c.priority === 'CORE').length;
-  const importantCount = classifications.filter(c => c.priority === 'IMPORTANT').length;
-  const maxImportant = Math.ceil(expectedCount * 0.3);
-
-  // Validate constraints
-  if (coreCount !== 1) {
-    logger.warn(
-      { coreCount },
-      'Comparative classification returned incorrect CORE count (expected exactly 1)'
-    );
-    // Auto-fix: promote highest ranked to CORE
-    if (coreCount === 0 && classifications.length > 0) {
-      classifications[0].priority = 'CORE';
-      logger.info('Auto-fixed: promoted first document to CORE');
-    }
-  }
-
-  if (importantCount > maxImportant) {
-    logger.warn(
-      { importantCount, maxImportant },
-      'Comparative classification returned too many IMPORTANT documents'
-    );
-    // Auto-fix: demote excess to SUPPLEMENTARY
-    let demotedCount = 0;
-    for (
-      let i = 0;
-      i < classifications.length && demotedCount < importantCount - maxImportant;
-      i++
-    ) {
-      if (classifications[i].priority === 'IMPORTANT') {
-        classifications[i].priority = 'SUPPLEMENTARY';
-        demotedCount++;
-      }
-    }
-    logger.info({ demotedCount }, 'Auto-fixed: demoted excess IMPORTANT to SUPPLEMENTARY');
-  }
-}
-
-/**
- * Build classification prompt for LLM (ORIGINAL INDEPENDENT APPROACH)
- */
-async function buildClassificationPrompt(
-  fileMeta: FileMetadata,
-  courseContext: { title: string; description: string }
-): Promise<[SystemMessage, HumanMessage]> {
-  const promptService = createPromptService();
-
-  // Load and render prompt from database (with hardcoded fallback)
-  const systemPromptText = await promptService.renderPrompt('stage3_classification_independent', {
-    courseTitle: courseContext.title || 'Not specified',
-    courseDescription: courseContext.description || 'Not specified',
-    filename: fileMeta.filename,
-    mimeType: fileMeta.mime_type,
-    fileSize: formatFileSize(fileMeta.file_size),
-    contentPreview: fileMeta.content_preview || '[No content available]',
-  });
-
-  const systemMessage = new SystemMessage(systemPromptText);
-
-  const humanMessage = new HumanMessage(
-    `Classify this document based on its importance and relevance to the course.`
-  );
-
-  return [systemMessage, humanMessage];
-}
-
-/**
- * Store classification results in database
- * Currently stores in file_catalog.summary_metadata as JSON
- * Will be updated to use document_priorities table when created
- */
-async function storeClassificationResults(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  courseId: string,
-  priorities: DocumentPriority[]
-): Promise<void> {
-  // Store classification in file_catalog.summary_metadata for each file
-  // This allows retrieval without a dedicated table
-  for (const priority of priorities) {
-    try {
-      // Get existing summary_metadata
-      const { data: existingData } = await supabase
-        .from('file_catalog')
-        .select('summary_metadata')
-        .eq('id', priority.file_id)
-        .single();
-
-      const existingMetadata = (existingData?.summary_metadata as Record<string, unknown>) || {};
-
-      // Merge classification data
-      const updatedMetadata = {
-        ...existingMetadata,
-        classification: {
-          priority: priority.priority,
-          importance_score: priority.importance_score,
-          order: priority.order,
-          classification_rationale: priority.classification_rationale,
-          classified_at: priority.classified_at.toISOString(),
-        },
-      };
-
-      // Update both summary_metadata and priority column
-      const updateData: Record<string, unknown> = {
-        summary_metadata: updatedMetadata,
-        updated_at: new Date().toISOString(),
-      };
-
-      // Store priority_level (CORE/IMPORTANT/SUPPLEMENTARY) in priority column for UI
-      if (priority.priority_level) {
-        updateData.priority = priority.priority_level;
-      }
-
-      const { error } = await supabase
-        .from('file_catalog')
-        .update(updateData)
-        .eq('id', priority.file_id);
-
-      if (error) {
-        logger.warn(
-          { fileId: priority.file_id, error },
-          'Failed to store classification in file_catalog'
-        );
-      }
-    } catch (error) {
-      logger.warn(
-        {
-          fileId: priority.file_id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        'Error storing classification result'
-      );
-    }
-  }
-
-  logger.debug(
-    { courseId, count: priorities.length },
-    'Classification results stored in file_catalog.summary_metadata'
-  );
-}
-
-/**
- * Truncate content to specified length
- * DEPRECATED: Now using full summaries, no truncation needed
- */
-// function truncateContent(content: string, maxLength: number): string {
-//   if (content.length <= maxLength) {
-//     return content;
-//   }
-//   return `${content.substring(0, maxLength)}...[truncated]`;
-// }
-
-/**
- * Extract JSON from LLM response (handles markdown code blocks)
- */
-function extractJsonFromResponse(response: string): string {
-  // Try to extract JSON from markdown code block
-  const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    return codeBlockMatch[1].trim();
-  }
-
-  // Try to find JSON object directly
-  const jsonMatch = response.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    return jsonMatch[0];
-  }
-
-  return response.trim();
-}
-
-/**
- * Detect document language using simple heuristic
- *
- * Checks for Cyrillic characters to detect Russian.
- * Falls back to English if no Cyrillic found.
- *
- * @param text - Text to analyze
- * @returns Language code ('rus' or 'eng')
- */
-function detectLanguage(text: string): string {
-  // Simple heuristic: check for Cyrillic characters
-  const cyrillicPattern = /[\u0400-\u04FF]/;
-  const hasCyrillic = cyrillicPattern.test(text.slice(0, 1000)); // Check first 1000 chars
-  return hasCyrillic ? 'rus' : 'eng';
 }
 
 // ============================================================================

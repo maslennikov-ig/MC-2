@@ -33,7 +33,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => {
   // Filter out props that conflict with motion.div (Radix overlay includes drag handlers that clash with framer-motion)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required: `as any` makes motionSafeProps lose Radix types so it can spread onto motion.div
-  const { onDrag: _onDrag, onDragStart: _onDragStart, onDragEnd, ...motionSafeProps } = props as any
+  const { onDrag: _onDrag, onDragStart: _onDragStart, onDragEnd: _onDragEnd, ...motionSafeProps } = props as any
 
   return (
     <SheetPrimitive.Overlay asChild>

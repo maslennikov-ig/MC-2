@@ -69,7 +69,6 @@ test.describe('Enrichment Inspector i18n - English Locale', () => {
     await inspectorPage.expectEnrichmentList()
 
     // Get page text content
-    const pageContent = await page.content()
     const pageText = await inspectorPage.enrichmentList.innerText()
 
     // Verify English status texts are present
@@ -282,7 +281,7 @@ test.describe('Enrichment Inspector i18n - Locale Switching', () => {
     await mockEnrichmentApi(page, 'lesson-1')
   })
 
-  test('should update texts when switching from English to Russian', async ({ page }) => {
+  test('should update texts when switching from English to Russian', async () => {
     // Start with English locale
     await inspectorPage.navigateToLesson('test-course', 'lesson-1', 'en')
     await inspectorPage.expectEmptyState()
@@ -303,7 +302,7 @@ test.describe('Enrichment Inspector i18n - Locale Switching', () => {
     expect(englishText).not.toEqual(russianText)
   })
 
-  test('should maintain locale in create view navigation', async ({ page }) => {
+  test('should maintain locale in create view navigation', async () => {
     // Navigate with Russian locale
     await inspectorPage.navigateToLesson('test-course', 'lesson-1', 'ru')
 

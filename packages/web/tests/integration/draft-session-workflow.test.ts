@@ -18,7 +18,7 @@ vi.mock('nanoid', () => ({
 }))
 
 // Hoist InMemoryRedis class so it's available in vi.mock factory
-const { inMemoryRedis, InMemoryRedis } = vi.hoisted(() => {
+const { inMemoryRedis } = vi.hoisted(() => {
   class InMemoryRedis {
     private store: Map<string, { value: unknown; expiresAt: number | null }> = new Map()
 

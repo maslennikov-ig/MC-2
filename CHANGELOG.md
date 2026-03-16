@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.20] - 2026-03-16
+
+### Added
+
+- **stage6**: add centralized sanitizeContent at DB write layer (9f1c6b7e)
+
+### Changed
+
+- **course-gen-platform**: split 4 files >800 lines into extracted modules (Batch 1) (00b6a442)
+- **course-gen-platform**: split large files to reduce max-lines warnings (0167faef)
+- **course-gen-platform**: split notebooklm-bridge-client.ts to fix max-lines (b9b811f4)
+- **course-gen-platform**: split model-config-bunker.ts to fix max-lines (232f1ace)
+- **course-gen-platform**: split phase-0.5-clarifying.ts to fix max-lines (e5557507)
+- **course-gen-platform**: split generation-phases.ts to fix max-lines (1e323f35)
+- **course-gen-platform**: split stage6-prompts.ts into individual files (563dffc7)
+- replace console logs with structured logger in web and shared-utils (6baec5c9)
+- **course-gen-platform**: replace console logs with structured logger (a6d651f8)
+- **stage6**: replace LO-code IDs with numbered format in prompts (023cb43c)
+
+### Fixed
+
+- **course-gen-platform**: add barrel index.ts files for split modules (9da0e080)
+- **ci**: fix PostCSS config and mermaid regex breaking CI pipeline (6538873b)
+- **pipeline**: fix error message propagation + monitoring blind spots (76d4d0b0)
+- **web**: fix remaining 18 ESLint warnings (no-img-element, alt-text, unused-disable) (2b9dc708)
+- **web**: resolve all @typescript-eslint/no-explicit-any warnings (final retry) (89b219db)
+- **web**: use imported tailwindcss plugin in postcss.config.mjs for Vite 7 compat (e9971abe)
+- **web**: handle /sse endpoint in Docling health check URL derivation (ca6228d5)
+- **infra**: prevent Docling proxy DNS caching + add auto-mute rule (9a32658e)
+- **worker**: capture uncaught exceptions in sandbox processor for 9MB DOCX crash (1793044b)
+- **web**: normalize course status for i18n translation keys (4292cc5a)
+- **stage1**: handle QuotaExceededError before duck-type checks in orchestrator (87a31b28)
+- **tests**: fix basic_plus tier enum and PGRST116 handling in quota-enforcer (9dee4c1d)
+- **tests**: reset Redis concurrency counters in contract generation tests (faca0495)
+- **tests**: fix multiple test failures across integration, e2e, and contract suites (b30586ab)
+- **logger**: add auto-mute pattern for Mermaid render-invalid warnings (d0c97f2b)
+- **worker**: preserve error message/stack in BullMQ sandbox serialization (5d9ab227)
+- **worker**: add safety net for stuck courses on sandbox crash (702d0fea)
+- **ci**: resolve test timeouts and hanging process issues (7751007b)
+- **web**: fix PostCSS config and shared-utils barrel import breaking build (3c1c5c91)
+- **shared-logger**: replace tsup --dts with tsc --emitDeclarationOnly (9f0c7400)
+- **stage6**: prevent LO_CODE_PATTERN from consuming newlines (ece1d0db)
+- **stage6**: strip LO-code references leaking into lesson content (9e3c2d31)
+- **stage6**: strip LLM metadata leaking into lesson content (31e681eb)
+
+### Other
+
+- triage TODO/FIXME markers and update eslint max-warnings (850→95) (bb392701)
+- **web**: remove unused-vars across package (fcf81de8)
+- eslint auto-fix across web and course-gen-platform (e3aefcd6)
+- fix DOCLING_MCP_URL default in deployment guide (/sse → /mcp) (e8508320)
+
 ## [0.31.19] - 2026-03-11
 
 ### Changed

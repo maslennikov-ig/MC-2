@@ -81,7 +81,17 @@ vi.mock('../QuickActions', () => ({
 
 // Mock UI components
 vi.mock('@/components/ui/button', () => ({
-  Button: ({ children, onClick, disabled, ...props }: any) => (
+  Button: ({
+    children,
+    onClick,
+    disabled,
+    ...props
+  }: {
+    children: React.ReactNode
+    onClick?: () => void
+    disabled?: boolean
+    [key: string]: unknown
+  }) => (
     <button onClick={onClick} disabled={disabled} {...props}>
       {children}
     </button>
@@ -89,28 +99,54 @@ vi.mock('@/components/ui/button', () => ({
 }))
 
 vi.mock('@/components/ui/textarea', () => ({
-  Textarea: ({ value, onChange, disabled, ...props }: any) => (
-    <textarea value={value} onChange={onChange} disabled={disabled} {...props} />
-  ),
+  Textarea: ({
+    value,
+    onChange,
+    disabled,
+    ...props
+  }: {
+    value?: string
+    onChange?: (e: unknown) => void
+    disabled?: boolean
+    [key: string]: unknown
+  }) => <textarea value={value} onChange={onChange} disabled={disabled} {...props} />,
 }))
 
 vi.mock('@/components/ui/scroll-area', () => ({
-  ScrollArea: ({ children }: any) => <div>{children}</div>,
+  ScrollArea: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 vi.mock('@/components/ui/collapsible', () => ({
-  Collapsible: ({ children }: any) => <div>{children}</div>,
-  CollapsibleContent: ({ children }: any) => <div>{children}</div>,
-  CollapsibleTrigger: ({ children }: any) => <div>{children}</div>,
+  Collapsible: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CollapsibleContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CollapsibleTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 vi.mock('@/components/ui/toggle-group', () => ({
-  ToggleGroup: ({ children, value, onValueChange, disabled }: any) => (
+  ToggleGroup: ({
+    children,
+    value,
+    onValueChange: _onValueChange,
+    disabled,
+  }: {
+    children: React.ReactNode
+    value: string
+    onValueChange?: () => void
+    disabled?: boolean
+  }) => (
     <div data-testid="toggle-group" data-value={value} aria-disabled={disabled}>
       {children}
     </div>
   ),
-  ToggleGroupItem: ({ children, value, onClick }: any) => (
+  ToggleGroupItem: ({
+    children,
+    value,
+    onClick,
+  }: {
+    children: React.ReactNode
+    value: string
+    onClick?: () => void
+  }) => (
     <button data-testid={`toggle-${value}`} onClick={onClick}>
       {children}
     </button>
@@ -118,14 +154,14 @@ vi.mock('@/components/ui/toggle-group', () => ({
 }))
 
 vi.mock('@/components/ui/tooltip', () => ({
-  TooltipProvider: ({ children }: any) => <div>{children}</div>,
-  Tooltip: ({ children }: any) => <div>{children}</div>,
-  TooltipTrigger: ({ children }: any) => <div>{children}</div>,
-  TooltipContent: ({ children }: any) => <div>{children}</div>,
+  TooltipProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 vi.mock('@/lib/utils', () => ({
-  cn: (...classes: any[]) => classes.filter(Boolean).join(' '),
+  cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
 }))
 
 // =============================================================================

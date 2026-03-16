@@ -325,6 +325,7 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
         colors: ['#a855f7', '#8b5cf6', '#7c3aed'],
       })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- confettiStorageKey is derived from courseId which is already in deps
   }, [isComplete, hasShownConfetti, totalQuestions, courseId])
 
   // Navigation handlers

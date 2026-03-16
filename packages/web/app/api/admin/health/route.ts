@@ -208,10 +208,9 @@ async function checkRedis(): Promise<ServiceStatus> {
 /**
  * Check Docling MCP document processing service
  *
- * Two-tier strategy:
- * 1. GET /health — available via nginx proxy in production/dev
- * 2. POST to MCP endpoint — fallback for local dev without nginx;
- *    handles SSE (text/event-stream) responses from Streamable HTTP transport
+ * Always tests the actual MCP endpoint (not just nginx /health which returns 200
+ * without actually proxying to the backend). Uses MCP initialize request —
+ * lightweight, verifies the full proxy→backend path.
  */
 async function checkDoclingMcp(): Promise<ServiceStatus> {
   const startTime = Date.now()
@@ -220,34 +219,25 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
   const mcpUrl = process.env.DOCLING_MCP_URL || 'http://docling-mcp:8000/mcp'
   const fallbackMcpUrl = 'http://localhost:8000/mcp'
 
-  // Derive /health URL from MCP URL (replace /mcp or /sse path with /health)
-  const deriveHealthUrl = (url: string) => url.replace(/\/(mcp|sse)$/, '/health')
-
-  // --- Tier 1: Try /health endpoint (nginx proxy provides this in production) ---
-  try {
-    const healthResponse = await fetchWithTimeout(deriveHealthUrl(mcpUrl), { method: 'GET' })
-
-    if (healthResponse.ok) {
-      return {
-        name: 'Docling MCP',
-        status: 'healthy',
-        responseTime: Date.now() - startTime,
-        lastCheck,
-      }
-    }
-  } catch {
-    // /health not available (e.g., local dev without nginx proxy) — continue to Tier 2
+  // Always test the actual MCP endpoint (not just nginx /health which returns 200 without proxying)
+  // Use MCP initialize request - lightweight, verifies full proxy→backend path
+  const mcpRequest = {
+    jsonrpc: '2.0',
+    method: 'initialize',
+    id: 1,
+    params: {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'health-check', version: '1.0.0' },
+    },
+  }
+  const mcpHeaders = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
   }
 
-  // --- Tier 2: POST to MCP endpoint with SSE-aware response handling ---
   try {
     let response: Response | null = null
-
-    const mcpRequest = { jsonrpc: '2.0', method: 'tools/list', id: 1 }
-    const mcpHeaders = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, text/event-stream',
-    }
 
     try {
       response = await fetchWithTimeout(mcpUrl, {
@@ -282,15 +272,13 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
       const data = await response.json()
 
       if (data.jsonrpc === '2.0' && (data.result !== undefined || data.error !== undefined)) {
-        const toolCount = data.result?.tools?.length
         return {
           name: 'Docling MCP',
           status: 'healthy',
           responseTime,
-          message:
-            toolCount !== undefined
-              ? `${toolCount} tool(s) available`
-              : `MCP responding: ${data.error?.message || 'OK'}`,
+          message: data.result?.serverInfo?.name
+            ? `MCP server: ${data.result.serverInfo.name}`
+            : 'MCP responding',
           lastCheck,
         }
       }
@@ -298,13 +286,25 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
       // JSON parse failed — but server responded
     }
 
-    // Server responded with unexpected format but is reachable
+    // Server responded but with unexpected format
     if (response.ok || response.status === 400 || response.status === 405) {
       return {
         name: 'Docling MCP',
         status: 'healthy',
         responseTime,
         message: `MCP server responding (HTTP ${response.status})`,
+        lastCheck,
+      }
+    }
+
+    // 502 Bad Gateway = nginx can't reach backend (the exact bug we're detecting)
+    if (response.status === 502) {
+      return {
+        name: 'Docling MCP',
+        status: 'error',
+        responseTime,
+        message:
+          '502 Bad Gateway — nginx cannot reach Docling backend (check DNS resolver or container)',
         lastCheck,
       }
     }
@@ -788,6 +788,141 @@ async function checkMermaidPipeline(): Promise<ServiceStatus> {
 }
 
 /**
+ * Check for stuck courses (non-terminal state for over 2 hours)
+ */
+async function checkStuckCourses(): Promise<ServiceStatus> {
+  const startTime = Date.now()
+  const lastCheck = new Date().toISOString()
+
+  try {
+    const supabase = await createAdminClient()
+
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+
+    const { data, error } = await supabase
+      .from('courses')
+      .select('generation_code, generation_status')
+      .not('generation_status', 'in', '("pending","completed","failed","cancelled")')
+      .lt('last_progress_update', twoHoursAgo)
+
+    const responseTime = Date.now() - startTime
+
+    if (error) {
+      return {
+        name: 'Stuck Courses',
+        status: 'unknown',
+        responseTime,
+        message: `Query error: ${error.message}`,
+        lastCheck,
+      }
+    }
+
+    const stuckCount = data?.length ?? 0
+
+    if (stuckCount === 0) {
+      return {
+        name: 'Stuck Courses',
+        status: 'healthy',
+        responseTime,
+        message: 'No stuck courses',
+        lastCheck,
+      }
+    }
+
+    const stuckCodes = data
+      .slice(0, 5)
+      .map((c) => `${c.generation_code || '?'} (${c.generation_status})`)
+      .join(', ')
+
+    return {
+      name: 'Stuck Courses',
+      status: 'degraded',
+      responseTime,
+      message: `${stuckCount} stuck course(s): ${stuckCodes}${stuckCount > 5 ? '...' : ''}`,
+      lastCheck,
+    }
+  } catch (error) {
+    return {
+      name: 'Stuck Courses',
+      status: 'unknown',
+      responseTime: Date.now() - startTime,
+      message: error instanceof Error ? error.message : 'Check failed',
+      lastCheck,
+    }
+  }
+}
+
+/**
+ * Check for repeated recent failures (>=3 in last 24 hours)
+ */
+async function checkRecentFailures(): Promise<ServiceStatus> {
+  const startTime = Date.now()
+  const lastCheck = new Date().toISOString()
+
+  try {
+    const supabase = await createAdminClient()
+
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+    const { count, error } = await supabase
+      .from('courses')
+      .select('*', { count: 'exact', head: true })
+      .eq('generation_status', 'failed')
+      .gt('updated_at', oneDayAgo)
+
+    const responseTime = Date.now() - startTime
+
+    if (error) {
+      return {
+        name: 'Recent Failures',
+        status: 'unknown',
+        responseTime,
+        message: `Query error: ${error.message}`,
+        lastCheck,
+      }
+    }
+
+    const recentFailures = count ?? 0
+
+    if (recentFailures === 0) {
+      return {
+        name: 'Recent Failures',
+        status: 'healthy',
+        responseTime,
+        message: 'No failures in last 24h',
+        lastCheck,
+      }
+    }
+
+    if (recentFailures < 3) {
+      return {
+        name: 'Recent Failures',
+        status: 'healthy',
+        responseTime,
+        message: `${recentFailures} failure(s) in last 24h`,
+        lastCheck,
+      }
+    }
+
+    return {
+      name: 'Recent Failures',
+      status: 'degraded',
+      responseTime,
+      message: `${recentFailures} failures in last 24h — check document processing pipeline`,
+      lastCheck,
+    }
+  } catch (error) {
+    return {
+      name: 'Recent Failures',
+      status: 'unknown',
+      responseTime: Date.now() - startTime,
+      message: error instanceof Error ? error.message : 'Check failed',
+      lastCheck,
+    }
+  }
+}
+
+/**
  * Admin Health Check API
  *
  * Checks the health of all system components:
@@ -798,6 +933,8 @@ async function checkMermaidPipeline(): Promise<ServiceStatus> {
  * - Qdrant (vector database)
  * - NotebookLM Bridge (audio/video generation)
  * - Mermaid Pipeline (diagram syntax fixer)
+ * - Stuck Courses (non-terminal state detection)
+ * - Recent Failures (failure rate monitoring)
  */
 export async function GET(
   request: NextRequest
@@ -844,6 +981,8 @@ export async function GET(
       notebookLMBridgeStatus,
       telegramStatus,
       mermaidPipelineStatus,
+      stuckCoursesStatus,
+      recentFailuresStatus,
     ] = await Promise.allSettled([
       checkSupabase(),
       checkApiServer(),
@@ -855,6 +994,8 @@ export async function GET(
       checkNotebookLMBridge(),
       checkTelegramBot(),
       checkMermaidPipeline(),
+      checkStuckCourses(),
+      checkRecentFailures(),
     ])
 
     // Extract results, handling rejected promises
@@ -944,6 +1085,24 @@ export async function GET(
         ? mermaidPipelineStatus.value
         : {
             name: 'Mermaid Pipeline',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
+      stuckCoursesStatus.status === 'fulfilled'
+        ? stuckCoursesStatus.value
+        : {
+            name: 'Stuck Courses',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
+      recentFailuresStatus.status === 'fulfilled'
+        ? recentFailuresStatus.value
+        : {
+            name: 'Recent Failures',
             status: 'error' as const,
             responseTime: 0,
             message: 'Check failed',

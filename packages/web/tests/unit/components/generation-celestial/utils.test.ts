@@ -3,7 +3,6 @@ import {
   getStageFromStatus,
   isAwaitingApproval,
   buildStagesFromStatus,
-  STAGE_CONFIG,
 } from '@/components/generation-celestial/utils'
 import { GenerationProgress } from '@/types/course-generation'
 

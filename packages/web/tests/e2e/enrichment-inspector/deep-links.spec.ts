@@ -247,7 +247,6 @@ test.describe('Enrichment Inspector Deep Links', () => {
 
     // Store current state
     const beforeRefreshPanelVisible = (await inspectorPage.panel.count()) > 0
-    const beforeRefreshUrl = page.url()
 
     // Refresh page
     await page.reload()
@@ -287,7 +286,6 @@ test.describe('Enrichment Inspector Deep Links', () => {
 
       // URL should reflect the navigation
       // Could include enrichment ID in query params or hash
-      const urlChanged = updatedUrl !== initialUrl
 
       console.log(`URL tracking: ${initialUrl} -> ${updatedUrl}`)
 
@@ -378,7 +376,7 @@ test.describe('Enrichment Inspector Deep Links', () => {
         await inspectorPage.expectPanelVisible()
 
         // Focus should move to inspector
-        const focusInPanel = await inspectorPage.panel.locator(':focus').count()
+        await inspectorPage.panel.locator(':focus').count()
 
         // Escape should close inspector
         await page.keyboard.press('Escape')

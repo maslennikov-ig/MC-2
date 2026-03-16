@@ -218,7 +218,7 @@ export function GenerationProgress({
 
           .subscribe((status, err) => {
             logger.info('Subscription status changed', { status, courseId })
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+             
             if (status === 'SUBSCRIBED') {
               setIsConnected(true)
               reconnectAttempts = 0 // Reset reconnect counter on success
@@ -238,7 +238,7 @@ export function GenerationProgress({
               }
 
               logger.info('Realtime subscription established', { courseId, channelName })
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+               
             } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
               logger.warn('Realtime connection lost', { status, error: err, courseId })
               setIsConnected(false)
@@ -377,7 +377,7 @@ export function GenerationProgress({
     void setupSubscription()
 
     // Also start a health check timer to verify status
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+     
     healthCheckInterval = setInterval(async () => {
       if (status === 'completed' || status === 'failed' || status === 'cancelled') {
         return // No need to check if already finished
@@ -425,6 +425,7 @@ export function GenerationProgress({
         clearTimeout(reconnectTimeout)
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t and tp are stable from next-intl
   }, [courseId, slug, router, status])
 
   // Retry connection
@@ -449,6 +450,7 @@ export function GenerationProgress({
       logger.error('Failed to cancel generation', { error: err })
       toast.error(tp('cancelError'))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tp from next-intl is stable
   }, [courseId, router])
 
   // Pause generation
@@ -474,6 +476,7 @@ export function GenerationProgress({
       setPauseLoading(false)
       setPauseResumeOperation(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tp from next-intl is stable
   }, [slug])
 
   // Resume generation
@@ -499,6 +502,7 @@ export function GenerationProgress({
       setPauseLoading(false)
       setPauseResumeOperation(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tp from next-intl is stable
   }, [slug])
 
   // Copy generation code to clipboard
@@ -507,6 +511,7 @@ export function GenerationProgress({
       void copyToClipboard(generationCode)
       toast.success(tp('codeCopied'))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tp from next-intl is stable
   }, [generationCode])
 
   // Render step item
@@ -748,7 +753,7 @@ export function GenerationProgress({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handlePause} // eslint-disable-line @typescript-eslint/no-misused-promises
+                onClick={handlePause}  
                 disabled={pauseLoading}
               >
                 {pauseLoading ? (
@@ -764,7 +769,7 @@ export function GenerationProgress({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleResume} // eslint-disable-line @typescript-eslint/no-misused-promises
+                onClick={handleResume}  
                 disabled={pauseLoading}
                 className="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
               >
@@ -788,7 +793,7 @@ export function GenerationProgress({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleCancel} // eslint-disable-line @typescript-eslint/no-misused-promises
+                onClick={handleCancel}  
                 className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
               >
                 <Square className="mr-2 h-4 w-4" />

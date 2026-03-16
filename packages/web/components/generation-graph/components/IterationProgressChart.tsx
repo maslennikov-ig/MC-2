@@ -182,7 +182,11 @@ export function IterationProgressChart({
             const isActive = point.status === 'active'
             const isInitial = point.status === 'initial'
             const isPending = point.status === 'pending'
-            const dotColor = getDotColor(point.status as any, point.score, targetScore)
+            const dotColor = getDotColor(
+              point.status === 'initial' ? 'completed' : point.status,
+              point.score,
+              targetScore
+            )
 
             const tooltipContent = isInitial
               ? `Начальный балл: ${point.score.toFixed(2)}`

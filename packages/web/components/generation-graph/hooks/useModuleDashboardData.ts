@@ -637,16 +637,13 @@ export function useModuleDashboardData({
     // Race condition guard: capture current fetchId BEFORE calling fetchLessonData
     // fetchLessonData increments fetchIdRef.current internally and checks against it
     // When user rapidly switches modules, old requests will be ignored
-    const currentFetchId = fetchIdRef.current
+    const fetchIdRefLocal = fetchIdRef
     fetchLessonData()
 
     return () => {
       // Cleanup: increment fetchId to mark current fetch as stale
       // This ensures any pending setState calls in fetchLessonData are skipped
-      // We captured currentFetchId above to satisfy eslint exhaustive-deps rule
-
-      void currentFetchId // Reference to satisfy linter (pattern requires ref mutation)
-      fetchIdRef.current++
+      fetchIdRefLocal.current++
     }
   }, [fetchLessonData])
 

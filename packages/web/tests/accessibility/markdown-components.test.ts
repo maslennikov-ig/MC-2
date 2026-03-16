@@ -78,7 +78,7 @@ test.describe('Markdown Component Accessibility', () => {
     await page.waitForLoadState('networkidle')
 
     // Inject a test container with markdown components
-    await page.evaluate((markdown) => {
+    await page.evaluate((_markdown) => {
       // Create test container
       const container = document.createElement('div')
       container.id = 'markdown-test-content'

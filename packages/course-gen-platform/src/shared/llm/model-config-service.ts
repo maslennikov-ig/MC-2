@@ -33,6 +33,7 @@ import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selec
 /** Emergency universal fallback model when DB config is unavailable */
 const EMERGENCY_FALLBACK_MODEL = 'google/gemini-3-flash-preview';
 import * as ModelConfigDB from './model-config-db';
+import { StaleWhileRevalidateCache } from './swr-cache';
 
 // Re-export types and constants from model-config-db for backward compatibility
 export type {
@@ -45,6 +46,25 @@ export type {
 import { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS } from './model-config-db';
 
 export { DEFAULT_STAGE_CONFIG, DEFAULT_PHASE_CONFIGS };
+
+// Re-export helpers for external consumers
+export { getEffectiveStageConfig, type ResolveModelOptions } from './model-config-helpers';
+import { resolveModelWithFallback as _resolveModelWithFallback } from './model-config-helpers';
+import type { ResolveModelOptions } from './model-config-helpers';
+
+/**
+ * Resolve model ID with priority: settings → database → fallback.
+ * Auto-injects ModelConfigService when not provided by caller.
+ */
+export async function resolveModelWithFallback(options: ResolveModelOptions): Promise<string> {
+  if (!options.modelConfigService) {
+    return _resolveModelWithFallback({
+      ...options,
+      modelConfigService: createModelConfigService(),
+    });
+  }
+  return _resolveModelWithFallback(options);
+}
 
 /**
  * Detect missing chat phase configuration errors from model config service.
@@ -60,157 +80,6 @@ export function isMissingChatPhaseConfigError(error: unknown): error is Error {
     message.includes('Chat phase') &&
     (message.includes('has no config') || message.includes('no active config'))
   );
-}
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-// ============================================================================
-// CACHE IMPLEMENTATION - STALE-WHILE-REVALIDATE PATTERN
-// ============================================================================
-
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-}
-
-/**
- * Cache result with staleness indicator
- */
-interface CacheResult<T> {
-  /** Cached data */
-  data: T;
-  /** Whether the data is stale (past TTL) */
-  isStale: boolean;
-  /** Age of the cache entry in milliseconds */
-  age: number;
-}
-
-/** Default fresh TTL: 5 minutes */
-const DEFAULT_FRESH_TTL_MS = 5 * 60 * 1000;
-
-/** Maximum age for cache entries: 24 hours (after which they are evicted) */
-const MAX_CACHE_AGE_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Stale-While-Revalidate Cache Implementation
- *
- * Industry-standard pattern used by Netflix, Spotify, AWS for resilient configuration management.
- *
- * Key principles:
- * 1. Never auto-deletes stale entries within 24h - stale data is better than nothing
- * 2. Evicts entries older than 24h to prevent unbounded memory growth
- * 3. Returns staleness indicator so caller can decide to log warnings
- * 4. Supports explicit failure when no cache and DB unavailable
- *
- * Flow:
- * 1. Check cache: fresh (TTL < 5min) → return immediately
- * 2. Stale or miss → try database
- * 3. DB success → update cache → return fresh data
- * 4. DB failure + stale cache (< 24h) → return stale with WARNING
- * 5. DB failure + no cache or expired (> 24h) → explicit error
- */
-class StaleWhileRevalidateCache<T> {
-  private cache = new Map<string, CacheEntry<T>>();
-  private readonly freshTTL: number;
-  private readonly maxAge: number;
-
-  constructor(freshTTLMs: number = DEFAULT_FRESH_TTL_MS, maxAgeMs: number = MAX_CACHE_AGE_MS) {
-    this.freshTTL = freshTTLMs;
-    this.maxAge = maxAgeMs;
-  }
-
-  /**
-   * Get cached data with staleness indicator
-   * Entries older than maxAge (24h) are evicted to prevent unbounded memory growth
-   *
-   * @param key - Cache key
-   * @returns CacheResult with data, isStale flag, and age in ms, or null if not found/expired
-   */
-  get(key: string): CacheResult<T> | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-
-    const age = Date.now() - entry.timestamp;
-
-    // Evict entries older than maxAge (24h) to prevent unbounded memory growth
-    if (age > this.maxAge) {
-      this.cache.delete(key);
-      logger.info(
-        { key, ageHours: Math.round(age / 3600000) },
-        'Cache entry evicted (exceeded 24h max age)'
-      );
-      return null;
-    }
-
-    const isStale = age > this.freshTTL;
-
-    return {
-      data: entry.data,
-      isStale,
-      age,
-    };
-  }
-
-  /**
-   * Store fresh data in cache
-   *
-   * @param key - Cache key
-   * @param data - Data to cache
-   */
-  set(key: string, data: T): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now(),
-    });
-  }
-
-  /**
-   * Check if key has any data (fresh or stale, but not expired)
-   *
-   * @param key - Cache key
-   * @returns true if valid data exists for this key
-   */
-  has(key: string): boolean {
-    const entry = this.cache.get(key);
-    if (!entry) return false;
-
-    const age = Date.now() - entry.timestamp;
-    if (age > this.maxAge) {
-      this.cache.delete(key);
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Clear all cached data
-   */
-  clear(): void {
-    this.cache.clear();
-  }
-
-  /**
-   * Get cache statistics for monitoring
-   */
-  getStats(): { size: number; oldestAgeMs: number } {
-    let oldestAge = 0;
-    const now = Date.now();
-
-    for (const entry of this.cache.values()) {
-      const age = now - entry.timestamp;
-      if (age > oldestAge) {
-        oldestAge = age;
-      }
-    }
-
-    return {
-      size: this.cache.size,
-      oldestAgeMs: oldestAge,
-    };
-  }
 }
 
 // ============================================================================
@@ -921,110 +790,6 @@ class ModelConfigServiceImpl {
         return this.determineTier(stageNumber, tokenCount);
       }
     }
-  }
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Get effective stage config with defaults applied
- *
- * @param config - Phase config from database (may have null values)
- * @returns Config with defaults applied for null values
- */
-export function getEffectiveStageConfig(config: ModelConfigDB.PhaseModelConfig): {
-  qualityThreshold: number;
-  maxRetries: number;
-  timeoutMs: number | null;
-} {
-  return {
-    qualityThreshold: config.qualityThreshold ?? DEFAULT_STAGE_CONFIG.qualityThreshold,
-    maxRetries: config.maxRetries ?? DEFAULT_STAGE_CONFIG.maxRetries,
-    timeoutMs: config.timeoutMs ?? DEFAULT_STAGE_CONFIG.timeoutMs,
-  };
-}
-
-// ============================================================================
-// HELPER: MODEL RESOLUTION WITH FALLBACK
-// ============================================================================
-
-/**
- * Options for model resolution
- */
-export interface ResolveModelOptions {
-  /** Model from user settings (explicit override) - highest priority */
-  settingsModel?: string;
-  /** Phase name for database lookup */
-  phaseName: string;
-  /** Course ID for course-specific overrides */
-  courseId?: string;
-  /** Fallback model if all else fails */
-  fallbackModel: string;
-  /** Logger context for debugging */
-  logContext?: Record<string, unknown>;
-}
-
-/**
- * Resolve model ID with priority: settings → database → fallback
- *
- * Optimization: skips database call entirely if settingsModel is provided.
- *
- * Priority order:
- * 1. settingsModel (user explicit override) - skip DB call
- * 2. database config (phaseConfig.modelId)
- * 3. fallbackModel (hardcoded default)
- *
- * @param options - Resolution options
- * @returns Resolved model ID
- *
- * @example
- * ```typescript
- * const model = await resolveModelWithFallback({
- *   settingsModel: settings.model as string | undefined,
- *   phaseName: 'stage_7_video',
- *   courseId: enrichmentContext.course.id,
- *   fallbackModel: DEFAULT_MODEL_ID,
- *   logContext: { lessonId, enrichmentId },
- * });
- * ```
- */
-export async function resolveModelWithFallback(options: ResolveModelOptions): Promise<string> {
-  const { settingsModel, phaseName, courseId, fallbackModel, logContext = {} } = options;
-
-  // Priority 1: User explicitly set model in settings - use it directly, skip DB call
-  if (settingsModel) {
-    logger.debug(
-      { ...logContext, model: settingsModel, source: 'settings' },
-      'Using model from settings (explicit override)'
-    );
-    return settingsModel;
-  }
-
-  // Priority 2: Try to get from database config
-  try {
-    const modelConfigService = createModelConfigService();
-    const phaseConfig = await modelConfigService.getModelForPhase(phaseName, courseId);
-    const model = phaseConfig.modelId || fallbackModel;
-
-    logger.debug(
-      { ...logContext, model, source: phaseConfig.modelId ? 'database' : 'fallback', phaseName },
-      'Model resolved from database config'
-    );
-    return model;
-  } catch (configError) {
-    // Priority 3: Database failed - use fallback
-    logger.warn(
-      {
-        ...logContext,
-        phaseName,
-        fallbackModel,
-        error: configError instanceof Error ? configError.message : String(configError),
-      },
-      'Failed to get model config from database, using fallback'
-    );
-    return fallbackModel;
   }
 }
 

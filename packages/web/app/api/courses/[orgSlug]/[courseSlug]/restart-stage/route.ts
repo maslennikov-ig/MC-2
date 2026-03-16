@@ -174,7 +174,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         route: '/api/courses/[orgSlug]/[courseSlug]/restart-stage',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
     return NextResponse.json(
       { error: 'Internal server error', code: 'INTERNAL_ERROR' },

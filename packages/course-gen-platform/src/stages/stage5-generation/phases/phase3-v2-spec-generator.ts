@@ -24,176 +24,30 @@ import type {
   LessonRAGContextV2,
   LearningObjectiveV2,
   IntroBlueprintV2,
-  ExerciseSpecV2,
-  LessonMetadataV2,
   SectionConstraintsV2,
   BloomLevelV2,
   HookStrategyV2,
-  ExerciseTypeV2,
-  ExerciseDifficultyV2,
-  ContentToneV2,
-  ComplianceLevelV2,
-  TargetAudienceV2,
   SectionDepthV2,
 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { SectionBreakdown, AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import { inferSemanticScaffolding } from '../utils/semantic-scaffolding';
 import { buildFallbackSearchQueries } from '../utils/rag-fallback-queries';
 import logger from '@/shared/logger';
+import {
+  V2_SPEC_DEFAULTS,
+  BLOOM_VERB_MAP,
+  validateKeyTopicsAlignment,
+} from './phase3-v2-spec-generator/constants';
+import { generateExerciseSpecs } from './phase3-v2-spec-generator/exercise-helpers';
+import {
+  buildLessonMetadata,
+  estimateLessonDuration,
+  generateLessonTitle,
+  generateLessonDescription,
+  distributeLearningObjectives,
+} from './phase3-v2-spec-generator/lesson-helpers';
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-/**
- * Default configuration for V2 spec generation
- */
-const V2_SPEC_DEFAULTS = {
-  /** Default lessons per section when estimated_lessons is not specified */
-  DEFAULT_LESSONS_PER_SECTION: 3,
-  /** Minimum lessons per section */
-  MIN_LESSONS_PER_SECTION: 1,
-  /** Maximum lessons per section */
-  MAX_LESSONS_PER_SECTION: 10,
-  /** Default estimated duration per lesson in minutes */
-  DEFAULT_LESSON_DURATION_MINUTES: 15,
-  /** Default expected RAG chunks for high confidence */
-  DEFAULT_RAG_CHUNKS_HIGH: 10,
-  /** Default expected RAG chunks for medium confidence */
-  DEFAULT_RAG_CHUNKS_MEDIUM: 7,
-} as const;
-
-/**
- * Validate alignment between key_topics and learning_objectives
- *
- * Ensures that section titles (from key_topics) have semantic overlap
- * with learning objectives to prevent Stage 6 regeneration loops.
- *
- * @param section - Section breakdown to validate
- * @returns Object with passed flag and warning message
- */
-function validateKeyTopicsAlignment(section: SectionBreakdown): {
-  passed: boolean;
-  warningMessage: string | null;
-  coverage: number;
-} {
-  const keyTopics = section.key_topics || [];
-  const objectives = section.learning_objectives || [];
-
-  if (keyTopics.length === 0 || objectives.length === 0) {
-    return { passed: true, warningMessage: null, coverage: 1.0 };
-  }
-
-  // Extract significant words from objectives (4+ chars, not common words)
-  const commonWords = new Set([
-    'that',
-    'this',
-    'with',
-    'from',
-    'have',
-    'will',
-    'able',
-    'about',
-    'which',
-    'their',
-    'использовать',
-    'применять',
-    'понимать',
-    'уметь',
-    'знать',
-    'научиться',
-    'освоить',
-  ]);
-
-  const objectiveKeywords = new Set<string>();
-  for (const obj of objectives) {
-    const words = obj.toLowerCase().match(/[a-zа-яё]{4,}/g) || [];
-    for (const word of words) {
-      if (!commonWords.has(word)) {
-        objectiveKeywords.add(word);
-      }
-    }
-  }
-
-  // Check how many key_topics have overlap with objective keywords
-  let matchedTopics = 0;
-  for (const topic of keyTopics) {
-    const topicWords = topic.toLowerCase().match(/[a-zа-яё]{4,}/g) || [];
-    const hasOverlap = topicWords.some(word => objectiveKeywords.has(word));
-    if (hasOverlap) {
-      matchedTopics++;
-    }
-  }
-
-  const coverage = matchedTopics / keyTopics.length;
-  const passed = coverage >= 0.5; // At least 50% of topics should align
-
-  const warningMessage = passed
-    ? null
-    : `Low key_topics/learning_objectives alignment: ${(coverage * 100).toFixed(0)}% ` +
-      `(${matchedTopics}/${keyTopics.length} topics match). ` +
-      `This may cause Stage 6 regeneration loops.`;
-
-  return { passed, warningMessage, coverage };
-}
-
-/**
- * Bloom's Taxonomy action verb mapping for learning objectives
- * Maps common action verbs to their Bloom's level
- */
-const BLOOM_VERB_MAP: Record<string, BloomLevelV2> = {
-  // Remember level
-  define: 'remember',
-  list: 'remember',
-  recall: 'remember',
-  identify: 'remember',
-  name: 'remember',
-  state: 'remember',
-  describe: 'remember',
-
-  // Understand level
-  explain: 'understand',
-  summarize: 'understand',
-  interpret: 'understand',
-  classify: 'understand',
-  compare: 'understand',
-  contrast: 'understand',
-  discuss: 'understand',
-
-  // Apply level
-  apply: 'apply',
-  demonstrate: 'apply',
-  implement: 'apply',
-  use: 'apply',
-  execute: 'apply',
-  solve: 'apply',
-  calculate: 'apply',
-
-  // Analyze level
-  analyze: 'analyze',
-  differentiate: 'analyze',
-  examine: 'analyze',
-  investigate: 'analyze',
-  distinguish: 'analyze',
-  organize: 'analyze',
-
-  // Evaluate level
-  evaluate: 'evaluate',
-  assess: 'evaluate',
-  critique: 'evaluate',
-  judge: 'evaluate',
-  justify: 'evaluate',
-  recommend: 'evaluate',
-
-  // Create level
-  create: 'create',
-  design: 'create',
-  develop: 'create',
-  construct: 'create',
-  produce: 'create',
-  compose: 'create',
-  build: 'create',
-};
+export { V2_SPEC_DEFAULTS, validateKeyTopicsAlignment } from './phase3-v2-spec-generator/constants';
 
 // ============================================================================
 // V2 LESSON SPEC GENERATOR CLASS
@@ -357,7 +211,7 @@ export class V2LessonSpecGenerator {
       const lessonId = `${sectionId}.${lessonIndex + 1}`;
 
       // Distribute learning objectives across lessons
-      const lessonObjectives = this.distributeLearningObjectives(
+      const lessonObjectives = distributeLearningObjectives(
         section.learning_objectives || [],
         lessonIndex,
         lessonCount
@@ -387,17 +241,17 @@ export class V2LessonSpecGenerator {
       );
 
       // Generate exercise specifications
-      const exercises = this.generateExerciseSpecs(section, learningObjectivesV2, analysisResult);
+      const exercises = generateExerciseSpecs(section, learningObjectivesV2, analysisResult);
 
       // Build metadata
-      const metadata = this.buildLessonMetadata(
+      const metadata = buildLessonMetadata(
         scaffolding.targetAudience,
         scaffolding.contentArchetype,
         analysisResult
       );
 
       // Estimate lesson duration
-      const estimatedDuration = this.estimateLessonDuration(section, learningObjectivesV2.length);
+      const estimatedDuration = estimateLessonDuration(section, learningObjectivesV2.length);
 
       // Determine difficulty level
       const difficultyLevel = section.difficulty || 'intermediate';
@@ -405,8 +259,8 @@ export class V2LessonSpecGenerator {
       // Build the complete lesson specification
       const lessonSpec: LessonSpecificationV2 = {
         lesson_id: lessonId,
-        title: this.generateLessonTitle(section.area, lessonIndex + 1, lessonCount),
-        description: this.generateLessonDescription(
+        title: generateLessonTitle(section.area, lessonIndex + 1, lessonCount),
+        description: generateLessonDescription(
           section,
           lessonIndex + 1,
           lessonCount,
@@ -732,344 +586,4 @@ export class V2LessonSpecGenerator {
 
     return points.filter(p => p.length >= 5);
   }
-
-  /**
-   * Generate exercise specifications with rubric criteria
-   *
-   * Creates 1-2 exercises per lesson linked to learning objectives.
-   * Exercises include type, difficulty, and weighted rubric criteria.
-   *
-   * @param section - Section breakdown for context
-   * @param objectives - V2 learning objectives to link
-   * @param analysisResult - Full analysis for exercise type hints
-   * @returns Array of V2 exercise specifications
-   */
-  private generateExerciseSpecs(
-    section: SectionBreakdown,
-    objectives: LearningObjectiveV2[],
-    analysisResult: AnalysisResult
-  ): ExerciseSpecV2[] {
-    if (objectives.length === 0) {
-      return [];
-    }
-
-    const exercises: ExerciseSpecV2[] = [];
-    const exerciseTypes = analysisResult.generation_guidance?.exercise_types || [];
-
-    // Generate 1-2 exercises based on objectives
-    const numExercises = Math.min(2, objectives.length);
-
-    for (let i = 0; i < numExercises; i++) {
-      const objective = objectives[i];
-      const exerciseType = this.mapExerciseType(
-        exerciseTypes[i % exerciseTypes.length],
-        objective.bloom_level
-      );
-      const difficulty = this.inferExerciseDifficulty(objective.bloom_level, i);
-
-      exercises.push({
-        type: exerciseType,
-        difficulty,
-        learning_objective_id: objective.id,
-        structure_template: this.generateExerciseTemplate(
-          exerciseType,
-          section.area,
-          objective.objective
-        ),
-        rubric_criteria: this.generateRubricCriteria(exerciseType, objective.bloom_level),
-      });
-    }
-
-    return exercises;
-  }
-
-  /**
-   * Map analysis exercise type to V2 exercise type
-   *
-   * @param analysisType - Exercise type from analysis
-   * @param bloomLevel - Bloom's level for fallback selection
-   * @returns V2 exercise type
-   */
-  private mapExerciseType(
-    analysisType: string | undefined,
-    bloomLevel: BloomLevelV2
-  ): ExerciseTypeV2 {
-    // Direct mapping from analysis types
-    if (analysisType) {
-      const typeMap: Record<string, ExerciseTypeV2> = {
-        coding: 'coding',
-        debugging: 'debugging',
-        refactoring: 'coding',
-        analysis: 'conceptual',
-        derivation: 'conceptual',
-        interpretation: 'case_study',
-      };
-      if (typeMap[analysisType]) {
-        return typeMap[analysisType];
-      }
-    }
-
-    // Infer from Bloom's level
-    const bloomTypeMap: Record<BloomLevelV2, ExerciseTypeV2> = {
-      remember: 'conceptual',
-      understand: 'conceptual',
-      apply: 'coding',
-      analyze: 'case_study',
-      evaluate: 'design',
-      create: 'design',
-    };
-
-    return bloomTypeMap[bloomLevel];
-  }
-
-  /**
-   * Infer exercise difficulty from Bloom's level and position
-   *
-   * @param bloomLevel - Bloom's Taxonomy level
-   * @param position - Exercise position (0 = first, 1 = second)
-   * @returns Exercise difficulty
-   */
-  private inferExerciseDifficulty(
-    bloomLevel: BloomLevelV2,
-    position: number
-  ): ExerciseDifficultyV2 {
-    // Higher Bloom's levels = harder exercises
-    const difficultyMap: Record<BloomLevelV2, ExerciseDifficultyV2> = {
-      remember: 'easy',
-      understand: 'easy',
-      apply: 'medium',
-      analyze: 'medium',
-      evaluate: 'hard',
-      create: 'hard',
-    };
-
-    // Second exercise is slightly harder
-    const baseDifficulty = difficultyMap[bloomLevel];
-    if (position > 0 && baseDifficulty === 'easy') {
-      return 'medium';
-    }
-    if (position > 0 && baseDifficulty === 'medium') {
-      return 'hard';
-    }
-
-    return baseDifficulty;
-  }
-
-  /**
-   * Generate exercise structure template
-   *
-   * @param exerciseType - Type of exercise
-   * @param area - Section area for context
-   * @param objective - Learning objective
-   * @returns Structure template string
-   */
-  private generateExerciseTemplate(
-    exerciseType: ExerciseTypeV2,
-    area: string,
-    objective: string
-  ): string {
-    const templates: Record<ExerciseTypeV2, string> = {
-      coding: `Given a [specific scenario related to ${area}], implement a solution that [requirement based on: ${objective}]. Your code should [acceptance criteria].`,
-      conceptual: `Based on your understanding of ${area}, explain [key concept] and describe how it relates to [application]. Your answer should demonstrate [criterion based on: ${objective}].`,
-      case_study: `Analyze the following case study about ${area}: [scenario description]. Identify the key challenges and propose solutions that address [requirement based on: ${objective}].`,
-      debugging: `The following code related to ${area} contains errors: [code snippet]. Identify and fix the bugs to make it correctly [expected behavior based on: ${objective}].`,
-      design: `Design a solution for ${area} that addresses [problem statement]. Your design should include [components] and meet [requirements based on: ${objective}].`,
-    };
-
-    return templates[exerciseType];
-  }
-
-  /**
-   * Generate rubric criteria for an exercise
-   *
-   * Creates weighted criteria that sum to 100.
-   *
-   * @param exerciseType - Type of exercise
-   * @param bloomLevel - Bloom's level for criteria focus
-   * @returns Array of rubric criteria
-   */
-  private generateRubricCriteria(
-    exerciseType: ExerciseTypeV2,
-    _bloomLevel: BloomLevelV2
-  ): ExerciseSpecV2['rubric_criteria'] {
-    // Define criteria based on exercise type
-    const criteriaByType: Record<ExerciseTypeV2, { criteria: string[]; weight: number }[]> = {
-      coding: [
-        { criteria: ['Code correctness and functionality'], weight: 40 },
-        { criteria: ['Code quality and readability'], weight: 30 },
-        { criteria: ['Handling edge cases'], weight: 30 },
-      ],
-      conceptual: [
-        { criteria: ['Accuracy of explanation'], weight: 40 },
-        { criteria: ['Depth of understanding demonstrated'], weight: 35 },
-        { criteria: ['Clarity and organization'], weight: 25 },
-      ],
-      case_study: [
-        { criteria: ['Analysis quality and insights'], weight: 40 },
-        { criteria: ['Proposed solutions relevance'], weight: 35 },
-        { criteria: ['Supporting evidence and reasoning'], weight: 25 },
-      ],
-      debugging: [
-        { criteria: ['Bug identification accuracy'], weight: 40 },
-        { criteria: ['Fix correctness'], weight: 40 },
-        { criteria: ['Explanation of root cause'], weight: 20 },
-      ],
-      design: [
-        { criteria: ['Design completeness and feasibility'], weight: 40 },
-        { criteria: ['Meeting requirements'], weight: 35 },
-        { criteria: ['Innovation and best practices'], weight: 25 },
-      ],
-    };
-
-    return criteriaByType[exerciseType];
-  }
-
-  /**
-   * Build lesson metadata
-   *
-   * @param targetAudience - Target audience type
-   * @param contentArchetype - Content archetype for the lesson
-   * @param analysisResult - Full analysis for tone inference
-   * @returns Lesson metadata
-   */
-  private buildLessonMetadata(
-    targetAudience: TargetAudienceV2,
-    contentArchetype: 'code_tutorial' | 'concept_explainer' | 'case_study' | 'legal_warning',
-    analysisResult: AnalysisResult
-  ): LessonMetadataV2 {
-    // Infer tone from analysis
-    const analysisTone = analysisResult.generation_guidance?.tone;
-    const tone: ContentToneV2 =
-      analysisTone === 'formal academic' ? 'formal' : 'conversational-professional';
-
-    // Legal content requires strict compliance
-    const complianceLevel: ComplianceLevelV2 =
-      contentArchetype === 'legal_warning' ? 'strict' : 'standard';
-
-    return {
-      target_audience: targetAudience,
-      tone,
-      compliance_level: complianceLevel,
-      content_archetype: contentArchetype,
-    };
-  }
-
-  /**
-   * Estimate lesson duration based on section data
-   *
-   * @param section - Section breakdown
-   * @param objectiveCount - Number of learning objectives
-   * @returns Estimated duration in minutes (3-45)
-   */
-  private estimateLessonDuration(section: SectionBreakdown, objectiveCount: number): number {
-    // Base calculation from section estimated_duration_hours
-    if (section.estimated_duration_hours) {
-      const sectionMinutes = section.estimated_duration_hours * 60;
-      const lessonCount = section.estimated_lessons || V2_SPEC_DEFAULTS.DEFAULT_LESSONS_PER_SECTION;
-      const baseMinutes = Math.floor(sectionMinutes / lessonCount);
-      return Math.min(45, Math.max(3, baseMinutes));
-    }
-
-    // Estimate based on objective count (more objectives = longer lesson)
-    const baseMinutes = V2_SPEC_DEFAULTS.DEFAULT_LESSON_DURATION_MINUTES;
-    const adjusted = baseMinutes + objectiveCount * 3;
-
-    return Math.min(45, Math.max(3, adjusted));
-  }
-
-  /**
-   * Generate lesson title
-   *
-   * @param area - Section area
-   * @param lessonNumber - Lesson number within section
-   * @param totalLessons - Total lessons in section
-   * @returns Generated lesson title
-   */
-  private generateLessonTitle(area: string, lessonNumber: number, totalLessons: number): string {
-    if (totalLessons === 1) {
-      return area;
-    }
-
-    // Create progression-based titles
-    const progressions = [
-      'Introduction to',
-      'Deep Dive:',
-      'Advanced',
-      'Practical Applications of',
-      'Mastering',
-    ];
-
-    const progressionIndex = Math.min(lessonNumber - 1, progressions.length - 1);
-    return `${progressions[progressionIndex]} ${area}`;
-  }
-
-  /**
-   * Generate lesson description
-   *
-   * @param section - Section breakdown
-   * @param lessonNumber - Lesson number
-   * @param totalLessons - Total lessons
-   * @param objectives - Learning objectives
-   * @returns Generated description
-   */
-  private generateLessonDescription(
-    section: SectionBreakdown,
-    lessonNumber: number,
-    totalLessons: number,
-    objectives: LearningObjectiveV2[]
-  ): string {
-    const mainObjective = objectives[0]?.objective || section.area;
-
-    if (totalLessons === 1) {
-      return `This lesson covers ${section.area}. You will learn to ${mainObjective.toLowerCase()}.`;
-    }
-
-    return `Lesson ${lessonNumber} of ${totalLessons} in the ${section.area} series. Focus: ${mainObjective}`;
-  }
-
-  /**
-   * Distribute learning objectives across lessons
-   *
-   * Divides the section's objectives among its lessons to ensure
-   * each lesson has relevant objectives.
-   *
-   * @param objectives - All section objectives
-   * @param lessonIndex - Zero-based lesson index
-   * @param totalLessons - Total lessons in section
-   * @returns Objectives for this lesson
-   */
-  private distributeLearningObjectives(
-    objectives: string[],
-    lessonIndex: number,
-    totalLessons: number
-  ): string[] {
-    if (objectives.length === 0) {
-      return [];
-    }
-
-    if (totalLessons === 1) {
-      return objectives;
-    }
-
-    // Calculate objectives per lesson
-    const objectivesPerLesson = Math.max(1, Math.ceil(objectives.length / totalLessons));
-    const startIndex = lessonIndex * objectivesPerLesson;
-    const endIndex = Math.min(startIndex + objectivesPerLesson, objectives.length);
-
-    // Get slice for this lesson
-    const lessonObjectives = objectives.slice(startIndex, endIndex);
-
-    // If last lesson and no objectives assigned, give it the last one
-    if (lessonObjectives.length === 0 && lessonIndex === totalLessons - 1) {
-      return [objectives[objectives.length - 1]];
-    }
-
-    return lessonObjectives;
-  }
 }
-
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-export { V2_SPEC_DEFAULTS };

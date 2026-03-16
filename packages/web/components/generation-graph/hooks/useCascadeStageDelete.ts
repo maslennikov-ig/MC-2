@@ -129,7 +129,7 @@ export function useCascadeStageDelete(
         performSave(fieldPath, value)
       }
     },
-    [courseId, sourceStage, performSave]
+    [courseId, sourceStage, performSave, utils.generation.checkDownstreamStages]
   )
 
   // Sync wrapper for EditableField onChange (avoids @typescript-eslint/no-misused-promises)

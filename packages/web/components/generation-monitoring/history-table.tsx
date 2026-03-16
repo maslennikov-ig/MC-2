@@ -115,18 +115,16 @@ function calculateDuration(
 }
 
 // Status keys for type-safe translations
-const STATUS_KEYS = [
-  'pending',
-  'stage_2_processing',
-  'stage_3_summarizing',
-  'stage_4_analyzing',
-  'stage_5_generating',
-  'finalizing',
-  'completed',
-  'failed',
-  'cancelled',
-] as const
-type StatusKey = (typeof STATUS_KEYS)[number]
+type StatusKey = 
+  | 'pending'
+  | 'stage_2_processing'
+  | 'stage_3_summarizing'
+  | 'stage_4_analyzing'
+  | 'stage_5_generating'
+  | 'finalizing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
 
 export function HistoryTable() {
   const router = useRouter()

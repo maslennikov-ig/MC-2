@@ -69,7 +69,7 @@ export function ModelBrowser({ onSelectModel }: ModelBrowserProps) {
   // tRPC query for OpenRouter models
   const { data: modelsData, isLoading } = trpc.pipelineAdmin.listOpenRouterModels.useQuery()
 
-  const models = modelsData?.models ?? []
+  const models = useMemo(() => modelsData?.models ?? [], [modelsData?.models])
   const fromCache = modelsData?.fromCache ?? false
   const cacheAge = modelsData?.cacheAge
 

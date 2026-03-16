@@ -373,6 +373,7 @@ function GraphViewInner({
         void fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 300 })
       })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialFitDone is a stable ref, not a reactive value
   }, [nodesInitialized, nodes.length, fitView])
 
   // Prepare Realtime Context

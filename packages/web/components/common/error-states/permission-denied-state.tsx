@@ -32,6 +32,7 @@ export function PermissionDeniedState({
   const t = useTranslations('common.errors.forbidden')
 
   const getRoleLabel = (role: string): string => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party untyped API dynamic key
     const roleKey = `roles.${role}` as any
     try {
       return t(roleKey)

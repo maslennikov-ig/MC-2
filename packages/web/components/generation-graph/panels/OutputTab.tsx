@@ -121,7 +121,7 @@ export const OutputTab = ({
     if (nodeType === 'module') {
       return (
         <ModuleSummaryView
-          data={outputData as any}
+          data={outputData as React.ComponentProps<typeof ModuleSummaryView>['data']}
           locale={locale}
           courseId={courseId}
           readOnly={readOnly}
@@ -132,7 +132,7 @@ export const OutputTab = ({
     // Show lesson content for lesson nodes (default for stage 6)
     return (
       <LessonContentView
-        data={outputData as any}
+        data={outputData as React.ComponentProps<typeof LessonContentView>['data']}
         locale={locale}
         courseId={courseId}
         editable={editable}

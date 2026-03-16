@@ -8,6 +8,7 @@ import {
   type Namespace,
   type Locale,
 } from './config'
+import { logger } from "@/lib/logger";
 
 type Messages = Record<Namespace, Record<string, unknown>>
 
@@ -27,12 +28,12 @@ async function loadNamespace(
   } catch (error) {
     // In development, fail fast to catch missing translations early
     if (process.env.NODE_ENV === 'development') {
-      console.error(`[i18n] Failed to load namespace "${namespace}" for locale "${locale}":`, error)
+      logger.error(`[i18n] Failed to load namespace "${namespace}" for locale "${locale}":`, { data: error })
       throw new Error(`Missing translation namespace: ${namespace} for locale: ${locale}`)
     }
 
     // In production, log error and try fallback
-    console.error(`Failed to load namespace "${namespace}" for locale "${locale}":`, error)
+    logger.error(`Failed to load namespace "${namespace}" for locale "${locale}":`, { data: error })
 
     // If already trying default locale, return empty object
     if (locale === defaultLocale) {
@@ -42,10 +43,10 @@ async function loadNamespace(
     // Try to load default locale namespace as fallback
     try {
       const fallbackModule = await import(`../../messages/${defaultLocale}/${namespace}.json`)
-      console.warn(`Using fallback locale "${defaultLocale}" for namespace "${namespace}"`)
+      logger.warn(`Using fallback locale "${defaultLocale}" for namespace "${namespace}"`)
       return fallbackModule.default
     } catch {
-      console.error(`Failed to load fallback namespace "${namespace}"`)
+      logger.error(`Failed to load fallback namespace "${namespace}"`)
       return {}
     }
   }

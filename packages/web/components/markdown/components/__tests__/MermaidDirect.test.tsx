@@ -488,7 +488,7 @@ describe('MermaidDirect', () => {
         takeRecords() {
           return []
         }
-      } as any
+      } as unknown as typeof MutationObserver
 
       const { unmount } = render(<MermaidDirect chart="graph TD\n  A-->B" />)
 
@@ -667,8 +667,8 @@ describe('MermaidDirect', () => {
   describe('Race conditions', () => {
     it('should discard stale render when chart changes rapidly', async () => {
       // Create controllable promises
-      let resolveFirstRender: (value: any) => void
-      let resolveSecondRender: (value: any) => void
+      let resolveFirstRender: (value: { svg: string; bindFunctions?: unknown }) => void
+      let resolveSecondRender: (value: { svg: string; bindFunctions?: unknown }) => void
 
       const firstRenderPromise = new Promise((resolve) => {
         resolveFirstRender = resolve
@@ -678,9 +678,9 @@ describe('MermaidDirect', () => {
       })
 
       // First call takes longer
-      mockRender.mockImplementationOnce(() => firstRenderPromise as any)
+      mockRender.mockImplementationOnce(() => firstRenderPromise)
       // Second call resolves faster
-      mockRender.mockImplementationOnce(() => secondRenderPromise as any)
+      mockRender.mockImplementationOnce(() => secondRenderPromise)
 
       const { container, rerender } = render(<MermaidDirect chart="graph TD\n  A-->B" />)
 

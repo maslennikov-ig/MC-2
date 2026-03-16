@@ -22,7 +22,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Worker, Job } from 'bullmq';
 import { getRedisClient, REDIS_UNAVAILABLE_EVENT } from '../shared/cache/redis';
-import { JobData, JobType } from '@megacampus/shared-types';
+import { JobData, JobType, type Json } from '@megacampus/shared-types';
 import logger from '../shared/logger';
 import { logger as baseLogger } from '@megacampus/shared-logger';
 import { QUEUE_NAME } from './queue';
@@ -130,10 +130,6 @@ const registeredJobTypes = [
   JobType.STRUCTURE_GENERATION,
   JobType.LESSON_CONTENT,
   JobType.BLOCK_REGENERATION,
-  // TODO (Stage 1+): Register additional handlers
-  // JobType.SUMMARY_GENERATION,
-  // JobType.TEXT_GENERATION,
-  // JobType.FINALIZATION,
 ];
 
 /**
@@ -384,26 +380,38 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             const t = getTranslator(locale as Locale);
             const message = t(`steps.${stepId}.failed`);
 
+            const safetyNetErrorMsg =
+              error?.message || error?.stack?.split('\n')[0] || 'Worker thread crashed';
             await supabase.rpc('update_course_progress', {
               p_course_id: courseId,
               p_step_id: stepId,
               p_status: 'failed',
               p_message: message,
+              p_error_message: safetyNetErrorMsg,
+              p_error_details: { stack: error?.stack, name: error?.name } as Json,
               p_metadata: {
                 job_id: job.id,
                 worker_type: jobType,
-                error_message:
-                  error?.message ||
-                  error?.stack?.split('\n')[0] ||
-                  'Worker thread crashed (no error details)',
                 safety_net: true,
-              },
+              } as Json,
             });
 
             logger.info(
               { courseId, stepId, jobType },
               'Safety net: updated course progress after sandbox failure'
             );
+
+            // Also update file_catalog for document processing jobs
+            const fileId = (job.data as Record<string, unknown>)?.fileId as string;
+            if (fileId && jobType === JobType.DOCUMENT_PROCESSING) {
+              await supabase
+                .from('file_catalog')
+                .update({
+                  vector_status: 'failed',
+                  error_message: safetyNetErrorMsg.substring(0, 1000),
+                })
+                .eq('id', fileId);
+            }
           } catch (progressError) {
             const errMsg =
               progressError instanceof Error ? progressError.message : String(progressError);

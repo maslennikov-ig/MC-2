@@ -89,7 +89,7 @@ export function updateDocumentSteps(
           id: docId,
           name: displayName,
           steps: [newStep],
-          priority: trace.input_data?.priority as any,
+          priority: trace.input_data?.priority as DocumentWithSteps['priority'],
         })
       }
       hasChanges = true

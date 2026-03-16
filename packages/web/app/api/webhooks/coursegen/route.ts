@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
               courseId: payload.courseId,
               webhookStatus: payload.status,
             },
-          }).catch((e) => console.error('Log write failed:', e.message))
+          }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
           return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
         }
@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
               courseId: payload.courseId,
               webhookStatus: 'completed',
             },
-          }).catch((e) => console.error('Log write failed:', e.message))
+          }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
           return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
         }
@@ -329,7 +329,7 @@ export async function POST(request: NextRequest) {
               webhookStatus: 'failed',
               originalError: payload.error,
             },
-          }).catch((e) => console.error('Log write failed:', e.message))
+          }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
           return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
         }
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
             courseId: payload.courseId,
             webhookStatus: 'failed',
           },
-        }).catch((e) => console.error('Log write failed:', e.message))
+        }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
         logger.error('Course generation failed', {
           courseId: payload.courseId,
@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
         route: '/api/webhooks/coursegen',
         errorCode: 'INTERNAL_ERROR',
       },
-    }).catch((e) => console.error('Log write failed:', e.message))
+    }).catch((e) => logger.error('Log write failed:', { data: e.message }))
 
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
