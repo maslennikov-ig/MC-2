@@ -211,6 +211,7 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
   const [healthData, setHealthData] = useState<HealthResponse | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isAuthError, setIsAuthError] = useState(false)
   const [countdown, setCountdown] = useState(autoRefreshInterval)
 
   // Fetch health data
@@ -224,6 +225,7 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           setError(t('error.unauthorized'))
+          setIsAuthError(true) // Stop auto-refresh on auth errors
         } else {
           setError(t('error.fetchFailed'))
         }
@@ -232,6 +234,7 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
 
       const data: HealthResponse = await response.json()
       setHealthData(data)
+      setIsAuthError(false) // Auth is valid, allow auto-refresh
       setCountdown(autoRefreshInterval)
     } catch {
       setError(t('error.fetchFailed'))
@@ -245,9 +248,9 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
     void fetchHealth()
   }, [fetchHealth])
 
-  // Auto-refresh countdown
+  // Auto-refresh countdown (pauses on auth errors to prevent 401 spam)
   useEffect(() => {
-    if (autoRefreshInterval <= 0) return
+    if (autoRefreshInterval <= 0 || isAuthError) return
 
     const interval = setInterval(() => {
       setCountdown((prev) => {
@@ -260,7 +263,7 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [autoRefreshInterval, fetchHealth])
+  }, [autoRefreshInterval, fetchHealth, isAuthError])
 
   // Loading skeleton
   if (!healthData && !error) {
@@ -349,7 +352,9 @@ export function SystemHealthMonitor({ autoRefreshInterval = 30 }: SystemHealthMo
       {/* Last Check Timestamp */}
       <p className="text-right text-xs text-gray-500 dark:text-gray-400">
         {t('lastCheck')}:{' '}
-        <time className="font-mono">{new Date(healthData.timestamp).toLocaleTimeString()}</time>
+        <time className="font-mono" suppressHydrationWarning>
+          {new Date(healthData.timestamp).toLocaleTimeString()}
+        </time>
       </p>
     </div>
   )

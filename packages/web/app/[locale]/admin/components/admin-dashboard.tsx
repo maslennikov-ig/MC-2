@@ -23,7 +23,10 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, href }: StatCardP
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
-          <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
+          <p
+            className="mt-1 text-3xl font-bold text-gray-900 dark:text-white"
+            suppressHydrationWarning
+          >
             {value.toLocaleString()}
           </p>
           {trend && trend.value > 0 && (

@@ -24,13 +24,26 @@ import { CONTENT_LABELS } from '@megacampus/shared-types';
  * they are consumed by .replace()/.match() (which reset lastIndex), not .test().
  * extractForeignCharFragments creates new RegExp instances for matchAll iteration.
  */
-const FOREIGN_SCRIPT_PATTERNS: Record<string, RegExp> = {
-  CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]/,
-  ARABIC: /[\u0600-\u06FF]/,
-  DEVANAGARI: /[\u0900-\u097F]/,
-  THAI: /[\u0E00-\u0E7F]/,
-  HEBREW: /[\u0590-\u05FF]/,
-};
+/**
+ * Regex factory for foreign script detection (returns new RegExp instance each time)
+ * Avoids any shared state/lastIndex mutation issues.
+ */
+function getForeignScriptPattern(scriptKey: string): RegExp | null {
+  switch (scriptKey) {
+    case 'CJK':
+      return /[\u4E00-\u9FFF\u3400-\u4DBF]/;
+    case 'ARABIC':
+      return /[\u0600-\u06FF]/;
+    case 'DEVANAGARI':
+      return /[\u0900-\u097F]/;
+    case 'THAI':
+      return /[\u0E00-\u0E7F]/;
+    case 'HEBREW':
+      return /[\u0590-\u05FF]/;
+    default:
+      return null;
+  }
+}
 
 /**
  * Find sections containing foreign script characters
@@ -88,7 +101,7 @@ export function findSectionsWithForeignCharacters(
 
     let hasForeignChars = false;
     for (const scriptKey of scriptsToFind) {
-      const pattern = FOREIGN_SCRIPT_PATTERNS[scriptKey];
+      const pattern = getForeignScriptPattern(scriptKey);
       if (pattern && pattern.test(proseContent)) {
         hasForeignChars = true;
         break;
@@ -170,7 +183,7 @@ export function extractForeignCharFragments(
   const proseContent = content.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '');
 
   for (const scriptKey of scriptsFound) {
-    const pattern = FOREIGN_SCRIPT_PATTERNS[scriptKey];
+    const pattern = getForeignScriptPattern(scriptKey);
     if (!pattern) continue;
 
     // Use matchAll for safe iteration (no lastIndex mutation)
@@ -286,13 +299,26 @@ export function protectMarkdownElements(content: string): ProtectedContent {
  * Global regex patterns for foreign script character removal
  * Uses /g flag since we need to replace ALL occurrences
  */
-const FOREIGN_SCRIPT_STRIP_PATTERNS: Record<string, RegExp> = {
-  CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]+/g,
-  ARABIC: /[\u0600-\u06FF]+/g,
-  DEVANAGARI: /[\u0900-\u097F]+/g,
-  THAI: /[\u0E00-\u0E7F]+/g,
-  HEBREW: /[\u0590-\u05FF]+/g,
-};
+/**
+ * Regex factory for foreign script character removal.
+ * Returns new instances with the /g flag to avoid shared lastIndex mutation risk.
+ */
+function getForeignScriptStripPattern(scriptKey: string): RegExp | null {
+  switch (scriptKey) {
+    case 'CJK':
+      return /[\u4E00-\u9FFF\u3400-\u4DBF]+/g;
+    case 'ARABIC':
+      return /[\u0600-\u06FF]+/g;
+    case 'DEVANAGARI':
+      return /[\u0900-\u097F]+/g;
+    case 'THAI':
+      return /[\u0E00-\u0E7F]+/g;
+    case 'HEBREW':
+      return /[\u0590-\u05FF]+/g;
+    default:
+      return null;
+  }
+}
 
 /**
  * Strip foreign script characters from content while preserving code blocks
@@ -326,10 +352,8 @@ export function stripForeignScriptCharacters(
 
   // Strip foreign characters from prose text
   for (const scriptKey of scriptsToStrip) {
-    const sourcePattern = FOREIGN_SCRIPT_STRIP_PATTERNS[scriptKey];
-    if (sourcePattern) {
-      // Create new instance to avoid mutating shared module-level constant
-      const pattern = new RegExp(sourcePattern.source, 'g');
+    const pattern = getForeignScriptStripPattern(scriptKey);
+    if (pattern) {
       const matches = processedContent.match(pattern);
       if (matches) {
         fixCount += matches.length;
@@ -363,23 +387,25 @@ export function stripForeignScriptCharacters(
  * - Use .*? for minimal matching to avoid over-removal
  * - Include sentence-ending punctuation to capture complete phrases
  */
-const CHATBOT_ARTIFACT_PATTERNS: RegExp[] = [
-  // English patterns - sentences that can appear anywhere
-  /Sure[,!]?\s*(?:here\s+is|I('ll|'d)\s+(?:explain|help|provide)|let\s+me).*?[!.]/gim,
-  /(?:As\s+)?(?:an?\s+)?AI\s+(?:language\s+)?model.*?[.!]/gim,
-  /I\s+(?:hope|think)\s+this\s+(?:\w+\s+)?helps?.*?[!.]/gim,
-  /(?:In\s+conclusion,?\s+)?I\s+have\s+(?:explained|shown|demonstrated).*?[.!]/gim,
-  /Let\s+me\s+know\s+if\s+(?:you\s+)?(?:need|have|want).*?[.!]/gim,
-  /Feel\s+free\s+to\s+(?:ask|reach\s+out).*?[.!]/gim,
-  /(?:Certainly|Absolutely)[!,]?\s*(?:I('ll|'d)\s+)?.*?[!.]/gim,
-  /Of\s+course[!,]?\s*(?:I('ll|'d)\s+)?.*?[!.]/gim,
-  // Russian patterns
-  /Конечно[,!]?\s*(?:я\s+)?(?:объясню|расскажу|помогу).*?[!.]/gim,
-  /Как\s+(?:языковая\s+)?модель\s+(?:ИИ|AI).*?[.!]/gim,
-  /Надеюсь,?\s+(?:это\s+)?(?:поможет|помогло).*?[!.]/gim,
-  /(?:В\s+заключение,?\s+)?я\s+(?:объяснил|рассказал|показал).*?[.!]/gim,
-  /(?:Если\s+)?(?:у\s+вас\s+)?есть\s+(?:вопросы|что-то).*?[.!]/gim,
-];
+function getChatbotArtifactPatterns(): RegExp[] {
+  return [
+    // English patterns - sentences that can appear anywhere
+    /Sure[,!]?\s*(?:here\s+is|I('ll|'d)\s+(?:explain|help|provide)|let\s+me).*?[!.]/gim,
+    /(?:As\s+)?(?:an?\s+)?AI\s+(?:language\s+)?model.*?[.!]/gim,
+    /I\s+(?:hope|think)\s+this\s+(?:\w+\s+)?helps?.*?[!.]/gim,
+    /(?:In\s+conclusion,?\s+)?I\s+have\s+(?:explained|shown|demonstrated).*?[.!]/gim,
+    /Let\s+me\s+know\s+if\s+(?:you\s+)?(?:need|have|want).*?[.!]/gim,
+    /Feel\s+free\s+to\s+(?:ask|reach\s+out).*?[.!]/gim,
+    /(?:Certainly|Absolutely)[!,]?\s*(?:I('ll|'d)\s+)?.*?[!.]/gim,
+    /Of\s+course[!,]?\s*(?:I('ll|'d)\s+)?.*?[!.]/gim,
+    // Russian patterns
+    /Конечно[,!]?\s*(?:я\s+)?(?:объясню|расскажу|помогу).*?[!.]/gim,
+    /Как\s+(?:языковая\s+)?модель\s+(?:ИИ|AI).*?[.!]/gim,
+    /Надеюсь,?\s+(?:это\s+)?(?:поможет|помогло).*?[!.]/gim,
+    /(?:В\s+заключение,?\s+)?я\s+(?:объяснил|рассказал|показал).*?[.!]/gim,
+    /(?:Если\s+)?(?:у\s+вас\s+)?есть\s+(?:вопросы|что-то).*?[.!]/gim,
+  ];
+}
 
 /**
  * Remove chatbot artifacts from content while preserving code blocks and mermaid diagrams
@@ -403,7 +429,7 @@ export function removeChatbotArtifacts(content: string): string {
   let processedContent = proseContent;
 
   // Apply chatbot artifact removal to prose text only
-  for (const pattern of CHATBOT_ARTIFACT_PATTERNS) {
+  for (const pattern of getChatbotArtifactPatterns()) {
     processedContent = processedContent.replace(pattern, '');
   }
 
@@ -427,24 +453,23 @@ export function removeChatbotArtifacts(content: string): string {
 let enToRuHeaderMap: Map<string, string> | null = null;
 
 function getEnToRuHeaderMap(): Map<string, string> {
-  if (enToRuHeaderMap) return enToRuHeaderMap;
+  if (enToRuHeaderMap !== null) return enToRuHeaderMap;
 
-  enToRuHeaderMap = new Map<string, string>();
+  const map = new Map<string, string>();
   const enLabels = CONTENT_LABELS['en'];
   const ruLabels = CONTENT_LABELS['ru'];
 
-  if (!enLabels || !ruLabels) {
-    return new Map();
-  }
-
-  for (const key of Object.keys(enLabels) as Array<keyof typeof enLabels>) {
-    const enValue = enLabels[key];
-    const ruValue = ruLabels[key];
-    if (enValue.toLowerCase() !== ruValue.toLowerCase()) {
-      enToRuHeaderMap.set(enValue.toLowerCase(), ruValue);
+  if (enLabels && ruLabels) {
+    for (const key of Object.keys(enLabels) as Array<keyof typeof enLabels>) {
+      const enValue = enLabels[key];
+      const ruValue = ruLabels[key];
+      if (enValue.toLowerCase() !== ruValue.toLowerCase()) {
+        map.set(enValue.toLowerCase(), ruValue);
+      }
     }
   }
 
+  enToRuHeaderMap = map;
   return enToRuHeaderMap;
 }
 
