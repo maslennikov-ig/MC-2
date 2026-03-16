@@ -28,6 +28,7 @@ export interface NotebookLMBridgeGenerateRequest {
   script: string;
   language: string;
   courseId?: string;
+  lessonId?: string;
   voice?: string;
   targetDurationMinutes?: number;
   durationRangeMinMinutes?: number;

@@ -347,6 +347,7 @@ async function generateFinal(
       script: normalizedDraft.script,
       language,
       courseId: enrichmentContext.course.id,
+      lessonId: enrichmentContext.lesson.id,
       voice: normalizedDraft.voice_id,
       sources,
       audioFormat: audioFormatPreset,

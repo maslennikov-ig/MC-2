@@ -338,8 +338,9 @@ async function generateFinal(
     const start = await notebookLmBridgeClient.startVideo({
       lessonTitle: enrichmentContext.lesson.title,
       script: parsedDraft.fullScript,
-      language: enrichmentContext.course.language || 'en',
+      language: enrichmentContext.course.language,
       courseId: enrichmentContext.course.id,
+      lessonId: enrichmentContext.lesson.id,
       sources,
       videoFormat: videoFormatPreset,
       videoStyle: videoStylePreset,

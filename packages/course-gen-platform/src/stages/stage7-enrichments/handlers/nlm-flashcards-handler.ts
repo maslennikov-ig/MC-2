@@ -214,6 +214,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     script: lessonContent,
     language,
     courseId: enrichmentContext.course.id,
+    lessonId: enrichmentContext.lesson.id,
     sources,
     flashcardDifficulty: difficulty,
     flashcardCount: cardCount,
