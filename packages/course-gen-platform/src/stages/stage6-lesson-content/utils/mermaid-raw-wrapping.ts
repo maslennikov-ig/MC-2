@@ -65,14 +65,14 @@ const RAW_MERMAID_KEYWORD_REGEX = new RegExp(
  *   specific to flowchart/graph diagrams
  */
 const MERMAID_SYNTAX_PATTERNS: RegExp[] = [
-  /-->|---|-\.->|==>|~~~/, // Mermaid arrows (very specific)
+  /-->|-\.->|==>|~~~/, // Mermaid arrows (excluding bare ---)
+  /\w\s*---\s*\w/, // Node to node link with ---
   /^\s+\w+\s*-->|^\s+\w+\s*---/m, // Indented node with arrow (e.g. "  A --> B")
   /subgraph\s+\w/i, // "subgraph Name" (not bare "subgraph" or "end")
-  /^\s*end\s*$/m, // "end" alone on a line (Mermaid block closer)
   /^participant\s+\w/im, // "participant Alice" (sequence diagrams)
   /^actor\s+\w/im, // "actor User" (sequence diagrams)
   /"[^"]+"\s*:\s*\d/, // gantt/pie data: "Label" : 42
-  /^\s+\w+[\[\\({\\|]/m, // Indented node with shape bracket: "  A[text]"
+  /^\s+\w+[\[({|]/m, // Indented node with shape bracket: "  A[text]"
 ];
 
 /**
@@ -83,11 +83,12 @@ const MERMAID_SYNTAX_PATTERNS: RegExp[] = [
  * is still continuing — prose keywords must never trigger continuation.
  */
 const MERMAID_CONTINUATION_PATTERNS: RegExp[] = [
-  /-->|---|-\.->|==>|~~~/, // Mermaid arrows
+  /-->|-\.->|==>|~~~/, // Mermaid arrows
+  /\w\s*---\s*\w/, // Node to node link with ---
   /^\s+\w+\s*-->|^\s+\w+\s*---/m, // Indented node with arrow
-  /^\s*end\s*$/m, // "end" alone on a line
+  /^\s*end\s*$/m, // "end" alone on a line remains safe as a block continuation
   /"[^"]+"\s*:\s*\d/, // pie/gantt data
-  /^\s+\w+[\[\\({\\|]/m, // Indented node with shape bracket
+  /^\s+\w+[\[({|]/m, // Indented node with shape bracket
 ];
 
 // ============================================================================

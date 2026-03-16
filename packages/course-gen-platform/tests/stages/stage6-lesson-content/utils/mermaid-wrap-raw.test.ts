@@ -281,4 +281,56 @@ describe('wrapRawMermaidBlocks (via runMermaidFixPipeline Stage 0)', () => {
       expect(result.metrics.diagramsAutoWrapped).toBe(1);
     });
   });
+
+  describe('False positive protection — strict syntax patterns', () => {
+    it('should NOT wrap prose containing markdown horizontal rule (---)', async () => {
+      const content = [
+        'graph',
+        '',
+        'Chapter 1: Introduction',
+        '',
+        '---',
+        '',
+        'This is a new section after a horizontal rule.',
+      ].join('\n');
+      const result = await run(content);
+      expect(result.metrics.diagramsAutoWrapped).toBe(0);
+    });
+
+    it('should NOT wrap text that has "graph" keyword followed by normal prose with dashes', async () => {
+      const content = [
+        'graph',
+        'The student should understand the following concepts:',
+        '- First concept',
+        '- Second concept',
+        '---',
+        'Next topic begins here.',
+      ].join('\n');
+      const result = await run(content);
+      expect(result.metrics.diagramsAutoWrapped).toBe(0);
+    });
+
+    it('should NOT wrap timeline keyword followed by normal numbered list', async () => {
+      const content = [
+        'timeline',
+        '1. First event in 2020',
+        '2. Second event in 2021',
+        '3. Third event in 2022',
+      ].join('\n');
+      const result = await run(content);
+      expect(result.metrics.diagramsAutoWrapped).toBe(0);
+    });
+
+    it('should NOT wrap "end" appearing alone in educational prose', async () => {
+      const content = [
+        'graph',
+        'The process described above has a beginning and an',
+        'end',
+        '',
+        'What follows next is the conclusion.',
+      ].join('\n');
+      const result = await run(content);
+      expect(result.metrics.diagramsAutoWrapped).toBe(0);
+    });
+  });
 });
