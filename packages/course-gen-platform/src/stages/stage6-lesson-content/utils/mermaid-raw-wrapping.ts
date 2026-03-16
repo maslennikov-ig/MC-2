@@ -42,7 +42,7 @@ const MERMAID_KEYWORDS = [
  * Must be at the start of a line; captures the full keyword line.
  */
 const RAW_MERMAID_KEYWORD_REGEX = new RegExp(
-  `^(${MERMAID_KEYWORDS.join('|')})(?:\\\\s+(TD|TB|BT|RL|LR))?\\\\s*$`,
+  `^(${MERMAID_KEYWORDS.join('|')})(?:\\s+(TD|TB|BT|RL|LR))?\\s*$`,
   'im'
 );
 
