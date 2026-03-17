@@ -2,6 +2,24 @@
 
 _Released on 2025-12-26_
 
+## v0.31.23
+
+_Released on 2026-03-17_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Increase LLM timeouts across all stages to prevent OpenRouter AbortErrors
+- **pipeline**: Increase Phase 0.5 LLM timeout to 30min with adaptive scaling
+- **shared-types**: Add post-build script to fix ESM import extensions
+- **pipeline**: Inline shared-utils in tsup bundle to fix ESM resolution
+- **pipeline**: Improve extractErrorMessage comment explaining \_sandboxError reliability
+- **pipeline**: Address code review findings for sandbox error capture
+- **pipeline**: Fix sandbox error capture with prependListener and cleanup dead code
+
+---
+
+_This release was automatically generated from 9 commits._
+
 ## v0.31.22
 
 _Released on 2026-03-17_

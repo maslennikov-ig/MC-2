@@ -43,7 +43,7 @@ export const HANDLER_CONFIG = {
  * Default job timeout in milliseconds (5 minutes per lesson)
  * Used as fallback when database config is unavailable
  */
-export const DEFAULT_JOB_TIMEOUT_MS = 300_000;
+export const DEFAULT_JOB_TIMEOUT_MS = 1_800_000; // 30 min — budget models via OpenRouter need generous timeouts
 
 /**
  * Model fallback configuration for retry strategy (FALLBACK ONLY)

@@ -1,100 +1,111 @@
-# Fix: Stage 2 Document Processing — Root Cause Investigation & Fix
+# Fix: VMF-9315 Stage 4 Failure — LLM Timeout in Phase 0.5 (Clarifying Questions)
 
 ## Context
 
-**Problem**: ALL document processing jobs (Stage 2) fail. After deploying v0.31.22 (Error Sandwich Pattern), error messages improved to `"Worker thread crashed (error details lost in sandbox serialization)"` but `_sandboxError` is NEVER saved — meaning the error bypasses ALL our error handling.
+**Problem**: Курс VMF-9315 (course_id: `1ba4cbea-a17a-4d45-9c43-2eadca8b7a0e`) успешно прошёл Stages 1-3, но Stage 4 падает на Phase 0.5 (Clarifying Questions). Все 3 попытки (`attemptsMade: 3`) заканчиваются одинаковым таймаутом.
 
-**Evidence from UEE-1826** (created AFTER v0.31.22 deploy):
+**Error**: `AbortError: This operation was aborted` в `phase-0.5-clarifying.ts:92:18`
 
-- `error_message`: "Worker thread crashed..." (fallback #4 from `extractErrorMessage`)
-- `_sandboxError`: NOT in job data (never saved)
-- No `[Sandbox]` prefix entries in error_logs (processJob catch block never executes)
-- `attemptsMade: 3` — all attempts fail identically
-- Stack: `sandbox.ts:38` — BullMQ parent-side `new Error()` + `Object.assign(err, msg.value)`
+**Root Cause**: LLM-запрос к модели `xiaomi/mimo-v2-flash` через OpenRouter не завершается за 5 минут (300,000ms). Документ — 9.2 MB DOCX (~10,404 токенов). Таймаут задан жёстко через `AbortController` + `setTimeout`.
 
-**Root cause analysis** (verified by reading BullMQ v5.66.3 source code):
+**Error flow**:
 
-1. BullMQ `main-base.js:31` registers `process.on('uncaughtException')` **BEFORE** importing processor.ts
-2. Our processor.ts:290-291 registers handlers with `process.on()` — appends to END of listener array
-3. When uncaught exception fires, BullMQ's handler runs FIRST → `send({cmd: Failed})` → `process.exit()`
-4. Our handler runs SECOND → tries `updateData()` → but `process.exit()` kills the thread
-5. Parent receives Failed with empty error (no Update message with `_sandboxError`)
-6. `extractErrorMessage` can't find `_sandboxError` → returns generic fallback
+1. `phase-0.5-clarifying.ts:90-94` — создаётся `AbortController` с таймаутом 300s
+2. `phase-0.5-clarifying.ts:98-100` — `model.invoke()` с `signal: controller.signal`
+3. Через 300s `setTimeout` вызывает `controller.abort()` → `AbortError`
+4. `handler-helpers.ts:138` — `AbortError` классифицируется как `LLM_ERROR` → BullMQ retries
+5. Все 3 попытки идентично провалены с тем же таймаутом
 
-**Why processJob catch block never runs**:
-
-- If it ran, `logPermanentFailure` would write `[Sandbox]` entries — none exist in error_logs
-- Error bypasses try/catch entirely → uncaught exception
-
-**MCP SDK finding**: Neither `Protocol` nor transports extend EventEmitter. All errors go through `onerror`/`onclose` callbacks. The `.on('error')` guards we added in client.ts are dead code (transports don't have `.on`).
+**Why 5 min is insufficient**: `xiaomi/mimo-v2-flash` — бюджетная модель через OpenRouter. Для больших промптов (~10K tokens input) с генерацией структурированного JSON (7+ вопросов с ответами, до 16K tokens maxTokens) — 5 минут может быть мало из-за очередей OpenRouter, cold start, или throughput limits.
 
 ## Solution
 
-### Part 1: Code Fixes (before local testing)
+### Fix 1: Увеличить дефолтный таймаут `LLM_CLARIFYING_TIMEOUT_MS` до 10 минут
 
-#### Fix 1: `process.prependListener` — processor.ts:290-291
-
-**File**: `packages/course-gen-platform/src/orchestrator/processor.ts`
-
-Change `process.on` to `process.prependListener` so our handler fires BEFORE BullMQ's:
+**File**: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-0.5-clarifying/utils.ts:10-13`
 
 ```typescript
-// BEFORE (broken — fires AFTER BullMQ's handler which calls process.exit())
-process.on('uncaughtException', captureUncaughtError('uncaughtException'));
-process.on('unhandledRejection', captureUncaughtError('unhandledRejection'));
+// BEFORE
+export const LLM_CLARIFYING_TIMEOUT_MS = parseInt(
+  process.env.LLM_CLARIFYING_TIMEOUT_MS || '300000', // 5 min
+  10
+);
 
-// AFTER (fires FIRST → postMessage(Update) enqueued before BullMQ's Failed + exit)
-process.prependListener('uncaughtException', captureUncaughtError('uncaughtException'));
-process.prependListener('unhandledRejection', captureUncaughtError('unhandledRejection'));
+// AFTER
+export const LLM_CLARIFYING_TIMEOUT_MS = parseInt(
+  process.env.LLM_CLARIFYING_TIMEOUT_MS || '600000', // 10 min
+  10
+);
 ```
 
-Also fix incorrect comment at lines 264-267.
+**Reasoning**: 5 минут слишком агрессивно для LLM через OpenRouter с большим контекстом и maxTokens=16K. 10 минут — стандартный таймаут для production LLM calls.
 
-#### Fix 2: Add diagnostic `console.error` — processor.ts
+### Fix 2: Adaptive timeout на основе размера документа
 
-Add synchronous `console.error` at key points (visible in local pino output):
+**File**: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-0.5-clarifying.ts:90-94`
 
-- Top of `processJob()`: confirm function is called
-- In catch block: confirm errors are caught
-- In `captureUncaughtError`: see actual uncaught error details
+Вместо фиксированного таймаута, масштабировать на основе `totalDocTokens`:
 
-#### Fix 3: Remove dead transport EventEmitter guards — client.ts:169-180
+```typescript
+// BEFORE
+const controller = new AbortController();
+const timeoutId = setTimeout(() => {
+  controller.abort();
+  phaseLogger.warn({ timeoutMs: LLM_CLARIFYING_TIMEOUT_MS }, 'LLM call timed out, aborting');
+}, LLM_CLARIFYING_TIMEOUT_MS);
 
-**File**: `packages/course-gen-platform/src/stages/stage2-document-processing/docling/client.ts`
+// AFTER
+// Adaptive timeout: base + extra time for large documents
+const extraTokens = Math.max(0, (totalDocTokens ?? 0) - 5000);
+const extraTimeMs = Math.ceil(extraTokens / 5000) * 60_000; // +1 min per 5K tokens above 5K
+const adaptiveTimeout = Math.min(LLM_CLARIFYING_TIMEOUT_MS + extraTimeMs, 900_000); // cap 15 min
 
-MCP transports don't extend EventEmitter — `typeof (this.transport as any).on === 'function'` is always false. Remove dead code, add comment explaining callback-based error handling.
+const controller = new AbortController();
+const timeoutId = setTimeout(() => {
+  controller.abort();
+  phaseLogger.warn(
+    { timeoutMs: adaptiveTimeout, totalDocTokens, modelId },
+    'LLM call timed out, aborting'
+  );
+}, adaptiveTimeout);
+```
 
-#### Fix 4: Wrap `client.connect()` more defensively — client.ts
+Для VMF-9315 (~10K tokens): 600_000 + ceil(5000/5000) × 60_000 = 660_000ms (11 min).
 
-In `connect()` method, ensure ALL errors from `this.client.connect(this.transport)` are wrapped with `normalizeError` to guarantee a meaningful message.
+### Fix 3: Улучшенное логирование при AbortError
 
-### Part 2: Local Testing
+**File**: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-0.5-clarifying.ts` (catch block ~line 236)
 
-1. **Check Docker services**: `docker compose up -d redis docling-mcp`
-2. **Verify Docling MCP**: `curl http://localhost:8000/mcp`
-3. **User runs**: `./start-dev.sh`
-4. **Create test course** with document upload in UI
-5. **Observe console** for `[DIAG]` lines — actual error will be visible
-6. **Fix root cause** based on findings
+Добавить специальное сообщение для таймаута в catch блоке:
 
-### Part 3: Fix Root Cause (TBD after local testing)
-
-Likely candidates:
-
-- Docling MCP server not running / wrong URL
-- MCP SDK connection error producing non-Error throw
-- Missing env var (DOCLING_MCP_URL, DOCLING_UPLOADS_BASE_PATH)
+```typescript
+if (error instanceof Error && error.name === 'AbortError') {
+  phaseLogger.error(
+    { adaptiveTimeout, totalDocTokens, modelId },
+    `Phase 0.5 LLM timeout after ${Math.round(adaptiveTimeout / 1000)}s — consider increasing LLM_CLARIFYING_TIMEOUT_MS or switching model`
+  );
+}
+```
 
 ## Files to Modify
 
-| File                                                                                   | Changes                                                                      |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `packages/course-gen-platform/src/orchestrator/processor.ts`                           | `prependListener` (fix handler order), diagnostic console.error, fix comment |
-| `packages/course-gen-platform/src/stages/stage2-document-processing/docling/client.ts` | Remove dead transport guards, defensive connect() wrapping                   |
+| File                                             | Changes                                             |
+| ------------------------------------------------ | --------------------------------------------------- |
+| `.../phases/phase-0.5-clarifying/utils.ts:10-13` | Дефолт `LLM_CLARIFYING_TIMEOUT_MS`: 300000 → 600000 |
+| `.../phases/phase-0.5-clarifying.ts:90-94`       | Adaptive timeout на основе `totalDocTokens`         |
+| `.../phases/phase-0.5-clarifying.ts:236+`        | Специальное логирование AbortError с деталями       |
 
 ## Verification
 
 1. `pnpm --filter course-gen-platform type-check`
-2. `pnpm --filter course-gen-platform test`
-3. Local test via `start-dev.sh` — observe console output
-4. Only push to remote after local verification succeeds
+2. `pnpm --filter course-gen-platform test` — unit тесты
+3. `npx vitest run "phase-0.5"` — если есть специфичные тесты для Phase 0.5
+4. Deploy → перезапустить курс VMF-9315
+5. Наблюдать логи: adaptive timeout > 10 min, LLM должен успеть ответить
+
+## Risk Assessment
+
+- **Low risk**: Увеличение таймаута не ломает ничего, только даёт больше времени
+- **No breaking changes**: Env var `LLM_CLARIFYING_TIMEOUT_MS` по-прежнему override
+- **Cap**: Max 15 min — защита от бесконечного ожидания
+- **Scope**: Только Phase 0.5 — остальные фазы не затронуты

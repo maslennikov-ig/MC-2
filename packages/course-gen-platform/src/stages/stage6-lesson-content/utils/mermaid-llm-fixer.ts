@@ -78,7 +78,7 @@ const LLM_MAX_TOKENS = 1000;
 /**
  * Timeout for LLM request (milliseconds)
  */
-const LLM_TIMEOUT = 10000;
+const LLM_TIMEOUT = 120_000; // 2 min — OpenRouter LLM calls need generous timeouts
 
 /**
  * LLM Fixer metrics for monitoring and debugging

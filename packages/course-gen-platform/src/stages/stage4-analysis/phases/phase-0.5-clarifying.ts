@@ -87,11 +87,19 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
 
     phaseLogger.debug('Prompt built with course context and document context');
 
+    // Adaptive timeout: base + extra time for large documents, cap at 30 min
+    const extraTokens = Math.max(0, (totalDocTokens ?? 0) - 5000);
+    const extraTimeMs = Math.ceil(extraTokens / 5000) * 60_000; // +1 min per 5K tokens above 5K
+    const adaptiveTimeout = Math.min(LLM_CLARIFYING_TIMEOUT_MS + extraTimeMs, 1_800_000);
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-      phaseLogger.warn({ timeoutMs: LLM_CLARIFYING_TIMEOUT_MS }, 'LLM call timed out, aborting');
-    }, LLM_CLARIFYING_TIMEOUT_MS);
+      phaseLogger.warn(
+        { timeoutMs: adaptiveTimeout, totalDocTokens, modelId },
+        'LLM call timed out, aborting'
+      );
+    }, adaptiveTimeout);
 
     let response;
     try {
@@ -235,6 +243,13 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     return output;
   } catch (error) {
     const endTime = Date.now();
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      phaseLogger.error(
+        { durationMs: endTime - startTime, totalDocTokens: input.budgetAllocation?.totalTokens },
+        'Phase 0.5 LLM timeout — consider increasing LLM_CLARIFYING_TIMEOUT_MS or switching model'
+      );
+    }
 
     phaseLogger.error(
       {
