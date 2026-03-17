@@ -150,7 +150,10 @@ function extractErrorMessage(job: Job<JobData>, error: Error): string {
     return error.message;
   }
 
-  // 2. Try sandbox error stashed in job data
+  // 2. Try sandbox error stashed in job data by processor.ts captureUncaughtError.
+  // No race condition: BullMQ's job.updateData() sets this.data synchronously
+  // before the async Redis write. Our prependListener ensures the Update message
+  // arrives before Failed, so job.data._sandboxError is set when this runs.
   const sandboxError = (job.data as Record<string, unknown>)?._sandboxError as
     | {
         message?: string;
