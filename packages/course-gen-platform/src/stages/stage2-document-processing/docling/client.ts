@@ -166,18 +166,9 @@ export class DoclingClient {
           logger.info({ serverUrl: this.config.serverUrl }, 'Using Streamable HTTP transport');
         }
 
-        // Prevent unhandled EventEmitter events on transport from crashing worker thread
-        // MCP transport can emit 'error', 'close', 'end', 'abort' — all must be caught
-        if (this.transport && typeof (this.transport as any).on === 'function') {
-          for (const event of ['error', 'close', 'end', 'abort']) {
-            (this.transport as any).on(event, (err: unknown) => {
-              // error/abort are concerning; close/end are normal lifecycle events
-              const level = event === 'error' || event === 'abort' ? 'warn' : 'debug';
-              logger[level]({ err, event }, `Docling MCP transport ${event} event`);
-              this.isConnected = false;
-            });
-          }
-        }
+        // NOTE: MCP SDK transports (StreamableHTTPClientTransport, SSEClientTransport) do NOT
+        // extend EventEmitter — they use callback-based error handling via client.onerror/onclose
+        // (set up in setupClientErrorHandlers). No .on('error') guards needed here.
 
         await this.client.connect(this.transport);
         this.isConnected = true;
@@ -191,10 +182,12 @@ export class DoclingClient {
       } catch (error) {
         this.connectionPromise = null; // Reset so retry is possible
         this.transport = null;
-        logger.error({ err: error }, 'Failed to connect to Docling MCP server');
+        // Normalize error — MCP SDK can throw non-Error objects or Errors without messages
+        const normalized = this.normalizeError(error, `connect(${this.config.serverUrl})`);
+        logger.error({ err: normalized.message }, 'Failed to connect to Docling MCP server');
         throw new DoclingError(
           DoclingErrorCode.NETWORK_ERROR,
-          'Failed to connect to Docling MCP server',
+          `Failed to connect to Docling MCP server: ${normalized.message}`,
           error
         );
       } finally {
