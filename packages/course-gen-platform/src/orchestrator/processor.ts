@@ -260,6 +260,15 @@ const captureUncaughtError = (type: string) => (err: unknown) => {
 
   // Save to current job data — fire-and-forget (can't await in process event handler).
   // BullMQ's handler calls process.exit() soon after, so this is best-effort.
+  //
+  // RACE CONDITION NOTE: Two handlers race on uncaughtException:
+  // 1. Ours (registered first): calls updateData() which uses postMessage()
+  // 2. BullMQ's main-base.js: sends Failed command, then process.exit()
+  // Node.js calls handlers sequentially in registration order, so ours runs first.
+  // For worker threads (production): postMessage() is synchronous on the sender side —
+  // the Update message is enqueued in the MessagePort before our handler returns.
+  // BullMQ's handler then sends Failed and exits. The parent processes Update first.
+  // This is reliable but depends on Node.js MessagePort implementation details.
   if (currentJob) {
     currentJob
       .updateData({
@@ -312,6 +321,18 @@ if (process.env.NODE_ENV !== 'test') {
  */
 async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<JobResult> {
   currentJob = job;
+
+  // Clear stale _sandboxError from previous retry attempt to prevent
+  // showing wrong error if this attempt fails with a different error
+  if ((job.data as Record<string, unknown>)?._sandboxError) {
+    const { _sandboxError: _, ...cleanData } = job.data as Record<string, unknown>;
+    try {
+      await job.updateData(cleanData as unknown as JobData);
+    } catch {
+      /* best-effort */
+    }
+  }
+
   const jobType = job.name;
 
   // Validate job has a name - this can happen with corrupted jobs
@@ -458,11 +479,14 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       );
     }
 
-    // If error has no message, wrap it so BullMQ serialization preserves something useful
+    // If error has no message, wrap it so BullMQ serialization preserves something useful.
+    // Preserve error.name to maintain UnrecoverableError/JobCancelledError behavior
+    // (BullMQ checks error.name for retry/cancel decisions).
     if (error instanceof Error && !error.message) {
       const wrapped = new Error(
         `[${error.name || 'Error'}] ${errorStack?.split('\n')[0] || 'Unknown error in sandbox'}`
       );
+      wrapped.name = error.name;
       wrapped.stack = error.stack;
       throw wrapped;
     }
