@@ -166,13 +166,9 @@ export class DoclingClient {
           logger.info({ serverUrl: this.config.serverUrl }, 'Using Streamable HTTP transport');
         }
 
-        // Prevent unhandled 'error' events on transport from crashing worker thread
-        if (this.transport && typeof (this.transport as any).on === 'function') {
-          (this.transport as any).on('error', (err: Error) => {
-            logger.error({ err }, 'Docling MCP transport error event');
-            this.isConnected = false;
-          });
-        }
+        // NOTE: MCP SDK transports (StreamableHTTPClientTransport, SSEClientTransport) do NOT
+        // extend EventEmitter — they use callback-based error handling via client.onerror/onclose
+        // (set up in setupClientErrorHandlers). No .on('error') guards needed here.
 
         await this.client.connect(this.transport);
         this.isConnected = true;
@@ -184,12 +180,13 @@ export class DoclingClient {
           'Connected to Docling MCP server'
         );
       } catch (error) {
-        this.connectionPromise = null; // Reset so retry is possible
         this.transport = null;
-        logger.error({ err: error }, 'Failed to connect to Docling MCP server');
+        // Normalize error — MCP SDK can throw non-Error objects or Errors without messages
+        const normalized = this.normalizeError(error, `connect(${this.config.serverUrl})`);
+        logger.error({ err: normalized }, 'Failed to connect to Docling MCP server');
         throw new DoclingError(
           DoclingErrorCode.NETWORK_ERROR,
-          'Failed to connect to Docling MCP server',
+          `Failed to connect to Docling MCP server: ${normalized.message}`,
           error
         );
       } finally {
@@ -498,8 +495,10 @@ export class DoclingClient {
           };
         }
       } catch (error) {
+        // Normalize error before handling — MCP SDK can throw non-Error objects
+        const normalized = this.normalizeError(error, `convertDocument(${request.file_path})`);
         // Handle terminated error with retry
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = normalized.message;
         if (errorMessage.includes('terminated') && retries < maxRetries) {
           retries++;
           logger.warn(
@@ -512,32 +511,40 @@ export class DoclingClient {
 
         logger.error({ err: errorMessage, request }, 'Document conversion failed');
 
-        if (error instanceof DoclingError) {
-          throw error;
+        if (normalized instanceof DoclingError) {
+          throw normalized;
         }
 
         // Map common errors to DoclingErrorCode
         if (errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
-          throw new DoclingError(DoclingErrorCode.FILE_NOT_FOUND, 'Document file not found', error);
+          throw new DoclingError(
+            DoclingErrorCode.FILE_NOT_FOUND,
+            'Document file not found',
+            normalized
+          );
         }
 
         if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-          throw new DoclingError(DoclingErrorCode.TIMEOUT, 'Document processing timed out', error);
+          throw new DoclingError(
+            DoclingErrorCode.TIMEOUT,
+            'Document processing timed out',
+            normalized
+          );
         }
 
         if (errorMessage.includes('memory') || errorMessage.includes('OOM')) {
           throw new DoclingError(
             DoclingErrorCode.OUT_OF_MEMORY,
             'Out of memory during processing',
-            error
+            normalized
           );
         }
 
         // Generic processing error
         throw new DoclingError(
           DoclingErrorCode.PROCESSING_ERROR,
-          'Document conversion failed',
-          error
+          `Document conversion failed: ${errorMessage}`,
+          normalized
         );
       }
     }
@@ -753,6 +760,32 @@ export class DoclingClient {
   }
 
   /**
+   * Normalize any error into a proper Error with message
+   * MCP SDK can throw non-Error objects or Errors without messages
+   */
+  private normalizeError(error: unknown, context: string): Error {
+    if (error instanceof DoclingError) return error;
+
+    if (error instanceof Error) {
+      if (!error.message || error.message === 'Error') {
+        return new DoclingError(
+          DoclingErrorCode.PROCESSING_ERROR,
+          `${context}: ${error.name || 'Error'} (no message)`,
+          error
+        );
+      }
+      return error;
+    }
+
+    // Non-Error objects (MCP SDK can throw these)
+    const msg =
+      typeof error === 'object' && error !== null
+        ? JSON.stringify(error).substring(0, 500)
+        : String(error);
+    return new DoclingError(DoclingErrorCode.PROCESSING_ERROR, `${context}: ${msg}`, error);
+  }
+
+  /**
    * Execute function with retry logic
    * Handles reconnection for "Not connected" and "terminated" errors
    */
@@ -760,24 +793,25 @@ export class DoclingClient {
     try {
       return await fn();
     } catch (error) {
+      const normalized = this.normalizeError(error, `callWithRetry attempt ${attempt}`);
       if (attempt >= this.config.maxRetries) {
-        throw error;
+        throw normalized;
       }
 
       // Don't retry on certain errors
-      if (error instanceof DoclingError) {
+      if (normalized instanceof DoclingError) {
         const nonRetryableErrors = [
           DoclingErrorCode.FILE_NOT_FOUND,
           DoclingErrorCode.UNSUPPORTED_FORMAT,
           DoclingErrorCode.CORRUPTED_FILE,
         ];
 
-        if (nonRetryableErrors.includes(error.code)) {
-          throw error;
+        if (nonRetryableErrors.includes(normalized.code)) {
+          throw normalized;
         }
       }
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = normalized.message;
 
       // Handle connection and session issues - reconnect before retry
       // Session errors occur when Docling MCP server loses its session state

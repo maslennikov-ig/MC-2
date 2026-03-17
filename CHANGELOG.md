@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.22] - 2026-03-17
+
+### Fixed
+
+- **pipeline**: address code review findings for sandbox error pattern (cee6a008)
+- **pipeline**: fix BullMQ sandbox error message loss in Stage 2 (44c1d688)
+- **admin**: fix Docling MCP 404 and stuck courses false positives in health monitor (b7e9b9c9)
+
 ## [0.31.21] - 2026-03-16
 
 ### Fixed

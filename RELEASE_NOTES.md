@@ -2,6 +2,20 @@
 
 _Released on 2025-12-26_
 
+## v0.31.22
+
+_Released on 2026-03-17_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Address code review findings for sandbox error pattern
+- **pipeline**: Fix BullMQ sandbox error message loss in Stage 2
+- **admin**: Fix Docling MCP 404 and stuck courses false positives in health monitor
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.31.21
 
 _Released on 2026-03-16_

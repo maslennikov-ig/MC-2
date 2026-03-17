@@ -24,6 +24,7 @@ import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { logPermanentFailure } from '../../shared/logger';
 import { ContentPolicyError } from '../../shared/errors/pipeline-errors';
+import { DoclingError, DoclingErrorCode } from './docling/types.js';
 import { getTranslator } from '../../shared/i18n/translator';
 import { checkPauseAndDelay } from '../../shared/pause-check';
 
@@ -115,17 +116,34 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
         },
       };
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+
       // Check if this is a file not found error that should be retried
       if (this.isFileNotFoundError(error)) {
         this.log(job, 'warn', 'File not found during processing, may retry', {
           fileId,
           filePath,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMsg,
         });
       }
 
       this.log(job, 'error', 'Document processing failed', { error, fileId });
 
+      // For transient errors, re-throw to allow BullMQ retries
+      const isTransient =
+        error instanceof DoclingError &&
+        [DoclingErrorCode.NETWORK_ERROR, DoclingErrorCode.TIMEOUT].includes(error.code);
+
+      if (isTransient && job.attemptsMade < (job.opts.attempts || 3) - 1) {
+        this.log(job, 'warn', 'Transient Docling error, allowing BullMQ retry', {
+          fileId,
+          errorCode: error.code,
+          attemptsMade: job.attemptsMade,
+        });
+        throw error; // Let BullMQ retry
+      }
+
+      // Permanent errors: update status and return failure
       // Update vector_status to 'failed' (with user message for content policy errors)
       const userMessage =
         error instanceof ContentPolicyError
@@ -143,7 +161,7 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
       return {
         success: false,
         message: 'Document processing failed',
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMsg,
       };
     }
   }

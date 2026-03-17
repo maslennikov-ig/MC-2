@@ -36,6 +36,14 @@ import { blockRegenerationHandler } from './handlers/block-regeneration-handler.
 import type { JobResult } from './handlers/base-handler.js';
 
 /**
+ * Track current job reference globally so uncaughtException handler can access it.
+ * This is the ONLY reliable way to pass error details out of the sandbox,
+ * because BullMQ's uncaughtException handler calls process.exit() before
+ * our async logPermanentFailure can complete.
+ */
+let currentJob: SandboxedJob<JobData> | null = null;
+
+/**
  * Type for handler that can process either Job or SandboxedJob
  *
  * SandboxedJob has a subset of Job's properties and methods:
@@ -232,29 +240,70 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
 }
 
 // Global error handlers for worker thread — capture errors that escape
-// try-catch blocks (e.g., EventEmitter 'error' events from MCP transports).
-// BullMQ's main-base.js also registers these, but it creates a generic Error().
-// Our handler runs first (registered at module load) and captures full details.
+// try-catch blocks (e.g., uncaught throws from async callbacks).
+// BullMQ's main-base.js also registers these BEFORE importing this processor,
+// but creates a generic Error(). We use prependListener() to run first and capture full details.
+//
+// IMPORTANT: Do NOT call async logPermanentFailure here — BullMQ's handler
+// calls process.exit() immediately after, killing our async DB write.
+// Instead, save error to currentJob data (sync Redis message) for parent recovery.
 const captureUncaughtError = (type: string) => (err: unknown) => {
   const errorMessage = err instanceof Error ? err.message : String(err);
   const errorStack = err instanceof Error ? err.stack : undefined;
+  const errorName = err instanceof Error ? err.name : typeof err;
+
+  // [DIAG] Synchronous console.error — visible even if pino/BullMQ fails
+  // Always on for uncaught errors (these are exceptional by definition)
+  console.error(`[DIAG] captureUncaughtError(${type}):`, errorMessage, errorStack);
+
+  // Log to stdout (pino) — synchronous, always works before process.exit()
   baseLogger.error(
-    { error: errorMessage, stack: errorStack, type },
+    { error: errorMessage, name: errorName, stack: errorStack, type },
     `Processor: ${type} in worker thread`
   );
-  logPermanentFailure({
-    organization_id: 'unknown',
-    error_message: `[WorkerThread ${type}] ${errorMessage}`,
-    stack_trace: errorStack,
-    severity: 'CRITICAL',
-    metadata: { source: 'processor_global_handler', type },
-  }).catch(() => {
-    /* ignore */
-  });
+
+  // Save to current job data — fire-and-forget (can't await in process event handler).
+  // BullMQ's handler calls process.exit() soon after, so this is best-effort.
+  //
+  // RACE CONDITION NOTE: Two handlers compete on uncaughtException:
+  // 1. BullMQ's main-base.js registers its handler BEFORE importing our processor
+  // 2. We use prependListener to insert our handler BEFORE BullMQ's in the listener array
+  // Node.js calls handlers sequentially in array order, so ours runs first.
+  //
+  // Execution interleaving:
+  // a) Our handler runs (sync), fires updateData().catch() — returns immediately
+  // b) BullMQ's async handler starts, calls await send({ cmd: Failed })
+  // c) process.exit() is called after BullMQ's await resolves
+  //
+  // REQUIRES worker-thread mode (useWorkerThreads: true — see worker.ts:297).
+  // In that mode, postMessage() is synchronous on the sender side: the Update message
+  // is enqueued in the MessagePort before this handler returns, guaranteeing ordering.
+  // In forked-process mode (tests, VITEST set), childProcess.send() is async and this
+  // is best-effort only — acceptable since tests don't exercise this uncaught path.
+  if (currentJob) {
+    currentJob
+      .updateData({
+        ...currentJob.data,
+        _sandboxError: {
+          message: errorMessage || `Uncaught ${type}`,
+          name: errorName,
+          stack: errorStack,
+          type,
+          source: 'global_handler',
+        },
+      } as unknown as JobData)
+      .catch(() => {
+        /* best-effort */
+      });
+  }
 };
 
-process.on('uncaughtException', captureUncaughtError('uncaughtException'));
-process.on('unhandledRejection', captureUncaughtError('unhandledRejection'));
+// Use prependListener so our handler fires BEFORE BullMQ's main-base.js handler.
+// BullMQ registers process.on('uncaughtException') BEFORE importing this processor,
+// so process.on() would append AFTER BullMQ's handler. prependListener inserts BEFORE it,
+// ensuring our updateData(sandboxError) postMessage is enqueued before BullMQ's Failed + exit.
+process.prependListener('uncaughtException', captureUncaughtError('uncaughtException'));
+process.prependListener('unhandledRejection', captureUncaughtError('unhandledRejection'));
 
 // Run health check on processor load (startup validation)
 // Skip in test environment to avoid side effects
@@ -286,6 +335,25 @@ if (process.env.NODE_ENV !== 'test') {
  * @throws Error if no handler is found for the job type
  */
 async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<JobResult> {
+  // [DIAG] Gated behind env var — enable with PROCESSOR_DIAG=1 for per-job tracing
+  if (process.env.PROCESSOR_DIAG) {
+    console.error(
+      `[DIAG] processJob entered: jobId=${job.id}, jobName=${job.name}, attempt=${job.attemptsMade}`
+    );
+  }
+  currentJob = job;
+
+  // Clear stale _sandboxError from previous retry attempt to prevent
+  // showing wrong error if this attempt fails with a different error
+  if ((job.data as Record<string, unknown>)?._sandboxError) {
+    const { _sandboxError: _, ...cleanData } = job.data as Record<string, unknown>;
+    try {
+      await job.updateData(cleanData as unknown as JobData);
+    } catch {
+      /* best-effort */
+    }
+  }
+
   const jobType = job.name;
 
   // Validate job has a name - this can happen with corrupted jobs
@@ -353,6 +421,11 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
+    // [DIAG] Gated — catch block confirmation (if this never prints, error is uncaught)
+    if (process.env.PROCESSOR_DIAG) {
+      console.error(`[DIAG] processJob catch: jobId=${job.id}, error=${errorMessage}`);
+    }
+
     // Log error in processor context (worker thread) for better debugging
     // Error is then re-thrown so BullMQ can handle retry logic
     // Uses baseLogger to avoid duplicate DB entries — canonical DB write is logPermanentFailure below
@@ -371,6 +444,23 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       },
       'Sandboxed processor: Job processing failed'
     );
+
+    // CRITICAL: Save error details to job data BEFORE re-throw.
+    // This is the "error sandwich" — store error in Redis (reliable channel)
+    // so parent process can recover it even if BullMQ serialization loses the message.
+    const errorInfo = {
+      message:
+        errorMessage ||
+        `[${error instanceof Error ? error.name : typeof error}] Unknown error in sandbox`,
+      name: error instanceof Error ? error.name : typeof error,
+      stack: errorStack,
+      source: 'sandbox_catch',
+    };
+    try {
+      await job.updateData({ ...job.data, _sandboxError: errorInfo } as unknown as JobData);
+    } catch {
+      /* best-effort — don't fail the job if Redis write fails */
+    }
 
     // Report to Sentry for alerting and aggregation
     captureError(error, {
@@ -415,7 +505,21 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       );
     }
 
+    // If error has no message, wrap it so BullMQ serialization preserves something useful.
+    // Preserve error.name to maintain UnrecoverableError/JobCancelledError behavior
+    // (BullMQ checks error.name for retry/cancel decisions).
+    if (error instanceof Error && !error.message) {
+      const wrapped = new Error(
+        `[${error.name || 'Error'}] ${errorStack?.split('\n')[0] || 'Unknown error in sandbox'}`
+      );
+      wrapped.name = error.name;
+      wrapped.stack = error.stack;
+      throw wrapped;
+    }
+
     throw error;
+  } finally {
+    currentJob = null;
   }
 }
 
