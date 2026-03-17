@@ -21,10 +21,10 @@ export const HEURISTIC_TOKENS_USED = 0;
 
 /**
  * Per-attempt timeout for LLM self-review in milliseconds.
- * With 3 retries and exponential backoff (1s, 2s delays), max total time is ~100s.
+ * With 3 retries and exponential backoff, max total time is ~20min.
  * Falls back to heuristic-only result after all retries fail.
  */
-export const LLM_PER_ATTEMPT_TIMEOUT_MS = 30000;
+export const LLM_PER_ATTEMPT_TIMEOUT_MS = 300_000; // 5 min — OpenRouter LLM calls can be slow
 
 // ============================================================================
 // SCHEMAS
