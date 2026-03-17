@@ -68,7 +68,10 @@ export default defineConfig({
   ],
   // Bundle all workspace packages inline - this is the key fix
   // These packages use relative imports without .js extensions
-  noExternal: ['@megacampus/shared-types', '@megacampus/shared-logger'],
+  // shared-utils must also be inlined: it imports from shared-types,
+  // which has "type":"module" but extensionless imports (moduleResolution:"bundler").
+  // Without inlining, Node.js ESM resolver fails with ERR_MODULE_NOT_FOUND.
+  noExternal: ['@megacampus/shared-types', '@megacampus/shared-logger', '@megacampus/shared-utils'],
   esbuildOptions(options) {
     options.platform = 'node';
     // Prefer ESM entry points
