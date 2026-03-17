@@ -3,13 +3,13 @@ import { defineConfig } from 'tsup';
 /**
  * tsup configuration for bundling BullMQ sandboxed processor
  *
- * Problem: BullMQ sandboxed processors run in a separate Node.js worker thread
- * with native ESM resolution. Node.js ESM requires explicit `.js` extensions
- * for relative imports, but our TypeScript codebase uses `moduleResolution: "Bundler"`
- * which doesn't add them.
+ * BullMQ sandboxed processors run in a separate Node.js worker thread
+ * with native ESM resolution. Bundling the processor into a standalone file
+ * eliminates runtime module resolution overhead and ensures all workspace
+ * dependencies are self-contained.
  *
- * Solution: Bundle processor.ts into a standalone file that inlines all workspace
- * dependencies, eliminating the need for relative imports with .js extensions.
+ * Note: shared-types now has a post-build script (fix-esm-imports.mjs) that
+ * adds .js extensions, so noExternal is an optimization, not a requirement.
  *
  * This only bundles the processor - other files are compiled by tsc normally.
  */
@@ -66,11 +66,9 @@ export default defineConfig({
     'process',
     'worker_threads',
   ],
-  // Bundle all workspace packages inline - this is the key fix
-  // These packages use relative imports without .js extensions
-  // shared-utils must also be inlined: it imports from shared-types,
-  // which has "type":"module" but extensionless imports (moduleResolution:"bundler").
-  // Without inlining, Node.js ESM resolver fails with ERR_MODULE_NOT_FOUND.
+  // Inline workspace packages for self-contained bundle (faster startup, no runtime resolution).
+  // Not strictly required since shared-types has fix-esm-imports.mjs post-build script,
+  // but keeps the processor bundle independent of node_modules layout.
   noExternal: ['@megacampus/shared-types', '@megacampus/shared-logger', '@megacampus/shared-utils'],
   esbuildOptions(options) {
     options.platform = 'node';
