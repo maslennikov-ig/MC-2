@@ -133,6 +133,50 @@ const registeredJobTypes = [
 ];
 
 /**
+ * Extract error message from failed job, recovering from BullMQ sandbox serialization loss.
+ *
+ * When BullMQ serializes errors across the sandbox boundary (worker thread → parent),
+ * Error properties that aren't enumerable (like .message) can be lost, resulting in
+ * empty error messages. This function recovers the real error from multiple sources:
+ *
+ * 1. BullMQ error.message (if present and non-empty)
+ * 2. _sandboxError stashed in job.data by our processor.ts error sandwich
+ * 3. First line of stack trace
+ * 4. Descriptive fallback
+ */
+function extractErrorMessage(job: Job<JobData>, error: Error): string {
+  // 1. Try BullMQ error message
+  if (error?.message && error.message !== 'Error' && error.message.trim() !== '') {
+    return error.message;
+  }
+
+  // 2. Try sandbox error stashed in job data
+  const sandboxError = (job.data as Record<string, unknown>)?._sandboxError as
+    | {
+        message?: string;
+        name?: string;
+        stack?: string;
+        type?: string;
+      }
+    | undefined;
+
+  if (sandboxError?.message) {
+    return sandboxError.message;
+  }
+
+  // 3. Try first line of stack trace
+  if (error?.stack) {
+    const firstLine = error.stack.split('\n')[0]?.trim();
+    if (firstLine && firstLine !== 'Error') {
+      return firstLine;
+    }
+  }
+
+  // 4. Fallback
+  return 'Worker thread crashed (error details lost in sandbox serialization)';
+}
+
+/**
  * BullMQ Worker instance
  */
 let worker: Worker<JobData, JobResult> | null = null;
@@ -363,8 +407,18 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
           return; // Don't call handleJobFailure for cancelled jobs
         }
 
+        // Enrich error with recovered message before passing to handleJobFailure
+        // This ensures handleJobFailure gets a useful error message even when
+        // BullMQ sandbox serialization strips it
+        const recoveredMsg = extractErrorMessage(job, error);
+        let enrichedError = error;
+        if (!error?.message || error.message === 'Error' || error.message.trim() === '') {
+          enrichedError = new Error(recoveredMsg);
+          enrichedError.stack = error?.stack;
+        }
+
         // Regular failure handling
-        handleJobFailure(job, error);
+        handleJobFailure(job, enrichedError);
 
         // Safety net: update course generation_status when sandbox crashes.
         // BaseJobHandler.process() runs in child thread — if it crashes,
@@ -380,8 +434,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             const t = getTranslator(locale as Locale);
             const message = t(`steps.${stepId}.failed`);
 
-            const safetyNetErrorMsg =
-              error?.message || error?.stack?.split('\n')[0] || 'Worker thread crashed';
+            const safetyNetErrorMsg = extractErrorMessage(job, error);
             await supabase.rpc('update_course_progress', {
               p_course_id: courseId,
               p_step_id: stepId,
@@ -424,10 +477,10 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
 
         if (isTestEnvironment) {
           // Await for test/init jobs
-          await markJobFailed(job, error);
+          await markJobFailed(job, enrichedError);
         } else {
           // Fire-and-forget for production jobs
-          markJobFailed(job, error).catch(err => {
+          markJobFailed(job, enrichedError).catch(err => {
             logger.error(
               {
                 jobId: job.id,
