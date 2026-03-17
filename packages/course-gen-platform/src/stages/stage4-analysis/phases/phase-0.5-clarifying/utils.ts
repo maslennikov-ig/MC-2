@@ -8,7 +8,7 @@ import type { ClarifyingQuestion } from './types.js';
  * Configurable via environment variable for different model latencies.
  */
 export const LLM_CLARIFYING_TIMEOUT_MS = parseInt(
-  process.env.LLM_CLARIFYING_TIMEOUT_MS || '300000',
+  process.env.LLM_CLARIFYING_TIMEOUT_MS || '1800000', // 30 min
   10
 );
 
