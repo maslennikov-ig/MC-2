@@ -171,7 +171,9 @@ export class DoclingClient {
         if (this.transport && typeof (this.transport as any).on === 'function') {
           for (const event of ['error', 'close', 'end', 'abort']) {
             (this.transport as any).on(event, (err: unknown) => {
-              logger.warn({ err, event }, `Docling MCP transport ${event} event`);
+              // error/abort are concerning; close/end are normal lifecycle events
+              const level = event === 'error' || event === 'abort' ? 'warn' : 'debug';
+              logger[level]({ err, event }, `Docling MCP transport ${event} event`);
               this.isConnected = false;
             });
           }
@@ -776,7 +778,7 @@ export class DoclingClient {
       if (!error.message || error.message === 'Error') {
         return new DoclingError(
           DoclingErrorCode.PROCESSING_ERROR,
-          `${context}: ${error.name || 'Error'} (no message) — stack: ${error.stack?.split('\n').slice(0, 3).join(' | ') || 'none'}`,
+          `${context}: ${error.name || 'Error'} (no message)`,
           error
         );
       }

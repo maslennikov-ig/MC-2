@@ -24,6 +24,7 @@ import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { logPermanentFailure } from '../../shared/logger';
 import { ContentPolicyError } from '../../shared/errors/pipeline-errors';
+import { DoclingError, DoclingErrorCode } from './docling/types.js';
 import { getTranslator } from '../../shared/i18n/translator';
 import { checkPauseAndDelay } from '../../shared/pause-check';
 
@@ -129,7 +130,6 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
       this.log(job, 'error', 'Document processing failed', { error, fileId });
 
       // For transient errors, re-throw to allow BullMQ retries
-      const { DoclingError, DoclingErrorCode } = await import('./docling/types.js');
       const isTransient =
         error instanceof DoclingError &&
         [DoclingErrorCode.NETWORK_ERROR, DoclingErrorCode.TIMEOUT].includes(error.code);
