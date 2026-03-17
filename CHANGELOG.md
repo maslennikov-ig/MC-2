@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.23] - 2026-03-17
+
+### Fixed
+
+- **pipeline**: increase LLM timeouts across all stages to prevent OpenRouter AbortErrors (117f493d)
+- **pipeline**: increase Phase 0.5 LLM timeout to 30min with adaptive scaling (0739e69c)
+- **shared-types**: add post-build script to fix ESM import extensions (66f5aa03)
+- **pipeline**: inline shared-utils in tsup bundle to fix ESM resolution (cfc8e209)
+- **pipeline**: improve extractErrorMessage comment explaining \_sandboxError reliability (03f7bae8)
+- **pipeline**: address code review findings for sandbox error capture (235b3b39)
+- **pipeline**: fix sandbox error capture with prependListener and cleanup dead code (affbb29c)
+
+### Other
+
+- update docs (67424fb5)
+- update Stage 2 sandbox fix plan with investigation findings (4c9da0f3)
+
 ## [0.31.22] - 2026-03-17
 
 ### Fixed
