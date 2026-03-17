@@ -180,11 +180,10 @@ export class DoclingClient {
           'Connected to Docling MCP server'
         );
       } catch (error) {
-        this.connectionPromise = null; // Reset so retry is possible
         this.transport = null;
         // Normalize error — MCP SDK can throw non-Error objects or Errors without messages
         const normalized = this.normalizeError(error, `connect(${this.config.serverUrl})`);
-        logger.error({ err: normalized.message }, 'Failed to connect to Docling MCP server');
+        logger.error({ err: normalized }, 'Failed to connect to Docling MCP server');
         throw new DoclingError(
           DoclingErrorCode.NETWORK_ERROR,
           `Failed to connect to Docling MCP server: ${normalized.message}`,

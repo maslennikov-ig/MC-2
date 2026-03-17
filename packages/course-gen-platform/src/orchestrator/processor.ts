@@ -240,9 +240,9 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
 }
 
 // Global error handlers for worker thread — capture errors that escape
-// try-catch blocks (e.g., EventEmitter 'error' events from MCP transports).
-// BullMQ's main-base.js also registers these, but it creates a generic Error().
-// Our handler runs first (registered at module load) and captures full details.
+// try-catch blocks (e.g., uncaught throws from async callbacks).
+// BullMQ's main-base.js also registers these BEFORE importing this processor,
+// but creates a generic Error(). We use prependListener() to run first and capture full details.
 //
 // IMPORTANT: Do NOT call async logPermanentFailure here — BullMQ's handler
 // calls process.exit() immediately after, killing our async DB write.
@@ -253,11 +253,12 @@ const captureUncaughtError = (type: string) => (err: unknown) => {
   const errorName = err instanceof Error ? err.name : typeof err;
 
   // [DIAG] Synchronous console.error — visible even if pino/BullMQ fails
+  // Always on for uncaught errors (these are exceptional by definition)
   console.error(`[DIAG] captureUncaughtError(${type}):`, errorMessage, errorStack);
 
   // Log to stdout (pino) — synchronous, always works before process.exit()
   baseLogger.error(
-    { error: errorMessage, stack: errorStack, type },
+    { error: errorMessage, name: errorName, stack: errorStack, type },
     `Processor: ${type} in worker thread`
   );
 
@@ -268,10 +269,17 @@ const captureUncaughtError = (type: string) => (err: unknown) => {
   // 1. BullMQ's main-base.js registers its handler BEFORE importing our processor
   // 2. We use prependListener to insert our handler BEFORE BullMQ's in the listener array
   // Node.js calls handlers sequentially in array order, so ours runs first.
-  // For worker threads (production): postMessage() is synchronous on the sender side —
-  // the Update message is enqueued in the MessagePort before our handler returns.
-  // BullMQ's handler then sends Failed and exits. The parent processes Update first.
-  // This is reliable but depends on Node.js MessagePort implementation details.
+  //
+  // Execution interleaving:
+  // a) Our handler runs (sync), fires updateData().catch() — returns immediately
+  // b) BullMQ's async handler starts, calls await send({ cmd: Failed })
+  // c) process.exit() is called after BullMQ's await resolves
+  //
+  // REQUIRES worker-thread mode (useWorkerThreads: true — see worker.ts:297).
+  // In that mode, postMessage() is synchronous on the sender side: the Update message
+  // is enqueued in the MessagePort before this handler returns, guaranteeing ordering.
+  // In forked-process mode (tests, VITEST set), childProcess.send() is async and this
+  // is best-effort only — acceptable since tests don't exercise this uncaught path.
   if (currentJob) {
     currentJob
       .updateData({
@@ -327,10 +335,12 @@ if (process.env.NODE_ENV !== 'test') {
  * @throws Error if no handler is found for the job type
  */
 async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<JobResult> {
-  // [DIAG] Confirm processJob is entered (visible in console before any async work)
-  console.error(
-    `[DIAG] processJob entered: jobId=${job.id}, jobName=${job.name}, attempt=${job.attemptsMade}`
-  );
+  // [DIAG] Gated behind env var — enable with PROCESSOR_DIAG=1 for per-job tracing
+  if (process.env.PROCESSOR_DIAG) {
+    console.error(
+      `[DIAG] processJob entered: jobId=${job.id}, jobName=${job.name}, attempt=${job.attemptsMade}`
+    );
+  }
   currentJob = job;
 
   // Clear stale _sandboxError from previous retry attempt to prevent
@@ -411,8 +421,10 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    // [DIAG] Confirm catch block is reached — if this never prints, error is uncaught
-    console.error(`[DIAG] processJob catch: jobId=${job.id}, error=${errorMessage}`);
+    // [DIAG] Gated — catch block confirmation (if this never prints, error is uncaught)
+    if (process.env.PROCESSOR_DIAG) {
+      console.error(`[DIAG] processJob catch: jobId=${job.id}, error=${errorMessage}`);
+    }
 
     // Log error in processor context (worker thread) for better debugging
     // Error is then re-thrown so BullMQ can handle retry logic
