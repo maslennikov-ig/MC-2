@@ -13,7 +13,6 @@
  * @see docs/specs/TECH-SPEC-DRAFT-COURSE-CLEANUP.md (section 6.3)
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -40,7 +39,7 @@ interface DeletedCourse {
   created_at: string;
 }
 
-serve(async req => {
+Deno.serve(async req => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -49,12 +48,13 @@ serve(async req => {
   console.log('[Cleanup] Edge function invoked');
 
   try {
-    // Security check: Only allow service role or cron invocations
+    // Security check: Only allow service role invocations (pg_cron passes service_role key)
     const authHeader = req.headers.get('Authorization');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const incomingToken = authHeader?.replace('Bearer ', '');
 
-    if (!authHeader || !authHeader.includes('Bearer')) {
-      console.error('[Cleanup] Missing or invalid Authorization header');
+    if (!incomingToken || incomingToken !== serviceRoleKey) {
+      console.error('[Cleanup] Unauthorized: invalid or missing service role token');
       return new Response(
         JSON.stringify({
           success: false,
