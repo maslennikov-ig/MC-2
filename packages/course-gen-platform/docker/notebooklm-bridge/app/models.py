@@ -32,6 +32,7 @@ class MediaGenerationRequest(BaseModel):
     language: str = Field(..., min_length=2, max_length=16)
     voice: str | None = Field(default=None, max_length=128)
     course_id: str | None = Field(default=None, max_length=200)
+    lesson_id: str | None = Field(default=None, max_length=200)
     target_duration_minutes: int | None = Field(default=None, ge=1, le=120)
     duration_range_min_minutes: int | None = Field(default=None, ge=1, le=120)
     duration_range_max_minutes: int | None = Field(default=None, ge=1, le=120)
@@ -53,6 +54,7 @@ class MediaGenerationRequest(BaseModel):
         "language",
         "voice",
         "course_id",
+        "lesson_id",
         "audio_format",
         "audio_length",
         "video_format",
