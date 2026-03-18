@@ -42,11 +42,25 @@ export async function getCurrentUser() {
     // Get full_name from user metadata
     const fullName = user.user_metadata?.full_name || user.email?.split('@')[0]
 
+    // Get organization_id from users table for org-level authorization
+    let organizationId: string | null = null
+    try {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+      organizationId = profile?.organization_id ?? null
+    } catch {
+      // Non-critical: org-level checks will fall back to owner-only
+    }
+
     return {
       id: user.id,
       email: user.email,
       name: fullName,
       role: role as 'superadmin' | 'admin' | 'instructor' | 'student',
+      organizationId,
     }
   } catch {
     // Return null on auth error
