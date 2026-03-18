@@ -8,6 +8,47 @@ import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import type { Database } from '@/types/database.generated'
 
 // ============================================================================
+// Authorization Helper
+// ============================================================================
+
+/**
+ * Verify that the current user has access to a course (owner OR same organization).
+ * Matches backend logic in enrichment/helpers.ts:verifyEnrichmentAccess().
+ */
+async function verifyCourseAccess(
+  supabase: Awaited<ReturnType<typeof getUserClient>>,
+  courseId: string,
+  currentUser: { id: string; organizationId?: string | null },
+  actionName: string
+): Promise<{ authorized: true } | { authorized: false; error: string }> {
+  const { data: course, error: courseError } = await supabase
+    .from('courses')
+    .select('user_id, organization_id')
+    .eq('id', courseId)
+    .single()
+
+  if (courseError || !course) {
+    logger.error(`[${actionName}] Course not found`, { courseId })
+    return { authorized: false, error: 'Course not found' }
+  }
+
+  const isOwner = course.user_id === currentUser.id
+  const isSameOrg =
+    currentUser.organizationId && course.organization_id === currentUser.organizationId
+
+  if (!isOwner && !isSameOrg) {
+    logger.error(`[${actionName}] Unauthorized access attempt`, {
+      userId: currentUser.id,
+      courseId,
+      courseOwner: course.user_id,
+    })
+    return { authorized: false, error: 'Unauthorized' }
+  }
+
+  return { authorized: true }
+}
+
+// ============================================================================
 // Input Validation Schemas
 // ============================================================================
 
@@ -96,25 +137,15 @@ export async function createEnrichment(
 
     const supabase = await getUserClient()
 
-    // Authorization: Verify user owns the course
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('user_id')
-      .eq('id', input.courseId)
-      .single()
-
-    if (courseError || !course) {
-      logger.error('[createEnrichment] Course not found', { courseId: input.courseId })
-      return { success: false, error: 'Course not found' }
-    }
-
-    if (course.user_id !== currentUser.id) {
-      logger.error('[createEnrichment] Unauthorized access attempt', {
-        userId: currentUser.id,
-        courseId: input.courseId,
-        courseOwner: course.user_id,
-      })
-      return { success: false, error: 'Unauthorized' }
+    // Authorization: Verify user owns the course or belongs to same organization
+    const access = await verifyCourseAccess(
+      supabase,
+      input.courseId,
+      currentUser,
+      'createEnrichment'
+    )
+    if (!access.authorized) {
+      return { success: false, error: access.error }
     }
 
     // Convert lessonId label to UUID
@@ -228,25 +259,15 @@ export async function reorderEnrichments(
 
     const supabase = await getUserClient()
 
-    // Authorization: Verify user owns the course
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('user_id')
-      .eq('id', input.courseId)
-      .single()
-
-    if (courseError || !course) {
-      logger.error('[reorderEnrichments] Course not found', { courseId: input.courseId })
-      return { success: false, error: 'Course not found' }
-    }
-
-    if (course.user_id !== currentUser.id) {
-      logger.error('[reorderEnrichments] Unauthorized access attempt', {
-        userId: currentUser.id,
-        courseId: input.courseId,
-        courseOwner: course.user_id,
-      })
-      return { success: false, error: 'Unauthorized' }
+    // Authorization: Verify user owns the course or belongs to same organization
+    const access = await verifyCourseAccess(
+      supabase,
+      input.courseId,
+      currentUser,
+      'reorderEnrichments'
+    )
+    if (!access.authorized) {
+      return { success: false, error: access.error }
     }
 
     // Convert lessonId label to UUID
@@ -372,25 +393,15 @@ export async function deleteEnrichment(
 
     const supabase = await getUserClient()
 
-    // Authorization: Verify user owns the course
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('user_id')
-      .eq('id', input.courseId)
-      .single()
-
-    if (courseError || !course) {
-      logger.error('[deleteEnrichment] Course not found', { courseId: input.courseId })
-      return { success: false, error: 'Course not found' }
-    }
-
-    if (course.user_id !== currentUser.id) {
-      logger.error('[deleteEnrichment] Unauthorized access attempt', {
-        userId: currentUser.id,
-        courseId: input.courseId,
-        courseOwner: course.user_id,
-      })
-      return { success: false, error: 'Unauthorized' }
+    // Authorization: Verify user owns the course or belongs to same organization
+    const access = await verifyCourseAccess(
+      supabase,
+      input.courseId,
+      currentUser,
+      'deleteEnrichment'
+    )
+    if (!access.authorized) {
+      return { success: false, error: access.error }
     }
 
     // Call tRPC API to delete enrichment
@@ -461,25 +472,15 @@ export async function regenerateEnrichment(
 
     const supabase = await getUserClient()
 
-    // Authorization: Verify user owns the course
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('user_id')
-      .eq('id', input.courseId)
-      .single()
-
-    if (courseError || !course) {
-      logger.error('[regenerateEnrichment] Course not found', { courseId: input.courseId })
-      return { success: false, error: 'Course not found' }
-    }
-
-    if (course.user_id !== currentUser.id) {
-      logger.error('[regenerateEnrichment] Unauthorized access attempt', {
-        userId: currentUser.id,
-        courseId: input.courseId,
-        courseOwner: course.user_id,
-      })
-      return { success: false, error: 'Unauthorized' }
+    // Authorization: Verify user owns the course or belongs to same organization
+    const access = await verifyCourseAccess(
+      supabase,
+      input.courseId,
+      currentUser,
+      'regenerateEnrichment'
+    )
+    if (!access.authorized) {
+      return { success: false, error: access.error }
     }
 
     // Call tRPC API to regenerate enrichment
@@ -586,25 +587,10 @@ export async function getEnrichment(input: GetEnrichmentInput): Promise<GetEnric
 
     const supabase = await getUserClient()
 
-    // Authorization: Verify user owns the course
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('user_id')
-      .eq('id', input.courseId)
-      .single()
-
-    if (courseError || !course) {
-      logger.error('[getEnrichment] Course not found', { courseId: input.courseId })
-      return { success: false, error: 'Course not found' }
-    }
-
-    if (course.user_id !== currentUser.id) {
-      logger.error('[getEnrichment] Unauthorized access attempt', {
-        userId: currentUser.id,
-        courseId: input.courseId,
-        courseOwner: course.user_id,
-      })
-      return { success: false, error: 'Unauthorized' }
+    // Authorization: Verify user owns the course or belongs to same organization
+    const access = await verifyCourseAccess(supabase, input.courseId, currentUser, 'getEnrichment')
+    if (!access.authorized) {
+      return { success: false, error: access.error }
     }
 
     // Fetch the enrichment
@@ -738,15 +724,15 @@ export async function getLessonEnrichments(
 
     const supabase = await getUserClient()
 
-    // Authorization: Verify user owns the course
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('user_id')
-      .eq('id', input.courseId)
-      .single()
-
-    if (courseError || !course || course.user_id !== currentUser.id) {
-      return { success: false, error: 'Unauthorized' }
+    // Authorization: Verify user owns the course or belongs to same organization
+    const access = await verifyCourseAccess(
+      supabase,
+      input.courseId,
+      currentUser,
+      'getLessonEnrichments'
+    )
+    if (!access.authorized) {
+      return { success: false, error: access.error }
     }
 
     // Fetch enrichments for the lesson (match SSR filter: exclude only failed/cancelled)
