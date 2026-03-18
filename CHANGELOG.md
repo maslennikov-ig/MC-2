@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.24] - 2026-03-18
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update 2 source file(s), +1 more (ed7fb505)
+
+### Fixed
+
+- **auth**: unify course authorization to allow org members across all actions (5ee1695a)
+- **enrichments**: allow org members to manage enrichments, not just course owner (ee213ee4)
+- **nlm-bridge**: add lesson_id field to MediaGenerationRequest model (86ca665b)
+
 ## [0.31.23] - 2026-03-17
 
 ### Fixed
