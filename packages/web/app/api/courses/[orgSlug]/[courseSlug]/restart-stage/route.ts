@@ -72,15 +72,23 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Course not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
-    // Check ownership
+    // Check ownership or organization membership
     if (courseData.user_id !== user.id) {
-      logger.warn('Unauthorized restart-stage attempt - wrong owner', {
-        orgSlug,
-        courseSlug,
-        attemptedBy: user.id,
-        owner: courseData.user_id,
-      })
-      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+      const { data: profile } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id || profile.organization_id !== courseData.organization_id) {
+        logger.warn('Unauthorized restart-stage attempt - not owner or org member', {
+          orgSlug,
+          courseSlug,
+          attemptedBy: user.id,
+          owner: courseData.user_id,
+        })
+        return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+      }
     }
 
     // Parse request body

@@ -1,7 +1,7 @@
 'use server'
 
 import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
-import { getCurrentUser } from '@/lib/auth-helpers'
+import { getCurrentUser, verifyCourseAccess } from '@/lib/auth-helpers'
 import { revalidatePath } from 'next/cache'
 import type { CourseStructureData, CourseVisibility } from '@/types/database'
 import type { GenerationProgress } from '@/types/course-generation'
@@ -167,7 +167,7 @@ export async function getCourses({
       }
     }
 
-    const userFavorites = await getUserFavorites(user.id)
+    const userFavorites = getUserFavorites(user.id)
     if (userFavorites.length === 0) {
       return {
         courses: [],
@@ -315,7 +315,7 @@ export async function getCourses({
   const user = await getCurrentUser()
   let userFavorites: string[] = []
   if (user?.id) {
-    userFavorites = await getUserFavorites(user.id)
+    userFavorites = getUserFavorites(user.id)
   }
 
   // Add favorite status to courses
@@ -489,8 +489,8 @@ export async function togglePublishCourse(courseSlug: string, isPublished: boole
  * Get user favorites - returns empty array as user_favorites table doesn't exist
  * Note: User favorites functionality will be implemented when table is added to database schema
  */
- 
-export async function getUserFavorites(_userId: string) {
+
+export function getUserFavorites(_userId: string) {
   // user_favorites table doesn't exist in database
   // Return empty array to maintain compatibility
   return []
@@ -593,29 +593,25 @@ export async function togglePublishStatus(courseId: string) {
   }
 
   try {
+    // Verify user has access to this course (owner OR same organization)
+    const access = await verifyCourseAccess(supabase, courseId, user, 'togglePublishStatus')
+    if (!access.authorized) {
+      // Still allow admin/superadmin
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
+        throw new Error('Unauthorized to change publish status')
+      }
+    }
+
     // First get current status
     const { data: course, error: fetchError } = await supabase
       .from('courses')
-      .select('is_published, visibility, user_id')
+      .select('is_published, visibility')
       .eq('id', courseId)
       .single()
 
     if (fetchError || !course) {
       logger.error('togglePublishStatus: Course not found or access denied', fetchError)
       throw new Error('Course not found or access denied')
-    }
-
-    // Check if user owns the course
-    if (course.user_id !== user.id) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile || (profile.role !== 'admin' && profile.role !== 'superadmin')) {
-        throw new Error('Unauthorized to change publish status')
-      }
     }
 
     // Toggle visibility between private and public (maps to is_published behavior)
@@ -669,27 +665,11 @@ export async function updateCourseVisibility(courseId: string, visibility: Cours
   }
 
   try {
-    // First get current course to verify ownership
-    const { data: course, error: fetchError } = await supabase
-      .from('courses')
-      .select('user_id')
-      .eq('id', courseId)
-      .single()
-
-    if (fetchError || !course) {
-      logger.error('updateCourseVisibility: Course not found or access denied', fetchError)
-      throw new Error('Course not found or access denied')
-    }
-
-    // Check if user owns the course or is admin
-    if (course.user_id !== user.id) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile || (profile.role !== 'admin' && profile.role !== 'superadmin')) {
+    // Verify user has access to this course (owner OR same organization)
+    const access = await verifyCourseAccess(supabase, courseId, user, 'updateCourseVisibility')
+    if (!access.authorized) {
+      // Still allow admin/superadmin
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
         throw new Error('Unauthorized to change visibility')
       }
     }

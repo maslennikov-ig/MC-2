@@ -39,11 +39,20 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
 
+    // Check ownership or organization membership
     if (courseData.user_id !== user.id) {
-      return NextResponse.json(
-        { error: 'You do not have permission to resume this course' },
-        { status: 403 }
-      )
+      const { data: profile } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id || profile.organization_id !== courseData.organization_id) {
+        return NextResponse.json(
+          { error: 'You do not have permission to resume this course' },
+          { status: 403 }
+        )
+      }
     }
 
     // Early validation: Check if actually paused (Issue #4 from code review)

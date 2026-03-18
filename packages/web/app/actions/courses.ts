@@ -9,6 +9,7 @@ import crypto from 'crypto'
 import { CreateCourseResponse, CreateCourseError, GenerationStep } from '@/types/course-generation'
 import { TRPCClientError } from '@trpc/client'
 import { logger, logPermanentFailure } from '@/lib/logger'
+import { getCurrentUser, verifyCourseAccess } from '@/lib/auth-helpers'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import type { Json } from '@/types/database.generated'
 import { generateSlug } from '@/lib/utils/slug'
@@ -623,28 +624,27 @@ export async function cancelCourseGeneration(
     const supabase = await createClient()
 
     // Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const user = await getCurrentUser()
 
-    if (authError || !user) {
+    if (!user) {
       return { success: false, error: 'Authentication required' }
     }
 
-    // Check course ownership and generation status
+    // Verify user has access to this course (owner OR same organization)
+    const access = await verifyCourseAccess(supabase, courseId, user, 'cancelCourseGeneration')
+    if (!access.authorized) {
+      return { success: false, error: access.error }
+    }
+
+    // Check generation status
     const { data: course, error: fetchError } = await supabase
       .from('courses')
-      .select('user_id, generation_status')
+      .select('generation_status')
       .eq('id', courseId)
       .single()
 
     if (fetchError || !course) {
       return { success: false, error: 'Course not found' }
-    }
-
-    if (course.user_id !== user.id) {
-      return { success: false, error: 'You do not have permission to cancel this course' }
     }
 
     const generationStatus = course.generation_status || ''
@@ -724,31 +724,17 @@ export async function updateDocumentPriority(
     const supabase = await createClient()
 
     // Get current user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const user = await getCurrentUser()
 
-    if (userError || !user) {
-      logger.error('User not authenticated', { error: userError })
+    if (!user) {
+      logger.error('User not authenticated')
       return { success: false, error: 'Authentication required' }
     }
 
-    // Verify user owns this course
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('id, user_id')
-      .eq('id', courseId)
-      .single()
-
-    if (courseError || !course) {
-      logger.error('Course not found', { error: courseError, courseId })
-      return { success: false, error: 'Course not found' }
-    }
-
-    if (course.user_id !== user.id) {
-      logger.error('User does not own this course', { userId: user.id, courseId })
-      return { success: false, error: 'Unauthorized' }
+    // Verify user has access to this course (owner OR same organization)
+    const access = await verifyCourseAccess(supabase, courseId, user, 'updateDocumentPriority')
+    if (!access.authorized) {
+      return { success: false, error: access.error }
     }
 
     // CONSTRAINT: Only 1 CORE document allowed per course

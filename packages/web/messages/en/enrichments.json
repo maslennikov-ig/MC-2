@@ -457,6 +457,7 @@
     "confirmDeleteDescription": "This action cannot be undone. The media file will be deleted.",
     "deleteSuccess": "Enrichment deleted",
     "deleteFailed": "Failed to delete enrichment",
+    "unauthorized": "You don't have permission for this action",
     "regenerateSuccess": "Regeneration started",
     "regenerateFailed": "Failed to start regeneration",
     "confirm": "Delete",

@@ -2,51 +2,10 @@
 
 import { z } from 'zod'
 import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
-import { getCurrentUser } from '@/lib/auth-helpers'
+import { getCurrentUser, verifyCourseAccess } from '@/lib/auth-helpers'
 import { logger } from '@/lib/logger'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import type { Database } from '@/types/database.generated'
-
-// ============================================================================
-// Authorization Helper
-// ============================================================================
-
-/**
- * Verify that the current user has access to a course (owner OR same organization).
- * Matches backend logic in enrichment/helpers.ts:verifyEnrichmentAccess().
- */
-async function verifyCourseAccess(
-  supabase: Awaited<ReturnType<typeof getUserClient>>,
-  courseId: string,
-  currentUser: { id: string; organizationId?: string | null },
-  actionName: string
-): Promise<{ authorized: true } | { authorized: false; error: string }> {
-  const { data: course, error: courseError } = await supabase
-    .from('courses')
-    .select('user_id, organization_id')
-    .eq('id', courseId)
-    .single()
-
-  if (courseError || !course) {
-    logger.error(`[${actionName}] Course not found`, { courseId })
-    return { authorized: false, error: 'Course not found' }
-  }
-
-  const isOwner = course.user_id === currentUser.id
-  const isSameOrg =
-    currentUser.organizationId && course.organization_id === currentUser.organizationId
-
-  if (!isOwner && !isSameOrg) {
-    logger.error(`[${actionName}] Unauthorized access attempt`, {
-      userId: currentUser.id,
-      courseId,
-      courseOwner: course.user_id,
-    })
-    return { authorized: false, error: 'Unauthorized' }
-  }
-
-  return { authorized: true }
-}
 
 // ============================================================================
 // Input Validation Schemas
