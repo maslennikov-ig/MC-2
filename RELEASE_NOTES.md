@@ -2,6 +2,24 @@
 
 _Released on 2025-12-26_
 
+## v0.31.24
+
+_Released on 2026-03-18_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 2 source file(s), +1 more
+
+### 🐛 Bug Fixes
+
+- **Authentication**: Unify course authorization to allow org members across all actions
+- **enrichments**: Allow org members to manage enrichments, not just course owner
+- **nlm-bridge**: Add lesson_id field to MediaGenerationRequest model
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.31.23
 
 _Released on 2026-03-17_

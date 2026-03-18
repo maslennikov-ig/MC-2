@@ -302,6 +302,11 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         // Default is 30s, but we need more for PDF processing, embedding generation, etc.
         // With sandboxed processors, lock renewal is handled automatically by the thread
         lockDuration: 2700000, // 45 minutes - must match PROCESSOR_MAX_TTL_MS
+        // Stall detection: when a worker process crashes (OOM, segfault, deploy),
+        // the restarted worker detects stalled jobs and moves them to failed/retry.
+        // Does not interrupt running jobs — only promotes expired-lock jobs back to wait queue.
+        stalledInterval: 60000, // 60 seconds (default 30s) — keeps detection latency low
+        maxStalledCount: 2, // Fail job after 2 stall detections (default: 1)
         // Exponential backoff: 2^attempt * 1000ms
         // Attempt 1: 2s, Attempt 2: 4s, Attempt 3: 8s, etc.
         settings: {

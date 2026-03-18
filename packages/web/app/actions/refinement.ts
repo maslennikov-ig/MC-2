@@ -9,7 +9,8 @@ import {
 import { TRPCClientError } from '@trpc/client'
 import { getServerTrpcClient } from '@/lib/trpc/server-caller'
 import { createClient } from '@/lib/supabase/server'
-import { logger } from "@/lib/logger";
+import { getCurrentUser, verifyCourseAccess } from '@/lib/auth-helpers'
+import { logger } from '@/lib/logger'
 
 /**
  * HTTP status code to user-friendly error message mapping.
@@ -50,34 +51,16 @@ export interface TokenEstimates {
 export async function getChatTokenEstimates(courseId: string): Promise<TokenEstimates | null> {
   // Verify user authentication
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     logger.warn('[getChatTokenEstimates] No authenticated user')
     return null
   }
 
-  // Verify user has access to this course
-  const { data: course, error: courseError } = await supabase
-    .from('courses')
-    .select('user_id')
-    .eq('id', courseId)
-    .single()
-
-  if (courseError || !course) {
-    logger.warn('[getChatTokenEstimates] Course not found or access denied', { data: { courseId } })
-    return null
-  }
-
-  // Check ownership (user owns course)
-  if (course.user_id !== user.id) {
-    logger.warn('[getChatTokenEstimates] User does not own course', { data: {
-                  userId: user.id,
-                  courseId,
-                  courseOwner: course.user_id,
-                } })
+  // Verify user has access to this course (owner OR same organization)
+  const access = await verifyCourseAccess(supabase, courseId, user, 'getChatTokenEstimates')
+  if (!access.authorized) {
     return null
   }
 
@@ -114,7 +97,9 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
     const parseResult = chatResponseSchema.safeParse(result)
 
     if (!parseResult.success) {
-      logger.error('[sendChatMessage] Response validation failed:', { data: parseResult.error.issues })
+      logger.error('[sendChatMessage] Response validation failed:', {
+        data: parseResult.error.issues,
+      })
       throw new Error('Received invalid response from server. Please try again.')
     }
 
@@ -233,34 +218,28 @@ export async function fetchCourseStructure(courseId: string): Promise<{
 } | null> {
   // Verify user authentication
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     logger.warn('[fetchCourseStructure] No authenticated user')
     return null
   }
 
-  // Fetch course with structure and title
+  // Verify user has access to this course (owner OR same organization)
+  const access = await verifyCourseAccess(supabase, courseId, user, 'fetchCourseStructure')
+  if (!access.authorized) {
+    return null
+  }
+
+  // Fetch course structure and title
   const { data: course, error: courseError } = await supabase
     .from('courses')
-    .select('user_id, title, course_structure')
+    .select('title, course_structure')
     .eq('id', courseId)
     .single()
 
   if (courseError || !course) {
     logger.warn('[fetchCourseStructure] Course not found', { data: { courseId } })
-    return null
-  }
-
-  // Check ownership (user owns course)
-  if (course.user_id !== user.id) {
-    logger.warn('[fetchCourseStructure] User does not own course', { data: {
-                  userId: user.id,
-                  courseId,
-                  courseOwner: course.user_id,
-                } })
     return null
   }
 

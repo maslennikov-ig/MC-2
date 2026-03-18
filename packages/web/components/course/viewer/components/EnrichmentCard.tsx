@@ -273,7 +273,9 @@ export function EnrichmentCard({
         toast.success(t('viewer.deleteSuccess'))
         onRefreshEnrichments?.()
       } else {
-        toast.error(t('viewer.deleteFailed'))
+        toast.error(
+          result.error === 'Unauthorized' ? t('viewer.unauthorized') : t('viewer.deleteFailed')
+        )
       }
     } catch {
       toast.error(t('viewer.deleteFailed'))
@@ -305,7 +307,7 @@ export function EnrichmentCard({
     if (isVideoType && urlLoading) {
       return (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
+          {/* placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -323,7 +325,7 @@ export function EnrichmentCard({
     if (isVideoType && urlError) {
       return (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
+          {/* placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -352,7 +354,7 @@ export function EnrichmentCard({
     if (isAudioType && urlLoading) {
       return (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
+          {/* placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -370,7 +372,7 @@ export function EnrichmentCard({
     if (isAudioType && urlError) {
       return (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
+          {/* placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -399,7 +401,7 @@ export function EnrichmentCard({
     if (isAudioType && playbackUrl) {
       return (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
+          {/* placeholder with dynamic URL, dimensions unknown */}
           <img
             src={placeholderImage}
             alt={enrichment.title || label}
@@ -448,7 +450,7 @@ export function EnrichmentCard({
     // Default: placeholder image with gradient
     return (
       <>
-        {/* eslint-disable-next-line @next/next/no-img-element -- placeholder with dynamic URL, dimensions unknown */}
+        {/* placeholder with dynamic URL, dimensions unknown */}
         <img
           src={placeholderImage}
           alt={enrichment.title || label}

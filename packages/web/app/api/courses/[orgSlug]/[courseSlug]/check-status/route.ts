@@ -37,16 +37,19 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
 
-    // Check if user owns the course
+    // Check if user owns the course, belongs to same org, or is superadmin
     if (course.user_id !== user.id) {
-      // Check if user is super admin
       const { data: profile } = await supabase
         .from('users')
-        .select('role')
+        .select('organization_id, role')
         .eq('id', user.id)
         .single()
 
-      if (profile?.role !== 'superadmin') {
+      const isSameOrg =
+        profile?.organization_id && profile.organization_id === course.organization_id
+      const isSuperAdmin = profile?.role === 'superadmin'
+
+      if (!isSameOrg && !isSuperAdmin) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     }
@@ -151,15 +154,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
 
-    // Check ownership
+    // Check ownership, organization membership, or superadmin
     if (course.user_id !== user.id) {
       const { data: profile } = await supabase
         .from('users')
-        .select('role')
+        .select('organization_id, role')
         .eq('id', user.id)
         .single()
 
-      if (profile?.role !== 'superadmin') {
+      const isSameOrg =
+        profile?.organization_id && profile.organization_id === course.organization_id
+      const isSuperAdmin = profile?.role === 'superadmin'
+
+      if (!isSameOrg && !isSuperAdmin) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     }

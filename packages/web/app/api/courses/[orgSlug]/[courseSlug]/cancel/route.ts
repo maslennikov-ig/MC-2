@@ -43,18 +43,27 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
 
-    // Verify ownership
+    // Verify ownership or organization membership
     if (courseData.user_id !== user.id) {
-      logger.warn('Unauthorized cancel attempt - wrong owner', {
-        orgSlug,
-        courseSlug,
-        attemptedBy: user.id,
-        owner: courseData.user_id,
-      })
-      return NextResponse.json(
-        { error: 'You do not have permission to cancel this course' },
-        { status: 403 }
-      )
+      // Check if user belongs to the same organization
+      const { data: profile } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id || profile.organization_id !== courseData.organization_id) {
+        logger.warn('Unauthorized cancel attempt - not owner or org member', {
+          orgSlug,
+          courseSlug,
+          attemptedBy: user.id,
+          owner: courseData.user_id,
+        })
+        return NextResponse.json(
+          { error: 'You do not have permission to cancel this course' },
+          { status: 403 }
+        )
+      }
     }
 
     // Check if cancellation is allowed based on status
@@ -275,9 +284,17 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
 
-    // Check ownership
+    // Check ownership or organization membership
     if (courseData.user_id !== user.id) {
-      return NextResponse.json({ canCancel: false, reason: 'Not the owner' }, { status: 403 })
+      const { data: profile } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.organization_id || profile.organization_id !== courseData.organization_id) {
+        return NextResponse.json({ canCancel: false, reason: 'Not the owner' }, { status: 403 })
+      }
     }
 
     // Check if cancellable - extended to support all stages
