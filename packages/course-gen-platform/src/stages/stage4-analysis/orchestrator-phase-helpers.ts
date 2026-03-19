@@ -295,6 +295,14 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
         );
       }
 
+      await updateCourseProgress(
+        courseId,
+        'stage_4_clarifying',
+        PROGRESS_RANGES.step_0_5.end,
+        PROGRESS_MESSAGES.step_0_5_waiting,
+        supabase
+      );
+
       const generatedQuestions = await getPendingQuestions(courseId);
       const criticalCount = generatedQuestions.filter(
         q => q.question_priority === 'critical' || q.question_priority === 'important'
