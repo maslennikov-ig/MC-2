@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.25] - 2026-03-19
+
+### Fixed
+
+- **pipeline**: add DB-level race condition guard to FSM initialization (9891db8b)
+- **pipeline**: address code review findings for FSM guard + progress fix (892ffc0a)
+- **pipeline**: prevent duplicate FSM init + fix clarifying progress message (de500dc0)
+- **web**: make getUserFavorites async to fix Next.js Server Actions build (430bdcd1)
+
 ## [0.31.24] - 2026-03-18
 
 ### Added

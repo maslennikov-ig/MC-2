@@ -2,6 +2,21 @@
 
 _Released on 2025-12-26_
 
+## v0.31.25
+
+_Released on 2026-03-19_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Add DB-level race condition guard to FSM initialization
+- **pipeline**: Address code review findings for FSM guard + progress fix
+- **pipeline**: Prevent duplicate FSM init + fix clarifying progress message
+- **web**: Make getUserFavorites async to fix Next.js Server Actions build
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.31.24
 
 _Released on 2026-03-18_
