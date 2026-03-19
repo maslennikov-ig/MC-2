@@ -52,6 +52,22 @@ export const initiateRouter = {
 
         assertCourseAccess(buildAuthContext(currentUser), course, 'initiate generation');
 
+        // Prevent duplicate generation - reject if already in progress
+        const ALLOWED_INITIATE_STATUSES = ['draft', 'pending', 'failed', 'cancelled'];
+        if (
+          course.generation_status &&
+          !ALLOWED_INITIATE_STATUSES.includes(course.generation_status)
+        ) {
+          logger.warn(
+            { requestId, courseId, currentStatus: course.generation_status },
+            'Duplicate generation attempt rejected - course already in progress'
+          );
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `Course generation already in progress (status: ${course.generation_status})`,
+          });
+        }
+
         const tier = extractTierFromOrg(
           course as unknown as { organization?: { tier?: string | null } | null }
         );
