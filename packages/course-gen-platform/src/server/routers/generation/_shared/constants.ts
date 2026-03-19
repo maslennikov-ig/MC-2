@@ -19,3 +19,11 @@ export const TIER_PRIORITY: Record<string, number> = {
  * These must never be used as path segments in setNestedValue.
  */
 export const FORBIDDEN_PATH_KEYS = ['__proto__', 'constructor', 'prototype'];
+
+/**
+ * Statuses that allow (re-)initiating course generation.
+ * NULL generation_status = never generated (new course), always allowed
+ * via short-circuit in the guard check.
+ * Must match the WHERE clause in initialize_fsm_with_outbox RPC.
+ */
+export const ALLOWED_INITIATE_STATUSES = ['pending', 'completed', 'failed', 'cancelled'] as const;
