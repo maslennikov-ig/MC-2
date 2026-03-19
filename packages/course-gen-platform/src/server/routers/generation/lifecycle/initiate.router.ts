@@ -53,7 +53,8 @@ export const initiateRouter = {
         assertCourseAccess(buildAuthContext(currentUser), course, 'initiate generation');
 
         // Prevent duplicate generation - reject if already in progress
-        const ALLOWED_INITIATE_STATUSES = ['draft', 'pending', 'failed', 'cancelled'];
+        // NULL generation_status = never generated (new course), always allowed via short-circuit
+        const ALLOWED_INITIATE_STATUSES = ['pending', 'completed', 'failed', 'cancelled'];
         if (
           course.generation_status &&
           !ALLOWED_INITIATE_STATUSES.includes(course.generation_status)

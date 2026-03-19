@@ -279,11 +279,27 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
         supabase
       );
     } else {
-      // Transition to clarifying status
+      // Transition to clarifying status + update progress message directly
+      // Cannot use updateCourseProgress RPC here because:
+      // - RPC rejects non-standard statuses like 'stage_4_clarifying'
+      // - Using 'in_progress' would overwrite generation_status to 'stage_4_analyzing'
+      const { data: currentCourse } = await supabase
+        .from('courses')
+        .select('generation_progress')
+        .eq('id', courseId)
+        .single();
+
+      const currentProgress = (currentCourse?.generation_progress ?? {}) as Record<string, unknown>;
+
       const { error: statusError } = await supabase
         .from('courses')
         .update({
           generation_status: 'stage_4_clarifying',
+          generation_progress: {
+            ...currentProgress,
+            message: PROGRESS_MESSAGES.step_0_5_waiting,
+          },
+          last_progress_update: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', courseId);
@@ -294,14 +310,6 @@ export async function runClarifyingPhase(context: AnalysisContext): Promise<void
           'Failed to transition to stage_4_clarifying'
         );
       }
-
-      await updateCourseProgress(
-        courseId,
-        'stage_4_clarifying',
-        PROGRESS_RANGES.step_0_5.end,
-        PROGRESS_MESSAGES.step_0_5_waiting,
-        supabase
-      );
 
       const generatedQuestions = await getPendingQuestions(courseId);
       const criticalCount = generatedQuestions.filter(
