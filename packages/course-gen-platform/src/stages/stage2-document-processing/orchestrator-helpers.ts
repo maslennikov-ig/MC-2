@@ -155,6 +155,14 @@ export async function getFileMetadata(fileId: string): Promise<{
 }
 
 /**
+ * Strip PostgreSQL-incompatible \u0000 null bytes from JSON data.
+ * OCR-extracted documents (via Docling) frequently contain these artifacts.
+ */
+function stripNullBytes(obj: unknown): unknown {
+  return JSON.parse(JSON.stringify(obj).replace(/\\u0000/g, ''));
+}
+
+/**
  * Store processed document data in file_catalog
  */
 export async function storeProcessedDocument(
@@ -164,11 +172,14 @@ export async function storeProcessedDocument(
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
 
+  const sanitizedJson = stripNullBytes(processingResult.json) as Json;
+  const sanitizedMarkdown = processingResult.markdown.replace(/\0/g, '');
+
   const { error } = await supabase
     .from('file_catalog')
     .update({
-      parsed_content: processingResult.json as unknown as Json,
-      markdown_content: processingResult.markdown,
+      parsed_content: sanitizedJson,
+      markdown_content: sanitizedMarkdown,
       updated_at: new Date().toISOString(),
     })
     .eq('id', fileId);
