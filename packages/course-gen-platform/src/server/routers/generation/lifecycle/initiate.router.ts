@@ -15,7 +15,7 @@ import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
 import { JobType } from '@megacampus/shared-types';
 import { initiateGenerationInputSchema } from '../_shared/schemas';
-import { TIER_PRIORITY } from '../_shared/constants';
+import { TIER_PRIORITY, ALLOWED_INITIATE_STATUSES } from '../_shared/constants';
 import { extractTierFromOrg, checkConcurrencyLimits } from '../_shared/helpers';
 import { InitializeFSMCommandHandler } from '../../../../shared/fsm/fsm-initialization-command-handler';
 import { generateGenerationCode } from '@megacampus/shared-utils';
@@ -51,6 +51,22 @@ export const initiateRouter = {
         if (!course) throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
 
         assertCourseAccess(buildAuthContext(currentUser), course, 'initiate generation');
+
+        // Prevent duplicate generation - reject if already in progress
+        // NULL generation_status = never generated (new course), always allowed via short-circuit
+        if (
+          course.generation_status &&
+          !(ALLOWED_INITIATE_STATUSES as readonly string[]).includes(course.generation_status)
+        ) {
+          logger.warn(
+            { requestId, courseId, currentStatus: course.generation_status },
+            'Duplicate generation attempt rejected - course already in progress'
+          );
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `Course generation already in progress (status: ${course.generation_status})`,
+          });
+        }
 
         const tier = extractTierFromOrg(
           course as unknown as { organization?: { tier?: string | null } | null }
@@ -293,6 +309,14 @@ export const initiateRouter = {
         };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
+
+        // Handle DB-level race condition guard (CONFLICT from FSM handler)
+        if (error instanceof Error && (error as Error & { code?: string }).code === 'CONFLICT') {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: error.message,
+          });
+        }
 
         logger.error(
           {

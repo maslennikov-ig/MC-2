@@ -155,6 +155,16 @@ export async function getFileMetadata(fileId: string): Promise<{
 }
 
 /**
+ * Strip PostgreSQL-incompatible Unicode sequences from JSON data.
+ * OCR-extracted documents (via Docling) frequently contain these artifacts:
+ * - \u0000 null bytes (rejected by JSONB)
+ * - \uD800-\uDFFF surrogate pairs (rejected by JSONB when unpaired)
+ */
+function sanitizeForPostgres(obj: unknown): unknown {
+  return JSON.parse(JSON.stringify(obj).replace(/\\u0000|\\u[dD][89a-fA-F][0-9a-fA-F]{2}/g, ''));
+}
+
+/**
  * Store processed document data in file_catalog
  */
 export async function storeProcessedDocument(
@@ -164,11 +174,14 @@ export async function storeProcessedDocument(
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
 
+  const sanitizedJson = sanitizeForPostgres(processingResult.json) as Json;
+  const sanitizedMarkdown = processingResult.markdown.replace(/\0|[\uD800-\uDFFF]/g, '');
+
   const { error } = await supabase
     .from('file_catalog')
     .update({
-      parsed_content: processingResult.json as unknown as Json,
-      markdown_content: processingResult.markdown,
+      parsed_content: sanitizedJson,
+      markdown_content: sanitizedMarkdown,
       updated_at: new Date().toISOString(),
     })
     .eq('id', fileId);

@@ -242,6 +242,9 @@ export class InitializeFSMCommandHandler {
     );
 
     if (error) {
+      const isAlreadyInProgress =
+        error.code === '23505' || error.message?.includes('already in progress');
+
       logger.error(
         {
           error: error.message,
@@ -251,9 +254,18 @@ export class InitializeFSMCommandHandler {
           entityId: command.entityId,
           idempotencyKey: command.idempotencyKey,
           initiatedBy: command.initiatedBy,
+          isAlreadyInProgress,
         },
-        'FSM initialization database transaction failed'
+        isAlreadyInProgress
+          ? 'FSM initialization rejected - course generation already in progress'
+          : 'FSM initialization database transaction failed'
       );
+
+      if (isAlreadyInProgress) {
+        const err = new Error(`Course generation already in progress`);
+        (err as Error & { code: string }).code = 'CONFLICT';
+        throw err;
+      }
 
       throw new Error(`FSM initialization failed: ${error.message}`);
     }
