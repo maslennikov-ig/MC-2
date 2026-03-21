@@ -448,7 +448,9 @@ export async function executeCLEVVoting(
   const scoresMatch = scoresAgree(
     primaryResult!.overallScore,
     secondaryResult!.overallScore,
-    finalConfig.agreementThreshold
+    finalConfig.agreementThreshold,
+    primaryResult!.issues,
+    secondaryResult!.issues
   );
 
   // Check confidence levels

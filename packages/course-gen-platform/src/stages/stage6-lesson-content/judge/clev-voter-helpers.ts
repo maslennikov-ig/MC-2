@@ -88,6 +88,22 @@ ${ragContext}
 Evaluate against these 6 criteria (scores 0.0-1.0):
 ${rubricCriteria}
 
+## ADDITIONAL VALIDATION RULES
+
+**Content Coherence (CRITICAL)**:
+- Verify ALL exercises, examples, and the conclusion DIRECTLY reference topics covered in THIS lesson's sections above.
+- If any exercise mentions a topic, module, or concept NOT discussed in this lesson's content, flag it as a CRITICAL issue under "factual_accuracy" criterion.
+- The lesson title is: "${lessonSpec.title}". The section it belongs to is: "${((lessonSpec as Record<string, unknown>)['section_title'] as string | undefined) || 'N/A'}".
+- Exercises that discuss unrelated modules (e.g., "leadership" exercises in a "strategy" lesson) must be flagged.
+
+**Language Purity**:
+- For ${input.language || 'en'} content: flag any unexpected foreign script characters (CJK/Chinese, Arabic, Devanagari) that appear in lesson prose (not in code examples).
+- Score under "clarity_readability" criterion.
+
+**Content Completeness (Length)**:
+- This is a ${lessonSpec.estimated_duration_minutes || 15}-minute lesson. Expected content length is approximately ${Math.round((lessonSpec.estimated_duration_minutes || 15) * 120)} words.
+- If total content is significantly shorter than expected (less than 50%), flag as CRITICAL under "completeness" criterion.
+
 **Passing Threshold**: ${rubric.passingThreshold}
 
 ## OUTPUT FORMAT
@@ -158,10 +174,35 @@ Evaluate objectively, focusing on educational quality and alignment with objecti
 // ============================================================================
 
 /**
- * Check if two scores agree within threshold
+ * Check if two judges agree on their evaluation.
+ * Agreement requires BOTH:
+ * 1. Numeric scores within threshold
+ * 2. No critical issue disagreement (one found critical, other didn't)
  */
-export function scoresAgree(score1: number, score2: number, threshold: number): boolean {
-  return Math.abs(score1 - score2) <= threshold;
+export function scoresAgree(
+  score1: number,
+  score2: number,
+  threshold: number,
+  issues1?: JudgeIssue[],
+  issues2?: JudgeIssue[]
+): boolean {
+  const numericAgree = Math.abs(score1 - score2) <= threshold;
+
+  // If no issues provided, fall back to numeric-only agreement
+  if (!issues1 || !issues2) {
+    return numericAgree;
+  }
+
+  // Check critical issue agreement
+  const hasCritical1 = issues1.some(i => i.severity === 'critical');
+  const hasCritical2 = issues2.some(i => i.severity === 'critical');
+
+  // If one judge found critical issues and the other didn't → disagreement
+  if (hasCritical1 !== hasCritical2) {
+    return false;
+  }
+
+  return numericAgree;
 }
 
 /**

@@ -83,6 +83,24 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
     issues.push(`Content suspiciously short (${trimmedContent.length} characters)`);
   }
 
+  // Check 5: Per-section truncation (check each section individually)
+  const sectionBlocks = content.split(/^#{2,3}\s+/m).filter(s => s.trim().length > 50);
+  for (let i = 0; i < sectionBlocks.length; i++) {
+    const section = sectionBlocks[i].trim();
+    // Skip last section (already checked by Check 1)
+    if (i === sectionBlocks.length - 1) continue;
+
+    // Check if section ends without proper punctuation (mid-word or mid-sentence)
+    const sectionEnd = section.slice(-50);
+    const lastChar = sectionEnd.replace(/[\s*_`#]+$/, '').slice(-1);
+    if (lastChar && !/[.!?。！？:\n]/.test(lastChar)) {
+      // Check if it's a title line (next section header) — skip those
+      if (!/^\S+\n/.test(section.slice(-20))) {
+        issues.push(`Section ${i + 1} appears truncated (ends with "${lastChar}")`);
+      }
+    }
+  }
+
   const passed = issues.length === 0;
 
   // Score: 1.0 if clean, reduces based on number of issues
