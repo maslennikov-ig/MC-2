@@ -14,12 +14,12 @@ BEGIN
 
   v_valid_transitions := '{
     "pending": ["stage_2_init", "stage_3_init", "stage_4_init", "cancelled"],
-    "stage_2_init": ["stage_2_processing", "stage_2_complete", "stage_2_awaiting_approval", "failed", "cancelled"],
+    "stage_2_init": ["stage_2_processing", "stage_2_complete", "stage_2_awaiting_approval", "stage_4_init", "failed", "cancelled"],
     "stage_2_processing": ["stage_2_complete", "stage_2_awaiting_approval", "failed", "cancelled"],
-    "stage_2_complete": ["stage_2_awaiting_approval", "stage_3_init", "failed", "cancelled"],
-    "stage_2_awaiting_approval": ["stage_2_complete", "stage_3_init", "failed", "cancelled"],
-    "stage_3_init": ["stage_3_summarizing", "stage_3_complete", "stage_3_awaiting_approval", "failed", "cancelled"],
-    "stage_3_summarizing": ["stage_3_complete", "stage_3_awaiting_approval", "failed", "cancelled"],
+    "stage_2_complete": ["stage_2_awaiting_approval", "stage_3_init", "stage_3_summarizing", "stage_4_init", "failed", "cancelled"],
+    "stage_2_awaiting_approval": ["stage_2_complete", "stage_3_init", "stage_3_summarizing", "stage_4_init", "failed", "cancelled"],
+    "stage_3_init": ["stage_3_summarizing", "stage_3_complete", "stage_3_awaiting_approval", "stage_2_complete", "failed", "cancelled"],
+    "stage_3_summarizing": ["stage_3_complete", "stage_3_awaiting_approval", "stage_2_complete", "failed", "cancelled"],
     "stage_3_complete": ["stage_3_awaiting_approval", "stage_4_init", "failed", "cancelled"],
     "stage_3_awaiting_approval": ["stage_3_complete", "stage_4_init", "finalizing", "failed", "cancelled"],
     "stage_4_init": ["stage_4_clarifying", "stage_4_analyzing", "stage_4_complete", "stage_4_awaiting_approval", "failed", "cancelled"],
