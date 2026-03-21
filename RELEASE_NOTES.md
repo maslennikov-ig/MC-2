@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.31.29
+
+_Released on 2026-03-21_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Harden Stage 6 quality pipeline — fix 6 root causes
+- **pipeline**: Definitive FSM with all transitions + bypass support
+- **pipeline**: Restore all lost FSM transitions from original migration
+- **Authentication**: Add admin/superadmin bypass to restart-stage endpoint
+- **pipeline**: Correct FSM status names to match actual enum values
+- **pipeline**: Add awaiting_approval to init state transitions
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.31.28
 
 _Released on 2026-03-21_
