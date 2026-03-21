@@ -137,8 +137,11 @@ export function LessonView({
       <div className="min-h-screen bg-white dark:bg-gray-950">
         <div className="sticky top-0 z-20 border-b border-gray-200/50 bg-white/95 backdrop-blur-sm dark:border-gray-800/50 dark:bg-gray-900/95">
           <div className="flex items-center justify-between px-6 py-3">
-            <div className="flex items-center gap-4">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+            <div className="flex min-w-0 items-center gap-4">
+              <h2
+                className="min-w-0 truncate text-lg font-semibold text-gray-800 dark:text-white/90"
+                title={currentLesson.title ?? ''}
+              >
                 {currentLesson.title}
               </h2>
               <Badge
@@ -241,7 +244,7 @@ export function LessonView({
                 <div className="text-left">
                   <div className="text-xs text-gray-500 dark:text-white/60">{t('prevLesson')}</div>
                   {currentIndex > 0 && (
-                    <div className="text-sm font-medium">
+                    <div className="max-w-[200px] truncate text-sm font-medium">
                       {allLessonsOrdered[currentIndex - 1].title}
                     </div>
                   )}
@@ -257,7 +260,7 @@ export function LessonView({
                 <div className="text-right">
                   <div className="text-xs text-gray-500 dark:text-white/60">{t('nextLesson')}</div>
                   {currentIndex < totalLessonsOrdered - 1 && (
-                    <div className="text-sm font-medium">
+                    <div className="max-w-[200px] truncate text-sm font-medium">
                       {allLessonsOrdered[currentIndex + 1].title}
                     </div>
                   )}

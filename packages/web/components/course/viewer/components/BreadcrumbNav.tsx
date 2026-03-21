@@ -43,7 +43,7 @@ export function BreadcrumbNav({
       className="border-b border-gray-100 bg-gray-50/50 px-6 py-3 dark:border-gray-800/50 dark:bg-gray-900/30"
     >
       {/* Desktop breadcrumbs */}
-      <ol className="hidden items-center gap-2 text-sm text-gray-600 md:flex dark:text-gray-400">
+      <ol className="hidden min-w-0 items-center gap-2 text-sm text-gray-600 md:flex dark:text-gray-400">
         <li>
           <Link
             href="/courses"
