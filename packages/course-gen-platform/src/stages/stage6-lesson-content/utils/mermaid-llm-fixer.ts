@@ -59,11 +59,16 @@ const MAX_LLM_FIXES_PER_LESSON = 5;
 const MAX_DIAGRAM_SIZE_FOR_LLM = 2000;
 
 /**
- * LLM model to use for fixing diagrams
- * Using minimax/minimax-m2.1 (good Russian support, cost-efficient)
- * Pricing: $0.30/1M input, $1.20/1M output
+ * 3-tier model cascade for fixing diagrams.
+ * T1 handles 90%+ of cases cheaply. T2/T3 escalate for complex failures.
  */
-const LLM_MODEL_ID = 'minimax/minimax-m2.1';
+const LLM_MODELS = {
+  primary: 'minimax/minimax-m2.1', // T1: cheap, $0.30/1M input
+  secondary: 'qwen/qwen3.5-plus-02-15', // T2: strong, ~$3/1M input
+  ultimate: 'z-ai/glm-5', // T3: top model, expensive, last resort
+} as const;
+
+export type MermaidModelTier = keyof typeof LLM_MODELS;
 
 /**
  * Temperature setting for LLM (low for deterministic fixes)
@@ -312,7 +317,8 @@ export interface MermaidLLMFixContext {
 export async function fixMermaidWithLLM(
   brokenDiagram: string,
   parserError: string,
-  context: MermaidLLMFixContext
+  context: MermaidLLMFixContext,
+  modelTier: MermaidModelTier = 'primary'
 ): Promise<MermaidLLMFixResult> {
   // Track attempt
   llmFixerMetrics.totalAttempts++;
@@ -355,8 +361,9 @@ export async function fixMermaidWithLLM(
     const diagramType = detectDiagramType(brokenDiagram);
     const systemPrompt = buildSystemPrompt(diagramType);
 
-    // Create LLM instance
-    const model = createOpenRouterModel(LLM_MODEL_ID, LLM_TEMPERATURE, LLM_MAX_TOKENS);
+    // Create LLM instance with selected model tier
+    const selectedModel = LLM_MODELS[modelTier];
+    const model = createOpenRouterModel(selectedModel, LLM_TEMPERATURE, LLM_MAX_TOKENS);
 
     // Configure timeout
     model.timeout = LLM_TIMEOUT;
@@ -377,7 +384,7 @@ Fix the syntax error and return ONLY the corrected ${diagramType} diagram code.`
         diagramLength: brokenDiagram.length,
         diagramType,
         errorPreview: parserError.slice(0, 100),
-        model: LLM_MODEL_ID,
+        model: selectedModel,
       },
       'Mermaid LLM fixer: Sending fix request'
     );
@@ -412,7 +419,7 @@ Fix the syntax error and return ONLY the corrected ${diagramType} diagram code.`
 
     if (tokensUsed === 0) {
       logger.warn(
-        { model: LLM_MODEL_ID },
+        { model: selectedModel },
         'Mermaid LLM fixer: Token usage unavailable in response metadata'
       );
     }
