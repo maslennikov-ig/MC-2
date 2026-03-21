@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.31.28
+
+_Released on 2026-03-21_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 6 source file(s), update docs
+- **pipeline**: Allow FSM pending → stage_3/4_init for pre-processed docs
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.27
 
 _Released on 2026-03-21_
