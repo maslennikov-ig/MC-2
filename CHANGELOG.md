@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.26] - 2026-03-21
+
+### Fixed
+
+- **pipeline**: add FSM transition + missing enum values + auto-mute rules (925c0afb)
+- **pipeline**: extend sanitization to strip surrogate pairs before PG storage (c2f572d4)
+- **pipeline**: strip null bytes from Docling output before PostgreSQL storage (11397c33)
+
+### Other
+
+- **docker**: upgrade Docling to v2.80+ in MCP server image (8c81bfbf)
+
 ## [0.31.25] - 2026-03-19
 
 ### Fixed

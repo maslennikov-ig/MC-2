@@ -2,6 +2,20 @@
 
 _Released on 2025-12-26_
 
+## v0.31.26
+
+_Released on 2026-03-21_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Add FSM transition + missing enum values + auto-mute rules
+- **pipeline**: Extend sanitization to strip surrogate pairs before PG storage
+- **pipeline**: Strip null bytes from Docling output before PostgreSQL storage
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.31.25
 
 _Released on 2026-03-19_
