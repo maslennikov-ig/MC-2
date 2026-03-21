@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.27] - 2026-03-21
+
+### Fixed
+
+- **stage6**: eliminate mermaid text fallback + add 3-tier model cascade (9378d327)
+- **web**: truncate long lesson titles to prevent horizontal scroll (64741a37)
+
 ## [0.31.26] - 2026-03-21
 
 ### Fixed
