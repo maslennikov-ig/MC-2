@@ -21,8 +21,8 @@ vi.mock('@/stages/stage6-lesson-content/utils/mermaid-llm-fixer', () => ({
   fixMermaidWithLLM: vi.fn((...args) => mockFixLLM(...args)),
 }));
 
-vi.mock('@/stages/stage6-lesson-content/utils/mermaid-render-validator', () => ({
-  validateMermaidBlockRender: vi.fn((...args) => mockValidate(...args)),
+vi.mock('@/stages/stage6-lesson-content/utils/mermaid-validator', () => ({
+  validateMermaidSyntax: vi.fn((...args) => mockValidate(...args)),
 }));
 
 vi.mock('@/shared/logger', () => {
@@ -41,9 +41,7 @@ describe('mermaid-fix-pipeline', () => {
     }));
 
     mockValidate.mockResolvedValue({
-      parseValid: true,
-      renderValid: true,
-      svgHasRenderableContent: true,
+      valid: true,
       errors: [],
       diagramType: 'flowchart',
     });
@@ -122,18 +120,14 @@ flowchart TD
       // valid content, so regex will not modify it, LLM will be called since we force validate failure later
       // First validation fails
       mockValidate.mockResolvedValueOnce({
-        parseValid: false,
-        renderValid: false,
-        svgHasRenderableContent: false,
+        valid: false,
         errors: ['Syntax error'],
         diagramType: 'flowchart',
       });
 
       // Second validation passes (after LLM)
       mockValidate.mockResolvedValueOnce({
-        parseValid: true,
-        renderValid: true,
-        svgHasRenderableContent: true,
+        valid: true,
         errors: [],
         diagramType: 'flowchart',
       });
@@ -155,9 +149,7 @@ flowchart TD
 
       // First validation fails, but LLM shouldn't be called
       mockValidate.mockResolvedValue({
-        parseValid: false,
-        renderValid: false,
-        svgHasRenderableContent: false,
+        valid: false,
         errors: ['Syntax error'],
         diagramType: 'flowchart',
       });
@@ -174,9 +166,7 @@ flowchart TD
 
       // Validation fails (e.g. timeout)
       mockValidate.mockResolvedValue({
-        parseValid: false,
-        renderValid: false,
-        svgHasRenderableContent: false,
+        valid: false,
         errors: ['Timeout'],
         diagramType: 'flowchart',
       });
@@ -185,17 +175,13 @@ flowchart TD
       mockValidate.mockImplementation(code => {
         if (!code.includes('style A')) {
           return Promise.resolve({
-            parseValid: true,
-            renderValid: true,
-            svgHasRenderableContent: true,
+            valid: true,
             errors: [],
             diagramType: 'flowchart',
           });
         }
         return Promise.resolve({
-          parseValid: false,
-          renderValid: false,
-          svgHasRenderableContent: false,
+          valid: false,
           errors: ['Error'],
           diagramType: 'flowchart',
         });
@@ -211,20 +197,16 @@ flowchart TD
       const content = '```mermaid\nflowchart TD\n  A --> B\n  B --> C\n```';
 
       // Validation fails for original, fails for simplified, passes for split
-      mockValidate.mockImplementation((code, idx) => {
+      mockValidate.mockImplementation((code: string) => {
         if (code.includes('A --> B') && code.includes('B --> C')) {
           return Promise.resolve({
-            parseValid: false,
-            renderValid: false,
-            svgHasRenderableContent: false,
+            valid: false,
             errors: ['Error'],
             diagramType: 'flowchart',
           });
         }
         return Promise.resolve({
-          parseValid: true,
-          renderValid: true,
-          svgHasRenderableContent: true,
+          valid: true,
           errors: [],
           diagramType: 'flowchart',
         });
@@ -237,23 +219,24 @@ flowchart TD
       expect(result.content.split('```mermaid').length - 1).toBe(2);
     });
 
-    it('falls back to structured markdown when all else fails', async () => {
+    it('strips unfixable diagram instead of text fallback', async () => {
       const content = '```mermaid\nflowchart TD\n  A --> B\n```';
 
       // Validation always fails
       mockValidate.mockResolvedValue({
-        parseValid: false,
-        renderValid: false,
-        svgHasRenderableContent: false,
+        valid: false,
         errors: ['Error'],
         diagramType: 'flowchart',
       });
 
       const result = await runMermaidFixPipeline(content, { skipLLM: true });
 
-      expect(result.metrics.diagramsStructuredFallback).toBe(1);
-      expect(result.content).toContain('**Diagram unavailable (auto-remediated)**');
-      expect(result.content).toContain('1. A -> B');
+      expect(result.metrics.diagramsFallback).toBe(1);
+      // Should NOT contain fallback text
+      expect(result.content).not.toContain('Diagram unavailable');
+      expect(result.content).not.toContain('auto-remediated');
+      // Diagram should be stripped (empty)
+      expect(result.content.trim()).toBe('');
     });
   });
 });
