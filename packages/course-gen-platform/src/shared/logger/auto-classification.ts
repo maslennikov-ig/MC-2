@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 65 (no optimization needed)
+ * Current rule count: 76 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -482,6 +482,43 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Phase 5 assembly field fallback to defaults - LLM values filtered out, expected',
   },
 
+  // === Jina API External Errors ===
+  {
+    pattern: /Jina API request failed/i,
+    reason: 'external_service',
+    description: 'Jina API request failed (429/5xx) - external service issue, has retry logic',
+  },
+
+  // === UI Race Conditions: Document Retry ===
+  {
+    pattern: /can only retry .?failed.? documents/i,
+    reason: 'ui_race_condition',
+    description: 'User clicked retry on already-indexed document - stale UI state, not a bug',
+  },
+
+  // === Document Classification Fallbacks ===
+  {
+    pattern: /Failed to classify documents comparatively.*falling back/i,
+    reason: 'graceful_fallback',
+    description:
+      'Comparative classification failed (LLM 403/timeout), falling back to independent - expected',
+  },
+
+  // === Phase 2 Overlap Degradation ===
+  {
+    pattern: /overlap persists after all retries.*proceeding/i,
+    reason: 'graceful_fallback',
+    description:
+      'Section overlap unresolved after retries, proceeding with best-effort - non-blocking',
+  },
+
+  // === Enrichment Transient Errors ===
+  {
+    pattern: /Enrichment lookup failed \(transient\)/i,
+    reason: 'external_service',
+    description: 'Enrichment status check got Cloudflare/network error - transient, has retry',
+  },
+
   // === Outbox Processor Transient Errors ===
   {
     pattern: /Failed to fetch pending jobs from outbox/i,
@@ -492,6 +529,50 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Outbox processor error.*retrying/i,
     reason: 'external_service',
     description: 'Outbox processor transient error with auto-retry - expected during network blips',
+  },
+
+  // === Infrastructure Monitoring Warnings ===
+  {
+    pattern: /Elevated memory usage/i,
+    reason: 'infrastructure',
+    description: 'Memory usage warning from Node.js process - monitoring signal, not a bug',
+  },
+
+  // === Course Progress DB Update Warnings ===
+  {
+    pattern: /Failed to update course progress in DB/i,
+    reason: 'graceful_fallback',
+    description:
+      'Non-blocking progress update failed - course generation continues, progress stale temporarily',
+  },
+
+  // === Stage 6 Partial Success ===
+  {
+    pattern: /Partial success.*content saved.*for review/i,
+    reason: 'graceful_fallback',
+    description:
+      'Stage 6 partial content saved for review - content delivered despite quality issues',
+  },
+
+  // === RAG Search Fallbacks ===
+  {
+    pattern: /Hybrid search failed.*falling back to dense/i,
+    reason: 'graceful_fallback',
+    description: 'Qdrant hybrid search failed, using dense-only fallback - search still works',
+  },
+
+  // === LO-Code Sanitization ===
+  {
+    pattern: /Stripped \d+ bytes of LO-code references/i,
+    reason: 'expected_behavior',
+    description: 'LO-code references stripped from LLM output - sanitizer working as designed',
+  },
+
+  // === LLM Retry Warnings ===
+  {
+    pattern: /^Retrying LLM request$/i,
+    reason: 'expected_behavior',
+    description: 'LLM request retry in progress - expected behavior with transient failures',
   },
 ];
 
