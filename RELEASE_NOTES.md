@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.31.27
+
+_Released on 2026-03-21_
+
+### 🐛 Bug Fixes
+
+- **stage6**: Eliminate mermaid text fallback + add 3-tier model cascade
+- **web**: Truncate long lesson titles to prevent horizontal scroll
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.26
 
 _Released on 2026-03-21_
