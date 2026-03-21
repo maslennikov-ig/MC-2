@@ -152,6 +152,10 @@ export interface CascadeResult {
   finalRecommendation: JudgeRecommendation;
   /** Total tokens used across all stages */
   totalTokensUsed: number;
+  /** Total input tokens across all stages (for cost tracking) */
+  totalInputTokens: number;
+  /** Total output tokens across all stages (for cost tracking) */
+  totalOutputTokens: number;
   /** Total duration in milliseconds */
   totalDurationMs: number;
   /** Cost savings achieved by cascade (0-1) */

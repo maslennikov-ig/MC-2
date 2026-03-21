@@ -22,6 +22,7 @@ import type { CascadeEvaluationInput, CascadeResult } from '../judge/cascade-eva
 import { DecisionAction, type DecisionResult } from '../judge/decision-engine';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
+import { costTracker, createTokenUsage } from '@/shared/metrics/cost-tracker';
 import { buildLessonContent } from '../judge/judge-helpers';
 import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
@@ -664,6 +665,8 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
 
   const durationMs = Date.now() - startTime;
   const totalTokensUsed = (cascadeResult?.totalTokensUsed ?? 0) + (refinementTokensUsed ?? 0);
+  const totalInputTokens = cascadeResult?.totalInputTokens ?? 0;
+  const totalOutputTokens = cascadeResult?.totalOutputTokens ?? 0;
 
   // Build reviewInfo
   const reviewInfo = buildReviewInfo(needsHumanReview, cascadeResult);
@@ -683,6 +686,32 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
         ? judgeModelsUsed[0]
         : judgeModelsUsed.join(', ');
 
+  // Calculate cost from per-model token usage
+  let costUsd = 0;
+  if (judgeModelsUsed.length > 0 && totalInputTokens > 0) {
+    // We have per-model breakdown from verdicts — split tokens proportionally
+    const perModelInput = Math.round(totalInputTokens / judgeModelsUsed.length);
+    const perModelOutput = Math.round(totalOutputTokens / judgeModelsUsed.length);
+    for (const modelId of judgeModelsUsed) {
+      costUsd += costTracker.calculateCost(
+        modelId,
+        createTokenUsage(perModelInput, perModelOutput)
+      );
+    }
+  } else if (judgeModelsUsed.length > 0 && totalTokensUsed > 0) {
+    // Fallback: no input/output breakdown, estimate 80/20 split
+    const estInput = Math.round(totalTokensUsed * 0.8);
+    const estOutput = totalTokensUsed - estInput;
+    const perModelInput = Math.round(estInput / judgeModelsUsed.length);
+    const perModelOutput = Math.round(estOutput / judgeModelsUsed.length);
+    for (const modelId of judgeModelsUsed) {
+      costUsd += costTracker.calculateCost(
+        modelId,
+        createTokenUsage(perModelInput, perModelOutput)
+      );
+    }
+  }
+
   // Log trace
   await logTrace({
     courseId: state.courseId,
@@ -694,6 +723,8 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
       lessonLabel: state.lessonSpec.lesson_id,
       lessonTitle: state.lessonSpec.title,
       moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
+      inputTokens: totalInputTokens || undefined,
+      outputTokens: totalOutputTokens || undefined,
     },
     outputData: {
       finalRecommendation,
@@ -723,6 +754,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     },
     modelUsed,
     tokensUsed: totalTokensUsed,
+    costUsd: costUsd > 0 ? costUsd : undefined,
     durationMs,
   });
 

@@ -108,6 +108,8 @@ export async function executeCascadeEvaluation(
 
   const startTime = Date.now();
   let totalTokensUsed = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
 
   logger.info({
     msg: 'Starting cascade evaluation',
@@ -147,6 +149,8 @@ export async function executeCascadeEvaluation(
         finalScore: 0,
         finalRecommendation: 'REGENERATE',
         totalTokensUsed: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
         totalDurationMs: Date.now() - startTime,
         costSavingsRatio: 1.0, // 100% savings - no LLM calls
       };
@@ -209,6 +213,8 @@ export async function executeCascadeEvaluation(
         finalScore: factualVerificationResult.overallAccuracyScore,
         finalRecommendation: 'REGENERATE',
         totalTokensUsed: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
         totalDurationMs: Date.now() - startTime,
         costSavingsRatio: 1.0, // 100% savings - no LLM calls
       };
@@ -242,6 +248,8 @@ export async function executeCascadeEvaluation(
 
     if (singleJudgeVerdict) {
       totalTokensUsed += singleJudgeVerdict.tokensUsed;
+      totalInputTokens += singleJudgeVerdict.inputTokens ?? 0;
+      totalOutputTokens += singleJudgeVerdict.outputTokens ?? 0;
 
       // Check confidence threshold
       const confidenceRank: Record<JudgeConfidence, number> = { high: 2, medium: 1, low: 0 };
@@ -268,6 +276,8 @@ export async function executeCascadeEvaluation(
           finalScore: singleJudgeVerdict.overallScore,
           finalRecommendation: singleJudgeVerdict.recommendation,
           totalTokensUsed,
+          totalInputTokens,
+          totalOutputTokens,
           totalDurationMs: Date.now() - startTime,
           costSavingsRatio: 0.67, // 67% savings - 1 judge instead of 3
         };
@@ -305,6 +315,8 @@ export async function executeCascadeEvaluation(
   // Sum tokens from all CLEV verdicts
   const clevTokens = clevResult.verdicts.reduce((sum, v) => sum + v.tokensUsed, 0);
   totalTokensUsed += clevTokens;
+  totalInputTokens += clevResult.verdicts.reduce((sum, v) => sum + (v.inputTokens ?? 0), 0);
+  totalOutputTokens += clevResult.verdicts.reduce((sum, v) => sum + (v.outputTokens ?? 0), 0);
 
   logger.info({
     msg: 'CLEV voting complete',
@@ -326,6 +338,8 @@ export async function executeCascadeEvaluation(
     finalScore: clevResult.aggregatedScore,
     finalRecommendation: clevResult.finalRecommendation,
     totalTokensUsed,
+    totalInputTokens,
+    totalOutputTokens,
     totalDurationMs: Date.now() - startTime,
     costSavingsRatio: 0, // No savings - full CLEV voting
   };

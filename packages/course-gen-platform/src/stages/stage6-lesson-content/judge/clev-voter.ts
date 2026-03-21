@@ -261,6 +261,8 @@ async function executeJudge(
       judgeModel: modelConfig.modelId,
       temperature: modelConfig.temperature,
       tokensUsed: response.totalTokens,
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
       durationMs,
     };
 

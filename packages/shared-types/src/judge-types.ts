@@ -183,6 +183,10 @@ export const JudgeVerdictSchema = z.object({
   temperature: z.number().min(0).max(1),
   /** Total tokens used for this evaluation */
   tokensUsed: z.number().int().min(0),
+  /** Input tokens consumed (for cost tracking) */
+  inputTokens: z.number().int().min(0).optional(),
+  /** Output tokens generated (for cost tracking) */
+  outputTokens: z.number().int().min(0).optional(),
   /** Duration of evaluation in milliseconds */
   durationMs: z.number().int().min(0),
 });
