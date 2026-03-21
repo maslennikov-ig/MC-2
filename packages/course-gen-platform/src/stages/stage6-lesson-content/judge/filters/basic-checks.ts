@@ -299,3 +299,67 @@ export function checkContentDensity(
 
   return result;
 }
+
+/**
+ * Check that each content section meets minimum word count
+ * Catches "stub sections" where a heading exists but content is empty/minimal
+ *
+ * @param content - Content to check (markdown string)
+ * @param minWordsPerSection - Minimum words per section (default: 40)
+ * @returns Filter check result with per-section word counts
+ */
+export function checkPerSectionWordCount(
+  content: string,
+  minWordsPerSection: number = 40
+): FilterCheckResult & { sectionWordCounts: Array<{ title: string; wordCount: number }> } {
+  // Split by markdown headers (## or ###)
+  const sectionRegex = /^(#{2,3})\s+(.+)$/gm;
+  const sections: Array<{ title: string; content: string }> = [];
+  let lastIndex = 0;
+  let lastTitle = '';
+  let match;
+
+  while ((match = sectionRegex.exec(content)) !== null) {
+    if (lastTitle) {
+      sections.push({ title: lastTitle, content: content.slice(lastIndex, match.index) });
+    }
+    lastTitle = match[2];
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastTitle) {
+    sections.push({ title: lastTitle, content: content.slice(lastIndex) });
+  }
+
+  const sectionWordCounts = sections.map(s => {
+    const words = s.content.match(/\b[\w\u0400-\u04FF]+\b/g) || [];
+    return { title: s.title, wordCount: words.length };
+  });
+
+  const stubSections = sectionWordCounts.filter(s => s.wordCount < minWordsPerSection);
+  const passed = stubSections.length === 0;
+  const scoreContribution =
+    sections.length > 0 ? (sections.length - stubSections.length) / sections.length : 1.0;
+
+  const result: FilterCheckResult & {
+    sectionWordCounts: Array<{ title: string; wordCount: number }>;
+  } = {
+    passed,
+    actual:
+      stubSections.length === 0 ? 'all sections adequate' : `${stubSections.length} stub sections`,
+    scoreContribution,
+    sectionWordCounts,
+  };
+
+  if (!passed) {
+    const stubNames = stubSections.map(s => `"${s.title}" (${s.wordCount} words)`).join(', ');
+    result.failure = {
+      filter: 'perSectionWordCount',
+      expected: `≥${minWordsPerSection} words per section`,
+      actual: `${stubSections.length} sections below minimum`,
+      severity: stubSections.length > 2 ? 'critical' : 'major',
+    };
+    result.suggestion = `Stub sections detected: ${stubNames}. Expand these sections with more content.`;
+  }
+
+  return result;
+}
