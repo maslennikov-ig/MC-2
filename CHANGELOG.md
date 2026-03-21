@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.28] - 2026-03-21
+
+### Fixed
+
+- **course-gen-platform**: update 6 source file(s), update docs (cd94b2b2)
+- **pipeline**: allow FSM pending → stage_3/4_init for pre-processed docs (80cd2a4d)
+
 ## [0.31.27] - 2026-03-21
 
 ### Fixed
