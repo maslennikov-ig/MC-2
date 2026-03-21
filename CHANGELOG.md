@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.29] - 2026-03-21
+
+### Fixed
+
+- **pipeline**: harden Stage 6 quality pipeline — fix 6 root causes (55662f8c)
+- **pipeline**: definitive FSM with all transitions + bypass support (2cc1b6cc)
+- **pipeline**: restore all lost FSM transitions from original migration (5fa0581c)
+- **auth**: add admin/superadmin bypass to restart-stage endpoint (4d3af215)
+- **pipeline**: correct FSM status names to match actual enum values (02fc286a)
+- **pipeline**: add awaiting_approval to init state transitions (74a2bcb1)
+
+### Other
+
+- trigger rebuild for server action hash fix (1698f7df)
+
 ## [0.31.28] - 2026-03-21
 
 ### Fixed
