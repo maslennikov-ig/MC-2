@@ -347,7 +347,7 @@ export default function CourseViewerEnhanced({
         />
 
         <motion.div
-          className="flex flex-1 flex-col"
+          className="flex min-w-0 flex-1 flex-col"
           animate={{
             width: sidebarOpen && !focusMode ? 'auto' : '100%',
           }}

@@ -215,14 +215,14 @@ export function Sidebar({
                 onClick={() => onToggleSection(section.id)}
                 className="hover:to-gray-150 group flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 px-3 py-2 shadow-sm transition-all duration-200 hover:from-gray-100 hover:shadow-md dark:border-gray-800 dark:from-gray-800/30 dark:to-gray-800/20 dark:hover:from-gray-800/50 dark:hover:to-gray-800/40"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <ChevronRight
-                    className={`h-4 w-4 text-gray-600 transition-transform dark:text-white/60 ${
+                    className={`h-4 w-4 flex-shrink-0 text-gray-600 transition-transform dark:text-white/60 ${
                       isExpanded ? 'rotate-90' : ''
                     }`}
                   />
-                  <Layers className="h-4 w-4 text-gray-600 dark:text-white/60" />
-                  <span className="text-sm font-semibold text-gray-800 dark:text-white/85">
+                  <Layers className="h-4 w-4 flex-shrink-0 text-gray-600 dark:text-white/60" />
+                  <span className="truncate text-sm font-semibold text-gray-800 dark:text-white/85">
                     {t('section')} {section.section_number}: {section.title}
                   </span>
                 </div>
