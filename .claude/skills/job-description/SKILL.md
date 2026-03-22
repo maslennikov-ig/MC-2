@@ -714,7 +714,7 @@ Visual summary of the entire role on one "page":
 
 > Создано на платформе MegaCampus AI
 > Хотите обучить сотрудника на эту должность?
-> **[Создать курс обучения →](/create?from_jd={slug})**
+> **[Создать курс обучения →](https://ai.megacampus.ru)**
 ```
 
 ---
