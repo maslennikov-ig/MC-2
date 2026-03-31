@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.30] - 2026-03-31
+
+### Added
+
+- **jd**: regenerate sales-manager-b2b v2 with 26 blocks + 3 Mermaid diagrams (b8dc606f)
+- **skill**: add job-description role guide generator (26 blocks) (2ccd8173)
+
+### Fixed
+
+- **enrichments**: break infinite realtime subscription loop in Stage 7 inspector (c9832c52)
+- **nlm**: replace broken CDP auth script with official notebooklm login (6165122f)
+- **jd**: update CTA link to https://ai.megacampus.ru in JD and skill (ef2893c1)
+
 ## [0.31.29] - 2026-03-21
 
 ### Fixed
