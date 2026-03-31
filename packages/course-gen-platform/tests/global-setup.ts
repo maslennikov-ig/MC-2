@@ -6,6 +6,7 @@ import { config } from 'dotenv';
 import path from 'path';
 import { startWorker, stopWorker } from '../src/orchestrator/worker.js';
 import { closeRedisClient } from '../src/shared/cache/redis.js';
+import { createCourseEmbeddingsCollection } from '../src/shared/qdrant/create-collection.js';
 
 // Load environment variables
 config({ path: path.resolve(__dirname, '../.env') });
@@ -14,6 +15,11 @@ export async function setup() {
   console.log('\n=== GLOBAL SETUP: Starting BullMQ Worker ===');
 
   try {
+    // Ensure Qdrant collection exists (idempotent — skips if already created)
+    console.log('Creating Qdrant course_embeddings collection if needed...');
+    await createCourseEmbeddingsCollection();
+    console.log('✅ Qdrant collection ready');
+
     // Start generic worker with production-like concurrency for tests
     // This worker now handles ALL job types including STAGE_3_SUMMARIZATION
     // Concurrency=5 enables parallel processing of Stage 2 and Stage 3 jobs

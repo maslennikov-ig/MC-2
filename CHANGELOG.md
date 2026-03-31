@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.31] - 2026-03-31
+
+### Fixed
+
+- **tests**: ensure Qdrant collection exists before integration tests (8243d429)
+
 ## [0.31.30] - 2026-03-31
 
 ### Added
