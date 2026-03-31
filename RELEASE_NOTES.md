@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.31
+
+_Released on 2026-03-31_
+
+### 🐛 Bug Fixes
+
+- **tests**: Ensure Qdrant collection exists before integration tests
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.31.30
 
 _Released on 2026-03-31_
