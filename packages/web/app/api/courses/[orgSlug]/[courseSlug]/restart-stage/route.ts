@@ -72,16 +72,21 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Course not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
-    // Check ownership or organization membership
+    // Check ownership, organization membership, or admin role
     if (courseData.user_id !== user.id) {
       const { data: profile } = await supabase
         .from('users')
-        .select('organization_id')
+        .select('organization_id, role')
         .eq('id', user.id)
         .single()
 
-      if (!profile?.organization_id || profile.organization_id !== courseData.organization_id) {
-        logger.warn('Unauthorized restart-stage attempt - not owner or org member', {
+      const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin'
+
+      if (
+        !isAdmin &&
+        (!profile?.organization_id || profile.organization_id !== courseData.organization_id)
+      ) {
+        logger.warn('Unauthorized restart-stage attempt - not owner, org member, or admin', {
           orgSlug,
           courseSlug,
           attemptedBy: user.id,

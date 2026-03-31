@@ -500,9 +500,18 @@ export function runHeuristicFilters(
     actualWordCount: wordCount,
   });
 
-  // Word count checks are WARNINGS, not blockers
-  // We care more about content being too short, but still don't block
-  if (wordCount < dynamicThresholds.minWordCount) {
+  // Word count checks: critically short content is a BLOCKER, slightly short is a WARNING.
+  // Rationale: content below 50% of the expected minimum cannot be meaningfully judged —
+  // it signals a generation failure (truncation, empty response) and must trigger REGENERATE.
+  // Content that is merely below minimum (but ≥ 50%) gets a warning so the judge can still
+  // evaluate it holistically rather than forcing an unnecessary regeneration.
+  if (wordCount < dynamicThresholds.minWordCount * 0.5) {
+    // Less than 50% of expected minimum → critical failure, triggers REGENERATE
+    failureReasons.push(
+      `Word count critically low (${wordCount}) — less than 50% of minimum (${dynamicThresholds.minWordCount}) for ${durationMinutes}min lesson`
+    );
+  } else if (wordCount < dynamicThresholds.minWordCount) {
+    // Below minimum but not critically → warning (allows judge to evaluate)
     warnings.push(
       `Word count (${wordCount}) below minimum (${dynamicThresholds.minWordCount}) for ${durationMinutes}min lesson`
     );

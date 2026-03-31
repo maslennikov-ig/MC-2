@@ -261,6 +261,8 @@ async function executeJudge(
       judgeModel: modelConfig.modelId,
       temperature: modelConfig.temperature,
       tokensUsed: response.totalTokens,
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
       durationMs,
     };
 
@@ -446,7 +448,9 @@ export async function executeCLEVVoting(
   const scoresMatch = scoresAgree(
     primaryResult!.overallScore,
     secondaryResult!.overallScore,
-    finalConfig.agreementThreshold
+    finalConfig.agreementThreshold,
+    primaryResult!.issues,
+    secondaryResult!.issues
   );
 
   // Check confidence levels

@@ -276,6 +276,10 @@ function useEnrichmentsByLesson(
   const { courseInfo } = useStaticGraph()
   const [state, setState] = useState<DataState>({ status: 'loading' })
   const [isConnected, setIsConnected] = useState(false)
+  // Dedicated state for triggering realtime subscription — changes only when lesson UUID is resolved
+  const [resolvedLessonUuid, setResolvedLessonUuid] = useState<string | null>(null)
+  // Track whether initial fetch is done to suppress loading flash on realtime refetches
+  const initialFetchDoneRef = useRef(false)
 
   // Refs for managing async operations
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -301,7 +305,10 @@ function useEnrichmentsByLesson(
     const abortController = new AbortController()
     abortControllerRef.current = abortController
 
-    setState({ status: 'loading' })
+    // Only show loading on initial fetch, not on realtime-triggered refetches
+    if (!initialFetchDoneRef.current) {
+      setState({ status: 'loading' })
+    }
 
     try {
       // lessonId is in format "1.2" - need to find the lesson UUID first
@@ -343,6 +350,7 @@ function useEnrichmentsByLesson(
 
       // Store the resolved lesson UUID for realtime subscription
       lessonUuidRef.current = lesson.id
+      setResolvedLessonUuid((prev) => (prev === lesson.id ? prev : lesson.id))
 
       // Fetch enrichments for this lesson
       const { data: enrichments, error } = await supabase
@@ -370,6 +378,7 @@ function useEnrichmentsByLesson(
           display_order: e.order_index ?? index,
         }))
 
+      initialFetchDoneRef.current = true
       setState({ status: 'success', data: enrichmentList })
     } catch (err) {
       // Ignore abort errors
@@ -387,6 +396,12 @@ function useEnrichmentsByLesson(
     fetchEnrichmentsRef.current = fetchEnrichments
   }, [fetchEnrichments])
 
+  // Reset on lesson change — must run before initial fetch effect
+  useEffect(() => {
+    initialFetchDoneRef.current = false
+    setResolvedLessonUuid(null)
+  }, [lessonId])
+
   // Initial fetch
   useEffect(() => {
     void fetchEnrichments()
@@ -401,9 +416,7 @@ function useEnrichmentsByLesson(
 
   // Realtime subscription - set up after we have the lesson UUID
   useEffect(() => {
-    // Wait until we have a lesson UUID from the first fetch
-    const lessonUuid = lessonUuidRef.current
-    if (!lessonUuid || !session) {
+    if (!resolvedLessonUuid || !session) {
       return
     }
 
@@ -411,7 +424,7 @@ function useEnrichmentsByLesson(
 
     logger.debug('[useEnrichmentsByLesson] Setting up realtime subscription', {
       lessonId,
-      lessonUuid,
+      lessonUuid: resolvedLessonUuid,
     })
 
     // Debounced refetch to batch rapid realtime updates
@@ -429,20 +442,20 @@ function useEnrichmentsByLesson(
 
     // Create realtime channel
     const channel = supabase
-      .channel(`enrichments:lesson:${lessonUuid}`)
+      .channel(`enrichments:lesson:${resolvedLessonUuid}`)
       .on(
         'postgres_changes',
         {
           event: '*', // INSERT, UPDATE, DELETE
           schema: 'public',
           table: 'lesson_enrichments',
-          filter: `lesson_id=eq.${lessonUuid}`,
+          filter: `lesson_id=eq.${resolvedLessonUuid}`,
         },
         (payload) => {
           logger.debug('[useEnrichmentsByLesson] Enrichment change received', {
             event: payload.eventType,
             lessonId,
-            lessonUuid,
+            lessonUuid: resolvedLessonUuid,
           })
 
           // Refetch to get updated data (debounced to batch rapid updates)
@@ -453,7 +466,7 @@ function useEnrichmentsByLesson(
         if (status === 'SUBSCRIBED') {
           logger.debug('[useEnrichmentsByLesson] Realtime subscription active', {
             lessonId,
-            lessonUuid,
+            lessonUuid: resolvedLessonUuid,
           })
           if (isMounted) {
             setIsConnected(true)
@@ -468,7 +481,7 @@ function useEnrichmentsByLesson(
             status,
             error: errorMessage,
             lessonId,
-            lessonUuid,
+            lessonUuid: resolvedLessonUuid,
           })
 
           if (isMounted) {
@@ -477,7 +490,7 @@ function useEnrichmentsByLesson(
         } else if (status === 'CLOSED') {
           logger.debug('[useEnrichmentsByLesson] Realtime connection closed', {
             lessonId,
-            lessonUuid,
+            lessonUuid: resolvedLessonUuid,
           })
           if (isMounted) {
             setIsConnected(false)
@@ -498,7 +511,7 @@ function useEnrichmentsByLesson(
 
       logger.debug('[useEnrichmentsByLesson] Unsubscribing from realtime channel', {
         lessonId,
-        lessonUuid,
+        lessonUuid: resolvedLessonUuid,
       })
 
       if (channelRef.current) {
@@ -508,7 +521,7 @@ function useEnrichmentsByLesson(
 
       setIsConnected(false)
     }
-  }, [lessonId, session, supabase, state.status]) // Re-subscribe when state becomes success (we have UUID)
+  }, [lessonId, resolvedLessonUuid, session, supabase])
 
   return { ...state, refetch: () => void fetchEnrichments(), isConnected }
 }

@@ -57,7 +57,12 @@ vi.mock('@/stages/stage6-lesson-content/nodes/judge-refinement-helpers', () => (
 }));
 
 vi.mock('@/stages/stage6-lesson-content/utils/mermaid-render-validator', () => ({
-  validateMermaidRenderInLessonContentBody: vi.fn(),
+  // countMermaidFallbackComments is imported directly into judge-node-helpers
+  countMermaidFallbackComments: vi.fn(() => 0),
+}));
+
+vi.mock('@/stages/stage6-lesson-content/utils/mermaid-validator', () => ({
+  validateMermaidSyntax: vi.fn(),
 }));
 
 vi.mock('@/stages/stage6-lesson-content/utils/mermaid-fix-pipeline', () => ({
@@ -70,10 +75,9 @@ import {
 } from '@/stages/stage6-lesson-content/nodes/judge-node-helpers';
 import { logTrace } from '@/shared/trace-logger';
 import { runMermaidFixPipeline } from '@/stages/stage6-lesson-content/utils/mermaid-fix-pipeline';
-import { validateMermaidRenderInLessonContentBody } from '@/stages/stage6-lesson-content/utils/mermaid-render-validator';
+import { validateMermaidSyntax } from '@/stages/stage6-lesson-content/utils/mermaid-validator';
 
-const mockValidateMermaidRenderInLessonContentBody =
-  validateMermaidRenderInLessonContentBody as ReturnType<typeof vi.fn>;
+const mockValidateMermaidSyntax = validateMermaidSyntax as ReturnType<typeof vi.fn>;
 const mockRunMermaidFixPipeline = runMermaidFixPipeline as ReturnType<typeof vi.fn>;
 const mockLogTrace = logTrace as ReturnType<typeof vi.fn>;
 
@@ -167,31 +171,15 @@ describe('processJudgeDecision Mermaid render gate', () => {
   });
 
   it('remediates Mermaid-only failures and keeps ACCEPT without regeneration', async () => {
-    mockValidateMermaidRenderInLessonContentBody
-      .mockResolvedValueOnce({
-        passed: false,
-        totalBlocks: 1,
-        failedBlocks: 1,
-        fallbackComments: 0,
-        diagnostics: [
-          {
-            blockIndex: 0,
-            diagramType: 'flowchart-v2',
-            parseValid: true,
-            renderValid: false,
-            svgHasRenderableContent: false,
-            errors: ['SVG has no renderable nodes'],
-            codeSnippet: 'flowchart TD A-->B',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        passed: true,
-        totalBlocks: 0,
-        failedBlocks: 0,
-        fallbackComments: 0,
-        diagnostics: [],
-      });
+    // First call: initial validation finds one broken block
+    mockValidateMermaidSyntax.mockResolvedValueOnce({
+      valid: false,
+      diagramType: 'flowchart-v2',
+      errors: ['Parse error: unexpected token'],
+    });
+    // After runMermaidFixPipeline strips the block, the post-remediation
+    // validateMermaidSyntaxInContentBody finds no mermaid blocks → passed: true.
+    // No further validateMermaidSyntax calls are needed.
 
     const result = await processJudgeDecision(buildContext());
 
@@ -211,31 +199,13 @@ describe('processJudgeDecision Mermaid render gate', () => {
   });
 
   it('includes Mermaid remediation metadata in judge trace output', async () => {
-    mockValidateMermaidRenderInLessonContentBody
-      .mockResolvedValueOnce({
-        passed: false,
-        totalBlocks: 1,
-        failedBlocks: 1,
-        fallbackComments: 0,
-        diagnostics: [
-          {
-            blockIndex: 0,
-            diagramType: 'flowchart-v2',
-            parseValid: true,
-            renderValid: false,
-            svgHasRenderableContent: false,
-            errors: ['SVG has no renderable nodes'],
-            codeSnippet: 'flowchart TD A-->B',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        passed: true,
-        totalBlocks: 0,
-        failedBlocks: 0,
-        fallbackComments: 0,
-        diagnostics: [],
-      });
+    // Initial validation: one broken block
+    mockValidateMermaidSyntax.mockResolvedValueOnce({
+      valid: false,
+      diagramType: 'flowchart-v2',
+      errors: ['Parse error: unexpected token'],
+    });
+    // Post-remediation: no mermaid blocks remain (pipeline stripped them)
 
     const processed = await processJudgeDecision(buildContext());
     await finalizeJudgeResult(processed);
@@ -256,12 +226,11 @@ describe('processJudgeDecision Mermaid render gate', () => {
   });
 
   it('keeps ACCEPT when Mermaid render validation passes immediately', async () => {
-    mockValidateMermaidRenderInLessonContentBody.mockResolvedValue({
-      passed: true,
-      totalBlocks: 1,
-      failedBlocks: 0,
-      fallbackComments: 0,
-      diagnostics: [],
+    // All blocks parse-valid → gate passes without remediation
+    mockValidateMermaidSyntax.mockResolvedValue({
+      valid: true,
+      diagramType: 'flowchart-v2',
+      errors: [],
     });
 
     const result = await processJudgeDecision(buildContext());
@@ -296,14 +265,12 @@ describe('processJudgeDecision Mermaid render gate', () => {
     expect(result.needsRegeneration).toBe(true);
     expect(result.needsHumanReview).toBe(false);
     expect(result.finalContent).toBeNull();
-    expect(mockValidateMermaidRenderInLessonContentBody).not.toHaveBeenCalled();
+    expect(mockValidateMermaidSyntax).not.toHaveBeenCalled();
     expect(mockRunMermaidFixPipeline).not.toHaveBeenCalled();
   });
 
   it('records remediation metadata when Mermaid gate crashes but does not force regenerate', async () => {
-    mockValidateMermaidRenderInLessonContentBody.mockRejectedValue(
-      new Error('render validator crashed')
-    );
+    mockValidateMermaidSyntax.mockRejectedValue(new Error('render validator crashed'));
 
     const result = await processJudgeDecision(buildContext());
 

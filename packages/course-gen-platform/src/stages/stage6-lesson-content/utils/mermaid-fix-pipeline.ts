@@ -53,7 +53,7 @@
 
 import { sanitizeMermaidBlocks, MERMAID_BLOCK_REGEX } from './mermaid-sanitizer';
 import { fixMermaidWithLLM } from './mermaid-llm-fixer';
-import { validateMermaidBlockRender } from './mermaid-render-validator';
+import { validateMermaidSyntax } from './mermaid-validator';
 // Note: cleanupDOMGlobals intentionally not imported/called here.
 // Mermaid is a singleton that caches DOMPurify reference at first initialization.
 // Calling cleanup would break subsequent pipeline calls with "DOMPurify.addHook is not a function".
@@ -64,7 +64,6 @@ import {
   wrapMermaidBlock,
   simplifyMermaidDiagram,
   splitMermaidDiagramIntoTwo,
-  generateStructuredFallbackText,
 } from './mermaid-remediation';
 
 // ============================================================================
@@ -108,6 +107,7 @@ type PipelineStage =
   | 'SIMPLIFY'
   | 'SPLIT'
   | 'STRUCTURED_FALLBACK'
+  | 'STRIP'
   | 'COMPLETE';
 
 /**
@@ -195,35 +195,27 @@ interface MermaidPipelineValidation {
 
 async function validateBlockForPipeline(
   code: string,
-  blockIndex: number
+  _blockIndex: number
 ): Promise<MermaidPipelineValidation> {
-  const diagnostic = await validateMermaidBlockRender(code, blockIndex);
+  // Parse validation is the reliable truth gate.
+  // JSDOM render validation was removed as a hard gate because JSDOM has limited
+  // SVG support, causing valid diagrams to be rejected and replaced with text fallback.
+  // Real browsers handle parse-valid diagrams correctly.
+  const parseResult = await validateMermaidSyntax(code);
 
-  if (!diagnostic.parseValid) {
+  if (!parseResult.valid) {
     return {
       valid: false,
-      errors: diagnostic.errors,
-      diagramType: diagnostic.diagramType,
+      errors: parseResult.errors.length > 0 ? parseResult.errors : ['Mermaid parse failed'],
+      diagramType: parseResult.diagramType,
       failureStage: 'parse',
-    };
-  }
-
-  if (!diagnostic.renderValid || !diagnostic.svgHasRenderableContent) {
-    return {
-      valid: false,
-      errors:
-        diagnostic.errors.length > 0
-          ? diagnostic.errors
-          : ['Mermaid render validation failed: SVG has no renderable content'],
-      diagramType: diagnostic.diagramType,
-      failureStage: 'render',
     };
   }
 
   return {
     valid: true,
     errors: [],
-    diagramType: diagnostic.diagramType,
+    diagramType: parseResult.diagramType,
     failureStage: null,
   };
 }
@@ -445,130 +437,101 @@ export async function runMermaidFixPipeline(
       }
 
       // -------------------------------------------------------------------------
-      // Stage 3: LLM Fixing (conditional)
+      // Stage 3: LLM Fixing with model cascade (primary → secondary → ultimate)
       // -------------------------------------------------------------------------
-      if (
-        !options?.skipLLM &&
-        llmFixCount < MAX_LLM_FIXES_PER_LESSON &&
-        validation.errors.length > 0
-      ) {
-        logger.info(
-          {
-            blockIndex: i,
-            error: validation.errors[0],
-            llmFixCount,
-          },
-          'Mermaid pipeline: Attempting LLM fix'
-        );
+      const MODEL_TIERS: import('./mermaid-llm-fixer').MermaidModelTier[] = [
+        'primary',
+        'secondary',
+        'ultimate',
+      ];
+      let llmFixedThisBlock = false;
 
-        // Log LLM fix attempt
-        logPipelineStage('LLM_FIX', i, { attempting: true });
+      if (!options?.skipLLM && validation.errors.length > 0) {
+        for (const tier of MODEL_TIERS) {
+          if (llmFixCount >= MAX_LLM_FIXES_PER_LESSON) {
+            logger.warn(
+              { blockIndex: i, llmFixCount, tier },
+              'Mermaid pipeline: LLM budget exhausted'
+            );
+            break;
+          }
 
-        try {
-          const llmResult = await fixMermaidWithLLM(fixedCode, validation.errors[0], {
-            llmFixCount,
-          });
+          logger.info(
+            { blockIndex: i, error: validation.errors[0], llmFixCount, tier },
+            `Mermaid pipeline: Attempting LLM fix (${tier})`
+          );
 
-          if (llmResult.fixed) {
-            // Validate LLM output doesn't contain XSS patterns
-            // NOTE: '-->' is VALID Mermaid flowchart syntax (A --> B), NOT an XSS pattern!
-            // We only check for actual HTML injection patterns
-            const hasXSSPatterns =
-              llmResult.content.includes('<script') ||
-              llmResult.content.includes('javascript:') ||
-              llmResult.content.includes('onerror=') ||
-              llmResult.content.includes('onclick=');
+          logPipelineStage('LLM_FIX', i, { attempting: true, tier });
 
-            if (hasXSSPatterns) {
-              logger.warn(
-                { blockIndex: i, snippet: getDiagramSnippet(llmResult.content) },
-                'Mermaid pipeline: LLM output contains HTML injection patterns, rejecting fix'
-              );
-              // Don't use the LLM fix, continue to fallback
-            } else {
+          try {
+            const llmResult = await fixMermaidWithLLM(
+              fixedCode,
+              validation.errors[0],
+              { llmFixCount },
+              tier
+            );
+
+            if (llmResult.fixed) {
+              const hasXSSPatterns =
+                llmResult.content.includes('<script') ||
+                llmResult.content.includes('javascript:') ||
+                llmResult.content.includes('onerror=') ||
+                llmResult.content.includes('onclick=');
+
+              if (hasXSSPatterns) {
+                logger.warn(
+                  { blockIndex: i, tier, snippet: getDiagramSnippet(llmResult.content) },
+                  'Mermaid pipeline: LLM output contains XSS patterns, trying next tier'
+                );
+                continue;
+              }
+
               fixedCode = llmResult.content;
               llmFixCount++;
               anyModified = true;
 
-              logger.debug(
-                {
-                  blockIndex: i,
-                  llmFixCount,
-                },
-                'Mermaid pipeline: LLM fix applied'
-              );
-
-              // -----------------------------------------------------------------------
-              // Stage 4: Re-validation
-              // -----------------------------------------------------------------------
+              // Re-validate
               validation = await validateBlockForPipeline(fixedCode, i);
 
-              logger.debug(
-                {
-                  blockIndex: i,
-                  valid: validation.valid,
-                  failureStage: validation.failureStage,
-                },
-                'Mermaid pipeline: Re-validation after LLM fix'
-              );
-
-              // Log re-validation result
               logPipelineStage('REVALIDATE', i, {
                 valid: validation.valid,
                 failureStage: validation.failureStage,
+                tier,
               });
 
               if (validation.valid) {
                 metrics.diagramsFixedLLM++;
                 logger.info(
-                  {
-                    blockIndex: i,
-                    diagramType: validation.diagramType,
-                  },
-                  'Mermaid pipeline: Fixed by LLM'
+                  { blockIndex: i, diagramType: validation.diagramType, tier },
+                  `Mermaid pipeline: Fixed by LLM (${tier})`
                 );
 
                 processedBlocks.push({ block, replacement: wrapMermaidBlock(fixedCode) });
-                continue;
+                llmFixedThisBlock = true;
+                break;
               }
 
-              if (validation.failureStage === 'render') {
-                logger.warn(
-                  {
-                    blockIndex: i,
-                    diagramType: validation.diagramType,
-                    errors: validation.errors,
-                  },
-                  'Mermaid pipeline: LLM fix parse-valid but still render-invalid'
-                );
-              }
+              logger.warn(
+                { blockIndex: i, tier, errors: validation.errors },
+                `Mermaid pipeline: LLM fix (${tier}) still invalid, escalating`
+              );
             }
+          } catch (error) {
+            logger.warn(
+              {
+                blockIndex: i,
+                tier,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              `Mermaid pipeline: LLM fix (${tier}) failed`
+            );
           }
-        } catch (error) {
-          logger.warn(
-            {
-              blockIndex: i,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            'Mermaid pipeline: LLM fix failed'
-          );
         }
       } else if (options?.skipLLM) {
-        logger.debug(
-          {
-            blockIndex: i,
-          },
-          'Mermaid pipeline: Skipping LLM fix (skipLLM option)'
-        );
-      } else if (llmFixCount >= MAX_LLM_FIXES_PER_LESSON) {
-        logger.warn(
-          {
-            blockIndex: i,
-            llmFixCount,
-          },
-          'Mermaid pipeline: LLM budget exhausted'
-        );
+        logger.debug({ blockIndex: i }, 'Mermaid pipeline: Skipping LLM fix (skipLLM option)');
       }
+
+      if (llmFixedThisBlock) continue;
 
       // -------------------------------------------------------------------------
       // Stage 5A: Simplify (deterministic downgrade before splitting/fallback)
@@ -633,25 +596,25 @@ export async function runMermaidFixPipeline(
       }
 
       // -------------------------------------------------------------------------
-      // Stage 5C: Structured markdown fallback (no HTML comments)
+      // Stage 5C: Strip unfixable diagram (instead of text fallback)
+      // Text fallback like "Diagram unavailable (auto-remediated)" provides
+      // zero value to users. Better to have no diagram than broken text.
       // -------------------------------------------------------------------------
-      logger.warn(
+      logger.error(
         {
           blockIndex: i,
           errors: validation.errors,
-          snippet: getDiagramSnippet(block.code),
+          originalCode: getDiagramSnippet(block.code, 500),
         },
-        'Mermaid pipeline: All remediation stages failed, using structured markdown fallback'
+        'Mermaid pipeline: All remediation stages failed, stripping diagram from content'
       );
 
-      logPipelineStage('STRUCTURED_FALLBACK', i, { reason: 'all_fixes_failed' });
+      logPipelineStage('STRIP', i, { reason: 'all_fixes_failed' });
 
-      const fallbackMarkdown = generateStructuredFallbackText(block.code);
       metrics.diagramsFallback++;
-      metrics.diagramsStructuredFallback++;
       anyModified = true;
 
-      processedBlocks.push({ block, replacement: fallbackMarkdown });
+      processedBlocks.push({ block, replacement: '' });
     }
 
     // -------------------------------------------------------------------------

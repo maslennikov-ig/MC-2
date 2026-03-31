@@ -17,14 +17,17 @@ import type {
   MermaidRenderValidationResult,
   MermaidRenderRemediationMetadata,
 } from '../utils/mermaid-render-validator';
+import { countMermaidFallbackComments } from '../utils/mermaid-render-validator';
 import type { CascadeEvaluationInput, CascadeResult } from '../judge/cascade-evaluator';
 import { DecisionAction, type DecisionResult } from '../judge/decision-engine';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
+import { costTracker, createTokenUsage } from '@/shared/metrics/cost-tracker';
 import { buildLessonContent } from '../judge/judge-helpers';
 import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
-import { validateMermaidRenderInLessonContentBody } from '../utils/mermaid-render-validator';
+import { validateMermaidSyntax } from '../utils/mermaid-validator';
+import { MERMAID_BLOCK_REGEX } from '../utils/mermaid-sanitizer';
 
 import { executeTargetedRefinementFlow, buildReviewInfo } from './judge-refinement-helpers';
 
@@ -312,6 +315,74 @@ export async function makeJudgeDecision(context: JudgeContext): Promise<JudgeCon
 }
 
 /**
+ * Parse-only Mermaid validation for a LessonContentBody.
+ *
+ * Replaces render-based validation (JSDOM) with mermaid.parse() only.
+ * JSDOM has limited SVG support and rejects valid diagrams; parse-only
+ * is the reliable gate.
+ *
+ * Produces a MermaidRenderValidationResult compatible with existing
+ * logging/metadata, with renderValid always set to match parseValid.
+ */
+async function validateMermaidSyntaxInContentBody(
+  contentBody: LessonContentBody
+): Promise<MermaidRenderValidationResult> {
+  // Flatten all text fields that may contain mermaid blocks
+  const parts: string[] = [];
+  if (contentBody.intro) parts.push(contentBody.intro);
+  for (const section of contentBody.sections ?? []) {
+    if (section.content) parts.push(section.content);
+  }
+  for (const example of contentBody.examples ?? []) {
+    if (example.content) parts.push(example.content);
+  }
+  for (const exercise of contentBody.exercises ?? []) {
+    if (exercise.question) parts.push(exercise.question);
+    if (exercise.solution) parts.push(exercise.solution);
+    for (const hint of exercise.hints ?? []) parts.push(hint);
+  }
+  const markdown = parts.join('\n\n');
+
+  // Extract mermaid code blocks
+  MERMAID_BLOCK_REGEX.lastIndex = 0;
+  const blocks: { index: number; code: string }[] = [];
+  let match: RegExpExecArray | null;
+  let blockIndex = 0;
+  while ((match = MERMAID_BLOCK_REGEX.exec(markdown)) !== null) {
+    blocks.push({ index: blockIndex++, code: match[1].trim() });
+  }
+
+  // Validate each block with parse-only
+  const diagnostics: MermaidRenderValidationResult['diagnostics'] = [];
+  for (const block of blocks) {
+    const result = await validateMermaidSyntax(block.code);
+    const snippet = block.code.replace(/\s+/g, ' ').trim();
+    diagnostics.push({
+      blockIndex: block.index,
+      diagramType: result.diagramType,
+      parseValid: result.valid,
+      // renderValid mirrors parseValid — we skip JSDOM render entirely
+      renderValid: result.valid,
+      svgHasRenderableContent: result.valid,
+      errors: result.errors,
+      codeSnippet: snippet.length > 140 ? `${snippet.slice(0, 140)}...` : snippet,
+    });
+  }
+
+  const fallbackComments = countMermaidFallbackComments(markdown);
+  const failedBlocks = diagnostics.filter(d => !d.parseValid).length;
+  const passed = failedBlocks === 0 && fallbackComments === 0;
+
+  return {
+    passed,
+    totalBlocks: blocks.length,
+    failedBlocks,
+    fallbackComments,
+    diagnostics,
+  };
+}
+
+/**
  * Phase 4: Process decision action
  *
  * Executes the appropriate action based on decision:
@@ -404,8 +475,10 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
     let contentForMermaidGate = finalContent?.content ?? contentBody;
 
     try {
-      const initialValidation =
-        await validateMermaidRenderInLessonContentBody(contentForMermaidGate);
+      // Parse-only validation: use mermaid.parse() instead of JSDOM render.
+      // JSDOM has limited SVG support and rejects valid diagrams — parse-only
+      // is the only reliable gate.
+      const initialValidation = await validateMermaidSyntaxInContentBody(contentForMermaidGate);
 
       if (!initialValidation.passed) {
         logger.warn(
@@ -416,7 +489,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
             failedBlocks: initialValidation.failedBlocks,
             fallbackComments: initialValidation.fallbackComments,
             failedDiagnostics: initialValidation.diagnostics
-              .filter(d => !d.renderValid)
+              .filter(d => !d.parseValid)
               .slice(0, 3)
               .map(d => ({
                 blockIndex: d.blockIndex,
@@ -424,14 +497,13 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
                 codeSnippet: d.codeSnippet,
               })),
           },
-          'Judge node: Mermaid render gate failed, applying deterministic remediation'
+          'Judge node: Mermaid parse gate failed, applying deterministic remediation'
         );
 
         const remediationResult = await remediateMermaidInContentBody(contentForMermaidGate);
         contentForMermaidGate = remediationResult.contentBody;
 
-        const postValidation =
-          await validateMermaidRenderInLessonContentBody(contentForMermaidGate);
+        const postValidation = await validateMermaidSyntaxInContentBody(contentForMermaidGate);
         const remediationMetadata: MermaidRenderRemediationMetadata = {
           attempted: true,
           transformed: remediationResult.transformed,
@@ -460,7 +532,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
               postFallbackComments: postValidation.fallbackComments,
               remediationMetadata,
             },
-            'Judge node: Mermaid remediation still reports failures, continuing with transformed content'
+            'Judge node: Mermaid remediation still reports parse failures, continuing with transformed content'
           );
         } else {
           logger.info(
@@ -513,7 +585,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
             parseValid: false,
             renderValid: false,
             svgHasRenderableContent: false,
-            errors: [`Mermaid render gate crashed: ${errorMessage}`],
+            errors: [`Mermaid parse gate crashed: ${errorMessage}`],
             codeSnippet: '',
           },
         ],
@@ -539,7 +611,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
           recommendationBeforeGate: finalRecommendation,
           error: errorMessage,
         },
-        'Judge node: Mermaid render gate crashed, continuing with existing accepted content'
+        'Judge node: Mermaid parse gate crashed, continuing with existing accepted content'
       );
 
       finalContent = finalContent ?? buildLessonContent(state, contentForMermaidGate, finalScore);
@@ -593,6 +665,8 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
 
   const durationMs = Date.now() - startTime;
   const totalTokensUsed = (cascadeResult?.totalTokensUsed ?? 0) + (refinementTokensUsed ?? 0);
+  const totalInputTokens = cascadeResult?.totalInputTokens ?? 0;
+  const totalOutputTokens = cascadeResult?.totalOutputTokens ?? 0;
 
   // Build reviewInfo
   const reviewInfo = buildReviewInfo(needsHumanReview, cascadeResult);
@@ -612,6 +686,32 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
         ? judgeModelsUsed[0]
         : judgeModelsUsed.join(', ');
 
+  // Calculate cost from per-model token usage
+  let costUsd = 0;
+  if (judgeModelsUsed.length > 0 && totalInputTokens > 0) {
+    // We have per-model breakdown from verdicts — split tokens proportionally
+    const perModelInput = Math.round(totalInputTokens / judgeModelsUsed.length);
+    const perModelOutput = Math.round(totalOutputTokens / judgeModelsUsed.length);
+    for (const modelId of judgeModelsUsed) {
+      costUsd += costTracker.calculateCost(
+        modelId,
+        createTokenUsage(perModelInput, perModelOutput)
+      );
+    }
+  } else if (judgeModelsUsed.length > 0 && totalTokensUsed > 0) {
+    // Fallback: no input/output breakdown, estimate 80/20 split
+    const estInput = Math.round(totalTokensUsed * 0.8);
+    const estOutput = totalTokensUsed - estInput;
+    const perModelInput = Math.round(estInput / judgeModelsUsed.length);
+    const perModelOutput = Math.round(estOutput / judgeModelsUsed.length);
+    for (const modelId of judgeModelsUsed) {
+      costUsd += costTracker.calculateCost(
+        modelId,
+        createTokenUsage(perModelInput, perModelOutput)
+      );
+    }
+  }
+
   // Log trace
   await logTrace({
     courseId: state.courseId,
@@ -623,6 +723,8 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
       lessonLabel: state.lessonSpec.lesson_id,
       lessonTitle: state.lessonSpec.title,
       moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
+      inputTokens: totalInputTokens || undefined,
+      outputTokens: totalOutputTokens || undefined,
     },
     outputData: {
       finalRecommendation,
@@ -638,7 +740,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
             failedBlocks: mermaidRenderValidation.failedBlocks,
             fallbackComments: mermaidRenderValidation.fallbackComments,
             failedDiagnostics: mermaidRenderValidation.diagnostics
-              .filter(d => !d.renderValid)
+              .filter(d => !d.parseValid)
               .slice(0, 3)
               .map(d => ({
                 blockIndex: d.blockIndex,
@@ -652,6 +754,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     },
     modelUsed,
     tokensUsed: totalTokensUsed,
+    costUsd: costUsd > 0 ? costUsd : undefined,
     durationMs,
   });
 

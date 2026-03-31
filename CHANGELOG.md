@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.30] - 2026-03-31
+
+### Added
+
+- **jd**: regenerate sales-manager-b2b v2 with 26 blocks + 3 Mermaid diagrams (b8dc606f)
+- **skill**: add job-description role guide generator (26 blocks) (2ccd8173)
+
+### Fixed
+
+- **enrichments**: break infinite realtime subscription loop in Stage 7 inspector (c9832c52)
+- **nlm**: replace broken CDP auth script with official notebooklm login (6165122f)
+- **jd**: update CTA link to https://ai.megacampus.ru in JD and skill (ef2893c1)
+
+## [0.31.29] - 2026-03-21
+
+### Fixed
+
+- **pipeline**: harden Stage 6 quality pipeline — fix 6 root causes (55662f8c)
+- **pipeline**: definitive FSM with all transitions + bypass support (2cc1b6cc)
+- **pipeline**: restore all lost FSM transitions from original migration (5fa0581c)
+- **auth**: add admin/superadmin bypass to restart-stage endpoint (4d3af215)
+- **pipeline**: correct FSM status names to match actual enum values (02fc286a)
+- **pipeline**: add awaiting_approval to init state transitions (74a2bcb1)
+
+### Other
+
+- trigger rebuild for server action hash fix (1698f7df)
+
+## [0.31.28] - 2026-03-21
+
+### Fixed
+
+- **course-gen-platform**: update 6 source file(s), update docs (cd94b2b2)
+- **pipeline**: allow FSM pending → stage_3/4_init for pre-processed docs (80cd2a4d)
+
+## [0.31.27] - 2026-03-21
+
+### Fixed
+
+- **stage6**: eliminate mermaid text fallback + add 3-tier model cascade (9378d327)
+- **web**: truncate long lesson titles to prevent horizontal scroll (64741a37)
+
+## [0.31.26] - 2026-03-21
+
+### Fixed
+
+- **pipeline**: add FSM transition + missing enum values + auto-mute rules (925c0afb)
+- **pipeline**: extend sanitization to strip surrogate pairs before PG storage (c2f572d4)
+- **pipeline**: strip null bytes from Docling output before PostgreSQL storage (11397c33)
+
+### Other
+
+- **docker**: upgrade Docling to v2.80+ in MCP server image (8c81bfbf)
+
 ## [0.31.25] - 2026-03-19
 
 ### Fixed

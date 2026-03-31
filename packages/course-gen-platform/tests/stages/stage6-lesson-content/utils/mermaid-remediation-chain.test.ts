@@ -5,8 +5,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockValidateMermaidBlockRender, mockFixMermaidWithLLM } = vi.hoisted(() => ({
-  mockValidateMermaidBlockRender: vi.fn(),
+const { mockValidateMermaidSyntax, mockFixMermaidWithLLM } = vi.hoisted(() => ({
+  mockValidateMermaidSyntax: vi.fn(),
   mockFixMermaidWithLLM: vi.fn(),
 }));
 
@@ -19,8 +19,8 @@ vi.mock('@/shared/logger', () => ({
   },
 }));
 
-vi.mock('../../../../src/stages/stage6-lesson-content/utils/mermaid-render-validator.js', () => ({
-  validateMermaidBlockRender: mockValidateMermaidBlockRender,
+vi.mock('../../../../src/stages/stage6-lesson-content/utils/mermaid-validator.js', () => ({
+  validateMermaidSyntax: mockValidateMermaidSyntax,
 }));
 
 vi.mock('../../../../src/stages/stage6-lesson-content/utils/mermaid-llm-fixer.js', () => ({
@@ -29,27 +29,19 @@ vi.mock('../../../../src/stages/stage6-lesson-content/utils/mermaid-llm-fixer.js
 
 import { runMermaidFixPipeline } from '../../../../src/stages/stage6-lesson-content/utils/mermaid-fix-pipeline.js';
 
-function invalidDiagnostic(message: string) {
+function invalidResult(message: string) {
   return {
-    blockIndex: 0,
+    valid: false,
     diagramType: 'flowchart-v2',
-    parseValid: false,
-    renderValid: false,
-    svgHasRenderableContent: false,
     errors: [message],
-    codeSnippet: 'flowchart TD A --> B',
   };
 }
 
-function validDiagnostic() {
+function validResult() {
   return {
-    blockIndex: 0,
+    valid: true,
     diagramType: 'flowchart-v2',
-    parseValid: true,
-    renderValid: true,
-    svgHasRenderableContent: true,
     errors: [],
-    codeSnippet: 'flowchart TD A --> B',
   };
 }
 
@@ -64,11 +56,11 @@ describe('runMermaidFixPipeline remediation chain', () => {
   });
 
   it('uses simplify stage before split/fallback when simplification can pass validation', async () => {
-    mockValidateMermaidBlockRender.mockImplementation((code: string) => {
+    mockValidateMermaidSyntax.mockImplementation((code: string) => {
       if (code.includes('style A')) {
-        return Promise.resolve(invalidDiagnostic('Unsupported style command'));
+        return Promise.resolve(invalidResult('Unsupported style command'));
       }
-      return Promise.resolve(validDiagnostic());
+      return Promise.resolve(validResult());
     });
 
     const content = `
@@ -88,17 +80,17 @@ flowchart TD
   });
 
   it('splits into at most two Mermaid diagrams when single-diagram validation keeps failing', async () => {
-    mockValidateMermaidBlockRender.mockImplementation((code: string) => {
+    mockValidateMermaidSyntax.mockImplementation((code: string) => {
       const hasLeftHalf =
         code.includes('A --> B') && code.includes('B --> C') && !code.includes('D --> E');
       const hasRightHalf =
         code.includes('C --> D') && code.includes('D --> E') && !code.includes('A --> B');
 
       if (hasLeftHalf || hasRightHalf) {
-        return Promise.resolve(validDiagnostic());
+        return Promise.resolve(validResult());
       }
 
-      return Promise.resolve(invalidDiagnostic('Diagram too complex'));
+      return Promise.resolve(invalidResult('Diagram too complex'));
     });
 
     const content = `
@@ -119,8 +111,8 @@ flowchart TD
     expect(result.content).not.toContain('<!-- Mermaid');
   });
 
-  it('falls back to structured markdown (not HTML comment) when simplify and split both fail', async () => {
-    mockValidateMermaidBlockRender.mockResolvedValue(invalidDiagnostic('Parse failed'));
+  it('strips unfixable diagram (instead of text fallback) when simplify and split both fail', async () => {
+    mockValidateMermaidSyntax.mockResolvedValue(invalidResult('Parse failed'));
 
     const content = `
 \`\`\`mermaid
@@ -133,7 +125,7 @@ flowchart TD
     const result = await runMermaidFixPipeline(content, { skipLLM: true });
 
     expect(result.metrics.diagramsFallback).toBe(1);
-    expect(result.content).toContain('Diagram unavailable (auto-remediated)');
+    expect(result.content).not.toContain('Diagram unavailable (auto-remediated)');
     expect(result.content).not.toContain('<!-- Mermaid');
     expect(result.content).not.toContain('```mermaid');
   });

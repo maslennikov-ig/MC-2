@@ -3399,8 +3399,6 @@ export type Database = {
         Args: { p_course_id: string; p_job_id: string }
         Returns: boolean
       }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
       soft_delete_organization: { Args: { org_id: string }; Returns: boolean }
       test_set_jwt: { Args: { user_id: string }; Returns: undefined }
       transfer_organization_ownership: {
@@ -3421,7 +3419,7 @@ export type Database = {
               p_course_id: string
               p_error_details?: Json
               p_error_message?: string
-              p_message?: string
+              p_message: string
               p_metadata?: Json
               p_status: string
               p_step_id: number
@@ -3599,6 +3597,11 @@ export type Database = {
         | "TIMEOUT"
         | "UNKNOWN"
         | "BARRIER_FAILED"
+        | "LLM_ERROR"
+        | "MINIMUM_LESSONS_NOT_MET"
+        | "CONTENT_POLICY_VIOLATION"
+        | "NETWORK_ERROR"
+        | "RATE_LIMIT_ERROR"
       tier: "trial" | "free" | "basic" | "standard" | "premium"
       vector_status: "pending" | "indexing" | "indexed" | "failed"
     }
@@ -3831,10 +3834,14 @@ export const Constants = {
         "TIMEOUT",
         "UNKNOWN",
         "BARRIER_FAILED",
+        "LLM_ERROR",
+        "MINIMUM_LESSONS_NOT_MET",
+        "CONTENT_POLICY_VIOLATION",
+        "NETWORK_ERROR",
+        "RATE_LIMIT_ERROR",
       ],
       tier: ["trial", "free", "basic", "standard", "premium"],
       vector_status: ["pending", "indexing", "indexed", "failed"],
     },
   },
 } as const
-

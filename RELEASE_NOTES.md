@@ -2,6 +2,82 @@
 
 _Released on 2025-12-26_
 
+## v0.31.30
+
+_Released on 2026-03-31_
+
+### ✨ New Features
+
+- **jd**: Regenerate sales-manager-b2b v2 with 26 blocks + 3 Mermaid diagrams
+- **skill**: Add job-description role guide generator (26 blocks)
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Break infinite realtime subscription loop in Stage 7 inspector
+- **nlm**: Replace broken CDP auth script with official notebooklm login
+- **jd**: Update CTA link to https://ai.megacampus.ru in JD and skill
+
+---
+
+_This release was automatically generated from 5 commits._
+
+## v0.31.29
+
+_Released on 2026-03-21_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Harden Stage 6 quality pipeline — fix 6 root causes
+- **pipeline**: Definitive FSM with all transitions + bypass support
+- **pipeline**: Restore all lost FSM transitions from original migration
+- **Authentication**: Add admin/superadmin bypass to restart-stage endpoint
+- **pipeline**: Correct FSM status names to match actual enum values
+- **pipeline**: Add awaiting_approval to init state transitions
+
+---
+
+_This release was automatically generated from 7 commits._
+
+## v0.31.28
+
+_Released on 2026-03-21_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 6 source file(s), update docs
+- **pipeline**: Allow FSM pending → stage_3/4_init for pre-processed docs
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.31.27
+
+_Released on 2026-03-21_
+
+### 🐛 Bug Fixes
+
+- **stage6**: Eliminate mermaid text fallback + add 3-tier model cascade
+- **web**: Truncate long lesson titles to prevent horizontal scroll
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.31.26
+
+_Released on 2026-03-21_
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Add FSM transition + missing enum values + auto-mute rules
+- **pipeline**: Extend sanitization to strip surrogate pairs before PG storage
+- **pipeline**: Strip null bytes from Docling output before PostgreSQL storage
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.31.25
 
 _Released on 2026-03-19_
