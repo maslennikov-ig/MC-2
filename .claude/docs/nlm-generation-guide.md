@@ -124,6 +124,53 @@ Base URL: `NOTEBOOKLM_BRIDGE_URL` (default: `http://notebooklm-bridge:8000`)
 }
 ```
 
+## Auth Refresh (Google Cookies)
+
+Google cookies expire periodically. When NotebookLM generation stops working, refresh auth.
+
+### Quick Steps
+
+1. **Activate bridge venv** (WSL terminal):
+   ```bash
+   cd /home/me/code/mc2
+   source packages/course-gen-platform/docker/notebooklm-bridge/.venv/bin/activate
+   ```
+2. **Export fresh cookies** via `notebooklm login` (Playwright):
+   ```bash
+   notebooklm login --storage /tmp/server_storage_state.json
+   ```
+   Playwright browser opens → log in with **server** Google account → wait for NotebookLM to load → press Enter in terminal.
+3. **Deploy to server + restart both bridges**:
+   ```bash
+   scp /tmp/server_storage_state.json megacampus-prod:/tmp/storage_state.json
+   ssh megacampus-prod "sudo cp /tmp/storage_state.json /opt/megacampus/secrets/notebooklm/storage_state.json && sudo chmod 600 /opt/megacampus/secrets/notebooklm/storage_state.json && rm /tmp/storage_state.json"
+   ssh megacampus-prod "cd /opt/megacampus && docker compose -f docker-compose.infra.yml restart notebooklm-bridge"
+   ssh megacampus-prod "cd /opt/megacampus && docker compose -f docker-compose.dev.yml restart notebooklm-bridge-dev"
+   rm /tmp/server_storage_state.json
+   ```
+4. **Verify**:
+   ```bash
+   ssh megacampus-prod "docker logs megacampus-notebooklm-bridge --tail=5"
+   ssh megacampus-prod "docker logs megacampus-notebooklm-bridge-dev --tail=5"
+   ```
+
+### Diagnostics
+
+```bash
+# Check auth status locally
+notebooklm auth check
+notebooklm auth check --test   # with network validation
+```
+
+### Auth Modes
+
+| Mode                    | Env Variable              | Description                                 |
+| ----------------------- | ------------------------- | ------------------------------------------- |
+| Inline JSON (preferred) | `NOTEBOOKLM_AUTH_JSON`    | Raw `storage_state.json` content as env var |
+| File fallback           | `NOTEBOOKLM_STORAGE_PATH` | Path to mounted `storage_state.json` file   |
+
+Server uses file fallback: `/opt/megacampus/secrets/notebooklm/storage_state.json`
+
 ## Environment Variables
 
 | Variable                                | Service             | Description                                                               |
