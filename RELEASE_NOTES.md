@@ -2,6 +2,25 @@
 
 _Released on 2025-12-26_
 
+## v0.31.30
+
+_Released on 2026-03-31_
+
+### ✨ New Features
+
+- **jd**: Regenerate sales-manager-b2b v2 with 26 blocks + 3 Mermaid diagrams
+- **skill**: Add job-description role guide generator (26 blocks)
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Break infinite realtime subscription loop in Stage 7 inspector
+- **nlm**: Replace broken CDP auth script with official notebooklm login
+- **jd**: Update CTA link to https://ai.megacampus.ru in JD and skill
+
+---
+
+_This release was automatically generated from 5 commits._
+
 ## v0.31.29
 
 _Released on 2026-03-21_
