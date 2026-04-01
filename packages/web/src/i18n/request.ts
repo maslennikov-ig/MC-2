@@ -8,7 +8,6 @@ import {
   type Namespace,
   type Locale,
 } from './config'
-import { logger } from "@/lib/logger";
 
 type Messages = Record<Namespace, Record<string, unknown>>
 
@@ -23,17 +22,19 @@ async function loadNamespace(
   namespace: Namespace
 ): Promise<Record<string, unknown>> {
   try {
-    const localeModule = await import(`../../messages/${locale}/${namespace}.json`)
+    const localeModule = (await import(`../../messages/${locale}/${namespace}.json`)) as {
+      default: Record<string, unknown>
+    }
     return localeModule.default
   } catch (error) {
     // In development, fail fast to catch missing translations early
     if (process.env.NODE_ENV === 'development') {
-      logger.error(`[i18n] Failed to load namespace "${namespace}" for locale "${locale}":`, { data: error })
+      console.error(`[i18n] Failed to load namespace "${namespace}" for locale "${locale}":`, error)
       throw new Error(`Missing translation namespace: ${namespace} for locale: ${locale}`)
     }
 
     // In production, log error and try fallback
-    logger.error(`Failed to load namespace "${namespace}" for locale "${locale}":`, { data: error })
+    console.error(`Failed to load namespace "${namespace}" for locale "${locale}":`, error)
 
     // If already trying default locale, return empty object
     if (locale === defaultLocale) {
@@ -42,11 +43,13 @@ async function loadNamespace(
 
     // Try to load default locale namespace as fallback
     try {
-      const fallbackModule = await import(`../../messages/${defaultLocale}/${namespace}.json`)
-      logger.warn(`Using fallback locale "${defaultLocale}" for namespace "${namespace}"`)
+      const fallbackModule = (await import(
+        `../../messages/${defaultLocale}/${namespace}.json`
+      )) as { default: Record<string, unknown> }
+      console.warn(`Using fallback locale "${defaultLocale}" for namespace "${namespace}"`)
       return fallbackModule.default
     } catch {
-      logger.error(`Failed to load fallback namespace "${namespace}"`)
+      console.error(`Failed to load fallback namespace "${namespace}"`)
       return {}
     }
   }
