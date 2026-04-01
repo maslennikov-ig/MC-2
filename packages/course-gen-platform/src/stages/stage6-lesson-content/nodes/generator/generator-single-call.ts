@@ -24,6 +24,7 @@ import {
   getStylePrompt,
   getContentLabels,
   DEFAULT_COURSE_STYLE,
+  CONCLUSION_HEADINGS,
 } from '@megacampus/shared-types';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
@@ -638,23 +639,6 @@ function stripUnwantedConclusionSections(
   markdown: string,
   labels: ReturnType<typeof getContentLabels>
 ): string {
-  // Headings to strip (case-insensitive, matched via startsWith on the heading text)
-  const conclusionHeadings = [
-    'заключение',
-    'итоговый вывод',
-    'подведение итогов',
-    'общий вывод',
-    'итоги',
-    'выводы',
-    'conclusion',
-    'key takeaways',
-    'key takeaway',
-    'wrap-up',
-    'wrap up',
-    'wrapup',
-    'summary',
-  ];
-
   // Protected headings that must NEVER be stripped (normalized lowercase)
   const protectedHeadings = [
     labels.lessonDigest, // e.g. "Краткое содержание урока"
@@ -686,7 +670,7 @@ function stripUnwantedConclusionSections(
       }
 
       // Check if this header matches a conclusion pattern
-      const isConclusion = conclusionHeadings.some(ch => headerLower.startsWith(ch));
+      const isConclusion = CONCLUSION_HEADINGS.some(ch => headerLower.startsWith(ch));
 
       if (isConclusion) {
         skipping = true;

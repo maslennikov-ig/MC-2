@@ -326,7 +326,7 @@ function isIntroductionTitle(title: string): boolean {
  * Digest sections are fully exempt from overlap detection (template-heavy boilerplate).
  */
 function isDigestSection(title: string): boolean {
-  return /(digest|краткое содержание|lesson digest)/i.test(title.toLowerCase());
+  return /(digest|краткое содержание)/i.test(title.toLowerCase());
 }
 
 /**
