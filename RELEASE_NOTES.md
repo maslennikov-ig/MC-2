@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.33
+
+_Released on 2026-04-01_
+
+### 🔧 Improvements
+
+- **shared-types**: Extract CONCLUSION_HEADINGS to shared constant, remove legacy code
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.31.32
 
 _Released on 2026-04-01_

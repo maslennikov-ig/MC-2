@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.33] - 2026-04-01
+
+### Changed
+
+- **shared-types**: extract CONCLUSION_HEADINGS to shared constant, remove legacy code (d9553bc0)
+
 ## [0.31.32] - 2026-04-01
 
 ### Fixed
