@@ -20,7 +20,7 @@
  * Test execution: pnpm test tests/contract/analysis.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { createTRPCClient, httpBatchLink, TRPCClientError } from '@trpc/client';
 import type { AppRouter } from '../../src/server/app-router';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
@@ -38,8 +38,21 @@ import { appRouter } from '../../src/server/app-router';
 import { createContext } from '../../src/server/trpc';
 import type { Server } from 'http';
 import cors from 'cors';
-import { closeQueue } from '../../src/orchestrator/queue';
 import { getAuthToken } from '../helpers/auth-token';
+
+// Mock BullMQ queue — contract tests verify API contracts, not job processing
+vi.mock('../../src/orchestrator/queue', () => {
+  const mockQueue = { add: vi.fn().mockResolvedValue({ id: 'mock-job-id' }) };
+  return {
+    addJob: vi.fn().mockResolvedValue({ id: 'mock-job-id' }),
+    closeQueue: vi.fn().mockResolvedValue(undefined),
+    getQueue: vi.fn().mockReturnValue(mockQueue),
+    removeJobsByCourseId: vi.fn().mockResolvedValue(undefined),
+    QUEUE_NAME: 'test-queue',
+    default: vi.fn().mockReturnValue(mockQueue),
+  };
+});
+import { closeQueue } from '../../src/orchestrator/queue';
 
 // ============================================================================
 // Type Definitions
@@ -850,6 +863,7 @@ describe('Contract: Analysis Router', () => {
       // When: Attempting to start analysis without courseId
       // Then: Should throw BAD_REQUEST error (Zod validation)
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         await client.analysis.start.mutate({} as any);
         expect.fail('Should have thrown BAD_REQUEST error');
       } catch (error) {
