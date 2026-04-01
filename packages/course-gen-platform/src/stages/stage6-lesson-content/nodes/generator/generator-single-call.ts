@@ -156,7 +156,10 @@ export async function generateLessonSingleCall(
   const interLessonContextXML = formatInterLessonContextXML(lessonSpec.lesson_context);
 
   // Step 4: Prepare generation guidance
-  const generationGuidanceXML = formatGenerationGuidanceXML(analysisResult);
+  const generationGuidanceXML = formatGenerationGuidanceXML(
+    analysisResult,
+    lessonSpec.lesson_context?.course_position?.lesson_index_in_course
+  );
 
   // Step 5: Get style prompt with fallback
   let stylePrompt: string;
@@ -226,6 +229,10 @@ export async function generateLessonSingleCall(
     sampleAnswerLabel: labels.sampleAnswer,
     digestHeader,
     sectionsWordBudget: String(sectionsWordBudget),
+    codeBlockInstruction:
+      lessonSpec.metadata.content_archetype === 'code_tutorial'
+        ? '5. **Code blocks** with filenames when relevant'
+        : '',
   });
 
   // Step 11: Calculate maxTokens
@@ -335,6 +342,9 @@ export async function generateLessonSingleCall(
 
     responseContent = retryContent;
   }
+
+  // Step 14.7: Strip unwanted conclusion/summary sections (safety net)
+  responseContent = stripUnwantedConclusionSections(responseContent, labels);
 
   // Step 15: Extract digest (pass the exact header we asked the model to use)
   const { content, digest } = extractLessonDigest(responseContent, digestHeader);
@@ -611,6 +621,103 @@ Return the full corrected lesson in ${outputLanguage}.
 <current_draft>
 ${generatedDraft}
 </current_draft>`;
+}
+
+/**
+ * Strip unwanted conclusion/summary sections from generated content.
+ * Safety net for cases where LLM adds conclusion despite prompt instructions.
+ * Does NOT strip the digest section (## Краткое содержание урока) or exercises.
+ *
+ * A section spans from its ## header to the next ## header or end of content.
+ *
+ * @param markdown - Generated lesson markdown
+ * @param labels - Localized content labels (used to protect legitimate sections)
+ * @returns Cleaned markdown with conclusion sections removed
+ */
+function stripUnwantedConclusionSections(
+  markdown: string,
+  labels: ReturnType<typeof getContentLabels>
+): string {
+  // Headings to strip (case-insensitive, matched via startsWith on the heading text)
+  const conclusionHeadings = [
+    'заключение',
+    'итоговый вывод',
+    'подведение итогов',
+    'общий вывод',
+    'итоги',
+    'выводы',
+    'conclusion',
+    'key takeaways',
+    'key takeaway',
+    'wrap-up',
+    'wrap up',
+    'wrapup',
+    'summary',
+  ];
+
+  // Protected headings that must NEVER be stripped (normalized lowercase)
+  const protectedHeadings = [
+    labels.lessonDigest, // e.g. "Краткое содержание урока"
+    labels.exercises, // e.g. "Упражнения"
+    labels.introduction, // e.g. "Введение"
+  ].map(h => h.toLowerCase().trim());
+
+  const lines = markdown.split('\n');
+  const result: string[] = [];
+  let skipping = false;
+  const strippedHeaders: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const headerMatch = line.match(/^##\s+(.+)$/);
+
+    if (headerMatch) {
+      const headerText = headerMatch[1].trim();
+      const headerLower = headerText.toLowerCase();
+
+      // Check if this header is protected
+      const isProtected = protectedHeadings.some(ph => headerLower.startsWith(ph));
+
+      if (isProtected) {
+        // Stop skipping, keep this line
+        skipping = false;
+        result.push(line);
+        continue;
+      }
+
+      // Check if this header matches a conclusion pattern
+      const isConclusion = conclusionHeadings.some(ch => headerLower.startsWith(ch));
+
+      if (isConclusion) {
+        skipping = true;
+        strippedHeaders.push(headerText);
+        continue;
+      }
+
+      // Any other ## header: stop skipping (we reached the next real section)
+      skipping = false;
+      result.push(line);
+      continue;
+    }
+
+    if (!skipping) {
+      result.push(line);
+    }
+  }
+
+  if (strippedHeaders.length > 0) {
+    logger.info(
+      { strippedHeaders, count: strippedHeaders.length },
+      'Stripped unwanted conclusion/summary sections from generated content'
+    );
+  }
+
+  // Clean up trailing blank lines that may remain after stripping
+  const cleaned = result
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
+  return cleaned;
 }
 
 /**

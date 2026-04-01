@@ -95,6 +95,10 @@ const SUMMARY_TERMS = [
   'Conclusion',
   'Key\\s*Takeaways?',
   'Wrap[- ]?up',
+  // Additional Russian conclusion-like variations
+  'Итоговый\\s+вывод',
+  'Подведение\\s+итогов',
+  'Общий\\s+вывод',
 ];
 
 /**
@@ -136,6 +140,11 @@ function buildSpecialSections(): Set<string> {
   sections.add('wrap-up');
   sections.add('wrapup');
   sections.add('wrap up');
+
+  // Additional Russian conclusion-like variations
+  sections.add('итоговый вывод');
+  sections.add('подведение итогов');
+  sections.add('общий вывод');
 
   return sections;
 }

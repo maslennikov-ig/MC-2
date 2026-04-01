@@ -346,6 +346,7 @@ export function calculateMaxTokensForSection(
  * - tone: Writing tone guidance
  *
  * @param analysisResult - AnalysisResult from Stage 4 with generation_guidance
+ * @param lessonIndex - Optional 1-based lesson index to rotate primary analogy
  * @returns XML string for prompt inclusion or empty string if no guidance
  */
 export function formatGenerationGuidanceXML(
@@ -363,7 +364,8 @@ export function formatGenerationGuidanceXML(
         };
       }
     | null
-    | undefined
+    | undefined,
+  lessonIndex?: number
 ): string {
   if (!analysisResult?.generation_guidance) {
     return '';
@@ -374,11 +376,31 @@ export function formatGenerationGuidanceXML(
 
   // Specific analogies to use in explanations
   if (guidance.specific_analogies && guidance.specific_analogies.length > 0) {
+    const analogies = guidance.specific_analogies;
     parts.push('  <specific_analogies>');
-    parts.push('    <!-- Use these domain-specific analogies to explain complex concepts -->');
-    for (const analogy of guidance.specific_analogies) {
-      parts.push(`    <analogy>${analogy}</analogy>`);
+
+    if (lessonIndex != null && analogies.length > 1) {
+      // Rotate primary analogy based on lesson index to avoid repetition
+      const primaryIdx = (lessonIndex - 1) % analogies.length;
+      parts.push(
+        '    <!-- Suggested analogy for this lesson (pick only if naturally fits the topic): -->'
+      );
+      parts.push(`    <primary_analogy>${analogies[primaryIdx]}</primary_analogy>`);
+      parts.push(
+        "    <!-- Alternative analogies (use only if the suggestion above doesn't fit): -->"
+      );
+      for (let i = 0; i < analogies.length; i++) {
+        if (i !== primaryIdx) {
+          parts.push(`    <analogy>${analogies[i]}</analogy>`);
+        }
+      }
+    } else {
+      parts.push('    <!-- Use these domain-specific analogies to explain complex concepts -->');
+      for (const analogy of analogies) {
+        parts.push(`    <analogy>${analogy}</analogy>`);
+      }
     }
+
     parts.push('  </specific_analogies>');
   }
 

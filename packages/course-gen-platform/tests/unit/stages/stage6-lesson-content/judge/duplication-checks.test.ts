@@ -145,19 +145,64 @@ Add rollout gates, telemetry checks, and rollback criteria for production safety
     expect(result.overlapPairs).toHaveLength(0);
   });
 
-  it('should ignore overlap checks for exercise and digest sections', () => {
-    const repeatedTemplate =
-      '**Task:** Implement a small script and explain your design choices. **Hint:** Start from the provided scaffold and iterate in small steps.';
+  it('should fully exempt digest sections from overlap detection', () => {
+    const repeatedCore =
+      'Data validation starts with schema checks, null audits, range controls, and duplicate detection before any feature work begins. Then we profile distributions, check drift against baseline snapshots, and log anomalies for triage. We also document assumptions, ownership boundaries, and remediation playbooks so the team can recover quickly when data quality drops.';
 
-    const content = `## Exercises
-${repeatedTemplate}
+    const content = `## Validation Workflow
+${repeatedCore}
+Add contract tests that block releases when critical quality rules regress.
 
 ## Lesson Digest
-${repeatedTemplate}`;
+${repeatedCore}
+Run incident drills quarterly and track MTTR trends to verify reliability gains.`;
 
     const result = checkSectionDuplication(content);
 
+    // Digest is fully excluded from overlap detection
     expect(result.overlapPairs).toHaveLength(0);
     expect(result.introOverlapPairs).toHaveLength(0);
+  });
+
+  it('should apply higher threshold (0.5) for exercise sections instead of exempting them', () => {
+    const repeatedCore =
+      'Data validation starts with schema checks, null audits, range controls, and duplicate detection before any feature work begins. Then we profile distributions, check drift against baseline snapshots, and log anomalies for triage. We also document assumptions, ownership boundaries, and remediation playbooks so the team can recover quickly when data quality drops.';
+
+    // Two sections with high overlap (>0.32) but one is an exercise section
+    const content = `## Core Concepts
+${repeatedCore}
+Add contract tests that block releases when critical quality rules regress.
+
+## Exercises
+${repeatedCore}
+Run incident drills quarterly and track MTTR trends to verify reliability gains.`;
+
+    const result = checkSectionDuplication(content);
+
+    // The overlap is ~0.32-0.49 range, below exercise threshold of 0.5
+    // so exercise section pairs should NOT be flagged at normal overlap levels
+    // (they would be flagged without the higher threshold)
+    const exercisePairs = result.overlapPairs.filter(
+      p => /exercise|упражнен/i.test(p.title1) || /exercise|упражнен/i.test(p.title2)
+    );
+    // Exercise pairs only flagged if overlap >= 0.5
+    for (const pair of exercisePairs) {
+      expect(pair.overlap).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  it('should detect exact duplicate headers with severity critical (B4)', () => {
+    const content = `## Data Pipeline Setup
+Outline the data pipeline architecture and ingestion plan.
+
+## Data Pipeline Setup
+Describe orchestration details and queueing strategy for reliability.`;
+
+    const result = checkSectionDuplication(content);
+
+    expect(result.passed).toBe(false);
+    expect(result.duplicatePairs.length).toBeGreaterThan(0);
+    expect(result.duplicatePairs[0].similarity).toBe(1.0);
+    expect(result.failure?.severity).toBe('critical');
   });
 });

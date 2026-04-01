@@ -17,8 +17,17 @@ import {
   checkKeywordCoverage,
   checkContentDensity,
 } from './basic-checks';
-import { checkLearningObjectiveCoverage, checkLanguageConsistency } from './content-quality';
-import { checkContentTruncation, checkMermaidSyntax } from './structural-checks';
+import {
+  checkLearningObjectiveCoverage,
+  checkLanguageConsistency,
+  checkHeaderLanguage,
+} from './content-quality';
+import {
+  checkContentTruncation,
+  checkMermaidSyntax,
+  checkCalloutDensity,
+  checkCodeBlockAudienceMatch,
+} from './structural-checks';
 import { checkProhibitedTerms, checkPromptMarkers } from './prohibited-content';
 import { checkSectionDuplication } from './duplication-checks';
 
@@ -220,6 +229,16 @@ export function runHeuristicFilters(
   const truncationResult = checkContentTruncation(content);
   accumulateFilterResult(truncationResult, FILTER_WEIGHTS.contentTruncation, acc);
 
+  const calloutDensityResult = checkCalloutDensity(content);
+  accumulateFilterResult(calloutDensityResult, FILTER_WEIGHTS.calloutDensity, acc);
+
+  const contentArchetype = lessonSpec.metadata?.content_archetype ?? 'concept_explainer';
+  const codeBlockAudienceResult = checkCodeBlockAudienceMatch(content, contentArchetype);
+  accumulateFilterResult(codeBlockAudienceResult, FILTER_WEIGHTS.codeBlockAudienceMatch, acc);
+
+  const headerLanguageResult = checkHeaderLanguage(content, language);
+  accumulateFilterResult(headerLanguageResult, FILTER_WEIGHTS.headerLanguage, acc);
+
   // Calculate sentence stats
   const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const words = content.match(/\b[a-zA-Z]+\b/g) || [];
@@ -288,6 +307,18 @@ export function runHeuristicFilters(
         truncationIssues: truncationResult.truncationIssues,
         lastCharacter: truncationResult.lastCharacter,
         hasMatchedCodeBlocks: truncationResult.hasMatchedCodeBlocks,
+      },
+      calloutDensity: {
+        calloutCount: calloutDensityResult.calloutCount,
+        calloutTypes: calloutDensityResult.calloutTypes,
+      },
+      codeBlockAudienceMatch: {
+        codeBlockCount: codeBlockAudienceResult.codeBlockCount,
+        contentArchetype: codeBlockAudienceResult.contentArchetype,
+      },
+      headerLanguage: {
+        englishHeaders: headerLanguageResult.englishHeaders,
+        totalHeaders: headerLanguageResult.totalHeaders,
       },
     },
     durationMs,

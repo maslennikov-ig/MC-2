@@ -438,6 +438,7 @@ describe('Prompt Contract Validation', () => {
         sampleAnswerLabel: key,
         digestHeader: key,
         sectionsWordBudget: key,
+        codeBlockInstruction: key,
       }));
 
       validateRequiredVariables('stage6_single_call_generator', interfaceKeys);

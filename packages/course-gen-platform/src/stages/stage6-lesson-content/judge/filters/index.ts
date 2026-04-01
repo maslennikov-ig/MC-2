@@ -46,10 +46,19 @@ export {
 } from './basic-checks';
 
 // Re-export content quality checks
-export { checkLearningObjectiveCoverage, checkLanguageConsistency } from './content-quality';
+export {
+  checkLearningObjectiveCoverage,
+  checkLanguageConsistency,
+  checkHeaderLanguage,
+} from './content-quality';
 
 // Re-export structural checks
-export { checkContentTruncation, checkMermaidSyntax } from './structural-checks';
+export {
+  checkContentTruncation,
+  checkMermaidSyntax,
+  checkCalloutDensity,
+  checkCodeBlockAudienceMatch,
+} from './structural-checks';
 
 // Re-export prohibited content checks
 export { checkProhibitedTerms, checkPromptMarkers } from './prohibited-content';

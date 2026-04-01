@@ -48,7 +48,19 @@ export const parsedLessonContentSchema = z
   .strict()
 
 const INTRO_HEADINGS = ['введение', 'introduction']
-const SUMMARY_HEADINGS = ['заключение', 'summary', 'итоги', 'выводы']
+const SUMMARY_HEADINGS = [
+  'заключение',
+  'summary',
+  'итоги',
+  'выводы',
+  'итоговый вывод',
+  'подведение итогов',
+  'общий вывод',
+  'key takeaways',
+  'conclusion',
+  'wrap-up',
+  'wrap up',
+]
 
 export function parseMarkdownToContent(markdown: string): ParsedLessonContent {
   const result: ParsedLessonContent = {}
