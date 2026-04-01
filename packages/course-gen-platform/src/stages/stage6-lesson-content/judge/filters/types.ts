@@ -142,6 +142,21 @@ export interface HeuristicFilterResult {
       lastCharacter: string;
       hasMatchedCodeBlocks: boolean;
     };
+    /** Callout density check results */
+    calloutDensity?: {
+      calloutCount: number;
+      calloutTypes: string[];
+    };
+    /** Code block audience match check results */
+    codeBlockAudienceMatch?: {
+      codeBlockCount: number;
+      contentArchetype: string;
+    };
+    /** Header language check results (English headers in non-English content) */
+    headerLanguage?: {
+      englishHeaders: string[];
+      totalHeaders: number;
+    };
   };
   /** Duration of heuristic check in milliseconds */
   durationMs: number;
@@ -188,16 +203,19 @@ export const DEFAULT_HEURISTIC_CONFIG: HeuristicFilterConfig = {
  */
 export const FILTER_WEIGHTS = {
   wordCount: 0.07, // basic length check
-  fleschKincaid: 0.06, // readability (English only; reduced — least useful for non-English)
-  sections: 0.06, // structure check
-  keywordCoverage: 0.06, // topic coverage
-  contentDensity: 0.04, // section depth
+  fleschKincaid: 0.04, // readability (English only; reduced — least useful for non-English)
+  sections: 0.05, // structure check
+  keywordCoverage: 0.05, // topic coverage
+  contentDensity: 0.02, // section depth
   markdownStructure: 0.1, // formatting
   learningObjectiveCoverage: 0.06, // spec alignment
   prohibitedTerms: 0.04, // term compliance
   promptMarkers: 0.15, // CRITICAL: LLM hallucination detection
-  languageConsistency: 0.12, // CRITICAL: CJK in Russian detection
+  languageConsistency: 0.09, // CRITICAL: CJK in Russian detection
   mermaidSyntax: 0.08, // HIGH: diagram validity
   sectionDuplication: 0.09, // HIGH: duplicate section detection
-  contentTruncation: 0.07, // HIGH: detects incomplete generation
+  contentTruncation: 0.06, // HIGH: detects incomplete generation
+  calloutDensity: 0.03, // callout overuse detection
+  codeBlockAudienceMatch: 0.04, // code blocks in non-technical content
+  headerLanguage: 0.03, // English headers in non-English content
 } as const;

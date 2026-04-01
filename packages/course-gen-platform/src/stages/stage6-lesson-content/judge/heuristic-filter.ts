@@ -47,10 +47,16 @@ export {
 export {
   checkLearningObjectiveCoverage,
   checkLanguageConsistency,
+  checkHeaderLanguage,
   ZERO_TOLERANCE_SCRIPTS,
 } from './filters/content-quality';
 
-export { checkContentTruncation, checkMermaidSyntax } from './filters/structural-checks';
+export {
+  checkContentTruncation,
+  checkMermaidSyntax,
+  checkCalloutDensity,
+  checkCodeBlockAudienceMatch,
+} from './filters/structural-checks';
 
 export { checkProhibitedTerms, checkPromptMarkers } from './filters/prohibited-content';
 

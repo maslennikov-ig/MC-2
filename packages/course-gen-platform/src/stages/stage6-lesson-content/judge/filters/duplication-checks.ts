@@ -33,6 +33,7 @@ interface TopLevelSection {
 }
 
 const OVERLAP_THRESHOLD = 0.32;
+const EXERCISE_OVERLAP_THRESHOLD = 0.5;
 const MIN_OVERLAP_TOKENS = 40;
 const PREFACE_INTRO_TITLE = '__preface_intro__';
 const PREFACE_INTRO_DISPLAY_TITLE = 'Preface (before first section)';
@@ -66,6 +67,15 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
   // Compare each pair of headers for similarity
   for (let i = 0; i < headers.length; i++) {
     for (let j = i + 1; j < headers.length; j++) {
+      // B4: Exact match pre-check (case-insensitive) — skip Levenshtein
+      if (headers[i].toLowerCase().trim() === headers[j].toLowerCase().trim()) {
+        duplicatePairs.push({
+          title1: headers[i],
+          title2: headers[j],
+          similarity: 1.0,
+        });
+        continue;
+      }
       const similarity = calculateSimilarity(headers[i], headers[j]);
       if (similarity > 0.8) {
         duplicatePairs.push({
@@ -78,7 +88,7 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
   }
 
   const sections = extractTopLevelSections(content).filter(
-    section => !isTemplateHeavySection(section.title)
+    section => !isDigestSection(section.title)
   );
   const prefaceSection = extractPrefaceSection(content);
   if (prefaceSection) {
@@ -117,7 +127,10 @@ export function checkSectionDuplication(content: string): FilterCheckResult & {
       filter: 'sectionDuplication',
       expected: '0 duplicate sections, section overlap pairs, or intro-vs-section overlaps',
       actual: `${duplicatePairs.length} duplicate title pairs, ${overlapPairs.length} overlap pairs, ${introOverlapPairs.length} intro overlap pairs`,
-      severity: totalDuplicationPairs > 2 ? 'critical' : 'major',
+      severity:
+        totalDuplicationPairs > 2 || duplicatePairs.some(p => p.similarity === 1.0)
+          ? 'critical'
+          : 'major',
     };
 
     const titleExamples = duplicatePairs
@@ -202,7 +215,12 @@ function detectSectionBodyOverlap(sections: TopLevelSection[]): OverlapPair[] {
   for (let i = 0; i < sections.length; i++) {
     for (let j = i + 1; j < sections.length; j++) {
       const overlapAnalysis = calculateSectionOverlap(sections[i].content, sections[j].content);
-      if (overlapAnalysis.overlap >= OVERLAP_THRESHOLD) {
+      // B3: Exercise sections use a higher threshold to avoid false positives
+      // from template formatting (e.g. repeated instruction boilerplate)
+      const eitherIsExercise =
+        isExerciseSection(sections[i].title) || isExerciseSection(sections[j].title);
+      const threshold = eitherIsExercise ? EXERCISE_OVERLAP_THRESHOLD : OVERLAP_THRESHOLD;
+      if (overlapAnalysis.overlap >= threshold) {
         overlapPairs.push({
           title1: sections[i].title,
           title2: sections[j].title,
@@ -304,9 +322,18 @@ function isIntroductionTitle(title: string): boolean {
   return false;
 }
 
-function isTemplateHeavySection(title: string): boolean {
-  // Template-heavy sections naturally repeat boilerplate instructions.
-  return /(exercise|упражнен|digest|краткое содержание)/i.test(title.toLowerCase());
+/**
+ * Digest sections are fully exempt from overlap detection (template-heavy boilerplate).
+ */
+function isDigestSection(title: string): boolean {
+  return /(digest|краткое содержание|lesson digest)/i.test(title.toLowerCase());
+}
+
+/**
+ * Exercise sections use a higher overlap threshold instead of being fully exempt.
+ */
+function isExerciseSection(title: string): boolean {
+  return /(exercise|упражнен)/i.test(title.toLowerCase());
 }
 
 function toDisplayTitle(title: string): string {

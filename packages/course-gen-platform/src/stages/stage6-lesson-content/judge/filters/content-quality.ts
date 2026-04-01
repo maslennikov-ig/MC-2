@@ -304,3 +304,92 @@ export function checkLanguageConsistency(
 
   return result;
 }
+
+// ============================================================================
+// HEADER LANGUAGE CHECK (English headers in non-English content)
+// ============================================================================
+
+/**
+ * Check if section headers contain predominantly English text in non-English courses.
+ *
+ * Detects cases like `## Key Takeaways` or `## Conclusion` in Russian courses.
+ * Only flags headers where >60% of characters are Latin AND the header has >2 words.
+ * Technical terms (single-word headers, abbreviations) are excluded.
+ *
+ * @param content - Lesson content (markdown string)
+ * @param expectedLanguage - Expected language code (e.g., 'ru', 'zh')
+ * @returns Filter check result with English header details
+ */
+export function checkHeaderLanguage(
+  content: string,
+  expectedLanguage: string
+): FilterCheckResult & {
+  englishHeaders: string[];
+  totalHeaders: number;
+} {
+  // Only relevant for non-English content
+  if (expectedLanguage === 'en') {
+    return {
+      passed: true,
+      actual: 'english content — skipped',
+      scoreContribution: 1.0,
+      englishHeaders: [],
+      totalHeaders: 0,
+    };
+  }
+
+  // Extract prose text (exclude code blocks)
+  const proseText = extractProseText(content);
+
+  // Extract all H2 headers from prose
+  const headerMatches = proseText.match(/^##\s+(.+)$/gm) || [];
+  const headers = headerMatches.map(h => h.replace(/^##\s+/, '').trim());
+
+  const englishHeaders: string[] = [];
+
+  for (const header of headers) {
+    const words = header.split(/\s+/);
+    // Skip short headers (1-2 words are often technical terms/abbreviations)
+    if (words.length <= 2) continue;
+
+    // Count Latin vs non-Latin characters (excluding spaces, digits, punctuation)
+    const letterChars = header.replace(/[\s\d\p{P}]/gu, '');
+    if (letterChars.length === 0) continue;
+
+    const latinCount = (letterChars.match(/[a-zA-Z]/g) || []).length;
+    const latinRatio = latinCount / letterChars.length;
+
+    if (latinRatio > 0.6) {
+      englishHeaders.push(header);
+    }
+  }
+
+  const passed = englishHeaders.length === 0;
+  const scoreContribution = passed ? 1.0 : Math.max(0, 1 - englishHeaders.length * 0.25);
+
+  const result: FilterCheckResult & {
+    englishHeaders: string[];
+    totalHeaders: number;
+  } = {
+    passed,
+    actual: passed ? 'all headers in target language' : `${englishHeaders.length} English headers`,
+    scoreContribution,
+    englishHeaders,
+    totalHeaders: headers.length,
+  };
+
+  if (!passed) {
+    result.failure = {
+      filter: 'headerLanguage',
+      expected: `Headers in ${expectedLanguage}`,
+      actual: `${englishHeaders.length} headers appear to be in English`,
+      severity: 'major',
+    };
+    result.suggestion = `Headers should be in ${expectedLanguage}: ${englishHeaders
+      .slice(0, 3)
+      .map(h => `"${h}"`)
+      .join(', ')}. Translate headers to the target language.`;
+  }
+
+  return result;
+}
