@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.31.32
+
+_Released on 2026-04-01_
+
+### 🐛 Bug Fixes
+
+- **web**: Resolve lint errors in profile pages and i18n
+- **stage6**: Fix systemic content quality issues in lesson generation
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.31
 
 _Released on 2026-03-31_
