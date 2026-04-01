@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.32] - 2026-04-01
+
+### Fixed
+
+- **web**: resolve lint errors in profile pages and i18n (8606e0eb)
+- **stage6**: fix systemic content quality issues in lesson generation (ca08480d)
+
 ## [0.31.31] - 2026-03-31
 
 ### Fixed
