@@ -501,6 +501,31 @@ export function validateLanguageCode(code: unknown): Language {
   return parsed.success ? parsed.data : 'en';
 }
 
+/**
+ * Conclusion-like section headings that should be treated as summary/conclusion sections.
+ * Used by parsers and post-processors to identify and handle unwanted conclusion sections.
+ * All strings are lowercase for case-insensitive matching.
+ */
+export const CONCLUSION_HEADINGS = [
+  // Russian
+  'заключение',
+  'итоговый вывод',
+  'подведение итогов',
+  'общий вывод',
+  'итоги',
+  'выводы',
+  // English (used as default for all non-Russian languages)
+  'conclusion',
+  'summary',
+  'key takeaways',
+  'key takeaway',
+  'wrap-up',
+  'wrap up',
+  'wrapup',
+] as const;
+
+export type ConclusionHeading = (typeof CONCLUSION_HEADINGS)[number];
+
 // ============================================================================
 // Difficulty/Level Enum
 // ============================================================================
