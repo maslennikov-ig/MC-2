@@ -288,7 +288,7 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
 // ============================================================================
 
 /** Regex to match callout markers: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO], > [!DANGER] */
-const CALLOUT_REGEX = /^>\s*\[!(TIP|WARNING|NOTE|INFO|DANGER)\]/gim;
+const CALLOUT_REGEX = /^>\s*\[!(PRO\s*TIP|TIP|WARNING|NOTE|INFO|DANGER)\]/gim;
 
 /**
  * Check callout density in lesson content
@@ -310,7 +310,15 @@ export function checkCalloutDensity(content: string): FilterCheckResult & {
 } {
   const matches = Array.from(content.matchAll(CALLOUT_REGEX));
   const calloutCount = matches.length;
-  const calloutTypes = [...new Set(matches.map(m => m[1].toUpperCase()))];
+  const calloutTypes = [
+    ...new Set(
+      matches.map(m => {
+        const raw = m[1].toUpperCase().replace(/\s+/g, ' ');
+        // Normalize non-standard types: "PRO TIP" → "TIP"
+        return raw === 'PRO TIP' || raw === 'PROTIP' ? 'TIP' : raw;
+      })
+    ),
+  ];
 
   if (calloutCount <= 2) {
     return {

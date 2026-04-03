@@ -239,6 +239,19 @@ export function runHeuristicFilters(
   const headerLanguageResult = checkHeaderLanguage(content, language);
   accumulateFilterResult(headerLanguageResult, FILTER_WEIGHTS.headerLanguage, acc);
 
+  // Check for zero-section content (all content in intro, no ## headers parsed)
+  if (densityResult.sectionCount === 0) {
+    acc.failures.push({
+      filter: 'emptySections',
+      expected: 'At least 1 content section with ## header',
+      actual: '0 sections found — all content appears to be in the introduction',
+      severity: 'critical',
+    });
+    acc.suggestions.push(
+      'Content has no sections (0 ## headers found). The entire lesson was placed into the introduction. Regenerate with proper section structure.'
+    );
+  }
+
   // Calculate sentence stats
   const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const words = content.match(/\b[a-zA-Z]+\b/g) || [];
