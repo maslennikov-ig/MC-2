@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.31.34
+
+_Released on 2026-04-03_
+
+### 🐛 Bug Fixes
+
+- **web**: Repair broken markdown table rows with split quoted text
+- **stage6,web**: Fix PRO TIP callout, section validation, and CI blocker
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.33
 
 _Released on 2026-04-01_
