@@ -259,3 +259,67 @@ sections.add('общий вывод');
 | `stage6/judge/filters/content-quality.ts`         | English headers (B6)                                    |
 | `stage6/utils/markdown-parser.ts`                 | Conclusion headings (C1)                                |
 | `web/lib/markdown-content-parser.ts`              | Conclusion headings (C1)                                |
+
+---
+
+## WAVE 2: Новые проблемы (курс 7a89b7d2, 2 апреля 2026)
+
+### Диагноз
+
+Курс сгенерирован **2 апреля** — после наших фиксов (1 апреля), но `course-gen-platform` workers **не были перезапущены** при деплое. Доказательства: "Заключение" присутствует, 12/20 уроков с code blocks при `archetype = concept_explainer`, 4 TIP callout-а в 2 уроках.
+
+**Действие**: Перезапуск workers + перегенерация курса.
+
+**ROOT CAUSE CI/CD FAILURE**: `passwordSchema` не экспортировался из `validation-schemas.ts`, что блокировало type-check → весь CI pipeline → Docker build → deploy. Все фиксы v0.31.32-33 НЕ были задеплоены на dev из-за этой ошибки. Исправлено в Wave 2.
+
+### Новые баги (не покрыты Wave 1)
+
+#### W2-1. `[!PRO TIP]` — нестандартный callout маркер (P0)
+
+LLM генерирует `> [!PRO TIP]` вместо `> [!TIP]`. Ни backend regex, ни frontend `CALLOUT_DETECT_RE` не распознают `PRO TIP`.
+
+**Фиксы**:
+
+1. **Backend**: `structural-checks.ts` — расширить regex: `PRO\s*TIP|TIP|...`
+2. **Frontend**: `web/components/markdown/utils/callout-parser.tsx:13` — расширить regex + маппинг `PRO TIP` → `tip`
+
+#### W2-2. Сломанная markdown-таблица: кавычки разрывают строку (P1)
+
+Урок 2.2: `| "Страдающие" пользователи |` разрывается кавычками. Генерационная проблема.
+
+**Фикс**: Post-generation table sanitizer — проверять одинаковое число `|` в строках таблицы, склеивать разорванные.
+
+#### W2-3. Урок целиком в intro (section_count = 0) (P1)
+
+Урок 3.3 (2969 chars) — `sections = []`, всё в intro. Парсер не распознал секции.
+
+**Фикс**: Heuristic filter — `section_count === 0` → severity `critical` (force regeneration).
+
+#### W2-4. Контент слишком технический для HR-аудитории (P2)
+
+Модуль 3: Docker/Kubernetes, SMTP/IMAP, DLP/SIEM. Stage 4 определил `tone = "technical professional"`, но не ограничил глубину для нетехнической аудитории.
+
+**Фикс**: Stage 4/6 промпт — учёт `target_audience` при контроле технической глубины.
+
+#### W2-5. "Слетевший текст" — проверка рендеринга (P1)
+
+Контент в БД корректный. Нужна проверка рендеринга через авторизованный браузер.
+
+### Порядок Wave 2
+
+1. **DevOps**: Перезапуск workers
+2. **W2-1**: Callout regex (backend + frontend)
+3. **W2-3**: Section count validation
+4. **W2-2**: Table sanitizer
+5. **W2-5**: Проверка рендеринга
+6. **W2-4**: Audience-aware prompts (Stage 4/6)
+
+### Ключевые файлы Wave 2
+
+| Файл                                                         | Что меняем                     |
+| ------------------------------------------------------------ | ------------------------------ |
+| `stage6/judge/filters/structural-checks.ts`                  | W2-1: callout regex PRO TIP    |
+| `web/components/markdown/utils/callout-parser.tsx`           | W2-1: PRO TIP → tip            |
+| `web/components/markdown/utils/normalize-markdown-tables.ts` | W2-2: broken table rows        |
+| `stage6/judge/filters/orchestrator.ts` или `basic-checks.ts` | W2-3: section_count validation |
+| `shared/prompts/stage4-prompts.ts`                           | W2-4: audience-aware depth     |
