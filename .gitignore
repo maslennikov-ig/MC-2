@@ -2,6 +2,9 @@
 node_modules/
 .pnpm-store/
 
+# --- Playwright MCP artifacts ---
+.playwright-mcp/
+
 # --- Build Outputs & Cache ---
 dist/
 build/
