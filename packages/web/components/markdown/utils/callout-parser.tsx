@@ -10,14 +10,14 @@ import type { CalloutType } from '../types'
  * Matches: [!NOTE], [!TIP], [!WARNING], [!DANGER], [!INFO]
  * With optional leading: spaces, tabs, ", ', «, », \u201C, \u201D
  */
-const CALLOUT_DETECT_RE = /^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]/i
+const CALLOUT_DETECT_RE = /^[\s"'«»\u201C\u201D]*\[!(PRO\s*TIP|NOTE|TIP|WARNING|DANGER|INFO)\]/i
 
 /**
  * Regex to strip the callout marker and surrounding quotes from text.
  * Used after detection to extract the remaining content.
  */
 const CALLOUT_STRIP_RE =
-  /^[\s"'«»\u201C\u201D]*\[!(NOTE|TIP|WARNING|DANGER|INFO)\]["'«»\u201C\u201D]*\s*/i
+  /^[\s"'«»\u201C\u201D]*\[!(PRO\s*TIP|NOTE|TIP|WARNING|DANGER|INFO)\]["'«»\u201C\u201D]*\s*/i
 
 /**
  * Parse callout syntax from blockquote children rendered by react-markdown or next-mdx-remote.
@@ -66,7 +66,9 @@ export function parseCalloutFromChildren(
   const match = textContent.match(CALLOUT_DETECT_RE)
   if (!match) return null
 
-  const type = match[1].toLowerCase() as CalloutType
+  const rawType = match[1].toLowerCase()
+  // Normalize non-standard callout types: "pro tip" → "tip"
+  const type = (rawType === 'pro tip' || rawType === 'protip' ? 'tip' : rawType) as CalloutType
 
   // Strip the [!TYPE] marker from the text
   const remainingText = textContent.replace(CALLOUT_STRIP_RE, '')

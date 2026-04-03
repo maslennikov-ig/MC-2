@@ -46,6 +46,22 @@ export const createPasswordSchema = (
       path: ['new_password'],
     })
 
+// Static password schema with default Russian messages (for components without i18n)
+export const passwordSchema = createPasswordSchema((key: string) => {
+  const messages: Record<string, string> = {
+    'validation.passwordMin6': 'Минимум 6 символов',
+    'validation.passwordMin8': 'Минимум 8 символов',
+    'validation.passwordMax': 'Максимум 128 символов',
+    'validation.passwordUppercase': 'Нужна хотя бы одна заглавная буква',
+    'validation.passwordLowercase': 'Нужна хотя бы одна строчная буква',
+    'validation.passwordDigit': 'Нужна хотя бы одна цифра',
+    'validation.passwordSpecial': 'Нужен хотя бы один спецсимвол',
+    'validation.passwordMismatch': 'Пароли не совпадают',
+    'validation.passwordSameAsCurrent': 'Новый пароль совпадает с текущим',
+  }
+  return messages[key] || key
+})
+
 // Type exports (inferred from schema created with empty translation function)
 export type PersonalInfoFormData = z.infer<ReturnType<typeof createPersonalInfoSchema>>
 export type PasswordFormData = z.infer<ReturnType<typeof createPasswordSchema>>
