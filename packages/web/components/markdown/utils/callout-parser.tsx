@@ -66,7 +66,7 @@ export function parseCalloutFromChildren(
   const match = textContent.match(CALLOUT_DETECT_RE)
   if (!match) return null
 
-  const rawType = match[1].toLowerCase()
+  const rawType = match[1].toLowerCase().replace(/\s+/g, ' ')
   // Normalize non-standard callout types: "pro tip" → "tip"
   const type = (rawType === 'pro tip' || rawType === 'protip' ? 'tip' : rawType) as CalloutType
 
