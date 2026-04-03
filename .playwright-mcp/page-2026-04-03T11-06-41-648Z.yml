@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+    - generic "Loading"
+    - alert [ref=e2]:
+        - generic [ref=e3]:
+            - img [ref=e5]
+            - heading "Страница не найдена" [level=1] [ref=e8]
+            - paragraph [ref=e9]: Запрошенная страница не существует или была перемещена
+            - generic [ref=e10]:
+                - link "На главную" [ref=e11] [cursor=pointer]:
+                    - /url: /
+                    - img [ref=e12]
+                    - text: На главную
+                - button "Назад" [ref=e15]:
+                    - img [ref=e16]
+                    - text: Назад
+    - region "Notifications alt+T"
+    - alert [ref=e18]

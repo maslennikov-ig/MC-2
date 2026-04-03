@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.34] - 2026-04-03
+
+### Fixed
+
+- **web**: repair broken markdown table rows with split quoted text (86b85e21)
+- **stage6,web**: fix PRO TIP callout, section validation, and CI blocker (bdb6680a)
+
 ## [0.31.33] - 2026-04-01
 
 ### Changed
