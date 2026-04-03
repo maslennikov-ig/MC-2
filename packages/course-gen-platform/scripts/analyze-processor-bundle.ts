@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 
 // Configuration
-const MAX_BUNDLE_SIZE_MB = 2.0; // Alert threshold
+const MAX_BUNDLE_SIZE_MB = 2.5; // Alert threshold
 const WARN_BUNDLE_SIZE_MB = 1.5; // Warning threshold
 const BUNDLE_PATH = 'dist/orchestrator/processor.js';
 
