@@ -308,6 +308,48 @@ export type LessonContentBody = z.infer<typeof LessonContentBodySchema>;
 // LESSON CONTENT METADATA
 // ============================================================================
 
+export const LessonQualitySignalsSchema = z.object({
+  /** Schema version for backward-compatible QA telemetry */
+  version: z.number().int().positive().default(1),
+
+  /** Compact per-lesson counters collected during Stage 6 QA */
+  lesson_counters: z
+    .object({
+      section_count: z.number().int().nonnegative().optional(),
+      callout_count: z.number().int().nonnegative().optional(),
+      code_block_count: z.number().int().nonnegative().optional(),
+      english_header_count: z.number().int().nonnegative().optional(),
+      duplicate_header_count: z.number().int().nonnegative().optional(),
+      conclusion_heading_count: z.number().int().nonnegative().optional(),
+    })
+    .partial()
+    .optional(),
+
+  /** Local lesson-level QA flags */
+  lesson_flags: z.array(z.string()).optional(),
+
+  /** Course-level QA flags attached back to this lesson */
+  course_flags: z.array(z.string()).optional(),
+
+  /** Remediation action selected by Stage 6 quality routing */
+  remediation_action: z.string().optional(),
+
+  /** Retry count attributable to quality enforcement */
+  quality_retry_count: z.number().int().nonnegative().optional(),
+
+  /** Optional cheap critic telemetry */
+  selective_critic: z
+    .object({
+      invoked: z.boolean(),
+      finding_count: z.number().int().nonnegative().optional(),
+      upgraded_action: z.string().optional(),
+    })
+    .partial()
+    .optional(),
+});
+
+export type LessonQualitySignals = z.infer<typeof LessonQualitySignalsSchema>;
+
 /**
  * Metadata for lesson content generation
  *
@@ -340,6 +382,9 @@ export const LessonContentMetadataSchema = z.object({
 
   /** Temperature setting used for generation */
   temperature_used: z.number().min(0).max(2),
+
+  /** Optional compact Stage 6 quality telemetry */
+  qa_signals: LessonQualitySignalsSchema.optional(),
 });
 
 export type LessonContentMetadata = z.infer<typeof LessonContentMetadataSchema>;

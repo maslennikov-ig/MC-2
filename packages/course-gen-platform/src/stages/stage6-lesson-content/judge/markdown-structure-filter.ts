@@ -37,11 +37,12 @@
  * @see {@link ./heuristic-filter.ts} - Previous filter in cascade
  */
 
+import { type LintError } from 'markdownlint';
 import { lint } from 'markdownlint/sync';
-import { applyFixes, type LintError } from 'markdownlint';
 import type { JudgeIssue, IssueSeverity } from '@megacampus/shared-types/judge-types';
 import type { JudgeCriterion } from '@megacampus/shared-types/judge-rubric';
 import { logger } from '@/shared/logger';
+import { applyDeterministicQualityAutoFixes } from '../quality/markdown-autofix';
 
 import {
   LESSON_MARKDOWNLINT_CONFIG,
@@ -320,33 +321,7 @@ export function validateMarkdownStructure(content: string): MarkdownStructureRes
  * ```
  */
 export function applyMarkdownAutoFixes(content: string): MarkdownAutoFixResult {
-  // Run lint to get issues with fix information
-  const lintResults = lint({
-    strings: { content },
-    config: LESSON_MARKDOWNLINT_CONFIG,
-  });
-
-  const lintErrors: LintError[] = lintResults.content || [];
-
-  // Filter to only auto-fixable rules
-  const fixableErrors = lintErrors.filter(error => {
-    const ruleId = error.ruleNames[0];
-    return isAutoFixable(ruleId) && error.fixInfo;
-  });
-
-  // Track which rules were fixed
-  const fixedRulesSet = new Set<string>();
-  for (const error of fixableErrors) {
-    fixedRulesSet.add(error.ruleNames[0]);
-  }
-
-  // Apply fixes (only processes errors with fixInfo)
-  const fixedContent = applyFixes(content, lintErrors);
-
-  return {
-    content: fixedContent,
-    fixedRules: Array.from(fixedRulesSet),
-  };
+  return applyDeterministicQualityAutoFixes(content);
 }
 
 // ============================================================================

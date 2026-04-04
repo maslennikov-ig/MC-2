@@ -5,6 +5,10 @@ node_modules/
 # --- Playwright MCP artifacts ---
 .playwright-mcp/
 
+# --- Agent/Codex artifacts ---
+.agents/
+.codex/
+
 # --- Build Outputs & Cache ---
 dist/
 build/

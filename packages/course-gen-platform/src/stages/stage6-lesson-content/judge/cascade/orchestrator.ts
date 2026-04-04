@@ -20,8 +20,16 @@ import {
   DEFAULT_FACTUAL_VERIFICATION_CONFIG,
 } from '../factual-verifier';
 import { runHeuristicFilters } from './heuristic-helpers';
+import { runHeuristicFilters as runDetailedHeuristicFilters } from '../filters/orchestrator';
 import { executeSingleJudge } from './single-judge';
 import { DEFAULT_CASCADE_CONFIG, DEFAULT_HEURISTIC_THRESHOLDS } from './constants';
+import { extractContentBodyMarkdown } from '../../services/content-utils';
+import { isStage6PresentationCriticEnabled } from '../../quality/flags';
+import { runPresentationCritic } from '../../quality/presentation-critic';
+import {
+  QualityRemediationAction,
+  summarizeDetailedHeuristicResult,
+} from '../../quality/remediation';
 import type {
   CascadeEvaluationInput,
   CascadeConfig,
@@ -153,6 +161,81 @@ export async function executeCascadeEvaluation(
         totalOutputTokens: 0,
         totalDurationMs: Date.now() - startTime,
         costSavingsRatio: 1.0, // 100% savings - no LLM calls
+      };
+    }
+
+    const lessonMarkdown = extractContentBodyMarkdown(input.lessonContent, language);
+    const detailedFilterResult = runDetailedHeuristicFilters(
+      lessonMarkdown,
+      input.lessonSpec,
+      undefined,
+      language
+    );
+    let qualitySummary = summarizeDetailedHeuristicResult(detailedFilterResult);
+    let presentationCritic = undefined;
+
+    if (qualitySummary.shouldRunPresentationCritic && isStage6PresentationCriticEnabled()) {
+      presentationCritic = await runPresentationCritic({
+        markdown: lessonMarkdown,
+        lessonSpec: input.lessonSpec,
+      });
+
+      if (presentationCritic.upgradedAction) {
+        qualitySummary = {
+          ...qualitySummary,
+          action: presentationCritic.upgradedAction,
+          reasons: [
+            ...qualitySummary.reasons,
+            ...presentationCritic.findings.map(finding => `presentation critic: ${finding}`),
+          ],
+        };
+      }
+    }
+
+    heuristicResults = {
+      ...heuristicResults,
+      warnings: [...heuristicResults.warnings, ...qualitySummary.reasons],
+      detailedFilterResult,
+      qualitySummary,
+      presentationCritic,
+    };
+
+    logger.info({
+      msg: 'Detailed heuristic evaluation complete',
+      lessonId: input.lessonSpec.lesson_id,
+      action: qualitySummary.action,
+      lessonFlags: qualitySummary.lessonFlags,
+      calloutCount: qualitySummary.lessonCounters.callout_count,
+      codeBlockCount: qualitySummary.lessonCounters.code_block_count,
+      presentationCriticInvoked: presentationCritic?.invoked ?? false,
+      presentationCriticFindingCount: presentationCritic?.findingCount ?? 0,
+    });
+
+    if (
+      qualitySummary.action === QualityRemediationAction.FULL_REGEN ||
+      qualitySummary.action === QualityRemediationAction.REVIEW_REQUIRED
+    ) {
+      logger.info({
+        msg: 'Detailed heuristics blocked content before LLM judge',
+        lessonId: input.lessonSpec.lesson_id,
+        action: qualitySummary.action,
+        lessonFlags: qualitySummary.lessonFlags,
+      });
+
+      return {
+        stage: 'heuristic',
+        passed: false,
+        heuristicResults,
+        finalScore: detailedFilterResult.score,
+        finalRecommendation:
+          qualitySummary.action === QualityRemediationAction.REVIEW_REQUIRED
+            ? 'ESCALATE_TO_HUMAN'
+            : 'REGENERATE',
+        totalTokensUsed: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalDurationMs: Date.now() - startTime,
+        costSavingsRatio: 1.0,
       };
     }
 

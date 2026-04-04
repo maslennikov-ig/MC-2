@@ -1,19 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetSupabaseAdmin, mockNotifyCourseCompletion, mockLogger } = vi.hoisted(() => {
-  const logger = {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-    child: vi.fn().mockReturnThis(),
-  };
-  return {
-    mockGetSupabaseAdmin: vi.fn(),
-    mockNotifyCourseCompletion: vi.fn().mockResolvedValue(undefined),
-    mockLogger: logger,
-  };
-});
+const { mockGetSupabaseAdmin, mockNotifyCourseCompletion, mockNotifyCourseError, mockLogger } =
+  vi.hoisted(() => {
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn().mockReturnThis(),
+    };
+    return {
+      mockGetSupabaseAdmin: vi.fn(),
+      mockNotifyCourseCompletion: vi.fn().mockResolvedValue(undefined),
+      mockNotifyCourseError: vi.fn().mockResolvedValue(undefined),
+      mockLogger: logger,
+    };
+  });
 
 vi.mock('@/shared/supabase/admin', () => ({
   getSupabaseAdmin: mockGetSupabaseAdmin,
@@ -21,6 +23,7 @@ vi.mock('@/shared/supabase/admin', () => ({
 
 vi.mock('@/shared/notifications/course-notifications', () => ({
   notifyCourseCompletion: mockNotifyCourseCompletion,
+  notifyCourseError: mockNotifyCourseError,
 }));
 
 vi.mock('@/shared/logger', () => ({
@@ -35,6 +38,7 @@ type CourseRow = {
   generation_status: string;
   auto_finalize_after_stage6: boolean;
   generation_progress: Record<string, unknown> | null;
+  target_audience?: string | null;
   course_structure: {
     sections: Array<{ lessons: Array<Record<string, unknown>> }>;
   };
@@ -42,7 +46,13 @@ type CourseRow = {
 
 function createSupabaseAdminMock(options: {
   courseRow: CourseRow;
-  lessonContentsRows: Array<{ lesson_id: string; status?: string; created_at?: string }>;
+  lessonContentsRows: Array<{
+    lesson_id: string;
+    status?: string;
+    created_at?: string;
+    content?: Record<string, unknown> | null;
+    metadata?: Record<string, unknown> | null;
+  }>;
   updateError?: { message: string } | null;
   lessonUpdateError?: { message: string } | null;
   insertError?: { message: string } | null;
@@ -131,6 +141,7 @@ function createCourseRow(autoFinalize = true): CourseRow {
     generation_status: 'stage_6_generating',
     auto_finalize_after_stage6: autoFinalize,
     generation_progress: null,
+    target_audience: 'novice',
     course_structure: {
       sections: [{ lessons: [{ lesson_number: 1 }] }, { lessons: [{ lesson_number: 1 }] }],
     },
@@ -140,6 +151,8 @@ function createCourseRow(autoFinalize = true): CourseRow {
 describe('checkAndSetStage6Complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.FEATURE_STAGE6_COURSE_AUDIT;
+    delete process.env.FEATURE_STAGE6_QUALITY_ALERTS;
   });
 
   it('does not finalize course when only rejected lesson contents exist', async () => {
@@ -212,6 +225,119 @@ describe('checkAndSetStage6Complete', () => {
 
     expect(coursesTable.update).not.toHaveBeenCalled();
     expect(mockNotifyCourseCompletion).not.toHaveBeenCalled();
+  });
+
+  it('downgrades auto-finalization to stage_6_complete when course audit flags cross-lesson repeats', async () => {
+    process.env.FEATURE_STAGE6_COURSE_AUDIT = 'true';
+    process.env.FEATURE_STAGE6_QUALITY_ALERTS = 'true';
+
+    const repeatedAnalogy = `## Введение
+Корпоративная социальная сеть похожа на чертеж здания: сначала проектируют каркас, потом заполняют его жизнью.
+
+## Упражнения
+Опишите первый шаг запуска сообщества.`;
+
+    const { supabase, coursesTable, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [
+        {
+          lesson_id: 'lesson-1',
+          status: 'completed',
+          metadata: {
+            lessonLabel: '1.1',
+            markdownContent: repeatedAnalogy,
+            qaSignals: { version: 1, lesson_counters: { callout_count: 0, code_block_count: 0 } },
+          },
+          content: {
+            metadata: {
+              archetype_used: 'concept_explainer',
+            },
+          },
+        },
+        {
+          lesson_id: 'lesson-2',
+          status: 'completed',
+          metadata: {
+            lessonLabel: '1.2',
+            markdownContent: repeatedAnalogy,
+            qaSignals: { version: 1, lesson_counters: { callout_count: 0, code_block_count: 0 } },
+          },
+          content: {
+            metadata: {
+              archetype_used: 'concept_explainer',
+            },
+          },
+        },
+      ],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await checkAndSetStage6Complete('course-123');
+
+    expect(coursesTable.update).toHaveBeenCalledTimes(1);
+    expect(coursesTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generation_status: 'stage_6_complete',
+      })
+    );
+    expect(lessonContentsTable.insert).toHaveBeenCalledTimes(2);
+    expect(mockNotifyCourseCompletion).not.toHaveBeenCalled();
+    expect(mockNotifyCourseError).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes real target_audience into course audit instead of falling back to novice', async () => {
+    process.env.FEATURE_STAGE6_COURSE_AUDIT = 'true';
+
+    const { supabase, coursesTable, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: {
+        ...createCourseRow(true),
+        target_audience: 'technical experts',
+      },
+      lessonContentsRows: [
+        {
+          lesson_id: 'lesson-1',
+          status: 'completed',
+          metadata: {
+            lessonLabel: '1.1',
+            markdownContent: '## Intro\n\n```python\nprint("a")\n```\n\n```json\n{"ok": true}\n```',
+            qaSignals: { version: 1, lesson_counters: { callout_count: 0, code_block_count: 4 } },
+          },
+          content: {
+            metadata: {
+              archetype_used: 'concept_explainer',
+            },
+          },
+        },
+        {
+          lesson_id: 'lesson-2',
+          status: 'completed',
+          metadata: {
+            lessonLabel: '1.2',
+            markdownContent: '## Intro\n\n```python\nprint("b")\n```\n\n```json\n{"ok": true}\n```',
+            qaSignals: { version: 1, lesson_counters: { callout_count: 0, code_block_count: 3 } },
+          },
+          content: {
+            metadata: {
+              archetype_used: 'concept_explainer',
+            },
+          },
+        },
+      ],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await checkAndSetStage6Complete('course-123');
+
+    expect(coursesTable.update).toHaveBeenCalledTimes(1);
+    expect(coursesTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generation_status: 'completed',
+        status: 'published',
+      })
+    );
+    expect(lessonContentsTable.insert).not.toHaveBeenCalled();
+    expect(mockNotifyCourseError).not.toHaveBeenCalled();
+    expect(mockNotifyCourseCompletion).toHaveBeenCalledTimes(1);
   });
 });
 

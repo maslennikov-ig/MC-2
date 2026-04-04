@@ -82,7 +82,12 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
     if (needsReview && !lessonContent) {
       const contentBody = extractContentBody(result);
       if (contentBody) {
-        lessonContent = buildLessonContent(result, contentBody, result.qualityScore ?? 0);
+        lessonContent = buildLessonContent(
+          result,
+          contentBody,
+          result.qualityScore ?? 0,
+          result.qaSignals ?? null
+        );
         synthesizedReviewContent = true;
       }
     }
