@@ -37,6 +37,9 @@ export const HANDLER_CONFIG = {
    * Truncation-only retries use cheap continuation instead of full regenerate.
    */
   MAX_TRUNCATION_CONTINUATION_ATTEMPTS: 2,
+
+  /** Maximum number of sections allowed for section-level regeneration. */
+  MAX_SECTIONS_TO_REGENERATE: 3,
 } as const;
 
 /**

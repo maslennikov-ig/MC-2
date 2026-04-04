@@ -189,6 +189,28 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
   // NEW: Check if specific sections need regeneration (not full regenerate)
   const sectionsToRegenerate = selfReviewResult.sectionsToRegenerate;
   if (sectionsToRegenerate && sectionsToRegenerate.length > 0) {
+    if (sectionsToRegenerate.length > HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE) {
+      const skippedSections =
+        sectionsToRegenerate.length - HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
+      const reason =
+        `Section regeneration request exceeds cap (${HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE}). ` +
+        `Requested ${sectionsToRegenerate.length} sections, skipped ${skippedSections}.`;
+
+      logger.warn(
+        {
+          lessonId: state.lessonSpec.lesson_id,
+          requestedSections: sectionsToRegenerate.length,
+          maxSectionsToRegenerate: HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE,
+          sectionsToRegenerate,
+        },
+        'SelfReviewer routing: Section regeneration request exceeds cap - marking as review_required'
+      );
+
+      markReviewRequired(state, reason);
+      state.errors.push(reason);
+      return '__end__';
+    }
+
     logger.info(
       {
         lessonId: state.lessonSpec.lesson_id,
