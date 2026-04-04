@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.31.35
+
+_Released on 2026-04-04_
+
+### 🐛 Bug Fixes
+
+- **stage6**: Address final review findings for quality hardening
+- **stage6,web**: Fix dead sectionCount check, callout whitespace, cleanup
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.31.34
 
 _Released on 2026-04-03_

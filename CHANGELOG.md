@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.35] - 2026-04-04
+
+### Fixed
+
+- **stage6**: address final review findings for quality hardening (29d57296)
+- **stage6,web**: fix dead sectionCount check, callout whitespace, cleanup (a64f4ff0)
+
+### Other
+
+- add .agents/ and .codex/ to .gitignore (eee37ba6)
+- **stage6**: bump bundle size threshold from 2.0 to 2.5 MB (9303f714)
+
 ## [0.31.34] - 2026-04-03
 
 ### Fixed
