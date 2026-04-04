@@ -22,6 +22,7 @@ import { buildLessonContent } from '../judge/judge-helpers';
 import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-output-builder';
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import type { JudgeContext } from './judge-node-helpers';
+import { QualityRemediationAction, buildQaSignals } from '../quality/remediation';
 
 /**
  * Execute targeted refinement flow
@@ -348,6 +349,17 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     state.progressSummary
   );
 
+  const qualitySummary = cascadeResult?.heuristicResults?.qualitySummary;
+  const presentationCritic = cascadeResult?.heuristicResults?.presentationCritic;
+  const finalQaAction = needsHumanReview
+    ? QualityRemediationAction.REVIEW_REQUIRED
+    : needsRegeneration
+      ? QualityRemediationAction.FULL_REGEN
+      : (qualitySummary?.action ?? null);
+  const qaSignals =
+    buildQaSignals(qualitySummary, presentationCritic, finalQaAction, state.regenerateCount ?? 0) ??
+    undefined;
+
   return {
     currentNode: 'judge',
     qualityScore: cascadeResult?.finalScore,
@@ -363,5 +375,6 @@ export async function handleNoVerdict(context: JudgeContext): Promise<LessonGrap
     tokensUsed: cascadeResult?.totalTokensUsed ?? 0,
     durationMs,
     progressSummary: syntheticProgress,
+    qaSignals,
   };
 }

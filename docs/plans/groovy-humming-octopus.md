@@ -323,3 +323,14 @@ LLM генерирует `> [!PRO TIP]` вместо `> [!TIP]`. Ни backend re
 | `web/components/markdown/utils/normalize-markdown-tables.ts` | W2-2: broken table rows        |
 | `stage6/judge/filters/orchestrator.ts` или `basic-checks.ts` | W2-3: section_count validation |
 | `shared/prompts/stage4-prompts.ts`                           | W2-4: audience-aware depth     |
+
+---
+
+## WAVE 3: Final Review Fixes
+
+4 Important issues from final review (`docs/reports/code-review/2026-04/final-quality-hardening-review.md`):
+
+1. **I-1**: Extract duplicated `buildQaSignals` from `judge-node-helpers.ts` and `judge-refinement-helpers.ts` into shared utility
+2. **I-2**: Add markdown truncation guard in `presentation-critic.ts` (12000 char limit)
+3. **I-3**: Add comment documenting `novice` fallback in `course-audit.ts:144`
+4. **I-4**: Add comment explaining dual qaSignals/qa_signals paths in `database-service.ts`
