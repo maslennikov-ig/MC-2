@@ -334,3 +334,49 @@ LLM генерирует `> [!PRO TIP]` вместо `> [!TIP]`. Ни backend re
 2. **I-2**: Add markdown truncation guard in `presentation-critic.ts` (12000 char limit)
 3. **I-3**: Add comment documenting `novice` fallback in `course-audit.ts:144`
 4. **I-4**: Add comment explaining dual qaSignals/qa_signals paths in `database-service.ts`
+
+---
+
+## Аудит токенов и безопасности ретраев (4 апреля 2026)
+
+### Бесконечные ретраи: НЕТ ПРОБЛЕМЫ
+
+Все retry-пути имеют жёсткие лимиты:
+
+| Путь                             | Лимит  | Файл                  | При превышении           |
+| -------------------------------- | ------ | --------------------- | ------------------------ |
+| Full regeneration                | max 2  | `config/index.ts:33`  | `needsHumanReview` → END |
+| Truncation continuation          | max 2  | `config/index.ts:39`  | `needsHumanReview` → END |
+| BullMQ job retries               | max 3  | `config/index.ts:12`  | Job failed               |
+| Targeted refinement iterations   | max 3  | `judge-types.ts:1152` | `stop_max_iterations`    |
+| Targeted refinement token budget | 15,000 | `judge-types.ts:1153` | `stop_token_budget`      |
+
+### Стоимость Quality Hardening: МИНИМАЛЬНАЯ
+
+| Компонент                            | Стоимость                     | За feature flag?                                          |
+| ------------------------------------ | ----------------------------- | --------------------------------------------------------- |
+| Детальные heuristic фильтры (16 шт)  | **0 токенов** (deterministic) | Нет (всегда)                                              |
+| `summarizeDetailedHeuristicResult()` | **0 токенов** (deterministic) | Нет (всегда)                                              |
+| Course audit (6 cross-lesson checks) | **0 токенов** (deterministic) | Да (`FEATURE_STAGE6_COURSE_AUDIT`)                        |
+| Presentation critic                  | **≤400 токенов**              | Да (`FEATURE_STAGE6_PRESENTATION_CRITIC`, off by default) |
+
+**Итог**: Quality hardening добавляет 0–400 токенов на урок (0 при выключенных flags).
+
+### Worst-case на урок (все фичи включены, всё ломается)
+
+| Этап                                            | Токены    |
+| ----------------------------------------------- | --------- |
+| Generator (primary + intro retry)               | 32,768    |
+| Truncation continuation ×2                      | 2,800     |
+| Self-reviewer                                   | 10,000    |
+| Judge cascade (single + CLEV 3)                 | 15,000    |
+| Presentation critic                             | 400       |
+| Targeted refinement (3 iterations, 15K budget)  | 15,000    |
+| Full regeneration ×2 (повтор generator + judge) | 95,000    |
+| **ИТОГО worst-case**                            | **~170K** |
+
+Это **абсолютный worst-case** — все компоненты фейлятся и ретраят максимум. Реальное потребление: 25–40K на урок.
+
+### Заключение: БЕЗОПАСНО
+
+Никаких действий не требуется. Все ретраи ограничены, quality hardening не добавляет значимых затрат.

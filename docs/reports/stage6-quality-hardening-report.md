@@ -194,6 +194,30 @@ Applied two post-review fixes after the main implementation:
 
 Additional regression coverage was added for both fixes.
 
+## Follow-up Token Safety Fixes
+
+Applied an additional production-safety pass for Stage 6 token and retry control:
+
+1. Targeted refinement token budget is now enforced as a hard stop in [packages/course-gen-platform/src/stages/stage6-lesson-content/judge/targeted-refinement/orchestrator.ts](/home/me/code/mc2/packages/course-gen-platform/src/stages/stage6-lesson-content/judge/targeted-refinement/orchestrator.ts).
+   - no new patcher/expander call starts once `REFINEMENT_CONFIG.limits.maxTokens` is reached
+   - patcher calls inside a batch are now started sequentially instead of `Promise.all`, because hard per-call budget enforcement is impossible if multiple LLM calls are launched concurrently
+   - the loop stops gracefully with `stop_token_budget`
+   - remaining tasks are skipped and logged
+   - full-auto mode now uses best-effort fallback for token-budget stops the same way it already did for max-iteration stops
+
+2. Refinement now caps started tasks per iteration at `5` via [packages/course-gen-platform/src/stages/stage6-lesson-content/judge/targeted-refinement/constants.ts](/home/me/code/mc2/packages/course-gen-platform/src/stages/stage6-lesson-content/judge/targeted-refinement/constants.ts).
+   - excess tasks are deferred/skipped for that iteration and logged
+   - this reduces worst-case token burn when a lesson accumulates too many localized fixes
+
+3. Section-level regeneration is now explicitly capped at `3` sections via [packages/course-gen-platform/src/stages/stage6-lesson-content/config/index.ts](/home/me/code/mc2/packages/course-gen-platform/src/stages/stage6-lesson-content/config/index.ts) and [packages/course-gen-platform/src/stages/stage6-lesson-content/routing/conditional-edges.ts](/home/me/code/mc2/packages/course-gen-platform/src/stages/stage6-lesson-content/routing/conditional-edges.ts).
+   - requests above the cap are routed to `review_required`
+   - the detection logic itself was not changed; the limit is enforced only at routing time
+
+Additional regression coverage was added in:
+
+- [packages/course-gen-platform/tests/unit/stages/stage6-lesson-content/judge/targeted-refinement-orchestrator.test.ts](/home/me/code/mc2/packages/course-gen-platform/tests/unit/stages/stage6-lesson-content/judge/targeted-refinement-orchestrator.test.ts)
+- [packages/course-gen-platform/tests/unit/stages/stage6-lesson-content/routing/conditional-edges.test.ts](/home/me/code/mc2/packages/course-gen-platform/tests/unit/stages/stage6-lesson-content/routing/conditional-edges.test.ts)
+
 ## Recommended Rollout
 
 1. Enable `FEATURE_STAGE6_COURSE_AUDIT=true` in shadow/staging first.
@@ -205,3 +229,5 @@ Additional regression coverage was added for both fixes.
    - token delta
    - audit finding distribution
    - false-positive rate for repeated analogies and exercises
+   - frequency of `stop_token_budget`
+   - frequency of section-regeneration requests above the cap
