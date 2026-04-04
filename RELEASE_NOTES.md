@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.31.36
+
+_Released on 2026-04-04_
+
+### 🐛 Bug Fixes
+
+- **tests**: Fix lint errors in targeted-refinement-orchestrator test
+- **stage6**: Fix token budget telemetry and deduplicate budget check
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.35
 
 _Released on 2026-04-04_

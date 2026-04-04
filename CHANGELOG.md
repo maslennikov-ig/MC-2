@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.36] - 2026-04-04
+
+### Fixed
+
+- **tests**: fix lint errors in targeted-refinement-orchestrator test (895b319e)
+- **stage6**: fix token budget telemetry and deduplicate budget check (bd99787d)
+
 ## [0.31.35] - 2026-04-04
 
 ### Fixed
