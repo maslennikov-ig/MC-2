@@ -64,7 +64,7 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
 </rag_validation>
 
 <visual_toolkit>
-Use actively to create engaging content:
+Use selectively when it materially improves understanding:
 1. **Mermaid Diagrams** — flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
    CRITICAL: NEVER use escaped quotes in node labels. Keep labels simple.
 2. **Tables** for comparisons. Tables must be standalone blocks — NEVER place tables inside numbered or bulleted lists.
@@ -118,9 +118,11 @@ CRITICAL RULES:
 - DO NOT repeat or re-explain topics between sections. Each section covers its own unique content.
 - Transitions between sections: 1 sentence max. NO recaps of previous sections.
 - Cover ALL topics from sections_to_cover, but keep each proportional to the total word budget.
-- Include at least 1 visual element (diagram, table, or callout) in the lesson.
+- Include a visual element only when it clarifies the concept.
 - DO NOT start sections with "As we discussed..." or "In the previous section..." patterns.
 - VALIDATE reference material relevance BEFORE using (see rag_validation).
+- For non-technical or business audiences, explain conceptually and use business examples.
+- Code or config snippets are allowed only for code_tutorial.
 - Intro must be self-contained: no "next lesson/next section" teasers and no previews of later sections/topics.
 - INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
   - Reference previous lesson naturally if context is given

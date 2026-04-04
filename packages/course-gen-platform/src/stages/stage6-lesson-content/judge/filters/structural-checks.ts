@@ -357,7 +357,7 @@ export function checkCalloutDensity(content: string): FilterCheckResult & {
  * Count non-mermaid code blocks using stateful line-by-line parsing.
  * Correctly handles mixed mermaid and non-mermaid blocks.
  */
-function countNonMermaidCodeBlocks(content: string): number {
+export function countNonMermaidCodeBlocks(content: string): number {
   const lines = content.split('\n');
   let count = 0;
   let inCodeBlock = false;

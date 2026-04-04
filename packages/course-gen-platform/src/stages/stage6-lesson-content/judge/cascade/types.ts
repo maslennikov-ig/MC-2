@@ -13,6 +13,9 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 import type { LessonContentBody, RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { OSCQRRubric } from '@megacampus/shared-types';
 import type { FactualVerificationResult, FactualVerificationConfig } from '../factual-verifier';
+import type { HeuristicFilterResult } from '../heuristic-filter';
+import type { PresentationCriticResult } from '../../quality/presentation-critic';
+import type { QualityRemediationSummary } from '../../quality/remediation';
 
 /**
  * Raw judge issue from LLM response (internal type)
@@ -114,6 +117,12 @@ export interface HeuristicResults {
   failureReasons: string[];
   /** Warnings (non-blocking, informational) */
   warnings: string[];
+  /** Full markdown-aware heuristic result from the live deterministic filter path */
+  detailedFilterResult?: HeuristicFilterResult;
+  /** Deterministic remediation summary derived from detailedFilterResult */
+  qualitySummary?: QualityRemediationSummary;
+  /** Optional presentation critic output (flagged lessons only) */
+  presentationCritic?: PresentationCriticResult;
 }
 
 /**

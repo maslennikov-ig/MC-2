@@ -13,7 +13,11 @@
 
 import { Annotation } from '@langchain/langgraph';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
-import type { LessonContent, RAGChunk } from '@megacampus/shared-types/lesson-content';
+import type {
+  LessonContent,
+  LessonQualitySignals,
+  RAGChunk,
+} from '@megacampus/shared-types/lesson-content';
 import type {
   JudgeVerdict,
   JudgeRecommendation,
@@ -419,6 +423,14 @@ export const LessonGraphState = Annotation.Root({
    * Used for accept/reject decisions
    */
   qualityScore: Annotation<number | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Compact Stage 6 QA telemetry collected from deterministic checks and critic gating.
+   */
+  qaSignals: Annotation<LessonQualitySignals | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),
