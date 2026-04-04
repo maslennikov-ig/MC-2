@@ -13,12 +13,43 @@ import { selectBestIteration } from './best-effort-selector';
 import { createExecutionBatches } from '../router';
 
 import type { TargetedRefinementInput, TargetedRefinementOutput, RefinementState } from './types';
-import { DELTA_JUDGE_ESTIMATED_TOKENS } from './constants';
+import { DELTA_JUDGE_ESTIMATED_TOKENS, MAX_TASKS_PER_ITERATION } from './constants';
 import { emitEvent } from './events';
 import { initializeQualityLocksFromArbiter } from './state-manager';
 import { calculateHeuristicScore, detectScoreOscillation } from './scoring';
 import { collectAllIssues, applyPatchToContent, convertToIterationHistory } from './content-utils';
 import { executePatcherTask, executeExpanderTask } from './task-executor';
+
+/**
+ * Check if token budget is exhausted and handle the stop condition.
+ * Returns true if budget is exhausted and execution should stop.
+ */
+function checkBudgetExhausted(
+  state: RefinementState,
+  remainingTaskCount: number,
+  onStreamEvent: TargetedRefinementInput['onStreamEvent']
+): { exhausted: boolean; skipped: number; stopReason: StopReason } {
+  if (state.tokensUsed < REFINEMENT_CONFIG.limits.maxTokens) {
+    return { exhausted: false, skipped: 0, stopReason: 'continue_more_tasks' };
+  }
+
+  logger.info(
+    {
+      iteration: state.iteration,
+      tokensUsed: state.tokensUsed,
+      maxTokens: REFINEMENT_CONFIG.limits.maxTokens,
+      skippedTasks: remainingTaskCount,
+    },
+    'Token budget exhausted during refinement - skipping remaining tasks'
+  );
+  emitEvent(onStreamEvent, {
+    type: 'budget_warning',
+    tokensUsed: state.tokensUsed,
+    maxTokens: REFINEMENT_CONFIG.limits.maxTokens,
+  });
+
+  return { exhausted: true, skipped: remainingTaskCount, stopReason: 'stop_token_budget' };
+}
 
 /**
  * Execute targeted refinement loop
@@ -69,6 +100,7 @@ export async function executeTargetedRefinement(
   };
 
   let currentContent = { ...content };
+  let skippedTasksDueToBudget = 0;
 
   // Calculate initial score
   const initialScore = calculateHeuristicScore(arbiterOutput, 0, 0, 0);
@@ -121,16 +153,15 @@ export async function executeTargetedRefinement(
       break;
     }
 
-    // Advisory budget check
     if (state.tokensUsed >= REFINEMENT_CONFIG.limits.maxTokens) {
-      const overBudget = state.tokensUsed - REFINEMENT_CONFIG.limits.maxTokens;
+      skippedTasksDueToBudget += availableTasks.length;
       logger.warn(
         {
           tokensUsed: state.tokensUsed,
           maxTokens: REFINEMENT_CONFIG.limits.maxTokens,
-          overBudget,
+          skippedTasks: availableTasks.length,
         },
-        'Token budget exceeded (advisory) - continuing with tasks'
+        'Token budget exhausted before refinement iteration - skipping remaining tasks'
       );
 
       emitEvent(onStreamEvent, {
@@ -138,6 +169,9 @@ export async function executeTargetedRefinement(
         tokensUsed: state.tokensUsed,
         maxTokens: REFINEMENT_CONFIG.limits.maxTokens,
       });
+
+      stopReason = 'stop_token_budget';
+      break;
     }
 
     // Sort tasks by priority
@@ -146,14 +180,30 @@ export async function executeTargetedRefinement(
       (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]
     );
 
-    const batches = createExecutionBatches(sortedByPriority);
+    const selectedTasks = sortedByPriority.slice(0, MAX_TASKS_PER_ITERATION);
+    const skippedTasksThisIteration = sortedByPriority.length - selectedTasks.length;
+
+    if (skippedTasksThisIteration > 0) {
+      logger.info(
+        {
+          iteration: state.iteration,
+          selectedTasks: selectedTasks.length,
+          skippedTasks: skippedTasksThisIteration,
+          maxTasksPerIteration: MAX_TASKS_PER_ITERATION,
+        },
+        'Refinement iteration task cap reached - deferring remaining tasks to next iteration'
+      );
+    }
+
+    const batches = createExecutionBatches(selectedTasks);
     const sectionsEditedThisIteration: string[] = [];
+    let startedTaskCount = 0;
+    let stopAfterCurrentIteration = false;
 
     // Execute batches
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    batchLoop: for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
       const batchSections = batch.map(t => t.sectionId);
-      sectionsEditedThisIteration.push(...batchSections);
 
       emitEvent(onStreamEvent, {
         type: 'batch_started',
@@ -181,24 +231,33 @@ export async function executeTargetedRefinement(
           throw new Error('Invalid batch: duplicate sectionIds detected');
         }
 
-        const patchResults = await Promise.all(
-          patcherTasks.map(task =>
-            executePatcherTask(task, currentContent, llmCall, onStreamEvent, {
-              score: state.scoreHistory[state.scoreHistory.length - 1] || 0.7,
-              iteration: state.iteration,
-              issues: collectAllIssues(arbiterOutput.plan.tasks),
-              iterationHistory: convertToIterationHistory(state.contentHistory),
-              lessonSpec,
-              strengths:
-                arbiterOutput.acceptedIssues.length === 0
-                  ? ['Content meets quality standards']
-                  : [],
-              language, // Pass language for token budget calculation
-            })
-          )
-        );
+        for (const task of patcherTasks) {
+          const budgetCheck = checkBudgetExhausted(
+            state,
+            patcherTasks.length + expanderTasks.length - startedTaskCount,
+            onStreamEvent
+          );
+          if (budgetCheck.exhausted) {
+            skippedTasksDueToBudget += budgetCheck.skipped;
+            stopReason = budgetCheck.stopReason;
+            stopAfterCurrentIteration = true;
+            break batchLoop;
+          }
 
-        for (const result of patchResults) {
+          startedTaskCount++;
+          sectionsEditedThisIteration.push(task.sectionId);
+
+          const result = await executePatcherTask(task, currentContent, llmCall, onStreamEvent, {
+            score: state.scoreHistory[state.scoreHistory.length - 1] || 0.7,
+            iteration: state.iteration,
+            issues: collectAllIssues(arbiterOutput.plan.tasks),
+            iterationHistory: convertToIterationHistory(state.contentHistory),
+            lessonSpec,
+            strengths:
+              arbiterOutput.acceptedIssues.length === 0 ? ['Content meets quality standards'] : [],
+            language, // Pass language for token budget calculation
+          });
+
           // Always increment edit count to prevent infinite loops on repeated failures
           // Section will lock after sectionLockAfterEdits attempts (success or failure)
           state.sectionEditCount[result.sectionId] =
@@ -230,6 +289,21 @@ export async function executeTargetedRefinement(
       // Execute Expander tasks
       if (expanderTasks.length > 0) {
         for (const task of expanderTasks) {
+          const budgetCheck = checkBudgetExhausted(
+            state,
+            expanderTasks.length - (startedTaskCount - patcherTasks.length),
+            onStreamEvent
+          );
+          if (budgetCheck.exhausted) {
+            skippedTasksDueToBudget += budgetCheck.skipped;
+            stopReason = budgetCheck.stopReason;
+            stopAfterCurrentIteration = true;
+            break batchLoop;
+          }
+
+          startedTaskCount++;
+          sectionsEditedThisIteration.push(task.sectionId);
+
           const result = await executeExpanderTask(
             task,
             currentContent,
@@ -355,24 +429,28 @@ export async function executeTargetedRefinement(
       'Iteration complete'
     );
 
-    // Check if we should continue
-    const decision = shouldContinueIteration({
-      currentState: {
-        iteration: state.iteration,
-        scoreHistory: state.scoreHistory,
-        contentHistory: state.contentHistory,
-        lockedSections: state.lockedSections,
-        sectionEditCount: state.sectionEditCount,
-        qualityLocks: state.qualityLocks,
-        tokensUsed: state.tokensUsed,
-        startTime: state.startTime,
-      },
-      latestScore: newScore,
-      operationMode,
-    });
+    if (stopAfterCurrentIteration) {
+      shouldContinue = false;
+    } else {
+      // Check if we should continue
+      const decision = shouldContinueIteration({
+        currentState: {
+          iteration: state.iteration,
+          scoreHistory: state.scoreHistory,
+          contentHistory: state.contentHistory,
+          lockedSections: state.lockedSections,
+          sectionEditCount: state.sectionEditCount,
+          qualityLocks: state.qualityLocks,
+          tokensUsed: state.tokensUsed,
+          startTime: state.startTime,
+        },
+        latestScore: newScore,
+        operationMode,
+      });
 
-    shouldContinue = decision.shouldContinue;
-    stopReason = decision.reason;
+      shouldContinue = decision.shouldContinue;
+      stopReason = decision.reason;
+    }
 
     if (!shouldContinue) {
       logger.info(
@@ -380,6 +458,7 @@ export async function executeTargetedRefinement(
           reason: stopReason,
           finalScore: newScore,
           iterations: state.iteration,
+          skippedTasksDueToBudget,
         },
         'Stopping refinement loop'
       );
@@ -396,7 +475,10 @@ export async function executeTargetedRefinement(
     finalStatus = 'accepted';
   } else if (finalScore >= modeConfig.goodEnoughThreshold) {
     finalStatus = 'accepted_warning';
-  } else if (stopReason === 'stop_max_iterations' && operationMode === 'full-auto') {
+  } else if (
+    (stopReason === 'stop_max_iterations' || stopReason === 'stop_token_budget') &&
+    operationMode === 'full-auto'
+  ) {
     const unresolvedIssues = state.contentHistory[state.contentHistory.length - 1].remainingIssues;
     const selectorResult = selectBestIteration({
       iterationHistory: state.contentHistory,
@@ -446,6 +528,8 @@ export async function executeTargetedRefinement(
       finalStatus,
       finalScore,
       iterations: state.iteration,
+      stopReason,
+      skippedTasksDueToBudget,
       tokensUsed: state.tokensUsed,
       durationMs,
     },
