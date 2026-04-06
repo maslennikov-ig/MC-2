@@ -4,7 +4,6 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
 import { cn } from '@/lib/utils'
 import {
-  LessonInspectorData,
   LessonInspectorDataRefinementExtension,
   STAGE6_NODE_LABELS,
   JudgeVerdictDisplay,
@@ -25,6 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { copyToClipboard } from '@/lib/utils/clipboard'
+import type { ReviewAwareLessonInspectorData } from '../../stage6-review-status'
 
 /**
  * Error fallback for LessonInspector
@@ -53,7 +53,7 @@ function InspectorErrorFallback({
 /**
  * Extended data type that includes refinement fields
  */
-type LessonInspectorDataWithRefinement = LessonInspectorData &
+type LessonInspectorDataWithRefinement = ReviewAwareLessonInspectorData &
   Partial<LessonInspectorDataRefinementExtension>
 
 interface LessonInspectorProps {
@@ -348,6 +348,7 @@ export function LessonInspector({
         tokensBreakdown: extractTokensBreakdown(data.pipelineNodes),
       }}
       status={data.status}
+      needsReview={data.needsReview}
       errorMessage={getErrorMessage()}
       onApprove={onApprove || (() => {})}
       onEdit={onEdit || (() => {})}

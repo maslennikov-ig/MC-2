@@ -11,6 +11,7 @@ import { getLessonContentInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import { getLatestUsableLessonContent } from './latest-usable-lesson-content';
 
 /**
  * Get lesson content
@@ -114,19 +115,16 @@ export const getLessonContent = protectedProcedure
         lessonUuid = lessonId;
       }
 
-      // Step 3: Query lesson_contents for the latest version
-      // Get the most recent content for this lesson (highest created_at)
-      const { data, error } = await supabase
+      // Step 3: Query lesson_contents and pick the latest usable version for preview.
+      const { data: lessonContentRows, error } = await supabase
         .from('lesson_contents')
         .select('*')
         .eq('course_id', courseId)
         .eq('lesson_id', lessonUuid)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      const data = getLatestUsableLessonContent(lessonContentRows);
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = not found
+      if (error) {
         logger.error(
           {
             requestId,
@@ -151,6 +149,7 @@ export const getLessonContent = protectedProcedure
           lessonId,
           lessonUuid,
           found: !!data,
+          candidateRowsCount: lessonContentRows?.length ?? 0,
           contentLength: data?.content ? JSON.stringify(data.content).length : 0,
         },
         'Retrieved lesson content from lesson_contents'

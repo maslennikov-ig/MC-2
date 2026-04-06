@@ -1089,7 +1089,9 @@
       "deleteConfirmCancel": "Cancel",
       "deleteConfirmAction": "Delete",
       "retryLabel": "Retry",
-      "cardUnavailable": "Card unavailable"
+      "cardUnavailable": "Card unavailable",
+      "reviewRequiredTitle": "Manual review required",
+      "reviewRequiredDescription": "Generation finished in fail-open mode: content is available, but it requires manual review before approval."
     },
     "pipeline": {
       "step": "Step",
@@ -1167,6 +1169,7 @@
       "completed": "completed",
       "active": "active",
       "pending": "pending",
+      "reviewRequired": "needs review",
       "failed": "failed",
       "error": "failed"
     }
@@ -1398,6 +1401,7 @@
     "pause": "Pause",
     "preview": "Preview",
     "retry": "Retry",
+    "reviewRequired": "Needs review",
     "title": "Title",
     "quality": "Quality",
     "action": "Action",

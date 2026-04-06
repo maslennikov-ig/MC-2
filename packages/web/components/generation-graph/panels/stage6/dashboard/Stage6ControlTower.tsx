@@ -38,6 +38,7 @@ export interface Stage6ControlTowerProps {
       active: number
       pending: number
       failed: number
+      reviewRequired: number
     }
     /** Total processing duration in milliseconds */
     totalDurationMs: number
@@ -129,10 +130,14 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
   const totalLessons =
     stats.statusCounts.completed +
     stats.statusCounts.approved +
+    stats.statusCounts.reviewRequired +
     stats.statusCounts.active +
     stats.statusCounts.pending +
     stats.statusCounts.failed
-  const readyLessons = stats.statusCounts.completed + stats.statusCounts.approved
+  const readyLessons =
+    stats.statusCounts.completed +
+    stats.statusCounts.approved +
+    stats.statusCounts.reviewRequired
   const progressPercentage = totalLessons > 0 ? (readyLessons / totalLessons) * 100 : 0
 
   // Actions disabled when there are active lessons
@@ -204,6 +209,14 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
                   className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400"
                 >
                   {stats.statusCounts.completed} {t('status.completed')}
+                </Badge>
+              )}
+              {stats.statusCounts.reviewRequired > 0 && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                >
+                  {stats.statusCounts.reviewRequired} {t('status.reviewRequired')}
                 </Badge>
               )}
               {stats.statusCounts.active > 0 && (

@@ -3,6 +3,10 @@ import { GRAPH_STAGE_CONFIG } from '@/lib/generation-graph/constants'
 import { STAGE6_LAYOUT_CONFIG, STAGE2_LAYOUT_CONFIG } from '@/lib/generation-graph/layout-constants'
 import { NodeStatus, TraceAttempt } from '@megacampus/shared-types'
 import {
+  getReviewAwareGraphNodeState,
+  summarizeReviewAwareStage6Statuses,
+} from '../../../stage6-review-status'
+import {
   ParallelItem,
   DocumentWithSteps,
   PhaseData,
@@ -361,18 +365,9 @@ export function buildGraph({
     if (i === 6 && config.parallelizable && items && items.length > 0) {
       const modules = items.filter((item) => item.type === 'module')
       const lessons = items.filter((item) => item.type === 'lesson')
-
-      let stage6Status: NodeStatus = 'pending'
-      if (lessons.some((l) => (l.status || getStatus(l.id)) === 'error')) {
-        stage6Status = 'error'
-      } else if (lessons.some((l) => (l.status || getStatus(l.id)) === 'active')) {
-        stage6Status = 'active'
-      } else if (
-        lessons.length > 0 &&
-        lessons.every((l) => (l.status || getStatus(l.id)) === 'completed')
-      ) {
-        stage6Status = 'completed'
-      }
+      const stage6Summary = summarizeReviewAwareStage6Statuses(
+        lessons.map((lesson) => lesson.status || getStatus(lesson.id))
+      )
 
       const allLessonAttempts = lessons.flatMap((l) => getAttempts(l.id))
       const totalTokens = allLessonAttempts.reduce(
@@ -384,9 +379,6 @@ export function buildGraph({
         (sum, a) => sum + (a.processMetrics?.duration || 0),
         0
       )
-      const completedLessons = lessons.filter(
-        (l) => (l.status || getStatus(l.id)) === 'completed'
-      ).length
 
       newNodes.push({
         id: stageKey,
@@ -394,7 +386,7 @@ export function buildGraph({
         position: getExistingPos(stageKey),
         data: {
           ...config,
-          status: stage6Status,
+          status: stage6Summary.status,
           stageNumber: 6 as const,
           label: config.name,
           tokens: totalTokens,
@@ -402,7 +394,8 @@ export function buildGraph({
           duration: totalDuration,
           attempts: allLessonAttempts,
           outputData: {
-            completedLessons,
+            completedLessons: stage6Summary.readyLessons,
+            reviewRequiredLessons: stage6Summary.reviewRequiredLessons,
             totalLessons: lessons.length,
           },
         },
@@ -454,14 +447,8 @@ export function buildGraph({
         const childLessons = lessonItems.filter((lesson) => lesson.parentId === item.id)
         const childIds = childLessons.map((lesson) => lesson.id)
         const childStatuses = childLessons.map((lesson) => lesson.status || getStatus(lesson.id))
-        const completedLessons = childStatuses.filter((s) => s === 'completed').length
+        const moduleSummary = summarizeReviewAwareStage6Statuses(childStatuses)
         const totalLessons = childIds.length
-
-        let moduleStatus: NodeStatus = 'pending'
-        if (childStatuses.some((s) => s === 'error')) moduleStatus = 'error'
-        else if (childStatuses.some((s) => s === 'active')) moduleStatus = 'active'
-        else if (totalLessons > 0 && completedLessons === totalLessons) moduleStatus = 'completed'
-        else if (completedLessons > 0) moduleStatus = 'active'
 
         const defaultCollapsed = modules.length > 5
         const isCollapsed =
@@ -487,12 +474,14 @@ export function buildGraph({
             ...config,
             ...item.data,
             label: item.label,
-            status: moduleStatus,
+            status: moduleSummary.status,
             stageNumber: 6 as const,
             moduleId: item.id,
             title: item.label,
             totalLessons: totalLessons,
-            completedLessons: completedLessons,
+            completedLessons: moduleSummary.readyLessons,
+            reviewRequiredLessons: moduleSummary.reviewRequiredLessons,
+            needsReview: moduleSummary.needsReview,
             isCollapsed: isCollapsed,
             childIds: childIds,
             currentStep: trace?.step_name,
@@ -533,7 +522,7 @@ export function buildGraph({
 
         lessonsInModule.forEach((item, indexInModule) => {
           const trace = getTrace(item.id)
-          const currentStatus = item.status || getStatus(item.id)
+          const reviewAwareState = getReviewAwareGraphNodeState(item.status || getStatus(item.id))
           const attempts = getAttempts(item.id)
           const latestAttempt = attempts[attempts.length - 1]
 
@@ -561,11 +550,12 @@ export function buildGraph({
             data: {
               ...config,
               label: item.label,
-              status: currentStatus,
+              status: reviewAwareState.status,
               stageNumber: 6 as const,
               lessonId: item.id,
               title: item.label,
               moduleId: item.parentId || '',
+              needsReview: reviewAwareState.needsReview,
               ...item.data,
               currentStep: trace?.step_name,
               duration: trace?.duration_ms,
