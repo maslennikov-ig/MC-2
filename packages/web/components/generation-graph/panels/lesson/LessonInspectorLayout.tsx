@@ -98,6 +98,7 @@ export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
           'Falling back to fixed lesson inspector split after invalid resizable measurements',
           {
             reason: assessment.reason,
+            layout: groupRef.current?.getLayout(),
             measurements: assessment.measurements,
           }
         )

@@ -8,8 +8,7 @@ base_commit: 370f80aab182cfb9c57a9d531fb8869345596247
 worktree: /home/me/.config/superpowers/worktrees/mc2/codex/mc2-dqbw1-inspector-layout
 status: accepted
 verification:
-  - pnpm -F web exec vitest run components/generation-graph/panels/lesson/__tests__/LessonInspectorLayout.test.tsx: passed (1 file, 2 tests)
-  - pnpm -F web exec tsc --noEmit: blocked_by_existing_repo_wide_typescript_issues_outside_scope
+  - pnpm -F web exec vitest run components/generation-graph/panels/lesson/__tests__/LessonInspectorLayout.test.tsx: passed (1 file, 4 tests)
   - git diff --check: passed
 changed_files:
   - .codex/stages/stage6-inspector-layout/artifacts/mc2-dqbw1.md
@@ -20,12 +19,12 @@ changed_files:
 
 # Summary
 
-Accepted `mc2-dqbw1` moved the Lesson Inspector split layout onto a measured hybrid path: it still prefers `react-resizable-panels`, performs one imperative layout recovery attempt after mount, and falls back to a stable fixed split when real container/panel measurements remain invalid inside the animated workflow drawer.
+Accepted `mc2-dqbw1` keeps the Lesson Inspector on the measured hybrid path but tightens the validity heuristic so a legally collapsed left pipeline panel is treated as valid. The resizable split remains the default, mount-time invalid measurements still get one imperative recovery attempt, and only a still-unusable preview/content side escalates to the fixed fallback inside the animated workflow drawer.
 
 # Verification
 
-Focused Vitest coverage for valid-versus-invalid measurements passed. `git diff --check` passed. The required `pnpm -F web exec tsc --noEmit` run failed on broad pre-existing workspace TypeScript issues unrelated to this write zone, including missing `@megacampus/shared-types` module resolution and existing tRPC typing debt in other `packages/web` areas.
+Focused Vitest coverage now covers three critical states: valid resizable measurements, invalid mount measurements that recover via the imperative group API, and intentional left-panel collapse that must not trip the fallback. `git diff --check` passed.
 
 # Risks / Follow-ups
 
-This slice intentionally did not touch backend/data fetching logic. The fallback logger is minimal and only fires when the resizable layout remains invalid after the imperative recovery attempt, so any future blank-state investigation should use that signal together with real browser reproduction inside the animated `Sheet`.
+This slice intentionally did not touch backend/data fetching logic. The fallback logger still stays minimal and only fires when the resizable layout remains unusable after the single recovery attempt, now including the last known group layout to help distinguish real broken measurements from legitimate user collapse.

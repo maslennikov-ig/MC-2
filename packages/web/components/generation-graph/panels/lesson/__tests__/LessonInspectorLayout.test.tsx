@@ -3,6 +3,14 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { LessonInspectorLayout } from '../LessonInspectorLayout'
 
+const resizableMocks = vi.hoisted(() => ({
+  getLayout: vi.fn(() => ({
+    'lesson-inspector-pipeline': 30,
+    'lesson-inspector-content': 70,
+  })),
+  setLayout: vi.fn((layout: Record<string, number>) => layout),
+}))
+
 vi.mock('@/components/ui/resizable', async () => {
   const React = await import('react')
 
@@ -20,17 +28,7 @@ vi.mock('@/components/ui/resizable', async () => {
     elementRef?: React.Ref<HTMLDivElement>
     defaultLayout?: Record<string, number>
   }) => {
-    React.useImperativeHandle(
-      groupRef,
-      () => ({
-        getLayout: () => ({
-          'lesson-inspector-pipeline': 30,
-          'lesson-inspector-content': 70,
-        }),
-        setLayout: (layout) => layout,
-      }),
-      []
-    )
+    React.useImperativeHandle(groupRef, () => resizableMocks, [])
 
     return (
       <div ref={elementRef} {...props}>
@@ -102,8 +100,11 @@ const defaultProps = {
 describe('LessonInspectorLayout', () => {
   const originalRequestAnimationFrame = window.requestAnimationFrame.bind(window)
   const originalCancelAnimationFrame = window.cancelAnimationFrame.bind(window)
+  let rectMap: RectMap = {}
 
-  function mockRects(rectMap: RectMap) {
+  function mockRects(nextRectMap: RectMap) {
+    rectMap = nextRectMap
+
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
       const testId = this.getAttribute('data-testid') ?? ''
       const rect = rectMap[testId]
@@ -126,8 +127,14 @@ describe('LessonInspectorLayout', () => {
 
   beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
+    resizableMocks.getLayout.mockClear()
+    resizableMocks.setLayout.mockReset()
+    resizableMocks.setLayout.mockImplementation((layout: Record<string, number>) => layout)
     window.requestAnimationFrame = ((callback: FrameRequestCallback) =>
-      window.setTimeout(() => callback(performance.now()), 0)) as typeof window.requestAnimationFrame
+      window.setTimeout(
+        () => callback(performance.now()),
+        0
+      )) as typeof window.requestAnimationFrame
     window.cancelAnimationFrame = ((handle: number) =>
       window.clearTimeout(handle)) as typeof window.cancelAnimationFrame
   })
@@ -155,6 +162,34 @@ describe('LessonInspectorLayout', () => {
     expect(screen.queryByTestId('lesson-inspector-fixed-layout')).not.toBeInTheDocument()
   })
 
+  it('keeps the resizable split when recovery restores a usable preview panel', async () => {
+    mockRects({
+      'lesson-inspector-resizable-layout': { width: 1200, height: 800 },
+      'lesson-inspector-resizable-left-panel': { width: 0, height: 0 },
+      'lesson-inspector-resizable-right-panel': { width: 0, height: 0 },
+    })
+
+    resizableMocks.setLayout.mockImplementationOnce((layout: Record<string, number>) => {
+      rectMap = {
+        'lesson-inspector-resizable-layout': { width: 1200, height: 800 },
+        'lesson-inspector-resizable-left-panel': { width: 360, height: 800 },
+        'lesson-inspector-resizable-right-panel': { width: 840, height: 800 },
+      }
+
+      return layout
+    })
+
+    render(<LessonInspectorLayout {...defaultProps} />)
+
+    await waitFor(() => {
+      expect(resizableMocks.setLayout).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('lesson-inspector-resizable-layout')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('lesson-inspector-fixed-layout')).not.toBeInTheDocument()
+    expect(console.warn).not.toHaveBeenCalled()
+  })
+
   it('switches to the fixed fallback when measurements stay invalid after recovery', async () => {
     mockRects({
       'lesson-inspector-resizable-layout': { width: 1200, height: 800 },
@@ -165,9 +200,28 @@ describe('LessonInspectorLayout', () => {
     render(<LessonInspectorLayout {...defaultProps} />)
 
     await waitFor(() => {
+      expect(resizableMocks.setLayout).toHaveBeenCalledTimes(1)
       expect(screen.getByTestId('lesson-inspector-fixed-layout')).toBeInTheDocument()
     })
 
     expect(console.warn).toHaveBeenCalled()
+  })
+
+  it('keeps the resizable split when the left panel is intentionally collapsed', async () => {
+    mockRects({
+      'lesson-inspector-resizable-layout': { width: 1200, height: 800 },
+      'lesson-inspector-resizable-left-panel': { width: 0, height: 800 },
+      'lesson-inspector-resizable-right-panel': { width: 1200, height: 800 },
+    })
+
+    render(<LessonInspectorLayout {...defaultProps} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('lesson-inspector-resizable-layout')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('lesson-inspector-fixed-layout')).not.toBeInTheDocument()
+    expect(resizableMocks.setLayout).not.toHaveBeenCalled()
+    expect(console.warn).not.toHaveBeenCalled()
   })
 })
