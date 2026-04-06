@@ -35,7 +35,7 @@ cleanup() {
 
     if [ "$stash_needed" = "true" ]; then
         local top_stash
-        top_stash="$(git stash list --format='%gd' | awk 'NR==1 {print; exit}')"
+        top_stash="$(git stash list --format='%gd' | sed -n '1p')"
         if [ -n "$top_stash" ]; then
             log_info "Restoring stashed local changes..."
             if ! git stash pop --quiet; then
