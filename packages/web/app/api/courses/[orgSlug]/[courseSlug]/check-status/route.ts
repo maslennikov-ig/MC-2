@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { getCourseByOrgAndSlug } from '@/lib/helpers/organization'
+import { reconcileStage6CourseStatus } from '@/lib/stage6-status-reconciliation'
 import type { Database } from '@/types/database.generated'
 import type { GenerationStep, GenerationProgress } from '@/types/course-generation'
 
@@ -63,6 +64,20 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     let recoveryReason = ''
     let suggestedStatus = course.generation_status
 
+    if (course.generation_status === 'stage_6_generating') {
+      const adminClient = await createAdminClient()
+      const stage6Reconciliation = await reconcileStage6CourseStatus({
+        supabase: adminClient,
+        course,
+      })
+
+      if (stage6Reconciliation.shouldReconcile && stage6Reconciliation.targetStatus) {
+        shouldRecover = true
+        recoveryReason = stage6Reconciliation.reason || 'Stage 6 reconciliation available'
+        suggestedStatus = stage6Reconciliation.targetStatus
+      }
+    }
+
     // If course has been generating for more than 15 minutes, it's likely stuck
     const generatingStatuses = [
       'stage_2_init',
@@ -76,6 +91,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       'finalizing',
     ]
     if (
+      !shouldRecover &&
       course.generation_status &&
       generatingStatuses.includes(course.generation_status) &&
       minutesSinceCreation > 15
@@ -176,20 +192,30 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const progress = course.generation_progress as unknown as GenerationProgress
 
     if (!newStatus) {
-      // Auto-determine based on progress
-      if (
-        progress?.percentage === 100 ||
-        progress?.steps?.every((s: GenerationStep) => s.status === 'completed')
-      ) {
-        newStatus = 'completed'
+      const adminClient = await createAdminClient()
+      const stage6Reconciliation = await reconcileStage6CourseStatus({
+        supabase: adminClient,
+        course,
+      })
+
+      if (stage6Reconciliation.shouldReconcile && stage6Reconciliation.targetStatus) {
+        newStatus = stage6Reconciliation.targetStatus
       } else {
-        newStatus = 'failed'
+        // Auto-determine based on progress
+        if (
+          progress?.percentage === 100 ||
+          progress?.steps?.every((s: GenerationStep) => s.status === 'completed')
+        ) {
+          newStatus = 'completed'
+        } else {
+          newStatus = 'failed'
+        }
       }
     }
 
     // Update the course status
     const updates: CourseUpdate = {
-      status: newStatus,
+      generation_status: newStatus,
       updated_at: new Date().toISOString(),
     }
 
@@ -209,6 +235,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           progress as unknown as Database['public']['Tables']['courses']['Update']['generation_progress']
       }
       updates.generation_completed_at = new Date().toISOString()
+      updates.status = 'published'
     }
     // If marking as failed, add error message
     else if (newStatus === 'failed') {
@@ -240,7 +267,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       courseId: course.id,
       orgSlug,
       courseSlug,
-      oldStatus: course.status,
+      oldStatus: course.generation_status,
       newStatus,
       reason: 'Manual recovery via API',
     })
@@ -250,9 +277,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       courseId: course.id,
       orgSlug,
       courseSlug,
-      oldStatus: course.status,
+      oldStatus: course.generation_status,
       newStatus,
-      message: `Course status updated from ${course.status} to ${newStatus}`,
+      message: `Course generation status updated from ${course.generation_status} to ${newStatus}`,
     })
   } catch (error) {
     logger.error('Error recovering course status', { error })
