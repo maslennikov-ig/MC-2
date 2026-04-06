@@ -22,7 +22,7 @@ export interface LessonInspectorLayoutMeasurements {
 export interface LessonInspectorLayoutAssessment {
   isReady: boolean
   isValid: boolean
-  reason: 'missing-elements' | 'container-not-ready' | 'panel-not-ready' | 'valid'
+  reason: 'missing-elements' | 'container-not-ready' | 'content-panel-not-ready' | 'valid'
   measurements: LessonInspectorLayoutMeasurements
 }
 
@@ -90,15 +90,13 @@ export function assessLessonInspectorLayout({
     }
   }
 
-  const panelsAreUsable =
-    hasUsableSize(leftPanelRect.width, leftPanelRect.height) &&
-    hasUsableSize(rightPanelRect.width, rightPanelRect.height)
+  const contentPanelIsUsable = hasUsableSize(rightPanelRect.width, rightPanelRect.height)
 
-  if (!panelsAreUsable) {
+  if (!contentPanelIsUsable) {
     return {
       isReady: true,
       isValid: false,
-      reason: 'panel-not-ready',
+      reason: 'content-panel-not-ready',
       measurements,
     }
   }
