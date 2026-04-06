@@ -5,7 +5,7 @@ argument-hint: [patch|minor|major] [-m "message"]
 
 Create a new version release with changelog. **This is NOT deployment!**
 
-- For **Dev deploy**: just `git push` (auto-deploys to dev.ai.megacampus.ru)
+- For **Dev delivery**: use `/push-dev`
 - For **Staging deploy**: use `/deploy` (merges to master → ai.megacampus.ru)
 - For **Release** (version): use `/push patch` (this command)
 

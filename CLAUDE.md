@@ -25,14 +25,14 @@
 
 **4. TRACK PROGRESS** — TodoWrite: in_progress BEFORE, completed AFTER verification
 
-**5. COMMIT** — `/push patch` after each task
+**5. COMMIT / DELIVER** — commit locally, then use `/push-dev` for Dev delivery or `/push patch` only for release/version work
 
 **6. EXECUTION PATTERN**
 
 ```
 1. Read task → 2. Gather context → 3. Delegate/execute
 4. VERIFY (never skip) → 5. Re-delegate if needed
-6. TodoWrite completed → 7. /push patch → 8. Next task
+6. TodoWrite completed → 7. commit + `/push-dev` (or `/push patch` for releases) → 8. Next task
 ```
 
 **7. CONTRADICTIONS** — Gather context, analyze patterns. Ask user only if truly ambiguous (~10%).
@@ -85,14 +85,14 @@ When working in multiple terminals simultaneously:
 ### Daily Workflow
 
 ```bash
-# 1. Работаем на develop
-git checkout develop
+# 1. Работаем в feature/codex ветке или в develop
+git checkout codex/<task-name>
 
 # 2. Делаем изменения, коммитим
 git add . && git commit -m "feat: new feature"
 
-# 3. Пушим → АВТОМАТИЧЕСКИ деплоится на Dev
-git push                          # → dev.ai.megacampus.ru
+# 3. Доставляем в Dev через develop
+/push-dev --yes                   # merge -> develop -> dev.ai.megacampus.ru
 
 # 4. Готовы к Staging? Используем /deploy
 /deploy                           # → merge develop → master → ai.megacampus.ru
@@ -102,7 +102,7 @@ git push                          # → dev.ai.megacampus.ru
 
 | Что хочу                   | Команда       | Результат                                        |
 | -------------------------- | ------------- | ------------------------------------------------ |
-| Задеплоить на **Dev**      | `git push`    | develop → dev.ai.megacampus.ru                   |
+| Задеплоить на **Dev**      | `/push-dev`   | current branch → develop → dev.ai.megacampus.ru  |
 | Задеплоить на **Staging**  | `/deploy`     | develop → master → ai.megacampus.ru (Blue/Green) |
 | Создать **релиз** (версия) | `/push patch` | Bump version + changelog + tag                   |
 | Форсировать деплой         | `/deploy -f`  | Skip type-check/build                            |
@@ -138,7 +138,7 @@ git push                          # → dev.ai.megacampus.ru
 ### Automation
 
 - **Daemon auto-sync**: Enabled (auto-commit, auto-push, auto-pull for beads)
-- **Hooks**: SessionStart/PreCompact → `bd prime`, Stop → `bd sync`
+- **Hooks**: SessionStart/PreCompact → `bd prime`. If git hooks still call old Beads subcommands after an upgrade, run `bd hooks install`. If this repo commits `.beads/issues.jsonl`, refresh it explicitly with `bd export -o .beads/issues.jsonl` at session end.
 - **Directory Labels**: Auto-assigned based on `--files` path (see config.yaml)
 - **Exclusive Lock**: Prevents conflicts in multi-terminal work
 

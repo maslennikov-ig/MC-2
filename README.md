@@ -549,6 +549,9 @@ Closes #123
 
 ### Release Management
 
+For Dev delivery, use `/push-dev` to merge/push into `develop`.
+Use `/push` only for versioned release flow.
+
 Use the `/push` command for automated releases:
 
 ```bash
