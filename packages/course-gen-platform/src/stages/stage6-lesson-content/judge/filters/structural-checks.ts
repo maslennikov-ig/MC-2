@@ -1,5 +1,5 @@
 /**
- * Structural content checks (truncation, Mermaid syntax)
+ * Structural content checks (truncation, Mermaid syntax, callout density, code block audience)
  * @module stages/stage6-lesson-content/judge/filters/structural-checks
  */
 
@@ -83,7 +83,18 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
     issues.push(`Content suspiciously short (${trimmedContent.length} characters)`);
   }
 
-  // Check 5: Per-section truncation (check each section individually)
+  // Check 5: Callout block truncation (> [!TIP] etc. ending without punctuation)
+  const calloutBlockRegex = /^>\s*\[!(TIP|WARNING|NOTE|INFO|DANGER)\].*$(?:\n>.*$)*/gm;
+  const calloutBlocks = content.matchAll(calloutBlockRegex);
+  for (const calloutMatch of calloutBlocks) {
+    const block = calloutMatch[0];
+    const lastLine = block.split('\n').pop()?.replace(/^>\s*/, '').trim() ?? '';
+    if (lastLine.length > 0 && lastLine.length < 20 && !/[.!?。！？:]$/.test(lastLine)) {
+      issues.push(`Callout block appears truncated (last line: "${lastLine}")`);
+    }
+  }
+
+  // Check 6: Per-section truncation (check each section individually)
   const sectionBlocks = content.split(/^#{2,3}\s+/m).filter(s => s.trim().length > 50);
   for (let i = 0; i < sectionBlocks.length; i++) {
     const section = sectionBlocks[i].trim();
@@ -270,4 +281,171 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
   }
 
   return result;
+}
+
+// ============================================================================
+// CALLOUT DENSITY CHECK
+// ============================================================================
+
+/** Regex to match callout markers: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO], > [!DANGER] */
+const CALLOUT_REGEX = /^>\s*\[!(PRO\s*TIP|TIP|WARNING|NOTE|INFO|DANGER)\]/gim;
+
+/**
+ * Check callout density in lesson content
+ *
+ * Too many callout blocks (> [!TIP], > [!WARNING], etc.) fragment the reading flow
+ * and dilute the signal each callout is meant to carry.
+ *
+ * Thresholds:
+ * - 0-2 callouts: pass (score 1.0)
+ * - 3-4 callouts: major (score 0.5)
+ * - 5+ callouts: critical (score 0.0)
+ *
+ * @param content - Lesson content (markdown string)
+ * @returns Filter check result with callout count and types found
+ */
+export function checkCalloutDensity(content: string): FilterCheckResult & {
+  calloutCount: number;
+  calloutTypes: string[];
+} {
+  const matches = Array.from(content.matchAll(CALLOUT_REGEX));
+  const calloutCount = matches.length;
+  const calloutTypes = [
+    ...new Set(
+      matches.map(m => {
+        const raw = m[1].toUpperCase().replace(/\s+/g, ' ');
+        // Normalize non-standard types: "PRO TIP" → "TIP"
+        return raw === 'PRO TIP' || raw === 'PROTIP' ? 'TIP' : raw;
+      })
+    ),
+  ];
+
+  if (calloutCount <= 2) {
+    return {
+      passed: true,
+      actual: `${calloutCount} callout(s)`,
+      scoreContribution: 1.0,
+      calloutCount,
+      calloutTypes,
+    };
+  }
+
+  const severity: 'major' | 'critical' = calloutCount <= 4 ? 'major' : 'critical';
+  const scoreContribution = calloutCount <= 4 ? 0.5 : 0.0;
+
+  return {
+    passed: false,
+    actual: `${calloutCount} callout(s)`,
+    scoreContribution,
+    calloutCount,
+    calloutTypes,
+    failure: {
+      filter: 'calloutDensity',
+      expected: 'At most 2 callout blocks',
+      actual: `${calloutCount} callouts (types: ${calloutTypes.join(', ')})`,
+      severity,
+    },
+    suggestion: `Reduce callout blocks from ${calloutCount} to at most 2. Found types: ${calloutTypes.join(', ')}. Merge related callouts or convert less important ones to regular text.`,
+  };
+}
+
+// ============================================================================
+// CODE BLOCK AUDIENCE MATCH CHECK
+// ============================================================================
+
+/**
+ * Count non-mermaid code blocks using stateful line-by-line parsing.
+ * Correctly handles mixed mermaid and non-mermaid blocks.
+ */
+export function countNonMermaidCodeBlocks(content: string): number {
+  const lines = content.split('\n');
+  let count = 0;
+  let inCodeBlock = false;
+  let currentBlockIsMermaid = false;
+
+  for (const line of lines) {
+    const trimmed = line.trimEnd();
+    if (trimmed.startsWith('```')) {
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        currentBlockIsMermaid = trimmed.startsWith('```mermaid');
+      } else {
+        if (!currentBlockIsMermaid) {
+          count++;
+        }
+        inCodeBlock = false;
+        currentBlockIsMermaid = false;
+      }
+    }
+  }
+
+  return count;
+}
+
+/**
+ * Check that code blocks are appropriate for the content archetype
+ *
+ * Non-technical archetypes (concept_explainer, case_study, legal_warning)
+ * should not contain code blocks — their presence signals a mismatch
+ * between the content and the intended audience.
+ *
+ * For code_tutorial archetype, this check always passes.
+ *
+ * Thresholds (non-code_tutorial only):
+ * - 0 code blocks: pass (score 1.0)
+ * - 1-3 code blocks: major (score 0.5)
+ * - 4+ code blocks: critical (score 0.0)
+ *
+ * @param content - Lesson content (markdown string)
+ * @param contentArchetype - Content archetype from lesson spec
+ * @returns Filter check result with code block count
+ */
+export function checkCodeBlockAudienceMatch(
+  content: string,
+  contentArchetype: string
+): FilterCheckResult & {
+  codeBlockCount: number;
+  contentArchetype: string;
+} {
+  const codeBlockCount = countNonMermaidCodeBlocks(content);
+
+  // code_tutorial archetype always passes
+  if (contentArchetype === 'code_tutorial') {
+    return {
+      passed: true,
+      actual: `${codeBlockCount} code block(s) (archetype: code_tutorial)`,
+      scoreContribution: 1.0,
+      codeBlockCount,
+      contentArchetype,
+    };
+  }
+
+  // Non-code archetypes
+  if (codeBlockCount === 0) {
+    return {
+      passed: true,
+      actual: `0 code blocks (archetype: ${contentArchetype})`,
+      scoreContribution: 1.0,
+      codeBlockCount,
+      contentArchetype,
+    };
+  }
+
+  const severity: 'major' | 'critical' = codeBlockCount <= 3 ? 'major' : 'critical';
+  const scoreContribution = codeBlockCount <= 3 ? 0.5 : 0.0;
+
+  return {
+    passed: false,
+    actual: `${codeBlockCount} code block(s)`,
+    scoreContribution,
+    codeBlockCount,
+    contentArchetype,
+    failure: {
+      filter: 'codeBlockAudienceMatch',
+      expected: 'No code blocks in non-technical content',
+      actual: `${codeBlockCount} code blocks found in "${contentArchetype}" content`,
+      severity,
+    },
+    suggestion: `Code blocks found in non-technical course content. Remove or replace ${codeBlockCount} code block(s) with prose descriptions, diagrams, or examples appropriate for "${contentArchetype}" archetype.`,
+  };
 }

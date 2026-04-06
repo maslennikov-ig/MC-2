@@ -269,12 +269,12 @@ export function checkContentDensity(
 ): FilterCheckResult & { avgWordsPerSection: number; sectionCount: number } {
   // Find all sections (markdown headers)
   const sections = content.split(/^#+\s+/m).filter(s => s.trim().length > 0);
-  const sectionCount = Math.max(1, sections.length);
+  const sectionCount = sections.length;
 
   // Calculate total words and average per section
   const words = content.match(/\b[a-zA-Z]+\b/g) || [];
   const totalWords = words.length;
-  const avgWordsPerSection = totalWords / sectionCount;
+  const avgWordsPerSection = sectionCount > 0 ? totalWords / sectionCount : 0;
 
   const passed = avgWordsPerSection >= threshold;
   const scoreContribution = Math.min(1, avgWordsPerSection / threshold);

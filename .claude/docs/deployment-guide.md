@@ -2,10 +2,10 @@
 
 ## Environments
 
-| Environment | URL                          | Branch    | Deploy Strategy | Auto-deploy? |
-| ----------- | ---------------------------- | --------- | --------------- | ------------ |
-| Staging     | https://ai.megacampus.ru     | `master`  | Blue/Green      | Yes (push)   |
-| Dev         | https://dev.ai.megacampus.ru | `develop` | Rolling         | Yes (push)   |
+| Environment | URL                          | Branch    | Deploy Strategy | Auto-deploy?            |
+| ----------- | ---------------------------- | --------- | --------------- | ----------------------- |
+| Staging     | https://ai.megacampus.ru     | `master`  | Blue/Green      | Yes (push)              |
+| Dev         | https://dev.ai.megacampus.ru | `develop` | Rolling         | Yes (after `/push-dev`) |
 
 Server: `95.81.98.230`, user: `claude-deploy`, path: `/opt/megacampus`
 
@@ -152,8 +152,8 @@ Zero-downtime deployment using nginx port switching.
 ### From Claude Code
 
 ```bash
-# Push to Dev (auto-deploys)
-git push                  # develop → dev.ai.megacampus.ru
+# Deliver to Dev via develop
+/push-dev                 # current branch -> develop -> dev.ai.megacampus.ru
 
 # Deploy to Staging (master → ai.megacampus.ru)
 /deploy

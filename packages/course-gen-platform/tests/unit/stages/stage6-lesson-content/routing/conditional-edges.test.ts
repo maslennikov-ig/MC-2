@@ -125,6 +125,50 @@ describe('shouldProceedToJudge', () => {
     expect(state.needsHumanReview).toBe(true);
     expect(state.reviewInfo?.needsReview).toBe(true);
   });
+
+  it('routes to sectionRegenerator when section count is within cap', () => {
+    const state = buildState({
+      selfReviewResult: {
+        status: 'PASS_WITH_FLAGS',
+        reasoning: 'Only a few sections need regeneration',
+        issues: [],
+        patchedContent: null,
+        tokensUsed: 0,
+        durationMs: 10,
+        heuristicsPassed: true,
+        sectionsToRegenerate: Array.from(
+          { length: HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE },
+          (_, index) => `section_${index + 1}`
+        ),
+      },
+    });
+
+    expect(shouldProceedToJudge(state)).toBe('sectionRegenerator');
+    expect(state.needsHumanReview).toBeFalsy();
+  });
+
+  it('marks review_required when section regeneration request exceeds cap', () => {
+    const state = buildState({
+      selfReviewResult: {
+        status: 'PASS_WITH_FLAGS',
+        reasoning: 'Too many sections need regeneration',
+        issues: [],
+        patchedContent: null,
+        tokensUsed: 0,
+        durationMs: 10,
+        heuristicsPassed: true,
+        sectionsToRegenerate: Array.from(
+          { length: HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE + 1 },
+          (_, index) => `section_${index + 1}`
+        ),
+      },
+    });
+
+    expect(shouldProceedToJudge(state)).toBe('__end__');
+    expect(state.needsHumanReview).toBe(true);
+    expect(state.reviewInfo?.needsReview).toBe(true);
+    expect(state.errors[0]).toContain('Section regeneration request exceeds cap');
+  });
 });
 
 describe('shouldRetryAfterJudge', () => {

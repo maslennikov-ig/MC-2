@@ -64,14 +64,14 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
 </rag_validation>
 
 <visual_toolkit>
-Use actively to create engaging content:
+Use selectively when it materially improves understanding:
 1. **Mermaid Diagrams** — flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
    CRITICAL: NEVER use escaped quotes in node labels. Keep labels simple.
-2. **Math Formulas** (LaTeX): inline \`$E=mc^2$\` or block \`$$\\sum_{i=1}^{n} x_i$$\`
-3. **Callouts**: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO]
+2. **Tables** for comparisons. Tables must be standalone blocks — NEVER place tables inside numbered or bulleted lists.
+3. **Math Formulas** (LaTeX): inline \`$E=mc^2$\` or block \`$$\\sum_{i=1}^{n} x_i$$\`
+{{codeBlockInstruction}}
+4. **Callouts**: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO] — use sparingly for genuinely important tips.
    CRITICAL: NEVER wrap callout markers in quotes. WRONG: > "[!TIP]"  CORRECT: > [!TIP]
-4. **Tables** for comparisons. Tables must be standalone blocks — NEVER place tables inside numbered or bulleted lists.
-5. **Code blocks** with filenames when relevant
 *Syntax keywords stay in English regardless of output language.*
 </visual_toolkit>
 
@@ -85,7 +85,7 @@ DO NOT mix languages (except code/syntax keywords).
 Write a COMPLETE lesson for a {{durationMinutes}}-minute reading session.
 Target: approximately {{targetWordCount}} words total (excluding exercises and digest).
 
-STRUCTURE (use ## headers for each section):
+STRUCTURE — exactly 4 parts (use ## headers for each):
 1. Intro block MUST start with this exact header line: ## {{introductionHeader}}
    Then write a short hook ({{hookStrategy}}) + motivating context in 2 short paragraphs (target 80-140 words, hard max 170 words).
    IMPORTANT: Do NOT list or preview learning objectives — they are displayed separately in the UI above the lesson content.
@@ -118,9 +118,11 @@ CRITICAL RULES:
 - DO NOT repeat or re-explain topics between sections. Each section covers its own unique content.
 - Transitions between sections: 1 sentence max. NO recaps of previous sections.
 - Cover ALL topics from sections_to_cover, but keep each proportional to the total word budget.
-- Include at least 1 visual element (diagram, table, or callout) in the lesson.
+- Include a visual element only when it clarifies the concept.
 - DO NOT start sections with "As we discussed..." or "In the previous section..." patterns.
 - VALIDATE reference material relevance BEFORE using (see rag_validation).
+- For non-technical or business audiences, explain conceptually and use business examples.
+- Code or config snippets are allowed only for code_tutorial.
 - Intro must be self-contained: no "next lesson/next section" teasers and no previews of later sections/topics.
 - INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
   - Reference previous lesson naturally if context is given
@@ -204,6 +206,12 @@ CRITICAL RULES:
       name: 'sectionsWordBudget',
       description: 'Word budget for main content sections (excludes intro, exercises, digest)',
       required: true,
+    },
+    {
+      name: 'codeBlockInstruction',
+      description:
+        'Conditional code block instruction for visual toolkit. Empty for non-technical courses, full instruction for code_tutorial archetype.',
+      required: false,
     },
   ],
 };

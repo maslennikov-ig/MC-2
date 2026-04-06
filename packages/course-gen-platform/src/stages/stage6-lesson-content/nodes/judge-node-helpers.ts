@@ -12,7 +12,11 @@ import type {
   JudgeVerdict,
   ArbiterOutput,
 } from '@megacampus/shared-types/judge-types';
-import type { LessonContent, LessonContentBody } from '@megacampus/shared-types/lesson-content';
+import type {
+  LessonContent,
+  LessonContentBody,
+  LessonQualitySignals,
+} from '@megacampus/shared-types/lesson-content';
 import type {
   MermaidRenderValidationResult,
   MermaidRenderRemediationMetadata,
@@ -51,6 +55,7 @@ export interface JudgeContext {
   arbiterOutput?: ArbiterOutput | null;
   mermaidRenderValidation?: MermaidRenderValidationResult | null;
   tableFixMetrics?: TableFixPipelineMetrics | null;
+  qaSignals?: LessonQualitySignals | null;
 }
 
 import {
@@ -60,6 +65,7 @@ import {
   resolveRemediationStrategy,
 } from './judge-remediation-helpers';
 import type { TableFixPipelineMetrics } from '../utils/table-fix-pipeline';
+import { QualityRemediationAction, buildQaSignals } from '../quality/remediation';
 
 /**
  * Phase 1: Setup judge context and validate inputs
@@ -297,6 +303,19 @@ export async function makeJudgeDecision(context: JudgeContext): Promise<JudgeCon
     state.previousScores
   );
 
+  const forcedAction = context.cascadeResult?.heuristicResults?.qualitySummary?.action;
+  if (
+    forcedAction === QualityRemediationAction.PARTIAL_REGEN &&
+    decision.action === DecisionAction.ACCEPT
+  ) {
+    decision.action = DecisionAction.TARGETED_FIX;
+    decision.reason =
+      'Deterministic quality guard requested localized regeneration for obvious lesson defects';
+  } else if (forcedAction === QualityRemediationAction.REVIEW_REQUIRED) {
+    decision.action = DecisionAction.ESCALATE_TO_HUMAN;
+    decision.reason = 'Deterministic quality guard escalated lesson to human review';
+  }
+
   logger.info(
     {
       lessonId: state.lessonSpec.lesson_id,
@@ -411,6 +430,9 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
   let arbiterOutput = null;
   let mermaidRenderValidation: MermaidRenderValidationResult | null = null;
   let tableFixMetrics: TableFixPipelineMetrics | null = null;
+  const qualitySummary = context.cascadeResult?.heuristicResults?.qualitySummary;
+  const presentationCritic = context.cascadeResult?.heuristicResults?.presentationCritic;
+  const qualityRetryCount = state.regenerateCount ?? 0;
 
   switch (decision.action) {
     case DecisionAction.ACCEPT: {
@@ -422,7 +444,17 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
         'Judge node: Content ACCEPTED'
       );
 
-      finalContent = buildLessonContent(state, contentBody, verdict.overallScore);
+      finalContent = buildLessonContent(
+        state,
+        contentBody,
+        verdict.overallScore,
+        buildQaSignals(
+          qualitySummary,
+          presentationCritic,
+          qualitySummary?.action ?? null,
+          qualityRetryCount
+        )
+      );
       break;
     }
 
@@ -568,7 +600,17 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
         );
       }
 
-      finalContent = buildLessonContent(state, contentForMermaidGate, finalScore);
+      finalContent = buildLessonContent(
+        state,
+        contentForMermaidGate,
+        finalScore,
+        buildQaSignals(
+          qualitySummary,
+          presentationCritic,
+          qualitySummary?.action ?? null,
+          qualityRetryCount
+        )
+      );
       needsRegeneration = false;
       needsHumanReview = false;
     } catch (error) {
@@ -614,11 +656,30 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
         'Judge node: Mermaid parse gate crashed, continuing with existing accepted content'
       );
 
-      finalContent = finalContent ?? buildLessonContent(state, contentForMermaidGate, finalScore);
+      finalContent =
+        finalContent ??
+        buildLessonContent(
+          state,
+          contentForMermaidGate,
+          finalScore,
+          buildQaSignals(
+            qualitySummary,
+            presentationCritic,
+            qualitySummary?.action ?? null,
+            qualityRetryCount
+          )
+        );
       needsRegeneration = false;
       needsHumanReview = false;
     }
   }
+
+  const finalQaAction =
+    needsHumanReview || finalRecommendation === 'ESCALATE_TO_HUMAN'
+      ? QualityRemediationAction.REVIEW_REQUIRED
+      : needsRegeneration
+        ? QualityRemediationAction.FULL_REGEN
+        : (qualitySummary?.action ?? null);
 
   return {
     ...context,
@@ -631,6 +692,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
     arbiterOutput,
     mermaidRenderValidation,
     tableFixMetrics,
+    qaSignals: buildQaSignals(qualitySummary, presentationCritic, finalQaAction, qualityRetryCount),
   };
 }
 
@@ -661,6 +723,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     arbiterOutput,
     mermaidRenderValidation,
     tableFixMetrics,
+    qaSignals,
   } = context;
 
   const durationMs = Date.now() - startTime;
@@ -733,6 +796,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
       needsRegeneration,
       judgeModelsUsed,
       enrichedOutput,
+      qualitySummary: cascadeResult?.heuristicResults?.qualitySummary ?? null,
       mermaidRenderGate: mermaidRenderValidation
         ? {
             passed: mermaidRenderValidation.passed,
@@ -797,6 +861,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     tokensUsed: totalTokensUsed,
     durationMs,
     progressSummary: completionProgress,
+    qaSignals: qaSignals ?? undefined,
     ...(usedTargetedRefinement && {
       arbiterOutput,
       targetedRefinementStatus: finalContent ? ('accepted' as const) : ('escalated' as const),

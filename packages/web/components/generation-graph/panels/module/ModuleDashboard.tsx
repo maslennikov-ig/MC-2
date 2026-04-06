@@ -3,7 +3,6 @@
 import React from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
 import { cn } from '@/lib/utils'
-import { ModuleDashboardData } from '@megacampus/shared-types'
 import { Stage6ControlTower } from '../stage6/dashboard/Stage6ControlTower'
 import { LessonMatrix } from './LessonMatrix'
 import { ModuleDashboardFooter } from './ModuleDashboardFooter'
@@ -11,6 +10,7 @@ import { useNodeSelection } from '../../hooks/useNodeSelection'
 import { useLessonActions } from '../../hooks/useLessonActions'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { logger } from '@/lib/client-logger'
+import type { ReviewAwareModuleDashboardData } from '../../stage6-review-status'
 
 /**
  * Error fallback for ModuleDashboard
@@ -40,7 +40,7 @@ function DashboardErrorFallback({
 }
 
 interface ModuleDashboardProps {
-  data: ModuleDashboardData | null
+  data: ReviewAwareModuleDashboardData | null
   courseId: string
   isLoading?: boolean
   error?: Error | null
@@ -157,6 +157,7 @@ export function ModuleDashboard({
       active: data.aggregates.activeLessons,
       pending: data.aggregates.pendingLessons,
       failed: data.aggregates.errorLessons,
+      reviewRequired: data.aggregates.reviewRequiredLessons,
     },
     totalDurationMs: data.aggregates.totalDurationMs,
     estimatedRemainingMs: data.aggregates.estimatedTimeRemainingMs ?? undefined,

@@ -2,79 +2,78 @@
 
 > **IMPORTANT**: This file overrides default Claude Code behavior. Follow strictly.
 
-## Quick Start: Gastown + Beads
-
-| Command                      | What it does          |
-| ---------------------------- | --------------------- |
-| `/work "task description"`   | Give task to AI agent |
-| `/work --agent codex "task"` | Use specific runtime  |
-| `/status`                    | See what's happening  |
-| `bd ready`                   | Find available tasks  |
-| `gt dashboard --open`        | Visual monitoring     |
-| `git push`                   | Ship to Dev           |
-
-> Everything below is reference. For daily work, these 6 commands are enough.
-
----
-
-## Multi-Agent Orchestration with Gastown
-
-This project uses **Gastown** (`gt`) for multi-agent orchestration and **Beads** (`bd`) for issue tracking. Global tools at `~/gt/`.
-
-Runtimes: `claude` (default), `codex`, `gemini` — all subscription-based, no API billing.
+## Main Pattern: You Are The Orchestrator
 
 ### Core Rules
 
-**1. GATHER CONTEXT FIRST** — Read code, search patterns, check commits. NEVER implement blindly.
+**1. GATHER CONTEXT FIRST (MANDATORY)**
 
-**2. VERIFY** — Never trust agent output without verification:
+- Read existing code, search patterns, check recent commits
+- NEVER delegate or implement blindly
 
-- Read modified files (`Read` tool)
-- Run `pnpm type-check && pnpm build`
-- Check for regressions
+**2. DELEGATE TO SUBAGENTS**
 
-**3. /push — NEVER DISCARD CHANGES**
+- Provide complete context (code, paths, patterns)
+- **NEVER TRUST SUBAGENT REPORTS** — always verify yourself:
+  - Read modified files (`Read` tool)
+  - Run type-check (`pnpm type-check`)
+  - Run build if needed (`pnpm build`)
+  - Check for regressions
+- Re-delegate if incorrect
 
-- **FORBIDDEN**: `git reset`, `git checkout --`, `git stash` during `/push`
-- **ALWAYS** commit all uncommitted changes or ASK user first
+**3. EXECUTE DIRECTLY** — Only for: single-line fixes, simple imports, minimal configs
+
+**4. TRACK PROGRESS** — TodoWrite: in_progress BEFORE, completed AFTER verification
+
+**5. COMMIT / DELIVER** — commit locally, then use `/push-dev` for Dev delivery or `/push patch` only for release/version work
+
+**6. EXECUTION PATTERN**
+
+```
+1. Read task → 2. Gather context → 3. Delegate/execute
+4. VERIFY (never skip) → 5. Re-delegate if needed
+6. TodoWrite completed → 7. commit + `/push-dev` (or `/push patch` for releases) → 8. Next task
+```
+
+**7. CONTRADICTIONS** — Gather context, analyze patterns. Ask user only if truly ambiguous (~10%).
+
+**8. TYPESCRIPT ERRORS** — Re-delegate to same agent OR `typescript-types-specialist`
 
 ---
 
-## Task Management with Beads + Gastown
+## Task Management with Beads
 
-> All work tracked in Beads, orchestrated by Gastown.
+> Constitution v1.2.0: All work MUST be tracked in Beads.
 
 ### Session Workflow
 
 ```bash
+# SESSION START (auto via hooks)
+# bd prime runs automatically → injects context
+
 # FIND WORK
 bd ready                          # Available tasks (no blockers)
+bd ready --label frontend         # Only frontend tasks
+bd list --unlocked                # Tasks not locked by other terminals
+bd show <id>                      # Task details
 
-# GIVE TASK TO AGENT (preferred — via /work slash command)
-/work Fix the login validation bug
-/work --agent codex Refactor auth module
-
-# MANUAL WORK (do it yourself)
-bd update <id> --status in_progress
+# WORK
+bd update <id> --status in_progress   # Acquires exclusive lock
 # ... do the work ...
-bd close <id> --reason "Done"
-
-# CHECK STATUS
-/status                           # Unified view
-gt convoy list                    # Active convoys
-gt dashboard --open               # Web panel
+bd close <id> --reason "Done"         # Releases lock
 
 # SESSION END
 git add . && git commit -m "..." && git push
 ```
 
-### Multi-Agent Work
+### Multi-Terminal Work
 
-Gastown manages parallel agents automatically:
+When working in multiple terminals simultaneously:
 
-- Mayor coordinates, Polecats execute, Refinery merges
-- Each polecat works in isolated git worktree — no conflicts
-- Witness monitors health, respawns crashed agents
+- Each terminal acquires **exclusive lock** via `bd update --status in_progress`
+- Lock auto-releases after 30min inactivity
+- **Rule**: Each terminal works on DIFFERENT issues
+- Find unlocked: `bd list --unlocked`
 
 ### Branches & Environments
 
@@ -86,14 +85,14 @@ Gastown manages parallel agents automatically:
 ### Daily Workflow
 
 ```bash
-# 1. Работаем на develop
-git checkout develop
+# 1. Работаем в feature/codex ветке или в develop
+git checkout codex/<task-name>
 
 # 2. Делаем изменения, коммитим
 git add . && git commit -m "feat: new feature"
 
-# 3. Пушим → АВТОМАТИЧЕСКИ деплоится на Dev
-git push                          # → dev.ai.megacampus.ru
+# 3. Доставляем в Dev через develop
+/push-dev --yes                   # merge -> develop -> dev.ai.megacampus.ru
 
 # 4. Готовы к Staging? Используем /deploy
 /deploy                           # → merge develop → master → ai.megacampus.ru
@@ -103,7 +102,7 @@ git push                          # → dev.ai.megacampus.ru
 
 | Что хочу                   | Команда       | Результат                                        |
 | -------------------------- | ------------- | ------------------------------------------------ |
-| Задеплоить на **Dev**      | `git push`    | develop → dev.ai.megacampus.ru                   |
+| Задеплоить на **Dev**      | `/push-dev`   | current branch → develop → dev.ai.megacampus.ru  |
 | Задеплоить на **Staging**  | `/deploy`     | develop → master → ai.megacampus.ru (Blue/Green) |
 | Создать **релиз** (версия) | `/push patch` | Bump version + changelog + tag                   |
 | Форсировать деплой         | `/deploy -f`  | Skip type-check/build                            |
@@ -114,13 +113,9 @@ git push                          # → dev.ai.megacampus.ru
 - Green: web:3002, api:4002
 - Zero-downtime, instant rollback
 
-**Nginx**: `deploy/nginx/` (single source of truth, never edit on server)
-
 **Rollback:** `ssh megacampus-prod "bash /opt/megacampus/scripts/rollback_blue_green.sh"`
 
-**Full guide**: `.claude/docs/deployment-guide.md`
-
-**LLM models**: `.claude/docs/llm-model-config.md` (all model configs per stage/phase)
+**Details**: `docs/ADR-005-deployment-strategy.md`
 
 ### How User Gives Me Tasks
 
@@ -140,31 +135,10 @@ git push                          # → dev.ai.megacampus.ru
 | Code review          | Patrol          | `bd patrol run code-review --vars "scope=X,topic=Y"` |
 | Health check         | Patrol          | `bd patrol run health-check`                         |
 
-### Infrastructure (Self-Managed)
-
-All services auto-start on boot via systemd. **No manual intervention needed.**
-
-- **Daemon** (`gastown-daemon.service`): Manages Dolt, heartbeats, patrols
-- **Dolt**: Managed internally by daemon via `dolt_server` config in `~/gt/mayor/daemon.json`
-- **Witness**: Monitors polecat health per rig (auto-spawned by daemon)
-- **Refinery**: Merge queue processor (auto-spawned by daemon)
-- **Deacon**: Health orchestrator (auto-spawned by daemon)
-
-If something breaks:
-
-```bash
-gt doctor --fix --rig mc2     # Diagnose and auto-fix
-gt daemon logs                # Check daemon logs
-systemctl --user status gastown-daemon  # Service status
-systemctl --user restart gastown-daemon # Restart everything
-```
-
-**NEVER start Dolt manually** (`gt dolt start`) — daemon manages it with health checks every 30s.
-
 ### Automation
 
 - **Daemon auto-sync**: Enabled (auto-commit, auto-push, auto-pull for beads)
-- **Hooks**: SessionStart/PreCompact → `bd prime`, Stop → `bd sync`
+- **Hooks**: SessionStart/PreCompact → `bd prime`. If git hooks still call old Beads subcommands after an upgrade, run `bd hooks install`. If this repo commits `.beads/issues.jsonl`, refresh it explicitly with `bd export -o .beads/issues.jsonl` at session end.
 - **Directory Labels**: Auto-assigned based on `--files` path (see config.yaml)
 - **Exclusive Lock**: Prevents conflicts in multi-terminal work
 
@@ -176,12 +150,10 @@ systemctl --user restart gastown-daemon # Restart everything
 
 ## Project Conventions
 
-**Documentation**: All project knowledge in Beads REF: issues.
+**Documentation**: All docs live in Beads issues (REF: prefix). No separate markdown files.
 
-- Find: `bd search "REF:"` → lists all reference issues
-- Read: `bd show mc2-xxx` → full content of specific issue
-- Covers: entities, pages, stages, tech, i18n, docker, logging, errors, auth, guides
-- Update when domain changes: `bd update mc2-xxx --description="..."`
+- `bd search "REF:"` — entities, pages, pipeline, tech stack
+- Update REF: issues when domain changes: `bd update mc2-xxx --description="..."`
 
 **File Organization**:
 
@@ -203,8 +175,6 @@ systemctl --user restart gastown-daemon # Restart everything
 - MCP server: project `diqooqbuchsliypgwksu`
 - Migrations: `packages/course-gen-platform/supabase/migrations/`
 - Two admin clients by design (different runtimes): `course-gen-platform/src/shared/supabase/admin.ts` (Node.js) and `web/lib/supabase-admin.ts` (Next.js)
-
-**Course lookup by short code**: User sends codes like `BRA-1467` — this is `courses.generation_code`. Query: `SELECT id, title FROM courses WHERE generation_code = 'BRA-1467'`. Use `generation_trace` table (join via `lesson_id`) to see which LLM model generated each lesson (`model_used`, `stage`, `phase`, `step_name`).
 
 **Single Source of Truth** (NEVER duplicate, always import from `@megacampus/shared-types`):
 

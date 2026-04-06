@@ -2,6 +2,70 @@
 
 _Released on 2025-12-26_
 
+## v0.31.36
+
+_Released on 2026-04-04_
+
+### 🐛 Bug Fixes
+
+- **tests**: Fix lint errors in targeted-refinement-orchestrator test
+- **stage6**: Fix token budget telemetry and deduplicate budget check
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.31.35
+
+_Released on 2026-04-04_
+
+### 🐛 Bug Fixes
+
+- **stage6**: Address final review findings for quality hardening
+- **stage6,web**: Fix dead sectionCount check, callout whitespace, cleanup
+
+---
+
+_This release was automatically generated from 4 commits._
+
+## v0.31.34
+
+_Released on 2026-04-03_
+
+### 🐛 Bug Fixes
+
+- **web**: Repair broken markdown table rows with split quoted text
+- **stage6,web**: Fix PRO TIP callout, section validation, and CI blocker
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.31.33
+
+_Released on 2026-04-01_
+
+### 🔧 Improvements
+
+- **shared-types**: Extract CONCLUSION_HEADINGS to shared constant, remove legacy code
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.31.32
+
+_Released on 2026-04-01_
+
+### 🐛 Bug Fixes
+
+- **web**: Resolve lint errors in profile pages and i18n
+- **stage6**: Fix systemic content quality issues in lesson generation
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.31
 
 _Released on 2026-03-31_

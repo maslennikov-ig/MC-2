@@ -22,6 +22,7 @@ import { getContentLabels } from '@megacampus/shared-types';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 import { runTableFixPipeline } from '../utils/table-fix-pipeline';
+import { applyDeterministicQualityAutoFixes } from '../quality/markdown-autofix';
 
 // Import from extracted modules
 import { calculateDynamicContextWindow } from './generator/generator-constants';
@@ -173,6 +174,31 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
           error: error instanceof Error ? error.message : String(error),
         },
         'Table fix pipeline failed, using content from previous step'
+      );
+    }
+
+    // ========================================================================
+    // 2.2 DETERMINISTIC QUALITY AUTO-FIXES (quote-wrapped callouts, PRO TIP)
+    // ========================================================================
+    try {
+      const qualityFixResult = applyDeterministicQualityAutoFixes(generatedContent);
+      if (qualityFixResult.fixedRules.length > 0) {
+        generatedContent = qualityFixResult.content;
+        logger.debug(
+          {
+            lessonId: lessonSpec.lesson_id,
+            fixedRules: qualityFixResult.fixedRules,
+          },
+          'Deterministic quality auto-fixes applied to generated content'
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          lessonId: lessonSpec.lesson_id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Deterministic quality auto-fixes failed, continuing with previous content'
       );
     }
 

@@ -1,5 +1,9 @@
 import type { LessonGraphStateType } from '../state';
-import type { LessonContent, LessonContentBody } from '@megacampus/shared-types/lesson-content';
+import type {
+  LessonContent,
+  LessonContentBody,
+  LessonQualitySignals,
+} from '@megacampus/shared-types/lesson-content';
 import { logger } from '@/shared/logger';
 import { safeJSONParse } from '@megacampus/shared-utils';
 import { parseMarkdownContent } from '../utils/markdown-parser';
@@ -151,7 +155,8 @@ export function countWords(contentBody: LessonContentBody): number {
 export function buildLessonContent(
   state: LessonGraphStateType,
   contentBody: LessonContentBody,
-  qualityScore: number
+  qualityScore: number,
+  qaSignals?: LessonQualitySignals | null
 ): LessonContent {
   const totalWords = countWords(contentBody);
   const now = new Date();
@@ -170,6 +175,7 @@ export function buildLessonContent(
       model_used: state.modelUsed ?? 'unknown',
       archetype_used: state.lessonSpec.metadata.content_archetype,
       temperature_used: state.temperature,
+      qa_signals: qaSignals ?? state.qaSignals ?? undefined,
     },
     status: 'completed',
     created_at: now,

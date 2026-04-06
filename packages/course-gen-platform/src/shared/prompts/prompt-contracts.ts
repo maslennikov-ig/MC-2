@@ -194,6 +194,7 @@ export interface Stage6SingleCallGeneratorVars {
   sampleAnswerLabel: string;
   digestHeader: string;
   sectionsWordBudget: string;
+  codeBlockInstruction: string;
 }
 
 // ============================================================================

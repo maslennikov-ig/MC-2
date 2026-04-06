@@ -1,7 +1,10 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
-import { notifyCourseCompletion } from '@/shared/notifications/course-notifications';
+import {
+  notifyCourseCompletion,
+  notifyCourseError,
+} from '@/shared/notifications/course-notifications';
 import type { Stage6Output } from '../orchestrator';
 import { extractContentMarkdown } from './content-utils';
 import { sanitizeContent } from '../judge/strip-metadata';
@@ -16,6 +19,9 @@ import {
 } from '@megacampus/shared-types';
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 import { parseGenerationProgress } from '@/shared/schemas/generation-progress.schema';
+import type { LessonContent, LessonQualitySignals } from '@megacampus/shared-types/lesson-content';
+import { runCourseQualityAudit, type CourseAuditFinding } from '../quality/course-audit';
+import { isStage6CourseAuditEnabled, isStage6QualityAlertsEnabled } from '../quality/flags';
 
 const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
   'completed',
@@ -24,6 +30,88 @@ const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
   'approved',
 ]);
 const STAGE6_FULLY_COMPLETED_STATUSES = new Set(['completed', 'approved']);
+
+type StoredLessonContentRow = {
+  lesson_id: string;
+  status: string;
+  created_at: string;
+  content?: Json | null;
+  metadata?: Json | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getQaSignalsFromResult(result: Stage6Output): LessonQualitySignals | undefined {
+  return result.lessonContent?.metadata?.qa_signals ?? undefined;
+}
+
+/**
+ * QA signals are stored in two locations with different casing:
+ * 1. metadata.qaSignals (camelCase) — written by saveLessonContent/handlePartialSuccess
+ *    to the top-level metadata JSONB column
+ * 2. content.metadata.qa_signals (snake_case) — embedded in the LessonContent JSON
+ *    via the Zod schema (LessonContentMetadataSchema)
+ * Both paths are checked for backward compatibility.
+ */
+function getQaSignalsFromStoredRow(
+  row: StoredLessonContentRow
+): Partial<LessonQualitySignals> | null {
+  if (isRecord(row.metadata) && isRecord(row.metadata.qaSignals)) {
+    return row.metadata.qaSignals as Partial<LessonQualitySignals>;
+  }
+
+  if (
+    isRecord(row.content) &&
+    isRecord(row.content.metadata) &&
+    isRecord(row.content.metadata.qa_signals)
+  ) {
+    return row.content.metadata.qa_signals as Partial<LessonQualitySignals>;
+  }
+
+  return null;
+}
+
+function getMarkdownFromStoredRow(row: StoredLessonContentRow): string {
+  if (isRecord(row.metadata) && typeof row.metadata.markdownContent === 'string') {
+    return row.metadata.markdownContent;
+  }
+
+  if (isRecord(row.content) && typeof row.content.raw_markdown === 'string') {
+    return row.content.raw_markdown;
+  }
+
+  if (isRecord(row.content) && isRecord(row.content.content) && isRecord(row.content.metadata)) {
+    return extractContentMarkdown(row.content as unknown as LessonContent);
+  }
+
+  return '';
+}
+
+function getLessonLabelFromStoredRow(row: StoredLessonContentRow): string {
+  if (isRecord(row.metadata) && typeof row.metadata.lessonLabel === 'string') {
+    return row.metadata.lessonLabel;
+  }
+
+  return row.lesson_id;
+}
+
+function getContentArchetypeFromStoredRow(row: StoredLessonContentRow): string | null {
+  if (isRecord(row.content) && isRecord(row.content.metadata)) {
+    const archetype = row.content.metadata.archetype_used;
+    return typeof archetype === 'string' ? archetype : null;
+  }
+
+  return null;
+}
+
+function summarizeCourseAuditFindings(findings: CourseAuditFinding[]): string {
+  return findings
+    .slice(0, 3)
+    .map(finding => `${finding.kind} [${finding.lessonLabels.join(', ')}]`)
+    .join('; ');
+}
 
 /**
  * Handle partial success scenarios
@@ -67,6 +155,7 @@ export async function handlePartialSuccess(
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
           regenerationMode: result.metrics.regenerationMode ?? null,
+          qaSignals: getQaSignalsFromResult(result),
           reviewInfo: result.reviewInfo ?? undefined,
         })
       ) as Json,
@@ -127,6 +216,9 @@ export interface ReviewMarkerContext {
   rejectedTokens?: number | null;
   regenerationMode?: string | null;
   reviewInfo?: Stage6Output['reviewInfo'];
+  qaSignals?: LessonQualitySignals | null;
+  courseAuditFindings?: Array<Pick<CourseAuditFinding, 'kind' | 'detail'>>;
+  suppressAlert?: boolean;
 }
 
 export async function markForReview(
@@ -178,6 +270,8 @@ export async function markForReview(
         rejectedTokens: context.rejectedTokens ?? null,
         regenerationMode: context.regenerationMode ?? null,
         reviewInfo: context.reviewInfo ?? undefined,
+        qaSignals: context.qaSignals ?? undefined,
+        courseAuditFindings: context.courseAuditFindings ?? undefined,
       },
       generation_attempt: (context.regenerateCount ?? 0) + 1,
     });
@@ -204,6 +298,26 @@ export async function markForReview(
         },
         'Lesson marked for manual review'
       );
+
+      if (
+        !context.suppressAlert &&
+        isStage6QualityAlertsEnabled() &&
+        /(retry|course audit|review required)/i.test(reason)
+      ) {
+        try {
+          await notifyCourseError(courseId, 6, reason);
+        } catch (notifyError) {
+          logger.warn(
+            {
+              courseId,
+              lessonUuid,
+              lessonLabel,
+              error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+            },
+            'Failed to send Stage 6 review escalation notification'
+          );
+        }
+      }
     }
   } catch (error) {
     logger.error(
@@ -267,6 +381,7 @@ export async function saveLessonContent(
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: markdown,
+          qaSignals: getQaSignalsFromResult(result),
           sanityCheck: sanityResult
             ? {
                 passed: sanityResult.ok,
@@ -594,7 +709,7 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
     const { data: course, error: courseError } = await supabaseAdmin
       .from('courses')
       .select(
-        'generation_status, course_structure, auto_finalize_after_stage6, generation_progress'
+        'generation_status, course_structure, auto_finalize_after_stage6, generation_progress, target_audience'
       )
       .eq('id', courseId)
       .single();
@@ -640,7 +755,7 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
     // Rejected drafts must not contribute to Stage 6 completion.
     const { data: contentsData, error: contentsError } = await supabaseAdmin
       .from('lesson_contents')
-      .select('lesson_id, status, created_at')
+      .select('lesson_id, status, created_at, content, metadata')
       .eq('course_id', courseId)
       .order('created_at', { ascending: false });
 
@@ -655,16 +770,17 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
       return;
     }
 
-    const latestStatusByLesson = new Map<string, string>();
-    for (const content of contentsData || []) {
-      if (!latestStatusByLesson.has(content.lesson_id)) {
-        latestStatusByLesson.set(content.lesson_id, content.status);
+    const latestRowByLesson = new Map<string, StoredLessonContentRow>();
+    for (const content of (contentsData || []) as StoredLessonContentRow[]) {
+      if (!latestRowByLesson.has(content.lesson_id)) {
+        latestRowByLesson.set(content.lesson_id, content);
       }
     }
 
     let terminalLessonsCount = 0;
     let fullyCompletedLessonsCount = 0;
-    for (const latestStatus of latestStatusByLesson.values()) {
+    for (const latestRow of latestRowByLesson.values()) {
+      const latestStatus = latestRow.status;
       if (STAGE6_TERMINAL_LESSON_STATUSES.has(latestStatus)) {
         terminalLessonsCount++;
       }
@@ -686,9 +802,100 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
 
     // If all lessons reached a terminal state, transition course out of stage_6_generating.
     if (terminalLessonsCount >= expectedLessonsCount) {
+      let courseAuditBlockedFinalize = false;
+      let courseAuditSummary: string | null = null;
+
+      if (
+        isStage6CourseAuditEnabled() &&
+        fullyCompletedLessonsCount >= expectedLessonsCount &&
+        latestRowByLesson.size >= expectedLessonsCount
+      ) {
+        const auditLessons = Array.from(latestRowByLesson.values())
+          .filter(row => STAGE6_FULLY_COMPLETED_STATUSES.has(row.status))
+          .map(row => ({
+            lessonId: row.lesson_id,
+            lessonLabel: getLessonLabelFromStoredRow(row),
+            markdown: getMarkdownFromStoredRow(row),
+            targetAudience:
+              typeof course.target_audience === 'string' ? course.target_audience : null,
+            contentArchetype: getContentArchetypeFromStoredRow(row),
+            qaSignals: getQaSignalsFromStoredRow(row),
+          }))
+          .filter(lesson => lesson.markdown.trim().length > 0);
+
+        if (auditLessons.length === expectedLessonsCount) {
+          const auditResult = runCourseQualityAudit(auditLessons);
+
+          if (auditResult.findings.length > 0) {
+            courseAuditBlockedFinalize = true;
+            courseAuditSummary = summarizeCourseAuditFindings(auditResult.findings);
+
+            logger.warn(
+              {
+                courseId,
+                findings: auditResult.findings,
+                affectedLessonIds: auditResult.affectedLessonIds,
+              },
+              'Stage 6 course audit found conservative review-required patterns'
+            );
+
+            for (const lesson of auditLessons) {
+              const flags = auditResult.perLessonFlags[lesson.lessonId] ?? [];
+              if (flags.length === 0) {
+                continue;
+              }
+
+              await markForReview(
+                courseId,
+                lesson.lessonId as LessonUUID,
+                lesson.lessonLabel as LessonLabel,
+                `Stage 6 course audit flagged: ${flags.join(', ')}`,
+                {
+                  qaSignals: lesson.qaSignals
+                    ? {
+                        version: lesson.qaSignals.version ?? 1,
+                        ...lesson.qaSignals,
+                        course_flags: Array.from(
+                          new Set([...(lesson.qaSignals?.course_flags ?? []), ...flags])
+                        ),
+                      }
+                    : {
+                        version: 1,
+                        course_flags: flags,
+                      },
+                  courseAuditFindings: auditResult.findings
+                    .filter(finding => finding.lessonIds.includes(lesson.lessonId))
+                    .map(finding => ({ kind: finding.kind, detail: finding.detail })),
+                  suppressAlert: true,
+                }
+              );
+            }
+
+            if (isStage6QualityAlertsEnabled()) {
+              try {
+                await notifyCourseError(
+                  courseId,
+                  6,
+                  `Stage 6 course audit flagged ${auditResult.findings.length} finding(s): ${courseAuditSummary}`
+                );
+              } catch (notifyError) {
+                logger.warn(
+                  {
+                    courseId,
+                    error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+                  },
+                  'Failed to send Stage 6 quality alert notification'
+                );
+              }
+            }
+          }
+        }
+      }
+
       // Auto-finalize only when every lesson has fully completed content.
       const shouldAutoFinalize =
         course.auto_finalize_after_stage6 === true &&
+        !courseAuditBlockedFinalize &&
         fullyCompletedLessonsCount >= expectedLessonsCount;
 
       // Set generation_completed_at when finalizing
@@ -722,7 +929,9 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
         percentage: 100,
         message: shouldAutoFinalize
           ? 'Курс успешно создан!'
-          : 'Генерация уроков завершена, требуется проверка',
+          : courseAuditBlockedFinalize
+            ? 'Генерация уроков завершена, аудит курса требует проверки'
+            : 'Генерация уроков завершена, требуется проверка',
         lessons_completed: terminalLessonsCount,
         ...(updatedSteps && { steps: updatedSteps }),
       };
@@ -762,6 +971,8 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
             terminalLessonsCount,
             fullyCompletedLessonsCount,
             autoFinalize: shouldAutoFinalize,
+            courseAuditBlockedFinalize,
+            courseAuditSummary,
           },
           shouldAutoFinalize
             ? 'All lessons generated - course auto-finalized to completed'

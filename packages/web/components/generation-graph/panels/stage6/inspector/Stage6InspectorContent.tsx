@@ -75,6 +75,7 @@ interface Stage6InspectorContentProps {
 
   // Status
   status: 'pending' | 'active' | 'completed' | 'error'
+  needsReview?: boolean
   errorMessage?: string
 
   // Actions
@@ -210,6 +211,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   judgeResult,
   stats,
   status,
+  needsReview = false,
   errorMessage,
   onApprove,
   onEdit,
@@ -465,6 +467,20 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
           tokensBreakdown={stats.tokensBreakdown}
           locale={locale}
         />
+
+        {needsReview && (
+          <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-300">
+                {t('reviewRequiredTitle')}
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-400/90">
+                {t('reviewRequiredDescription')}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Error banner (if error status) */}
         {status === 'error' && errorMessage && (

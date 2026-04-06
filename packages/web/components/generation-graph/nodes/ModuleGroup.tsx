@@ -30,6 +30,7 @@ import { useNodeStatus } from '../hooks/useNodeStatus'
 import { useNodeSelection } from '../hooks/useNodeSelection'
 import { NodeErrorTooltip, RetryBadge, NodeProgressBar, StatusBadge } from '../components/shared'
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext'
+import { getReviewAwareGraphNodeState } from '../stage6-review-status'
 
 /**
  * Zoom thresholds for semantic zoom (P3.2: extracted magic numbers)
@@ -70,10 +71,13 @@ const OpenPanelButton = memo(function OpenPanelButton({
 const MinimalModuleNode = ({ id, data }: { id: string; data: RFModuleNode['data'] }) => {
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status || 'pending'
+  const visualStatus = data.needsReview
+    ? getReviewAwareGraphNodeState('review_required').visualStatus
+    : currentStatus
 
   return (
     <div
-      className={`relative h-5 w-5 rounded transition-all duration-300 ${getStatusColor(currentStatus)} ${currentStatus === 'active' ? 'animate-pulse' : ''} `}
+      className={`relative h-5 w-5 rounded transition-all duration-300 ${getStatusColor(visualStatus)} ${currentStatus === 'active' ? 'animate-pulse' : ''} `}
       title={data.title}
       data-testid={`node-minimal-module-${id}`}
     >
@@ -95,12 +99,15 @@ const MediumModuleNode = ({
 }) => {
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status || 'pending'
+  const visualStatus = data.needsReview
+    ? getReviewAwareGraphNodeState('review_required').visualStatus
+    : currentStatus
   const progressPercent =
     data.totalLessons > 0 ? Math.round((data.completedLessons / data.totalLessons) * 100) : 0
 
   return (
     <div
-      className={`relative flex w-[120px] flex-col gap-1 rounded border px-2 py-1.5 transition-all duration-300 ${getNodeStatusStyles(currentStatus, 'module')} ${selected ? 'ring-2 ring-blue-400 ring-offset-1' : ''} `}
+      className={`relative flex w-[120px] flex-col gap-1 rounded border px-2 py-1.5 transition-all duration-300 ${getNodeStatusStyles(visualStatus, 'module')} ${selected ? 'ring-2 ring-blue-400 ring-offset-1' : ''} `}
       data-testid={`node-medium-${id}`}
     >
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !bg-slate-400" />
@@ -121,7 +128,9 @@ const MediumModuleNode = ({
         </span>
         <span
           className={`font-medium ${
-            currentStatus === 'completed'
+            data.needsReview
+              ? 'text-amber-600 dark:text-amber-400'
+              : currentStatus === 'completed'
               ? 'text-emerald-600 dark:text-emerald-400'
               : currentStatus === 'active'
                 ? 'text-blue-600 dark:text-blue-400'
@@ -162,6 +171,9 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
   // Subscribe to realtime status updates - MUST be called before any conditional returns (Rules of Hooks)
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status || 'pending'
+  const visualStatus = data.needsReview
+    ? getReviewAwareGraphNodeState('review_required').visualStatus
+    : currentStatus
 
   // Partial generation context (optional - may not be in provider)
   const contextValue = useOptionalPartialGenerationContext()
@@ -256,10 +268,10 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
-          className={`relative min-h-[90px] w-[300px] rounded-md border transition-all duration-300 ${getStatusBorderClass(currentStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
+          className={`relative min-h-[90px] w-[300px] rounded-md border transition-all duration-300 ${getStatusBorderClass(visualStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
           data-testid={`node-module-${id}`}
-          data-node-status={currentStatus}
-          aria-label={`Модуль: ${data.title}, ${data.completedLessons} из ${data.totalLessons} уроков завершено, статус: ${currentStatus}`}
+          data-node-status={data.needsReview ? 'review_required' : currentStatus}
+          aria-label={`Модуль: ${data.title}, ${data.completedLessons} из ${data.totalLessons} уроков готовы, статус: ${data.needsReview ? 'требует проверки' : currentStatus}`}
           role="group"
           tabIndex={0}
         >
@@ -324,7 +336,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
                   onClick={(e) => {
                     e.stopPropagation()
                     if (generateSection) {
-                      generateSection(moduleNumber)
+                      void generateSection(moduleNumber)
                     }
                   }}
                   disabled={isSectionGenerating(moduleNumber) || currentStatus === 'active'}
@@ -377,8 +389,14 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
                   {data.completedLessons}/{data.totalLessons} •
                 </span>
                 <StatusBadge
-                  status={currentStatus}
-                  label={currentStatus === 'completed' ? '✓ Готово' : undefined}
+                  status={visualStatus}
+                  label={
+                    data.needsReview
+                      ? 'Требует проверки'
+                      : currentStatus === 'completed'
+                        ? '✓ Готово'
+                        : undefined
+                  }
                   size="xs"
                 />
               </div>
@@ -388,7 +406,9 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
                 <NodeProgressBar
                   progress={progressPercent}
                   variant={
-                    currentStatus === 'completed'
+                    data.needsReview
+                      ? 'default'
+                      : currentStatus === 'completed'
                       ? 'success'
                       : currentStatus === 'error'
                         ? 'error'
@@ -421,9 +441,13 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
             <div className="border-t border-black/5 bg-slate-50/50 px-2.5 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-900/30 dark:text-slate-400">
               <div className="flex items-center justify-between">
                 <span>
-                  {data.completedLessons} / {data.totalLessons} уроков
+                {data.completedLessons} / {data.totalLessons} уроков
                 </span>
-                {currentStatus === 'completed' ? (
+                {data.needsReview ? (
+                  <span className="font-medium text-amber-600 dark:text-amber-400">
+                    Требует проверки
+                  </span>
+                ) : currentStatus === 'completed' ? (
                   <span className="font-medium text-green-600 dark:text-green-400">Готово</span>
                 ) : currentStatus === 'active' ? (
                   <div className="flex items-center gap-1">
@@ -452,7 +476,9 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
           className={`relative h-full w-full rounded-md border-2 transition-all duration-300 ${
-            currentStatus === 'active'
+            data.needsReview
+              ? 'border-amber-400 bg-amber-50/20 dark:border-amber-500 dark:bg-amber-900/10'
+              : currentStatus === 'active'
               ? 'border-blue-400 bg-blue-50/20 dark:border-blue-500 dark:bg-blue-900/10'
               : currentStatus === 'completed'
                 ? 'border-emerald-400 bg-emerald-50/20 dark:border-emerald-500 dark:bg-emerald-900/10'
@@ -498,7 +524,9 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
 
             <span
               className={`relative z-10 flex-shrink-0 rounded-full px-2 py-1 text-[10px] font-medium ${
-                currentStatus === 'completed'
+                data.needsReview
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                  : currentStatus === 'completed'
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                   : currentStatus === 'active'
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'

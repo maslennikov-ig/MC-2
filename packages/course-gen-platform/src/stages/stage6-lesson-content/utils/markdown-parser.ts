@@ -15,7 +15,7 @@
  */
 
 import type { ContentSection } from '@megacampus/shared-types/lesson-content';
-import { CONTENT_LABELS } from '@megacampus/shared-types';
+import { CONTENT_LABELS, CONCLUSION_HEADINGS } from '@megacampus/shared-types';
 import { logger } from '@/shared/logger';
 
 // ============================================================================
@@ -95,6 +95,10 @@ const SUMMARY_TERMS = [
   'Conclusion',
   'Key\\s*Takeaways?',
   'Wrap[- ]?up',
+  // Additional Russian conclusion-like variations
+  'Итоговый\\s+вывод',
+  'Подведение\\s+итогов',
+  'Общий\\s+вывод',
 ];
 
 /**
@@ -130,12 +134,11 @@ function buildSpecialSections(): Set<string> {
   sections.add('problem');
   sections.add('questions');
   sections.add('question');
-  sections.add('conclusion');
-  sections.add('key takeaways');
-  sections.add('key takeaway');
-  sections.add('wrap-up');
-  sections.add('wrapup');
-  sections.add('wrap up');
+
+  // Add conclusion-like headings from shared constant
+  for (const heading of CONCLUSION_HEADINGS) {
+    sections.add(heading);
+  }
 
   return sections;
 }

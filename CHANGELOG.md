@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.36] - 2026-04-04
+
+### Fixed
+
+- **tests**: fix lint errors in targeted-refinement-orchestrator test (895b319e)
+- **stage6**: fix token budget telemetry and deduplicate budget check (bd99787d)
+
+## [0.31.35] - 2026-04-04
+
+### Fixed
+
+- **stage6**: address final review findings for quality hardening (29d57296)
+- **stage6,web**: fix dead sectionCount check, callout whitespace, cleanup (a64f4ff0)
+
+### Other
+
+- add .agents/ and .codex/ to .gitignore (eee37ba6)
+- **stage6**: bump bundle size threshold from 2.0 to 2.5 MB (9303f714)
+
+## [0.31.34] - 2026-04-03
+
+### Fixed
+
+- **web**: repair broken markdown table rows with split quoted text (86b85e21)
+- **stage6,web**: fix PRO TIP callout, section validation, and CI blocker (bdb6680a)
+
+## [0.31.33] - 2026-04-01
+
+### Changed
+
+- **shared-types**: extract CONCLUSION_HEADINGS to shared constant, remove legacy code (d9553bc0)
+
+## [0.31.32] - 2026-04-01
+
+### Fixed
+
+- **web**: resolve lint errors in profile pages and i18n (8606e0eb)
+- **stage6**: fix systemic content quality issues in lesson generation (ca08480d)
+
 ## [0.31.31] - 2026-03-31
 
 ### Fixed

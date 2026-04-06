@@ -1,4 +1,4 @@
-import type { LessonContent } from '@megacampus/shared-types/lesson-content';
+import type { LessonContent, LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import { getContentLabels } from '@megacampus/shared-types';
 
 /**
@@ -19,18 +19,21 @@ function escapeCurrencyDollarSigns(content: string): string {
  * @param language - Language code for localized headers (default: 'en')
  * @returns Markdown string representation
  */
-export function extractContentMarkdown(content: LessonContent, language: string = 'en'): string {
+export function extractContentBodyMarkdown(
+  contentBody: LessonContentBody,
+  language: string = 'en'
+): string {
   const labels = getContentLabels(language);
   const parts: string[] = [];
 
   // Add introduction
-  if (content.content.intro) {
-    parts.push(content.content.intro);
+  if (contentBody.intro) {
+    parts.push(contentBody.intro);
     parts.push('');
   }
 
   // Add sections
-  for (const section of content.content.sections) {
+  for (const section of contentBody.sections) {
     parts.push(`## ${section.title}`);
     parts.push('');
     parts.push(section.content);
@@ -38,10 +41,10 @@ export function extractContentMarkdown(content: LessonContent, language: string 
   }
 
   // Add examples
-  if (content.content.examples.length > 0) {
+  if (contentBody.examples.length > 0) {
     parts.push(`## ${labels.examples}`);
     parts.push('');
-    for (const example of content.content.examples) {
+    for (const example of contentBody.examples) {
       parts.push(`### ${example.title}`);
       parts.push('');
       parts.push(example.content);
@@ -56,11 +59,11 @@ export function extractContentMarkdown(content: LessonContent, language: string 
   }
 
   // Add exercises
-  if (content.content.exercises.length > 0) {
+  if (contentBody.exercises.length > 0) {
     parts.push(`## ${labels.exercises}`);
     parts.push('');
-    for (let i = 0; i < content.content.exercises.length; i++) {
-      const exercise = content.content.exercises[i];
+    for (let i = 0; i < contentBody.exercises.length; i++) {
+      const exercise = contentBody.exercises[i];
       parts.push(`### ${labels.exercise} ${i + 1}`);
       parts.push('');
       parts.push(exercise.question);
@@ -76,4 +79,8 @@ export function extractContentMarkdown(content: LessonContent, language: string 
   }
 
   return escapeCurrencyDollarSigns(parts.join('\n'));
+}
+
+export function extractContentMarkdown(content: LessonContent, language: string = 'en'): string {
+  return extractContentBodyMarkdown(content.content, language);
 }

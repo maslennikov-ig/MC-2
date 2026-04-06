@@ -2,72 +2,134 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ErrorBoundary } from '@/components/common/error-boundary'
+import Image from 'next/image'
 import { Link, useRouter } from '@/src/i18n/navigation'
 import { useSupabase } from '@/lib/supabase/browser-client'
 import { toast } from 'sonner'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
-import { useTranslations } from 'next-intl'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import {
   User,
   Settings,
   BookOpen,
   BarChart3,
+  AlertTriangle,
   Keyboard,
   ArrowLeft,
   X,
   ChevronRight,
 } from 'lucide-react'
-import { logger } from '@/lib/client-logger'
+import { cn } from '@/lib/utils'
 import type { Profile } from '@/types/database'
+import PersonalInfoSection from './components/PersonalInfoSection'
+import AccountSettingsSection from './components/AccountSettingsSection'
+import LearningPreferencesSection from './components/LearningPreferencesSection'
+import StatisticsSection from './components/StatisticsSection'
 import {
   loadUserPreferences,
   saveUserPreferences,
   type UserPreferences as UserPrefs,
 } from '@/lib/user-preferences'
 import { ProfileHeader as MainProfileHeader } from './_components/profile-header'
-import { safeStorage, type UserProfile } from './_components/profile-utils'
-import { ProfileSidebar } from './_components/ProfileSidebar'
-import { ProfileHeaderBanner } from './_components/ProfileHeaderBanner'
-import { ProfileContent } from './_components/ProfileContent'
-import { ProfilePageSkeleton } from './_components/ProfilePageSkeleton'
-import { ProfileErrorBoundary } from './_components/ProfileErrorBoundary'
+
+// Safe storage utilities
+const safeStorage = {
+  getItem: (key: string, storage: Storage = localStorage) => {
+    if (typeof window === 'undefined') return null
+    try {
+      return storage.getItem(key)
+    } catch {
+      // Failed to get from storage - return null silently
+      return null
+    }
+  },
+  setItem: (key: string, value: string, storage: Storage = localStorage) => {
+    if (typeof window === 'undefined') return false
+    try {
+      storage.setItem(key, value)
+      return true
+    } catch (error) {
+      // Storage might be full or disabled
+      // Failed to set in storage - handle silently
+      // Try to clear old data if storage is full
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        try {
+          // Clear old preferences to make room
+          storage.removeItem('userPreferences_old')
+          storage.setItem(key, value)
+          return true
+        } catch {
+          return false
+        }
+      }
+      return false
+    }
+  },
+  removeItem: (key: string, storage: Storage = localStorage) => {
+    if (typeof window === 'undefined') return
+    try {
+      storage.removeItem(key)
+    } catch {
+      // Failed to remove from storage - handle silently
+    }
+  },
+  clear: (storage: Storage = sessionStorage) => {
+    if (typeof window === 'undefined') return
+    try {
+      storage.clear()
+    } catch {
+      // Failed to clear storage - handle silently
+    }
+  },
+}
+
+// Extended Profile data structure for Phase 3
+export interface UserProfile extends Profile {
+  bio?: string
+  preferences?: UserPrefs
+  courses_enrolled?: number
+  courses_completed?: number
+  total_learning_hours?: number
+  last_activity?: string
+  telegram_chat_id?: string | null
+  telegram_notifications_enabled?: boolean | null
+}
+
+// Tab configuration
+const profileTabs = [
+  {
+    value: 'personal',
+    label: 'Личная информация',
+    icon: User,
+    description: 'Управление профилем и личными данными',
+  },
+  {
+    value: 'settings',
+    label: 'Настройки',
+    icon: Settings,
+    description: 'Настройки аккаунта и безопасности',
+  },
+  {
+    value: 'learning',
+    label: 'Обучение',
+    icon: BookOpen,
+    description: 'Настройки обучения и предпочтения',
+  },
+  {
+    value: 'statistics',
+    label: 'Статистика',
+    icon: BarChart3,
+    description: 'Ваш прогресс и достижения',
+  },
+]
 
 export default function ProfilePage() {
-  const t = useTranslations('profile')
   const router = useRouter()
   const { supabase, session, isLoading: sessionLoading } = useSupabase()
-  const { setTheme, mounted } = useThemeSync()
-
-  // Tab configuration with translations
-  const profileTabs = [
-    {
-      value: 'personal',
-      label: t('tabs.personal.label'),
-      icon: User,
-      description: t('tabs.personal.description'),
-    },
-    {
-      value: 'settings',
-      label: t('tabs.settings.label'),
-      icon: Settings,
-      description: t('tabs.settings.description'),
-    },
-    {
-      value: 'learning',
-      label: t('tabs.learning.label'),
-      icon: BookOpen,
-      description: t('tabs.learning.description'),
-    },
-    {
-      value: 'statistics',
-      label: t('tabs.statistics.label'),
-      icon: BarChart3,
-      description: t('tabs.statistics.description'),
-    },
-  ]
+  const { theme, setTheme, mounted } = useThemeSync()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [preferences, setPreferences] = useState<UserPrefs | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -93,13 +155,13 @@ export default function ProfilePage() {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         e.preventDefault()
-        e.returnValue = t('confirmations.unsavedChangesLeave')
+        e.returnValue =
+          'У вас есть несохраненные изменения. Вы уверены, что хотите покинуть страницу?'
       }
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
   }, [hasUnsavedChanges])
 
   // Keyboard navigation for tabs
@@ -142,9 +204,8 @@ export default function ProfilePage() {
           // Announce tab change to screen readers
           const announcement = document.getElementById('tab-announcement')
           if (announcement) {
-            announcement.textContent = t('announcements.tabSwitched', {
-              tab: profileTabs[tabIndex].label,
-            })
+            const tabLabels = ['Личная информация', 'Настройки', 'Обучение', 'Статистика']
+            announcement.textContent = `Переключено на вкладку: ${tabLabels[tabIndex]}`
           }
         }
       }
@@ -170,7 +231,6 @@ export default function ProfilePage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable; profileTabs recreated each render (adding would cause infinite loop)
   }, [activeTab, showKeyboardHints, router])
 
   // Handle touch gestures for mobile tab navigation (iOS Safari compatible)
@@ -227,13 +287,8 @@ export default function ProfilePage() {
         // Announce to screen readers
         const announcement = document.getElementById('swipe-announcement')
         if (announcement) {
-          const tabLabels = [
-            t('tabs.personal.label'),
-            t('tabs.settings.label'),
-            t('tabs.learning.label'),
-            t('tabs.statistics.label'),
-          ]
-          announcement.textContent = t('announcements.tabSwitched', { tab: tabLabels[newIndex] })
+          const tabLabels = ['Личная информация', 'Настройки', 'Обучение', 'Статистика']
+          announcement.textContent = `Переключено на вкладку: ${tabLabels[newIndex]}`
         }
 
         // Haptic feedback for iOS devices
@@ -246,7 +301,6 @@ export default function ProfilePage() {
     // Reset touch positions
     setTouchStartX(0)
     setTouchEndX(0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
   }, [touchStartX, touchEndX, activeTab])
 
   // Load profile data and preferences
@@ -298,8 +352,6 @@ export default function ProfilePage() {
           avatar_url: data.avatar_url || undefined,
           bio: data.bio || undefined,
           role: (data.role as 'student' | 'admin' | 'superadmin') || 'student',
-          telegram_chat_id: data.telegram_chat_id || undefined,
-          telegram_notifications_enabled: data.telegram_notifications_enabled ?? false,
           created_at: data.created_at || undefined,
           updated_at: data.updated_at || undefined,
           preferences: userPreferences,
@@ -313,7 +365,7 @@ export default function ProfilePage() {
         setProfile(enhancedProfile)
       } catch {
         // Failed to load profile - error will be shown via toast
-        setError(t('errors.loadFailed'))
+        setError('Не удалось загрузить профиль. Попробуйте обновить страницу.')
       } finally {
         setIsLoading(false)
       }
@@ -322,8 +374,7 @@ export default function ProfilePage() {
     if (session?.user && mounted) {
       void loadProfile()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
-  }, [session, supabase, mounted, setTheme])
+  }, [session, supabase, mounted, theme, setTheme])
 
   // Avatar upload handler
   const handleAvatarUpload = useCallback(
@@ -334,13 +385,13 @@ export default function ProfilePage() {
 
       // Validate file type
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-        toast.error(t('avatar.invalidType'))
+        toast.error('Пожалуйста, загрузите изображение (JPEG, PNG или WebP)')
         return
       }
 
       // Validate file size
       if (file.size > 5 * 1024 * 1024) {
-        toast.error(t('avatar.sizeError'))
+        toast.error('Размер файла не должен превышать 5MB')
         return
       }
 
@@ -354,14 +405,14 @@ export default function ProfilePage() {
 
             // Check minimum dimensions
             if (width < 100 || height < 100) {
-              toast.error(t('avatar.tooSmall'))
+              toast.error('Изображение слишком маленькое. Минимальный размер 100x100 пикселей.')
               resolve(false)
               return
             }
 
             // Check maximum dimensions
             if (width > 4096 || height > 4096) {
-              toast.error(t('avatar.tooLarge'))
+              toast.error('Изображение слишком большое. Максимальный размер 4096x4096 пикселей.')
               resolve(false)
               return
             }
@@ -369,7 +420,9 @@ export default function ProfilePage() {
             // Check aspect ratio (allow up to 3:1 or 1:3)
             const aspectRatio = width / height
             if (aspectRatio > 3 || aspectRatio < 0.33) {
-              toast.error(t('avatar.aspectRatio'))
+              toast.error(
+                'Неподходящее соотношение сторон. Используйте более квадратное изображение.'
+              )
               resolve(false)
               return
             }
@@ -378,7 +431,7 @@ export default function ProfilePage() {
           }
           img.onerror = () => {
             URL.revokeObjectURL(img.src)
-            toast.error(t('avatar.validationFailed'))
+            toast.error('Не удалось загрузить изображение для проверки.')
             resolve(false)
           }
           img.src = URL.createObjectURL(file)
@@ -406,10 +459,10 @@ export default function ProfilePage() {
         if (uploadError) {
           // Upload error handled, showing user notification
           const errorMessage = uploadError.message?.includes('row-level security')
-            ? t('avatar.noPermission')
+            ? 'У вас нет прав для загрузки файлов. Обратитесь к администратору.'
             : uploadError.message?.includes('Storage')
-              ? t('avatar.storageError')
-              : t('avatar.uploadError')
+              ? 'Ошибка хранилища. Попробуйте позже.'
+              : 'Не удалось загрузить файл. Проверьте соединение и попробуйте снова.'
           toast.error(errorMessage)
           return
         }
@@ -432,25 +485,24 @@ export default function ProfilePage() {
         if (updateError) {
           // Update error handled, showing user notification
           const errorMessage = updateError.message?.includes('duplicate')
-            ? t('avatar.duplicateError')
+            ? 'Такой аватар уже существует. Попробуйте другое изображение.'
             : updateError.message?.includes('permission')
-              ? t('avatar.permissionError')
-              : t('avatar.updateError', { error: updateError.message || '' })
+              ? 'У вас нет прав для обновления профиля.'
+              : `Не удалось обновить профиль: ${updateError.message || 'Неизвестная ошибка'}`
           toast.error(errorMessage)
           return
         }
 
         // Update local state
         setProfile({ ...profile, avatar_url: publicUrl })
-        toast.success(t('avatar.updateSuccess'))
+        toast.success('Аватар успешно обновлен')
       } catch {
         // Avatar upload error handled, showing user notification
-        toast.error(t('avatar.uploadFailed'))
+        toast.error('Не удалось загрузить аватар')
       } finally {
         setTimeout(() => setUploadProgress(0), 1000)
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t from next-intl is stable
     [session, supabase, profile]
   )
 
@@ -481,25 +533,12 @@ export default function ProfilePage() {
 
           if (error) {
             const errorMessage = error.message?.includes('row-level security')
-              ? t('errors.rlsError')
+              ? 'У вас нет прав для изменения этих данных.'
               : error.message?.includes('unique')
-                ? t('errors.uniqueError')
-                : t('errors.saveError', { error: error.message || '' })
+                ? 'Это имя уже используется другим пользователем.'
+                : `Ошибка сохранения: ${error.message || 'Попробуйте позже'}`
             toast.error(errorMessage)
             return
-          }
-
-          // Sync profile fields to auth user_metadata so header/nav update immediately
-          const authData: Record<string, string> = {}
-          if (profileUpdates.full_name !== undefined) authData.full_name = profileUpdates.full_name
-          if (profileUpdates.avatar_url !== undefined)
-            authData.avatar_url = profileUpdates.avatar_url
-          if (Object.keys(authData).length > 0) {
-            const { error: authError } = await supabase.auth.updateUser({ data: authData })
-            if (authError) {
-              logger.warn('Failed to sync profile to auth metadata', authError.message)
-              toast.warning(t('warnings.profileSyncPartial'))
-            }
           }
         }
 
@@ -549,15 +588,15 @@ export default function ProfilePage() {
 
         // Update local state
         setProfile({ ...profile, ...profileUpdates })
-        toast.success(t('success.settingsSaved'))
+        toast.success('Настройки сохранены')
       } catch {
         // Failed to save settings - error will be shown via toast
-        toast.error(t('errors.saveFailed'))
+        toast.error('Не удалось сохранить настройки')
       } finally {
         setIsSaving(false)
       }
     },
-    [session, supabase, profile, preferences, mounted, setTheme, t]
+    [session, supabase, profile, preferences, mounted, setTheme]
   )
 
   // Export data function
@@ -580,8 +619,8 @@ export default function ProfilePage() {
     document.body.appendChild(link)
     link.click()
 
-    toast.success(t('success.dataExported'))
-  }, [profile, t])
+    toast.success('Данные экспортированы')
+  }, [profile])
 
   // Delete account function
   const deleteAccount = useCallback(async () => {
@@ -600,10 +639,14 @@ export default function ProfilePage() {
         },
       })
 
-      const data = await response.json()
+      const data = (await response.json()) as {
+        error?: string
+        partial?: boolean
+        message?: string
+      }
 
       if (!response.ok) {
-        toast.error(data.error || t('accountSettings.deleteAccountFailed'))
+        toast.error(data.error || 'Не удалось удалить аккаунт')
         return
       }
 
@@ -612,16 +655,16 @@ export default function ProfilePage() {
         toast.warning(data.message)
       } else {
         // Full deletion successful
-        toast.success(data.message || t('accountSettings.deleteAccountSuccess'))
+        toast.success(data.message || 'Аккаунт успешно удален')
       }
 
       // Redirect to home page
       router.push('/')
     } catch {
       // Delete account error handled, showing user notification
-      toast.error(t('accountSettings.deleteAccountTryLater'))
+      toast.error('Не удалось удалить аккаунт. Попробуйте позже.')
     }
-  }, [session, router, t])
+  }, [session, router])
 
   // Loading state
   if (sessionLoading || isLoading) {
@@ -675,14 +718,16 @@ export default function ProfilePage() {
                   size="icon"
                   onClick={() => {
                     if (hasUnsavedChanges) {
-                      if (confirm(t('confirmations.unsavedChangesNav'))) {
+                      if (
+                        confirm('У вас есть несохраненные изменения. Вы уверены, что хотите выйти?')
+                      ) {
                         router.back()
                       }
                     } else {
                       router.back()
                     }
                   }}
-                  aria-label={t('navigation.back')}
+                  aria-label="Назад"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
@@ -691,10 +736,10 @@ export default function ProfilePage() {
                   aria-label="Breadcrumb"
                 >
                   <Link href="/" className="hover:text-foreground transition-colors">
-                    {t('navigation.home')}
+                    Главная
                   </Link>
                   <ChevronRight className="h-4 w-4" />
-                  <span className="text-foreground">{t('navigation.profile')}</span>
+                  <span className="text-foreground">Профиль</span>
                 </nav>
               </div>
               <Button
@@ -702,14 +747,16 @@ export default function ProfilePage() {
                 size="icon"
                 onClick={() => {
                   if (hasUnsavedChanges) {
-                    if (confirm(t('confirmations.unsavedChangesNav'))) {
+                    if (
+                      confirm('У вас есть несохраненные изменения. Вы уверены, что хотите выйти?')
+                    ) {
                       router.push('/')
                     }
                   } else {
                     router.push('/')
                   }
                 }}
-                aria-label={t('navigation.close')}
+                aria-label="Закрыть"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -728,7 +775,7 @@ export default function ProfilePage() {
             }
           }}
         >
-          {t('navigation.skipToMain')}
+          Перейти к основному содержимому
         </a>
 
         {/* Screen reader announcements */}
@@ -745,52 +792,54 @@ export default function ProfilePage() {
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-lg font-semibold">
                   <Keyboard className="h-5 w-5" />
-                  {t('keyboard.title')}
+                  Сочетания клавиш
                 </h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowKeyboardHints(false)}
-                  aria-label={t('keyboard.closeHints')}
+                  aria-label="Закрыть подсказки"
                 >
                   ✕
                 </Button>
               </div>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('keyboard.showHelp')}</span>
+                  <span className="text-muted-foreground">Показать эту справку</span>
                   <kbd className="rounded border px-2 py-1 text-xs">Shift + ?</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('keyboard.personalInfo')}</span>
+                  <span className="text-muted-foreground">Личная информация</span>
                   <kbd className="rounded border px-2 py-1 text-xs">Ctrl/⌘ + 1</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('keyboard.settings')}</span>
+                  <span className="text-muted-foreground">Настройки</span>
                   <kbd className="rounded border px-2 py-1 text-xs">Ctrl/⌘ + 2</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('keyboard.learning')}</span>
+                  <span className="text-muted-foreground">Обучение</span>
                   <kbd className="rounded border px-2 py-1 text-xs">Ctrl/⌘ + 3</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('keyboard.statistics')}</span>
+                  <span className="text-muted-foreground">Статистика</span>
                   <kbd className="rounded border px-2 py-1 text-xs">Ctrl/⌘ + 4</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('keyboard.nextTab')}</span>
+                  <span className="text-muted-foreground">Следующая вкладка</span>
                   <kbd className="rounded border px-2 py-1 text-xs">→</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('keyboard.previousTab')}</span>
+                  <span className="text-muted-foreground">Предыдущая вкладка</span>
                   <kbd className="rounded border px-2 py-1 text-xs">←</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('keyboard.closeDialog')}</span>
+                  <span className="text-muted-foreground">Закрыть диалог</span>
                   <kbd className="rounded border px-2 py-1 text-xs">Esc</kbd>
                 </div>
               </div>
-              <p className="text-muted-foreground mt-4 text-xs">{t('keyboard.tip')}</p>
+              <p className="text-muted-foreground mt-4 text-xs">
+                Совет: используйте Tab для навигации по элементам формы
+              </p>
             </Card>
           </div>
         )}
@@ -811,7 +860,7 @@ export default function ProfilePage() {
             className="flex-1 overflow-y-auto"
             ref={mainContentRef}
             tabIndex={-1}
-            aria-label={t('navigation.mainContent')}
+            aria-label="Основное содержимое профиля"
           >
             <div className="container mx-auto max-w-4xl px-6 py-8">
               <ProfileContent
@@ -838,18 +887,18 @@ export default function ProfilePage() {
           role="presentation"
         >
           <div className="container mx-auto px-4 py-6">
-            <ProfileHeaderBanner profile={profileWithPrefs || profile} />
+            <ProfileHeader profile={profileWithPrefs || profile} />
 
             <Tabs
               value={activeTab}
               onValueChange={setActiveTab}
               className="mt-6"
-              aria-label={t('navigation.profileSections')}
+              aria-label="Разделы профиля"
             >
               <TabsList
                 className="grid w-full grid-cols-2 sm:grid-cols-4"
                 role="tablist"
-                aria-label={t('navigation.profileNav')}
+                aria-label="Навигация по профилю"
               >
                 {profileTabs.map((tab) => (
                   <TabsTrigger
@@ -886,5 +935,365 @@ export default function ProfilePage() {
         </div>
       </div>
     </ErrorBoundary>
+  )
+}
+
+// Desktop Sidebar Component
+const ProfileSidebar = React.memo(function ProfileSidebar({
+  profile,
+  activeTab,
+  onTabChange,
+  tabs,
+}: {
+  profile: UserProfile | (UserProfile & UserPrefs)
+  activeTab: string
+  onTabChange: (value: string) => void
+  tabs: typeof profileTabs
+}) {
+  return (
+    <aside className="w-80 border-r" role="navigation" aria-label="Навигация по профилю">
+      <div className="sticky top-0 h-screen overflow-y-auto">
+        {/* Profile Header with gradient accent */}
+        <div className="relative overflow-hidden border-b p-6">
+          <div className="gradient-subtle absolute inset-0" />
+          <div className="relative z-10">
+            <ProfileHeader profile={profile} />
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="p-4" aria-label="Основная навигация профиля">
+          <ul className="space-y-2">
+            {tabs.map((tab) => (
+              <li key={tab.value}>
+                <button
+                  onClick={() => onTabChange(tab.value)}
+                  role="tab"
+                  aria-selected={activeTab === tab.value}
+                  aria-controls={`${tab.value}-panel`}
+                  id={`desktop-${tab.value}-tab`}
+                  tabIndex={activeTab === tab.value ? 0 : -1}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left',
+                    'transition-all duration-200 ease-in-out',
+                    'tab-hover', // Add hover class for all tabs
+                    activeTab === tab.value
+                      ? 'tab-active'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <tab.icon className="h-5 w-5" />
+                  <div className="flex-1">
+                    <div className="font-medium">{tab.label}</div>
+                    <div className="mt-0.5 text-xs opacity-75">{tab.description}</div>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </aside>
+  )
+})
+
+// Profile Header Component
+const ProfileHeader = React.memo(function ProfileHeader({
+  profile,
+}: {
+  profile: UserProfile | (UserProfile & UserPrefs)
+}) {
+  const roleLabel =
+    profile.role === 'superadmin'
+      ? 'Супер администратор'
+      : profile.role === 'admin'
+        ? 'Администратор'
+        : 'Пользователь'
+  const initials =
+    profile.full_name
+      ?.split(' ')
+      ?.map((n) => n[0])
+      ?.join('')
+      ?.toUpperCase() ||
+    profile.email?.split('@')[0]?.slice(0, 2)?.toUpperCase() ||
+    'U'
+
+  return (
+    <div className="flex items-center gap-4" role="banner" aria-label="Информация о пользователе">
+      <div className="group relative">
+        <div className="avatar-ring h-16 w-16">
+          <div className="bg-background flex h-full w-full items-center justify-center overflow-hidden rounded-full">
+            {profile.avatar_url ? (
+              <Image
+                src={profile.avatar_url}
+                alt={`Аватар пользователя ${profile.full_name || profile.email}`}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                fill
+                sizes="64px"
+                priority={false}
+              />
+            ) : (
+              <span
+                className="gradient-text text-xl font-semibold"
+                aria-label={`Инициалы: ${initials}`}
+              >
+                {initials}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <h1 className="gradient-text truncate text-lg font-semibold" id="profile-heading">
+          {profile.full_name || 'Пользователь'}
+        </h1>
+        <p className="text-muted-foreground truncate text-sm">{profile.email}</p>
+        {profile.role && profile.role !== 'student' && (
+          <span
+            className="gradient-badge text-primary mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium transition-all duration-300 hover:shadow-lg"
+            role="status"
+            aria-label={`Роль: ${roleLabel}`}
+          >
+            {profile.role === 'superadmin' ? 'Супер админ' : 'Админ'}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+})
+
+// Common tab content renderer
+const TabContentRenderer = React.memo(function TabContentRenderer({
+  tabValue,
+  profile,
+  updateProfile,
+  handleAvatarUpload,
+  uploadProgress,
+  isSaving,
+  exportUserData,
+  deleteAccount,
+}: {
+  tabValue: string
+  profile: UserProfile | (UserProfile & UserPrefs)
+  updateProfile: (updates: Partial<UserProfile & UserPrefs>) => Promise<void>
+  handleAvatarUpload: (files: File[]) => Promise<void>
+  uploadProgress: number
+  isSaving: boolean
+  exportUserData: () => void
+  deleteAccount: () => Promise<void>
+}) {
+  const renderContent = React.useCallback(() => {
+    switch (tabValue) {
+      case 'personal':
+        return (
+          <PersonalInfoSection
+            profile={profile}
+            onUpdate={updateProfile}
+            onAvatarUpload={handleAvatarUpload}
+            uploadProgress={uploadProgress}
+            isSaving={isSaving}
+          />
+        )
+      case 'settings':
+        return (
+          <AccountSettingsSection
+            profile={profile}
+            onUpdate={updateProfile}
+            isSaving={isSaving}
+            onExportData={exportUserData}
+            onDeleteAccount={deleteAccount}
+          />
+        )
+      case 'learning':
+        return <LearningPreferencesSection profile={profile} onUpdate={updateProfile} />
+      case 'statistics':
+        return <StatisticsSection profile={profile} />
+      default:
+        return null
+    }
+  }, [
+    tabValue,
+    profile,
+    updateProfile,
+    handleAvatarUpload,
+    uploadProgress,
+    isSaving,
+    exportUserData,
+    deleteAccount,
+  ])
+
+  return <>{renderContent()}</>
+})
+
+// Profile Content Component
+const ProfileContent = React.memo(function ProfileContent({
+  profile,
+  activeTab,
+  tabs,
+  isMobile = false,
+  updateProfile,
+  handleAvatarUpload,
+  uploadProgress,
+  isSaving,
+  exportUserData,
+  deleteAccount,
+}: {
+  profile: UserProfile | (UserProfile & UserPrefs)
+  activeTab: string
+  tabs: typeof profileTabs
+  isMobile?: boolean
+  updateProfile: (updates: Partial<UserProfile & UserPrefs>) => Promise<void>
+  handleAvatarUpload: (files: File[]) => Promise<void>
+  uploadProgress: number
+  isSaving: boolean
+  exportUserData: () => void
+  deleteAccount: () => Promise<void>
+}) {
+  if (!isMobile) {
+    // Desktop: Direct content rendering
+    const currentTab = tabs.find((t) => t.value === activeTab)
+
+    return (
+      <section
+        role="tabpanel"
+        id={`${activeTab}-panel`}
+        aria-labelledby={`desktop-${activeTab}-tab`}
+        tabIndex={0}
+      >
+        <div className="animate-tabFadeIn mb-6">
+          <h2 className="flex items-center gap-3 text-2xl font-bold" id="section-heading">
+            {currentTab && (
+              <>
+                <currentTab.icon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <span className="gradient-text">{currentTab.label}</span>
+              </>
+            )}
+          </h2>
+          <p className="text-muted-foreground mt-1">{currentTab?.description}</p>
+        </div>
+
+        <div className="animate-tabSlideIn space-y-6">
+          <TabContentRenderer
+            tabValue={activeTab}
+            profile={profile}
+            updateProfile={updateProfile}
+            handleAvatarUpload={handleAvatarUpload}
+            uploadProgress={uploadProgress}
+            isSaving={isSaving}
+            exportUserData={exportUserData}
+            deleteAccount={deleteAccount}
+          />
+        </div>
+      </section>
+    )
+  }
+
+  // Mobile: Tabs content
+  return (
+    <>
+      {tabs.map((tab) => (
+        <TabsContent key={tab.value} value={tab.value} className="animate-tabSlideIn mt-0">
+          <div className="animate-tabSlideIn space-y-6">
+            <TabContentRenderer
+              tabValue={tab.value}
+              profile={profile}
+              updateProfile={updateProfile}
+              handleAvatarUpload={handleAvatarUpload}
+              uploadProgress={uploadProgress}
+              isSaving={isSaving}
+              exportUserData={exportUserData}
+              deleteAccount={deleteAccount}
+            />
+          </div>
+        </TabsContent>
+      ))}
+    </>
+  )
+})
+
+// Loading Skeleton Component
+function ProfilePageSkeleton() {
+  return (
+    <div className="bg-background relative min-h-screen">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-100/20 via-transparent to-pink-100/20 dark:from-purple-900/10 dark:to-pink-900/10" />
+      <div className="relative z-10 hidden lg:flex">
+        {/* Desktop Skeleton */}
+        <aside className="w-80 border-r">
+          <div className="border-b p-6">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-16 w-16 rounded-full" />
+              <div className="flex-1">
+                <Skeleton className="mb-2 h-5 w-32" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2 p-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="shimmer h-16 w-full rounded-lg" />
+            ))}
+          </div>
+        </aside>
+        <main className="flex-1 p-8">
+          <div className="mx-auto max-w-4xl space-y-6">
+            <div>
+              <Skeleton className="mb-2 h-8 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <Card className="p-6">
+              <Skeleton className="mb-4 h-6 w-32" />
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i}>
+                    <Skeleton className="mb-2 h-4 w-24" />
+                    <Skeleton className="h-5 w-full max-w-sm" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </main>
+      </div>
+
+      {/* Mobile Skeleton */}
+      <div className="p-4 lg:hidden">
+        <div className="mb-6 flex items-center gap-4">
+          <Skeleton className="h-16 w-16 rounded-full" />
+          <div className="flex-1">
+            <Skeleton className="mb-2 h-5 w-32" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <Skeleton className="mb-6 h-10 w-full" />
+        <Card className="p-6">
+          <Skeleton className="mb-4 h-6 w-32" />
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i}>
+                <Skeleton className="mb-2 h-4 w-24" />
+                <Skeleton className="h-5 w-full" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+// Error Boundary Component
+function ProfileErrorBoundary({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return (
+    <Card className="mx-auto max-w-md p-8 text-center">
+      <AlertTriangle className="text-destructive mx-auto mb-4 h-12 w-12" />
+      <h2 className="mb-2 text-lg font-semibold">Произошла ошибка</h2>
+      <p className="text-muted-foreground mb-4">{error}</p>
+      <button
+        onClick={onRetry}
+        className="btn-primary transform rounded-md px-4 py-2 transition-all duration-300 hover:scale-105"
+      >
+        Попробовать снова
+      </button>
+    </Card>
   )
 }

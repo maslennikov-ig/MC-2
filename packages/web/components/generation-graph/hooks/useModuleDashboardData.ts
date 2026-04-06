@@ -5,14 +5,19 @@ import { getSupabaseClient } from '@/lib/supabase/browser-client'
 import { logger } from '@/lib/client-logger'
 import type { Database } from '@/types/database.generated'
 import type {
-  ModuleDashboardData,
-  ModuleDashboardAggregates,
-  LessonMatrixRow,
   MicroStepperState,
   Stage6NodeName,
   Stage6NodeStatus,
   CourseStructure,
 } from '@megacampus/shared-types'
+import {
+  calculateReviewAwareAggregates,
+  getReviewAwareModuleStatus,
+  isReviewRequiredStatus,
+  mapStage6LessonStatus,
+  type ReviewAwareLessonMatrixRow,
+  type ReviewAwareModuleDashboardData,
+} from '../stage6-review-status'
 
 /**
  * Metadata structure from lesson_contents.metadata JSONB column
@@ -47,7 +52,7 @@ function parseMetadata(
  */
 export interface UseModuleDashboardDataReturn {
   /** Aggregated module dashboard data */
-  data: ModuleDashboardData | null
+  data: ReviewAwareModuleDashboardData | null
   /** Loading state */
   isLoading: boolean
   /** Error state */
@@ -73,29 +78,6 @@ export interface UseModuleDashboardDataOptions {
 }
 
 /**
- * Map database status to Stage6NodeStatus
- */
-function mapLessonStatus(
-  status: string
-): 'pending' | 'active' | 'completed' | 'approved' | 'error' {
-  switch (status.toLowerCase()) {
-    case 'approved':
-      return 'approved'
-    case 'completed':
-      return 'completed'
-    case 'generating':
-    case 'active':
-      return 'active'
-    case 'failed':
-    case 'error':
-      return 'error'
-    case 'pending':
-    default:
-      return 'pending'
-  }
-}
-
-/**
  * Extract pipeline state from generation_trace or metadata
  *
  * FUTURE: When generation_trace JSONB column is added to lesson_contents,
@@ -103,7 +85,7 @@ function mapLessonStatus(
  * For now, we derive state from status column only.
  */
 function extractPipelineState(status: string, _metadata: LessonMetadata | null): MicroStepperState {
-  const lessonStatus = mapLessonStatus(status)
+  const lessonStatus = mapStage6LessonStatus(status)
 
   // Default pipeline: all nodes pending (3-node pipeline: generator → selfReviewer → judge)
   const nodes: Array<{ node: Stage6NodeName; status: Stage6NodeStatus }> = [
@@ -127,83 +109,6 @@ function extractPipelineState(status: string, _metadata: LessonMetadata | null):
   }
 
   return { nodes }
-}
-
-/**
- * Calculate aggregated metrics from lesson rows
- */
-function calculateAggregates(lessons: LessonMatrixRow[]): ModuleDashboardAggregates {
-  const totalLessons = lessons.length
-  const completedLessons = lessons.filter((l) => l.status === 'completed').length
-  const approvedLessons = lessons.filter((l) => l.status === 'approved').length
-  const activeLessons = lessons.filter((l) => l.status === 'active').length
-  const errorLessons = lessons.filter((l) => l.status === 'error').length
-  const pendingLessons = lessons.filter((l) => l.status === 'pending').length
-
-  // Sum total cost
-  const totalCostUsd = lessons.reduce((sum, l) => sum + l.costUsd, 0)
-
-  // Sum total tokens
-  const totalTokens = lessons.reduce((sum, l) => sum + (l.totalTokens || 0), 0)
-
-  // Calculate average quality score (from completed and approved lessons - they are "done")
-  const doneWithQuality = lessons.filter(
-    (l) => (l.status === 'completed' || l.status === 'approved') && l.qualityScore !== null
-  )
-  const avgQualityScore =
-    doneWithQuality.length > 0
-      ? doneWithQuality.reduce((sum, l) => sum + (l.qualityScore || 0), 0) / doneWithQuality.length
-      : null
-
-  // Sum total duration (only completed and approved lessons)
-  const totalDurationMs = lessons.reduce((sum, l) => sum + (l.durationMs || 0), 0)
-
-  // Estimate time remaining
-  // Average duration per done lesson × number of pending/active lessons
-  const doneWithDuration = lessons.filter(
-    (l) =>
-      (l.status === 'completed' || l.status === 'approved') &&
-      l.durationMs !== null &&
-      l.durationMs > 0
-  )
-  const avgDurationPerLesson =
-    doneWithDuration.length > 0
-      ? doneWithDuration.reduce((sum, l) => sum + (l.durationMs || 0), 0) / doneWithDuration.length
-      : null
-
-  const remainingLessons = pendingLessons + activeLessons
-  const estimatedTimeRemainingMs =
-    avgDurationPerLesson !== null && remainingLessons > 0
-      ? avgDurationPerLesson * remainingLessons
-      : null
-
-  return {
-    totalLessons,
-    completedLessons,
-    approvedLessons,
-    activeLessons,
-    errorLessons,
-    pendingLessons,
-    totalCostUsd,
-    avgQualityScore,
-    totalDurationMs,
-    estimatedTimeRemainingMs,
-    totalTokens,
-  }
-}
-
-/**
- * Determine overall module status from lessons
- */
-function getModuleStatus(lessons: LessonMatrixRow[]): 'pending' | 'active' | 'completed' | 'error' {
-  if (lessons.length === 0) return 'pending'
-
-  if (lessons.some((l) => l.status === 'error')) return 'error'
-  if (lessons.some((l) => l.status === 'active')) return 'active'
-  // Module is completed if all lessons are either 'completed' or 'approved'
-  if (lessons.every((l) => l.status === 'completed' || l.status === 'approved')) return 'completed'
-
-  return 'pending'
 }
 
 /**
@@ -247,7 +152,7 @@ export function useModuleDashboardData({
   enableRealtime = true,
   enabled = true,
 }: UseModuleDashboardDataOptions): UseModuleDashboardDataReturn {
-  const [data, setData] = useState<ModuleDashboardData | null>(null)
+  const [data, setData] = useState<ReviewAwareModuleDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [internalCourseStructure, setInternalCourseStructure] = useState<CourseStructure | null>(
@@ -308,7 +213,7 @@ export function useModuleDashboardData({
       }
     }
 
-    fetchCourseStructure()
+    void fetchCourseStructure()
 
     return () => {
       ignore = true
@@ -405,12 +310,14 @@ export function useModuleDashboardData({
             activeLessons: 0,
             errorLessons: 0,
             pendingLessons: 0,
+            reviewRequiredLessons: 0,
             totalCostUsd: 0,
             avgQualityScore: null,
             totalDurationMs: 0,
             estimatedTimeRemainingMs: null,
             totalTokens: 0,
           },
+          needsReview: false,
         })
         setIsLoading(false)
         return
@@ -436,7 +343,7 @@ export function useModuleDashboardData({
           }
         )
         // Section not yet created in DB - show pending state with expected lessons
-        const pendingLessons: LessonMatrixRow[] = Array.from(
+        const pendingLessons: ReviewAwareLessonMatrixRow[] = Array.from(
           { length: expectedLessonCount },
           (_, idx) => ({
             lessonId: `${moduleNumber}.${idx + 1}`,
@@ -450,6 +357,7 @@ export function useModuleDashboardData({
             retryCount: 0,
             canRetry: false,
             totalTokens: null,
+            needsReview: false,
           })
         )
 
@@ -459,7 +367,8 @@ export function useModuleDashboardData({
           title: moduleTitle,
           status: 'pending',
           lessons: pendingLessons,
-          aggregates: calculateAggregates(pendingLessons),
+          aggregates: calculateReviewAwareAggregates(pendingLessons),
+          needsReview: false,
         })
         setIsLoading(false)
         return
@@ -515,7 +424,7 @@ export function useModuleDashboardData({
 
       // Build lesson matrix rows
       // Use lessons from DB if available, otherwise use expected count from course structure
-      const lessonRows: LessonMatrixRow[] = []
+      const lessonRows: ReviewAwareLessonMatrixRow[] = []
 
       if (lessons.length > 0) {
         // Use actual lessons from database
@@ -541,11 +450,13 @@ export function useModuleDashboardData({
               retryCount: 0,
               canRetry: false,
               totalTokens: null,
+              needsReview: false,
             })
           } else {
-            const status = mapLessonStatus(contentRow.status)
+            const status = mapStage6LessonStatus(contentRow.status)
             const metadata = parseMetadata(contentRow.metadata)
             const pipelineState = extractPipelineState(contentRow.status, metadata)
+            const needsReview = isReviewRequiredStatus(contentRow.status)
 
             lessonRows.push({
               lessonId: lessonLabel,
@@ -559,6 +470,7 @@ export function useModuleDashboardData({
               retryCount: contentRow.generation_attempt > 1 ? contentRow.generation_attempt - 1 : 0,
               canRetry: status === 'error',
               totalTokens: metadata?.total_tokens ?? null,
+              needsReview,
             })
           }
         }
@@ -581,23 +493,25 @@ export function useModuleDashboardData({
             retryCount: 0,
             canRetry: false,
             totalTokens: null,
+            needsReview: false,
           })
         }
       }
 
       // Calculate aggregates
-      const aggregates = calculateAggregates(lessonRows)
+      const aggregates = calculateReviewAwareAggregates(lessonRows)
 
       // Determine module status
-      const moduleStatus = getModuleStatus(lessonRows)
+      const moduleStatus = getReviewAwareModuleStatus(lessonRows)
 
-      const dashboardData: ModuleDashboardData = {
+      const dashboardData: ReviewAwareModuleDashboardData = {
         moduleId,
         moduleNumber,
         title: moduleTitle,
         status: moduleStatus,
         lessons: lessonRows,
         aggregates,
+        needsReview: aggregates.reviewRequiredLessons > 0,
       }
 
       setData(dashboardData)
@@ -638,7 +552,7 @@ export function useModuleDashboardData({
     // fetchLessonData increments fetchIdRef.current internally and checks against it
     // When user rapidly switches modules, old requests will be ignored
     const fetchIdRefLocal = fetchIdRef
-    fetchLessonData()
+    void fetchLessonData()
 
     return () => {
       // Cleanup: increment fetchId to mark current fetch as stale
@@ -696,7 +610,7 @@ export function useModuleDashboardData({
             })
 
             // Refetch data to get updated state
-            fetchLessonData()
+            void fetchLessonData()
           } else {
             logger.debug('Realtime update ignored (not in current module)', {
               event: payload.eventType,
@@ -710,13 +624,13 @@ export function useModuleDashboardData({
 
     return () => {
       logger.debug('Unsubscribing from realtime channel', { moduleId })
-      channel.unsubscribe()
+      void channel.unsubscribe()
     }
   }, [enableRealtime, courseId, moduleId, getLessonCountForModule, fetchLessonData, supabase])
 
   // Refetch function for manual refresh
   const refetch = useCallback(() => {
-    fetchLessonData()
+    void fetchLessonData()
   }, [fetchLessonData])
 
   return {

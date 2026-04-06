@@ -18,6 +18,7 @@
  */
 
 import { z } from 'zod'
+import { CONCLUSION_HEADINGS } from '@megacampus/shared-types'
 
 export interface ParsedLessonContent {
   intro?: string
@@ -48,7 +49,7 @@ export const parsedLessonContentSchema = z
   .strict()
 
 const INTRO_HEADINGS = ['введение', 'introduction']
-const SUMMARY_HEADINGS = ['заключение', 'summary', 'итоги', 'выводы']
+const SUMMARY_HEADINGS = CONCLUSION_HEADINGS as readonly string[]
 
 export function parseMarkdownToContent(markdown: string): ParsedLessonContent {
   const result: ParsedLessonContent = {}

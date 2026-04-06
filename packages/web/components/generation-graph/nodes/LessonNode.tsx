@@ -15,6 +15,7 @@ import {
 } from '../hooks/useNodeStatusStyles'
 import { logger } from '@/lib/client-logger'
 import { AssetDock } from './AssetDock'
+import { getReviewAwareGraphNodeState } from '../stage6-review-status'
 // DISABLED: Enrichments now created via Course Viewer, not Workflow
 // import { EnrichmentNodeToolbar } from '../components/EnrichmentNodeToolbar';
 // import { useEnrichmentInspectorStore, type CreateEnrichmentType } from '../stores/enrichment-inspector-store';
@@ -31,10 +32,12 @@ const MinimalLessonNode = ({
 }) => {
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status
+  const needsReview = Boolean(data.needsReview)
+  const visualStatus = needsReview ? getReviewAwareGraphNodeState('review_required').visualStatus : currentStatus
 
   return (
     <div
-      className={`relative h-4 w-4 cursor-pointer rounded-sm transition-all duration-300 ${getStatusColor(currentStatus)} ${currentStatus === 'active' ? 'animate-pulse' : ''} `}
+      className={`relative h-4 w-4 cursor-pointer rounded-sm transition-all duration-300 ${getStatusColor(visualStatus)} ${currentStatus === 'active' ? 'animate-pulse' : ''} `}
       title={data.title}
       data-testid={`node-minimal-lesson-${id}`}
       onDoubleClick={onDoubleClick}
@@ -56,11 +59,13 @@ const MediumLessonNode = ({
 }) => {
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status
+  const needsReview = Boolean(data.needsReview)
+  const visualStatus = needsReview ? getReviewAwareGraphNodeState('review_required').visualStatus : currentStatus
   const hasEnrichments = (data.enrichmentCount ?? 0) > 0
 
   return (
     <div
-      className={`relative flex w-[90px] cursor-pointer items-center justify-center rounded border px-1.5 py-1 text-center transition-all duration-300 ${getNodeStatusStyles(currentStatus, 'lesson')} ${selected ? 'ring-2 ring-blue-400 ring-offset-1' : ''} `}
+      className={`relative flex w-[90px] cursor-pointer items-center justify-center rounded border px-1.5 py-1 text-center transition-all duration-300 ${getNodeStatusStyles(visualStatus, 'lesson')} ${selected ? 'ring-2 ring-blue-400 ring-offset-1' : ''} `}
       data-testid={`node-medium-lesson-${id}`}
       onDoubleClick={onDoubleClick}
     >
@@ -86,6 +91,7 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   // Subscribe to realtime status updates - MUST be called before any conditional returns (Rules of Hooks)
   const statusEntry = useNodeStatus(id)
   const realtimeStatus = statusEntry?.status || data.status
+  const needsReview = Boolean(data.needsReview)
 
   // Partial generation context (optional - may not be in provider)
   const contextValue = useOptionalPartialGenerationContext()
@@ -110,6 +116,7 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   // Determine effective status: treat generating lessons as 'active'
   const isCurrentlyGenerating = isLessonGenerating(getLessonIdForApi())
   const currentStatus = isCurrentlyGenerating ? 'active' : realtimeStatus
+  const visualStatus = needsReview ? getReviewAwareGraphNodeState('review_required').visualStatus : currentStatus
 
   // Workaround: React Flow captures onDoubleClick, so we detect it manually via click timing
   // MUST be called before any conditional returns (Rules of Hooks)
@@ -161,6 +168,9 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
 
   // Status text for Line 2 - consistent with DocumentNode style
   const getStatusText = () => {
+    if (needsReview) {
+      return <span className="font-medium text-amber-600 dark:text-amber-400">Требует проверки</span>
+    }
     if (currentStatus === 'approved') {
       return (
         <span className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
@@ -208,10 +218,10 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
 
   return (
     <div
-      className={`group relative flex w-full cursor-pointer flex-col rounded border border-slate-200 transition-all duration-300 dark:border-slate-700 ${hasEnrichments ? 'h-[64px]' : 'h-[50px]'} ${getStatusBorderClass(currentStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
+      className={`group relative flex w-full cursor-pointer flex-col rounded border border-slate-200 transition-all duration-300 dark:border-slate-700 ${hasEnrichments ? 'h-[64px]' : 'h-[50px]'} ${getStatusBorderClass(visualStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
       data-testid={`node-lesson-${id}`}
-      data-node-status={currentStatus}
-      aria-label={`Урок ${lessonNumber}: ${data.title}, статус: ${currentStatus}`}
+      data-node-status={needsReview ? 'review_required' : currentStatus}
+      aria-label={`Урок ${lessonNumber}: ${data.title}, статус: ${needsReview ? 'требует проверки' : currentStatus}`}
       role="button"
       tabIndex={0}
       onClick={handleClick}

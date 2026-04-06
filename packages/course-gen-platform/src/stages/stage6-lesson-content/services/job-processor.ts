@@ -700,6 +700,7 @@ export async function processStage6Job(
             rejectedTokens: result.metrics.rejectedTokens,
             regenerationMode: result.metrics.regenerationMode ?? null,
             reviewInfo: result.reviewInfo,
+            qaSignals: result.lessonContent?.metadata.qa_signals ?? null,
           }
         );
         runCompletionCheck();

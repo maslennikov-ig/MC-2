@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+    - generic "Loading"
+    - alert [ref=e2]:
+        - generic [ref=e3]:
+            - img [ref=e5]
+            - heading "Page Not Found" [level=1] [ref=e8]
+            - paragraph [ref=e9]: The requested page does not exist or has been moved
+            - generic [ref=e10]:
+                - link "Go Home" [ref=e11] [cursor=pointer]:
+                    - /url: /en
+                    - img [ref=e12]
+                    - text: Go Home
+                - button "Go Back" [ref=e15]:
+                    - img [ref=e16]
+                    - text: Go Back
+    - region "Notifications alt+T"
+    - alert [ref=e18]
