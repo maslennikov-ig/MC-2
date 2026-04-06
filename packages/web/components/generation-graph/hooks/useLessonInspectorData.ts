@@ -7,6 +7,7 @@ import { logger } from '@/lib/client-logger'
 import {
   getLatestUsableLessonContent,
   getLessonInspectorContentPresentation,
+  isLessonContentUsable,
 } from './lessonInspectorContent'
 import {
   PipelineNodeState,
@@ -29,6 +30,36 @@ import {
 
 type GenerationTraceRow = Database['public']['Tables']['generation_trace']['Row']
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
+
+interface LessonInspectorContentRowSelection<T extends { status?: string | null }> {
+  statusRow: T | null
+  previewRow: T | null
+}
+
+export function selectLessonInspectorContentRows<T extends LessonContentRow>(
+  rows: T[] | null | undefined
+): LessonInspectorContentRowSelection<T> {
+  const statusRow = rows?.[0] ?? null
+
+  if (!statusRow) {
+    return {
+      statusRow: null,
+      previewRow: null,
+    }
+  }
+
+  if (statusRow.status?.toLowerCase() === 'review_required') {
+    return {
+      statusRow,
+      previewRow: isLessonContentUsable(statusRow) ? statusRow : null,
+    }
+  }
+
+  return {
+    statusRow,
+    previewRow: getLatestUsableLessonContent(rows),
+  }
+}
 
 /**
  * Return type for useLessonInspectorData hook
@@ -792,7 +823,7 @@ export function useLessonInspectorData({
           .order('created_at', { ascending: false })
 
         if (contentError) throw contentError
-        const contentData = getLatestUsableLessonContent(lessonContentRows)
+        const { statusRow, previewRow } = selectLessonInspectorContentRows(lessonContentRows)
 
         // Step 4: Fetch generation traces for this lesson using UUID
         const { data: tracesData, error: tracesError } = await supabase
@@ -819,18 +850,20 @@ export function useLessonInspectorData({
           retryCount,
         } = buildPipelineState(traces)
 
-        const { content, rawMarkdown } = getLessonInspectorContentPresentation(contentData)
+        const { content, rawMarkdown } = getLessonInspectorContentPresentation(previewRow)
 
         // Parse judge result
-        const judgeResult = contentData ? parseJudgeResult(contentData, traces) : null
+        const judgeResult = previewRow ? parseJudgeResult(previewRow, traces) : null
 
         // Build logs
         const logs = buildLogEntries(traces)
 
-        const hasFinishTrace = traces.some((t) => t.step_name === 'finish' && t.phase === 'complete')
+        const hasFinishTrace = traces.some(
+          (t) => t.step_name === 'finish' && t.phase === 'complete'
+        )
         const hasErrorTrace = traces.some((t) => t.error_data != null)
         const { status, needsReview } = deriveLessonInspectorStatus({
-          contentStatus: contentData?.status ?? null,
+          contentStatus: statusRow?.status ?? previewRow?.status ?? null,
           pipelineNodes,
           hasContent: Boolean(rawMarkdown || content),
           hasFinishTrace,
@@ -852,8 +885,7 @@ export function useLessonInspectorData({
           typeof generatorInputData?.style === 'string' ? generatorInputData.style : null
         const traceLanguage =
           typeof generatorInputData?.language === 'string' ? generatorInputData.language : null
-        const traceLessonSpec =
-          (generatorInputData?.lessonSpec as Record<string, unknown>) ?? null
+        const traceLessonSpec = (generatorInputData?.lessonSpec as Record<string, unknown>) ?? null
 
         // Construct final data
         const inspectorData: ReviewAwareLessonInspectorData = {
@@ -895,6 +927,8 @@ export function useLessonInspectorData({
           logsCount: logs.length,
           lessonContentRowsCount: lessonContentRows?.length ?? 0,
           hasContent: !!content,
+          latestLessonContentStatus: statusRow?.status ?? null,
+          previewLessonContentId: previewRow?.id ?? null,
           sourceDocumentsCount: sourceDocuments.length,
         })
       } catch (err) {

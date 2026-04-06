@@ -123,6 +123,25 @@ function InspectorContentErrorFallback({
   )
 }
 
+function ReviewNeededEmptyState({
+  title,
+  description,
+  noContentLabel,
+}: {
+  title: string
+  description: string
+  noContentLabel: string
+}) {
+  return (
+    <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-amber-200 bg-amber-50/60 px-6 py-12 text-center dark:border-amber-800 dark:bg-amber-950/20">
+      <AlertCircle className="mb-4 h-10 w-10 text-amber-500" />
+      <h3 className="text-foreground text-lg font-semibold">{title}</h3>
+      <p className="mt-2 max-w-xl text-sm text-amber-900 dark:text-amber-300">{description}</p>
+      <p className="text-muted-foreground mt-4 text-sm">{noContentLabel}</p>
+    </div>
+  )
+}
+
 // =============================================================================
 // LOG VIEWER COMPONENT
 // =============================================================================
@@ -236,6 +255,9 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
 
   // Localized labels
   const t = useTranslations('generation.stage6.inspector')
+  const hasPreviewContent = Boolean(rawMarkdown?.trim() || content)
+  const showReviewNeededEmptyState = !isEditing && needsReview && !hasPreviewContent
+  const showReviewBanner = needsReview && !showReviewNeededEmptyState
 
   // Action bar visibility - show for completed OR error with content, hide when editing
   const showActions =
@@ -256,7 +278,17 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         )
       }
 
-      if (!rawMarkdown?.trim() && !content) {
+      if (!hasPreviewContent) {
+        if (needsReview) {
+          return (
+            <ReviewNeededEmptyState
+              title={t('reviewRequiredTitle')}
+              description={t('reviewRequiredDescription')}
+              noContentLabel={t('noContent')}
+            />
+          )
+        }
+
         return (
           <div className="text-muted-foreground py-12 text-center text-sm">{t('noContent')}</div>
         )
@@ -468,7 +500,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
           locale={locale}
         />
 
-        {needsReview && (
+        {showReviewBanner && (
           <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
             <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
             <div className="min-w-0 flex-1">
