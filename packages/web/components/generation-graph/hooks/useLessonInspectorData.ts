@@ -5,9 +5,11 @@ import { useSupabase } from '@/lib/supabase/browser-client'
 import { RealtimeChannel } from '@supabase/supabase-js'
 import { logger } from '@/lib/client-logger'
 import {
-  LessonInspectorData,
+  getLatestUsableLessonContent,
+  getLessonInspectorContentPresentation,
+} from './lessonInspectorContent'
+import {
   PipelineNodeState,
-  LessonContentPreview,
   JudgeVerdictDisplay,
   LessonLogEntry,
   Stage6NodeName,
@@ -20,6 +22,10 @@ import {
 } from '@megacampus/shared-types'
 import { isValidSourceDocument } from '../panels/lesson/SourceDocumentsPanel'
 import type { Database } from '@/types/database.generated'
+import {
+  deriveLessonInspectorStatus,
+  type ReviewAwareLessonInspectorData,
+} from '../stage6-review-status'
 
 type GenerationTraceRow = Database['public']['Tables']['generation_trace']['Row']
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
@@ -29,7 +35,7 @@ type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
  */
 export interface UseLessonInspectorDataReturn {
   /** Complete lesson inspector data */
-  data: LessonInspectorData | null
+  data: ReviewAwareLessonInspectorData | null
   /** Whether data is being fetched */
   isLoading: boolean
   /** Fetch error if any */
@@ -104,6 +110,22 @@ function getStatusFromStepName(stepName: string, trace: GenerationTraceRow): Sta
   return 'active'
 }
 
+function stringifyTraceError(errorData: unknown): string | undefined {
+  if (errorData == null) {
+    return undefined
+  }
+
+  if (typeof errorData === 'string') {
+    return errorData
+  }
+
+  try {
+    return JSON.stringify(errorData)
+  } catch {
+    return 'Unserializable trace error'
+  }
+}
+
 /**
  * Build pipeline node states from generation traces
  */
@@ -161,7 +183,7 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
         tokensUsed: (existingNode.tokensUsed || 0) + (trace.tokens_used || 0),
         costUsd: (existingNode.costUsd || 0) + (trace.cost_usd || 0),
         durationMs: (existingNode.durationMs || 0) + (trace.duration_ms || 0),
-        errorMessage: trace.error_data ? String(trace.error_data) : existingNode.errorMessage,
+        errorMessage: stringifyTraceError(trace.error_data) ?? existingNode.errorMessage,
         retryAttempt: Math.max(existingNode.retryAttempt || 0, trace.retry_attempt || 0),
         output: trace.output_data || existingNode.output,
       })
@@ -175,7 +197,7 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
         tokensUsed: trace.tokens_used || 0,
         costUsd: trace.cost_usd || 0,
         durationMs: trace.duration_ms || 0,
-        errorMessage: trace.error_data ? String(trace.error_data) : undefined,
+        errorMessage: stringifyTraceError(trace.error_data),
         retryAttempt: trace.retry_attempt || 0,
         output: trace.output_data || undefined,
       })
@@ -244,158 +266,6 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
 /**
  * Parse lesson content body into preview format
  */
-function parseLessonContent(contentRow: LessonContentRow): LessonContentPreview | null {
-  if (!contentRow.content || typeof contentRow.content !== 'object') return null
-
-  let contentObj = contentRow.content as Record<string, unknown>
-
-  // Handle nested structure: {status, content: {...}, metadata: {...}}
-  if (contentObj.content && typeof contentObj.content === 'object') {
-    contentObj = contentObj.content as Record<string, unknown>
-  }
-
-  const intro = contentObj.intro as string | undefined
-  const sections = contentObj.sections as Array<Record<string, unknown>> | undefined
-  const summary = contentObj.summary as string | undefined
-  const exercises = contentObj.exercises as Array<unknown> | undefined
-
-  return {
-    introduction: intro || '',
-    sections:
-      sections?.map((section) => ({
-        title: (section.title as string) || '',
-        content: truncateContent((section.content as string) || '', 500),
-        keyPoints: extractKeyPoints((section.content as string) || ''),
-      })) || [],
-    summary: summary || '',
-    exerciseCount: exercises?.length || 0,
-  }
-}
-
-/**
- * Truncate content to max length
- */
-function truncateContent(content: string, maxLength: number): string {
-  if (content.length <= maxLength) return content
-  return content.substring(0, maxLength) + '...'
-}
-
-/**
- * Extract key points from markdown content (simple heuristic)
- */
-function extractKeyPoints(content: string): string[] {
-  // Extract bullet points or numbered lists
-  const lines = content.split('\n')
-  const keyPoints: string[] = []
-
-  for (const line of lines) {
-    const trimmed = line.trim()
-    // Match bullet points (-, *, +) or numbered lists (1., 2., etc.)
-    if (/^[-*+]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
-      const point = trimmed.replace(/^[-*+\d.]\s+/, '').trim()
-      if (point.length > 0 && point.length < 200) {
-        keyPoints.push(point)
-      }
-    }
-    if (keyPoints.length >= 5) break // Limit to 5 key points
-  }
-
-  return keyPoints
-}
-
-/**
- * Build full markdown text from structured lesson content
- *
- * Converts the structured content object (intro, sections, summary, exercises)
- * into a single markdown document for display in the Preview tab.
- *
- * Handles multiple content formats:
- * 1. Raw markdown string in common field names
- * 2. Structured content with intro/introduction, sections, summary, exercises
- * 3. Fallback to body field if present
- */
-function buildMarkdownFromContent(content: Record<string, unknown>): string {
-  // Case 1: Check for raw markdown in common locations
-  if (content.markdown && typeof content.markdown === 'string') {
-    return content.markdown
-  }
-  if (content.rawMarkdown && typeof content.rawMarkdown === 'string') {
-    return content.rawMarkdown
-  }
-  if (content.raw_markdown && typeof content.raw_markdown === 'string') {
-    return content.raw_markdown
-  }
-  // Check for text field (some content formats use this)
-  if (content.text && typeof content.text === 'string') {
-    return content.text
-  }
-
-  // Case 2: Structured content
-  const sections = content.sections as Array<Record<string, unknown>> | undefined
-  const exercises = content.exercises as Array<Record<string, unknown>> | undefined
-
-  // Pre-allocate array capacity: intro + sections*2 + summary + exercises*3
-  const estimatedSize = 1 + (sections?.length || 0) * 2 + 1 + (exercises?.length || 0) * 3
-  const parts: string[] = []
-  parts.length = estimatedSize // Pre-allocate
-  let idx = 0
-
-  // Introduction (check both 'intro' and 'introduction')
-  const intro = content.intro || content.introduction
-  if (intro && typeof intro === 'string') {
-    parts[idx++] = `## Введение\n\n${intro}`
-  }
-
-  // Main content (if present as a separate field)
-  if (content.mainContent && typeof content.mainContent === 'string') {
-    parts[idx++] = `## Основной контент\n\n${content.mainContent}`
-  }
-  if (content.main_content && typeof content.main_content === 'string') {
-    parts[idx++] = `## Основной контент\n\n${content.main_content}`
-  }
-
-  // Sections
-  if (sections && Array.isArray(sections)) {
-    for (const section of sections) {
-      if (section.title && typeof section.title === 'string') {
-        parts[idx++] = `\n## ${section.title}\n`
-      }
-      if (section.content && typeof section.content === 'string') {
-        parts[idx++] = section.content
-      }
-    }
-  }
-
-  // Summary
-  if (content.summary && typeof content.summary === 'string') {
-    parts[idx++] = `\n## Заключение\n${content.summary}`
-  }
-
-  // Exercises
-  if (exercises && Array.isArray(exercises)) {
-    parts[idx++] = '\n## Упражнения\n'
-    for (const exercise of exercises) {
-      if (exercise.title && typeof exercise.title === 'string') {
-        parts[idx++] = `### ${exercise.title}`
-      }
-      if (exercise.description && typeof exercise.description === 'string') {
-        parts[idx++] = exercise.description
-      }
-    }
-  }
-
-  // Trim to actual size and join
-  parts.length = idx
-  const result = parts.join('\n\n')
-
-  // Case 3: If no structured content found, check for body field as fallback
-  if (!result && content.body && typeof content.body === 'string') {
-    return content.body
-  }
-
-  return result
-}
-
 /**
  * Parse judge result from lesson content metadata
  *
@@ -729,7 +599,7 @@ export function useLessonInspectorData({
   enabled = true,
 }: UseLessonInspectorDataOptions): UseLessonInspectorDataReturn {
   const { supabase, session, isLoading: authLoading } = useSupabase()
-  const [data, setData] = useState<LessonInspectorData | null>(null)
+  const [data, setData] = useState<ReviewAwareLessonInspectorData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
@@ -848,6 +718,7 @@ export function useLessonInspectorData({
             canRegenerate: false,
             canApprove: false,
             canEdit: false,
+            needsReview: false,
           })
           setIsLoading(false)
           return
@@ -888,6 +759,7 @@ export function useLessonInspectorData({
             canRegenerate: false,
             canApprove: false,
             canEdit: false,
+            needsReview: false,
           })
           setIsLoading(false)
           return
@@ -913,15 +785,14 @@ export function useLessonInspectorData({
         })
 
         // Step 3: Fetch lesson content using UUID
-        const { data: contentData, error: contentError } = await supabase
+        const { data: lessonContentRows, error: contentError } = await supabase
           .from('lesson_contents')
           .select('*')
           .eq('lesson_id', lessonUuid)
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
 
         if (contentError) throw contentError
+        const contentData = getLatestUsableLessonContent(lessonContentRows)
 
         // Step 4: Fetch generation traces for this lesson using UUID
         const { data: tracesData, error: tracesError } = await supabase
@@ -948,27 +819,7 @@ export function useLessonInspectorData({
           retryCount,
         } = buildPipelineState(traces)
 
-        // Parse content if available
-        const content = contentData ? parseLessonContent(contentData) : null
-
-        // Extract rawMarkdown - priority: metadata.markdownContent > build from content
-        let rawMarkdown: string | null = null
-        if (contentData?.metadata && typeof contentData.metadata === 'object') {
-          const metadata = contentData.metadata as Record<string, unknown>
-          if (metadata.markdownContent && typeof metadata.markdownContent === 'string') {
-            rawMarkdown = metadata.markdownContent
-          }
-        }
-        // Fallback: build from content structure
-        if (!rawMarkdown && contentData?.content && typeof contentData.content === 'object') {
-          const contentObj = contentData.content as Record<string, unknown>
-          // Check for nested content structure: {status, content: {...}, metadata: {...}}
-          if (contentObj.content && typeof contentObj.content === 'object') {
-            rawMarkdown = buildMarkdownFromContent(contentObj.content as Record<string, unknown>)
-          } else {
-            rawMarkdown = buildMarkdownFromContent(contentObj)
-          }
-        }
+        const { content, rawMarkdown } = getLessonInspectorContentPresentation(contentData)
 
         // Parse judge result
         const judgeResult = contentData ? parseJudgeResult(contentData, traces) : null
@@ -976,31 +827,16 @@ export function useLessonInspectorData({
         // Build logs
         const logs = buildLogEntries(traces)
 
-        // Determine overall status
-        let status: 'pending' | 'active' | 'completed' | 'error' = 'pending'
-        if (pipelineNodes.length > 0) {
-          // Determine from pipeline nodes if available
-          if (pipelineNodes.some((n) => n.status === 'error')) {
-            status = 'error'
-          } else if (pipelineNodes.some((n) => n.status === 'active')) {
-            status = 'active'
-          } else if (pipelineNodes.every((n) => n.status === 'completed')) {
-            status = 'completed'
-          }
-        } else if (rawMarkdown || content) {
-          // No pipeline nodes but content exists - check traces for completion
-          const hasFinishTrace = traces.some(
-            (t) => t.step_name === 'finish' && t.phase === 'complete'
-          )
-          const hasErrorTrace = traces.some((t) => t.error_data != null)
-          if (hasErrorTrace) {
-            status = 'error'
-          } else if (hasFinishTrace) {
-            status = 'completed'
-          } else if (traces.length > 0) {
-            status = 'active'
-          }
-        }
+        const hasFinishTrace = traces.some((t) => t.step_name === 'finish' && t.phase === 'complete')
+        const hasErrorTrace = traces.some((t) => t.error_data != null)
+        const { status, needsReview } = deriveLessonInspectorStatus({
+          contentStatus: contentData?.status ?? null,
+          pipelineNodes,
+          hasContent: Boolean(rawMarkdown || content),
+          hasFinishTrace,
+          hasErrorTrace,
+          hasTraces: traces.length > 0,
+        })
 
         // Calculate refinement iterations (judge node retries)
         const judgeNode = pipelineNodes.find((n) => n.node === 'judge')
@@ -1020,7 +856,7 @@ export function useLessonInspectorData({
           (generatorInputData?.lessonSpec as Record<string, unknown>) ?? null
 
         // Construct final data
-        const inspectorData: LessonInspectorData = {
+        const inspectorData: ReviewAwareLessonInspectorData = {
           lessonId,
           lessonUuid,
           lessonNumber,
@@ -1046,6 +882,7 @@ export function useLessonInspectorData({
           canApprove: status === 'completed' && judgeResult !== null,
           canEdit: status === 'completed',
           tier,
+          needsReview,
         }
 
         setData(inspectorData)
@@ -1056,6 +893,7 @@ export function useLessonInspectorData({
           status,
           pipelineNodesCount: pipelineNodes.length,
           logsCount: logs.length,
+          lessonContentRowsCount: lessonContentRows?.length ?? 0,
           hasContent: !!content,
           sourceDocumentsCount: sourceDocuments.length,
         })
@@ -1095,7 +933,7 @@ export function useLessonInspectorData({
 
     // Set new timer - use silent mode to avoid loading spinner flicker
     debounceTimerRef.current = setTimeout(() => {
-      fetchLessonData({ silent: true })
+      void fetchLessonData({ silent: true })
       debounceTimerRef.current = null
     }, 500) // 500ms debounce
   }, [fetchLessonData])
@@ -1105,7 +943,7 @@ export function useLessonInspectorData({
   const isAuthenticated = !!session && !authLoading
   useEffect(() => {
     if (isAuthenticated) {
-      fetchLessonData()
+      void fetchLessonData()
     }
   }, [fetchLessonData, isAuthenticated])
 
@@ -1122,7 +960,7 @@ export function useLessonInspectorData({
 
     // Cleanup previous subscription
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current)
+      void supabase.removeChannel(channelRef.current)
       channelRef.current = null
     }
 
@@ -1183,7 +1021,7 @@ export function useLessonInspectorData({
 
       // Cleanup channel
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
+        void supabase.removeChannel(channelRef.current)
         channelRef.current = null
       }
     }
@@ -1192,7 +1030,7 @@ export function useLessonInspectorData({
 
   // Manual refetch function
   const refetch = useCallback(() => {
-    fetchLessonData()
+    void fetchLessonData()
   }, [fetchLessonData])
 
   return {

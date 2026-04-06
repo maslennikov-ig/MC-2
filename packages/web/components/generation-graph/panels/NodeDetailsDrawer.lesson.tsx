@@ -4,15 +4,15 @@ import { LessonPanelErrorBoundary } from './NodeDetailsDrawer.error'
 import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs'
 import { RefinementChat } from './RefinementChat'
 import type {
-  LessonInspectorData,
   LessonInspectorDataRefinementExtension,
 } from '@megacampus/shared-types'
 import type { Proposal } from '@megacampus/shared-types/chat-types'
 import type { ChatMessage } from '../hooks/useRefinement'
 import type { ParsedLessonContent } from '@/lib/markdown-content-parser'
+import type { ReviewAwareLessonInspectorData } from '../stage6-review-status'
 
 // Extended data type that includes refinement fields (matches LessonPanelWithTabs requirement)
-type LessonInspectorDataWithRefinement = LessonInspectorData &
+type LessonInspectorDataWithRefinement = ReviewAwareLessonInspectorData &
   Partial<LessonInspectorDataRefinementExtension>
 
 interface NodeDetailsDrawerLessonProps {

@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { LessonMatrixRow } from '@megacampus/shared-types'
 import {
   Table,
   TableBody,
@@ -12,10 +11,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { SegmentedPillTrack } from '../stage6/dashboard/SegmentedPillTrack'
 import { Eye, Play, Pause, RotateCw, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
+import type { ReviewAwareLessonMatrixRow } from '../../stage6-review-status'
 
 /**
  * LessonMatrix - High-density table for lesson list with pipeline status
@@ -44,7 +45,7 @@ import { useTranslations } from 'next-intl'
 
 interface LessonMatrixProps {
   /** List of lessons to display */
-  lessons: LessonMatrixRow[]
+  lessons: ReviewAwareLessonMatrixRow[]
   /** Callback when clicking a lesson row */
   onLessonClick: (lessonId: string) => void
   /** Callback for action buttons */
@@ -70,8 +71,12 @@ function formatQuality(score: number | null): string {
 /**
  * Get row styling based on lesson status
  */
-function getRowClassName(status: LessonMatrixRow['status']): string {
-  switch (status) {
+function getRowClassName(lesson: ReviewAwareLessonMatrixRow): string {
+  if (lesson.needsReview) {
+    return 'bg-amber-50/70 text-amber-950 dark:bg-amber-950/20 dark:text-amber-100'
+  }
+
+  switch (lesson.status) {
     case 'pending':
       return 'text-slate-400 dark:text-slate-500'
     case 'active':
@@ -96,15 +101,15 @@ function ActionButton({
   isResuming,
   t,
 }: {
-  lesson: LessonMatrixRow
+  lesson: ReviewAwareLessonMatrixRow
   onClick: (action: 'view' | 'retry' | 'pause' | 'play') => void
   isRetrying?: (lessonId: string) => boolean
   isPausing?: boolean
   isResuming?: boolean
-  t: (key: 'prioritize' | 'pause' | 'preview' | 'retry') => string
+  t: (key: 'prioritize' | 'pause' | 'preview' | 'retry' | 'reviewRequired') => string
 }) {
   switch (lesson.status) {
-    case 'pending':
+    case 'pending': {
       const resumeLoading = isResuming
       return (
         <Button
@@ -125,7 +130,8 @@ function ActionButton({
           )}
         </Button>
       )
-    case 'active':
+    }
+    case 'active': {
       const pauseLoading = isPausing
       return (
         <Button
@@ -146,6 +152,7 @@ function ActionButton({
           )}
         </Button>
       )
+    }
     case 'completed':
     case 'approved':
       return (
@@ -162,7 +169,7 @@ function ActionButton({
           <Eye className="h-4 w-4" />
         </Button>
       )
-    case 'error':
+    case 'error': {
       const retryLoading = isRetrying?.(lesson.lessonId) ?? false
       return (
         <Button
@@ -183,13 +190,14 @@ function ActionButton({
           )}
         </Button>
       )
+    }
   }
 }
 
 /**
  * Calculate summary statistics
  */
-function calculateSummary(lessons: LessonMatrixRow[]) {
+function calculateSummary(lessons: ReviewAwareLessonMatrixRow[]) {
   const completedLessons = lessons.filter((l) => l.qualityScore !== null)
   const avgQuality =
     completedLessons.length > 0
@@ -234,14 +242,24 @@ export function LessonMatrix({
               onClick={() => onLessonClick(lesson.lessonId)}
               className={cn(
                 'cursor-pointer transition-colors',
-                getRowClassName(lesson.status),
+                getRowClassName(lesson),
                 'hover:bg-slate-100 dark:hover:bg-slate-800'
               )}
             >
               <TableCell className="text-center font-mono text-sm">{lesson.lessonNumber}</TableCell>
               <TableCell className="font-medium">
-                <div className="max-w-xs truncate" title={lesson.title}>
-                  {lesson.title}
+                <div className="flex items-center gap-2">
+                  <div className="max-w-xs truncate" title={lesson.title}>
+                    {lesson.title}
+                  </div>
+                  {lesson.needsReview && (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-300 bg-amber-100 text-[10px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                    >
+                      {t('reviewRequired')}
+                    </Badge>
+                  )}
                 </div>
               </TableCell>
               <TableCell>

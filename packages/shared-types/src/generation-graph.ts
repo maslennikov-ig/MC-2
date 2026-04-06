@@ -214,6 +214,9 @@ export interface LessonNode extends GraphNode {
   /** Parent module ID */
   moduleId: string;
 
+  /** True when generation finished fail-open and requires manual review */
+  needsReview?: boolean;
+
   // === Stage 7: Enrichment Summary Fields ===
 
   /**
@@ -257,8 +260,14 @@ export interface ModuleNode extends GraphNode {
   /** Total lessons in module */
   totalLessons: number;
 
-  /** Completed lessons count */
+  /** Generated/ready lessons count used for Stage 6 graph progress */
   completedLessons: number;
+
+  /** Lessons that require manual review before approval */
+  reviewRequiredLessons?: number;
+
+  /** True when any child lesson requires manual review */
+  needsReview?: boolean;
 
   /** Whether module is collapsed */
   isCollapsed: boolean;

@@ -1089,7 +1089,9 @@
       "deleteConfirmCancel": "Отмена",
       "deleteConfirmAction": "Удалить",
       "retryLabel": "Попробовать снова",
-      "cardUnavailable": "Карточка недоступна"
+      "cardUnavailable": "Карточка недоступна",
+      "reviewRequiredTitle": "Требуется ручная проверка",
+      "reviewRequiredDescription": "Генерация завершилась в fail-open режиме: контент доступен, но перед одобрением нужен ручной review."
     },
     "pipeline": {
       "step": "Шаг",
@@ -1167,6 +1169,7 @@
       "completed": "готово",
       "active": "в работе",
       "pending": "ожидает",
+      "reviewRequired": "требует проверки",
       "failed": "ошибка",
       "error": "ошибка"
     }
@@ -1398,6 +1401,7 @@
     "pause": "Приостановить",
     "preview": "Просмотр",
     "retry": "Повторить",
+    "reviewRequired": "Требует проверки",
     "title": "Название",
     "quality": "Качество",
     "action": "Действие",
