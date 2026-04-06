@@ -3,7 +3,7 @@ description: Promote current branch into develop and push develop
 argument-hint: [--yes|-y]
 ---
 
-Promote the current feature branch into `develop` and push `develop` to Dev. This is **not** the release/version command.
+Promote the current working branch into `develop` and push `develop` to Dev. This is **not** the release/version command.
 
 - For **Dev delivery**: use this command
 - For **Staging deploy**: use `/deploy`
