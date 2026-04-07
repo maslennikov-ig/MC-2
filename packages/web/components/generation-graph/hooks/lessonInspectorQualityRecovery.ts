@@ -1,24 +1,18 @@
 import {
   LessonQualitySignalsSchema,
-  QualityRecoverySchema,
   type JudgeVerdictDisplay,
-  type Stage6AutomaticQualityRungPhaseName,
   type LessonQualitySignals,
-  type QualityRecovery,
 } from '@megacampus/shared-types'
 import type {
   LessonInspectorQualityRecoveryReason,
   LessonInspectorQualityRecoverySummary,
 } from '@megacampus/shared-types/stage6-ui.types'
 import {
+  QualityRecoverySchema,
   STAGE6_QUALITY_RUNG_MODEL_IDS,
-  type Stage6AutomaticQualityRungPhaseName as Stage6AutomaticQualityRungPhaseNameFromSubpath,
-  type QualityRecovery as QualityRecoveryFromSubpath,
+  type Stage6AutomaticQualityRungPhaseName,
+  type QualityRecovery,
 } from '@megacampus/shared-types/stage6-quality-recovery'
-
-type Stage6AutomaticQualityRungPhaseNameCompat = Stage6AutomaticQualityRungPhaseName
-
-type QualityRecoveryCompat = QualityRecovery
 
 type LessonContentHistoryRow = {
   status: string | null
@@ -201,7 +195,7 @@ export function buildLessonInspectorQualityRecoverySummary({
       recoveryRow.status?.toLowerCase() === 'review_required',
     automaticRungs: recovery.attempts
       .filter((attempt) => attempt.mode === 'automatic')
-      .map((attempt) => attempt.phase_name as Stage6AutomaticQualityRungPhaseNameCompat),
+      .map((attempt) => attempt.phase_name as Stage6AutomaticQualityRungPhaseName),
     terminalPhaseName,
     terminalModelId:
       STAGE6_QUALITY_RUNG_MODEL_IDS[
