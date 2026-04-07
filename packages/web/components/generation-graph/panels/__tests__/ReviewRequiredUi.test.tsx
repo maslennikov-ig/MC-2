@@ -96,7 +96,7 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.getByText('Needs review')).toBeInTheDocument()
+    expect(screen.getByText('Needs review')).toBeTruthy()
   })
 
   it('renders review-required counts in the control tower', () => {
@@ -125,7 +125,7 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.getByText(/needs review/i)).toBeInTheDocument()
+    expect(screen.getByText(/needs review/i)).toBeTruthy()
   })
 
   it('renders a manual-review callout in the lesson inspector', () => {
@@ -174,12 +174,12 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.getByText('Manual review required')).toBeInTheDocument()
+    expect(screen.getByText('Manual review required')).toBeTruthy()
     expect(
       screen.getByText('Generation finished fail-open and now requires manual review.')
-    ).toBeInTheDocument()
-    expect(screen.getByText('stage_6_auto_last_chance')).toBeInTheDocument()
-    expect(screen.getByText('z-ai/glm-5')).toBeInTheDocument()
+    ).toBeTruthy()
+    expect(screen.getByText('stage_6_auto_last_chance')).toBeTruthy()
+    expect(screen.getByText('z-ai/glm-5')).toBeTruthy()
   })
 
   it('renders manual-top regeneration history without treating it as the automatic ladder', () => {
@@ -217,10 +217,10 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.getByText('Manual-top regeneration used')).toBeInTheDocument()
-    expect(screen.getByText('stage_6_manual_regeneration')).toBeInTheDocument()
-    expect(screen.getByText('openai/gpt-5.4')).toBeInTheDocument()
-    expect(screen.queryByText('Automatic rungs passed')).not.toBeInTheDocument()
+    expect(screen.getByText('Manual-top regeneration used')).toBeTruthy()
+    expect(screen.getByText('stage_6_manual_regeneration')).toBeTruthy()
+    expect(screen.getByText('openai/gpt-5.4')).toBeTruthy()
+    expect(screen.queryByText('Automatic rungs passed')).toBeNull()
   })
 
   it('does not render recovery history for normal completed lessons', () => {
@@ -246,8 +246,8 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.queryByText('Quality recovery history')).not.toBeInTheDocument()
-    expect(screen.queryByText('Manual-top regeneration used')).not.toBeInTheDocument()
+    expect(screen.queryByText('Quality recovery history')).toBeNull()
+    expect(screen.queryByText('Manual-top regeneration used')).toBeNull()
   })
 
   it('renders an explicit review-needed empty state when no preview is available', () => {
