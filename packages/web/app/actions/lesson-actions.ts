@@ -68,7 +68,8 @@ export async function retryLessonGeneration(
       courseId,
       lessonIds: [lessonId],
       priority,
-    })
+      manualTopRegeneration: true,
+    } as Parameters<typeof client.lessonContent.partialGenerate.mutate>[0])
 
     return {
       success: result?.success ?? false,
@@ -196,7 +197,8 @@ export async function retryMultipleLessons(
       courseId,
       lessonIds,
       priority,
-    })
+      manualTopRegeneration: true,
+    } as Parameters<typeof client.lessonContent.partialGenerate.mutate>[0])
 
     return {
       success: result?.success ?? false,

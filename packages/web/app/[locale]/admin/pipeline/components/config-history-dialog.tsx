@@ -76,7 +76,7 @@ export function ConfigHistoryDialog({
     error,
   } = trpc.pipelineAdmin.getModelConfigHistory.useQuery(
     {
-      phaseName,
+      phaseName: phaseName as never,
       configType: 'global',
     },
     { enabled: open && !!phaseName }
@@ -117,7 +117,7 @@ export function ConfigHistoryDialog({
     if (!revertTargetVersion) return
 
     revertMutation.mutate({
-      phaseName,
+      phaseName: phaseName as never,
       targetVersion: revertTargetVersion,
     })
   }

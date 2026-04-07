@@ -4,6 +4,7 @@ import { logTrace } from '@/shared/trace-logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { checkPauseAndDelay, isCoursePaused } from '@/shared/pause-check';
+import { createModelConfigService } from '@/shared/llm/model-config-service';
 import {
   executeStage6 as executeStage6Orchestrator,
   type Stage6Input,
@@ -17,15 +18,26 @@ import {
 } from '../utils/lesson-rag-retriever';
 import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
 import { createLessonLabel, LessonLabel, validateLanguageCode } from '@megacampus/shared-types';
+import type {
+  Stage6AutomaticQualityRungPhaseName,
+  Stage6QualityRungPhaseName,
+} from '@megacampus/shared-types/stage6-quality-recovery';
 
 import {
   Stage6JobInput,
   Stage6JobResult,
   ProgressUpdate,
   ModelConfig,
+  Stage6ExecutionPolicy,
+  Stage6QualityRecoveryAttemptHistory,
+  Stage6QualityRecoveryHistory,
   Stage6ModelTierName,
 } from '../types';
 import { MODEL_FALLBACK } from '../config';
+import {
+  classifyStage6QualityRecoveryFinalDisposition,
+  planStage6QualityRecoveryAttempts,
+} from '../execution/quality-ladder';
 import { selectStage6ModelTier } from '../nodes/generator/model-selector';
 import {
   handlePartialSuccess,
@@ -168,7 +180,7 @@ export async function processWithFallback(
   modelSelection?: {
     selectedModel: string;
     fallbackModel: string;
-    selectedModelTier: Stage6ModelTierName;
+    selectedModelTier: Stage6ModelTierName | null;
     selectedModelTierReason: string;
   }
 ): Promise<Stage6Output> {
@@ -392,7 +404,12 @@ async function enrichSummaryPreviewFromDB(
  * tier selection has already completed but no generation was performed.
  */
 function buildZeroMetrics(
-  tierResult: { model: string; fallback: string; tier: Stage6ModelTierName; reason: string },
+  tierResult: {
+    model: string | null;
+    fallback: string | null;
+    tier: Stage6ModelTierName | null;
+    reason: string | null;
+  },
   durationMs: number
 ): Stage6JobResult['metrics'] {
   return {
@@ -409,6 +426,141 @@ function buildZeroMetrics(
     rejectedTokens: 0,
     regenerationMode: null,
   };
+}
+
+interface ResolvedStage6ExecutionPlan {
+  initialAutomaticTier: {
+    tier: Stage6ModelTierName;
+    reason: string;
+  } | null;
+  initialAutomaticRung?: Stage6AutomaticQualityRungPhaseName;
+  qualityRecovery: Stage6QualityRecoveryHistory;
+}
+
+interface ResolvedRungModelConfig {
+  primary: string;
+  fallback: string;
+  source: string;
+}
+
+function isManualTopRegenerationPolicy(
+  policy?: Stage6ExecutionPolicy
+): policy is Stage6ExecutionPolicy {
+  return policy?.mode === 'manual_top_regeneration';
+}
+
+function mapTierToAutomaticRung(
+  tier: Stage6ModelTierName
+): Stage6AutomaticQualityRungPhaseName {
+  return `stage_6_${tier}` as Stage6AutomaticQualityRungPhaseName;
+}
+
+function mapRungToLegacyTier(phaseName: Stage6QualityRungPhaseName): Stage6ModelTierName | null {
+  switch (phaseName) {
+    case 'stage_6_simple':
+      return 'simple';
+    case 'stage_6_normal':
+      return 'normal';
+    case 'stage_6_complex':
+      return 'complex';
+    default:
+      return null;
+  }
+}
+
+async function resolveRungModelConfig(
+  phaseName: Stage6QualityRungPhaseName,
+  courseId: string,
+  language: string
+): Promise<ResolvedRungModelConfig> {
+  const modelConfigService = createModelConfigService();
+  const phaseConfig = await modelConfigService.getModelForPhase(phaseName, courseId, undefined, language);
+
+  return {
+    primary: phaseConfig.modelId,
+    fallback: phaseConfig.fallbackModelId ?? MODEL_FALLBACK.fallback,
+    source: phaseConfig.source,
+  };
+}
+
+async function resolveStage6ExecutionPlan(
+  lessonSpec: Stage6JobInput['lessonSpec'],
+  executionPolicy?: Stage6ExecutionPolicy
+): Promise<ResolvedStage6ExecutionPlan> {
+  if (isManualTopRegenerationPolicy(executionPolicy)) {
+    return {
+      initialAutomaticTier: null,
+      qualityRecovery: {
+        mode: 'manual',
+        manual_triggered: true,
+        attempts: [],
+      },
+    };
+  }
+
+  const tierResult = await selectStage6ModelTier(lessonSpec);
+
+  return {
+    initialAutomaticTier: {
+      tier: tierResult.tier,
+      reason: tierResult.reason,
+    },
+    initialAutomaticRung: mapTierToAutomaticRung(tierResult.tier),
+    qualityRecovery: {
+      mode: 'automatic',
+      attempts: [],
+    },
+  };
+}
+
+function createSameTierRetryReason(
+  phaseName: Stage6QualityRungPhaseName,
+  rungAttemptIndex: number
+): string {
+  return rungAttemptIndex === 0
+    ? `Initial quality rung ${phaseName}`
+    : `Same-tier retry ${rungAttemptIndex} for ${phaseName}`;
+}
+
+function createPromotedRungReason(
+  phaseName: Stage6QualityRungPhaseName,
+  promotedFromPhaseName: Stage6QualityRungPhaseName | undefined
+): string {
+  if (promotedFromPhaseName) {
+    return `Promoted from ${promotedFromPhaseName} to ${phaseName} after quality_retryable`;
+  }
+
+  return `Quality rung ${phaseName}`;
+}
+
+function createSelectedModelTierReason(
+  rungPhaseName: Stage6QualityRungPhaseName,
+  rungAttemptIndex: number,
+  promotedFromPhaseName: Stage6QualityRungPhaseName | undefined,
+  initialAutomaticTierReason: string | null,
+  modelSource: string
+): string {
+  if (rungPhaseName === 'stage_6_manual_regeneration') {
+    return `Manual top-model regeneration via ${rungPhaseName} (${modelSource})`;
+  }
+
+  if (promotedFromPhaseName) {
+    return `${createPromotedRungReason(rungPhaseName, promotedFromPhaseName)} (${modelSource})`;
+  }
+
+  const retryReason = createSameTierRetryReason(rungPhaseName, rungAttemptIndex);
+  if (initialAutomaticTierReason) {
+    return `${initialAutomaticTierReason}; ${retryReason} (${modelSource})`;
+  }
+
+  return `${retryReason} (${modelSource})`;
+}
+
+function appendQualityRecoveryAttempt(
+  qualityRecovery: Stage6QualityRecoveryHistory,
+  attempt: Stage6QualityRecoveryAttemptHistory
+): void {
+  qualityRecovery.attempts.push(attempt);
 }
 
 /**
@@ -540,10 +692,17 @@ export async function processStage6Job(
   }
 
   const lessonUuid = await resolveLessonUuid(courseId, lessonLabel);
+  const executionPlan = await resolveStage6ExecutionPlan(lessonSpec, job.data.executionPolicy);
 
-  // 3-tier model selection: simple/normal/complex based on difficulty + first-module rule
-  const tierResult = await selectStage6ModelTier(lessonSpec);
-  const modelConfig: ModelConfig = { primary: tierResult.model, fallback: tierResult.fallback };
+  const initialSelectionSummary = executionPlan.initialAutomaticTier
+    ? {
+        selectedModelTier: executionPlan.initialAutomaticTier.tier,
+        selectedModelTierReason: executionPlan.initialAutomaticTier.reason,
+      }
+    : {
+        selectedModelTier: null,
+        selectedModelTierReason: 'Manual top-model regeneration requested',
+      };
 
   // Check pause status for logging (Issue #9 from code review)
   // Note: If we reached here, course was not paused at job start (checkPauseAndDelay passed)
@@ -557,10 +716,9 @@ export async function processStage6Job(
     attempt: job.attemptsMade + 1,
     language,
     style: style ?? 'default',
-    primaryModel: modelConfig.primary,
-    fallbackModel: modelConfig.fallback,
-    selectedModelTier: tierResult.tier,
-    selectedModelTierReason: tierResult.reason,
+    selectedModelTier: initialSelectionSummary.selectedModelTier,
+    selectedModelTierReason: initialSelectionSummary.selectedModelTierReason,
+    executionPolicy: job.data.executionPolicy?.mode ?? 'automatic_ladder',
     isPaused: pauseStatusForLogging,
   });
 
@@ -585,11 +743,10 @@ export async function processStage6Job(
       lessonTitle: lessonSpec.title,
       ragChunksCount: ragChunks.length,
       ragContextId,
-      primaryModel: modelConfig.primary,
-      selectedModel: tierResult.model,
-      fallbackModel: modelConfig.fallback,
-      selectedModelTier: tierResult.tier,
-      selectedModelTierReason: tierResult.reason,
+      qualityRecoveryMode: executionPlan.qualityRecovery.mode,
+      initialAutomaticRung: executionPlan.initialAutomaticRung,
+      selectedModelTier: initialSelectionSummary.selectedModelTier,
+      selectedModelTierReason: initialSelectionSummary.selectedModelTierReason,
       isPaused: pauseStatusForLogging,
     },
     durationMs: 0,
@@ -610,6 +767,20 @@ export async function processStage6Job(
     });
   };
 
+  let lastResolvedModelSelection: {
+    model: string | null;
+    fallback: string | null;
+    tier: Stage6ModelTierName | null;
+    reason: string | null;
+    phaseName: Stage6QualityRungPhaseName | null;
+  } = {
+    model: null,
+    fallback: null,
+    tier: initialSelectionSummary.selectedModelTier,
+    reason: initialSelectionSummary.selectedModelTierReason,
+    phaseName: executionPlan.initialAutomaticRung ?? 'stage_6_manual_regeneration',
+  };
+
   await updateJobProgress(job, {
     lessonId: lessonSpec.lesson_id,
     phase: 'planner',
@@ -618,28 +789,150 @@ export async function processStage6Job(
   });
 
   try {
-    const result = await processWithFallback(
-      job,
-      modelConfig,
-      lessonUuid,
-      ragChunks,
-      ragContextId,
-      {
-        selectedModel: tierResult.model,
-        fallbackModel: tierResult.fallback,
-        selectedModelTier: tierResult.tier,
-        selectedModelTierReason: tierResult.reason,
-      }
+    const plannedRungs = planStage6QualityRecoveryAttempts(
+      executionPlan.qualityRecovery.mode === 'manual'
+        ? { manualTriggered: true }
+        : { initialAutomaticRung: executionPlan.initialAutomaticRung! }
     );
+
+    let result: Stage6Output | null = null;
+    let lastReviewResult: Stage6Output | null = null;
+
+    outer: for (const rung of plannedRungs) {
+      const totalRungAttempts = rung.max_regeneration_retries + 1;
+
+      for (let rungAttemptIndex = 0; rungAttemptIndex < totalRungAttempts; rungAttemptIndex++) {
+        const rungModelConfig = await resolveRungModelConfig(rung.phase_name, courseId, language);
+        const selectedModelTier = mapRungToLegacyTier(rung.phase_name);
+        const selectedModelTierReason = createSelectedModelTierReason(
+          rung.phase_name,
+          rungAttemptIndex,
+          rung.promoted_from_phase_name,
+          executionPlan.initialAutomaticTier?.reason ?? null,
+          rungModelConfig.source
+        );
+
+        lastResolvedModelSelection = {
+          model: rungModelConfig.primary,
+          fallback: rungModelConfig.fallback,
+          tier: selectedModelTier,
+          reason: selectedModelTierReason,
+          phaseName: rung.phase_name,
+        };
+
+        jobLogger.info(
+          {
+            rungPhaseName: rung.phase_name,
+            rungAttemptIndex,
+            totalRungAttempts,
+            primaryModel: rungModelConfig.primary,
+            fallbackModel: rungModelConfig.fallback,
+            selectedModelTier,
+            selectedModelTierReason,
+          },
+          'Executing Stage 6 quality rung'
+        );
+
+        try {
+          const rungResult = await processWithFallback(
+            job,
+            {
+              primary: rungModelConfig.primary,
+              fallback: rungModelConfig.fallback,
+            },
+            lessonUuid,
+            ragChunks,
+            ragContextId,
+            {
+              selectedModel: rungModelConfig.primary,
+              fallbackModel: rungModelConfig.fallback,
+              selectedModelTier,
+              selectedModelTierReason,
+            }
+          );
+
+          const needsQualityPromotion = rungResult.reviewInfo?.needsReview === true;
+
+          appendQualityRecoveryAttempt(executionPlan.qualityRecovery, {
+            sequence_index: rung.sequence_index,
+            phase_name: rung.phase_name,
+            mode: rung.mode,
+            is_initial_rung: rung.is_initial_rung,
+            promoted_from_phase_name: rung.promoted_from_phase_name,
+            max_regeneration_retries: rung.max_regeneration_retries,
+            manual_triggered: rung.manual_triggered,
+            rung_attempt_index: rungAttemptIndex,
+            outcome: needsQualityPromotion ? 'quality_retryable' : 'accepted',
+            selected_model: rungModelConfig.primary,
+            fallback_model: rungModelConfig.fallback,
+            model_used: rungResult.metrics.modelUsed,
+            quality_score: rungResult.metrics.qualityScore,
+            errors: [...rungResult.errors],
+            review_reasons: rungResult.reviewInfo?.reasons,
+          });
+
+          rungResult.metrics.selectedModel = rungResult.metrics.selectedModel ?? rungModelConfig.primary;
+          rungResult.metrics.fallbackModel =
+            rungResult.metrics.fallbackModel ?? rungModelConfig.fallback;
+          rungResult.metrics.selectedModelTier =
+            rungResult.metrics.selectedModelTier ?? selectedModelTier;
+          rungResult.metrics.selectedModelTierReason =
+            rungResult.metrics.selectedModelTierReason ?? selectedModelTierReason;
+
+          if (!needsQualityPromotion) {
+            result = {
+              ...rungResult,
+              qualityRecovery: executionPlan.qualityRecovery,
+            };
+            break outer;
+          }
+
+          lastReviewResult = rungResult;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          appendQualityRecoveryAttempt(executionPlan.qualityRecovery, {
+            sequence_index: rung.sequence_index,
+            phase_name: rung.phase_name,
+            mode: rung.mode,
+            is_initial_rung: rung.is_initial_rung,
+            promoted_from_phase_name: rung.promoted_from_phase_name,
+            max_regeneration_retries: rung.max_regeneration_retries,
+            manual_triggered: rung.manual_triggered,
+            rung_attempt_index: rungAttemptIndex,
+            outcome: 'failed',
+            selected_model: rungModelConfig.primary,
+            fallback_model: rungModelConfig.fallback,
+            model_used: null,
+            quality_score: 0,
+            errors: [errorMessage],
+          });
+
+          throw error;
+        }
+      }
+    }
+
+    if (!result) {
+      const terminalRung = plannedRungs.at(-1);
+      if (!lastReviewResult || !terminalRung) {
+        throw new Error('Stage 6 quality ladder ended without a terminal result');
+      }
+
+      executionPlan.qualityRecovery.final_disposition =
+        classifyStage6QualityRecoveryFinalDisposition({
+          exhaustedPhaseName: terminalRung.phase_name,
+          mode: executionPlan.qualityRecovery.mode,
+        });
+
+      result = {
+        ...lastReviewResult,
+        qualityRecovery: executionPlan.qualityRecovery,
+      };
+    }
 
     const durationMs = Date.now() - startTime;
     const needsReview = result.reviewInfo?.needsReview === true;
-
-    result.metrics.selectedModel = result.metrics.selectedModel ?? tierResult.model;
-    result.metrics.fallbackModel = result.metrics.fallbackModel ?? tierResult.fallback;
-    result.metrics.selectedModelTier = result.metrics.selectedModelTier ?? tierResult.tier;
-    result.metrics.selectedModelTierReason =
-      result.metrics.selectedModelTierReason ?? tierResult.reason;
 
     let sanityResult: SanityCheckResult = { ok: true };
     if (result.lessonContent) {
@@ -701,6 +994,7 @@ export async function processStage6Job(
             regenerationMode: result.metrics.regenerationMode ?? null,
             reviewInfo: result.reviewInfo,
             qaSignals: result.lessonContent?.metadata.qa_signals ?? null,
+            qualityRecovery: result.qualityRecovery,
           }
         );
         runCompletionCheck();
@@ -773,6 +1067,7 @@ export async function processStage6Job(
         fallbackModel: result.metrics.fallbackModel,
         selectedModelTier: result.metrics.selectedModelTier,
         selectedModelTierReason: result.metrics.selectedModelTierReason,
+        qualityRecovery: result.qualityRecovery,
         reviewRequired: needsReview,
         tokensUsed: result.metrics.tokensUsed,
         regenerateCount: result.metrics.regenerateCount,
@@ -788,6 +1083,7 @@ export async function processStage6Job(
       success: result.success,
       lessonContent: result.lessonContent,
       errors: result.errors,
+      qualityRecovery: result.qualityRecovery,
       metrics: {
         ...result.metrics,
         durationMs,
@@ -801,8 +1097,9 @@ export async function processStage6Job(
       {
         error: errorMsg,
         durationMs,
-        primaryModel: modelConfig.primary,
-        fallbackModel: modelConfig.fallback,
+        primaryModel: lastResolvedModelSelection.model,
+        fallbackModel: lastResolvedModelSelection.fallback,
+        qualityRecovery: executionPlan.qualityRecovery,
       },
       'Stage 6 job failed after all retry attempts'
     );
@@ -826,14 +1123,15 @@ export async function processStage6Job(
         `Generation failed after model fallback: ${errorMsg}`,
         {
           modelUsed: null,
-          selectedModel: tierResult.model,
-          fallbackModel: tierResult.fallback,
-          selectedModelTier: tierResult.tier,
-          selectedModelTierReason: tierResult.reason,
+          selectedModel: lastResolvedModelSelection.model,
+          fallbackModel: lastResolvedModelSelection.fallback,
+          selectedModelTier: lastResolvedModelSelection.tier,
+          selectedModelTierReason: lastResolvedModelSelection.reason,
           regenerateCount: 0,
           truncationCount: 0,
           rejectedTokens: 0,
           regenerationMode: null,
+          qualityRecovery: executionPlan.qualityRecovery,
         }
       );
       runCompletionCheck();
@@ -853,7 +1151,16 @@ export async function processStage6Job(
       success: false,
       lessonContent: null,
       errors: [errorMsg],
-      metrics: buildZeroMetrics(tierResult, durationMs),
+      qualityRecovery: executionPlan.qualityRecovery,
+      metrics: buildZeroMetrics(
+        {
+          model: lastResolvedModelSelection.model,
+          fallback: lastResolvedModelSelection.fallback,
+          tier: lastResolvedModelSelection.tier,
+          reason: lastResolvedModelSelection.reason,
+        },
+        durationMs
+      ),
     };
   }
 }

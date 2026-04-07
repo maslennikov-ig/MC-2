@@ -18,6 +18,7 @@ interface PartialGenerateRequest {
   lessonIds?: string[] // ["1.1", "1.2", "2.1"]
   sectionIds?: number[] // [1, 2, 3]
   priority?: number // 1-10, default 5
+  manualTopRegeneration?: boolean
 }
 
 /**
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
       lessonIds: body.lessonIds,
       sectionIds: body.sectionIds,
       priority: body.priority,
+      manualTopRegeneration: body.manualTopRegeneration ?? false,
     })
 
     // Call tRPC via type-safe server caller (uses httpBatchLink with correct wire format)
@@ -96,7 +98,8 @@ export async function POST(request: NextRequest) {
       lessonIds: body.lessonIds,
       sectionIds: body.sectionIds,
       priority: body.priority ?? 5,
-    })
+      manualTopRegeneration: body.manualTopRegeneration,
+    } as Parameters<typeof client.lessonContent.partialGenerate.mutate>[0])
 
     logger.info('Partial generation initiated successfully', {
       userId: user.id,

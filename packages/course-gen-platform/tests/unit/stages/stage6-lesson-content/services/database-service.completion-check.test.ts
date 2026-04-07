@@ -421,4 +421,76 @@ describe('markForReview', () => {
       })
     );
   });
+
+  it('persists quality ladder history in the final review_required marker', async () => {
+    const { supabase, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await markForReview(
+      'course-123',
+      'lesson-uuid' as unknown as string,
+      '1.1' as unknown as string,
+      'Automatic ladder exhausted',
+      {
+        qualityRecovery: {
+          mode: 'automatic',
+          attempts: [
+            {
+              sequence_index: 0,
+              phase_name: 'stage_6_simple',
+              mode: 'automatic',
+              is_initial_rung: true,
+              max_regeneration_retries: 1,
+              rung_attempt_index: 0,
+              outcome: 'quality_retryable',
+              selected_model: 'stage_6_simple-primary',
+              fallback_model: 'stage_6_simple-fallback',
+              model_used: 'stage_6_simple-primary',
+              quality_score: 0.41,
+              errors: [],
+              review_reasons: ['Low quality score'],
+            },
+            {
+              sequence_index: 3,
+              phase_name: 'stage_6_auto_last_chance',
+              mode: 'automatic',
+              is_initial_rung: false,
+              promoted_from_phase_name: 'stage_6_complex',
+              max_regeneration_retries: 0,
+              rung_attempt_index: 0,
+              outcome: 'quality_retryable',
+              selected_model: 'z-ai/glm-5',
+              fallback_model: 'qwen/qwen3.5-plus-02-15',
+              model_used: 'z-ai/glm-5',
+              quality_score: 0.52,
+              errors: [],
+              review_reasons: ['Still below threshold'],
+            },
+          ],
+          final_disposition: {
+            outcome: 'review_required',
+            terminal_phase_name: 'stage_6_auto_last_chance',
+            terminal_mode: 'automatic',
+            human_review_required: true,
+          },
+        },
+      }
+    );
+
+    expect(lessonContentsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          qualityRecovery: expect.objectContaining({
+            mode: 'automatic',
+            final_disposition: expect.objectContaining({
+              terminal_phase_name: 'stage_6_auto_last_chance',
+            }),
+          }),
+        }),
+      })
+    );
+  });
 });
