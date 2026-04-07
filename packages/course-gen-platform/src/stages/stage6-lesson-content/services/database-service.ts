@@ -22,6 +22,7 @@ import { parseGenerationProgress } from '@/shared/schemas/generation-progress.sc
 import type { LessonContent, LessonQualitySignals } from '@megacampus/shared-types/lesson-content';
 import { runCourseQualityAudit, type CourseAuditFinding } from '../quality/course-audit';
 import { isStage6CourseAuditEnabled, isStage6QualityAlertsEnabled } from '../quality/flags';
+import type { Stage6QualityRecoveryHistory } from '../types';
 
 const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
   'completed',
@@ -157,6 +158,7 @@ export async function handlePartialSuccess(
           regenerationMode: result.metrics.regenerationMode ?? null,
           qaSignals: getQaSignalsFromResult(result),
           reviewInfo: result.reviewInfo ?? undefined,
+          qualityRecovery: result.qualityRecovery ?? undefined,
         })
       ) as Json,
       generation_attempt: (result.metrics.regenerateCount ?? 0) + 1,
@@ -218,6 +220,7 @@ export interface ReviewMarkerContext {
   reviewInfo?: Stage6Output['reviewInfo'];
   qaSignals?: LessonQualitySignals | null;
   courseAuditFindings?: Array<Pick<CourseAuditFinding, 'kind' | 'detail'>>;
+  qualityRecovery?: Stage6QualityRecoveryHistory;
   suppressAlert?: boolean;
 }
 
@@ -256,23 +259,26 @@ export async function markForReview(
       lesson_id: lessonUuid,
       course_id: courseId,
       status: 'review_required',
-      metadata: {
-        lessonLabel,
-        markedForReviewAt: markedAt,
-        failureReason: reason,
-        modelUsed: context.modelUsed ?? null,
-        selectedModel: context.selectedModel ?? null,
-        fallbackModel: context.fallbackModel ?? null,
-        selectedModelTier: context.selectedModelTier ?? null,
-        selectedModelTierReason: context.selectedModelTierReason ?? null,
-        regenerateCount: context.regenerateCount ?? null,
-        truncationCount: context.truncationCount ?? null,
-        rejectedTokens: context.rejectedTokens ?? null,
-        regenerationMode: context.regenerationMode ?? null,
-        reviewInfo: context.reviewInfo ?? undefined,
-        qaSignals: context.qaSignals ?? undefined,
-        courseAuditFindings: context.courseAuditFindings ?? undefined,
-      },
+      metadata: JSON.parse(
+        JSON.stringify({
+          lessonLabel,
+          markedForReviewAt: markedAt,
+          failureReason: reason,
+          modelUsed: context.modelUsed ?? null,
+          selectedModel: context.selectedModel ?? null,
+          fallbackModel: context.fallbackModel ?? null,
+          selectedModelTier: context.selectedModelTier ?? null,
+          selectedModelTierReason: context.selectedModelTierReason ?? null,
+          regenerateCount: context.regenerateCount ?? null,
+          truncationCount: context.truncationCount ?? null,
+          rejectedTokens: context.rejectedTokens ?? null,
+          regenerationMode: context.regenerationMode ?? null,
+          reviewInfo: context.reviewInfo ?? undefined,
+          qaSignals: context.qaSignals ?? undefined,
+          courseAuditFindings: context.courseAuditFindings ?? undefined,
+          qualityRecovery: context.qualityRecovery ?? undefined,
+        })
+      ) as Json,
       generation_attempt: (context.regenerateCount ?? 0) + 1,
     });
 
@@ -393,6 +399,7 @@ export async function saveLessonContent(
           // Human review info for UI warnings (only present if review needed)
           reviewInfo: result.reviewInfo ?? undefined,
           lessonDigest: result.lessonDigest ?? undefined,
+          qualityRecovery: result.qualityRecovery ?? undefined,
         })
       ) as Json,
       status: 'completed',

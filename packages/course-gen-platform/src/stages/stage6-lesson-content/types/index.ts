@@ -4,12 +4,37 @@ import type { CourseStyle } from '@megacampus/shared-types/style-prompts';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import type {
   QualityRecoveryAttempt,
+  QualityRecoveryMode,
   QualityRecoveryFinalDisposition,
   Stage6QualityRungPhaseName,
 } from '@megacampus/shared-types/stage6-quality-recovery';
 
 export type Stage6ModelTierName = 'simple' | 'normal' | 'complex';
 export type Stage6QualityRungName = Stage6QualityRungPhaseName;
+export type Stage6ExecutionPolicyMode = 'manual_top_regeneration';
+export type Stage6QualityAttemptOutcome = 'accepted' | 'quality_retryable' | 'failed';
+
+export interface Stage6ExecutionPolicy {
+  mode: Stage6ExecutionPolicyMode;
+}
+
+export interface Stage6QualityRecoveryAttemptHistory extends QualityRecoveryAttempt {
+  rung_attempt_index: number;
+  outcome: Stage6QualityAttemptOutcome;
+  selected_model: string | null;
+  fallback_model: string | null;
+  model_used: string | null;
+  quality_score: number;
+  errors: string[];
+  review_reasons?: string[];
+}
+
+export interface Stage6QualityRecoveryHistory {
+  mode: QualityRecoveryMode;
+  manual_triggered?: boolean;
+  attempts: Stage6QualityRecoveryAttemptHistory[];
+  final_disposition?: QualityRecoveryFinalDisposition;
+}
 
 export interface Stage6ControlDecision {
   action: 'run_rung' | 'human_review_required';
@@ -42,6 +67,9 @@ export interface Stage6JobInput {
 
   /** Optional model override for fallback retry */
   modelOverride?: string;
+
+  /** Optional execution policy for user-triggered top-model regeneration. */
+  executionPolicy?: Stage6ExecutionPolicy;
 
   /** Model selected by Stage 6 tier routing before overrides/retries */
   selectedModel?: string | null;
@@ -106,6 +134,9 @@ export interface Stage6JobResult {
 
   /** Error messages (empty on success) */
   errors: string[];
+
+  /** Outer quality ladder history (if the job used multi-rung recovery). */
+  qualityRecovery?: Stage6QualityRecoveryHistory;
 
   /** Generation metrics */
   metrics: {
@@ -240,6 +271,10 @@ export interface Stage6Output {
   success: boolean;
   /** Accumulated errors during generation */
   errors: string[];
+
+  /** Outer quality ladder history (if the run used multi-rung recovery). */
+  qualityRecovery?: Stage6QualityRecoveryHistory;
+
   /** Execution metrics */
   metrics: {
     /** Total tokens used across all nodes */

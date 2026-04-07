@@ -18,11 +18,23 @@ const {
   mockRetrieveLessonContext,
   mockExtractSourceDocuments,
   mockSelectStage6ModelTier,
+  mockHandlePartialSuccess,
+  mockMarkForReview,
+  mockSaveLessonContent,
+  mockSaveSourceDocuments,
+  mockCheckAndSetStage6Complete,
+  mockGetModelForPhase,
 } = vi.hoisted(() => ({
   mockExecuteStage6Orchestrator: vi.fn(),
   mockRetrieveLessonContext: vi.fn(),
   mockExtractSourceDocuments: vi.fn(),
   mockSelectStage6ModelTier: vi.fn(),
+  mockHandlePartialSuccess: vi.fn().mockResolvedValue(undefined),
+  mockMarkForReview: vi.fn().mockResolvedValue(undefined),
+  mockSaveLessonContent: vi.fn().mockResolvedValue(undefined),
+  mockSaveSourceDocuments: vi.fn().mockResolvedValue(undefined),
+  mockCheckAndSetStage6Complete: vi.fn().mockResolvedValue(undefined),
+  mockGetModelForPhase: vi.fn(),
 }));
 
 // Mock Supabase
@@ -86,11 +98,11 @@ vi.mock('@/stages/stage6-lesson-content/utils/sanity-check', () => ({
 
 // Mock database-service
 vi.mock('@/stages/stage6-lesson-content/services/database-service', () => ({
-  handlePartialSuccess: vi.fn().mockResolvedValue(undefined),
-  markForReview: vi.fn().mockResolvedValue(undefined),
-  saveLessonContent: vi.fn().mockResolvedValue(undefined),
-  saveSourceDocuments: vi.fn().mockResolvedValue(undefined),
-  checkAndSetStage6Complete: vi.fn().mockResolvedValue(undefined),
+  handlePartialSuccess: mockHandlePartialSuccess,
+  markForReview: mockMarkForReview,
+  saveLessonContent: mockSaveLessonContent,
+  saveSourceDocuments: mockSaveSourceDocuments,
+  checkAndSetStage6Complete: mockCheckAndSetStage6Complete,
 }));
 
 // Mock content utils
@@ -101,6 +113,12 @@ vi.mock('@/stages/stage6-lesson-content/services/content-utils', () => ({
 // Mock model selector
 vi.mock('@/stages/stage6-lesson-content/nodes/generator/model-selector', () => ({
   selectStage6ModelTier: mockSelectStage6ModelTier,
+}));
+
+vi.mock('@/shared/llm/model-config-service', () => ({
+  createModelConfigService: vi.fn(() => ({
+    getModelForPhase: mockGetModelForPhase,
+  })),
 }));
 
 // Mock config
@@ -114,6 +132,45 @@ vi.mock('@/stages/stage6-lesson-content/config', () => ({
     QUALITY_THRESHOLD: 0.75,
     MAX_REGENERATION_RETRIES: 2,
     MAX_TRUNCATION_CONTINUATION_ATTEMPTS: 2,
+  },
+  STAGE6_AUTOMATIC_QUALITY_RUNGS: [
+    'stage_6_simple',
+    'stage_6_normal',
+    'stage_6_complex',
+    'stage_6_auto_last_chance',
+  ],
+  STAGE6_MANUAL_QUALITY_RUNG: 'stage_6_manual_regeneration',
+  STAGE6_QUALITY_RUNG_CONFIGS: {
+    stage_6_simple: {
+      phaseName: 'stage_6_simple',
+      mode: 'automatic',
+      initialMaxRegenerationRetries: 1,
+      promotedMaxRegenerationRetries: 0,
+    },
+    stage_6_normal: {
+      phaseName: 'stage_6_normal',
+      mode: 'automatic',
+      initialMaxRegenerationRetries: 1,
+      promotedMaxRegenerationRetries: 0,
+    },
+    stage_6_complex: {
+      phaseName: 'stage_6_complex',
+      mode: 'automatic',
+      initialMaxRegenerationRetries: 1,
+      promotedMaxRegenerationRetries: 0,
+    },
+    stage_6_auto_last_chance: {
+      phaseName: 'stage_6_auto_last_chance',
+      mode: 'automatic',
+      initialMaxRegenerationRetries: 0,
+      promotedMaxRegenerationRetries: 0,
+    },
+    stage_6_manual_regeneration: {
+      phaseName: 'stage_6_manual_regeneration',
+      mode: 'manual',
+      initialMaxRegenerationRetries: 0,
+      promotedMaxRegenerationRetries: 0,
+    },
   },
 }));
 
@@ -229,6 +286,26 @@ function createFailOutput(errors: string[] = ['LLM timeout']): Stage6Output {
   };
 }
 
+function createReviewOutput(reason: string = 'Low quality score'): Stage6Output {
+  return {
+    ...createFailOutput([]),
+    success: true,
+    lessonContent: {
+      lesson_id: '1.1',
+      title: 'Needs Review',
+      sections: [],
+    } as unknown as Stage6Output['lessonContent'],
+    reviewInfo: {
+      needsReview: true,
+      reasons: [reason],
+    },
+    metrics: {
+      ...createFailOutput([]).metrics,
+      qualityScore: 0.42,
+    },
+  };
+}
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -255,6 +332,11 @@ describe('stage6/services/job-processor', () => {
       tier: 'normal' as const,
       reason: 'standard difficulty',
     });
+    mockGetModelForPhase.mockImplementation(async (phaseName: string) => ({
+      modelId: `${phaseName}-primary`,
+      fallbackModelId: `${phaseName}-fallback`,
+      source: 'database',
+    }));
   });
 
   afterEach(() => {
@@ -497,6 +579,224 @@ describe('stage6/services/job-processor', () => {
       expect(result.success).toBe(true);
       expect(result.lessonId).toBe('1.1');
       expect(result.metrics.tokensUsed).toBe(5000);
+    });
+
+    it('stops the ladder immediately when the initial rung is accepted', async () => {
+      mockSelectStage6ModelTier.mockResolvedValue({
+        model: 'tier-simple-model',
+        fallback: 'tier-simple-fallback',
+        tier: 'simple' as const,
+        reason: 'beginner lesson',
+      });
+      mockExecuteStage6Orchestrator.mockResolvedValueOnce(createSuccessOutput());
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(true);
+      expect(mockGetModelForPhase).toHaveBeenCalledTimes(1);
+      expect(mockGetModelForPhase).toHaveBeenCalledWith(
+        'stage_6_simple',
+        'course-uuid',
+        undefined,
+        'en'
+      );
+      expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(1);
+      expect(mockSaveLessonContent).toHaveBeenCalledTimes(1);
+      const savedResult = vi.mocked(mockSaveLessonContent).mock.calls[0][2];
+      expect(savedResult.qualityRecovery?.attempts).toHaveLength(1);
+      expect(savedResult.qualityRecovery?.attempts[0]).toMatchObject({
+        phase_name: 'stage_6_simple',
+        outcome: 'accepted',
+      });
+      expect(mockHandlePartialSuccess).not.toHaveBeenCalled();
+      expect(mockMarkForReview).not.toHaveBeenCalled();
+    });
+
+    it('retries the same tier once before promoting on quality_retryable', async () => {
+      mockSelectStage6ModelTier.mockResolvedValue({
+        model: 'tier-simple-model',
+        fallback: 'tier-simple-fallback',
+        tier: 'simple' as const,
+        reason: 'beginner lesson',
+      });
+      mockExecuteStage6Orchestrator
+        .mockResolvedValueOnce(createReviewOutput('simple first fail'))
+        .mockResolvedValueOnce(createReviewOutput('simple second fail'))
+        .mockResolvedValueOnce(createSuccessOutput());
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(true);
+      expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(3);
+      expect(mockExecuteStage6Orchestrator.mock.calls[0][0]).toMatchObject({
+        modelOverride: 'stage_6_simple-primary',
+      });
+      expect(mockExecuteStage6Orchestrator.mock.calls[1][0]).toMatchObject({
+        modelOverride: 'stage_6_simple-primary',
+      });
+      expect(mockExecuteStage6Orchestrator.mock.calls[2][0]).toMatchObject({
+        modelOverride: 'stage_6_normal-primary',
+      });
+      const savedResult = vi.mocked(mockSaveLessonContent).mock.calls[0][2];
+      expect(savedResult.qualityRecovery?.attempts.map(attempt => attempt.phase_name)).toEqual([
+        'stage_6_simple',
+        'stage_6_simple',
+        'stage_6_normal',
+      ]);
+      expect(savedResult.qualityRecovery?.attempts.map(attempt => attempt.outcome)).toEqual([
+        'quality_retryable',
+        'quality_retryable',
+        'accepted',
+      ]);
+    });
+
+    it('walks simple -> normal -> complex -> auto_last_chance before final review_required', async () => {
+      mockSelectStage6ModelTier.mockResolvedValue({
+        model: 'tier-simple-model',
+        fallback: 'tier-simple-fallback',
+        tier: 'simple' as const,
+        reason: 'beginner lesson',
+      });
+      mockExecuteStage6Orchestrator
+        .mockResolvedValueOnce(createReviewOutput('simple first fail'))
+        .mockResolvedValueOnce(createReviewOutput('simple second fail'))
+        .mockResolvedValueOnce(createReviewOutput('normal fail'))
+        .mockResolvedValueOnce(createReviewOutput('complex fail'))
+        .mockResolvedValueOnce(createReviewOutput('auto last chance fail'));
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(true);
+      expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(5);
+      expect(mockExecuteStage6Orchestrator.mock.calls.map(call => call[0].modelOverride)).toEqual([
+        'stage_6_simple-primary',
+        'stage_6_simple-primary',
+        'stage_6_normal-primary',
+        'stage_6_complex-primary',
+        'stage_6_auto_last_chance-primary',
+      ]);
+      expect(mockHandlePartialSuccess).toHaveBeenCalledTimes(1);
+      expect(mockMarkForReview).not.toHaveBeenCalled();
+      const finalReviewResult = vi.mocked(mockHandlePartialSuccess).mock.calls[0][4];
+      expect(finalReviewResult.qualityRecovery?.final_disposition).toEqual({
+        outcome: 'review_required',
+        terminal_phase_name: 'stage_6_auto_last_chance',
+        terminal_mode: 'automatic',
+        human_review_required: true,
+      });
+      expect(
+        finalReviewResult.qualityRecovery?.attempts.map(attempt => attempt.phase_name)
+      ).toEqual([
+        'stage_6_simple',
+        'stage_6_simple',
+        'stage_6_normal',
+        'stage_6_complex',
+        'stage_6_auto_last_chance',
+      ]);
+    });
+
+    it('uses provider fallback inside the rung before quality promotion', async () => {
+      mockSelectStage6ModelTier.mockResolvedValue({
+        model: 'tier-simple-model',
+        fallback: 'tier-simple-fallback',
+        tier: 'simple' as const,
+        reason: 'beginner lesson',
+      });
+      mockExecuteStage6Orchestrator
+        .mockResolvedValueOnce(createFailOutput(['provider timeout']))
+        .mockResolvedValueOnce(createFailOutput(['provider timeout']))
+        .mockResolvedValueOnce(createReviewOutput('fallback still low quality'))
+        .mockResolvedValueOnce(createSuccessOutput());
+
+      const resultPromise = processStage6Job(createMockJob());
+      await vi.advanceTimersByTimeAsync(5000);
+      const result = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(4);
+      expect(mockExecuteStage6Orchestrator.mock.calls[0][0]).toMatchObject({
+        modelOverride: 'stage_6_simple-primary',
+      });
+      expect(mockExecuteStage6Orchestrator.mock.calls[1][0]).toMatchObject({
+        modelOverride: 'stage_6_simple-primary',
+      });
+      expect(mockExecuteStage6Orchestrator.mock.calls[2][0]).toMatchObject({
+        modelOverride: 'stage_6_simple-fallback',
+      });
+      expect(mockExecuteStage6Orchestrator.mock.calls[3][0]).toMatchObject({
+        modelOverride: 'stage_6_simple-primary',
+      });
+      expect(mockGetModelForPhase.mock.calls.map(call => call[0])).not.toContain('stage_6_normal');
+    });
+
+    it('stores intermediate rung failures only in ladder history when a later rung succeeds', async () => {
+      mockSelectStage6ModelTier.mockResolvedValue({
+        model: 'tier-simple-model',
+        fallback: 'tier-simple-fallback',
+        tier: 'simple' as const,
+        reason: 'beginner lesson',
+      });
+      mockExecuteStage6Orchestrator
+        .mockResolvedValueOnce(createReviewOutput('simple first fail'))
+        .mockResolvedValueOnce(createReviewOutput('simple second fail'))
+        .mockResolvedValueOnce(createSuccessOutput());
+
+      await processStage6Job(createMockJob());
+
+      expect(mockHandlePartialSuccess).not.toHaveBeenCalled();
+      expect(mockMarkForReview).not.toHaveBeenCalled();
+      expect(mockSaveLessonContent).toHaveBeenCalledTimes(1);
+      const savedResult = vi.mocked(mockSaveLessonContent).mock.calls[0][2];
+      expect(savedResult.qualityRecovery?.attempts).toHaveLength(3);
+      expect(savedResult.qualityRecovery?.final_disposition).toBeUndefined();
+      expect(savedResult.qualityRecovery?.attempts[0].outcome).toBe('quality_retryable');
+    });
+
+    it('starts manual top regeneration directly on stage_6_manual_regeneration', async () => {
+      mockGetModelForPhase.mockImplementation(async (phaseName: string) => {
+        if (phaseName === 'stage_6_manual_regeneration') {
+          return {
+            modelId: 'openai/gpt-5.4',
+            fallbackModelId: 'z-ai/glm-5',
+            source: 'database',
+          };
+        }
+
+        return {
+          modelId: `${phaseName}-primary`,
+          fallbackModelId: `${phaseName}-fallback`,
+          source: 'database',
+        };
+      });
+      mockExecuteStage6Orchestrator.mockResolvedValueOnce(createSuccessOutput());
+
+      const job = createMockJob({
+        executionPolicy: {
+          mode: 'manual_top_regeneration',
+        },
+      });
+      const result = await processStage6Job(job);
+
+      expect(result.success).toBe(true);
+      expect(mockSelectStage6ModelTier).not.toHaveBeenCalled();
+      expect(mockGetModelForPhase).toHaveBeenCalledTimes(1);
+      expect(mockGetModelForPhase).toHaveBeenCalledWith(
+        'stage_6_manual_regeneration',
+        'course-uuid',
+        undefined,
+        'en'
+      );
+      expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(1);
+      expect(mockExecuteStage6Orchestrator.mock.calls[0][0]).toMatchObject({
+        modelOverride: 'openai/gpt-5.4',
+        selectedModel: 'openai/gpt-5.4',
+        fallbackModel: 'z-ai/glm-5',
+        selectedModelTier: null,
+      });
+      const calledPhases = mockGetModelForPhase.mock.calls.map(call => call[0]);
+      expect(calledPhases).not.toContain('stage_6_simple');
+      expect(calledPhases).not.toContain('stage_6_normal');
+      expect(calledPhases).not.toContain('stage_6_complex');
     });
 
     it('should continue without RAG context if retrieval fails', async () => {
