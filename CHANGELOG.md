@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.37] - 2026-04-07
+
+### Added
+
+- add 2 source file(s), update docs (70b51d27)
+- **stage6**: surface quality ladder review history (650b5aa7)
+- **stage6**: add quality recovery execution ladder (2ca4b1f4)
+- **stage6**: add quality ladder contract (f1bfc65c)
+- **orchestration**: add local contract and dev delivery path (23e7c2a9)
+- **cli**: add dev delivery command (b4c33792)
+
+### Fixed
+
+- **web**: simplify quality recovery hook imports (c9eccd3d)
+- **web**: align quality ladder shared-type imports (31464c90)
+- **stage6**: show explicit review empty state (3f9dbe09)
+- **web**: preserve collapsed lesson inspector split (463d234c)
+- **web**: add lesson inspector split fallback (33b6e94c)
+- **web**: reconcile stuck stage6 course status (d5befcb9)
+- **cli**: make push-dev cleanup pipefail-safe (370f80aa)
+- **cli**: restore push-dev cleanup trap (a08764ec)
+- **stage6**: restore lesson preview and review-required state (8cb1b502)
+
+### Other
+
+- **web**: stabilize quality ladder ui assertions (e59232a4)
+
 ## [0.31.36] - 2026-04-04
 
 ### Fixed

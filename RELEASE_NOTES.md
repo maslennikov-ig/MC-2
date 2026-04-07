@@ -2,6 +2,35 @@
 
 _Released on 2025-12-26_
 
+## v0.31.37
+
+_Released on 2026-04-07_
+
+### ✨ New Features
+
+- Add 2 source file(s), update docs
+- **stage6**: Surface quality ladder review history
+- **stage6**: Add quality recovery execution ladder
+- **stage6**: Add quality ladder contract
+- **orchestration**: Add local contract and dev delivery path
+- **cli**: Add dev delivery command
+
+### 🐛 Bug Fixes
+
+- **web**: Simplify quality recovery hook imports
+- **web**: Align quality ladder shared-type imports
+- **stage6**: Show explicit review empty state
+- **web**: Preserve collapsed lesson inspector split
+- **web**: Add lesson inspector split fallback
+- **web**: Reconcile stuck stage6 course status
+- **cli**: Make push-dev cleanup pipefail-safe
+- **cli**: Restore push-dev cleanup trap
+- **stage6**: Restore lesson preview and review-required state
+
+---
+
+_This release was automatically generated from 16 commits._
+
 ## v0.31.36
 
 _Released on 2026-04-04_
