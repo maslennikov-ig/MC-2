@@ -57,6 +57,7 @@ export * from './course-operations';
 
 // Stage 6 UI Types (Glass Factory Dashboard)
 export * from './stage6-ui.types';
+export * from './stage6-quality-recovery';
 
 // LMS Integration Types (Open edX, v0.23.0+)
 export * from './lms';

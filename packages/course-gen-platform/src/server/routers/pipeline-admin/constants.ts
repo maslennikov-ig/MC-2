@@ -5,7 +5,7 @@
  * Static definitions for pipeline stages and their configurations.
  */
 
-import type { PhaseName } from '@megacampus/shared-types';
+import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
   DEFAULT_MODEL_ID,
   DEFAULT_FALLBACK_MODEL_ID,
@@ -96,6 +96,8 @@ export const PIPELINE_STAGES = [
       'stage_6_simple',
       'stage_6_normal',
       'stage_6_complex',
+      'stage_6_auto_last_chance',
+      'stage_6_manual_regeneration',
     ] as PhaseName[],
     linkedPrompts: [
       'stage_6_planner',
@@ -355,6 +357,18 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     temperature: 0.7,
     maxTokens: 8000,
     fallbackModelId: 'moonshotai/kimi-k2-thinking',
+  },
+  stage_6_auto_last_chance: {
+    modelId: 'z-ai/glm-5',
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: 'qwen/qwen3.5-plus-02-15',
+  },
+  stage_6_manual_regeneration: {
+    modelId: 'openai/gpt-5.4',
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: 'z-ai/glm-5',
   },
   stage_6_standard_ru: {
     modelId: DEFAULT_MODEL_ID,

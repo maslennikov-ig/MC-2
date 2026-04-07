@@ -228,6 +228,16 @@ const PHASE_FALLBACK_CONFIG: Record<
     temperature: 0.7,
     maxTokens: 8000,
   },
+  stage_6_auto_last_chance: {
+    modelId: 'z-ai/glm-5',
+    temperature: 0.7,
+    maxTokens: 8000,
+  },
+  stage_6_manual_regeneration: {
+    modelId: 'openai/gpt-5.4',
+    temperature: 0.7,
+    maxTokens: 8000,
+  },
   stage_6_arbiter: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.0, // Deterministic for agreement scoring
