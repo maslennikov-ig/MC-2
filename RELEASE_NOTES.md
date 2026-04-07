@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.31.39
+
+_Released on 2026-04-07_
+
+### 🐛 Bug Fixes
+
+- **web**: Derive stage6 ladder models from persisted history
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.31.38
 
 _Released on 2026-04-07_
