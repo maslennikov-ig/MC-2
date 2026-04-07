@@ -59,23 +59,34 @@ echo ""
 echo "Pulling latest develop images..."
 docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" pull
 
-# 7. Deploy dev containers (do NOT use --remove-orphans, it kills shared infra!)
-echo "Deploying dev containers..."
-docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" up -d --force-recreate
+# 7. Deploy dev containers in stages
+# Stage 1: Start core services (web, notebooklm-bridge, api) without workers
+# Workers depend on api-dev:service_healthy which causes compose to exit 1
+# if api takes time to start. So we start core services first, wait for health,
+# then start workers.
+DEV_COMPOSE="docker compose -f $BASE_PATH/docker-compose.dev.yml --env-file $BASE_PATH/.env.dev"
 
-# 8. Health Check
+echo "Deploying core dev containers (web, bridge, api)..."
+$DEV_COMPOSE up -d --force-recreate --no-deps web-dev notebooklm-bridge-dev api-dev
+
+# 8. Health Check — wait for API and Web before starting workers
 echo "Performing Health Checks..."
 
 # Check API health
 API_HEALTHY=false
 echo "   Checking API on localhost:4010..."
-for i in {1..12}; do
+for i in {1..24}; do
     if curl -s -f "http://localhost:4010/health" > /dev/null 2>&1; then
         echo "   API health check passed!"
         API_HEALTHY=true
         break
     fi
-    echo "   Waiting for API... ($i/12)"
+    # Show container status on every 4th attempt for debugging
+    if [ $((i % 4)) -eq 0 ]; then
+        echo "   Container status:"
+        docker inspect --format='{{.State.Status}} (exit={{.State.ExitCode}})' megacampus-api-dev 2>/dev/null || echo "   (container not found)"
+    fi
+    echo "   Waiting for API... ($i/24)"
     sleep 5
 done
 
@@ -98,9 +109,18 @@ if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
     [ "$API_HEALTHY" = false ] && echo "   - API not healthy"
     [ "$WEB_HEALTHY" = false ] && echo "   - Web not healthy"
     echo ""
-    echo "Check logs with: docker compose -f docker-compose.dev.yml logs"
+    echo "=== API container logs (last 50 lines) ==="
+    docker logs megacampus-api-dev --tail 50 2>&1 || true
+    echo ""
+    echo "=== API container inspect ==="
+    docker inspect --format='Status={{.State.Status}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} StartedAt={{.State.StartedAt}}' megacampus-api-dev 2>/dev/null || true
+    echo ""
     exit 1
 fi
+
+# Stage 2: Start workers now that API is healthy
+echo "Starting worker containers..."
+$DEV_COMPOSE up -d --force-recreate worker-dev worker-stage6-dev worker-stage7-dev
 
 # 9. Docker Cleanup (prevent disk space exhaustion)
 echo ""
