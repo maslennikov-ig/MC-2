@@ -129,7 +129,12 @@ export function useViewerState(
       lastUpdated: now,
     }
     localProgressTimestampRef.current = now
-    localStorage.setItem(storageKey, JSON.stringify(progressData))
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(progressData))
+    } catch {
+      // Silent failure acceptable - progress persistence is a nice-to-have feature
+      // localStorage may be unavailable (private browsing) or quota exceeded
+    }
   }, [course.id, completedLessons])
 
   // Sync progress to server (fire and forget)
