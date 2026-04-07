@@ -1,47 +1,84 @@
-schema_version = 1
+schema_version = 2
 role = "technical-orchestrator"
 beads_dir = ".beads"
 handoff_file = ".codex/handoff.md"
-report_template = ".codex/report-template.md"
-report_path_template = ".codex/agent-reports/{date}/{task_id}.md"
+stage_summary_path_template = ".codex/stages/{stage_id}/summary.md"
+artifact_template = ".codex/stage-artifact-template.md"
+artifact_path_template = ".codex/stages/{stage_id}/artifacts/{task_id}.md"
 
 [workspace]
 multi_repo = false
+launch_mode = "manual_user_launch"
+
+[baseline]
+profile = "balanced-v2.1"
+source_skill = "orchestration-bootstrap"
 
 [execution]
 default_mode = "hybrid"
 simple_task_max_files = 2
 simple_task_max_minutes = 15
 
-[execution.agent_launch]
-mode = "manual_user_launch"
-orchestrator_prepares_prompts = true
-orchestrator_must_not_assume_agent_started_until_user_confirms = true
-parallel_agents_require_isolated_worktrees = true
-parallel_agents_require_isolated_branches = true
-report_back_to_orchestrator = true
+[autonomy]
+default_mode = "act_on_reversible_local_changes"
+act_without_asking = [
+  "read_repo_files",
+  "edit_tracked_repo_files",
+  "update_repo_local_orchestration_contracts",
+  "run_local_verification",
+  "update_beads_when_task_truth_is_clear",
+]
+ask_before = [
+  "destructive_or_irreversible_actions",
+  "high_impact_externally_visible_actions_not_explicitly_required",
+  "deploy_or_prod_staging_mutation",
+  "permission_scope_expansion",
+  "force_push_or_history_rewrite",
+  "material_requirement_ambiguity",
+]
 
-[execution.simple_task_policy]
-do_locally = true
-use_beads_if_handoff_needed = true
-disallow_if_schema_change = true
-disallow_if_route_expansion = true
-disallow_if_docs_sensitive = true
-disallow_if_parallel_work_needed = true
+[handoff]
+mode = "current_state_plus_stages"
+current_state_max_lines = 45
+legacy_archive_dir = ".codex/agent-reports"
 
-[execution.medium_complex_policy]
-orchestrate = true
-require_repo_context_first = true
-require_beads_tracking = true
-require_local_review_before_close = true
-require_local_verification_before_close = true
+[artifacts]
+tracked_in_git = true
+format = "frontmatter_plus_short_note"
+sensitivity = "internal_no_secrets"
 
-[workflow]
-require_context7_for_docs_sensitive_changes = true
-require_report_files_for_delegated_work = true
-delegated_report_file_format = "markdown"
-require_findings_first_reviews = true
-require_final_local_verification_before_close = true
+[docs]
+required_read_paths = [
+  "AGENTS.md",
+  "README.md",
+  ".codex/handoff.md",
+  ".claude/commands/push-dev.md",
+  ".claude/commands/push.md",
+  ".claude/commands/deploy.md",
+  ".claude/docs/deployment-guide.md",
+]
+optional_read_paths = [
+  ".codex/config.toml",
+  "CLAUDE.md",
+]
+stage_close_update_paths = [
+  ".codex/handoff.md",
+  ".codex/stages",
+]
+runtime_contract_update_paths = [
+  "AGENTS.md",
+  "README.md",
+  ".claude/commands/push-dev.md",
+  ".claude/commands/push.md",
+  ".claude/commands/deploy.md",
+  ".claude/docs/deployment-guide.md",
+  ".codex/handoff.md",
+  ".codex/stages",
+]
+notes = [
+  "Keep AGENTS.md short and stable; keep delivery commands and tracked stage state here instead of in large duplicated prompt files.",
+  "Do not append stage chronology into .codex/handoff.md; move material stage history into .codex/stages/.",
+]
 
 [delivery]
 dev_branch = "develop"
@@ -51,102 +88,39 @@ release_command = "/push"
 staging_deploy_command = "/deploy"
 direct_push_to_protected_branches_forbidden = true
 
-[routing]
-enabled = true
-required_for = ["medium", "complex", "docs_sensitive"]
-docs_first_for_version_sensitive = true
-check_installed_assets_first = true
-check_local_catalog = true
-use_skill_scout_if_no_fit = true
-use_asset_vetter_for_promotion_candidates = true
-prefer_installed_assets = true
-prefer_cli_over_mcp = true
-record_routing_decision_in_handoff_when_material = true
-
-[brainstorming]
-enabled = true
-required_for = ["new_behavior", "non_trivial_change", "product_ambiguity", "ux_ambiguity", "architecture_ambiguity", "scope_ambiguity"]
-ask_user_questions_before_stage_planning = true
-one_question_at_a_time = true
-require_design_approval_before_planning = true
-require_writing_plans_after_brainstorming = true
-allow_skip_for = ["simple_fix", "narrow_bugfix", "process_only", "already_approved_plan"]
-
-[process_skills]
-do_not_bypass_superpowers = true
-required_sequence_for_non_trivial_work = ["brainstorming", "writing-plans"]
-tdd_required_for = ["feature", "bugfix", "refactor", "behavior_change"]
-tdd_exceptions_require_user_approval = true
-systematic_debugging_required_for = ["bug", "test_failure", "unexpected_behavior", "build_failure", "integration_issue", "performance_issue"]
-verification_before_completion_required = true
-
-[docs]
-required_read_paths = [
-  "AGENTS.md",
-  "README.md",
-  "CLAUDE.md",
-  ".codex/config.toml",
-  ".claude/commands/push-dev.md",
-  ".claude/commands/push.md",
-  ".claude/commands/deploy.md",
-  ".claude/docs/deployment-guide.md",
-]
-stage_close_update_paths = [
-  ".codex/handoff.md",
-]
-runtime_contract_update_paths = [
-  "AGENTS.md",
-  "CLAUDE.md",
-  "README.md",
-  ".claude/commands/push-dev.md",
-  ".claude/commands/push.md",
-  ".claude/docs/deployment-guide.md",
-  ".codex/handoff.md",
-]
-rules = [
-  "Update .codex/handoff.md when the next realistic stage changes materially or a stage closes.",
-  "Keep docs changes scoped to workflow/runtime truth; do not churn docs for internal-only implementation details.",
-  "Keep `/push` as the release/version flow and document Dev delivery via `/push-dev` instead of overloading release semantics.",
-]
-
 [delegation]
+launcher = "user"
 require_base_branch_and_commit = true
 require_dedicated_worktree = true
 require_strict_write_zone = true
 require_clean_git_status = true
-require_markdown_report_file = true
-require_short_completion_message = true
-completion_fields = ["task_id", "report_path", "commit_hash", "git_status_clean"]
-completion_format = "task ID | report path | commit hash | git status clean yes/no"
-
-[delegation.manual_launch_contract]
-launcher = "user"
-prompt_author = "orchestrator"
-parallel_mode = "allowed_only_with_isolated_worktrees_and_branches"
-start_condition = "agent/session is considered active only after user launches it"
-return_artifacts = ["report_file", "commit_hash_or_n/a", "git_status_clean_flag"]
-prompt_style = "detailed_manual_launch_with_hard_requirements_and_report_addendum"
+require_artifact = true
+artifact_fields = [
+  "task_id",
+  "stage_id",
+  "branch",
+  "base_branch",
+  "base_commit",
+  "worktree",
+  "status",
+  "verification",
+  "changed_files",
+]
 
 [review]
-format = "findings-first"
+require_findings_first = true
 allowed_decisions = ["merge", "fix", "split", "defer"]
 
-[corrective_loop]
-enabled = true
-treat_review_findings_as_mandatory_when_in_scope = true
-treat_verification_discoveries_as_mandatory_when_in_scope = true
-fix_in_scope_issues_before_merge = true
-fix_in_scope_issues_before_close = true
-allow_defer_only_for = ["external_blocker", "unrelated_scope", "high_risk_separate_batch", "explicit_user_direction"]
-require_explicit_followup_when_deferred = true
+[enforcement]
+process_verification_entrypoint = "scripts/orchestration/run_process_verification.sh"
+artifact_validator = "scripts/orchestration/validate_artifact.py"
+stage_closure_check = "scripts/orchestration/check_stage_ready.py"
+artifact_required_for_stage_close = true
+handoff_must_reference_stage_on_close = true
 
 [verification]
 process_only_commands = [
-  "python3 - <<'PY'\nimport tomllib, pathlib\np = pathlib.Path('.codex/orchestrator.toml')\ntomllib.loads(p.read_text())\nprint('orchestrator.toml OK')\nPY",
-  "test -f .codex/handoff.md",
-  "test -f .codex/report-template.md",
-  "git diff --check",
-  "git status --short",
+  "scripts/orchestration/run_process_verification.sh",
 ]
 code_change_commands = [
   "pnpm type-check",
@@ -160,8 +134,11 @@ stage_level_optional_commands = [
 required_steps = [
   "Run relevant verification commands for the touched scope.",
   "Update Beads statuses for completed and follow-up work.",
-  "If this repo commits .beads/issues.jsonl, refresh it explicitly with bd export -o .beads/issues.jsonl at session end.",
   "git pull --rebase",
   "git push",
   "Update .codex/handoff.md if stage truth changed.",
 ]
+
+[exceptions]
+shared_types_import_policy = "@megacampus/shared-types only"
+manual_launch_is_default = true
