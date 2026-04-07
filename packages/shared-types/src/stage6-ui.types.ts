@@ -13,6 +13,11 @@
  */
 
 import type { JudgeRecommendation, SelfReviewResult } from './judge-types';
+import type {
+  QualityRecoveryMode,
+  Stage6AutomaticQualityRungPhaseName,
+  Stage6QualityRungPhaseName,
+} from './stage6-quality-recovery';
 
 // =============================================================================
 // Pipeline Node Types
@@ -428,6 +433,24 @@ export interface LessonContentPreview {
   exerciseCount: number;
 }
 
+export type LessonInspectorQualityRecoveryReasonSource = 'self_review' | 'judge' | 'qa_signals';
+
+export interface LessonInspectorQualityRecoveryReason {
+  source: LessonInspectorQualityRecoveryReasonSource;
+  text: string;
+}
+
+export interface LessonInspectorQualityRecoverySummary {
+  recoveryMode: QualityRecoveryMode;
+  outcome: 'completed' | 'review_required';
+  humanReviewRequired: boolean;
+  automaticRungs: Stage6AutomaticQualityRungPhaseName[];
+  terminalPhaseName: Stage6QualityRungPhaseName;
+  terminalModelId: string | null;
+  manualRegenerationRequested: boolean;
+  reasons: LessonInspectorQualityRecoveryReason[];
+}
+
 /**
  * LessonInspectorData - Complete data for Lesson Inspector view
  *
@@ -481,6 +504,8 @@ export interface LessonInspectorData {
   selfReviewResult?: SelfReviewResult | null;
   /** Judge evaluation result with CLEV voting (null if not judged yet) */
   judgeResult: JudgeVerdictDisplay | null;
+  /** Inspector-friendly view of Stage 6 quality-ladder history. */
+  qualityRecoverySummary?: LessonInspectorQualityRecoverySummary | null;
 
   // Metrics
   /** Total tokens consumed across all nodes */

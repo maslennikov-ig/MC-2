@@ -340,6 +340,7 @@ export function LessonInspector({
       generationLanguage={data.language ?? null}
       selfReviewResult={data.selfReviewResult ?? null}
       judgeResult={data.judgeResult}
+      qualityRecoverySummary={data.qualityRecoverySummary ?? null}
       stats={{
         tokens: data.totalTokensUsed,
         durationMs: data.totalDurationMs,

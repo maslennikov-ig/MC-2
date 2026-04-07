@@ -9,6 +9,7 @@ import {
   getLessonInspectorContentPresentation,
   isLessonContentUsable,
 } from './lessonInspectorContent'
+import { buildLessonInspectorQualityRecoverySummary } from './lessonInspectorQualityRecovery'
 import {
   PipelineNodeState,
   JudgeVerdictDisplay,
@@ -854,6 +855,10 @@ export function useLessonInspectorData({
 
         // Parse judge result
         const judgeResult = previewRow ? parseJudgeResult(previewRow, traces) : null
+        const qualityRecoverySummary = buildLessonInspectorQualityRecoverySummary({
+          lessonContentRows,
+          judgeResult,
+        })
 
         // Build logs
         const logs = buildLogEntries(traces)
@@ -904,6 +909,7 @@ export function useLessonInspectorData({
           style: traceStyle,
           language: traceLanguage,
           judgeResult,
+          qualityRecoverySummary,
           totalTokensUsed,
           totalCostUsd,
           totalDurationMs,

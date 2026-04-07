@@ -1091,7 +1091,19 @@
       "retryLabel": "Попробовать снова",
       "cardUnavailable": "Карточка недоступна",
       "reviewRequiredTitle": "Требуется ручная проверка",
-      "reviewRequiredDescription": "Генерация завершилась в fail-open режиме: контент доступен, но перед одобрением нужен ручной review."
+      "reviewRequiredDescription": "Генерация завершилась в fail-open режиме: контент доступен, но перед одобрением нужен ручной review.",
+      "qualityRecoveryTitle": "История quality recovery",
+      "qualityRecoveryAutomaticRungs": "Пройденные automatic rung'и",
+      "qualityRecoveryFinalAutomaticRung": "Финальный automatic rung",
+      "qualityRecoveryTerminalModel": "Финальная модель",
+      "qualityRecoveryTopReasons": "Основные причины",
+      "qualityRecoveryReasonSelfReview": "Self-review",
+      "qualityRecoveryReasonJudge": "Judge",
+      "qualityRecoveryReasonQaSignals": "QA signals",
+      "manualRegenerationTitle": "Использована manual-top regeneration",
+      "manualRegenerationDescription": "Урок был отправлен в manual-top regeneration path.",
+      "manualRegenerationPhase": "Фаза manual regeneration",
+      "manualRegenerationModel": "Manual model"
     },
     "pipeline": {
       "step": "Шаг",
