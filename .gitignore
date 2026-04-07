@@ -12,6 +12,9 @@ node_modules/
 !.codex/orchestrator.toml
 !.codex/handoff.md
 !.codex/report-template.md
+!.codex/stage-artifact-template.md
+!.codex/stages/
+!.codex/stages/**
 
 # --- Build Outputs & Cache ---
 dist/
