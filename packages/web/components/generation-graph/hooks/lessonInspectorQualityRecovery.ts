@@ -9,7 +9,6 @@ import type {
 } from '@megacampus/shared-types/stage6-ui.types'
 import {
   QualityRecoverySchema,
-  STAGE6_QUALITY_RUNG_MODEL_IDS,
   type Stage6AutomaticQualityRungPhaseName,
   type QualityRecovery,
 } from '@megacampus/shared-types/stage6-quality-recovery'
@@ -60,7 +59,29 @@ function getMetadataModelId(metadata: unknown): string | null {
     return null
   }
 
-  return getNonEmptyString(metadata.model_used) ?? getNonEmptyString(metadata.modelUsed)
+  return (
+    getNonEmptyString(metadata.model_used) ??
+    getNonEmptyString(metadata.modelUsed) ??
+    getNonEmptyString(metadata.selected_model) ??
+    getNonEmptyString(metadata.selectedModel)
+  )
+}
+
+function getAttemptModelId(recovery: QualityRecovery, terminalPhaseName: string): string | null {
+  const terminalAttempt =
+    [...recovery.attempts]
+      .reverse()
+      .find((attempt) => attempt.phase_name === terminalPhaseName) ?? recovery.attempts.at(-1)
+
+  if (!terminalAttempt) {
+    return null
+  }
+
+  return (
+    getNonEmptyString(terminalAttempt.model_used) ??
+    getNonEmptyString(terminalAttempt.selected_model) ??
+    getNonEmptyString(terminalAttempt.fallback_model)
+  )
 }
 
 function extractSelfReviewReason(rows: LessonContentHistoryRow[]): string | null {
@@ -198,9 +219,7 @@ export function buildLessonInspectorQualityRecoverySummary({
       .map((attempt) => attempt.phase_name as Stage6AutomaticQualityRungPhaseName),
     terminalPhaseName,
     terminalModelId:
-      STAGE6_QUALITY_RUNG_MODEL_IDS[
-        terminalPhaseName as keyof typeof STAGE6_QUALITY_RUNG_MODEL_IDS
-      ] ?? getMetadataModelId(recoveryRow.metadata),
+      getAttemptModelId(recovery, terminalPhaseName) ?? getMetadataModelId(recoveryRow.metadata),
     manualRegenerationRequested:
       recovery.manual_triggered === true ||
       recovery.attempts.some((attempt) => attempt.mode === 'manual'),

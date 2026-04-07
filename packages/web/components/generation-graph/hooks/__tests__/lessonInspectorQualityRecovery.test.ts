@@ -91,6 +91,8 @@ describe('buildLessonInspectorQualityRecoverySummary', () => {
                 is_initial_rung: false,
                 promoted_from_phase_name: 'stage_6_complex',
                 max_regeneration_retries: 0,
+                selected_model: 'z-ai/glm-5',
+                model_used: 'z-ai/glm-5',
               },
             ],
             final_disposition: {
@@ -168,6 +170,8 @@ describe('buildLessonInspectorQualityRecoverySummary', () => {
                 is_initial_rung: true,
                 max_regeneration_retries: 0,
                 manual_triggered: true,
+                selected_model: 'openai/gpt-5.4',
+                model_used: 'openai/gpt-5.4',
               },
             ],
             final_disposition: {
@@ -196,6 +200,52 @@ describe('buildLessonInspectorQualityRecoverySummary', () => {
       terminalModelId: 'openai/gpt-5.4',
       manualRegenerationRequested: true,
     })
+  })
+
+  it('falls back to persisted row metadata when attempt-level model history is missing', () => {
+    const rows = [
+      createRow({
+        id: 'review-required-legacy',
+        status: 'review_required',
+        created_at: '2026-04-07T12:00:00.000Z',
+        metadata: {
+          modelUsed: 'z-ai/glm-5',
+          qualityRecovery: {
+            mode: 'automatic',
+            attempts: [
+              {
+                sequence_index: 0,
+                phase_name: 'stage_6_complex',
+                mode: 'automatic',
+                is_initial_rung: true,
+                max_regeneration_retries: 1,
+              },
+              {
+                sequence_index: 1,
+                phase_name: 'stage_6_auto_last_chance',
+                mode: 'automatic',
+                is_initial_rung: false,
+                promoted_from_phase_name: 'stage_6_complex',
+                max_regeneration_retries: 0,
+              },
+            ],
+            final_disposition: {
+              outcome: 'review_required',
+              terminal_phase_name: 'stage_6_auto_last_chance',
+              terminal_mode: 'automatic',
+              human_review_required: true,
+            },
+          },
+        },
+      }),
+    ]
+
+    const summary = buildLessonInspectorQualityRecoverySummary({
+      lessonContentRows: rows as never,
+      judgeResult: null,
+    })
+
+    expect(summary?.terminalModelId).toBe('z-ai/glm-5')
   })
 
   it('returns null for legacy lessons without qualityRecovery metadata', () => {
