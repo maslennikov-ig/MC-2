@@ -2,8 +2,20 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 import type { LessonContent, RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { CourseStyle } from '@megacampus/shared-types/style-prompts';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
+import type {
+  QualityRecoveryAttempt,
+  QualityRecoveryFinalDisposition,
+  Stage6QualityRungPhaseName,
+} from '@megacampus/shared-types/stage6-quality-recovery';
 
 export type Stage6ModelTierName = 'simple' | 'normal' | 'complex';
+export type Stage6QualityRungName = Stage6QualityRungPhaseName;
+
+export interface Stage6ControlDecision {
+  action: 'run_rung' | 'human_review_required';
+  attempt: QualityRecoveryAttempt | null;
+  finalDisposition: QualityRecoveryFinalDisposition | null;
+}
 
 /**
  * Stage 6 job input structure

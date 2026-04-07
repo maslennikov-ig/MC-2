@@ -29,7 +29,10 @@ export const HANDLER_CONFIG = {
   /** Quality threshold for lesson acceptance */
   QUALITY_THRESHOLD: 0.75,
 
-  /** Maximum regeneration attempts before giving up (prevents infinite loops) */
+  /**
+   * Legacy global regeneration cap.
+   * Kept only as a compatibility fallback until the quality ladder helper is wired in.
+   */
   MAX_REGENERATION_RETRIES: 2,
 
   /**
@@ -69,3 +72,5 @@ export const MODEL_FALLBACK = {
   /** Max attempts before switching to fallback model */
   maxPrimaryAttempts: 2,
 } as const;
+
+export * from './quality-ladder';

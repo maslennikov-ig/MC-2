@@ -56,6 +56,8 @@ export const phaseNameSchema = z.enum([
   'stage_6_simple',
   'stage_6_normal',
   'stage_6_complex',
+  'stage_6_auto_last_chance',
+  'stage_6_manual_regeneration',
   'stage_6_standard_ru',
   'stage_6_standard_en',
   'stage_6_extended_ru',
