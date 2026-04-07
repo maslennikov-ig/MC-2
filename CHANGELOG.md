@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.38] - 2026-04-07
+
+### Fixed
+
+- **web**: cherry-pick 2 minor fixes from stale branches (242d2cc0)
+
+### Other
+
+- update docs (3f615923)
+
 ## [0.31.37] - 2026-04-07
 
 ### Added
