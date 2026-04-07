@@ -23,5 +23,20 @@
       "@megacampus/shared-types/*": ["./packages/shared-types/src/*"]
     }
   },
-  "exclude": ["node_modules", "dist", "build"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "packages/web",
+    "packages/course-gen-platform",
+    "docs",
+    "specs",
+    "scripts",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/tests/**",
+    "test-*.ts"
+  ]
 }
