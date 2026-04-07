@@ -7,9 +7,9 @@
 
 import { TRPCError } from '@trpc/server';
 import type { Queue } from 'bullmq';
-import { getSupabaseAdmin } from '../../../shared/supabase/admin';
-import { logger } from '../../../shared/logger/index.js';
-import { throwOnSupabaseError } from '../../utils/supabase-query-guard';
+import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
+import { logger } from '../../../../shared/logger/index.js';
+import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import type { Language } from '@megacampus/shared-types';
 import type {
   LessonSpecificationV2,
@@ -24,7 +24,7 @@ import {
   inferContentArchetype,
   inferHookStrategy,
   mapDepth,
-} from '../../../stages/stage5-generation/utils/semantic-scaffolding';
+} from '../../../../stages/stage5-generation/utils/semantic-scaffolding';
 
 export type LessonFromStructure = {
   lesson_number: number;
