@@ -29,6 +29,7 @@ import type {
   LessonContentPreview,
   SelfReviewResult,
   JudgeVerdictDisplay,
+  LessonInspectorQualityRecoverySummary,
   Stage6NodeName,
   SourceDocument,
   LessonSpecificationV2,
@@ -62,6 +63,7 @@ interface Stage6InspectorContentProps {
   // Quality data
   selfReviewResult: SelfReviewResult | null
   judgeResult: JudgeVerdictDisplay | null
+  qualityRecoverySummary?: LessonInspectorQualityRecoverySummary | null
 
   // Stats for StatsStrip
   stats: {
@@ -228,6 +230,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   generationLanguage,
   selfReviewResult,
   judgeResult,
+  qualityRecoverySummary,
   stats,
   status,
   needsReview = false,
@@ -262,6 +265,51 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   // Action bar visibility - show for completed OR error with content, hide when editing
   const showActions =
     !isEditing && (status === 'completed' || (status === 'error' && (rawMarkdown || content)))
+
+  const qualityRecoveryTone = needsReview
+    ? {
+        border: 'border-amber-200 dark:border-amber-800',
+        background: 'bg-amber-50 dark:bg-amber-950/20',
+        title: 'text-amber-900 dark:text-amber-300',
+        body: 'text-amber-800 dark:text-amber-400/90',
+        icon: 'text-amber-500',
+      }
+    : {
+        border: 'border-sky-200 dark:border-sky-800',
+        background: 'bg-sky-50 dark:bg-sky-950/20',
+        title: 'text-sky-900 dark:text-sky-300',
+        body: 'text-sky-800 dark:text-sky-400/90',
+        icon: 'text-sky-500',
+      }
+
+  const qualityRecoveryTitle = needsReview
+    ? t('reviewRequiredTitle')
+    : qualityRecoverySummary?.recoveryMode === 'manual'
+      ? t('manualRegenerationTitle')
+      : t('qualityRecoveryTitle')
+
+  const qualityRecoveryDescription = needsReview
+    ? t('reviewRequiredDescription')
+    : qualityRecoverySummary?.recoveryMode === 'manual'
+      ? t('manualRegenerationDescription')
+      : null
+
+  const getReasonLabel = (
+    source: NonNullable<
+      Stage6InspectorContentProps['qualityRecoverySummary']
+    >['reasons'][number]['source']
+  ) => {
+    switch (source) {
+      case 'self_review':
+        return t('qualityRecoveryReasonSelfReview')
+      case 'judge':
+        return t('qualityRecoveryReasonJudge')
+      case 'qa_signals':
+        return t('qualityRecoveryReasonQaSignals')
+      default:
+        return source
+    }
+  }
 
   // Render content based on active tab
   const renderTabContent = () => {
@@ -500,16 +548,75 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
           locale={locale}
         />
 
-        {showReviewBanner && (
-          <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
-            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+        {(showReviewBanner || qualityRecoverySummary) && (
+          <div
+            className={cn(
+              'flex items-start gap-3 border-b p-3',
+              qualityRecoveryTone.border,
+              qualityRecoveryTone.background
+            )}
+          >
+            <AlertCircle className={cn('mt-0.5 h-5 w-5 flex-shrink-0', qualityRecoveryTone.icon)} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-amber-900 dark:text-amber-300">
-                {t('reviewRequiredTitle')}
+              <p className={cn('text-sm font-medium', qualityRecoveryTone.title)}>
+                {qualityRecoveryTitle}
               </p>
-              <p className="text-xs text-amber-800 dark:text-amber-400/90">
-                {t('reviewRequiredDescription')}
-              </p>
+              {qualityRecoveryDescription && (
+                <p className={cn('text-xs', qualityRecoveryTone.body)}>
+                  {qualityRecoveryDescription}
+                </p>
+              )}
+              {qualityRecoverySummary && (
+                <div className={cn('mt-3 space-y-2 text-xs', qualityRecoveryTone.body)}>
+                  {qualityRecoverySummary.recoveryMode === 'automatic' &&
+                    qualityRecoverySummary.automaticRungs.length > 0 && (
+                      <div>
+                        <span className="font-medium">{t('qualityRecoveryAutomaticRungs')}:</span>{' '}
+                        <span>{qualityRecoverySummary.automaticRungs.join(' -> ')}</span>
+                      </div>
+                    )}
+
+                  {qualityRecoverySummary.recoveryMode === 'manual' ? (
+                    <>
+                      <div>
+                        <span className="font-medium">{t('manualRegenerationPhase')}:</span>{' '}
+                        <span>{qualityRecoverySummary.terminalPhaseName}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">{t('manualRegenerationModel')}:</span>{' '}
+                        <span>{qualityRecoverySummary.terminalModelId ?? 'unknown'}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="font-medium">
+                          {t('qualityRecoveryFinalAutomaticRung')}:
+                        </span>{' '}
+                        <span>{qualityRecoverySummary.terminalPhaseName}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">{t('qualityRecoveryTerminalModel')}:</span>{' '}
+                        <span>{qualityRecoverySummary.terminalModelId ?? 'unknown'}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {qualityRecoverySummary.reasons.length > 0 && (
+                    <div>
+                      <p className="font-medium">{t('qualityRecoveryTopReasons')}:</p>
+                      <ul className="mt-1 space-y-1">
+                        {qualityRecoverySummary.reasons.map((reason, index) => (
+                          <li key={`${reason.source}-${index}`}>
+                            <span className="font-medium">{getReasonLabel(reason.source)}:</span>{' '}
+                            <span>{reason.text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -14,6 +14,11 @@ export const STAGE6_QUALITY_RUNGS = [
   STAGE6_MANUAL_QUALITY_RUNG,
 ] as const;
 
+export const STAGE6_QUALITY_RUNG_MODEL_IDS = {
+  stage_6_auto_last_chance: 'z-ai/glm-5',
+  stage_6_manual_regeneration: 'openai/gpt-5.4',
+} as const;
+
 export const Stage6AutomaticQualityRungPhaseNameSchema = z.enum(STAGE6_AUTOMATIC_QUALITY_RUNGS);
 export type Stage6AutomaticQualityRungPhaseName = z.infer<
   typeof Stage6AutomaticQualityRungPhaseNameSchema

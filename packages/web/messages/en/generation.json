@@ -1091,7 +1091,19 @@
       "retryLabel": "Retry",
       "cardUnavailable": "Card unavailable",
       "reviewRequiredTitle": "Manual review required",
-      "reviewRequiredDescription": "Generation finished in fail-open mode: content is available, but it requires manual review before approval."
+      "reviewRequiredDescription": "Generation finished in fail-open mode: content is available, but it requires manual review before approval.",
+      "qualityRecoveryTitle": "Quality recovery history",
+      "qualityRecoveryAutomaticRungs": "Automatic rungs passed",
+      "qualityRecoveryFinalAutomaticRung": "Final automatic rung",
+      "qualityRecoveryTerminalModel": "Terminal model",
+      "qualityRecoveryTopReasons": "Top reasons",
+      "qualityRecoveryReasonSelfReview": "Self-review",
+      "qualityRecoveryReasonJudge": "Judge",
+      "qualityRecoveryReasonQaSignals": "QA signals",
+      "manualRegenerationTitle": "Manual-top regeneration used",
+      "manualRegenerationDescription": "This lesson was sent to the manual-top regeneration path.",
+      "manualRegenerationPhase": "Manual regeneration phase",
+      "manualRegenerationModel": "Manual model"
     },
     "pipeline": {
       "step": "Step",

@@ -48,6 +48,19 @@ vi.mock('next-intl', () => ({
       'generation.stage6.inspector.reviewRequiredTitle': 'Manual review required',
       'generation.stage6.inspector.reviewRequiredDescription':
         'Generation finished fail-open and now requires manual review.',
+      'generation.stage6.inspector.qualityRecoveryTitle': 'Quality recovery history',
+      'generation.stage6.inspector.qualityRecoveryAutomaticRungs': 'Automatic rungs passed',
+      'generation.stage6.inspector.qualityRecoveryFinalAutomaticRung': 'Final automatic rung',
+      'generation.stage6.inspector.qualityRecoveryTerminalModel': 'Terminal model',
+      'generation.stage6.inspector.qualityRecoveryTopReasons': 'Top reasons',
+      'generation.stage6.inspector.qualityRecoveryReasonSelfReview': 'Self-review',
+      'generation.stage6.inspector.qualityRecoveryReasonJudge': 'Judge',
+      'generation.stage6.inspector.qualityRecoveryReasonQaSignals': 'QA signals',
+      'generation.stage6.inspector.manualRegenerationTitle': 'Manual-top regeneration used',
+      'generation.stage6.inspector.manualRegenerationDescription':
+        'This lesson was sent to the manual-top regeneration path.',
+      'generation.stage6.inspector.manualRegenerationPhase': 'Manual regeneration phase',
+      'generation.stage6.inspector.manualRegenerationModel': 'Manual model',
     }
 
     return messages[namespace ? `${namespace}.${key}` : key] ?? key
@@ -132,6 +145,28 @@ describe('review-required UI surfaces', () => {
         }}
         status="completed"
         needsReview={true as never}
+        qualityRecoverySummary={
+          {
+            recoveryMode: 'automatic',
+            outcome: 'review_required',
+            humanReviewRequired: true,
+            automaticRungs: [
+              'stage_6_simple',
+              'stage_6_normal',
+              'stage_6_complex',
+              'stage_6_auto_last_chance',
+            ],
+            terminalPhaseName: 'stage_6_auto_last_chance',
+            terminalModelId: 'z-ai/glm-5',
+            manualRegenerationRequested: false,
+            reasons: [
+              {
+                source: 'self_review',
+                text: 'Self-review blocked publication because the lesson ends mid-thought.',
+              },
+            ],
+          } as never
+        }
         onApprove={() => {}}
         onEdit={() => {}}
         onRegenerate={() => {}}
@@ -143,6 +178,76 @@ describe('review-required UI surfaces', () => {
     expect(
       screen.getByText('Generation finished fail-open and now requires manual review.')
     ).toBeInTheDocument()
+    expect(screen.getByText('stage_6_auto_last_chance')).toBeInTheDocument()
+    expect(screen.getByText('z-ai/glm-5')).toBeInTheDocument()
+  })
+
+  it('renders manual-top regeneration history without treating it as the automatic ladder', () => {
+    render(
+      <Stage6InspectorContent
+        content={null}
+        rawMarkdown={null}
+        metadata={null}
+        logs={[]}
+        selfReviewResult={null}
+        judgeResult={null}
+        stats={{
+          tokens: 100,
+          durationMs: 1000,
+          modelTier: 'standard',
+          quality: 72,
+        }}
+        status="completed"
+        qualityRecoverySummary={
+          {
+            recoveryMode: 'manual',
+            outcome: 'completed',
+            humanReviewRequired: false,
+            automaticRungs: [],
+            terminalPhaseName: 'stage_6_manual_regeneration',
+            terminalModelId: 'openai/gpt-5.4',
+            manualRegenerationRequested: true,
+            reasons: [],
+          } as never
+        }
+        onApprove={() => {}}
+        onEdit={() => {}}
+        onRegenerate={() => {}}
+        locale="en"
+      />
+    )
+
+    expect(screen.getByText('Manual-top regeneration used')).toBeInTheDocument()
+    expect(screen.getByText('stage_6_manual_regeneration')).toBeInTheDocument()
+    expect(screen.getByText('openai/gpt-5.4')).toBeInTheDocument()
+    expect(screen.queryByText('Automatic rungs passed')).not.toBeInTheDocument()
+  })
+
+  it('does not render recovery history for normal completed lessons', () => {
+    render(
+      <Stage6InspectorContent
+        content={null}
+        rawMarkdown={null}
+        metadata={null}
+        logs={[]}
+        selfReviewResult={null}
+        judgeResult={null}
+        stats={{
+          tokens: 100,
+          durationMs: 1000,
+          modelTier: 'standard',
+          quality: 72,
+        }}
+        status="completed"
+        onApprove={() => {}}
+        onEdit={() => {}}
+        onRegenerate={() => {}}
+        locale="en"
+      />
+    )
+
+    expect(screen.queryByText('Quality recovery history')).not.toBeInTheDocument()
+    expect(screen.queryByText('Manual-top regeneration used')).not.toBeInTheDocument()
   })
 
   it('renders an explicit review-needed empty state when no preview is available', () => {
