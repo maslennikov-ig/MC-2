@@ -14,11 +14,6 @@ export const STAGE6_QUALITY_RUNGS = [
   STAGE6_MANUAL_QUALITY_RUNG,
 ] as const;
 
-export const STAGE6_QUALITY_RUNG_MODEL_IDS = {
-  stage_6_auto_last_chance: 'z-ai/glm-5',
-  stage_6_manual_regeneration: 'openai/gpt-5.4',
-} as const;
-
 export const Stage6AutomaticQualityRungPhaseNameSchema = z.enum(STAGE6_AUTOMATIC_QUALITY_RUNGS);
 export type Stage6AutomaticQualityRungPhaseName = z.infer<
   typeof Stage6AutomaticQualityRungPhaseNameSchema
@@ -38,6 +33,9 @@ export const QualityRecoveryAttemptSchema = z.object({
   promoted_from_phase_name: Stage6QualityRungPhaseNameSchema.optional(),
   max_regeneration_retries: z.number().int().min(0),
   manual_triggered: z.boolean().optional(),
+  selected_model: z.string().nullable().optional(),
+  fallback_model: z.string().nullable().optional(),
+  model_used: z.string().nullable().optional(),
 });
 
 export type QualityRecoveryAttempt = z.infer<typeof QualityRecoveryAttemptSchema>;

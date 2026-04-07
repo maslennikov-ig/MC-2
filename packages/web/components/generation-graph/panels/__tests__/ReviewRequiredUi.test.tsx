@@ -174,10 +174,10 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.getByText('Manual review required')).toBeTruthy()
+    expect(screen.getAllByText('Manual review required')).toHaveLength(2)
     expect(
-      screen.getByText('Generation finished fail-open and now requires manual review.')
-    ).toBeTruthy()
+      screen.getAllByText('Generation finished fail-open and now requires manual review.')
+    ).toHaveLength(2)
     expect(screen.getByText('stage_6_auto_last_chance')).toBeTruthy()
     expect(screen.getByText('z-ai/glm-5')).toBeTruthy()
   })
