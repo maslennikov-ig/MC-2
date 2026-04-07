@@ -3,9 +3,9 @@ import type {
   LessonMatrixRow,
   ModuleDashboardAggregates,
   ModuleDashboardData,
-  NodeStatus,
   PipelineNodeState,
-} from '@megacampus/shared-types'
+} from '@megacampus/shared-types/stage6-ui.types'
+import type { NodeStatus } from '@megacampus/shared-types/generation-graph'
 
 export type ReviewAwareLessonMatrixRow = LessonMatrixRow & {
   needsReview: boolean
@@ -15,10 +15,7 @@ export type ReviewAwareModuleDashboardAggregates = ModuleDashboardAggregates & {
   reviewRequiredLessons: number
 }
 
-export type ReviewAwareModuleDashboardData = Omit<
-  ModuleDashboardData,
-  'lessons' | 'aggregates'
-> & {
+export type ReviewAwareModuleDashboardData = Omit<ModuleDashboardData, 'lessons' | 'aggregates'> & {
   lessons: ReviewAwareLessonMatrixRow[]
   aggregates: ReviewAwareModuleDashboardAggregates
   needsReview: boolean
@@ -98,7 +95,9 @@ export function summarizeReviewAwareStage6Statuses(
   statuses: Array<string | null | undefined>
 ): ReviewAwareStage6GraphSummary {
   const mapped = statuses.map((status) => getReviewAwareGraphNodeState(status))
-  const readyLessons = mapped.filter((entry) => entry.status === 'completed' || entry.status === 'approved').length
+  const readyLessons = mapped.filter(
+    (entry) => entry.status === 'completed' || entry.status === 'approved'
+  ).length
   const reviewRequiredLessons = mapped.filter((entry) => entry.needsReview).length
 
   let status: NodeStatus = 'pending'
@@ -206,7 +205,10 @@ export function deriveLessonInspectorStatus({
   hasFinishTrace,
   hasErrorTrace,
   hasTraces,
-}: DeriveLessonInspectorStatusOptions): Pick<ReviewAwareLessonInspectorData, 'status' | 'needsReview'> {
+}: DeriveLessonInspectorStatusOptions): Pick<
+  ReviewAwareLessonInspectorData,
+  'status' | 'needsReview'
+> {
   const normalizedStatus = contentStatus?.toLowerCase() ?? null
   const needsReview = normalizedStatus === 'review_required'
 

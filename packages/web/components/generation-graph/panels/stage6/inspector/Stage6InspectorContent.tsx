@@ -29,11 +29,11 @@ import type {
   LessonContentPreview,
   SelfReviewResult,
   JudgeVerdictDisplay,
-  LessonInspectorQualityRecoverySummary,
   Stage6NodeName,
   SourceDocument,
   LessonSpecificationV2,
 } from '@megacampus/shared-types'
+import type { LessonInspectorQualityRecoverySummary } from '@megacampus/shared-types/stage6-ui.types'
 import { SourceDocumentsPanel } from '../../lesson/SourceDocumentsPanel'
 import { LessonMarkdownEditor } from '../../lesson/LessonMarkdownEditor'
 import { useLessonEdit } from '../../../contexts/LessonEditContext'
