@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.40] - 2026-04-10
+
+### Added
+
+- add 2 source file(s), update 1 source file(s), +1 more (568b7a64)
+
+### Fixed
+
+- **api**: resolve ESM module conflict between helpers.ts and helpers/ directory (be088c89)
+- **deploy**: staged container startup and diagnostic logging (91d942fd)
+
 ## [0.31.39] - 2026-04-07
 
 ### Fixed

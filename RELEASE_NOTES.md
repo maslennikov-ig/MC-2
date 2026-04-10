@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.31.40
+
+_Released on 2026-04-10_
+
+### ✨ New Features
+
+- Add 2 source file(s), update 1 source file(s), +1 more
+
+### 🐛 Bug Fixes
+
+- **API**: Resolve ESM module conflict between helpers.ts and helpers/ directory
+- **deploy**: Staged container startup and diagnostic logging
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.31.39
 
 _Released on 2026-04-07_
