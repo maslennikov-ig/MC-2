@@ -21,5 +21,16 @@ Current baseline commit: `8cb1b502f2809223cac73fe630951e2945be0ccd`
 
 ## Next recommended
 
-- Keep Stage 6 follow-ups split: use `mc2-dqbw1` for Lesson Inspector loading and latest-usable-content resolution, not for the already-completed review-state visibility slice.
-- If Beads lock contention returns, treat it as a separate operational follow-up instead of widening product stages.
+- Next stage id: `mc2-dqbw1`
+- Recommended action: use `mc2-dqbw1` for Lesson Inspector loading and latest-usable-content resolution, keep it separate from the completed review-state visibility slice, and treat Beads lock contention as a separate operational follow-up.
+
+## Starter prompt for next orchestrator
+
+```text
+Use $stage-orchestrator to continue with stage `mc2-dqbw1` in this repository. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, and the linked stage summary/artifact first. Then confirm current develop-baseline truth, keep Beads lock contention out of the product stage, and prepare the next execution step for Lesson Inspector loading and latest-usable-content resolution.
+```
+
+## Explicit defers
+
+- `mc2-dqbw1` remains the explicit product follow-up for Lesson Inspector loading and latest-usable-content resolution.
+- Beads lock contention remains a separate operational follow-up; do not hide it inside unrelated product-stage completion claims.

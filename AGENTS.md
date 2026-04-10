@@ -19,6 +19,7 @@
 
 Use the repo-local verification commands from `.codex/orchestrator.toml`.
 Use `scripts/orchestration/run_process_verification.sh` as the process-verification entrypoint before claiming the orchestration layer is in a good state.
+Use `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` when a stage is actually closing; it is the canonical two-phase closeout entrypoint.
 
 Typical code-change gates in this repo include:
 
@@ -36,6 +37,7 @@ Typical code-change gates in this repo include:
 - Import shared contracts only from `@megacampus/shared-types`.
 - Never hardcode credentials or store unsafe env values in tracked files.
 - Prefer isolated worktrees or feature branches for delegated or parallel streams; do not treat the dirty primary worktree as a safe delegation baseline.
+- Do not leave silent technical debt. Fix in-scope issues before close; any justified defer must be explicit, bounded, tracked in Beads, and listed in `.codex/handoff.md` under `Explicit defers`.
 
 ## Operational State
 
@@ -46,4 +48,6 @@ Typical code-change gates in this repo include:
 - `.codex/agent-reports/` is the legacy local-only pre-v2 archive.
 - `scripts/orchestration/validate_artifact.py` validates tracked artifacts.
 - `scripts/orchestration/check_stage_ready.py <stage_id>` is the minimal hard stop before stage close.
+- `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` runs stage-close verification before delivery.
+- `scripts/orchestration/cleanup_stage_workspace.py --stage <stage_id>` removes safe local worktrees and branches for completed stage deliveries.
 - Beads remains the source of truth for queue, status, and dependencies.

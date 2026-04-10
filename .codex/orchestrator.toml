@@ -1,5 +1,5 @@
 schema_version = 2
-role = "technical-orchestrator"
+role = "stage-orchestrator"
 beads_dir = ".beads"
 handoff_file = ".codex/handoff.md"
 stage_summary_path_template = ".codex/stages/{stage_id}/summary.md"
@@ -11,8 +11,8 @@ multi_repo = false
 launch_mode = "manual_user_launch"
 
 [baseline]
-profile = "balanced-v2.1"
-source_skill = "orchestration-bootstrap"
+profile = "balanced-v2.3"
+source_skill = "orchestration-setup"
 
 [execution]
 default_mode = "hybrid"
@@ -115,8 +115,18 @@ allowed_decisions = ["merge", "fix", "split", "defer"]
 process_verification_entrypoint = "scripts/orchestration/run_process_verification.sh"
 artifact_validator = "scripts/orchestration/validate_artifact.py"
 stage_closure_check = "scripts/orchestration/check_stage_ready.py"
+stage_closeout_entrypoint = "scripts/orchestration/run_stage_closeout.py"
+workspace_cleanup_entrypoint = "scripts/orchestration/cleanup_stage_workspace.py"
 artifact_required_for_stage_close = true
 handoff_must_reference_stage_on_close = true
+
+[closeout]
+phase_model = "stage_then_delivery"
+git_automation = "balanced"
+clean_state = "strict"
+merge_requires_explicit_authorization = true
+auto_remove_stage_worktrees = true
+auto_delete_local_branch_after_remote_delivery = true
 
 [verification]
 process_only_commands = [

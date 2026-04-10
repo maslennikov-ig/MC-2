@@ -21,6 +21,7 @@ Short outcome summary.
 
 List the commands that were actually run and the result.
 
-# Risks / Follow-ups
+# Risks / Follow-ups / Explicit Defers
 
-List residual risks, blockers, or explicit next steps.
+List residual risks, blockers, explicit next steps, and any justified defer.
+Do not leave silent technical debt behind this artifact.

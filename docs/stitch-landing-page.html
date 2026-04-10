@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#ddb8ff",
+                    "on-error-container": "#ffdad6",
+                    "error": "#ffb4ab",
+                    "on-surface": "#dfe2f3",
+                    "inverse-surface": "#dfe2f3",
+                    "outline-variant": "#4d4354",
+                    "on-secondary-fixed-variant": "#7b0190",
+                    "on-error": "#690005",
+                    "on-primary-fixed": "#2c0051",
+                    "secondary-container": "#7d0793",
+                    "tertiary-fixed-dim": "#ddb8ff",
+                    "on-tertiary-fixed-variant": "#6800b4",
+                    "secondary": "#f8acff",
+                    "primary-fixed": "#f0dbff",
+                    "on-primary-container": "#400071",
+                    "inverse-primary": "#842bd2",
+                    "inverse-on-surface": "#2c303d",
+                    "tertiary-fixed": "#f0dbff",
+                    "on-background": "#dfe2f3",
+                    "primary-container": "#b76dff",
+                    "surface-dim": "#0f131f",
+                    "error-container": "#93000a",
+                    "secondary-fixed": "#ffd6ff",
+                    "surface-tint": "#ddb7ff",
+                    "on-tertiary-container": "#400071",
+                    "surface": "#0f131f",
+                    "background": "#0f131f",
+                    "primary-fixed-dim": "#ddb7ff",
+                    "on-primary-fixed-variant": "#6900b3",
+                    "surface-container": "#1b1f2c",
+                    "on-primary": "#490080",
+                    "surface-bright": "#353946",
+                    "tertiary-container": "#b66dff",
+                    "surface-container-low": "#171b28",
+                    "on-surface-variant": "#cfc2d6",
+                    "on-tertiary": "#490080",
+                    "secondary-fixed-dim": "#f8acff",
+                    "outline": "#988d9f",
+                    "surface-container-highest": "#313442",
+                    "surface-container-high": "#262a37",
+                    "on-secondary-container": "#f396ff",
+                    "primary": "#ddb7ff",
+                    "surface-variant": "#313442",
+                    "on-secondary": "#570067",
+                    "surface-container-lowest": "#0a0e1a",
+                    "on-secondary-fixed": "#350040",
+                    "on-tertiary-fixed": "#2c0051"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #0a0e1a; color: #dfe2f3; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); }
+        .hero-gradient { background: radial-gradient(circle at top center, #490080 0%, #0a0e1a 70%); }
+    </style>
+</head>
+<body class="font-body selection:bg-primary/30">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-[#0a0e1a]/60 backdrop-blur-xl">
+<div class="max-w-7xl mx-auto px-8 h-20 flex justify-between items-center">
+<div class="text-2xl font-black text-white tracking-tighter font-headline">MegaCampusAI</div>
+<div class="hidden md:flex gap-8 items-center font-headline font-bold tracking-tight">
+<a class="text-[#a855f7] border-b-2 border-[#a855f7] pb-1 transition-colors duration-300" href="#">Особенности</a>
+<a class="text-white/70 hover:text-white transition-colors duration-300" href="#">Тарифы</a>
+<a class="text-white/70 hover:text-white transition-colors duration-300" href="#">Сообщество</a>
+<a class="text-white/70 hover:text-white transition-colors duration-300" href="#">Курсы</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="hidden sm:block text-white/70 hover:text-white font-bold transition-all px-4 py-2">Войти</button>
+<button class="bg-gradient-to-r from-[#a855f7] to-[#b66dff] text-white px-6 py-2.5 rounded-full font-bold hover:scale-105 active:scale-95 transition-all duration-300">Начать обучение</button>
+</div>
+</div>
+</nav>
+<main>
+<!-- Hero Section -->
+<section class="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 hero-gradient">
+<div class="absolute inset-0 z-0">
+<div class="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 blur-[120px] rounded-full"></div>
+<div class="absolute bottom-1/4 right-1/4 w-64 h-64 bg-secondary/10 blur-[100px] rounded-full"></div>
+</div>
+<!-- Floating Decorative Shapes -->
+<div class="absolute top-40 right-10 w-32 h-32 glass-card rounded-xl rotate-12 opacity-40"></div>
+<div class="absolute bottom-40 left-20 w-48 h-48 glass-card rounded-full opacity-30"></div>
+<div class="relative z-10 max-w-5xl mx-auto px-8 text-center">
+<h1 class="font-headline text-5xl md:text-7xl font-extrabold tracking-tighter text-white mb-6 leading-tight">
+                    Создавайте курсы <br/>
+<span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">с помощью ИИ</span>
+</h1>
+<p class="text-xl md:text-2xl text-on-surface-variant max-w-2xl mx-auto mb-10 leading-relaxed">
+                    Превратите свои знания в структурированные образовательные программы за считанные минуты. Интеллектуальный ассистент для современных экспертов.
+                </p>
+<div class="flex flex-col sm:flex-row items-center justify-center gap-6">
+<button class="w-full sm:w-auto bg-gradient-to-r from-[#a855f7] to-[#b66dff] text-white px-10 py-5 rounded-full font-bold text-lg hover:shadow-[0_0_40px_rgba(168,85,247,0.4)] transition-all duration-300">
+                        Начать бесплатно
+                    </button>
+<button class="w-full sm:w-auto border border-outline-variant hover:bg-surface-container-high text-white px-10 py-5 rounded-full font-bold text-lg transition-all duration-300">
+                        Узнать больше
+                    </button>
+</div>
+<!-- Product Preview Card -->
+<div class="mt-20 relative group">
+<div class="absolute inset-0 bg-gradient-to-b from-primary/20 to-transparent blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+<div class="relative glass-card border border-white/5 rounded-xl p-4 md:p-8 transform hover:-translate-y-2 transition-transform duration-500">
+<img alt="MegaCampusAI Platform Preview" class="rounded-lg w-full aspect-video object-cover shadow-2xl" data-alt="Modern abstract background with flowing purple and blue digital waves, representing artificial intelligence and data flow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMfsf9i0o2jZPpoZxvzTi6ovrJMcRtqewGJOABuly9cBm39qJ5U7J-_v3Ka7qb5eqQIxml7f8J1-rhVKfCCLxQLoxz14tYLXQ50X6-OBRW1ntpbiJHMiNouDlkzw6lujBjh3eELQS666pwzLwlswFekv5UyQCusIZ1eHZ87VcauTBp-Jcd04b1h3yn9PfmsKVvsAvbo4jrG8f5vcu6f-dGdjfXbBHZOjwxGvqHNG7bsFdjqsd-t74mQvc6dqqdoeJleR5uj6-WSCo"/>
+</div>
+</div>
+</div>
+</section>
+<!-- Social Proof Stats -->
+<section class="py-24 bg-surface-container-lowest">
+<div class="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
+<div class="flex flex-col gap-2">
+<span class="font-headline text-5xl font-extrabold text-white">500+</span>
+<span class="text-on-surface-variant font-medium">курсов создано</span>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-headline text-5xl font-extrabold text-white">10,000+</span>
+<span class="text-on-surface-variant font-medium">уроков сгенерировано</span>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-headline text-5xl font-extrabold text-white">50+</span>
+<span class="text-on-surface-variant font-medium">организаций доверяют нам</span>
+</div>
+</div>
+</section>
+<!-- Features Bento Grid -->
+<section class="py-32 bg-surface">
+<div class="max-w-7xl mx-auto px-8">
+<div class="mb-20 text-left md:w-2/3">
+<h2 class="font-headline text-4xl font-extrabold text-white mb-4 tracking-tight">Будущее образования уже здесь</h2>
+<p class="text-lg text-on-surface-variant">Все необходимые инструменты для упаковки вашей экспертизы в один мощный AI-пайплайн.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- Card 1 -->
+<div class="md:col-span-1 glass-card p-8 rounded-lg border border-white/5 flex flex-col gap-6 hover:bg-surface-container-high transition-colors">
+<div class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">upload_file</span>
+</div>
+<div>
+<h3 class="font-headline text-xl font-bold text-white mb-2">Загрузка материалов</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">Просто загрузите PDF, видео или текстовые заметки — ИИ проанализирует контекст за секунды.</p>
+</div>
+</div>
+<!-- Card 2 (Large) -->
+<div class="md:col-span-2 glass-card p-8 rounded-lg border border-white/5 flex flex-col md:flex-row gap-8 hover:bg-surface-container-high transition-colors">
+<div class="md:w-1/2 flex flex-col justify-center">
+<div class="w-12 h-12 bg-secondary/10 rounded-full flex items-center justify-center text-secondary mb-6">
+<span class="material-symbols-outlined">auto_awesome</span>
+</div>
+<h3 class="font-headline text-2xl font-bold text-white mb-4">AI-генерация контента</h3>
+<p class="text-on-surface-variant leading-relaxed mb-6">Наша нейросеть создает структуру курса, пишет скрипты лекций и генерирует проверочные тесты, сохраняя ваш авторский стиль.</p>
+<a class="text-primary font-bold inline-flex items-center gap-2 group" href="#">
+                                Попробовать сейчас
+                                <span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</a>
+</div>
+<div class="md:w-1/2 overflow-hidden rounded-lg">
+<img class="w-full h-full object-cover" data-alt="Digital representation of complex neural network nodes connected by glowing lines on a dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASPFIc-9SxQAB32ezrmZepbhvqB0tVjXwydPfRspNu_MH6t5pfWlrWRCxlE4IdckuulJ-ZKn9xP3w-2Z4Ylox4Jvwc3aX24OdlWeOCIOEWCGdT4PfpZgwVU9JMun7m4RGnr4DVYd-ot13gK2CU-PZLE4esIH5n4EKHRxiK5pTLxjxqiiROQXW2yMrEdtYJANPbTHgOdR6F5hH8Z1Enzr2kARCGIPfcdNHCA8fnaW0lE-4van3ShmEIw4FR8Dn4WHFfUnO5IeD8g0g"/>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="md:col-span-1 glass-card p-8 rounded-lg border border-white/5 flex flex-col gap-6 hover:bg-surface-container-high transition-colors">
+<div class="w-12 h-12 bg-tertiary/10 rounded-full flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined">account_tree</span>
+</div>
+<div>
+<h3 class="font-headline text-xl font-bold text-white mb-2">6-этапный пайплайн</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">От идеи до готового продукта за 6 шагов: анализ, структура, контент, визуал, тесты, публикация.</p>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="md:col-span-1 glass-card p-8 rounded-lg border border-white/5 flex flex-col gap-6 hover:bg-surface-container-high transition-colors">
+<div class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">monitoring</span>
+</div>
+<div>
+<h3 class="font-headline text-xl font-bold text-white mb-2">Мониторинг</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">Отслеживайте прогресс студентов и качество усвоения материала в режиме реального времени через дашборд.</p>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="md:col-span-1 glass-card p-8 rounded-lg border border-white/5 flex flex-col gap-6 hover:bg-surface-container-high transition-colors">
+<div class="w-12 h-12 bg-secondary/10 rounded-full flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">language</span>
+</div>
+<div>
+<h3 class="font-headline text-xl font-bold text-white mb-2">Мультиязычность</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">Автоматический перевод и локализация контента на 50+ языков мира с сохранением смысла.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="py-24 px-8">
+<div class="max-w-5xl mx-auto rounded-xl p-12 text-center bg-gradient-to-br from-surface-container to-surface-container-high relative overflow-hidden">
+<div class="absolute -top-20 -right-20 w-64 h-64 bg-primary/20 blur-[80px] rounded-full"></div>
+<div class="relative z-10">
+<h2 class="font-headline text-4xl font-extrabold text-white mb-6">Готовы масштабировать свои знания?</h2>
+<p class="text-lg text-on-surface-variant mb-10 max-w-xl mx-auto">Присоединяйтесь к тысячам экспертов, которые уже создают будущее онлайн-образования.</p>
+<button class="bg-gradient-to-r from-[#a855f7] to-[#b66dff] text-white px-12 py-4 rounded-full font-bold text-lg hover:scale-105 transition-transform">Создать первый курс</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-[#0a0e1a] py-12 border-t border-white/5">
+<div class="max-w-7xl mx-auto px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="flex flex-col gap-2">
+<div class="text-lg font-bold text-white">MegaCampusAI</div>
+<p class="text-white/40 text-sm max-w-xs text-center md:text-left">Экосистема интеллектуального обучения. Мы делаем образование доступным.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-8 font-inter text-sm">
+<a class="text-white/40 hover:text-[#a855f7] transition-colors" href="#">Конфиденциальность</a>
+<a class="text-white/40 hover:text-[#a855f7] transition-colors" href="#">Условия использования</a>
+<a class="text-white/40 hover:text-[#a855f7] transition-colors" href="#">Поддержка</a>
+<a class="text-white/40 hover:text-[#a855f7] transition-colors" href="#">API</a>
+</div>
+<div class="text-white/40 text-sm">
+                © 2024 MegaCampusAI.
+            </div>
+</div>
+</footer>
+</body></html>
