@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MegaCampusAI — Создание курсов нового поколения</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Manrope:wght@200;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#fabc4e",
+                        "surface-bright": "#353946",
+                        "surface-dim": "#0f131f",
+                        "error": "#ffb4ab",
+                        "secondary": "#f8acff",
+                        "inverse-surface": "#dfe2f3",
+                        "surface-container": "#1b1f2c",
+                        "on-secondary-container": "#f396ff",
+                        "on-tertiary": "#432c00",
+                        "on-primary-fixed": "#2c0051",
+                        "secondary-fixed-dim": "#f8acff",
+                        "on-background": "#dfe2f3",
+                        "surface-tint": "#ddb7ff",
+                        "outline-variant": "#4d4354",
+                        "primary": "#ddb7ff",
+                        "secondary-fixed": "#ffd6ff",
+                        "background": "#0f131f",
+                        "outline": "#988d9f",
+                        "primary-container": "#b76dff",
+                        "tertiary-fixed": "#ffdead",
+                        "on-surface": "#dfe2f3",
+                        "primary-fixed-dim": "#ddb7ff",
+                        "tertiary-container": "#bd871a",
+                        "error-container": "#93000a",
+                        "on-secondary-fixed": "#350040",
+                        "surface-container-lowest": "#0a0e1a",
+                        "tertiary-fixed-dim": "#fabc4e",
+                        "surface-container-highest": "#313442",
+                        "on-tertiary-fixed": "#281900",
+                        "on-error-container": "#ffdad6",
+                        "secondary-container": "#7d0793",
+                        "surface-container-high": "#262a37",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "surface-container-low": "#171b28",
+                        "surface": "#0f131f",
+                        "on-primary-fixed-variant": "#6900b3",
+                        "on-tertiary-container": "#3a2600",
+                        "on-primary-container": "#400071",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#2c303d",
+                        "on-secondary": "#570067",
+                        "surface-variant": "#313442",
+                        "inverse-primary": "#842bd2",
+                        "on-secondary-fixed-variant": "#7b0190",
+                        "primary-fixed": "#f0dbff",
+                        "on-surface-variant": "#cfc2d6",
+                        "on-primary": "#490080"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "1rem",
+                        "xl": "1.25rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0a0e1a;
+            color: #dfe2f3;
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-panel {
+            background: rgba(27, 31, 44, 0.4);
+            backdrop-filter: blur(20px);
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #ddb7ff 0%, #f8acff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="selection:bg-primary-container selection:text-white">
+<!-- Header / TopNavBar -->
+<header class="fixed top-0 w-full z-50 bg-[#0a0e1a]/80 backdrop-blur-xl shadow-[0_20px_50px_rgba(168,85,247,0.05)]">
+<nav class="flex justify-between items-center px-8 py-6 max-w-[1440px] mx-auto font-['Manrope'] tracking-tight">
+<div class="text-2xl font-black text-white tracking-tighter">
+                MegaCampusAI
+            </div>
+<div class="hidden md:flex gap-10">
+<a class="text-slate-400 hover:text-white transition-colors" href="#">Возможности</a>
+<a class="text-slate-400 hover:text-white transition-colors" href="#">Тарифы</a>
+<a class="text-slate-400 hover:text-white transition-colors" href="#">Курсы</a>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-slate-400 hover:text-white transition-colors hover:scale-105 duration-300">Войти</button>
+<button class="bg-gradient-to-r from-primary to-primary-container text-on-primary-container px-6 py-2.5 rounded-full font-bold hover:scale-105 transition-transform duration-300 shadow-lg shadow-primary-container/20">
+                    Создать курс
+                </button>
+</div>
+</nav>
+</header>
+<main>
+<!-- Hero Section -->
+<section class="relative pt-48 pb-32 px-8 overflow-hidden min-h-screen flex flex-col justify-center">
+<!-- Decorative Glows -->
+<div class="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/10 blur-[120px] rounded-full"></div>
+<div class="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-secondary/10 blur-[100px] rounded-full"></div>
+<div class="max-w-[1440px] mx-auto relative z-10 w-full">
+<div class="flex flex-col lg:flex-row items-center gap-20">
+<div class="lg:w-3/5">
+<div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel border border-white/5 mb-8">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-xs font-['Inter'] uppercase tracking-widest text-primary">Эра интеллектуального обучения</span>
+</div>
+<h1 class="font-headline text-6xl md:text-8xl font-extrabold tracking-tighter leading-[0.95] mb-10 text-white">
+                            Создавайте <span class="text-gradient">образовательные курсы</span> с помощью ИИ
+                        </h1>
+<p class="font-body text-xl md:text-2xl text-on-surface-variant max-w-2xl leading-relaxed mb-12">
+                            Загружайте PDF, видео или текст — наш ИИ мгновенно проанализирует материалы и создаст полноценную образовательную траекторию с уроками и тестами.
+                        </p>
+<div class="flex flex-col sm:flex-row gap-6">
+<button class="bg-gradient-to-r from-primary to-primary-container text-on-primary-container px-10 py-5 rounded-full font-bold text-lg hover:scale-105 transition-transform duration-300 shadow-xl shadow-primary-container/30">
+                                Создать курс бесплатно
+                            </button>
+<button class="px-10 py-5 rounded-full border border-outline-variant/30 text-white font-bold text-lg hover:bg-white/5 transition-all duration-300">
+                                Узнать больше
+                            </button>
+</div>
+</div>
+<div class="lg:w-2/5 relative">
+<div class="relative w-full aspect-square rounded-[3rem] overflow-hidden shadow-2xl shadow-black/50 rotate-3 border border-white/10">
+<img class="w-full h-full object-cover" data-alt="Abstract futuristic AI visualization with flowing purple energy lines and geometric shapes in a dark tech space" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-GpewVR1v4vVx3Ad2_S1J2YWHb3w531LaNuHhVx4KwNkXBQtUv6X7MjFbLVjvfj3vkkF8tLAoi9lHBS7YHVH8BqXFhXEK6NUYXlCnQvBoOfVbpuhR5Zj1RZuRUl3EUrKMQaJkVwWH27SDc37ZTSf7fvEKwxyp0Yj9yJlrBDVng9PmONGpZnivKWuOnQJySYr51CUbkps_KZTlqh3bB4wqJ7KTwZrtMU1sAwo1ll8QjsNBQ807DqEJHittOt53ZRKfTrPTpC5VJZo"/>
+<div class="absolute inset-0 bg-gradient-to-t from-[#0a0e1a] via-transparent to-transparent"></div>
+</div>
+<!-- Floating Insight Card -->
+<div class="absolute -bottom-10 -left-10 glass-panel p-6 rounded-2xl shadow-2xl border border-white/10 max-w-xs transform -rotate-3">
+<div class="flex items-center gap-4 mb-4">
+<div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary">auto_awesome</span>
+</div>
+<span class="font-bold text-white text-sm">MegaCampus AI Insight</span>
+</div>
+<p class="text-xs text-on-surface-variant leading-relaxed">
+                                "Ваш PDF-файл содержит 12 ключевых концепций. Рекомендуется структура из 4 модулей для оптимального усвоения."
+                            </p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Stats Section -->
+<section class="py-24 px-8 border-y border-white/5 bg-surface-container-lowest">
+<div class="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-16 md:gap-4 divide-x divide-white/5">
+<div class="flex flex-col items-center text-center">
+<span class="font-headline text-7xl font-black text-white mb-4 tracking-tighter">500+</span>
+<span class="font-body text-on-surface-variant uppercase tracking-widest text-sm">созданных курсов</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<span class="font-headline text-7xl font-black text-primary mb-4 tracking-tighter">10,000+</span>
+<span class="font-body text-on-surface-variant uppercase tracking-widest text-sm">уроков сгенерировано</span>
+</div>
+<div class="flex flex-col items-center text-center">
+<span class="font-headline text-7xl font-black text-white mb-4 tracking-tighter">50+</span>
+<span class="font-body text-on-surface-variant uppercase tracking-widest text-sm">крупных организаций</span>
+</div>
+</div>
+</section>
+<!-- Process Section -->
+<section class="py-40 px-8 relative overflow-hidden">
+<div class="max-w-[1440px] mx-auto relative z-10">
+<div class="text-center mb-32">
+<h2 class="font-headline text-5xl md:text-7xl font-extrabold text-white mb-6 tracking-tight">6 этапов до идеального курса</h2>
+<p class="text-on-surface-variant text-xl max-w-2xl mx-auto">Наш конвейер превращает сырые материалы в структурированные знания.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<!-- Step 1 -->
+<div class="p-10 rounded-3xl bg-surface-container-low hover:bg-surface-container transition-colors duration-500 group border border-white/5">
+<div class="text-primary font-headline text-4xl font-black mb-6 opacity-40">01</div>
+<span class="material-symbols-outlined text-4xl text-primary mb-6 group-hover:scale-110 transition-transform duration-300">upload_file</span>
+<h3 class="text-2xl font-bold text-white mb-4">Material Upload</h3>
+<p class="text-on-surface-variant">Загрузка документов любого формата: PDF, Word, видео-лекции или ссылки.</p>
+</div>
+<!-- Step 2 -->
+<div class="p-10 rounded-3xl bg-surface-container-low hover:bg-surface-container transition-colors duration-500 group border border-white/5">
+<div class="text-primary font-headline text-4xl font-black mb-6 opacity-40">02</div>
+<span class="material-symbols-outlined text-4xl text-primary mb-6 group-hover:scale-110 transition-transform duration-300">psychology</span>
+<h3 class="text-2xl font-bold text-white mb-4">Semantic Analysis</h3>
+<p class="text-on-surface-variant">ИИ извлекает ключевые смыслы, термины и иерархию понятий из материалов.</p>
+</div>
+<!-- Step 3 -->
+<div class="p-10 rounded-3xl bg-surface-container-low hover:bg-surface-container transition-colors duration-500 group border border-white/5">
+<div class="text-primary font-headline text-4xl font-black mb-6 opacity-40">03</div>
+<span class="material-symbols-outlined text-4xl text-primary mb-6 group-hover:scale-110 transition-transform duration-300">account_tree</span>
+<h3 class="text-2xl font-bold text-white mb-4">Curriculum Design</h3>
+<p class="text-on-surface-variant">Формирование логической структуры модулей и уроков для лучшего понимания.</p>
+</div>
+<!-- Step 4 -->
+<div class="p-10 rounded-3xl bg-surface-container-low hover:bg-surface-container transition-colors duration-500 group border border-white/5">
+<div class="text-primary font-headline text-4xl font-black mb-6 opacity-40">04</div>
+<span class="material-symbols-outlined text-4xl text-primary mb-6 group-hover:scale-110 transition-transform duration-300">edit_note</span>
+<h3 class="text-2xl font-bold text-white mb-4">Content Generation</h3>
+<p class="text-on-surface-variant">Создание текстов уроков, практических заданий и проверочных тестов.</p>
+</div>
+<!-- Step 5 -->
+<div class="p-10 rounded-3xl bg-surface-container-low hover:bg-surface-container transition-colors duration-500 group border border-white/5">
+<div class="text-primary font-headline text-4xl font-black mb-6 opacity-40">05</div>
+<span class="material-symbols-outlined text-4xl text-primary mb-6 group-hover:scale-110 transition-transform duration-300">translate</span>
+<h3 class="text-2xl font-bold text-white mb-4">Multilingual Adaptive</h3>
+<p class="text-on-surface-variant">Адаптация контента под культурные особенности и перевод на 50+ языков.</p>
+</div>
+<!-- Step 6 -->
+<div class="p-10 rounded-3xl bg-surface-container-low hover:bg-surface-container transition-colors duration-500 group border border-white/5">
+<div class="text-primary font-headline text-4xl font-black mb-6 opacity-40">06</div>
+<span class="material-symbols-outlined text-4xl text-primary mb-6 group-hover:scale-110 transition-transform duration-300">rocket_launch</span>
+<h3 class="text-2xl font-bold text-white mb-4">LMS Deployment</h3>
+<p class="text-on-surface-variant">Мгновенная публикация курса и готовность к обучению первых студентов.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Features Bento Grid -->
+<section class="py-40 px-8 bg-surface-container-low">
+<div class="max-w-[1440px] mx-auto">
+<div class="grid grid-cols-12 gap-8">
+<!-- Major Feature 1 -->
+<div class="col-span-12 lg:col-span-8 p-12 rounded-[3rem] bg-surface-container-lowest border border-white/5 relative overflow-hidden group">
+<div class="relative z-10">
+<h3 class="font-headline text-4xl md:text-5xl font-extrabold text-white mb-6">Мультиязычность без границ</h3>
+<p class="text-xl text-on-surface-variant max-w-md mb-10">Создайте курс один раз и обучите студентов по всему миру. Поддержка более 50 языков с сохранением контекста.</p>
+<div class="flex flex-wrap gap-3">
+<span class="px-4 py-2 rounded-full glass-panel text-xs text-primary font-bold">RU</span>
+<span class="px-4 py-2 rounded-full glass-panel text-xs text-slate-400">EN</span>
+<span class="px-4 py-2 rounded-full glass-panel text-xs text-slate-400">FR</span>
+<span class="px-4 py-2 rounded-full glass-panel text-xs text-slate-400">ES</span>
+<span class="px-4 py-2 rounded-full glass-panel text-xs text-slate-400">DE</span>
+<span class="px-4 py-2 rounded-full glass-panel text-xs text-slate-400">CN</span>
+</div>
+</div>
+<div class="absolute top-0 right-0 w-1/2 h-full opacity-20 group-hover:opacity-40 transition-opacity duration-700">
+<img class="w-full h-full object-cover grayscale brightness-50" data-alt="Digital representation of global communication networking with subtle light dots across world map silhouette" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2o4B_wHrgJUU-k6RbNi1civO9pjyuDypeDDSVzQVw0z7iVG2ZOYX2lCXO9PzzYFRWdnI8shQwJ_fA2GML9yzNz5n_BWIBj_QyzB_-YRZHzrMUZc7kJh_Vw0ZDZULDpQzw6lv6EkjzlN9Q1dsCHK9j5PV5BEg8yCae_GuWN0sn-RKqb_DwfW87V8iwpzRx4kKZRry-e9pxTIt3XXlmYo2q-WJz5MA5jQ6BB8gfF7bnihZRBdW4w_VmOMujFDWhZ-Eipw5zjToee5o"/>
+</div>
+</div>
+<!-- Small Feature 1 -->
+<div class="col-span-12 lg:col-span-4 p-12 rounded-[3rem] bg-gradient-to-br from-secondary-container to-surface-container border border-white/5 flex flex-col justify-between">
+<span class="material-symbols-outlined text-6xl text-on-secondary-container">monitoring</span>
+<div>
+<h3 class="text-3xl font-bold text-white mb-4">Real-time Monitoring</h3>
+<p class="text-on-surface-variant">Следите за прогрессом создания и качеством контента в прямом эфире.</p>
+</div>
+</div>
+<!-- Small Feature 2 -->
+<div class="col-span-12 lg:col-span-4 p-12 rounded-[3rem] bg-surface-container-high border border-white/5 flex flex-col justify-between">
+<span class="material-symbols-outlined text-6xl text-primary">universal_currency_alt</span>
+<div>
+<h3 class="text-3xl font-bold text-white mb-4">Universal Upload</h3>
+<p class="text-on-surface-variant">Принимаем всё: от заметок на салфетке до терабайтов корпоративных данных.</p>
+</div>
+</div>
+<!-- Major Feature 2 -->
+<div class="col-span-12 lg:col-span-8 p-12 rounded-[3rem] bg-[#1a1b26] border border-white/5 relative overflow-hidden">
+<div class="relative z-10 flex flex-col md:flex-row gap-12 items-center">
+<div class="md:w-1/2">
+<h3 class="font-headline text-4xl font-extrabold text-white mb-6">Адаптивные тесты</h3>
+<p class="text-on-surface-variant mb-8">ИИ генерирует вопросы разной сложности на основе вашего контента, обеспечивая 100% проверку знаний.</p>
+<button class="text-primary font-bold flex items-center gap-2 hover:translate-x-2 transition-transform">
+                                    Попробовать сейчас <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+<div class="md:w-1/2 glass-panel p-6 rounded-2xl border border-white/10 w-full">
+<div class="space-y-4">
+<div class="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-3/4"></div>
+</div>
+<div class="flex justify-between text-xs text-slate-500 font-bold tracking-widest uppercase">
+<span>Accuracy</span>
+<span>98.2%</span>
+</div>
+<div class="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-1/2"></div>
+</div>
+<div class="flex justify-between text-xs text-slate-500 font-bold tracking-widest uppercase">
+<span>Confidence</span>
+<span>High</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="py-40 px-8 relative">
+<div class="max-w-[1440px] mx-auto">
+<div class="relative p-20 rounded-[4rem] bg-[#0a0e1a] border border-white/10 overflow-hidden text-center flex flex-col items-center">
+<!-- Background accent -->
+<div class="absolute -top-1/2 -left-1/2 w-full h-full bg-primary-container/20 blur-[150px] rounded-full"></div>
+<h2 class="relative z-10 font-headline text-5xl md:text-8xl font-black text-white mb-10 tracking-tighter leading-none">
+                        Готовы запустить <br/>свой <span class="text-gradient">AI-курс?</span>
+</h2>
+<p class="relative z-10 text-xl md:text-2xl text-on-surface-variant max-w-2xl mb-16">
+                        Присоединяйтесь к тысячам экспертов, которые уже перешли на интеллектуальный способ создания контента.
+                    </p>
+<div class="relative z-10 flex flex-col sm:flex-row gap-8">
+<button class="bg-white text-[#0a0e1a] px-12 py-6 rounded-full font-black text-xl hover:scale-105 transition-transform duration-300">
+                            Создать курс сейчас
+                        </button>
+<button class="glass-panel text-white border border-white/20 px-12 py-6 rounded-full font-black text-xl hover:bg-white/5 transition-all duration-300">
+                            Посмотреть демо
+                        </button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-20 mt-auto bg-[#0a0e1a] border-t border-white/5">
+<div class="max-w-[1440px] mx-auto px-12 flex flex-col md:flex-row justify-between items-center font-['Inter'] text-sm uppercase tracking-widest">
+<div class="mb-10 md:mb-0">
+<div class="text-xl font-bold text-white mb-4">MegaCampusAI</div>
+<p class="text-slate-500 max-w-xs normal-case tracking-normal">© 2024 MegaCampusAI. Искусство интеллектуального превосходства.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-10">
+<a class="text-slate-500 hover:text-[#ddb7ff] transition-colors" href="#">Конфиденциальность</a>
+<a class="text-slate-500 hover:text-[#ddb7ff] transition-colors" href="#">Условия использования</a>
+<a class="text-slate-500 hover:text-[#ddb7ff] transition-colors" href="#">Поддержка</a>
+<a class="text-slate-500 hover:text-[#ddb7ff] transition-colors" href="#">API</a>
+</div>
+</div>
+</footer>
+</body></html>

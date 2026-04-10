@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -37,6 +38,15 @@ def main(argv: list[str]) -> int:
         handoff_text = handoff_path.read_text()
         if stage_id not in handoff_text:
             errors.append(f"handoff does not mention stage id {stage_id}")
+        explicit_defers_match = re.search(
+            r"^## Explicit defers\s*\n(?P<body>.*?)(?=^## |\Z)",
+            handoff_text,
+            re.MULTILINE | re.DOTALL,
+        )
+        if not explicit_defers_match:
+            errors.append("handoff is missing ## Explicit defers")
+        elif not explicit_defers_match.group("body").strip():
+            errors.append("handoff has an empty ## Explicit defers section")
     else:
         errors.append(f"missing handoff file: {handoff_path}")
 

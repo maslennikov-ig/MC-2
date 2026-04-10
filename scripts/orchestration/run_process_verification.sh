@@ -27,20 +27,27 @@ done
 
 python3 - <<'PY'
 import pathlib
+import re
 import tomllib
+
+orchestrator_path = pathlib.Path(".codex/orchestrator.toml")
+contract = tomllib.loads(orchestrator_path.read_text())
+handoff_file = pathlib.Path(contract.get("handoff_file", ".codex/handoff.md"))
+artifact_template = pathlib.Path(contract.get("artifact_template", ".codex/stage-artifact-template.md"))
 
 required = [
     pathlib.Path("AGENTS.md"),
-    pathlib.Path(".codex/orchestrator.toml"),
-    pathlib.Path(".codex/handoff.md"),
-    pathlib.Path(".codex/stage-artifact-template.md"),
+    orchestrator_path,
+    handoff_file,
+    artifact_template,
+    pathlib.Path("scripts/orchestration/run_stage_closeout.py"),
+    pathlib.Path("scripts/orchestration/cleanup_stage_workspace.py"),
 ]
 
 missing = [str(path) for path in required if not path.exists()]
 if missing:
     raise SystemExit(f"Missing required orchestration files: {', '.join(missing)}")
 
-contract = tomllib.loads(pathlib.Path(".codex/orchestrator.toml").read_text())
 baseline = contract.get("baseline")
 if not isinstance(baseline, dict):
     raise SystemExit("Missing [baseline] section in .codex/orchestrator.toml")
@@ -54,14 +61,40 @@ for blocked in (pathlib.Path("tasks.json"), pathlib.Path(".codex/tasks.json")):
     if blocked.exists():
         raise SystemExit(f"Duplicate task ledger is not allowed: {blocked}")
 
-handoff_text = pathlib.Path(".codex/handoff.md").read_text()
+handoff_text = handoff_file.read_text()
 handoff_lines = len(handoff_text.splitlines())
 handoff = contract.get("handoff", {})
 max_lines = handoff.get("hard_limit_lines") or handoff.get("current_state_max_lines")
 if isinstance(max_lines, int) and handoff_lines > max_lines:
     raise SystemExit(
-        f".codex/handoff.md has {handoff_lines} lines, exceeds configured limit {max_lines}"
+        f"{handoff_file} has {handoff_lines} lines, exceeds configured limit {max_lines}"
     )
+
+required_handoff_tokens = [
+    "## Next recommended",
+    "Next stage id:",
+    "Recommended action:",
+    "## Starter prompt for next orchestrator",
+    "Use $stage-orchestrator",
+    "## Explicit defers",
+]
+missing_handoff_tokens = [token for token in required_handoff_tokens if token not in handoff_text]
+if missing_handoff_tokens:
+    raise SystemExit(
+        f"{handoff_file} is missing required next-stage handoff fields: {', '.join(missing_handoff_tokens)}"
+    )
+
+explicit_defers_match = re.search(
+    r"^## Explicit defers\s*\n(?P<body>.*?)(?=^## |\Z)",
+    handoff_text,
+    re.MULTILINE | re.DOTALL,
+)
+if not explicit_defers_match:
+    raise SystemExit(f"{handoff_file} is missing the Explicit defers section")
+
+explicit_defers_body = explicit_defers_match.group("body").strip()
+if not explicit_defers_body:
+    raise SystemExit(f"{handoff_file} has an empty Explicit defers section")
 
 print(f"orchestration contract OK ({profile} via {source_skill})")
 PY
