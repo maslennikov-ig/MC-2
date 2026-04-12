@@ -1100,8 +1100,10 @@
       "qualityRecoveryReasonSelfReview": "Self-review",
       "qualityRecoveryReasonJudge": "Judge",
       "qualityRecoveryReasonQaSignals": "QA signals",
-      "manualRegenerationTitle": "Использована manual-top regeneration",
-      "manualRegenerationDescription": "Урок был отправлен в manual-top regeneration path.",
+      "manualRegenerationTitle": "Использована ручная эскалация",
+      "manualRegenerationDescription": "Урок был отправлен в manual-top regeneration path с участием человека.",
+      "manualEscalationTitle": "Нужна ручная проверка после эскалации к человеку",
+      "manualEscalationDescription": "Автоматические попытки и manual-top regeneration уже исчерпаны. Дальше нужен ручной разбор человеком.",
       "manualRegenerationPhase": "Фаза manual regeneration",
       "manualRegenerationModel": "Manual model"
     },

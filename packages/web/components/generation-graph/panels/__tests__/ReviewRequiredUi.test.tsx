@@ -56,9 +56,13 @@ vi.mock('next-intl', () => ({
       'generation.stage6.inspector.qualityRecoveryReasonSelfReview': 'Self-review',
       'generation.stage6.inspector.qualityRecoveryReasonJudge': 'Judge',
       'generation.stage6.inspector.qualityRecoveryReasonQaSignals': 'QA signals',
-      'generation.stage6.inspector.manualRegenerationTitle': 'Manual-top regeneration used',
+      'generation.stage6.inspector.manualRegenerationTitle': 'Human escalation used',
       'generation.stage6.inspector.manualRegenerationDescription':
-        'This lesson was sent to the manual-top regeneration path.',
+        'This lesson was sent to the manual-top regeneration path with human involvement.',
+      'generation.stage6.inspector.manualEscalationTitle':
+        'Manual review required after human escalation',
+      'generation.stage6.inspector.manualEscalationDescription':
+        'Automatic attempts and manual-top regeneration were both exhausted. A human now needs to review this lesson directly.',
       'generation.stage6.inspector.manualRegenerationPhase': 'Manual regeneration phase',
       'generation.stage6.inspector.manualRegenerationModel': 'Manual model',
     }
@@ -217,10 +221,55 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.getByText('Manual-top regeneration used')).toBeTruthy()
+    expect(screen.getByText('Human escalation used')).toBeTruthy()
     expect(screen.getByText('stage_6_manual_regeneration')).toBeTruthy()
     expect(screen.getByText('openai/gpt-5.4')).toBeTruthy()
     expect(screen.queryByText('Automatic rungs passed')).toBeNull()
+  })
+
+  it('renders an explicit post-manual human-escalation callout without error styling', () => {
+    render(
+      <Stage6InspectorContent
+        content={null}
+        rawMarkdown={null}
+        metadata={null}
+        logs={[]}
+        selfReviewResult={null}
+        judgeResult={null}
+        stats={{
+          tokens: 100,
+          durationMs: 1000,
+          modelTier: 'standard',
+          quality: 73,
+        }}
+        status="completed"
+        needsReview={true as never}
+        qualityRecoverySummary={
+          {
+            recoveryMode: 'manual',
+            outcome: 'review_required',
+            humanReviewRequired: true,
+            automaticRungs: ['stage_6_complex', 'stage_6_auto_last_chance'],
+            terminalPhaseName: 'stage_6_manual_regeneration',
+            terminalModelId: 'openai/gpt-5.4',
+            manualRegenerationRequested: true,
+            reasons: [],
+          } as never
+        }
+        onApprove={() => {}}
+        onEdit={() => {}}
+        onRegenerate={() => {}}
+        locale="en"
+      />
+    )
+
+    expect(screen.getAllByText('Manual review required after human escalation')).toHaveLength(2)
+    expect(
+      screen.getAllByText(
+        'Automatic attempts and manual-top regeneration were both exhausted. A human now needs to review this lesson directly.'
+      )
+    ).toHaveLength(2)
+    expect(screen.getByText('openai/gpt-5.4')).toBeInTheDocument()
   })
 
   it('does not render recovery history for normal completed lessons', () => {

@@ -71,7 +71,7 @@ interface Stage6InspectorContentProps {
     durationMs: number
     /** Subscription tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' */
     modelTier: string
-    quality: number // 0-100
+    quality: number | null // 0-100
     tokensBreakdown?: Record<Stage6NodeName, number>
   }
 
@@ -261,12 +261,24 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   const hasPreviewContent = Boolean(rawMarkdown?.trim() || content)
   const showReviewNeededEmptyState = !isEditing && needsReview && !hasPreviewContent
   const showReviewBanner = needsReview && !showReviewNeededEmptyState
+  const isManualRecoveryPath = qualityRecoverySummary?.recoveryMode === 'manual'
+  const isManualEscalation =
+    qualityRecoverySummary?.manualRegenerationRequested === true &&
+    qualityRecoverySummary?.humanReviewRequired === true
 
   // Action bar visibility - show for completed OR error with content, hide when editing
   const showActions =
     !isEditing && (status === 'completed' || (status === 'error' && (rawMarkdown || content)))
 
-  const qualityRecoveryTone = needsReview
+  const qualityRecoveryTone = isManualEscalation || isManualRecoveryPath
+    ? {
+        border: 'border-fuchsia-200 dark:border-fuchsia-800',
+        background: 'bg-fuchsia-50 dark:bg-fuchsia-950/20',
+        title: 'text-fuchsia-900 dark:text-fuchsia-300',
+        body: 'text-fuchsia-800 dark:text-fuchsia-400/90',
+        icon: 'text-fuchsia-500',
+      }
+    : needsReview
     ? {
         border: 'border-amber-200 dark:border-amber-800',
         background: 'bg-amber-50 dark:bg-amber-950/20',
@@ -282,15 +294,19 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         icon: 'text-sky-500',
       }
 
-  const qualityRecoveryTitle = needsReview
+  const qualityRecoveryTitle = isManualEscalation
+    ? t('manualEscalationTitle')
+    : needsReview
     ? t('reviewRequiredTitle')
-    : qualityRecoverySummary?.recoveryMode === 'manual'
+    : isManualRecoveryPath
       ? t('manualRegenerationTitle')
       : t('qualityRecoveryTitle')
 
-  const qualityRecoveryDescription = needsReview
+  const qualityRecoveryDescription = isManualEscalation
+    ? t('manualEscalationDescription')
+    : needsReview
     ? t('reviewRequiredDescription')
-    : qualityRecoverySummary?.recoveryMode === 'manual'
+    : isManualRecoveryPath
       ? t('manualRegenerationDescription')
       : null
 
@@ -330,8 +346,8 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         if (needsReview) {
           return (
             <ReviewNeededEmptyState
-              title={t('reviewRequiredTitle')}
-              description={t('reviewRequiredDescription')}
+              title={qualityRecoveryTitle}
+              description={qualityRecoveryDescription ?? t('reviewRequiredDescription')}
               noContentLabel={t('noContent')}
             />
           )

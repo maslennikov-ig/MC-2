@@ -504,6 +504,8 @@ export interface LessonInspectorData {
   selfReviewResult?: SelfReviewResult | null;
   /** Judge evaluation result with CLEV voting (null if not judged yet) */
   judgeResult: JudgeVerdictDisplay | null;
+  /** Best available quality score for inspector display (0-100, null if unavailable). */
+  qualityScore?: number | null;
   /** Inspector-friendly view of Stage 6 quality-ladder history. */
   qualityRecoverySummary?: LessonInspectorQualityRecoverySummary | null;
 

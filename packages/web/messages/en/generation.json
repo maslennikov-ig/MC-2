@@ -1100,8 +1100,10 @@
       "qualityRecoveryReasonSelfReview": "Self-review",
       "qualityRecoveryReasonJudge": "Judge",
       "qualityRecoveryReasonQaSignals": "QA signals",
-      "manualRegenerationTitle": "Manual-top regeneration used",
-      "manualRegenerationDescription": "This lesson was sent to the manual-top regeneration path.",
+      "manualRegenerationTitle": "Human escalation used",
+      "manualRegenerationDescription": "This lesson was sent to the manual-top regeneration path with human involvement.",
+      "manualEscalationTitle": "Manual review required after human escalation",
+      "manualEscalationDescription": "Automatic attempts and manual-top regeneration were both exhausted. A human now needs to review this lesson directly.",
       "manualRegenerationPhase": "Manual regeneration phase",
       "manualRegenerationModel": "Manual model"
     },
