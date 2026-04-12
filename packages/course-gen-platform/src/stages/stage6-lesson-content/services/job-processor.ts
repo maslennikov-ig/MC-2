@@ -52,6 +52,103 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+type Stage6FailureDisposition = 'quality_review' | 'non_retryable' | 'retryable';
+
+const NON_RETRYABLE_STAGE6_PATTERNS = [
+  'invalid job input',
+  'invalid lesson_id',
+  'invalid depth value',
+  'schema validation',
+  'zod',
+  'unauthorized',
+  'forbidden',
+  'invalid api key',
+  'cannot aggregate empty',
+  'missing prerequisites',
+];
+
+const STRUCTURAL_MISMATCH_PATTERNS = [
+  'schema validation',
+  'validation failed',
+  'zod',
+  'invalid',
+  'missing field',
+  'missing required',
+  'required field',
+  'sections mismatch',
+];
+
+function isLessonSpecificationQualityMismatchError(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes('max regeneration retries') &&
+    normalizedMessage.includes('review lessonspecification') &&
+    normalizedMessage.includes('mismatch')
+  );
+}
+
+function classifyStage6FailureMessages(messages: string[]): Stage6FailureDisposition {
+  let sawQualityReview = false;
+
+  for (const message of messages) {
+    const normalizedMessage = message.toLowerCase();
+
+    if (isLessonSpecificationQualityMismatchError(normalizedMessage)) {
+      sawQualityReview = true;
+      continue;
+    }
+
+    if (NON_RETRYABLE_STAGE6_PATTERNS.some(pattern => normalizedMessage.includes(pattern))) {
+      return 'non_retryable';
+    }
+
+    if (
+      normalizedMessage.includes('mismatch') &&
+      STRUCTURAL_MISMATCH_PATTERNS.some(pattern => normalizedMessage.includes(pattern))
+    ) {
+      return 'non_retryable';
+    }
+  }
+
+  return sawQualityReview ? 'quality_review' : 'retryable';
+}
+
+function buildStage6QualityReviewOutput(
+  errors: string[],
+  existingResult?: Stage6Output
+): Stage6Output {
+  const reasons =
+    existingResult?.reviewInfo?.reasons && existingResult.reviewInfo.reasons.length > 0
+      ? existingResult.reviewInfo.reasons
+      : errors;
+
+  return {
+    lessonContent: existingResult?.lessonContent ?? null,
+    success: true,
+    errors,
+    metrics: existingResult?.metrics ?? {
+      tokensUsed: 0,
+      durationMs: 0,
+      modelUsed: null,
+      selectedModel: null,
+      fallbackModel: null,
+      selectedModelTier: null,
+      selectedModelTierReason: null,
+      qualityScore: 0,
+      regenerateCount: 0,
+      truncationCount: 0,
+      rejectedTokens: 0,
+      regenerationMode: null,
+    },
+    reviewInfo: {
+      needsReview: true,
+      reasons,
+    },
+    lessonDigest: existingResult?.lessonDigest,
+  };
+}
+
 /**
  * Update job progress for streaming
  */
@@ -126,35 +223,14 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
  * Aligned with Stage 5 isRetryableError pattern (v0.30.4).
  */
 function isNonRetryableStage6Error(error: Error): boolean {
-  const msg = error.message.toLowerCase();
-  return (
-    msg.includes('invalid job input') ||
-    msg.includes('invalid lesson_id') ||
-    msg.includes('invalid depth value') ||
-    msg.includes('mismatch') ||
-    msg.includes('schema validation') ||
-    msg.includes('zod') ||
-    msg.includes('unauthorized') ||
-    msg.includes('forbidden') ||
-    msg.includes('invalid api key') ||
-    msg.includes('cannot aggregate empty') ||
-    msg.includes('missing prerequisites')
-  );
+  return classifyStage6FailureMessages([error.message]) === 'non_retryable';
 }
 
 /**
  * Check if orchestrator result errors indicate a non-retryable structural problem.
  */
 function hasNonRetryableResultErrors(errors: string[]): boolean {
-  return errors.some(e => {
-    const msg = e.toLowerCase();
-    return (
-      msg.includes('mismatch') ||
-      msg.includes('schema validation') ||
-      msg.includes('invalid') ||
-      msg.includes('zod')
-    );
-  });
+  return classifyStage6FailureMessages(errors) === 'non_retryable';
 }
 
 /**
@@ -228,6 +304,19 @@ export async function processWithFallback(
         return result;
       }
 
+      if (classifyStage6FailureMessages(result.errors) === 'quality_review') {
+        logger.info(
+          {
+            jobId,
+            model: modelConfig.primary,
+            attempt,
+            errors: result.errors,
+          },
+          'Treating Stage 6 quality mismatch exhaustion as review_required for outer ladder'
+        );
+        return buildStage6QualityReviewOutput(result.errors, result);
+      }
+
       lastError = new Error(result.errors.join(', ') || 'Unknown generation error');
 
       // Bail out immediately for non-retryable structural errors in result
@@ -250,6 +339,14 @@ export async function processWithFallback(
       );
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (classifyStage6FailureMessages([lastError.message]) === 'quality_review') {
+        logger.info(
+          { jobId, model: modelConfig.primary, attempt, error: lastError.message },
+          'Treating Stage 6 quality mismatch exception as review_required for outer ladder'
+        );
+        return buildStage6QualityReviewOutput([lastError.message]);
+      }
 
       // Bail out immediately for non-retryable structural errors
       if (isNonRetryableStage6Error(lastError)) {
@@ -323,6 +420,18 @@ export async function processWithFallback(
       return result;
     }
 
+    if (classifyStage6FailureMessages(result.errors) === 'quality_review') {
+      logger.info(
+        {
+          jobId,
+          fallbackModel: modelConfig.fallback,
+          errors: result.errors,
+        },
+        'Treating fallback Stage 6 quality mismatch exhaustion as review_required for outer ladder'
+      );
+      return buildStage6QualityReviewOutput(result.errors, result);
+    }
+
     const fallbackError = new Error(
       result.errors.join(', ') || 'Fallback model returned unsuccessful result'
     );
@@ -337,6 +446,15 @@ export async function processWithFallback(
     throw fallbackError;
   } catch (error) {
     const fallbackError = error instanceof Error ? error : new Error(String(error));
+
+    if (classifyStage6FailureMessages([fallbackError.message]) === 'quality_review') {
+      logger.info(
+        { jobId, fallbackModel: modelConfig.fallback, error: fallbackError.message },
+        'Treating fallback Stage 6 quality mismatch exception as review_required for outer ladder'
+      );
+      return buildStage6QualityReviewOutput([fallbackError.message]);
+    }
+
     logger.error(
       {
         jobId,
