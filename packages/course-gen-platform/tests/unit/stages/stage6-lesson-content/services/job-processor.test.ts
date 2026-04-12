@@ -306,6 +306,9 @@ function createReviewOutput(reason: string = 'Low quality score'): Stage6Output 
   };
 }
 
+const LESSON_SPEC_MISMATCH_MESSAGE =
+  'Max regeneration retries (2) exceeded. Latest quality score: 73.5%. Review LessonSpecification for key_topics/lesson_objectives mismatch.';
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -515,6 +518,28 @@ describe('stage6/services/job-processor', () => {
 
       expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(1);
     });
+
+    it('should treat LessonSpecification mismatch exhaustion as review_required for the outer ladder', async () => {
+      const fail = createFailOutput([LESSON_SPEC_MISMATCH_MESSAGE]);
+      mockExecuteStage6Orchestrator.mockResolvedValueOnce(fail);
+
+      const job = createMockJob();
+      const result = await processWithFallback(
+        job,
+        { primary: 'test-primary', fallback: 'test-fallback' },
+        'lesson-uuid-123',
+        [],
+        null
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.errors).toEqual([LESSON_SPEC_MISMATCH_MESSAGE]);
+      expect(result.reviewInfo).toEqual({
+        needsReview: true,
+        reasons: [LESSON_SPEC_MISMATCH_MESSAGE],
+      });
+      expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(1);
+    });
   });
 
   // --------------------------------------------------------------------------
@@ -692,6 +717,51 @@ describe('stage6/services/job-processor', () => {
         'stage_6_normal',
         'stage_6_complex',
         'stage_6_auto_last_chance',
+      ]);
+    });
+
+    it('keeps LessonSpecification mismatch exhaustion quality-retryable across the automatic ladder', async () => {
+      mockSelectStage6ModelTier.mockResolvedValue({
+        model: 'tier-simple-model',
+        fallback: 'tier-simple-fallback',
+        tier: 'simple' as const,
+        reason: 'beginner lesson',
+      });
+      mockExecuteStage6Orchestrator
+        .mockResolvedValueOnce(createFailOutput([LESSON_SPEC_MISMATCH_MESSAGE]))
+        .mockResolvedValueOnce(createFailOutput([LESSON_SPEC_MISMATCH_MESSAGE]))
+        .mockResolvedValueOnce(createFailOutput([LESSON_SPEC_MISMATCH_MESSAGE]))
+        .mockResolvedValueOnce(createFailOutput([LESSON_SPEC_MISMATCH_MESSAGE]))
+        .mockResolvedValueOnce(createSuccessOutput());
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(true);
+      expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(5);
+      expect(mockExecuteStage6Orchestrator.mock.calls.map(call => call[0].modelOverride)).toEqual([
+        'stage_6_simple-primary',
+        'stage_6_simple-primary',
+        'stage_6_normal-primary',
+        'stage_6_complex-primary',
+        'stage_6_auto_last_chance-primary',
+      ]);
+      expect(mockHandlePartialSuccess).not.toHaveBeenCalled();
+      expect(mockMarkForReview).not.toHaveBeenCalled();
+
+      const savedResult = vi.mocked(mockSaveLessonContent).mock.calls[0][2];
+      expect(savedResult.qualityRecovery?.attempts.map(attempt => attempt.phase_name)).toEqual([
+        'stage_6_simple',
+        'stage_6_simple',
+        'stage_6_normal',
+        'stage_6_complex',
+        'stage_6_auto_last_chance',
+      ]);
+      expect(savedResult.qualityRecovery?.attempts.map(attempt => attempt.outcome)).toEqual([
+        'quality_retryable',
+        'quality_retryable',
+        'quality_retryable',
+        'quality_retryable',
+        'accepted',
       ]);
     });
 
