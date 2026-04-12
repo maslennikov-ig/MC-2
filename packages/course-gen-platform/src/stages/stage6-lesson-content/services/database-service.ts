@@ -16,6 +16,7 @@ import {
   GenerationProgress,
   GenerationProgressStep,
   Json,
+  Database,
 } from '@megacampus/shared-types';
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 import { parseGenerationProgress } from '@/shared/schemas/generation-progress.schema';
@@ -336,6 +337,97 @@ export async function markForReview(
       },
       'Exception while marking lesson for review'
     );
+  }
+}
+
+export async function isStage6CourseActive(courseId: string): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('courses')
+      .select('generation_status')
+      .eq('id', courseId)
+      .single();
+
+    if (error) {
+      logger.warn({ courseId, error: error.message }, 'Failed to read Stage 6 course status');
+      return true;
+    }
+
+    return data?.generation_status === 'stage_6_generating';
+  } catch (error) {
+    logger.warn(
+      {
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Exception while checking Stage 6 course status'
+    );
+    return true;
+  }
+}
+
+export async function failStage6Course(courseId: string, reason: string): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
+  const failedAt = new Date().toISOString();
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('courses')
+      .update({
+        generation_status: 'failed',
+        failed_at_stage: 6,
+        error_code: 'NETWORK_ERROR' as Database['public']['Enums']['stage_error_code'],
+        generation_metadata: {
+          error_code: 'NETWORK_ERROR',
+          failed_at: failedAt,
+          failed_phase: 'rag_preflight',
+          error_message: reason,
+        } as Json,
+        updated_at: failedAt,
+      })
+      .eq('id', courseId)
+      .eq('generation_status', 'stage_6_generating')
+      .select('id');
+
+    if (error) {
+      logger.error({ courseId, error: error.message, reason }, 'Failed to mark Stage 6 course failed');
+      return false;
+    }
+
+    const didTransition = Array.isArray(data) && data.length > 0;
+    if (!didTransition) {
+      logger.info(
+        { courseId, reason },
+        'Stage 6 course failure already handled or course no longer generating'
+      );
+      return false;
+    }
+
+    try {
+      await notifyCourseError(courseId, 6, reason);
+    } catch (notifyError) {
+      logger.warn(
+        {
+          courseId,
+          error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+        },
+        'Failed to send Stage 6 infrastructure error notification'
+      );
+    }
+
+    return true;
+  } catch (error) {
+    logger.error(
+      {
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+        reason,
+      },
+      'Exception while marking Stage 6 course failed'
+    );
+    return false;
   }
 }
 

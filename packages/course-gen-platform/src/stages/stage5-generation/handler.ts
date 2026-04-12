@@ -48,6 +48,8 @@ import { handleStageCompletion } from '@/shared/auto-approval';
 import { writeCourseNodes } from '@/shared/course-nodes/writer';
 import { checkPauseAndDelay } from '../../shared/pause-check';
 import { isPipelineInterrupt } from '@/shared/errors';
+import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
+import { notifyCourseError } from '@/shared/notifications';
 import { z } from 'zod';
 
 // Import helpers extracted from this file
@@ -504,7 +506,8 @@ class Stage5GenerationHandler {
 
     // Classify error
     const errorCode = classifyGenerationError(error instanceof Error ? error : String(error));
-    const shouldRetry = isRetryableError(errorCode);
+    const shouldRetry =
+      error instanceof RequiredRagUnavailableError ? false : isRetryableError(errorCode);
     const phase = determinePhaseFromError(error instanceof Error ? error : String(error));
 
     jobLogger.info({ errorCode, shouldRetry, phase }, 'Error classified');
@@ -545,6 +548,17 @@ class Stage5GenerationHandler {
         phase,
         duration_ms: totalDurationMs,
       });
+
+      if (error instanceof RequiredRagUnavailableError) {
+        try {
+          await notifyCourseError(courseId, 5, errorMessage);
+        } catch (notifyError) {
+          jobLogger.warn(
+            { courseId, error: notifyError instanceof Error ? notifyError.message : String(notifyError) },
+            'Failed to send Stage 5 required-RAG outage notification'
+          );
+        }
+      }
 
       return buildNonRetryableResult(
         courseId,

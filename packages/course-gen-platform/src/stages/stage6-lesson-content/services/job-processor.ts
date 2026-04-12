@@ -5,6 +5,7 @@ import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { checkPauseAndDelay, isCoursePaused } from '@/shared/pause-check';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
+import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
 import {
   executeStage6 as executeStage6Orchestrator,
   type Stage6Input,
@@ -41,6 +42,8 @@ import {
 import { selectStage6ModelTier } from '../nodes/generator/model-selector';
 import {
   handlePartialSuccess,
+  failStage6Course,
+  isStage6CourseActive,
   markForReview,
   saveLessonContent,
   saveSourceDocuments,
@@ -704,6 +707,32 @@ export async function processStage6Job(
   // Check if course generation is paused - if so, delay this job
   await checkPauseAndDelay(job, courseId, token);
 
+  const courseActive = await isStage6CourseActive(courseId);
+  if (!courseActive) {
+    const message = 'Stage 6 course is no longer active';
+    logger.info({ jobId: job.id, courseId }, message);
+    return {
+      lessonId: lessonSpec?.lesson_id || 'unknown',
+      success: false,
+      lessonContent: null,
+      errors: [message],
+      metrics: {
+        tokensUsed: 0,
+        durationMs: Date.now() - startTime,
+        modelUsed: null,
+        selectedModel: null,
+        fallbackModel: null,
+        selectedModelTier: null,
+        selectedModelTierReason: null,
+        qualityScore: 0,
+        regenerateCount: 0,
+        truncationCount: 0,
+        rejectedTokens: 0,
+        regenerationMode: null,
+      },
+    };
+  }
+
   if (
     !lessonSpec ||
     !lessonSpec.lesson_id ||
@@ -765,6 +794,33 @@ export async function processStage6Job(
       'RAG context retrieved for lesson'
     );
   } catch (error) {
+    if (error instanceof RequiredRagUnavailableError) {
+      const errorMsg = error.message;
+
+      await failStage6Course(courseId, errorMsg);
+
+      return {
+        lessonId: lessonSpec.lesson_id,
+        success: false,
+        lessonContent: null,
+        errors: [errorMsg],
+        metrics: {
+          tokensUsed: 0,
+          durationMs: Date.now() - startTime,
+          modelUsed: null,
+          selectedModel: null,
+          fallbackModel: null,
+          selectedModelTier: null,
+          selectedModelTierReason: null,
+          qualityScore: 0,
+          regenerateCount: 0,
+          truncationCount: 0,
+          rejectedTokens: 0,
+          regenerationMode: null,
+        },
+      };
+    }
+
     logger.warn(
       {
         lessonId: lessonSpec.lesson_id,

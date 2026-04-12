@@ -9,6 +9,8 @@
 
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
+import { qdrantClient } from '@/shared/qdrant/client';
+import { PipelineInternalError } from '@/shared/errors';
 
 // ============================================================================
 // CACHE
@@ -20,6 +22,171 @@ import { logger } from '@/shared/logger';
  */
 const courseDocumentCache = new Map<string, { hasDocuments: boolean; timestamp: number }>();
 const DOCUMENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const QDRANT_HEALTH_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
+let qdrantHealthCache:
+  | {
+      reachable: boolean;
+      timestamp: number;
+    }
+  | null = null;
+
+export type CourseRagAvailability =
+  | 'optional_no_documents'
+  | 'ready'
+  | 'required_unavailable';
+
+export type CourseRagAvailabilityReason =
+  | 'no_uploaded_documents'
+  | 'rag_ready'
+  | 'no_indexed_documents'
+  | 'document_query_failed'
+  | 'qdrant_unavailable';
+
+export interface CourseRagAvailabilityResult {
+  availability: CourseRagAvailability;
+  ragRequired: boolean;
+  hasUploadedDocuments: boolean;
+  hasIndexedDocuments: boolean;
+  reason: CourseRagAvailabilityReason;
+}
+
+export class RequiredRagUnavailableError extends PipelineInternalError {
+  readonly code = 'NETWORK_ERROR';
+
+  constructor(
+    courseId: string,
+    public readonly reason: CourseRagAvailabilityReason,
+    originalError?: string
+  ) {
+    super('RAG is required for this course, but Qdrant is unavailable', {
+      courseId,
+      service: 'qdrant',
+      reason,
+      originalError,
+    });
+  }
+}
+
+async function isQdrantCollectionReachable(): Promise<boolean> {
+  if (qdrantHealthCache && Date.now() - qdrantHealthCache.timestamp < QDRANT_HEALTH_CACHE_TTL_MS) {
+    return qdrantHealthCache.reachable;
+  }
+
+  try {
+    await qdrantClient.getCollection('course_embeddings');
+    qdrantHealthCache = { reachable: true, timestamp: Date.now() };
+    return true;
+  } catch (error) {
+    logger.warn(
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      '[RAG] Qdrant collection health check failed'
+    );
+    qdrantHealthCache = { reachable: false, timestamp: Date.now() };
+    return false;
+  }
+}
+
+export async function resolveCourseRagAvailability(
+  courseId: string
+): Promise<CourseRagAvailabilityResult> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('file_catalog')
+      .select('id, vector_status')
+      .eq('course_id', courseId);
+
+    if (error) {
+      logger.warn(
+        {
+          courseId,
+          error: error.message,
+        },
+        '[RAG] Failed to resolve course document availability'
+      );
+
+      return {
+        availability: 'required_unavailable',
+        ragRequired: true,
+        hasUploadedDocuments: true,
+        hasIndexedDocuments: false,
+        reason: 'document_query_failed',
+      };
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+    const hasUploadedDocuments = rows.length > 0;
+    const hasIndexedDocuments = rows.some(row => row.vector_status === 'indexed');
+
+    if (!hasUploadedDocuments) {
+      return {
+        availability: 'optional_no_documents',
+        ragRequired: false,
+        hasUploadedDocuments: false,
+        hasIndexedDocuments: false,
+        reason: 'no_uploaded_documents',
+      };
+    }
+
+    if (!hasIndexedDocuments) {
+      return {
+        availability: 'required_unavailable',
+        ragRequired: true,
+        hasUploadedDocuments: true,
+        hasIndexedDocuments: false,
+        reason: 'no_indexed_documents',
+      };
+    }
+
+    const qdrantReachable = await isQdrantCollectionReachable();
+    if (!qdrantReachable) {
+      return {
+        availability: 'required_unavailable',
+        ragRequired: true,
+        hasUploadedDocuments: true,
+        hasIndexedDocuments: true,
+        reason: 'qdrant_unavailable',
+      };
+    }
+
+    return {
+      availability: 'ready',
+      ragRequired: true,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: true,
+      reason: 'rag_ready',
+    };
+  } catch (error) {
+    logger.warn(
+      {
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      '[RAG] Unexpected failure while resolving availability'
+    );
+
+    return {
+      availability: 'required_unavailable',
+      ragRequired: true,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: false,
+      reason: 'document_query_failed',
+    };
+  }
+}
+
+export async function assertCourseRagReady(courseId: string): Promise<CourseRagAvailabilityResult> {
+  const result = await resolveCourseRagAvailability(courseId);
+
+  if (result.availability === 'required_unavailable') {
+    throw new RequiredRagUnavailableError(courseId, result.reason);
+  }
+
+  return result;
+}
 
 // ============================================================================
 // MAIN FUNCTION
@@ -54,26 +221,8 @@ export async function checkCourseHasIndexedDocuments(courseId: string): Promise<
   }
 
   try {
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from('file_catalog')
-      .select('id')
-      .eq('course_id', courseId)
-      .eq('vector_status', 'indexed')
-      .limit(1);
-
-    if (error) {
-      logger.warn(
-        {
-          courseId,
-          error: error.message,
-        },
-        '[RAG] Failed to check document availability, proceeding with retrieval'
-      );
-      return true; // Assume documents exist on error to avoid skipping RAG
-    }
-
-    const hasDocuments = (data?.length ?? 0) > 0;
+    const availability = await resolveCourseRagAvailability(courseId);
+    const hasDocuments = availability.hasIndexedDocuments;
 
     // Cache the result
     courseDocumentCache.set(courseId, {
@@ -119,5 +268,6 @@ export function clearDocumentAvailabilityCache(courseId: string): void {
  */
 export function clearAllDocumentAvailabilityCache(): void {
   courseDocumentCache.clear();
+  qdrantHealthCache = null;
   logger.debug('[RAG] Cleared all document availability cache');
 }

@@ -20,6 +20,8 @@ const {
   mockSelectStage6ModelTier,
   mockHandlePartialSuccess,
   mockMarkForReview,
+  mockFailStage6Course,
+  mockIsStage6CourseActive,
   mockSaveLessonContent,
   mockSaveSourceDocuments,
   mockCheckAndSetStage6Complete,
@@ -31,6 +33,8 @@ const {
   mockSelectStage6ModelTier: vi.fn(),
   mockHandlePartialSuccess: vi.fn().mockResolvedValue(undefined),
   mockMarkForReview: vi.fn().mockResolvedValue(undefined),
+  mockFailStage6Course: vi.fn().mockResolvedValue(true),
+  mockIsStage6CourseActive: vi.fn().mockResolvedValue(true),
   mockSaveLessonContent: vi.fn().mockResolvedValue(undefined),
   mockSaveSourceDocuments: vi.fn().mockResolvedValue(undefined),
   mockCheckAndSetStage6Complete: vi.fn().mockResolvedValue(undefined),
@@ -100,6 +104,8 @@ vi.mock('@/stages/stage6-lesson-content/utils/sanity-check', () => ({
 vi.mock('@/stages/stage6-lesson-content/services/database-service', () => ({
   handlePartialSuccess: mockHandlePartialSuccess,
   markForReview: mockMarkForReview,
+  failStage6Course: mockFailStage6Course,
+  isStage6CourseActive: mockIsStage6CourseActive,
   saveLessonContent: mockSaveLessonContent,
   saveSourceDocuments: mockSaveSourceDocuments,
   checkAndSetStage6Complete: mockCheckAndSetStage6Complete,
@@ -592,6 +598,17 @@ describe('stage6/services/job-processor', () => {
       expect(result.errors[0]).toContain('Invalid lesson_id');
     });
 
+    it('stops immediately when the Stage 6 course is no longer active', async () => {
+      mockIsStage6CourseActive.mockResolvedValueOnce(false);
+
+      const result = await processStage6Job(createMockJob());
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toEqual(['Stage 6 course is no longer active']);
+      expect(mockRetrieveLessonContext).not.toHaveBeenCalled();
+      expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
+    });
+
     it('should handle successful generation', async () => {
       mockExecuteStage6Orchestrator.mockResolvedValueOnce(createSuccessOutput());
 
@@ -880,6 +897,28 @@ describe('stage6/services/job-processor', () => {
 
       // Should still succeed, generation proceeds without RAG
       expect(result.success).toBe(true);
+    });
+
+    it('fails the course instead of review-marking the lesson when required RAG becomes unavailable', async () => {
+      const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
+
+      mockRetrieveLessonContext.mockRejectedValueOnce(
+        new RequiredRagUnavailableError('course-uuid', 'qdrant_unavailable')
+      );
+
+      const resultPromise = processStage6Job(createMockJob());
+      await vi.advanceTimersByTimeAsync(1000);
+      const result = await resultPromise;
+
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toContain('RAG is required for this course');
+      expect(mockFailStage6Course).toHaveBeenCalledWith(
+        'course-uuid',
+        expect.stringContaining('RAG is required for this course')
+      );
+      expect(mockMarkForReview).not.toHaveBeenCalled();
+      expect(mockHandlePartialSuccess).not.toHaveBeenCalled();
+      expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
     });
 
     it('should return failure result when all retries fail', async () => {
