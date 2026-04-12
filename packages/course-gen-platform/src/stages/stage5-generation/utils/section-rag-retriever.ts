@@ -20,7 +20,8 @@ import type { SearchOptions, SearchResult } from '@/shared/qdrant/search-types';
 import { logger } from '@/shared/logger';
 import { rerankDocuments, type RerankResult } from '../../../shared/jina';
 import { logTrace } from '../../../shared/trace-logger';
-import { assertCourseRagReady, RequiredRagUnavailableError } from '@/shared/rag/document-availability';
+import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
+import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
 
 // ============================================================================
 // CONSTANTS
@@ -202,7 +203,7 @@ export async function retrieveSectionContext(params: SectionRAGParams): Promise<
   try {
     // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries
     // This prevents wasted time when course has no uploaded documents
-    const ragAvailability = await assertCourseRagReady(courseId);
+    const ragAvailability = await assertCourseRagReadyWithRetry(courseId);
     if (ragAvailability.availability === 'optional_no_documents') {
       logger.info(
         {

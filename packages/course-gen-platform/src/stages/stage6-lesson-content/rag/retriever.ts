@@ -5,7 +5,7 @@ import { ragContextCache } from '@/stages/stage5-generation/utils/rag-context-ca
 import type { RAGChunk as SectionRAGChunk } from '@/stages/stage5-generation/utils/section-rag-retriever';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
-import { assertCourseRagReady } from '@/shared/rag/document-availability';
+import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
 
 import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants';
 import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
@@ -106,7 +106,7 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
 
   // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries
   // This prevents ~100s of wasted time when course has no uploaded documents
-  const ragAvailability = await assertCourseRagReady(courseId);
+  const ragAvailability = await assertCourseRagReadyWithRetry(courseId);
   if (ragAvailability.availability === 'optional_no_documents') {
     logger.info(
       {
