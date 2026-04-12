@@ -8,20 +8,27 @@ import { useTranslations } from 'next-intl'
 const MinimalNode = ({ id, data, selected }: NodeProps<RFStageNode>) => {
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status
+  const reviewRequiredLessons =
+    data.stageNumber === 6
+      ? Number(
+          (data.outputData as { reviewRequiredLessons?: number } | undefined)?.reviewRequiredLessons || 0
+        )
+      : 0
+  const visualStatus = reviewRequiredLessons > 0 ? 'awaiting' : currentStatus
   const t = useTranslations('generation')
 
   return (
     <div
-      className={`relative h-6 w-6 rounded-full transition-all duration-300 ${getStatusColor(currentStatus)} ${selected ? 'scale-125 ring-2 ring-blue-400 ring-offset-2' : ''} ${currentStatus === 'active' ? 'animate-pulse' : ''} ${currentStatus === 'skipped' ? 'opacity-50' : ''} `}
+      className={`relative h-6 w-6 rounded-full transition-all duration-300 ${getStatusColor(visualStatus)} ${selected ? 'scale-125 ring-2 ring-blue-400 ring-offset-2' : ''} ${currentStatus === 'active' ? 'animate-pulse' : ''} ${currentStatus === 'skipped' ? 'opacity-50' : ''} `}
       title={
-        currentStatus === 'skipped'
+        visualStatus === 'skipped'
           ? `${data.label} (${t('status.skipped').toLowerCase()})`
           : data.label
       }
       data-testid={`node-minimal-${id}`}
       tabIndex={0}
       role="button"
-      aria-label={`${data.label}, status: ${currentStatus}${currentStatus === 'skipped' ? ', skipped' : ''}`}
+      aria-label={`${data.label}, status: ${visualStatus}${visualStatus === 'skipped' ? ', skipped' : ''}`}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()

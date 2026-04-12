@@ -274,3 +274,76 @@ describe('buildGraph - Stage 1 data merging', () => {
     })
   })
 })
+
+describe('buildGraph - Stage 6 review-aware counters', () => {
+  it('keeps review-required lessons out of completedLessons while preserving review flags', () => {
+    const rebuiltGraph = buildGraph({
+      parallelItems: new Map([
+        [
+          6,
+          [
+            {
+              id: 'module_1',
+              label: 'Модуль 1',
+              status: 'pending' as const,
+              type: 'module' as const,
+              data: {
+                moduleOrder: 1,
+                totalLessons: 2,
+                isCollapsed: false,
+              },
+            },
+            {
+              id: 'lesson_1_1',
+              label: 'Урок 1',
+              status: 'completed' as const,
+              type: 'lesson' as const,
+              parentId: 'module_1',
+              data: { lessonOrder: 1 },
+            },
+            {
+              id: 'lesson_1_2',
+              label: 'Урок 2',
+              status: 'review_required' as never,
+              type: 'lesson' as const,
+              parentId: 'module_1',
+              data: { lessonOrder: 2 },
+            },
+          ],
+        ],
+      ]),
+      stageStatuses: {
+        stage_6: 'completed',
+      },
+      documentSteps: new Map(),
+      hasDocuments: false,
+      getTrace: () => undefined,
+      getAttempts: () => [],
+      getPhases: () => [],
+      getExistingPos: () => ({ x: 0, y: 0 }),
+      getModuleCollapsed: () => false,
+      getStage2Collapsed: () => false,
+    })
+
+    const rebuiltStage6Node = rebuiltGraph.nodes.find((node) => node.id === 'stage_6')
+    const rebuiltModuleNode = rebuiltGraph.nodes.find((node) => node.id === 'module_1')
+    const rebuiltLessonNode = rebuiltGraph.nodes.find((node) => node.id === 'lesson_1_2')
+
+    expect(rebuiltStage6Node?.data.outputData).toMatchObject({
+      completedLessons: 1,
+      readyLessons: 2,
+      reviewRequiredLessons: 1,
+      totalLessons: 2,
+    })
+    expect(rebuiltModuleNode?.data).toMatchObject({
+      completedLessons: 1,
+      readyLessons: 2,
+      reviewRequiredLessons: 1,
+      needsReview: true,
+    })
+    expect(rebuiltLessonNode?.data).toMatchObject({
+      status: 'completed',
+      needsReview: true,
+    })
+  })
+})
