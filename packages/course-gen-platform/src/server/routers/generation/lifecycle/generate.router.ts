@@ -26,7 +26,10 @@ import {
 } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
-import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
+import {
+  getRequiredRagApiMessage,
+  RequiredRagUnavailableError,
+} from '@/shared/rag/document-availability';
 
 export const generateRouter = {
   generate: instructorProcedure
@@ -249,15 +252,16 @@ export const generateRouter = {
             {
               requestId,
               courseId,
+              retryable: error.retryable,
+              reason: error.reason,
               message: error.message,
             },
             'Generation blocked: required RAG is unavailable'
           );
 
           throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message:
-              'This course has uploaded documents, but the vector database is temporarily unavailable. Please try again later.',
+            code: error.apiErrorCode,
+            message: getRequiredRagApiMessage(error),
             cause: error,
           });
         }

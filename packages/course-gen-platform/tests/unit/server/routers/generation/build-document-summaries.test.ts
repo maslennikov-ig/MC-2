@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  mockAssertCourseRagReady,
+  mockAssertCourseRagReadyWithRetry,
   mockLogger,
   mockNotifyCourseError,
   mockSetNestedValue,
   mockThrowOnSupabaseError,
 } = vi.hoisted(() => ({
-  mockAssertCourseRagReady: vi.fn(),
+  mockAssertCourseRagReadyWithRetry: vi.fn(),
   mockLogger: {
     debug: vi.fn(),
     info: vi.fn(),
@@ -28,13 +28,9 @@ vi.mock('@megacampus/shared-utils', () => ({
   setNestedValue: vi.fn((...args) => mockSetNestedValue(...args)),
 }));
 
-vi.mock('@/shared/rag/document-availability', async importOriginal => {
-  const original = await importOriginal<typeof import('@/shared/rag/document-availability')>();
-  return {
-    ...original,
-    assertCourseRagReady: vi.fn((...args) => mockAssertCourseRagReady(...args)),
-  };
-});
+vi.mock('@/shared/rag/required-rag-retry', () => ({
+  assertCourseRagReadyWithRetry: vi.fn((...args) => mockAssertCourseRagReadyWithRetry(...args)),
+}));
 
 vi.mock('@/server/utils/supabase-query-guard', () => ({
   throwOnSupabaseError: vi.fn((...args) => mockThrowOnSupabaseError(...args)),
@@ -65,7 +61,7 @@ describe('buildDocumentSummaries', () => {
   }
 
   it('returns empty summaries when the course has no uploaded documents', async () => {
-    mockAssertCourseRagReady.mockResolvedValue({
+    mockAssertCourseRagReadyWithRetry.mockResolvedValue({
       availability: 'optional_no_documents',
       ragRequired: false,
       hasUploadedDocuments: false,
@@ -86,8 +82,8 @@ describe('buildDocumentSummaries', () => {
   it('throws when RAG is required but unavailable', async () => {
     const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
 
-    mockAssertCourseRagReady.mockRejectedValue(
-      new RequiredRagUnavailableError('course-rag-down', 'qdrant_unavailable')
+    mockAssertCourseRagReadyWithRetry.mockRejectedValue(
+      new RequiredRagUnavailableError('course-rag-down', 'qdrant_timeout')
     );
 
     const { buildDocumentSummaries } = await import('@/server/routers/generation/_shared/helpers');
@@ -98,31 +94,34 @@ describe('buildDocumentSummaries', () => {
     expect(mockNotifyCourseError).toHaveBeenCalledWith(
       'course-rag-down',
       5,
-      'RAG is required for this course, but Qdrant is unavailable'
+      'RAG is required for this course, but the vector database timed out'
     );
   });
 
-  it('does not send a Qdrant outage alert when metadata lookup fails', async () => {
-    const { NetworkError } = await import('@/shared/errors');
+  it('preserves metadata-specific failure messaging after retry exhaustion', async () => {
+    const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
 
-    mockAssertCourseRagReady.mockRejectedValue(
-      new NetworkError(
-        'Failed to determine RAG availability from file metadata',
-        'supabase:file_catalog',
-        'temporary read failure'
-      )
+    mockAssertCourseRagReadyWithRetry.mockRejectedValue(
+      new RequiredRagUnavailableError('course-metadata-error', 'metadata_lookup_failed')
     );
 
     const { buildDocumentSummaries } = await import('@/server/routers/generation/_shared/helpers');
 
     await expect(
       buildDocumentSummaries(createSupabaseVectorizedFiles([]), 'course-metadata-error')
-    ).rejects.toBeInstanceOf(NetworkError);
-    expect(mockNotifyCourseError).not.toHaveBeenCalled();
+    ).rejects.toMatchObject({
+      reason: 'metadata_lookup_failed',
+      retryable: true,
+    });
+    expect(mockNotifyCourseError).toHaveBeenCalledWith(
+      'course-metadata-error',
+      5,
+      'RAG is required for this course, but document metadata is temporarily unavailable'
+    );
   });
 
   it('returns vectorized document summaries when RAG is ready', async () => {
-    mockAssertCourseRagReady.mockResolvedValue({
+    mockAssertCourseRagReadyWithRetry.mockResolvedValue({
       availability: 'ready',
       ragRequired: true,
       hasUploadedDocuments: true,

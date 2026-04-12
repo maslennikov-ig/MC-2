@@ -7,10 +7,16 @@
  * @module shared/rag/document-availability
  */
 
+import {
+  QdrantClientConfigError,
+  QdrantClientResourceExhaustedError,
+  QdrantClientTimeoutError,
+} from '@qdrant/js-client-rest';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { qdrantClient } from '@/shared/qdrant/client';
-import { NetworkError, PipelineInternalError } from '@/shared/errors';
+import type { PipelineErrorSeverity } from '@/shared/errors';
+import { PipelineError } from '@/shared/errors';
 
 // ============================================================================
 // CACHE
@@ -23,11 +29,17 @@ import { NetworkError, PipelineInternalError } from '@/shared/errors';
 const courseDocumentCache = new Map<string, { hasDocuments: boolean; timestamp: number }>();
 const DOCUMENT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const QDRANT_HEALTH_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+const QDRANT_PREFLIGHT_TIMEOUT_MS = 10_000;
 
 let qdrantHealthCache:
   | {
-      reachable: boolean;
+      reachable: true;
       timestamp: number;
+    }
+  | {
+      reachable: false;
+      timestamp: number;
+      error: RequiredRagUnavailableError;
     }
   | null = null;
 
@@ -40,8 +52,13 @@ export type CourseRagAvailabilityReason =
   | 'no_uploaded_documents'
   | 'rag_ready'
   | 'no_indexed_documents'
-  | 'document_query_failed'
-  | 'qdrant_unavailable';
+  | 'metadata_lookup_failed'
+  | 'qdrant_timeout'
+  | 'qdrant_rate_limited'
+  | 'qdrant_network_error'
+  | 'qdrant_service_unavailable'
+  | 'qdrant_collection_missing'
+  | 'qdrant_invalid_config';
 
 export interface CourseRagAvailabilityResult {
   availability: CourseRagAvailability;
@@ -51,53 +68,252 @@ export interface CourseRagAvailabilityResult {
   reason: CourseRagAvailabilityReason;
 }
 
-export class RequiredRagUnavailableError extends PipelineInternalError {
+export type RequiredRagApiErrorCode = 'PRECONDITION_FAILED' | 'SERVICE_UNAVAILABLE';
+
+export class RequiredRagUnavailableError extends PipelineError {
   readonly code = 'NETWORK_ERROR';
+  readonly retryable: boolean;
+  readonly apiErrorCode: RequiredRagApiErrorCode;
+  readonly severity: PipelineErrorSeverity;
 
   constructor(
     courseId: string,
     public readonly reason: CourseRagAvailabilityReason,
     originalError?: string
   ) {
+    const retryable = isRetryableRequiredRagReason(reason);
+    const apiErrorCode = retryable ? 'SERVICE_UNAVAILABLE' : 'PRECONDITION_FAILED';
     super(getRequiredRagUnavailableMessage(reason), {
       courseId,
-      service: 'qdrant',
+      service: reason === 'metadata_lookup_failed' ? 'supabase:file_catalog' : 'qdrant',
       reason,
+      retryable,
+      apiErrorCode,
       originalError,
     });
+
+    this.retryable = retryable;
+    this.apiErrorCode = apiErrorCode;
+    this.severity = retryable ? 'WARNING' : 'CRITICAL';
   }
+}
+
+function isRetryableRequiredRagReason(reason: CourseRagAvailabilityReason): boolean {
+  return [
+    'metadata_lookup_failed',
+    'qdrant_timeout',
+    'qdrant_rate_limited',
+    'qdrant_network_error',
+    'qdrant_service_unavailable',
+  ].includes(reason);
 }
 
 function getRequiredRagUnavailableMessage(reason: CourseRagAvailabilityReason): string {
   switch (reason) {
     case 'no_indexed_documents':
       return 'RAG is required for this course, but indexed documents are unavailable';
-    case 'document_query_failed':
-      return 'RAG is required for this course, but document metadata is unavailable';
-    case 'qdrant_unavailable':
+    case 'metadata_lookup_failed':
+      return 'RAG is required for this course, but document metadata is temporarily unavailable';
+    case 'qdrant_timeout':
+      return 'RAG is required for this course, but the vector database timed out';
+    case 'qdrant_rate_limited':
+      return 'RAG is required for this course, but the vector database is rate limited';
+    case 'qdrant_collection_missing':
+      return 'RAG is required for this course, but the required vector collection is missing';
+    case 'qdrant_invalid_config':
+      return 'RAG is required for this course, but the vector database configuration is invalid';
+    case 'qdrant_network_error':
+    case 'qdrant_service_unavailable':
     default:
-      return 'RAG is required for this course, but Qdrant is unavailable';
+      return 'RAG is required for this course, but the vector database is temporarily unavailable';
   }
 }
 
-async function isQdrantCollectionReachable(): Promise<boolean> {
+export function getRequiredRagApiMessage(error: RequiredRagUnavailableError): string {
+  switch (error.reason) {
+    case 'no_indexed_documents':
+      return 'This course has uploaded documents, but none are indexed for RAG yet. Please finish document processing and try again.';
+    case 'metadata_lookup_failed':
+      return 'This course has uploaded documents, but document metadata is temporarily unavailable. Please try again later.';
+    case 'qdrant_collection_missing':
+    case 'qdrant_invalid_config':
+      return 'This course requires RAG, but the vector database configuration is invalid. Please contact support.';
+    default:
+      return 'This course has uploaded documents, but the vector database is temporarily unavailable. Please try again later.';
+  }
+}
+
+function getUnknownErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return Object.prototype.toString.call(error);
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+
+  if ('status' in error && typeof error.status === 'number') {
+    return error.status;
+  }
+
+  if ('getActualType' in error && typeof error.getActualType === 'function') {
+    try {
+      const getActualType = error.getActualType as () => { status?: unknown } | undefined;
+      const actual = getActualType?.();
+      if (typeof actual?.status === 'number') {
+        return actual.status;
+      }
+    } catch {
+      // Ignore typed error extraction failures and fall back to message parsing.
+    }
+  }
+
+  const message = getUnknownErrorMessage(error);
+  const statusMatch = message.match(/\b(\d{3})\b/);
+  if (!statusMatch) {
+    return undefined;
+  }
+
+  const parsed = Number(statusMatch[1]);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function isLikelyNetworkError(message: string): boolean {
+  const normalized = message.toLowerCase();
+
+  return [
+    'fetch failed',
+    'network',
+    'econnrefused',
+    'econnreset',
+    'enotfound',
+    'etimedout',
+    'socket hang up',
+    'connect timeout',
+    'timed out',
+  ].some(pattern => normalized.includes(pattern));
+}
+
+function isLikelyConfigError(message: string): boolean {
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes('missing required qdrant environment variables') ||
+    normalized.includes('cannot specify both url and host') ||
+    normalized.includes('invalid retryafter value')
+  );
+}
+
+function classifyQdrantAvailabilityError(
+  courseId: string,
+  error: unknown
+): RequiredRagUnavailableError {
+  if (error instanceof RequiredRagUnavailableError) {
+    return error;
+  }
+
+  const message = getUnknownErrorMessage(error);
+
+  if (error instanceof QdrantClientTimeoutError) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_timeout', message);
+  }
+
+  if (error instanceof QdrantClientResourceExhaustedError) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_rate_limited', message);
+  }
+
+  if (error instanceof QdrantClientConfigError || isLikelyConfigError(message)) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_invalid_config', message);
+  }
+
+  const status = getErrorStatus(error);
+  if (status === 404 || message.toLowerCase().includes('not found')) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_collection_missing', message);
+  }
+  if (status === 408) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_timeout', message);
+  }
+  if (status === 429) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_rate_limited', message);
+  }
+  if (status !== undefined && status >= 500) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_service_unavailable', message);
+  }
+  if (status !== undefined && status >= 400) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_invalid_config', message);
+  }
+  if (isLikelyNetworkError(message)) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_network_error', message);
+  }
+
+  return new RequiredRagUnavailableError(courseId, 'qdrant_service_unavailable', message);
+}
+
+async function getCollectionWithTimeout(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new QdrantClientTimeoutError(
+          `Qdrant preflight timed out after ${QDRANT_PREFLIGHT_TIMEOUT_MS}ms`
+        )
+      );
+    }, QDRANT_PREFLIGHT_TIMEOUT_MS);
+
+    qdrantClient
+      .getCollection('course_embeddings')
+      .then(() => {
+        clearTimeout(timer);
+        resolve();
+      })
+      .catch(error => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(getUnknownErrorMessage(error)));
+      });
+  });
+}
+
+async function assertQdrantCollectionReachable(courseId: string): Promise<void> {
   if (qdrantHealthCache && Date.now() - qdrantHealthCache.timestamp < QDRANT_HEALTH_CACHE_TTL_MS) {
-    return qdrantHealthCache.reachable;
+    if (qdrantHealthCache.reachable) {
+      return;
+    }
+
+    if (!qdrantHealthCache.error.retryable) {
+      throw qdrantHealthCache.error;
+    }
   }
 
   try {
-    await qdrantClient.getCollection('course_embeddings');
+    await getCollectionWithTimeout();
     qdrantHealthCache = { reachable: true, timestamp: Date.now() };
-    return true;
   } catch (error) {
+    const ragError = classifyQdrantAvailabilityError(courseId, error);
+
     logger.warn(
       {
+        courseId,
+        reason: ragError.reason,
+        retryable: ragError.retryable,
         error: error instanceof Error ? error.message : String(error),
       },
       '[RAG] Qdrant collection health check failed'
     );
-    qdrantHealthCache = { reachable: false, timestamp: Date.now() };
-    return false;
+
+    if (!ragError.retryable) {
+      qdrantHealthCache = { reachable: false, timestamp: Date.now(), error: ragError };
+    } else {
+      qdrantHealthCache = null;
+    }
+
+    throw ragError;
   }
 }
 
@@ -119,11 +335,7 @@ export async function resolveCourseRagAvailability(
         },
         '[RAG] Failed to resolve course document availability'
       );
-      throw new NetworkError(
-        'Failed to determine RAG availability from file metadata',
-        'supabase:file_catalog',
-        error.message
-      );
+      throw new RequiredRagUnavailableError(courseId, 'metadata_lookup_failed', error.message);
     }
 
     const rows = Array.isArray(data) ? data : [];
@@ -150,16 +362,7 @@ export async function resolveCourseRagAvailability(
       };
     }
 
-    const qdrantReachable = await isQdrantCollectionReachable();
-    if (!qdrantReachable) {
-      return {
-        availability: 'required_unavailable',
-        ragRequired: true,
-        hasUploadedDocuments: true,
-        hasIndexedDocuments: true,
-        reason: 'qdrant_unavailable',
-      };
-    }
+    await assertQdrantCollectionReachable(courseId);
 
     return {
       availability: 'ready',
@@ -169,7 +372,7 @@ export async function resolveCourseRagAvailability(
       reason: 'rag_ready',
     };
   } catch (error) {
-    if (error instanceof NetworkError) {
+    if (error instanceof RequiredRagUnavailableError) {
       throw error;
     }
 
@@ -180,9 +383,9 @@ export async function resolveCourseRagAvailability(
       },
       '[RAG] Unexpected failure while resolving availability'
     );
-    throw new NetworkError(
-      'Failed to determine RAG availability from file metadata',
-      'supabase:file_catalog',
+    throw new RequiredRagUnavailableError(
+      courseId,
+      'metadata_lookup_failed',
       error instanceof Error ? error.message : String(error)
     );
   }
