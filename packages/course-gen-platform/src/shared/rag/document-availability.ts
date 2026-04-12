@@ -10,7 +10,7 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { qdrantClient } from '@/shared/qdrant/client';
-import { PipelineInternalError } from '@/shared/errors';
+import { NetworkError, PipelineInternalError } from '@/shared/errors';
 
 // ============================================================================
 // CACHE
@@ -59,12 +59,24 @@ export class RequiredRagUnavailableError extends PipelineInternalError {
     public readonly reason: CourseRagAvailabilityReason,
     originalError?: string
   ) {
-    super('RAG is required for this course, but Qdrant is unavailable', {
+    super(getRequiredRagUnavailableMessage(reason), {
       courseId,
       service: 'qdrant',
       reason,
       originalError,
     });
+  }
+}
+
+function getRequiredRagUnavailableMessage(reason: CourseRagAvailabilityReason): string {
+  switch (reason) {
+    case 'no_indexed_documents':
+      return 'RAG is required for this course, but indexed documents are unavailable';
+    case 'document_query_failed':
+      return 'RAG is required for this course, but document metadata is unavailable';
+    case 'qdrant_unavailable':
+    default:
+      return 'RAG is required for this course, but Qdrant is unavailable';
   }
 }
 
@@ -107,14 +119,11 @@ export async function resolveCourseRagAvailability(
         },
         '[RAG] Failed to resolve course document availability'
       );
-
-      return {
-        availability: 'required_unavailable',
-        ragRequired: true,
-        hasUploadedDocuments: true,
-        hasIndexedDocuments: false,
-        reason: 'document_query_failed',
-      };
+      throw new NetworkError(
+        'Failed to determine RAG availability from file metadata',
+        'supabase:file_catalog',
+        error.message
+      );
     }
 
     const rows = Array.isArray(data) ? data : [];
@@ -160,6 +169,10 @@ export async function resolveCourseRagAvailability(
       reason: 'rag_ready',
     };
   } catch (error) {
+    if (error instanceof NetworkError) {
+      throw error;
+    }
+
     logger.warn(
       {
         courseId,
@@ -167,14 +180,11 @@ export async function resolveCourseRagAvailability(
       },
       '[RAG] Unexpected failure while resolving availability'
     );
-
-    return {
-      availability: 'required_unavailable',
-      ragRequired: true,
-      hasUploadedDocuments: true,
-      hasIndexedDocuments: false,
-      reason: 'document_query_failed',
-    };
+    throw new NetworkError(
+      'Failed to determine RAG availability from file metadata',
+      'supabase:file_catalog',
+      error instanceof Error ? error.message : String(error)
+    );
   }
 }
 

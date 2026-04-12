@@ -277,9 +277,15 @@ export async function retrieveSectionContext(params: SectionRAGParams): Promise<
           '[Section RAG] Query executed'
         );
       } catch (queryError) {
-        const errorMessage =
-          queryError instanceof Error ? queryError.message : String(queryError);
-        throw new RequiredRagUnavailableError(courseId, 'qdrant_unavailable', errorMessage);
+        logger.warn(
+          {
+            err: queryError instanceof Error ? queryError.message : String(queryError),
+            courseId,
+            sectionId,
+            query: query.substring(0, 50),
+          },
+          '[Section RAG] Query failed - continuing with remaining queries'
+        );
       }
     }
 

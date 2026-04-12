@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockAssertCourseRagReady, mockCheckCourseHasIndexedDocuments, mockLogger } = vi.hoisted(() => ({
+const { mockAssertCourseRagReady, mockCacheGet, mockLogger } = vi.hoisted(() => ({
   mockAssertCourseRagReady: vi.fn(),
-  mockCheckCourseHasIndexedDocuments: vi.fn(),
+  mockCacheGet: vi.fn(() => Promise.resolve(null)),
   mockLogger: {
     debug: vi.fn(),
     info: vi.fn(),
@@ -16,9 +16,6 @@ vi.mock('@/shared/rag/document-availability', async importOriginal => {
   return {
     ...original,
     assertCourseRagReady: vi.fn((...args) => mockAssertCourseRagReady(...args)),
-    checkCourseHasIndexedDocuments: vi.fn((...args) =>
-      mockCheckCourseHasIndexedDocuments(...args)
-    ),
   };
 });
 
@@ -28,7 +25,7 @@ vi.mock('@/shared/qdrant/search', () => ({
 
 vi.mock('@/stages/stage5-generation/utils/rag-context-cache', () => ({
   ragContextCache: {
-    get: vi.fn(() => Promise.resolve(null)),
+    get: vi.fn((...args) => mockCacheGet(...args)),
     store: vi.fn(() => Promise.resolve()),
   },
 }));
@@ -101,7 +98,6 @@ describe('lesson-rag-retriever', () => {
       hasIndexedDocuments: false,
       reason: 'no_uploaded_documents',
     });
-    mockCheckCourseHasIndexedDocuments.mockResolvedValue(false);
 
     const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
 
@@ -124,7 +120,6 @@ describe('lesson-rag-retriever', () => {
     mockAssertCourseRagReady.mockRejectedValue(
       new RequiredRagUnavailableError('course-1', 'qdrant_unavailable')
     );
-    mockCheckCourseHasIndexedDocuments.mockResolvedValue(false);
 
     const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
 
@@ -137,8 +132,7 @@ describe('lesson-rag-retriever', () => {
     ).rejects.toBeInstanceOf(RequiredRagUnavailableError);
   });
 
-  it('throws RequiredRagUnavailableError when a required-RAG query fails after preflight', async () => {
-    const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
+  it('continues when an individual required-RAG query fails after preflight', async () => {
     const { searchChunks } = await import('@/shared/qdrant/search');
 
     mockAssertCourseRagReady.mockResolvedValue({
@@ -148,7 +142,6 @@ describe('lesson-rag-retriever', () => {
       hasIndexedDocuments: true,
       reason: 'rag_ready',
     });
-    mockCheckCourseHasIndexedDocuments.mockResolvedValue(true);
     vi.mocked(searchChunks).mockRejectedValue(new Error('404 page not found'));
 
     const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
@@ -159,6 +152,56 @@ describe('lesson-rag-retriever', () => {
         lessonSpec: lessonSpec as any,
         useCache: false,
       })
-    ).rejects.toBeInstanceOf(RequiredRagUnavailableError);
+    ).resolves.toMatchObject({
+      lessonId: '1.1',
+      chunks: [],
+      totalRetrieved: 0,
+    });
+  });
+
+  it('uses cached lesson context before checking live RAG availability', async () => {
+    const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
+
+    mockCacheGet.mockResolvedValueOnce({
+      chunks: [
+        {
+          chunkId: 'chunk-1',
+          documentId: 'doc-1',
+          documentName: 'Doc 1',
+          content: 'Cached content',
+          headingPath: 'Section 1',
+          score: 0.91,
+          matchedQuery: 'query 1',
+        },
+      ],
+      searchQueriesUsed: ['query 1'],
+      coverageScore: 0.8,
+    });
+    mockAssertCourseRagReady.mockRejectedValueOnce(
+      new RequiredRagUnavailableError('course-1', 'qdrant_unavailable')
+    );
+
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        lessonSpec: lessonSpec as any,
+        useCache: true,
+      })
+    ).resolves.toMatchObject({
+      lessonId: '1.1',
+      cached: true,
+      totalRetrieved: 1,
+      chunks: [
+        expect.objectContaining({
+          chunk_id: 'chunk-1',
+          document_id: 'doc-1',
+          document_name: 'Doc 1',
+        }),
+      ],
+    });
+
+    expect(mockAssertCourseRagReady).not.toHaveBeenCalled();
   });
 });
