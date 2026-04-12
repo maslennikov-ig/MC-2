@@ -70,17 +70,25 @@ export interface CourseRagAvailabilityResult {
 
 export type RequiredRagApiErrorCode = 'PRECONDITION_FAILED' | 'SERVICE_UNAVAILABLE';
 
+interface RequiredRagUnavailableErrorOptions {
+  originalError?: string;
+  retryAfterMs?: number;
+}
+
 export class RequiredRagUnavailableError extends PipelineError {
   readonly code = 'NETWORK_ERROR';
   readonly retryable: boolean;
   readonly apiErrorCode: RequiredRagApiErrorCode;
   readonly severity: PipelineErrorSeverity;
+  readonly retryAfterMs?: number;
 
   constructor(
     courseId: string,
     public readonly reason: CourseRagAvailabilityReason,
-    originalError?: string
+    options: string | RequiredRagUnavailableErrorOptions = {}
   ) {
+    const resolvedOptions =
+      typeof options === 'string' ? { originalError: options } : options;
     const retryable = isRetryableRequiredRagReason(reason);
     const apiErrorCode = retryable ? 'SERVICE_UNAVAILABLE' : 'PRECONDITION_FAILED';
     super(getRequiredRagUnavailableMessage(reason), {
@@ -89,12 +97,14 @@ export class RequiredRagUnavailableError extends PipelineError {
       reason,
       retryable,
       apiErrorCode,
-      originalError,
+      originalError: resolvedOptions.originalError,
+      retryAfterMs: resolvedOptions.retryAfterMs,
     });
 
     this.retryable = retryable;
     this.apiErrorCode = apiErrorCode;
     this.severity = retryable ? 'WARNING' : 'CRITICAL';
+    this.retryAfterMs = resolvedOptions.retryAfterMs;
   }
 }
 
@@ -212,6 +222,36 @@ function isLikelyConfigError(message: string): boolean {
   );
 }
 
+function isLikelyMissingCollectionError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('collection') &&
+    (normalized.includes('not found') ||
+      normalized.includes("doesn't exist") ||
+      normalized.includes('does not exist') ||
+      normalized.includes('missing'))
+  );
+}
+
+function getRetryAfterMs(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+
+  const rawRetryAfter =
+    'retryAfter' in error && typeof error.retryAfter === 'number'
+      ? error.retryAfter
+      : 'retry_after' in error && typeof error.retry_after === 'number'
+        ? error.retry_after
+        : undefined;
+
+  if (rawRetryAfter === undefined || !Number.isFinite(rawRetryAfter) || rawRetryAfter <= 0) {
+    return undefined;
+  }
+
+  return Math.ceil(rawRetryAfter * 1000);
+}
+
 function classifyQdrantAvailabilityError(
   courseId: string,
   error: unknown
@@ -227,7 +267,10 @@ function classifyQdrantAvailabilityError(
   }
 
   if (error instanceof QdrantClientResourceExhaustedError) {
-    return new RequiredRagUnavailableError(courseId, 'qdrant_rate_limited', message);
+    return new RequiredRagUnavailableError(courseId, 'qdrant_rate_limited', {
+      originalError: message,
+      retryAfterMs: getRetryAfterMs(error),
+    });
   }
 
   if (error instanceof QdrantClientConfigError || isLikelyConfigError(message)) {
@@ -235,14 +278,20 @@ function classifyQdrantAvailabilityError(
   }
 
   const status = getErrorStatus(error);
-  if (status === 404 || message.toLowerCase().includes('not found')) {
+  if (status === 404 && isLikelyMissingCollectionError(message)) {
     return new RequiredRagUnavailableError(courseId, 'qdrant_collection_missing', message);
+  }
+  if (status === 404 || message.toLowerCase().includes('page not found')) {
+    return new RequiredRagUnavailableError(courseId, 'qdrant_invalid_config', message);
   }
   if (status === 408) {
     return new RequiredRagUnavailableError(courseId, 'qdrant_timeout', message);
   }
   if (status === 429) {
-    return new RequiredRagUnavailableError(courseId, 'qdrant_rate_limited', message);
+    return new RequiredRagUnavailableError(courseId, 'qdrant_rate_limited', {
+      originalError: message,
+      retryAfterMs: getRetryAfterMs(error),
+    });
   }
   if (status !== undefined && status >= 500) {
     return new RequiredRagUnavailableError(courseId, 'qdrant_service_unavailable', message);
