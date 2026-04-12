@@ -5,13 +5,14 @@ handoff_file = ".codex/handoff.md"
 stage_summary_path_template = ".codex/stages/{stage_id}/summary.md"
 artifact_template = ".codex/stage-artifact-template.md"
 artifact_path_template = ".codex/stages/{stage_id}/artifacts/{task_id}.md"
+manual_prompt_template = ".codex/manual-agent-prompt-template.md"
 
 [workspace]
 multi_repo = false
 launch_mode = "manual_user_launch"
 
 [baseline]
-profile = "balanced-v2.3"
+profile = "balanced-v2.4"
 source_skill = "orchestration-setup"
 
 [execution]
