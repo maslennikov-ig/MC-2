@@ -260,8 +260,11 @@ export interface ModuleNode extends GraphNode {
   /** Total lessons in module */
   totalLessons: number;
 
-  /** Generated/ready lessons count used for Stage 6 graph progress */
+  /** Lessons completed or approved without pending manual review */
   completedLessons: number;
+
+  /** Terminal lessons count including review_required */
+  readyLessons?: number;
 
   /** Lessons that require manual review before approval */
   reviewRequiredLessons?: number;

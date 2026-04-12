@@ -67,6 +67,13 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   // For Stage 6: show as 'active' if any lesson is currently generating
   const isStage6Generating = data.stageNumber === 6 && partialGenContext?.isGenerating
   const currentStatus = isStage6Generating ? 'active' : baseStatus
+  const reviewRequiredLessons =
+    data.stageNumber === 6
+      ? Number(
+          (data.outputData as { reviewRequiredLessons?: number } | undefined)?.reviewRequiredLessons || 0
+        )
+      : 0
+  const visualStatus = reviewRequiredLessons > 0 && currentStatus === 'completed' ? 'awaiting' : currentStatus
   // Extract error message safely
   const errorMessage =
     statusEntry?.errorMessage ||
@@ -86,10 +93,10 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
-      className={`relative min-w-[180px] rounded-lg border transition-all duration-300 ${getNodeStatusStyles(currentStatus, 'stage')} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
+      className={`relative min-w-[180px] rounded-lg border transition-all duration-300 ${getNodeStatusStyles(visualStatus, 'stage')} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
       data-testid={`node-${id}`}
-      data-node-status={currentStatus}
-      aria-label={`${t('drawer.stageLabel', { number: data.stageNumber })}: ${stageName}, ${t(`status.${currentStatus}`)}`}
+      data-node-status={visualStatus}
+      aria-label={`${t('drawer.stageLabel', { number: data.stageNumber })}: ${stageName}, ${t(`status.${visualStatus}`)}`}
       role="button"
       tabIndex={0}
     >
@@ -175,7 +182,13 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
       {/* Status/Metrics Footer */}
       <div className="border-t border-black/5 px-3 py-2 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
         <div className="flex items-center justify-between">
-          {currentStatus === 'completed' ? (
+          {visualStatus === 'awaiting' ? (
+            <span className="font-medium text-amber-600 dark:text-amber-400">
+              {reviewRequiredLessons > 0
+                ? `Требует проверки (${reviewRequiredLessons})`
+                : t('status.awaiting')}
+            </span>
+          ) : currentStatus === 'completed' ? (
             <span className="font-medium text-green-600 dark:text-green-400">
               {t(`completionMessages.stage_${data.stageNumber}`)}
             </span>

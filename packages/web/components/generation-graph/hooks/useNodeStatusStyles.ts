@@ -47,8 +47,8 @@ export function getNodeStatusStyles(status: NodeStatus, variant: NodeVariant = '
       return 'border-red-500 bg-red-50 dark:bg-red-900/30'
 
     case 'awaiting':
-      // Awaiting status with yellow/amber styling and pulse animation
-      return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 shadow-[0_0_15px_rgba(234,179,8,0.6)] scale-105 animate-pulse'
+      // Awaiting review is terminal, not active: keep it visually distinct from success/error without pulse
+      return 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-900/30 shadow-[0_0_10px_rgba(245,158,11,0.28)]'
 
     case 'skipped':
       return 'border-slate-400 bg-slate-100 dark:bg-slate-700 opacity-60'
@@ -80,7 +80,7 @@ export function getStatusColor(status: NodeStatus): string {
     case 'error':
       return 'bg-red-500 dark:bg-red-600'
     case 'awaiting':
-      return 'bg-yellow-500 dark:bg-yellow-600'
+      return 'bg-amber-500 dark:bg-amber-500'
     case 'skipped':
       return 'bg-slate-400 dark:bg-slate-500'
     default:
@@ -109,7 +109,7 @@ export function getStatusBorderClass(status: NodeStatus): string {
     case 'error':
       return 'border-l-4 border-l-red-500 dark:border-l-red-400 bg-red-50 dark:bg-red-900/30'
     case 'awaiting':
-      return 'border-l-4 border-l-yellow-500 dark:border-l-yellow-400 bg-yellow-50 dark:bg-yellow-900/30'
+      return 'border-l-4 border-l-amber-500 dark:border-l-amber-400 bg-amber-50 dark:bg-amber-900/30'
     case 'skipped':
       return 'border-l-4 border-l-slate-400 dark:border-l-slate-500 bg-slate-100 dark:bg-slate-700 opacity-60'
     default:
@@ -133,6 +133,8 @@ export function getProgressBarColor(status: NodeStatus): string {
       return 'bg-emerald-500'
     case 'error':
       return 'bg-red-500'
+    case 'awaiting':
+      return 'bg-amber-500'
     default:
       return 'bg-purple-500'
   }

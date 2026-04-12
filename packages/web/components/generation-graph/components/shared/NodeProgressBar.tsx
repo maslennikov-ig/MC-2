@@ -6,7 +6,7 @@ export interface NodeProgressBarProps {
   /** Progress percentage (0-100) */
   progress: number
   /** Visual variant for different states */
-  variant?: 'default' | 'success' | 'error' | 'active'
+  variant?: 'default' | 'success' | 'error' | 'active' | 'review'
   /** Progress bar size (default: 'sm') */
   size?: 'xs' | 'sm' | 'md'
   /** Additional CSS classes */
@@ -19,6 +19,7 @@ const variantColorMap: Record<string, string | undefined> = {
   active: undefined,
   success: 'bg-emerald-500 dark:bg-emerald-400',
   error: 'bg-red-500 dark:bg-red-400',
+  review: 'bg-amber-500 dark:bg-amber-400',
 }
 
 // Map NodeProgressBar sizes to SmoothProgress sizes

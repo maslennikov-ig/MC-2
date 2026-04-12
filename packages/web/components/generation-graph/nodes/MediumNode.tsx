@@ -7,14 +7,21 @@ import { getNodeStatusStyles } from '../hooks/useNodeStatusStyles'
 const MediumNode = ({ id, data, selected }: NodeProps<RFStageNode>) => {
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status
+  const reviewRequiredLessons =
+    data.stageNumber === 6
+      ? Number(
+          (data.outputData as { reviewRequiredLessons?: number } | undefined)?.reviewRequiredLessons || 0
+        )
+      : 0
+  const visualStatus = reviewRequiredLessons > 0 ? 'awaiting' : currentStatus
 
   return (
     <div
-      className={`relative flex min-w-[120px] items-center justify-center rounded-md border px-2 py-1.5 text-center transition-all duration-300 ${getNodeStatusStyles(currentStatus, 'stage')} ${selected ? 'ring-2 ring-blue-400 ring-offset-1' : ''} `}
+      className={`relative flex min-w-[120px] items-center justify-center rounded-md border px-2 py-1.5 text-center transition-all duration-300 ${getNodeStatusStyles(visualStatus, 'stage')} ${selected ? 'ring-2 ring-blue-400 ring-offset-1' : ''} `}
       data-testid={`node-medium-${id}`}
       tabIndex={0}
       role="button"
-      aria-label={`Stage ${data.stageNumber}: ${data.label}, status: ${currentStatus}`}
+      aria-label={`Stage ${data.stageNumber}: ${data.label}, status: ${visualStatus}`}
       aria-pressed={selected}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -32,7 +39,7 @@ const MediumNode = ({ id, data, selected }: NodeProps<RFStageNode>) => {
       <div className="flex flex-col">
         <span
           className={`text-[10px] uppercase ${
-            currentStatus === 'skipped'
+            visualStatus === 'skipped'
               ? 'text-slate-400 dark:text-slate-500'
               : 'text-slate-500 dark:text-slate-400'
           }`}
@@ -41,7 +48,7 @@ const MediumNode = ({ id, data, selected }: NodeProps<RFStageNode>) => {
         </span>
         <span
           className={`max-w-[110px] truncate text-xs font-medium ${
-            currentStatus === 'skipped'
+            visualStatus === 'skipped'
               ? 'text-slate-500 line-through dark:text-slate-400'
               : 'text-slate-800 dark:text-slate-200'
           }`}

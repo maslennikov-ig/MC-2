@@ -33,6 +33,7 @@ export interface ReviewAwareGraphNodeState {
 }
 
 export interface ReviewAwareStage6GraphSummary {
+  completedLessons: number
   readyLessons: number
   reviewRequiredLessons: number
   status: NodeStatus
@@ -96,6 +97,9 @@ export function summarizeReviewAwareStage6Statuses(
   statuses: Array<string | null | undefined>
 ): ReviewAwareStage6GraphSummary {
   const mapped = statuses.map((status) => getReviewAwareGraphNodeState(status))
+  const completedLessons = mapped.filter(
+    (entry) => !entry.needsReview && (entry.status === 'completed' || entry.status === 'approved')
+  ).length
   const readyLessons = mapped.filter(
     (entry) => entry.status === 'completed' || entry.status === 'approved'
   ).length
@@ -114,6 +118,7 @@ export function summarizeReviewAwareStage6Statuses(
   }
 
   return {
+    completedLessons,
     readyLessons,
     reviewRequiredLessons,
     status,
