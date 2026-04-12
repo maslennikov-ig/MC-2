@@ -117,9 +117,26 @@ describe('generateRouter.generate', () => {
     });
   });
 
-  it('surfaces required-RAG unavailability as a PRECONDITION_FAILED TRPCError', async () => {
+  it('surfaces transient required-RAG outages as a SERVICE_UNAVAILABLE TRPCError', async () => {
     mockBuildDocumentSummaries.mockRejectedValueOnce(
-      new RequiredRagUnavailableError('course-123', 'qdrant_unavailable')
+      new RequiredRagUnavailableError('course-123', 'qdrant_timeout')
+    );
+
+    const request = caller.generate({ courseId: '550e8400-e29b-41d4-a716-446655440000' });
+
+    await expect(request).rejects.toBeInstanceOf(TRPCError);
+    await expect(request).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message:
+        'This course has uploaded documents, but the vector database is temporarily unavailable. Please try again later.',
+    });
+
+    expect(mockAddJob).not.toHaveBeenCalled();
+  });
+
+  it('surfaces deterministic required-RAG preconditions as a PRECONDITION_FAILED TRPCError', async () => {
+    mockBuildDocumentSummaries.mockRejectedValueOnce(
+      new RequiredRagUnavailableError('course-123', 'no_indexed_documents')
     );
 
     const request = caller.generate({ courseId: '550e8400-e29b-41d4-a716-446655440000' });
@@ -128,7 +145,7 @@ describe('generateRouter.generate', () => {
     await expect(request).rejects.toMatchObject({
       code: 'PRECONDITION_FAILED',
       message:
-        'This course has uploaded documents, but the vector database is temporarily unavailable. Please try again later.',
+        'This course has uploaded documents, but none are indexed for RAG yet. Please finish document processing and try again.',
     });
 
     expect(mockAddJob).not.toHaveBeenCalled();

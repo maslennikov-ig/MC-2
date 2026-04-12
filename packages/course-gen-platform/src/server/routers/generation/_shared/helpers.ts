@@ -11,9 +11,9 @@ import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import type { ConcurrencyCheckResult, NormalizedTier, CourseSettings } from './types';
 import {
-  assertCourseRagReady,
   RequiredRagUnavailableError,
 } from '@/shared/rag/document-availability';
+import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
 import { notifyCourseError } from '@/shared/notifications';
 
 // Re-export from shared utility (single source of truth)
@@ -206,7 +206,7 @@ export async function buildDocumentSummaries(
 ): Promise<{ hasVectorizedDocs: boolean; documentSummaries: DocumentSummary[] }> {
   let ragAvailability;
   try {
-    ragAvailability = await assertCourseRagReady(courseId);
+    ragAvailability = await assertCourseRagReadyWithRetry(courseId);
   } catch (error) {
     if (error instanceof RequiredRagUnavailableError) {
       await notifyCourseError(courseId, 5, error.message);
