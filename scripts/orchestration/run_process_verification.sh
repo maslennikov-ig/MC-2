@@ -44,6 +44,13 @@ required = [
     pathlib.Path("scripts/orchestration/cleanup_stage_workspace.py"),
 ]
 
+workspace = contract.get("workspace", {})
+if isinstance(workspace, dict) and workspace.get("launch_mode") == "manual_user_launch":
+    manual_prompt_template = pathlib.Path(
+        contract.get("manual_prompt_template", ".codex/manual-agent-prompt-template.md")
+    )
+    required.append(manual_prompt_template)
+
 missing = [str(path) for path in required if not path.exists()]
 if missing:
     raise SystemExit(f"Missing required orchestration files: {', '.join(missing)}")

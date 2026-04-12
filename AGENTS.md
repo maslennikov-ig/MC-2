@@ -45,6 +45,7 @@ Typical code-change gates in this repo include:
 - `.codex/handoff.md` is current-state only.
 - `.codex/stages/<stage_id>/summary.md` stores tracked stage summaries.
 - `.codex/stages/<stage_id>/artifacts/<task_id>.md` stores tracked delegated artifacts.
+- `.codex/manual-agent-prompt-template.md` is the prompt skeleton for user-launched delegated streams.
 - `.codex/agent-reports/` is the legacy local-only pre-v2 archive.
 - `scripts/orchestration/validate_artifact.py` validates tracked artifacts.
 - `scripts/orchestration/check_stage_ready.py <stage_id>` is the minimal hard stop before stage close.
