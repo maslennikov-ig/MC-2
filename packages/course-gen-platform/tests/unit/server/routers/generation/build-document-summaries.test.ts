@@ -102,6 +102,25 @@ describe('buildDocumentSummaries', () => {
     );
   });
 
+  it('does not send a Qdrant outage alert when metadata lookup fails', async () => {
+    const { NetworkError } = await import('@/shared/errors');
+
+    mockAssertCourseRagReady.mockRejectedValue(
+      new NetworkError(
+        'Failed to determine RAG availability from file metadata',
+        'supabase:file_catalog',
+        'temporary read failure'
+      )
+    );
+
+    const { buildDocumentSummaries } = await import('@/server/routers/generation/_shared/helpers');
+
+    await expect(
+      buildDocumentSummaries(createSupabaseVectorizedFiles([]), 'course-metadata-error')
+    ).rejects.toBeInstanceOf(NetworkError);
+    expect(mockNotifyCourseError).not.toHaveBeenCalled();
+  });
+
   it('returns vectorized document summaries when RAG is ready', async () => {
     mockAssertCourseRagReady.mockResolvedValue({
       availability: 'ready',

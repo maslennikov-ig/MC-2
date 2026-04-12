@@ -110,6 +110,29 @@ describe('document-availability', () => {
     expect(mockGetCollection).not.toHaveBeenCalled();
   });
 
+  it('throws a retryable metadata error when file availability cannot be determined', async () => {
+    mockGetSupabaseAdmin.mockReturnValue({
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            data: null,
+            error: { message: 'temporary read failure' },
+          })),
+        })),
+      })),
+    });
+
+    const { clearAllDocumentAvailabilityCache, assertCourseRagReady } = await import(
+      '@/shared/rag/document-availability'
+    );
+    const { NetworkError } = await import('@/shared/errors');
+    clearAllDocumentAvailabilityCache();
+
+    await expect(assertCourseRagReady('course-metadata-error')).rejects.toBeInstanceOf(
+      NetworkError
+    );
+  });
+
   it('throws RequiredRagUnavailableError from assertCourseRagReady when Qdrant is unavailable', async () => {
     mockGetSupabaseAdmin.mockReturnValue(
       createSupabaseWithFileCatalogRows([{ id: 'file-1', vector_status: 'indexed' }])
@@ -124,6 +147,26 @@ describe('document-availability', () => {
     clearAllDocumentAvailabilityCache();
 
     await expect(assertCourseRagReady('course-qdrant-down')).rejects.toBeInstanceOf(
+      RequiredRagUnavailableError
+    );
+  });
+
+  it('uses a reason-specific message when indexed documents are unavailable', async () => {
+    mockGetSupabaseAdmin.mockReturnValue(
+      createSupabaseWithFileCatalogRows([{ id: 'file-1', vector_status: 'failed' }])
+    );
+
+    const {
+      clearAllDocumentAvailabilityCache,
+      assertCourseRagReady,
+      RequiredRagUnavailableError,
+    } = await import('@/shared/rag/document-availability');
+    clearAllDocumentAvailabilityCache();
+
+    await expect(assertCourseRagReady('course-unindexed')).rejects.toThrow(
+      'RAG is required for this course, but indexed documents are unavailable'
+    );
+    await expect(assertCourseRagReady('course-unindexed')).rejects.toBeInstanceOf(
       RequiredRagUnavailableError
     );
   });

@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockAssertCourseRagReady, mockCheckCourseHasIndexedDocuments, mockLogger } = vi.hoisted(() => ({
+const { mockAssertCourseRagReady, mockLogger } = vi.hoisted(() => ({
   mockAssertCourseRagReady: vi.fn(),
-  mockCheckCourseHasIndexedDocuments: vi.fn(),
   mockLogger: {
     debug: vi.fn(),
     info: vi.fn(),
@@ -16,9 +15,6 @@ vi.mock('@/shared/rag/document-availability', async importOriginal => {
   return {
     ...original,
     assertCourseRagReady: vi.fn((...args) => mockAssertCourseRagReady(...args)),
-    checkCourseHasIndexedDocuments: vi.fn((...args) =>
-      mockCheckCourseHasIndexedDocuments(...args)
-    ),
   };
 });
 
@@ -63,7 +59,6 @@ describe('section-rag-retriever', () => {
       hasIndexedDocuments: false,
       reason: 'no_uploaded_documents',
     });
-    mockCheckCourseHasIndexedDocuments.mockResolvedValue(false);
 
     const { retrieveSectionContext } = await import(
       '@/stages/stage5-generation/utils/section-rag-retriever'
@@ -82,7 +77,6 @@ describe('section-rag-retriever', () => {
     mockAssertCourseRagReady.mockRejectedValue(
       new RequiredRagUnavailableError('course-1', 'qdrant_unavailable')
     );
-    mockCheckCourseHasIndexedDocuments.mockResolvedValue(false);
 
     const { retrieveSectionContext } = await import(
       '@/stages/stage5-generation/utils/section-rag-retriever'
@@ -93,8 +87,7 @@ describe('section-rag-retriever', () => {
     );
   });
 
-  it('throws RequiredRagUnavailableError when a required-RAG query fails after preflight', async () => {
-    const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
+  it('continues when an individual required-RAG query fails after preflight', async () => {
     const { searchChunks } = await import('@/shared/qdrant/search');
 
     mockAssertCourseRagReady.mockResolvedValue({
@@ -104,15 +97,16 @@ describe('section-rag-retriever', () => {
       hasIndexedDocuments: true,
       reason: 'rag_ready',
     });
-    mockCheckCourseHasIndexedDocuments.mockResolvedValue(true);
     vi.mocked(searchChunks).mockRejectedValue(new Error('404 page not found'));
 
     const { retrieveSectionContext } = await import(
       '@/stages/stage5-generation/utils/section-rag-retriever'
     );
 
-    await expect(retrieveSectionContext(baseParams)).rejects.toBeInstanceOf(
-      RequiredRagUnavailableError
-    );
+    await expect(retrieveSectionContext(baseParams)).resolves.toMatchObject({
+      sectionId: 'section-1',
+      chunks: [],
+      totalRetrieved: 0,
+    });
   });
 });
