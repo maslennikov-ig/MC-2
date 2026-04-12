@@ -1,4 +1,4 @@
-import { QdrantClientTimeoutError } from '@qdrant/js-client-rest';
+import { QdrantClientResourceExhaustedError, QdrantClientTimeoutError } from '@qdrant/js-client-rest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetSupabaseAdmin, mockGetCollection, mockLogger } = vi.hoisted(() => ({
@@ -160,6 +160,82 @@ describe('document-availability', () => {
       reason: 'qdrant_timeout',
       retryable: true,
       apiErrorCode: 'SERVICE_UNAVAILABLE',
+    });
+  });
+
+  it('classifies generic 404 page-not-found responses as invalid config, not missing collection', async () => {
+    mockGetSupabaseAdmin.mockReturnValue(
+      createSupabaseWithFileCatalogRows([{ id: 'file-1', vector_status: 'indexed' }])
+    );
+    mockGetCollection.mockRejectedValue(new Error('Unexpected Response: 404 (Not Found)\npage not found'));
+
+    const {
+      clearAllDocumentAvailabilityCache,
+      assertCourseRagReady,
+      RequiredRagUnavailableError,
+    } = await import('@/shared/rag/document-availability');
+    clearAllDocumentAvailabilityCache();
+
+    await expect(assertCourseRagReady('course-404-page')).rejects.toBeInstanceOf(
+      RequiredRagUnavailableError
+    );
+    await expect(assertCourseRagReady('course-404-page')).rejects.toMatchObject({
+      reason: 'qdrant_invalid_config',
+      retryable: false,
+      apiErrorCode: 'PRECONDITION_FAILED',
+    });
+  });
+
+  it('classifies explicit missing collection responses as collection-missing preconditions', async () => {
+    mockGetSupabaseAdmin.mockReturnValue(
+      createSupabaseWithFileCatalogRows([{ id: 'file-1', vector_status: 'indexed' }])
+    );
+    mockGetCollection.mockRejectedValue(
+      new Error(
+        'Unexpected Response: 404 (Not Found)\nRaw response content:\n{"status":{"error":"Collection `course_embeddings` doesn\'t exist!"}}'
+      )
+    );
+
+    const {
+      clearAllDocumentAvailabilityCache,
+      assertCourseRagReady,
+      RequiredRagUnavailableError,
+    } = await import('@/shared/rag/document-availability');
+    clearAllDocumentAvailabilityCache();
+
+    await expect(assertCourseRagReady('course-collection-missing')).rejects.toBeInstanceOf(
+      RequiredRagUnavailableError
+    );
+    await expect(assertCourseRagReady('course-collection-missing')).rejects.toMatchObject({
+      reason: 'qdrant_collection_missing',
+      retryable: false,
+      apiErrorCode: 'PRECONDITION_FAILED',
+    });
+  });
+
+  it('preserves retryAfter from Qdrant rate-limit errors', async () => {
+    mockGetSupabaseAdmin.mockReturnValue(
+      createSupabaseWithFileCatalogRows([{ id: 'file-1', vector_status: 'indexed' }])
+    );
+    mockGetCollection.mockRejectedValue(
+      new QdrantClientResourceExhaustedError('Rate limited by Qdrant', '5')
+    );
+
+    const {
+      clearAllDocumentAvailabilityCache,
+      assertCourseRagReady,
+      RequiredRagUnavailableError,
+    } = await import('@/shared/rag/document-availability');
+    clearAllDocumentAvailabilityCache();
+
+    await expect(assertCourseRagReady('course-rate-limited')).rejects.toBeInstanceOf(
+      RequiredRagUnavailableError
+    );
+    await expect(assertCourseRagReady('course-rate-limited')).rejects.toMatchObject({
+      reason: 'qdrant_rate_limited',
+      retryable: true,
+      apiErrorCode: 'SERVICE_UNAVAILABLE',
+      retryAfterMs: 5000,
     });
   });
 

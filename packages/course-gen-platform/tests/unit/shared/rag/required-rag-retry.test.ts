@@ -73,4 +73,44 @@ describe('required-rag-retry', () => {
     });
     expect(mockAssertCourseRagReady).toHaveBeenCalledTimes(1);
   });
+
+  it('honors qdrant retryAfter when rate limited', async () => {
+    const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
+    const { assertCourseRagReadyWithRetry } = await import('@/shared/rag/required-rag-retry');
+
+    mockAssertCourseRagReady
+      .mockRejectedValueOnce(
+        new RequiredRagUnavailableError('course-1', 'qdrant_rate_limited', {
+          retryAfterMs: 5000,
+        })
+      )
+      .mockResolvedValueOnce({
+        availability: 'ready',
+        ragRequired: true,
+        hasUploadedDocuments: true,
+        hasIndexedDocuments: true,
+        reason: 'rag_ready',
+      });
+
+    const promise = assertCourseRagReadyWithRetry('course-1');
+
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(mockAssertCourseRagReady).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(promise).resolves.toMatchObject({
+      availability: 'ready',
+      reason: 'rag_ready',
+    });
+    expect(mockAssertCourseRagReady).toHaveBeenCalledTimes(2);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        courseId: 'course-1',
+        reason: 'qdrant_rate_limited',
+        retryInMs: 5000,
+        retryAfterMs: 5000,
+      }),
+      '[RAG] Required-RAG preflight failed transiently, retrying'
+    );
+  });
 });

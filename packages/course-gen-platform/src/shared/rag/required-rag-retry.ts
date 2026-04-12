@@ -11,6 +11,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function getRetryDelayMs(error: RequiredRagUnavailableError, attempt: number): number {
+  const baseDelayMs = REQUIRED_RAG_RETRY_DELAYS_MS[attempt] ?? REQUIRED_RAG_RETRY_DELAYS_MS.at(-1) ?? 0;
+
+  if (error.reason !== 'qdrant_rate_limited') {
+    return baseDelayMs;
+  }
+
+  return Math.max(baseDelayMs, error.retryAfterMs ?? 0);
+}
+
 export async function assertCourseRagReadyWithRetry(
   courseId: string
 ): Promise<CourseRagAvailabilityResult> {
@@ -30,13 +40,14 @@ export async function assertCourseRagReadyWithRetry(
         throw error;
       }
 
-      const delayMs = REQUIRED_RAG_RETRY_DELAYS_MS[attempt];
+      const delayMs = getRetryDelayMs(error, attempt);
       logger.warn(
         {
           courseId,
           reason: error.reason,
           attempt: attempt + 1,
           retryInMs: delayMs,
+          retryAfterMs: error.retryAfterMs,
         },
         '[RAG] Required-RAG preflight failed transiently, retrying'
       );
