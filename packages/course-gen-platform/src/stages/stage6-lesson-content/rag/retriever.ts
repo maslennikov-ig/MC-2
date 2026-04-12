@@ -5,7 +5,10 @@ import { ragContextCache } from '@/stages/stage5-generation/utils/rag-context-ca
 import type { RAGChunk as SectionRAGChunk } from '@/stages/stage5-generation/utils/section-rag-retriever';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
-import { checkCourseHasIndexedDocuments } from '@/shared/rag/document-availability';
+import {
+  assertCourseRagReady,
+  RequiredRagUnavailableError,
+} from '@/shared/rag/document-availability';
 
 import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants';
 import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
@@ -45,8 +48,8 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
 
   // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries
   // This prevents ~100s of wasted time when course has no uploaded documents
-  const hasIndexedDocuments = await checkCourseHasIndexedDocuments(courseId);
-  if (!hasIndexedDocuments) {
+  const ragAvailability = await assertCourseRagReady(courseId);
+  if (ragAvailability.availability === 'optional_no_documents') {
     logger.info(
       {
         courseId,
@@ -216,15 +219,8 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
           '[Lesson RAG] Tier 1 query executed'
         );
       } catch (error) {
-        logger.warn(
-          {
-            err: error instanceof Error ? error.message : String(error),
-            query: query.substring(0, 50),
-            lessonId: lessonSpec.lesson_id,
-            tier: 1,
-          },
-          '[Lesson RAG] Tier 1 query failed - continuing'
-        );
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new RequiredRagUnavailableError(courseId, 'qdrant_unavailable', errorMessage);
       }
     }
 
@@ -360,15 +356,8 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         '[Lesson RAG] Tier 2 query executed'
       );
     } catch (error) {
-      logger.warn(
-        {
-          err: error instanceof Error ? error.message : String(error),
-          query: query.substring(0, 50),
-          lessonId: lessonSpec.lesson_id,
-          tier: 2,
-        },
-        '[Lesson RAG] Tier 2 query failed - continuing with remaining queries'
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new RequiredRagUnavailableError(courseId, 'qdrant_unavailable', errorMessage);
     }
 
     // Stop if we have enough candidates
