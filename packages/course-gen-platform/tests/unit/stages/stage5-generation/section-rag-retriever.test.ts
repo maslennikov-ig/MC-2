@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockAssertCourseRagReady, mockLogger } = vi.hoisted(() => ({
   mockAssertCourseRagReady: vi.fn(),
@@ -38,6 +38,11 @@ vi.mock('@/shared/jina', () => ({
 describe('section-rag-retriever', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   const baseParams = {
@@ -71,20 +76,26 @@ describe('section-rag-retriever', () => {
     });
   });
 
-  it('throws RequiredRagUnavailableError when document-backed Stage 5 loses RAG', async () => {
+  it('retries transient Stage 5 required-RAG outages before failing', async () => {
     const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
 
     mockAssertCourseRagReady.mockRejectedValue(
-      new RequiredRagUnavailableError('course-1', 'qdrant_unavailable')
+      new RequiredRagUnavailableError('course-1', 'qdrant_timeout')
     );
 
     const { retrieveSectionContext } = await import(
       '@/stages/stage5-generation/utils/section-rag-retriever'
     );
 
-    await expect(retrieveSectionContext(baseParams)).rejects.toBeInstanceOf(
-      RequiredRagUnavailableError
-    );
+    const promise = retrieveSectionContext(baseParams);
+    const expectation = expect(promise).rejects.toMatchObject({
+      reason: 'qdrant_timeout',
+      retryable: true,
+    });
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await expectation;
+    expect(mockAssertCourseRagReady).toHaveBeenCalledTimes(3);
   });
 
   it('continues when an individual required-RAG query fails after preflight', async () => {

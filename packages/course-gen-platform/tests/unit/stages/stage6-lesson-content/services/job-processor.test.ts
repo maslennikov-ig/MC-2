@@ -903,7 +903,7 @@ describe('stage6/services/job-processor', () => {
       const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
 
       mockRetrieveLessonContext.mockRejectedValueOnce(
-        new RequiredRagUnavailableError('course-uuid', 'qdrant_unavailable')
+        new RequiredRagUnavailableError('course-uuid', 'qdrant_timeout')
       );
 
       const resultPromise = processStage6Job(createMockJob());
