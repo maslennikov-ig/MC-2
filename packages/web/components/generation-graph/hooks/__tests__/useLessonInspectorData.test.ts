@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { selectLessonInspectorContentRows } from '../useLessonInspectorData'
+import {
+  resolveLessonInspectorQualityScore,
+  selectLessonInspectorContentRows,
+} from '../useLessonInspectorData'
 
 type LessonContentRowFixture = {
   id: string
@@ -61,5 +64,74 @@ describe('selectLessonInspectorContentRows', () => {
 
     expect(selection.statusRow?.id).toBe('latest-review-required')
     expect(selection.previewRow?.id).toBe('latest-review-required')
+  })
+})
+
+describe('resolveLessonInspectorQualityScore', () => {
+  it('prefers persisted metadata quality when judge payload is missing', () => {
+    const statusRow = createLessonContentRow({
+      metadata: {
+        qualityScore: 0.88,
+      },
+    })
+
+    const qualityScore = resolveLessonInspectorQualityScore({
+      judgeResult: null,
+      statusRow,
+      previewRow: null,
+    })
+
+    expect(qualityScore).toBe(88)
+  })
+
+  it('falls back to the latest non-zero quality-recovery score instead of rendering 0%', () => {
+    const statusRow = createLessonContentRow({
+      status: 'review_required',
+      metadata: {
+        qualityRecovery: {
+          mode: 'manual',
+          manual_triggered: true,
+          attempts: [
+            {
+              sequence_index: 0,
+              phase_name: 'stage_6_auto_last_chance',
+              mode: 'automatic',
+              is_initial_rung: false,
+              max_regeneration_retries: 0,
+              selected_model: 'z-ai/glm-5',
+              fallback_model: 'qwen/qwen3.5-plus-02-15',
+              model_used: 'z-ai/glm-5',
+              quality_score: 0.7161,
+            },
+            {
+              sequence_index: 1,
+              phase_name: 'stage_6_manual_regeneration',
+              mode: 'manual',
+              is_initial_rung: true,
+              max_regeneration_retries: 0,
+              manual_triggered: true,
+              selected_model: 'openai/gpt-5.4',
+              fallback_model: 'z-ai/glm-5',
+              model_used: 'xiaomi/mimo-v2-flash',
+              quality_score: 0,
+            },
+          ],
+          final_disposition: {
+            outcome: 'review_required',
+            terminal_phase_name: 'stage_6_manual_regeneration',
+            terminal_mode: 'manual',
+            human_review_required: true,
+          },
+        },
+      },
+    })
+
+    const qualityScore = resolveLessonInspectorQualityScore({
+      judgeResult: null,
+      statusRow,
+      previewRow: null,
+    })
+
+    expect(qualityScore).toBe(72)
   })
 })

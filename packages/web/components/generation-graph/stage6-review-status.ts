@@ -23,6 +23,7 @@ export type ReviewAwareModuleDashboardData = Omit<ModuleDashboardData, 'lessons'
 
 export type ReviewAwareLessonInspectorData = LessonInspectorData & {
   needsReview: boolean
+  qualityScore?: number | null
 }
 
 export interface ReviewAwareGraphNodeState {
