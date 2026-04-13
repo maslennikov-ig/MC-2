@@ -33,6 +33,8 @@ export interface TargetedRefinementInput {
   lessonSpec?: LessonSpecificationV2;
   /** Content language for generation (ISO 639-1 code: 'ru', 'en') */
   language?: string;
+  /** Course UUID for course-aware model config lookup */
+  courseId?: string;
 }
 
 /**
@@ -81,4 +83,6 @@ export interface IterationContext {
   strengths?: string[];
   /** Content language for token budget calculation (ISO 639-1 code: 'ru', 'en', 'zh') */
   language?: string;
+  /** Course UUID for course-aware model config lookup */
+  courseId?: string;
 }

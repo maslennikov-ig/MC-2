@@ -104,7 +104,8 @@ export async function generateLessonSingleCall(
   language: string,
   modelOverride: string | null,
   style: string | null,
-  analysisResult: AnalysisResult | null
+  analysisResult: AnalysisResult | null,
+  courseId?: string
 ): Promise<{
   content: string;
   lessonDigest: string;
@@ -258,7 +259,7 @@ export async function generateLessonSingleCall(
   if (modelOverride) {
     modelId = modelOverride;
   } else {
-    const tierResult = await selectStage6ModelTier(lessonSpec);
+    const tierResult = await selectStage6ModelTier(lessonSpec, courseId);
     modelId = tierResult.model;
   }
 
@@ -380,7 +381,8 @@ export async function generateLessonSingleCall(
 export async function generateTruncationContinuation(
   lessonSpec: LessonSpecificationV2,
   currentContent: string,
-  language: string
+  language: string,
+  courseId?: string
 ): Promise<{
   mergedContent: string;
   continuation: string;
@@ -391,7 +393,7 @@ export async function generateTruncationContinuation(
   const tailContext = currentContent.slice(-TRUNCATION_CONTINUATION_TAIL_CHARS);
   const sectionsList = lessonSpec.sections.map((s, i) => `${i + 1}. ${s.title}`).join('\n');
 
-  const modelId = await resolveContinuationModelId();
+  const modelId = await resolveContinuationModelId(courseId);
   const model = createOpenRouterModel(modelId, 0.2, TRUNCATION_CONTINUATION_MAX_TOKENS);
 
   const prompt = TRUNCATION_CONTINUATION_PROMPT_TEMPLATE.replace(
@@ -434,11 +436,11 @@ export async function generateTruncationContinuation(
   };
 }
 
-async function resolveContinuationModelId(): Promise<string> {
+async function resolveContinuationModelId(courseId?: string): Promise<string> {
   const phase = 'stage_6_simple' as PhaseName;
   try {
     const modelConfigService = createModelConfigService();
-    const config = await modelConfigService.getModelForPhase(phase);
+    const config = await modelConfigService.getModelForPhase(phase, courseId);
     return config.modelId || STAGE6_TIER_MODELS.simple;
   } catch (error) {
     logger.warn(

@@ -110,4 +110,37 @@ describe('runLLMReview modelUsed tracking', () => {
     expect(result.modelUsed).toBe('qwen/qwen3.5-plus-02-15');
     expect(result.tokensUsed).toBe(111);
   });
+
+  it('passes courseId into phase config lookup so course overrides can win', async () => {
+    mockGetModelForPhase.mockResolvedValue({
+      modelId: 'course-specific-model',
+      fallbackModelId: 'fallback-model',
+    });
+
+    mockGenerateCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        status: 'PASS',
+        reasoning: 'Looks good',
+        issues: [],
+      }),
+      totalTokens: 100,
+      finishReason: 'stop',
+      model: 'unused-by-code',
+    });
+
+    await runLLMReview({
+      lessonSpec: buildLessonSpec(),
+      ragChunks: [],
+      generatedContent: '## Intro\nContent',
+      language: 'ru',
+      courseId: 'course-123',
+    } as Parameters<typeof runLLMReview>[0] & { courseId: string });
+
+    expect(mockGetModelForPhase).toHaveBeenCalledWith(
+      'stage_6_refinement',
+      'course-123',
+      expect.any(Number),
+      'ru'
+    );
+  });
 });

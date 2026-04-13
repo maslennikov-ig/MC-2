@@ -93,6 +93,7 @@ export async function executeTargetedRefinementFlow(
     ragChunks: state.ragChunks,
     lessonSpec: state.lessonSpec,
     language: state.language,
+    courseId: state.courseId,
   };
 
   const refinementResult = await executeTargetedRefinement(refinementInput);

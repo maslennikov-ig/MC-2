@@ -108,6 +108,17 @@ function getContentArchetypeFromStoredRow(row: StoredLessonContentRow): string |
   return null;
 }
 
+function getAttemptLadderFromResult(
+  result:
+    | Pick<Stage6Output, 'qualityRecovery' | 'metrics'>
+    | { qualityRecovery?: Stage6QualityRecoveryHistory; attemptLadder?: Stage6QualityRecoveryHistory['attempts'] }
+): Stage6QualityRecoveryHistory['attempts'] {
+  const metricsAttemptLadder =
+    'metrics' in result ? result.metrics.attemptLadder : undefined;
+  const directAttemptLadder = 'attemptLadder' in result ? result.attemptLadder : undefined;
+  return result.qualityRecovery?.attempts ?? metricsAttemptLadder ?? directAttemptLadder ?? [];
+}
+
 function summarizeCourseAuditFindings(findings: CourseAuditFinding[]): string {
   return findings
     .slice(0, 3)
@@ -152,11 +163,14 @@ export async function handlePartialSuccess(
           fallbackModel: result.metrics.fallbackModel,
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
+          selectedModelPhase: result.metrics.selectedModelPhase,
+          selectedModelSource: result.metrics.selectedModelSource,
           qualityScore: result.metrics.qualityScore,
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
           regenerationMode: result.metrics.regenerationMode ?? null,
+          attemptLadder: getAttemptLadderFromResult(result),
           qaSignals: getQaSignalsFromResult(result),
           reviewInfo: result.reviewInfo ?? undefined,
           qualityRecovery: result.qualityRecovery ?? undefined,
@@ -214,6 +228,8 @@ export interface ReviewMarkerContext {
   fallbackModel?: string | null;
   selectedModelTier?: string | null;
   selectedModelTierReason?: string | null;
+  selectedModelPhase?: string | null;
+  selectedModelSource?: string | null;
   regenerateCount?: number | null;
   truncationCount?: number | null;
   rejectedTokens?: number | null;
@@ -222,6 +238,7 @@ export interface ReviewMarkerContext {
   qaSignals?: LessonQualitySignals | null;
   courseAuditFindings?: Array<Pick<CourseAuditFinding, 'kind' | 'detail'>>;
   qualityRecovery?: Stage6QualityRecoveryHistory;
+  attemptLadder?: Stage6QualityRecoveryHistory['attempts'];
   suppressAlert?: boolean;
 }
 
@@ -270,10 +287,14 @@ export async function markForReview(
           fallbackModel: context.fallbackModel ?? null,
           selectedModelTier: context.selectedModelTier ?? null,
           selectedModelTierReason: context.selectedModelTierReason ?? null,
+          selectedModelPhase: context.selectedModelPhase ?? null,
+          selectedModelSource: context.selectedModelSource ?? null,
           regenerateCount: context.regenerateCount ?? null,
           truncationCount: context.truncationCount ?? null,
           rejectedTokens: context.rejectedTokens ?? null,
           regenerationMode: context.regenerationMode ?? null,
+          attemptLadder:
+            context.qualityRecovery?.attempts ?? context.attemptLadder ?? [],
           reviewInfo: context.reviewInfo ?? undefined,
           qaSignals: context.qaSignals ?? undefined,
           courseAuditFindings: context.courseAuditFindings ?? undefined,
@@ -471,11 +492,14 @@ export async function saveLessonContent(
           fallbackModel: result.metrics.fallbackModel,
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
+          selectedModelPhase: result.metrics.selectedModelPhase,
+          selectedModelSource: result.metrics.selectedModelSource,
           qualityScore: result.metrics.qualityScore,
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
           regenerationMode: result.metrics.regenerationMode ?? null,
+          attemptLadder: getAttemptLadderFromResult(result),
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: markdown,
@@ -603,11 +627,14 @@ export async function saveRejectedContent(
     fallbackModel?: string | null;
     selectedModelTier?: string | null;
     selectedModelTierReason?: string | null;
+    selectedModelPhase?: string | null;
+    selectedModelSource?: string | null;
     modelOverride?: string | null;
     regenerateCount?: number | null;
     truncationCount?: number | null;
     rejectedTokens?: number | null;
     regenerationMode?: string | null;
+    attemptLadder?: Stage6QualityRecoveryHistory['attempts'];
   }
 ): Promise<void> {
   if (!generatedContent) {
@@ -660,19 +687,22 @@ export async function saveRejectedContent(
       fallbackModel: context?.fallbackModel ?? null,
       selectedModelTier: context?.selectedModelTier ?? null,
       selectedModelTierReason: context?.selectedModelTierReason ?? null,
+      selectedModelPhase: context?.selectedModelPhase ?? null,
+      selectedModelSource: context?.selectedModelSource ?? null,
       modelOverride: context?.modelOverride ?? null,
       regenerateCount: context?.regenerateCount ?? null,
       truncationCount: context?.truncationCount ?? null,
       rejectedTokens: context?.rejectedTokens ?? null,
       regenerationMode: context?.regenerationMode ?? null,
+      attemptLadder: context?.attemptLadder ?? [],
       generationAttempt,
     };
 
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: resolvedLessonUuid,
       course_id: courseId,
-      content: contentObject,
-      metadata,
+      content: JSON.parse(JSON.stringify(contentObject)) as Json,
+      metadata: JSON.parse(JSON.stringify(metadata)) as Json,
       status: 'rejected',
       generation_attempt: generationAttempt,
     });

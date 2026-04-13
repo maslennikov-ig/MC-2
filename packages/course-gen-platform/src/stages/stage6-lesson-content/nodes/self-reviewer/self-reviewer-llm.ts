@@ -54,6 +54,7 @@ export interface LLMReviewOptions {
   ragChunks: RAGChunk[];
   generatedContent: string;
   language: string;
+  courseId?: string;
   /** Pre-detected issues from heuristic phase for targeted LLM fixing */
   detectedIssues?: DetectedIssueForLLM[];
 }
@@ -71,7 +72,7 @@ export interface LLMReviewOptions {
  * @returns LLM review result with parsed response or error
  */
 export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReviewResult> {
-  const { lessonSpec, ragChunks, generatedContent, language, detectedIssues } = options;
+  const { lessonSpec, ragChunks, generatedContent, language, courseId, detectedIssues } = options;
   const nodeLogger = logger.child({ phase: 'llmReview' });
 
   // Get model configuration
@@ -80,7 +81,7 @@ export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReview
   const normalizedLanguage: 'ru' | 'en' = language === 'ru' ? 'ru' : 'en';
   const phaseConfig = await modelConfigService.getModelForPhase(
     'stage_6_refinement',
-    undefined,
+    courseId,
     estimatedTokens,
     normalizedLanguage
   );

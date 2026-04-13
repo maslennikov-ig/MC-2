@@ -66,6 +66,7 @@ export async function executeTargetedRefinement(
     ragChunks,
     lessonSpec,
     language,
+    courseId,
   } = input;
   const startTime = Date.now();
 
@@ -256,6 +257,7 @@ export async function executeTargetedRefinement(
             strengths:
               arbiterOutput.acceptedIssues.length === 0 ? ['Content meets quality standards'] : [],
             language, // Pass language for token budget calculation
+            courseId,
           });
 
           // Always increment edit count to prevent infinite loops on repeated failures
@@ -310,7 +312,8 @@ export async function executeTargetedRefinement(
             onStreamEvent,
             ragChunks || [],
             lessonSpec?.learning_objectives?.map(lo => lo.objective) || [],
-            language
+            language,
+            courseId
           );
 
           // Always increment edit count to prevent infinite loops on repeated failures
