@@ -64,6 +64,8 @@ export interface SectionRegenerationInput {
   ragChunks: RAGChunk[];
   /** Target language */
   language: string;
+  /** Course UUID for course-aware model config lookup */
+  courseId?: string | null;
   /** Optional model override */
   modelOverride?: string | null;
   /** Course content style (e.g., 'gamified', 'professional', 'storytelling') */
@@ -117,6 +119,7 @@ function normalizeSectionContent(content: string): string {
 async function regenerateIntroduction(
   lessonSpec: LessonSpecificationV2,
   language: string,
+  courseId?: string | null,
   modelOverride?: string | null,
   style?: string | null
 ): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
@@ -140,6 +143,7 @@ async function regenerateIntroduction(
     [], // No RAG for intro
     '', // No previous context for intro
     language,
+    courseId ?? null,
     modelOverride,
     style
   );
@@ -154,6 +158,7 @@ async function regenerateSummary(
   lessonSpec: LessonSpecificationV2,
   previousContext: string,
   language: string,
+  courseId?: string | null,
   modelOverride?: string | null,
   style?: string | null
 ): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
@@ -177,6 +182,7 @@ async function regenerateSummary(
     [], // No RAG for summary
     previousContext,
     language,
+    courseId ?? null,
     modelOverride,
     style
   );
@@ -195,7 +201,8 @@ export async function regenerateSections(
   input: SectionRegenerationInput
 ): Promise<SectionRegenerationResult> {
   const startTime = performance.now();
-  const { markdown, sectionIds, lessonSpec, ragChunks, language, modelOverride, style } = input;
+  const { markdown, sectionIds, lessonSpec, ragChunks, language, courseId, modelOverride, style } =
+    input;
 
   const nodeLogger = logger.child({
     component: 'section-regenerator',
@@ -232,9 +239,22 @@ export async function regenerateSections(
         let result: { content: string; tokensUsed: number; modelUsed: string };
 
         if (sectionId === 'introduction') {
-          result = await regenerateIntroduction(lessonSpec, language, modelOverride, style);
+          result = await regenerateIntroduction(
+            lessonSpec,
+            language,
+            courseId,
+            modelOverride,
+            style
+          );
         } else if (sectionId === 'summary') {
-          result = await regenerateSummary(lessonSpec, context, language, modelOverride, style);
+          result = await regenerateSummary(
+            lessonSpec,
+            context,
+            language,
+            courseId,
+            modelOverride,
+            style
+          );
         } else {
           const sectionSpec = findSectionSpec(sectionId, lessonSpec);
           if (!sectionSpec) {
@@ -249,6 +269,7 @@ export async function regenerateSections(
             ragChunks,
             context,
             language,
+            courseId ?? null,
             modelOverride,
             style
           );

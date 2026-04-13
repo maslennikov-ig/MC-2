@@ -28,7 +28,8 @@ export async function verifyPatchWithDeltaJudge(
   originalContent: string,
   patchedContent: string,
   task: SectionRefinementTask,
-  onStreamEvent: ((event: RefinementEvent) => void) | undefined
+  onStreamEvent: ((event: RefinementEvent) => void) | undefined,
+  courseId?: string
 ): Promise<{ passed: boolean; tokensUsed: number }> {
   // Guard: skip verification if no source issues
   if (task.sourceIssues.length === 0) {
@@ -63,6 +64,7 @@ export async function verifyPatchWithDeltaJudge(
     addressedIssue: primaryIssue,
     sectionId: task.sectionId,
     contextAnchors: task.contextAnchors,
+    courseId,
   });
 
   // Log and emit new issues
@@ -216,7 +218,8 @@ export async function executePatcherTask(
       sectionContent,
       patchedContent,
       task,
-      onStreamEvent
+      onStreamEvent,
+      iterationContext.courseId
     );
 
     return {
@@ -327,7 +330,8 @@ async function verifyPatchIfChanged(
   originalContent: string,
   patchedContent: string,
   task: SectionRefinementTask,
-  onStreamEvent: ((event: RefinementEvent) => void) | undefined
+  onStreamEvent: ((event: RefinementEvent) => void) | undefined,
+  courseId?: string
 ): Promise<{ passed: boolean; tokensUsed: number }> {
   if (patchedContent === originalContent) {
     emitEvent(onStreamEvent, {
@@ -343,7 +347,8 @@ async function verifyPatchIfChanged(
       originalContent,
       patchedContent,
       task,
-      onStreamEvent
+      onStreamEvent,
+      courseId
     );
 
     logger.info(
@@ -390,7 +395,8 @@ export async function executeExpanderTask(
   onStreamEvent: ((event: RefinementEvent) => void) | undefined,
   ragChunks: RAGChunk[],
   learningObjectives: string[],
-  language?: string
+  language?: string,
+  courseId?: string
 ): Promise<{
   success: boolean;
   sectionId: string;
@@ -444,6 +450,7 @@ export async function executeExpanderTask(
       contextAnchors: task.contextAnchors,
       targetWordCount: 300,
       language: validatedLanguage,
+      courseId,
     };
 
     // Execute expansion
@@ -487,7 +494,8 @@ export async function executeExpanderTask(
           sectionContent,
           expandedContent,
           task,
-          onStreamEvent
+          onStreamEvent,
+          courseId
         );
         verificationPassed = result.passed;
         deltaJudgeTokens = result.tokensUsed;

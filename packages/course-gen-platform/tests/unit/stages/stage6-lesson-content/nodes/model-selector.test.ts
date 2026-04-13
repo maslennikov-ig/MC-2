@@ -51,7 +51,7 @@ describe('selectStage6ModelTier', () => {
 
     const result = await selectStage6ModelTier(buildLessonSpec('1.2', 'beginner'));
 
-    expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_complex');
+    expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_complex', undefined);
     expect(result.tier).toBe('complex');
     expect(result.model).toBe('qwen/qwen3.5-plus-02-15');
   });
@@ -65,7 +65,7 @@ describe('selectStage6ModelTier', () => {
 
     const result = await selectStage6ModelTier(buildLessonSpec('3.1', 'beginner'));
 
-    expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_simple');
+    expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_simple', undefined);
     expect(result.tier).toBe('simple');
     expect(result.model).toBe('xiaomi/mimo-v2-flash');
   });
@@ -77,9 +77,16 @@ describe('selectStage6ModelTier', () => {
       source: 'database',
     });
 
-    const result = await selectStage6ModelTier(buildLessonSpec('3.2', 'intermediate'));
+    const selectStage6ModelTierWithCourseId = selectStage6ModelTier as unknown as (
+      lessonSpec: LessonSpecificationV2,
+      courseId?: string
+    ) => Promise<Awaited<ReturnType<typeof selectStage6ModelTier>>>;
+    const result = await selectStage6ModelTierWithCourseId(
+      buildLessonSpec('3.2', 'intermediate'),
+      'course-123'
+    );
 
-    expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_normal');
+    expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_normal', 'course-123');
     expect(result.tier).toBe('normal');
     expect(result.model).toBe('moonshotai/kimi-k2-thinking');
   });
@@ -93,7 +100,7 @@ describe('selectStage6ModelTier', () => {
 
     const result = await selectStage6ModelTier(buildLessonSpec('5.3', 'advanced'));
 
-    expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_complex');
+    expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_complex', undefined);
     expect(result.tier).toBe('complex');
     expect(result.model).toBe('qwen/qwen3.5-plus-02-15');
   });

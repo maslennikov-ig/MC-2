@@ -53,6 +53,7 @@ export async function sectionRegeneratorNode(
       lessonSpec: state.lessonSpec,
       ragChunks: state.ragChunks,
       language: state.language,
+      courseId: state.courseId,
       modelOverride: state.modelOverride,
       style: state.style,
     });

@@ -130,7 +130,9 @@ function parseDeltaJudgeResponse(content: string): {
  * @param input - DeltaJudgeInput with original, patched, and issue
  * @returns DeltaJudgeOutput with pass/fail and reasoning
  */
-export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOutput> {
+export async function verifyPatch(
+  input: DeltaJudgeInput & { courseId?: string }
+): Promise<DeltaJudgeOutput> {
   const startTime = Date.now();
   const llmClient = new LLMClient();
   const modelService = createModelConfigService();
@@ -142,7 +144,10 @@ export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOut
     let maxTokens = 512;
 
     try {
-      const config = (await modelService.getModelForPhase('stage_6_delta_judge')) as {
+      const config = (await modelService.getModelForPhase(
+        'stage_6_delta_judge',
+        input.courseId
+      )) as {
         modelId: string;
         temperature: number;
         maxTokens: number;

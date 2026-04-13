@@ -99,7 +99,8 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       const continuationResult = await generateTruncationContinuation(
         lessonSpec,
         state.generatedContent!,
-        language
+        language,
+        courseId
       );
       const labels = getContentLabels(language);
       const digestExtraction = extractLessonDigest(
@@ -118,7 +119,8 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         language,
         state.modelOverride,
         style,
-        analysisResult
+        analysisResult,
+        courseId
       );
       generatedContent = result.content;
       lessonDigest = result.lessonDigest;
@@ -263,6 +265,8 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         selectedModel: state.selectedModel,
         selectedModelTier: state.selectedModelTier,
         selectedModelTierReason: state.selectedModelTierReason,
+        selectedModelPhase: state.selectedModelPhase,
+        selectedModelSource: state.selectedModelSource,
         modelOverride: state.modelOverride,
         regenerateCount: state.regenerateCount ?? 0,
         truncationCount: state.truncationCount ?? 0,

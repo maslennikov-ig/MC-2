@@ -50,7 +50,7 @@ export { buildPatcherPrompt, buildPatcherSystemPrompt } from './patcher-prompt';
 export type LLMCallFn = (
   prompt: string,
   systemPrompt: string,
-  options: { maxTokens: number; temperature: number }
+  options: { maxTokens: number; temperature: number; courseId?: string }
 ) => Promise<{ content: string; tokensUsed: number }>;
 
 /**
@@ -62,14 +62,14 @@ export type LLMCallFn = (
 async function defaultLLMCall(
   prompt: string,
   systemPrompt: string,
-  options: { maxTokens: number; temperature: number }
+  options: { maxTokens: number; temperature: number; courseId?: string }
 ): Promise<{ content: string; tokensUsed: number }> {
   const llmClient = new LLMClient();
   const modelService = createModelConfigService();
 
   let modelId = 'unknown'; // Will be set from database config
   try {
-    const config = await modelService.getModelForPhase('stage_6_patcher');
+    const config = await modelService.getModelForPhase('stage_6_patcher', options.courseId);
     modelId = config.modelId;
     logger.info({ modelId, source: config.source }, 'Patcher using model from config');
   } catch (error) {
@@ -160,7 +160,7 @@ function calculateMaxTokensForPatch(
 }
 
 export async function executePatch(
-  input: PatcherInput,
+  input: PatcherInput & { courseId?: string },
   llmCall: LLMCallFn = defaultLLMCall
 ): Promise<PatcherOutput> {
   const startTime = Date.now();
@@ -193,6 +193,7 @@ export async function executePatch(
     const response = await llmCall(prompt, systemPrompt, {
       maxTokens,
       temperature: 0.1,
+      courseId: input.courseId,
     });
     let patchedContent = response.content.trim();
     const tokensUsed = response.tokensUsed;

@@ -59,6 +59,7 @@ export async function generateSection(
   ragChunks: RAGChunk[],
   previousContext: string,
   language: string,
+  courseId: string | null = null,
   modelOverride: string | null = null,
   style: string | null = null,
   analysisResult: AnalysisResult | null = null
@@ -91,7 +92,10 @@ export async function generateSection(
 
   // Get model from ModelConfigService (database-driven, throws on failure)
   const modelConfigService = createModelConfigService();
-  const phaseConfig = await modelConfigService.getModelForPhase('stage_6_section_expander');
+  const phaseConfig = await modelConfigService.getModelForPhase(
+    'stage_6_section_expander',
+    courseId ?? undefined
+  );
   const modelId = modelOverride ?? phaseConfig.modelId;
 
   // Calculate maxTokens dynamically

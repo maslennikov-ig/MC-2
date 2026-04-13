@@ -122,7 +122,7 @@ export {
  * ```
  */
 export async function executeExpansion(
-  input: SectionExpanderInput
+  input: SectionExpanderInput & { courseId?: string }
 ): Promise<SectionExpanderOutput> {
   const startTime = Date.now();
 
@@ -135,7 +135,10 @@ export async function executeExpansion(
     let temperature = 0.7;
 
     try {
-      const config = await modelService.getModelForPhase('stage_6_section_expander');
+      const config = await modelService.getModelForPhase(
+        'stage_6_section_expander',
+        input.courseId
+      );
       modelId = config.modelId;
       temperature = config.temperature;
       logger.info({ modelId, source: config.source }, 'Section-Expander using model from config');

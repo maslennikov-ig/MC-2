@@ -74,7 +74,7 @@ export function buildPatcherPrompt(
 export async function executeLlmCall(
   prompt: string,
   systemPrompt: string,
-  options: { maxTokens: number; temperature: number },
+  options: { maxTokens: number; temperature: number; courseId?: string },
   llmCall?: LLMCallFn
 ): Promise<{ content: string; tokensUsed: number }> {
   if (llmCall) {
@@ -87,7 +87,7 @@ export async function executeLlmCall(
 
   let modelId = 'unknown';
   try {
-    const config = await modelService.getModelForPhase('stage_6_patcher');
+    const config = await modelService.getModelForPhase('stage_6_patcher', options.courseId);
     modelId = config.modelId;
     logger.info({ modelId, source: config.source }, 'Patcher using model from config');
   } catch (error) {
@@ -180,7 +180,7 @@ export async function applyCoherencePreservingPatch(
   const response = await executeLlmCall(
     coherencePrompt,
     buildPatcherSystemPrompt(),
-    { maxTokens: 1200, temperature: 0.1 },
+    { maxTokens: 1200, temperature: 0.1, courseId: iterationContext.courseId },
     llmCall
   );
 
@@ -274,6 +274,7 @@ export async function applyStandardPatch(
     },
     lessonDurationMinutes: iterationContext.lessonSpec?.estimated_duration_minutes,
     language: iterationContext.language,
+    courseId: iterationContext.courseId,
   };
 
   // Execute patch

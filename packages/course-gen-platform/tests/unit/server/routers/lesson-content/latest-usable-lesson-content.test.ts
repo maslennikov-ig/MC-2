@@ -59,6 +59,25 @@ describe('getLatestUsableLessonContent', () => {
     expect(selected?.id).toBe('older-usable');
   });
 
+  it('skips latest review_required rows even when they contain markdown', () => {
+    const latestReviewOnly = createLessonContentRow({
+      id: 'latest-review-only',
+      status: 'review_required',
+      created_at: '2026-04-05T11:00:00.000Z',
+      metadata: { markdownContent: '# Review-only draft' },
+    });
+    const olderCompleted = createLessonContentRow({
+      id: 'older-completed',
+      status: 'completed',
+      created_at: '2026-04-05T10:00:00.000Z',
+      metadata: { markdownContent: '# Stable published lesson' },
+    });
+
+    const selected = getLatestUsableLessonContent([latestReviewOnly, olderCompleted]);
+
+    expect(selected?.id).toBe('older-completed');
+  });
+
   it('returns null when no usable lesson content rows exist', () => {
     const latestEmpty = createLessonContentRow({
       id: 'latest-empty',

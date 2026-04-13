@@ -138,11 +138,14 @@ function buildStage6QualityReviewOutput(
       fallbackModel: null,
       selectedModelTier: null,
       selectedModelTierReason: null,
+      selectedModelPhase: null,
+      selectedModelSource: null,
       qualityScore: 0,
       regenerateCount: 0,
       truncationCount: 0,
       rejectedTokens: 0,
       regenerationMode: null,
+      attemptLadder: [],
     },
     reviewInfo: {
       needsReview: true,
@@ -261,6 +264,8 @@ export async function processWithFallback(
     fallbackModel: string;
     selectedModelTier: Stage6ModelTierName | null;
     selectedModelTierReason: string;
+    selectedModelPhase: string | null;
+    selectedModelSource: string | null;
   }
 ): Promise<Stage6Output> {
   let lastError: Error | null = null;
@@ -288,6 +293,8 @@ export async function processWithFallback(
         fallbackModel: modelSelection?.fallbackModel ?? null,
         selectedModelTier: modelSelection?.selectedModelTier ?? null,
         selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
+        selectedModelPhase: modelSelection?.selectedModelPhase ?? null,
+        selectedModelSource: modelSelection?.selectedModelSource ?? null,
       });
 
       if (result.success) {
@@ -398,6 +405,8 @@ export async function processWithFallback(
       fallbackModel: modelSelection?.fallbackModel ?? null,
       selectedModelTier: modelSelection?.selectedModelTier ?? null,
       selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
+      selectedModelPhase: modelSelection?.selectedModelPhase ?? null,
+      selectedModelSource: modelSelection?.selectedModelSource ?? null,
     });
 
     if (result.success) {
@@ -530,6 +539,8 @@ function buildZeroMetrics(
     fallback: string | null;
     tier: Stage6ModelTierName | null;
     reason: string | null;
+    phaseName?: string | null;
+    source?: string | null;
   },
   durationMs: number
 ): Stage6JobResult['metrics'] {
@@ -541,11 +552,14 @@ function buildZeroMetrics(
     fallbackModel: tierResult.fallback,
     selectedModelTier: tierResult.tier,
     selectedModelTierReason: tierResult.reason,
+    selectedModelPhase: tierResult.phaseName ?? null,
+    selectedModelSource: tierResult.source ?? null,
     qualityScore: 0,
     regenerateCount: 0,
     truncationCount: 0,
     rejectedTokens: 0,
     regenerationMode: null,
+    attemptLadder: [],
   };
 }
 
@@ -606,6 +620,7 @@ async function resolveRungModelConfig(
 
 async function resolveStage6ExecutionPlan(
   lessonSpec: Stage6JobInput['lessonSpec'],
+  courseId: string,
   executionPolicy?: Stage6ExecutionPolicy
 ): Promise<ResolvedStage6ExecutionPlan> {
   if (isManualTopRegenerationPolicy(executionPolicy)) {
@@ -619,7 +634,7 @@ async function resolveStage6ExecutionPlan(
     };
   }
 
-  const tierResult = await selectStage6ModelTier(lessonSpec);
+  const tierResult = await selectStage6ModelTier(lessonSpec, courseId);
 
   return {
     initialAutomaticTier: {
@@ -724,11 +739,14 @@ export async function processStage6Job(
         fallbackModel: null,
         selectedModelTier: null,
         selectedModelTierReason: null,
+        selectedModelPhase: null,
+        selectedModelSource: null,
         qualityScore: 0,
         regenerateCount: 0,
         truncationCount: 0,
         rejectedTokens: 0,
         regenerationMode: null,
+        attemptLadder: [],
       },
     };
   }
@@ -754,11 +772,14 @@ export async function processStage6Job(
         fallbackModel: null,
         selectedModelTier: null,
         selectedModelTierReason: null,
+        selectedModelPhase: null,
+        selectedModelSource: null,
         qualityScore: 0,
         regenerateCount: 0,
         truncationCount: 0,
         rejectedTokens: 0,
         regenerationMode: null,
+        attemptLadder: [],
       },
     };
   }
@@ -812,11 +833,14 @@ export async function processStage6Job(
           fallbackModel: null,
           selectedModelTier: null,
           selectedModelTierReason: null,
+          selectedModelPhase: null,
+          selectedModelSource: null,
           qualityScore: 0,
           regenerateCount: 0,
           truncationCount: 0,
           rejectedTokens: 0,
           regenerationMode: null,
+          attemptLadder: [],
         },
       };
     }
@@ -856,17 +880,24 @@ export async function processStage6Job(
         fallbackModel: null,
         selectedModelTier: null,
         selectedModelTierReason: null,
+        selectedModelPhase: null,
+        selectedModelSource: null,
         qualityScore: 0,
         regenerateCount: 0,
         truncationCount: 0,
         rejectedTokens: 0,
         regenerationMode: null,
+        attemptLadder: [],
       },
     };
   }
 
   const lessonUuid = await resolveLessonUuid(courseId, lessonLabel);
-  const executionPlan = await resolveStage6ExecutionPlan(lessonSpec, job.data.executionPolicy);
+  const executionPlan = await resolveStage6ExecutionPlan(
+    lessonSpec,
+    courseId,
+    job.data.executionPolicy
+  );
 
   const initialSelectionSummary = executionPlan.initialAutomaticTier
     ? {
@@ -921,6 +952,8 @@ export async function processStage6Job(
       initialAutomaticRung: executionPlan.initialAutomaticRung,
       selectedModelTier: initialSelectionSummary.selectedModelTier,
       selectedModelTierReason: initialSelectionSummary.selectedModelTierReason,
+      selectedModelPhase:
+        executionPlan.initialAutomaticRung ?? 'stage_6_manual_regeneration',
       isPaused: pauseStatusForLogging,
     },
     durationMs: 0,
@@ -947,12 +980,14 @@ export async function processStage6Job(
     tier: Stage6ModelTierName | null;
     reason: string | null;
     phaseName: Stage6QualityRungPhaseName | null;
+    source: string | null;
   } = {
     model: null,
     fallback: null,
     tier: initialSelectionSummary.selectedModelTier,
     reason: initialSelectionSummary.selectedModelTierReason,
     phaseName: executionPlan.initialAutomaticRung ?? 'stage_6_manual_regeneration',
+    source: null,
   };
 
   await updateJobProgress(job, {
@@ -992,6 +1027,7 @@ export async function processStage6Job(
           tier: selectedModelTier,
           reason: selectedModelTierReason,
           phaseName: rung.phase_name,
+          source: rungModelConfig.source,
         };
 
         jobLogger.info(
@@ -1022,6 +1058,8 @@ export async function processStage6Job(
               fallbackModel: rungModelConfig.fallback,
               selectedModelTier,
               selectedModelTierReason,
+              selectedModelPhase: rung.phase_name,
+              selectedModelSource: rungModelConfig.source,
             }
           );
 
@@ -1039,6 +1077,8 @@ export async function processStage6Job(
             outcome: needsQualityPromotion ? 'quality_retryable' : 'accepted',
             selected_model: rungModelConfig.primary,
             fallback_model: rungModelConfig.fallback,
+            selected_model_phase: rung.phase_name,
+            selected_model_source: rungModelConfig.source,
             model_used: rungResult.metrics.modelUsed,
             quality_score: rungResult.metrics.qualityScore,
             errors: [...rungResult.errors],
@@ -1052,6 +1092,11 @@ export async function processStage6Job(
             rungResult.metrics.selectedModelTier ?? selectedModelTier;
           rungResult.metrics.selectedModelTierReason =
             rungResult.metrics.selectedModelTierReason ?? selectedModelTierReason;
+          rungResult.metrics.selectedModelPhase =
+            rungResult.metrics.selectedModelPhase ?? rung.phase_name;
+          rungResult.metrics.selectedModelSource =
+            rungResult.metrics.selectedModelSource ?? rungModelConfig.source;
+          rungResult.metrics.attemptLadder = [...executionPlan.qualityRecovery.attempts];
 
           if (!needsQualityPromotion) {
             result = {
@@ -1077,6 +1122,8 @@ export async function processStage6Job(
             outcome: 'failed',
             selected_model: rungModelConfig.primary,
             fallback_model: rungModelConfig.fallback,
+            selected_model_phase: rung.phase_name,
+            selected_model_source: rungModelConfig.source,
             model_used: null,
             quality_score: 0,
             errors: [errorMessage],
@@ -1162,6 +1209,8 @@ export async function processStage6Job(
             fallbackModel: result.metrics.fallbackModel,
             selectedModelTier: result.metrics.selectedModelTier,
             selectedModelTierReason: result.metrics.selectedModelTierReason,
+            selectedModelPhase: result.metrics.selectedModelPhase,
+            selectedModelSource: result.metrics.selectedModelSource,
             regenerateCount: result.metrics.regenerateCount,
             truncationCount: result.metrics.truncationCount,
             rejectedTokens: result.metrics.rejectedTokens,
@@ -1217,6 +1266,8 @@ export async function processStage6Job(
         selectedModel: result.metrics.selectedModel,
         fallbackModel: result.metrics.fallbackModel,
         selectedModelTier: result.metrics.selectedModelTier,
+        selectedModelPhase: result.metrics.selectedModelPhase,
+        selectedModelSource: result.metrics.selectedModelSource,
         regenerateCount: result.metrics.regenerateCount,
         truncationCount: result.metrics.truncationCount,
         rejectedTokens: result.metrics.rejectedTokens,
@@ -1241,6 +1292,9 @@ export async function processStage6Job(
         fallbackModel: result.metrics.fallbackModel,
         selectedModelTier: result.metrics.selectedModelTier,
         selectedModelTierReason: result.metrics.selectedModelTierReason,
+        selectedModelPhase: result.metrics.selectedModelPhase,
+        selectedModelSource: result.metrics.selectedModelSource,
+        attemptLadder: result.metrics.attemptLadder,
         qualityRecovery: result.qualityRecovery,
         reviewRequired: needsReview,
         tokensUsed: result.metrics.tokensUsed,
@@ -1261,6 +1315,12 @@ export async function processStage6Job(
       metrics: {
         ...result.metrics,
         durationMs,
+        selectedModelPhase:
+          result.metrics.selectedModelPhase ?? lastResolvedModelSelection.phaseName,
+        selectedModelSource:
+          result.metrics.selectedModelSource ?? lastResolvedModelSelection.source,
+        attemptLadder:
+          result.metrics.attemptLadder ?? executionPlan.qualityRecovery.attempts,
       },
     };
   } catch (error) {
@@ -1273,6 +1333,8 @@ export async function processStage6Job(
         durationMs,
         primaryModel: lastResolvedModelSelection.model,
         fallbackModel: lastResolvedModelSelection.fallback,
+        selectedModelPhase: lastResolvedModelSelection.phaseName,
+        selectedModelSource: lastResolvedModelSelection.source,
         qualityRecovery: executionPlan.qualityRecovery,
       },
       'Stage 6 job failed after all retry attempts'
@@ -1284,8 +1346,17 @@ export async function processStage6Job(
       stage: 'stage_6',
       phase: 'complete',
       stepName: 'failed',
-      inputData: { lessonLabel },
-      errorData: { error: errorMsg },
+      inputData: {
+        lessonLabel,
+        selectedModel: lastResolvedModelSelection.model,
+        fallbackModel: lastResolvedModelSelection.fallback,
+        selectedModelPhase: lastResolvedModelSelection.phaseName,
+        selectedModelSource: lastResolvedModelSelection.source,
+      },
+      errorData: {
+        error: errorMsg,
+        attemptLadder: executionPlan.qualityRecovery.attempts,
+      },
       durationMs,
     });
 
@@ -1301,6 +1372,8 @@ export async function processStage6Job(
           fallbackModel: lastResolvedModelSelection.fallback,
           selectedModelTier: lastResolvedModelSelection.tier,
           selectedModelTierReason: lastResolvedModelSelection.reason,
+          selectedModelPhase: lastResolvedModelSelection.phaseName,
+          selectedModelSource: lastResolvedModelSelection.source,
           regenerateCount: 0,
           truncationCount: 0,
           rejectedTokens: 0,
@@ -1332,6 +1405,8 @@ export async function processStage6Job(
           fallback: lastResolvedModelSelection.fallback,
           tier: lastResolvedModelSelection.tier,
           reason: lastResolvedModelSelection.reason,
+          phaseName: lastResolvedModelSelection.phaseName,
+          source: lastResolvedModelSelection.source,
         },
         durationMs
       ),

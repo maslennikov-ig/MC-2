@@ -23,6 +23,8 @@ export interface Stage6QualityRecoveryAttemptHistory extends QualityRecoveryAtte
   outcome: Stage6QualityAttemptOutcome;
   selected_model: string | null;
   fallback_model: string | null;
+  selected_model_phase?: string | null;
+  selected_model_source?: string | null;
   model_used: string | null;
   quality_score: number;
   errors: string[];
@@ -82,6 +84,12 @@ export interface Stage6JobInput {
 
   /** Human-readable tier selection reason */
   selectedModelTierReason?: string | null;
+
+  /** Effective Stage 6 phase backing the selected model */
+  selectedModelPhase?: string | null;
+
+  /** Effective config source for the selected model */
+  selectedModelSource?: string | null;
 
   /** Optional user instructions for refinement */
   userRefinementPrompt?: string;
@@ -161,6 +169,12 @@ export interface Stage6JobResult {
     /** Human-readable tier selection reason */
     selectedModelTierReason: string | null;
 
+    /** Effective Stage 6 phase backing the selected model */
+    selectedModelPhase?: string | null;
+
+    /** Effective config source for the selected model */
+    selectedModelSource?: string | null;
+
     /** Quality score from validation (0-1) */
     qualityScore: number;
 
@@ -175,6 +189,9 @@ export interface Stage6JobResult {
 
     /** Last regeneration mode used (null if no regeneration needed) */
     regenerationMode: 'full_regenerate' | 'truncation_continuation' | null;
+
+    /** Attempt ladder captured for persistence/debugging */
+    attemptLadder?: Stage6QualityRecoveryAttemptHistory[];
   };
 }
 
@@ -257,6 +274,12 @@ export interface Stage6Input {
 
   /** Human-readable tier selection reason */
   selectedModelTierReason?: string | null;
+
+  /** Effective Stage 6 phase backing the selected model */
+  selectedModelPhase?: string | null;
+
+  /** Effective config source for the selected model */
+  selectedModelSource?: string | null;
 }
 
 /**
@@ -291,6 +314,10 @@ export interface Stage6Output {
     selectedModelTier: Stage6ModelTierName | null;
     /** Human-readable tier selection reason */
     selectedModelTierReason: string | null;
+    /** Effective Stage 6 phase backing the selected model */
+    selectedModelPhase?: string | null;
+    /** Effective config source for the selected model */
+    selectedModelSource?: string | null;
     /** Quality score from judge (0-1, or 0 if not evaluated) */
     qualityScore: number;
     /** Number of full regenerate loops requested */
@@ -301,6 +328,8 @@ export interface Stage6Output {
     rejectedTokens: number;
     /** Last regeneration mode used (null if no regeneration needed) */
     regenerationMode: 'full_regenerate' | 'truncation_continuation' | null;
+    /** Attempt ladder captured for persistence/debugging */
+    attemptLadder?: Stage6QualityRecoveryAttemptHistory[];
   };
   /** Human review metadata (for UI warnings) */
   reviewInfo?: {

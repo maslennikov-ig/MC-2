@@ -31,12 +31,50 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import { validateLocale } from '@/shared/validation';
+import { getLatestUsableLessonContent } from './latest-usable-lesson-content';
 
 type LessonWithContentRow = {
+  id?: string;
   order_index: number;
-  lesson_contents: Array<{ id: string }> | null;
+  lesson_contents:
+    | Array<{
+        id: string;
+        status?: string | null;
+        created_at?: string | null;
+        content?: Record<string, unknown> | string | null;
+        metadata?: Record<string, unknown> | null;
+      }>
+    | null;
   sections: { order_index: number } | Array<{ order_index: number }> | null;
 };
+
+export function getLessonIdsWithUsableContent(
+  lessonsWithContent: LessonWithContentRow[]
+): Set<string> {
+  const lessonIdsWithUsableContent = new Set<string>();
+
+  for (const lesson of lessonsWithContent) {
+    const sectionData = Array.isArray(lesson.sections) ? lesson.sections[0] : lesson.sections;
+    if (!sectionData) {
+      continue;
+    }
+
+    const latestUsableContent = getLatestUsableLessonContent(
+      [...(lesson.lesson_contents ?? [])].sort((left, right) =>
+        (right.created_at ?? '').localeCompare(left.created_at ?? '')
+      )
+    );
+
+    if (!latestUsableContent) {
+      continue;
+    }
+
+    const lessonId = `${sectionData.order_index}.${lesson.order_index}`;
+    lessonIdsWithUsableContent.add(lessonId);
+  }
+
+  return lessonIdsWithUsableContent;
+}
 
 const generateMissingInputSchema = z.object({
   courseId: z.string().uuid('Invalid course ID'),
@@ -148,7 +186,7 @@ export const generateMissingContent = protectedProcedure
       const { data: lessonsWithContent, error: lessonsError } = await supabase
         .from('lessons')
         .select(
-          'id, order_index, section_id, sections!inner(order_index, course_id), lesson_contents(id)'
+          'id, order_index, section_id, sections!inner(order_index, course_id), lesson_contents(id, status, created_at, content, metadata)'
         )
         .eq('sections.course_id', courseId);
 
@@ -168,22 +206,8 @@ export const generateMissingContent = protectedProcedure
         });
       }
 
-      // Build a set of lesson IDs that already have content
-      const lessonsWithContentSet = new Set<string>();
       const typedLessonsWithContent = (lessonsWithContent ?? []) as LessonWithContentRow[];
-      for (const lesson of typedLessonsWithContent) {
-        // lesson_contents is an array; if non-empty, the lesson has content
-        const hasContent =
-          Array.isArray(lesson.lesson_contents) && lesson.lesson_contents.length > 0;
-        if (hasContent) {
-          // sections is an inner join result - can be object or array depending on Supabase client
-          const sectionData = Array.isArray(lesson.sections) ? lesson.sections[0] : lesson.sections;
-          if (sectionData) {
-            const lessonId = `${sectionData.order_index}.${lesson.order_index}`;
-            lessonsWithContentSet.add(lessonId);
-          }
-        }
-      }
+      const lessonsWithContentSet = getLessonIdsWithUsableContent(typedLessonsWithContent);
 
       // Step 6: Filter to only lessons WITHOUT content
       const missingLessonIds = allLessonIds.filter(id => !lessonsWithContentSet.has(id));

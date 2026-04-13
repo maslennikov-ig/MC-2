@@ -374,6 +374,22 @@ export const LessonGraphState = Annotation.Root({
   }),
 
   /**
+   * Effective Stage 6 phase backing the selected model.
+   */
+  selectedModelPhase: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Effective config source for the selected model.
+   */
+  selectedModelSource: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
    * Total tokens used across all phases
    * Accumulated for cost tracking
    */
