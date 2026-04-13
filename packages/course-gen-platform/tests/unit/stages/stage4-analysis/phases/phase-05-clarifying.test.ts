@@ -298,6 +298,56 @@ describe('Phase 0.5 Clarifying - analyzeSufficiency', () => {
       expect(result.confidence).toBe(0.3);
       expect(result.gaps).toContain('Validation failure - proceeding by default');
     });
+
+    it('persists offending short-answer context into trace metadata before failing validation', async () => {
+      const { getModelForPhase } = await import('@/shared/llm/langchain-models');
+      const { logTrace } = await import('@/shared/trace-logger');
+      const invalidJSON = JSON.stringify({
+        is_sufficient: false,
+        confidence: 0.4,
+        gaps: ['Need one more concrete answer'],
+        follow_up_questions: [
+          {
+            question_text: 'What is the preferred rollout style?',
+            question_type: 'open',
+            question_priority: 'important',
+            question_category: 'content_structure',
+            suggested_answers: [
+              { text: 'No', rationale: 'Too short to pass validation', is_recommended: true },
+              {
+                text: 'Self-paced workshop',
+                rationale: 'Long enough alternative rationale',
+                is_recommended: false,
+              },
+            ],
+          },
+        ],
+      });
+      const mockModel = {
+        model: 'openai/gpt-oss-20b',
+        invoke: vi.fn().mockResolvedValue({
+          content: invalidJSON,
+        }),
+      };
+      vi.mocked(getModelForPhase).mockResolvedValue(mockModel as any);
+
+      const result = await analyzeSufficiency(mockPhase05Input, mockAnsweredQuestions, 1);
+
+      expect(result.is_sufficient).toBe(true);
+      expect(logTrace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stepName: 'sufficiency_validation_failure_round_1',
+          errorData: expect.objectContaining({
+            offendingValue: expect.objectContaining({
+              path: 'follow_up_questions[0].suggested_answers[0].text',
+              index: 0,
+              length: 2,
+              snippet: 'No',
+            }),
+          }),
+        })
+      );
+    });
   });
 
   describe('CRITICAL-002: confidence threshold', () => {
