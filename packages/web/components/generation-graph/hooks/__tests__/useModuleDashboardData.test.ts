@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { LessonMatrixRow } from '@megacampus/shared-types'
+import { resolveModuleLessonContentRows } from '../useModuleDashboardData'
 
 /**
  * Unit tests for useModuleDashboardData hook utility functions
@@ -112,6 +113,28 @@ const createMockLesson = (overrides: Partial<LessonMatrixRow> = {}): LessonMatri
   retryCount: 0,
   canRetry: false,
   ...overrides,
+})
+
+type LessonContentRowFixture = {
+  id: string
+  lesson_id: string
+  status: string
+  created_at: string
+  generation_attempt: number
+  content: Record<string, unknown> | null
+  metadata: Record<string, unknown> | null
+}
+
+const createLessonContentRow = (
+  overrides: Partial<LessonContentRowFixture> = {}
+): LessonContentRowFixture => ({
+  id: overrides.id ?? crypto.randomUUID(),
+  lesson_id: overrides.lesson_id ?? 'lesson-1',
+  status: overrides.status ?? 'completed',
+  created_at: overrides.created_at ?? new Date().toISOString(),
+  generation_attempt: overrides.generation_attempt ?? 1,
+  content: overrides.content ?? null,
+  metadata: overrides.metadata ?? null,
 })
 
 // =============================================================================
@@ -527,5 +550,36 @@ describe('calculateAggregates', () => {
       // Estimate: 1350 * 2 = 2700
       expect(aggregates.estimatedTimeRemainingMs).toBe(2700)
     })
+  })
+})
+
+describe('resolveModuleLessonContentRows', () => {
+  it('keeps the latest review_required status row while resolving usable content from persisted history', () => {
+    const olderCompleted = createLessonContentRow({
+      id: 'older-completed',
+      status: 'completed',
+      created_at: '2026-04-07T10:00:00.000Z',
+      metadata: {
+        markdownContent: '# Persisted lesson preview',
+        quality_score: 0.72,
+        cost_usd: 0.12,
+      },
+      content: {
+        intro: 'Older intro',
+      },
+    })
+    const latestReviewRequired = createLessonContentRow({
+      id: 'latest-review-required',
+      status: 'review_required',
+      created_at: '2026-04-07T11:00:00.000Z',
+      generation_attempt: 2,
+      content: null,
+      metadata: null,
+    })
+
+    const selection = resolveModuleLessonContentRows([olderCompleted, latestReviewRequired] as never)
+
+    expect(selection.statusRow?.id).toBe('latest-review-required')
+    expect(selection.usableContentRow?.id).toBe('older-completed')
   })
 })

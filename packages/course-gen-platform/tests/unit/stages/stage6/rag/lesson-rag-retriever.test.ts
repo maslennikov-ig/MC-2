@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CourseRagAvailabilityReason } from '@/shared/rag/document-availability';
 
 const { mockAssertCourseRagReady, mockCacheGet, mockLogger } = vi.hoisted(() => ({
   mockAssertCourseRagReady: vi.fn(),
@@ -46,6 +47,14 @@ vi.mock('@/stages/stage6-lesson-content/rag/reranking', () => ({
 vi.mock('@/stages/stage6-lesson-content/rag/coverage', () => ({
   calculateLessonCoverage: vi.fn(() => 0),
 }));
+
+const actualDocumentAvailability = await vi.importActual<
+  typeof import('@/shared/rag/document-availability')
+>('@/shared/rag/document-availability');
+
+function createRequiredRagUnavailableError(reason: CourseRagAvailabilityReason) {
+  return new actualDocumentAvailability.RequiredRagUnavailableError('course-1', reason);
+}
 
 describe('lesson-rag-retriever', () => {
   beforeEach(() => {
@@ -120,11 +129,9 @@ describe('lesson-rag-retriever', () => {
   });
 
   it('retries transient Stage 6 required-RAG outages before failing', async () => {
-    const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
-
-    mockAssertCourseRagReady.mockRejectedValue(
-      new RequiredRagUnavailableError('course-1', 'qdrant_timeout')
-    );
+    mockAssertCourseRagReady.mockImplementation(async () => {
+      throw createRequiredRagUnavailableError('qdrant_timeout');
+    });
 
     const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
 
@@ -171,8 +178,6 @@ describe('lesson-rag-retriever', () => {
   });
 
   it('uses cached lesson context before checking live RAG availability', async () => {
-    const { RequiredRagUnavailableError } = await import('@/shared/rag/document-availability');
-
     mockCacheGet.mockResolvedValueOnce({
       chunks: [
         {
@@ -188,9 +193,9 @@ describe('lesson-rag-retriever', () => {
       searchQueriesUsed: ['query 1'],
       coverageScore: 0.8,
     });
-    mockAssertCourseRagReady.mockRejectedValueOnce(
-      new RequiredRagUnavailableError('course-1', 'qdrant_timeout')
-    );
+    mockAssertCourseRagReady.mockImplementationOnce(async () => {
+      throw createRequiredRagUnavailableError('qdrant_timeout');
+    });
 
     const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
 

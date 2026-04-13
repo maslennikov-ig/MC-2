@@ -18,6 +18,7 @@ import {
   type ReviewAwareLessonMatrixRow,
   type ReviewAwareModuleDashboardData,
 } from '../stage6-review-status'
+import { getLatestLessonContentRow, getLatestUsableLessonContent } from './lessonInspectorContent'
 
 /**
  * Metadata structure from lesson_contents.metadata JSONB column
@@ -35,6 +36,11 @@ interface LessonMetadata {
  */
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
+interface ModuleLessonContentRowSelection<T extends LessonContentRow> {
+  statusRow: T | null
+  usableContentRow: T | null
+}
+
 /**
  * Safely parse metadata from Json type
  */
@@ -45,6 +51,15 @@ function parseMetadata(
     return null
   }
   return metadata as LessonMetadata
+}
+
+export function resolveModuleLessonContentRows<T extends LessonContentRow>(
+  rows: T[] | null | undefined
+): ModuleLessonContentRowSelection<T> {
+  return {
+    statusRow: getLatestLessonContentRow(rows),
+    usableContentRow: getLatestUsableLessonContent(rows),
+  }
 }
 
 /**
@@ -425,11 +440,20 @@ export function useModuleDashboardData({
       // Build lesson matrix rows
       // Use lessons from DB if available, otherwise use expected count from course structure
       const lessonRows: ReviewAwareLessonMatrixRow[] = []
+      const lessonContentsByLessonId = new Map<string, LessonContentRow[]>()
+
+      for (const lessonContent of lessonContents) {
+        const existingRows = lessonContentsByLessonId.get(lessonContent.lesson_id) ?? []
+        existingRows.push(lessonContent)
+        lessonContentsByLessonId.set(lessonContent.lesson_id, existingRows)
+      }
 
       if (lessons.length > 0) {
         // Use actual lessons from database
         for (const lesson of lessons) {
-          const contentRow = lessonContents.find((c) => c.lesson_id === lesson.id)
+          const { statusRow, usableContentRow } = resolveModuleLessonContentRows(
+            lessonContentsByLessonId.get(lesson.id)
+          )
           const lessonNumber = lesson.order_index
           const lessonTitle =
             lesson.title ||
@@ -437,7 +461,7 @@ export function useModuleDashboardData({
             `Урок ${lessonNumber}`
           const lessonLabel = `${moduleNumber}.${lessonNumber}`
 
-          if (!contentRow) {
+          if (!statusRow) {
             lessonRows.push({
               lessonId: lessonLabel,
               lessonNumber,
@@ -453,10 +477,12 @@ export function useModuleDashboardData({
               needsReview: false,
             })
           } else {
-            const status = mapStage6LessonStatus(contentRow.status)
-            const metadata = parseMetadata(contentRow.metadata)
-            const pipelineState = extractPipelineState(contentRow.status, metadata)
-            const needsReview = isReviewRequiredStatus(contentRow.status)
+            const metricsRow = usableContentRow ?? statusRow
+            const statusMetadata = parseMetadata(statusRow.metadata)
+            const metricsMetadata = parseMetadata(metricsRow.metadata)
+            const status = mapStage6LessonStatus(statusRow.status)
+            const pipelineState = extractPipelineState(statusRow.status, statusMetadata)
+            const needsReview = isReviewRequiredStatus(statusRow.status)
 
             lessonRows.push({
               lessonId: lessonLabel,
@@ -464,12 +490,12 @@ export function useModuleDashboardData({
               title: lessonTitle,
               status,
               pipelineState,
-              qualityScore: metadata?.quality_score ?? null,
-              costUsd: metadata?.cost_usd ?? 0,
-              durationMs: metadata?.generation_duration_ms ?? null,
-              retryCount: contentRow.generation_attempt > 1 ? contentRow.generation_attempt - 1 : 0,
+              qualityScore: metricsMetadata?.quality_score ?? null,
+              costUsd: metricsMetadata?.cost_usd ?? 0,
+              durationMs: metricsMetadata?.generation_duration_ms ?? null,
+              retryCount: statusRow.generation_attempt > 1 ? statusRow.generation_attempt - 1 : 0,
               canRetry: status === 'error',
-              totalTokens: metadata?.total_tokens ?? null,
+              totalTokens: metricsMetadata?.total_tokens ?? null,
               needsReview,
             })
           }

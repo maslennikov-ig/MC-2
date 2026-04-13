@@ -5,6 +5,7 @@ import { useSupabase } from '@/lib/supabase/browser-client'
 import { RealtimeChannel } from '@supabase/supabase-js'
 import { logger } from '@/lib/client-logger'
 import {
+  getLatestLessonContentRow,
   getLatestUsableLessonContent,
   getLessonInspectorContentPresentation,
   isLessonContentUsable,
@@ -135,7 +136,7 @@ export function resolveLessonInspectorQualityScore({
 export function selectLessonInspectorContentRows<T extends LessonContentRow>(
   rows: T[] | null | undefined
 ): LessonInspectorContentRowSelection<T> {
-  const statusRow = rows?.[0] ?? null
+  const statusRow = getLatestLessonContentRow(rows)
 
   if (!statusRow) {
     return {
