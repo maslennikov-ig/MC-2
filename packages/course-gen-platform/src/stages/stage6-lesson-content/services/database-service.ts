@@ -23,7 +23,8 @@ import { parseGenerationProgress } from '@/shared/schemas/generation-progress.sc
 import type { LessonContent, LessonQualitySignals } from '@megacampus/shared-types/lesson-content';
 import { runCourseQualityAudit, type CourseAuditFinding } from '../quality/course-audit';
 import { isStage6CourseAuditEnabled, isStage6QualityAlertsEnabled } from '../quality/flags';
-import type { Stage6QualityRecoveryHistory } from '../types';
+import type { Stage6ExecutionContext, Stage6QualityRecoveryHistory } from '../types';
+import { STAGE6_REMEDIATION_CONTEXTS } from '../types';
 
 const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
   'completed',
@@ -361,7 +362,20 @@ export async function markForReview(
   }
 }
 
-export async function isStage6CourseActive(courseId: string): Promise<boolean> {
+/**
+ * Check whether a Stage 6 job is allowed to run for this course.
+ *
+ * For normal full_generation jobs, only `stage_6_generating` is accepted.
+ * For remediation jobs (partial_regeneration, manual_regeneration,
+ * generate_missing), `stage_6_generating` is also the expected state because
+ * `transitionToStage6Generating()` moves the course there before enqueueing.
+ * However, if the transition was skipped or a race occurred, remediation jobs
+ * also accept `stage_6_complete` and `completed` so they don't silently no-op.
+ */
+export async function isStage6CourseActive(
+  courseId: string,
+  executionContext?: Stage6ExecutionContext
+): Promise<boolean> {
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
@@ -376,7 +390,27 @@ export async function isStage6CourseActive(courseId: string): Promise<boolean> {
       return true;
     }
 
-    return data?.generation_status === 'stage_6_generating';
+    const status = data?.generation_status;
+
+    if (status === 'stage_6_generating') {
+      return true;
+    }
+
+    // Remediation contexts tolerate completed/stage_6_complete because
+    // transitionToStage6Generating may have raced or been skipped.
+    if (
+      executionContext &&
+      STAGE6_REMEDIATION_CONTEXTS.has(executionContext) &&
+      (status === 'stage_6_complete' || status === 'completed')
+    ) {
+      logger.info(
+        { courseId, executionContext, generationStatus: status },
+        'Remediation job allowed on completed course'
+      );
+      return true;
+    }
+
+    return false;
   } catch (error) {
     logger.warn(
       {

@@ -601,10 +601,8 @@ describe('stage6/services/job-processor', () => {
     it('stops immediately when the Stage 6 course is no longer active', async () => {
       mockIsStage6CourseActive.mockResolvedValueOnce(false);
 
-      const result = await processStage6Job(createMockJob());
-
-      expect(result.success).toBe(false);
-      expect(result.errors).toEqual(['Stage 6 course is no longer active']);
+      // Now throws UnrecoverableError so BullMQ marks job as failed, not completed
+      await expect(processStage6Job(createMockJob())).rejects.toThrow(/no longer active/);
       expect(mockRetrieveLessonContext).not.toHaveBeenCalled();
       expect(mockExecuteStage6Orchestrator).not.toHaveBeenCalled();
     });

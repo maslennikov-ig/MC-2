@@ -76,9 +76,9 @@ export function findLessonByOrder(
 /**
  * Decide whether partial Stage 6 jobs should skip backend completion checks.
  *
- * We skip only when re-generating content from an already completed Stage 6
- * course (`stage_6_complete`) to avoid premature status flips while selected
- * jobs are still running.
+ * We skip when re-generating content from an already completed course
+ * (`stage_6_complete` or `completed`) to avoid premature status flips while
+ * selected jobs are still running.
  *
  * For in-flight Stage 6 generation (`stage_6_generating`) we must NOT skip
  * this check, otherwise retries can finish all lessons but leave the course
@@ -87,7 +87,7 @@ export function findLessonByOrder(
 export function shouldSkipCompletionCheckForPartialGeneration(
   generationStatus: string | null | undefined
 ): boolean {
-  return generationStatus === 'stage_6_complete';
+  return generationStatus === 'stage_6_complete' || generationStatus === 'completed';
 }
 
 /**
@@ -504,6 +504,7 @@ export function buildMinimalLessonSpec(
  * - stage_5_complete          → stage_6_init → stage_6_generating
  * - stage_6_init              → stage_6_generating
  * - stage_6_complete          → stage_6_generating  (re-generation of missing/partial content)
+ * - completed                 → stage_6_generating  (remediation on finalized course)
  * - stage_6_generating        → no-op (already in target state)
  *
  * Logs a warning if the current status is not in the set of allowed statuses.
@@ -531,6 +532,7 @@ export async function transitionToStage6Generating(
     'stage_6_init',
     'stage_6_generating',
     'stage_6_complete',
+    'completed',
   ];
 
   if (currentStatus === 'stage_5_awaiting_approval' || currentStatus === 'stage_5_complete') {
@@ -569,8 +571,14 @@ export async function transitionToStage6Generating(
         'Failed to update generation_status to stage_6_generating'
       );
     }
-  } else if (currentStatus === 'stage_6_complete') {
-    // Re-generation: transition back to generating for new/missing content
+  } else if (currentStatus === 'stage_6_complete' || currentStatus === 'completed') {
+    // Re-generation: transition back to generating for remediation paths
+    // (partial regeneration, manual regeneration, generate missing)
+    logger.info(
+      { requestId, courseId, currentStatus },
+      `Re-opening ${currentStatus} course for Stage 6 remediation`
+    );
+
     const { error: updateError } = await supabase
       .from('courses')
       .update({ generation_status: 'stage_6_generating' })

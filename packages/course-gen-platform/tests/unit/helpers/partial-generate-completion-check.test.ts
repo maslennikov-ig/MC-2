@@ -15,9 +15,13 @@ describe('shouldSkipCompletionCheckForPartialGeneration', () => {
     expect(shouldSkipCompletionCheckForPartialGeneration('stage_5_awaiting_approval')).toBe(false);
   });
 
+  it('returns true when status is completed (finalized course)', () => {
+    expect(shouldSkipCompletionCheckForPartialGeneration('completed')).toBe(true);
+  });
+
   it('returns false for nullish/unknown status', () => {
     expect(shouldSkipCompletionCheckForPartialGeneration(null)).toBe(false);
     expect(shouldSkipCompletionCheckForPartialGeneration(undefined)).toBe(false);
-    expect(shouldSkipCompletionCheckForPartialGeneration('completed')).toBe(false);
+    expect(shouldSkipCompletionCheckForPartialGeneration('some_other_status')).toBe(false);
   });
 });

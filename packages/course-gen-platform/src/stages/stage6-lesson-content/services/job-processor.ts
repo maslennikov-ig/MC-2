@@ -1,4 +1,4 @@
-import { Job } from 'bullmq';
+import { Job, UnrecoverableError } from 'bullmq';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
@@ -722,33 +722,15 @@ export async function processStage6Job(
   // Check if course generation is paused - if so, delay this job
   await checkPauseAndDelay(job, courseId, token);
 
-  const courseActive = await isStage6CourseActive(courseId);
+  const executionContext = job.data.executionContext ?? 'full_generation';
+  const courseActive = await isStage6CourseActive(courseId, executionContext);
   if (!courseActive) {
-    const message = 'Stage 6 course is no longer active';
-    logger.info({ jobId: job.id, courseId }, message);
-    return {
-      lessonId: lessonSpec?.lesson_id || 'unknown',
-      success: false,
-      lessonContent: null,
-      errors: [message],
-      metrics: {
-        tokensUsed: 0,
-        durationMs: Date.now() - startTime,
-        modelUsed: null,
-        selectedModel: null,
-        fallbackModel: null,
-        selectedModelTier: null,
-        selectedModelTierReason: null,
-        selectedModelPhase: null,
-        selectedModelSource: null,
-        qualityScore: 0,
-        regenerateCount: 0,
-        truncationCount: 0,
-        rejectedTokens: 0,
-        regenerationMode: null,
-        attemptLadder: [],
-      },
-    };
+    // Throw UnrecoverableError so BullMQ marks the job as *failed*, not completed.
+    // This prevents false-positive "completed" status when a job no-ops due to
+    // the course no longer being in an active generation state.
+    const message = `Stage 6 course is no longer active (executionContext=${executionContext})`;
+    logger.warn({ jobId: job.id, courseId, executionContext }, message);
+    throw new UnrecoverableError(message);
   }
 
   if (
@@ -924,6 +906,7 @@ export async function processStage6Job(
     selectedModelTier: initialSelectionSummary.selectedModelTier,
     selectedModelTierReason: initialSelectionSummary.selectedModelTierReason,
     executionPolicy: job.data.executionPolicy?.mode ?? 'automatic_ladder',
+    executionContext,
     isPaused: pauseStatusForLogging,
   });
 
@@ -950,6 +933,7 @@ export async function processStage6Job(
       ragContextId,
       qualityRecoveryMode: executionPlan.qualityRecovery.mode,
       initialAutomaticRung: executionPlan.initialAutomaticRung,
+      executionContext,
       selectedModelTier: initialSelectionSummary.selectedModelTier,
       selectedModelTierReason: initialSelectionSummary.selectedModelTierReason,
       selectedModelPhase:

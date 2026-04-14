@@ -14,6 +14,31 @@ export type Stage6QualityRungName = Stage6QualityRungPhaseName;
 export type Stage6ExecutionPolicyMode = 'manual_top_regeneration';
 export type Stage6QualityAttemptOutcome = 'accepted' | 'quality_retryable' | 'failed';
 
+/**
+ * Execution context for Stage 6 jobs.
+ *
+ * Distinguishes the reason a lesson generation was triggered so that
+ * precondition checks (e.g. isStage6CourseActive) can allow legitimate
+ * remediation jobs on completed courses.
+ *
+ * - full_generation:        Normal pipeline-driven first-time generation
+ * - partial_regeneration:   User-triggered regeneration of selected lessons (partialGenerate)
+ * - manual_regeneration:    Manual top-model regeneration via admin UI
+ * - generate_missing:       Backfill missing lessons on an otherwise completed course
+ */
+export type Stage6ExecutionContext =
+  | 'full_generation'
+  | 'partial_regeneration'
+  | 'manual_regeneration'
+  | 'generate_missing';
+
+/** Execution contexts that allow jobs to run on completed courses. */
+export const STAGE6_REMEDIATION_CONTEXTS: ReadonlySet<Stage6ExecutionContext> = new Set([
+  'partial_regeneration',
+  'manual_regeneration',
+  'generate_missing',
+]);
+
 export interface Stage6ExecutionPolicy {
   mode: Stage6ExecutionPolicyMode;
 }
@@ -115,6 +140,15 @@ export interface Stage6JobInput {
    * Set to true for partialGenerate jobs where frontend tracks completion independently
    */
   skipCompletionCheck?: boolean;
+
+  /**
+   * Execution context explaining why this job was created.
+   * Remediation contexts (partial_regeneration, manual_regeneration, generate_missing)
+   * allow the worker to proceed even when the course is in 'completed' or
+   * 'stage_6_complete' state.
+   * @default 'full_generation'
+   */
+  executionContext?: Stage6ExecutionContext;
 
   /** Organization UUID (for job status tracking, optional) */
   organizationId?: string;
