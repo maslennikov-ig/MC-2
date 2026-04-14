@@ -7,6 +7,7 @@ import {
   prepareLessonsForViewer,
   sanitizeTokenForLog,
   SHARE_TOKEN_CONFIG,
+  VIEWER_READY_LESSON_CONTENT_STATUSES,
 } from '@/lib/course-data-utils'
 import type { Database } from '@/types/database.generated'
 
@@ -535,6 +536,10 @@ describe('course-data-utils', () => {
   })
 
   describe('groupLessonContentsByLessonIdForViewer', () => {
+    it('exports viewer-ready lesson content statuses for SSR loaders', () => {
+      expect(VIEWER_READY_LESSON_CONTENT_STATUSES).toEqual(['completed', 'approved'])
+    })
+
     it('keeps the latest approved lesson content row for viewer payloads', () => {
       const rows: Partial<LessonContentRow>[] = [
         {

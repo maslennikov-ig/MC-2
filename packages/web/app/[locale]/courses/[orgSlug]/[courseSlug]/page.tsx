@@ -14,6 +14,7 @@ import {
   groupLessonContentsByLessonIdForViewer,
   prepareSectionsForViewer,
   prepareLessonsForViewer,
+  VIEWER_READY_LESSON_CONTENT_STATUSES,
 } from '@/lib/course-data-utils'
 import type { Course } from '@/types/database'
 import { PostgrestError } from '@supabase/supabase-js'
@@ -225,7 +226,7 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
         .from('lesson_contents')
         .select('*')
         .in('lesson_id', lessonIds)
-        .in('status', ['completed', 'approved'])
+        .in('status', [...VIEWER_READY_LESSON_CONTENT_STATUSES])
         .order('created_at', { ascending: false }),
     ])
 

@@ -14,7 +14,9 @@ type AssetRow = Database['public']['Tables']['assets']['Row']
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
-const VIEWER_READY_LESSON_CONTENT_STATUSES = new Set(['completed', 'approved'])
+export const VIEWER_READY_LESSON_CONTENT_STATUSES = ['completed', 'approved'] as const
+
+const VIEWER_READY_LESSON_CONTENT_STATUS_SET = new Set<string>(VIEWER_READY_LESSON_CONTENT_STATUSES)
 
 /**
  * Groups assets by their lesson_id for efficient lookup
@@ -77,7 +79,7 @@ export function groupLessonContentsByLessonIdForViewer(
 
   return lessonContents.reduce(
     (acc, lessonContent) => {
-      if (!VIEWER_READY_LESSON_CONTENT_STATUSES.has(String(lessonContent.status))) {
+      if (!VIEWER_READY_LESSON_CONTENT_STATUS_SET.has(String(lessonContent.status))) {
         return acc
       }
 
