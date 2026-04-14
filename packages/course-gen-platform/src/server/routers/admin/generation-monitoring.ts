@@ -150,7 +150,7 @@ export const generationMonitoringRouter = router({
           organization_id: string;
           user_id: string;
           course_structure: CourseStructure | null;
-          analysis_result: unknown | null;
+          analysis_result: unknown;
           language: string | null;
         };
 
@@ -274,7 +274,7 @@ export const generationMonitoringRouter = router({
             organization_id: string;
             user_id: string;
             course_structure: CourseStructure | null;
-            analysis_result: unknown | null;
+            analysis_result: unknown;
             language: string | null;
           };
           const language = (courses.language || 'en') as Language;
