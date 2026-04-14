@@ -441,6 +441,7 @@ export const generateMissingContent = protectedProcedure
               language: courseLanguage,
               ragChunks: [],
               ragContextId: null,
+              executionContext: 'generate_missing',
               organizationId: currentUser.organizationId,
               userId: currentUser.id,
             },

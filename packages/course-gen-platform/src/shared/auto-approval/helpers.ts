@@ -375,6 +375,7 @@ export async function queueStage6Jobs(courseId: string, priority: number): Promi
           style,
           ragChunks: [],
           ragContextId: null,
+          executionContext: 'full_generation',
           analysisResult: courseData.analysis_result as AnalysisResult | undefined,
         },
         jobName: `lesson:${lesson.lesson_id}`,

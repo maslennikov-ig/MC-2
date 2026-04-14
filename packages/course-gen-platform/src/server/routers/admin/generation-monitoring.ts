@@ -13,6 +13,7 @@ import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import type { CourseStructure, Language } from '@megacampus/shared-types';
 import { enqueueStage6Lesson } from '../../../stages/stage6-lesson-content/enqueue';
+import { transitionToStage6Generating } from '../lesson-content/helpers';
 
 export const generationMonitoringRouter = router({
   /**
@@ -193,6 +194,8 @@ export const generationMonitoringRouter = router({
           'Admin triggered Stage 6 generation'
         );
 
+        await transitionToStage6Generating(courses.id, `admin-trigger:${input.lessonId}`);
+
         await enqueueStage6Lesson({
           jobData: {
             lessonSpec,
@@ -200,6 +203,7 @@ export const generationMonitoringRouter = router({
             language,
             ragChunks: [],
             ragContextId: null,
+            executionContext: 'partial_regeneration',
             organizationId: courses.organization_id,
             userId: courses.user_id,
           },
@@ -281,6 +285,8 @@ export const generationMonitoringRouter = router({
             'Admin triggered lesson regeneration with refinement'
           );
 
+          await transitionToStage6Generating(courses.id, `admin-refinement:${input.lessonId}`);
+
           await enqueueStage6Lesson({
             jobData: {
               lessonSpec: {
@@ -295,6 +301,7 @@ export const generationMonitoringRouter = router({
               language,
               ragChunks: [],
               ragContextId: null,
+              executionContext: 'partial_regeneration',
               organizationId: courses.organization_id,
               userId: courses.user_id,
               userRefinementPrompt: input.userInstructions,

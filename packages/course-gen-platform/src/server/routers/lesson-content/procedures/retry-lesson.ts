@@ -8,7 +8,7 @@ import { nanoid } from 'nanoid';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { retryLessonInputSchema } from '../schemas';
-import { verifyCourseAccess } from '../helpers';
+import { transitionToStage6Generating, verifyCourseAccess } from '../helpers';
 import { enqueueStage6Lesson } from '../../../../stages/stage6-lesson-content/enqueue';
 import { logger } from '../../../../shared/logger/index.js';
 
@@ -73,6 +73,9 @@ export const retryLesson = protectedProcedure
         requestId
       );
 
+      // Retry is a remediation path and must work on already completed courses.
+      await transitionToStage6Generating(courseId, requestId);
+
       // Step 2: Enqueue with high priority for retries via canonical helper
       // Unique deduplication ID for retries (includes timestamp)
       // Format: stage6:retry:{courseId}:{lessonId}:{timestamp}
@@ -86,6 +89,7 @@ export const retryLesson = protectedProcedure
           language: course.language,
           ragChunks: [],
           ragContextId: null,
+          executionContext: 'partial_regeneration',
           organizationId: currentUser.organizationId,
           userId: currentUser.id,
         },

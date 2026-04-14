@@ -96,6 +96,7 @@ export const startStage6 = protectedProcedure
               style: (course.style as CourseStyle | null) ?? undefined,
               ragChunks: [],
               ragContextId: null,
+              executionContext: 'full_generation',
             },
             jobName: `lesson:${spec.lesson_id}`,
             source: 'startStage6',

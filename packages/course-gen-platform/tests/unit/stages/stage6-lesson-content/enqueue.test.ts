@@ -16,10 +16,14 @@ const mockAdd = vi.fn();
 const mockOn = vi.fn();
 
 vi.mock('bullmq', () => ({
-  Queue: vi.fn().mockImplementation(() => ({
-    add: mockAdd,
-    on: mockOn,
-  })),
+  Queue: vi.fn().mockImplementation(
+    function MockQueue() {
+      return {
+        add: mockAdd,
+        on: mockOn,
+      };
+    }
+  ),
   Worker: vi.fn(),
 }));
 
@@ -31,6 +35,12 @@ vi.mock('@/shared/cache/redis', () => ({
 // ── Mock logger ──
 vi.mock('@/shared/logger', () => ({
   logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+  default: {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
