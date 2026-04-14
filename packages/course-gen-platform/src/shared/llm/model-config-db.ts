@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import type { Database } from '@megacampus/shared-types';
+import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
 import { normalizeLanguageForReserve, type LanguageCode } from '@megacampus/shared-utils';
 
 type LLMModelConfigRow = Database['public']['Tables']['llm_model_config']['Row'];
@@ -495,6 +496,24 @@ function seedEntryToPhaseConfig(entry: Record<string, unknown>): PhaseModelConfi
   };
 }
 
+function canonicalStage6EntryToPhaseConfig(
+  entry: (typeof STAGE6_CANONICAL_PHASE_DEFAULTS)[keyof typeof STAGE6_CANONICAL_PHASE_DEFAULTS]
+): PhaseModelConfig {
+  return {
+    modelId: entry.modelId,
+    fallbackModelId: entry.fallbackModelId,
+    temperature: entry.temperature,
+    maxTokens: entry.maxTokens,
+    maxContextTokens: entry.maxContextTokens,
+    qualityThreshold: entry.qualityThreshold,
+    maxRetries: entry.maxRetries,
+    timeoutMs: entry.timeoutMs,
+    cacheReadEnabled: entry.cacheReadEnabled,
+    tier: entry.tier,
+    source: 'hardcoded',
+  };
+}
+
 /**
  * Load DEFAULT_PHASE_CONFIGS from config-seed.json (auto-updated from DB during prebuild).
  * Falls back to minimal emergency configs if seed file is unavailable.
@@ -603,6 +622,10 @@ function loadDefaultPhaseConfigs(): Record<string, PhaseModelConfig> {
     }
     if (!configs['emergency']) {
       configs['emergency'] = EMERGENCY_FALLBACK_CONFIGS['emergency'];
+    }
+
+    for (const [phaseName, entry] of Object.entries(STAGE6_CANONICAL_PHASE_DEFAULTS)) {
+      configs[phaseName] = canonicalStage6EntryToPhaseConfig(entry);
     }
 
     log.info(`Loaded ${Object.keys(configs).length} phase configs from ${seedPath}`);

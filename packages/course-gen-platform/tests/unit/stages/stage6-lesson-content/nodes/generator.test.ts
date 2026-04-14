@@ -12,6 +12,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const { mockGetModelForPhase } = vi.hoisted(() => ({
+  mockGetModelForPhase: vi.fn().mockResolvedValue({ modelId: 'test-model-id' }),
+}));
+
 // ============================================================================
 // MOCKS
 // ============================================================================
@@ -641,7 +645,7 @@ vi.mock('@/shared/prompts/prompt-service', () => {
 
 vi.mock('@/shared/llm/model-config-service', () => ({
   createModelConfigService: vi.fn(() => ({
-    getModelForPhase: vi.fn().mockResolvedValue({ modelId: 'test-model-id' }),
+    getModelForPhase: mockGetModelForPhase,
   })),
 }));
 
@@ -760,6 +764,8 @@ Exercise content.`;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockGetModelForPhase.mockReset();
+    mockGetModelForPhase.mockResolvedValue({ modelId: 'test-model-id' });
 
     // Get references to mocked functions
     const langchainModels = await import('@/shared/llm/langchain-models');
@@ -1255,7 +1261,7 @@ Main section.`,
   });
 
   describe('generateTruncationContinuation', () => {
-    it('should use simple-tier model config and append continuation text', async () => {
+    it('should append continuation text using the resolved continuation model', async () => {
       mockModelInvoke.mockResolvedValue({
         content: `---existing tail---
 
@@ -1278,6 +1284,37 @@ Additional completion in Russian.`,
       expect(result.continuation).toContain('Additional completion');
       expect(result.mergedContent).toContain('Additional completion');
       expect(result.mergedContent).toContain('---existing tail---');
+    });
+
+    it('should keep advanced lesson continuation on the complex tier', async () => {
+      mockGetModelForPhase.mockImplementation(async phaseName => ({
+        modelId: phaseName === 'stage_6_complex' ? 'test-complex-model-id' : 'test-model-id',
+      }));
+      mockModelInvoke.mockResolvedValue({
+        content: `---existing tail---
+
+Advanced completion in Russian.`,
+        response_metadata: {
+          usage: { total_tokens: 111 },
+        },
+      });
+
+      const advancedLessonSpec: LessonSpecificationV2 = {
+        ...mockLessonSpec,
+        lesson_id: '2.3',
+        difficulty_level: 'advanced',
+      };
+      const existingContent = `# Заголовок
+
+Текст урока.
+
+---existing tail---`;
+
+      const result = await generateTruncationContinuation(advancedLessonSpec, existingContent, 'ru');
+
+      expect(result.modelUsed).toBe('test-complex-model-id');
+      expect(mockGetModelForPhase).toHaveBeenCalledWith('stage_6_complex', undefined);
+      expect(mockGetModelForPhase).not.toHaveBeenCalledWith('stage_6_simple', undefined);
     });
 
     it('should remove duplicated overlap from continuation prefix', async () => {

@@ -6,8 +6,12 @@
  * and prompt guidance for content generation.
  */
 
-import type { SectionDepthV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { getTokenMultiplier } from '@megacampus/shared-types';
+import type { SectionDepthV2 } from '@megacampus/shared-types/lesson-specification-v2';
+export {
+  STAGE6_TIER_FALLBACKS,
+  STAGE6_TIER_MODELS,
+} from '@megacampus/shared-types/stage6-model-config';
 
 // ============================================================================
 // DEPTH-BASED TOKEN LIMITS
@@ -191,27 +195,3 @@ export function calculateDynamicContextWindow(durationMinutes: number, language:
 // ============================================================================
 // STAGE 6 3-TIER MODEL ROUTING
 // ============================================================================
-
-/**
- * LAST-RESORT fallback models for Stage 6 3-tier routing.
- * Primary selection uses getModelForPhase() from database.
- * These are ONLY used when database is completely unavailable.
- */
-export const STAGE6_TIER_MODELS = {
-  /** Simple tier: fast cheap model for beginner difficulty lessons */
-  simple: 'xiaomi/mimo-v2-flash',
-  /** Normal tier: thinking model for intermediate difficulty lessons */
-  normal: 'moonshotai/kimi-k2-thinking',
-  /** Complex tier: premium model for advanced difficulty + module 1 lessons */
-  complex: 'qwen/qwen3.5-plus-02-15',
-} as const;
-
-/**
- * LAST-RESORT fallback models per tier (used when database is unavailable).
- * Maps to the fallback_model_id column in llm_model_config for each stage_6_* phase.
- */
-export const STAGE6_TIER_FALLBACKS = {
-  simple: 'moonshotai/kimi-k2-thinking',
-  normal: 'moonshotai/kimi-k2-thinking',
-  complex: 'moonshotai/kimi-k2-thinking',
-} as const;

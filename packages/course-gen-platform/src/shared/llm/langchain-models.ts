@@ -30,6 +30,7 @@ import {
   CHAT_PRIMARY_MODEL_ID,
   CHAT_STAGE6_PRIMARY_MODEL_ID,
 } from '@megacampus/shared-types';
+import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
 import { createModelConfigService } from './model-config-service';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
@@ -204,59 +205,59 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 4096,
   },
   stage_6_refinement: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.5,
-    maxTokens: 8000,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.maxTokens,
   },
   stage_6_rag_planning: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.3,
-    maxTokens: 4096,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_rag_planning.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_rag_planning.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_rag_planning.maxTokens,
   },
   stage_6_simple: {
-    modelId: 'moonshotai/kimi-k2-thinking',
-    temperature: 0.7,
-    maxTokens: 8000,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_simple.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_simple.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_simple.maxTokens,
   },
   stage_6_normal: {
-    modelId: 'moonshotai/kimi-k2-thinking',
-    temperature: 0.7,
-    maxTokens: 8000,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_normal.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_normal.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_normal.maxTokens,
   },
   stage_6_complex: {
-    modelId: 'qwen/qwen3.5-plus-02-15',
-    temperature: 0.7,
-    maxTokens: 8000,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_complex.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_complex.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_complex.maxTokens,
   },
   stage_6_auto_last_chance: {
-    modelId: 'z-ai/glm-5',
-    temperature: 0.7,
-    maxTokens: 8000,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.maxTokens,
   },
   stage_6_manual_regeneration: {
-    modelId: 'openai/gpt-5.4',
-    temperature: 0.7,
-    maxTokens: 8000,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.maxTokens,
   },
   stage_6_arbiter: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.0, // Deterministic for agreement scoring
-    maxTokens: 2048,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_arbiter.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_arbiter.temperature, // Deterministic for agreement scoring
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_arbiter.maxTokens,
   },
   stage_6_patcher: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.1, // Low temp for precise editing
-    maxTokens: 1000, // Small output for patches
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_patcher.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_patcher.temperature, // Low temp for precise editing
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_patcher.maxTokens, // Small output for patches
   },
   stage_6_section_expander: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.7, // Moderate creativity
-    maxTokens: 2000, // Larger output for full sections
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_section_expander.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_section_expander.temperature, // Moderate creativity
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_section_expander.maxTokens, // Larger output for full sections
   },
   stage_6_delta_judge: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.0, // Deterministic for validation
-    maxTokens: 512, // Small focused output
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_delta_judge.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_delta_judge.temperature, // Deterministic for validation
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_delta_judge.maxTokens, // Small focused output
   },
   stage_6_standard_ru: {
     modelId: DEFAULT_MODEL_ID,

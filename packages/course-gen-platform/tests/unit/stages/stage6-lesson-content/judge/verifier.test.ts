@@ -15,7 +15,55 @@
  * - verifyPatch: placeholder verification logic
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
+
+const { mockGenerateCompletion, mockGetModelForPhase } = vi.hoisted(() => ({
+  mockGenerateCompletion: vi.fn(),
+  mockGetModelForPhase: vi.fn().mockResolvedValue({
+    modelId: 'test-delta-judge-model',
+    temperature: 0.0,
+    maxTokens: 512,
+    source: 'test',
+  }),
+}));
+
+vi.mock('@/shared/llm', () => ({
+  LLMClient: class MockLLMClient {
+    generateCompletion = mockGenerateCompletion;
+  },
+}));
+
+vi.mock('@/shared/llm/model-config-service', () => ({
+  createModelConfigService: () => ({
+    getModelForPhase: mockGetModelForPhase,
+  }),
+}));
+
+vi.mock('@/shared/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+  default: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+vi.mock('@megacampus/shared-utils', () => ({
+  safeJSONParse: (value: string) => {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  },
+}));
 import {
   checkQualityLocks,
   initializeQualityLocks,
@@ -761,6 +809,28 @@ describe('buildDeltaJudgePrompt', () => {
 // ============================================================================
 
 describe('verifyPatch', () => {
+  beforeEach(() => {
+    mockGenerateCompletion.mockReset();
+    mockGetModelForPhase.mockReset();
+    mockGetModelForPhase.mockResolvedValue({
+      modelId: 'test-delta-judge-model',
+      temperature: 0.0,
+      maxTokens: 512,
+      source: 'test',
+    });
+    mockGenerateCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        passed: true,
+        confidence: 'high',
+        reasoning: 'Patch addressed the issue.',
+        newIssues: [],
+      }),
+      totalTokens: 120,
+      inputTokens: 70,
+      outputTokens: 50,
+    });
+  });
+
   it('should return DeltaJudgeOutput with passed field', async () => {
     const input: DeltaJudgeInput = {
       originalContent: 'Original',
@@ -871,5 +941,25 @@ describe('verifyPatch', () => {
     expect(typeof result.confidence).toBe('string');
     expect(typeof result.reasoning).toBe('string');
     expect(result.reasoning.length).toBeGreaterThan(0);
+  });
+
+  it('should use canonical delta judge fallback instead of model=unknown when config lookup fails', async () => {
+    mockGetModelForPhase.mockRejectedValue(new Error('DB down'));
+    const input: DeltaJudgeInput = {
+      originalContent: 'Original',
+      patchedContent: 'Patched',
+      addressedIssue: createMockTargetedIssue(),
+      sectionId: 'sec_1',
+      contextAnchors: {},
+    };
+
+    await verifyPatch(input);
+
+    expect(mockGenerateCompletion).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        model: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_delta_judge.modelId,
+      })
+    );
   });
 });
