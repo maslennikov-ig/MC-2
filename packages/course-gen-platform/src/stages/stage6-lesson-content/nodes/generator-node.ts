@@ -120,7 +120,8 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         state.modelOverride,
         style,
         analysisResult,
-        courseId
+        courseId,
+        state.maxTokensOverride ?? undefined
       );
       generatedContent = result.content;
       lessonDigest = result.lessonDigest;

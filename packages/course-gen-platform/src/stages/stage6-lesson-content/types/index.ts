@@ -95,6 +95,9 @@ export interface Stage6JobInput {
   /** Optional model override for fallback retry */
   modelOverride?: string;
 
+  /** Optional maxTokens override from phase config (auto_last_chance, manual_regeneration) */
+  maxTokensOverride?: number;
+
   /** Optional execution policy for user-triggered top-model regeneration. */
   executionPolicy?: Stage6ExecutionPolicy;
 
@@ -282,6 +285,8 @@ export interface Stage6Input {
   userRefinementPrompt?: string;
   /** Model override for fallback retry (optional) */
   modelOverride?: string;
+  /** Optional maxTokens override from phase config */
+  maxTokensOverride?: number;
   /**
    * Course content style for lesson generation
    * Controls vocabulary, phrasing, and narrative approach

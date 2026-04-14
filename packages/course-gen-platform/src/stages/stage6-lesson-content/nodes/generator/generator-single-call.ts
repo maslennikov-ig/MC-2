@@ -104,7 +104,8 @@ export async function generateLessonSingleCall(
   modelOverride: string | null,
   style: string | null,
   analysisResult: AnalysisResult | null,
-  courseId?: string
+  courseId?: string,
+  maxTokensOverride?: number
 ): Promise<{
   content: string;
   lessonDigest: string;
@@ -238,11 +239,16 @@ export async function generateLessonSingleCall(
 
   // Step 11: Calculate maxTokens
   // Apply language multiplier + structural overhead (headers, exercises, digest, formatting)
+  // When a phase config provides maxTokensOverride (e.g. auto_last_chance=12000),
+  // use it as an additional floor so the phase budget is never undercut.
   const languageMultiplier = getTokenMultiplier(language);
   const rawTokens = Math.ceil(
     targetWordCount * TOKENS_PER_WORD_RATIO * languageMultiplier * SINGLE_CALL_OVERHEAD_MULTIPLIER
   );
-  const maxTokens = Math.min(SINGLE_CALL_MAX_TOKENS, Math.max(SINGLE_CALL_MIN_TOKENS, rawTokens));
+  const effectiveFloor = maxTokensOverride
+    ? Math.max(SINGLE_CALL_MIN_TOKENS, maxTokensOverride)
+    : SINGLE_CALL_MIN_TOKENS;
+  const maxTokens = Math.min(SINGLE_CALL_MAX_TOKENS, Math.max(effectiveFloor, rawTokens));
 
   logger.debug(
     {

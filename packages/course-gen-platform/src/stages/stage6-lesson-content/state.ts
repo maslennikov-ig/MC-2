@@ -147,6 +147,16 @@ export const LessonGraphState = Annotation.Root({
   }),
 
   /**
+   * Optional maxTokens override from phase config.
+   * When set, acts as an additional floor for the dynamic token budget,
+   * ensuring phases like auto_last_chance get at least their configured budget.
+   */
+  maxTokensOverride: Annotation<number | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
    * Course content style (e.g., 'gamified', 'professional', 'storytelling')
    * Used by generator to apply style-specific prompts for content generation
    * Defaults to 'professional' if not provided
