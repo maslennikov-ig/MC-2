@@ -13,6 +13,10 @@ import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
+import {
+  APPROVABLE_LESSON_CONTENT_STATUSES,
+  buildSupabaseInFilterValue,
+} from './status-semantics';
 
 /**
  * Schema for lesson_contents.metadata JSONB column
@@ -77,7 +81,8 @@ function getSafeMetadata(metadata: Record<string, unknown>): Record<string, unkn
  *
  * Purpose: Marks multiple lessons as approved after user review. Updates lesson_contents
  * status to 'approved' and records approval metadata for all qualifying lessons.
- * Only lessons with status 'completed' will be approved (skips pending, error, already approved).
+ * Lessons with status 'completed' or 'review_required' will be approved
+ * (skips pending, error, already approved).
  *
  * Authorization:
  * - Requires authenticated user (protectedProcedure middleware)
@@ -101,13 +106,13 @@ function getSafeMetadata(metadata: Record<string, unknown>): Record<string, unkn
  *
  * @example
  * ```typescript
- * // Approve all completed lessons in course
+ * // Approve all approvable lessons in course
  * const result = await trpc.lessonContent.approveLessons.mutate({
  *   courseId: '3f8e1cd4-0c6e-43cf-8264-57c470a6c102',
  * });
  * // { success: true, approvedCount: 15, skippedCount: 3 }
  *
- * // Approve only lessons in module 2
+ * // Approve only approvable lessons in module 2
  * const result = await trpc.lessonContent.approveLessons.mutate({
  *   courseId: '3f8e1cd4-0c6e-43cf-8264-57c470a6c102',
  *   moduleNumber: 2,
@@ -183,12 +188,12 @@ export const approveLessons = protectedProcedure
         );
       }
 
-      // Step 3: Count lessons to be skipped (not in 'completed' status)
+      // Step 3: Count lessons to be skipped (not in an approvable status)
       let countQuery = supabase
         .from('lesson_contents')
         .select('id', { count: 'exact', head: true })
         .eq('course_id', courseId)
-        .neq('status', 'completed');
+        .not('status', 'in', buildSupabaseInFilterValue(APPROVABLE_LESSON_CONTENT_STATUSES));
 
       if (lessonIds !== null) {
         countQuery = countQuery.in('lesson_id', lessonIds);
@@ -204,12 +209,12 @@ export const approveLessons = protectedProcedure
         });
       }
 
-      // Step 4: Get all lesson_contents with status 'completed' to update
+      // Step 4: Get all lesson_contents with approvable status to update
       let selectQuery = supabase
         .from('lesson_contents')
         .select('id, course_id, lesson_id, metadata')
         .eq('course_id', courseId)
-        .eq('status', 'completed');
+        .in('status', [...APPROVABLE_LESSON_CONTENT_STATUSES]);
 
       if (lessonIds !== null) {
         selectQuery = selectQuery.in('lesson_id', lessonIds);
@@ -229,7 +234,7 @@ export const approveLessons = protectedProcedure
       }
 
       if (!lessonsToApprove || lessonsToApprove.length === 0) {
-        logger.info({ requestId, courseId, moduleNumber }, 'No completed lessons to approve');
+        logger.info({ requestId, courseId, moduleNumber }, 'No approvable lessons found');
         return { success: true, approvedCount: 0, skippedCount: skippedCount || 0 };
       }
 
