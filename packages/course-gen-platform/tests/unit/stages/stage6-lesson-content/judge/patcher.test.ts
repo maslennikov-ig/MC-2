@@ -21,6 +21,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
 import {
   executePatch,
   buildPatcherPrompt,
@@ -47,6 +48,15 @@ import type {
   TargetedIssue,
 } from '@megacampus/shared-types';
 
+const { mockGetModelForPhase } = vi.hoisted(() => ({
+  mockGetModelForPhase: vi.fn().mockResolvedValue({
+    modelId: 'test-model',
+    temperature: 0.7,
+    maxTokens: 2000,
+    source: 'test',
+  }),
+}));
+
 // Mock LLMClient and ModelConfigService used by executeExpansion (no DI parameter)
 const mockGenerateCompletion = vi.fn();
 
@@ -61,13 +71,7 @@ vi.mock('@/shared/llm', () => {
 vi.mock('@/shared/llm/model-config-service', () => {
   return {
     createModelConfigService: () => ({
-      getModelForPhase: () =>
-        Promise.resolve({
-          modelId: 'test-model',
-          temperature: 0.7,
-          maxTokens: 2000,
-          source: 'test',
-        }),
+      getModelForPhase: mockGetModelForPhase,
     }),
   };
 });
@@ -157,6 +161,16 @@ function createMockSectionExpanderInput(
 
 describe('T040 - Patcher Execution Tests', () => {
   describe('executePatch', () => {
+    beforeEach(() => {
+      mockGetModelForPhase.mockReset();
+      mockGetModelForPhase.mockResolvedValue({
+        modelId: 'test-model',
+        temperature: 0.7,
+        maxTokens: 2000,
+        source: 'test',
+      });
+    });
+
     it('should return original content and success: false when default LLM call fails', async () => {
       // When no LLM function is provided, executePatch uses defaultLLMCall which calls real LLM.
       // If the LLM call fails (e.g., no API key, network error), it returns original content.
@@ -287,6 +301,26 @@ describe('T040 - Patcher Execution Tests', () => {
       const result = await executePatch(input, mockLLMCall);
 
       expect(result.patchedContent).toBe('Trimmed content here.');
+    });
+
+    it('should use canonical patcher fallback instead of model=unknown when config lookup fails', async () => {
+      const input = createMockPatcherInput();
+      mockGetModelForPhase.mockRejectedValue(new Error('DB down'));
+      mockGenerateCompletion.mockResolvedValue({
+        content: 'This is the patched section content with improvements applied.',
+        totalTokens: 320,
+        inputTokens: 160,
+        outputTokens: 160,
+      });
+
+      await executePatch(input);
+
+      expect(mockGenerateCompletion).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          model: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_patcher.modelId,
+        })
+      );
     });
   });
 
@@ -437,6 +471,13 @@ describe('T040 - Patcher Execution Tests', () => {
 describe('T041 - Section-Expander Execution Tests', () => {
   beforeEach(() => {
     mockGenerateCompletion.mockReset();
+    mockGetModelForPhase.mockReset();
+    mockGetModelForPhase.mockResolvedValue({
+      modelId: 'test-model',
+      temperature: 0.7,
+      maxTokens: 2000,
+      source: 'test',
+    });
   });
 
   describe('executeExpansion', () => {
@@ -535,6 +576,26 @@ describe('T041 - Section-Expander Execution Tests', () => {
 
       // Word count below range logs warning but still returns success
       expect(result.success).toBe(true);
+    });
+
+    it('should use canonical expander fallback instead of model=unknown when config lookup fails', async () => {
+      const input = createMockSectionExpanderInput();
+      mockGetModelForPhase.mockRejectedValue(new Error('DB down'));
+      mockGenerateCompletion.mockResolvedValue({
+        content: 'This is the regenerated content from the LLM with improvements.',
+        totalTokens: 400,
+        inputTokens: 180,
+        outputTokens: 220,
+      });
+
+      await executeExpansion(input);
+
+      expect(mockGenerateCompletion).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          model: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_section_expander.modelId,
+        })
+      );
     });
   });
 

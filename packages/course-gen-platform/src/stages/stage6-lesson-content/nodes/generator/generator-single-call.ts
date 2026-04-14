@@ -12,12 +12,10 @@
 
 import { logger } from '@/shared/logger';
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
-import { createModelConfigService } from '@/shared/llm/model-config-service';
 import {
   getRecommendedTemperatureV2,
   type LessonSpecificationV2,
 } from '@megacampus/shared-types/lesson-specification-v2';
-import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
   getLanguageName,
   getTokenMultiplier,
@@ -376,7 +374,7 @@ export async function generateLessonSingleCall(
  * Generate cheap continuation/repair text for truncation-only failures.
  *
  * This path avoids full lesson regeneration and only appends missing tail content
- * using a small token budget and the Stage 6 simple-tier model.
+ * using a small token budget and the same Stage 6 tier family as the lesson.
  */
 export async function generateTruncationContinuation(
   lessonSpec: LessonSpecificationV2,
@@ -393,7 +391,7 @@ export async function generateTruncationContinuation(
   const tailContext = currentContent.slice(-TRUNCATION_CONTINUATION_TAIL_CHARS);
   const sectionsList = lessonSpec.sections.map((s, i) => `${i + 1}. ${s.title}`).join('\n');
 
-  const modelId = await resolveContinuationModelId(courseId);
+  const modelId = await resolveContinuationModelId(lessonSpec, courseId);
   const model = createOpenRouterModel(modelId, 0.2, TRUNCATION_CONTINUATION_MAX_TOKENS);
 
   const prompt = TRUNCATION_CONTINUATION_PROMPT_TEMPLATE.replace(
@@ -436,21 +434,35 @@ export async function generateTruncationContinuation(
   };
 }
 
-async function resolveContinuationModelId(courseId?: string): Promise<string> {
-  const phase = 'stage_6_simple' as PhaseName;
+async function resolveContinuationModelId(
+  lessonSpec: LessonSpecificationV2,
+  courseId?: string
+): Promise<string> {
   try {
-    const modelConfigService = createModelConfigService();
-    const config = await modelConfigService.getModelForPhase(phase, courseId);
-    return config.modelId || STAGE6_TIER_MODELS.simple;
+    const tierResult = await selectStage6ModelTier(lessonSpec, courseId);
+    return tierResult.model;
   } catch (error) {
+    const difficultyLevel = lessonSpec.difficulty_level || 'intermediate';
+    const moduleNumber = lessonSpec.lesson_id?.split('.')[0] || '';
+    const fallbackTier =
+      moduleNumber === '1'
+        ? 'complex'
+        : difficultyLevel === 'advanced'
+          ? 'complex'
+          : difficultyLevel === 'beginner'
+            ? 'simple'
+            : 'normal';
+
     logger.warn(
       {
-        phase,
+        lessonId: lessonSpec.lesson_id,
+        difficultyLevel,
+        fallbackTier,
         error: error instanceof Error ? error.message : String(error),
       },
       'Failed to resolve continuation model from config, using hardcoded fallback'
     );
-    return STAGE6_TIER_MODELS.simple;
+    return STAGE6_TIER_MODELS[fallbackTier];
   }
 }
 

@@ -34,6 +34,7 @@
  */
 
 import type { PatcherInput, PatcherOutput } from '@megacampus/shared-types';
+import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-model-config';
 import { buildPatcherPrompt, buildPatcherSystemPrompt } from './patcher-prompt';
 import { logger } from '../../../../shared/logger';
 import { LLMClient } from '@/shared/llm';
@@ -66,15 +67,19 @@ async function defaultLLMCall(
 ): Promise<{ content: string; tokensUsed: number }> {
   const llmClient = new LLMClient();
   const modelService = createModelConfigService();
+  const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_patcher');
 
-  let modelId = 'unknown'; // Will be set from database config
+  let modelId = fallbackConfig?.modelId ?? 'xiaomi/mimo-v2-flash';
   try {
     const config = await modelService.getModelForPhase('stage_6_patcher', options.courseId);
-    modelId = config.modelId;
+    modelId = config.modelId || fallbackConfig?.modelId || modelId;
     logger.info({ modelId, source: config.source }, 'Patcher using model from config');
   } catch (error) {
     logger.warn(
-      { error: error instanceof Error ? error.message : String(error) },
+      {
+        error: error instanceof Error ? error.message : String(error),
+        fallbackModelId: modelId,
+      },
       'Failed to get patcher model config, using fallback'
     );
   }
