@@ -102,6 +102,8 @@ WORKDIR /app
 COPY --from=builder --chown=nodejs:nodejs /app/pruned/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/package.json ./package.json
+# Copy config-seed.json to dist/config/ where model-config-db.ts expects it
+COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/src/config/config-seed.json ./dist/config/config-seed.json
 # Copy shared-types workspace package (not included in pruned)
 COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-types/dist ./node_modules/@megacampus/shared-types/dist
 COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-types/package.json ./node_modules/@megacampus/shared-types/package.json

@@ -33,6 +33,7 @@ import {
   TOKENS_PER_WORD_RATIO,
   SINGLE_CALL_MIN_TOKENS,
   SINGLE_CALL_MAX_TOKENS,
+  SINGLE_CALL_OVERHEAD_MULTIPLIER,
   SINGLE_CALL_RAG_BUDGET_CHARS,
   STAGE6_TIER_MODELS,
   TRUNCATION_CONTINUATION_TAIL_CHARS,
@@ -236,8 +237,11 @@ export async function generateLessonSingleCall(
   });
 
   // Step 11: Calculate maxTokens
+  // Apply language multiplier + structural overhead (headers, exercises, digest, formatting)
   const languageMultiplier = getTokenMultiplier(language);
-  const rawTokens = Math.ceil(targetWordCount * TOKENS_PER_WORD_RATIO * languageMultiplier);
+  const rawTokens = Math.ceil(
+    targetWordCount * TOKENS_PER_WORD_RATIO * languageMultiplier * SINGLE_CALL_OVERHEAD_MULTIPLIER
+  );
   const maxTokens = Math.min(SINGLE_CALL_MAX_TOKENS, Math.max(SINGLE_CALL_MIN_TOKENS, rawTokens));
 
   logger.debug(
