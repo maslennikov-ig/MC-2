@@ -22,15 +22,14 @@ import {
   transitionToStage6Generating,
   type SectionFromStructure,
 } from '../helpers';
-import { addJob } from '../../../../orchestrator/queue';
+import { enqueueStage6Lesson } from '../../../../stages/stage6-lesson-content/enqueue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { invalidateLessonUuidCache } from '../../../../shared/database/lesson-resolver';
-import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
-import type { LessonContentJobData, Language } from '@megacampus/shared-types';
+import { parseAnalysisResult } from '@megacampus/shared-types';
+import type { Language } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
-import { validateLocale } from '@/shared/validation';
 import { getLatestUsableLessonContent } from './latest-usable-lesson-content';
 
 type LessonWithContentRow = {
@@ -429,31 +428,26 @@ export const generateMissingContent = protectedProcedure
         }
       }
 
-      // Step 10: Enqueue all lessons using addJob with deduplication
+      // Step 10: Enqueue all lessons using canonical Stage 6 enqueue helper
       const courseLanguage = (course.language || 'en') as Language;
       const jobs = await Promise.all(
         lessonSpecs.map(spec => {
-          const jobData: LessonContentJobData = {
-            organizationId: currentUser.organizationId,
-            courseId,
-            userId: currentUser.id,
-            jobType: JobType.LESSON_CONTENT,
-            createdAt: new Date().toISOString(),
-            lessonSpec: spec,
-            ragChunks: [],
-            ragContextId: null,
-            language: courseLanguage,
-            locale: validateLocale(courseLanguage),
-          };
-
           const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
 
-          return addJob(JobType.LESSON_CONTENT, jobData, {
-            priority,
-            deduplication: {
-              id: deduplicationId,
-              ttl: 150000,
+          return enqueueStage6Lesson({
+            jobData: {
+              lessonSpec: spec,
+              courseId,
+              language: courseLanguage,
+              ragChunks: [],
+              ragContextId: null,
+              organizationId: currentUser.organizationId,
+              userId: currentUser.id,
             },
+            jobName: `lesson:${spec.lesson_id}`,
+            source: 'generateMissing',
+            priority,
+            deduplication: { kind: 'ttl', id: deduplicationId, ttl: 150_000 },
           });
         })
       );

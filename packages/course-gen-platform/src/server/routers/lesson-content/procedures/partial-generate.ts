@@ -20,7 +20,7 @@ import {
   shouldSkipCompletionCheckForPartialGeneration,
   type SectionFromStructure,
 } from '../helpers';
-import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
+import { enqueueStage6Lesson, getStage6Queue } from '../../../../stages/stage6-lesson-content/enqueue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { invalidateLessonUuidCache } from '../../../../shared/database/lesson-resolver';
 import { parseAnalysisResult } from '@megacampus/shared-types';
@@ -424,12 +424,12 @@ export const partialGenerate = protectedProcedure
         }
       }
 
-      // Step 6: Enqueue all lessons using dedicated Stage 6 queue (30 concurrent workers)
+      // Step 6: Enqueue all lessons using canonical Stage 6 enqueue helper
       const courseLanguage = (course.language || 'en') as Language;
       const skipCompletionCheck = shouldSkipCompletionCheckForPartialGeneration(
         course.generation_status
       );
-      const stage6Queue = createStage6Queue();
+      const stage6Queue = getStage6Queue();
       const jobs = await Promise.all(
         lessonSpecs.map(async spec => {
           const jobData = buildPartialGenerateJobData({
@@ -443,17 +443,18 @@ export const partialGenerate = protectedProcedure
             manualTopRegeneration,
           });
 
-          // Deterministic job ID for deduplication
-          const jobName = `lesson:${spec.lesson_id}`;
           const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
 
           // Remove stale completed/failed job to allow re-generation
           // (BullMQ rejects queue.add with same jobId if old job still exists)
           await removeStaleJob(stage6Queue, deduplicationId, requestId);
 
-          return stage6Queue.add(jobName, jobData, {
+          return enqueueStage6Lesson({
+            jobData,
+            jobName: `lesson:${spec.lesson_id}`,
+            source: 'partialGenerate',
             priority,
-            jobId: deduplicationId,
+            deduplication: { kind: 'jobId', jobId: deduplicationId },
           });
         })
       );

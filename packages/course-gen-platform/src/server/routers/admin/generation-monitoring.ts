@@ -12,9 +12,7 @@ import { adminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import type { CourseStructure, Language } from '@megacampus/shared-types';
-import { JobType } from '@megacampus/shared-types';
-import { addJob } from '../../../orchestrator/queue';
-import { validateLocale } from '@/shared/validation';
+import { enqueueStage6Lesson } from '../../../stages/stage6-lesson-content/enqueue';
 
 export const generationMonitoringRouter = router({
   /**
@@ -195,17 +193,18 @@ export const generationMonitoringRouter = router({
           'Admin triggered Stage 6 generation'
         );
 
-        await addJob(JobType.LESSON_CONTENT, {
-          jobType: JobType.LESSON_CONTENT,
-          organizationId: courses.organization_id,
-          courseId: courses.id,
-          userId: courses.user_id,
-          createdAt: new Date().toISOString(),
-          lessonSpec: lessonSpec,
-          ragChunks: [],
-          ragContextId: null,
-          language,
-          locale: validateLocale(language),
+        await enqueueStage6Lesson({
+          jobData: {
+            lessonSpec,
+            courseId: courses.id,
+            language,
+            ragChunks: [],
+            ragContextId: null,
+            organizationId: courses.organization_id,
+            userId: courses.user_id,
+          },
+          jobName: `lesson:${lesson.id}`,
+          source: 'adminTrigger',
         });
 
         return { success: true, message: 'Lesson generation queued' };
@@ -282,24 +281,26 @@ export const generationMonitoringRouter = router({
             'Admin triggered lesson regeneration with refinement'
           );
 
-          await addJob(JobType.LESSON_CONTENT, {
-            jobType: JobType.LESSON_CONTENT,
-            organizationId: courses.organization_id,
-            courseId: courses.id,
-            userId: courses.user_id,
-            createdAt: new Date().toISOString(),
-            lessonSpec: {
-              lesson_id: lesson.id,
-              title: lesson.title,
-              sections: [],
-              metadata: {
-                userRefinementPrompt: input.userInstructions,
+          await enqueueStage6Lesson({
+            jobData: {
+              lessonSpec: {
+                lesson_id: lesson.id,
+                title: lesson.title,
+                sections: [],
+                metadata: {
+                  userRefinementPrompt: input.userInstructions,
+                },
               },
+              courseId: courses.id,
+              language,
+              ragChunks: [],
+              ragContextId: null,
+              organizationId: courses.organization_id,
+              userId: courses.user_id,
+              userRefinementPrompt: input.userInstructions,
             },
-            ragChunks: [],
-            ragContextId: null,
-            language,
-            locale: validateLocale(language),
+            jobName: `lesson:${lesson.id}`,
+            source: 'adminRefinement',
           });
         }
 
