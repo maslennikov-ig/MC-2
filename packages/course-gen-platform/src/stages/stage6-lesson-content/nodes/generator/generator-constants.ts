@@ -112,7 +112,7 @@ export const TRUNCATION_CONTINUATION_TAIL_CHARS = 2200;
 /**
  * Max tokens for truncation continuation repair calls.
  */
-export const TRUNCATION_CONTINUATION_MAX_TOKENS = 1400;
+export const TRUNCATION_CONTINUATION_MAX_TOKENS = SINGLE_CALL_MIN_TOKENS;
 
 /**
  * Prompt template for truncation continuation repair.
