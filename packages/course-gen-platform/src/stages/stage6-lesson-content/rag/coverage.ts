@@ -37,13 +37,17 @@ export function termMatchesInContent(term: string, contentPool: string): boolean
   if (term.length >= 4 && term.length <= 5) {
     const shortStem = term.slice(0, 3);
     // Only match if the stem is followed by word boundary or more letters
-    const stemRegex = new RegExp(shortStem + '[а-яёa-z]*', 'i');
+    const stemRegex = new RegExp(escapeRegex(shortStem) + '[а-яёa-z]*', 'i');
     if (stemRegex.test(contentPool)) {
       return true;
     }
   }
 
   return false;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
