@@ -74,15 +74,26 @@ export const TOKENS_PER_WORD_RATIO = 1.8;
 
 /**
  * Minimum maxTokens for single-call generation.
- * Floor value to ensure short lessons still get enough generation space.
+ * Floor value to ensure even the shortest lessons (5 min) have enough
+ * generation space for intro + sections + exercises + digest.
+ * A 5-min Russian lesson with 4 sections needs ~2600 tokens;
+ * 4096 provides comfortable headroom to avoid truncation.
  */
-export const SINGLE_CALL_MIN_TOKENS = 2048;
+export const SINGLE_CALL_MIN_TOKENS = 4096;
 
 /**
  * Maximum maxTokens for single-call generation.
  * Cap to prevent excessive token usage on very long lessons.
  */
 export const SINGLE_CALL_MAX_TOKENS = 16384;
+
+/**
+ * Structural overhead multiplier applied to the raw duration-based token budget.
+ * Accounts for markdown formatting, section headers, exercises block,
+ * lesson digest, and callout markup that are not covered by the
+ * word-count-only estimate.  1.35 = 35% headroom.
+ */
+export const SINGLE_CALL_OVERHEAD_MULTIPLIER = 1.35;
 
 /**
  * Total character budget for RAG context in single-call generation.

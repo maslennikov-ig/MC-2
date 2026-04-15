@@ -192,6 +192,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     ragContextId,
     language,
     modelOverride,
+    maxTokensOverride,
     userRefinementPrompt,
     style,
     analysisResult,
@@ -199,6 +200,8 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     fallbackModel,
     selectedModelTier,
     selectedModelTierReason,
+    selectedModelPhase,
+    selectedModelSource,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -213,12 +216,15 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     ragContextId: ragContextId ?? undefined,
     userRefinementPrompt,
     modelOverride,
+    maxTokensOverride,
     style,
     analysisResult,
     selectedModel: selectedModel ?? null,
     fallbackModel: fallbackModel ?? null,
     selectedModelTier: selectedModelTier ?? null,
     selectedModelTierReason: selectedModelTierReason ?? null,
+    selectedModelPhase: selectedModelPhase ?? null,
+    selectedModelSource: selectedModelSource ?? null,
   };
 
   return executeStage6Orchestrator(orchestratorInput);
@@ -266,6 +272,7 @@ export async function processWithFallback(
     selectedModelTierReason: string;
     selectedModelPhase: string | null;
     selectedModelSource: string | null;
+    maxTokensOverride?: number | null;
   }
 ): Promise<Stage6Output> {
   let lastError: Error | null = null;
@@ -289,6 +296,7 @@ export async function processWithFallback(
         ragChunks,
         ragContextId,
         modelOverride: modelConfig.primary,
+        maxTokensOverride: modelSelection?.maxTokensOverride ?? undefined,
         selectedModel: modelSelection?.selectedModel ?? null,
         fallbackModel: modelSelection?.fallbackModel ?? null,
         selectedModelTier: modelSelection?.selectedModelTier ?? null,
@@ -401,6 +409,7 @@ export async function processWithFallback(
       ragChunks,
       ragContextId,
       modelOverride: modelConfig.fallback,
+      maxTokensOverride: modelSelection?.maxTokensOverride ?? undefined,
       selectedModel: modelSelection?.selectedModel ?? null,
       fallbackModel: modelSelection?.fallbackModel ?? null,
       selectedModelTier: modelSelection?.selectedModelTier ?? null,
@@ -576,6 +585,7 @@ interface ResolvedRungModelConfig {
   primary: string;
   fallback: string;
   source: string;
+  maxTokens: number | null;
 }
 
 function isManualTopRegenerationPolicy(
@@ -584,9 +594,7 @@ function isManualTopRegenerationPolicy(
   return policy?.mode === 'manual_top_regeneration';
 }
 
-function mapTierToAutomaticRung(
-  tier: Stage6ModelTierName
-): Stage6AutomaticQualityRungPhaseName {
+function mapTierToAutomaticRung(tier: Stage6ModelTierName): Stage6AutomaticQualityRungPhaseName {
   return `stage_6_${tier}` as Stage6AutomaticQualityRungPhaseName;
 }
 
@@ -609,12 +617,18 @@ async function resolveRungModelConfig(
   language: string
 ): Promise<ResolvedRungModelConfig> {
   const modelConfigService = createModelConfigService();
-  const phaseConfig = await modelConfigService.getModelForPhase(phaseName, courseId, undefined, language);
+  const phaseConfig = await modelConfigService.getModelForPhase(
+    phaseName,
+    courseId,
+    undefined,
+    language
+  );
 
   return {
     primary: phaseConfig.modelId,
     fallback: phaseConfig.fallbackModelId ?? MODEL_FALLBACK.fallback,
     source: phaseConfig.source,
+    maxTokens: phaseConfig.maxTokens ?? null,
   };
 }
 
@@ -936,8 +950,7 @@ export async function processStage6Job(
       executionContext,
       selectedModelTier: initialSelectionSummary.selectedModelTier,
       selectedModelTierReason: initialSelectionSummary.selectedModelTierReason,
-      selectedModelPhase:
-        executionPlan.initialAutomaticRung ?? 'stage_6_manual_regeneration',
+      selectedModelPhase: executionPlan.initialAutomaticRung ?? 'stage_6_manual_regeneration',
       isPaused: pauseStatusForLogging,
     },
     durationMs: 0,
@@ -1044,6 +1057,7 @@ export async function processStage6Job(
               selectedModelTierReason,
               selectedModelPhase: rung.phase_name,
               selectedModelSource: rungModelConfig.source,
+              maxTokensOverride: rungModelConfig.maxTokens,
             }
           );
 
@@ -1069,7 +1083,8 @@ export async function processStage6Job(
             review_reasons: rungResult.reviewInfo?.reasons,
           });
 
-          rungResult.metrics.selectedModel = rungResult.metrics.selectedModel ?? rungModelConfig.primary;
+          rungResult.metrics.selectedModel =
+            rungResult.metrics.selectedModel ?? rungModelConfig.primary;
           rungResult.metrics.fallbackModel =
             rungResult.metrics.fallbackModel ?? rungModelConfig.fallback;
           rungResult.metrics.selectedModelTier =
@@ -1303,8 +1318,7 @@ export async function processStage6Job(
           result.metrics.selectedModelPhase ?? lastResolvedModelSelection.phaseName,
         selectedModelSource:
           result.metrics.selectedModelSource ?? lastResolvedModelSelection.source,
-        attemptLadder:
-          result.metrics.attemptLadder ?? executionPlan.qualityRecovery.attempts,
+        attemptLadder: result.metrics.attemptLadder ?? executionPlan.qualityRecovery.attempts,
       },
     };
   } catch (error) {

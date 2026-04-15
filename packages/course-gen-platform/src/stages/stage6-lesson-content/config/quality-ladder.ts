@@ -41,7 +41,7 @@ export const STAGE6_QUALITY_RUNG_CONFIGS: Record<
     phaseName: 'stage_6_auto_last_chance',
     mode: 'automatic',
     initialMaxRegenerationRetries: 0,
-    promotedMaxRegenerationRetries: 0,
+    promotedMaxRegenerationRetries: 1,
   },
   stage_6_manual_regeneration: {
     phaseName: 'stage_6_manual_regeneration',

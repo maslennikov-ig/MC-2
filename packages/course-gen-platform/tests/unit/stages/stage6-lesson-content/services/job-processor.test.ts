@@ -341,9 +341,10 @@ describe('stage6/services/job-processor', () => {
       tier: 'normal' as const,
       reason: 'standard difficulty',
     });
-    mockGetModelForPhase.mockImplementation(async (phaseName: string) => ({
+    mockGetModelForPhase.mockImplementation((phaseName: string) => ({
       modelId: `${phaseName}-primary`,
       fallbackModelId: `${phaseName}-fallback`,
+      maxTokens: phaseName === 'stage_6_auto_last_chance' ? 12000 : 8000,
       source: 'database',
     }));
   });
@@ -545,6 +546,37 @@ describe('stage6/services/job-processor', () => {
         reasons: [LESSON_SPEC_MISMATCH_MESSAGE],
       });
       expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(1);
+    });
+
+    it('should pass maxTokensOverride from modelSelection to orchestrator input', async () => {
+      const job = createMockJob();
+      mockExecuteStage6Orchestrator.mockResolvedValueOnce({
+        success: true,
+        content: { sections: [] },
+        metrics: { tokensUsed: 100, qualityScore: 0.9 },
+        errors: [],
+      });
+
+      await processWithFallback(
+        job,
+        { primary: 'test-primary', fallback: 'test-fallback' },
+        'lesson-uuid-123',
+        [],
+        null,
+        {
+          selectedModel: 'test-primary',
+          fallbackModel: 'test-fallback',
+          selectedModelTier: 'complex',
+          selectedModelTierReason: 'test',
+          selectedModelPhase: 'stage_6_auto_last_chance',
+          selectedModelSource: 'database',
+          maxTokensOverride: 12000,
+        }
+      );
+
+      expect(mockExecuteStage6Orchestrator).toHaveBeenCalledTimes(1);
+      const orchestratorInput = mockExecuteStage6Orchestrator.mock.calls[0][0];
+      expect(orchestratorInput.maxTokensOverride).toBe(12000);
     });
   });
 
@@ -838,7 +870,7 @@ describe('stage6/services/job-processor', () => {
     });
 
     it('starts manual top regeneration directly on stage_6_manual_regeneration', async () => {
-      mockGetModelForPhase.mockImplementation(async (phaseName: string) => {
+      mockGetModelForPhase.mockImplementation((phaseName: string) => {
         if (phaseName === 'stage_6_manual_regeneration') {
           return {
             modelId: 'openai/gpt-5.4',

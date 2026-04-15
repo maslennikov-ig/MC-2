@@ -51,6 +51,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       ragContextId: input.ragContextId ?? null,
       userRefinementPrompt: input.userRefinementPrompt ?? null,
       modelOverride: validatedModelOverride,
+      maxTokensOverride: input.maxTokensOverride ?? null,
       style: input.style ?? null,
       analysisResult: input.analysisResult ?? null,
       selectedModel: input.selectedModel ?? null,

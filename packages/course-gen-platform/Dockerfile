@@ -102,6 +102,11 @@ WORKDIR /app
 COPY --from=builder --chown=nodejs:nodejs /app/pruned/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/package.json ./package.json
+# Copy config-seed.json to both paths where it may be resolved:
+# 1. dist/config/ — used by model-config-db.ts loadDefaultPhaseConfigs()
+# 2. config/     — used by model-config-bunker/constants.ts SEED_PATH
+COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/src/config/config-seed.json ./dist/config/config-seed.json
+COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/src/config/config-seed.json ./config/config-seed.json
 # Copy shared-types workspace package (not included in pruned)
 COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-types/dist ./node_modules/@megacampus/shared-types/dist
 COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-types/package.json ./node_modules/@megacampus/shared-types/package.json

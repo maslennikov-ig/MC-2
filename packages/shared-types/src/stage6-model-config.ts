@@ -61,10 +61,12 @@ export const STAGE6_CANONICAL_PHASE_DEFAULTS = {
   stage_6_auto_last_chance: createStage6Config({
     modelId: 'z-ai/glm-5',
     fallbackModelId: 'qwen/qwen3.5-plus-02-15',
+    maxTokens: 12000,
   }),
   stage_6_manual_regeneration: createStage6Config({
     modelId: 'openai/gpt-5.4',
     fallbackModelId: 'z-ai/glm-5',
+    maxTokens: 12000,
   }),
   stage_6_arbiter: createStage6Config({
     modelId: DEFAULT_MODEL_ID,
@@ -121,8 +123,6 @@ export function getStage6CanonicalPhaseConfig(
   phaseName: string
 ): Stage6CanonicalPhaseConfig | null {
   return phaseName in STAGE6_CANONICAL_PHASE_DEFAULTS
-    ? STAGE6_CANONICAL_PHASE_DEFAULTS[
-        phaseName as keyof typeof STAGE6_CANONICAL_PHASE_DEFAULTS
-      ]
+    ? STAGE6_CANONICAL_PHASE_DEFAULTS[phaseName as keyof typeof STAGE6_CANONICAL_PHASE_DEFAULTS]
     : null;
 }

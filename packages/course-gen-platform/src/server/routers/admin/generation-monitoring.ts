@@ -92,9 +92,9 @@ export const generationMonitoringRouter = router({
           supabase
             .from('lessons')
             .select(
-              'id, title, order_index, lesson_type, status, created_at, lesson_contents(id, status, generation_attempt, created_at)'
+              'id, title, order_index, lesson_type, status, created_at, sections!inner(course_id), lesson_contents(id, status, generation_attempt, created_at)'
             )
-            .eq('course_id', input.courseId)
+            .eq('sections.course_id', input.courseId)
             .order('order_index', { ascending: true }),
           supabase
             .from('generation_trace')
@@ -135,28 +135,32 @@ export const generationMonitoringRouter = router({
         const { data: lesson } = await supabase
           .from('lessons')
           .select(
-            '*, sections(order_index), courses(id, organization_id, user_id, course_structure, analysis_result, language)'
+            '*, sections!inner(order_index, courses!inner(id, organization_id, user_id, course_structure, analysis_result, language))'
           )
           .eq('id', input.lessonId)
           .single();
 
-        if (!lesson || !lesson.courses) {
+        if (!lesson || !lesson.sections) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
         }
 
-        // Type assertion for joined course
-        const courses = lesson.courses as unknown as {
-          id: string;
-          organization_id: string;
-          user_id: string;
-          course_structure: CourseStructure | null;
-          analysis_result: unknown;
-          language: string | null;
+        // Type assertion for joined section -> course
+        const sectionData = lesson.sections as unknown as {
+          order_index: number;
+          courses: {
+            id: string;
+            organization_id: string;
+            user_id: string;
+            course_structure: CourseStructure | null;
+            analysis_result: unknown;
+            language: string | null;
+          };
         };
+        const courses = sectionData.courses;
 
         const courseStructure = courses.course_structure;
         const analysisResult = parseAnalysisResult(courses.analysis_result);
-        const sectionNumber = (lesson.sections as { order_index?: number } | null)?.order_index ?? 1;
+        const sectionNumber = sectionData.order_index ?? 1;
         const lessonId = buildLessonId(sectionNumber, lesson.order_index ?? 1);
         const typedStructure = courseStructure
           ? { sections: courseStructure.sections as SectionFromStructure[] }
@@ -263,24 +267,27 @@ export const generationMonitoringRouter = router({
         const { data: lesson } = await supabase
           .from('lessons')
           .select(
-            '*, sections(order_index), courses(id, organization_id, user_id, course_structure, analysis_result, language)'
+            '*, sections!inner(order_index, courses!inner(id, organization_id, user_id, course_structure, analysis_result, language))'
           )
           .eq('id', input.lessonId)
           .single();
 
-        if (lesson && lesson.courses) {
-          const courses = lesson.courses as unknown as {
-            id: string;
-            organization_id: string;
-            user_id: string;
-            course_structure: CourseStructure | null;
-            analysis_result: unknown;
-            language: string | null;
+        if (lesson && lesson.sections) {
+          const sectionData = lesson.sections as unknown as {
+            order_index: number;
+            courses: {
+              id: string;
+              organization_id: string;
+              user_id: string;
+              course_structure: CourseStructure | null;
+              analysis_result: unknown;
+              language: string | null;
+            };
           };
+          const courses = sectionData.courses;
           const language = (courses.language || 'en') as Language;
           const analysisResult = parseAnalysisResult(courses.analysis_result);
-          const sectionNumber =
-            (lesson.sections as { order_index?: number } | null)?.order_index ?? 1;
+          const sectionNumber = sectionData.order_index ?? 1;
           const lessonId = buildLessonId(sectionNumber, lesson.order_index ?? 1);
           const typedStructure = courses.course_structure
             ? { sections: courses.course_structure.sections as SectionFromStructure[] }
@@ -289,7 +296,9 @@ export const generationMonitoringRouter = router({
             (section, index) => resolveSectionNumber(section, index) === sectionNumber
           );
           const structureLesson =
-            (matchingSection ? findLessonByOrder(matchingSection, lesson.order_index ?? 1) : null) ??
+            (matchingSection
+              ? findLessonByOrder(matchingSection, lesson.order_index ?? 1)
+              : null) ??
             matchingSection?.lessons.find(candidate => candidate.lesson_title === lesson.title) ??
             null;
           const lessonSpec = buildMinimalLessonSpec(

@@ -33,7 +33,15 @@ export default tseslint.config(
         ...globals.es2022,
       },
       parserOptions: {
-        projectService: true,
+        // Use explicit project list instead of projectService so that
+        // test files (excluded from main tsconfig.json) are covered by
+        // tsconfig.test.json / tsconfig.eslint.json.
+        project: [
+          './tsconfig.json',
+          './packages/*/tsconfig.json',
+          './packages/*/tsconfig.test.json',
+          './packages/*/tsconfig.eslint.json',
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },
