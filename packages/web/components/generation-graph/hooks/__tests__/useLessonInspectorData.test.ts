@@ -65,6 +65,26 @@ describe('selectLessonInspectorContentRows', () => {
     expect(selection.statusRow?.id).toBe('latest-review-required')
     expect(selection.previewRow?.id).toBe('latest-review-required')
   })
+
+  it('skips a latest rejected row for preview and falls back to the next usable row', () => {
+    const latestRejected = createLessonContentRow({
+      id: 'latest-rejected',
+      status: 'rejected',
+      created_at: '2026-04-06T13:00:00.000Z',
+      metadata: { markdownContent: '# Rejected lesson preview' },
+    })
+    const olderCompleted = createLessonContentRow({
+      id: 'older-completed',
+      status: 'completed',
+      created_at: '2026-04-06T11:00:00.000Z',
+      metadata: { markdownContent: '# Older lesson preview' },
+    })
+
+    const selection = selectLessonInspectorContentRows([latestRejected, olderCompleted])
+
+    expect(selection.statusRow?.id).toBe('latest-rejected')
+    expect(selection.previewRow?.id).toBe('older-completed')
+  })
 })
 
 describe('resolveLessonInspectorQualityScore', () => {

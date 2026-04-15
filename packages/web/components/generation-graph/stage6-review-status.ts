@@ -226,6 +226,10 @@ export function deriveLessonInspectorStatus({
     return { status: 'completed', needsReview: false }
   }
 
+  if (normalizedStatus === 'rejected') {
+    return { status: 'error', needsReview: false }
+  }
+
   if (normalizedStatus === 'failed' || normalizedStatus === 'error') {
     return { status: 'error', needsReview: false }
   }

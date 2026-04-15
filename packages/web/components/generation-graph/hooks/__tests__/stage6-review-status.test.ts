@@ -122,6 +122,22 @@ describe('deriveLessonInspectorStatus', () => {
       needsReview: false,
     })
   })
+
+  it('treats rejected lesson content as a failed inspector state', () => {
+    const state = deriveLessonInspectorStatus({
+      contentStatus: 'rejected',
+      pipelineNodes: [{ node: 'judge', status: 'completed' }],
+      hasContent: true,
+      hasFinishTrace: true,
+      hasErrorTrace: false,
+      hasTraces: true,
+    })
+
+    expect(state).toEqual({
+      status: 'error',
+      needsReview: false,
+    })
+  })
 })
 
 describe('getReviewAwareGraphNodeState', () => {

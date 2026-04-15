@@ -1,6 +1,7 @@
 type LessonContentLike = {
   content?: unknown
   metadata?: unknown
+  status?: unknown
 }
 
 type DatedLessonContentLike = LessonContentLike & {
@@ -196,6 +197,10 @@ function hasPreviewContent(content: LessonContentPreviewData | null): boolean {
   )
 }
 
+function isRejectedLessonContent(contentRow: LessonContentLike | null | undefined): boolean {
+  return typeof contentRow?.status === 'string' && contentRow.status.toLowerCase() === 'rejected'
+}
+
 function getCreatedAtTimestamp(value: string | null | undefined): number {
   if (!value) {
     return Number.NEGATIVE_INFINITY
@@ -231,6 +236,10 @@ export function getLessonInspectorContentPresentation(
 }
 
 export function isLessonContentUsable(contentRow: LessonContentLike | null | undefined): boolean {
+  if (isRejectedLessonContent(contentRow)) {
+    return false
+  }
+
   const presentation = getLessonInspectorContentPresentation(contentRow)
   return Boolean(presentation.rawMarkdown?.trim() || hasPreviewContent(presentation.content))
 }
