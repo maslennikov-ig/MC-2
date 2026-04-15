@@ -125,6 +125,28 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
       const truncationCount = state.truncationCount ?? 0;
 
       if (truncationCount > maxContinuationAttempts) {
+        // Escalate: try full regeneration before giving up
+        const maxFullRetries = HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
+        const regenerateCount = state.regenerateCount ?? 0;
+
+        if (regenerateCount < maxFullRetries) {
+          state.regenerationMode = 'full_regenerate';
+          state.regenerateCount = regenerateCount + 1;
+
+          logger.info(
+            {
+              lessonId: state.lessonSpec.lesson_id,
+              truncationCount,
+              maxContinuationAttempts,
+              regenerateCount: regenerateCount + 1,
+              maxFullRetries,
+            },
+            'SelfReviewer routing: Truncation continuation cap exceeded - escalating to full regeneration'
+          );
+
+          return 'generator';
+        }
+
         const reason =
           `Truncation continuation attempts exceeded (${maxContinuationAttempts}). ` +
           `Marked as review_required (fail-open).`;
@@ -134,8 +156,10 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
             lessonId: state.lessonSpec.lesson_id,
             truncationCount,
             maxContinuationAttempts,
+            regenerateCount,
+            maxFullRetries,
           },
-          'SelfReviewer routing: Truncation continuation cap exceeded - marking as review_required'
+          'SelfReviewer routing: Truncation continuation and full regeneration budget exhausted - marking as review_required'
         );
 
         markReviewRequired(state, reason);
