@@ -46,13 +46,20 @@ describe('planStage6QualityRecoveryAttempts', () => {
     });
   });
 
-  it('applies balanced retry policy: initial rung=1, promoted rungs=0', () => {
+  it('applies balanced retry policy: initial=1, mid-promoted=0, last_chance=1', () => {
     const attempts = planStage6QualityRecoveryAttempts({
       initialAutomaticRung: 'stage_6_simple',
     });
 
+    // Initial rung gets 1 retry
     expect(attempts[0].max_regeneration_retries).toBe(1);
-    expect(attempts.slice(1).every(attempt => attempt.max_regeneration_retries === 0)).toBe(true);
+    // Mid-ladder promoted rungs (normal, complex) get 0 retries
+    const midRungs = attempts.slice(1, -1);
+    expect(midRungs.every(attempt => attempt.max_regeneration_retries === 0)).toBe(true);
+    // auto_last_chance gets 1 promoted retry (P4 fix)
+    const lastChance = attempts[attempts.length - 1];
+    expect(lastChance.phase_name).toBe('stage_6_auto_last_chance');
+    expect(lastChance.max_regeneration_retries).toBe(1);
   });
 });
 
