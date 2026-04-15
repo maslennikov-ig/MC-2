@@ -192,6 +192,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     ragContextId,
     language,
     modelOverride,
+    maxTokensOverride,
     userRefinementPrompt,
     style,
     analysisResult,
@@ -199,6 +200,8 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     fallbackModel,
     selectedModelTier,
     selectedModelTierReason,
+    selectedModelPhase,
+    selectedModelSource,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -213,12 +216,15 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     ragContextId: ragContextId ?? undefined,
     userRefinementPrompt,
     modelOverride,
+    maxTokensOverride,
     style,
     analysisResult,
     selectedModel: selectedModel ?? null,
     fallbackModel: fallbackModel ?? null,
     selectedModelTier: selectedModelTier ?? null,
     selectedModelTierReason: selectedModelTierReason ?? null,
+    selectedModelPhase: selectedModelPhase ?? null,
+    selectedModelSource: selectedModelSource ?? null,
   };
 
   return executeStage6Orchestrator(orchestratorInput);
