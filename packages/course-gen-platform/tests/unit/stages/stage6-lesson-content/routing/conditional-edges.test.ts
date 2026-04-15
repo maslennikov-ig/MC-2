@@ -45,10 +45,45 @@ describe('shouldProceedToJudge', () => {
     expect(state.needsHumanReview).toBeFalsy();
   });
 
-  it('ends as review_required when truncation continuation cap is exceeded', () => {
+  it('escalates to full_regenerate when truncation cap exceeded and regenerateCount budget remains', () => {
     const state = buildState({
-      retryCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES + 1,
+      retryCount: HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS + 1,
       truncationCount: HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS + 1,
+      regenerateCount: 0,
+      regenerationMode: 'truncation_continuation',
+      selfReviewResult: {
+        status: 'REGENERATE',
+        reasoning: 'Critical truncation',
+        issues: [
+          {
+            type: 'TRUNCATION',
+            severity: 'CRITICAL',
+            location: 'global',
+            description: 'Cut off',
+          },
+        ],
+        patchedContent: null,
+        tokensUsed: 0,
+        durationMs: 10,
+        heuristicsPassed: false,
+      },
+    });
+
+    expect(shouldProceedToJudge(state)).toBe('generator');
+    expect(state.needsHumanReview).toBeFalsy();
+    // Mode must be switched so generator does a fresh single-call, not continuation
+    expect(state.regenerationMode).toBe('full_regenerate');
+    expect(state.regenerateCount).toBe(1);
+  });
+
+  it('ends as review_required when truncation cap exceeded AND full regen budget exhausted', () => {
+    const state = buildState({
+      retryCount:
+        HANDLER_CONFIG.MAX_REGENERATION_RETRIES +
+        HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS +
+        1,
+      truncationCount: HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS + 1,
+      regenerateCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES,
       regenerationMode: 'truncation_continuation',
       selfReviewResult: {
         status: 'REGENERATE',
