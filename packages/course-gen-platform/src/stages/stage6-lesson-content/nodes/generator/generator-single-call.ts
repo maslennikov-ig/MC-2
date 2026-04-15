@@ -238,23 +238,23 @@ export async function generateLessonSingleCall(
   });
 
   // Step 11: Calculate maxTokens
-  // Apply language multiplier + structural overhead (headers, exercises, digest, formatting)
-  // When a phase config provides maxTokensOverride (e.g. auto_last_chance=12000),
-  // use it as an additional floor so the phase budget is never undercut.
+  // Apply language multiplier + structural overhead (headers, exercises, digest, formatting).
+  // Phase-config maxTokensOverride remains a ceiling, matching llm_model_config semantics.
   const languageMultiplier = getTokenMultiplier(language);
   const rawTokens = Math.ceil(
     targetWordCount * TOKENS_PER_WORD_RATIO * languageMultiplier * SINGLE_CALL_OVERHEAD_MULTIPLIER
   );
-  const effectiveFloor = maxTokensOverride
-    ? Math.max(SINGLE_CALL_MIN_TOKENS, maxTokensOverride)
-    : SINGLE_CALL_MIN_TOKENS;
-  const maxTokens = Math.min(SINGLE_CALL_MAX_TOKENS, Math.max(effectiveFloor, rawTokens));
+  const configuredCeiling = maxTokensOverride
+    ? Math.max(SINGLE_CALL_MIN_TOKENS, Math.min(SINGLE_CALL_MAX_TOKENS, maxTokensOverride))
+    : SINGLE_CALL_MAX_TOKENS;
+  const maxTokens = Math.max(SINGLE_CALL_MIN_TOKENS, Math.min(configuredCeiling, rawTokens));
 
   logger.debug(
     {
       lessonId: lessonSpec.lesson_id,
       targetWordCount,
       rawTokens,
+      configuredCeiling,
       maxTokens,
       languageMultiplier,
     },

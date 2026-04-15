@@ -1287,7 +1287,7 @@ Additional completion in Russian.`,
     });
 
     it('should keep advanced lesson continuation on the complex tier', async () => {
-      mockGetModelForPhase.mockImplementation(async phaseName => ({
+      mockGetModelForPhase.mockImplementation(phaseName => ({
         modelId: phaseName === 'stage_6_complex' ? 'test-complex-model-id' : 'test-model-id',
       }));
       mockModelInvoke.mockResolvedValue({
@@ -1458,6 +1458,27 @@ ${marker}`;
         0.7, // Mocked return value
         expect.any(Number)
       );
+    });
+
+    it('should respect maxTokensOverride as a ceiling for rescue phases', async () => {
+      const { createOpenRouterModel } = await import('@/shared/llm/langchain-models');
+      const longLessonSpec: LessonSpecificationV2 = {
+        ...mockLessonSpec,
+        estimated_duration_minutes: 60,
+      };
+
+      await generateLessonSingleCall(
+        longLessonSpec,
+        [],
+        'en',
+        null,
+        null,
+        null,
+        undefined,
+        12000
+      );
+
+      expect(createOpenRouterModel).toHaveBeenCalledWith(expect.any(String), expect.any(Number), 12000);
     });
   });
 });
