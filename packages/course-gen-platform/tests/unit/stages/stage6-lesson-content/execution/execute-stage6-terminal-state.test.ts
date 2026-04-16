@@ -174,4 +174,43 @@ describe('executeStage6 terminal state detection', () => {
     expect(result.success).toBe(true);
     expect(result.reviewInfo).toEqual(existingReviewInfo);
   });
+
+  it('detects review_required when sectionsToRegenerate exceeds MAX and needsHumanReview was lost', async () => {
+    // Section-cap exceeded: self-reviewer found too many sections to regenerate.
+    // The node should set terminal state, but if it's lost in LangGraph channels,
+    // the safety net must catch it via selfReviewResult.sectionsToRegenerate.
+    mockInvoke.mockResolvedValueOnce({
+      lessonSpec: baseInput.lessonSpec,
+      courseId: baseInput.courseId,
+      lessonContent: null,
+      generatedContent: 'some markdown content',
+      needsHumanReview: false, // LOST
+      reviewInfo: null, // LOST
+      needsRegeneration: false,
+      retryCount: 0,
+      regenerateCount: 0,
+      truncationCount: 0,
+      selfReviewResult: {
+        status: 'PASS_WITH_FLAGS',
+        reasoning: 'Too many sections need regeneration',
+        issues: [],
+        patchedContent: null,
+        tokensUsed: 500,
+        durationMs: 100,
+        heuristicsPassed: true,
+        sectionsToRegenerate: ['section_1', 'section_2', 'section_3', 'section_4'],
+      },
+      errors: ['Section regeneration request exceeds cap (3). Requested 4 sections, skipped 1.'],
+      tokensUsed: 500,
+      modelUsed: 'test-model',
+      qualityScore: null,
+      currentNode: 'selfReviewer',
+    });
+
+    const result = await executeStage6(baseInput);
+
+    expect(result.success).toBe(true);
+    expect(result.reviewInfo).toBeDefined();
+    expect(result.reviewInfo?.needsReview).toBe(true);
+  });
 });

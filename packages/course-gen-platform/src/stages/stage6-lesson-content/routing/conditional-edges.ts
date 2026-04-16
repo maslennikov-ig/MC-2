@@ -164,11 +164,8 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
           maxSectionsToRegenerate: HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE,
           sectionsToRegenerate,
         },
-        'SelfReviewer routing: Section regeneration request exceeds cap - ending graph'
+        'SelfReviewer routing: Section regeneration request exceeds cap - ending graph (terminal state set by node)'
       );
-
-      // NOTE: section-cap terminal state is not yet set by node (edge case).
-      // The executeStage6 safety-net in execute-stage6.ts handles this.
       return '__end__';
     }
 

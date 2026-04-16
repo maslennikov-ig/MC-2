@@ -168,8 +168,14 @@ describe('shouldProceedToJudge (pure routing — reads state set by node)', () =
     expect(shouldProceedToJudge(state)).toBe('sectionRegenerator');
   });
 
-  it('ends graph when section regeneration request exceeds cap', () => {
+  it('ends graph when section regeneration cap exceeded (terminal state set by node)', () => {
+    // Node already set needsHumanReview + reviewInfo for section-cap exceeded
     const state = buildState({
+      needsHumanReview: true,
+      reviewInfo: {
+        needsReview: true,
+        reasons: ['Section regeneration request exceeds cap (3). Requested 4 sections, skipped 1.'],
+      },
       selfReviewResult: {
         status: 'PASS_WITH_FLAGS',
         reasoning: 'Too many sections need regeneration',
@@ -185,6 +191,7 @@ describe('shouldProceedToJudge (pure routing — reads state set by node)', () =
       },
     });
 
+    // The routing function just reads the section count and returns __end__
     expect(shouldProceedToJudge(state)).toBe('__end__');
   });
 });

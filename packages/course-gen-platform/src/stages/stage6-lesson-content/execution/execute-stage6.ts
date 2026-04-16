@@ -89,8 +89,11 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       const retryCapHit = (result.retryCount ?? 0) >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
       const truncCapHit =
         (result.truncationCount ?? 0) > HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS;
+      const sectionCapHit =
+        (result.selfReviewResult?.sectionsToRegenerate?.length ?? 0) >
+        HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
 
-      if (retryCapHit || truncCapHit) {
+      if (retryCapHit || truncCapHit || sectionCapHit) {
         needsReview = true;
 
         const reasons =

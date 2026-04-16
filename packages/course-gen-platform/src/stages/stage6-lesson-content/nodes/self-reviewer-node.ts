@@ -310,6 +310,21 @@ export async function selfReviewerNode(
       stateUpdate.generatedContent = patchedContent;
     }
 
+    // Channel-safe terminal for section-regeneration cap exceeded.
+    // The conditional-edge reads sectionsToRegenerate from selfReviewResult
+    // and routes to __end__ when the cap is exceeded. We must set terminal
+    // flags here (in the node) so they survive the LangGraph channel system.
+    const sections = result.sectionsToRegenerate;
+    if (sections && sections.length > HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE) {
+      const reason =
+        `Section regeneration request exceeds cap (${HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE}). ` +
+        `Requested ${sections.length} sections, skipped ${sections.length - HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE}.`;
+      stateUpdate.needsHumanReview = true;
+      stateUpdate.needsRegeneration = false;
+      stateUpdate.reviewInfo = { needsReview: true, reasons: [reason] };
+      stateUpdate.errors = [reason];
+    }
+
     if (result.status === 'REGENERATE') {
       const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
       stateUpdate.retryCount = retryCount + 1;
