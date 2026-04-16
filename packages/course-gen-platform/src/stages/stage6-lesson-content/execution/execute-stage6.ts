@@ -1,5 +1,6 @@
 import { logger } from '@/shared/logger';
 import { getGraph } from '../graph';
+import { HANDLER_CONFIG } from '../config';
 import type { Stage6Input, Stage6Output } from '../types';
 import type { LessonGraphStateType } from '../state';
 import { buildLessonContent, extractContentBody } from '../judge/judge-helpers';
@@ -76,7 +77,48 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
     const durationMs = Date.now() - startTime;
 
     // Fail-open: review-required outcomes should not trigger outer fallback loops.
-    const needsReview = result.needsHumanReview || result.reviewInfo?.needsReview === true;
+    //
+    // SAFETY NET: LangGraph conditional-edge routing functions (shouldProceedToJudge,
+    // shouldRetryAfterJudge) set needsHumanReview and reviewInfo via direct state mutation.
+    // These mutations bypass the channel/reducer system and are NOT reflected in the
+    // final graph output returned by invoke(). Detect the lost terminal condition from
+    // durable graph signals (retryCount, truncationCount) that DO go through reducers.
+    let needsReview = result.needsHumanReview || result.reviewInfo?.needsReview === true;
+
+    if (!needsReview && !result.lessonContent) {
+      const retryCapHit = (result.retryCount ?? 0) >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
+      const truncCapHit =
+        (result.truncationCount ?? 0) > HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS;
+      const sectionCapHit =
+        (result.selfReviewResult?.sectionsToRegenerate?.length ?? 0) >
+        HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
+
+      if (retryCapHit || truncCapHit || sectionCapHit) {
+        needsReview = true;
+
+        const reasons =
+          result.errors.length > 0
+            ? [...result.errors]
+            : ['Generation retries exhausted without producing acceptable content'];
+
+        result.reviewInfo = {
+          needsReview: true,
+          reasons,
+        };
+        result.needsHumanReview = true;
+
+        logger.warn(
+          {
+            lessonId: input.lessonSpec.lesson_id,
+            retryCount: result.retryCount,
+            truncationCount: result.truncationCount,
+            regenerateCount: result.regenerateCount,
+            errorCount: result.errors.length,
+          },
+          'Recovered lost review_required state from conditional-edge — graph ended at retry/truncation cap without channel-persisted reviewInfo'
+        );
+      }
+    }
     let lessonContent = result.lessonContent ?? null;
     let synthesizedReviewContent = false;
 
