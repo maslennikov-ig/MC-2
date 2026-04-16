@@ -197,7 +197,6 @@ export async function selfReviewerNode(
       ragChunks: state.ragChunks || [],
       generatedContent,
       language,
-      courseId: state.courseId,
       detectedIssues: detectedIssues && detectedIssues.length > 0 ? detectedIssues : undefined,
     });
 
@@ -310,22 +309,30 @@ export async function selfReviewerNode(
       stateUpdate.generatedContent = patchedContent;
     }
 
-    // Channel-safe terminal for section-regeneration cap exceeded.
-    // The conditional-edge reads sectionsToRegenerate from selfReviewResult
-    // and routes to __end__ when the cap is exceeded. We must set terminal
-    // flags here (in the node) so they survive the LangGraph channel system.
+    // Channel-safe terminal-state setup. Section-cap and REGENERATE paths are
+    // MUTUALLY EXCLUSIVE to avoid double-stamping contradictory channel writes
+    // (e.g. needsHumanReview=true AND regenerationMode='full_regenerate').
+    //
+    // Priority:
+    //   1. Section-cap exceeded → terminal review_required, no REGENERATE mode
+    //   2. REGENERATE status → telemetry + escalation/terminal policy
+    //   3. Otherwise → state update proceeds without terminal flags
     const sections = result.sectionsToRegenerate;
-    if (sections && sections.length > HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE) {
+    const sectionCapExceeded =
+      sections != null && sections.length > HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
+
+    if (sectionCapExceeded) {
+      const skipped = sections.length - HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
       const reason =
         `Section regeneration request exceeds cap (${HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE}). ` +
-        `Requested ${sections.length} sections, skipped ${sections.length - HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE}.`;
+        `Requested ${sections.length} sections, skipped ${skipped}.`;
       stateUpdate.needsHumanReview = true;
       stateUpdate.needsRegeneration = false;
       stateUpdate.reviewInfo = { needsReview: true, reasons: [reason] };
       stateUpdate.errors = [reason];
-    }
-
-    if (result.status === 'REGENERATE') {
+      // Also bump retryCount so the safety net sees consistent counters
+      stateUpdate.retryCount = retryCount + 1;
+    } else if (result.status === 'REGENERATE') {
       const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
       stateUpdate.retryCount = retryCount + 1;
       stateUpdate.regenerationMode = telemetryUpdate.regenerationMode;
@@ -335,6 +342,9 @@ export async function selfReviewerNode(
 
       applyChannelSafeEscalation(stateUpdate, retryCount + 1);
 
+      // modelOverride is set even if escalation marked terminal: admin-triggered
+      // retries and resume logic use this value to decide which model to try
+      // next. Downstream (saveRejectedContent) records it for debugging.
       if (shouldEscalateTruncationRegenerate(retryCount, result.issues)) {
         stateUpdate.modelOverride = MODEL_FALLBACK.fallback;
       }
@@ -355,8 +365,6 @@ export async function selfReviewerNode(
           fallbackModel: state.fallbackModel,
           selectedModelTier: state.selectedModelTier,
           selectedModelTierReason: state.selectedModelTierReason,
-          selectedModelPhase: state.selectedModelPhase,
-          selectedModelSource: state.selectedModelSource,
           modelOverride: state.modelOverride,
           regenerateCount: stateUpdate.regenerateCount ?? state.regenerateCount,
           truncationCount: stateUpdate.truncationCount ?? state.truncationCount,
@@ -538,8 +546,6 @@ async function handleCriticalIssues(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
-      selectedModelPhase: state.selectedModelPhase,
-      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,
@@ -561,6 +567,12 @@ async function handleCriticalIssues(
   };
 
   applyChannelSafeEscalation(baseResult, retryCount + 1);
+
+  // modelOverride is set even when escalation marked this state as terminal:
+  // (1) admin retry / resume logic uses it to pick the model for the next run
+  // (2) saveRejectedContent records it for debugging/attribution
+  // The CJK persistent-fallback contract specifically requires this value
+  // to survive into the terminal state.
 
   if (criticalAnalysis.requiresModelFallback && criticalAnalysis.fallbackModel) {
     return {
@@ -636,8 +648,6 @@ async function handleModelFallback(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
-      selectedModelPhase: state.selectedModelPhase,
-      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,
@@ -658,6 +668,8 @@ async function handleModelFallback(
   };
 
   applyChannelSafeEscalation(stateUpdate, retryCount + 1);
+  // modelOverride = MODEL_FALLBACK.fallback is preserved even when terminal:
+  // downstream (saveRejectedContent, admin retry) consumes it.
   return stateUpdate;
 }
 
@@ -744,8 +756,6 @@ async function handleError(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
-      selectedModelPhase: state.selectedModelPhase,
-      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,
@@ -764,6 +774,18 @@ async function handleError(
     retryCount: retryCount + 1,
   };
 
+  // NOTE ON RETRY BUDGET (handler errors):
+  // Unexpected exceptions in the self-reviewer flow (DB timeout during
+  // trace-logging, serialization errors, etc.) ARE counted against the
+  // regular MAX_REGENERATION_RETRIES budget via applyChannelSafeEscalation.
+  // This means a transient error at the last budget step terminates
+  // the graph as review_required. This is intentional fail-open behavior:
+  //   - Persistent errors → terminate cleanly (avoid infinite loop)
+  //   - Transient errors with budget left → retry via generator
+  //   - Transient at last step → review_required is acceptable outcome
+  //     because we can't distinguish transient vs persistent without
+  //     tracking a separate handler-error counter.
+  // If handler-error rate rises, consider a dedicated counter (follow-up).
   applyChannelSafeEscalation(stateUpdate, retryCount + 1);
   return stateUpdate;
 }
@@ -843,6 +865,21 @@ function shouldEscalateTruncationRegenerate(
  * This function is called after buildRegenerateTelemetryUpdate to overlay:
  * - Truncation-cap → full_regenerate escalation (regenerationMode, regenerateCount)
  * - Terminal review_required (needsHumanReview, reviewInfo, errors) when all budgets are exhausted
+ *
+ * CAP OPERATOR CONVENTIONS (verify invariants):
+ * - truncationCount > MAX_TRUNCATION_CONTINUATION_ATTEMPTS:
+ *     Strict-greater semantics. MAX represents the NUMBER of allowed attempts;
+ *     after MAX attempts the counter equals MAX, the (MAX+1)-th attempt triggers
+ *     escalation. Example: MAX=2 allows 2 continuations (counter 1, 2), then
+ *     on the 3rd attempt counter becomes 3 > 2 → escalate to full_regenerate.
+ * - nextRetryCount >= MAX_REGENERATION_RETRIES:
+ *     Greater-or-equal semantics. MAX represents the cap VALUE; when counter
+ *     reaches MAX we terminate. Example: MAX=2 means on the 2nd retry the
+ *     counter is 2 >= 2 → terminal review_required.
+ *
+ * The different operators are load-bearing: truncation uses "attempts completed
+ * past MAX before escalating" (permissive), while regeneration uses "reached cap"
+ * (strict). Keep in sync with safety-net operators in execute-stage6.ts.
  *
  * @param stateUpdate - Mutable state update being built by the self-reviewer node
  * @param nextRetryCount - retryCount AFTER this REGENERATE (i.e. already incremented)

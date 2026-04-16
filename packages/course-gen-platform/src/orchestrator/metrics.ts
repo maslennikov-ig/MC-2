@@ -173,6 +173,16 @@ class MetricsStore {
     timestamps: [],
   };
 
+  // Stage 6 truncation heuristic suppression (for observability / alerting)
+  private truncationHeuristicMetrics = {
+    /** Number of times heuristic-only truncation signals were suppressed (non-blocking) */
+    suppressedCount: 0,
+    /** Counts per kind (SECTION_TRUNCATED, CALLOUT_TRUNCATED, GLOBAL_ENDING) */
+    byKind: new Map<string, number>(),
+    /** Recent timestamps for rate calculation */
+    timestamps: [] as Date[],
+  };
+
   // Enrichment metrics (Stage 7)
   private enrichmentMetrics: EnrichmentMetrics = {
     total: 0,
@@ -567,6 +577,50 @@ class MetricsStore {
     if (this.modelFallbackMetrics.timestamps.length > this.MAX_HISTORY) {
       this.modelFallbackMetrics.timestamps.shift();
     }
+  }
+
+  /**
+   * Record Stage 6 truncation heuristic suppression.
+   *
+   * Called when self-reviewer categorizes truncation issues as heuristic-only
+   * (section-level or callout-level last-char checks) and decides NOT to block.
+   * Ops can alert on a rising suppression rate to catch silent quality regressions.
+   *
+   * @param kinds - Array of issue kinds that were suppressed
+   *   (e.g. ['SECTION_TRUNCATED', 'CALLOUT_TRUNCATED'])
+   */
+  recordTruncationHeuristicSuppressed(kinds: string[]): void {
+    this.truncationHeuristicMetrics.suppressedCount++;
+
+    for (const kind of kinds) {
+      const count = this.truncationHeuristicMetrics.byKind.get(kind) || 0;
+      this.truncationHeuristicMetrics.byKind.set(kind, count + 1);
+    }
+
+    this.truncationHeuristicMetrics.timestamps.push(new Date());
+    if (this.truncationHeuristicMetrics.timestamps.length > this.MAX_HISTORY) {
+      this.truncationHeuristicMetrics.timestamps.shift();
+    }
+  }
+
+  /**
+   * Get Stage 6 truncation heuristic suppression metrics
+   */
+  getTruncationHeuristicMetrics(): {
+    suppressedCount: number;
+    byKind: Record<string, number>;
+    recentSuppressions: number;
+  } {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const recentSuppressions = this.truncationHeuristicMetrics.timestamps.filter(
+      t => t.getTime() > oneHourAgo
+    ).length;
+
+    return {
+      suppressedCount: this.truncationHeuristicMetrics.suppressedCount,
+      byKind: Object.fromEntries(this.truncationHeuristicMetrics.byKind),
+      recentSuppressions,
+    };
   }
 
   /**

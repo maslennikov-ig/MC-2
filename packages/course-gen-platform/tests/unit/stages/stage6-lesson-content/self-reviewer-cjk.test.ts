@@ -985,15 +985,29 @@ describe('Edge Cases', () => {
 // ============================================================================
 
 describe('Integration: CJK with Other Issues', () => {
-  it('should handle CJK + truncation issues together', async () => {
+  it('should handle CJK + heuristic truncation signals together', async () => {
+    // Post-2026-04-16 severity policy: heuristic truncation (section-level
+    // last-char) is non-blocking. Deterministic signals (mid-sentence cut,
+    // unmatched code, short content) still fire CRITICAL alone. This test
+    // covers the co-existence of CJK (LANGUAGE COMPLEX → partial regen)
+    // and heuristic truncation (ignored), which is the common real-world mix.
     const cjkAndTruncation = `
 ## Введение
 
-Введение с 稀缺性资源分配问题供给需求市场经济价格机制基础 символами в учебном материале экономики.
+Введение с 稀缺性资源分配问题供给需求市场经济价格机制基础 символами в учебном материале экономики значительного объема для прохождения проверки длины.
 
 ## Основные концепции
 
-Концепция экономики обрывается на полуслове и
+Основные концепции представлены в таблице ниже для удобства восприятия материала.
+
+| Тема | Описание |
+|---|---|
+| A | Первое определение. |
+| B | Второе определение. |
+
+## Резюме
+
+Основные идеи урока кратко изложены.
 `;
 
     const state = createMockState({

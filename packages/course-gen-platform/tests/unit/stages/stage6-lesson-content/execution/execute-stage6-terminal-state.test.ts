@@ -213,4 +213,65 @@ describe('executeStage6 terminal state detection', () => {
     expect(result.reviewInfo).toBeDefined();
     expect(result.reviewInfo?.needsReview).toBe(true);
   });
+
+  describe('safety net preserves node-authored reviewInfo (BLOCKER 1 regression)', () => {
+    it('does NOT overwrite specific terminal reason with generic one', async () => {
+      // Scenario: node correctly set reviewInfo with specific reason.
+      // retryCount is at MAX (would trigger safety net), but since node
+      // already set needsHumanReview, safety net must NOT re-fire.
+      const nodeAuthoredReason =
+        'Truncation continuation attempts exceeded (2). Marked as review_required (fail-open).';
+
+      mockInvoke.mockResolvedValueOnce({
+        lessonSpec: baseInput.lessonSpec,
+        courseId: baseInput.courseId,
+        lessonContent: null,
+        generatedContent: null,
+        needsHumanReview: true,
+        reviewInfo: { needsReview: true, reasons: [nodeAuthoredReason] },
+        needsRegeneration: false,
+        retryCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES, // hits safety-net cap
+        regenerateCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES,
+        truncationCount: HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS + 1,
+        errors: [nodeAuthoredReason],
+        tokensUsed: 3000,
+        modelUsed: 'test-model',
+        qualityScore: null,
+        currentNode: 'selfReviewer',
+      });
+
+      const result = await executeStage6(baseInput);
+
+      // Node's specific terminal reason MUST survive — no generic overwrite
+      expect(result.reviewInfo?.reasons).toEqual([nodeAuthoredReason]);
+      expect(result.reviewInfo?.reasons[0]).toContain('Truncation continuation attempts exceeded');
+      expect(result.reviewInfo?.reasons[0]).not.toContain('Generation retries exhausted');
+    });
+
+    it('uses safety-net generic reason only when node did not set reviewInfo', async () => {
+      mockInvoke.mockResolvedValueOnce({
+        lessonSpec: baseInput.lessonSpec,
+        courseId: baseInput.courseId,
+        lessonContent: null,
+        generatedContent: null,
+        needsHumanReview: false, // node failed to set
+        reviewInfo: null, // node failed to set
+        needsRegeneration: false,
+        retryCount: HANDLER_CONFIG.MAX_REGENERATION_RETRIES,
+        regenerateCount: 0,
+        truncationCount: 0,
+        errors: [], // no prior reasons
+        tokensUsed: 3000,
+        modelUsed: 'test-model',
+        qualityScore: null,
+        currentNode: 'selfReviewer',
+      });
+
+      const result = await executeStage6(baseInput);
+
+      expect(result.reviewInfo?.needsReview).toBe(true);
+      // Falls back to generic when no specific reason available
+      expect(result.reviewInfo?.reasons[0]).toContain('Generation retries exhausted');
+    });
+  });
 });
