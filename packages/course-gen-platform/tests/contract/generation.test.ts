@@ -20,7 +20,7 @@
  * Test execution: pnpm test tests/contract/generation.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { createTRPCClient, httpBatchLink, TRPCClientError } from '@trpc/client';
 import type { AppRouter } from '../../src/server/app-router';
 import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
@@ -42,6 +42,7 @@ import cors from 'cors';
 import { closeQueue } from '../../src/orchestrator/queue';
 import { getAuthToken, clearTokenCache } from '../helpers/auth-token';
 import { getRedisClient } from '../../src/shared/cache/redis';
+import { SectionRegenerationService } from '../../src/stages/stage5-generation/utils/section-regeneration-service';
 
 // ============================================================================
 // Type Definitions
@@ -284,6 +285,20 @@ async function createTestCourseWithStructure(title: string): Promise<string> {
   }
 
   return data.id;
+}
+
+function createMockRegeneratedStructure(title: string) {
+  return {
+    course_title: title,
+    course_description: 'Mock regenerated structure for contract validation',
+    sections: [
+      {
+        section_title: 'Section 1',
+        section_description: 'Mock regenerated section',
+        lessons: [{ lesson_title: 'Lesson 1.1', lesson_objective: 'Mock objective' }],
+      },
+    ],
+  };
 }
 
 // ============================================================================
@@ -762,33 +777,23 @@ describe('Contract: Generation Router', () => {
       const courseId = await createTestCourseWithStructure('Test Course - Regenerate Section');
       testCourseIds.push(courseId);
 
-      // When: Regenerating section 1 (with retry logic for non-deterministic LLM failures)
+      // And: Section regeneration itself is mocked because contract tests verify
+      // API/auth/validation contracts, not live LLM-backed section generation.
+      const regenerateSectionSpy = vi
+        .spyOn(SectionRegenerationService.prototype, 'regenerateSection')
+        .mockResolvedValue(
+          createMockRegeneratedStructure('Test Course - Regenerate Section') as any
+        );
+
       let result;
-      let lastError;
-      const maxRetries = 3;
-
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          result = await client.regeneration.regenerateSection.mutate({
-            courseId,
-            sectionNumber: 1,
-          });
-          break; // Success! Exit retry loop
-        } catch (error) {
-          lastError = error;
-          if (attempt < maxRetries) {
-            console.log(
-              `Attempt ${attempt} failed due to LLM parsing error, retrying... (${maxRetries - attempt} attempts remaining)`
-            );
-            // Wait 2 seconds before retrying to give LLM a chance to recover
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-        }
-      }
-
-      // If all retries failed, throw the last error
-      if (!result) {
-        throw lastError;
+      try {
+        // When: Regenerating section 1
+        result = await client.regeneration.regenerateSection.mutate({
+          courseId,
+          sectionNumber: 1,
+        });
+      } finally {
+        regenerateSectionSpy.mockRestore();
       }
 
       // Then: Should return success response
