@@ -704,9 +704,12 @@ export async function saveRejectedContent(
     };
 
     // Build metadata with rejection details
+    // failureReason is the canonical field name used by markForReview and UI queries.
+    // rejectionReason is kept for backward compatibility with existing debug tooling.
     const metadata = {
       lessonLabel,
       generatedAt: new Date().toISOString(),
+      failureReason: selfReviewResult.reasoning,
       rejectionReason: selfReviewResult.reasoning,
       rejectionStatus: selfReviewResult.status,
       issues: selfReviewResult.issues,
