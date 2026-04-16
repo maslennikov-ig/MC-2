@@ -16,15 +16,12 @@ import {
   GenerationProgress,
   GenerationProgressStep,
   Json,
-  Database,
 } from '@megacampus/shared-types';
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 import { parseGenerationProgress } from '@/shared/schemas/generation-progress.schema';
 import type { LessonContent, LessonQualitySignals } from '@megacampus/shared-types/lesson-content';
 import { runCourseQualityAudit, type CourseAuditFinding } from '../quality/course-audit';
 import { isStage6CourseAuditEnabled, isStage6QualityAlertsEnabled } from '../quality/flags';
-import type { Stage6ExecutionContext, Stage6QualityRecoveryHistory } from '../types';
-import { STAGE6_REMEDIATION_CONTEXTS } from '../types';
 
 const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
   'completed',
@@ -109,17 +106,6 @@ function getContentArchetypeFromStoredRow(row: StoredLessonContentRow): string |
   return null;
 }
 
-function getAttemptLadderFromResult(
-  result:
-    | Pick<Stage6Output, 'qualityRecovery' | 'metrics'>
-    | { qualityRecovery?: Stage6QualityRecoveryHistory; attemptLadder?: Stage6QualityRecoveryHistory['attempts'] }
-): Stage6QualityRecoveryHistory['attempts'] {
-  const metricsAttemptLadder =
-    'metrics' in result ? result.metrics.attemptLadder : undefined;
-  const directAttemptLadder = 'attemptLadder' in result ? result.attemptLadder : undefined;
-  return result.qualityRecovery?.attempts ?? metricsAttemptLadder ?? directAttemptLadder ?? [];
-}
-
 function summarizeCourseAuditFindings(findings: CourseAuditFinding[]): string {
   return findings
     .slice(0, 3)
@@ -164,17 +150,13 @@ export async function handlePartialSuccess(
           fallbackModel: result.metrics.fallbackModel,
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
-          selectedModelPhase: result.metrics.selectedModelPhase,
-          selectedModelSource: result.metrics.selectedModelSource,
           qualityScore: result.metrics.qualityScore,
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
           regenerationMode: result.metrics.regenerationMode ?? null,
-          attemptLadder: getAttemptLadderFromResult(result),
           qaSignals: getQaSignalsFromResult(result),
           reviewInfo: result.reviewInfo ?? undefined,
-          qualityRecovery: result.qualityRecovery ?? undefined,
         })
       ) as Json,
       generation_attempt: (result.metrics.regenerateCount ?? 0) + 1,
@@ -229,8 +211,6 @@ export interface ReviewMarkerContext {
   fallbackModel?: string | null;
   selectedModelTier?: string | null;
   selectedModelTierReason?: string | null;
-  selectedModelPhase?: string | null;
-  selectedModelSource?: string | null;
   regenerateCount?: number | null;
   truncationCount?: number | null;
   rejectedTokens?: number | null;
@@ -238,8 +218,6 @@ export interface ReviewMarkerContext {
   reviewInfo?: Stage6Output['reviewInfo'];
   qaSignals?: LessonQualitySignals | null;
   courseAuditFindings?: Array<Pick<CourseAuditFinding, 'kind' | 'detail'>>;
-  qualityRecovery?: Stage6QualityRecoveryHistory;
-  attemptLadder?: Stage6QualityRecoveryHistory['attempts'];
   suppressAlert?: boolean;
 }
 
@@ -278,30 +256,23 @@ export async function markForReview(
       lesson_id: lessonUuid,
       course_id: courseId,
       status: 'review_required',
-      metadata: JSON.parse(
-        JSON.stringify({
-          lessonLabel,
-          markedForReviewAt: markedAt,
-          failureReason: reason,
-          modelUsed: context.modelUsed ?? null,
-          selectedModel: context.selectedModel ?? null,
-          fallbackModel: context.fallbackModel ?? null,
-          selectedModelTier: context.selectedModelTier ?? null,
-          selectedModelTierReason: context.selectedModelTierReason ?? null,
-          selectedModelPhase: context.selectedModelPhase ?? null,
-          selectedModelSource: context.selectedModelSource ?? null,
-          regenerateCount: context.regenerateCount ?? null,
-          truncationCount: context.truncationCount ?? null,
-          rejectedTokens: context.rejectedTokens ?? null,
-          regenerationMode: context.regenerationMode ?? null,
-          attemptLadder:
-            context.qualityRecovery?.attempts ?? context.attemptLadder ?? [],
-          reviewInfo: context.reviewInfo ?? undefined,
-          qaSignals: context.qaSignals ?? undefined,
-          courseAuditFindings: context.courseAuditFindings ?? undefined,
-          qualityRecovery: context.qualityRecovery ?? undefined,
-        })
-      ) as Json,
+      metadata: {
+        lessonLabel,
+        markedForReviewAt: markedAt,
+        failureReason: reason,
+        modelUsed: context.modelUsed ?? null,
+        selectedModel: context.selectedModel ?? null,
+        fallbackModel: context.fallbackModel ?? null,
+        selectedModelTier: context.selectedModelTier ?? null,
+        selectedModelTierReason: context.selectedModelTierReason ?? null,
+        regenerateCount: context.regenerateCount ?? null,
+        truncationCount: context.truncationCount ?? null,
+        rejectedTokens: context.rejectedTokens ?? null,
+        regenerationMode: context.regenerationMode ?? null,
+        reviewInfo: context.reviewInfo ?? undefined,
+        qaSignals: context.qaSignals ?? undefined,
+        courseAuditFindings: context.courseAuditFindings ?? undefined,
+      },
       generation_attempt: (context.regenerateCount ?? 0) + 1,
     });
 
@@ -363,130 +334,6 @@ export async function markForReview(
 }
 
 /**
- * Check whether a Stage 6 job is allowed to run for this course.
- *
- * For normal full_generation jobs, only `stage_6_generating` is accepted.
- * For remediation jobs (partial_regeneration, manual_regeneration,
- * generate_missing), `stage_6_generating` is also the expected state because
- * `transitionToStage6Generating()` moves the course there before enqueueing.
- * However, if the transition was skipped or a race occurred, remediation jobs
- * also accept `stage_6_complete` and `completed` so they don't silently no-op.
- */
-export async function isStage6CourseActive(
-  courseId: string,
-  executionContext?: Stage6ExecutionContext
-): Promise<boolean> {
-  const supabaseAdmin = getSupabaseAdmin();
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('courses')
-      .select('generation_status')
-      .eq('id', courseId)
-      .single();
-
-    if (error) {
-      logger.warn({ courseId, error: error.message }, 'Failed to read Stage 6 course status');
-      return true;
-    }
-
-    const status = data?.generation_status;
-
-    if (status === 'stage_6_generating') {
-      return true;
-    }
-
-    // Remediation contexts tolerate completed/stage_6_complete because
-    // transitionToStage6Generating may have raced or been skipped.
-    if (
-      executionContext &&
-      STAGE6_REMEDIATION_CONTEXTS.has(executionContext) &&
-      (status === 'stage_6_complete' || status === 'completed')
-    ) {
-      logger.info(
-        { courseId, executionContext, generationStatus: status },
-        'Remediation job allowed on completed course'
-      );
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    logger.warn(
-      {
-        courseId,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      'Exception while checking Stage 6 course status'
-    );
-    return true;
-  }
-}
-
-export async function failStage6Course(courseId: string, reason: string): Promise<boolean> {
-  const supabaseAdmin = getSupabaseAdmin();
-  const failedAt = new Date().toISOString();
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('courses')
-      .update({
-        generation_status: 'failed',
-        failed_at_stage: 6,
-        error_code: 'NETWORK_ERROR' as Database['public']['Enums']['stage_error_code'],
-        generation_metadata: {
-          error_code: 'NETWORK_ERROR',
-          failed_at: failedAt,
-          failed_phase: 'rag_preflight',
-          error_message: reason,
-        } as Json,
-        updated_at: failedAt,
-      })
-      .eq('id', courseId)
-      .eq('generation_status', 'stage_6_generating')
-      .select('id');
-
-    if (error) {
-      logger.error({ courseId, error: error.message, reason }, 'Failed to mark Stage 6 course failed');
-      return false;
-    }
-
-    const didTransition = Array.isArray(data) && data.length > 0;
-    if (!didTransition) {
-      logger.info(
-        { courseId, reason },
-        'Stage 6 course failure already handled or course no longer generating'
-      );
-      return false;
-    }
-
-    try {
-      await notifyCourseError(courseId, 6, reason);
-    } catch (notifyError) {
-      logger.warn(
-        {
-          courseId,
-          error: notifyError instanceof Error ? notifyError.message : String(notifyError),
-        },
-        'Failed to send Stage 6 infrastructure error notification'
-      );
-    }
-
-    return true;
-  } catch (error) {
-    logger.error(
-      {
-        courseId,
-        error: error instanceof Error ? error.message : String(error),
-        reason,
-      },
-      'Exception while marking Stage 6 course failed'
-    );
-    return false;
-  }
-}
-
-/**
  * Save generated lesson content to database
  */
 export async function saveLessonContent(
@@ -526,14 +373,11 @@ export async function saveLessonContent(
           fallbackModel: result.metrics.fallbackModel,
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
-          selectedModelPhase: result.metrics.selectedModelPhase,
-          selectedModelSource: result.metrics.selectedModelSource,
           qualityScore: result.metrics.qualityScore,
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
           regenerationMode: result.metrics.regenerationMode ?? null,
-          attemptLadder: getAttemptLadderFromResult(result),
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: markdown,
@@ -549,7 +393,6 @@ export async function saveLessonContent(
           // Human review info for UI warnings (only present if review needed)
           reviewInfo: result.reviewInfo ?? undefined,
           lessonDigest: result.lessonDigest ?? undefined,
-          qualityRecovery: result.qualityRecovery ?? undefined,
         })
       ) as Json,
       status: 'completed',
@@ -661,14 +504,11 @@ export async function saveRejectedContent(
     fallbackModel?: string | null;
     selectedModelTier?: string | null;
     selectedModelTierReason?: string | null;
-    selectedModelPhase?: string | null;
-    selectedModelSource?: string | null;
     modelOverride?: string | null;
     regenerateCount?: number | null;
     truncationCount?: number | null;
     rejectedTokens?: number | null;
     regenerationMode?: string | null;
-    attemptLadder?: Stage6QualityRecoveryHistory['attempts'];
   }
 ): Promise<void> {
   if (!generatedContent) {
@@ -724,22 +564,19 @@ export async function saveRejectedContent(
       fallbackModel: context?.fallbackModel ?? null,
       selectedModelTier: context?.selectedModelTier ?? null,
       selectedModelTierReason: context?.selectedModelTierReason ?? null,
-      selectedModelPhase: context?.selectedModelPhase ?? null,
-      selectedModelSource: context?.selectedModelSource ?? null,
       modelOverride: context?.modelOverride ?? null,
       regenerateCount: context?.regenerateCount ?? null,
       truncationCount: context?.truncationCount ?? null,
       rejectedTokens: context?.rejectedTokens ?? null,
       regenerationMode: context?.regenerationMode ?? null,
-      attemptLadder: context?.attemptLadder ?? [],
       generationAttempt,
     };
 
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: resolvedLessonUuid,
       course_id: courseId,
-      content: JSON.parse(JSON.stringify(contentObject)) as Json,
-      metadata: JSON.parse(JSON.stringify(metadata)) as Json,
+      content: contentObject,
+      metadata,
       status: 'rejected',
       generation_attempt: generationAttempt,
     });
