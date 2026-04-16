@@ -33,7 +33,7 @@ import { logTrace } from '@/shared/trace-logger';
 import { saveRejectedContent } from '../services/database-service';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import type { SelfReviewResult, SelfReviewIssue } from '@megacampus/shared-types/judge-types';
-import { MODEL_FALLBACK } from '../config';
+import { MODEL_FALLBACK, HANDLER_CONFIG } from '../config';
 
 // Import from extracted modules
 import { HEURISTIC_TOKENS_USED, SELF_REVIEW_CONFIG } from './self-reviewer/self-reviewer-constants';
@@ -318,6 +318,8 @@ export async function selfReviewerNode(
       stateUpdate.truncationCount = telemetryUpdate.truncationCount;
       stateUpdate.rejectedTokens = telemetryUpdate.rejectedTokens;
 
+      applyChannelSafeEscalation(stateUpdate, retryCount + 1);
+
       if (shouldEscalateTruncationRegenerate(retryCount, result.issues)) {
         stateUpdate.modelOverride = MODEL_FALLBACK.fallback;
       }
@@ -417,8 +419,9 @@ async function handleEmptyContent(
   });
 
   const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
+  const nextRetryCount = (state.retryCount || 0) + 1;
 
-  return {
+  const stateUpdate: LessonGraphStateUpdate = {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
@@ -426,8 +429,11 @@ async function handleEmptyContent(
     regenerateCount: telemetryUpdate.regenerateCount,
     truncationCount: telemetryUpdate.truncationCount,
     rejectedTokens: telemetryUpdate.rejectedTokens,
-    retryCount: (state.retryCount || 0) + 1,
+    retryCount: nextRetryCount,
   };
+
+  applyChannelSafeEscalation(stateUpdate, nextRetryCount);
+  return stateUpdate;
 }
 
 /**
@@ -539,6 +545,8 @@ async function handleCriticalIssues(
     retryCount: retryCount + 1,
   };
 
+  applyChannelSafeEscalation(baseResult, retryCount + 1);
+
   if (criticalAnalysis.requiresModelFallback && criticalAnalysis.fallbackModel) {
     return {
       ...baseResult,
@@ -622,7 +630,7 @@ async function handleModelFallback(
     }
   );
 
-  return {
+  const stateUpdate: LessonGraphStateUpdate = {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
@@ -633,6 +641,9 @@ async function handleModelFallback(
     modelOverride: MODEL_FALLBACK.fallback,
     retryCount: retryCount + 1,
   };
+
+  applyChannelSafeEscalation(stateUpdate, retryCount + 1);
+  return stateUpdate;
 }
 
 /**
@@ -727,7 +738,7 @@ async function handleError(
     }
   );
 
-  return {
+  const stateUpdate: LessonGraphStateUpdate = {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
@@ -737,6 +748,9 @@ async function handleError(
     rejectedTokens: telemetryUpdate.rejectedTokens,
     retryCount: retryCount + 1,
   };
+
+  applyChannelSafeEscalation(stateUpdate, retryCount + 1);
+  return stateUpdate;
 }
 
 /**
@@ -801,4 +815,58 @@ function shouldEscalateTruncationRegenerate(
 
   // retryCount is the count before this REGENERATE result is applied.
   return retryCount + 1 >= MODEL_FALLBACK.maxPrimaryAttempts;
+}
+
+/**
+ * Channel-safe escalation and terminal-state decisions.
+ *
+ * LangGraph conditional-edge routing functions cannot reliably mutate state
+ * (direct property assignments bypass the channel/reducer system and are lost
+ * in the final graph output). All state transitions MUST be set inside nodes
+ * so they go through the Annotation reducers.
+ *
+ * This function is called after buildRegenerateTelemetryUpdate to overlay:
+ * - Truncation-cap → full_regenerate escalation (regenerationMode, regenerateCount)
+ * - Terminal review_required (needsHumanReview, reviewInfo, errors) when all budgets are exhausted
+ *
+ * @param stateUpdate - Mutable state update being built by the self-reviewer node
+ * @param nextRetryCount - retryCount AFTER this REGENERATE (i.e. already incremented)
+ */
+export function applyChannelSafeEscalation(
+  stateUpdate: LessonGraphStateUpdate,
+  nextRetryCount: number
+): void {
+  const isTruncation = stateUpdate.regenerationMode === 'truncation_continuation';
+  const nextTruncationCount = stateUpdate.truncationCount ?? 0;
+  const nextRegenerateCount = stateUpdate.regenerateCount ?? 0;
+
+  if (isTruncation && nextTruncationCount > HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS) {
+    // Truncation cap exceeded — escalate or fail-open
+    if (nextRegenerateCount < HANDLER_CONFIG.MAX_REGENERATION_RETRIES) {
+      // ESCALATE to full_regenerate (channel-safe: fields go through reducer)
+      stateUpdate.regenerationMode = 'full_regenerate';
+      stateUpdate.regenerateCount = nextRegenerateCount + 1;
+    } else {
+      // Both budgets exhausted — terminal review_required
+      const reason =
+        `Truncation continuation attempts exceeded (${HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS}). ` +
+        `Marked as review_required (fail-open).`;
+      stateUpdate.needsHumanReview = true;
+      stateUpdate.needsRegeneration = false;
+      stateUpdate.reviewInfo = { needsReview: true, reasons: [reason] };
+      stateUpdate.errors = [reason];
+    }
+    return;
+  }
+
+  if (!isTruncation && nextRetryCount >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES) {
+    // Full-regenerate budget exhausted — terminal review_required
+    const reason =
+      `Self-review regeneration retries exceeded (${HANDLER_CONFIG.MAX_REGENERATION_RETRIES}). ` +
+      `Last status: REGENERATE.`;
+    stateUpdate.needsHumanReview = true;
+    stateUpdate.needsRegeneration = false;
+    stateUpdate.reviewInfo = { needsReview: true, reasons: [reason] };
+    stateUpdate.errors = [reason];
+  }
 }

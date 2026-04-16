@@ -2,24 +2,16 @@ import { type LessonGraphStateType } from '../state';
 import { logger } from '@/shared/logger';
 import { HANDLER_CONFIG } from '../config';
 
-function markReviewRequired(state: LessonGraphStateType, reason: string): void {
-  const existingReasons = state.reviewInfo?.reasons ?? [];
-  const reasons = existingReasons.includes(reason) ? existingReasons : [...existingReasons, reason];
-
-  state.needsHumanReview = true;
-  state.needsRegeneration = false;
-  state.reviewInfo = {
-    needsReview: true,
-    reasons,
-    factualAccuracyScore: state.reviewInfo?.factualAccuracyScore,
-    unverifiedClaims: state.reviewInfo?.unverifiedClaims,
-  };
-}
-
 /**
  * Routing function for judge node conditional edges
  *
  * Determines if we need to loop back to generator or end based on judge output.
+ *
+ * IMPORTANT: This is a PURE ROUTING function. It must NOT mutate state.
+ * All state transitions (needsHumanReview, reviewInfo, errors) are set
+ * by the preceding node through the LangGraph channel/reducer system.
+ * Direct state mutations in routing functions bypass channels and are lost
+ * in the final graph output.
  *
  * @param state - Current graph state
  * @returns Next node name or END
@@ -40,12 +32,9 @@ export function shouldRetryAfterJudge(state: LessonGraphStateType): string {
     return 'generator';
   }
 
-  // Priority 2: Max retries exceeded - log error and end
+  // Priority 2: Max retries exceeded — the judge node or executeStage6 safety-net
+  // handles setting needsHumanReview/reviewInfo. We just route to __end__.
   if (state.needsRegeneration && state.retryCount >= maxRetries) {
-    const reason =
-      `Max regeneration retries (${maxRetries}) exceeded. ` +
-      `Latest quality score: ${((state.qualityScore ?? 0) * 100).toFixed(1)}%.`;
-
     logger.warn(
       {
         lessonId: state.lessonSpec.lesson_id,
@@ -53,12 +42,7 @@ export function shouldRetryAfterJudge(state: LessonGraphStateType): string {
         maxRetries,
         qualityScore: state.qualityScore,
       },
-      'Judge routing: Max regeneration retries exceeded - marking as review_required'
-    );
-
-    markReviewRequired(state, reason);
-    state.errors.push(
-      `${reason} Review LessonSpecification for key_topics/lesson_objectives mismatch.`
+      'Judge routing: Max regeneration retries exceeded - ending graph'
     );
     return '__end__';
   }
@@ -95,7 +79,12 @@ export function shouldRetryAfterJudge(state: LessonGraphStateType): string {
  * - 'judge': Content passed or needs judge attention (PASS, PASS_WITH_FLAGS, FIXED, FLAG_TO_JUDGE)
  * - 'sectionRegenerator': Specific sections need regeneration (sectionsToRegenerate populated)
  * - 'generator': Content needs regeneration (REGENERATE status)
- * - '__end__': Max retries exceeded
+ * - '__end__': Retry budgets exhausted (review_required set by node via channel)
+ *
+ * IMPORTANT: This is a PURE ROUTING function. It must NOT mutate state.
+ * The self-reviewer node sets all state transitions (regenerationMode,
+ * regenerateCount, needsHumanReview, reviewInfo, errors) through the
+ * LangGraph channel/reducer system via its return value.
  *
  * @param state - Current graph state after selfReviewer evaluation
  * @returns Next node name: 'judge', 'sectionRegenerator', 'generator', or '__end__'
@@ -118,67 +107,40 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
 
   // REGENERATE status: Fatal errors detected, skip judge and restart pipeline
   if (status === 'REGENERATE') {
-    const isTruncationContinuation = state.regenerationMode === 'truncation_continuation';
+    // Terminal: the self-reviewer node already set needsHumanReview via channel
+    if (state.needsHumanReview) {
+      logger.warn(
+        {
+          lessonId: state.lessonSpec.lesson_id,
+          retryCount: state.retryCount,
+          truncationCount: state.truncationCount,
+          regenerateCount: state.regenerateCount,
+          regenerationMode: state.regenerationMode,
+        },
+        'SelfReviewer routing: Retry/truncation budget exhausted (review_required set by node) - ending graph'
+      );
+      return '__end__';
+    }
 
-    if (isTruncationContinuation) {
-      const maxContinuationAttempts = HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS;
-      const truncationCount = state.truncationCount ?? 0;
-
-      if (truncationCount > maxContinuationAttempts) {
-        // Escalate: try full regeneration before giving up
-        const maxFullRetries = HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
-        const regenerateCount = state.regenerateCount ?? 0;
-
-        if (regenerateCount < maxFullRetries) {
-          state.regenerationMode = 'full_regenerate';
-          state.regenerateCount = regenerateCount + 1;
-
-          logger.info(
-            {
-              lessonId: state.lessonSpec.lesson_id,
-              truncationCount,
-              maxContinuationAttempts,
-              regenerateCount: regenerateCount + 1,
-              maxFullRetries,
-            },
-            'SelfReviewer routing: Truncation continuation cap exceeded - escalating to full regeneration'
-          );
-
-          return 'generator';
-        }
-
-        const reason =
-          `Truncation continuation attempts exceeded (${maxContinuationAttempts}). ` +
-          `Marked as review_required (fail-open).`;
-
-        logger.warn(
-          {
-            lessonId: state.lessonSpec.lesson_id,
-            truncationCount,
-            maxContinuationAttempts,
-            regenerateCount,
-            maxFullRetries,
-          },
-          'SelfReviewer routing: Truncation continuation and full regeneration budget exhausted - marking as review_required'
-        );
-
-        markReviewRequired(state, reason);
-        state.errors.push(reason);
-        return '__end__';
-      }
-
+    // Escalation/continuation: the node already set regenerationMode via channel
+    if (
+      state.regenerationMode === 'full_regenerate' ||
+      state.regenerationMode === 'truncation_continuation'
+    ) {
       logger.info(
         {
           lessonId: state.lessonSpec.lesson_id,
-          truncationCount,
-          maxContinuationAttempts,
+          regenerationMode: state.regenerationMode,
+          retryCount: state.retryCount,
+          truncationCount: state.truncationCount,
+          regenerateCount: state.regenerateCount,
         },
-        'SelfReviewer routing: truncation-only regenerate - routing to generator continuation'
+        `SelfReviewer routing: ${state.regenerationMode} - routing to generator`
       );
-
       return 'generator';
     }
 
+    // Fallback: no mode set yet (should not happen), route to generator
     logger.info(
       {
         lessonId: state.lessonSpec.lesson_id,
@@ -188,38 +150,13 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
       },
       'SelfReviewer routing: REGENERATE status - routing to generator'
     );
-
-    // Check retry limit
-    const maxRetries = HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
-    if (state.retryCount >= maxRetries) {
-      const reason = `Self-review regeneration retries exceeded (${maxRetries}). Last status: ${status}.`;
-
-      logger.warn(
-        {
-          lessonId: state.lessonSpec.lesson_id,
-          retryCount: state.retryCount,
-          maxRetries,
-        },
-        'SelfReviewer routing: Max retries exceeded - marking as review_required'
-      );
-      markReviewRequired(state, reason);
-      state.errors.push(reason);
-      return '__end__';
-    }
-
     return 'generator';
   }
 
-  // NEW: Check if specific sections need regeneration (not full regenerate)
+  // Section-level regeneration
   const sectionsToRegenerate = selfReviewResult.sectionsToRegenerate;
   if (sectionsToRegenerate && sectionsToRegenerate.length > 0) {
     if (sectionsToRegenerate.length > HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE) {
-      const skippedSections =
-        sectionsToRegenerate.length - HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
-      const reason =
-        `Section regeneration request exceeds cap (${HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE}). ` +
-        `Requested ${sectionsToRegenerate.length} sections, skipped ${skippedSections}.`;
-
       logger.warn(
         {
           lessonId: state.lessonSpec.lesson_id,
@@ -227,11 +164,11 @@ export function shouldProceedToJudge(state: LessonGraphStateType): string {
           maxSectionsToRegenerate: HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE,
           sectionsToRegenerate,
         },
-        'SelfReviewer routing: Section regeneration request exceeds cap - marking as review_required'
+        'SelfReviewer routing: Section regeneration request exceeds cap - ending graph'
       );
 
-      markReviewRequired(state, reason);
-      state.errors.push(reason);
+      // NOTE: section-cap terminal state is not yet set by node (edge case).
+      // The executeStage6 safety-net in execute-stage6.ts handles this.
       return '__end__';
     }
 
