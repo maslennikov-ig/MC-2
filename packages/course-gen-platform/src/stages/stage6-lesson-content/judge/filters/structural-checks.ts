@@ -81,105 +81,125 @@ export function classifyTruncationIssue(message: string): TruncationIssueKind | 
 const MAX_FOOTER_LINE_CHARS = 80;
 
 /**
- * Anchored shape predicates. A line must match ONE of these to be treated
- * as a footer. The key anchoring is `^\s*` — keyword MUST begin the line,
- * not appear mid-sentence. Combined with MAX_FOOTER_LINE_CHARS this excludes
- * substantive prose that happens to mention a footer keyword.
+ * Deterministic footer patterns.
  *
- * For "Copyright" we additionally require a STRUCTURAL signal (©, year, or
- * "reserved") within the same line, because "Copyright" alone is also a
- * valid English noun that can start an analytical sentence
- * ("Copyright law is discussed...", "Copyright Act of 1976...").
- *
- * Cyrillic patterns deliberately avoid \b — JS regex `\b` matches only
- * ASCII word boundaries, so `защищ(?:ен|ён)?\b` would fail against
- * "Материал защищен авторским правом". We anchor by shape + length instead.
+ * These lines are self-sufficient evidence of a real footer/attribution block.
+ * If the entire tail block consists of footer-shaped lines AND at least one
+ * line matches these patterns, we can safely ignore the block for global
+ * ending checks.
  */
-const FOOTER_SHAPE_PATTERNS: RegExp[] = [
-  // ^ © ... / ® ... / (c) ... — symbol-led attribution
+const DEFINITE_FOOTER_PATTERNS: RegExp[] = [
+  // Symbol-led attribution
   /^\s*(?:©|®|\(c\))\s+\S/,
-  // ^ Copyright ... WITH a structural signal (©, 4-digit year, "reserved",
-  // "Inc.", "Ltd.", "LLC"). Bare "Copyright ..." is not enough — it's a
-  // noun that legitimately starts analytical prose.
+  // Copyright with a structural signal.
   /^\s*[Cc]opyright\b.*(?:©|\(c\)|\b\d{4}\b|[Rr]eserved\b|\bInc\.|\bLtd\.|\bLLC\b|\bCorp\.)/,
-  // ^ Все права защищены / зарезервированы (no \b — Cyrillic)
+  // Rights-reserved phrases.
   /^\s*[Вв]се\s+права\s+(?:защищ|зарезервир)/,
-  // ^ All rights reserved
   /^\s*[Aa]ll\s+[Rr]ights\s+[Rr]eserved\b/,
-  // ^ Материал защищён/защищен/подготовлен (no \b — Cyrillic)
-  /^\s*[Мм]атериал\s+(?:защищ(?:ен|ён)?|подготовлен)(?:\s|$)/,
-  // ^ Авторские права / Авторским правом (no \b — Cyrillic)
+  // Explicit copyright phrasing.
   /^\s*[Аа]вторские?\s+права(?:\s|$)/,
   /^\s*[Аа]вторским\s+правом(?:\s|$)/,
+  /^\s*[Мм]атериал\s+защищ(?:ен|ён)?\s+авторским\s+правом/,
 ];
 
 /**
- * Check whether a single trailing line looks like a footer.
+ * Ambiguous footer-ish shapes.
  *
- * Two-part predicate:
- *   - Line length ≤ MAX_FOOTER_LINE_CHARS (short-form constraint)
- *   - Matches one of FOOTER_SHAPE_PATTERNS (anchored start)
+ * These lines are plausible footer attributions in Russian, but they can also
+ * start normal prose:
+ * - "Материал подготовлен учебным центром ..."  -> attribution
+ * - "Материал подготовлен в формате кейса ..." -> substantive content
  *
- * This is strictly narrower than "any line containing a footer keyword".
- * Substantive trailing prose like "Copyright law is discussed in this
- * appendix..." or "Материал подготовлен в формате кейса с подробным
- * разбором..." fails both constraints and is preserved, so Check 1
- * (GLOBAL_ENDING) continues to catch real last-section truncation.
+ * We treat such blocks conservatively: they are not deterministic footer
+ * evidence, but they also should not alone trigger GLOBAL_ENDING.
  */
-function isFooterLine(line: string): boolean {
+const AMBIGUOUS_FOOTERISH_PATTERNS: RegExp[] = [
+  /^\s*[Мм]атериал\s+подготовлен(?:\s|$)/,
+  /^\s*[Мм]атериал\s+защищ(?:ен|ён)?(?:\s|$)/,
+];
+
+type TrailingHrBlockKind = 'none' | 'definite_footer' | 'ambiguous_footerish' | 'substantive_tail';
+
+type TrailingHrBlockClassification = {
+  kind: TrailingHrBlockKind;
+  contentBeforeHr: string;
+};
+
+function isBoundedFooterLine(line: string): boolean {
   const trimmed = line.trim();
   if (trimmed.length === 0) return false;
-  if (trimmed.length > MAX_FOOTER_LINE_CHARS) return false;
-  return FOOTER_SHAPE_PATTERNS.some(pattern => pattern.test(trimmed));
+  return trimmed.length <= MAX_FOOTER_LINE_CHARS;
+}
+
+function isDefiniteFooterLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!isBoundedFooterLine(trimmed)) return false;
+  return DEFINITE_FOOTER_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
+function isAmbiguousFooterishLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!isBoundedFooterLine(trimmed)) return false;
+  return AMBIGUOUS_FOOTERISH_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
+function isFooterShapedLine(line: string): boolean {
+  return isDefiniteFooterLine(line) || isAmbiguousFooterishLine(line);
+}
+
+/**
+ * Classify the block after the LAST standalone horizontal rule.
+ *
+ * We intentionally separate:
+ * - definite_footer: safe to ignore entirely
+ * - ambiguous_footerish: do not strip, but do not let it alone trigger Check 1
+ * - substantive_tail: keep normal truncation behavior
+ */
+function classifyTrailingHrBlock(content: string): TrailingHrBlockClassification {
+  const hrPattern = /(?:^|\n)[-*_]{3,}\s*(?:\n|$)/g;
+  let lastHRIndex = -1;
+  let match: RegExpExecArray | null;
+
+  while ((match = hrPattern.exec(content)) !== null) {
+    lastHRIndex = match.index + (content[match.index] === '\n' ? 1 : 0);
+    if (match.index === hrPattern.lastIndex) hrPattern.lastIndex++;
+  }
+
+  if (lastHRIndex === -1) {
+    return { kind: 'none', contentBeforeHr: content };
+  }
+
+  const contentBeforeHr = content.slice(0, lastHRIndex).trimEnd();
+  const afterHRMatch = content.slice(lastHRIndex).match(/^[-*_]{3,}\s*\n([\s\S]+)$/);
+  if (!afterHRMatch) {
+    return { kind: 'none', contentBeforeHr: content };
+  }
+
+  const lines = afterHRMatch[1].split('\n').filter(line => line.trim().length > 0);
+  if (lines.length === 0) {
+    return { kind: 'none', contentBeforeHr: content };
+  }
+
+  if (!lines.every(isFooterShapedLine)) {
+    return { kind: 'substantive_tail', contentBeforeHr };
+  }
+
+  if (lines.some(isDefiniteFooterLine)) {
+    return { kind: 'definite_footer', contentBeforeHr };
+  }
+
+  return { kind: 'ambiguous_footerish', contentBeforeHr };
 }
 
 /**
  * Strip a trailing "--- + footer-block" segment from content.
  *
- * Behavior:
- *   - Finds the LAST standalone horizontal rule
- *   - Checks whether every non-empty line after it matches FOOTER_LINE_REGEX
- *   - If yes → strips from HR onwards
- *   - If no (any line looks like substantive content) → leaves content intact
- *
- * This is strictly narrower than "strip any non-heading line after HR": it
- * preserves genuine trailing paragraphs, bullet lists, and other substantive
- * content so Check 1 (GLOBAL_ENDING) can still catch real truncation.
+ * Only deterministic footer blocks are stripped. Ambiguous footer-ish blocks
+ * stay in the content; Check 1 handles them via classifier-aware suppression.
  */
 function stripTrailingFooterBlock(content: string): string {
-  // Find ALL standalone horizontal rules (on their own line, ending at \n or EOF).
-  // Take the LAST one — that's the only candidate for separating a footer block.
-  //
-  // Previous implementation used a lazy exec() that matched the FIRST HR
-  // that could reach EOF. When earlier `---` existed as a section separator,
-  // it captured the whole tail including body content, failed the
-  // allFooter check, and returned unchanged — missing the real footer
-  // block after the final HR.
-  const hrPattern = /(?:^|\n)[-*_]{3,}\s*(?:\n|$)/g;
-  let lastHRIndex = -1;
-  let m: RegExpExecArray | null;
-  while ((m = hrPattern.exec(content)) !== null) {
-    // HR starts after the leading \n if present
-    lastHRIndex = m.index + (content[m.index] === '\n' ? 1 : 0);
-    // Guard against zero-length match infinite loop
-    if (m.index === hrPattern.lastIndex) hrPattern.lastIndex++;
-  }
-  if (lastHRIndex === -1) return content;
-
-  // Extract content between the LAST HR and EOF.
-  // Require a newline after the HR — bare "---" at EOF has no footer
-  // and is handled separately by the horizontal-rule strip pattern.
-  const afterHRMatch = content.slice(lastHRIndex).match(/^[-*_]{3,}\s*\n([\s\S]+)$/);
-  if (!afterHRMatch) return content;
-
-  const lines = afterHRMatch[1].split('\n').filter(l => l.trim().length > 0);
-  if (lines.length === 0) return content;
-
-  // Every non-empty line after the LAST HR must be a footer-shaped line
-  const allFooter = lines.every(isFooterLine);
-  if (!allFooter) return content;
-
-  return content.slice(0, lastHRIndex).trimEnd();
+  const classification = classifyTrailingHrBlock(content);
+  return classification.kind === 'definite_footer' ? classification.contentBeforeHr : content;
 }
 
 /**
@@ -189,9 +209,8 @@ function stripTrailingFooterBlock(content: string): string {
  * - Copyright/meta italic lines (*text*) — only when they appear at the tail
  * - Trailing bold lines (**text**)
  * - Quote/callout lines
- * - "--- + footer block" pattern (via stripTrailingFooterBlock — applies
- *   ONLY when every line after the HR matches footer keywords; preserves
- *   genuine trailing content so Check 1 still catches real truncation)
+ * - "--- + definite footer block" pattern (ambiguous footer-ish tails are
+ *   handled separately by Check 1 and are not stripped here)
  *
  * Runs iteratively because the tail often has multiple trailing markers
  * (e.g. horizontal rule + italic copyright).
@@ -228,11 +247,18 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
 
   // Check 1: Proper ending punctuation
   const trimmedContent = content.trim();
+  const trailingHrBlock = classifyTrailingHrBlock(trimmedContent);
 
   // Strip trailing structural markdown (horizontal rules, copyright lines,
   // trailing bold/italic, quote lines) before evaluating the last char.
-  // These are valid structural endings, not truncation signals.
-  const contentForEndCheck = stripTrailingStructuralMarkers(trimmedContent).trim();
+  // Definite footer blocks can be stripped safely. Ambiguous footer-ish
+  // blocks are not stripped globally, but they also should not alone trigger
+  // a blocking GLOBAL_ENDING signal.
+  const contentForEndCheckSeed =
+    trailingHrBlock.kind === 'definite_footer' || trailingHrBlock.kind === 'ambiguous_footerish'
+      ? trailingHrBlock.contentBeforeHr
+      : trimmedContent;
+  const contentForEndCheck = stripTrailingStructuralMarkers(contentForEndCheckSeed).trim();
 
   // Get last meaningful character (skip closing markdown like ** _ ` #)
   let lastMeaningfulIndex = contentForEndCheck.length - 1;

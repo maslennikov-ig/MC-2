@@ -364,6 +364,75 @@ ${PAD}
       expect(globalTruncIssues.length).toBeGreaterThan(0);
     });
 
+    it('does NOT strip SHORT substantive prose starting with "Материал подготовлен"', () => {
+      const content = `## Введение
+
+${PAD}
+
+---
+Материал подготовлен в формате кейса без финальной точки`;
+
+      const result = checkContentTruncation(content);
+      const globalTruncIssues = result.truncationIssues.filter(i =>
+        i.includes('does not end with proper punctuation')
+      );
+      expect(globalTruncIssues).toHaveLength(0);
+    });
+
+    it('does NOT raise GLOBAL_ENDING for weak-only attribution block', () => {
+      const content = `## Введение
+
+${PAD}
+
+## Итог
+
+Всё рассмотрено.
+
+---
+Материал подготовлен учебным центром Мегакампус`;
+
+      const result = checkContentTruncation(content);
+      const globalTruncIssues = result.truncationIssues.filter(i =>
+        i.includes('does not end with proper punctuation')
+      );
+      expect(globalTruncIssues).toHaveLength(0);
+    });
+
+    it('does NOT strip short ambiguous "Материал защищен X" without authorship signal', () => {
+      const content = `## Введение
+
+${PAD}
+
+---
+Материал защищен от повреждений специальной обработкой`;
+
+      const result = checkContentTruncation(content);
+      const globalTruncIssues = result.truncationIssues.filter(i =>
+        i.includes('does not end with proper punctuation')
+      );
+      expect(globalTruncIssues).toHaveLength(0);
+    });
+
+    it('still strips weak "Материал подготовлен" when block also has strong copyright anchor', () => {
+      const content = `## Введение
+
+${PAD}
+
+## Итог
+
+Всё рассмотрено.
+
+---
+Материал подготовлен учебным центром Мегакампус
+© 2024 МегаКампус`;
+
+      const result = checkContentTruncation(content);
+      const globalTruncIssues = result.truncationIssues.filter(i =>
+        i.includes('does not end with proper punctuation')
+      );
+      expect(globalTruncIssues).toHaveLength(0);
+    });
+
     it('does NOT strip prose where "Copyright" appears in an analysis context', () => {
       // Edge: "Copyright" in running text with substantial length
       const content = `## Legal analysis
