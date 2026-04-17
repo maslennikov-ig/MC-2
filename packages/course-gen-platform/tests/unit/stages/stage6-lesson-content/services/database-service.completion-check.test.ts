@@ -31,8 +31,12 @@ vi.mock('@/shared/logger', () => ({
   default: mockLogger,
 }));
 
-import { checkAndSetStage6Complete } from '@/stages/stage6-lesson-content/services/database-service';
-import { markForReview } from '@/stages/stage6-lesson-content/services/database-service';
+import {
+  checkAndSetStage6Complete,
+  failStage6Course,
+  isStage6CourseActive,
+  markForReview,
+} from '@/stages/stage6-lesson-content/services/database-service';
 
 type CourseRow = {
   generation_status: string;
@@ -491,6 +495,100 @@ describe('markForReview', () => {
           }),
         }),
       })
+    );
+  });
+
+  it('persists selected model phase/source in review_required metadata', async () => {
+    const { supabase, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await markForReview(
+      'course-123',
+      'lesson-uuid' as unknown as string,
+      '1.1' as unknown as string,
+      'Automatic ladder exhausted',
+      {
+        selectedModel: 'z-ai/glm-5',
+        selectedModelPhase: 'stage_6_auto_last_chance',
+        selectedModelSource: 'database',
+      }
+    );
+
+    expect(lessonContentsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          selectedModel: 'z-ai/glm-5',
+          selectedModelPhase: 'stage_6_auto_last_chance',
+          selectedModelSource: 'database',
+        }),
+      })
+    );
+  });
+});
+
+describe('isStage6CourseActive', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('allows full generation only while stage_6_generating', async () => {
+    const { supabase } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await expect(isStage6CourseActive('course-123', 'full_generation')).resolves.toBe(true);
+    await expect(isStage6CourseActive('course-123', 'partial_regeneration')).resolves.toBe(true);
+  });
+
+  it('allows remediation contexts on completed courses but rejects full generation', async () => {
+    const { supabase } = createSupabaseAdminMock({
+      courseRow: {
+        ...createCourseRow(true),
+        generation_status: 'completed',
+      },
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await expect(isStage6CourseActive('course-123', 'full_generation')).resolves.toBe(false);
+    await expect(isStage6CourseActive('course-123', 'partial_regeneration')).resolves.toBe(true);
+    await expect(isStage6CourseActive('course-123', 'manual_regeneration')).resolves.toBe(true);
+  });
+});
+
+describe('failStage6Course', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('marks the course as failed and sends a Stage 6 error notification', async () => {
+    const { supabase, coursesTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    await failStage6Course('course-123', 'Required RAG documents unavailable');
+
+    expect(coursesTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generation_status: 'failed',
+        failed_at_stage: 6,
+        generation_metadata: expect.objectContaining({
+          failed_phase: 'stage_6',
+          error_message: 'Required RAG documents unavailable',
+        }),
+      })
+    );
+    expect(mockNotifyCourseError).toHaveBeenCalledWith(
+      'course-123',
+      6,
+      'Required RAG documents unavailable'
     );
   });
 });
