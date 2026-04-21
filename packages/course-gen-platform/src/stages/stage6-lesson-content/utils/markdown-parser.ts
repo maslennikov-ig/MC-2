@@ -566,7 +566,12 @@ function extractIntroduction(markdown: string): string {
   // Fallback: content between H1 and first H2
   const h1Match = markdown.match(PATTERNS.h1);
   if (!h1Match) {
-    return '';
+    const firstH2Match = markdown.match(/^##\s+/m);
+    if (!firstH2Match || firstH2Match.index === undefined || firstH2Match.index <= 0) {
+      return '';
+    }
+
+    return markdown.slice(0, firstH2Match.index).trim();
   }
 
   const h1Index = h1Match.index || 0;

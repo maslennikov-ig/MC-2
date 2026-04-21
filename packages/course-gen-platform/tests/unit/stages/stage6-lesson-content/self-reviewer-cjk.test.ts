@@ -378,11 +378,14 @@ describe('findSectionsWithForeignCharacters (unit)', () => {
     const languageIssues =
       result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
-    // 2 sections with CJK (intro + summary) out of 4 total = 50% -> triggers CRITICAL global
-    // So we check for global issue containing both affected areas
+    // Canonical review evaluates persisted LessonContentBody markdown. Summary/conclusion
+    // is not represented in LessonContentBody, so only visible introduction CJK is blocking.
     expect(languageIssues.length).toBeGreaterThan(0);
-    const criticalIssue = languageIssues.find(i => i.severity === 'CRITICAL');
-    expect(criticalIssue).toBeDefined();
+    expect(languageIssues.some(i => i.severity === 'CRITICAL')).toBe(false);
+    const introIssue = languageIssues.find(
+      i => i.severity === 'COMPLEX' && i.location === 'introduction'
+    );
+    expect(introIssue).toBeDefined();
   });
 });
 
