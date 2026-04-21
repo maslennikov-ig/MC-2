@@ -28,6 +28,10 @@ interface LessonMetadata {
   quality_score?: number
   generation_duration_ms?: number
   total_tokens?: number
+  costUsd?: number
+  qualityScore?: number
+  durationMs?: number
+  tokensUsed?: number
   [key: string]: unknown
 }
 
@@ -51,6 +55,33 @@ function parseMetadata(
     return null
   }
   return metadata as LessonMetadata
+}
+
+function getMetadataNumber(
+  metadata: LessonMetadata | null,
+  ...keys: string[]
+): number | null {
+  if (!metadata) {
+    return null
+  }
+
+  for (const key of keys) {
+    const value = metadata[key]
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+  }
+
+  return null
+}
+
+export function extractLessonMetricsFromMetadata(metadata: LessonMetadata | null) {
+  return {
+    qualityScore: getMetadataNumber(metadata, 'quality_score', 'qualityScore'),
+    costUsd: getMetadataNumber(metadata, 'cost_usd', 'costUsd') ?? 0,
+    durationMs: getMetadataNumber(metadata, 'generation_duration_ms', 'durationMs'),
+    totalTokens: getMetadataNumber(metadata, 'total_tokens', 'tokensUsed'),
+  }
 }
 
 export function resolveModuleLessonContentRows<T extends LessonContentRow>(
@@ -480,6 +511,7 @@ export function useModuleDashboardData({
             const metricsRow = usableContentRow ?? statusRow
             const statusMetadata = parseMetadata(statusRow.metadata)
             const metricsMetadata = parseMetadata(metricsRow.metadata)
+            const metrics = extractLessonMetricsFromMetadata(metricsMetadata)
             const status = mapStage6LessonStatus(statusRow.status)
             const pipelineState = extractPipelineState(statusRow.status, statusMetadata)
             const needsReview = isReviewRequiredStatus(statusRow.status)
@@ -490,12 +522,12 @@ export function useModuleDashboardData({
               title: lessonTitle,
               status,
               pipelineState,
-              qualityScore: metricsMetadata?.quality_score ?? null,
-              costUsd: metricsMetadata?.cost_usd ?? 0,
-              durationMs: metricsMetadata?.generation_duration_ms ?? null,
+              qualityScore: metrics.qualityScore,
+              costUsd: metrics.costUsd,
+              durationMs: metrics.durationMs,
               retryCount: statusRow.generation_attempt > 1 ? statusRow.generation_attempt - 1 : 0,
               canRetry: status === 'error',
-              totalTokens: metricsMetadata?.total_tokens ?? null,
+              totalTokens: metrics.totalTokens,
               needsReview,
             })
           }

@@ -78,6 +78,8 @@ export interface DecisionContext {
   totalSections?: number;
   /** Whether this is a high-value content (e.g., flagship course) */
   isHighValueContent?: boolean;
+  /** Whether this evaluation runs on the terminal remediation rung (auto_last_chance) */
+  isTerminalRemediationRung?: boolean;
 }
 
 /**
@@ -115,6 +117,8 @@ export const DECISION_THRESHOLDS = {
   ACCEPT: 0.9,
   /** Score 0.75-0.90: TARGETED_FIX or ITERATIVE_REFINEMENT */
   HIGH_QUALITY: 0.75,
+  /** Pragmatic accept threshold on terminal remediation rung */
+  TERMINAL_REMEDIATION_ACCEPT: 0.75,
   /** Score 0.60-0.75: ITERATIVE_REFINEMENT */
   MEDIUM_QUALITY: 0.6,
   /** Score < 0.60: IMMEDIATE REGENERATE */
@@ -203,6 +207,14 @@ function hasCriticalIssues(issues: JudgeIssue[]): boolean {
   return issues.some(issue => issue.severity === 'critical');
 }
 
+function hasFactualBlockers(issues: JudgeIssue[]): boolean {
+  return issues.some(
+    issue =>
+      issue.criterion === 'factual_accuracy' &&
+      (issue.severity === 'critical' || issue.severity === 'major')
+  );
+}
+
 /**
  * Count issues by severity
  *
@@ -277,6 +289,7 @@ export function makeDecision(context: DecisionContext): DecisionResult {
     iterationCount,
     previousScores,
     contentAffectedPercentage,
+    isTerminalRemediationRung,
     // isHighValueContent reserved for future premium content handling
   } = context;
 
@@ -292,6 +305,7 @@ export function makeDecision(context: DecisionContext): DecisionResult {
     iterationCount,
     contentAffectedPercentage,
     previousScores,
+    isTerminalRemediationRung,
   });
 
   // =========================================================================
@@ -315,6 +329,65 @@ export function makeDecision(context: DecisionContext): DecisionResult {
         issueAnalysis: `${issues.length} issues identified`,
         confidenceLevel: 'LOW - requires human validation',
         iterationHistory: `${iterationCount} iterations completed`,
+      },
+    };
+  }
+
+  // =========================================================================
+  // TERMINAL REMEDIATION RUNG PRAGMATIC ACCEPT
+  // =========================================================================
+
+  if (isTerminalRemediationRung === true) {
+    const terminalRungPragmaticAccept =
+      score >= DECISION_THRESHOLDS.TERMINAL_REMEDIATION_ACCEPT &&
+      !hasCriticalIssues(issues) &&
+      !hasFactualBlockers(issues);
+
+    if (terminalRungPragmaticAccept) {
+      logger.info({
+        msg: 'Terminal remediation rung reached pragmatic acceptance threshold',
+        score,
+        iterationCount,
+      });
+
+      return {
+        action: DecisionAction.ACCEPT,
+        reason: `Terminal remediation rung accepted content at pragmatic threshold (${(score * 100).toFixed(1)}%)`,
+        maxIterations: 0,
+        targetScore: score,
+        factors: {
+          scoreThreshold: `Terminal rung score ${(score * 100).toFixed(1)}% >= ${(DECISION_THRESHOLDS.TERMINAL_REMEDIATION_ACCEPT * 100).toFixed(0)}% pragmatic threshold`,
+          issueAnalysis:
+            issues.length > 0 ? `${issues.length} non-blocking issues remain` : 'No blocking issues found',
+          confidenceLevel: confidence.toUpperCase(),
+          iterationHistory:
+            iterationCount > 0
+              ? `${iterationCount} terminal-rung iterations completed`
+              : 'Terminal rung evaluated without additional refinement iterations',
+        },
+      };
+    }
+
+    logger.info({
+      msg: 'Terminal remediation rung remains below pragmatic acceptance threshold',
+      score,
+      iterationCount,
+    });
+
+    return {
+      action: DecisionAction.REGENERATE,
+      reason: `Terminal remediation rung still below pragmatic acceptance threshold (${(DECISION_THRESHOLDS.TERMINAL_REMEDIATION_ACCEPT * 100).toFixed(0)}%) or has blocking factual/critical issues`,
+      maxIterations: 0,
+      targetScore: DECISION_THRESHOLDS.TERMINAL_REMEDIATION_ACCEPT,
+      feedbackForRegeneration: buildRegenerationFeedback(issues, score),
+      factors: {
+        scoreThreshold: `Terminal rung score ${(score * 100).toFixed(1)}%`,
+        issueAnalysis: buildIssueAnalysisSummary(issues),
+        confidenceLevel: confidence.toUpperCase(),
+        iterationHistory:
+          iterationCount > 0
+            ? `${iterationCount} terminal-rung iterations exhausted`
+            : 'Terminal rung rejected before additional refinement iterations',
       },
     };
   }
@@ -638,7 +711,8 @@ export function makeDecisionFromVerdict(
   verdict: JudgeVerdict,
   content: LessonContentBody,
   iterationCount: number = 0,
-  previousScores: number[] = []
+  previousScores: number[] = [],
+  overrides: Pick<DecisionContext, 'isTerminalRemediationRung'> = {}
 ): DecisionResult {
   const sectionsLength = content.sections?.length ?? 0;
   const context: DecisionContext = {
@@ -649,6 +723,7 @@ export function makeDecisionFromVerdict(
     previousScores,
     contentAffectedPercentage: calculateContentAffectedPercentage(verdict.issues, sectionsLength),
     totalSections: sectionsLength,
+    ...overrides,
   };
 
   return makeDecision(context);

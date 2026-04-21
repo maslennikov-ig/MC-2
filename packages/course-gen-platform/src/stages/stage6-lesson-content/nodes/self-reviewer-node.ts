@@ -31,6 +31,8 @@
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { saveRejectedContent } from '../services/database-service';
+import { extractContentBody } from '../judge/judge-helpers';
+import { extractContentBodyMarkdown } from '../services/content-utils';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import type { SelfReviewResult, SelfReviewIssue } from '@megacampus/shared-types/judge-types';
 import { MODEL_FALLBACK, HANDLER_CONFIG } from '../config';
@@ -60,6 +62,62 @@ import {
 
 // Re-export for backward compatibility
 export { removeChatbotArtifacts, SELF_REVIEW_CONFIG };
+
+type PreparedSelfReviewContent = {
+  rawContent: string;
+  reviewContent: string;
+  source: 'canonical' | 'raw';
+  changed: boolean;
+  failureReason: string | null;
+};
+
+function prepareSelfReviewContent(
+  state: LessonGraphStateType,
+  language: string,
+  nodeLogger: Pick<typeof logger, 'warn'>
+): PreparedSelfReviewContent {
+  const rawContent = state.generatedContent ?? '';
+  const contentBody = extractContentBody(state);
+
+  if (!contentBody) {
+    nodeLogger.warn({
+      msg: 'canonicalization_failed',
+      reason: 'content_body_unavailable',
+    });
+
+    return {
+      rawContent,
+      reviewContent: rawContent,
+      source: 'raw',
+      changed: false,
+      failureReason: 'content_body_unavailable',
+    };
+  }
+
+  const canonicalContent = extractContentBodyMarkdown(contentBody, language);
+  if (!canonicalContent.trim()) {
+    nodeLogger.warn({
+      msg: 'canonicalization_failed',
+      reason: 'canonical_markdown_empty',
+    });
+
+    return {
+      rawContent,
+      reviewContent: rawContent,
+      source: 'raw',
+      changed: false,
+      failureReason: 'canonical_markdown_empty',
+    };
+  }
+
+  return {
+    rawContent,
+    reviewContent: canonicalContent,
+    source: 'canonical',
+    changed: canonicalContent !== rawContent,
+    failureReason: null,
+  };
+}
 
 /**
  * Self-Reviewer Node - Pre-judge validation with two-phase Fail-Fast architecture
@@ -92,12 +150,13 @@ export async function selfReviewerNode(
     // VALIDATION: Check for generated content
     // ============================================================================
 
-    const generatedContent = state.generatedContent;
-    if (!generatedContent) {
+    if (!state.generatedContent) {
       return handleEmptyContent(state, startTime);
     }
 
     const language = state.language || 'en';
+    const preparedContent = prepareSelfReviewContent(state, language, nodeLogger);
+    const generatedContent = preparedContent.reviewContent;
 
     // ============================================================================
     // PHASE 1: Heuristic Pre-Checks (FREE, no LLM)
@@ -125,7 +184,7 @@ export async function selfReviewerNode(
     if (criticalIssues.length > 0) {
       return handleCriticalIssues(
         state,
-        generatedContent,
+        preparedContent,
         heuristics,
         criticalAnalysis,
         criticalIssues,
@@ -141,7 +200,7 @@ export async function selfReviewerNode(
     if (criticalAnalysis.requiresModelFallback) {
       return handleModelFallback(
         state,
-        generatedContent,
+        preparedContent,
         heuristics,
         criticalAnalysis,
         language,
@@ -206,7 +265,7 @@ export async function selfReviewerNode(
         msg: 'LLM review failed, falling back to heuristics-only',
         error: llmResult.error,
       });
-      return buildHeuristicOnlyResult(
+      const fallbackResult = buildHeuristicOnlyResult(
         buildHeuristicDetails(
           heuristics.languageCheck,
           heuristics.truncationCheck,
@@ -219,6 +278,12 @@ export async function selfReviewerNode(
         llmResult.error || 'unknown error',
         llmResult.tokensUsed
       );
+
+      if (preparedContent.source === 'canonical') {
+        fallbackResult.generatedContent = generatedContent;
+      }
+
+      return fallbackResult;
     }
 
     // ============================================================================
@@ -292,6 +357,9 @@ export async function selfReviewerNode(
         llmReviewPerformed: true,
         tokensUsed: result.tokensUsed,
         wasPatched: patchedContent !== null,
+        reviewContentSource: preparedContent.source,
+        canonicalizationChanged: preparedContent.changed,
+        canonicalizationFailedReason: preparedContent.failureReason ?? undefined,
         progressSummary,
       },
       modelUsed: llmResult.modelUsed,
@@ -307,6 +375,8 @@ export async function selfReviewerNode(
 
     if (patchedContent) {
       stateUpdate.generatedContent = patchedContent;
+    } else if (preparedContent.source === 'canonical') {
+      stateUpdate.generatedContent = generatedContent;
     }
 
     // Channel-safe terminal-state setup. Section-cap and REGENERATE paths are
@@ -356,7 +426,7 @@ export async function selfReviewerNode(
         state.courseId,
         state.lessonSpec?.lesson_id ?? 'unknown',
         state.lessonUuid,
-        generatedContent,
+        preparedContent.rawContent,
         result,
         retryCount + 1,
         {
@@ -365,10 +435,15 @@ export async function selfReviewerNode(
           fallbackModel: state.fallbackModel,
           selectedModelTier: state.selectedModelTier,
           selectedModelTierReason: state.selectedModelTierReason,
+          selectedModelPhase: state.selectedModelPhase,
+          selectedModelSource: state.selectedModelSource,
           modelOverride: state.modelOverride,
           regenerateCount: stateUpdate.regenerateCount ?? state.regenerateCount,
           truncationCount: stateUpdate.truncationCount ?? state.truncationCount,
           rejectedTokens: stateUpdate.rejectedTokens ?? state.rejectedTokens,
+          reviewContent: preparedContent.reviewContent,
+          reviewContentSource: preparedContent.source,
+          canonicalizationFailureReason: preparedContent.failureReason,
         }
       );
     }
@@ -464,7 +539,7 @@ async function handleEmptyContent(
  */
 async function handleCriticalIssues(
   state: LessonGraphStateType,
-  generatedContent: string,
+  preparedContent: PreparedSelfReviewContent,
   heuristics: ReturnType<typeof runHeuristicPhase>,
   criticalAnalysis: ReturnType<typeof analyzeCriticalIssues>,
   criticalIssues: SelfReviewIssue[],
@@ -537,7 +612,7 @@ async function handleCriticalIssues(
     state.courseId,
     state.lessonSpec?.lesson_id ?? 'unknown',
     state.lessonUuid,
-    generatedContent,
+    preparedContent.rawContent,
     result,
     retryCount + 1,
     {
@@ -546,10 +621,15 @@ async function handleCriticalIssues(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
+      selectedModelPhase: state.selectedModelPhase,
+      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,
       rejectedTokens: telemetryUpdate.rejectedTokens,
+      reviewContent: preparedContent.reviewContent,
+      reviewContentSource: preparedContent.source,
+      canonicalizationFailureReason: preparedContent.failureReason,
     }
   );
 
@@ -559,6 +639,7 @@ async function handleCriticalIssues(
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    generatedContent: preparedContent.reviewContent,
     regenerationMode: telemetryUpdate.regenerationMode,
     regenerateCount: telemetryUpdate.regenerateCount,
     truncationCount: telemetryUpdate.truncationCount,
@@ -596,7 +677,7 @@ async function handleCriticalIssues(
  */
 async function handleModelFallback(
   state: LessonGraphStateType,
-  generatedContent: string,
+  preparedContent: PreparedSelfReviewContent,
   heuristics: ReturnType<typeof runHeuristicPhase>,
   criticalAnalysis: ReturnType<typeof analyzeCriticalIssues>,
   language: string,
@@ -639,7 +720,7 @@ async function handleModelFallback(
     state.courseId,
     state.lessonSpec?.lesson_id ?? 'unknown',
     state.lessonUuid,
-    generatedContent,
+    preparedContent.rawContent,
     result,
     retryCount + 1,
     {
@@ -648,10 +729,15 @@ async function handleModelFallback(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
+      selectedModelPhase: state.selectedModelPhase,
+      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,
       rejectedTokens: telemetryUpdate.rejectedTokens,
+      reviewContent: preparedContent.reviewContent,
+      reviewContentSource: preparedContent.source,
+      canonicalizationFailureReason: preparedContent.failureReason,
     }
   );
 
@@ -659,6 +745,7 @@ async function handleModelFallback(
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    generatedContent: preparedContent.reviewContent,
     regenerationMode: telemetryUpdate.regenerationMode,
     regenerateCount: telemetryUpdate.regenerateCount,
     truncationCount: telemetryUpdate.truncationCount,
@@ -756,6 +843,8 @@ async function handleError(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
+      selectedModelPhase: state.selectedModelPhase,
+      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,

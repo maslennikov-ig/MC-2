@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetSupabaseAdmin, mockNotifyCourseCompletion, mockNotifyCourseError, mockLogger } =
+const {
+  mockGetSupabaseAdmin,
+  mockNotifyCourseCompletion,
+  mockNotifyCourseError,
+  mockResolveLessonUuid,
+  mockLogger,
+} =
   vi.hoisted(() => {
     const logger = {
       info: vi.fn(),
@@ -13,6 +19,7 @@ const { mockGetSupabaseAdmin, mockNotifyCourseCompletion, mockNotifyCourseError,
       mockGetSupabaseAdmin: vi.fn(),
       mockNotifyCourseCompletion: vi.fn().mockResolvedValue(undefined),
       mockNotifyCourseError: vi.fn().mockResolvedValue(undefined),
+      mockResolveLessonUuid: vi.fn().mockResolvedValue('lesson-uuid'),
       mockLogger: logger,
     };
   });
@@ -26,6 +33,10 @@ vi.mock('@/shared/notifications/course-notifications', () => ({
   notifyCourseError: mockNotifyCourseError,
 }));
 
+vi.mock('@/shared/database/lesson-resolver', () => ({
+  resolveLessonUuid: mockResolveLessonUuid,
+}));
+
 vi.mock('@/shared/logger', () => ({
   logger: mockLogger,
   default: mockLogger,
@@ -36,7 +47,9 @@ import {
   failStage6Course,
   isStage6CourseActive,
   markForReview,
+  saveLessonContent,
 } from '@/stages/stage6-lesson-content/services/database-service';
+import type { Stage6Output } from '@/stages/stage6-lesson-content/types';
 
 type CourseRow = {
   generation_status: string;
@@ -134,6 +147,13 @@ function createSupabaseAdminMock(options: {
       if (table === 'lessons') return lessonsTable;
       if (table === 'lesson_contents') return lessonContentsTable;
       throw new Error(`Unexpected table: ${table}`);
+    }),
+    rpc: vi.fn((fn: string) => {
+      if (fn === 'increment_lessons_completed') {
+        return Promise.resolve({ data: 1, error: null });
+      }
+
+      return Promise.resolve({ data: null, error: null });
     }),
   };
 
@@ -526,6 +546,132 @@ describe('markForReview', () => {
         }),
       })
     );
+  });
+});
+
+describe('saveLessonContent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveLessonUuid.mockResolvedValue('lesson-uuid');
+  });
+
+  it('persists selected model phase/source and terminal quality recovery metadata for completed rows', async () => {
+    const { supabase, lessonContentsTable } = createSupabaseAdminMock({
+      courseRow: createCourseRow(true),
+      lessonContentsRows: [],
+    });
+    mockGetSupabaseAdmin.mockReturnValue(supabase);
+
+    const result: Stage6Output = {
+      lessonContent: {
+        lesson_id: '1.1',
+        course_id: 'course-123',
+        content: {
+          intro: 'Введение.',
+          sections: [
+            {
+              title: 'Практика',
+              content: 'Тактические задачи: 2, 4.',
+            },
+          ],
+          examples: [],
+          exercises: [],
+        },
+        metadata: {
+          total_words: 6,
+          total_tokens: 1200,
+          cost_usd: 0,
+          quality_score: 0.81,
+          rag_chunks_used: 0,
+          generation_duration_ms: 5000,
+          model_used: 'z-ai/glm-5',
+          archetype_used: 'concept_explainer',
+          temperature_used: 0.7,
+          qa_signals: {
+            version: 1,
+            lesson_counters: {
+              callout_count: 1,
+              code_block_count: 0,
+            },
+          },
+        },
+        status: 'completed',
+        created_at: new Date('2026-04-17T12:00:00Z'),
+        updated_at: new Date('2026-04-17T12:00:00Z'),
+      },
+      success: true,
+      errors: [],
+      qualityRecovery: {
+        mode: 'automatic',
+        attempts: [],
+        final_disposition: {
+          outcome: 'completed',
+          terminal_phase_name: 'stage_6_auto_last_chance',
+          terminal_mode: 'automatic',
+          human_review_required: false,
+        },
+      },
+      reviewInfo: {
+        needsReview: false,
+        reasons: ['Accepted pragmatically on terminal remediation rung'],
+      },
+      metrics: {
+        tokensUsed: 1200,
+        durationMs: 5000,
+        modelUsed: 'z-ai/glm-5',
+        selectedModel: 'z-ai/glm-5',
+        fallbackModel: 'qwen/qwen3.5-plus-02-15',
+        selectedModelTier: 'complex',
+        selectedModelTierReason: 'module 1 premium path',
+        selectedModelPhase: 'stage_6_auto_last_chance',
+        selectedModelSource: 'database',
+        qualityScore: 0.81,
+        regenerateCount: 2,
+        truncationCount: 0,
+        rejectedTokens: 400,
+        regenerationMode: null,
+      },
+    };
+
+    await saveLessonContent('course-123', '1.1', result, undefined, 'ru');
+
+    expect(lessonContentsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lesson_id: 'lesson-uuid',
+        status: 'completed',
+        generation_attempt: 3,
+        metadata: expect.objectContaining({
+          total_tokens: 1200,
+          generation_duration_ms: 5000,
+          quality_score: 0.81,
+          qa_signals: expect.objectContaining({
+            version: 1,
+          }),
+          selectedModelPhase: 'stage_6_auto_last_chance',
+          selectedModelSource: 'database',
+          reviewReasons: ['Accepted pragmatically on terminal remediation rung'],
+          terminalReason: 'Accepted pragmatically on terminal remediation rung',
+          qualityRecovery: expect.objectContaining({
+            final_disposition: expect.objectContaining({
+              terminal_phase_name: 'stage_6_auto_last_chance',
+              outcome: 'completed',
+            }),
+          }),
+          qualityRecoveryDisposition: expect.objectContaining({
+            terminal_phase_name: 'stage_6_auto_last_chance',
+            outcome: 'completed',
+          }),
+        }),
+      })
+    );
+    expect(supabase.rpc).toHaveBeenCalledWith('increment_lessons_completed', {
+      p_course_id: 'course-123',
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith('upsert_stage_tokens', {
+      p_course_id: 'course-123',
+      p_stage_key: 'lesson:lesson-uuid',
+      p_tokens: 1200,
+    });
   });
 });
 

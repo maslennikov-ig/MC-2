@@ -269,6 +269,46 @@ describe('processJudgeDecision Mermaid render gate', () => {
     expect(mockRunMermaidFixPipeline).not.toHaveBeenCalled();
   });
 
+  it('normalizes pragmatic terminal-rung ACCEPT into a persisted success outcome', async () => {
+    mockValidateMermaidSyntax.mockResolvedValue({
+      valid: true,
+      diagramType: 'flowchart-v2',
+      errors: [],
+    });
+
+    const processed = await processJudgeDecision(
+      buildContext({
+        state: {
+          ...buildContext().state,
+          selectedModelPhase: 'stage_6_auto_last_chance',
+        } as JudgeContext['state'],
+        verdict: {
+          ...buildContext().verdict!,
+          overallScore: 0.76,
+          recommendation: 'REGENERATE',
+        },
+        decision: {
+          action: DecisionAction.ACCEPT,
+          reason: 'Terminal remediation rung accepted content at pragmatic threshold (76.0%)',
+          maxIterations: 0,
+          targetScore: 0.76,
+          factors: {
+            scoreThreshold: 'Terminal rung score 76.0% >= 75% pragmatic threshold',
+            issueAnalysis: 'No blocking issues found',
+            confidenceLevel: 'MEDIUM',
+            iterationHistory: 'terminal rung pragmatic accept',
+          },
+        },
+      })
+    );
+    const finalized = await finalizeJudgeResult(processed);
+
+    expect(processed.finalRecommendation).toBe('ACCEPT');
+    expect(processed.finalContent).not.toBeNull();
+    expect(finalized.lessonContent).not.toBeNull();
+    expect(finalized.needsRegeneration).toBe(false);
+  });
+
   it('records remediation metadata when Mermaid gate crashes but does not force regenerate', async () => {
     mockValidateMermaidSyntax.mockRejectedValue(new Error('render validator crashed'));
 

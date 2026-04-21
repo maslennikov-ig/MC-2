@@ -54,6 +54,18 @@ function getQaSignalsFromResult(result: Stage6Output): LessonQualitySignals | un
   return result.lessonContent?.metadata?.qa_signals ?? undefined;
 }
 
+function buildMetadataMetricAliases(
+  metrics: Pick<Stage6Output['metrics'], 'tokensUsed' | 'durationMs' | 'qualityScore'>,
+  qaSignals?: LessonQualitySignals
+): Record<string, unknown> {
+  return {
+    total_tokens: metrics.tokensUsed,
+    generation_duration_ms: metrics.durationMs,
+    quality_score: metrics.qualityScore,
+    qa_signals: qaSignals,
+  };
+}
+
 /**
  * QA signals are stored in two locations with different casing:
  * 1. metadata.qaSignals (camelCase) — written by saveLessonContent/handlePartialSuccess
@@ -252,6 +264,7 @@ export async function handlePartialSuccess(
     // Serialize content to convert Date objects to strings (LessonContent has Date fields)
     const rawMarkdown = extractContentMarkdown(result.lessonContent, language);
     const markdown = sanitizeContent(rawMarkdown, { component: 'handlePartialSuccess' });
+    const qaSignals = getQaSignalsFromResult(result);
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
@@ -267,13 +280,20 @@ export async function handlePartialSuccess(
           fallbackModel: result.metrics.fallbackModel,
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
+          selectedModelPhase: result.metrics.selectedModelPhase ?? null,
+          selectedModelSource: result.metrics.selectedModelSource ?? null,
           qualityScore: result.metrics.qualityScore,
+          ...buildMetadataMetricAliases(result.metrics, qaSignals),
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
           regenerationMode: result.metrics.regenerationMode ?? null,
-          qaSignals: getQaSignalsFromResult(result),
+          qaSignals,
           reviewInfo: result.reviewInfo ?? undefined,
+          reviewReasons: result.reviewInfo?.reasons ?? undefined,
+          terminalReason: result.reviewInfo?.reasons?.[0] ?? undefined,
+          qualityRecovery: result.qualityRecovery ?? undefined,
+          qualityRecoveryDisposition: result.qualityRecovery?.final_disposition ?? undefined,
         })
       ) as Json,
       generation_attempt: (result.metrics.regenerateCount ?? 0) + 1,
@@ -381,6 +401,7 @@ export async function markForReview(
           lessonLabel,
           markedForReviewAt: markedAt,
           failureReason: reason,
+          terminalReason: reason,
           modelUsed: context.modelUsed ?? null,
           selectedModel: context.selectedModel ?? null,
           fallbackModel: context.fallbackModel ?? null,
@@ -393,8 +414,11 @@ export async function markForReview(
           rejectedTokens: context.rejectedTokens ?? null,
           regenerationMode: context.regenerationMode ?? null,
           reviewInfo: context.reviewInfo ?? undefined,
+          reviewReasons: context.reviewInfo?.reasons ?? [reason],
           qaSignals: context.qaSignals ?? undefined,
+          qa_signals: context.qaSignals ?? undefined,
           qualityRecovery: context.qualityRecovery ?? undefined,
+          qualityRecoveryDisposition: context.qualityRecovery?.final_disposition ?? undefined,
           courseAuditFindings: context.courseAuditFindings ?? undefined,
         })
       ) as Json,
@@ -485,6 +509,7 @@ export async function saveLessonContent(
 
     const rawMarkdown = extractContentMarkdown(result.lessonContent, language);
     const markdown = sanitizeContent(rawMarkdown, { component: 'saveLessonContent' });
+    const qaSignals = getQaSignalsFromResult(result);
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
@@ -493,11 +518,14 @@ export async function saveLessonContent(
         JSON.stringify({
           lessonLabel,
           tokensUsed: result.metrics.tokensUsed,
+          ...buildMetadataMetricAliases(result.metrics, qaSignals),
           modelUsed: result.metrics.modelUsed,
           selectedModel: result.metrics.selectedModel,
           fallbackModel: result.metrics.fallbackModel,
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
+          selectedModelPhase: result.metrics.selectedModelPhase ?? null,
+          selectedModelSource: result.metrics.selectedModelSource ?? null,
           qualityScore: result.metrics.qualityScore,
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
@@ -506,7 +534,11 @@ export async function saveLessonContent(
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: markdown,
-          qaSignals: getQaSignalsFromResult(result),
+          qaSignals,
+          qualityRecovery: result.qualityRecovery ?? undefined,
+          qualityRecoveryDisposition: result.qualityRecovery?.final_disposition ?? undefined,
+          reviewReasons: result.reviewInfo?.reasons ?? undefined,
+          terminalReason: result.reviewInfo?.reasons?.[0] ?? undefined,
           sanityCheck: sanityResult
             ? {
                 passed: sanityResult.ok,
@@ -521,7 +553,7 @@ export async function saveLessonContent(
         })
       ) as Json,
       status: 'completed',
-      generation_attempt: 1,
+      generation_attempt: (result.metrics.regenerateCount ?? 0) + 1,
     });
 
     if (error) {
@@ -629,11 +661,16 @@ export async function saveRejectedContent(
     fallbackModel?: string | null;
     selectedModelTier?: string | null;
     selectedModelTierReason?: string | null;
+    selectedModelPhase?: string | null;
+    selectedModelSource?: string | null;
     modelOverride?: string | null;
     regenerateCount?: number | null;
     truncationCount?: number | null;
     rejectedTokens?: number | null;
     regenerationMode?: string | null;
+    reviewContent?: string | null;
+    reviewContentSource?: 'canonical' | 'raw';
+    canonicalizationFailureReason?: string | null;
   }
 ): Promise<void> {
   if (!generatedContent) {
@@ -689,11 +726,19 @@ export async function saveRejectedContent(
       fallbackModel: context?.fallbackModel ?? null,
       selectedModelTier: context?.selectedModelTier ?? null,
       selectedModelTierReason: context?.selectedModelTierReason ?? null,
+      selectedModelPhase: context?.selectedModelPhase ?? null,
+      selectedModelSource: context?.selectedModelSource ?? null,
       modelOverride: context?.modelOverride ?? null,
       regenerateCount: context?.regenerateCount ?? null,
       truncationCount: context?.truncationCount ?? null,
       rejectedTokens: context?.rejectedTokens ?? null,
       regenerationMode: context?.regenerationMode ?? null,
+      reviewContent:
+        context?.reviewContent && context.reviewContent !== generatedContent
+          ? context.reviewContent
+          : undefined,
+      reviewContentSource: context?.reviewContentSource ?? 'raw',
+      canonicalizationFailureReason: context?.canonicalizationFailureReason ?? null,
       generationAttempt,
     };
 

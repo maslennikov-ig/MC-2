@@ -24,6 +24,7 @@ import type {
 import { countMermaidFallbackComments } from '../utils/mermaid-render-validator';
 import type { CascadeEvaluationInput, CascadeResult } from '../judge/cascade-evaluator';
 import { DecisionAction, type DecisionResult } from '../judge/decision-engine';
+import { actionToRecommendation } from '../judge/decision-engine';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { costTracker, createTokenUsage } from '@/shared/metrics/cost-tracker';
@@ -300,7 +301,10 @@ export async function makeJudgeDecision(context: JudgeContext): Promise<JudgeCon
     verdict,
     context.contentBody,
     state.refinementIterationCount,
-    state.previousScores
+    state.previousScores,
+    {
+      isTerminalRemediationRung: state.selectedModelPhase === 'stage_6_auto_last_chance',
+    }
   );
 
   const forcedAction = context.cascadeResult?.heuristicResults?.qualitySummary?.action;
@@ -455,6 +459,10 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
           qualityRetryCount
         )
       );
+      finalRecommendation =
+        verdict.recommendation === 'ACCEPT_WITH_MINOR_REVISION'
+          ? 'ACCEPT_WITH_MINOR_REVISION'
+          : actionToRecommendation(decision.action);
       break;
     }
 

@@ -68,6 +68,24 @@ function getMetadataQualityScore(row: LessonContentMetadataCarrier | null): numb
   )
 }
 
+function getMetadataNumericField(
+  metadata: Record<string, unknown> | null,
+  ...keys: string[]
+): number | null {
+  if (!metadata) {
+    return null
+  }
+
+  for (const key of keys) {
+    const value = metadata[key]
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+  }
+
+  return null
+}
+
 function getQualityRecoveryScore(row: LessonContentMetadataCarrier | null): number | null {
   if (!row || !isRecord(row.metadata) || !isRecord(row.metadata.qualityRecovery)) {
     return null
@@ -410,7 +428,8 @@ function parseJudgeResult(
 ): JudgeVerdictDisplay | null {
   // Try to extract judge result from metadata
   const metadata = contentRow.metadata as Record<string, unknown> | null
-  const qualityScore = metadata?.quality_score as number | undefined
+  const qualityScore =
+    getMetadataNumericField(metadata, 'quality_score', 'qualityScore') ?? undefined
 
   // Find judge traces (prefer phase field, fallback to step_name pattern)
   const judgeTraces = traces.filter(

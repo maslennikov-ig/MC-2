@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import type { LessonMatrixRow } from '@megacampus/shared-types'
-import { resolveModuleLessonContentRows } from '../useModuleDashboardData'
+import {
+  extractLessonMetricsFromMetadata,
+  resolveModuleLessonContentRows,
+} from '../useModuleDashboardData'
 
 /**
  * Unit tests for useModuleDashboardData hook utility functions
@@ -581,5 +584,39 @@ describe('resolveModuleLessonContentRows', () => {
 
     expect(selection.statusRow?.id).toBe('latest-review-required')
     expect(selection.usableContentRow?.id).toBe('older-completed')
+  })
+})
+
+describe('extractLessonMetricsFromMetadata', () => {
+  it('reads legacy snake_case metrics', () => {
+    expect(
+      extractLessonMetricsFromMetadata({
+        quality_score: 0.72,
+        cost_usd: 0.12,
+        generation_duration_ms: 1800,
+        total_tokens: 900,
+      })
+    ).toEqual({
+      qualityScore: 0.72,
+      costUsd: 0.12,
+      durationMs: 1800,
+      totalTokens: 900,
+    })
+  })
+
+  it('falls back to camelCase metrics for newer Stage 6 rows', () => {
+    expect(
+      extractLessonMetricsFromMetadata({
+        qualityScore: 0.81,
+        costUsd: 0.2,
+        durationMs: 2200,
+        tokensUsed: 1100,
+      })
+    ).toEqual({
+      qualityScore: 0.81,
+      costUsd: 0.2,
+      durationMs: 2200,
+      totalTokens: 1100,
+    })
   })
 })

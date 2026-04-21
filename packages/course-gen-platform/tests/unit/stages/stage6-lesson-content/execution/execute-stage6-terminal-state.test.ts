@@ -175,6 +175,71 @@ describe('executeStage6 terminal state detection', () => {
     expect(result.reviewInfo).toEqual(existingReviewInfo);
   });
 
+  it('propagates selected model phase/source into graph state and output metrics', async () => {
+    mockInvoke.mockResolvedValueOnce({
+      lessonSpec: baseInput.lessonSpec,
+      courseId: baseInput.courseId,
+      lessonContent: {
+        lesson_id: '1.2',
+        course_id: baseInput.courseId,
+        content: {
+          intro: 'Введение.',
+          sections: [],
+          examples: [],
+          exercises: [],
+        },
+        metadata: {
+          total_words: 1,
+          total_tokens: 10,
+          cost_usd: 0,
+          quality_score: 0.81,
+          rag_chunks_used: 0,
+          generation_duration_ms: 10,
+          model_used: 'z-ai/glm-5',
+          archetype_used: 'concept_explainer',
+          temperature_used: 0.7,
+        },
+        status: 'completed',
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      generatedContent: 'Введение.',
+      needsHumanReview: false,
+      reviewInfo: null,
+      needsRegeneration: false,
+      retryCount: 0,
+      regenerateCount: 0,
+      truncationCount: 0,
+      errors: [],
+      tokensUsed: 4200,
+      modelUsed: 'z-ai/glm-5',
+      selectedModel: 'z-ai/glm-5',
+      fallbackModel: 'qwen/qwen3.5-plus-02-15',
+      selectedModelTier: 'complex',
+      selectedModelTierReason: 'module 1',
+      selectedModelPhase: 'stage_6_auto_last_chance',
+      selectedModelSource: 'database',
+      qualityScore: 0.81,
+      currentNode: 'judge',
+      regenerationMode: null,
+    });
+
+    const result = await executeStage6({
+      ...baseInput,
+      selectedModelPhase: 'stage_6_auto_last_chance',
+      selectedModelSource: 'database',
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedModelPhase: 'stage_6_auto_last_chance',
+        selectedModelSource: 'database',
+      })
+    );
+    expect(result.metrics.selectedModelPhase).toBe('stage_6_auto_last_chance');
+    expect(result.metrics.selectedModelSource).toBe('database');
+  });
+
   it('detects review_required when sectionsToRegenerate exceeds MAX and needsHumanReview was lost', async () => {
     // Section-cap exceeded: self-reviewer found too many sections to regenerate.
     // The node should set terminal state, but if it's lost in LangGraph channels,
