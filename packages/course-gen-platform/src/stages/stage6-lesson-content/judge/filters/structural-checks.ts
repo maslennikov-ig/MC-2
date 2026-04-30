@@ -238,6 +238,21 @@ function stripTrailingStructuralMarkers(content: string): string {
   return current;
 }
 
+function getLastNonEmptyLine(content: string): string {
+  const lines = content.split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (line.length > 0) {
+      return line;
+    }
+  }
+  return '';
+}
+
+function isMarkdownListLine(line: string): boolean {
+  return /^\s*(?:[-*+]|\d+[.)])\s+\S/.test(line);
+}
+
 export function checkContentTruncation(content: string): FilterCheckResult & {
   truncationIssues: string[];
   lastCharacter: string;
@@ -267,9 +282,9 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
   }
   const lastMeaningfulChar = contentForEndCheck[lastMeaningfulIndex] ?? '';
 
-  // Accept standard punctuation + common closing markdown: ) ] for parenthesized
-  // endings like "...(note that X)." or "Молодец!]"
-  const validEndingPunctuation = /[.!?。！？:)\]]/;
+  // Accept standard punctuation + common closing markdown/quotes: ) ] » ” for
+  // parenthesized or quoted endings like "...(note that X)." or "формат: «X»".
+  const validEndingPunctuation = /[.!?。！？:)\]»”"']/;
   // Skip Check 1 entirely when stripping removed everything (content was all
   // structural markers, which is itself a bigger problem caught by Check 4).
   if (contentForEndCheck.length > 0 && !validEndingPunctuation.test(lastMeaningfulChar)) {
@@ -342,6 +357,11 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
       .replace(/\n\|[^|\n]*\|\s*$/, '') // trailing table row
       .replace(/\n\|[-|\s:]+\|\s*$/, '') // trailing table separator |---|---|
       .trim();
+    const lastLine = getLastNonEmptyLine(sectionForCheck);
+
+    if (isMarkdownListLine(lastLine)) {
+      continue;
+    }
 
     const sectionEnd = sectionForCheck.slice(-50);
     const lastChar = sectionEnd.replace(/[\s*_`#]+$/, '').slice(-1);
