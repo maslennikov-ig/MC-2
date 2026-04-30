@@ -210,6 +210,7 @@ export const LESSON_MARKDOWNLINT_CONFIG: LessonMarkdownLintConfig = {
       // Markup and config
       'markdown',
       'sql',
+      'mermaid',
       'bash',
       'sh',
       'shell',
@@ -465,6 +466,7 @@ export const MINOR_MARKDOWN_RULES = [
   'MD012', // Multiple blanks
   'MD032', // Blanks around lists
   'MD047', // Single trailing newline
+  'MD060', // Table column style
 ] as const;
 
 /**
@@ -494,4 +496,5 @@ export const MARKDOWN_RULE_SEVERITY: Record<string, 'critical' | 'major' | 'mino
   MD012: 'minor',
   MD032: 'minor',
   MD047: 'minor',
+  MD060: 'minor',
 };
