@@ -184,6 +184,67 @@ SMM решает конкретные задачи бизнеса. Измеря�
     expect(globalTruncIssues).toHaveLength(0);
   });
 
+  it('should NOT flag a section that ends with a bullet list item without punctuation', () => {
+    // Live pattern from KPE-0507 lesson 1.1 rejected on 2026-04-17:
+    // section-level truncation fired on list tails ending with plain words
+    // ("продукта", "конфликтов") even though the section was complete.
+    const content = `## Введение
+
+${PAD}
+
+## Интеграция с отделом продаж
+
+SMM не существует в вакууме. Ниже перечислены корректные точки интеграции
+с другими отделами. Список завершён осознанно и не требует точки в каждом
+элементе, потому что это обычный markdown list.
+
+- Сквозная аналитика: путь клиента из поста в сделку
+- Лид-магниты: обмен контакта на ценность
+- Обратная связь: жалобы в комментариях -> улучшение продукта
+
+## Следующий раздел
+
+Здесь начинается новый раздел, поэтому предыдущий список не был обрывом.
+Контент явно завершён и не должен маркироваться как truncated.`;
+
+    const result = checkContentTruncation(content);
+
+    const sectionIssues = result.truncationIssues.filter(i => i.includes('Section'));
+    expect(sectionIssues).toHaveLength(0);
+  });
+
+  it('should NOT flag final exercise blockquotes after stripping trailing --- marker', () => {
+    // Live pattern from KPE-0507 lesson 1.1 rejected on 2026-04-17:
+    // tail ended with exercise helper blockquotes plus a horizontal rule.
+    // stripTrailingStructuralMarkers() removed the quote lines, exposing an
+    // earlier scenario line ending with closing guillemet ("»"), which then
+    // triggered a false global-ending truncation failure.
+    const content = `## Введение
+
+${PAD}
+
+## Упражнения
+
+### Упражнение 1
+
+**Задание:** Нарисуйте схему взаимодействия SMM с другими отделами.
+
+**Сценарий:** Используйте формат: «SMM -> [Отдел]: [Что передаем] -> [Результат]»
+
+**Ваш ответ:**
+> **Подсказка:** Начните с лидов в отдел продаж и жалоб в поддержку.
+> **Образец ответа:** SMM -> Продажи: лиды из лид-магнита -> 15% конверсия.
+
+---`;
+
+    const result = checkContentTruncation(content);
+
+    const globalTruncIssues = result.truncationIssues.filter(i =>
+      i.includes('does not end with proper punctuation')
+    );
+    expect(globalTruncIssues).toHaveLength(0);
+  });
+
   it('should NOT flag content ending with --- followed by plain footer/copyright', () => {
     // Live pattern from MKK-6903 lesson 1.3:
     //   tail = "...гарантия стабильного результата завтра.\n---\n© 2024 Внутренний стандарт..."
