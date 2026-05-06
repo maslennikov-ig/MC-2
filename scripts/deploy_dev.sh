@@ -23,6 +23,20 @@ echo "Cleaning up orphan dev containers..."
 # Docker filter doesn't support regex, so we explicitly list dev container names
 docker rm -f megacampus-api-dev megacampus-web-dev 2>/dev/null || true
 
+DEV_COMPOSE="docker compose -f $BASE_PATH/docker-compose.dev.yml --env-file $BASE_PATH/.env.dev"
+
+# Qdrant used to be started outside docker-compose.dev.yml on some Dev hosts.
+# Compose cannot adopt a container with the same container_name but different labels,
+# so normalize only that legacy state before starting dependent workers.
+if docker inspect megacampus-qdrant-dev > /dev/null 2>&1; then
+    QDRANT_COMPOSE_PROJECT="$(docker inspect -f '{{ with index .Config.Labels "com.docker.compose.project" }}{{ . }}{{ end }}' megacampus-qdrant-dev 2>/dev/null || true)"
+    QDRANT_COMPOSE_SERVICE="$(docker inspect -f '{{ with index .Config.Labels "com.docker.compose.service" }}{{ . }}{{ end }}' megacampus-qdrant-dev 2>/dev/null || true)"
+    if [ "$QDRANT_COMPOSE_PROJECT" != "megacampus" ] || [ "$QDRANT_COMPOSE_SERVICE" != "qdrant-dev" ]; then
+        echo "   Removing legacy megacampus-qdrant-dev container so compose can manage it..."
+        docker rm -f megacampus-qdrant-dev 2>/dev/null || true
+    fi
+fi
+
 # 3. Check docling-mcp image exists (manually built, 8GB)
 DOCLING_IMAGE="ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest"
 if ! docker image inspect "$DOCLING_IMAGE" > /dev/null 2>&1; then
@@ -64,7 +78,8 @@ docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.en
 # Workers depend on api-dev:service_healthy which causes compose to exit 1
 # if api takes time to start. So we start core services first, wait for health,
 # then start workers.
-DEV_COMPOSE="docker compose -f $BASE_PATH/docker-compose.dev.yml --env-file $BASE_PATH/.env.dev"
+echo "Ensuring Qdrant dev container is compose-managed..."
+$DEV_COMPOSE up -d qdrant-dev
 
 echo "Deploying core dev containers (web, bridge, api)..."
 $DEV_COMPOSE up -d --force-recreate --no-deps web-dev notebooklm-bridge-dev api-dev
