@@ -58,16 +58,27 @@ describe('executeLlmCall config failures', () => {
     });
   });
 
-  it('should reject before LLM call when targeted-refinement model config lookup fails', async () => {
+  it('should use canonical fallback when targeted-refinement model config lookup fails', async () => {
     mockGetModelForPhase.mockRejectedValue(new Error('targeted refinement config missing'));
+    mockGenerateCompletion.mockResolvedValue({
+      content: 'patched content',
+      totalTokens: 321,
+    });
 
-    await expect(
-      executeLlmCall('prompt', 'system prompt', {
-        maxTokens: 1200,
-        temperature: 0.1,
-      })
-    ).rejects.toThrow('targeted refinement config missing');
+    const result = await executeLlmCall('prompt', 'system prompt', {
+      maxTokens: 1200,
+      temperature: 0.1,
+    });
 
-    expect(mockGenerateCompletion).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      content: 'patched content',
+      tokensUsed: 321,
+    });
+    expect(mockGenerateCompletion).toHaveBeenCalledWith('prompt', {
+      model: 'xiaomi/mimo-v2-flash',
+      temperature: 0.1,
+      maxTokens: 1200,
+      systemPrompt: 'system prompt',
+    });
   });
 });
