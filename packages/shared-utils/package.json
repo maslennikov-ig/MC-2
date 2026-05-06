@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm && tsc --emitDeclarationOnly",
-    "type-check": "tsc --noEmit",
+    "type-check": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },

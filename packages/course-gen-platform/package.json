@@ -23,6 +23,7 @@
     "dev:worker:safe": "pkill -f 'worker-entrypoint' 2>/dev/null; sleep 1; tsx watch src/orchestrator/worker-entrypoint.ts",
     "kill:workers": "pkill -f 'worker-entrypoint' 2>/dev/null && echo 'Workers killed' || echo 'No workers running'",
     "build": "tsc -p tsconfig.json && tsup",
+    "build:types": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && pnpm --filter @megacampus/shared-utils build && tsc -p tsconfig.json --emitDeclarationOnly",
     "build:processor": "tsup",
     "generate:config-seed": "tsx src/build/generate-config-seed.ts",
     "prebuild": "tsx src/build/generate-config-seed.ts",
@@ -44,7 +45,7 @@
     "qdrant:create-collection": "tsx src/shared/qdrant/create-collection.ts",
     "cleanup:docling-cache": "tsx tools/maintenance/cleanup-docling-cache.ts",
     "lint": "eslint src --max-warnings=95",
-    "type-check": "tsc --noEmit",
+    "type-check": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && pnpm --filter @megacampus/shared-utils build && tsc --noEmit",
     "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts",
     "benchmark-llm": "tsx scripts/benchmark-llm/index.ts"
   },

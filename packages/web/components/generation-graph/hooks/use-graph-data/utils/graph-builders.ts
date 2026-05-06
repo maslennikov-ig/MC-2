@@ -365,8 +365,11 @@ export function buildGraph({
     if (i === 6 && config.parallelizable && items && items.length > 0) {
       const modules = items.filter((item) => item.type === 'module')
       const lessons = items.filter((item) => item.type === 'lesson')
+      const getReviewAwareItemStatus = (item: ParallelItem): string | null | undefined =>
+        item.data?.needsReview ? 'review_required' : item.status || getStatus(item.id)
+
       const stage6Summary = summarizeReviewAwareStage6Statuses(
-        lessons.map((lesson) => lesson.status || getStatus(lesson.id))
+        lessons.map((lesson) => getReviewAwareItemStatus(lesson))
       )
 
       const allLessonAttempts = lessons.flatMap((l) => getAttempts(l.id))
@@ -447,7 +450,7 @@ export function buildGraph({
         const latestAttempt = attempts[attempts.length - 1]
         const childLessons = lessonItems.filter((lesson) => lesson.parentId === item.id)
         const childIds = childLessons.map((lesson) => lesson.id)
-        const childStatuses = childLessons.map((lesson) => lesson.status || getStatus(lesson.id))
+        const childStatuses = childLessons.map((lesson) => getReviewAwareItemStatus(lesson))
         const moduleSummary = summarizeReviewAwareStage6Statuses(childStatuses)
         const totalLessons = childIds.length
 
@@ -524,7 +527,7 @@ export function buildGraph({
 
         lessonsInModule.forEach((item, indexInModule) => {
           const trace = getTrace(item.id)
-          const reviewAwareState = getReviewAwareGraphNodeState(item.status || getStatus(item.id))
+          const reviewAwareState = getReviewAwareGraphNodeState(getReviewAwareItemStatus(item))
           const attempts = getAttempts(item.id)
           const latestAttempt = attempts[attempts.length - 1]
 

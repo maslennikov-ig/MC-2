@@ -22,10 +22,7 @@ import { parseGenerationProgress } from '@/shared/schemas/generation-progress.sc
 import type { LessonContent, LessonQualitySignals } from '@megacampus/shared-types/lesson-content';
 import { runCourseQualityAudit, type CourseAuditFinding } from '../quality/course-audit';
 import { isStage6CourseAuditEnabled, isStage6QualityAlertsEnabled } from '../quality/flags';
-import type {
-  Stage6ExecutionContext,
-  Stage6QualityRecoveryHistory,
-} from '../types';
+import type { Stage6ExecutionContext, Stage6QualityRecoveryHistory } from '../types';
 import { STAGE6_REMEDIATION_CONTEXTS } from '../types';
 
 const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
@@ -290,6 +287,7 @@ export async function handlePartialSuccess(
           regenerationMode: result.metrics.regenerationMode ?? null,
           qaSignals,
           reviewInfo: result.reviewInfo ?? undefined,
+          factualWarnings: result.factualWarnings ?? undefined,
           reviewReasons: result.reviewInfo?.reasons ?? undefined,
           terminalReason: result.reviewInfo?.reasons?.[0] ?? undefined,
           qualityRecovery: result.qualityRecovery ?? undefined,
@@ -355,6 +353,7 @@ export interface ReviewMarkerContext {
   rejectedTokens?: number | null;
   regenerationMode?: string | null;
   reviewInfo?: Stage6Output['reviewInfo'];
+  factualWarnings?: Stage6Output['factualWarnings'];
   qaSignals?: LessonQualitySignals | null;
   qualityRecovery?: Stage6QualityRecoveryHistory;
   courseAuditFindings?: Array<Pick<CourseAuditFinding, 'kind' | 'detail'>>;
@@ -414,6 +413,7 @@ export async function markForReview(
           rejectedTokens: context.rejectedTokens ?? null,
           regenerationMode: context.regenerationMode ?? null,
           reviewInfo: context.reviewInfo ?? undefined,
+          factualWarnings: context.factualWarnings ?? undefined,
           reviewReasons: context.reviewInfo?.reasons ?? [reason],
           qaSignals: context.qaSignals ?? undefined,
           qa_signals: context.qaSignals ?? undefined,
@@ -549,6 +549,7 @@ export async function saveLessonContent(
             : undefined,
           // Human review info for UI warnings (only present if review needed)
           reviewInfo: result.reviewInfo ?? undefined,
+          factualWarnings: result.factualWarnings ?? undefined,
           lessonDigest: result.lessonDigest ?? undefined,
         })
       ) as Json,

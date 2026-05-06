@@ -259,18 +259,8 @@ export function buildReviewInfo(
     reviewReasons.push('Judge escalated to human review');
   }
 
-  if (factualResult?.requiresHumanReview) {
-    if (factualResult.contradictedClaims > 0) {
-      reviewReasons.push(
-        `${factualResult.contradictedClaims} claim(s) contradict source materials`
-      );
-    }
-    if (factualResult.unverifiedClaims > 0) {
-      reviewReasons.push(`${factualResult.unverifiedClaims} claim(s) could not be verified`);
-    }
-    if (factualResult.noEvidenceClaims > 0) {
-      reviewReasons.push(`${factualResult.noEvidenceClaims} claim(s) have no evidence in sources`);
-    }
+  if (factualResult?.contradictedClaims && factualResult.contradictedClaims > 0) {
+    reviewReasons.push(`${factualResult.contradictedClaims} claim(s) contradict source materials`);
   }
 
   if (reviewReasons.length === 0) {
@@ -283,6 +273,54 @@ export function buildReviewInfo(
     factualAccuracyScore: factualResult?.overallAccuracyScore,
     unverifiedClaims:
       (factualResult?.unverifiedClaims ?? 0) + (factualResult?.noEvidenceClaims ?? 0),
+  };
+}
+
+export interface FactualWarningSummary {
+  hasWarnings: boolean;
+  factualAccuracyScore?: number;
+  unverifiedClaims: number;
+  noEvidenceClaims: number;
+  contradictedClaims: number;
+  claims: Array<{
+    text: string;
+    status: string;
+    confidence: number;
+    evidenceChunkIds: string[];
+    mismatchReason?: string;
+    evidencePreview?: string;
+  }>;
+}
+
+export function buildFactualWarnings(
+  cascadeResult: CascadeResult | undefined
+): FactualWarningSummary | null {
+  const factualResult = cascadeResult?.factualVerificationResult;
+  if (!factualResult) return null;
+
+  const warningClaims = factualResult.claims.filter(
+    claim =>
+      claim.verificationStatus === 'no_evidence' ||
+      claim.verificationStatus === 'unverified' ||
+      claim.verificationStatus === 'contradicted'
+  );
+
+  if (warningClaims.length === 0) return null;
+
+  return {
+    hasWarnings: true,
+    factualAccuracyScore: factualResult.overallAccuracyScore,
+    unverifiedClaims: factualResult.unverifiedClaims,
+    noEvidenceClaims: factualResult.noEvidenceClaims,
+    contradictedClaims: factualResult.contradictedClaims,
+    claims: warningClaims.slice(0, 5).map(claim => ({
+      text: claim.text,
+      status: claim.verificationStatus,
+      confidence: claim.confidence,
+      evidenceChunkIds: claim.ragEvidence.map(chunk => chunk.chunk_id),
+      mismatchReason: claim.diagnostics?.mismatchReason,
+      evidencePreview: claim.diagnostics?.evidencePreview,
+    })),
   };
 }
 

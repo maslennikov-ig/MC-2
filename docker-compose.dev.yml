@@ -7,6 +7,25 @@ services:
   # DEV APPLICATION SERVICES
   # ============================================
 
+  # Qdrant Vector Database (Dev) - local persistent vector store for RAG
+  qdrant-dev:
+    image: qdrant/qdrant:latest
+    container_name: megacampus-qdrant-dev
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6333:6333'
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+    volumes:
+      - qdrant-dev-data:/qdrant/storage
+    networks:
+      - megacampus
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
   # NotebookLM Bridge (Dev) - Stage 7 audio/video generation backend
   notebooklm-bridge-dev:
     image: ghcr.io/maslennikov-ig/mc-2/notebooklm-bridge:develop
@@ -136,6 +155,8 @@ services:
     networks:
       - megacampus
     depends_on:
+      qdrant-dev:
+        condition: service_started
       notebooklm-bridge-dev:
         condition: service_healthy
     deploy:
@@ -182,6 +203,8 @@ services:
     networks:
       - megacampus
     depends_on:
+      qdrant-dev:
+        condition: service_started
       api-dev:
         condition: service_healthy
     deploy:
@@ -224,6 +247,8 @@ services:
     networks:
       - megacampus
     depends_on:
+      qdrant-dev:
+        condition: service_started
       api-dev:
         condition: service_healthy
     deploy:
@@ -285,6 +310,8 @@ services:
         max-file: '3'
 
 volumes:
+  qdrant-dev-data:
+    name: megacampus_qdrant-dev
   docling-json-cache:
     external: true
     name: megacampus_docling-json-cache

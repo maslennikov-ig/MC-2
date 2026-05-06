@@ -54,6 +54,7 @@ vi.mock('@/stages/stage6-lesson-content/judge/judge-helpers', () => ({
 vi.mock('@/stages/stage6-lesson-content/nodes/judge-refinement-helpers', () => ({
   executeTargetedRefinementFlow: vi.fn(),
   buildReviewInfo: vi.fn(),
+  buildFactualWarnings: vi.fn(() => null),
 }));
 
 vi.mock('@/stages/stage6-lesson-content/utils/mermaid-render-validator', () => ({

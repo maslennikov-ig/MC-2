@@ -60,6 +60,11 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
 
 4. **When in doubt**: Generate accurate content from your knowledge rather than forcing irrelevant reference material.
 
+5. **Exact facts discipline**:
+   - Exact metrics, dates, deadlines, percentages, prices, revenue, named case outcomes, and internal standards MUST come from <reference_material>.
+   - If a precise example is invented for teaching value, explicitly label it as a hypothetical example.
+   - If no source supports a precise number or real-world case, generalize it or remove it.
+
 **Quality over quantity**: It's better to write accurate content without references than to include misleading information from unrelated chunks.
 </rag_validation>
 

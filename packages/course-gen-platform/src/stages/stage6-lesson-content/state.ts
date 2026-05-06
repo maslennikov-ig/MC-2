@@ -516,6 +516,29 @@ export const LessonGraphState = Annotation.Root({
   }),
 
   /**
+   * Non-terminal factual verification warnings.
+   * These are persisted for QA/debugging but do not imply review_required.
+   */
+  factualWarnings: Annotation<{
+    hasWarnings: boolean;
+    factualAccuracyScore?: number;
+    unverifiedClaims: number;
+    noEvidenceClaims: number;
+    contradictedClaims: number;
+    claims: Array<{
+      text: string;
+      status: string;
+      confidence: number;
+      evidenceChunkIds: string[];
+      mismatchReason?: string;
+      evidencePreview?: string;
+    }>;
+  } | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
    * Previous quality scores for trend analysis
    * Used by decision engine to detect diminishing returns
    */

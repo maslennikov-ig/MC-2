@@ -30,6 +30,7 @@ import {
   QualityRemediationAction,
   summarizeDetailedHeuristicResult,
 } from '../../quality/remediation';
+import { applyFactualIssueVeto } from '../factual-issue-veto';
 import type {
   CascadeEvaluationInput,
   CascadeConfig,
@@ -401,25 +402,32 @@ export async function executeCascadeEvaluation(
   totalInputTokens += clevResult.verdicts.reduce((sum, v) => sum + (v.inputTokens ?? 0), 0);
   totalOutputTokens += clevResult.verdicts.reduce((sum, v) => sum + (v.outputTokens ?? 0), 0);
 
+  const vetoedClevResult = applyFactualIssueVeto(clevResult);
+  const factualIssueVetoApplied = Boolean(vetoedClevResult.blockingFactualIssue);
+
   logger.info({
     msg: 'CLEV voting complete',
     lessonId: input.lessonSpec.lesson_id,
-    aggregatedScore: clevResult.aggregatedScore,
-    finalRecommendation: clevResult.finalRecommendation,
+    aggregatedScore: vetoedClevResult.aggregatedScore,
+    finalRecommendation: vetoedClevResult.finalRecommendation,
     votingMethod: clevResult.votingMethod,
     consensusReached: clevResult.consensusReached,
     judgesUsed: clevResult.verdicts.length,
+    factualIssueVetoApplied,
+    blockingFactualIssue: vetoedClevResult.blockingFactualIssue?.quotedText,
   });
 
   return {
     stage: 'clev_voting',
-    passed: clevResult.aggregatedScore >= (finalConfig.rubric?.passingThreshold ?? 0.7),
+    passed: vetoedClevResult.aggregatedScore >= (finalConfig.rubric?.passingThreshold ?? 0.7),
     heuristicResults,
     factualVerificationResult,
     singleJudgeVerdict,
-    clevResult,
-    finalScore: clevResult.aggregatedScore,
-    finalRecommendation: clevResult.finalRecommendation,
+    clevResult: vetoedClevResult,
+    blockingFactualIssue: vetoedClevResult.blockingFactualIssue,
+    factualIssueVetoApplied,
+    finalScore: vetoedClevResult.aggregatedScore,
+    finalRecommendation: vetoedClevResult.finalRecommendation,
     totalTokensUsed,
     totalInputTokens,
     totalOutputTokens,

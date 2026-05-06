@@ -448,6 +448,9 @@ export const PatcherInputSchema = z.object({
    */
   lessonDurationMinutes: z.number().int().min(3).max(45).optional(),
 
+  /** Optional course UUID for course-specific model routing overrides */
+  courseId: z.string().uuid().optional(),
+
   /**
    * Content language for token budget calculation.
    * Different languages have different tokenization ratios:
@@ -458,6 +461,9 @@ export const PatcherInputSchema = z.object({
    * - ar/hi/bn: ~1.6x
    */
   language: z.string().optional(),
+
+  /** Optional precomputed token count for Stage 6 phase model selection */
+  tokenCount: z.number().int().positive().optional(),
 });
 
 /** PatcherInput type */
@@ -507,8 +513,12 @@ export const SectionExpanderInputSchema = z.object({
   }),
   /** Word count target */
   targetWordCount: z.number().int().min(50).max(2000).optional(),
+  /** Optional course UUID for course-specific model routing overrides */
+  courseId: z.string().uuid().optional(),
   /** Content language for generation (ISO 639-1 code: 'ru', 'en') */
   language: z.string().optional(),
+  /** Optional precomputed token count for Stage 6 phase model selection */
+  tokenCount: z.number().int().positive().optional(),
 });
 
 /** SectionExpanderInput type */
@@ -547,6 +557,12 @@ export const DeltaJudgeInputSchema = z.object({
   addressedIssue: TargetedIssueSchema,
   /** Section ID */
   sectionId: z.string(),
+  /** Optional course UUID for course-specific model routing overrides */
+  courseId: z.string().uuid().optional(),
+  /** Content language for model selection and token estimation */
+  language: z.string().optional(),
+  /** Optional precomputed token count for Stage 6 phase model selection */
+  tokenCount: z.number().int().positive().optional(),
   /** Context anchors for coherence check */
   contextAnchors: z.object({
     prevSectionEnd: z.string().optional(),

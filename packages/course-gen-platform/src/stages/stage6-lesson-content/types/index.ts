@@ -381,6 +381,22 @@ export interface Stage6Output {
     /** Number of unverified claims */
     unverifiedClaims?: number;
   };
+  /** Non-terminal factual QA warnings for diagnostics/UI */
+  factualWarnings?: {
+    hasWarnings: boolean;
+    factualAccuracyScore?: number;
+    unverifiedClaims: number;
+    noEvidenceClaims: number;
+    contradictedClaims: number;
+    claims: Array<{
+      text: string;
+      status: string;
+      confidence: number;
+      evidenceChunkIds: string[];
+      mismatchReason?: string;
+      evidencePreview?: string;
+    }>;
+  };
   /** Lesson digest — 3-5 sentence factual summary for inter-lesson context */
   lessonDigest?: string;
 }

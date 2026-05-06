@@ -15,6 +15,7 @@ import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { EntropyAnalysisResult } from './entropy-detector';
 import { logger } from '@/shared/logger';
 import type {
+  FactualClaimDiagnostics,
   FactualVerificationConfig,
   VerificationClaim,
   VerificationStatus,
@@ -158,6 +159,10 @@ export function splitIntoSentences(content: string): { text: string; index: numb
  * Check if a sentence contains a factual claim
  */
 function containsFactualClaim(sentence: string): boolean {
+  if (/условн|гипотетическ|hypothetical|illustrative/i.test(sentence)) {
+    return false;
+  }
+
   return FACTUAL_CLAIM_PATTERNS.some(pattern => {
     pattern.lastIndex = 0;
     return pattern.test(sentence);
@@ -279,6 +284,120 @@ export function calculateKeywordSimilarity(text1: string, text2: string): number
   return union > 0 ? intersection / union : 0;
 }
 
+type NumberedFact = {
+  raw: string;
+  value: number;
+  unit: string;
+  unitFamily: string;
+};
+
+const NUMERIC_UNIT_PATTERN =
+  /\d+(?:[.,]\d+)?\s*(?:%|процент(?:а|ов)?|день|дня|дней|сут(?:ки|ок)|час(?:а|ов)?|минут(?:а|ы)?|руб(?:ль|ля|лей)?|₽|млн|миллион(?:а|ов)?|тыс(?:яч[аи])?|thousand|million|billion|day|days|hour|hours|minute|minutes|rubles?|usd|dollars?)/giu;
+
+const CYRILLIC_STOPWORDS = new Set([
+  'это',
+  'как',
+  'для',
+  'или',
+  'при',
+  'что',
+  'чем',
+  'его',
+  'она',
+  'они',
+  'если',
+  'когда',
+  'после',
+  'перед',
+  'без',
+  'над',
+  'под',
+  'между',
+  'который',
+  'которая',
+  'которые',
+]);
+
+function normalizeNumericValue(raw: string): number {
+  return Number.parseFloat(raw.replace(',', '.'));
+}
+
+function normalizeUnitFamily(unit: string): string {
+  const normalized = unit.toLowerCase();
+  if (normalized === '%' || normalized.startsWith('процент')) return 'percent';
+  if (/^день|^дня|^дней|^сут|^day/.test(normalized)) return 'days';
+  if (/^час|^hour/.test(normalized)) return 'hours';
+  if (/^минут|^minute/.test(normalized)) return 'minutes';
+  if (
+    normalized.includes('руб') ||
+    normalized === '₽' ||
+    normalized === 'млн' ||
+    normalized.startsWith('миллион') ||
+    normalized.startsWith('тыс') ||
+    normalized === 'usd' ||
+    normalized.startsWith('dollar')
+  ) {
+    return 'money';
+  }
+  if (normalized === 'thousand' || normalized === 'million' || normalized === 'billion') {
+    return normalized;
+  }
+  return normalized;
+}
+
+export function extractNumberedFacts(text: string): NumberedFact[] {
+  const facts: NumberedFact[] = [];
+  for (const match of text.matchAll(NUMERIC_UNIT_PATTERN)) {
+    const raw = match[0].trim();
+    const valueMatch = raw.match(/\d+(?:[.,]\d+)?/);
+    if (!valueMatch) continue;
+
+    const unit = raw.slice(valueMatch[0].length).trim();
+    facts.push({
+      raw,
+      value: normalizeNumericValue(valueMatch[0]),
+      unit,
+      unitFamily: normalizeUnitFamily(unit),
+    });
+  }
+  return facts;
+}
+
+function stripNumberedFacts(text: string): string {
+  return text.replace(NUMERIC_UNIT_PATTERN, ' ');
+}
+
+function findNumericMismatch(
+  claim: string,
+  evidence: RAGChunk[]
+): { claimFact: NumberedFact; evidenceFact: NumberedFact; chunk: RAGChunk } | null {
+  const claimFacts = extractNumberedFacts(claim);
+  if (claimFacts.length === 0) return null;
+
+  const claimWithoutNumbers = stripNumberedFacts(claim);
+
+  for (const chunk of evidence) {
+    const lexicalSimilarity = calculateKeywordSimilarity(
+      claimWithoutNumbers,
+      stripNumberedFacts(chunk.content)
+    );
+
+    if (lexicalSimilarity < 0.08) continue;
+
+    const evidenceFacts = extractNumberedFacts(chunk.content);
+    for (const claimFact of claimFacts) {
+      for (const evidenceFact of evidenceFacts) {
+        if (claimFact.unitFamily !== evidenceFact.unitFamily) continue;
+        if (Math.abs(claimFact.value - evidenceFact.value) < 0.0001) continue;
+
+        return { claimFact, evidenceFact, chunk };
+      }
+    }
+  }
+
+  return null;
+}
+
 /**
  * Find relevant RAG chunks for a claim
  */
@@ -323,9 +442,23 @@ export function findRelevantChunks(
 export function analyzeEvidence(
   claim: string,
   evidence: RAGChunk[]
-): { status: VerificationStatus; confidence: number } {
+): { status: VerificationStatus; confidence: number; diagnostics?: FactualClaimDiagnostics } {
   if (evidence.length === 0) {
     return { status: 'no_evidence', confidence: 0.5 };
+  }
+
+  const numericMismatch = findNumericMismatch(claim, evidence);
+  if (numericMismatch) {
+    const { claimFact, evidenceFact, chunk } = numericMismatch;
+    return {
+      status: 'contradicted',
+      confidence: 0.9,
+      diagnostics: {
+        mismatchReason: `Numeric mismatch: claim has ${claimFact.raw}, evidence has ${evidenceFact.raw}`,
+        matchedEvidenceChunkIds: [chunk.chunk_id],
+        evidencePreview: chunk.content.slice(0, 240),
+      },
+    };
   }
 
   const extractKeyTerms = (text: string): string[] => {
@@ -336,6 +469,11 @@ export function analyzeEvidence(
     if (properNouns) terms.push(...properNouns);
     const years = text.match(/\b(19|20)\d{2}\b/g);
     if (years) terms.push(...years);
+    const cyrillicTerms = text
+      .toLowerCase()
+      .match(/\b[а-яё]{4,}\b/giu)
+      ?.filter(term => !CYRILLIC_STOPWORDS.has(term));
+    if (cyrillicTerms) terms.push(...cyrillicTerms.slice(0, 12));
     return terms;
   };
 
@@ -399,7 +537,12 @@ export function verifyClaimWithRAG(
   claim: string,
   ragChunks: RAGChunk[],
   config?: FactualVerificationConfig
-): { ragEvidence: RAGChunk[]; verificationStatus: VerificationStatus; confidence: number } {
+): {
+  ragEvidence: RAGChunk[];
+  verificationStatus: VerificationStatus;
+  confidence: number;
+  diagnostics?: FactualClaimDiagnostics;
+} {
   const effectiveConfig = config ?? {
     entropyThreshold: 2.0,
     ragChunkLimit: 10,
@@ -422,7 +565,7 @@ export function verifyClaimWithRAG(
     };
   }
 
-  const { status, confidence } = analyzeEvidence(claim, relevantChunks);
+  const { status, confidence, diagnostics } = analyzeEvidence(claim, relevantChunks);
 
   const finalStatus: VerificationStatus =
     status === 'verified' && confidence < effectiveConfig.minConfidence ? 'unverified' : status;
@@ -439,5 +582,6 @@ export function verifyClaimWithRAG(
     ragEvidence: relevantChunks,
     verificationStatus: finalStatus,
     confidence,
+    diagnostics,
   };
 }

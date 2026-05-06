@@ -190,6 +190,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       // in the self-reviewer node, falling back to a generic one only if the
       // node path didn't fire.
       reviewInfo: result.reviewInfo ?? recoveredReviewInfo ?? undefined,
+      factualWarnings: result.factualWarnings ?? undefined,
       lessonDigest: result.lessonDigest || undefined,
     };
   } catch (error) {

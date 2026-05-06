@@ -70,6 +70,11 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
 
 4. **When in doubt**: Generate accurate content from your knowledge rather than forcing irrelevant reference material.
 
+5. **Exact facts discipline**:
+   - Exact metrics, deadlines, dates, prices, percentages, revenue figures, named case-study outcomes, and internal standards MUST come from <reference_material>.
+   - If no source supports a precise number/case, either remove the number or explicitly label it as a hypothetical/illustrative example.
+   - Do NOT present invented numeric examples as real company results.
+
 **Quality over quantity**: It's better to write accurate content without references than to include misleading information from unrelated chunks.
 </rag_validation>
 
@@ -133,6 +138,7 @@ CRITICAL INSTRUCTIONS:
 1. DO NOT repeat the lesson title or introduction
 2. Create a SMOOTH TRANSITION from the previous context
 3. **VALIDATE reference material relevance BEFORE using** (see rag_validation above)
+3a. Source-ground exact metrics/dates/deadlines before writing them. Unsupported numeric examples must be explicitly hypothetical.
 4. Apply depth guidance: {{depthGuidance}}
 5. Match the {{tone}} tone for {{targetAudience}} audience
 6. **APPLY WRITING STYLE from <content_style> section** — This is crucial for consistency

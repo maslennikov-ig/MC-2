@@ -204,6 +204,11 @@ const PHASE_FALLBACK_CONFIG: Record<
     temperature: 0.3,
     maxTokens: 4096,
   },
+  stage_6_content: {
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.maxTokens,
+  },
   stage_6_refinement: {
     modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.modelId,
     temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.temperature,

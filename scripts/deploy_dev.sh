@@ -72,6 +72,23 @@ $DEV_COMPOSE up -d --force-recreate --no-deps web-dev notebooklm-bridge-dev api-
 # 8. Health Check — wait for API and Web before starting workers
 echo "Performing Health Checks..."
 
+# Check Qdrant readiness before accepting the deployment.
+QDRANT_HEALTHY=false
+QDRANT_API_KEY_VALUE="${QDRANT_API_KEY:-}"
+if [ -z "$QDRANT_API_KEY_VALUE" ] && [ -f "$BASE_PATH/.env.dev" ]; then
+    QDRANT_API_KEY_VALUE="$(grep -E '^QDRANT_API_KEY=' "$BASE_PATH/.env.dev" | tail -n 1 | cut -d= -f2-)"
+fi
+echo "   Checking Qdrant on localhost:6333..."
+for i in {1..12}; do
+    if curl -s -f -H "api-key: $QDRANT_API_KEY_VALUE" "http://localhost:6333/collections" > /dev/null 2>&1; then
+        echo "   Qdrant health check passed!"
+        QDRANT_HEALTHY=true
+        break
+    fi
+    echo "   Waiting for Qdrant... ($i/12)"
+    sleep 5
+done
+
 # Check API health
 API_HEALTHY=false
 echo "   Checking API on localhost:4010..."
@@ -103,9 +120,10 @@ for i in {1..12}; do
     sleep 5
 done
 
-if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
+if [ "$QDRANT_HEALTHY" = false ] || [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
     echo ""
     echo "Health check failed!"
+    [ "$QDRANT_HEALTHY" = false ] && echo "   - Qdrant not healthy"
     [ "$API_HEALTHY" = false ] && echo "   - API not healthy"
     [ "$WEB_HEALTHY" = false ] && echo "   - Web not healthy"
     echo ""

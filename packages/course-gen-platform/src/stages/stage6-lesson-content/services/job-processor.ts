@@ -1215,6 +1215,7 @@ export async function processStage6Job(
             rejectedTokens: result.metrics.rejectedTokens,
             regenerationMode: result.metrics.regenerationMode ?? null,
             reviewInfo: result.reviewInfo,
+            factualWarnings: result.factualWarnings,
             qaSignals: result.lessonContent?.metadata.qa_signals ?? null,
             qualityRecovery: result.qualityRecovery,
           }
@@ -1225,6 +1226,10 @@ export async function processStage6Job(
           { lessonLabel },
           'Cannot save review_required marker - lessonUuid not resolved'
         );
+      }
+
+      if (lessonUuid && sourceDocuments.length > 0) {
+        await saveSourceDocuments(courseId, lessonUuid, sourceDocuments);
       }
     } else if (result.lessonContent && result.errors.length > 0) {
       if (lessonUuid) {
