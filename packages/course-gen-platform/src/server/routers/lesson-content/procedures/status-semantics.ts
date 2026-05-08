@@ -13,6 +13,35 @@ export function buildSupabaseInFilterValue(values: readonly string[]): string {
   return `(${values.map(value => `"${value}"`).join(',')})`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function buildApprovalMetadata(
+  metadata: unknown,
+  approval: { approvedAt: string; approvedBy: string }
+): Record<string, unknown> {
+  const base = isRecord(metadata) ? { ...metadata } : {};
+  const reviewInfo = isRecord(base.reviewInfo) ? base.reviewInfo : null;
+
+  return {
+    ...base,
+    approved_at: approval.approvedAt,
+    approved_by: approval.approvedBy,
+    ...(reviewInfo
+      ? {
+          reviewInfo: {
+            ...reviewInfo,
+            needsReview: false,
+            resolvedByApproval: true,
+            resolved_at: approval.approvedAt,
+            resolved_by: approval.approvedBy,
+          },
+        }
+      : {}),
+  };
+}
+
 export function getLessonProgressSemantics(
   contentStatus: string | null | undefined
 ): LessonProgressSemantics {

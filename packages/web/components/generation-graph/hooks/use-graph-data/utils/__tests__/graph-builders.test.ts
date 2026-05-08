@@ -346,4 +346,71 @@ describe('buildGraph - Stage 6 review-aware counters', () => {
       needsReview: true,
     })
   })
+
+  it('treats approved lessons as resolved even when stale needsReview data remains', () => {
+    const rebuiltGraph = buildGraph({
+      parallelItems: new Map([
+        [
+          6,
+          [
+            {
+              id: 'module_8',
+              label: 'Модуль 8',
+              status: 'completed' as const,
+              type: 'module' as const,
+              data: {
+                moduleOrder: 8,
+                totalLessons: 1,
+                isCollapsed: false,
+                needsReview: true,
+              },
+            },
+            {
+              id: 'lesson_8_5',
+              label: 'Урок 8.5',
+              status: 'approved' as const,
+              type: 'lesson' as const,
+              parentId: 'module_8',
+              data: {
+                lessonOrder: 5,
+                needsReview: true,
+              },
+            },
+          ],
+        ],
+      ]),
+      stageStatuses: {
+        stage_6: 'completed',
+      },
+      documentSteps: new Map(),
+      hasDocuments: false,
+      getTrace: () => undefined,
+      getAttempts: () => [],
+      getPhases: () => [],
+      getExistingPos: () => ({ x: 0, y: 0 }),
+      getModuleCollapsed: () => false,
+      getStage2Collapsed: () => false,
+    })
+
+    const rebuiltStage6Node = rebuiltGraph.nodes.find((node) => node.id === 'stage_6')
+    const rebuiltModuleNode = rebuiltGraph.nodes.find((node) => node.id === 'module_8')
+    const rebuiltLessonNode = rebuiltGraph.nodes.find((node) => node.id === 'lesson_8_5')
+
+    expect(rebuiltStage6Node?.data.outputData).toMatchObject({
+      completedLessons: 1,
+      readyLessons: 1,
+      reviewRequiredLessons: 0,
+      totalLessons: 1,
+    })
+    expect(rebuiltModuleNode?.data).toMatchObject({
+      completedLessons: 1,
+      readyLessons: 1,
+      reviewRequiredLessons: 0,
+      needsReview: false,
+    })
+    expect(rebuiltLessonNode?.data).toMatchObject({
+      status: 'approved',
+      needsReview: false,
+    })
+  })
 })

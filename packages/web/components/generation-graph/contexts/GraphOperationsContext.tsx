@@ -9,6 +9,16 @@ interface GraphOperationsContextValue {
    * @param lessonId - Lesson ID in format "lesson_1_2" or "1.2"
    */
   removeLesson: (lessonId: string) => void
+  /**
+   * Update a lesson node status in the graph.
+   * Used for immediate UI feedback after lesson approval.
+   * @param lessonId - Lesson ID in format "lesson_1_2" or "1.2"
+   * @param status - New lesson content status
+   */
+  updateLessonStatus: (
+    lessonId: string,
+    status: 'completed' | 'approved' | 'review_required'
+  ) => void
 }
 
 const GraphOperationsContext = createContext<GraphOperationsContextValue | null>(null)
@@ -27,12 +37,20 @@ export function useGraphOperations() {
 
 interface GraphOperationsProviderProps {
   removeLesson: (lessonId: string) => void
+  updateLessonStatus: (
+    lessonId: string,
+    status: 'completed' | 'approved' | 'review_required'
+  ) => void
   children: ReactNode
 }
 
-export function GraphOperationsProvider({ removeLesson, children }: GraphOperationsProviderProps) {
+export function GraphOperationsProvider({
+  removeLesson,
+  updateLessonStatus,
+  children,
+}: GraphOperationsProviderProps) {
   return (
-    <GraphOperationsContext.Provider value={{ removeLesson }}>
+    <GraphOperationsContext.Provider value={{ removeLesson, updateLessonStatus }}>
       {children}
     </GraphOperationsContext.Provider>
   )

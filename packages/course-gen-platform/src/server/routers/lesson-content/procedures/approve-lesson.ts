@@ -5,6 +5,7 @@
 
 import { TRPCError } from '@trpc/server';
 import { nanoid } from 'nanoid';
+import type { Json } from '@megacampus/shared-types';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { approveLessonInputSchema } from '../schemas';
@@ -12,6 +13,7 @@ import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolver';
 import { logger } from '../../../../shared/logger/index.js';
+import { buildApprovalMetadata } from './status-semantics';
 
 /**
  * Approve a lesson after review
@@ -82,18 +84,18 @@ export const approveLesson = protectedProcedure
       }
 
       // Step 4: Update lesson_contents status to approved
-      const updatedMetadata = {
-        ...((currentLesson?.metadata as object) || {}),
-        approved_at: new Date().toISOString(),
-        approved_by: currentUser.id,
-      };
+      const now = new Date().toISOString();
+      const updatedMetadata = buildApprovalMetadata(currentLesson?.metadata, {
+        approvedAt: now,
+        approvedBy: currentUser.id,
+      });
 
       const { error } = await supabase
         .from('lesson_contents')
         .update({
           status: 'approved',
-          updated_at: new Date().toISOString(),
-          metadata: updatedMetadata,
+          updated_at: now,
+          metadata: updatedMetadata as Json,
         })
         .eq('course_id', courseId)
         .eq('lesson_id', lessonUuid);

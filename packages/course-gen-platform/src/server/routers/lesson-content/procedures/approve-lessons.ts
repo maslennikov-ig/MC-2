@@ -15,6 +15,7 @@ import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import {
   APPROVABLE_LESSON_CONTENT_STATUSES,
+  buildApprovalMetadata,
   buildSupabaseInFilterValue,
 } from './status-semantics';
 
@@ -250,11 +251,10 @@ export const approveLessons = protectedProcedure
         const safeMetadata = getSafeMetadata(currentMetadata);
         return {
           id: lesson.id,
-          metadata: {
-            ...safeMetadata,
-            approved_at: now,
-            approved_by: currentUser.id,
-          },
+          metadata: buildApprovalMetadata(safeMetadata, {
+            approvedAt: now,
+            approvedBy: currentUser.id,
+          }),
         };
       });
 

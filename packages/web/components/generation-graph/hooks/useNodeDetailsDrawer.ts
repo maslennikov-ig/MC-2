@@ -62,7 +62,7 @@ export function useNodeDetailsDrawer() {
   const t = useTranslations('generation')
   const { getNode } = useReactFlow()
   const { courseInfo } = useStaticGraph()
-  const { removeLesson: removeLessonFromGraph } = useGraphOperations()
+  const { removeLesson: removeLessonFromGraph, updateLessonStatus } = useGraphOperations()
   const { isAdmin } = useUserRole()
   const params = useParams()
   const courseSlug = params?.courseSlug as string | undefined
@@ -446,6 +446,7 @@ export function useNodeDetailsDrawer() {
     setIsApproving(true)
     try {
       await approveLesson(courseInfo.id, lessonInfoForInspector.lessonId)
+      updateLessonStatus(lessonInfoForInspector.lessonId, 'approved')
       toast.success('Урок одобрен')
       refetchLessonInspector()
     } catch (error) {
@@ -453,7 +454,7 @@ export function useNodeDetailsDrawer() {
     } finally {
       setIsApproving(false)
     }
-  }, [lessonInfoForInspector, courseInfo.id, refetchLessonInspector])
+  }, [lessonInfoForInspector, courseInfo.id, refetchLessonInspector, updateLessonStatus])
 
   // Callbacks: Module actions
   const handleApproveAllLessons = useCallback(async () => {
@@ -728,11 +729,7 @@ export function useNodeDetailsDrawer() {
     return () => {
       cancelled = true
     }
-  }, [
-    selectedNodeId,
-    displayData,
-    fetchTraceDetails,
-  ])
+  }, [selectedNodeId, displayData, fetchTraceDetails])
 
   return {
     // Node data

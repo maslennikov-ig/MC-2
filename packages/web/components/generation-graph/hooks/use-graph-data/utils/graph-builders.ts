@@ -365,8 +365,11 @@ export function buildGraph({
     if (i === 6 && config.parallelizable && items && items.length > 0) {
       const modules = items.filter((item) => item.type === 'module')
       const lessons = items.filter((item) => item.type === 'lesson')
-      const getReviewAwareItemStatus = (item: ParallelItem): string | null | undefined =>
-        item.data?.needsReview ? 'review_required' : item.status || getStatus(item.id)
+      const getReviewAwareItemStatus = (item: ParallelItem): string | null | undefined => {
+        const status = item.status || getStatus(item.id)
+        if (status?.toLowerCase() === 'approved') return 'approved'
+        return item.data?.needsReview ? 'review_required' : status
+      }
 
       const stage6Summary = summarizeReviewAwareStage6Statuses(
         lessons.map((lesson) => getReviewAwareItemStatus(lesson))
@@ -554,6 +557,7 @@ export function buildGraph({
             },
             data: {
               ...config,
+              ...item.data,
               label: item.label,
               status: reviewAwareState.status,
               stageNumber: 6 as const,
@@ -561,7 +565,6 @@ export function buildGraph({
               title: item.label,
               moduleId: item.parentId || '',
               needsReview: reviewAwareState.needsReview,
-              ...item.data,
               currentStep: trace?.step_name,
               duration: trace?.duration_ms,
               tokens: trace?.tokens_used,

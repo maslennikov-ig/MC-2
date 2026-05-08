@@ -276,6 +276,7 @@ function GraphViewInner({
     initializeFromCourseStructure,
     initializeDocumentsFromDb,
     removeLesson,
+    updateLessonStatus,
     setNodes,
     nodePositionsRef,
   } = useGraphData({
@@ -440,7 +441,10 @@ function GraphViewInner({
   return (
     <RealtimeStatusProvider value={realtimeData}>
       <StaticGraphProvider {...staticData}>
-        <GraphOperationsProvider removeLesson={removeLesson}>
+        <GraphOperationsProvider
+          removeLesson={removeLesson}
+          updateLessonStatus={updateLessonStatus}
+        >
           <FullscreenProvider portalContainerRef={portalContainerRef} isFullscreen={isFullscreen}>
             <div
               ref={containerRef}

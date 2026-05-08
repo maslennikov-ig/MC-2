@@ -358,6 +358,94 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
   }, [])
 
   /**
+   * Update a lesson status locally after a user action such as approval.
+   */
+  const updateLessonStatus = useCallback(
+    (lessonId: string, status: 'completed' | 'approved' | 'review_required') => {
+      const normalizedId = lessonId.includes('lesson_')
+        ? lessonId
+        : `lesson_${lessonId.replace('.', '_')}`
+
+      setParallelItems((prevItems) => {
+        const existingStage6 = prevItems.get(6)
+        if (!existingStage6 || existingStage6.length === 0) {
+          return prevItems
+        }
+
+        let parentModuleId: string | undefined
+        let hasChanges = false
+        const lessonNodeStatus: NodeStatus = status === 'review_required' ? 'completed' : status
+        const lessonNeedsReview = status === 'review_required'
+
+        const updatedItems = existingStage6.map((item) => {
+          if (item.type !== 'lesson' || item.id !== normalizedId) return item
+
+          parentModuleId = item.parentId
+          const currentNeedsReview = Boolean(item.data?.needsReview)
+          if (item.status === lessonNodeStatus && currentNeedsReview === lessonNeedsReview) {
+            return item
+          }
+
+          hasChanges = true
+          return {
+            ...item,
+            status: lessonNodeStatus,
+            data: {
+              ...item.data,
+              needsReview: lessonNeedsReview,
+            },
+          }
+        })
+
+        if (!hasChanges) return prevItems
+
+        const finalItems = updatedItems.map((item) => {
+          if (item.type !== 'module' || item.id !== parentModuleId) return item
+
+          const moduleLessons = updatedItems.filter(
+            (lesson) => lesson.type === 'lesson' && lesson.parentId === item.id
+          )
+          const readyCount = moduleLessons.filter(
+            (lesson) => lesson.status === 'completed' || lesson.status === 'approved'
+          ).length
+          const reviewRequiredCount = moduleLessons.filter((lesson) =>
+            Boolean(lesson.data?.needsReview)
+          ).length
+          const completedCount = moduleLessons.filter(
+            (lesson) =>
+              (lesson.status === 'completed' || lesson.status === 'approved') &&
+              !lesson.data?.needsReview
+          ).length
+          const totalCount = moduleLessons.length
+
+          let moduleStatus: NodeStatus = 'pending'
+          if (moduleLessons.some((lesson) => lesson.status === 'error')) moduleStatus = 'error'
+          else if (moduleLessons.some((lesson) => lesson.status === 'active'))
+            moduleStatus = 'active'
+          else if (totalCount > 0 && readyCount === totalCount) moduleStatus = 'completed'
+          else if (readyCount > 0) moduleStatus = 'active'
+
+          return {
+            ...item,
+            status: moduleStatus,
+            data: {
+              ...item.data,
+              completedLessons: completedCount,
+              reviewRequiredLessons: reviewRequiredCount,
+              needsReview: reviewRequiredCount > 0,
+            },
+          }
+        })
+
+        const nextItems = new Map(prevItems)
+        nextItems.set(6, finalItems)
+        return nextItems
+      })
+    },
+    []
+  )
+
+  /**
    * Update lesson statuses from completed lesson IDs.
    */
   const updateLessonStatuses = useCallback(
@@ -633,6 +721,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
     initializeDocumentsFromDb,
     updateLessonStatuses,
     removeLesson,
+    updateLessonStatus,
     setNodes,
     setEdges,
     nodePositionsRef,
