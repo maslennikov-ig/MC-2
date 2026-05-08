@@ -297,7 +297,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
-          className={`relative min-h-[90px] w-[300px] rounded-md border transition-all duration-300 ${getStatusBorderClass(visualStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
+          className={`relative flex h-full min-h-[190px] w-full flex-col overflow-hidden rounded-md border transition-all duration-300 ${getStatusBorderClass(visualStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
           data-testid={`node-module-${id}`}
           data-node-status={data.needsReview ? 'review_required' : currentStatus}
           aria-label={`Модуль: ${data.title}, ${moduleAriaSummary}, статус: ${data.needsReview ? 'требует проверки' : currentStatus}`}
@@ -326,7 +326,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           {/* nopan nodrag: prevent React Flow from panning/dragging when clicking header */}
           <div
             onClick={handleHeaderClick}
-            className="nopan nodrag flex cursor-pointer items-center gap-3 p-3 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+            className="nopan nodrag flex flex-1 cursor-pointer items-center gap-3 p-3 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
             data-testid={`expand-module-${id}`}
             role="button"
             aria-expanded="false"
@@ -443,12 +443,12 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
                     data.needsReview
                       ? 'review'
                       : currentStatus === 'completed'
-                      ? 'success'
-                      : currentStatus === 'error'
-                        ? 'error'
-                        : currentStatus === 'active'
-                          ? 'active'
-                          : 'default'
+                        ? 'success'
+                        : currentStatus === 'error'
+                          ? 'error'
+                          : currentStatus === 'active'
+                            ? 'active'
+                            : 'default'
                   }
                   size="sm"
                   className="mt-1.5"
@@ -472,7 +472,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           {(currentStatus === 'active' ||
             currentStatus === 'completed' ||
             currentStatus === 'error') && (
-            <div className="border-t border-black/5 bg-slate-50/50 px-2.5 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-900/30 dark:text-slate-400">
+            <div className="mt-auto border-t border-black/5 bg-slate-50/50 px-2.5 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-900/30 dark:text-slate-400">
               <div className="flex items-center justify-between">
                 <span>
                   {data.completedLessons} / {data.totalLessons} завершено
@@ -520,12 +520,12 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
             data.needsReview
               ? 'border-amber-400 bg-amber-50/20 dark:border-amber-500 dark:bg-amber-900/10'
               : currentStatus === 'active'
-              ? 'border-blue-400 bg-blue-50/20 dark:border-blue-500 dark:bg-blue-900/10'
-              : currentStatus === 'completed'
-                ? 'border-emerald-400 bg-emerald-50/20 dark:border-emerald-500 dark:bg-emerald-900/10'
-                : currentStatus === 'error'
-                  ? 'border-red-400 bg-red-50/20 dark:border-red-500 dark:bg-red-900/10'
-                  : 'border-purple-300 bg-purple-50/20 dark:border-purple-600 dark:bg-purple-900/10'
+                ? 'border-blue-400 bg-blue-50/20 dark:border-blue-500 dark:bg-blue-900/10'
+                : currentStatus === 'completed'
+                  ? 'border-emerald-400 bg-emerald-50/20 dark:border-emerald-500 dark:bg-emerald-900/10'
+                  : currentStatus === 'error'
+                    ? 'border-red-400 bg-red-50/20 dark:border-red-500 dark:bg-red-900/10'
+                    : 'border-purple-300 bg-purple-50/20 dark:border-purple-600 dark:bg-purple-900/10'
           } ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
           data-testid={`node-module-expanded-${id}`}
           data-node-status={data.needsReview ? 'review_required' : currentStatus}
@@ -570,12 +570,12 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
                 data.needsReview
                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                   : currentStatus === 'completed'
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                  : currentStatus === 'active'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                    : currentStatus === 'error'
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                      : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                    : currentStatus === 'active'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      : currentStatus === 'error'
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
               } `}
             >
               {completedSummary}

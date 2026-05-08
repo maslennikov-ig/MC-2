@@ -6,6 +6,7 @@ import { useReactFlow } from '@xyflow/react'
 import type { AppNode, AppEdge } from '../types'
 import { useGraphLayout } from './useGraphLayout'
 import { useViewportPreservation } from './useViewportPreservation'
+import { WORKFLOW_INITIAL_FIT_OPTIONS } from './viewport-guards'
 
 interface UseGraphLayoutEffectParams {
   nodes: AppNode[]
@@ -43,6 +44,7 @@ export function useGraphLayoutEffect({
   // Layout generation counter to prevent stale layout results
   const layoutGenerationRef = useRef(0)
   const initialFitDone = useRef(false)
+  const initialFitReady = useRef(false)
 
   // Ref to access latest nodes without adding to effect dependencies
   const nodesRef = useRef(nodes)
@@ -109,7 +111,9 @@ export function useGraphLayoutEffect({
         if (!initialFitDone.current) {
           initialFitDone.current = true
           requestAnimationFrame(() => {
-            void fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 })
+            void fitView(WORKFLOW_INITIAL_FIT_OPTIONS).then(() => {
+              initialFitReady.current = true
+            })
           })
         } else if (wasCollapseChange) {
           // Restore viewport after layout when collapse changed
@@ -156,5 +160,5 @@ export function useGraphLayoutEffect({
     }
   }, [layoutTrigger, edges, debouncedLayout])
 
-  return { initialFitDone }
+  return { initialFitDone, initialFitReady }
 }

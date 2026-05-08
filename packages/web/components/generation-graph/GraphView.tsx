@@ -1,14 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  ReactFlow,
-  ReactFlowProvider,
-  Background,
-  Panel,
-  useNodesInitialized,
-  useReactFlow,
-} from '@xyflow/react'
+import { ReactFlow, ReactFlowProvider, Background, Panel, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
 import { useGraphData } from './hooks/useGraphData'
@@ -57,6 +50,7 @@ import type { ClarifyingProgressData } from './hooks/use-graph-data/types'
 import { nodeTypes, edgeTypes } from './GraphView.constants'
 import { GraphInteractions } from './GraphInteractions'
 import type { GraphViewProps } from './GraphView.types'
+import { shouldPreserveWorkflowViewport } from './hooks/viewport-guards'
 
 // Re-export GraphViewProps for backward compatibility
 export type { GraphViewProps } from './GraphView.types'
@@ -99,8 +93,7 @@ function GraphViewInner({
   onSwitchToManual,
 }: GraphViewProps) {
   const { isTablet } = useBreakpoint(768)
-  const nodesInitialized = useNodesInitialized()
-  const { fitView, getNodes, setCenter } = useReactFlow()
+  const { getNodes, setCenter } = useReactFlow()
 
   // Get courseSlug and orgSlug from URL params for navigation
   const params = useParams()
@@ -301,7 +294,7 @@ function GraphViewInner({
   })
 
   // Auto-layout when graph structure changes
-  const { initialFitDone } = useGraphLayoutEffect({
+  const { initialFitReady } = useGraphLayoutEffect({
     nodes,
     edges,
     setNodes,
@@ -358,23 +351,29 @@ function GraphViewInner({
   useEffect(() => {
     if (isInteracting) return
 
-    if (effectiveTraces.length > 0) {
-      preserveViewport()
-      processTraces(effectiveTraces)
-      restoreViewport()
-    }
-  }, [effectiveTraces, processTraces, preserveViewport, restoreViewport, isInteracting])
+    const shouldPreserveViewport = shouldPreserveWorkflowViewport({
+      traceCount: effectiveTraces.length,
+      isInteracting,
+      isInitialFitReady: initialFitReady.current,
+    })
 
-  // Initial Fit View - show all nodes with comfortable zoom level
-  useEffect(() => {
-    if (nodesInitialized && !initialFitDone.current && nodes.length > 0) {
-      initialFitDone.current = true
-      requestAnimationFrame(() => {
-        void fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 300 })
-      })
+    if (effectiveTraces.length > 0) {
+      if (shouldPreserveViewport) {
+        preserveViewport()
+      }
+      processTraces(effectiveTraces)
+      if (shouldPreserveViewport) {
+        restoreViewport()
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialFitDone is a stable ref, not a reactive value
-  }, [nodesInitialized, nodes.length, fitView])
+  }, [
+    effectiveTraces,
+    processTraces,
+    preserveViewport,
+    restoreViewport,
+    isInteracting,
+    initialFitReady,
+  ])
 
   // Prepare Realtime Context
   const realtimeData = useRealtimeStatusData({
@@ -484,7 +483,6 @@ function GraphViewInner({
                   onEdgesChange={onEdgesChange}
                   nodeTypes={nodeTypes}
                   edgeTypes={edgeTypes}
-                  fitView
                   defaultViewport={{ x: 0, y: 0, zoom: 1 }}
                   onNodeDoubleClick={(_, node) => {
                     logger.devLog('[GraphView] onNodeDoubleClick', {
