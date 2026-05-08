@@ -162,9 +162,13 @@ export function usePartialGeneration(courseId: string) {
   useEffect(() => {
     if (trackedJobs.length > 0 && !pollIntervalRef.current) {
       // Start polling at interval (don't call immediately to avoid double-call)
-      pollIntervalRef.current = setInterval(pollJobStatuses, POLL_INTERVAL)
+      pollIntervalRef.current = setInterval(() => {
+        void pollJobStatuses()
+      }, POLL_INTERVAL)
       // Initial poll after short delay (save ref for cleanup)
-      initialPollTimeoutRef.current = setTimeout(pollJobStatuses, 500)
+      initialPollTimeoutRef.current = setTimeout(() => {
+        void pollJobStatuses()
+      }, 500)
     }
 
     // Cleanup only when no jobs left
@@ -205,6 +209,11 @@ export function usePartialGeneration(courseId: string) {
         )
       )
       if (alreadyPending || alreadyGenerating) {
+        const skipMessage =
+          lessonIds.length === 1
+            ? `Урок ${lessonIds[0]} уже поставлен в очередь или генерируется`
+            : `${lessonIds.length} уроков уже поставлены в очередь или генерируются`
+        toast.info(skipMessage)
         logger.info('Generation skipped - lessons already pending/generating', {
           lessonIds,
           alreadyPending,

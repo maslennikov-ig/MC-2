@@ -33,7 +33,9 @@ const MinimalLessonNode = ({
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status
   const needsReview = Boolean(data.needsReview)
-  const visualStatus = needsReview ? getReviewAwareGraphNodeState('review_required').visualStatus : currentStatus
+  const visualStatus = needsReview
+    ? getReviewAwareGraphNodeState('review_required').visualStatus
+    : currentStatus
 
   return (
     <div
@@ -60,7 +62,9 @@ const MediumLessonNode = ({
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status
   const needsReview = Boolean(data.needsReview)
-  const visualStatus = needsReview ? getReviewAwareGraphNodeState('review_required').visualStatus : currentStatus
+  const visualStatus = needsReview
+    ? getReviewAwareGraphNodeState('review_required').visualStatus
+    : currentStatus
   const hasEnrichments = (data.enrichmentCount ?? 0) > 0
 
   return (
@@ -116,7 +120,9 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   // Determine effective status: treat generating lessons as 'active'
   const isCurrentlyGenerating = isLessonGenerating(getLessonIdForApi())
   const currentStatus = isCurrentlyGenerating ? 'active' : realtimeStatus
-  const visualStatus = needsReview ? getReviewAwareGraphNodeState('review_required').visualStatus : currentStatus
+  const visualStatus = needsReview
+    ? getReviewAwareGraphNodeState('review_required').visualStatus
+    : currentStatus
 
   // Workaround: React Flow captures onDoubleClick, so we detect it manually via click timing
   // MUST be called before any conditional returns (Rules of Hooks)
@@ -169,7 +175,9 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   // Status text for Line 2 - consistent with DocumentNode style
   const getStatusText = () => {
     if (needsReview) {
-      return <span className="font-medium text-amber-600 dark:text-amber-400">Требует проверки</span>
+      return (
+        <span className="font-medium text-amber-600 dark:text-amber-400">Требует проверки</span>
+      )
     }
     if (currentStatus === 'approved') {
       return (
@@ -275,8 +283,12 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
             {isSelectionMode ? (
               // Checkbox in selection mode
               <button
-                onClick={() => toggleLesson(getLessonIdForApi())}
-                className={`flex h-4 w-4 items-center justify-center rounded border-2 transition-colors ${
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleLesson(getLessonIdForApi())
+                }}
+                className={`nodrag nopan flex h-4 w-4 items-center justify-center rounded border-2 transition-colors ${
                   selectedLessons.has(getLessonIdForApi())
                     ? 'border-blue-500 bg-blue-500 text-white'
                     : 'border-slate-300 hover:border-blue-300 dark:border-slate-600'
@@ -288,13 +300,15 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
             ) : currentStatus !== 'active' ? (
               // Generate button (not in active status)
               <button
-                onClick={() => {
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
                   if (generateLesson) {
                     void generateLesson(getLessonIdForApi())
                   }
                 }}
                 disabled={isLessonGenerating(getLessonIdForApi())}
-                className={`rounded p-1 transition-colors ${
+                className={`nodrag nopan rounded p-1 transition-colors ${
                   currentStatus === 'completed' || currentStatus === 'error'
                     ? 'text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30'
                     : 'text-emerald-600 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-900/30'
