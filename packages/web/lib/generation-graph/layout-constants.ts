@@ -22,8 +22,8 @@
 export const STAGE6_LAYOUT_CONFIG = {
   /** Width of module container node */
   MODULE_WIDTH: 300,
-  /** Height when collapsed - matches the full ModuleGroup card including footer */
-  MODULE_COLLAPSED_HEIGHT: 190,
+  /** Height when collapsed - compact summary card */
+  MODULE_COLLAPSED_HEIGHT: 90,
   /** Vertical gap between collapsed module cards in the Stage 6 stack */
   MODULE_STACK_GAP: 48,
   /** Height of header area (title + expand button) */

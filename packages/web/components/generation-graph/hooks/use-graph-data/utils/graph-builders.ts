@@ -457,7 +457,7 @@ export function buildGraph({
         const moduleSummary = summarizeReviewAwareStage6Statuses(childStatuses)
         const totalLessons = childIds.length
 
-        const defaultCollapsed = modules.length > 5
+        const defaultCollapsed = false
         const isCollapsed =
           getModuleCollapsed(item.id) ?? (item.data?.isCollapsed as boolean) ?? defaultCollapsed
 
@@ -504,7 +504,7 @@ export function buildGraph({
         } as AppNode)
       })
 
-      const defaultCollapsedForLessons = modules.length > 5
+      const defaultCollapsedForLessons = false
       const moduleCollapsedMap = new Map(
         moduleItems.map((m) => [
           m.id,

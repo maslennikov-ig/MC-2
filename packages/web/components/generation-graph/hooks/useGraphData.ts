@@ -233,7 +233,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
                 completedLessons: completedLessonsCount,
                 reviewRequiredLessons,
                 needsReview: reviewRequiredLessons > 0,
-                isCollapsed: courseStructure.sections.length > 5,
+                isCollapsed: false,
               },
             })
           }

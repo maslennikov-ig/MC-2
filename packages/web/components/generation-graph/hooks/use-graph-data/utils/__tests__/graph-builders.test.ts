@@ -413,4 +413,52 @@ describe('buildGraph - Stage 6 review-aware counters', () => {
       needsReview: false,
     })
   })
+
+  it('keeps modules expanded by default even when a course has many modules', () => {
+    const items = Array.from({ length: 6 }).flatMap((_, moduleIndex) => {
+      const moduleNumber = moduleIndex + 1
+      return [
+        {
+          id: `module_${moduleNumber}`,
+          label: `Модуль ${moduleNumber}`,
+          status: 'completed' as const,
+          type: 'module' as const,
+          data: {
+            moduleOrder: moduleNumber,
+            totalLessons: 1,
+          },
+        },
+        {
+          id: `lesson_${moduleNumber}_1`,
+          label: `Урок ${moduleNumber}.1`,
+          status: 'completed' as const,
+          type: 'lesson' as const,
+          parentId: `module_${moduleNumber}`,
+          data: { lessonOrder: 1 },
+        },
+      ]
+    })
+
+    const rebuiltGraph = buildGraph({
+      parallelItems: new Map([[6, items]]),
+      stageStatuses: {
+        stage_6: 'completed',
+      },
+      documentSteps: new Map(),
+      hasDocuments: false,
+      getTrace: () => undefined,
+      getAttempts: () => [],
+      getPhases: () => [],
+      getExistingPos: () => ({ x: 0, y: 0 }),
+      getModuleCollapsed: () => undefined,
+      getStage2Collapsed: () => false,
+    })
+
+    const moduleNodes = rebuiltGraph.nodes.filter((node) => node.type === 'module')
+    const lessonNodes = rebuiltGraph.nodes.filter((node) => node.type === 'lesson')
+
+    expect(moduleNodes).toHaveLength(6)
+    expect(moduleNodes.every((node) => node.data.isCollapsed === false)).toBe(true)
+    expect(lessonNodes.every((node) => node.hidden === false)).toBe(true)
+  })
 })

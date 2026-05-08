@@ -297,7 +297,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
-          className={`relative flex h-full min-h-[190px] w-full flex-col overflow-hidden rounded-md border transition-all duration-300 ${getStatusBorderClass(visualStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
+          className={`relative min-h-[90px] w-[300px] rounded-md border transition-all duration-300 ${getStatusBorderClass(visualStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
           data-testid={`node-module-${id}`}
           data-node-status={data.needsReview ? 'review_required' : currentStatus}
           aria-label={`Модуль: ${data.title}, ${moduleAriaSummary}, статус: ${data.needsReview ? 'требует проверки' : currentStatus}`}
@@ -326,7 +326,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           {/* nopan nodrag: prevent React Flow from panning/dragging when clicking header */}
           <div
             onClick={handleHeaderClick}
-            className="nopan nodrag flex flex-1 cursor-pointer items-center gap-3 p-3 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
+            className="nopan nodrag flex cursor-pointer items-center gap-3 p-3 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30"
             data-testid={`expand-module-${id}`}
             role="button"
             aria-expanded="false"
@@ -472,7 +472,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           {(currentStatus === 'active' ||
             currentStatus === 'completed' ||
             currentStatus === 'error') && (
-            <div className="mt-auto border-t border-black/5 bg-slate-50/50 px-2.5 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-900/30 dark:text-slate-400">
+            <div className="border-t border-black/5 bg-slate-50/50 px-2.5 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-900/30 dark:text-slate-400">
               <div className="flex items-center justify-between">
                 <span>
                   {data.completedLessons} / {data.totalLessons} завершено
