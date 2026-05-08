@@ -24,7 +24,16 @@ import { AutoCardPreview } from '../../shared/AutoCardPreview'
 import { Stage6StatsStrip } from './Stage6StatsStrip'
 import { Stage6QualityTab } from './tabs/Stage6QualityTab'
 import { Stage6InputTab } from './tabs/Stage6InputTab'
-import { CheckCircle2, Edit3, RotateCcw, AlertCircle, Loader2, Trash2 } from 'lucide-react'
+import {
+  CheckCircle2,
+  Edit3,
+  RotateCcw,
+  AlertCircle,
+  Loader2,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
 import type {
   LessonContentPreview,
   SelfReviewResult,
@@ -250,6 +259,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   const [activeTab, setActiveTab] = useState<
     'preview' | 'quality' | 'sources' | 'input' | 'blueprint' | 'trace' | 'card'
   >('preview')
+  const [isReviewDetailsExpanded, setIsReviewDetailsExpanded] = useState(false)
 
   // Inline editing state from context (provided by LessonEditProvider in NodeDetailsDrawer)
   const lessonEdit = useLessonEdit()
@@ -261,6 +271,8 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   const hasPreviewContent = Boolean(rawMarkdown?.trim() || content)
   const showReviewNeededEmptyState = !isEditing && needsReview && !hasPreviewContent
   const showReviewBanner = needsReview && !showReviewNeededEmptyState
+  const showQualityRecoveryBanner =
+    !showReviewNeededEmptyState && (showReviewBanner || Boolean(qualityRecoverySummary))
   const isManualRecoveryPath = qualityRecoverySummary?.recoveryMode === 'manual'
   const isManualEscalation =
     qualityRecoverySummary?.manualRegenerationRequested === true &&
@@ -270,45 +282,57 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   const showActions =
     !isEditing && (status === 'completed' || (status === 'error' && (rawMarkdown || content)))
 
-  const qualityRecoveryTone = isManualEscalation || isManualRecoveryPath
-    ? {
-        border: 'border-fuchsia-200 dark:border-fuchsia-800',
-        background: 'bg-fuchsia-50 dark:bg-fuchsia-950/20',
-        title: 'text-fuchsia-900 dark:text-fuchsia-300',
-        body: 'text-fuchsia-800 dark:text-fuchsia-400/90',
-        icon: 'text-fuchsia-500',
-      }
-    : needsReview
-    ? {
-        border: 'border-amber-200 dark:border-amber-800',
-        background: 'bg-amber-50 dark:bg-amber-950/20',
-        title: 'text-amber-900 dark:text-amber-300',
-        body: 'text-amber-800 dark:text-amber-400/90',
-        icon: 'text-amber-500',
-      }
-    : {
-        border: 'border-sky-200 dark:border-sky-800',
-        background: 'bg-sky-50 dark:bg-sky-950/20',
-        title: 'text-sky-900 dark:text-sky-300',
-        body: 'text-sky-800 dark:text-sky-400/90',
-        icon: 'text-sky-500',
-      }
+  const qualityRecoveryTone =
+    isManualEscalation || isManualRecoveryPath
+      ? {
+          border: 'border-fuchsia-200 dark:border-fuchsia-800',
+          background: 'bg-fuchsia-50 dark:bg-fuchsia-950/20',
+          title: 'text-fuchsia-900 dark:text-fuchsia-300',
+          body: 'text-fuchsia-800 dark:text-fuchsia-400/90',
+          icon: 'text-fuchsia-500',
+        }
+      : needsReview
+        ? {
+            border: 'border-amber-200 dark:border-amber-800',
+            background: 'bg-amber-50 dark:bg-amber-950/20',
+            title: 'text-amber-900 dark:text-amber-300',
+            body: 'text-amber-800 dark:text-amber-400/90',
+            icon: 'text-amber-500',
+          }
+        : {
+            border: 'border-sky-200 dark:border-sky-800',
+            background: 'bg-sky-50 dark:bg-sky-950/20',
+            title: 'text-sky-900 dark:text-sky-300',
+            body: 'text-sky-800 dark:text-sky-400/90',
+            icon: 'text-sky-500',
+          }
 
   const qualityRecoveryTitle = isManualEscalation
     ? t('manualEscalationTitle')
     : needsReview
-    ? t('reviewRequiredTitle')
-    : isManualRecoveryPath
-      ? t('manualRegenerationTitle')
-      : t('qualityRecoveryTitle')
+      ? t('reviewRequiredTitle')
+      : isManualRecoveryPath
+        ? t('manualRegenerationTitle')
+        : t('qualityRecoveryTitle')
 
   const qualityRecoveryDescription = isManualEscalation
     ? t('manualEscalationDescription')
     : needsReview
-    ? t('reviewRequiredDescription')
-    : isManualRecoveryPath
-      ? t('manualRegenerationDescription')
-      : null
+      ? t('reviewRequiredDescription')
+      : isManualRecoveryPath
+        ? t('manualRegenerationDescription')
+        : null
+  const approveReviewedLessonLabel =
+    locale === 'ru' ? 'Принять проверенный урок' : 'Approve reviewed lesson'
+  const reviewDetailsToggleLabel = isReviewDetailsExpanded
+    ? locale === 'ru'
+      ? 'Скрыть детали проверки'
+      : 'Hide review details'
+    : locale === 'ru'
+      ? 'Показать детали проверки'
+      : 'Show review details'
+  const showQualityRecoveryDetails =
+    Boolean(qualityRecoverySummary) && (!needsReview || isReviewDetailsExpanded)
 
   const getReasonLabel = (
     source: NonNullable<
@@ -564,76 +588,124 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
           locale={locale}
         />
 
-        {(showReviewBanner || qualityRecoverySummary) && (
+        {showQualityRecoveryBanner && (
           <div
             className={cn(
-              'flex items-start gap-3 border-b p-3',
+              'border-b p-3',
               qualityRecoveryTone.border,
               qualityRecoveryTone.background
             )}
           >
-            <AlertCircle className={cn('mt-0.5 h-5 w-5 flex-shrink-0', qualityRecoveryTone.icon)} />
-            <div className="min-w-0 flex-1">
-              <p className={cn('text-sm font-medium', qualityRecoveryTone.title)}>
-                {qualityRecoveryTitle}
-              </p>
-              {qualityRecoveryDescription && (
-                <p className={cn('text-xs', qualityRecoveryTone.body)}>
-                  {qualityRecoveryDescription}
-                </p>
-              )}
-              {qualityRecoverySummary && (
-                <div className={cn('mt-3 space-y-2 text-xs', qualityRecoveryTone.body)}>
-                  {qualityRecoverySummary.recoveryMode === 'automatic' &&
-                    qualityRecoverySummary.automaticRungs.length > 0 && (
-                      <div>
-                        <span className="font-medium">{t('qualityRecoveryAutomaticRungs')}:</span>{' '}
-                        <span>{qualityRecoverySummary.automaticRungs.join(' -> ')}</span>
-                      </div>
-                    )}
-
-                  {qualityRecoverySummary.recoveryMode === 'manual' ? (
-                    <>
-                      <div>
-                        <span className="font-medium">{t('manualRegenerationPhase')}:</span>{' '}
-                        <span>{qualityRecoverySummary.terminalPhaseName}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">{t('manualRegenerationModel')}:</span>{' '}
-                        <span>{qualityRecoverySummary.terminalModelId ?? 'unknown'}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <span className="font-medium">
-                          {t('qualityRecoveryFinalAutomaticRung')}:
-                        </span>{' '}
-                        <span>{qualityRecoverySummary.terminalPhaseName}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">{t('qualityRecoveryTerminalModel')}:</span>{' '}
-                        <span>{qualityRecoverySummary.terminalModelId ?? 'unknown'}</span>
-                      </div>
-                    </>
-                  )}
-
-                  {qualityRecoverySummary.reasons.length > 0 && (
-                    <div>
-                      <p className="font-medium">{t('qualityRecoveryTopReasons')}:</p>
-                      <ul className="mt-1 space-y-1">
-                        {qualityRecoverySummary.reasons.map((reason, index) => (
-                          <li key={`${reason.source}-${index}`}>
-                            <span className="font-medium">{getReasonLabel(reason.source)}:</span>{' '}
-                            <span>{reason.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <AlertCircle
+                  className={cn('mt-0.5 h-5 w-5 flex-shrink-0', qualityRecoveryTone.icon)}
+                />
+                <div className="min-w-0">
+                  <p className={cn('text-sm font-medium', qualityRecoveryTone.title)}>
+                    {qualityRecoveryTitle}
+                  </p>
+                  {qualityRecoveryDescription && (
+                    <p className={cn('text-xs leading-5', qualityRecoveryTone.body)}>
+                      {qualityRecoveryDescription}
+                    </p>
                   )}
                 </div>
-              )}
+              </div>
+
+              <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                {needsReview && !isEditing && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={onApprove}
+                    disabled={isApproving || isRegenerating || isDeleting}
+                    aria-label={approveReviewedLessonLabel}
+                    className="h-8"
+                  >
+                    {isApproving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t('approving')}
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        {t('approve')}
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {qualityRecoverySummary && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsReviewDetailsExpanded((current) => !current)}
+                    aria-label={reviewDetailsToggleLabel}
+                    aria-expanded={isReviewDetailsExpanded}
+                    className={cn('h-8', qualityRecoveryTone.body)}
+                  >
+                    {isReviewDetailsExpanded ? (
+                      <ChevronUp className="mr-2 h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="mr-2 h-4 w-4" />
+                    )}
+                    {locale === 'ru' ? 'Детали' : 'Details'}
+                  </Button>
+                )}
+              </div>
             </div>
+
+            {showQualityRecoveryDetails && qualityRecoverySummary && (
+              <div className={cn('mt-3 space-y-2 text-xs', qualityRecoveryTone.body)}>
+                {qualityRecoverySummary.recoveryMode === 'automatic' &&
+                  qualityRecoverySummary.automaticRungs.length > 0 && (
+                    <div>
+                      <span className="font-medium">{t('qualityRecoveryAutomaticRungs')}:</span>{' '}
+                      <span>{qualityRecoverySummary.automaticRungs.join(' -> ')}</span>
+                    </div>
+                  )}
+
+                {qualityRecoverySummary.recoveryMode === 'manual' ? (
+                  <>
+                    <div>
+                      <span className="font-medium">{t('manualRegenerationPhase')}:</span>{' '}
+                      <span>{qualityRecoverySummary.terminalPhaseName}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">{t('manualRegenerationModel')}:</span>{' '}
+                      <span>{qualityRecoverySummary.terminalModelId ?? 'unknown'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <span className="font-medium">{t('qualityRecoveryFinalAutomaticRung')}:</span>{' '}
+                      <span>{qualityRecoverySummary.terminalPhaseName}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">{t('qualityRecoveryTerminalModel')}:</span>{' '}
+                      <span>{qualityRecoverySummary.terminalModelId ?? 'unknown'}</span>
+                    </div>
+                  </>
+                )}
+
+                {qualityRecoverySummary.reasons.length > 0 && (
+                  <div>
+                    <p className="font-medium">{t('qualityRecoveryTopReasons')}:</p>
+                    <ul className="mt-1 space-y-1">
+                      {qualityRecoverySummary.reasons.map((reason, index) => (
+                        <li key={`${reason.source}-${index}`}>
+                          <span className="font-medium">{getReasonLabel(reason.source)}:</span>{' '}
+                          <span>{reason.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

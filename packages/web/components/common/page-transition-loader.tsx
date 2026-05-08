@@ -137,6 +137,12 @@ export function PageTransitionLoader() {
 
       if (!button) return
 
+      // Tab clicks only switch local panel state. Labels like "Preview"/"Просмотр"
+      // must not trigger the global page-transition loader.
+      if (button.getAttribute('role') === 'tab' || button.closest('[role="tablist"]')) {
+        return
+      }
+
       // Check for data attributes indicating navigation
       const navigateTo = button.dataset.navigateTo
       if (navigateTo) {

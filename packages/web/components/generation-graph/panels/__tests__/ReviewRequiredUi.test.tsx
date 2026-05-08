@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { LessonMatrix } from '../module/LessonMatrix'
 import { Stage6ControlTower } from '../stage6/dashboard/Stage6ControlTower'
 import { Stage6InspectorContent } from '../stage6/inspector/Stage6InspectorContent'
@@ -178,12 +178,12 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.getAllByText('Manual review required')).toHaveLength(2)
+    expect(screen.getAllByText('Manual review required')).toHaveLength(1)
     expect(
       screen.getAllByText('Generation finished fail-open and now requires manual review.')
-    ).toHaveLength(2)
-    expect(screen.getByText('stage_6_auto_last_chance')).toBeTruthy()
-    expect(screen.getByText('z-ai/glm-5')).toBeTruthy()
+    ).toHaveLength(1)
+    expect(screen.queryByText('stage_6_auto_last_chance')).toBeNull()
+    expect(screen.queryByText('z-ai/glm-5')).toBeNull()
   })
 
   it('renders manual-top regeneration history without treating it as the automatic ladder', () => {
@@ -263,13 +263,13 @@ describe('review-required UI surfaces', () => {
       />
     )
 
-    expect(screen.getAllByText('Manual review required after human escalation')).toHaveLength(2)
+    expect(screen.getAllByText('Manual review required after human escalation')).toHaveLength(1)
     expect(
       screen.getAllByText(
         'Automatic attempts and manual-top regeneration were both exhausted. A human now needs to review this lesson directly.'
       )
-    ).toHaveLength(2)
-    expect(screen.getByText('openai/gpt-5.4')).toBeInTheDocument()
+    ).toHaveLength(1)
+    expect(screen.queryByText('openai/gpt-5.4')).not.toBeInTheDocument()
   })
 
   it('does not render recovery history for normal completed lessons', () => {
@@ -328,6 +328,8 @@ describe('review-required UI surfaces', () => {
   })
 
   it('renders preview content together with the review banner when review content is usable', () => {
+    const onApprove = vi.fn()
+
     render(
       <Stage6InspectorContent
         content={null}
@@ -344,7 +346,7 @@ describe('review-required UI surfaces', () => {
         }}
         status="completed"
         needsReview={true as never}
-        onApprove={() => {}}
+        onApprove={onApprove}
         onEdit={() => {}}
         onRegenerate={() => {}}
         locale="en"
@@ -354,6 +356,61 @@ describe('review-required UI surfaces', () => {
     expect(screen.getByText('Manual review required')).toBeInTheDocument()
     expect(screen.getByText('Useful review content.')).toBeInTheDocument()
     expect(screen.queryByText('Lesson content unavailable')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /approve reviewed lesson/i }))
+    expect(onApprove).toHaveBeenCalledOnce()
+  })
+
+  it('keeps review recovery details collapsed by default and expands them on demand', () => {
+    render(
+      <Stage6InspectorContent
+        content={null}
+        rawMarkdown={'# Lesson preview\n\nUseful review content.'}
+        metadata={null}
+        logs={[]}
+        selfReviewResult={null}
+        judgeResult={null}
+        stats={{
+          tokens: 100,
+          durationMs: 1000,
+          modelTier: 'standard',
+          quality: 72,
+        }}
+        status="completed"
+        needsReview={true as never}
+        qualityRecoverySummary={
+          {
+            recoveryMode: 'automatic',
+            outcome: 'review_required',
+            humanReviewRequired: true,
+            automaticRungs: [
+              'stage_6_simple',
+              'stage_6_normal',
+              'stage_6_complex',
+              'stage_6_auto_last_chance',
+            ],
+            terminalPhaseName: 'stage_6_auto_last_chance',
+            terminalModelId: 'z-ai/glm-5',
+            manualRegenerationRequested: false,
+            reasons: [
+              {
+                source: 'self_review',
+                text: 'Self-review blocked publication because the lesson ends mid-thought.',
+              },
+            ],
+          } as never
+        }
+        onApprove={() => {}}
+        onEdit={() => {}}
+        onRegenerate={() => {}}
+        locale="en"
+      />
+    )
+
+    expect(screen.queryByText('stage_6_auto_last_chance')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /show review details/i }))
+
+    expect(screen.getByText('stage_6_auto_last_chance')).toBeInTheDocument()
   })
 
   it('renders normal completed preview without review banner when markdown is available', () => {
