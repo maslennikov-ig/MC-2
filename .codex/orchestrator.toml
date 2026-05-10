@@ -1,5 +1,5 @@
 schema_version = 2
-role = "stage-orchestrator"
+role = "orchestrator-stage"
 beads_dir = ".beads"
 handoff_file = ".codex/handoff.md"
 stage_summary_path_template = ".codex/stages/{stage_id}/summary.md"
@@ -12,7 +12,7 @@ multi_repo = false
 launch_mode = "manual_user_launch"
 
 [baseline]
-profile = "balanced-v2.4"
+profile = "balanced-v2.5"
 source_skill = "orchestration-setup"
 
 [execution]
@@ -47,6 +47,14 @@ legacy_archive_dir = ".codex/agent-reports"
 tracked_in_git = true
 format = "frontmatter_plus_short_note"
 sensitivity = "internal_no_secrets"
+
+[completion_inbox]
+scope = "git_common_dir"
+transport = "local_ndjson"
+events_file = "codex-orchestration/completions.ndjson"
+review_state_file = "codex-orchestration/review-state.json"
+report_entrypoint = "scripts/orchestration/report_child_completion.py"
+review_entrypoint = "scripts/orchestration/review_completion_inbox.py"
 
 [docs]
 required_read_paths = [

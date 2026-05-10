@@ -42,6 +42,8 @@ required = [
     artifact_template,
     pathlib.Path("scripts/orchestration/run_stage_closeout.py"),
     pathlib.Path("scripts/orchestration/cleanup_stage_workspace.py"),
+    pathlib.Path("scripts/orchestration/report_child_completion.py"),
+    pathlib.Path("scripts/orchestration/review_completion_inbox.py"),
 ]
 
 workspace = contract.get("workspace", {})
@@ -64,6 +66,16 @@ source_skill = baseline.get("source_skill")
 if not profile or not source_skill:
     raise SystemExit("Baseline metadata must define profile and source_skill")
 
+if contract.get("role") != "orchestrator-stage":
+    raise SystemExit("orchestrator role must be 'orchestrator-stage'")
+
+completion_inbox = contract.get("completion_inbox")
+if not isinstance(completion_inbox, dict):
+    raise SystemExit("Missing [completion_inbox] section in .codex/orchestrator.toml")
+for key in ("scope", "events_file", "review_state_file", "report_entrypoint", "review_entrypoint"):
+    if not completion_inbox.get(key):
+        raise SystemExit(f"completion_inbox.{key} is required")
+
 for blocked in (pathlib.Path("tasks.json"), pathlib.Path(".codex/tasks.json")):
     if blocked.exists():
         raise SystemExit(f"Duplicate task ledger is not allowed: {blocked}")
@@ -82,7 +94,7 @@ required_handoff_tokens = [
     "Next stage id:",
     "Recommended action:",
     "## Starter prompt for next orchestrator",
-    "Use $stage-orchestrator",
+    "Use $orchestrator-stage",
     "## Explicit defers",
 ]
 missing_handoff_tokens = [token for token in required_handoff_tokens if token not in handoff_text]

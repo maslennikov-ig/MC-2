@@ -5,7 +5,9 @@
     "backup_export": {
       "name": "backup_export",
       "url": "file:///home/me/code/mc2/.beads/backup",
-      "fetch_specs": ["refs/heads/*:refs/remotes/backup_export/*"],
+      "fetch_specs": [
+        "refs/heads/*:refs/remotes/backup_export/*"
+      ],
       "params": {}
     }
   },

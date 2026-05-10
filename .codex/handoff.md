@@ -27,7 +27,7 @@ Current baseline commit: `8cb1b502f2809223cac73fe630951e2945be0ccd`
 ## Starter prompt for next orchestrator
 
 ```text
-Use $stage-orchestrator to continue with stage `mc2-dqbw1` in this repository. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, and the linked stage summary/artifact first. Then confirm current develop-baseline truth, keep Beads lock contention out of the product stage, and prepare the next execution step for Lesson Inspector loading and latest-usable-content resolution.
+Use $orchestrator-stage to continue with stage `mc2-dqbw1` in this repository. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, and the linked stage summary/artifact first. Then confirm current develop-baseline truth, keep Beads lock contention out of the product stage, and prepare the next execution step for Lesson Inspector loading and latest-usable-content resolution.
 ```
 
 ## Explicit defers

@@ -46,9 +46,13 @@ Typical code-change gates in this repo include:
 - `.codex/stages/<stage_id>/summary.md` stores tracked stage summaries.
 - `.codex/stages/<stage_id>/artifacts/<task_id>.md` stores tracked delegated artifacts.
 - `.codex/manual-agent-prompt-template.md` is the prompt skeleton for user-launched delegated streams.
+- The delegated completion inbox lives in shared git-common-dir runtime state so parallel worktrees report into one repo-local queue.
+- Completion-inbox state is transport/review state, not task truth.
 - `.codex/agent-reports/` is the legacy local-only pre-v2 archive.
 - `scripts/orchestration/validate_artifact.py` validates tracked artifacts.
 - `scripts/orchestration/check_stage_ready.py <stage_id>` is the minimal hard stop before stage close.
 - `scripts/orchestration/run_stage_closeout.py --stage <stage_id>` runs stage-close verification before delivery.
 - `scripts/orchestration/cleanup_stage_workspace.py --stage <stage_id>` removes safe local worktrees and branches for completed stage deliveries.
+- `scripts/orchestration/report_child_completion.py` records delegated completion events.
+- `scripts/orchestration/review_completion_inbox.py` shows unread completion events and review decisions.
 - Beads remains the source of truth for queue, status, and dependencies.
