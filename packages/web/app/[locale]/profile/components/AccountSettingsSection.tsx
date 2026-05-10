@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { FormField } from '@/components/ui/form-field'
 import {
   Lock, Download, Trash2, Moon, Sun,
-  Loader2, AlertTriangle
+  Loader2, AlertTriangle, Send
 } from 'lucide-react'
 import { passwordSchema, type PasswordFormData } from '../validation-schemas'
 import type { UserProfile } from '../page'
@@ -82,6 +82,9 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const { theme, setTheme } = useThemeSync()
+  const [telegramChatId, setTelegramChatId] = useState(profile.telegram_chat_id || '')
+  const [telegramNotifications, setTelegramNotifications] = useState(profile.telegram_notifications_enabled || false)
+  const [isTelegramSaving, setIsTelegramSaving] = useState(false)
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
@@ -92,11 +95,32 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
     }
   })
 
-  const handlePasswordSubmit = async () => {
+  const handlePasswordSubmit = () => {
     // In production, this would call the backend API
     toast.success('Пароль успешно изменен')
     setShowPasswordForm(false)
     passwordForm.reset()
+  }
+
+  const handleTelegramSave = async () => {
+    // Validate chat_id format (only digits, optional minus for groups)
+    if (telegramChatId && !/^-?\d+$/.test(telegramChatId)) {
+      toast.error('Chat ID должен содержать только цифры')
+      return
+    }
+
+    setIsTelegramSaving(true)
+    try {
+      await onUpdate({
+        telegram_chat_id: telegramChatId || null,
+        telegram_notifications_enabled: telegramNotifications
+      })
+      toast.success('Telegram настройки сохранены')
+    } catch {
+      toast.error('Не удалось сохранить Telegram настройки')
+    } finally {
+      setIsTelegramSaving(false)
+    }
   }
 
   return (
@@ -112,10 +136,12 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
             <div className="mt-2 flex gap-4">
               <button
                 type="button"
-                onClick={async () => {
-                  setTheme('light')
-                  // Also update in the database
-                  await onUpdate({ theme_preference: 'light' })
+                onClick={() => {
+                  void (async () => {
+                    setTheme('light')
+                    // Also update in the database
+                    await onUpdate({ theme_preference: 'light' })
+                  })()
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
                   theme === 'light'
@@ -129,10 +155,12 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               </button>
               <button
                 type="button"
-                onClick={async () => {
-                  setTheme('dark')
-                  // Also update in the database
-                  await onUpdate({ theme_preference: 'dark' })
+                onClick={() => {
+                  void (async () => {
+                    setTheme('dark')
+                    // Also update in the database
+                    await onUpdate({ theme_preference: 'dark' })
+                  })()
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
                   theme === 'dark'
@@ -152,7 +180,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
             <Suspense fallback={<div className="h-10 w-full bg-muted animate-pulse rounded-md mt-2" />}>
               <Select
                 value={'language' in profile ? profile.language : 'ru'}
-                onValueChange={(value) => onUpdate({ language: value })}
+                onValueChange={(value) => { void onUpdate({ language: value }) }}
                 aria-label="Выбор языка интерфейса"
               >
                 <SelectTrigger className="mt-2">
@@ -188,7 +216,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               <Switch
                 id="email-notifications"
                 checked={'email_notifications' in profile ? profile.email_notifications : true}
-                onCheckedChange={(checked) => onUpdate({ email_notifications: checked })}
+                onCheckedChange={(checked) => { void onUpdate({ email_notifications: checked }) }}
                 aria-label="Получать уведомления на email"
                 aria-describedby="email-notifications-description"
               />
@@ -204,7 +232,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               <Switch
                 id="course-updates"
                 checked={'email_course_updates' in profile ? profile.email_course_updates : true}
-                onCheckedChange={(checked) => onUpdate({ email_course_updates: checked })}
+                onCheckedChange={(checked) => { void onUpdate({ email_course_updates: checked }) }}
               />
             </div>
 
@@ -218,10 +246,73 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               <Switch
                 id="push-notifications"
                 checked={'push_notifications' in profile ? profile.push_notifications : false}
-                onCheckedChange={(checked) => onUpdate({ push_notifications: checked })}
+                onCheckedChange={(checked) => { void onUpdate({ push_notifications: checked }) }}
               />
             </div>
           </Suspense>
+        </div>
+      </Card>
+
+      {/* Telegram Notifications */}
+      <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+        <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+          <Send className="h-5 w-5" />
+          Telegram уведомления
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Получайте уведомления о статусе генерации курсов в Telegram
+        </p>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="telegram-chat-id">Telegram Chat ID</Label>
+            <Input
+              id="telegram-chat-id"
+              type="text"
+              placeholder="Введите ваш Chat ID"
+              value={telegramChatId}
+              onChange={(e) => setTelegramChatId(e.target.value)}
+              className="mt-2"
+              aria-describedby="telegram-chat-id-help"
+            />
+            <p id="telegram-chat-id-help" className="text-xs text-muted-foreground mt-2">
+              Напишите боту <span className="font-mono">@userinfobot</span> в Telegram, чтобы узнать свой Chat ID
+            </p>
+          </div>
+
+          <Suspense fallback={<div className="h-10 bg-muted animate-pulse rounded" />}>
+            <div className="flex items-center justify-between py-2">
+              <div className="space-y-0.5">
+                <Label htmlFor="telegram-notifications">Включить Telegram уведомления</Label>
+                <p className="text-sm text-muted-foreground">
+                  Получать уведомления о курсах
+                </p>
+              </div>
+              <Switch
+                id="telegram-notifications"
+                checked={telegramNotifications}
+                onCheckedChange={setTelegramNotifications}
+                disabled={!telegramChatId}
+                aria-label="Включить Telegram уведомления"
+              />
+            </div>
+          </Suspense>
+
+          {(telegramChatId !== (profile.telegram_chat_id || '') || telegramNotifications !== (profile.telegram_notifications_enabled || false)) && (
+            <Button
+              onClick={() => { void handleTelegramSave() }}
+              disabled={isTelegramSaving}
+              className="w-full transition-colors"
+            >
+              {isTelegramSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Сохранение...
+                </>
+              ) : (
+                'Сохранить'
+              )}
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -242,7 +333,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               <Switch
                 id="profile-visibility"
                 checked={'profile_visibility' in profile ? profile.profile_visibility === 'public' : true}
-                onCheckedChange={(checked) => onUpdate({ profile_visibility: checked ? 'public' : 'private' })}
+                onCheckedChange={(checked) => { void onUpdate({ profile_visibility: checked ? 'public' : 'private' }) }}
               />
             </div>
 
@@ -256,7 +347,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               <Switch
                 id="show-achievements"
                 checked={'show_achievements' in profile ? profile.show_achievements : true}
-                onCheckedChange={(checked) => onUpdate({ show_achievements: checked })}
+                onCheckedChange={(checked) => { void onUpdate({ show_achievements: checked }) }}
               />
             </div>
 
@@ -270,7 +361,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               <Switch
                 id="data-collection"
                 checked={'data_collection' in profile ? profile.data_collection : true}
-                onCheckedChange={(checked) => onUpdate({ data_collection: checked })}
+                onCheckedChange={(checked) => { void onUpdate({ data_collection: checked }) }}
               />
             </div>
           </Suspense>
@@ -421,9 +512,11 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                     variant="destructive"
                     disabled={deleteConfirmText !== 'УДАЛИТЬ'}
                     className="transition-colors"
-                    onClick={async () => {
-                      await onDeleteAccount()
-                      setShowDeleteDialog(false)
+                    onClick={() => {
+                      void (async () => {
+                        await onDeleteAccount()
+                        setShowDeleteDialog(false)
+                      })()
                     }}
                   >
                     Удалить аккаунт

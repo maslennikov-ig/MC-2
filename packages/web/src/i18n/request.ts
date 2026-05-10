@@ -12,8 +12,8 @@ type Messages = Record<Namespace, Record<string, unknown>>;
  */
 async function loadNamespace(locale: string, namespace: Namespace): Promise<Record<string, unknown>> {
   try {
-    const module = await import(`../../messages/${locale}/${namespace}.json`);
-    return module.default;
+    const localeModule = await import(`../../messages/${locale}/${namespace}.json`);
+    return localeModule.default;
   } catch (error) {
     // In development, fail fast to catch missing translations early
     if (process.env.NODE_ENV === 'development') {

@@ -149,6 +149,8 @@ export interface Profile {
   role: UserRole
   created_at?: string
   updated_at?: string
+  telegram_chat_id?: string | null
+  telegram_notifications_enabled?: boolean | null
 }
 
 // Asset type is already defined above
