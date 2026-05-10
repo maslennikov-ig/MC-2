@@ -39,6 +39,29 @@ Issues in Beads are:
 - **Branch-aware**: Issues can follow your branch workflow
 - **Always in sync**: Auto-syncs with your commits
 
+## Git Storage Policy
+
+Commit the portable task data and shared configuration:
+
+- `.beads/issues.jsonl`
+- `.beads/interactions.jsonl`
+- `.beads/config.yaml`
+- `.beads/formulas/`
+- `.beads/hooks/`
+
+Do not commit local runtime databases or backup caches:
+
+- `.beads/dolt/`
+- `.beads/embeddeddolt/`
+- `.beads/backup/`
+- `.beads/sync_base.jsonl`
+
+If a clone has no local Dolt database, rebuild it from the tracked JSONL:
+
+```bash
+bd import
+```
+
 ## Why Beads?
 
 ✨ **AI-Native Design**
