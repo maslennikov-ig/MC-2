@@ -336,6 +336,7 @@ export async function finalizeProcessing(context: PhaseContext): Promise<void> {
   // Finalize (95%)
   await job.updateProgress(95);
   await updateCourseProgressInDB(courseId, t('stage2.finalizing'));
+  await assertIndexedBeforeFinalize(fileId, supabase);
 
   logger.info(
     {
@@ -362,6 +363,37 @@ export async function finalizeProcessing(context: PhaseContext): Promise<void> {
     inputData: { fileId },
     durationMs: Date.now() - startTime,
   });
+}
+
+async function assertIndexedBeforeFinalize(
+  fileId: string,
+  supabase: ReturnType<typeof getSupabaseAdmin>
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('file_catalog')
+    .select('vector_status, error_message')
+    .eq('id', fileId)
+    .single();
+
+  if (error) {
+    throw new Error(
+      `Unable to verify vector_status before finalization for file ${fileId}: ${error.message}`
+    );
+  }
+
+  if (!data || data.vector_status !== 'indexed') {
+    const vectorStatus = data?.vector_status || 'unknown';
+    const errorSuffix = data?.error_message ? `: ${data.error_message}` : '';
+
+    logger.error(
+      { fileId, vectorStatus, errorMessage: data?.error_message || null },
+      'Refusing to finalize Stage 2 because vector indexing did not complete successfully'
+    );
+
+    throw new Error(
+      `Cannot finalize Stage 2 for file ${fileId} because vector_status is '${vectorStatus}'${errorSuffix}`
+    );
+  }
 }
 
 /**

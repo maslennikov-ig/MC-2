@@ -141,6 +141,8 @@ export async function updateVectorStatus(
  *   }
  * );
  * ```
+ *
+ * @throws Error when Qdrant upload fails after vector_status updates are attempted
  */
 export async function uploadChunksToQdrant(
   embeddingResults: EmbeddingResult[],
@@ -313,13 +315,7 @@ export async function uploadChunksToQdrant(
       logger.warn({ reason: 'Supabase not configured' }, 'Skipping vector_status update');
     }
 
-    return {
-      points_uploaded: 0,
-      batch_count: 0,
-      duration_ms: duration,
-      success: false,
-      error: errorMessage,
-    };
+    throw new Error(errorMessage);
   }
 }
 
