@@ -87,6 +87,9 @@ export const partialGenerateInputSchema = z
 
     /** Job priority (1-10, higher = more priority) */
     priority: z.number().int().min(1).max(10).default(5),
+
+    /** Force manual top-model regeneration instead of the automatic quality ladder. */
+    manualTopRegeneration: z.boolean().optional(),
   })
   .refine(
     data =>

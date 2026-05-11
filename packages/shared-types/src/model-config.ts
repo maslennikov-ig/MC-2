@@ -48,8 +48,11 @@ export type PhaseName =
   | 'stage_5_extended_en'
   // Stage 6: Lesson Content
   | 'stage_6_judge'
+  | 'stage_6_content'
   | 'stage_6_refinement'
   | 'stage_6_rag_planning'
+  | 'stage_6_auto_last_chance'
+  | 'stage_6_manual_regeneration'
   // Stage 6: 3-tier generation routing
   | 'stage_6_simple'
   | 'stage_6_normal'

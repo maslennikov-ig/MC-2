@@ -34,6 +34,123 @@ export * from './phase-0.5-clarifying/types.js';
 export * from './phase-0.5-clarifying/utils.js';
 export * from './phase-0.5-clarifying/prompts.js';
 
+type ValidationIssuePath = Array<string | number>;
+
+interface ValidationIssueLike {
+  code?: string;
+  message: string;
+  path: ValidationIssuePath;
+  type?: string;
+}
+
+interface ValidationIssueSummary {
+  code?: string;
+  message: string;
+  path: string;
+}
+
+interface OffendingStringValue {
+  path: string;
+  index: number | null;
+  length: number;
+  snippet: string;
+}
+
+interface ValidationDiagnostics {
+  issues: ValidationIssueSummary[];
+  offendingValue?: OffendingStringValue;
+}
+
+interface ValidationErrorWithMetadata extends Error {
+  validationMetadata?: ValidationDiagnostics;
+}
+
+function formatIssuePath(path: ValidationIssuePath): string {
+  return path.reduce<string>((acc, segment) => {
+    if (typeof segment === 'number') {
+      return `${acc}[${segment}]`;
+    }
+    return acc ? `${acc}.${segment}` : segment;
+  }, '');
+}
+
+function getValueAtPath(root: unknown, path: ValidationIssuePath): unknown {
+  let current = root;
+  for (const segment of path) {
+    if (typeof segment === 'number') {
+      if (!Array.isArray(current) || segment >= current.length) {
+        return undefined;
+      }
+      current = current[segment];
+      continue;
+    }
+
+    if (!current || typeof current !== 'object' || !(segment in current)) {
+      return undefined;
+    }
+
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return current;
+}
+
+function extractValidationDiagnostics(
+  parsedOutput: unknown,
+  issues: ValidationIssueLike[]
+): ValidationDiagnostics {
+  const summaries = issues.map(issue => ({
+    code: issue.code,
+    message: issue.message,
+    path: formatIssuePath(issue.path),
+  }));
+
+  const offendingIssue = issues.find(
+    issue =>
+      (issue.code === 'too_small' && issue.type === 'string') ||
+      issue.message.includes('String must contain at least')
+  );
+
+  if (!offendingIssue) {
+    return { issues: summaries };
+  }
+
+  const offendingValue = getValueAtPath(parsedOutput, offendingIssue.path);
+  if (typeof offendingValue !== 'string') {
+    return { issues: summaries };
+  }
+
+  const numericSegments = offendingIssue.path.filter(
+    (segment): segment is number => typeof segment === 'number'
+  );
+
+  return {
+    issues: summaries,
+    offendingValue: {
+      path: formatIssuePath(offendingIssue.path),
+      index: numericSegments.at(-1) ?? null,
+      length: offendingValue.length,
+      snippet: offendingValue.slice(0, 120),
+    },
+  };
+}
+
+function buildValidationError(
+  message: string,
+  validationMetadata: ValidationDiagnostics
+): ValidationErrorWithMetadata {
+  const error = new Error(message) as ValidationErrorWithMetadata;
+  error.validationMetadata = validationMetadata;
+  return error;
+}
+
+function getValidationMetadata(error: unknown): ValidationDiagnostics | undefined {
+  if (error instanceof Error && 'validationMetadata' in error) {
+    return (error as ValidationErrorWithMetadata).validationMetadata;
+  }
+  return undefined;
+}
+
 /**
  * Run Phase 0.5: Clarifying Questions
  *
@@ -192,14 +309,35 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     const validationResult = ClarifyingOutputSchema.safeParse(parsedOutput);
 
     if (!validationResult.success) {
+      const validationMetadata = extractValidationDiagnostics(
+        parsedOutput,
+        validationResult.error.issues
+      );
+
+      await logTrace({
+        courseId,
+        stage: 'stage_4',
+        phase: 'stage_4_clarifying',
+        stepName: 'validation_failure',
+        errorData: {
+          error: 'Validation failed',
+          ...validationMetadata,
+        },
+        durationMs: Date.now() - startTime,
+      });
+
       phaseLogger.error(
         {
           errors: validationResult.error.errors,
+          offendingValue: validationMetadata.offendingValue,
           rawOutputPreview: rawOutput.substring(0, 500),
         },
         'LLM output failed Zod validation'
       );
-      throw new Error(`Validation failed: ${validationResult.error.message}`);
+      throw buildValidationError(
+        `Validation failed: ${validationResult.error.message}`,
+        validationMetadata
+      );
     }
 
     const output = validationResult.data;
@@ -243,6 +381,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     return output;
   } catch (error) {
     const endTime = Date.now();
+    const validationMetadata = getValidationMetadata(error);
 
     if (error instanceof Error && error.name === 'AbortError') {
       phaseLogger.error(
@@ -255,6 +394,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
       {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
+        offendingValue: validationMetadata?.offendingValue,
         durationMs: endTime - startTime,
       },
       'Phase 0.5: Clarifying Questions failed'
@@ -267,6 +407,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
       stepName: 'failed',
       errorData: {
         error: error instanceof Error ? error.message : String(error),
+        ...(validationMetadata ? validationMetadata : {}),
       },
       durationMs: endTime - startTime,
     });
@@ -370,10 +511,30 @@ Output valid JSON.`);
 
   const result = SufficiencyVerdictSchema.safeParse(parsed);
   if (!result.success) {
+    const validationMetadata = extractValidationDiagnostics(parsed, result.error.issues);
+
     logger.error(
-      { courseId: input.course_id, currentRound, errors: result.error.errors },
+      {
+        courseId: input.course_id,
+        currentRound,
+        errors: result.error.errors,
+        offendingValue: validationMetadata.offendingValue,
+      },
       'Sufficiency verdict validation failed, defaulting to sufficient'
     );
+
+    await logTrace({
+      courseId: input.course_id,
+      stage: 'stage_4',
+      phase: 'stage_4_clarifying',
+      stepName: `sufficiency_validation_failure_round_${currentRound}`,
+      errorData: {
+        error: 'Validation failed',
+        ...validationMetadata,
+      },
+      durationMs: Date.now() - startTime,
+    });
+
     return {
       is_sufficient: true,
       confidence: 0.3,

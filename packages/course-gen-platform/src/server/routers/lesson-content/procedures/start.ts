@@ -9,8 +9,7 @@ import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { startStage6InputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
-import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
-import type { Stage6JobInput } from '../../../../stages/stage6-lesson-content/types';
+import { enqueueStage6Lesson } from '../../../../stages/stage6-lesson-content/enqueue';
 import type { CourseStyle } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
 
@@ -84,30 +83,25 @@ export const startStage6 = protectedProcedure
         requestId
       );
 
-      // Step 2: Enqueue all lessons using dedicated Stage 6 queue (30 concurrent workers)
-      // @see docs/plans/sprightly-wondering-widget.md for architecture details
-      const stage6Queue = createStage6Queue();
-
+      // Step 2: Enqueue all lessons via canonical Stage 6 enqueue helper
       const jobs = await Promise.all(
         lessonSpecs.map(spec => {
-          const jobData: Stage6JobInput = {
-            lessonSpec: spec,
-            courseId,
-            language: course.language,
-            style: (course.style as CourseStyle | null) ?? undefined,
-            // RAG chunks fetched by handler via retrieveLessonContext()
-            ragChunks: [],
-            ragContextId: null,
-          };
-
-          // Deterministic job ID for deduplication
-          // Format: stage6:{courseId}:{lessonId}
-          const jobName = `lesson:${spec.lesson_id}`;
           const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
 
-          return stage6Queue.add(jobName, jobData, {
+          return enqueueStage6Lesson({
+            jobData: {
+              lessonSpec: spec,
+              courseId,
+              language: course.language,
+              style: (course.style as CourseStyle | null) ?? undefined,
+              ragChunks: [],
+              ragContextId: null,
+              executionContext: 'full_generation',
+            },
+            jobName: `lesson:${spec.lesson_id}`,
+            source: 'startStage6',
             priority,
-            jobId: deduplicationId, // BullMQ uses jobId for deduplication
+            deduplication: { kind: 'jobId', jobId: deduplicationId },
           });
         })
       );

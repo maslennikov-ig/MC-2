@@ -22,6 +22,8 @@ import { parseGenerationProgress } from '@/shared/schemas/generation-progress.sc
 import type { LessonContent, LessonQualitySignals } from '@megacampus/shared-types/lesson-content';
 import { runCourseQualityAudit, type CourseAuditFinding } from '../quality/course-audit';
 import { isStage6CourseAuditEnabled, isStage6QualityAlertsEnabled } from '../quality/flags';
+import type { Stage6ExecutionContext, Stage6QualityRecoveryHistory } from '../types';
+import { STAGE6_REMEDIATION_CONTEXTS } from '../types';
 
 const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
   'completed',
@@ -30,6 +32,8 @@ const STAGE6_TERMINAL_LESSON_STATUSES = new Set([
   'approved',
 ]);
 const STAGE6_FULLY_COMPLETED_STATUSES = new Set(['completed', 'approved']);
+const STAGE6_PRIMARY_ACTIVE_STATUS = 'stage_6_generating';
+const STAGE6_REMEDIATION_ALLOWED_STATUSES = new Set(['stage_6_complete', 'completed']);
 
 type StoredLessonContentRow = {
   lesson_id: string;
@@ -45,6 +49,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function getQaSignalsFromResult(result: Stage6Output): LessonQualitySignals | undefined {
   return result.lessonContent?.metadata?.qa_signals ?? undefined;
+}
+
+function buildMetadataMetricAliases(
+  metrics: Pick<Stage6Output['metrics'], 'tokensUsed' | 'durationMs' | 'qualityScore'>,
+  qaSignals?: LessonQualitySignals
+): Record<string, unknown> {
+  return {
+    total_tokens: metrics.tokensUsed,
+    generation_duration_ms: metrics.durationMs,
+    quality_score: metrics.qualityScore,
+    qa_signals: qaSignals,
+  };
 }
 
 /**
@@ -113,6 +129,116 @@ function summarizeCourseAuditFindings(findings: CourseAuditFinding[]): string {
     .join('; ');
 }
 
+function isCourseStatusExecutableForStage6(
+  generationStatus: string | null | undefined,
+  executionContext: Stage6ExecutionContext
+): boolean {
+  if (generationStatus === STAGE6_PRIMARY_ACTIVE_STATUS) {
+    return true;
+  }
+
+  return (
+    generationStatus !== null &&
+    generationStatus !== undefined &&
+    STAGE6_REMEDIATION_CONTEXTS.has(executionContext) &&
+    STAGE6_REMEDIATION_ALLOWED_STATUSES.has(generationStatus)
+  );
+}
+
+export async function isStage6CourseActive(
+  courseId: string,
+  executionContext: Stage6ExecutionContext = 'full_generation'
+): Promise<boolean> {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  try {
+    const { data: course, error } = await supabaseAdmin
+      .from('courses')
+      .select('generation_status')
+      .eq('id', courseId)
+      .single();
+
+    if (error || !course) {
+      logger.warn(
+        {
+          courseId,
+          executionContext,
+          error: error?.message,
+        },
+        'Failed to fetch course generation_status for Stage 6 activity check'
+      );
+      return false;
+    }
+
+    return isCourseStatusExecutableForStage6(course.generation_status, executionContext);
+  } catch (error) {
+    logger.error(
+      {
+        courseId,
+        executionContext,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Exception while checking whether Stage 6 course is active'
+    );
+    return false;
+  }
+}
+
+export async function failStage6Course(courseId: string, reason: string): Promise<void> {
+  const supabaseAdmin = getSupabaseAdmin();
+  const failedAt = new Date().toISOString();
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('courses')
+      .update({
+        generation_status: 'failed',
+        failed_at_stage: 6,
+        generation_metadata: {
+          failed_at: failedAt,
+          failed_phase: 'stage_6',
+          error_message: reason,
+        } as Json,
+        updated_at: failedAt,
+      })
+      .eq('id', courseId);
+
+    if (error) {
+      logger.warn(
+        {
+          courseId,
+          reason,
+          error: error.message,
+        },
+        'Failed to mark Stage 6 course as failed'
+      );
+      return;
+    }
+
+    try {
+      await notifyCourseError(courseId, 6, reason);
+    } catch (notifyError) {
+      logger.warn(
+        {
+          courseId,
+          reason,
+          error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+        },
+        'Failed to send Stage 6 course failure notification'
+      );
+    }
+  } catch (error) {
+    logger.error(
+      {
+        courseId,
+        reason,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Exception while marking Stage 6 course as failed'
+    );
+  }
+}
+
 /**
  * Handle partial success scenarios
  */
@@ -135,6 +261,7 @@ export async function handlePartialSuccess(
     // Serialize content to convert Date objects to strings (LessonContent has Date fields)
     const rawMarkdown = extractContentMarkdown(result.lessonContent, language);
     const markdown = sanitizeContent(rawMarkdown, { component: 'handlePartialSuccess' });
+    const qaSignals = getQaSignalsFromResult(result);
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
@@ -150,13 +277,21 @@ export async function handlePartialSuccess(
           fallbackModel: result.metrics.fallbackModel,
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
+          selectedModelPhase: result.metrics.selectedModelPhase ?? null,
+          selectedModelSource: result.metrics.selectedModelSource ?? null,
           qualityScore: result.metrics.qualityScore,
+          ...buildMetadataMetricAliases(result.metrics, qaSignals),
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
           rejectedTokens: result.metrics.rejectedTokens,
           regenerationMode: result.metrics.regenerationMode ?? null,
-          qaSignals: getQaSignalsFromResult(result),
+          qaSignals,
           reviewInfo: result.reviewInfo ?? undefined,
+          factualWarnings: result.factualWarnings ?? undefined,
+          reviewReasons: result.reviewInfo?.reasons ?? undefined,
+          terminalReason: result.reviewInfo?.reasons?.[0] ?? undefined,
+          qualityRecovery: result.qualityRecovery ?? undefined,
+          qualityRecoveryDisposition: result.qualityRecovery?.final_disposition ?? undefined,
         })
       ) as Json,
       generation_attempt: (result.metrics.regenerateCount ?? 0) + 1,
@@ -211,12 +346,16 @@ export interface ReviewMarkerContext {
   fallbackModel?: string | null;
   selectedModelTier?: string | null;
   selectedModelTierReason?: string | null;
+  selectedModelPhase?: string | null;
+  selectedModelSource?: string | null;
   regenerateCount?: number | null;
   truncationCount?: number | null;
   rejectedTokens?: number | null;
   regenerationMode?: string | null;
   reviewInfo?: Stage6Output['reviewInfo'];
+  factualWarnings?: Stage6Output['factualWarnings'];
   qaSignals?: LessonQualitySignals | null;
+  qualityRecovery?: Stage6QualityRecoveryHistory;
   courseAuditFindings?: Array<Pick<CourseAuditFinding, 'kind' | 'detail'>>;
   suppressAlert?: boolean;
 }
@@ -256,23 +395,33 @@ export async function markForReview(
       lesson_id: lessonUuid,
       course_id: courseId,
       status: 'review_required',
-      metadata: {
-        lessonLabel,
-        markedForReviewAt: markedAt,
-        failureReason: reason,
-        modelUsed: context.modelUsed ?? null,
-        selectedModel: context.selectedModel ?? null,
-        fallbackModel: context.fallbackModel ?? null,
-        selectedModelTier: context.selectedModelTier ?? null,
-        selectedModelTierReason: context.selectedModelTierReason ?? null,
-        regenerateCount: context.regenerateCount ?? null,
-        truncationCount: context.truncationCount ?? null,
-        rejectedTokens: context.rejectedTokens ?? null,
-        regenerationMode: context.regenerationMode ?? null,
-        reviewInfo: context.reviewInfo ?? undefined,
-        qaSignals: context.qaSignals ?? undefined,
-        courseAuditFindings: context.courseAuditFindings ?? undefined,
-      },
+      metadata: JSON.parse(
+        JSON.stringify({
+          lessonLabel,
+          markedForReviewAt: markedAt,
+          failureReason: reason,
+          terminalReason: reason,
+          modelUsed: context.modelUsed ?? null,
+          selectedModel: context.selectedModel ?? null,
+          fallbackModel: context.fallbackModel ?? null,
+          selectedModelTier: context.selectedModelTier ?? null,
+          selectedModelTierReason: context.selectedModelTierReason ?? null,
+          selectedModelPhase: context.selectedModelPhase ?? null,
+          selectedModelSource: context.selectedModelSource ?? null,
+          regenerateCount: context.regenerateCount ?? null,
+          truncationCount: context.truncationCount ?? null,
+          rejectedTokens: context.rejectedTokens ?? null,
+          regenerationMode: context.regenerationMode ?? null,
+          reviewInfo: context.reviewInfo ?? undefined,
+          factualWarnings: context.factualWarnings ?? undefined,
+          reviewReasons: context.reviewInfo?.reasons ?? [reason],
+          qaSignals: context.qaSignals ?? undefined,
+          qa_signals: context.qaSignals ?? undefined,
+          qualityRecovery: context.qualityRecovery ?? undefined,
+          qualityRecoveryDisposition: context.qualityRecovery?.final_disposition ?? undefined,
+          courseAuditFindings: context.courseAuditFindings ?? undefined,
+        })
+      ) as Json,
       generation_attempt: (context.regenerateCount ?? 0) + 1,
     });
 
@@ -360,6 +509,7 @@ export async function saveLessonContent(
 
     const rawMarkdown = extractContentMarkdown(result.lessonContent, language);
     const markdown = sanitizeContent(rawMarkdown, { component: 'saveLessonContent' });
+    const qaSignals = getQaSignalsFromResult(result);
     const { error } = await supabaseAdmin.from('lesson_contents').insert({
       lesson_id: lessonUuid,
       course_id: courseId,
@@ -368,11 +518,14 @@ export async function saveLessonContent(
         JSON.stringify({
           lessonLabel,
           tokensUsed: result.metrics.tokensUsed,
+          ...buildMetadataMetricAliases(result.metrics, qaSignals),
           modelUsed: result.metrics.modelUsed,
           selectedModel: result.metrics.selectedModel,
           fallbackModel: result.metrics.fallbackModel,
           selectedModelTier: result.metrics.selectedModelTier,
           selectedModelTierReason: result.metrics.selectedModelTierReason,
+          selectedModelPhase: result.metrics.selectedModelPhase ?? null,
+          selectedModelSource: result.metrics.selectedModelSource ?? null,
           qualityScore: result.metrics.qualityScore,
           regenerateCount: result.metrics.regenerateCount,
           truncationCount: result.metrics.truncationCount,
@@ -381,7 +534,11 @@ export async function saveLessonContent(
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: markdown,
-          qaSignals: getQaSignalsFromResult(result),
+          qaSignals,
+          qualityRecovery: result.qualityRecovery ?? undefined,
+          qualityRecoveryDisposition: result.qualityRecovery?.final_disposition ?? undefined,
+          reviewReasons: result.reviewInfo?.reasons ?? undefined,
+          terminalReason: result.reviewInfo?.reasons?.[0] ?? undefined,
           sanityCheck: sanityResult
             ? {
                 passed: sanityResult.ok,
@@ -392,11 +549,12 @@ export async function saveLessonContent(
             : undefined,
           // Human review info for UI warnings (only present if review needed)
           reviewInfo: result.reviewInfo ?? undefined,
+          factualWarnings: result.factualWarnings ?? undefined,
           lessonDigest: result.lessonDigest ?? undefined,
         })
       ) as Json,
       status: 'completed',
-      generation_attempt: 1,
+      generation_attempt: (result.metrics.regenerateCount ?? 0) + 1,
     });
 
     if (error) {
@@ -504,11 +662,16 @@ export async function saveRejectedContent(
     fallbackModel?: string | null;
     selectedModelTier?: string | null;
     selectedModelTierReason?: string | null;
+    selectedModelPhase?: string | null;
+    selectedModelSource?: string | null;
     modelOverride?: string | null;
     regenerateCount?: number | null;
     truncationCount?: number | null;
     rejectedTokens?: number | null;
     regenerationMode?: string | null;
+    reviewContent?: string | null;
+    reviewContentSource?: 'canonical' | 'raw';
+    canonicalizationFailureReason?: string | null;
   }
 ): Promise<void> {
   if (!generatedContent) {
@@ -544,9 +707,12 @@ export async function saveRejectedContent(
     };
 
     // Build metadata with rejection details
+    // failureReason is the canonical field name used by markForReview and UI queries.
+    // rejectionReason is kept for backward compatibility with existing debug tooling.
     const metadata = {
       lessonLabel,
       generatedAt: new Date().toISOString(),
+      failureReason: selfReviewResult.reasoning,
       rejectionReason: selfReviewResult.reasoning,
       rejectionStatus: selfReviewResult.status,
       issues: selfReviewResult.issues,
@@ -561,11 +727,19 @@ export async function saveRejectedContent(
       fallbackModel: context?.fallbackModel ?? null,
       selectedModelTier: context?.selectedModelTier ?? null,
       selectedModelTierReason: context?.selectedModelTierReason ?? null,
+      selectedModelPhase: context?.selectedModelPhase ?? null,
+      selectedModelSource: context?.selectedModelSource ?? null,
       modelOverride: context?.modelOverride ?? null,
       regenerateCount: context?.regenerateCount ?? null,
       truncationCount: context?.truncationCount ?? null,
       rejectedTokens: context?.rejectedTokens ?? null,
       regenerationMode: context?.regenerationMode ?? null,
+      reviewContent:
+        context?.reviewContent && context.reviewContent !== generatedContent
+          ? context.reviewContent
+          : undefined,
+      reviewContentSource: context?.reviewContentSource ?? 'raw',
+      canonicalizationFailureReason: context?.canonicalizationFailureReason ?? null,
       generationAttempt,
     };
 

@@ -16,6 +16,7 @@ import type {
   JudgeIssue,
   JudgeConfidence,
 } from '@megacampus/shared-types';
+import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-model-config';
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { logger } from '@/shared/logger';
@@ -130,31 +131,40 @@ function parseDeltaJudgeResponse(content: string): {
  * @param input - DeltaJudgeInput with original, patched, and issue
  * @returns DeltaJudgeOutput with pass/fail and reasoning
  */
-export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOutput> {
+export async function verifyPatch(
+  input: DeltaJudgeInput & { courseId?: string }
+): Promise<DeltaJudgeOutput> {
   const startTime = Date.now();
   const llmClient = new LLMClient();
   const modelService = createModelConfigService();
+  const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_delta_judge');
 
   try {
     // Get model configuration
-    let modelId = 'unknown'; // Will be set from database config
-    let temperature = 0.0;
-    let maxTokens = 512;
+    let modelId = fallbackConfig?.modelId ?? 'xiaomi/mimo-v2-flash';
+    let temperature = fallbackConfig?.temperature ?? 0.0;
+    let maxTokens = fallbackConfig?.maxTokens ?? 512;
 
     try {
-      const config = (await modelService.getModelForPhase('stage_6_delta_judge')) as {
+      const config = (await modelService.getModelForPhase(
+        'stage_6_delta_judge',
+        input.courseId
+      )) as {
         modelId: string;
         temperature: number;
         maxTokens: number;
         source: string;
       };
-      modelId = config.modelId;
-      temperature = config.temperature;
-      maxTokens = config.maxTokens;
+      modelId = config.modelId || fallbackConfig?.modelId || modelId;
+      temperature = config.temperature ?? fallbackConfig?.temperature ?? temperature;
+      maxTokens = config.maxTokens ?? fallbackConfig?.maxTokens ?? maxTokens;
       logger.info({ modelId, source: config.source }, 'Delta-Judge using model from config');
     } catch (error) {
       logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        {
+          error: error instanceof Error ? error.message : String(error),
+          fallbackModelId: modelId,
+        },
         'Failed to get delta judge model config, using fallback'
       );
     }

@@ -24,6 +24,7 @@ import type {
 import { countMermaidFallbackComments } from '../utils/mermaid-render-validator';
 import type { CascadeEvaluationInput, CascadeResult } from '../judge/cascade-evaluator';
 import { DecisionAction, type DecisionResult } from '../judge/decision-engine';
+import { actionToRecommendation } from '../judge/decision-engine';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { costTracker, createTokenUsage } from '@/shared/metrics/cost-tracker';
@@ -32,8 +33,17 @@ import { buildEnrichedJudgeOutput, extractJudgeModels } from '../judge/judge-out
 import { buildJudgeProgressSummary } from '../judge/judge-progress';
 import { validateMermaidSyntax } from '../utils/mermaid-validator';
 import { MERMAID_BLOCK_REGEX } from '../utils/mermaid-sanitizer';
+import {
+  applySourceGroundingRemediation,
+  buildSourceGroundingRemediationTasks,
+  type SourceGroundingRemediationResult,
+} from '../judge/source-grounding-remediation';
 
-import { executeTargetedRefinementFlow, buildReviewInfo } from './judge-refinement-helpers';
+import {
+  executeTargetedRefinementFlow,
+  buildFactualWarnings,
+  buildReviewInfo,
+} from './judge-refinement-helpers';
 
 /**
  * Context object passed between judge phases
@@ -55,6 +65,7 @@ export interface JudgeContext {
   arbiterOutput?: ArbiterOutput | null;
   mermaidRenderValidation?: MermaidRenderValidationResult | null;
   tableFixMetrics?: TableFixPipelineMetrics | null;
+  sourceGroundingRemediation?: SourceGroundingRemediationResult | null;
   qaSignals?: LessonQualitySignals | null;
 }
 
@@ -163,6 +174,32 @@ export async function runCascadeEvaluation(context: JudgeContext): Promise<Judge
 
   // Extract verdict
   let verdict = cascadeResult.clevResult?.verdicts?.[0] ?? cascadeResult.singleJudgeVerdict ?? null;
+
+  if (cascadeResult.blockingFactualIssue) {
+    const baseVerdict = verdict;
+    verdict = {
+      judgeModel: 'factual-issue-veto',
+      overallScore: Math.min(cascadeResult.finalScore, baseVerdict?.overallScore ?? 0.79),
+      passed: false,
+      confidence: 'high',
+      criteriaScores: baseVerdict?.criteriaScores ?? {
+        learning_objective_alignment: 0.85,
+        pedagogical_structure: 0.85,
+        factual_accuracy: 0.55,
+        clarity_readability: 0.85,
+        engagement_examples: 0.85,
+        completeness: 0.85,
+      },
+      issues: [cascadeResult.blockingFactualIssue],
+      strengths: baseVerdict?.strengths ?? [],
+      recommendation: 'ITERATIVE_REFINEMENT',
+      temperature: baseVerdict?.temperature ?? 0.1,
+      tokensUsed: baseVerdict?.tokensUsed ?? 0,
+      inputTokens: baseVerdict?.inputTokens,
+      outputTokens: baseVerdict?.outputTokens,
+      durationMs: baseVerdict?.durationMs ?? 0,
+    };
+  }
 
   // Create synthetic verdict for heuristic structural issues
   verdict = createSyntheticVerdictIfNeeded(verdict, cascadeResult, contentBody, state);
@@ -300,7 +337,10 @@ export async function makeJudgeDecision(context: JudgeContext): Promise<JudgeCon
     verdict,
     context.contentBody,
     state.refinementIterationCount,
-    state.previousScores
+    state.previousScores,
+    {
+      isTerminalRemediationRung: state.selectedModelPhase === 'stage_6_auto_last_chance',
+    }
   );
 
   const forcedAction = context.cascadeResult?.heuristicResults?.qualitySummary?.action;
@@ -430,6 +470,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
   let arbiterOutput = null;
   let mermaidRenderValidation: MermaidRenderValidationResult | null = null;
   let tableFixMetrics: TableFixPipelineMetrics | null = null;
+  let sourceGroundingRemediation: SourceGroundingRemediationResult | null = null;
   const qualitySummary = context.cascadeResult?.heuristicResults?.qualitySummary;
   const presentationCritic = context.cascadeResult?.heuristicResults?.presentationCritic;
   const qualityRetryCount = state.regenerateCount ?? 0;
@@ -455,6 +496,10 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
           qualityRetryCount
         )
       );
+      finalRecommendation =
+        verdict.recommendation === 'ACCEPT_WITH_MINOR_REVISION'
+          ? 'ACCEPT_WITH_MINOR_REVISION'
+          : actionToRecommendation(decision.action);
       break;
     }
 
@@ -507,6 +552,28 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
     let contentForMermaidGate = finalContent?.content ?? contentBody;
 
     try {
+      const sourceGroundingTasks = buildSourceGroundingRemediationTasks(
+        context.cascadeResult?.factualVerificationResult,
+        state.language
+      );
+      sourceGroundingRemediation = applySourceGroundingRemediation(
+        contentForMermaidGate,
+        sourceGroundingTasks,
+        state.language
+      );
+      contentForMermaidGate = sourceGroundingRemediation.content;
+
+      if (sourceGroundingRemediation.changed) {
+        logger.info(
+          {
+            lessonId: state.lessonSpec.lesson_id,
+            tasksCount: sourceGroundingRemediation.tasks.length,
+            actions: sourceGroundingRemediation.tasks.map(task => task.action),
+          },
+          'Judge node: Source-grounding remediation applied to accepted content'
+        );
+      }
+
       // Parse-only validation: use mermaid.parse() instead of JSDOM render.
       // JSDOM has limited SVG support and rejects valid diagrams — parse-only
       // is the only reliable gate.
@@ -692,6 +759,7 @@ export async function processJudgeDecision(context: JudgeContext): Promise<Judge
     arbiterOutput,
     mermaidRenderValidation,
     tableFixMetrics,
+    sourceGroundingRemediation,
     qaSignals: buildQaSignals(qualitySummary, presentationCritic, finalQaAction, qualityRetryCount),
   };
 }
@@ -723,6 +791,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     arbiterOutput,
     mermaidRenderValidation,
     tableFixMetrics,
+    sourceGroundingRemediation,
     qaSignals,
   } = context;
 
@@ -733,6 +802,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
 
   // Build reviewInfo
   const reviewInfo = buildReviewInfo(needsHumanReview, cascadeResult);
+  const factualWarnings = buildFactualWarnings(cascadeResult);
 
   // Build enriched output
   const enrichedOutput = buildEnrichedJudgeOutput(
@@ -797,6 +867,34 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
       judgeModelsUsed,
       enrichedOutput,
       qualitySummary: cascadeResult?.heuristicResults?.qualitySummary ?? null,
+      factualDiagnostics: cascadeResult?.factualVerificationResult
+        ? {
+            overallAccuracyScore: cascadeResult.factualVerificationResult.overallAccuracyScore,
+            contradictedClaims: cascadeResult.factualVerificationResult.contradictedClaims,
+            unverifiedClaims: cascadeResult.factualVerificationResult.unverifiedClaims,
+            noEvidenceClaims: cascadeResult.factualVerificationResult.noEvidenceClaims,
+            claims: cascadeResult.factualVerificationResult.claims.slice(0, 5).map(claim => ({
+              text: claim.text,
+              status: claim.verificationStatus,
+              confidence: claim.confidence,
+              evidenceChunkIds: claim.ragEvidence.map(chunk => chunk.chunk_id),
+              mismatchReason: claim.diagnostics?.mismatchReason,
+            })),
+          }
+        : null,
+      factualWarnings,
+      sourceGroundingRemediation: sourceGroundingRemediation
+        ? {
+            changed: sourceGroundingRemediation.changed,
+            tasks: sourceGroundingRemediation.tasks,
+          }
+        : null,
+      factualIssueVeto: cascadeResult?.factualIssueVetoApplied
+        ? {
+            applied: true,
+            issue: cascadeResult.blockingFactualIssue,
+          }
+        : null,
       mermaidRenderGate: mermaidRenderValidation
         ? {
             passed: mermaidRenderValidation.passed,
@@ -853,6 +951,7 @@ export async function finalizeJudgeResult(context: JudgeContext): Promise<Lesson
     needsRegeneration,
     needsHumanReview,
     reviewInfo: reviewInfo ?? undefined,
+    factualWarnings: factualWarnings ?? undefined,
     regenerationMode: needsRegeneration ? 'full_regenerate' : null,
     regenerateCount: needsRegeneration
       ? (state.regenerateCount ?? 0) + 1

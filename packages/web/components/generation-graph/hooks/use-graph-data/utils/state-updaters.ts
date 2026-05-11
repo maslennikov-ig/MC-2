@@ -154,7 +154,7 @@ export function updateParallelItems(
               moduleOrder,
               totalLessons: mod.lessons?.length || 0,
               completedLessons: 0,
-              isCollapsed: modules.length > 5,
+              isCollapsed: false,
             },
           })
 

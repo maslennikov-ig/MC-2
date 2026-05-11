@@ -9,8 +9,7 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import { addJob } from '../../orchestrator/queue';
-import { createStage6Queue } from '../../stages/stage6-lesson-content/factory';
-import type { Stage6JobInput } from '../../stages/stage6-lesson-content/types';
+import { enqueueStage6Lesson } from '../../stages/stage6-lesson-content/enqueue';
 import {
   JobType,
   type JobData,
@@ -361,7 +360,6 @@ export async function queueStage6Jobs(courseId: string, priority: number): Promi
     courseData.style && isValidStyle(courseData.style) ? courseData.style : DEFAULT_COURSE_STYLE;
 
   const courseTitle = courseData.title || 'Untitled Course';
-  const stage6Queue = createStage6Queue();
 
   try {
     let queuedCount = 0;
@@ -369,19 +367,21 @@ export async function queueStage6Jobs(courseId: string, priority: number): Promi
       const lessonJobId = `auto-${courseId}-stage6-lesson-${lesson.lesson_id}`;
       const fullLessonSpec = convertToLessonSpecV2(lesson, courseTitle);
 
-      const lessonJobData: Stage6JobInput = {
-        lessonSpec: fullLessonSpec,
-        courseId,
-        language,
-        style,
-        ragChunks: [],
-        ragContextId: null,
-        analysisResult: courseData.analysis_result as AnalysisResult | undefined,
-      };
-
-      await stage6Queue.add(`lesson:${lesson.lesson_id}`, lessonJobData, {
+      await enqueueStage6Lesson({
+        jobData: {
+          lessonSpec: fullLessonSpec,
+          courseId,
+          language,
+          style,
+          ragChunks: [],
+          ragContextId: null,
+          executionContext: 'full_generation',
+          analysisResult: courseData.analysis_result as AnalysisResult | undefined,
+        },
+        jobName: `lesson:${lesson.lesson_id}`,
+        source: 'autoApproval',
         priority,
-        jobId: lessonJobId,
+        deduplication: { kind: 'jobId', jobId: lessonJobId },
       });
       queuedCount++;
     }

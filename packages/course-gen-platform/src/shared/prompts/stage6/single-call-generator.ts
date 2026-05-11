@@ -60,19 +60,50 @@ Before using ANY content from <reference_material>, you MUST verify its relevanc
 
 4. **When in doubt**: Generate accurate content from your knowledge rather than forcing irrelevant reference material.
 
+5. **Exact facts discipline**:
+   - Exact metrics, dates, deadlines, percentages, prices, revenue, named case outcomes, and internal standards MUST come from <reference_material>.
+   - If a precise example is invented for teaching value, explicitly label it as a hypothetical example.
+   - If no source supports a precise number or real-world case, generalize it or remove it.
+
 **Quality over quantity**: It's better to write accurate content without references than to include misleading information from unrelated chunks.
 </rag_validation>
 
 <visual_toolkit>
-Use selectively when it materially improves understanding:
-1. **Mermaid Diagrams** — flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
+**VISUAL ELEMENTS** — Use actively to create engaging, professional content:
+
+1. **Mermaid Diagrams** — For processes, flows, relationships:
+   \`\`\`mermaid
+   flowchart TD
+     A[Input] --> B{Decision}
+     B -->|Yes| C[Result]
+     B -->|No| D[Alternative]
+   \`\`\`
+   Types: flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
    CRITICAL: NEVER use escaped quotes in node labels. Keep labels simple.
-2. **Tables** for comparisons. Tables must be standalone blocks — NEVER place tables inside numbered or bulleted lists.
+
+2. **Tables** — For comparisons, structured data, feature matrices:
+   | Feature | Option A | Option B |
+   |---------|----------|----------|
+   | Speed   | Fast     | Moderate |
+   Tables must be standalone blocks — NEVER place tables inside numbered or bulleted lists.
+
 3. **Math Formulas** (LaTeX): inline \`$E=mc^2$\` or block \`$$\\sum_{i=1}^{n} x_i$$\`
 {{codeBlockInstruction}}
-4. **Callouts**: > [!TIP], > [!WARNING], > [!NOTE], > [!INFO] — use sparingly for genuinely important tips.
+
+4. **Callouts** — For tips, warnings, key insights:
+   > [!TIP]
+   > Best practice or recommendation
+
+   > [!WARNING]
+   > Important caution
+
+   Types: NOTE, TIP, WARNING, INFO
    CRITICAL: NEVER wrap callout markers in quotes. WRONG: > "[!TIP]"  CORRECT: > [!TIP]
-*Syntax keywords stay in English regardless of output language.*
+   Use max 1-2 callouts per lesson for genuinely important tips.
+
+*Syntax keywords (mermaid, [!TIP]) stay in English regardless of output language.*
+
+**MINIMUM VISUAL DENSITY**: Each content section SHOULD include at least one visual element (diagram, table, callout, or comparison). Lessons without ANY visual elements are considered low quality.
 </visual_toolkit>
 
 <output_language>
@@ -118,10 +149,10 @@ CRITICAL RULES:
 - DO NOT repeat or re-explain topics between sections. Each section covers its own unique content.
 - Transitions between sections: 1 sentence max. NO recaps of previous sections.
 - Cover ALL topics from sections_to_cover, but keep each proportional to the total word budget.
-- Include a visual element only when it clarifies the concept.
+- **REQUIRED: Visual Enhancement** — Include at least one visual element per content section (diagram, table, callout, or comparison). Use visuals that enhance understanding, not decoration.
 - DO NOT start sections with "As we discussed..." or "In the previous section..." patterns.
 - VALIDATE reference material relevance BEFORE using (see rag_validation).
-- For non-technical or business audiences, explain conceptually and use business examples.
+- For non-technical or business audiences: explain conceptually and use business examples. Tables are especially effective for comparing strategies, metrics, or features. Mermaid flowcharts work well for workflows, decision trees, and process maps.
 - Code or config snippets are allowed only for code_tutorial.
 - Intro must be self-contained: no "next lesson/next section" teasers and no previews of later sections/topics.
 - INTER-LESSON CONTINUITY (from inter_lesson_context if provided):

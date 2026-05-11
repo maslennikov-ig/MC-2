@@ -182,6 +182,8 @@ function createMockState(overrides: Partial<LessonGraphStateType> = {}): LessonG
     fallbackModel: null,
     selectedModelTier: null,
     selectedModelTierReason: null,
+    selectedModelPhase: null,
+    selectedModelSource: null,
     tokensUsed: 0,
     durationMs: 0,
     totalCostUsd: 0,
@@ -267,6 +269,7 @@ We have covered the fundamentals of TypeScript and are now ready to apply them i
     expect(result.selfReviewResult!.heuristicsPassed).toBe(true);
     expect(result.selfReviewResult!.issues).toHaveLength(0);
   });
+
 
   it('should return PASS for content with code blocks containing any characters', async () => {
     const state = createMockState({

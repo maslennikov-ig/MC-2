@@ -6,8 +6,12 @@
  * and prompt guidance for content generation.
  */
 
-import type { SectionDepthV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { getTokenMultiplier } from '@megacampus/shared-types';
+import type { SectionDepthV2 } from '@megacampus/shared-types/lesson-specification-v2';
+export {
+  STAGE6_TIER_FALLBACKS,
+  STAGE6_TIER_MODELS,
+} from '@megacampus/shared-types/stage6-model-config';
 
 // ============================================================================
 // DEPTH-BASED TOKEN LIMITS
@@ -70,15 +74,26 @@ export const TOKENS_PER_WORD_RATIO = 1.8;
 
 /**
  * Minimum maxTokens for single-call generation.
- * Floor value to ensure short lessons still get enough generation space.
+ * Floor value to ensure even the shortest lessons (5 min) have enough
+ * generation space for intro + sections + exercises + digest.
+ * A 5-min Russian lesson with 4 sections needs ~2600 tokens;
+ * 4096 provides comfortable headroom to avoid truncation.
  */
-export const SINGLE_CALL_MIN_TOKENS = 2048;
+export const SINGLE_CALL_MIN_TOKENS = 4096;
 
 /**
  * Maximum maxTokens for single-call generation.
  * Cap to prevent excessive token usage on very long lessons.
  */
 export const SINGLE_CALL_MAX_TOKENS = 16384;
+
+/**
+ * Structural overhead multiplier applied to the raw duration-based token budget.
+ * Accounts for markdown formatting, section headers, exercises block,
+ * lesson digest, and callout markup that are not covered by the
+ * word-count-only estimate.  1.35 = 35% headroom.
+ */
+export const SINGLE_CALL_OVERHEAD_MULTIPLIER = 1.35;
 
 /**
  * Total character budget for RAG context in single-call generation.
@@ -97,7 +112,7 @@ export const TRUNCATION_CONTINUATION_TAIL_CHARS = 2200;
 /**
  * Max tokens for truncation continuation repair calls.
  */
-export const TRUNCATION_CONTINUATION_MAX_TOKENS = 1400;
+export const TRUNCATION_CONTINUATION_MAX_TOKENS = SINGLE_CALL_MIN_TOKENS;
 
 /**
  * Prompt template for truncation continuation repair.
@@ -191,27 +206,3 @@ export function calculateDynamicContextWindow(durationMinutes: number, language:
 // ============================================================================
 // STAGE 6 3-TIER MODEL ROUTING
 // ============================================================================
-
-/**
- * LAST-RESORT fallback models for Stage 6 3-tier routing.
- * Primary selection uses getModelForPhase() from database.
- * These are ONLY used when database is completely unavailable.
- */
-export const STAGE6_TIER_MODELS = {
-  /** Simple tier: fast cheap model for beginner difficulty lessons */
-  simple: 'xiaomi/mimo-v2-flash',
-  /** Normal tier: thinking model for intermediate difficulty lessons */
-  normal: 'moonshotai/kimi-k2-thinking',
-  /** Complex tier: premium model for advanced difficulty + module 1 lessons */
-  complex: 'qwen/qwen3.5-plus-02-15',
-} as const;
-
-/**
- * LAST-RESORT fallback models per tier (used when database is unavailable).
- * Maps to the fallback_model_id column in llm_model_config for each stage_6_* phase.
- */
-export const STAGE6_TIER_FALLBACKS = {
-  simple: 'moonshotai/kimi-k2-thinking',
-  normal: 'moonshotai/kimi-k2-thinking',
-  complex: 'moonshotai/kimi-k2-thinking',
-} as const;

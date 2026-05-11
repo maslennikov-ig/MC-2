@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 import {
   LessonInspectorDataRefinementExtension,
   STAGE6_NODE_LABELS,
-  JudgeVerdictDisplay,
   PipelineNodeState,
   Stage6NodeName,
   type LessonSpecificationV2,
@@ -164,43 +163,6 @@ export function LessonInspector({
   }, [])
 
   /**
-   * Extract quality score (0-100) from judge result
-   * Supports cascade evaluation: heuristic → single_judge → clev_voting
-   * @param judgeResult - Judge verdict with voting results
-   * @returns Quality score as integer 0-100
-   */
-  const extractQualityScore = useCallback((judgeResult: JudgeVerdictDisplay | null): number => {
-    if (!judgeResult) return 0
-
-    let score: number | undefined
-
-    // Check cascade stage to determine score source
-    switch (judgeResult.cascadeStage) {
-      case 'heuristic':
-        // Heuristics passed = 100%, otherwise 0%
-        score = judgeResult.heuristicsPassed ? 100 : 0
-        break
-
-      case 'single_judge':
-        // Score from single judge (0-1 scale)
-        score = judgeResult.singleJudgeResult?.score
-        break
-
-      case 'clev_voting':
-      default:
-        // Score from CLEV voting
-        score = judgeResult.votingResult?.finalScore
-        break
-    }
-
-    // Guard: No score found
-    if (score === undefined || score === null) return 0
-
-    // Convert to 0-100 scale: if 0-1 multiply by 100, if already 0-100 keep as is
-    return score <= 1 ? Math.round(score * 100) : Math.round(score)
-  }, [])
-
-  /**
    * Extract tokens breakdown per node from pipeline nodes
    */
   const extractTokensBreakdown = useCallback(
@@ -340,11 +302,12 @@ export function LessonInspector({
       generationLanguage={data.language ?? null}
       selfReviewResult={data.selfReviewResult ?? null}
       judgeResult={data.judgeResult}
+      qualityRecoverySummary={data.qualityRecoverySummary ?? null}
       stats={{
         tokens: data.totalTokensUsed,
         durationMs: data.totalDurationMs,
         modelTier: data.tier || tier,
-        quality: extractQualityScore(data.judgeResult),
+        quality: data.qualityScore ?? null,
         tokensBreakdown: extractTokensBreakdown(data.pipelineNodes),
       }}
       status={data.status}

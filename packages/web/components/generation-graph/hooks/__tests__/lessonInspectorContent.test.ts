@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  getLatestLessonContentRow,
   getLatestUsableLessonContent,
   getLessonInspectorContentPresentation,
 } from '../lessonInspectorContent'
@@ -25,6 +26,24 @@ function createLessonContentRow(
 }
 
 describe('lessonInspectorContent helpers', () => {
+  it('resolves the latest status row by created_at even when rows arrive unsorted', () => {
+    const older = createLessonContentRow({
+      id: 'older',
+      status: 'completed',
+      created_at: '2026-04-05T10:00:00.000Z',
+      metadata: { markdownContent: '# Older lesson' },
+    })
+    const latest = createLessonContentRow({
+      id: 'latest',
+      status: 'review_required',
+      created_at: '2026-04-05T11:00:00.000Z',
+      content: null,
+      metadata: null,
+    })
+
+    expect(getLatestLessonContentRow([older, latest])?.id).toBe('latest')
+  })
+
   it('uses the latest row when it is already usable for preview', () => {
     const older = createLessonContentRow({
       id: 'older',
@@ -68,7 +87,7 @@ describe('lessonInspectorContent helpers', () => {
       metadata: {},
     })
 
-    const selected = getLatestUsableLessonContent([latestEmpty, olderUsable])
+    const selected = getLatestUsableLessonContent([olderUsable, latestEmpty])
     const presentation = getLessonInspectorContentPresentation(selected)
 
     expect(selected?.id).toBe('older-usable')

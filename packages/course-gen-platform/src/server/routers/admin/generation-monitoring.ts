@@ -11,10 +11,16 @@ import { router } from '../../trpc';
 import { adminProcedure } from '../../procedures';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
-import type { CourseStructure, Language } from '@megacampus/shared-types';
-import { JobType } from '@megacampus/shared-types';
-import { addJob } from '../../../orchestrator/queue';
-import { validateLocale } from '@/shared/validation';
+import { parseAnalysisResult, type CourseStructure, type Language } from '@megacampus/shared-types';
+import { enqueueStage6Lesson } from '../../../stages/stage6-lesson-content/enqueue';
+import {
+  buildLessonId,
+  buildMinimalLessonSpec,
+  findLessonByOrder,
+  resolveSectionNumber,
+  transitionToStage6Generating,
+  type SectionFromStructure,
+} from '../lesson-content/helpers';
 
 export const generationMonitoringRouter = router({
   /**
@@ -86,9 +92,9 @@ export const generationMonitoringRouter = router({
           supabase
             .from('lessons')
             .select(
-              'id, title, order_index, lesson_type, status, created_at, lesson_contents(id, status, generation_attempt, created_at)'
+              'id, title, order_index, lesson_type, status, created_at, sections!inner(course_id), lesson_contents(id, status, generation_attempt, created_at)'
             )
-            .eq('course_id', input.courseId)
+            .eq('sections.course_id', input.courseId)
             .order('order_index', { ascending: true }),
           supabase
             .from('generation_trace')
@@ -128,60 +134,58 @@ export const generationMonitoringRouter = router({
 
         const { data: lesson } = await supabase
           .from('lessons')
-          .select('*, courses(id, organization_id, user_id, course_structure, language)')
+          .select(
+            '*, sections!inner(order_index, courses!inner(id, organization_id, user_id, course_structure, analysis_result, language))'
+          )
           .eq('id', input.lessonId)
           .single();
 
-        if (!lesson || !lesson.courses) {
+        if (!lesson || !lesson.sections) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Lesson not found' });
         }
 
-        // Type assertion for joined course
-        const courses = lesson.courses as unknown as {
-          id: string;
-          organization_id: string;
-          user_id: string;
-          course_structure: CourseStructure | null;
-          language: string | null;
+        // Type assertion for joined section -> course
+        const sectionData = lesson.sections as unknown as {
+          order_index: number;
+          courses: {
+            id: string;
+            organization_id: string;
+            user_id: string;
+            course_structure: CourseStructure | null;
+            analysis_result: unknown;
+            language: string | null;
+          };
         };
+        const courses = sectionData.courses;
 
         const courseStructure = courses.course_structure;
-        interface LessonSpec {
-          lesson_id: string;
-          title: string;
-          lesson_objectives?: string[];
-          key_topics?: string[];
-          sections: Array<{ title: string } & Record<string, unknown>>;
-          metadata: Record<string, unknown>;
-          [key: string]: unknown;
-        }
-        let lessonSpec: LessonSpec | null = null;
+        const analysisResult = parseAnalysisResult(courses.analysis_result);
+        const sectionNumber = sectionData.order_index ?? 1;
+        const lessonId = buildLessonId(sectionNumber, lesson.order_index ?? 1);
+        const typedStructure = courseStructure
+          ? { sections: courseStructure.sections as SectionFromStructure[] }
+          : undefined;
+        const matchingSection = typedStructure?.sections.find(
+          (section, index) => resolveSectionNumber(section, index) === sectionNumber
+        );
+        const structureLesson =
+          (matchingSection ? findLessonByOrder(matchingSection, lesson.order_index ?? 1) : null) ??
+          matchingSection?.lessons.find(candidate => candidate.lesson_title === lesson.title) ??
+          null;
 
-        if (courseStructure && courseStructure.sections) {
-          for (const section of courseStructure.sections) {
-            const found = section.lessons.find(l => l.lesson_title === lesson.title);
-            if (found) {
-              lessonSpec = {
-                lesson_id: lesson.id,
-                title: lesson.title,
-                lesson_objectives: found.lesson_objectives || [],
-                key_topics: found.key_topics || [],
-                sections: [],
-                metadata: {},
-              };
-              break;
-            }
-          }
-        }
-
-        if (!lessonSpec) {
-          lessonSpec = {
-            lesson_id: lesson.id,
-            title: lesson.title,
-            sections: [],
-            metadata: {},
-          };
-        }
+        const lessonSpec = buildMinimalLessonSpec(
+          lessonId,
+          structureLesson ?? {
+            lesson_title: lesson.title,
+            lesson_objectives: [`Understand ${lesson.title}`],
+            key_topics: [lesson.title, 'Core concepts'],
+            estimated_duration_minutes: lesson.duration_minutes ?? 15,
+          },
+          sectionNumber,
+          `admin-trigger:${input.lessonId}`,
+          analysisResult,
+          typedStructure
+        );
 
         const language = (courses.language || 'en') as Language;
 
@@ -195,17 +199,21 @@ export const generationMonitoringRouter = router({
           'Admin triggered Stage 6 generation'
         );
 
-        await addJob(JobType.LESSON_CONTENT, {
-          jobType: JobType.LESSON_CONTENT,
-          organizationId: courses.organization_id,
-          courseId: courses.id,
-          userId: courses.user_id,
-          createdAt: new Date().toISOString(),
-          lessonSpec: lessonSpec,
-          ragChunks: [],
-          ragContextId: null,
-          language,
-          locale: validateLocale(language),
+        await transitionToStage6Generating(courses.id, `admin-trigger:${input.lessonId}`);
+
+        await enqueueStage6Lesson({
+          jobData: {
+            lessonSpec,
+            courseId: courses.id,
+            language,
+            ragChunks: [],
+            ragContextId: null,
+            executionContext: 'partial_regeneration',
+            organizationId: courses.organization_id,
+            userId: courses.user_id,
+          },
+          jobName: `lesson:${lesson.id}`,
+          source: 'adminTrigger',
         });
 
         return { success: true, message: 'Lesson generation queued' };
@@ -258,18 +266,54 @@ export const generationMonitoringRouter = router({
 
         const { data: lesson } = await supabase
           .from('lessons')
-          .select('*, courses(id, organization_id, user_id, language)')
+          .select(
+            '*, sections!inner(order_index, courses!inner(id, organization_id, user_id, course_structure, analysis_result, language))'
+          )
           .eq('id', input.lessonId)
           .single();
 
-        if (lesson && lesson.courses) {
-          const courses = lesson.courses as unknown as {
-            id: string;
-            organization_id: string;
-            user_id: string;
-            language: string | null;
+        if (lesson && lesson.sections) {
+          const sectionData = lesson.sections as unknown as {
+            order_index: number;
+            courses: {
+              id: string;
+              organization_id: string;
+              user_id: string;
+              course_structure: CourseStructure | null;
+              analysis_result: unknown;
+              language: string | null;
+            };
           };
+          const courses = sectionData.courses;
           const language = (courses.language || 'en') as Language;
+          const analysisResult = parseAnalysisResult(courses.analysis_result);
+          const sectionNumber = sectionData.order_index ?? 1;
+          const lessonId = buildLessonId(sectionNumber, lesson.order_index ?? 1);
+          const typedStructure = courses.course_structure
+            ? { sections: courses.course_structure.sections as SectionFromStructure[] }
+            : undefined;
+          const matchingSection = typedStructure?.sections.find(
+            (section, index) => resolveSectionNumber(section, index) === sectionNumber
+          );
+          const structureLesson =
+            (matchingSection
+              ? findLessonByOrder(matchingSection, lesson.order_index ?? 1)
+              : null) ??
+            matchingSection?.lessons.find(candidate => candidate.lesson_title === lesson.title) ??
+            null;
+          const lessonSpec = buildMinimalLessonSpec(
+            lessonId,
+            structureLesson ?? {
+              lesson_title: lesson.title,
+              lesson_objectives: [`Refine ${lesson.title}`],
+              key_topics: [lesson.title, 'Refinement'],
+              estimated_duration_minutes: lesson.duration_minutes ?? 15,
+            },
+            sectionNumber,
+            `admin-refinement:${input.lessonId}`,
+            analysisResult,
+            typedStructure
+          );
 
           logger.info(
             {
@@ -282,24 +326,22 @@ export const generationMonitoringRouter = router({
             'Admin triggered lesson regeneration with refinement'
           );
 
-          await addJob(JobType.LESSON_CONTENT, {
-            jobType: JobType.LESSON_CONTENT,
-            organizationId: courses.organization_id,
-            courseId: courses.id,
-            userId: courses.user_id,
-            createdAt: new Date().toISOString(),
-            lessonSpec: {
-              lesson_id: lesson.id,
-              title: lesson.title,
-              sections: [],
-              metadata: {
-                userRefinementPrompt: input.userInstructions,
-              },
+          await transitionToStage6Generating(courses.id, `admin-refinement:${input.lessonId}`);
+
+          await enqueueStage6Lesson({
+            jobData: {
+              lessonSpec,
+              courseId: courses.id,
+              language,
+              ragChunks: [],
+              ragContextId: null,
+              executionContext: 'partial_regeneration',
+              organizationId: courses.organization_id,
+              userId: courses.user_id,
+              userRefinementPrompt: input.userInstructions,
             },
-            ragChunks: [],
-            ragContextId: null,
-            language,
-            locale: validateLocale(language),
+            jobName: `lesson:${lesson.id}`,
+            source: 'adminRefinement',
           });
         }
 

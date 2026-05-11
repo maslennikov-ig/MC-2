@@ -3,6 +3,7 @@ import * as clarifyingPhase from '@/stages/stage4-analysis/phases/phase-0.5-clar
 import { getModelForPhase, getTextContent } from '@/shared/llm/langchain-models';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { safeJSONParse } from '@megacampus/shared-utils';
+import { logTrace } from '@/shared/trace-logger';
 
 // ---- MOCKS ----
 vi.mock('@/shared/llm/langchain-models', () => ({
@@ -175,6 +176,40 @@ describe('Phase 0.5: Clarifying Questions', () => {
       (safeJSONParse as any).mockReturnValueOnce({ questions: [] });
       await expect(clarifyingPhase.runPhase05Clarifying(baseInput as any)).rejects.toThrow(
         'Validation failed'
+      );
+    });
+
+    it('logs offending short suggested-answer metadata before throwing on validation failure', async () => {
+      (safeJSONParse as any).mockReturnValueOnce({
+        questions: [
+          {
+            ...validOutput.questions[0],
+            suggested_answers: [
+              { text: 'No', rationale: 'Too short answer text', is_recommended: true },
+              validOutput.questions[0].suggested_answers[1],
+            ],
+          },
+          validOutput.questions[1],
+          validOutput.questions[2],
+        ],
+      });
+
+      await expect(clarifyingPhase.runPhase05Clarifying(baseInput as any)).rejects.toThrow(
+        'Validation failed'
+      );
+
+      expect(logTrace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stepName: 'validation_failure',
+          errorData: expect.objectContaining({
+            offendingValue: expect.objectContaining({
+              path: 'questions[0].suggested_answers[0].text',
+              index: 0,
+              length: 2,
+              snippet: 'No',
+            }),
+          }),
+        })
       );
     });
 

@@ -5,9 +5,12 @@ import { useSupabase } from '@/lib/supabase/browser-client'
 import { RealtimeChannel } from '@supabase/supabase-js'
 import { logger } from '@/lib/client-logger'
 import {
+  getLatestLessonContentRow,
   getLatestUsableLessonContent,
   getLessonInspectorContentPresentation,
+  isLessonContentUsable,
 } from './lessonInspectorContent'
+import { buildLessonInspectorQualityRecoverySummary } from './lessonInspectorQualityRecovery'
 import {
   PipelineNodeState,
   JudgeVerdictDisplay,
@@ -29,6 +32,149 @@ import {
 
 type GenerationTraceRow = Database['public']['Tables']['generation_trace']['Row']
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
+
+interface LessonInspectorContentRowSelection<T extends { status?: string | null }> {
+  statusRow: T | null
+  previewRow: T | null
+}
+
+type LessonContentMetadataCarrier = {
+  metadata?: unknown
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function normalizeQualityScore(rawScore: unknown): number | null {
+  if (typeof rawScore !== 'number' || !Number.isFinite(rawScore)) {
+    return null
+  }
+
+  // Stored scores may be decimals (0-1) or already percentages.
+  const normalized = rawScore <= 1 ? rawScore * 100 : rawScore
+  // Zero is usually "no trustworthy score", not a meaningful evaluated result.
+  return normalized > 0 ? Math.round(normalized) : null
+}
+
+function getMetadataQualityScore(row: LessonContentMetadataCarrier | null): number | null {
+  if (!row || !isRecord(row.metadata)) {
+    return null
+  }
+
+  return (
+    normalizeQualityScore(row.metadata.qualityScore) ??
+    normalizeQualityScore(row.metadata.quality_score)
+  )
+}
+
+function getMetadataNumericField(
+  metadata: Record<string, unknown> | null,
+  ...keys: string[]
+): number | null {
+  if (!metadata) {
+    return null
+  }
+
+  for (const key of keys) {
+    const value = metadata[key]
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+  }
+
+  return null
+}
+
+function getQualityRecoveryScore(row: LessonContentMetadataCarrier | null): number | null {
+  if (!row || !isRecord(row.metadata) || !isRecord(row.metadata.qualityRecovery)) {
+    return null
+  }
+
+  const attempts = row.metadata.qualityRecovery.attempts
+  if (!Array.isArray(attempts)) {
+    return null
+  }
+
+  for (const attempt of [...attempts].reverse()) {
+    if (!isRecord(attempt)) {
+      continue
+    }
+
+    const score = normalizeQualityScore(attempt.quality_score)
+    if (score !== null) {
+      return score
+    }
+  }
+
+  return null
+}
+
+function getJudgeResultQualityScore(judgeResult: JudgeVerdictDisplay | null): number | null {
+  if (!judgeResult) {
+    return null
+  }
+
+  let rawScore: number | undefined
+
+  switch (judgeResult.cascadeStage) {
+    case 'heuristic':
+      rawScore = judgeResult.heuristicsPassed ? 100 : undefined
+      break
+    case 'single_judge':
+      rawScore = judgeResult.singleJudgeResult?.score
+      break
+    case 'clev_voting':
+    default:
+      rawScore = judgeResult.votingResult?.finalScore
+      break
+  }
+
+  return normalizeQualityScore(rawScore)
+}
+
+export function resolveLessonInspectorQualityScore({
+  judgeResult,
+  statusRow,
+  previewRow,
+}: {
+  judgeResult: JudgeVerdictDisplay | null
+  statusRow: LessonContentMetadataCarrier | null
+  previewRow: LessonContentMetadataCarrier | null
+}): number | null {
+  return (
+    getJudgeResultQualityScore(judgeResult) ??
+    getMetadataQualityScore(statusRow) ??
+    getMetadataQualityScore(previewRow) ??
+    getQualityRecoveryScore(statusRow) ??
+    getQualityRecoveryScore(previewRow)
+  )
+}
+
+export function selectLessonInspectorContentRows<T extends LessonContentRow>(
+  rows: T[] | null | undefined
+): LessonInspectorContentRowSelection<T> {
+  const statusRow = getLatestLessonContentRow(rows)
+
+  if (!statusRow) {
+    return {
+      statusRow: null,
+      previewRow: null,
+    }
+  }
+
+  if (statusRow.status?.toLowerCase() === 'review_required') {
+    return {
+      statusRow,
+      previewRow: isLessonContentUsable(statusRow) ? statusRow : null,
+    }
+  }
+
+  return {
+    statusRow,
+    previewRow: getLatestUsableLessonContent(rows),
+  }
+}
 
 /**
  * Return type for useLessonInspectorData hook
@@ -282,7 +428,8 @@ function parseJudgeResult(
 ): JudgeVerdictDisplay | null {
   // Try to extract judge result from metadata
   const metadata = contentRow.metadata as Record<string, unknown> | null
-  const qualityScore = metadata?.quality_score as number | undefined
+  const qualityScore =
+    getMetadataNumericField(metadata, 'quality_score', 'qualityScore') ?? undefined
 
   // Find judge traces (prefer phase field, fallback to step_name pattern)
   const judgeTraces = traces.filter(
@@ -709,6 +856,7 @@ export function useLessonInspectorData({
             content: null,
             rawMarkdown: null,
             judgeResult: null,
+            qualityScore: null,
             totalTokensUsed: 0,
             totalCostUsd: 0,
             totalDurationMs: 0,
@@ -750,6 +898,7 @@ export function useLessonInspectorData({
             content: null,
             rawMarkdown: null,
             judgeResult: null,
+            qualityScore: null,
             totalTokensUsed: 0,
             totalCostUsd: 0,
             totalDurationMs: 0,
@@ -792,7 +941,7 @@ export function useLessonInspectorData({
           .order('created_at', { ascending: false })
 
         if (contentError) throw contentError
-        const contentData = getLatestUsableLessonContent(lessonContentRows)
+        const { statusRow, previewRow } = selectLessonInspectorContentRows(lessonContentRows)
 
         // Step 4: Fetch generation traces for this lesson using UUID
         const { data: tracesData, error: tracesError } = await supabase
@@ -819,18 +968,29 @@ export function useLessonInspectorData({
           retryCount,
         } = buildPipelineState(traces)
 
-        const { content, rawMarkdown } = getLessonInspectorContentPresentation(contentData)
+        const { content, rawMarkdown } = getLessonInspectorContentPresentation(previewRow)
 
         // Parse judge result
-        const judgeResult = contentData ? parseJudgeResult(contentData, traces) : null
+        const judgeResult = previewRow ? parseJudgeResult(previewRow, traces) : null
+        const qualityScore = resolveLessonInspectorQualityScore({
+          judgeResult,
+          statusRow,
+          previewRow,
+        })
+        const qualityRecoverySummary = buildLessonInspectorQualityRecoverySummary({
+          lessonContentRows,
+          judgeResult,
+        })
 
         // Build logs
         const logs = buildLogEntries(traces)
 
-        const hasFinishTrace = traces.some((t) => t.step_name === 'finish' && t.phase === 'complete')
+        const hasFinishTrace = traces.some(
+          (t) => t.step_name === 'finish' && t.phase === 'complete'
+        )
         const hasErrorTrace = traces.some((t) => t.error_data != null)
         const { status, needsReview } = deriveLessonInspectorStatus({
-          contentStatus: contentData?.status ?? null,
+          contentStatus: statusRow?.status ?? previewRow?.status ?? null,
           pipelineNodes,
           hasContent: Boolean(rawMarkdown || content),
           hasFinishTrace,
@@ -852,8 +1012,7 @@ export function useLessonInspectorData({
           typeof generatorInputData?.style === 'string' ? generatorInputData.style : null
         const traceLanguage =
           typeof generatorInputData?.language === 'string' ? generatorInputData.language : null
-        const traceLessonSpec =
-          (generatorInputData?.lessonSpec as Record<string, unknown>) ?? null
+        const traceLessonSpec = (generatorInputData?.lessonSpec as Record<string, unknown>) ?? null
 
         // Construct final data
         const inspectorData: ReviewAwareLessonInspectorData = {
@@ -872,6 +1031,8 @@ export function useLessonInspectorData({
           style: traceStyle,
           language: traceLanguage,
           judgeResult,
+          qualityScore,
+          qualityRecoverySummary,
           totalTokensUsed,
           totalCostUsd,
           totalDurationMs,
@@ -895,6 +1056,8 @@ export function useLessonInspectorData({
           logsCount: logs.length,
           lessonContentRowsCount: lessonContentRows?.length ?? 0,
           hasContent: !!content,
+          latestLessonContentStatus: statusRow?.status ?? null,
+          previewLessonContentId: previewRow?.id ?? null,
           sourceDocumentsCount: sourceDocuments.length,
         })
       } catch (err) {

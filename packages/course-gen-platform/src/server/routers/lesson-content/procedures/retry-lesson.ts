@@ -8,12 +8,9 @@ import { nanoid } from 'nanoid';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { retryLessonInputSchema } from '../schemas';
-import { verifyCourseAccess } from '../helpers';
-import { addJob } from '../../../../orchestrator/queue';
-import { JobType } from '@megacampus/shared-types';
-import type { LessonContentJobData } from '@megacampus/shared-types';
+import { transitionToStage6Generating, verifyCourseAccess } from '../helpers';
+import { enqueueStage6Lesson } from '../../../../stages/stage6-lesson-content/enqueue';
 import { logger } from '../../../../shared/logger/index.js';
-import { validateLocale } from '@/shared/validation';
 
 /**
  * Retry a failed lesson
@@ -76,31 +73,30 @@ export const retryLesson = protectedProcedure
         requestId
       );
 
-      // Step 2: Enqueue with high priority for retries
-      const jobData: LessonContentJobData = {
-        organizationId: currentUser.organizationId,
-        courseId,
-        userId: currentUser.id,
-        jobType: JobType.LESSON_CONTENT,
-        createdAt: new Date().toISOString(),
-        lessonSpec,
-        ragChunks: [], // Deprecated: RAG chunks are now fetched by handler via retrieveLessonContext()
-        ragContextId: null,
-        language: course.language, // Pass course language for content generation
-        locale: validateLocale(course.language),
-      };
+      // Retry is a remediation path and must work on already completed courses.
+      await transitionToStage6Generating(courseId, requestId);
 
+      // Step 2: Enqueue with high priority for retries via canonical helper
       // Unique deduplication ID for retries (includes timestamp)
       // Format: stage6:retry:{courseId}:{lessonId}:{timestamp}
       // This ensures retries are never deduplicated
       const deduplicationId = `stage6:retry:${courseId}:${lessonId}:${Date.now()}`;
 
-      const job = await addJob(JobType.LESSON_CONTENT, jobData, {
-        priority: 1, // High priority for retries
-        deduplication: {
-          id: deduplicationId,
-          ttl: 150000, // 2.5 minutes - half of job timeout to allow faster retries
+      const job = await enqueueStage6Lesson({
+        jobData: {
+          lessonSpec,
+          courseId,
+          language: course.language,
+          ragChunks: [],
+          ragContextId: null,
+          executionContext: 'partial_regeneration',
+          organizationId: currentUser.organizationId,
+          userId: currentUser.id,
         },
+        jobName: `lesson:${lessonSpec.lesson_id}`,
+        source: 'retryLesson',
+        priority: 1, // High priority for retries
+        deduplication: { kind: 'ttl', id: deduplicationId, ttl: 150_000 },
       });
 
       logger.info(

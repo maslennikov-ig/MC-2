@@ -25,6 +25,8 @@ export interface Stage6ModelTier {
   fallback: string;
   tier: 'simple' | 'normal' | 'complex';
   reason: string;
+  phaseName: PhaseName;
+  source: string;
 }
 
 /**
@@ -41,7 +43,8 @@ export interface Stage6ModelTier {
  * @returns Model tier with selected primary + fallback model IDs and reasoning
  */
 export async function selectStage6ModelTier(
-  lessonSpec: LessonSpecificationV2
+  lessonSpec: LessonSpecificationV2,
+  courseId?: string
 ): Promise<Stage6ModelTier> {
   const difficultyLevel = lessonSpec.difficulty_level || 'intermediate';
   const moduleNumber = lessonSpec.lesson_id?.split('.')[0] || '';
@@ -68,7 +71,7 @@ export async function selectStage6ModelTier(
 
   try {
     const modelConfigService = createModelConfigService();
-    const config = await modelConfigService.getModelForPhase(phaseName);
+    const config = await modelConfigService.getModelForPhase(phaseName, courseId);
     const modelId = config.modelId || STAGE6_TIER_MODELS[targetTier];
     const fallbackId = config.fallbackModelId || STAGE6_TIER_FALLBACKS[targetTier];
 
@@ -89,6 +92,8 @@ export async function selectStage6ModelTier(
       fallback: fallbackId,
       tier: targetTier,
       reason: `${tierReason} → ${modelId} (from ${config.source})`,
+      phaseName,
+      source: config.source,
     };
   } catch (error) {
     logger.warn({
@@ -102,6 +107,8 @@ export async function selectStage6ModelTier(
       fallback: STAGE6_TIER_FALLBACKS[targetTier],
       tier: targetTier,
       reason: `${tierReason} → ${STAGE6_TIER_MODELS[targetTier]} (hardcoded fallback)`,
+      phaseName,
+      source: 'hardcoded',
     };
   }
 }

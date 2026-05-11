@@ -10,6 +10,11 @@ import { ConcurrencyTracker } from '../../../../shared/concurrency/tracker';
 import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
 import type { ConcurrencyCheckResult, NormalizedTier, CourseSettings } from './types';
+import {
+  RequiredRagUnavailableError,
+} from '@/shared/rag/document-availability';
+import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
+import { notifyCourseError } from '@/shared/notifications';
 
 // Re-export from shared utility (single source of truth)
 export { setNestedValue } from '@megacampus/shared-utils';
@@ -199,6 +204,21 @@ export async function buildDocumentSummaries(
   courseId: string,
   requestId?: string
 ): Promise<{ hasVectorizedDocs: boolean; documentSummaries: DocumentSummary[] }> {
+  let ragAvailability;
+  try {
+    ragAvailability = await assertCourseRagReadyWithRetry(courseId);
+  } catch (error) {
+    if (error instanceof RequiredRagUnavailableError) {
+      await notifyCourseError(courseId, 5, error.message);
+    }
+    throw error;
+  }
+
+  if (ragAvailability.availability === 'optional_no_documents') {
+    logger.debug({ requestId, courseId }, 'No uploaded documents - Stage 5 will run without RAG');
+    return { hasVectorizedDocs: false, documentSummaries: [] };
+  }
+
   const { data: vectorizedFiles, error: filesError } = await supabase
     .from('file_catalog')
     .select('id, filename, processed_content, mime_type')
@@ -206,22 +226,14 @@ export async function buildDocumentSummaries(
     .eq('vector_status', 'indexed' as unknown as Database['public']['Enums']['vector_status']);
 
   if (filesError) {
-    // Differentiate expected vs unexpected errors
-    const isTableNotFound = filesError.code === '42P01'; // relation does not exist
-    if (isTableNotFound) {
-      logger.debug(
-        { requestId, courseId },
-        'file_catalog table not available, assuming no documents'
-      );
-    } else {
-      logger.warn(
-        { requestId, courseId, error: filesError, code: filesError.code },
-        'Failed to query vectorized files, assuming no documents'
-      );
-    }
+    logger.error(
+      { requestId, courseId, error: filesError, code: filesError.code },
+      'Failed to query indexed documents for required-RAG course'
+    );
+    throw filesError;
   }
 
-  const hasVectorizedDocs = !filesError && vectorizedFiles && vectorizedFiles.length > 0;
+  const hasVectorizedDocs = !!vectorizedFiles && vectorizedFiles.length > 0;
 
   const documentSummaries: DocumentSummary[] = hasVectorizedDocs
     ? (

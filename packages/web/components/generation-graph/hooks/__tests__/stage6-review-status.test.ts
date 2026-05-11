@@ -122,6 +122,22 @@ describe('deriveLessonInspectorStatus', () => {
       needsReview: false,
     })
   })
+
+  it('treats rejected lesson content as a failed inspector state', () => {
+    const state = deriveLessonInspectorStatus({
+      contentStatus: 'rejected',
+      pipelineNodes: [{ node: 'judge', status: 'completed' }],
+      hasContent: true,
+      hasFinishTrace: true,
+      hasErrorTrace: false,
+      hasTraces: true,
+    })
+
+    expect(state).toEqual({
+      status: 'error',
+      needsReview: false,
+    })
+  })
 })
 
 describe('getReviewAwareGraphNodeState', () => {
@@ -139,6 +155,7 @@ describe('summarizeReviewAwareStage6Statuses', () => {
     expect(
       summarizeReviewAwareStage6Statuses(['completed', 'review_required', 'pending'])
     ).toEqual({
+      completedLessons: 1,
       readyLessons: 2,
       reviewRequiredLessons: 1,
       status: 'active',
@@ -148,6 +165,7 @@ describe('summarizeReviewAwareStage6Statuses', () => {
 
   it('treats fully review-required batches as completed progress with review-needed state', () => {
     expect(summarizeReviewAwareStage6Statuses(['review_required', 'review_required'])).toEqual({
+      completedLessons: 0,
       readyLessons: 2,
       reviewRequiredLessons: 2,
       status: 'completed',

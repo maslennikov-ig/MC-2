@@ -365,8 +365,14 @@ export function buildGraph({
     if (i === 6 && config.parallelizable && items && items.length > 0) {
       const modules = items.filter((item) => item.type === 'module')
       const lessons = items.filter((item) => item.type === 'lesson')
+      const getReviewAwareItemStatus = (item: ParallelItem): string | null | undefined => {
+        const status = item.status || getStatus(item.id)
+        if (status?.toLowerCase() === 'approved') return 'approved'
+        return item.data?.needsReview ? 'review_required' : status
+      }
+
       const stage6Summary = summarizeReviewAwareStage6Statuses(
-        lessons.map((lesson) => lesson.status || getStatus(lesson.id))
+        lessons.map((lesson) => getReviewAwareItemStatus(lesson))
       )
 
       const allLessonAttempts = lessons.flatMap((l) => getAttempts(l.id))
@@ -394,7 +400,8 @@ export function buildGraph({
           duration: totalDuration,
           attempts: allLessonAttempts,
           outputData: {
-            completedLessons: stage6Summary.readyLessons,
+            completedLessons: stage6Summary.completedLessons,
+            readyLessons: stage6Summary.readyLessons,
             reviewRequiredLessons: stage6Summary.reviewRequiredLessons,
             totalLessons: lessons.length,
           },
@@ -446,11 +453,11 @@ export function buildGraph({
         const latestAttempt = attempts[attempts.length - 1]
         const childLessons = lessonItems.filter((lesson) => lesson.parentId === item.id)
         const childIds = childLessons.map((lesson) => lesson.id)
-        const childStatuses = childLessons.map((lesson) => lesson.status || getStatus(lesson.id))
+        const childStatuses = childLessons.map((lesson) => getReviewAwareItemStatus(lesson))
         const moduleSummary = summarizeReviewAwareStage6Statuses(childStatuses)
         const totalLessons = childIds.length
 
-        const defaultCollapsed = modules.length > 5
+        const defaultCollapsed = false
         const isCollapsed =
           getModuleCollapsed(item.id) ?? (item.data?.isCollapsed as boolean) ?? defaultCollapsed
 
@@ -479,7 +486,8 @@ export function buildGraph({
             moduleId: item.id,
             title: item.label,
             totalLessons: totalLessons,
-            completedLessons: moduleSummary.readyLessons,
+            completedLessons: moduleSummary.completedLessons,
+            readyLessons: moduleSummary.readyLessons,
             reviewRequiredLessons: moduleSummary.reviewRequiredLessons,
             needsReview: moduleSummary.needsReview,
             isCollapsed: isCollapsed,
@@ -496,7 +504,7 @@ export function buildGraph({
         } as AppNode)
       })
 
-      const defaultCollapsedForLessons = modules.length > 5
+      const defaultCollapsedForLessons = false
       const moduleCollapsedMap = new Map(
         moduleItems.map((m) => [
           m.id,
@@ -522,7 +530,7 @@ export function buildGraph({
 
         lessonsInModule.forEach((item, indexInModule) => {
           const trace = getTrace(item.id)
-          const reviewAwareState = getReviewAwareGraphNodeState(item.status || getStatus(item.id))
+          const reviewAwareState = getReviewAwareGraphNodeState(getReviewAwareItemStatus(item))
           const attempts = getAttempts(item.id)
           const latestAttempt = attempts[attempts.length - 1]
 
@@ -549,6 +557,7 @@ export function buildGraph({
             },
             data: {
               ...config,
+              ...item.data,
               label: item.label,
               status: reviewAwareState.status,
               stageNumber: 6 as const,
@@ -556,7 +565,6 @@ export function buildGraph({
               title: item.label,
               moduleId: item.parentId || '',
               needsReview: reviewAwareState.needsReview,
-              ...item.data,
               currentStep: trace?.step_name,
               duration: trace?.duration_ms,
               tokens: trace?.tokens_used,

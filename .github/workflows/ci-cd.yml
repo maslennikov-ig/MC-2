@@ -787,7 +787,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
           REDIS_URL=redis://megacampus-redis:6379
-          QDRANT_URL=${{ secrets.QDRANT_URL }}
+          QDRANT_URL=http://megacampus-qdrant-dev:6333
           QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }}
           JINA_API_KEY=${{ secrets.JINA_API_KEY }}
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}

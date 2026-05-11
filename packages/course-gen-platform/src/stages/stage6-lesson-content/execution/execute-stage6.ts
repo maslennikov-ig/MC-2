@@ -1,5 +1,6 @@
 import { logger } from '@/shared/logger';
 import { getGraph } from '../graph';
+import { HANDLER_CONFIG } from '../config';
 import type { Stage6Input, Stage6Output } from '../types';
 import type { LessonGraphStateType } from '../state';
 import { buildLessonContent, extractContentBody } from '../judge/judge-helpers';
@@ -57,6 +58,8 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       fallbackModel: input.fallbackModel ?? null,
       selectedModelTier: input.selectedModelTier ?? null,
       selectedModelTierReason: input.selectedModelTierReason ?? null,
+      selectedModelPhase: input.selectedModelPhase ?? null,
+      selectedModelSource: input.selectedModelSource ?? null,
       currentNode: 'generator',
       errors: [],
       retryCount: 0,
@@ -73,7 +76,60 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
     const durationMs = Date.now() - startTime;
 
     // Fail-open: review-required outcomes should not trigger outer fallback loops.
-    const needsReview = result.needsHumanReview || result.reviewInfo?.needsReview === true;
+    //
+    // SAFETY NET (defensive): the self-reviewer node already sets needsHumanReview
+    // and reviewInfo through channel-safe state updates (applyChannelSafeEscalation).
+    // This block is a last-resort recovery for edge cases where the node path might
+    // not fire — e.g. future refactors that add new terminal conditions without
+    // routing them through the node. Since channel-safety chain landed (commits
+    // 67725d56 → 020bed88), the node path is authoritative; this safety net should
+    // rarely trigger in production.
+    //
+    // IMPORTANT: this block does NOT mutate `result`. Instead it computes a local
+    // recoveredReviewInfo that's used only if `result.reviewInfo` is absent.
+    // This preserves any node-authored reason verbatim.
+    let needsReview = result.needsHumanReview || result.reviewInfo?.needsReview === true;
+    let recoveredReviewInfo: typeof result.reviewInfo = null;
+
+    if (!needsReview && !result.lessonContent) {
+      // Cap operator conventions (see docs/specs/stage6-truncation-policy.md):
+      //   - retryCount uses >= (count == MAX means cap reached)
+      //   - truncationCount uses > (MAX allowed attempts, MAX+1 = exceeded)
+      //   - sectionsToRegenerate uses > (MAX allowed sections, MAX+1 = exceeded)
+      const retryCapHit = (result.retryCount ?? 0) >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
+      const truncCapHit =
+        (result.truncationCount ?? 0) > HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS;
+      const sectionCapHit =
+        (result.selfReviewResult?.sectionsToRegenerate?.length ?? 0) >
+        HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
+
+      if (retryCapHit || truncCapHit || sectionCapHit) {
+        needsReview = true;
+
+        const reasons =
+          result.errors.length > 0
+            ? [...result.errors]
+            : ['Generation retries exhausted without producing acceptable content'];
+
+        recoveredReviewInfo = {
+          needsReview: true,
+          reasons,
+        };
+
+        logger.warn(
+          {
+            lessonId: input.lessonSpec.lesson_id,
+            retryCount: result.retryCount,
+            truncationCount: result.truncationCount,
+            regenerateCount: result.regenerateCount,
+            sectionCount: result.selfReviewResult?.sectionsToRegenerate?.length,
+            errorCount: result.errors.length,
+            capTrigger: retryCapHit ? 'retry' : truncCapHit ? 'truncation' : 'section',
+          },
+          'Safety-net recovered review_required state — node path did not set channel flags (should be rare post channel-safety chain)'
+        );
+      }
+    }
     let lessonContent = result.lessonContent ?? null;
     let synthesizedReviewContent = false;
 
@@ -120,14 +176,21 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         fallbackModel: result.fallbackModel ?? null,
         selectedModelTier: result.selectedModelTier ?? null,
         selectedModelTierReason: result.selectedModelTierReason ?? null,
+        selectedModelPhase: result.selectedModelPhase ?? null,
+        selectedModelSource: result.selectedModelSource ?? null,
         qualityScore: result.qualityScore ?? 0,
         regenerateCount: result.regenerateCount ?? 0,
         truncationCount: result.truncationCount ?? 0,
         rejectedTokens: result.rejectedTokens ?? 0,
         regenerationMode: result.regenerationMode ?? null,
       },
-      // Include review info for UI warnings (undefined if not set)
-      reviewInfo: result.reviewInfo ?? undefined,
+      // Include review info for UI warnings (undefined if not set).
+      // Priority: node-authored reviewInfo > safety-net recovered reviewInfo.
+      // This preserves the specific terminal reason set by applyChannelSafeEscalation
+      // in the self-reviewer node, falling back to a generic one only if the
+      // node path didn't fire.
+      reviewInfo: result.reviewInfo ?? recoveredReviewInfo ?? undefined,
+      factualWarnings: result.factualWarnings ?? undefined,
       lessonDigest: result.lessonDigest || undefined,
     };
   } catch (error) {
@@ -155,6 +218,8 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         fallbackModel: null,
         selectedModelTier: null,
         selectedModelTierReason: null,
+        selectedModelPhase: null,
+        selectedModelSource: null,
         qualityScore: 0,
         regenerateCount: 0,
         truncationCount: 0,

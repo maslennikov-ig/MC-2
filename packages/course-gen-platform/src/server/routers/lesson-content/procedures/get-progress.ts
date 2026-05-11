@@ -11,13 +11,14 @@ import { getProgressInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
+import { getLessonProgressSemantics, type LessonProgressStatus } from './status-semantics';
 
 /**
  * Get progress for all lessons in a course
  *
  * Purpose: Retrieves progress information for all lessons in a course.
- * Returns counts for completed, failed, and in-progress lessons along
- * with individual lesson status.
+ * Returns counts for ready, failed, and in-progress lessons along
+ * with individual lesson status and raw review-aware content status.
  *
  * Authorization: Requires authenticated user (protectedProcedure)
  *
@@ -26,11 +27,11 @@ import { logger } from '../../../../shared/logger/index.js';
  *
  * Output:
  * - total: Total number of lessons
- * - completed: Number of completed lessons
+ * - completed: Number of lessons effectively ready (completed, approved, or review_required)
  * - failed: Number of failed lessons
  * - inProgress: Number of lessons currently processing
  * - progressPercent: Overall completion percentage (0-100)
- * - lessons: Array of lesson status objects
+ * - lessons: Array of lesson status objects with raw content status and review flags
  *
  * Error Handling:
  * - Course not found -> 404 NOT_FOUND
@@ -122,29 +123,26 @@ export const getProgress = protectedProcedure
       // Step 3: Calculate progress metrics based on lesson_contents status
       const lessonsWithStatus = (lessons || []).map(lesson => {
         const contentInfo = contentStatusMap.get(lesson.id);
-        let status: 'completed' | 'failed' | 'generating' | 'pending' = 'pending';
-
-        if (contentInfo) {
-          if (contentInfo.status === 'completed') {
-            status = 'completed';
-          } else if (contentInfo.status === 'failed') {
-            status = 'failed';
-          } else if (contentInfo.status === 'generating') {
-            status = 'generating';
-          }
-        }
+        const progress = getLessonProgressSemantics(contentInfo?.status);
+        const status: LessonProgressStatus = progress.status;
 
         return {
           lesson_id: lesson.id,
           status,
+          content_status: progress.contentStatus,
+          needsReview: progress.needsReview,
           generated_at: contentInfo?.created_at ?? null,
         };
       });
 
       const total = lessonsWithStatus.length;
-      const completed = lessonsWithStatus.filter(l => l.status === 'completed').length;
+      const completed = lessonsWithStatus.filter(
+        l => l.status === 'completed' || l.status === 'approved'
+      ).length;
       const failed = lessonsWithStatus.filter(l => l.status === 'failed').length;
       const inProgress = lessonsWithStatus.filter(l => l.status === 'generating').length;
+      const reviewRequired = lessonsWithStatus.filter(l => l.needsReview).length;
+      const approved = lessonsWithStatus.filter(l => l.status === 'approved').length;
 
       logger.debug(
         {
@@ -152,6 +150,8 @@ export const getProgress = protectedProcedure
           courseId,
           total,
           completed,
+          approved,
+          reviewRequired,
           failed,
           inProgress,
         },

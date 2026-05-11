@@ -3,6 +3,10 @@ import { retrieveLessonContext } from '@/stages/stage6-lesson-content/rag/retrie
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { SearchResult } from '@/shared/qdrant/search-types';
 
+const { mockAssertCourseRagReady } = vi.hoisted(() => ({
+  mockAssertCourseRagReady: vi.fn(),
+}));
+
 // ============================================================================
 // MOCKS
 // ============================================================================
@@ -12,9 +16,13 @@ vi.mock('@/shared/qdrant/search', () => ({
   searchChunks: vi.fn(),
 }));
 
-vi.mock('@/shared/rag/document-availability', () => ({
-  checkCourseHasIndexedDocuments: vi.fn(() => Promise.resolve(true)),
-}));
+vi.mock('@/shared/rag/document-availability', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/shared/rag/document-availability')>();
+  return {
+    ...actual,
+    assertCourseRagReady: vi.fn((...args) => mockAssertCourseRagReady(...args)),
+  };
+});
 
 vi.mock('@/stages/stage5-generation/utils/rag-context-cache', () => ({
   ragContextCache: {
@@ -67,7 +75,6 @@ vi.mock('@/stages/stage6-lesson-content/rag/helpers', async importOriginal => {
 
 // Import mocked functions
 import { searchChunks } from '@/shared/qdrant/search';
-import { checkCourseHasIndexedDocuments } from '@/shared/rag/document-availability';
 import { ragContextCache } from '@/stages/stage5-generation/utils/rag-context-cache';
 import { logTrace } from '@/shared/trace-logger';
 import { rerankChunks } from '@/stages/stage6-lesson-content/rag/reranking';
@@ -160,6 +167,13 @@ describe('Two-Tier RAG Retrieval - retrieveLessonContext()', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     vi.clearAllMocks();
+    mockAssertCourseRagReady.mockResolvedValue({
+      availability: 'ready',
+      ragRequired: true,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: true,
+      reason: 'rag_ready',
+    });
 
     // Reset environment variables to defaults
     delete process.env.RAG_TWO_TIER_ENABLED;

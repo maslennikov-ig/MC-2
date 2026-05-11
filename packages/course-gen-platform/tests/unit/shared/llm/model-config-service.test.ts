@@ -8,6 +8,8 @@ import {
 } from '@/shared/llm/model-config-service';
 import * as ModelConfigDB from '@/shared/llm/model-config-db';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
+import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
 
 // Hoist mocks
 const { mockSupabase, mockLogger } = vi.hoisted(() => ({
@@ -202,6 +204,46 @@ describe('model-config-service', () => {
         expect(mockLogger.warn).toHaveBeenCalledWith(
           expect.anything(),
           expect.stringContaining('Using global_default HARDCODED fallback')
+        );
+      });
+
+      it('uses canonical explicit fallback for stage_6_content instead of global_default', async () => {
+        vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockResolvedValue(null);
+
+        const config = await service.getModelForPhase('stage_6_content');
+
+        expect(config.modelId).toBe(STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.modelId);
+        expect(config.fallbackModelId).toBe(
+          STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.fallbackModelId
+        );
+        expect(config.modelId).not.toBe(DEFAULT_PHASE_CONFIGS.global_default.modelId);
+      });
+
+      it('keeps stage_6_auto_last_chance fallback off the Xiaomi path', async () => {
+        vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockResolvedValue(null);
+
+        const config = await service.getModelForPhase('stage_6_auto_last_chance');
+
+        expect(config.modelId).toBe(
+          STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.modelId
+        );
+        expect(config.modelId).not.toBe(DEFAULT_MODEL_ID);
+        expect(config.fallbackModelId).toBe(
+          STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.fallbackModelId
+        );
+      });
+
+      it('keeps stage_6_manual_regeneration fallback off the Xiaomi path', async () => {
+        vi.mocked(ModelConfigDB.fetchPhaseConfigFromDb).mockResolvedValue(null);
+
+        const config = await service.getModelForPhase('stage_6_manual_regeneration');
+
+        expect(config.modelId).toBe(
+          STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.modelId
+        );
+        expect(config.modelId).not.toBe(DEFAULT_MODEL_ID);
+        expect(config.fallbackModelId).toBe(
+          STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.fallbackModelId
         );
       });
     });

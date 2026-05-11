@@ -12,7 +12,9 @@ import {
   sanitizeTokenForLog,
   groupAssetsByLessonId,
   groupEnrichmentsByLessonId,
+  groupLessonContentsByLessonIdForViewer,
   prepareLessonsForViewer,
+  VIEWER_READY_LESSON_CONTENT_STATUSES,
 } from '@/lib/course-data-utils'
 import type { Section, Course } from '@/types/database'
 import { Database } from '@/types/database.generated'
@@ -25,6 +27,7 @@ type SectionRow = Database['public']['Tables']['sections']['Row']
 type LessonRow = Database['public']['Tables']['lessons']['Row']
 type AssetRow = Database['public']['Tables']['assets']['Row']
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 // Nested section type from joined query
 type NestedSection = SectionRow & {
@@ -177,18 +180,30 @@ export default async function SharedCoursePage({ params }: PageProps) {
 
   // Fetch enrichments for shared course lessons
   let enrichmentsByLessonId: Record<string, EnrichmentRow[]> = {}
+  let lessonContentsByLessonId: Record<string, LessonContentRow> = {}
   if (flatLessons.length > 0) {
     const lessonIds = flatLessons.map((l) => l.id)
     const adminSupabase = getAdminClient()
     // Excludes 'metadata' column which can be 27MB+ for NLM types
     const ENRICHMENT_DISPLAY_COLUMNS =
       'id, enrichment_type, status, content, lesson_id, course_id, created_at, updated_at, title, order_index, asset_id, error_details, error_message, generated_at, generation_attempt' as const
-    const { data: enrichments, error: enrichmentsError } = await adminSupabase
-      .from('lesson_enrichments')
-      .select(ENRICHMENT_DISPLAY_COLUMNS)
-      .in('lesson_id', lessonIds)
-      .eq('status', 'completed')
-      .order('order_index')
+    const [
+      { data: enrichments, error: enrichmentsError },
+      { data: lessonContents, error: lessonContentsError },
+    ] = await Promise.all([
+        adminSupabase
+          .from('lesson_enrichments')
+          .select(ENRICHMENT_DISPLAY_COLUMNS)
+          .in('lesson_id', lessonIds)
+          .eq('status', 'completed')
+          .order('order_index'),
+        adminSupabase
+          .from('lesson_contents')
+          .select('*')
+          .in('lesson_id', lessonIds)
+          .in('status', [...VIEWER_READY_LESSON_CONTENT_STATUSES])
+          .order('created_at', { ascending: false }),
+      ])
 
     if (enrichmentsError) {
       logger.warn('Failed to load lesson enrichments for shared course', {
@@ -198,6 +213,18 @@ export default async function SharedCoursePage({ params }: PageProps) {
       })
     } else {
       enrichmentsByLessonId = groupEnrichmentsByLessonId(enrichments as EnrichmentRow[])
+    }
+
+    if (lessonContentsError) {
+      logger.warn('Failed to load lesson contents for shared course', {
+        courseId: course.id,
+        token: sanitizeTokenForLog(token),
+        error: lessonContentsError.message,
+      })
+    } else {
+      lessonContentsByLessonId = groupLessonContentsByLessonIdForViewer(
+        (lessonContents ?? null) as LessonContentRow[] | null
+      )
     }
   }
 
@@ -225,6 +252,7 @@ export default async function SharedCoursePage({ params }: PageProps) {
         lessons={lessonsForViewer}
         assets={assetsByLessonId}
         enrichments={enrichmentsByLessonId}
+        lessonContents={lessonContentsByLessonId}
         readOnly={true}
         orgSlug={orgSlug}
       />

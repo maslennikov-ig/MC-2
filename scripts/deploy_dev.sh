@@ -23,6 +23,20 @@ echo "Cleaning up orphan dev containers..."
 # Docker filter doesn't support regex, so we explicitly list dev container names
 docker rm -f megacampus-api-dev megacampus-web-dev 2>/dev/null || true
 
+DEV_COMPOSE="docker compose -f $BASE_PATH/docker-compose.dev.yml --env-file $BASE_PATH/.env.dev"
+
+# Qdrant used to be started outside docker-compose.dev.yml on some Dev hosts.
+# Compose cannot adopt a container with the same container_name but different labels,
+# so normalize only that legacy state before starting dependent workers.
+if docker inspect megacampus-qdrant-dev > /dev/null 2>&1; then
+    QDRANT_COMPOSE_PROJECT="$(docker inspect -f '{{ with index .Config.Labels "com.docker.compose.project" }}{{ . }}{{ end }}' megacampus-qdrant-dev 2>/dev/null || true)"
+    QDRANT_COMPOSE_SERVICE="$(docker inspect -f '{{ with index .Config.Labels "com.docker.compose.service" }}{{ . }}{{ end }}' megacampus-qdrant-dev 2>/dev/null || true)"
+    if [ "$QDRANT_COMPOSE_PROJECT" != "megacampus" ] || [ "$QDRANT_COMPOSE_SERVICE" != "qdrant-dev" ]; then
+        echo "   Removing legacy megacampus-qdrant-dev container so compose can manage it..."
+        docker rm -f megacampus-qdrant-dev 2>/dev/null || true
+    fi
+fi
+
 # 3. Check docling-mcp image exists (manually built, 8GB)
 DOCLING_IMAGE="ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest"
 if ! docker image inspect "$DOCLING_IMAGE" > /dev/null 2>&1; then
@@ -59,23 +73,52 @@ echo ""
 echo "Pulling latest develop images..."
 docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" pull
 
-# 7. Deploy dev containers (do NOT use --remove-orphans, it kills shared infra!)
-echo "Deploying dev containers..."
-docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" up -d --force-recreate
+# 7. Deploy dev containers in stages
+# Stage 1: Start core services (web, notebooklm-bridge, api) without workers
+# Workers depend on api-dev:service_healthy which causes compose to exit 1
+# if api takes time to start. So we start core services first, wait for health,
+# then start workers.
+echo "Ensuring Qdrant dev container is compose-managed..."
+$DEV_COMPOSE up -d qdrant-dev
 
-# 8. Health Check
+echo "Deploying core dev containers (web, bridge, api)..."
+$DEV_COMPOSE up -d --force-recreate --no-deps web-dev notebooklm-bridge-dev api-dev
+
+# 8. Health Check — wait for API and Web before starting workers
 echo "Performing Health Checks..."
+
+# Check Qdrant readiness before accepting the deployment.
+QDRANT_HEALTHY=false
+QDRANT_API_KEY_VALUE="${QDRANT_API_KEY:-}"
+if [ -z "$QDRANT_API_KEY_VALUE" ] && [ -f "$BASE_PATH/.env.dev" ]; then
+    QDRANT_API_KEY_VALUE="$(grep -E '^QDRANT_API_KEY=' "$BASE_PATH/.env.dev" | tail -n 1 | cut -d= -f2-)"
+fi
+echo "   Checking Qdrant on localhost:6333..."
+for i in {1..12}; do
+    if curl -s -f -H "api-key: $QDRANT_API_KEY_VALUE" "http://localhost:6333/collections" > /dev/null 2>&1; then
+        echo "   Qdrant health check passed!"
+        QDRANT_HEALTHY=true
+        break
+    fi
+    echo "   Waiting for Qdrant... ($i/12)"
+    sleep 5
+done
 
 # Check API health
 API_HEALTHY=false
 echo "   Checking API on localhost:4010..."
-for i in {1..12}; do
+for i in {1..24}; do
     if curl -s -f "http://localhost:4010/health" > /dev/null 2>&1; then
         echo "   API health check passed!"
         API_HEALTHY=true
         break
     fi
-    echo "   Waiting for API... ($i/12)"
+    # Show container status on every 4th attempt for debugging
+    if [ $((i % 4)) -eq 0 ]; then
+        echo "   Container status:"
+        docker inspect --format='{{.State.Status}} (exit={{.State.ExitCode}})' megacampus-api-dev 2>/dev/null || echo "   (container not found)"
+    fi
+    echo "   Waiting for API... ($i/24)"
     sleep 5
 done
 
@@ -92,15 +135,25 @@ for i in {1..12}; do
     sleep 5
 done
 
-if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
+if [ "$QDRANT_HEALTHY" = false ] || [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
     echo ""
     echo "Health check failed!"
+    [ "$QDRANT_HEALTHY" = false ] && echo "   - Qdrant not healthy"
     [ "$API_HEALTHY" = false ] && echo "   - API not healthy"
     [ "$WEB_HEALTHY" = false ] && echo "   - Web not healthy"
     echo ""
-    echo "Check logs with: docker compose -f docker-compose.dev.yml logs"
+    echo "=== API container logs (last 50 lines) ==="
+    docker logs megacampus-api-dev --tail 50 2>&1 || true
+    echo ""
+    echo "=== API container inspect ==="
+    docker inspect --format='Status={{.State.Status}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} StartedAt={{.State.StartedAt}}' megacampus-api-dev 2>/dev/null || true
+    echo ""
     exit 1
 fi
+
+# Stage 2: Start workers now that API is healthy
+echo "Starting worker containers..."
+$DEV_COMPOSE up -d --force-recreate worker-dev worker-stage6-dev worker-stage7-dev
 
 # 9. Docker Cleanup (prevent disk space exhaustion)
 echo ""

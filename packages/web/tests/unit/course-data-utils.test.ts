@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest'
 import {
   isValidShareToken,
   groupAssetsByLessonId,
+  groupLessonContentsByLessonIdForViewer,
   prepareSectionsForViewer,
   prepareLessonsForViewer,
   sanitizeTokenForLog,
   SHARE_TOKEN_CONFIG,
+  VIEWER_READY_LESSON_CONTENT_STATUSES,
 } from '@/lib/course-data-utils'
 import type { Database } from '@/types/database.generated'
 
@@ -13,6 +15,7 @@ import type { Database } from '@/types/database.generated'
 type SectionRow = Database['public']['Tables']['sections']['Row']
 type LessonRow = Database['public']['Tables']['lessons']['Row']
 type AssetRow = Database['public']['Tables']['assets']['Row']
+type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 describe('course-data-utils', () => {
   describe('isValidShareToken', () => {
@@ -529,6 +532,67 @@ describe('course-data-utils', () => {
         expect(result[1].lesson_number).toBe('100')
         expect(result[2].lesson_number).toBe('')
       })
+    })
+  })
+
+  describe('groupLessonContentsByLessonIdForViewer', () => {
+    it('exports viewer-ready lesson content statuses for SSR loaders', () => {
+      expect(VIEWER_READY_LESSON_CONTENT_STATUSES).toEqual(['completed', 'approved'])
+    })
+
+    it('keeps the latest approved lesson content row for viewer payloads', () => {
+      const rows: Partial<LessonContentRow>[] = [
+        {
+          id: 'approved-latest',
+          lesson_id: 'lesson-1',
+          status: 'approved' as LessonContentRow['status'],
+          created_at: '2026-04-14T10:00:00.000Z',
+        },
+        {
+          id: 'completed-older',
+          lesson_id: 'lesson-1',
+          status: 'completed',
+          created_at: '2026-04-14T09:00:00.000Z',
+        },
+      ]
+
+      const result = groupLessonContentsByLessonIdForViewer(rows as LessonContentRow[])
+
+      expect(result['lesson-1']?.id).toBe('approved-latest')
+    })
+
+    it('ignores non-viewer statuses and keeps latest ready row per lesson', () => {
+      const rows: Partial<LessonContentRow>[] = [
+        {
+          id: 'review-required',
+          lesson_id: 'lesson-1',
+          status: 'review_required',
+          created_at: '2026-04-14T11:00:00.000Z',
+        },
+        {
+          id: 'completed-latest-ready',
+          lesson_id: 'lesson-1',
+          status: 'completed',
+          created_at: '2026-04-14T10:00:00.000Z',
+        },
+        {
+          id: 'approved-other-lesson',
+          lesson_id: 'lesson-2',
+          status: 'approved' as LessonContentRow['status'],
+          created_at: '2026-04-14T12:00:00.000Z',
+        },
+      ]
+
+      const result = groupLessonContentsByLessonIdForViewer(rows as LessonContentRow[])
+
+      expect(result['lesson-1']?.id).toBe('completed-latest-ready')
+      expect(result['lesson-2']?.id).toBe('approved-other-lesson')
+      expect(Object.keys(result)).toHaveLength(2)
+    })
+
+    it('returns empty object for null or empty input', () => {
+      expect(groupLessonContentsByLessonIdForViewer(null)).toEqual({})
+      expect(groupLessonContentsByLessonIdForViewer([])).toEqual({})
     })
   })
 

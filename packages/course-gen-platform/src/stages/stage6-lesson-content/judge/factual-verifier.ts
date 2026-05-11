@@ -48,6 +48,12 @@ export interface FactualVerificationConfig {
  */
 export type VerificationStatus = 'verified' | 'unverified' | 'contradicted' | 'no_evidence';
 
+export interface FactualClaimDiagnostics {
+  mismatchReason?: string;
+  matchedEvidenceChunkIds?: string[];
+  evidencePreview?: string;
+}
+
 /**
  * A claim extracted from content with verification result
  */
@@ -64,6 +70,8 @@ export interface VerificationClaim {
   verificationStatus: VerificationStatus;
   /** Confidence score of the verification (0-1) */
   confidence: number;
+  /** Optional structured diagnostics for debugging and remediation */
+  diagnostics?: FactualClaimDiagnostics;
 }
 
 /**

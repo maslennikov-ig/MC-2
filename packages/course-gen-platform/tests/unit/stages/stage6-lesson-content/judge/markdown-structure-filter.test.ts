@@ -171,6 +171,21 @@ const code = 'no language specified';
       expect(md040Issue?.ruleDescription).toContain('language');
     });
 
+    it('should allow Mermaid fenced blocks as a valid diagram language', () => {
+      const validMarkdown = `# Title
+
+\`\`\`mermaid
+graph TD
+  A[Start] --> B[Finish]
+\`\`\`
+`;
+
+      const result = validateMarkdownStructure(validMarkdown);
+
+      expect(result.passed).toBe(true);
+      expect(result.issues.find(issue => issue.ruleNames.includes('MD040'))).toBeUndefined();
+    });
+
     it('should detect MD031 (missing blank lines) as major', () => {
       const invalidMarkdown = `# Title
 \`\`\`typescript
@@ -186,6 +201,27 @@ More content immediately after.
 
       const md031Issue = result.issues.find(issue => issue.ruleNames.includes('MD031'));
       expect(md031Issue).toBeDefined();
+    });
+
+    it('should not block generated tables for alignment style only', () => {
+      const markdownWithGeneratedTable = `# Title
+
+## Comparison
+
+| Stage | Action | Owner |
+|-------|--------|-------|
+| Draft | Build initial workflow automation scenario | Content team |
+| Review | Validate deterministic table normalization outcome | QA |
+`;
+
+      const result = validateMarkdownStructure(markdownWithGeneratedTable);
+
+      expect(result.passed).toBe(true);
+      expect(result.issuesBySeverity.major).toHaveLength(0);
+
+      const md060Issue = result.issues.find(issue => issue.ruleNames.includes('MD060'));
+      expect(md060Issue).toBeDefined();
+      expect(result.issuesBySeverity.minor).toContain(md060Issue);
     });
 
     it('should fail on major code block issues', () => {
@@ -363,7 +399,7 @@ describe('applyMarkdownAutoFixes', () => {
 
     expect(result.fixedRules).toContain('MD009');
     // Should not have 3+ trailing spaces anymore
-    expect(result.content).not.toMatch(/   \n/);
+    expect(result.content).not.toMatch(/ {3}\n/);
     expect(result.content).toContain('# Title');
   });
 
@@ -429,7 +465,7 @@ describe('applyMarkdownAutoFixes', () => {
     // Should fix MD009, MD010, MD012
     expect(result.fixedRules.length).toBeGreaterThan(0);
     expect(result.content).not.toContain('\t');
-    expect(result.content).not.toMatch(/   \n/);
+    expect(result.content).not.toMatch(/ {3}\n/);
     expect(result.content).not.toMatch(/\n\n\n/);
   });
 });

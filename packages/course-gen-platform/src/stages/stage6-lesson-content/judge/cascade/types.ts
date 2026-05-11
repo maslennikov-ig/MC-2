@@ -8,6 +8,7 @@ import type {
   JudgeAggregatedResult,
   JudgeRecommendation,
   CriteriaScores,
+  JudgeIssue,
 } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { LessonContentBody, RAGChunk } from '@megacampus/shared-types/lesson-content';
@@ -155,6 +156,10 @@ export interface CascadeResult {
   singleJudgeVerdict?: JudgeVerdict;
   /** CLEV voting result (if run) */
   clevResult?: JudgeAggregatedResult;
+  /** Blocking factual issue detected by a dissenting judge and preserved against majority override */
+  blockingFactualIssue?: JudgeIssue;
+  /** Whether CLEV majority was overridden by factual issue veto */
+  factualIssueVetoApplied?: boolean;
   /** Final overall score (0-1) */
   finalScore: number;
   /** Final recommendation */

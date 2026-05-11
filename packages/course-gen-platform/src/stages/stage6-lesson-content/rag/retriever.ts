@@ -5,7 +5,7 @@ import { ragContextCache } from '@/stages/stage5-generation/utils/rag-context-ca
 import type { RAGChunk as SectionRAGChunk } from '@/stages/stage5-generation/utils/section-rag-retriever';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
-import { checkCourseHasIndexedDocuments } from '@/shared/rag/document-availability';
+import { assertCourseRagReadyWithRetry } from '@/shared/rag/required-rag-retry';
 
 import { LESSON_RAG_CONFIG, RERANKER_CONFIG, TWO_TIER_CONFIG } from './constants';
 import type { LessonRAGParams, LessonRAGResult, LessonRAGChunk } from './types';
@@ -43,22 +43,8 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
     '[Lesson RAG] Starting retrieval'
   );
 
-  // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries
-  // This prevents ~100s of wasted time when course has no uploaded documents
-  const hasIndexedDocuments = await checkCourseHasIndexedDocuments(courseId);
-  if (!hasIndexedDocuments) {
-    logger.info(
-      {
-        courseId,
-        lessonId: lessonSpec.lesson_id,
-      },
-      '[Lesson RAG] Course has no indexed documents, skipping RAG retrieval'
-    );
-
-    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
-  }
-
-  // Check cache first if enabled
+  // Preserve existing resilience: if a lesson already has cached RAG context,
+  // reuse it without touching live Qdrant.
   if (useCache && lessonSpec.rag_context) {
     const ragContextId = generateCacheKey(courseId, lessonSpec.lesson_id);
     const cached = await ragContextCache.get(ragContextId);
@@ -72,7 +58,6 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         '[Lesson RAG] Using cached context'
       );
 
-      // Log trace for cache hit observability
       try {
         await logTrace({
           courseId,
@@ -95,7 +80,6 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         // Don't fail on trace error
       }
 
-      // Convert cached chunks (section-rag format) to shared-types RAGChunk format
       const convertedChunks: RAGChunk[] = cached.chunks.map((chunk: SectionRAGChunk) => ({
         chunk_id: chunk.chunkId,
         document_id: chunk.documentId,
@@ -118,6 +102,21 @@ export async function retrieveLessonContext(params: LessonRAGParams): Promise<Le
         cached: true,
       };
     }
+  }
+
+  // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries
+  // This prevents ~100s of wasted time when course has no uploaded documents
+  const ragAvailability = await assertCourseRagReadyWithRetry(courseId);
+  if (ragAvailability.availability === 'optional_no_documents') {
+    logger.info(
+      {
+        courseId,
+        lessonId: lessonSpec.lesson_id,
+      },
+      '[Lesson RAG] Course has no indexed documents, skipping RAG retrieval'
+    );
+
+    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
   }
 
   // Build search queries from lesson specification

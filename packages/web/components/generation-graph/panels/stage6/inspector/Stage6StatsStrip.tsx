@@ -13,7 +13,7 @@ interface Stage6StatsStripProps {
   durationMs: number
   /** Subscription tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' */
   modelTier: string
-  quality: number
+  quality: number | null
   tokensBreakdown?: Record<Stage6NodeName, number>
   locale?: 'ru' | 'en'
 }
@@ -34,7 +34,11 @@ function formatDuration(ms: number): string {
   return `${remainingSeconds}s`
 }
 
-const QualityIndicator = memo(({ quality }: { quality: number }) => {
+const QualityIndicator = memo(({ quality }: { quality: number | null }) => {
+  if (quality === null) {
+    return <span className="text-muted-foreground font-medium">—</span>
+  }
+
   const isGood = quality >= 85
   const isWarning = quality < 70
 
@@ -145,7 +149,7 @@ const ModelTierMetric = memo(
 ModelTierMetric.displayName = 'ModelTierMetric'
 
 const QualityMetric = memo(
-  ({ quality, locale = 'en' }: { quality: number; locale?: 'ru' | 'en' }) => {
+  ({ quality, locale = 'en' }: { quality: number | null; locale?: 'ru' | 'en' }) => {
     return (
       <div className="flex items-center gap-1.5 text-sm">
         <span className="text-muted-foreground">{locale === 'ru' ? 'Качество' : 'Quality'}:</span>

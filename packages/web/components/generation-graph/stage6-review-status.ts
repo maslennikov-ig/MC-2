@@ -3,9 +3,9 @@ import type {
   LessonMatrixRow,
   ModuleDashboardAggregates,
   ModuleDashboardData,
-  NodeStatus,
   PipelineNodeState,
-} from '@megacampus/shared-types'
+} from '@megacampus/shared-types/stage6-ui.types'
+import type { NodeStatus } from '@megacampus/shared-types/generation-graph'
 
 export type ReviewAwareLessonMatrixRow = LessonMatrixRow & {
   needsReview: boolean
@@ -15,10 +15,7 @@ export type ReviewAwareModuleDashboardAggregates = ModuleDashboardAggregates & {
   reviewRequiredLessons: number
 }
 
-export type ReviewAwareModuleDashboardData = Omit<
-  ModuleDashboardData,
-  'lessons' | 'aggregates'
-> & {
+export type ReviewAwareModuleDashboardData = Omit<ModuleDashboardData, 'lessons' | 'aggregates'> & {
   lessons: ReviewAwareLessonMatrixRow[]
   aggregates: ReviewAwareModuleDashboardAggregates
   needsReview: boolean
@@ -26,6 +23,7 @@ export type ReviewAwareModuleDashboardData = Omit<
 
 export type ReviewAwareLessonInspectorData = LessonInspectorData & {
   needsReview: boolean
+  qualityScore?: number | null
 }
 
 export interface ReviewAwareGraphNodeState {
@@ -35,6 +33,7 @@ export interface ReviewAwareGraphNodeState {
 }
 
 export interface ReviewAwareStage6GraphSummary {
+  completedLessons: number
   readyLessons: number
   reviewRequiredLessons: number
   status: NodeStatus
@@ -98,7 +97,12 @@ export function summarizeReviewAwareStage6Statuses(
   statuses: Array<string | null | undefined>
 ): ReviewAwareStage6GraphSummary {
   const mapped = statuses.map((status) => getReviewAwareGraphNodeState(status))
-  const readyLessons = mapped.filter((entry) => entry.status === 'completed' || entry.status === 'approved').length
+  const completedLessons = mapped.filter(
+    (entry) => !entry.needsReview && (entry.status === 'completed' || entry.status === 'approved')
+  ).length
+  const readyLessons = mapped.filter(
+    (entry) => entry.status === 'completed' || entry.status === 'approved'
+  ).length
   const reviewRequiredLessons = mapped.filter((entry) => entry.needsReview).length
 
   let status: NodeStatus = 'pending'
@@ -114,6 +118,7 @@ export function summarizeReviewAwareStage6Statuses(
   }
 
   return {
+    completedLessons,
     readyLessons,
     reviewRequiredLessons,
     status,
@@ -206,7 +211,10 @@ export function deriveLessonInspectorStatus({
   hasFinishTrace,
   hasErrorTrace,
   hasTraces,
-}: DeriveLessonInspectorStatusOptions): Pick<ReviewAwareLessonInspectorData, 'status' | 'needsReview'> {
+}: DeriveLessonInspectorStatusOptions): Pick<
+  ReviewAwareLessonInspectorData,
+  'status' | 'needsReview'
+> {
   const normalizedStatus = contentStatus?.toLowerCase() ?? null
   const needsReview = normalizedStatus === 'review_required'
 
@@ -216,6 +224,10 @@ export function deriveLessonInspectorStatus({
 
   if (normalizedStatus === 'approved' || normalizedStatus === 'completed') {
     return { status: 'completed', needsReview: false }
+  }
+
+  if (normalizedStatus === 'rejected') {
+    return { status: 'error', needsReview: false }
   }
 
   if (normalizedStatus === 'failed' || normalizedStatus === 'error') {

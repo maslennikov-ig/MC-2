@@ -118,6 +118,10 @@ export async function executeQdrantUpload(
         `Qdrant upload timed out after ${QDRANT_UPLOAD_TIMEOUT_MS}ms`
       );
 
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || 'Qdrant upload returned unsuccessful result');
+      }
+
       await job.updateProgress(95);
 
       logger.debug(

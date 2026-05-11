@@ -5,7 +5,7 @@
  * Static definitions for pipeline stages and their configurations.
  */
 
-import type { PhaseName } from '@megacampus/shared-types';
+import type { PhaseName } from '@megacampus/shared-types/model-config';
 import {
   DEFAULT_MODEL_ID,
   DEFAULT_FALLBACK_MODEL_ID,
@@ -15,6 +15,7 @@ import {
   CHAT_STAGE6_PRIMARY_MODEL_ID,
   CHAT_STAGE6_FALLBACK_MODEL_ID,
 } from '@megacampus/shared-types';
+import { STAGE6_CANONICAL_PHASE_DEFAULTS } from '@megacampus/shared-types/stage6-model-config';
 
 // =============================================================================
 // Static Stage Definitions
@@ -96,6 +97,12 @@ export const PIPELINE_STAGES = [
       'stage_6_simple',
       'stage_6_normal',
       'stage_6_complex',
+      'stage_6_auto_last_chance',
+      'stage_6_manual_regeneration',
+      'stage_6_arbiter',
+      'stage_6_patcher',
+      'stage_6_section_expander',
+      'stage_6_delta_judge',
     ] as PhaseName[],
     linkedPrompts: [
       'stage_6_planner',
@@ -143,6 +150,8 @@ export interface DefaultModelConfig {
   fallbackModelId?: string;
 }
 
+type PipelineDefaultPhaseName = PhaseName | 'stage_6_content';
+
 /**
  * Hardcoded default model configurations for each phase
  * Used by resetModelConfigToDefault procedure
@@ -151,7 +160,7 @@ export interface DefaultModelConfig {
  * Uses DEFAULT_MODEL_ID (Xiaomi MiMo V2 Flash) for standard phases.
  * Extended phases use Gemini 2.5 Flash for large context.
  */
-export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
+export const DEFAULT_MODEL_CONFIGS: Record<PipelineDefaultPhaseName, DefaultModelConfig> = {
   // Global default (admin-configurable fallback)
   global_default: {
     modelId: DEFAULT_MODEL_ID,
@@ -327,34 +336,53 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_6_refinement: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.5,
-    maxTokens: 8000,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_refinement.fallbackModelId,
   },
   stage_6_rag_planning: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.3,
-    maxTokens: 4096,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_rag_planning.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_rag_planning.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_rag_planning.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_rag_planning.fallbackModelId,
+  },
+  stage_6_content: {
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_content.fallbackModelId,
   },
   stage_6_simple: {
-    modelId: 'xiaomi/mimo-v2-flash',
-    temperature: 0.7,
-    maxTokens: 8000,
-    fallbackModelId: 'moonshotai/kimi-k2-thinking',
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_simple.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_simple.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_simple.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_simple.fallbackModelId,
   },
   stage_6_normal: {
-    modelId: 'moonshotai/kimi-k2-thinking',
-    temperature: 0.7,
-    maxTokens: 8000,
-    fallbackModelId: 'google/gemini-3-flash-preview',
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_normal.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_normal.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_normal.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_normal.fallbackModelId,
   },
   stage_6_complex: {
-    modelId: 'qwen/qwen3.5-plus-02-15',
-    temperature: 0.7,
-    maxTokens: 8000,
-    fallbackModelId: 'moonshotai/kimi-k2-thinking',
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_complex.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_complex.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_complex.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_complex.fallbackModelId,
+  },
+  stage_6_auto_last_chance: {
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_auto_last_chance.fallbackModelId,
+  },
+  stage_6_manual_regeneration: {
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_manual_regeneration
+      .fallbackModelId,
   },
   stage_6_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
@@ -382,28 +410,28 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
   },
   // Stage 6: Targeted Refinement phases
   stage_6_arbiter: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.0,
-    maxTokens: 2048,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_arbiter.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_arbiter.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_arbiter.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_arbiter.fallbackModelId,
   },
   stage_6_patcher: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.1,
-    maxTokens: 1000,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_patcher.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_patcher.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_patcher.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_patcher.fallbackModelId,
   },
   stage_6_section_expander: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.7,
-    maxTokens: 2000,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_section_expander.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_section_expander.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_section_expander.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_section_expander.fallbackModelId,
   },
   stage_6_delta_judge: {
-    modelId: DEFAULT_MODEL_ID,
-    temperature: 0.0,
-    maxTokens: 512,
-    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+    modelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_delta_judge.modelId,
+    temperature: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_delta_judge.temperature,
+    maxTokens: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_delta_judge.maxTokens,
+    fallbackModelId: STAGE6_CANONICAL_PHASE_DEFAULTS.stage_6_delta_judge.fallbackModelId,
   },
   // Stage 7: Enrichments (Activities)
   // Cover and Card use image generation models directly

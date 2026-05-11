@@ -26,6 +26,10 @@ import {
 } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
+import {
+  getRequiredRagApiMessage,
+  RequiredRagUnavailableError,
+} from '@/shared/rag/document-availability';
 
 export const generateRouter = {
   generate: instructorProcedure
@@ -243,6 +247,25 @@ export const generateRouter = {
           estimatedDuration: 150000,
         };
       } catch (error) {
+        if (error instanceof RequiredRagUnavailableError) {
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              retryable: error.retryable,
+              reason: error.reason,
+              message: error.message,
+            },
+            'Generation blocked: required RAG is unavailable'
+          );
+
+          throw new TRPCError({
+            code: error.apiErrorCode,
+            message: getRequiredRagApiMessage(error),
+            cause: error,
+          });
+        }
+
         if (error instanceof TRPCError) throw error;
 
         logger.error(

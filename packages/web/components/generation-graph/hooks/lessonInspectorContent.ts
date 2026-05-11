@@ -1,6 +1,12 @@
 type LessonContentLike = {
   content?: unknown
   metadata?: unknown
+  status?: unknown
+}
+
+type DatedLessonContentLike = LessonContentLike & {
+  created_at?: string | null
+  status?: string | null
 }
 
 interface LessonContentPreviewData {
@@ -191,6 +197,32 @@ function hasPreviewContent(content: LessonContentPreviewData | null): boolean {
   )
 }
 
+function isRejectedLessonContent(contentRow: LessonContentLike | null | undefined): boolean {
+  return typeof contentRow?.status === 'string' && contentRow.status.toLowerCase() === 'rejected'
+}
+
+function getCreatedAtTimestamp(value: string | null | undefined): number {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY
+  }
+
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY
+}
+
+function sortLessonContentRowsNewestFirst<T extends DatedLessonContentLike>(
+  rows: T[] | null | undefined
+): T[] {
+  if (!rows || rows.length === 0) {
+    return []
+  }
+
+  return [...rows].sort(
+    (left, right) =>
+      getCreatedAtTimestamp(right.created_at) - getCreatedAtTimestamp(left.created_at)
+  )
+}
+
 export function getLessonInspectorContentPresentation(
   contentRow: LessonContentLike | null | undefined
 ): LessonInspectorContentPresentation {
@@ -204,18 +236,24 @@ export function getLessonInspectorContentPresentation(
 }
 
 export function isLessonContentUsable(contentRow: LessonContentLike | null | undefined): boolean {
+  if (isRejectedLessonContent(contentRow)) {
+    return false
+  }
+
   const presentation = getLessonInspectorContentPresentation(contentRow)
   return Boolean(presentation.rawMarkdown?.trim() || hasPreviewContent(presentation.content))
 }
 
-export function getLatestUsableLessonContent<T extends LessonContentLike>(
+export function getLatestLessonContentRow<T extends DatedLessonContentLike>(
   rows: T[] | null | undefined
 ): T | null {
-  if (!rows || rows.length === 0) {
-    return null
-  }
+  return sortLessonContentRowsNewestFirst(rows)[0] ?? null
+}
 
-  for (const row of rows) {
+export function getLatestUsableLessonContent<T extends DatedLessonContentLike>(
+  rows: T[] | null | undefined
+): T | null {
+  for (const row of sortLessonContentRowsNewestFirst(rows)) {
     if (isLessonContentUsable(row)) {
       return row
     }

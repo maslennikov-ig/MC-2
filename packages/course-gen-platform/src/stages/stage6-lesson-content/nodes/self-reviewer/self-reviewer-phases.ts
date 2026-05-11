@@ -14,6 +14,10 @@ import {
   checkMermaidSyntax,
   ZERO_TOLERANCE_SCRIPTS,
 } from '../../judge/heuristic-filter';
+import {
+  classifyTruncationIssue,
+  type TruncationIssueKind,
+} from '../../judge/filters/structural-checks';
 import { MODEL_FALLBACK } from '../../config';
 import { SELF_REVIEW_CONFIG } from './self-reviewer-constants';
 import { findSectionsWithForeignCharacters } from './self-reviewer-heuristics';
@@ -40,6 +44,76 @@ export interface CriticalIssueAnalysis {
   requiresModelFallback: boolean;
   fallbackModel: string | null;
   affectedSections: string[];
+}
+
+// ============================================================================
+// TRUNCATION ISSUE CATEGORIZATION
+// ============================================================================
+
+/**
+ * Severity bucket for a given truncation issue kind.
+ *
+ * Maps issue kinds (from structural-checks.ts) to detection-reliability
+ * buckets. Used to decide whether truncation should trigger CRITICAL
+ * (blocking → REGENERATE) or INFO (non-blocking observation for judge).
+ *
+ * Policy rationale: after token limits were bumped, real truncation is
+ * rare. FP cost (rejected rows, REGENERATE loop) > FN cost (judge still
+ * runs as 2nd-tier catch). See ADR / commit 020bed88.
+ */
+const TRUNCATION_SEVERITY_BUCKET: Record<
+  TruncationIssueKind,
+  'deterministic' | 'globalEnding' | 'heuristic'
+> = {
+  // Deterministic: independently indicates truncation
+  UNMATCHED_CODE: 'deterministic',
+  MID_SENTENCE: 'deterministic',
+  SUSPICIOUSLY_SHORT: 'deterministic',
+  // Medium-confidence: blocks only in composite with another signal
+  GLOBAL_ENDING: 'globalEnding',
+  // Heuristic: false-positives on tables/HR/lists/quotes → never block alone
+  SECTION_TRUNCATED: 'heuristic',
+  CALLOUT_TRUNCATED: 'heuristic',
+};
+
+export interface CategorizedTruncationIssues {
+  /** Deterministic signals that independently indicate truncation */
+  deterministic: string[];
+  /** Global last-char check — fragile alone, strong as part of composite */
+  globalEnding: string[];
+  /** Per-section / callout last-char heuristics — never block on their own */
+  heuristic: string[];
+  /** Unknown/unclassifiable messages — conservatively treated as heuristic */
+  unknown: string[];
+}
+
+/**
+ * Categorize truncation issues by detection reliability using typed
+ * issue-kind codes (no magic-string coupling to structural-checks.ts).
+ *
+ * Unknown/unclassifiable messages go to `unknown` bucket (not auto-escalated
+ * to deterministic) — if someone adds a new check without wiring severity,
+ * we fail-open rather than fail-closed to avoid regressions.
+ */
+export function categorizeTruncationIssues(issues: string[]): CategorizedTruncationIssues {
+  const result: CategorizedTruncationIssues = {
+    deterministic: [],
+    globalEnding: [],
+    heuristic: [],
+    unknown: [],
+  };
+
+  for (const issue of issues) {
+    const kind = classifyTruncationIssue(issue);
+    if (!kind) {
+      result.unknown.push(issue);
+      continue;
+    }
+    const bucket = TRUNCATION_SEVERITY_BUCKET[kind];
+    result[bucket].push(issue);
+  }
+
+  return result;
 }
 
 // ============================================================================
@@ -179,25 +253,76 @@ export function analyzeCriticalIssues(
   // ============================================================================
   // TRUNCATION FAILURES
   // ============================================================================
+  //
+  // Severity policy (post-2026-04-16):
+  //   - Deterministic signals → CRITICAL on first hit
+  //     (unmatched code fence, <200 chars, explicit mid-sentence pattern).
+  //   - Heuristic signals → NEVER block on their own
+  //     (per-section last-char, callout-block last-line). These false-positive
+  //     on markdown tables, horizontal rules, quote blocks, list endings.
+  //     Surfaced as INFO via buildMinorIssues for judge/telemetry.
+  //   - Global last-char (Check 1) → CRITICAL only with supporting signal.
+  //     Alone it's too fragile (closing punctuation like "Молодец!)" flags false).
+  //
+  // Rationale: token limits were bumped (4096 floor → 16384 ceiling + overhead
+  // multiplier), so real truncation is rare. FP cost (rejected rows, REGENERATE
+  // loop) > FN cost (judge still runs as second-tier catch).
 
-  if (
-    !truncationCheck.passed &&
-    truncationCheck.truncationIssues.length > SELF_REVIEW_CONFIG.criticalTruncationThreshold
-  ) {
-    issues.push({
-      type: 'TRUNCATION',
-      severity: 'CRITICAL',
-      location: 'global',
-      description: truncationCheck.truncationIssues.join('; '),
-    });
+  if (!truncationCheck.passed) {
+    const categorized = categorizeTruncationIssues(truncationCheck.truncationIssues);
+    const hasDeterministic = categorized.deterministic.length > 0;
+    const hasGlobalEnding = categorized.globalEnding.length > 0;
+    const hasHeuristic = categorized.heuristic.length > 0;
+    const hasUnknown = categorized.unknown.length > 0;
 
-    nodeLogger.warn({
-      msg: 'Critical truncation failure',
-      issuesCount: truncationCheck.truncationIssues.length,
-      issues: truncationCheck.truncationIssues,
-      lastCharacter: truncationCheck.lastCharacter,
-      hasMatchedCodeBlocks: truncationCheck.hasMatchedCodeBlocks,
-    });
+    // Composite rule: global-ending alone is fragile; require a second signal.
+    // Unknown kinds are conservatively treated as heuristic (fail-open) to
+    // avoid silent regressions if structural-checks adds a new message type
+    // without updating the severity bucket map.
+    const isCritical = hasDeterministic || (hasGlobalEnding && hasHeuristic);
+
+    if (isCritical) {
+      issues.push({
+        type: 'TRUNCATION',
+        severity: 'CRITICAL',
+        location: 'global',
+        description: truncationCheck.truncationIssues.join('; '),
+      });
+
+      nodeLogger.warn({
+        msg: 'Critical truncation failure (deterministic or composite signal)',
+        deterministicCount: categorized.deterministic.length,
+        globalEndingCount: categorized.globalEnding.length,
+        heuristicCount: categorized.heuristic.length,
+        unknownCount: categorized.unknown.length,
+        issues: truncationCheck.truncationIssues,
+        lastCharacter: truncationCheck.lastCharacter,
+        hasMatchedCodeBlocks: truncationCheck.hasMatchedCodeBlocks,
+      });
+    } else if (hasHeuristic || hasGlobalEnding || hasUnknown) {
+      // Heuristic-only, global-ending-only, or unknown: log for telemetry,
+      // do NOT block. buildMinorIssues emits INFO-level for judge visibility.
+      const suppressedKinds: string[] = [];
+      for (const msg of categorized.heuristic) {
+        const kind = classifyTruncationIssue(msg);
+        if (kind) suppressedKinds.push(kind);
+      }
+      for (const msg of categorized.globalEnding) {
+        const kind = classifyTruncationIssue(msg);
+        if (kind) suppressedKinds.push(kind);
+      }
+      if (hasUnknown) suppressedKinds.push('UNKNOWN');
+
+      metricsStore.recordTruncationHeuristicSuppressed(suppressedKinds);
+
+      nodeLogger.info({
+        msg: 'Heuristic truncation signals ignored (non-blocking)',
+        heuristicCount: categorized.heuristic.length,
+        globalEndingCount: categorized.globalEnding.length,
+        unknownCount: categorized.unknown.length,
+        issues: truncationCheck.truncationIssues,
+      });
+    }
   }
 
   // ============================================================================

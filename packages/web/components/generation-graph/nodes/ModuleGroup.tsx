@@ -102,6 +102,7 @@ const MediumModuleNode = ({
   const visualStatus = data.needsReview
     ? getReviewAwareGraphNodeState('review_required').visualStatus
     : currentStatus
+  const reviewRequiredLessons = data.reviewRequiredLessons || 0
   const progressPercent =
     data.totalLessons > 0 ? Math.round((data.completedLessons / data.totalLessons) * 100) : 0
 
@@ -126,19 +127,23 @@ const MediumModuleNode = ({
         <span className="text-slate-500 dark:text-slate-400">
           {data.completedLessons}/{data.totalLessons}
         </span>
-        <span
-          className={`font-medium ${
-            data.needsReview
-              ? 'text-amber-600 dark:text-amber-400'
-              : currentStatus === 'completed'
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : currentStatus === 'active'
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-slate-500 dark:text-slate-400'
-          }`}
-        >
-          {progressPercent}%
-        </span>
+        {data.needsReview ? (
+          <span className="font-medium text-amber-600 dark:text-amber-400">
+            {reviewRequiredLessons} рев.
+          </span>
+        ) : (
+          <span
+            className={`font-medium ${
+              currentStatus === 'completed'
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : currentStatus === 'active'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            {progressPercent}%
+          </span>
+        )}
       </div>
 
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !bg-slate-400" />
@@ -174,6 +179,30 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
   const visualStatus = data.needsReview
     ? getReviewAwareGraphNodeState('review_required').visualStatus
     : currentStatus
+  const reviewRequiredLessons = data.reviewRequiredLessons || 0
+  const completedSummary = `${data.completedLessons}/${data.totalLessons}`
+  const moduleAriaSummary = data.needsReview
+    ? `${data.completedLessons} уроков завершены, ${reviewRequiredLessons} требуют проверки`
+    : `${data.completedLessons} из ${data.totalLessons} уроков завершены`
+  const headerAccentClasses = data.needsReview
+    ? {
+        border: 'border-amber-200/60 dark:border-amber-700/30',
+        hover: 'hover:bg-amber-50/30 dark:hover:bg-amber-900/20',
+        progressFill: 'bg-amber-100/60 dark:bg-amber-900/20',
+        iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+        iconText: 'text-amber-600 dark:text-amber-400',
+        labelText: 'text-amber-600 dark:text-amber-300',
+        buttonHover: 'hover:bg-amber-100 dark:hover:bg-amber-800',
+      }
+    : {
+        border: 'border-purple-200/50 dark:border-purple-700/30',
+        hover: 'hover:bg-purple-50/30 dark:hover:bg-purple-900/20',
+        progressFill: 'bg-purple-100/50 dark:bg-purple-900/20',
+        iconBg: 'bg-purple-100 dark:bg-purple-900/30',
+        iconText: 'text-purple-600 dark:text-purple-400',
+        labelText: 'text-purple-500 dark:text-purple-400',
+        buttonHover: 'hover:bg-purple-100 dark:hover:bg-purple-800',
+      }
 
   // Partial generation context (optional - may not be in provider)
   const contextValue = useOptionalPartialGenerationContext()
@@ -271,7 +300,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           className={`relative min-h-[90px] w-[300px] rounded-md border transition-all duration-300 ${getStatusBorderClass(visualStatus)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
           data-testid={`node-module-${id}`}
           data-node-status={data.needsReview ? 'review_required' : currentStatus}
-          aria-label={`Модуль: ${data.title}, ${data.completedLessons} из ${data.totalLessons} уроков готовы, статус: ${data.needsReview ? 'требует проверки' : currentStatus}`}
+          aria-label={`Модуль: ${data.title}, ${moduleAriaSummary}, статус: ${data.needsReview ? 'требует проверки' : currentStatus}`}
           role="group"
           tabIndex={0}
         >
@@ -386,8 +415,13 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
               </span>
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-xs text-slate-600 dark:text-slate-400">
-                  {data.completedLessons}/{data.totalLessons} •
+                  {completedSummary}
                 </span>
+                {data.needsReview && reviewRequiredLessons > 0 && (
+                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                    • {reviewRequiredLessons} на проверке
+                  </span>
+                )}
                 <StatusBadge
                   status={visualStatus}
                   label={
@@ -407,14 +441,14 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
                   progress={progressPercent}
                   variant={
                     data.needsReview
-                      ? 'default'
+                      ? 'review'
                       : currentStatus === 'completed'
-                      ? 'success'
-                      : currentStatus === 'error'
-                        ? 'error'
-                        : currentStatus === 'active'
-                          ? 'active'
-                          : 'default'
+                        ? 'success'
+                        : currentStatus === 'error'
+                          ? 'error'
+                          : currentStatus === 'active'
+                            ? 'active'
+                            : 'default'
                   }
                   size="sm"
                   className="mt-1.5"
@@ -441,12 +475,19 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
             <div className="border-t border-black/5 bg-slate-50/50 px-2.5 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-900/30 dark:text-slate-400">
               <div className="flex items-center justify-between">
                 <span>
-                {data.completedLessons} / {data.totalLessons} уроков
+                  {data.completedLessons} / {data.totalLessons} завершено
                 </span>
                 {data.needsReview ? (
-                  <span className="font-medium text-amber-600 dark:text-amber-400">
-                    Требует проверки
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {reviewRequiredLessons > 0 && (
+                      <span className="font-medium text-amber-600 dark:text-amber-400">
+                        {reviewRequiredLessons} на проверке
+                      </span>
+                    )}
+                    <span className="font-medium text-amber-600 dark:text-amber-400">
+                      Требует проверки
+                    </span>
+                  </div>
                 ) : currentStatus === 'completed' ? (
                   <span className="font-medium text-green-600 dark:text-green-400">Готово</span>
                 ) : currentStatus === 'active' ? (
@@ -479,22 +520,22 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
             data.needsReview
               ? 'border-amber-400 bg-amber-50/20 dark:border-amber-500 dark:bg-amber-900/10'
               : currentStatus === 'active'
-              ? 'border-blue-400 bg-blue-50/20 dark:border-blue-500 dark:bg-blue-900/10'
-              : currentStatus === 'completed'
-                ? 'border-emerald-400 bg-emerald-50/20 dark:border-emerald-500 dark:bg-emerald-900/10'
-                : currentStatus === 'error'
-                  ? 'border-red-400 bg-red-50/20 dark:border-red-500 dark:bg-red-900/10'
-                  : 'border-purple-300 bg-purple-50/20 dark:border-purple-600 dark:bg-purple-900/10'
+                ? 'border-blue-400 bg-blue-50/20 dark:border-blue-500 dark:bg-blue-900/10'
+                : currentStatus === 'completed'
+                  ? 'border-emerald-400 bg-emerald-50/20 dark:border-emerald-500 dark:bg-emerald-900/10'
+                  : currentStatus === 'error'
+                    ? 'border-red-400 bg-red-50/20 dark:border-red-500 dark:bg-red-900/10'
+                    : 'border-purple-300 bg-purple-50/20 dark:border-purple-600 dark:bg-purple-900/10'
           } ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''} `}
           data-testid={`node-module-expanded-${id}`}
-          data-node-status={currentStatus}
-          aria-label={`Модуль развернут: ${data.title}`}
+          data-node-status={data.needsReview ? 'review_required' : currentStatus}
+          aria-label={`Модуль развернут: ${data.title}, ${moduleAriaSummary}`}
         >
           {/* Header (60px) - click to collapse */}
           {/* nopan nodrag: prevent React Flow from panning/dragging when clicking header */}
           <div
             onClick={handleHeaderClick}
-            className="nopan nodrag relative flex h-[60px] cursor-pointer items-center gap-3 overflow-hidden border-b border-purple-200/50 px-3 transition-colors hover:bg-purple-50/30 dark:border-purple-700/30 dark:hover:bg-purple-900/20"
+            className={`nopan nodrag relative flex h-[60px] cursor-pointer items-center gap-3 overflow-hidden border-b px-3 transition-colors ${headerAccentClasses.border} ${headerAccentClasses.hover}`}
             data-testid={`collapse-module-${id}`}
             role="button"
             aria-expanded="true"
@@ -502,19 +543,21 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
           >
             {/* Progress Background Fill */}
             <div
-              className="absolute inset-0 bg-purple-100/50 transition-all duration-500 dark:bg-purple-900/20"
+              className={`absolute inset-0 transition-all duration-500 ${headerAccentClasses.progressFill}`}
               style={{ width: `${progressPercent}%` }}
             />
 
             {/* Content (above progress background) */}
             <div
-              className={`relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30`}
+              className={`relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${headerAccentClasses.iconBg}`}
             >
-              <Layers size={18} className="text-purple-600 dark:text-purple-400" />
+              <Layers size={18} className={headerAccentClasses.iconText} />
             </div>
 
             <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-              <span className="text-[10px] font-medium tracking-wider text-purple-500 uppercase dark:text-purple-400">
+              <span
+                className={`text-[10px] font-medium tracking-wider uppercase ${headerAccentClasses.labelText}`}
+              >
                 Модуль {moduleNumber}
               </span>
               <span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -527,16 +570,22 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
                 data.needsReview
                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                   : currentStatus === 'completed'
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                  : currentStatus === 'active'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                    : currentStatus === 'error'
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                      : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                    : currentStatus === 'active'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      : currentStatus === 'error'
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
               } `}
             >
-              {data.completedLessons}/{data.totalLessons}
+              {completedSummary}
             </span>
+
+            {data.needsReview && reviewRequiredLessons > 0 && (
+              <span className="relative z-10 flex-shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                {reviewRequiredLessons} на проверке
+              </span>
+            )}
 
             {hasErrors && (
               <NodeErrorTooltip
@@ -550,7 +599,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
               {/* Open details panel button */}
               <OpenPanelButton
                 onClick={handleOpenPanel}
-                className="hover:bg-purple-100 dark:hover:bg-purple-800"
+                className={headerAccentClasses.buttonHover}
               />
               {/* Chevron pointing down when expanded */}
               <ChevronDown

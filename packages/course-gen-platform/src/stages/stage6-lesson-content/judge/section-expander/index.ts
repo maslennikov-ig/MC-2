@@ -50,6 +50,7 @@
 
 import type { SectionExpanderInput, SectionExpanderOutput } from '@megacampus/shared-types';
 import { calculateRequiredTokens } from '@megacampus/shared-types';
+import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-model-config';
 import {
   buildExpanderPrompt,
   buildExpanderSystemPrompt,
@@ -122,7 +123,7 @@ export {
  * ```
  */
 export async function executeExpansion(
-  input: SectionExpanderInput
+  input: SectionExpanderInput & { courseId?: string }
 ): Promise<SectionExpanderOutput> {
   const startTime = Date.now();
 
@@ -130,18 +131,25 @@ export async function executeExpansion(
     // Get model configuration from database (model and temperature only)
     const llmClient = new LLMClient();
     const modelService = createModelConfigService();
+    const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_section_expander');
 
-    let modelId = 'unknown'; // Will be set from database config
-    let temperature = 0.7;
+    let modelId = fallbackConfig?.modelId ?? 'xiaomi/mimo-v2-flash';
+    let temperature = fallbackConfig?.temperature ?? 0.7;
 
     try {
-      const config = await modelService.getModelForPhase('stage_6_section_expander');
-      modelId = config.modelId;
-      temperature = config.temperature;
+      const config = await modelService.getModelForPhase(
+        'stage_6_section_expander',
+        input.courseId
+      );
+      modelId = config.modelId || fallbackConfig?.modelId || modelId;
+      temperature = config.temperature ?? fallbackConfig?.temperature ?? temperature;
       logger.info({ modelId, source: config.source }, 'Section-Expander using model from config');
     } catch (error) {
       logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        {
+          error: error instanceof Error ? error.message : String(error),
+          fallbackModelId: modelId,
+        },
         'Failed to get expander model config, using fallback'
       );
     }

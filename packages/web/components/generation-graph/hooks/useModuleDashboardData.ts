@@ -18,6 +18,7 @@ import {
   type ReviewAwareLessonMatrixRow,
   type ReviewAwareModuleDashboardData,
 } from '../stage6-review-status'
+import { getLatestLessonContentRow, getLatestUsableLessonContent } from './lessonInspectorContent'
 
 /**
  * Metadata structure from lesson_contents.metadata JSONB column
@@ -27,6 +28,10 @@ interface LessonMetadata {
   quality_score?: number
   generation_duration_ms?: number
   total_tokens?: number
+  costUsd?: number
+  qualityScore?: number
+  durationMs?: number
+  tokensUsed?: number
   [key: string]: unknown
 }
 
@@ -34,6 +39,11 @@ interface LessonMetadata {
  * Type alias for lesson_contents table row
  */
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
+
+interface ModuleLessonContentRowSelection<T extends LessonContentRow> {
+  statusRow: T | null
+  usableContentRow: T | null
+}
 
 /**
  * Safely parse metadata from Json type
@@ -45,6 +55,42 @@ function parseMetadata(
     return null
   }
   return metadata as LessonMetadata
+}
+
+function getMetadataNumber(
+  metadata: LessonMetadata | null,
+  ...keys: string[]
+): number | null {
+  if (!metadata) {
+    return null
+  }
+
+  for (const key of keys) {
+    const value = metadata[key]
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+  }
+
+  return null
+}
+
+export function extractLessonMetricsFromMetadata(metadata: LessonMetadata | null) {
+  return {
+    qualityScore: getMetadataNumber(metadata, 'quality_score', 'qualityScore'),
+    costUsd: getMetadataNumber(metadata, 'cost_usd', 'costUsd') ?? 0,
+    durationMs: getMetadataNumber(metadata, 'generation_duration_ms', 'durationMs'),
+    totalTokens: getMetadataNumber(metadata, 'total_tokens', 'tokensUsed'),
+  }
+}
+
+export function resolveModuleLessonContentRows<T extends LessonContentRow>(
+  rows: T[] | null | undefined
+): ModuleLessonContentRowSelection<T> {
+  return {
+    statusRow: getLatestLessonContentRow(rows),
+    usableContentRow: getLatestUsableLessonContent(rows),
+  }
 }
 
 /**
@@ -425,11 +471,20 @@ export function useModuleDashboardData({
       // Build lesson matrix rows
       // Use lessons from DB if available, otherwise use expected count from course structure
       const lessonRows: ReviewAwareLessonMatrixRow[] = []
+      const lessonContentsByLessonId = new Map<string, LessonContentRow[]>()
+
+      for (const lessonContent of lessonContents) {
+        const existingRows = lessonContentsByLessonId.get(lessonContent.lesson_id) ?? []
+        existingRows.push(lessonContent)
+        lessonContentsByLessonId.set(lessonContent.lesson_id, existingRows)
+      }
 
       if (lessons.length > 0) {
         // Use actual lessons from database
         for (const lesson of lessons) {
-          const contentRow = lessonContents.find((c) => c.lesson_id === lesson.id)
+          const { statusRow, usableContentRow } = resolveModuleLessonContentRows(
+            lessonContentsByLessonId.get(lesson.id)
+          )
           const lessonNumber = lesson.order_index
           const lessonTitle =
             lesson.title ||
@@ -437,7 +492,7 @@ export function useModuleDashboardData({
             `Урок ${lessonNumber}`
           const lessonLabel = `${moduleNumber}.${lessonNumber}`
 
-          if (!contentRow) {
+          if (!statusRow) {
             lessonRows.push({
               lessonId: lessonLabel,
               lessonNumber,
@@ -453,10 +508,13 @@ export function useModuleDashboardData({
               needsReview: false,
             })
           } else {
-            const status = mapStage6LessonStatus(contentRow.status)
-            const metadata = parseMetadata(contentRow.metadata)
-            const pipelineState = extractPipelineState(contentRow.status, metadata)
-            const needsReview = isReviewRequiredStatus(contentRow.status)
+            const metricsRow = usableContentRow ?? statusRow
+            const statusMetadata = parseMetadata(statusRow.metadata)
+            const metricsMetadata = parseMetadata(metricsRow.metadata)
+            const metrics = extractLessonMetricsFromMetadata(metricsMetadata)
+            const status = mapStage6LessonStatus(statusRow.status)
+            const pipelineState = extractPipelineState(statusRow.status, statusMetadata)
+            const needsReview = isReviewRequiredStatus(statusRow.status)
 
             lessonRows.push({
               lessonId: lessonLabel,
@@ -464,12 +522,12 @@ export function useModuleDashboardData({
               title: lessonTitle,
               status,
               pipelineState,
-              qualityScore: metadata?.quality_score ?? null,
-              costUsd: metadata?.cost_usd ?? 0,
-              durationMs: metadata?.generation_duration_ms ?? null,
-              retryCount: contentRow.generation_attempt > 1 ? contentRow.generation_attempt - 1 : 0,
+              qualityScore: metrics.qualityScore,
+              costUsd: metrics.costUsd,
+              durationMs: metrics.durationMs,
+              retryCount: statusRow.generation_attempt > 1 ? statusRow.generation_attempt - 1 : 0,
               canRetry: status === 'error',
-              totalTokens: metadata?.total_tokens ?? null,
+              totalTokens: metrics.totalTokens,
               needsReview,
             })
           }

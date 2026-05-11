@@ -1,9 +1,11 @@
-import { Job } from 'bullmq';
+import { Job, UnrecoverableError } from 'bullmq';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { checkPauseAndDelay, isCoursePaused } from '@/shared/pause-check';
+import { createModelConfigService } from '@/shared/llm/model-config-service';
+import { RequiredRagUnavailableError } from '@/shared/rag/document-availability';
 import {
   executeStage6 as executeStage6Orchestrator,
   type Stage6Input,
@@ -17,18 +19,31 @@ import {
 } from '../utils/lesson-rag-retriever';
 import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
 import { createLessonLabel, LessonLabel, validateLanguageCode } from '@megacampus/shared-types';
+import type {
+  Stage6AutomaticQualityRungPhaseName,
+  Stage6QualityRungPhaseName,
+} from '@megacampus/shared-types/stage6-quality-recovery';
 
 import {
   Stage6JobInput,
   Stage6JobResult,
   ProgressUpdate,
   ModelConfig,
+  Stage6ExecutionPolicy,
+  Stage6QualityRecoveryAttemptHistory,
+  Stage6QualityRecoveryHistory,
   Stage6ModelTierName,
 } from '../types';
 import { MODEL_FALLBACK } from '../config';
+import {
+  classifyStage6QualityRecoveryFinalDisposition,
+  planStage6QualityRecoveryAttempts,
+} from '../execution/quality-ladder';
 import { selectStage6ModelTier } from '../nodes/generator/model-selector';
 import {
   handlePartialSuccess,
+  failStage6Course,
+  isStage6CourseActive,
   markForReview,
   saveLessonContent,
   saveSourceDocuments,
@@ -38,6 +53,106 @@ import { extractContentMarkdown } from './content-utils';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+type Stage6FailureDisposition = 'quality_review' | 'non_retryable' | 'retryable';
+
+const NON_RETRYABLE_STAGE6_PATTERNS = [
+  'invalid job input',
+  'invalid lesson_id',
+  'invalid depth value',
+  'schema validation',
+  'zod',
+  'unauthorized',
+  'forbidden',
+  'invalid api key',
+  'cannot aggregate empty',
+  'missing prerequisites',
+];
+
+const STRUCTURAL_MISMATCH_PATTERNS = [
+  'schema validation',
+  'validation failed',
+  'zod',
+  'invalid',
+  'missing field',
+  'missing required',
+  'required field',
+  'sections mismatch',
+];
+
+function isLessonSpecificationQualityMismatchError(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes('max regeneration retries') &&
+    normalizedMessage.includes('review lessonspecification') &&
+    normalizedMessage.includes('mismatch')
+  );
+}
+
+function classifyStage6FailureMessages(messages: string[]): Stage6FailureDisposition {
+  let sawQualityReview = false;
+
+  for (const message of messages) {
+    const normalizedMessage = message.toLowerCase();
+
+    if (isLessonSpecificationQualityMismatchError(normalizedMessage)) {
+      sawQualityReview = true;
+      continue;
+    }
+
+    if (NON_RETRYABLE_STAGE6_PATTERNS.some(pattern => normalizedMessage.includes(pattern))) {
+      return 'non_retryable';
+    }
+
+    if (
+      normalizedMessage.includes('mismatch') &&
+      STRUCTURAL_MISMATCH_PATTERNS.some(pattern => normalizedMessage.includes(pattern))
+    ) {
+      return 'non_retryable';
+    }
+  }
+
+  return sawQualityReview ? 'quality_review' : 'retryable';
+}
+
+function buildStage6QualityReviewOutput(
+  errors: string[],
+  existingResult?: Stage6Output
+): Stage6Output {
+  const reasons =
+    existingResult?.reviewInfo?.reasons && existingResult.reviewInfo.reasons.length > 0
+      ? existingResult.reviewInfo.reasons
+      : errors;
+
+  return {
+    lessonContent: existingResult?.lessonContent ?? null,
+    success: true,
+    errors,
+    metrics: existingResult?.metrics ?? {
+      tokensUsed: 0,
+      durationMs: 0,
+      modelUsed: null,
+      selectedModel: null,
+      fallbackModel: null,
+      selectedModelTier: null,
+      selectedModelTierReason: null,
+      selectedModelPhase: null,
+      selectedModelSource: null,
+      qualityScore: 0,
+      regenerateCount: 0,
+      truncationCount: 0,
+      rejectedTokens: 0,
+      regenerationMode: null,
+      attemptLadder: [],
+    },
+    reviewInfo: {
+      needsReview: true,
+      reasons,
+    },
+    lessonDigest: existingResult?.lessonDigest,
+  };
 }
 
 /**
@@ -77,6 +192,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     ragContextId,
     language,
     modelOverride,
+    maxTokensOverride,
     userRefinementPrompt,
     style,
     analysisResult,
@@ -84,6 +200,8 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     fallbackModel,
     selectedModelTier,
     selectedModelTierReason,
+    selectedModelPhase,
+    selectedModelSource,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -98,12 +216,15 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     ragContextId: ragContextId ?? undefined,
     userRefinementPrompt,
     modelOverride,
+    maxTokensOverride,
     style,
     analysisResult,
     selectedModel: selectedModel ?? null,
     fallbackModel: fallbackModel ?? null,
     selectedModelTier: selectedModelTier ?? null,
     selectedModelTierReason: selectedModelTierReason ?? null,
+    selectedModelPhase: selectedModelPhase ?? null,
+    selectedModelSource: selectedModelSource ?? null,
   };
 
   return executeStage6Orchestrator(orchestratorInput);
@@ -114,35 +235,14 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
  * Aligned with Stage 5 isRetryableError pattern (v0.30.4).
  */
 function isNonRetryableStage6Error(error: Error): boolean {
-  const msg = error.message.toLowerCase();
-  return (
-    msg.includes('invalid job input') ||
-    msg.includes('invalid lesson_id') ||
-    msg.includes('invalid depth value') ||
-    msg.includes('mismatch') ||
-    msg.includes('schema validation') ||
-    msg.includes('zod') ||
-    msg.includes('unauthorized') ||
-    msg.includes('forbidden') ||
-    msg.includes('invalid api key') ||
-    msg.includes('cannot aggregate empty') ||
-    msg.includes('missing prerequisites')
-  );
+  return classifyStage6FailureMessages([error.message]) === 'non_retryable';
 }
 
 /**
  * Check if orchestrator result errors indicate a non-retryable structural problem.
  */
 function hasNonRetryableResultErrors(errors: string[]): boolean {
-  return errors.some(e => {
-    const msg = e.toLowerCase();
-    return (
-      msg.includes('mismatch') ||
-      msg.includes('schema validation') ||
-      msg.includes('invalid') ||
-      msg.includes('zod')
-    );
-  });
+  return classifyStage6FailureMessages(errors) === 'non_retryable';
 }
 
 /**
@@ -168,8 +268,11 @@ export async function processWithFallback(
   modelSelection?: {
     selectedModel: string;
     fallbackModel: string;
-    selectedModelTier: Stage6ModelTierName;
+    selectedModelTier: Stage6ModelTierName | null;
     selectedModelTierReason: string;
+    selectedModelPhase: string | null;
+    selectedModelSource: string | null;
+    maxTokensOverride?: number | null;
   }
 ): Promise<Stage6Output> {
   let lastError: Error | null = null;
@@ -193,10 +296,13 @@ export async function processWithFallback(
         ragChunks,
         ragContextId,
         modelOverride: modelConfig.primary,
+        maxTokensOverride: modelSelection?.maxTokensOverride ?? undefined,
         selectedModel: modelSelection?.selectedModel ?? null,
         fallbackModel: modelSelection?.fallbackModel ?? null,
         selectedModelTier: modelSelection?.selectedModelTier ?? null,
         selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
+        selectedModelPhase: modelSelection?.selectedModelPhase ?? null,
+        selectedModelSource: modelSelection?.selectedModelSource ?? null,
       });
 
       if (result.success) {
@@ -214,6 +320,19 @@ export async function processWithFallback(
           'Primary model attempt ended with review_required (fail-open)'
         );
         return result;
+      }
+
+      if (classifyStage6FailureMessages(result.errors) === 'quality_review') {
+        logger.info(
+          {
+            jobId,
+            model: modelConfig.primary,
+            attempt,
+            errors: result.errors,
+          },
+          'Treating Stage 6 quality mismatch exhaustion as review_required for outer ladder'
+        );
+        return buildStage6QualityReviewOutput(result.errors, result);
       }
 
       lastError = new Error(result.errors.join(', ') || 'Unknown generation error');
@@ -238,6 +357,14 @@ export async function processWithFallback(
       );
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (classifyStage6FailureMessages([lastError.message]) === 'quality_review') {
+        logger.info(
+          { jobId, model: modelConfig.primary, attempt, error: lastError.message },
+          'Treating Stage 6 quality mismatch exception as review_required for outer ladder'
+        );
+        return buildStage6QualityReviewOutput([lastError.message]);
+      }
 
       // Bail out immediately for non-retryable structural errors
       if (isNonRetryableStage6Error(lastError)) {
@@ -282,10 +409,13 @@ export async function processWithFallback(
       ragChunks,
       ragContextId,
       modelOverride: modelConfig.fallback,
+      maxTokensOverride: modelSelection?.maxTokensOverride ?? undefined,
       selectedModel: modelSelection?.selectedModel ?? null,
       fallbackModel: modelSelection?.fallbackModel ?? null,
       selectedModelTier: modelSelection?.selectedModelTier ?? null,
       selectedModelTierReason: modelSelection?.selectedModelTierReason ?? null,
+      selectedModelPhase: modelSelection?.selectedModelPhase ?? null,
+      selectedModelSource: modelSelection?.selectedModelSource ?? null,
     });
 
     if (result.success) {
@@ -311,6 +441,18 @@ export async function processWithFallback(
       return result;
     }
 
+    if (classifyStage6FailureMessages(result.errors) === 'quality_review') {
+      logger.info(
+        {
+          jobId,
+          fallbackModel: modelConfig.fallback,
+          errors: result.errors,
+        },
+        'Treating fallback Stage 6 quality mismatch exhaustion as review_required for outer ladder'
+      );
+      return buildStage6QualityReviewOutput(result.errors, result);
+    }
+
     const fallbackError = new Error(
       result.errors.join(', ') || 'Fallback model returned unsuccessful result'
     );
@@ -325,6 +467,15 @@ export async function processWithFallback(
     throw fallbackError;
   } catch (error) {
     const fallbackError = error instanceof Error ? error : new Error(String(error));
+
+    if (classifyStage6FailureMessages([fallbackError.message]) === 'quality_review') {
+      logger.info(
+        { jobId, fallbackModel: modelConfig.fallback, error: fallbackError.message },
+        'Treating fallback Stage 6 quality mismatch exception as review_required for outer ladder'
+      );
+      return buildStage6QualityReviewOutput([fallbackError.message]);
+    }
+
     logger.error(
       {
         jobId,
@@ -392,7 +543,14 @@ async function enrichSummaryPreviewFromDB(
  * tier selection has already completed but no generation was performed.
  */
 function buildZeroMetrics(
-  tierResult: { model: string; fallback: string; tier: Stage6ModelTierName; reason: string },
+  tierResult: {
+    model: string | null;
+    fallback: string | null;
+    tier: Stage6ModelTierName | null;
+    reason: string | null;
+    phaseName?: string | null;
+    source?: string | null;
+  },
   durationMs: number
 ): Stage6JobResult['metrics'] {
   return {
@@ -403,12 +561,156 @@ function buildZeroMetrics(
     fallbackModel: tierResult.fallback,
     selectedModelTier: tierResult.tier,
     selectedModelTierReason: tierResult.reason,
+    selectedModelPhase: tierResult.phaseName ?? null,
+    selectedModelSource: tierResult.source ?? null,
     qualityScore: 0,
     regenerateCount: 0,
     truncationCount: 0,
     rejectedTokens: 0,
     regenerationMode: null,
+    attemptLadder: [],
   };
+}
+
+interface ResolvedStage6ExecutionPlan {
+  initialAutomaticTier: {
+    tier: Stage6ModelTierName;
+    reason: string;
+  } | null;
+  initialAutomaticRung?: Stage6AutomaticQualityRungPhaseName;
+  qualityRecovery: Stage6QualityRecoveryHistory;
+}
+
+interface ResolvedRungModelConfig {
+  primary: string;
+  fallback: string;
+  source: string;
+  maxTokens: number | null;
+}
+
+function isManualTopRegenerationPolicy(
+  policy?: Stage6ExecutionPolicy
+): policy is Stage6ExecutionPolicy {
+  return policy?.mode === 'manual_top_regeneration';
+}
+
+function mapTierToAutomaticRung(tier: Stage6ModelTierName): Stage6AutomaticQualityRungPhaseName {
+  return `stage_6_${tier}` as Stage6AutomaticQualityRungPhaseName;
+}
+
+function mapRungToLegacyTier(phaseName: Stage6QualityRungPhaseName): Stage6ModelTierName | null {
+  switch (phaseName) {
+    case 'stage_6_simple':
+      return 'simple';
+    case 'stage_6_normal':
+      return 'normal';
+    case 'stage_6_complex':
+      return 'complex';
+    default:
+      return null;
+  }
+}
+
+async function resolveRungModelConfig(
+  phaseName: Stage6QualityRungPhaseName,
+  courseId: string,
+  language: string
+): Promise<ResolvedRungModelConfig> {
+  const modelConfigService = createModelConfigService();
+  const phaseConfig = await modelConfigService.getModelForPhase(
+    phaseName,
+    courseId,
+    undefined,
+    language
+  );
+
+  return {
+    primary: phaseConfig.modelId,
+    fallback: phaseConfig.fallbackModelId ?? MODEL_FALLBACK.fallback,
+    source: phaseConfig.source,
+    maxTokens: phaseConfig.maxTokens ?? null,
+  };
+}
+
+async function resolveStage6ExecutionPlan(
+  lessonSpec: Stage6JobInput['lessonSpec'],
+  courseId: string,
+  executionPolicy?: Stage6ExecutionPolicy
+): Promise<ResolvedStage6ExecutionPlan> {
+  if (isManualTopRegenerationPolicy(executionPolicy)) {
+    return {
+      initialAutomaticTier: null,
+      qualityRecovery: {
+        mode: 'manual',
+        manual_triggered: true,
+        attempts: [],
+      },
+    };
+  }
+
+  const tierResult = await selectStage6ModelTier(lessonSpec, courseId);
+
+  return {
+    initialAutomaticTier: {
+      tier: tierResult.tier,
+      reason: tierResult.reason,
+    },
+    initialAutomaticRung: mapTierToAutomaticRung(tierResult.tier),
+    qualityRecovery: {
+      mode: 'automatic',
+      attempts: [],
+    },
+  };
+}
+
+function createSameTierRetryReason(
+  phaseName: Stage6QualityRungPhaseName,
+  rungAttemptIndex: number
+): string {
+  return rungAttemptIndex === 0
+    ? `Initial quality rung ${phaseName}`
+    : `Same-tier retry ${rungAttemptIndex} for ${phaseName}`;
+}
+
+function createPromotedRungReason(
+  phaseName: Stage6QualityRungPhaseName,
+  promotedFromPhaseName: Stage6QualityRungPhaseName | undefined
+): string {
+  if (promotedFromPhaseName) {
+    return `Promoted from ${promotedFromPhaseName} to ${phaseName} after quality_retryable`;
+  }
+
+  return `Quality rung ${phaseName}`;
+}
+
+function createSelectedModelTierReason(
+  rungPhaseName: Stage6QualityRungPhaseName,
+  rungAttemptIndex: number,
+  promotedFromPhaseName: Stage6QualityRungPhaseName | undefined,
+  initialAutomaticTierReason: string | null,
+  modelSource: string
+): string {
+  if (rungPhaseName === 'stage_6_manual_regeneration') {
+    return `Manual top-model regeneration via ${rungPhaseName} (${modelSource})`;
+  }
+
+  if (promotedFromPhaseName) {
+    return `${createPromotedRungReason(rungPhaseName, promotedFromPhaseName)} (${modelSource})`;
+  }
+
+  const retryReason = createSameTierRetryReason(rungPhaseName, rungAttemptIndex);
+  if (initialAutomaticTierReason) {
+    return `${initialAutomaticTierReason}; ${retryReason} (${modelSource})`;
+  }
+
+  return `${retryReason} (${modelSource})`;
+}
+
+function appendQualityRecoveryAttempt(
+  qualityRecovery: Stage6QualityRecoveryHistory,
+  attempt: Stage6QualityRecoveryAttemptHistory
+): void {
+  qualityRecovery.attempts.push(attempt);
 }
 
 /**
@@ -434,6 +736,17 @@ export async function processStage6Job(
   // Check if course generation is paused - if so, delay this job
   await checkPauseAndDelay(job, courseId, token);
 
+  const executionContext = job.data.executionContext ?? 'full_generation';
+  const courseActive = await isStage6CourseActive(courseId, executionContext);
+  if (!courseActive) {
+    // Throw UnrecoverableError so BullMQ marks the job as *failed*, not completed.
+    // This prevents false-positive "completed" status when a job no-ops due to
+    // the course no longer being in an active generation state.
+    const message = `Stage 6 course is no longer active (executionContext=${executionContext})`;
+    logger.warn({ jobId: job.id, courseId, executionContext }, message);
+    throw new UnrecoverableError(message);
+  }
+
   if (
     !lessonSpec ||
     !lessonSpec.lesson_id ||
@@ -455,11 +768,14 @@ export async function processStage6Job(
         fallbackModel: null,
         selectedModelTier: null,
         selectedModelTierReason: null,
+        selectedModelPhase: null,
+        selectedModelSource: null,
         qualityScore: 0,
         regenerateCount: 0,
         truncationCount: 0,
         rejectedTokens: 0,
         regenerationMode: null,
+        attemptLadder: [],
       },
     };
   }
@@ -495,6 +811,36 @@ export async function processStage6Job(
       'RAG context retrieved for lesson'
     );
   } catch (error) {
+    if (error instanceof RequiredRagUnavailableError) {
+      const errorMsg = error.message;
+
+      await failStage6Course(courseId, errorMsg);
+
+      return {
+        lessonId: lessonSpec.lesson_id,
+        success: false,
+        lessonContent: null,
+        errors: [errorMsg],
+        metrics: {
+          tokensUsed: 0,
+          durationMs: Date.now() - startTime,
+          modelUsed: null,
+          selectedModel: null,
+          fallbackModel: null,
+          selectedModelTier: null,
+          selectedModelTierReason: null,
+          selectedModelPhase: null,
+          selectedModelSource: null,
+          qualityScore: 0,
+          regenerateCount: 0,
+          truncationCount: 0,
+          rejectedTokens: 0,
+          regenerationMode: null,
+          attemptLadder: [],
+        },
+      };
+    }
+
     logger.warn(
       {
         lessonId: lessonSpec.lesson_id,
@@ -530,20 +876,34 @@ export async function processStage6Job(
         fallbackModel: null,
         selectedModelTier: null,
         selectedModelTierReason: null,
+        selectedModelPhase: null,
+        selectedModelSource: null,
         qualityScore: 0,
         regenerateCount: 0,
         truncationCount: 0,
         rejectedTokens: 0,
         regenerationMode: null,
+        attemptLadder: [],
       },
     };
   }
 
   const lessonUuid = await resolveLessonUuid(courseId, lessonLabel);
+  const executionPlan = await resolveStage6ExecutionPlan(
+    lessonSpec,
+    courseId,
+    job.data.executionPolicy
+  );
 
-  // 3-tier model selection: simple/normal/complex based on difficulty + first-module rule
-  const tierResult = await selectStage6ModelTier(lessonSpec);
-  const modelConfig: ModelConfig = { primary: tierResult.model, fallback: tierResult.fallback };
+  const initialSelectionSummary = executionPlan.initialAutomaticTier
+    ? {
+        selectedModelTier: executionPlan.initialAutomaticTier.tier,
+        selectedModelTierReason: executionPlan.initialAutomaticTier.reason,
+      }
+    : {
+        selectedModelTier: null,
+        selectedModelTierReason: 'Manual top-model regeneration requested',
+      };
 
   // Check pause status for logging (Issue #9 from code review)
   // Note: If we reached here, course was not paused at job start (checkPauseAndDelay passed)
@@ -557,10 +917,10 @@ export async function processStage6Job(
     attempt: job.attemptsMade + 1,
     language,
     style: style ?? 'default',
-    primaryModel: modelConfig.primary,
-    fallbackModel: modelConfig.fallback,
-    selectedModelTier: tierResult.tier,
-    selectedModelTierReason: tierResult.reason,
+    selectedModelTier: initialSelectionSummary.selectedModelTier,
+    selectedModelTierReason: initialSelectionSummary.selectedModelTierReason,
+    executionPolicy: job.data.executionPolicy?.mode ?? 'automatic_ladder',
+    executionContext,
     isPaused: pauseStatusForLogging,
   });
 
@@ -585,11 +945,12 @@ export async function processStage6Job(
       lessonTitle: lessonSpec.title,
       ragChunksCount: ragChunks.length,
       ragContextId,
-      primaryModel: modelConfig.primary,
-      selectedModel: tierResult.model,
-      fallbackModel: modelConfig.fallback,
-      selectedModelTier: tierResult.tier,
-      selectedModelTierReason: tierResult.reason,
+      qualityRecoveryMode: executionPlan.qualityRecovery.mode,
+      initialAutomaticRung: executionPlan.initialAutomaticRung,
+      executionContext,
+      selectedModelTier: initialSelectionSummary.selectedModelTier,
+      selectedModelTierReason: initialSelectionSummary.selectedModelTierReason,
+      selectedModelPhase: executionPlan.initialAutomaticRung ?? 'stage_6_manual_regeneration',
       isPaused: pauseStatusForLogging,
     },
     durationMs: 0,
@@ -610,6 +971,22 @@ export async function processStage6Job(
     });
   };
 
+  let lastResolvedModelSelection: {
+    model: string | null;
+    fallback: string | null;
+    tier: Stage6ModelTierName | null;
+    reason: string | null;
+    phaseName: Stage6QualityRungPhaseName | null;
+    source: string | null;
+  } = {
+    model: null,
+    fallback: null,
+    tier: initialSelectionSummary.selectedModelTier,
+    reason: initialSelectionSummary.selectedModelTierReason,
+    phaseName: executionPlan.initialAutomaticRung ?? 'stage_6_manual_regeneration',
+    source: null,
+  };
+
   await updateJobProgress(job, {
     lessonId: lessonSpec.lesson_id,
     phase: 'planner',
@@ -618,28 +995,164 @@ export async function processStage6Job(
   });
 
   try {
-    const result = await processWithFallback(
-      job,
-      modelConfig,
-      lessonUuid,
-      ragChunks,
-      ragContextId,
-      {
-        selectedModel: tierResult.model,
-        fallbackModel: tierResult.fallback,
-        selectedModelTier: tierResult.tier,
-        selectedModelTierReason: tierResult.reason,
-      }
+    const plannedRungs = planStage6QualityRecoveryAttempts(
+      executionPlan.qualityRecovery.mode === 'manual'
+        ? { manualTriggered: true }
+        : { initialAutomaticRung: executionPlan.initialAutomaticRung! }
     );
+
+    let result: Stage6Output | null = null;
+    let lastReviewResult: Stage6Output | null = null;
+
+    outer: for (const rung of plannedRungs) {
+      const totalRungAttempts = rung.max_regeneration_retries + 1;
+
+      for (let rungAttemptIndex = 0; rungAttemptIndex < totalRungAttempts; rungAttemptIndex++) {
+        const rungModelConfig = await resolveRungModelConfig(rung.phase_name, courseId, language);
+        const selectedModelTier = mapRungToLegacyTier(rung.phase_name);
+        const selectedModelTierReason = createSelectedModelTierReason(
+          rung.phase_name,
+          rungAttemptIndex,
+          rung.promoted_from_phase_name,
+          executionPlan.initialAutomaticTier?.reason ?? null,
+          rungModelConfig.source
+        );
+
+        lastResolvedModelSelection = {
+          model: rungModelConfig.primary,
+          fallback: rungModelConfig.fallback,
+          tier: selectedModelTier,
+          reason: selectedModelTierReason,
+          phaseName: rung.phase_name,
+          source: rungModelConfig.source,
+        };
+
+        jobLogger.info(
+          {
+            rungPhaseName: rung.phase_name,
+            rungAttemptIndex,
+            totalRungAttempts,
+            primaryModel: rungModelConfig.primary,
+            fallbackModel: rungModelConfig.fallback,
+            selectedModelTier,
+            selectedModelTierReason,
+          },
+          'Executing Stage 6 quality rung'
+        );
+
+        try {
+          const rungResult = await processWithFallback(
+            job,
+            {
+              primary: rungModelConfig.primary,
+              fallback: rungModelConfig.fallback,
+            },
+            lessonUuid,
+            ragChunks,
+            ragContextId,
+            {
+              selectedModel: rungModelConfig.primary,
+              fallbackModel: rungModelConfig.fallback,
+              selectedModelTier,
+              selectedModelTierReason,
+              selectedModelPhase: rung.phase_name,
+              selectedModelSource: rungModelConfig.source,
+              maxTokensOverride: rungModelConfig.maxTokens,
+            }
+          );
+
+          const needsQualityPromotion = rungResult.reviewInfo?.needsReview === true;
+
+          appendQualityRecoveryAttempt(executionPlan.qualityRecovery, {
+            sequence_index: rung.sequence_index,
+            phase_name: rung.phase_name,
+            mode: rung.mode,
+            is_initial_rung: rung.is_initial_rung,
+            promoted_from_phase_name: rung.promoted_from_phase_name,
+            max_regeneration_retries: rung.max_regeneration_retries,
+            manual_triggered: rung.manual_triggered,
+            rung_attempt_index: rungAttemptIndex,
+            outcome: needsQualityPromotion ? 'quality_retryable' : 'accepted',
+            selected_model: rungModelConfig.primary,
+            fallback_model: rungModelConfig.fallback,
+            selected_model_phase: rung.phase_name,
+            selected_model_source: rungModelConfig.source,
+            model_used: rungResult.metrics.modelUsed,
+            quality_score: rungResult.metrics.qualityScore,
+            errors: [...rungResult.errors],
+            review_reasons: rungResult.reviewInfo?.reasons,
+          });
+
+          rungResult.metrics.selectedModel =
+            rungResult.metrics.selectedModel ?? rungModelConfig.primary;
+          rungResult.metrics.fallbackModel =
+            rungResult.metrics.fallbackModel ?? rungModelConfig.fallback;
+          rungResult.metrics.selectedModelTier =
+            rungResult.metrics.selectedModelTier ?? selectedModelTier;
+          rungResult.metrics.selectedModelTierReason =
+            rungResult.metrics.selectedModelTierReason ?? selectedModelTierReason;
+          rungResult.metrics.selectedModelPhase =
+            rungResult.metrics.selectedModelPhase ?? rung.phase_name;
+          rungResult.metrics.selectedModelSource =
+            rungResult.metrics.selectedModelSource ?? rungModelConfig.source;
+          rungResult.metrics.attemptLadder = [...executionPlan.qualityRecovery.attempts];
+
+          if (!needsQualityPromotion) {
+            result = {
+              ...rungResult,
+              qualityRecovery: executionPlan.qualityRecovery,
+            };
+            break outer;
+          }
+
+          lastReviewResult = rungResult;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          appendQualityRecoveryAttempt(executionPlan.qualityRecovery, {
+            sequence_index: rung.sequence_index,
+            phase_name: rung.phase_name,
+            mode: rung.mode,
+            is_initial_rung: rung.is_initial_rung,
+            promoted_from_phase_name: rung.promoted_from_phase_name,
+            max_regeneration_retries: rung.max_regeneration_retries,
+            manual_triggered: rung.manual_triggered,
+            rung_attempt_index: rungAttemptIndex,
+            outcome: 'failed',
+            selected_model: rungModelConfig.primary,
+            fallback_model: rungModelConfig.fallback,
+            selected_model_phase: rung.phase_name,
+            selected_model_source: rungModelConfig.source,
+            model_used: null,
+            quality_score: 0,
+            errors: [errorMessage],
+          });
+
+          throw error;
+        }
+      }
+    }
+
+    if (!result) {
+      const terminalRung = plannedRungs.at(-1);
+      if (!lastReviewResult || !terminalRung) {
+        throw new Error('Stage 6 quality ladder ended without a terminal result');
+      }
+
+      executionPlan.qualityRecovery.final_disposition =
+        classifyStage6QualityRecoveryFinalDisposition({
+          exhaustedPhaseName: terminalRung.phase_name,
+          mode: executionPlan.qualityRecovery.mode,
+        });
+
+      result = {
+        ...lastReviewResult,
+        qualityRecovery: executionPlan.qualityRecovery,
+      };
+    }
 
     const durationMs = Date.now() - startTime;
     const needsReview = result.reviewInfo?.needsReview === true;
-
-    result.metrics.selectedModel = result.metrics.selectedModel ?? tierResult.model;
-    result.metrics.fallbackModel = result.metrics.fallbackModel ?? tierResult.fallback;
-    result.metrics.selectedModelTier = result.metrics.selectedModelTier ?? tierResult.tier;
-    result.metrics.selectedModelTierReason =
-      result.metrics.selectedModelTierReason ?? tierResult.reason;
 
     let sanityResult: SanityCheckResult = { ok: true };
     if (result.lessonContent) {
@@ -695,12 +1208,16 @@ export async function processStage6Job(
             fallbackModel: result.metrics.fallbackModel,
             selectedModelTier: result.metrics.selectedModelTier,
             selectedModelTierReason: result.metrics.selectedModelTierReason,
+            selectedModelPhase: result.metrics.selectedModelPhase,
+            selectedModelSource: result.metrics.selectedModelSource,
             regenerateCount: result.metrics.regenerateCount,
             truncationCount: result.metrics.truncationCount,
             rejectedTokens: result.metrics.rejectedTokens,
             regenerationMode: result.metrics.regenerationMode ?? null,
             reviewInfo: result.reviewInfo,
+            factualWarnings: result.factualWarnings,
             qaSignals: result.lessonContent?.metadata.qa_signals ?? null,
+            qualityRecovery: result.qualityRecovery,
           }
         );
         runCompletionCheck();
@@ -709,6 +1226,10 @@ export async function processStage6Job(
           { lessonLabel },
           'Cannot save review_required marker - lessonUuid not resolved'
         );
+      }
+
+      if (lessonUuid && sourceDocuments.length > 0) {
+        await saveSourceDocuments(courseId, lessonUuid, sourceDocuments);
       }
     } else if (result.lessonContent && result.errors.length > 0) {
       if (lessonUuid) {
@@ -749,6 +1270,8 @@ export async function processStage6Job(
         selectedModel: result.metrics.selectedModel,
         fallbackModel: result.metrics.fallbackModel,
         selectedModelTier: result.metrics.selectedModelTier,
+        selectedModelPhase: result.metrics.selectedModelPhase,
+        selectedModelSource: result.metrics.selectedModelSource,
         regenerateCount: result.metrics.regenerateCount,
         truncationCount: result.metrics.truncationCount,
         rejectedTokens: result.metrics.rejectedTokens,
@@ -773,6 +1296,10 @@ export async function processStage6Job(
         fallbackModel: result.metrics.fallbackModel,
         selectedModelTier: result.metrics.selectedModelTier,
         selectedModelTierReason: result.metrics.selectedModelTierReason,
+        selectedModelPhase: result.metrics.selectedModelPhase,
+        selectedModelSource: result.metrics.selectedModelSource,
+        attemptLadder: result.metrics.attemptLadder,
+        qualityRecovery: result.qualityRecovery,
         reviewRequired: needsReview,
         tokensUsed: result.metrics.tokensUsed,
         regenerateCount: result.metrics.regenerateCount,
@@ -788,9 +1315,15 @@ export async function processStage6Job(
       success: result.success,
       lessonContent: result.lessonContent,
       errors: result.errors,
+      qualityRecovery: result.qualityRecovery,
       metrics: {
         ...result.metrics,
         durationMs,
+        selectedModelPhase:
+          result.metrics.selectedModelPhase ?? lastResolvedModelSelection.phaseName,
+        selectedModelSource:
+          result.metrics.selectedModelSource ?? lastResolvedModelSelection.source,
+        attemptLadder: result.metrics.attemptLadder ?? executionPlan.qualityRecovery.attempts,
       },
     };
   } catch (error) {
@@ -801,8 +1334,11 @@ export async function processStage6Job(
       {
         error: errorMsg,
         durationMs,
-        primaryModel: modelConfig.primary,
-        fallbackModel: modelConfig.fallback,
+        primaryModel: lastResolvedModelSelection.model,
+        fallbackModel: lastResolvedModelSelection.fallback,
+        selectedModelPhase: lastResolvedModelSelection.phaseName,
+        selectedModelSource: lastResolvedModelSelection.source,
+        qualityRecovery: executionPlan.qualityRecovery,
       },
       'Stage 6 job failed after all retry attempts'
     );
@@ -813,8 +1349,17 @@ export async function processStage6Job(
       stage: 'stage_6',
       phase: 'complete',
       stepName: 'failed',
-      inputData: { lessonLabel },
-      errorData: { error: errorMsg },
+      inputData: {
+        lessonLabel,
+        selectedModel: lastResolvedModelSelection.model,
+        fallbackModel: lastResolvedModelSelection.fallback,
+        selectedModelPhase: lastResolvedModelSelection.phaseName,
+        selectedModelSource: lastResolvedModelSelection.source,
+      },
+      errorData: {
+        error: errorMsg,
+        attemptLadder: executionPlan.qualityRecovery.attempts,
+      },
       durationMs,
     });
 
@@ -826,14 +1371,17 @@ export async function processStage6Job(
         `Generation failed after model fallback: ${errorMsg}`,
         {
           modelUsed: null,
-          selectedModel: tierResult.model,
-          fallbackModel: tierResult.fallback,
-          selectedModelTier: tierResult.tier,
-          selectedModelTierReason: tierResult.reason,
+          selectedModel: lastResolvedModelSelection.model,
+          fallbackModel: lastResolvedModelSelection.fallback,
+          selectedModelTier: lastResolvedModelSelection.tier,
+          selectedModelTierReason: lastResolvedModelSelection.reason,
+          selectedModelPhase: lastResolvedModelSelection.phaseName,
+          selectedModelSource: lastResolvedModelSelection.source,
           regenerateCount: 0,
           truncationCount: 0,
           rejectedTokens: 0,
           regenerationMode: null,
+          qualityRecovery: executionPlan.qualityRecovery,
         }
       );
       runCompletionCheck();
@@ -853,7 +1401,18 @@ export async function processStage6Job(
       success: false,
       lessonContent: null,
       errors: [errorMsg],
-      metrics: buildZeroMetrics(tierResult, durationMs),
+      qualityRecovery: executionPlan.qualityRecovery,
+      metrics: buildZeroMetrics(
+        {
+          model: lastResolvedModelSelection.model,
+          fallback: lastResolvedModelSelection.fallback,
+          tier: lastResolvedModelSelection.tier,
+          reason: lastResolvedModelSelection.reason,
+          phaseName: lastResolvedModelSelection.phaseName,
+          source: lastResolvedModelSelection.source,
+        },
+        durationMs
+      ),
     };
   }
 }

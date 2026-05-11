@@ -382,7 +382,7 @@ export function useGraphLayout() {
           // Horizontal spacing between layers (stages)
           'elk.layered.spacing.nodeNodeBetweenLayers': '100',
           // Vertical spacing between nodes in same layer (modules)
-          'elk.spacing.nodeNode': '30',
+          'elk.spacing.nodeNode': String(LAYOUT_CONFIG.MODULE_STACK_GAP),
           // Edge spacing for cleaner routing
           'elk.layered.spacing.edgeNodeBetweenLayers': '30',
           'elk.layered.spacing.edgeEdgeBetweenLayers': '20',
@@ -536,7 +536,7 @@ export function useGraphLayout() {
         // Align all modules to the same X coordinate
         // Also redistribute Y positions evenly for consistent spacing
         const sortedModules = [...moduleNodes].sort((a, b) => a.position.y - b.position.y)
-        const moduleSpacing = 20 // Vertical gap between modules
+        const moduleSpacing = LAYOUT_CONFIG.MODULE_STACK_GAP
         const firstModuleY = sortedModules[0]?.position.y ?? 0
 
         const alignedModules = sortedModules.map((module, index) => {
@@ -664,7 +664,7 @@ export function useGraphLayout() {
   const applyFitView = useCallback(
     (options?: { padding?: number; duration?: number }) => {
       requestAnimationFrame(() => {
-        fitView({
+        void fitView({
           padding: options?.padding ?? 0.1,
           duration: options?.duration ?? 200,
         })

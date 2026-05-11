@@ -22,21 +22,58 @@ import {
   transitionToStage6Generating,
   type SectionFromStructure,
 } from '../helpers';
-import { addJob } from '../../../../orchestrator/queue';
+import { enqueueStage6Lesson } from '../../../../stages/stage6-lesson-content/enqueue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { invalidateLessonUuidCache } from '../../../../shared/database/lesson-resolver';
-import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
-import type { LessonContentJobData, Language } from '@megacampus/shared-types';
+import { parseAnalysisResult } from '@megacampus/shared-types';
+import type { Language } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
-import { validateLocale } from '@/shared/validation';
+import { getLatestUsableLessonContent } from './latest-usable-lesson-content';
 
 type LessonWithContentRow = {
+  id?: string;
   order_index: number;
-  lesson_contents: Array<{ id: string }> | null;
+  lesson_contents:
+    | Array<{
+        id: string;
+        status?: string | null;
+        created_at?: string | null;
+        content?: Record<string, unknown> | string | null;
+        metadata?: Record<string, unknown> | null;
+      }>
+    | null;
   sections: { order_index: number } | Array<{ order_index: number }> | null;
 };
+
+export function getLessonIdsWithUsableContent(
+  lessonsWithContent: LessonWithContentRow[]
+): Set<string> {
+  const lessonIdsWithUsableContent = new Set<string>();
+
+  for (const lesson of lessonsWithContent) {
+    const sectionData = Array.isArray(lesson.sections) ? lesson.sections[0] : lesson.sections;
+    if (!sectionData) {
+      continue;
+    }
+
+    const latestUsableContent = getLatestUsableLessonContent(
+      [...(lesson.lesson_contents ?? [])].sort((left, right) =>
+        (right.created_at ?? '').localeCompare(left.created_at ?? '')
+      )
+    );
+
+    if (!latestUsableContent) {
+      continue;
+    }
+
+    const lessonId = `${sectionData.order_index}.${lesson.order_index}`;
+    lessonIdsWithUsableContent.add(lessonId);
+  }
+
+  return lessonIdsWithUsableContent;
+}
 
 const generateMissingInputSchema = z.object({
   courseId: z.string().uuid('Invalid course ID'),
@@ -148,7 +185,7 @@ export const generateMissingContent = protectedProcedure
       const { data: lessonsWithContent, error: lessonsError } = await supabase
         .from('lessons')
         .select(
-          'id, order_index, section_id, sections!inner(order_index, course_id), lesson_contents(id)'
+          'id, order_index, section_id, sections!inner(order_index, course_id), lesson_contents(id, status, created_at, content, metadata)'
         )
         .eq('sections.course_id', courseId);
 
@@ -168,22 +205,8 @@ export const generateMissingContent = protectedProcedure
         });
       }
 
-      // Build a set of lesson IDs that already have content
-      const lessonsWithContentSet = new Set<string>();
       const typedLessonsWithContent = (lessonsWithContent ?? []) as LessonWithContentRow[];
-      for (const lesson of typedLessonsWithContent) {
-        // lesson_contents is an array; if non-empty, the lesson has content
-        const hasContent =
-          Array.isArray(lesson.lesson_contents) && lesson.lesson_contents.length > 0;
-        if (hasContent) {
-          // sections is an inner join result - can be object or array depending on Supabase client
-          const sectionData = Array.isArray(lesson.sections) ? lesson.sections[0] : lesson.sections;
-          if (sectionData) {
-            const lessonId = `${sectionData.order_index}.${lesson.order_index}`;
-            lessonsWithContentSet.add(lessonId);
-          }
-        }
-      }
+      const lessonsWithContentSet = getLessonIdsWithUsableContent(typedLessonsWithContent);
 
       // Step 6: Filter to only lessons WITHOUT content
       const missingLessonIds = allLessonIds.filter(id => !lessonsWithContentSet.has(id));
@@ -405,31 +428,27 @@ export const generateMissingContent = protectedProcedure
         }
       }
 
-      // Step 10: Enqueue all lessons using addJob with deduplication
+      // Step 10: Enqueue all lessons using canonical Stage 6 enqueue helper
       const courseLanguage = (course.language || 'en') as Language;
       const jobs = await Promise.all(
         lessonSpecs.map(spec => {
-          const jobData: LessonContentJobData = {
-            organizationId: currentUser.organizationId,
-            courseId,
-            userId: currentUser.id,
-            jobType: JobType.LESSON_CONTENT,
-            createdAt: new Date().toISOString(),
-            lessonSpec: spec,
-            ragChunks: [],
-            ragContextId: null,
-            language: courseLanguage,
-            locale: validateLocale(courseLanguage),
-          };
-
           const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
 
-          return addJob(JobType.LESSON_CONTENT, jobData, {
-            priority,
-            deduplication: {
-              id: deduplicationId,
-              ttl: 150000,
+          return enqueueStage6Lesson({
+            jobData: {
+              lessonSpec: spec,
+              courseId,
+              language: courseLanguage,
+              ragChunks: [],
+              ragContextId: null,
+              executionContext: 'generate_missing',
+              organizationId: currentUser.organizationId,
+              userId: currentUser.id,
             },
+            jobName: `lesson:${spec.lesson_id}`,
+            source: 'generateMissing',
+            priority,
+            deduplication: { kind: 'ttl', id: deduplicationId, ttl: 150_000 },
           });
         })
       );

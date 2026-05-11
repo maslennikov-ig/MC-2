@@ -15,12 +15,20 @@ import {
 } from '@megacampus/shared-types'
 import type { CourseStructure } from '@megacampus/shared-types'
 import { isVisualStyle } from '../GraphView.helpers'
+import {
+  selectLatestLessonContentStatusLabels,
+  type LessonContentStatusLabels,
+} from './moduleDashboardContentSelection'
 
 type GenerationStatus = Database['public']['Enums']['generation_status']
 
 interface UseCourseDataSyncParams {
   courseId: string
-  initializeFromCourseStructure: (structure: CourseStructure, completedLabels: string[]) => void
+  initializeFromCourseStructure: (
+    structure: CourseStructure,
+    completedLabels: string[],
+    reviewRequiredLabels?: string[]
+  ) => void
   isConnected: boolean
   pipelineStatus: GenerationStatus | null
 }
@@ -32,6 +40,72 @@ interface UseCourseDataSyncReturn {
   courseLanguage: string | null
 }
 
+type SectionLessonsRow = {
+  order_index: number | null
+  lessons?: Array<{
+    id: string
+    order_index: number | null
+  }> | null
+}
+
+const emptyLessonContentStatusLabels: LessonContentStatusLabels = {
+  completedLabels: [],
+  reviewRequiredLabels: [],
+}
+
+async function fetchLessonContentStatusLabels(
+  supabase: ReturnType<typeof createClient>,
+  courseId: string,
+  enabled: boolean
+): Promise<LessonContentStatusLabels> {
+  if (!enabled) return emptyLessonContentStatusLabels
+
+  const [sectionsResult, contentsResult] = await Promise.all([
+    supabase
+      .from('sections')
+      .select('order_index, lessons(id, order_index)')
+      .eq('course_id', courseId)
+      .order('order_index', { ascending: true }),
+    supabase
+      .from('lesson_contents')
+      .select('id, lesson_id, status, created_at')
+      .eq('course_id', courseId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false }),
+  ])
+
+  if (sectionsResult.error) {
+    logger.warn('[useCourseDataSync] Failed to fetch lesson indexes:', sectionsResult.error)
+    return emptyLessonContentStatusLabels
+  }
+
+  if (contentsResult.error) {
+    logger.warn(
+      '[useCourseDataSync] Failed to fetch lesson content statuses:',
+      contentsResult.error
+    )
+    return emptyLessonContentStatusLabels
+  }
+
+  const lessonLabelsById = new Map<string, string>()
+  const sections = (sectionsResult.data || []) as SectionLessonsRow[]
+
+  for (const section of sections) {
+    if (typeof section.order_index !== 'number') continue
+
+    const lessons = [...(section.lessons || [])].sort(
+      (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+    )
+
+    for (const lesson of lessons) {
+      if (!lesson.id || typeof lesson.order_index !== 'number') continue
+      lessonLabelsById.set(lesson.id, `${section.order_index}.${lesson.order_index}`)
+    }
+  }
+
+  return selectLatestLessonContentStatusLabels(contentsResult.data || [], lessonLabelsById)
+}
+
 /**
  * Hook for syncing course data (structure, visual_style, style, analysis_result) from database.
  * Handles initial fetch, course-data-updated events, and stage transitions.
@@ -39,7 +113,7 @@ interface UseCourseDataSyncReturn {
  * Features:
  * - Prevents concurrent refetches (race condition protection)
  * - Change detection to avoid unnecessary graph rebuilds
- * - Fetches completed lesson labels from generation_trace
+ * - Fetches completed/review-required lesson labels from lesson_contents
  * - Guards against setState on unmounted component
  */
 export function useCourseDataSync({
@@ -59,6 +133,10 @@ export function useCourseDataSync({
   const courseStructureInitialized = useRef(false)
   // Ref to store previous course structure for change detection
   const prevCourseStructureRef = useRef<string | null>(null)
+  // Ref to store previous Stage 6 lesson statuses for graph color updates
+  const prevLessonStatusRef = useRef<string | null>(null)
+  // Debounce lesson_contents realtime bursts during Stage 6 regeneration
+  const lessonStatusRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /**
    * Unified function to fetch course data from database.
@@ -66,7 +144,7 @@ export function useCourseDataSync({
    *
    * @param fields - 'all' fetches course_structure, visual_style, style, analysis_result;
    *                 'structure_only' fetches only course_structure
-   * @param includeCompletedLessons - Whether to also fetch completed lesson labels from generation_trace
+   * @param includeCompletedLessons - Whether to also fetch completed/review-required lesson labels from lesson_contents
    * @param options - Additional options for fetch behavior
    */
   const fetchCourseData = useCallback(
@@ -97,16 +175,11 @@ export function useCourseDataSync({
 
         const supabase = createClient()
 
-        // Build completed lessons query if needed
-        const lessonsQuery = includeCompletedLessons
-          ? supabase
-              .from('generation_trace')
-              .select('input_data')
-              .eq('course_id', courseId)
-              .eq('stage', 'stage_6')
-              .eq('step_name', 'finish')
-              .not('input_data->lessonLabel', 'is', null)
-          : null
+        const lessonStatusLabelsPromise = fetchLessonContentStatusLabels(
+          supabase,
+          courseId,
+          includeCompletedLessons
+        )
 
         // Fetch based on fields parameter - use separate queries for type safety
         let courseStructure: CourseStructure | null = null
@@ -116,13 +189,13 @@ export function useCourseDataSync({
 
         if (fields === 'all') {
           // Fetch all fields
-          const [courseResult, lessonsResult] = await Promise.all([
+          const [courseResult, lessonStatusLabels] = await Promise.all([
             supabase
               .from('courses')
               .select('course_structure, visual_style, style, analysis_result, language')
               .eq('id', courseId)
               .single(),
-            lessonsQuery,
+            lessonStatusLabelsPromise,
           ])
 
           if (courseResult.error) {
@@ -166,26 +239,21 @@ export function useCourseDataSync({
             }
           }
 
-          // Extract completed labels
-          const completedLabels =
-            lessonsResult?.data && lessonsResult.data.length > 0
-              ? [
-                  ...new Set(
-                    lessonsResult.data
-                      .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
-                      .filter(Boolean)
-                  ),
-                ]
-              : []
-
           // Update course structure (only if changed)
           if (courseStructure) {
             const structureJson = JSON.stringify(courseStructure)
+            const lessonStatusJson = JSON.stringify(lessonStatusLabels)
             const hasStructureChanged = prevCourseStructureRef.current !== structureJson
+            const hasLessonStatusesChanged = prevLessonStatusRef.current !== lessonStatusJson
 
-            if (hasStructureChanged) {
-              initializeFromCourseStructure(courseStructure, completedLabels)
+            if (hasStructureChanged || hasLessonStatusesChanged) {
+              initializeFromCourseStructure(
+                courseStructure,
+                lessonStatusLabels.completedLabels,
+                lessonStatusLabels.reviewRequiredLabels
+              )
               prevCourseStructureRef.current = structureJson
+              prevLessonStatusRef.current = lessonStatusJson
               logger.debug('[useCourseDataSync] Course structure updated')
             } else {
               logger.debug('[useCourseDataSync] Course structure unchanged, skipping rebuild')
@@ -197,9 +265,9 @@ export function useCourseDataSync({
           }
         } else {
           // Fetch structure only
-          const [courseResult, lessonsResult] = await Promise.all([
+          const [courseResult, lessonStatusLabels] = await Promise.all([
             supabase.from('courses').select('course_structure').eq('id', courseId).single(),
-            lessonsQuery,
+            lessonStatusLabelsPromise,
           ])
 
           if (courseResult.error) {
@@ -219,26 +287,21 @@ export function useCourseDataSync({
 
           courseStructure = courseResult.data?.course_structure as CourseStructure | null
 
-          // Extract completed labels
-          const completedLabels =
-            lessonsResult?.data && lessonsResult.data.length > 0
-              ? [
-                  ...new Set(
-                    lessonsResult.data
-                      .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
-                      .filter(Boolean)
-                  ),
-                ]
-              : []
-
           // Update course structure (only if changed)
           if (courseStructure) {
             const structureJson = JSON.stringify(courseStructure)
+            const lessonStatusJson = JSON.stringify(lessonStatusLabels)
             const hasStructureChanged = prevCourseStructureRef.current !== structureJson
+            const hasLessonStatusesChanged = prevLessonStatusRef.current !== lessonStatusJson
 
-            if (hasStructureChanged) {
-              initializeFromCourseStructure(courseStructure, completedLabels)
+            if (hasStructureChanged || hasLessonStatusesChanged) {
+              initializeFromCourseStructure(
+                courseStructure,
+                lessonStatusLabels.completedLabels,
+                lessonStatusLabels.reviewRequiredLabels
+              )
               prevCourseStructureRef.current = structureJson
+              prevLessonStatusRef.current = lessonStatusJson
               logger.debug('[useCourseDataSync] Course structure updated (structure_only)')
             } else {
               logger.debug('[useCourseDataSync] Course structure unchanged, skipping rebuild')
@@ -308,8 +371,8 @@ export function useCourseDataSync({
         return
       }
 
-      // Event refetch: all fields, no completed lessons
-      void fetchCourseData('all', false, {
+      // Event refetch: keep Stage 6 labels in sync with latest lesson_contents rows.
+      void fetchCourseData('all', true, {
         source: detail.source,
         checkMounted: () => isMounted,
       })
@@ -320,6 +383,48 @@ export function useCourseDataSync({
       isMounted = false
       window.removeEventListener(COURSE_DATA_UPDATED_EVENT, handleCourseDataUpdated)
       logger.info('[useCourseDataSync] Removed course-data-updated listener for', courseId)
+    }
+  }, [courseId, fetchCourseData, isConnected])
+
+  // Keep the main graph in sync when Stage 6 writes new lesson_contents rows.
+  // Without this, an open graph can keep showing a green completed card until reload.
+  useEffect(() => {
+    if (!courseId || !isConnected) return
+
+    const supabase = createClient()
+    const scheduleLessonStatusRefresh = () => {
+      if (lessonStatusRefreshTimeoutRef.current) {
+        clearTimeout(lessonStatusRefreshTimeoutRef.current)
+      }
+
+      lessonStatusRefreshTimeoutRef.current = setTimeout(() => {
+        lessonStatusRefreshTimeoutRef.current = null
+        void fetchCourseData('structure_only', true, {
+          source: 'lesson_contents',
+        })
+      }, 500)
+    }
+
+    const channel = supabase
+      .channel(`course_lesson_content_status:${courseId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lesson_contents',
+          filter: `course_id=eq.${courseId}`,
+        },
+        scheduleLessonStatusRefresh
+      )
+      .subscribe()
+
+    return () => {
+      if (lessonStatusRefreshTimeoutRef.current) {
+        clearTimeout(lessonStatusRefreshTimeoutRef.current)
+        lessonStatusRefreshTimeoutRef.current = null
+      }
+      void channel.unsubscribe()
     }
   }, [courseId, fetchCourseData, isConnected])
 
@@ -350,7 +455,7 @@ export function useCourseDataSync({
     const wasNotComplete = !completionStatuses.includes(prevPipelineStatus || '')
     const isNowComplete = completionStatuses.includes(pipelineStatus || '')
     if (wasNotComplete && isNowComplete) {
-      void fetchCourseData('all', false, {
+      void fetchCourseData('all', true, {
         source: `status-transition:${pipelineStatus}`,
       })
     }

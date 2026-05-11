@@ -20,15 +20,15 @@ import {
   shouldSkipCompletionCheckForPartialGeneration,
   type SectionFromStructure,
 } from '../helpers';
-import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
-import type { Stage6JobInput } from '../../../../stages/stage6-lesson-content/types';
+import { enqueueStage6Lesson, getStage6Queue } from '../../../../stages/stage6-lesson-content/enqueue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { invalidateLessonUuidCache } from '../../../../shared/database/lesson-resolver';
-import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
+import { parseAnalysisResult } from '@megacampus/shared-types';
 import type { Language, CourseStyle } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
 import { throwOnSupabaseError } from '../../../utils/supabase-query-guard';
+import { buildPartialGenerateJobData } from '../helpers/build-partial-generate-job-data';
 
 /**
  * Partial Stage 6 generation for selected lessons
@@ -86,7 +86,7 @@ export const partialGenerate = protectedProcedure
   .use(createRateLimiter({ requests: 10, window: 60 })) // 10 partial generations per minute
   .input(partialGenerateInputSchema)
   .mutation(async ({ ctx, input }) => {
-    const { courseId, lessonIds, sectionIds, priority } = input;
+    const { courseId, lessonIds, sectionIds, priority, manualTopRegeneration } = input;
     const requestId = nanoid();
 
     // ctx.user is guaranteed non-null by protectedProcedure middleware
@@ -101,6 +101,7 @@ export const partialGenerate = protectedProcedure
         lessonIds,
         sectionIds,
         priority,
+        manualTopRegeneration: manualTopRegeneration ?? false,
       },
       'Partial Stage 6 generation request'
     );
@@ -423,39 +424,37 @@ export const partialGenerate = protectedProcedure
         }
       }
 
-      // Step 6: Enqueue all lessons using dedicated Stage 6 queue (30 concurrent workers)
+      // Step 6: Enqueue all lessons using canonical Stage 6 enqueue helper
       const courseLanguage = (course.language || 'en') as Language;
       const skipCompletionCheck = shouldSkipCompletionCheckForPartialGeneration(
         course.generation_status
       );
-      const stage6Queue = createStage6Queue();
+      const stage6Queue = getStage6Queue();
       const jobs = await Promise.all(
         lessonSpecs.map(async spec => {
-          const jobData: Stage6JobInput = {
-            lessonSpec: spec,
+          const jobData = buildPartialGenerateJobData({
+            spec,
             courseId,
             language: courseLanguage,
             style: (course.style as CourseStyle | null) ?? undefined,
-            ragChunks: [],
-            ragContextId: null,
             skipCompletionCheck,
-            // For job_status tracking
             organizationId: currentUser.organizationId,
             userId: currentUser.id,
-            jobType: JobType.LESSON_CONTENT,
-          };
+            manualTopRegeneration,
+          });
 
-          // Deterministic job ID for deduplication
-          const jobName = `lesson:${spec.lesson_id}`;
           const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
 
           // Remove stale completed/failed job to allow re-generation
           // (BullMQ rejects queue.add with same jobId if old job still exists)
           await removeStaleJob(stage6Queue, deduplicationId, requestId);
 
-          return stage6Queue.add(jobName, jobData, {
+          return enqueueStage6Lesson({
+            jobData,
+            jobName: `lesson:${spec.lesson_id}`,
+            source: 'partialGenerate',
             priority,
-            jobId: deduplicationId,
+            deduplication: { kind: 'jobId', jobId: deduplicationId },
           });
         })
       );
@@ -466,6 +465,7 @@ export const partialGenerate = protectedProcedure
           requestId,
           courseId,
           skipCompletionCheck,
+          manualTopRegeneration: manualTopRegeneration ?? false,
           lessonsEnqueued: jobs.length,
           jobIds: jobs.map(j => j.id),
           selectedLessonIds: lessonSpecs.map(s => s.lesson_id),

@@ -11,6 +11,7 @@ import type {
   LessonContent,
   RefinementEvent,
 } from '@megacampus/shared-types';
+import { getStage6CanonicalPhaseConfig } from '@megacampus/shared-types/stage6-model-config';
 import type { LLMCallFn } from '../patcher';
 import type { IterationContext } from './types';
 import type { FixPromptContext } from '../fix-templates';
@@ -74,7 +75,7 @@ export function buildPatcherPrompt(
 export async function executeLlmCall(
   prompt: string,
   systemPrompt: string,
-  options: { maxTokens: number; temperature: number },
+  options: { maxTokens: number; temperature: number; courseId?: string },
   llmCall?: LLMCallFn
 ): Promise<{ content: string; tokensUsed: number }> {
   if (llmCall) {
@@ -84,15 +85,19 @@ export async function executeLlmCall(
   // Default LLM call implementation
   const llmClient = new LLMClient();
   const modelService = createModelConfigService();
+  const fallbackConfig = getStage6CanonicalPhaseConfig('stage_6_patcher');
 
-  let modelId = 'unknown';
+  let modelId = fallbackConfig?.modelId ?? 'xiaomi/mimo-v2-flash';
   try {
-    const config = await modelService.getModelForPhase('stage_6_patcher');
-    modelId = config.modelId;
+    const config = await modelService.getModelForPhase('stage_6_patcher', options.courseId);
+    modelId = config.modelId || fallbackConfig?.modelId || modelId;
     logger.info({ modelId, source: config.source }, 'Patcher using model from config');
   } catch (error) {
     logger.warn(
-      { error: error instanceof Error ? error.message : String(error) },
+      {
+        error: error instanceof Error ? error.message : String(error),
+        fallbackModelId: modelId,
+      },
       'Failed to get patcher model config, using fallback'
     );
   }
@@ -180,7 +185,7 @@ export async function applyCoherencePreservingPatch(
   const response = await executeLlmCall(
     coherencePrompt,
     buildPatcherSystemPrompt(),
-    { maxTokens: 1200, temperature: 0.1 },
+    { maxTokens: 1200, temperature: 0.1, courseId: iterationContext.courseId },
     llmCall
   );
 
@@ -274,6 +279,7 @@ export async function applyStandardPatch(
     },
     lessonDurationMinutes: iterationContext.lessonSpec?.estimated_duration_minutes,
     language: iterationContext.language,
+    courseId: iterationContext.courseId,
   };
 
   // Execute patch

@@ -23,6 +23,236 @@ import { countMermaidFallbackComments } from '../../utils/mermaid-fallback-marke
  * @param content - Lesson content (markdown string)
  * @returns Filter check result with truncation issues
  */
+/**
+ * Stable prefixes for truncation issue messages.
+ *
+ * EXPORTED so downstream consumers (self-reviewer-phases.ts categorizer)
+ * can key off these without relying on fragile magic-string regexes.
+ *
+ * IMPORTANT: when changing message format, update both the generator site
+ * below AND the categorizer patterns that depend on these prefixes.
+ */
+export const TRUNCATION_ISSUE_PREFIXES = {
+  GLOBAL_ENDING: 'Content does not end with proper punctuation',
+  UNMATCHED_CODE: 'Unmatched code blocks detected',
+  MID_SENTENCE: 'Content appears to end mid-sentence',
+  SUSPICIOUSLY_SHORT: 'Content suspiciously short',
+  CALLOUT_TRUNCATED: 'Callout block appears truncated',
+  SECTION_TRUNCATED: 'Section ', // prefix only — "Section N appears truncated"
+} as const;
+
+export type TruncationIssueKind =
+  | 'GLOBAL_ENDING'
+  | 'UNMATCHED_CODE'
+  | 'MID_SENTENCE'
+  | 'SUSPICIOUSLY_SHORT'
+  | 'CALLOUT_TRUNCATED'
+  | 'SECTION_TRUNCATED';
+
+/**
+ * Classify an issue message back to its kind. Single source of truth for
+ * the message-prefix → kind mapping used by the severity categorizer.
+ */
+export function classifyTruncationIssue(message: string): TruncationIssueKind | null {
+  if (message.startsWith(TRUNCATION_ISSUE_PREFIXES.UNMATCHED_CODE)) return 'UNMATCHED_CODE';
+  if (message.startsWith(TRUNCATION_ISSUE_PREFIXES.MID_SENTENCE)) return 'MID_SENTENCE';
+  if (message.startsWith(TRUNCATION_ISSUE_PREFIXES.SUSPICIOUSLY_SHORT)) return 'SUSPICIOUSLY_SHORT';
+  if (message.startsWith(TRUNCATION_ISSUE_PREFIXES.CALLOUT_TRUNCATED)) return 'CALLOUT_TRUNCATED';
+  if (message.startsWith(TRUNCATION_ISSUE_PREFIXES.GLOBAL_ENDING)) return 'GLOBAL_ENDING';
+  if (/^Section \d+ appears truncated/.test(message)) return 'SECTION_TRUNCATED';
+  return null;
+}
+
+/**
+ * Maximum length of a line that can qualify as a footer.
+ *
+ * Real footers are SHORT ("© 2024 Company", "All rights reserved",
+ * "Copyright © 2024 Acme Inc.", "Материал подготовлен учебным центром
+ * Мегакампус") — typically 10-70 chars.
+ *
+ * Substantive prose mentioning these keywords in context ("Copyright law is
+ * discussed in this appendix...", "Материал подготовлен в формате кейса с
+ * подробным разбором...") runs noticeably longer.
+ *
+ * 80 chars balances between accepting long attribution lines and rejecting
+ * full sentences. If a real footer legitimately exceeds 80 chars (e.g.
+ * multi-author attribution), wrap it across multiple short lines instead.
+ */
+const MAX_FOOTER_LINE_CHARS = 80;
+
+/**
+ * Deterministic footer patterns.
+ *
+ * These lines are self-sufficient evidence of a real footer/attribution block.
+ * If the entire tail block consists of footer-shaped lines AND at least one
+ * line matches these patterns, we can safely ignore the block for global
+ * ending checks.
+ */
+const DEFINITE_FOOTER_PATTERNS: RegExp[] = [
+  // Symbol-led attribution
+  /^\s*(?:©|®|\(c\))\s+\S/,
+  // Copyright with a structural signal.
+  /^\s*[Cc]opyright\b.*(?:©|\(c\)|\b\d{4}\b|[Rr]eserved\b|\bInc\.|\bLtd\.|\bLLC\b|\bCorp\.)/,
+  // Rights-reserved phrases.
+  /^\s*[Вв]се\s+права\s+(?:защищ|зарезервир)/,
+  /^\s*[Aa]ll\s+[Rr]ights\s+[Rr]eserved\b/,
+  // Explicit copyright phrasing.
+  /^\s*[Аа]вторские?\s+права(?:\s|$)/,
+  /^\s*[Аа]вторским\s+правом(?:\s|$)/,
+  /^\s*[Мм]атериал\s+защищ(?:ен|ён)?\s+авторским\s+правом/,
+];
+
+/**
+ * Ambiguous footer-ish shapes.
+ *
+ * These lines are plausible footer attributions in Russian, but they can also
+ * start normal prose:
+ * - "Материал подготовлен учебным центром ..."  -> attribution
+ * - "Материал подготовлен в формате кейса ..." -> substantive content
+ *
+ * We treat such blocks conservatively: they are not deterministic footer
+ * evidence, but they also should not alone trigger GLOBAL_ENDING.
+ */
+const AMBIGUOUS_FOOTERISH_PATTERNS: RegExp[] = [
+  /^\s*[Мм]атериал\s+подготовлен(?:\s|$)/,
+  /^\s*[Мм]атериал\s+защищ(?:ен|ён)?(?:\s|$)/,
+];
+
+type TrailingHrBlockKind = 'none' | 'definite_footer' | 'ambiguous_footerish' | 'substantive_tail';
+
+type TrailingHrBlockClassification = {
+  kind: TrailingHrBlockKind;
+  contentBeforeHr: string;
+};
+
+function isBoundedFooterLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return false;
+  return trimmed.length <= MAX_FOOTER_LINE_CHARS;
+}
+
+function isDefiniteFooterLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!isBoundedFooterLine(trimmed)) return false;
+  return DEFINITE_FOOTER_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
+function isAmbiguousFooterishLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!isBoundedFooterLine(trimmed)) return false;
+  return AMBIGUOUS_FOOTERISH_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
+function isFooterShapedLine(line: string): boolean {
+  return isDefiniteFooterLine(line) || isAmbiguousFooterishLine(line);
+}
+
+/**
+ * Classify the block after the LAST standalone horizontal rule.
+ *
+ * We intentionally separate:
+ * - definite_footer: safe to ignore entirely
+ * - ambiguous_footerish: do not strip, but do not let it alone trigger Check 1
+ * - substantive_tail: keep normal truncation behavior
+ */
+function classifyTrailingHrBlock(content: string): TrailingHrBlockClassification {
+  const hrPattern = /(?:^|\n)[-*_]{3,}\s*(?:\n|$)/g;
+  let lastHRIndex = -1;
+  let match: RegExpExecArray | null;
+
+  while ((match = hrPattern.exec(content)) !== null) {
+    lastHRIndex = match.index + (content[match.index] === '\n' ? 1 : 0);
+    if (match.index === hrPattern.lastIndex) hrPattern.lastIndex++;
+  }
+
+  if (lastHRIndex === -1) {
+    return { kind: 'none', contentBeforeHr: content };
+  }
+
+  const contentBeforeHr = content.slice(0, lastHRIndex).trimEnd();
+  const afterHRMatch = content.slice(lastHRIndex).match(/^[-*_]{3,}\s*\n([\s\S]+)$/);
+  if (!afterHRMatch) {
+    return { kind: 'none', contentBeforeHr: content };
+  }
+
+  const lines = afterHRMatch[1].split('\n').filter(line => line.trim().length > 0);
+  if (lines.length === 0) {
+    return { kind: 'none', contentBeforeHr: content };
+  }
+
+  if (!lines.every(isFooterShapedLine)) {
+    return { kind: 'substantive_tail', contentBeforeHr };
+  }
+
+  if (lines.some(isDefiniteFooterLine)) {
+    return { kind: 'definite_footer', contentBeforeHr };
+  }
+
+  return { kind: 'ambiguous_footerish', contentBeforeHr };
+}
+
+/**
+ * Strip a trailing "--- + footer-block" segment from content.
+ *
+ * Only deterministic footer blocks are stripped. Ambiguous footer-ish blocks
+ * stay in the content; Check 1 handles them via classifier-aware suppression.
+ */
+function stripTrailingFooterBlock(content: string): string {
+  const classification = classifyTrailingHrBlock(content);
+  return classification.kind === 'definite_footer' ? classification.contentBeforeHr : content;
+}
+
+/**
+ * Strip trailing structural markdown that represents VALID section endings
+ * but would confuse naive last-char checks:
+ * - Horizontal rules (---, ***, ___)
+ * - Copyright/meta italic lines (*text*) — only when they appear at the tail
+ * - Trailing bold lines (**text**)
+ * - Quote/callout lines
+ * - "--- + definite footer block" pattern (ambiguous footer-ish tails are
+ *   handled separately by Check 1 and are not stripped here)
+ *
+ * Runs iteratively because the tail often has multiple trailing markers
+ * (e.g. horizontal rule + italic copyright).
+ */
+function stripTrailingStructuralMarkers(content: string): string {
+  let current = content;
+  const linePatterns = [
+    /(?:^|\n)[-*_]{3,}\s*$/, // horizontal rule on its own line (or at very start)
+    /(?:^|\n)\*[^*\n]+\*\s*$/, // trailing single-asterisk italic line
+    /(?:^|\n)\*\*[^\n]+\*\*\s*$/, // trailing double-asterisk bold line
+    /(?:^|\n)>\s*\S[^\n]*\s*$/, // trailing quote/callout line (handled by Check 5)
+  ];
+
+  // Iterate up to 5 times — in practice 2-3 is enough; bound prevents adversarial loops
+  for (let i = 0; i < 5; i++) {
+    const before = current;
+    // First, try to strip the "--- + footer block" pattern (narrow predicate)
+    current = stripTrailingFooterBlock(current);
+    // Then strip individual trailing markers
+    for (const pattern of linePatterns) {
+      current = current.replace(pattern, '').trimEnd();
+    }
+    if (current === before) break;
+  }
+  return current;
+}
+
+function getLastNonEmptyLine(content: string): string {
+  const lines = content.split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (line.length > 0) {
+      return line;
+    }
+  }
+  return '';
+}
+
+function isMarkdownListLine(line: string): boolean {
+  return /^\s*(?:[-*+]|\d+[.)])\s+\S/.test(line);
+}
+
 export function checkContentTruncation(content: string): FilterCheckResult & {
   truncationIssues: string[];
   lastCharacter: string;
@@ -32,19 +262,33 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
 
   // Check 1: Proper ending punctuation
   const trimmedContent = content.trim();
+  const trailingHrBlock = classifyTrailingHrBlock(trimmedContent);
 
-  // Get last meaningful character (skip closing markdown like **)
-  let lastMeaningfulIndex = trimmedContent.length - 1;
-  while (lastMeaningfulIndex > 0 && /[*_`#\s]/.test(trimmedContent[lastMeaningfulIndex])) {
+  // Strip trailing structural markdown (horizontal rules, copyright lines,
+  // trailing bold/italic, quote lines) before evaluating the last char.
+  // Definite footer blocks can be stripped safely. Ambiguous footer-ish
+  // blocks are not stripped globally, but they also should not alone trigger
+  // a blocking GLOBAL_ENDING signal.
+  const contentForEndCheckSeed =
+    trailingHrBlock.kind === 'definite_footer' || trailingHrBlock.kind === 'ambiguous_footerish'
+      ? trailingHrBlock.contentBeforeHr
+      : trimmedContent;
+  const contentForEndCheck = stripTrailingStructuralMarkers(contentForEndCheckSeed).trim();
+
+  // Get last meaningful character (skip closing markdown like ** _ ` #)
+  let lastMeaningfulIndex = contentForEndCheck.length - 1;
+  while (lastMeaningfulIndex > 0 && /[*_`#\s]/.test(contentForEndCheck[lastMeaningfulIndex])) {
     lastMeaningfulIndex--;
   }
-  const lastMeaningfulChar = trimmedContent[lastMeaningfulIndex];
+  const lastMeaningfulChar = contentForEndCheck[lastMeaningfulIndex] ?? '';
 
-  const validEndingPunctuation = /[.!?。！？:]/;
-  if (!validEndingPunctuation.test(lastMeaningfulChar)) {
-    issues.push(
-      `Content does not end with proper punctuation (last char: "${lastMeaningfulChar}")`
-    );
+  // Accept standard punctuation + common closing markdown/quotes: ) ] » ” for
+  // parenthesized or quoted endings like "...(note that X)." or "формат: «X»".
+  const validEndingPunctuation = /[.!?。！？:)\]»”"']/;
+  // Skip Check 1 entirely when stripping removed everything (content was all
+  // structural markers, which is itself a bigger problem caught by Check 4).
+  if (contentForEndCheck.length > 0 && !validEndingPunctuation.test(lastMeaningfulChar)) {
+    issues.push(`${TRUNCATION_ISSUE_PREFIXES.GLOBAL_ENDING} (last char: "${lastMeaningfulChar}")`);
   }
 
   // Check 2: Matched code blocks
@@ -52,7 +296,7 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
   const hasMatchedCodeBlocks = codeBlockCount % 2 === 0;
   if (!hasMatchedCodeBlocks) {
     issues.push(
-      `Unmatched code blocks detected (${codeBlockCount} markers found, expected even number)`
+      `${TRUNCATION_ISSUE_PREFIXES.UNMATCHED_CODE} (${codeBlockCount} markers found, expected even number)`
     );
   }
 
@@ -73,14 +317,16 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
 
   for (const pattern of incompletePatterns) {
     if (pattern.test(lastSentence)) {
-      issues.push('Content appears to end mid-sentence');
+      issues.push(TRUNCATION_ISSUE_PREFIXES.MID_SENTENCE);
       break;
     }
   }
 
   // Check 4: Very short content (less than 200 characters suggests truncation)
   if (trimmedContent.length < 200) {
-    issues.push(`Content suspiciously short (${trimmedContent.length} characters)`);
+    issues.push(
+      `${TRUNCATION_ISSUE_PREFIXES.SUSPICIOUSLY_SHORT} (${trimmedContent.length} characters)`
+    );
   }
 
   // Check 5: Callout block truncation (> [!TIP] etc. ending without punctuation)
@@ -90,7 +336,7 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
     const block = calloutMatch[0];
     const lastLine = block.split('\n').pop()?.replace(/^>\s*/, '').trim() ?? '';
     if (lastLine.length > 0 && lastLine.length < 20 && !/[.!?。！？:]$/.test(lastLine)) {
-      issues.push(`Callout block appears truncated (last line: "${lastLine}")`);
+      issues.push(`${TRUNCATION_ISSUE_PREFIXES.CALLOUT_TRUNCATED} (last line: "${lastLine}")`);
     }
   }
 
@@ -101,12 +347,27 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
     // Skip last section (already checked by Check 1)
     if (i === sectionBlocks.length - 1) continue;
 
-    // Check if section ends without proper punctuation (mid-word or mid-sentence)
-    const sectionEnd = section.slice(-50);
+    // Strip valid markdown structural endings before checking last char:
+    // - Horizontal rules (---, ***, ___)
+    // - Table rows ending with | (pipe)
+    // - Table separator rows (|---|---|)
+    // These are valid section endings, not truncation.
+    const sectionForCheck = section
+      .replace(/\n[-*_]{3,}\s*$/, '') // trailing --- or *** or ___
+      .replace(/\n\|[^|\n]*\|\s*$/, '') // trailing table row
+      .replace(/\n\|[-|\s:]+\|\s*$/, '') // trailing table separator |---|---|
+      .trim();
+    const lastLine = getLastNonEmptyLine(sectionForCheck);
+
+    if (isMarkdownListLine(lastLine)) {
+      continue;
+    }
+
+    const sectionEnd = sectionForCheck.slice(-50);
     const lastChar = sectionEnd.replace(/[\s*_`#]+$/, '').slice(-1);
-    if (lastChar && !/[.!?。！？:\n]/.test(lastChar)) {
+    if (lastChar && !/[.!?。！？:\n)\]|]/.test(lastChar)) {
       // Check if it's a title line (next section header) — skip those
-      if (!/^\S+\n/.test(section.slice(-20))) {
+      if (!/^\S+\n/.test(sectionForCheck.slice(-20))) {
         issues.push(`Section ${i + 1} appears truncated (ends with "${lastChar}")`);
       }
     }

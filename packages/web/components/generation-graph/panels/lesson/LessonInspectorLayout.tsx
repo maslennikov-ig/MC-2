@@ -1,9 +1,16 @@
 'use client'
 
 import React from 'react'
+import type { GroupImperativeHandle } from 'react-resizable-panels'
 import { ArrowLeft, X, Maximize2, Minimize2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
+import { createLogger } from '@/lib/client-logger'
+import {
+  assessLessonInspectorLayout,
+  LESSON_INSPECTOR_DEFAULT_LAYOUT,
+  LESSON_INSPECTOR_PANEL_IDS,
+} from './LessonInspectorLayout.measurements'
 
 interface LessonInspectorLayoutProps {
   moduleNumber: number
@@ -20,6 +27,8 @@ interface LessonInspectorLayoutProps {
   hideHeader?: boolean
 }
 
+const log = createLogger({ component: 'LessonInspectorLayout' })
+
 export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
   moduleNumber,
   lessonNumber,
@@ -33,6 +42,115 @@ export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
   className = '',
   hideHeader = false,
 }) => {
+  const [useFixedLayout, setUseFixedLayout] = React.useState(false)
+  const groupRef = React.useRef<GroupImperativeHandle | null>(null)
+  const containerRef = React.useRef<HTMLDivElement | null>(null)
+  const leftPanelRef = React.useRef<HTMLDivElement | null>(null)
+  const rightPanelRef = React.useRef<HTMLDivElement | null>(null)
+
+  React.useEffect(() => {
+    setUseFixedLayout(false)
+  }, [moduleNumber, lessonNumber, isMaximized])
+
+  React.useEffect(() => {
+    if (useFixedLayout) {
+      return
+    }
+
+    let isDisposed = false
+    let frameId: number | null = null
+    const attemptedRecovery = { current: false }
+    const loggedFallback = { current: false }
+
+    const validateLayout = () => {
+      if (isDisposed) {
+        return
+      }
+
+      frameId = null
+
+      const assessment = assessLessonInspectorLayout({
+        container: containerRef.current,
+        leftPanel: leftPanelRef.current,
+        rightPanel: rightPanelRef.current,
+      })
+
+      if (!assessment.isReady) {
+        return
+      }
+
+      if (assessment.isValid) {
+        return
+      }
+
+      if (!attemptedRecovery.current) {
+        attemptedRecovery.current = true
+        groupRef.current?.setLayout(LESSON_INSPECTOR_DEFAULT_LAYOUT)
+        scheduleValidation()
+        return
+      }
+
+      setUseFixedLayout(true)
+
+      if (!loggedFallback.current) {
+        loggedFallback.current = true
+        log.warn(
+          'Falling back to fixed lesson inspector split after invalid resizable measurements',
+          {
+            reason: assessment.reason,
+            layout: groupRef.current?.getLayout(),
+            measurements: assessment.measurements,
+          }
+        )
+      }
+    }
+
+    const scheduleValidation = () => {
+      if (isDisposed) {
+        return
+      }
+
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId)
+      }
+
+      frameId = window.requestAnimationFrame(validateLayout)
+    }
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => scheduleValidation())
+
+    ;[containerRef.current, leftPanelRef.current, rightPanelRef.current].forEach((element) => {
+      if (element) {
+        resizeObserver?.observe(element)
+      }
+    })
+
+    scheduleValidation()
+
+    return () => {
+      isDisposed = true
+
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId)
+      }
+
+      resizeObserver?.disconnect()
+    }
+  }, [moduleNumber, lessonNumber, useFixedLayout])
+
+  const renderLeftPanel = () => (
+    <div className="h-full overflow-y-auto" data-testid="pipeline-panel">
+      {leftPanel}
+    </div>
+  )
+
+  const renderRightPanel = () => (
+    <div className="h-full overflow-hidden" data-testid="content-panel">
+      {rightPanel}
+    </div>
+  )
+
   return (
     <div
       className={`flex h-full w-full flex-col bg-white dark:bg-slate-900 ${className}`}
@@ -90,31 +208,60 @@ export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
         </header>
       )}
 
-      {/* Split View Container using ResizablePanel */}
-      <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1">
-        {/* Left Panel: Pipeline (collapsible, default 30%) */}
-        <ResizablePanel
-          defaultSize={30}
-          minSize={15}
-          maxSize={50}
-          collapsible={true}
-          collapsedSize={0}
-          className="bg-slate-50 dark:bg-slate-800/50"
+      {useFixedLayout ? (
+        <div className="flex min-h-0 flex-1" data-testid="lesson-inspector-fixed-layout">
+          <div
+            className="min-h-0 shrink-0 bg-slate-50 dark:bg-slate-800/50"
+            style={{ flexBasis: '30%', minWidth: '15%', maxWidth: '50%' }}
+          >
+            {renderLeftPanel()}
+          </div>
+
+          <div className="bg-border relative flex w-px shrink-0 justify-center" aria-hidden="true">
+            <div className="bg-border z-10 my-auto flex h-4 w-3 items-center justify-center rounded-sm border" />
+          </div>
+
+          <div className="min-h-0 min-w-0 flex-1 bg-white dark:bg-slate-900">
+            {renderRightPanel()}
+          </div>
+        </div>
+      ) : (
+        <ResizablePanelGroup
+          direction="horizontal"
+          defaultLayout={LESSON_INSPECTOR_DEFAULT_LAYOUT}
+          groupRef={groupRef}
+          elementRef={containerRef}
+          className="min-h-0 flex-1"
+          data-testid="lesson-inspector-resizable-layout"
         >
-          <div className="h-full overflow-y-auto" data-testid="pipeline-panel">
-            {leftPanel}
-          </div>
-        </ResizablePanel>
+          <ResizablePanel
+            id={LESSON_INSPECTOR_PANEL_IDS.left}
+            defaultSize={30}
+            minSize={15}
+            maxSize={50}
+            collapsible={true}
+            collapsedSize={0}
+            elementRef={leftPanelRef}
+            className="bg-slate-50 dark:bg-slate-800/50"
+            data-testid="lesson-inspector-resizable-left-panel"
+          >
+            {renderLeftPanel()}
+          </ResizablePanel>
 
-        <ResizableHandle withHandle />
+          <ResizableHandle withHandle />
 
-        {/* Right Panel: Content Preview (70%, expands when left collapsed) */}
-        <ResizablePanel defaultSize={70} minSize={50} className="bg-white dark:bg-slate-900">
-          <div className="h-full overflow-hidden" data-testid="content-panel">
-            {rightPanel}
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          <ResizablePanel
+            id={LESSON_INSPECTOR_PANEL_IDS.right}
+            defaultSize={70}
+            minSize={50}
+            elementRef={rightPanelRef}
+            className="bg-white dark:bg-slate-900"
+            data-testid="lesson-inspector-resizable-right-panel"
+          >
+            {renderRightPanel()}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      )}
     </div>
   )
 }

@@ -2,6 +2,76 @@
 
 _Released on 2025-12-26_
 
+## v0.31.40
+
+_Released on 2026-04-10_
+
+### ✨ New Features
+
+- Add 2 source file(s), update 1 source file(s), +1 more
+
+### 🐛 Bug Fixes
+
+- **API**: Resolve ESM module conflict between helpers.ts and helpers/ directory
+- **deploy**: Staged container startup and diagnostic logging
+
+---
+
+_This release was automatically generated from 3 commits._
+
+## v0.31.39
+
+_Released on 2026-04-07_
+
+### 🐛 Bug Fixes
+
+- **web**: Derive stage6 ladder models from persisted history
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.31.38
+
+_Released on 2026-04-07_
+
+### 🐛 Bug Fixes
+
+- **web**: Cherry-pick 2 minor fixes from stale branches
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.31.37
+
+_Released on 2026-04-07_
+
+### ✨ New Features
+
+- Add 2 source file(s), update docs
+- **stage6**: Surface quality ladder review history
+- **stage6**: Add quality recovery execution ladder
+- **stage6**: Add quality ladder contract
+- **orchestration**: Add local contract and dev delivery path
+- **cli**: Add dev delivery command
+
+### 🐛 Bug Fixes
+
+- **web**: Simplify quality recovery hook imports
+- **web**: Align quality ladder shared-type imports
+- **stage6**: Show explicit review empty state
+- **web**: Preserve collapsed lesson inspector split
+- **web**: Add lesson inspector split fallback
+- **web**: Reconcile stuck stage6 course status
+- **cli**: Make push-dev cleanup pipefail-safe
+- **cli**: Restore push-dev cleanup trap
+- **stage6**: Restore lesson preview and review-required state
+
+---
+
+_This release was automatically generated from 16 commits._
+
 ## v0.31.36
 
 _Released on 2026-04-04_

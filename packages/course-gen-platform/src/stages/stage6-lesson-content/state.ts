@@ -147,6 +147,16 @@ export const LessonGraphState = Annotation.Root({
   }),
 
   /**
+   * Optional maxTokens override from phase config.
+   * When set, acts as an additional floor for the dynamic token budget,
+   * ensuring phases like auto_last_chance get at least their configured budget.
+   */
+  maxTokensOverride: Annotation<number | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
    * Course content style (e.g., 'gamified', 'professional', 'storytelling')
    * Used by generator to apply style-specific prompts for content generation
    * Defaults to 'professional' if not provided
@@ -374,6 +384,22 @@ export const LessonGraphState = Annotation.Root({
   }),
 
   /**
+   * Effective Stage 6 phase backing the selected model.
+   */
+  selectedModelPhase: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Effective config source for the selected model.
+   */
+  selectedModelSource: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
    * Total tokens used across all phases
    * Accumulated for cost tracking
    */
@@ -484,6 +510,29 @@ export const LessonGraphState = Annotation.Root({
     reasons: string[];
     factualAccuracyScore?: number;
     unverifiedClaims?: number;
+  } | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Non-terminal factual verification warnings.
+   * These are persisted for QA/debugging but do not imply review_required.
+   */
+  factualWarnings: Annotation<{
+    hasWarnings: boolean;
+    factualAccuracyScore?: number;
+    unverifiedClaims: number;
+    noEvidenceClaims: number;
+    contradictedClaims: number;
+    claims: Array<{
+      text: string;
+      status: string;
+      confidence: number;
+      evidenceChunkIds: string[];
+      mismatchReason?: string;
+      evidencePreview?: string;
+    }>;
   } | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,

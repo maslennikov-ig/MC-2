@@ -11,8 +11,10 @@ import { CourseErrorBoundary } from '@/components/common/error-boundary'
 import {
   groupAssetsByLessonId,
   groupEnrichmentsByLessonId,
+  groupLessonContentsByLessonIdForViewer,
   prepareSectionsForViewer,
   prepareLessonsForViewer,
+  VIEWER_READY_LESSON_CONTENT_STATUSES,
 } from '@/lib/course-data-utils'
 import type { Course } from '@/types/database'
 import { PostgrestError } from '@supabase/supabase-js'
@@ -224,7 +226,7 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
         .from('lesson_contents')
         .select('*')
         .in('lesson_id', lessonIds)
-        .eq('status', 'completed')
+        .in('status', [...VIEWER_READY_LESSON_CONTENT_STATUSES])
         .order('created_at', { ascending: false }),
     ])
 
@@ -267,16 +269,7 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
     }
   }
 
-  // Group lesson contents by lesson_id (take the latest completed one per lesson)
-  const lessonContentsByLessonId: Record<string, LessonContentRow> = {}
-  if (lessonContents) {
-    for (const lc of lessonContents) {
-      // Only keep the first (latest) content per lesson
-      if (!lessonContentsByLessonId[lc.lesson_id]) {
-        lessonContentsByLessonId[lc.lesson_id] = lc
-      }
-    }
-  }
+  const lessonContentsByLessonId = groupLessonContentsByLessonIdForViewer(lessonContents)
 
   // Use shared utilities for data transformation
   const assetsByLessonId = groupAssetsByLessonId(assets)

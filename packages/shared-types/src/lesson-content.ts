@@ -14,6 +14,7 @@
  */
 
 import { z } from 'zod';
+import { QualityRecoverySchema } from './stage6-quality-recovery';
 
 // ============================================================================
 // CONTENT ARCHETYPE (Shared Enum)
@@ -385,6 +386,9 @@ export const LessonContentMetadataSchema = z.object({
 
   /** Optional compact Stage 6 quality telemetry */
   qa_signals: LessonQualitySignalsSchema.optional(),
+
+  /** Optional Stage 6 quality-recovery ladder trace */
+  qualityRecovery: QualityRecoverySchema.optional(),
 });
 
 export type LessonContentMetadata = z.infer<typeof LessonContentMetadataSchema>;

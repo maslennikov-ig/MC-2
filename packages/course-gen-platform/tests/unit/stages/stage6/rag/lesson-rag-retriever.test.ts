@@ -1,0 +1,223 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CourseRagAvailabilityReason } from '@/shared/rag/document-availability';
+
+const { mockAssertCourseRagReady, mockCacheGet, mockLogger } = vi.hoisted(() => ({
+  mockAssertCourseRagReady: vi.fn(),
+  mockCacheGet: vi.fn(() => Promise.resolve(null)),
+  mockLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock('@/shared/rag/document-availability', async importOriginal => {
+  const original = await importOriginal<typeof import('@/shared/rag/document-availability')>();
+  return {
+    ...original,
+    assertCourseRagReady: vi.fn((...args) => mockAssertCourseRagReady(...args)),
+  };
+});
+
+vi.mock('@/shared/qdrant/search', () => ({
+  searchChunks: vi.fn(),
+}));
+
+vi.mock('@/stages/stage5-generation/utils/rag-context-cache', () => ({
+  ragContextCache: {
+    get: vi.fn((...args) => mockCacheGet(...args)),
+    store: vi.fn(() => Promise.resolve()),
+  },
+}));
+
+vi.mock('@/shared/trace-logger', () => ({
+  logTrace: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('@/shared/logger', () => ({
+  logger: mockLogger,
+  default: mockLogger,
+}));
+
+vi.mock('@/stages/stage6-lesson-content/rag/reranking', () => ({
+  rerankChunks: vi.fn(() => Promise.resolve([])),
+}));
+
+vi.mock('@/stages/stage6-lesson-content/rag/coverage', () => ({
+  calculateLessonCoverage: vi.fn(() => 0),
+}));
+
+const actualDocumentAvailability = await vi.importActual<
+  typeof import('@/shared/rag/document-availability')
+>('@/shared/rag/document-availability');
+
+function createRequiredRagUnavailableError(reason: CourseRagAvailabilityReason) {
+  return new actualDocumentAvailability.RequiredRagUnavailableError('course-1', reason);
+}
+
+describe('lesson-rag-retriever', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const lessonSpec = {
+    lesson_id: '1.1',
+    title: 'Test lesson',
+    metadata: {
+      target_audience: 'practitioner',
+      tone: 'conversational-professional',
+      compliance_level: 'standard',
+      content_archetype: 'concept_explainer',
+    },
+    learning_objectives: [],
+    intro_blueprint: {
+      hook_strategy: 'question',
+      hook_topic: 'Topic',
+      key_learning_objectives: 'Goal',
+    },
+    sections: [
+      {
+        title: 'Section 1',
+        content_archetype: 'concept_explainer',
+        rag_context_id: '1',
+        constraints: {
+          depth: 'detailed_analysis',
+          required_keywords: [],
+          prohibited_terms: [],
+        },
+        key_points_to_cover: ['Point 1'],
+      },
+    ],
+    exercises: [],
+    rag_context: {
+      primary_documents: [],
+      search_queries: ['query 1'],
+      expected_chunks: 7,
+    },
+    estimated_duration_minutes: 20,
+    difficulty_level: 'intermediate',
+  } as const;
+
+  it('returns an empty result when the course has no uploaded documents', async () => {
+    mockAssertCourseRagReady.mockResolvedValue({
+      availability: 'optional_no_documents',
+      ragRequired: false,
+      hasUploadedDocuments: false,
+      hasIndexedDocuments: false,
+      reason: 'no_uploaded_documents',
+    });
+
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        lessonSpec: lessonSpec as any,
+        useCache: false,
+      })
+    ).resolves.toMatchObject({
+      lessonId: '1.1',
+      chunks: [],
+      totalRetrieved: 0,
+    });
+  });
+
+  it('retries transient Stage 6 required-RAG outages before failing', async () => {
+    mockAssertCourseRagReady.mockImplementation(async () => {
+      throw createRequiredRagUnavailableError('qdrant_timeout');
+    });
+
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    const promise = retrieveLessonContext({
+      courseId: 'course-1',
+      lessonSpec: lessonSpec as any,
+      useCache: false,
+    });
+    const expectation = expect(promise).rejects.toMatchObject({
+      reason: 'qdrant_timeout',
+      retryable: true,
+    });
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await expectation;
+    expect(mockAssertCourseRagReady).toHaveBeenCalledTimes(3);
+  });
+
+  it('continues when an individual required-RAG query fails after preflight', async () => {
+    const { searchChunks } = await import('@/shared/qdrant/search');
+
+    mockAssertCourseRagReady.mockResolvedValue({
+      availability: 'ready',
+      ragRequired: true,
+      hasUploadedDocuments: true,
+      hasIndexedDocuments: true,
+      reason: 'rag_ready',
+    });
+    vi.mocked(searchChunks).mockRejectedValue(new Error('404 page not found'));
+
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        lessonSpec: lessonSpec as any,
+        useCache: false,
+      })
+    ).resolves.toMatchObject({
+      lessonId: '1.1',
+      chunks: [],
+      totalRetrieved: 0,
+    });
+  });
+
+  it('uses cached lesson context before checking live RAG availability', async () => {
+    mockCacheGet.mockResolvedValueOnce({
+      chunks: [
+        {
+          chunkId: 'chunk-1',
+          documentId: 'doc-1',
+          documentName: 'Doc 1',
+          content: 'Cached content',
+          headingPath: 'Section 1',
+          score: 0.91,
+          matchedQuery: 'query 1',
+        },
+      ],
+      searchQueriesUsed: ['query 1'],
+      coverageScore: 0.8,
+    });
+    mockAssertCourseRagReady.mockImplementationOnce(async () => {
+      throw createRequiredRagUnavailableError('qdrant_timeout');
+    });
+
+    const { retrieveLessonContext } = await import('@/stages/stage6-lesson-content/rag/retriever');
+
+    await expect(
+      retrieveLessonContext({
+        courseId: 'course-1',
+        lessonSpec: lessonSpec as any,
+        useCache: true,
+      })
+    ).resolves.toMatchObject({
+      lessonId: '1.1',
+      cached: true,
+      totalRetrieved: 1,
+      chunks: [
+        expect.objectContaining({
+          chunk_id: 'chunk-1',
+          document_id: 'doc-1',
+          document_name: 'Doc 1',
+        }),
+      ],
+    });
+
+    expect(mockAssertCourseRagReady).not.toHaveBeenCalled();
+  });
+});

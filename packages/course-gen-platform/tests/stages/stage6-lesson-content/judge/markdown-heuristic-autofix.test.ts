@@ -91,6 +91,6 @@ describe('markdownlint table severity mapping', () => {
   it('should classify table rules with structural severity', () => {
     expect(getRuleSeverity('MD055')).toBe('major');
     expect(getRuleSeverity('MD056')).toBe('critical');
-    expect(getRuleSeverity('MD060')).toBe('major');
+    expect(getRuleSeverity('MD060')).toBe('minor');
   });
 });

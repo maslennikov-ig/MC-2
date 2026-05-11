@@ -378,11 +378,14 @@ describe('findSectionsWithForeignCharacters (unit)', () => {
     const languageIssues =
       result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
-    // 2 sections with CJK (intro + summary) out of 4 total = 50% -> triggers CRITICAL global
-    // So we check for global issue containing both affected areas
+    // Canonical review evaluates persisted LessonContentBody markdown. Summary/conclusion
+    // is not represented in LessonContentBody, so only visible introduction CJK is blocking.
     expect(languageIssues.length).toBeGreaterThan(0);
-    const criticalIssue = languageIssues.find(i => i.severity === 'CRITICAL');
-    expect(criticalIssue).toBeDefined();
+    expect(languageIssues.some(i => i.severity === 'CRITICAL')).toBe(false);
+    const introIssue = languageIssues.find(
+      i => i.severity === 'COMPLEX' && i.location === 'introduction'
+    );
+    expect(introIssue).toBeDefined();
   });
 });
 
@@ -985,15 +988,29 @@ describe('Edge Cases', () => {
 // ============================================================================
 
 describe('Integration: CJK with Other Issues', () => {
-  it('should handle CJK + truncation issues together', async () => {
+  it('should handle CJK + heuristic truncation signals together', async () => {
+    // Post-2026-04-16 severity policy: heuristic truncation (section-level
+    // last-char) is non-blocking. Deterministic signals (mid-sentence cut,
+    // unmatched code, short content) still fire CRITICAL alone. This test
+    // covers the co-existence of CJK (LANGUAGE COMPLEX → partial regen)
+    // and heuristic truncation (ignored), which is the common real-world mix.
     const cjkAndTruncation = `
 ## Введение
 
-Введение с 稀缺性资源分配问题供给需求市场经济价格机制基础 символами в учебном материале экономики.
+Введение с 稀缺性资源分配问题供给需求市场经济价格机制基础 символами в учебном материале экономики значительного объема для прохождения проверки длины.
 
 ## Основные концепции
 
-Концепция экономики обрывается на полуслове и
+Основные концепции представлены в таблице ниже для удобства восприятия материала.
+
+| Тема | Описание |
+|---|---|
+| A | Первое определение. |
+| B | Второе определение. |
+
+## Резюме
+
+Основные идеи урока кратко изложены.
 `;
 
     const state = createMockState({

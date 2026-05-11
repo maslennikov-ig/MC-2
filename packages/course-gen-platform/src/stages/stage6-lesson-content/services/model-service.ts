@@ -9,10 +9,10 @@ import { DEFAULT_JOB_TIMEOUT_MS, MODEL_FALLBACK } from '../config';
 /**
  * Get job timeout from database configuration
  */
-export async function getJobTimeout(): Promise<number> {
+export async function getJobTimeout(courseId?: string): Promise<number> {
   try {
     const modelConfigService = createModelConfigService();
-    const phaseConfig = await modelConfigService.getModelForPhase('stage_6_content');
+    const phaseConfig = await modelConfigService.getModelForPhase('stage_6_content', courseId);
     const effectiveConfig = getEffectiveStageConfig(phaseConfig);
 
     const timeout = effectiveConfig.timeoutMs ?? DEFAULT_JOB_TIMEOUT_MS;
@@ -52,7 +52,8 @@ export function detectLanguage(spec: LessonSpecificationV2): 'ru' | 'en' {
  */
 export async function getStage6ModelConfig(
   lessonSpec: LessonSpecificationV2,
-  language: string
+  language: string,
+  courseId?: string
 ): Promise<{ primary: string; fallback: string }> {
   const modelConfigService = createModelConfigService();
 
@@ -72,7 +73,10 @@ export async function getStage6ModelConfig(
 
   try {
     // Use phase-based config - Stage 6 has multiple phases, not a single stage config
-    const phaseConfig = await modelConfigService.getModelForPhase('stage_6_section_expander');
+    const phaseConfig = await modelConfigService.getModelForPhase(
+      'stage_6_section_expander',
+      courseId
+    );
 
     logger.info(
       {

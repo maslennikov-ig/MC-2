@@ -12,6 +12,11 @@ type SectionRow = Database['public']['Tables']['sections']['Row']
 type LessonRow = Database['public']['Tables']['lessons']['Row']
 type AssetRow = Database['public']['Tables']['assets']['Row']
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
+
+export const VIEWER_READY_LESSON_CONTENT_STATUSES = ['completed', 'approved'] as const
+
+const VIEWER_READY_LESSON_CONTENT_STATUS_SET = new Set<string>(VIEWER_READY_LESSON_CONTENT_STATUSES)
 
 /**
  * Groups assets by their lesson_id for efficient lookup
@@ -58,6 +63,33 @@ export function groupEnrichmentsByLessonId(
       return acc
     },
     {} as Record<string, EnrichmentRow[]>
+  )
+}
+
+/**
+ * Groups latest viewer-ready lesson contents by lesson_id.
+ * The input is expected to be ordered newest-first.
+ * Viewer-ready means content that can be shown in the course viewer without
+ * exposing review-required drafts.
+ */
+export function groupLessonContentsByLessonIdForViewer(
+  lessonContents: LessonContentRow[] | null
+): Record<string, LessonContentRow> {
+  if (!lessonContents || lessonContents.length === 0) return {}
+
+  return lessonContents.reduce(
+    (acc, lessonContent) => {
+      if (!VIEWER_READY_LESSON_CONTENT_STATUS_SET.has(String(lessonContent.status))) {
+        return acc
+      }
+
+      if (!acc[lessonContent.lesson_id]) {
+        acc[lessonContent.lesson_id] = lessonContent
+      }
+
+      return acc
+    },
+    {} as Record<string, LessonContentRow>
   )
 }
 

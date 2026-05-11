@@ -4,6 +4,7 @@ import { Locale } from '@/src/i18n/config'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCourseByOrgAndSlugWithRLS, getCourseByOrgAndSlug } from '@/lib/helpers/organization'
 import { buildCourseUrl } from '@/lib/helpers/course-urls'
+import { reconcileStage6CourseStatus } from '@/lib/stage6-status-reconciliation'
 import { GenerationProgress, GenerationStep, CourseStatus } from '@/types/course-generation'
 import GenerationProgressDynamic from './GenerationProgressDynamic'
 import GenerationErrorBoundary from './GenerationErrorBoundary'
@@ -87,6 +88,21 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
       notFound()
     }
     course = fullCourse
+  }
+
+  const reconciliationClient = await createAdminClient()
+  const stage6Reconciliation = await reconcileStage6CourseStatus({
+    supabase: reconciliationClient,
+    course,
+    persist: true,
+  })
+
+  if (stage6Reconciliation.applied && stage6Reconciliation.targetStatus) {
+    course = {
+      ...course,
+      generation_status: stage6Reconciliation.targetStatus,
+      ...(stage6Reconciliation.targetStatus === 'completed' ? { status: 'published' as const } : {}),
+    }
   }
 
   // If course generation is already completed, redirect to the course page

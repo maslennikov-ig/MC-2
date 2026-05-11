@@ -1,29 +1,5 @@
-# Delegated Work Report
+# Legacy Report Template
 
-- Task ID:
-- Branch:
-- Base branch:
-- Base commit:
-- Worktree:
+Use `.codex/stage-artifact-template.md` for new delegated artifacts.
 
-## Scope
-
-- Write zone:
-- Files changed:
-
-## Summary
-
-- Change:
-
-## Verification
-
-- Command:
-- Result:
-
-## Risks / Follow-ups
-
-- None
-
-## Completion Line
-
-- `task ID | report path | commit hash | git status clean yes/no`
+This file remains only as a migration-era compatibility pointer for older local reports and should not be used as the primary contract.

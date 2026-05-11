@@ -31,9 +31,11 @@
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { saveRejectedContent } from '../services/database-service';
+import { extractContentBody } from '../judge/judge-helpers';
+import { extractContentBodyMarkdown } from '../services/content-utils';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import type { SelfReviewResult, SelfReviewIssue } from '@megacampus/shared-types/judge-types';
-import { MODEL_FALLBACK } from '../config';
+import { MODEL_FALLBACK, HANDLER_CONFIG } from '../config';
 
 // Import from extracted modules
 import { HEURISTIC_TOKENS_USED, SELF_REVIEW_CONFIG } from './self-reviewer/self-reviewer-constants';
@@ -60,6 +62,62 @@ import {
 
 // Re-export for backward compatibility
 export { removeChatbotArtifacts, SELF_REVIEW_CONFIG };
+
+type PreparedSelfReviewContent = {
+  rawContent: string;
+  reviewContent: string;
+  source: 'canonical' | 'raw';
+  changed: boolean;
+  failureReason: string | null;
+};
+
+function prepareSelfReviewContent(
+  state: LessonGraphStateType,
+  language: string,
+  nodeLogger: Pick<typeof logger, 'warn'>
+): PreparedSelfReviewContent {
+  const rawContent = state.generatedContent ?? '';
+  const contentBody = extractContentBody(state);
+
+  if (!contentBody) {
+    nodeLogger.warn({
+      msg: 'canonicalization_failed',
+      reason: 'content_body_unavailable',
+    });
+
+    return {
+      rawContent,
+      reviewContent: rawContent,
+      source: 'raw',
+      changed: false,
+      failureReason: 'content_body_unavailable',
+    };
+  }
+
+  const canonicalContent = extractContentBodyMarkdown(contentBody, language);
+  if (!canonicalContent.trim()) {
+    nodeLogger.warn({
+      msg: 'canonicalization_failed',
+      reason: 'canonical_markdown_empty',
+    });
+
+    return {
+      rawContent,
+      reviewContent: rawContent,
+      source: 'raw',
+      changed: false,
+      failureReason: 'canonical_markdown_empty',
+    };
+  }
+
+  return {
+    rawContent,
+    reviewContent: canonicalContent,
+    source: 'canonical',
+    changed: canonicalContent !== rawContent,
+    failureReason: null,
+  };
+}
 
 /**
  * Self-Reviewer Node - Pre-judge validation with two-phase Fail-Fast architecture
@@ -92,12 +150,13 @@ export async function selfReviewerNode(
     // VALIDATION: Check for generated content
     // ============================================================================
 
-    const generatedContent = state.generatedContent;
-    if (!generatedContent) {
+    if (!state.generatedContent) {
       return handleEmptyContent(state, startTime);
     }
 
     const language = state.language || 'en';
+    const preparedContent = prepareSelfReviewContent(state, language, nodeLogger);
+    const generatedContent = preparedContent.reviewContent;
 
     // ============================================================================
     // PHASE 1: Heuristic Pre-Checks (FREE, no LLM)
@@ -125,7 +184,7 @@ export async function selfReviewerNode(
     if (criticalIssues.length > 0) {
       return handleCriticalIssues(
         state,
-        generatedContent,
+        preparedContent,
         heuristics,
         criticalAnalysis,
         criticalIssues,
@@ -141,7 +200,7 @@ export async function selfReviewerNode(
     if (criticalAnalysis.requiresModelFallback) {
       return handleModelFallback(
         state,
-        generatedContent,
+        preparedContent,
         heuristics,
         criticalAnalysis,
         language,
@@ -206,7 +265,7 @@ export async function selfReviewerNode(
         msg: 'LLM review failed, falling back to heuristics-only',
         error: llmResult.error,
       });
-      return buildHeuristicOnlyResult(
+      const fallbackResult = buildHeuristicOnlyResult(
         buildHeuristicDetails(
           heuristics.languageCheck,
           heuristics.truncationCheck,
@@ -219,6 +278,12 @@ export async function selfReviewerNode(
         llmResult.error || 'unknown error',
         llmResult.tokensUsed
       );
+
+      if (preparedContent.source === 'canonical') {
+        fallbackResult.generatedContent = generatedContent;
+      }
+
+      return fallbackResult;
     }
 
     // ============================================================================
@@ -292,6 +357,9 @@ export async function selfReviewerNode(
         llmReviewPerformed: true,
         tokensUsed: result.tokensUsed,
         wasPatched: patchedContent !== null,
+        reviewContentSource: preparedContent.source,
+        canonicalizationChanged: preparedContent.changed,
+        canonicalizationFailedReason: preparedContent.failureReason ?? undefined,
         progressSummary,
       },
       modelUsed: llmResult.modelUsed,
@@ -307,9 +375,34 @@ export async function selfReviewerNode(
 
     if (patchedContent) {
       stateUpdate.generatedContent = patchedContent;
+    } else if (preparedContent.source === 'canonical') {
+      stateUpdate.generatedContent = generatedContent;
     }
 
-    if (result.status === 'REGENERATE') {
+    // Channel-safe terminal-state setup. Section-cap and REGENERATE paths are
+    // MUTUALLY EXCLUSIVE to avoid double-stamping contradictory channel writes
+    // (e.g. needsHumanReview=true AND regenerationMode='full_regenerate').
+    //
+    // Priority:
+    //   1. Section-cap exceeded → terminal review_required, no REGENERATE mode
+    //   2. REGENERATE status → telemetry + escalation/terminal policy
+    //   3. Otherwise → state update proceeds without terminal flags
+    const sections = result.sectionsToRegenerate;
+    const sectionCapExceeded =
+      sections != null && sections.length > HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
+
+    if (sectionCapExceeded) {
+      const skipped = sections.length - HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE;
+      const reason =
+        `Section regeneration request exceeds cap (${HANDLER_CONFIG.MAX_SECTIONS_TO_REGENERATE}). ` +
+        `Requested ${sections.length} sections, skipped ${skipped}.`;
+      stateUpdate.needsHumanReview = true;
+      stateUpdate.needsRegeneration = false;
+      stateUpdate.reviewInfo = { needsReview: true, reasons: [reason] };
+      stateUpdate.errors = [reason];
+      // Also bump retryCount so the safety net sees consistent counters
+      stateUpdate.retryCount = retryCount + 1;
+    } else if (result.status === 'REGENERATE') {
       const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
       stateUpdate.retryCount = retryCount + 1;
       stateUpdate.regenerationMode = telemetryUpdate.regenerationMode;
@@ -317,6 +410,11 @@ export async function selfReviewerNode(
       stateUpdate.truncationCount = telemetryUpdate.truncationCount;
       stateUpdate.rejectedTokens = telemetryUpdate.rejectedTokens;
 
+      applyChannelSafeEscalation(stateUpdate, retryCount + 1);
+
+      // modelOverride is set even if escalation marked terminal: admin-triggered
+      // retries and resume logic use this value to decide which model to try
+      // next. Downstream (saveRejectedContent) records it for debugging.
       if (shouldEscalateTruncationRegenerate(retryCount, result.issues)) {
         stateUpdate.modelOverride = MODEL_FALLBACK.fallback;
       }
@@ -328,7 +426,7 @@ export async function selfReviewerNode(
         state.courseId,
         state.lessonSpec?.lesson_id ?? 'unknown',
         state.lessonUuid,
-        generatedContent,
+        preparedContent.rawContent,
         result,
         retryCount + 1,
         {
@@ -337,10 +435,15 @@ export async function selfReviewerNode(
           fallbackModel: state.fallbackModel,
           selectedModelTier: state.selectedModelTier,
           selectedModelTierReason: state.selectedModelTierReason,
+          selectedModelPhase: state.selectedModelPhase,
+          selectedModelSource: state.selectedModelSource,
           modelOverride: state.modelOverride,
           regenerateCount: stateUpdate.regenerateCount ?? state.regenerateCount,
           truncationCount: stateUpdate.truncationCount ?? state.truncationCount,
           rejectedTokens: stateUpdate.rejectedTokens ?? state.rejectedTokens,
+          reviewContent: preparedContent.reviewContent,
+          reviewContentSource: preparedContent.source,
+          canonicalizationFailureReason: preparedContent.failureReason,
         }
       );
     }
@@ -414,8 +517,9 @@ async function handleEmptyContent(
   });
 
   const telemetryUpdate = buildRegenerateTelemetryUpdate(state, result.issues);
+  const nextRetryCount = (state.retryCount || 0) + 1;
 
-  return {
+  const stateUpdate: LessonGraphStateUpdate = {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
@@ -423,8 +527,11 @@ async function handleEmptyContent(
     regenerateCount: telemetryUpdate.regenerateCount,
     truncationCount: telemetryUpdate.truncationCount,
     rejectedTokens: telemetryUpdate.rejectedTokens,
-    retryCount: (state.retryCount || 0) + 1,
+    retryCount: nextRetryCount,
   };
+
+  applyChannelSafeEscalation(stateUpdate, nextRetryCount);
+  return stateUpdate;
 }
 
 /**
@@ -432,7 +539,7 @@ async function handleEmptyContent(
  */
 async function handleCriticalIssues(
   state: LessonGraphStateType,
-  generatedContent: string,
+  preparedContent: PreparedSelfReviewContent,
   heuristics: ReturnType<typeof runHeuristicPhase>,
   criticalAnalysis: ReturnType<typeof analyzeCriticalIssues>,
   criticalIssues: SelfReviewIssue[],
@@ -505,7 +612,7 @@ async function handleCriticalIssues(
     state.courseId,
     state.lessonSpec?.lesson_id ?? 'unknown',
     state.lessonUuid,
-    generatedContent,
+    preparedContent.rawContent,
     result,
     retryCount + 1,
     {
@@ -514,10 +621,15 @@ async function handleCriticalIssues(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
+      selectedModelPhase: state.selectedModelPhase,
+      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,
       rejectedTokens: telemetryUpdate.rejectedTokens,
+      reviewContent: preparedContent.reviewContent,
+      reviewContentSource: preparedContent.source,
+      canonicalizationFailureReason: preparedContent.failureReason,
     }
   );
 
@@ -527,12 +639,21 @@ async function handleCriticalIssues(
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    generatedContent: preparedContent.reviewContent,
     regenerationMode: telemetryUpdate.regenerationMode,
     regenerateCount: telemetryUpdate.regenerateCount,
     truncationCount: telemetryUpdate.truncationCount,
     rejectedTokens: telemetryUpdate.rejectedTokens,
     retryCount: retryCount + 1,
   };
+
+  applyChannelSafeEscalation(baseResult, retryCount + 1);
+
+  // modelOverride is set even when escalation marked this state as terminal:
+  // (1) admin retry / resume logic uses it to pick the model for the next run
+  // (2) saveRejectedContent records it for debugging/attribution
+  // The CJK persistent-fallback contract specifically requires this value
+  // to survive into the terminal state.
 
   if (criticalAnalysis.requiresModelFallback && criticalAnalysis.fallbackModel) {
     return {
@@ -556,7 +677,7 @@ async function handleCriticalIssues(
  */
 async function handleModelFallback(
   state: LessonGraphStateType,
-  generatedContent: string,
+  preparedContent: PreparedSelfReviewContent,
   heuristics: ReturnType<typeof runHeuristicPhase>,
   criticalAnalysis: ReturnType<typeof analyzeCriticalIssues>,
   language: string,
@@ -599,7 +720,7 @@ async function handleModelFallback(
     state.courseId,
     state.lessonSpec?.lesson_id ?? 'unknown',
     state.lessonUuid,
-    generatedContent,
+    preparedContent.rawContent,
     result,
     retryCount + 1,
     {
@@ -608,17 +729,23 @@ async function handleModelFallback(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
+      selectedModelPhase: state.selectedModelPhase,
+      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,
       rejectedTokens: telemetryUpdate.rejectedTokens,
+      reviewContent: preparedContent.reviewContent,
+      reviewContentSource: preparedContent.source,
+      canonicalizationFailureReason: preparedContent.failureReason,
     }
   );
 
-  return {
+  const stateUpdate: LessonGraphStateUpdate = {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
+    generatedContent: preparedContent.reviewContent,
     regenerationMode: telemetryUpdate.regenerationMode,
     regenerateCount: telemetryUpdate.regenerateCount,
     truncationCount: telemetryUpdate.truncationCount,
@@ -626,6 +753,11 @@ async function handleModelFallback(
     modelOverride: MODEL_FALLBACK.fallback,
     retryCount: retryCount + 1,
   };
+
+  applyChannelSafeEscalation(stateUpdate, retryCount + 1);
+  // modelOverride = MODEL_FALLBACK.fallback is preserved even when terminal:
+  // downstream (saveRejectedContent, admin retry) consumes it.
+  return stateUpdate;
 }
 
 /**
@@ -711,6 +843,8 @@ async function handleError(
       fallbackModel: state.fallbackModel,
       selectedModelTier: state.selectedModelTier,
       selectedModelTierReason: state.selectedModelTierReason,
+      selectedModelPhase: state.selectedModelPhase,
+      selectedModelSource: state.selectedModelSource,
       modelOverride: state.modelOverride,
       regenerateCount: telemetryUpdate.regenerateCount,
       truncationCount: telemetryUpdate.truncationCount,
@@ -718,7 +852,7 @@ async function handleError(
     }
   );
 
-  return {
+  const stateUpdate: LessonGraphStateUpdate = {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
@@ -728,6 +862,21 @@ async function handleError(
     rejectedTokens: telemetryUpdate.rejectedTokens,
     retryCount: retryCount + 1,
   };
+
+  // NOTE ON RETRY BUDGET (handler errors):
+  // Unexpected exceptions in the self-reviewer flow (DB timeout during
+  // trace-logging, serialization errors, etc.) ARE counted against the
+  // regular MAX_REGENERATION_RETRIES budget via applyChannelSafeEscalation.
+  // This means a transient error at the last budget step terminates
+  // the graph as review_required. This is intentional fail-open behavior:
+  //   - Persistent errors → terminate cleanly (avoid infinite loop)
+  //   - Transient errors with budget left → retry via generator
+  //   - Transient at last step → review_required is acceptable outcome
+  //     because we can't distinguish transient vs persistent without
+  //     tracking a separate handler-error counter.
+  // If handler-error rate rises, consider a dedicated counter (follow-up).
+  applyChannelSafeEscalation(stateUpdate, retryCount + 1);
+  return stateUpdate;
 }
 
 /**
@@ -792,4 +941,73 @@ function shouldEscalateTruncationRegenerate(
 
   // retryCount is the count before this REGENERATE result is applied.
   return retryCount + 1 >= MODEL_FALLBACK.maxPrimaryAttempts;
+}
+
+/**
+ * Channel-safe escalation and terminal-state decisions.
+ *
+ * LangGraph conditional-edge routing functions cannot reliably mutate state
+ * (direct property assignments bypass the channel/reducer system and are lost
+ * in the final graph output). All state transitions MUST be set inside nodes
+ * so they go through the Annotation reducers.
+ *
+ * This function is called after buildRegenerateTelemetryUpdate to overlay:
+ * - Truncation-cap → full_regenerate escalation (regenerationMode, regenerateCount)
+ * - Terminal review_required (needsHumanReview, reviewInfo, errors) when all budgets are exhausted
+ *
+ * CAP OPERATOR CONVENTIONS (verify invariants):
+ * - truncationCount > MAX_TRUNCATION_CONTINUATION_ATTEMPTS:
+ *     Strict-greater semantics. MAX represents the NUMBER of allowed attempts;
+ *     after MAX attempts the counter equals MAX, the (MAX+1)-th attempt triggers
+ *     escalation. Example: MAX=2 allows 2 continuations (counter 1, 2), then
+ *     on the 3rd attempt counter becomes 3 > 2 → escalate to full_regenerate.
+ * - nextRetryCount >= MAX_REGENERATION_RETRIES:
+ *     Greater-or-equal semantics. MAX represents the cap VALUE; when counter
+ *     reaches MAX we terminate. Example: MAX=2 means on the 2nd retry the
+ *     counter is 2 >= 2 → terminal review_required.
+ *
+ * The different operators are load-bearing: truncation uses "attempts completed
+ * past MAX before escalating" (permissive), while regeneration uses "reached cap"
+ * (strict). Keep in sync with safety-net operators in execute-stage6.ts.
+ *
+ * @param stateUpdate - Mutable state update being built by the self-reviewer node
+ * @param nextRetryCount - retryCount AFTER this REGENERATE (i.e. already incremented)
+ */
+export function applyChannelSafeEscalation(
+  stateUpdate: LessonGraphStateUpdate,
+  nextRetryCount: number
+): void {
+  const isTruncation = stateUpdate.regenerationMode === 'truncation_continuation';
+  const nextTruncationCount = stateUpdate.truncationCount ?? 0;
+  const nextRegenerateCount = stateUpdate.regenerateCount ?? 0;
+
+  if (isTruncation && nextTruncationCount > HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS) {
+    // Truncation cap exceeded — escalate or fail-open
+    if (nextRegenerateCount < HANDLER_CONFIG.MAX_REGENERATION_RETRIES) {
+      // ESCALATE to full_regenerate (channel-safe: fields go through reducer)
+      stateUpdate.regenerationMode = 'full_regenerate';
+      stateUpdate.regenerateCount = nextRegenerateCount + 1;
+    } else {
+      // Both budgets exhausted — terminal review_required
+      const reason =
+        `Truncation continuation attempts exceeded (${HANDLER_CONFIG.MAX_TRUNCATION_CONTINUATION_ATTEMPTS}). ` +
+        `Marked as review_required (fail-open).`;
+      stateUpdate.needsHumanReview = true;
+      stateUpdate.needsRegeneration = false;
+      stateUpdate.reviewInfo = { needsReview: true, reasons: [reason] };
+      stateUpdate.errors = [reason];
+    }
+    return;
+  }
+
+  if (!isTruncation && nextRetryCount >= HANDLER_CONFIG.MAX_REGENERATION_RETRIES) {
+    // Full-regenerate budget exhausted — terminal review_required
+    const reason =
+      `Self-review regeneration retries exceeded (${HANDLER_CONFIG.MAX_REGENERATION_RETRIES}). ` +
+      `Last status: REGENERATE.`;
+    stateUpdate.needsHumanReview = true;
+    stateUpdate.needsRegeneration = false;
+    stateUpdate.reviewInfo = { needsReview: true, reasons: [reason] };
+    stateUpdate.errors = [reason];
+  }
 }

@@ -3,12 +3,19 @@ import { useReactFlow, Viewport } from '@xyflow/react'
 
 const STORAGE_KEY_PREFIX = 'graph_viewport_'
 
+type UseSessionRecoveryOptions = {
+  restoreOnMount?: boolean
+}
+
 /**
  * Persists graph viewport position to localStorage per course.
- * Restores position on mount, saves on changes.
+ * Restores position only when explicitly enabled; default workflow loads rely on fitView.
  * T120: Persist graph positions to localStorage per TRD Open Question #1
  */
-export function useSessionRecovery(courseId?: string) {
+export function useSessionRecovery(
+  courseId?: string,
+  { restoreOnMount = false }: UseSessionRecoveryOptions = {}
+) {
   const { setViewport, getViewport } = useReactFlow()
   const storageKey = courseId ? `${STORAGE_KEY_PREFIX}${courseId}` : `${STORAGE_KEY_PREFIX}default`
 
@@ -41,8 +48,21 @@ export function useSessionRecovery(courseId?: string) {
     }
   }, [saveViewport])
 
-  // Restore on mount
+  // Restoring stale viewport on workflow load fights the initial fit-to-workflow behavior.
+  // Keep persistence available for explicit future opt-in, but default reloads to a clean fit.
   useEffect(() => {
+    if (!restoreOnMount) {
+      try {
+        localStorage.removeItem(storageKey)
+      } catch (e) {
+        console.debug(
+          '[useSessionRecovery] Failed to clear saved viewport:',
+          e instanceof Error ? e.message : 'Unknown error'
+        )
+      }
+      return
+    }
+
     // Try localStorage first
     const saved = localStorage.getItem(storageKey)
 
@@ -51,7 +71,7 @@ export function useSessionRecovery(courseId?: string) {
         const viewport = JSON.parse(saved) as Viewport
         if (viewport.x !== undefined && viewport.zoom !== undefined) {
           // Set viewport immediately
-          setViewport(viewport)
+          void setViewport(viewport)
         }
       } catch (e) {
         // Invalid storage data - log for debugging
@@ -61,5 +81,5 @@ export function useSessionRecovery(courseId?: string) {
         )
       }
     }
-  }, [setViewport, storageKey])
+  }, [restoreOnMount, setViewport, storageKey])
 }

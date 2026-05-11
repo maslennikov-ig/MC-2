@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/shared-utils",
-  "version": "0.31.36",
+  "version": "0.31.40",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm && tsc --emitDeclarationOnly",
-    "type-check": "tsc --noEmit",
+    "type-check": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },

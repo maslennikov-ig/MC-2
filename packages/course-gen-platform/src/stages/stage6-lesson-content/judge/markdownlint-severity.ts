@@ -49,7 +49,6 @@ export type MarkdownLintSeverity = 'critical' | 'major' | 'minor';
  * - MD032: Blanks around lists - Cramped lists harder to scan
  * - MD046: Code block style - Inconsistent code block styles (fenced vs indented) reduce consistency
  * - MD055: Table pipe style - Inconsistent pipe usage can break table parsing/rendering
- * - MD060: Table column style - Inconsistent table separators degrade rendering consistency
  *
  * **MINOR** - Cosmetic issues, typically auto-fixable by markdownlint:
  * - MD009: Trailing spaces - Auto-fixable, purely cosmetic
@@ -59,6 +58,7 @@ export type MarkdownLintSeverity = 'critical' | 'major' | 'minor';
  * - MD005: List indent - Auto-fixable, style preference
  * - MD007: Unordered list indent - Auto-fixable, style preference
  * - MD022: Blanks around headings - Auto-fixable, style preference
+ * - MD060: Table column style - Alignment-only table formatting issue
  */
 export const RULE_SEVERITY: Record<string, MarkdownLintSeverity> = {
   // CRITICAL - Structural issues affecting comprehension/accessibility
@@ -75,7 +75,6 @@ export const RULE_SEVERITY: Record<string, MarkdownLintSeverity> = {
   MD032: 'major', // blanks-around-lists - Missing blank lines around lists
   MD046: 'major', // code-block-style - Inconsistent code block styles (fenced vs indented)
   MD055: 'major', // table-pipe-style - Inconsistent pipe style can confuse parsers/renderers
-  MD060: 'major', // table-column-style - Inconsistent column separator style in tables
 
   // MINOR - Cosmetic issues, auto-fixable
   MD009: 'minor', // no-trailing-spaces - Trailing spaces (auto-fixable)
@@ -85,6 +84,7 @@ export const RULE_SEVERITY: Record<string, MarkdownLintSeverity> = {
   MD005: 'minor', // list-indent - Inconsistent list indentation (style preference)
   MD007: 'minor', // ul-indent - Unordered list indentation (style preference)
   MD022: 'minor', // blanks-around-headings - Blank lines around headings (auto-fixable)
+  MD060: 'minor', // table-column-style - Alignment is cosmetic; MD056 still blocks broken tables
 };
 
 // ============================================================================

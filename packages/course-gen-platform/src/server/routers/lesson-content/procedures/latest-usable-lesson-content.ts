@@ -1,7 +1,10 @@
 type LessonContentLike = {
+  status?: unknown;
   content?: unknown;
   metadata?: unknown;
 };
+
+const USABLE_LESSON_CONTENT_STATUSES = new Set(['completed', 'approved']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -110,6 +113,14 @@ export function getLessonContentMarkdown(row: LessonContentLike | null | undefin
 }
 
 export function isLessonContentUsable(row: LessonContentLike | null | undefined): boolean {
+  if (!row) {
+    return false;
+  }
+
+  if (typeof row.status === 'string' && !USABLE_LESSON_CONTENT_STATUSES.has(row.status)) {
+    return false;
+  }
+
   return getLessonContentMarkdown(row) !== null;
 }
 
