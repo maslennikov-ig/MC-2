@@ -201,6 +201,7 @@ import { documentProcessingRouter } from './routers/document-processing';
 import { lmsRouter } from './routers/lms';
 import { enrichmentRouter } from './routers/enrichment';
 import { clarifyingRouter } from './routers/clarifying.router';
+import { careerPlaybookRouter } from './routers/career-playbook';
 
 /**
  * Main application router combining all feature routers
@@ -305,6 +306,12 @@ export const appRouter = router({
    * @see {@link clarifyingRouter}
    */
   clarifying: clarifyingRouter,
+
+  /**
+   * Career Playbook Role Guide track
+   * @see {@link careerPlaybookRouter}
+   */
+  careerPlaybook: careerPlaybookRouter,
 });
 
 /**
