@@ -2,15 +2,32 @@ import { Annotation } from '@langchain/langgraph';
 import type {
   CareerPlaybookBlockId,
   CareerPlaybookBlockState,
+  CareerPlaybookJudgeVerdict,
   CareerPlaybookNodeCost,
   CareerPlaybookQAData,
   CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 import type { CareerPlaybookWebResearchResult } from './rag/web-research';
 
-export type CareerPlaybookGroupKey = 'group_1_foundation' | 'group_2_operations';
+export type CareerPlaybookGroupKey =
+  | 'group_1_foundation'
+  | 'group_2_operations'
+  | 'group_3_people'
+  | 'group_4_growth'
+  | 'group_5_system'
+  | 'group_6_wrap';
 
-export type CareerPlaybookGraphNode = 'specBuilder' | 'group1Generator' | 'group2Generator';
+export type CareerPlaybookGraphNode =
+  | 'specBuilder'
+  | 'group1Generator'
+  | 'group2Generator'
+  | 'group3Generator'
+  | 'group4Generator'
+  | 'group5Generator'
+  | 'group6Generator'
+  | 'crossBlockJudge'
+  | 'blockRegenerator'
+  | 'finalAssembler';
 
 export interface CareerPlaybookGroupResult {
   groupKey: CareerPlaybookGroupKey;
@@ -46,11 +63,35 @@ export const CareerPlaybookGraphState = Annotation.Root({
     reducer: (current, update) => ({ ...current, ...update }),
     default: () => ({}),
   }),
+  judgeVerdicts: Annotation<CareerPlaybookJudgeVerdict[]>({
+    reducer: (current, update) => [...current, ...update],
+    default: () => [],
+  }),
+  lastJudgeVerdict: Annotation<CareerPlaybookJudgeVerdict | null>({
+    reducer: (current, update) => update ?? current,
+    default: () => null,
+  }),
+  lastJudgedBlockIds: Annotation<CareerPlaybookBlockId[]>({
+    reducer: (current, update) => update ?? current,
+    default: () => [],
+  }),
+  blockRegenerationAttempts: Annotation<Partial<Record<CareerPlaybookBlockId, number>>>({
+    reducer: (current, update) => ({ ...current, ...update }),
+    default: () => ({}),
+  }),
+  finalMarkdown: Annotation<string | null>({
+    reducer: (current, update) => update ?? current,
+    default: () => null,
+  }),
   nodeCosts: Annotation<CareerPlaybookNodeCost[]>({
     reducer: (current, update) => [...current, ...update],
     default: () => [],
   }),
   errors: Annotation<string[]>({
+    reducer: (current, update) => [...current, ...update],
+    default: () => [],
+  }),
+  warnings: Annotation<string[]>({
     reducer: (current, update) => [...current, ...update],
     default: () => [],
   }),

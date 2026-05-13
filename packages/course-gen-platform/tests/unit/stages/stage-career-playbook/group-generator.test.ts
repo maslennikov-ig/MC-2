@@ -5,6 +5,7 @@ import {
   getCareerPlaybookGroupSpec,
   splitCareerPlaybookGroupMarkdown,
 } from '@/stages/stage-career-playbook/nodes/group-generator';
+import { careerPlaybookPrompts } from '@/shared/prompts/career-playbook-prompts';
 
 const spec: CareerPlaybookRoleProfileSpec = {
   position: {
@@ -67,6 +68,56 @@ const groupOneMarkdown = `## Header
 | Legal terms | Approval | Ask Legal |
 `;
 
+const groupSixMarkdown = `## 18. FAQ
+
+| Вопрос | Ответ |
+| --- | --- |
+| Как понять успех? | По KPI и Definition of Done |
+
+## 22. "Как со мной работать" (заполняется сотрудником)
+
+**Мой стиль общения:** {заполните}
+
+## 23. Протокол непрерывности ("Hit by a Bus")
+
+| Функция | Основной | Дублёр | Последнее обучение |
+| --- | --- | --- | --- |
+| CRM handoff | Эта роль | Sales Ops | {дата} |
+
+## 24. Role Canvas
+
+| Миссия | Метрики |
+| --- | --- |
+| Рост выручки | Pipeline |
+
+## 25. Когда пересматривать эту инструкцию
+
+Версия: 1.0
+
+## 26. Implementation checklist
+
+- Manager reviews role canvas
+- HR schedules calibration
+`;
+
+function promptHeadingLines(promptKey: string): string[] {
+  const prompt = careerPlaybookPrompts.find(entry => entry.promptKey === promptKey);
+  if (!prompt) {
+    return [];
+  }
+
+  const headingsSection = prompt.promptTemplate.match(
+    /Use exactly these top-level headings:\n(?<headings>(?:## .+\n?)+)\nUSER:/
+  );
+
+  return (
+    headingsSection?.groups?.headings
+      .trim()
+      .split('\n')
+      .map(line => line.trim()) ?? []
+  );
+}
+
 describe('Career Playbook group generator', () => {
   it('defines group 1 as Header + blocks 1, 2, and 5', () => {
     const group = getCareerPlaybookGroupSpec('group_1_foundation');
@@ -78,6 +129,53 @@ describe('Career Playbook group generator', () => {
       'block_2',
       'block_5',
     ]);
+  });
+
+  it('defines group 3 as People with deterministic node and phase names', () => {
+    const group = getCareerPlaybookGroupSpec('group_3_people');
+
+    expect(group.promptKey).toBe('career_playbook_group_3_people');
+    expect(group.phaseName).toBe('stage_career_playbook_group_3');
+    expect(group.node).toBe('group3Generator');
+    expect(group.blocks.map(block => block.blockId)).toEqual([
+      'block_7',
+      'block_9',
+      'block_12',
+      'block_13',
+    ]);
+  });
+
+  it('defines group 6 as Wrap with deterministic node and phase names', () => {
+    const group = getCareerPlaybookGroupSpec('group_6_wrap');
+
+    expect(group.promptKey).toBe('career_playbook_group_6_wrap');
+    expect(group.phaseName).toBe('stage_career_playbook_group_6');
+    expect(group.node).toBe('group6Generator');
+    expect(group.blocks.map(block => block.blockId)).toEqual([
+      'block_18',
+      'block_22',
+      'block_23',
+      'block_24',
+      'block_25',
+      'block_26',
+    ]);
+  });
+
+  it('registers group 3-6 prompts with headings that match their group specs', () => {
+    for (const groupKey of [
+      'group_3_people',
+      'group_4_growth',
+      'group_5_system',
+      'group_6_wrap',
+    ] as const) {
+      const group = getCareerPlaybookGroupSpec(groupKey);
+      const headings = promptHeadingLines(group.promptKey);
+
+      expect(headings).toHaveLength(group.blocks.length);
+      expect(headings).toEqual(
+        group.blocks.map(block => expect.stringMatching(block.headingPattern))
+      );
+    }
   });
 
   it('generates group 1 blocks through the prompt service and mock LLM', async () => {
@@ -144,5 +242,25 @@ Decision text`,
         group
       )
     ).toThrow('Career Playbook group group_1_foundation is missing blocks: block_2');
+  });
+
+  it('rejects later group markdown that omits required block headings', () => {
+    const group = getCareerPlaybookGroupSpec('group_6_wrap');
+
+    expect(() =>
+      splitCareerPlaybookGroupMarkdown(
+        groupSixMarkdown.replace(
+          `## 24. Role Canvas
+
+| Миссия | Метрики |
+| --- | --- |
+| Рост выручки | Pipeline |
+
+`,
+          ''
+        ),
+        group
+      )
+    ).toThrow('Career Playbook group group_6_wrap is missing blocks: block_24');
   });
 });

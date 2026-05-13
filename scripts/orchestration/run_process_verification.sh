@@ -30,7 +30,7 @@ import pathlib
 import re
 import tomllib
 
-EXPECTED_PROFILE = "balanced-v2.9"
+EXPECTED_PROFILE = "balanced-v2.10"
 EXPECTED_SOURCE_SKILL = "orchestration-setup"
 
 orchestrator_path = pathlib.Path(".codex/orchestrator.toml")
@@ -65,6 +65,21 @@ if launcher not in {"codex_subagents", "manual_user_launch", "none"}:
     raise SystemExit(
         "delegation.launcher must be one of codex_subagents, manual_user_launch, or none"
     )
+
+if launcher == "codex_subagents":
+    visibility = delegation.get("subagent_visibility")
+    if visibility != "separate_spawned_threads":
+        raise SystemExit(
+            "delegation.subagent_visibility must be 'separate_spawned_threads' for codex_subagents"
+        )
+    if delegation.get("inline_subagents_allowed") is not False:
+        raise SystemExit(
+            "delegation.inline_subagents_allowed must be false for codex_subagents"
+        )
+    if delegation.get("requires_explicit_user_spawn_request") is not True:
+        raise SystemExit(
+            "delegation.requires_explicit_user_spawn_request must be true for codex_subagents"
+        )
 
 if launcher == "manual_user_launch":
     manual_prompt_template = pathlib.Path(

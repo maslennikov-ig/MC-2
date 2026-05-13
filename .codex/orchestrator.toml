@@ -12,7 +12,7 @@ multi_repo = false
 launch_mode = "manual_user_launch"
 
 [baseline]
-profile = "balanced-v2.9"
+profile = "balanced-v2.10"
 source_skill = "orchestration-setup"
 
 [execution]
@@ -99,6 +99,9 @@ direct_push_to_protected_branches_forbidden = true
 
 [delegation]
 launcher = "codex_subagents"
+subagent_visibility = "separate_spawned_threads"
+inline_subagents_allowed = false
+requires_explicit_user_spawn_request = true
 require_base_branch_and_commit = true
 require_dedicated_worktree = true
 require_strict_write_zone = true
