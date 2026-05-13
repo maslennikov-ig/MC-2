@@ -4,6 +4,9 @@ artifact_type: delegated-stream
 task_id: <task-id>
 stage_id: <stage-id>
 agent_type: <worker|explorer|docs_researcher|skill_scout|custom-or-n/a>
+subagent_model: <inherit_orchestrator|model-id|role_default|n/a>
+reasoning_effort: <inherit_orchestrator|role_default|low|medium|high|xhigh|n/a>
+model_reasoning_rationale: <short reason>
 repo: <repo-or-n/a>
 branch: <branch>
 base_branch: <base-branch>
@@ -45,7 +48,7 @@ Short outcome summary.
 
 # Scope / Routing
 
-Record the assigned write zone, success criteria, selected docs, selected skills, selected agents, catalog candidates, parallel group, and dependency boundaries.
+Record the assigned write zone, success criteria, selected docs, selected skills, selected agents, catalog candidates, model/reasoning choice, parallel group, and dependency boundaries.
 
 # Verification
 

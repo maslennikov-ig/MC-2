@@ -61,7 +61,11 @@ test.describe('Career Playbook Phase A wizard', () => {
       await page.getByRole('button', { name: 'Далее' }).click()
       await page.getByRole('button', { name: 'Завершить Phase A' }).click()
 
-      await expect(page.getByRole('heading', { name: 'Phase A готова' })).toBeVisible()
+      await expect(
+        page.getByRole('heading', { name: 'Адаптивные уточнения пока недоступны' })
+      ).toBeVisible()
+      await page.getByRole('button', { name: 'Достаточно, сгенерируй' }).click()
+      await expect(page.getByRole('heading', { name: 'Готовы создать?' })).toBeVisible()
     })
   })
 })
