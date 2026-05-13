@@ -1,0 +1,94 @@
+import { describe, expect, it } from 'vitest';
+import type { CareerPlaybookQAData } from '@megacampus/shared-types';
+import {
+  buildCareerPlaybookResearchQueries,
+  parseRoleProfileSpecFromLLM,
+  runCareerPlaybookWebResearch,
+} from '@/stages/stage-career-playbook/nodes/spec-builder';
+
+const qaData: CareerPlaybookQAData = {
+  fixed: [
+    { question_key: 'position', value: 'B2B Sales Manager' },
+    { question_key: 'department', value: 'sales' },
+    { question_key: 'level', value: 'senior' },
+    { question_key: 'team_size', value: '51-200' },
+    { question_key: 'reporting', value: 'Reports to CRO. Leads 3 SDRs.' },
+    { question_key: 'content_language', value: 'ru' },
+  ],
+  followups: [],
+  freeform: [{ text: 'Enterprise sales, consultative deals, CRM discipline.' }],
+};
+
+const roleProfileSpec = {
+  position: {
+    title: 'B2B Sales Manager',
+    slug: 'b2b-sales-manager',
+    department: 'sales',
+    level: 'senior',
+  },
+  context: {
+    company_stage: 'growth',
+    team_size: '51-200',
+    reports_to: 'CRO',
+    has_subordinates: true,
+    subordinates_description: '3 SDRs',
+  },
+  focus_areas: {
+    primary_kpis: ['Qualified pipeline', 'Closed revenue', 'Win rate'],
+    key_tools: ['CRM', 'Sales engagement'],
+    critical_competencies: ['Discovery', 'Negotiation', 'Forecasting'],
+    anti_goals: ['Own product roadmap', 'Approve legal terms'],
+    failure_patterns: ['Poor CRM hygiene', 'Discount-first selling'],
+  },
+  research: {
+    kpis_insights: ['Pipeline coverage should be reviewed weekly'],
+    trends_insights: ['AI copilots improve account preparation'],
+    onboarding_insights: ['Shadowing shortens ramp time'],
+    sources: ['https://example.com/sales-kpi'],
+  },
+  block_boundaries: {
+    block_1: {
+      primary_topics: ['mission', 'north star metric'],
+      do_not_repeat: ['decision authority'],
+    },
+    block_5: {
+      primary_topics: ['decision authority'],
+      do_not_repeat: ['competency matrix'],
+    },
+  },
+  content_language: 'ru',
+};
+
+describe('Career Playbook spec builder', () => {
+  it('parses RoleProfileSpec from fenced LLM JSON', () => {
+    const parsed = parseRoleProfileSpecFromLLM(
+      `Here is the spec:\n\n\`\`\`json\n${JSON.stringify(roleProfileSpec)}\n\`\`\``
+    );
+
+    expect(parsed.position.title).toBe('B2B Sales Manager');
+    expect(parsed.focus_areas.primary_kpis).toContain('Qualified pipeline');
+    expect(parsed.block_boundaries.block_5.primary_topics).toContain('decision authority');
+  });
+
+  it('builds exactly three role-specific web research queries', () => {
+    const queries = buildCareerPlaybookResearchQueries(qaData);
+
+    expect(queries).toHaveLength(3);
+    expect(queries.map(query => query.category)).toEqual(['kpis', 'trends', 'onboarding']);
+    expect(queries[0].query).toContain('B2B Sales Manager');
+    expect(queries[1].query).toContain('2026');
+  });
+
+  it('returns empty research with error metadata when every web search times out', async () => {
+    const research = await runCareerPlaybookWebResearch(qaData, {
+      timeoutMs: 1,
+      client: () => new Promise(resolve => setTimeout(() => resolve([]), 50)),
+    });
+
+    expect(research.kpis_insights).toEqual([]);
+    expect(research.trends_insights).toEqual([]);
+    expect(research.onboarding_insights).toEqual([]);
+    expect(research.sources).toEqual([]);
+    expect(research.errors).toHaveLength(3);
+  });
+});
