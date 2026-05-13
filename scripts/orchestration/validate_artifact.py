@@ -6,18 +6,37 @@ from __future__ import annotations
 import pathlib
 import re
 import sys
+from typing import TypeAlias
+
+YamlValue: TypeAlias = str | list[str]
 
 REQUIRED_KEYS = {
+    "schema_version",
     "task_id",
     "stage_id",
+    "repo",
     "branch",
     "base_branch",
     "base_commit",
     "worktree",
     "status",
+    "delivery_method",
+    "accepted_by_orchestrator",
+    "cleanup_status",
+    "cleanup_notes",
+    "risk_level",
     "verification",
     "changed_files",
+    "explicit_defers",
 }
+
+REQUIRED_LIST_KEYS = {"verification", "changed_files", "explicit_defers"}
+ALLOWED_SCHEMA_VERSIONS = {"orchestration-artifact/v1"}
+ALLOWED_STATUSES = {"returned", "accepted", "merged", "blocked"}
+ALLOWED_DELIVERY_METHODS = {"merge", "cherry-pick", "manual integration", "not accepted", "n/a"}
+ALLOWED_ACCEPTED_BY_ORCHESTRATOR = {"yes", "no"}
+ALLOWED_CLEANUP_STATUSES = {"pending", "cleaned", "blocked", "not_applicable"}
+ALLOWED_RISK_LEVELS = {"low", "medium", "high"}
 
 REQUIRED_HEADINGS = [
     "# Summary",
@@ -44,16 +63,62 @@ def parse_frontmatter(text: str) -> tuple[str, str]:
     return text[4:end], text[end + 5 :]
 
 
-def extract_keys(frontmatter: str) -> dict[str, str]:
-    keys: dict[str, str] = {}
+def extract_frontmatter_values(frontmatter: str) -> dict[str, YamlValue]:
+    values: dict[str, YamlValue] = {}
+    current_key: str | None = None
+
     for raw_line in frontmatter.splitlines():
-        if not raw_line or raw_line.startswith(" ") or raw_line.startswith("-"):
+        if not raw_line:
             continue
-        if ":" not in raw_line:
+
+        if raw_line.startswith("  - ") or raw_line.startswith("- "):
+            if current_key is not None:
+                current_values = values.setdefault(current_key, [])
+                if isinstance(current_values, list):
+                    current_values.append(raw_line.split("-", 1)[1].strip())
             continue
-        key, value = raw_line.split(":", 1)
-        keys[key.strip()] = value.strip()
-    return keys
+
+        if ":" not in raw_line or raw_line.startswith(" "):
+            continue
+
+        key, raw_value = raw_line.split(":", 1)
+        key = key.strip()
+        raw_value = raw_value.strip()
+        if raw_value:
+            values[key] = raw_value
+            current_key = None
+        else:
+            values[key] = []
+            current_key = key
+
+    return values
+
+
+def is_placeholder(value: str) -> bool:
+    stripped = value.strip()
+    return stripped.startswith("<") and stripped.endswith(">")
+
+
+def list_is_meaningful(value: YamlValue | None) -> bool:
+    if not isinstance(value, list):
+        return False
+    return any(item.strip() and not is_placeholder(item) for item in value)
+
+
+def validate_scalar(
+    path: pathlib.Path,
+    key: str,
+    values: dict[str, YamlValue],
+    allowed: set[str] | None = None,
+) -> list[str]:
+    value = values.get(key)
+    if not isinstance(value, str) or not value.strip():
+        return [f"{path}: frontmatter key {key!r} must be a non-empty scalar"]
+    if is_placeholder(value):
+        return [f"{path}: unresolved placeholder value: {key}"]
+    if allowed is not None and value not in allowed:
+        return [f"{path}: invalid {key!r} value {value!r}; expected one of {sorted(allowed)}"]
+    return []
 
 
 def validate_file(path: pathlib.Path) -> list[str]:
@@ -68,14 +133,31 @@ def validate_file(path: pathlib.Path) -> list[str]:
     except ValueError as exc:
         return [f"{path}: {exc}"]
 
-    keys = extract_keys(frontmatter)
-    missing = sorted(REQUIRED_KEYS - set(keys))
+    values = extract_frontmatter_values(frontmatter)
+    missing = sorted(REQUIRED_KEYS - set(values))
     if missing:
         errors.append(f"{path}: missing frontmatter keys: {', '.join(missing)}")
 
-    placeholders = [key for key, value in keys.items() if value.startswith("<") and value.endswith(">")]
-    if placeholders:
-        errors.append(f"{path}: unresolved placeholder values: {', '.join(placeholders)}")
+    for key in REQUIRED_KEYS - REQUIRED_LIST_KEYS:
+        if key in values:
+            errors.extend(validate_scalar(path, key, values))
+
+    if "schema_version" in values:
+        errors.extend(validate_scalar(path, "schema_version", values, ALLOWED_SCHEMA_VERSIONS))
+    if "status" in values:
+        errors.extend(validate_scalar(path, "status", values, ALLOWED_STATUSES))
+    if "delivery_method" in values:
+        errors.extend(validate_scalar(path, "delivery_method", values, ALLOWED_DELIVERY_METHODS))
+    if "accepted_by_orchestrator" in values:
+        errors.extend(validate_scalar(path, "accepted_by_orchestrator", values, ALLOWED_ACCEPTED_BY_ORCHESTRATOR))
+    if "cleanup_status" in values:
+        errors.extend(validate_scalar(path, "cleanup_status", values, ALLOWED_CLEANUP_STATUSES))
+    if "risk_level" in values:
+        errors.extend(validate_scalar(path, "risk_level", values, ALLOWED_RISK_LEVELS))
+
+    for key in sorted(REQUIRED_LIST_KEYS):
+        if key in values and not list_is_meaningful(values.get(key)):
+            errors.append(f"{path}: frontmatter key {key!r} must contain at least one non-placeholder item")
 
     for heading in REQUIRED_HEADINGS:
         if heading not in body:
