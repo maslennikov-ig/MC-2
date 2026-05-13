@@ -30,7 +30,7 @@ import pathlib
 import re
 import tomllib
 
-EXPECTED_PROFILE = "balanced-v2.10"
+EXPECTED_PROFILE = "balanced-v2.11"
 EXPECTED_SOURCE_SKILL = "orchestration-setup"
 
 orchestrator_path = pathlib.Path(".codex/orchestrator.toml")
@@ -79,6 +79,18 @@ if launcher == "codex_subagents":
     if delegation.get("requires_explicit_user_spawn_request") is not True:
         raise SystemExit(
             "delegation.requires_explicit_user_spawn_request must be true for codex_subagents"
+        )
+    if delegation.get("parallel_decomposition_matrix") != "required_for_medium_complex":
+        raise SystemExit(
+            "delegation.parallel_decomposition_matrix must be 'required_for_medium_complex'"
+        )
+    if delegation.get("parallel_execution_default") != "spawn_all_independent_streams":
+        raise SystemExit(
+            "delegation.parallel_execution_default must be 'spawn_all_independent_streams'"
+        )
+    if delegation.get("sequential_requires_reason") is not True:
+        raise SystemExit(
+            "delegation.sequential_requires_reason must be true"
         )
 
 if launcher == "manual_user_launch":

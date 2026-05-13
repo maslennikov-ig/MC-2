@@ -12,7 +12,7 @@ multi_repo = false
 launch_mode = "manual_user_launch"
 
 [baseline]
-profile = "balanced-v2.10"
+profile = "balanced-v2.11"
 source_skill = "orchestration-setup"
 
 [execution]
@@ -121,6 +121,9 @@ artifact_fields = [
 write_heavy_requires_dedicated_worktree = true
 worker_isolation = "dedicated_branch_worktree"
 
+parallel_decomposition_matrix = "required_for_medium_complex"
+parallel_execution_default = "spawn_all_independent_streams"
+sequential_requires_reason = true
 [review]
 require_findings_first = true
 allowed_decisions = ["merge", "fix", "split", "defer"]

@@ -1,38 +1,38 @@
 # Orchestrator Handoff
 
 Updated: 2026-05-13
-Current working branch: `feature/career-playbook-backend-3`
-Base branch: `feature/career-playbook-backend-2` stacked on PR #26
+Current working branch: `feature/career-playbook-frontend-wizard`
+Base branch: `feature/career-playbook-backend-3` stacked on PR #27
 
 ## Current state
 
-- This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
-- Delivery truth remains unchanged: `develop` is the dev delivery branch, `master` is staging, and direct pushes to protected branches are forbidden.
-- Career Playbook Phase 1 is closed in Beads as `mc2-db696.1`; Phase 2 is `mc2-db696.2` on `feature/career-playbook-backend-2`.
-- Phase 3 work is tracked in Beads as `mc2-db696.3` and implemented on `feature/career-playbook-backend-3`.
-- No billing or payment scope is part of the Career Playbook MVP work in this branch.
+- Repo shape: single pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
+- Delivery truth: `develop` is dev delivery, `master` is staging, and direct pushes to protected branches remain forbidden.
+- Career Playbook PR stack is still open: #24 base orchestration, #25 Phase 1, #26 backend stage, #27 backend stage 3.
+- Phase 4 `mc2-db696.4` is implemented locally on this branch: Phase A wizard route, store, components, i18n, unit tests, and Playwright e2e.
+- No billing or payment scope is part of Career Playbook MVP work.
 
 ## Latest relevant stage
 
-- Latest relevant Career Playbook stage: `mc2-db696.3` — groups 3-6, cross-block judge, block regenerator, final assembler, follow-up helper, and graph/handler integration.
-- Stage summary: [`.codex/stages/mc2-db696.3/summary.md`](./stages/mc2-db696.3/summary.md)
-- Delegated artifacts: [groups](./stages/mc2-db696.3/artifacts/mc2-db696.3-groups.md), [judge](./stages/mc2-db696.3/artifacts/mc2-db696.3-judge.md), [support nodes](./stages/mc2-db696.3/artifacts/mc2-db696.3-support-nodes.md).
+- Latest relevant Career Playbook stage: `mc2-db696.4` - Frontend wizard Phase A plus draft persistence.
+- Stage summary: [`.codex/stages/mc2-db696.4/summary.md`](./stages/mc2-db696.4/summary.md)
+- Artifacts: store, wizard-ui, and route-i18n-e2e under [`.codex/stages/mc2-db696.4/artifacts`](./stages/mc2-db696.4/artifacts).
 
 ## Next recommended
 
-Next stage id: `mc2-db696.4`
-Recommended action: continue Frontend wizard Phase A after Phase 3 PR is opened; keep the stack aligned until PR #24/#25/#26 land.
+Next stage id: `mc2-db696.5`
+Recommended action: after closing and pushing Phase 4, open a draft PR targeting `feature/career-playbook-backend-3`; then continue the stack with Frontend Phase B only if the PR stack remains intentional and clean.
 
-- Keep `feature/career-playbook-backend-3` stacked until PR #26 lands, then rebase or retarget according to the final backend merge path.
-- Frontend, marketing, library/share, PDF, bridge, and smoke tasks remain separate Beads work.
+- If PR #24/#25/#26/#27 land first, rebase/retarget before more dependent frontend work.
+- Independent marketing/library/share tasks may proceed separately if their base branch decision is explicit.
 
 ## Starter prompt for next orchestrator
 
 ```text
-Use $orchestrator-stage to continue Career Playbook. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth, verify PR #24/#25/#26 status, and avoid dependent work on develop unless the stacked PRs have merged.
+Use $orchestrator-stage to continue Career Playbook. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth, verify PR #24/#25/#26/#27 status, and avoid dependent work on develop unless the stacked PRs have merged.
 ```
 
 ## Explicit defers
 
-- Frontend wizard Phase A is tracked as `mc2-db696.4`.
-- Marketing, library/share/RLS/public viewer, PDF, JD bridge, and end-to-end smoke work remain tracked in later Beads tasks under epic `mc2-db696`.
+- Follow-up adaptive questions, free-form continuation, and generation handoff remain tracked as `mc2-db696.5`.
+- Marketing, library/share/RLS/public viewer, PDF, JD bridge, and end-to-end smoke work remain later Beads tasks under epic `mc2-db696`.

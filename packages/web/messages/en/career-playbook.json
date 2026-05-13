@@ -1,0 +1,26 @@
+{
+  "wizard": {
+    "eyebrow": "Career Playbook",
+    "title": "Role Guide constructor",
+    "subtitle": "Answer the fixed role questions. The draft is saved locally and syncs with the server when the backend can accept answers.",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish Phase A",
+    "freeform": "Free-form",
+    "freeformTitle": "Tell freely",
+    "freeformPlaceholder": "Describe the role, company context, and important expectations in your own words.",
+    "saveFreeform": "Save text",
+    "draftSaving": "Saving draft...",
+    "draftSaved": "Draft saved locally",
+    "draftUnsynced": "Local draft saved. Server sync is waiting for retry.",
+    "openPlaceholder": "Type your answer",
+    "chooseOneLabel": "Choose one",
+    "chooseManyLabel": "Choose several",
+    "questionLabel": "Question",
+    "answeredLabel": "Answered",
+    "ofLabel": "of",
+    "completionTitle": "Phase A is ready",
+    "completionDescription": "Adaptive follow-ups continue in Phase B.",
+    "completionCta": "Continue"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "wizard": {
+    "eyebrow": "Career Playbook",
+    "title": "Конструктор Role Guide",
+    "subtitle": "Ответьте на фиксированные вопросы о роли. Черновик сохраняется локально и синхронизируется с сервером, когда backend готов принять ответы.",
+    "back": "Назад",
+    "next": "Далее",
+    "finish": "Завершить Phase A",
+    "freeform": "Свободный ответ",
+    "freeformTitle": "Расскажите свободно",
+    "freeformPlaceholder": "Опишите роль, контекст компании и важные ожидания одним текстом.",
+    "saveFreeform": "Сохранить текст",
+    "draftSaving": "Сохранение черновика...",
+    "draftSaved": "Черновик сохранён локально",
+    "draftUnsynced": "Локальный черновик сохранён. Синхронизация с сервером ожидает повтора.",
+    "openPlaceholder": "Введите ответ",
+    "chooseOneLabel": "Выберите один вариант",
+    "chooseManyLabel": "Можно выбрать несколько",
+    "questionLabel": "Вопрос",
+    "answeredLabel": "Отвечено",
+    "ofLabel": "из",
+    "completionTitle": "Phase A готова",
+    "completionDescription": "Адаптивные уточнения продолжатся в Phase B.",
+    "completionCta": "Продолжить"
+  }
+}

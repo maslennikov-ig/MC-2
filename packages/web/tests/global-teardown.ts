@@ -7,12 +7,15 @@
 import { type FullConfig } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 async function globalTeardown(_config: FullConfig) {
   console.log('[Global Teardown] Starting cleanup...')
 
   // Optional: Clean up auth files
-  const authDir = path.join(__dirname, '.auth')
+  const authDir = path.join(dirname, '.auth')
   if (fs.existsSync(authDir)) {
     console.log('[Global Teardown] Auth directory preserved for debugging')
     // Uncomment to remove auth files:

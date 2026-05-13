@@ -21,6 +21,10 @@ selected_agents:
   - <agent-or-none>
 catalog_candidates:
   - <candidate-or-none>
+parallel_group: <matrix-stream-id-or-n/a>
+depends_on_streams:
+  - <stream-id-or-none>
+parallel_decision: <parallel|sequential|local|n/a>
 status: <returned|accepted|merged|blocked>
 delivery_method: <merge|cherry-pick|manual integration|not accepted|n/a>
 accepted_by_orchestrator: <yes|no>
@@ -41,7 +45,7 @@ Short outcome summary.
 
 # Scope / Routing
 
-Record the assigned write zone, success criteria, selected docs, selected skills, selected agents, and catalog candidates.
+Record the assigned write zone, success criteria, selected docs, selected skills, selected agents, catalog candidates, parallel group, and dependency boundaries.
 
 # Verification
 
