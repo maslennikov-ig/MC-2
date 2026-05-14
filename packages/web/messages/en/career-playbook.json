@@ -42,8 +42,10 @@
     "skippedLabel": "Skipped",
     "editLabel": "Edit",
     "generateCta": "Generate Role Guide",
-    "generationHandoffTitle": "Generation handoff saved",
-    "generationHandoffDescription": "The draft is saved and ready for backend generation handoff.",
+    "generationHandoffTitle": "Generation started",
+    "generationHandoffDescription": "Backend generation has started.",
+    "generationStarting": "Starting generation...",
+    "generationErrorTitle": "Generation could not start",
     "emptySummary": "No data yet"
   }
 }

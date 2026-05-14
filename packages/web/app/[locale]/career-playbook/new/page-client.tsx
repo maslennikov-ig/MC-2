@@ -163,6 +163,8 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
     generate: t('generateCta'),
     generationHandoffTitle: t('generationHandoffTitle'),
     generationHandoffDescription: t('generationHandoffDescription'),
+    generationStarting: t('generationStarting'),
+    generationErrorTitle: t('generationErrorTitle'),
     empty: t('emptySummary'),
   }
 
@@ -212,7 +214,13 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
     void useCareerPlaybookStore
       .getState()
       .flushCareerPlaybookAutosave()
-      .then(() => setGenerationHandoffVisible(true))
+      .then(async (autosaveResult) => {
+        if (!autosaveResult.ok) return
+        const result = await useCareerPlaybookStore.getState().approveCareerPlaybookGeneration()
+        if (result.ok) {
+          setGenerationHandoffVisible(true)
+        }
+      })
   }
 
   return (
@@ -322,7 +330,13 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
             onEditFixedAnswer={state.editCareerPlaybookFixedAnswer}
             onEditFollowupAnswer={state.editCareerPlaybookFollowupAnswer}
             onGenerate={handleGenerate}
-            generationHandoffVisible={generationHandoffVisible}
+            generationHandoffVisible={
+              generationHandoffVisible ||
+              state.status === 'generating' ||
+              state.status === 'completed'
+            }
+            generationError={state.generationStartError}
+            isGenerationStarting={state.isStartingGeneration || state.isAutosaving}
             copy={completionCopy}
           />
         ) : null}
