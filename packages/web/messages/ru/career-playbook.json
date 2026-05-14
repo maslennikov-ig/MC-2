@@ -47,5 +47,38 @@
     "generationStarting": "Запускаем генерацию...",
     "generationErrorTitle": "Не удалось запустить генерацию",
     "emptySummary": "Пока нет данных"
+  },
+  "library": {
+    "title": "Библиотека Role Guide",
+    "subtitle": "Ваши сгенерированные и опубликованные Role Guide",
+    "searchPlaceholder": "Поиск по названию роли",
+    "filters": {
+      "all": "Все статусы",
+      "completed": "Готово",
+      "generating": "Генерируется",
+      "failed": "Ошибка",
+      "department": "Отдел",
+      "departmentAll": "Все отделы",
+      "level": "Уровень",
+      "levelAll": "Все уровни"
+    },
+    "createNew": "Создать новый",
+    "emptyTitle": "Пока нет Role Guide",
+    "emptyDescription": "Создайте первый Career Playbook, чтобы собрать библиотеку.",
+    "errorTitle": "Библиотека временно недоступна",
+    "errorDescription": "Повторите позже или начните новый guide.",
+    "selectedCount": "Выбрано: {count}",
+    "bulkDelete": "Удалить выбранные",
+    "deleting": "Удаляем...",
+    "loadMore": "Загрузить ещё",
+    "loadingMore": "Загружаем...",
+    "card": {
+      "publicBadge": "Публичный",
+      "privateBadge": "Приватный"
+    }
+  },
+  "share": {
+    "fallbackTitle": "Публичный Career Playbook",
+    "fallbackDescription": "Откройте публичный Role Guide, созданный на MC2."
   }
 }

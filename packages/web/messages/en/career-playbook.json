@@ -47,5 +47,38 @@
     "generationStarting": "Starting generation...",
     "generationErrorTitle": "Generation could not start",
     "emptySummary": "No data yet"
+  },
+  "library": {
+    "title": "Role Guide library",
+    "subtitle": "Your generated and shared role guides",
+    "searchPlaceholder": "Search by role title",
+    "filters": {
+      "all": "All statuses",
+      "completed": "Completed",
+      "generating": "Generating",
+      "failed": "Failed",
+      "department": "Department",
+      "departmentAll": "All departments",
+      "level": "Level",
+      "levelAll": "All levels"
+    },
+    "createNew": "Create new",
+    "emptyTitle": "No role guides yet",
+    "emptyDescription": "Create your first Career Playbook to build your library.",
+    "errorTitle": "Library temporarily unavailable",
+    "errorDescription": "Retry in a minute or create a new guide.",
+    "selectedCount": "{count} selected",
+    "bulkDelete": "Delete selected",
+    "deleting": "Deleting...",
+    "loadMore": "Load more",
+    "loadingMore": "Loading...",
+    "card": {
+      "publicBadge": "Public",
+      "privateBadge": "Private"
+    }
+  },
+  "share": {
+    "fallbackTitle": "Shared Career Playbook",
+    "fallbackDescription": "Open a shared role guide created on MC2."
   }
 }
