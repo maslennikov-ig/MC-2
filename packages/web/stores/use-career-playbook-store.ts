@@ -5,9 +5,12 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
 import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
-import { languageSchema } from '@megacampus/shared-types'
+import { CAREER_PLAYBOOK_BLOCK_CATALOG, languageSchema } from '@megacampus/shared-types'
 import type {
   CareerPlaybookAnswerSubmission,
+  CareerPlaybookBlockCatalogItem,
+  CareerPlaybookBlockId,
+  CareerPlaybookBlockState,
   CareerPlaybookFixedAnswer,
   CareerPlaybookFixedQuestion,
   CareerPlaybookFixedQuestionLanguage,
@@ -15,8 +18,12 @@ import type {
   CareerPlaybookFollowupQuestion,
   CareerPlaybookFollowupResponse,
   CareerPlaybookPlaybookStatus,
+  CareerPlaybookViewerSnapshot,
   Language,
 } from '@megacampus/shared-types'
+
+export { CAREER_PLAYBOOK_BLOCK_CATALOG }
+export type { CareerPlaybookBlockId, CareerPlaybookViewerSnapshot }
 
 export type CareerPlaybookWizardPhase = 'fixed' | 'followups' | 'completion'
 export type CareerPlaybookAnswerValue = string | string[]
@@ -43,6 +50,18 @@ export interface CareerPlaybookDraft {
 export interface CareerPlaybookClient {
   startSession?: (input: { language: Language }) => Promise<CareerPlaybookDraft>
   getDraft?: (input: { playbookId: string }) => Promise<CareerPlaybookDraft>
+  getViewer?: (input: { playbookId: string }) => Promise<CareerPlaybookViewerSnapshot>
+  editBlock?: (input: {
+    playbookId: string
+    blockId: CareerPlaybookBlockId
+    content: string
+  }) => Promise<CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }>
+  regenerateBlock?: (input: {
+    playbookId: string
+    blockId: CareerPlaybookBlockId
+    instruction: string
+  }) => Promise<CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }>
+  requestPdf?: (input: { playbookId: string }) => Promise<unknown>
   requestFollowups?: (input: {
     playbookId: string
     fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
@@ -59,6 +78,11 @@ export interface CareerPlaybookClient {
 export interface CareerPlaybookAutosaveResult {
   ok: boolean
   error?: string
+  backendPending?: boolean
+}
+
+export interface CareerPlaybookViewerBlock extends CareerPlaybookBlockCatalogItem {
+  state: CareerPlaybookBlockState
 }
 
 interface CareerPlaybookStoreState {
@@ -85,9 +109,28 @@ interface CareerPlaybookStoreState {
   dirtyFollowupQuestionIds: string[]
   dirtyFreeformDraft: boolean
   lastAutosavedAt: string | null
+  viewer: CareerPlaybookViewerSnapshot | null
+  viewerBlocks: CareerPlaybookViewerBlock[]
+  isLoadingViewer: boolean
+  isUpdatingViewerBlock: boolean
+  viewerError: string | null
+  viewerActionMessage: string | null
+  showCareerPlaybookThinkingStream: boolean
 
   initializeCareerPlaybookPhaseA: (input: { uiLanguage: string; contentLanguage: string }) => void
   hydrateCareerPlaybookDraft: (draft: CareerPlaybookDraft) => void
+  hydrateCareerPlaybookViewer: (snapshot: CareerPlaybookViewerSnapshot) => void
+  loadCareerPlaybookViewer: (playbookId: string) => Promise<CareerPlaybookAutosaveResult>
+  editCareerPlaybookViewerBlock: (
+    blockId: CareerPlaybookBlockId,
+    content: string
+  ) => Promise<CareerPlaybookAutosaveResult>
+  regenerateCareerPlaybookViewerBlock: (
+    blockId: CareerPlaybookBlockId,
+    instruction: string
+  ) => Promise<CareerPlaybookAutosaveResult>
+  requestCareerPlaybookPdf: () => Promise<CareerPlaybookAutosaveResult>
+  toggleCareerPlaybookThinkingStream: () => void
   answerCareerPlaybookFixedQuestion: (questionKey: string, value: CareerPlaybookAnswerValue) => void
   goToNextCareerPlaybookQuestion: () => void
   goToPreviousCareerPlaybookQuestion: () => void
@@ -341,6 +384,12 @@ function initialState(): Omit<
   CareerPlaybookStoreState,
   | 'initializeCareerPlaybookPhaseA'
   | 'hydrateCareerPlaybookDraft'
+  | 'hydrateCareerPlaybookViewer'
+  | 'loadCareerPlaybookViewer'
+  | 'editCareerPlaybookViewerBlock'
+  | 'regenerateCareerPlaybookViewerBlock'
+  | 'requestCareerPlaybookPdf'
+  | 'toggleCareerPlaybookThinkingStream'
   | 'answerCareerPlaybookFixedQuestion'
   | 'goToNextCareerPlaybookQuestion'
   | 'goToPreviousCareerPlaybookQuestion'
@@ -383,6 +432,13 @@ function initialState(): Omit<
     dirtyFollowupQuestionIds: [],
     dirtyFreeformDraft: false,
     lastAutosavedAt: null,
+    viewer: null,
+    viewerBlocks: [],
+    isLoadingViewer: false,
+    isUpdatingViewerBlock: false,
+    viewerError: null,
+    viewerActionMessage: null,
+    showCareerPlaybookThinkingStream: false,
   }
 }
 
@@ -485,6 +541,37 @@ function answerValuesEqual(
   return left === right
 }
 
+function emptyViewerBlockState(): CareerPlaybookBlockState {
+  return {
+    content: '',
+    status: 'pending',
+    attempt: 0,
+  }
+}
+
+function viewerBlocksFromSnapshot(
+  snapshot: CareerPlaybookViewerSnapshot
+): CareerPlaybookViewerBlock[] {
+  return CAREER_PLAYBOOK_BLOCK_CATALOG.map((block) => ({
+    ...block,
+    state: snapshot.blocks[block.blockId] ?? emptyViewerBlockState(),
+  }))
+}
+
+function normalizeViewerSnapshot(
+  snapshot: CareerPlaybookViewerSnapshot
+): CareerPlaybookViewerSnapshot {
+  return {
+    ...snapshot,
+    blocks: { ...snapshot.blocks },
+  }
+}
+
+function isCareerPlaybookBackendPending(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('METHOD_NOT_SUPPORTED') || message.includes('not implemented')
+}
+
 function getClient(): CareerPlaybookClient {
   if (testClient) return testClient
 
@@ -494,6 +581,18 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.session.start.mutate(input)) as unknown as CareerPlaybookDraft,
     getDraft: async (input) =>
       (await client.careerPlaybook.session.getDraft.query(input)) as unknown as CareerPlaybookDraft,
+    getViewer: async (input) =>
+      (await client.careerPlaybook.library.get.query(
+        input
+      )) as unknown as CareerPlaybookViewerSnapshot,
+    editBlock: async (input) =>
+      (await client.careerPlaybook.library.edit.mutate(
+        input
+      )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
+    regenerateBlock: async (input) =>
+      (await client.careerPlaybook.library.regenerateBlock.mutate(
+        input
+      )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
     submitAnswer: (input) => client.careerPlaybook.session.submitAnswer.mutate(input),
   }
 }
@@ -621,6 +720,249 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             0,
             Math.min(state.currentFollowupIndex, state.followupQuestions.length - 1)
           )
+        }),
+
+      hydrateCareerPlaybookViewer: (snapshot) =>
+        set((state) => {
+          const normalizedSnapshot = normalizeViewerSnapshot(snapshot)
+          state.playbookId = normalizedSnapshot.playbookId
+          state.status = normalizedSnapshot.status
+          state.contentLanguage = normalizedSnapshot.contentLanguage
+          state.viewer = normalizedSnapshot
+          state.viewerBlocks = viewerBlocksFromSnapshot(normalizedSnapshot)
+          state.isLoadingViewer = false
+          state.isUpdatingViewerBlock = false
+          state.viewerError = null
+          state.viewerActionMessage = null
+        }),
+
+      loadCareerPlaybookViewer: async (playbookId) => {
+        set((state) => {
+          state.isLoadingViewer = true
+          state.viewerError = null
+          state.viewerActionMessage = null
+          if (state.viewer?.playbookId !== playbookId) {
+            state.viewer = null
+            state.viewerBlocks = []
+          }
+        })
+
+        try {
+          const client = getClient()
+          if (!client.getViewer) {
+            const message =
+              'Career Playbook viewer is unavailable until the backend action is connected'
+            set((state) => {
+              state.isLoadingViewer = false
+              state.viewerError = message
+            })
+            return { ok: false, error: message, backendPending: true }
+          }
+
+          const snapshot = await client.getViewer({ playbookId })
+          get().hydrateCareerPlaybookViewer(snapshot)
+          return { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Career Playbook viewer failed'
+          const backendPending = isCareerPlaybookBackendPending(error)
+          set((state) => {
+            state.isLoadingViewer = false
+            state.viewerError = message
+          })
+          return { ok: false, error: message, backendPending }
+        }
+      },
+
+      editCareerPlaybookViewerBlock: async (blockId, content) => {
+        const snapshot = get()
+        if (!snapshot.viewer?.playbookId) {
+          return { ok: false, error: 'Career Playbook viewer is not loaded' }
+        }
+
+        const applyLocalEdit = () => {
+          const previousBlock = snapshot.viewer?.blocks[blockId]
+          const localBlock: CareerPlaybookBlockState = {
+            ...previousBlock,
+            content,
+            status: 'generated',
+            attempt: previousBlock?.attempt ?? 0,
+            generated_at: nowIso(),
+          }
+          set((state) => {
+            if (!state.viewer) return
+            state.viewer = normalizeViewerSnapshot({
+              ...state.viewer,
+              blocks: {
+                ...state.viewer.blocks,
+                [blockId]: localBlock,
+              },
+            })
+            state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
+            state.isUpdatingViewerBlock = false
+            state.viewerActionMessage =
+              'Block edit saved locally until the backend action is connected'
+          })
+        }
+
+        set((state) => {
+          state.isUpdatingViewerBlock = true
+          state.viewerActionMessage = null
+        })
+
+        try {
+          const client = getClient()
+          if (!client.editBlock) {
+            applyLocalEdit()
+            return { ok: true }
+          }
+
+          const updatedBlock = await client.editBlock({
+            playbookId: snapshot.viewer.playbookId,
+            blockId,
+            content,
+          })
+
+          set((state) => {
+            if (!state.viewer) return
+            const nextBlocks = {
+              ...state.viewer.blocks,
+              [updatedBlock.blockId ?? blockId]: {
+                content: updatedBlock.content,
+                status: updatedBlock.status,
+                judge_verdict: updatedBlock.judge_verdict,
+                generated_at: updatedBlock.generated_at,
+                llm_model: updatedBlock.llm_model,
+                attempt: updatedBlock.attempt,
+              },
+            }
+            state.viewer = normalizeViewerSnapshot({
+              ...state.viewer,
+              blocks: nextBlocks,
+            })
+            state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
+            state.isUpdatingViewerBlock = false
+            state.viewerActionMessage = null
+          })
+
+          return { ok: true }
+        } catch (error) {
+          if (isCareerPlaybookBackendPending(error)) {
+            applyLocalEdit()
+            return { ok: true }
+          }
+
+          const message = error instanceof Error ? error.message : 'Block editing failed'
+          set((state) => {
+            state.isUpdatingViewerBlock = false
+            state.viewerActionMessage = message
+          })
+          return { ok: false, error: message }
+        }
+      },
+
+      regenerateCareerPlaybookViewerBlock: async (blockId, instruction) => {
+        const snapshot = get()
+        if (!snapshot.viewer?.playbookId) {
+          return { ok: false, error: 'Career Playbook viewer is not loaded' }
+        }
+
+        const applyLocalRegeneration = () => {
+          const previousBlock = snapshot.viewer?.blocks[blockId] ?? emptyViewerBlockState()
+          const baseContent = previousBlock.content.trim() || '## Draft block'
+          const localBlock: CareerPlaybookBlockState = {
+            ...previousBlock,
+            content: `${baseContent}\n\n> Regeneration instruction: ${instruction}`,
+            status: 'generated',
+            attempt: (previousBlock.attempt ?? 0) + 1,
+            generated_at: nowIso(),
+          }
+          set((state) => {
+            if (!state.viewer) return
+            state.viewer = normalizeViewerSnapshot({
+              ...state.viewer,
+              blocks: {
+                ...state.viewer.blocks,
+                [blockId]: localBlock,
+              },
+            })
+            state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
+            state.isUpdatingViewerBlock = false
+            state.viewerActionMessage =
+              'Block regenerated locally until the backend action is connected'
+          })
+        }
+
+        set((state) => {
+          state.isUpdatingViewerBlock = true
+          state.viewerActionMessage = null
+        })
+
+        try {
+          const client = getClient()
+          if (!client.regenerateBlock) {
+            applyLocalRegeneration()
+            return { ok: true }
+          }
+
+          const updatedBlock = await client.regenerateBlock({
+            playbookId: snapshot.viewer.playbookId,
+            blockId,
+            instruction,
+          })
+
+          set((state) => {
+            if (!state.viewer) return
+            const nextBlocks = {
+              ...state.viewer.blocks,
+              [updatedBlock.blockId ?? blockId]: {
+                content: updatedBlock.content,
+                status: updatedBlock.status,
+                judge_verdict: updatedBlock.judge_verdict,
+                generated_at: updatedBlock.generated_at,
+                llm_model: updatedBlock.llm_model,
+                attempt: updatedBlock.attempt,
+              },
+            }
+            state.viewer = normalizeViewerSnapshot({
+              ...state.viewer,
+              blocks: nextBlocks,
+            })
+            state.viewerBlocks = viewerBlocksFromSnapshot(state.viewer)
+            state.isUpdatingViewerBlock = false
+            state.viewerActionMessage = null
+          })
+
+          return { ok: true }
+        } catch (error) {
+          if (isCareerPlaybookBackendPending(error)) {
+            applyLocalRegeneration()
+            return { ok: true }
+          }
+
+          const message = error instanceof Error ? error.message : 'Block regeneration failed'
+          set((state) => {
+            state.isUpdatingViewerBlock = false
+            state.viewerActionMessage = message
+          })
+          return { ok: false, error: message }
+        }
+      },
+
+      requestCareerPlaybookPdf: () => {
+        const snapshot = get()
+        const message = 'PDF export is unavailable until the backend action is connected'
+        if (!snapshot.viewer?.playbookId) {
+          return Promise.resolve({ ok: false, error: 'Career Playbook viewer is not loaded' })
+        }
+        set((state) => {
+          state.viewerActionMessage = message
+        })
+        return Promise.resolve({ ok: false, error: message })
+      },
+
+      toggleCareerPlaybookThinkingStream: () =>
+        set((state) => {
+          state.showCareerPlaybookThinkingStream = !state.showCareerPlaybookThinkingStream
         }),
 
       answerCareerPlaybookFixedQuestion: (questionKey, value) =>
