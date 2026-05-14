@@ -1,4 +1,150 @@
 {
+  "landing": {
+    "metadataTitle": "Career Playbook by MC2",
+    "metadataDescription": "Create a structured operating manual for any role, then reuse it as course-generation context in MC2.",
+    "heroEyebrow": "Career Playbook",
+    "heroTitle": "Turn a job description into a company operating manual",
+    "heroSubtitle": "Collect role context, generate a 26-block Role Guide, and keep it editable for onboarding, hiring, and course creation.",
+    "ctaPrimary": "Create your Career Playbook",
+    "ctaSecondary": "See methodology",
+    "heroMetricOneValue": "26",
+    "heroMetricOneLabel": "operational blocks",
+    "heroMetricTwoValue": "5",
+    "heroMetricTwoLabel": "management systems",
+    "heroMetricThreeValue": "1",
+    "heroMetricThreeLabel": "course-ready source",
+    "methodologyEyebrow": "Methodology",
+    "methodologyTitle": "Built from operating systems used by serious teams",
+    "methodologySubtitle": "Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",
+    "methodologyBlocksTitle": "26-block map",
+    "selectedBlocksLabel": "Selected blocks",
+    "methodologies": {
+      "netflix": {
+        "title": "Netflix Context over Control",
+        "description": "Gives the role strategic context, clear boundaries, and room to act without micromanagement."
+      },
+      "amazon": {
+        "title": "Amazon Leadership Principles",
+        "description": "Turns culture into decision rules, input metrics, counter-metrics, and customer-oriented judgment."
+      },
+      "toyota": {
+        "title": "Toyota Standardized Work",
+        "description": "Captures the best-known way of working through checklists, exceptions, and quality criteria."
+      },
+      "spotify": {
+        "title": "Spotify Squad Model",
+        "description": "Shows how the role fits into real work streams, dependencies, squads, and growth paths."
+      },
+      "bridgewater": {
+        "title": "Bridgewater Baseball Cards",
+        "description": "Documents strengths, communication style, energy patterns, risks, and candidate fit."
+      }
+    },
+    "blockMap": {
+      "groups": {
+        "foundation": {
+          "title": "Foundation"
+        },
+        "operations": {
+          "title": "Operations"
+        },
+        "people": {
+          "title": "People"
+        },
+        "growth": {
+          "title": "Growth"
+        },
+        "system": {
+          "title": "System"
+        },
+        "wrap": {
+          "title": "Wrap"
+        }
+      },
+      "blocks": {
+        "block1": "1. Mission/KR",
+        "block2": "2. Anti-goals",
+        "block3": "3. Responsibilities",
+        "block4": "4. Duties",
+        "block5": "5. Decision matrix",
+        "block6": "6. KPI",
+        "block7": "7. Competencies",
+        "block8": "8. Tools",
+        "block9": "9. Human-AI",
+        "block10": "10. Dependencies",
+        "block11": "11. Career path",
+        "block12": "12. Candidate profile",
+        "block13": "13. Day in role",
+        "block14": "14. Onboarding",
+        "block15": "15. Motivation",
+        "block16": "16. Processes",
+        "block17": "17. Red flags",
+        "block18": "18. FAQ",
+        "block19": "19. Industry",
+        "block20": "20. Business goals",
+        "block21": "21. Failure modes",
+        "block22": "22. Role README",
+        "block23": "23. Continuity",
+        "block24": "24. Role canvas",
+        "block25": "25. Revision cadence",
+        "block26": "26. Implementation checklist"
+      }
+    },
+    "demoEyebrow": "Interactive demo",
+    "demoTitle": "Annotated B2B sales Role Guide preview",
+    "demoSubtitle": "Explore a compact preview inspired by the sample B2B sales manager playbook. Each annotation explains why that block matters.",
+    "demoPreviewTitle": "B2B Sales Role Guide",
+    "demoSections": {
+      "mission": {
+        "title": "Mission and key results",
+        "excerpt": "The role turns B2B pipeline into predictable revenue: it qualifies opportunities, moves deals forward, and keeps the funnel healthy.",
+        "annotation": "Mission connects the role purpose to measurable outcomes and gives managers a fast quality check.",
+        "blockLabel": "Block 1"
+      },
+      "decisions": {
+        "title": "Decision matrix",
+        "excerpt": "Small discounts can move quickly; larger discounts and unusual contract terms require commercial approval.",
+        "annotation": "Decision rules turn autonomy into visible guardrails, using the Amazon one-way/two-way door pattern.",
+        "blockLabel": "Block 5"
+      },
+      "kpi": {
+        "title": "KPI and counter-metrics",
+        "excerpt": "Qualified pipeline, win rate, sales cycle, and first-year retention are paired to prevent metric gaming.",
+        "annotation": "Counter-metrics keep the role from optimizing one number while damaging the business outcome.",
+        "blockLabel": "Block 6"
+      }
+    },
+    "valueEyebrow": "Why it works",
+    "valueTitle": "A lead magnet that produces a real work artifact",
+    "valueProps": {
+      "0": {
+        "title": "Executive-ready output",
+        "description": "The result is a practical operating manual, not a thin job post or prompt demo."
+      },
+      "1": {
+        "title": "Course bridge context",
+        "description": "Competencies, tools, and workflows become source material for the MC2 course pipeline."
+      },
+      "2": {
+        "title": "Editable after generation",
+        "description": "Teams can refine individual blocks without starting the entire Role Guide again."
+      }
+    },
+    "faqTitle": "Questions",
+    "faq": {
+      "0": {
+        "question": "Who should use this first?",
+        "answer": "HR leaders, founders, department heads, and enablement teams that need role clarity before hiring, onboarding, or training."
+      },
+      "1": {
+        "question": "Can the generated guide be edited?",
+        "answer": "Yes. The Career Playbook flow is designed around block-level review, editing, regeneration, sharing, and course reuse."
+      }
+    },
+    "finalCtaTitle": "Build the first Role Guide for your team",
+    "finalCtaDescription": "Start with the constructor, answer the role questions, and keep the generated playbook editable as the team learns.",
+    "finalCtaButton": "Create your Career Playbook"
+  },
   "wizard": {
     "eyebrow": "Career Playbook",
     "title": "Role Guide constructor",
