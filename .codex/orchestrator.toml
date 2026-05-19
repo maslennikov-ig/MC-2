@@ -12,7 +12,7 @@ multi_repo = false
 launch_mode = "manual_user_launch"
 
 [baseline]
-profile = "balanced-v2.10"
+profile = "balanced-v2.12"
 source_skill = "orchestration-setup"
 
 [execution]
@@ -120,6 +120,26 @@ artifact_fields = [
 ]
 write_heavy_requires_dedicated_worktree = true
 worker_isolation = "dedicated_branch_worktree"
+
+parallel_decomposition_matrix = "required_for_medium_complex"
+parallel_execution_default = "spawn_all_independent_streams"
+sequential_requires_reason = true
+
+[subagent_model_policy]
+default_model = "inherit_orchestrator"
+default_reasoning_effort = "inherit_orchestrator"
+reasoning_policy = "complexity_based"
+model_override_requires_current_user_authorization = true
+record_model_reasoning_rationale = true
+high_reasoning_triggers = [
+  "architecture",
+  "security",
+  "data_migration",
+  "cross_module_change",
+  "critical_bug",
+  "review",
+  "ambiguous_requirements",
+]
 
 [review]
 require_findings_first = true

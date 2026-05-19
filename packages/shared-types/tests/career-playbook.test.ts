@@ -9,6 +9,7 @@ import {
   CareerPlaybookRoleProfileSpecSchema,
   SUPPORTED_CAREER_PLAYBOOK_CONTENT_LANGUAGES,
 } from '../src/career-playbook';
+import { DEFAULT_JOB_OPTIONS, JobDataSchema, JobType } from '../src/bullmq-jobs';
 
 const baseRoleProfileSpec = {
   position: {
@@ -216,5 +217,42 @@ describe('Career Playbook shared schemas', () => {
       'completed',
       'failed',
     ]);
+  });
+
+  it('registers Career Playbook generation in the BullMQ job contract', () => {
+    const parsed = JobDataSchema.parse({
+      organizationId: '0f9dc5e4-a2f7-4af5-968f-81c8a92b7253',
+      courseId: 'fe0ca675-8d3f-4372-a7c3-2781916a5cd2',
+      userId: '4b7c5538-2367-4012-9088-c2cad7dac9a9',
+      jobType: JobType.CAREER_PLAYBOOK,
+      createdAt: '2026-05-19T10:00:00.000Z',
+      playbookId: '88de7022-17f5-4d30-b982-5fefb3dbe354',
+      action: 'GENERATE_FOLLOWUPS',
+      language: 'en',
+      qaData: {
+        fixed: [{ question_key: 'position', value: 'Head of Sales' }],
+        followups: [],
+        freeform: [],
+      },
+    });
+
+    expect(parsed.jobType).toBe(JobType.CAREER_PLAYBOOK);
+    expect(DEFAULT_JOB_OPTIONS[JobType.CAREER_PLAYBOOK].attempts).toBeGreaterThan(0);
+  });
+
+  it('requires block and instruction data for Career Playbook block regeneration jobs', () => {
+    const result = JobDataSchema.safeParse({
+      organizationId: '0f9dc5e4-a2f7-4af5-968f-81c8a92b7253',
+      courseId: 'fe0ca675-8d3f-4372-a7c3-2781916a5cd2',
+      userId: '4b7c5538-2367-4012-9088-c2cad7dac9a9',
+      jobType: JobType.CAREER_PLAYBOOK,
+      createdAt: '2026-05-19T10:00:00.000Z',
+      playbookId: '88de7022-17f5-4d30-b982-5fefb3dbe354',
+      action: 'REGENERATE_BLOCK',
+      language: 'en',
+      blockId: 'block_1',
+    });
+
+    expect(result.success).toBe(false);
   });
 });

@@ -30,7 +30,7 @@ import pathlib
 import re
 import tomllib
 
-EXPECTED_PROFILE = "balanced-v2.10"
+EXPECTED_PROFILE = "balanced-v2.12"
 EXPECTED_SOURCE_SKILL = "orchestration-setup"
 
 orchestrator_path = pathlib.Path(".codex/orchestrator.toml")
@@ -80,12 +80,42 @@ if launcher == "codex_subagents":
         raise SystemExit(
             "delegation.requires_explicit_user_spawn_request must be true for codex_subagents"
         )
+    if delegation.get("parallel_decomposition_matrix") != "required_for_medium_complex":
+        raise SystemExit(
+            "delegation.parallel_decomposition_matrix must be 'required_for_medium_complex'"
+        )
+    if delegation.get("parallel_execution_default") != "spawn_all_independent_streams":
+        raise SystemExit(
+            "delegation.parallel_execution_default must be 'spawn_all_independent_streams'"
+        )
+    if delegation.get("sequential_requires_reason") is not True:
+        raise SystemExit(
+            "delegation.sequential_requires_reason must be true"
+        )
 
 if launcher == "manual_user_launch":
     manual_prompt_template = pathlib.Path(
         contract.get("manual_prompt_template", ".codex/manual-agent-prompt-template.md")
     )
     required.append(manual_prompt_template)
+
+model_policy = contract.get("subagent_model_policy")
+if launcher == "codex_subagents":
+    if not isinstance(model_policy, dict):
+        raise SystemExit("Missing [subagent_model_policy] section for codex_subagents")
+    required_model_policy = {
+        "default_model": "inherit_orchestrator",
+        "default_reasoning_effort": "inherit_orchestrator",
+        "reasoning_policy": "complexity_based",
+        "model_override_requires_current_user_authorization": True,
+        "record_model_reasoning_rationale": True,
+    }
+    for key, expected in required_model_policy.items():
+        if model_policy.get(key) != expected:
+            raise SystemExit(f"subagent_model_policy.{key} must be {expected!r}")
+    triggers = model_policy.get("high_reasoning_triggers")
+    if not isinstance(triggers, list) or not triggers:
+        raise SystemExit("subagent_model_policy.high_reasoning_triggers must be a non-empty list")
 
 missing = [str(path) for path in required if not path.exists()]
 if missing:
