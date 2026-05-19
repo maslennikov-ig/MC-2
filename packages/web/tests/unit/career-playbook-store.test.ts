@@ -106,6 +106,7 @@ describe('useCareerPlaybookStore', () => {
     useCareerPlaybookStore
       .getState()
       .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-1')
     useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'Sales Manager')
     useCareerPlaybookStore.getState().saveCareerPlaybookFreeformDraft('We sell B2B SaaS.')
 
@@ -117,6 +118,7 @@ describe('useCareerPlaybookStore', () => {
       playbookId: null,
       phase: 'fixed',
       status: 'answering_fixed',
+      ownerUserId: 'user-1',
       uiLanguage: 'en',
       contentLanguage: 'en',
       fixedAnswers: {
@@ -127,6 +129,47 @@ describe('useCareerPlaybookStore', () => {
     expect(persisted.state.fixedQuestions).toBeUndefined()
     expect(persisted.state.autosaveError).toBeUndefined()
     expect(persisted.state.isAutosaving).toBeUndefined()
+  })
+
+  it('invalidates a persisted draft when the browser user changes', () => {
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-1')
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'Sales Manager')
+    useCareerPlaybookStore.getState().saveCareerPlaybookFreeformDraft('Private context')
+
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-2')
+
+    expect(useCareerPlaybookStore.getState().ownerUserId).toBe('user-2')
+    expect(useCareerPlaybookStore.getState().playbookId).toBeNull()
+    expect(useCareerPlaybookStore.getState().fixedAnswers.position).toBeUndefined()
+    expect(useCareerPlaybookStore.getState().freeformDraft).toBe('')
+  })
+
+  it('removes answers for questions hidden by a changed branch answer', () => {
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '51-200')
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('company_stage', 'growth')
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.company_stage?.value).toBe('growth')
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).toContain('company_stage')
+
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '201-1000')
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.company_stage).toBeUndefined()
+    expect(useCareerPlaybookStore.getState().dirtyFixedQuestionKeys).not.toContain('company_stage')
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).not.toContain('company_stage')
   })
 
   it('flushes autosave through an injectable client and keeps local draft when remote submit rejects', async () => {

@@ -68,7 +68,7 @@ let requestFollowups: Mock
 function renderPage() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CareerPlaybookNewPageClient locale="en" />
+      <CareerPlaybookNewPageClient locale="en" userId="user-1" />
     </NextIntlClientProvider>
   )
 }
@@ -163,12 +163,15 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
     expect(screen.getByText('Fixed answers')).toBeInTheDocument()
     expect(screen.getByText('Follow-ups')).toBeInTheDocument()
+    expect(screen.getByText('Department or functional area')).toBeInTheDocument()
+    expect(screen.getByText('Sales')).toBeInTheDocument()
     expect(screen.getByText('Win rate')).toBeInTheDocument()
   })
 
   it('keeps a persisted Phase B draft when bootstrapping fixed questions after reload', async () => {
     useCareerPlaybookStore.setState({
       playbookId: '00000000-0000-4000-8000-000000000801',
+      ownerUserId: 'user-1',
       uiLanguage: 'en',
       contentLanguage: 'en',
       phase: 'followups',
@@ -212,11 +215,106 @@ describe('CareerPlaybookNewPageClient', () => {
     ])
   })
 
+  it('moves to review when an additional follow-up request says the draft is ready', async () => {
+    const user = userEvent.setup()
+    requestFollowups.mockResolvedValueOnce({
+      questions: [],
+      completeness_score: 0.76,
+      stop_recommendation: 'ready_to_generate',
+    })
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000811',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'followups',
+      status: 'answering_followups',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Head of Sales',
+        },
+      },
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000812',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      currentFollowupIndex: 0,
+      completenessScore: 0.4,
+      followupGenerationCount: 0,
+      followupGenerationLimit: 2,
+    })
+
+    renderPage()
+
+    await user.type(
+      await screen.findByLabelText('Which KPIs define success in this role?'),
+      'Win rate'
+    )
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
+    expect(screen.getByText('Win rate')).toBeInTheDocument()
+  })
+
+  it('opens and edits the saved Phase B free-form draft', async () => {
+    const user = userEvent.setup()
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000821',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'followups',
+      status: 'answering_followups',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Head of Sales',
+        },
+      },
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000822',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      currentFollowupIndex: 0,
+      completenessScore: 0.8,
+      freeformDraft: 'Existing operating context',
+    })
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Free-form' }))
+    const textarea = screen.getByRole('textbox', { name: 'Tell freely' })
+
+    expect(textarea).toHaveValue('Existing operating context')
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Updated operating context')
+    await user.click(screen.getByRole('button', { name: 'Save text' }))
+
+    expect(useCareerPlaybookStore.getState().freeformDraft).toBe('Updated operating context')
+  })
+
   it('shows a generation handoff state after clicking the generate CTA', async () => {
     const user = userEvent.setup()
 
     useCareerPlaybookStore.setState({
       playbookId: '00000000-0000-4000-8000-000000000901',
+      ownerUserId: 'user-1',
       uiLanguage: 'en',
       contentLanguage: 'en',
       phase: 'completion',

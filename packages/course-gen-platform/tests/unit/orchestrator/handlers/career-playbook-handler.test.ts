@@ -1,8 +1,10 @@
 import type { Job } from 'bullmq';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  CareerPlaybookBlockState,
-  CareerPlaybookRoleProfileSpec,
+import {
+  JobType,
+  type CareerPlaybookBlockState,
+  type CareerPlaybookJobData,
+  type CareerPlaybookRoleProfileSpec,
 } from '@megacampus/shared-types';
 
 const mocks = vi.hoisted(() => ({
@@ -23,12 +25,24 @@ vi.mock('@/stages/stage-career-playbook/graph', () => ({
 }));
 
 import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
-import {
-  CareerPlaybookHandler,
-  type CareerPlaybookJobData,
-} from '@/orchestrator/handlers/career-playbook-handler';
+import { CareerPlaybookHandler } from '@/orchestrator/handlers/career-playbook-handler';
 
 const getCareerPlaybookGraphMock = vi.mocked(getCareerPlaybookGraph);
+
+const baseJobData = {
+  organizationId: '0f9dc5e4-a2f7-4af5-968f-81c8a92b7253',
+  courseId: 'fe0ca675-8d3f-4372-a7c3-2781916a5cd2',
+  userId: '4b7c5538-2367-4012-9088-c2cad7dac9a9',
+  jobType: JobType.CAREER_PLAYBOOK,
+  createdAt: '2026-05-19T10:00:00.000Z',
+  playbookId: '88de7022-17f5-4d30-b982-5fefb3dbe354',
+  language: 'en',
+  qaData: {
+    fixed: [{ question_key: 'position', value: 'Head of Sales' }],
+    followups: [],
+    freeform: [],
+  },
+} satisfies Omit<CareerPlaybookJobData, 'action'>;
 
 const roleProfileSpec: CareerPlaybookRoleProfileSpec = {
   position: {
@@ -64,8 +78,16 @@ const originalBlock: CareerPlaybookBlockState = {
   attempt: 1,
 };
 
-function job(data: CareerPlaybookJobData): Job<CareerPlaybookJobData> {
-  return { data } as Job<CareerPlaybookJobData>;
+function createJob(data: CareerPlaybookJobData): Job<CareerPlaybookJobData> {
+  return {
+    id: 'job-1',
+    name: JobType.CAREER_PLAYBOOK,
+    data,
+    attemptsMade: 0,
+    opts: {},
+    updateProgress: vi.fn(),
+    log: vi.fn(),
+  } as unknown as Job<CareerPlaybookJobData>;
 }
 
 describe('CareerPlaybookHandler', () => {
@@ -86,14 +108,7 @@ describe('CareerPlaybookHandler', () => {
     });
 
     const result = await new CareerPlaybookHandler().process(
-      job({
-        jobType: 'GENERATE_FOLLOWUPS',
-        playbookId: '00000000-0000-4000-8000-000000000001',
-        userId: '00000000-0000-4000-8000-000000000002',
-        organizationId: '00000000-0000-4000-8000-000000000003',
-        language: 'ru',
-        qaData: { fixed: [], followups: [], freeform: [] },
-      })
+      createJob({ ...baseJobData, action: 'GENERATE_FOLLOWUPS' })
     );
 
     expect(result.success).toBe(true);
@@ -103,8 +118,8 @@ describe('CareerPlaybookHandler', () => {
       stop_recommendation: 'ready_to_generate',
     });
     expect(mocks.generateCareerPlaybookFollowups).toHaveBeenCalledWith({
-      qaData: { fixed: [], followups: [], freeform: [] },
-      language: 'ru',
+      qaData: baseJobData.qaData,
+      language: 'en',
     });
   });
 
@@ -122,12 +137,9 @@ describe('CareerPlaybookHandler', () => {
     });
 
     const result = await new CareerPlaybookHandler().process(
-      job({
-        jobType: 'REGENERATE_BLOCK',
-        playbookId: '00000000-0000-4000-8000-000000000001',
-        userId: '00000000-0000-4000-8000-000000000002',
-        organizationId: '00000000-0000-4000-8000-000000000003',
-        language: 'ru',
+      createJob({
+        ...baseJobData,
+        action: 'REGENERATE_BLOCK',
         blockId: 'block_6',
         instruction: 'Make metrics concrete',
         roleProfileSpec,
@@ -172,18 +184,25 @@ describe('CareerPlaybookHandler', () => {
     } as ReturnType<typeof getCareerPlaybookGraph>);
 
     const result = await new CareerPlaybookHandler().process(
-      job({
-        jobType: 'GENERATE_PLAYBOOK',
-        playbookId: '00000000-0000-4000-8000-000000000001',
-        userId: '00000000-0000-4000-8000-000000000002',
-        organizationId: '00000000-0000-4000-8000-000000000003',
-        language: 'ru',
-        qaData: { fixed: [], followups: [], freeform: [] },
-      })
+      createJob({ ...baseJobData, action: 'GENERATE_PLAYBOOK' })
     );
 
     expect(result.success).toBe(true);
     expect(result.message).toBe('Career Playbook generated');
     expect(result.error).toBeUndefined();
+  });
+
+  it('throws when graph generation returns errors so BullMQ marks the job failed', async () => {
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: ['specBuilder failed: invalid JSON'],
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    await expect(
+      new CareerPlaybookHandler().process(
+        createJob({ ...baseJobData, action: 'GENERATE_PLAYBOOK' })
+      )
+    ).rejects.toThrow('Career Playbook generation failed: specBuilder failed: invalid JSON');
   });
 });

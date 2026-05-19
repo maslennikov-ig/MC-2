@@ -1,4 +1,6 @@
 import { extractJSON, safeJSONParse } from '@megacampus/shared-utils';
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import {
   CareerPlaybookFollowupResponseSchema,
   type CareerPlaybookFollowupResponse,
@@ -49,9 +51,25 @@ export function buildFollowupPromptVariables(
 
 export function parseFollowupResponseFromLLM(rawContent: string): CareerPlaybookFollowupResponse {
   const extractedJson = extractJSON(rawContent);
-  const parsed = safeJSONParse(extractedJson);
-  return CareerPlaybookFollowupResponseSchema.parse(parsed);
+  const parsed = LLMFollowupResponseSchema.parse(safeJSONParse(extractedJson));
+  return CareerPlaybookFollowupResponseSchema.parse({
+    ...parsed,
+    questions: parsed.questions.map(question => ({
+      ...question,
+      question_id: question.question_id ?? randomUUID(),
+    })),
+  });
 }
+
+const LLMFollowupQuestionSchema = CareerPlaybookFollowupResponseSchema.shape.questions.element
+  .omit({ question_id: true })
+  .extend({
+    question_id: z.string().uuid().optional().catch(undefined),
+  });
+
+const LLMFollowupResponseSchema = CareerPlaybookFollowupResponseSchema.extend({
+  questions: z.array(LLMFollowupQuestionSchema).min(0).max(7),
+});
 
 function buildNodeCost(result: {
   model: string;

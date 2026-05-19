@@ -229,6 +229,33 @@ const NEXT_GROUP_NODE: Partial<Record<CareerPlaybookGroupKey, CareerPlaybookGrap
   group_5_system: 'group6Generator',
 };
 
+const GROUP_HEADING_LABELS = {
+  ru: {
+    heading_header: '## Header',
+    heading_block_1: '## 1. Миссия и ключевые результаты',
+    heading_block_2: '## 2. Анти-цели: что эта роль НЕ делает',
+    heading_block_3: '## 3. Ключевые зоны ответственности',
+    heading_block_4: '## 4. Обязанности',
+    heading_block_5: '## 5. Матрица решений (Decision Authority)',
+    heading_block_6: '## 6. KPI и метрики',
+    heading_block_8: '## 8. Инструменты и технологии',
+  },
+  en: {
+    heading_header: '## Header',
+    heading_block_1: '## 1. Mission and key results',
+    heading_block_2: '## 2. Anti-goals: what this role does NOT do',
+    heading_block_3: '## 3. Key responsibility zones',
+    heading_block_4: '## 4. Duties',
+    heading_block_5: '## 5. Decision authority matrix',
+    heading_block_6: '## 6. KPI and metrics',
+    heading_block_8: '## 8. Tools and technologies',
+  },
+} as const;
+
+function getGroupHeadingLabels(language: string) {
+  return language === 'en' ? GROUP_HEADING_LABELS.en : GROUP_HEADING_LABELS.ru;
+}
+
 export function getCareerPlaybookGroupSpec(
   groupKey: CareerPlaybookGroupKey
 ): CareerPlaybookGroupSpec {
@@ -297,6 +324,7 @@ export async function generateCareerPlaybookGroup(
   const prompt = await runtime.renderPrompt(groupSpec.promptKey, {
     spec_json: JSON.stringify(input.roleProfileSpec, null, 2),
     content_language: input.language,
+    ...getGroupHeadingLabels(input.language),
   });
   const llmResult = await runtime.invokeLLM(prompt, {
     phaseName: groupSpec.phaseName,
