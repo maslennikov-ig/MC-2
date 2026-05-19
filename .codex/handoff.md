@@ -1,38 +1,42 @@
 # Orchestrator Handoff
 
-Updated: 2026-05-14
-Current working branch: `feature/career-playbook-phase-b-transport`
-Base branch: `feature/career-playbook-frontend-phase-b` stacked on PR #29
+Updated: 2026-05-19
+Current working branch: `codex/pr32-phase-b-transport-develop`
+Current PR: #32 `feature/career-playbook-phase-b-transport` -> `develop`
 
 ## Current state
 
-- Repo shape: single pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
-- Delivery truth: `develop` is dev delivery, `master` is staging, and direct pushes to protected branches remain forbidden.
-- Career Playbook PR stack is still open: #24 base orchestration, #25 Phase 1, #26 backend stage 2, #27 backend stage 3, #28 Phase A frontend, #29 Phase B frontend.
-- `mc2-db696.12` is ready for stacked PR delivery on this branch: Phase B follow-up transport now uses concrete backend tRPC mutations/queries, and the generation CTA starts a truthful backend `generating` handoff.
-- No billing or payment scope is part of Career Playbook MVP work.
+- This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
+- `.codex/orchestrator.toml` is the machine-readable contract; `.codex/handoff.md` is current-state only; `.codex/project-index.md` is the navigation map.
+- Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, and `/deploy` targets staging through `master`.
+- Career Playbook PR #24, PR #25, PR #26, PR #27, PR #28, and PR #29 have landed in `develop`.
+- Career Playbook Phase B transport is being retargeted to `develop` as PR #32.
+- No billing or payment scope is part of the Career Playbook MVP work in this branch.
 
 ## Latest relevant stage
 
 - Latest relevant Career Playbook stage: `mc2-db696.12` - Phase B real follow-up/generation-start transport.
 - Stage summary: [`.codex/stages/mc2-db696.12/summary.md`](./stages/mc2-db696.12/summary.md)
 - Artifacts: backend-contract-explorer, frontend-transport-explorer, local-implementation, and code-review under [`.codex/stages/mc2-db696.12/artifacts`](./stages/mc2-db696.12/artifacts).
+- Key verification for stack advancement: merge `origin/develop`, preserve PR #29 frontend/store correctness fixes, run backend/frontend focused checks, push for GitHub CI, then mark ready and merge only after checks pass.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.10`
-Recommended action: after closing and pushing `mc2-db696.12`, open a draft PR targeting `feature/career-playbook-frontend-phase-b`; then continue Library + share + RLS + public viewer only if the stacked PR base remains intentional and clean.
+Next stage id: `mc2-db696.11.7.7`
+Recommended action: complete PR #32 readiness against `develop`, then advance PR #30 viewer/editor before PR #31 landing unless PR #31 copy is softened to current MVP scope.
 
-- If PR #24/#25/#26/#27/#28/#29 land first, rebase/retarget before more dependent work.
-- Independent marketing work may proceed separately if its base branch decision is explicit.
+- PR #32 closes real browser/backend follow-up transport and generation-start handoff.
+- PR #32 does not close full queue worker completion, live SSE/subscription status streaming, PDF, share, or JD bridge.
+- When retargeting PR #30 after PR #32, preserve both transport methods from #32 and viewer/library methods from #30.
+- PR #31 public landing needs copy review before release so it does not promise unavailable generation/edit/share/course reuse flows.
 
 ## Starter prompt for next orchestrator
 
 ```text
-Use $orchestrator-stage to continue Career Playbook. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth, verify PR #24/#25/#26/#27/#28/#29 status, and avoid dependent work on develop unless the stacked PRs have merged.
+Use $orchestrator-stage to continue Career Playbook PR-stack readiness. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. PR #24-#29 have landed in develop; continue sequentially from PR #32 and do not advance downstream PRs until their base PR has landed.
 ```
 
 ## Explicit defers
 
-- Queue worker completion and live SSE/subscription status streaming remain separate Career Playbook integration work tracked as `mc2-db696.13`.
+- Queue worker completion and live SSE/subscription status streaming remain separate Career Playbook integration work tracked after `mc2-db696.12`.
 - Marketing, library/share/RLS/public viewer, PDF, JD bridge, and end-to-end smoke work remain later Beads tasks under epic `mc2-db696`.

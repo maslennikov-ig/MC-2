@@ -22,6 +22,7 @@ export type CareerPlaybookWizardPhase = 'fixed' | 'followups' | 'completion'
 export type CareerPlaybookAnswerValue = string | string[]
 
 export interface CareerPlaybookDraft {
+  ownerUserId?: string | null
   playbookId?: string | null
   uiLanguage?: CareerPlaybookFixedQuestionLanguage
   contentLanguage?: string
@@ -72,6 +73,7 @@ export interface CareerPlaybookAutosaveResult {
 
 interface CareerPlaybookStoreState {
   playbookId: string | null
+  ownerUserId: string | null
   status: CareerPlaybookPlaybookStatus
   phase: CareerPlaybookWizardPhase
   uiLanguage: CareerPlaybookFixedQuestionLanguage
@@ -99,6 +101,7 @@ interface CareerPlaybookStoreState {
 
   initializeCareerPlaybookPhaseA: (input: { uiLanguage: string; contentLanguage: string }) => void
   hydrateCareerPlaybookDraft: (draft: CareerPlaybookDraft) => void
+  setCareerPlaybookDraftOwner: (ownerUserId: string) => void
   answerCareerPlaybookFixedQuestion: (questionKey: string, value: CareerPlaybookAnswerValue) => void
   goToNextCareerPlaybookQuestion: () => void
   goToPreviousCareerPlaybookQuestion: () => void
@@ -353,6 +356,7 @@ function initialState(): Omit<
   CareerPlaybookStoreState,
   | 'initializeCareerPlaybookPhaseA'
   | 'hydrateCareerPlaybookDraft'
+  | 'setCareerPlaybookDraftOwner'
   | 'answerCareerPlaybookFixedQuestion'
   | 'goToNextCareerPlaybookQuestion'
   | 'goToPreviousCareerPlaybookQuestion'
@@ -374,6 +378,7 @@ function initialState(): Omit<
 > {
   return {
     playbookId: null,
+    ownerUserId: null,
     status: 'draft',
     phase: 'fixed',
     uiLanguage: 'ru',
@@ -543,6 +548,29 @@ function clampCurrentFixedIndex(state: CareerPlaybookStoreState) {
   )
 }
 
+function hasLocalDraftData(state: CareerPlaybookStoreState) {
+  return (
+    Boolean(state.playbookId) ||
+    Object.keys(state.fixedAnswers).some((questionKey) => questionKey !== 'content_language') ||
+    Boolean(state.freeformDraft.trim())
+  )
+}
+
+function removeHiddenFixedAnswers(state: CareerPlaybookStoreState) {
+  const visibleQuestionKeys = new Set(
+    visibleQuestionsFromState(state).map((question) => question.question_key)
+  )
+
+  for (const questionKey of Object.keys(state.fixedAnswers)) {
+    if (!visibleQuestionKeys.has(questionKey)) {
+      delete state.fixedAnswers[questionKey]
+      state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter(
+        (key) => key !== questionKey
+      )
+    }
+  }
+}
+
 function markDirtyKey(state: CareerPlaybookStoreState, questionKey: string) {
   if (!state.dirtyFixedQuestionKeys.includes(questionKey)) {
     state.dirtyFixedQuestionKeys.push(questionKey)
@@ -603,6 +631,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       hydrateCareerPlaybookDraft: (draft) =>
         set((state) => {
           const normalizedUiLanguage = normalizeUiLanguage(draft.uiLanguage ?? state.uiLanguage)
+          state.ownerUserId = draft.ownerUserId ?? state.ownerUserId
           state.playbookId = draft.playbookId ?? null
           state.uiLanguage = normalizedUiLanguage
           state.contentLanguage = draft.contentLanguage ?? state.contentLanguage
@@ -638,11 +667,25 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.dirtyFollowupQuestionIds =
             draft.dirtyFollowupQuestionIds ?? state.dirtyFollowupQuestionIds
           state.dirtyFreeformDraft = draft.dirtyFreeformDraft ?? false
+          removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
           state.currentFollowupIndex = Math.max(
             0,
             Math.min(state.currentFollowupIndex, state.followupQuestions.length - 1)
           )
+        }),
+
+      setCareerPlaybookDraftOwner: (ownerUserId) =>
+        set((state) => {
+          const shouldReset =
+            (state.ownerUserId && state.ownerUserId !== ownerUserId) ||
+            (!state.ownerUserId && hasLocalDraftData(state))
+
+          if (shouldReset) {
+            Object.assign(state, initialState())
+          }
+
+          state.ownerUserId = ownerUserId
         }),
 
       answerCareerPlaybookFixedQuestion: (questionKey, value) =>
@@ -662,6 +705,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             clearDependentFollowupContext(state)
           }
           markDirtyKey(state, questionKey)
+          removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
         }),
 
@@ -1072,6 +1116,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         playbookId: state.playbookId,
+        ownerUserId: state.ownerUserId,
         status: state.status,
         phase: state.phase,
         uiLanguage: state.uiLanguage,

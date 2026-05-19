@@ -1,10 +1,6 @@
 'use client'
 
 import { AlertCircle, CheckCircle2, Info, Loader2, Pencil, WandSparkles } from 'lucide-react'
-import type {
-  CareerPlaybookFixedAnswer,
-  CareerPlaybookFollowupAnswer,
-} from '@megacampus/shared-types'
 
 import { Button } from '@/components/ui/button'
 
@@ -25,8 +21,8 @@ export interface CompletionScreenCopy {
 }
 
 interface CompletionScreenProps {
-  fixedAnswers: CareerPlaybookFixedAnswer[]
-  followupAnswers: CareerPlaybookFollowupAnswer[]
+  fixedAnswers: CompletionSummaryAnswer[]
+  followupAnswers: CompletionSummaryAnswer[]
   freeformNotes: string[]
   onEditFixedAnswer: (questionKey: string) => void
   onEditFollowupAnswer: (questionId: string) => void
@@ -35,6 +31,13 @@ interface CompletionScreenProps {
   generationError?: string | null
   isGenerationStarting?: boolean
   copy?: CompletionScreenCopy
+}
+
+export interface CompletionSummaryAnswer {
+  id: string
+  title: string
+  value: string
+  skipped?: boolean
 }
 
 const defaultCopy: Required<CompletionScreenCopy> = {
@@ -122,11 +125,11 @@ export function CompletionScreen({
       <SummarySection title={labels.fixedTitle} empty={labels.empty}>
         {fixedAnswers.map((answer) => (
           <SummaryRow
-            key={answer.question_key}
-            title={answer.question_key}
-            value={formatValue(answer.value)}
-            editLabel={`${labels.edit} ${answer.question_key}`}
-            onEdit={() => onEditFixedAnswer(answer.question_key)}
+            key={answer.id}
+            title={answer.title}
+            value={answer.value}
+            editLabel={`${labels.edit} ${answer.title}`}
+            onEdit={() => onEditFixedAnswer(answer.id)}
           />
         ))}
       </SummarySection>
@@ -134,11 +137,11 @@ export function CompletionScreen({
       <SummarySection title={labels.followupsTitle} empty={labels.empty}>
         {followupAnswers.map((answer) => (
           <SummaryRow
-            key={answer.question_id}
-            title={answer.question_text}
-            value={answer.skipped ? labels.skipped : formatValue(answer.value)}
-            editLabel={`${labels.edit} ${answer.question_text}`}
-            onEdit={() => onEditFollowupAnswer(answer.question_id)}
+            key={answer.id}
+            title={answer.title}
+            value={answer.skipped ? labels.skipped : answer.value}
+            editLabel={`${labels.edit} ${answer.title}`}
+            onEdit={() => onEditFollowupAnswer(answer.id)}
           />
         ))}
       </SummarySection>
@@ -204,11 +207,4 @@ function SummaryRow({
       </Button>
     </div>
   )
-}
-
-function formatValue(
-  value: CareerPlaybookFixedAnswer['value'] | CareerPlaybookFollowupAnswer['value']
-) {
-  if (Array.isArray(value)) return value.join(', ')
-  return value ?? ''
 }

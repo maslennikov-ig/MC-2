@@ -21,7 +21,7 @@ export default async function CareerPlaybookNewPage({ params }: Props) {
     return <CareerPlaybookAuthRequiredClient locale={locale} />
   }
 
-  return <CareerPlaybookNewPageClient locale={locale} />
+  return <CareerPlaybookNewPageClient locale={locale} userId={user.id} />
 }
 
 export async function generateMetadata({ params }: Props) {
