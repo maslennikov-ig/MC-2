@@ -47,12 +47,7 @@ export const CareerPlaybookTeamSizeSchema = z.enum([
 ]);
 export type CareerPlaybookTeamSize = z.infer<typeof CareerPlaybookTeamSizeSchema>;
 
-export const CareerPlaybookCompanyStageSchema = z.enum([
-  'pre-pmf',
-  'growth',
-  'scale',
-  'mature',
-]);
+export const CareerPlaybookCompanyStageSchema = z.enum(['pre-pmf', 'growth', 'scale', 'mature']);
 export type CareerPlaybookCompanyStage = z.infer<typeof CareerPlaybookCompanyStageSchema>;
 
 export const CareerPlaybookOptionSchema = z.object({
@@ -110,6 +105,22 @@ export const CareerPlaybookFollowupAnswerSchema = z
   });
 export type CareerPlaybookFollowupAnswer = z.infer<typeof CareerPlaybookFollowupAnswerSchema>;
 
+export const CareerPlaybookFollowupQuestionSchema = z.object({
+  question_id: z.string().uuid(),
+  question_text: z.string().min(1),
+  question_type: CareerPlaybookQuestionTypeSchema,
+  options: z.array(CareerPlaybookOptionSchema).min(1).nullable(),
+  rationale: z.string().min(1),
+});
+export type CareerPlaybookFollowupQuestion = z.infer<typeof CareerPlaybookFollowupQuestionSchema>;
+
+export const CareerPlaybookFollowupResponseSchema = z.object({
+  questions: z.array(CareerPlaybookFollowupQuestionSchema).min(0).max(7),
+  completeness_score: z.number().min(0).max(1),
+  stop_recommendation: z.enum(['ask_more', 'ready_to_generate']),
+});
+export type CareerPlaybookFollowupResponse = z.infer<typeof CareerPlaybookFollowupResponseSchema>;
+
 export const CareerPlaybookFreeformAnswerSchema = z.object({
   text: z.string().min(1),
   parsed_signals: z.record(z.unknown()).optional(),
@@ -127,9 +138,7 @@ export type CareerPlaybookQAData = z.infer<typeof CareerPlaybookQADataSchema>;
 
 export const CareerPlaybookBlockIdSchema = z.union([
   z.literal('header'),
-  z
-    .string()
-    .regex(/^block_([1-9]|1[0-9]|2[0-6])$/, 'Expected header or block_1 through block_26'),
+  z.string().regex(/^block_([1-9]|1[0-9]|2[0-6])$/, 'Expected header or block_1 through block_26'),
 ]);
 export type CareerPlaybookBlockId = z.infer<typeof CareerPlaybookBlockIdSchema>;
 
@@ -240,6 +249,4 @@ export const CareerPlaybookAnswerSubmissionSchema = z
       message: 'Answer submission must include a value, skip flag, or free-form text',
     }
   );
-export type CareerPlaybookAnswerSubmission = z.infer<
-  typeof CareerPlaybookAnswerSubmissionSchema
->;
+export type CareerPlaybookAnswerSubmission = z.infer<typeof CareerPlaybookAnswerSubmissionSchema>;

@@ -45,6 +45,7 @@ export { stage4Prompts } from './stage4-prompts.js';
 export { stage5Prompts } from './stage5-prompts.js';
 export { stage6Prompts } from './stage6-prompts.js';
 export { stage7Prompts } from './stage7-prompts.js';
+export { careerPlaybookPrompts } from './career-playbook-prompts.js';
 
 // ============================================================================
 // IMPORTS: For Registry Construction
@@ -56,6 +57,7 @@ import { stage4Prompts } from './stage4-prompts.js';
 import { stage5Prompts } from './stage5-prompts.js';
 import { stage6Prompts } from './stage6-prompts.js';
 import { stage7Prompts } from './stage7-prompts.js';
+import { careerPlaybookPrompts } from './career-playbook-prompts.js';
 
 // ============================================================================
 // REGISTRY CONSTRUCTION
@@ -72,6 +74,7 @@ export const PROMPT_REGISTRY = new Map<string, HardcodedPrompt>([
   ...stage5Prompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
   ...stage6Prompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
   ...stage7Prompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
+  ...careerPlaybookPrompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
 ]);
 
 /**
