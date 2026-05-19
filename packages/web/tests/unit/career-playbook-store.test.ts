@@ -4,6 +4,7 @@ const trpcMocks = vi.hoisted(() => ({
   getBrowserTrpcClient: vi.fn(),
   requestFollowupsMutate: vi.fn(),
   approveAndGenerateMutate: vi.fn(),
+  getStatusQuery: vi.fn(),
   submitAnswerMutate: vi.fn(),
 }))
 
@@ -27,6 +28,7 @@ function resetStore() {
   setCareerPlaybookClientForTests(null)
   trpcMocks.requestFollowupsMutate.mockReset()
   trpcMocks.approveAndGenerateMutate.mockReset()
+  trpcMocks.getStatusQuery.mockReset()
   trpcMocks.submitAnswerMutate.mockReset()
   trpcMocks.getBrowserTrpcClient.mockReset()
   trpcMocks.getBrowserTrpcClient.mockReturnValue({
@@ -39,6 +41,7 @@ function resetStore() {
       generation: {
         requestFollowups: { mutate: trpcMocks.requestFollowupsMutate },
         approveAndGenerate: { mutate: trpcMocks.approveAndGenerateMutate },
+        getStatus: { query: trpcMocks.getStatusQuery },
       },
     },
   })
@@ -491,6 +494,126 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().status).toBe('generating')
     expect(useCareerPlaybookStore.getState().phase).toBe('completion')
     expect(useCareerPlaybookStore.getState().generationStartError).toBeNull()
+  })
+
+  it('refreshes generation status through the injectable client and stores completed markdown', async () => {
+    const approveAndGenerate = vi
+      .fn<NonNullable<CareerPlaybookClient['approveAndGenerate']>>()
+      .mockResolvedValue({
+        playbookId: '00000000-0000-4000-8000-000000000913',
+        status: 'generating',
+        phase: 'completion',
+        progress: 80,
+      })
+    const getGenerationStatus = vi
+      .fn<NonNullable<CareerPlaybookClient['getGenerationStatus']>>()
+      .mockResolvedValue({
+        playbookId: '00000000-0000-4000-8000-000000000913',
+        status: 'completed',
+        phase: 'completion',
+        progress: 100,
+        finalMarkdown: '# Product Lead Role Guide',
+      })
+    setCareerPlaybookClientForTests({
+      approveAndGenerate,
+      getGenerationStatus,
+      submitAnswer: vi.fn(),
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000913',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'ready_to_generate',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().approveCareerPlaybookGeneration()
+    ).resolves.toEqual({ ok: true })
+    expect(useCareerPlaybookStore.getState().status).toBe('generating')
+    expect(useCareerPlaybookStore.getState().generationProgress).toBe(80)
+
+    await expect(
+      useCareerPlaybookStore.getState().refreshCareerPlaybookGenerationStatus()
+    ).resolves.toBe(false)
+
+    expect(getGenerationStatus).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000913',
+    })
+    expect(useCareerPlaybookStore.getState().status).toBe('completed')
+    expect(useCareerPlaybookStore.getState().phase).toBe('completion')
+    expect(useCareerPlaybookStore.getState().generationProgress).toBe(100)
+    expect(useCareerPlaybookStore.getState().finalMarkdown).toBe('# Product Lead Role Guide')
+    expect(useCareerPlaybookStore.getState().generationStatusError).toBeNull()
+  })
+
+  it('refreshes generation status through the production tRPC status query', async () => {
+    trpcMocks.getStatusQuery.mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000000914',
+      status: 'failed',
+      phase: 'completion',
+      progress: 100,
+      error: 'worker failed',
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000914',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'generating',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().refreshCareerPlaybookGenerationStatus()
+    ).resolves.toBe(false)
+
+    expect(trpcMocks.getStatusQuery).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000914',
+    })
+    expect(useCareerPlaybookStore.getState().status).toBe('failed')
+    expect(useCareerPlaybookStore.getState().generationProgress).toBe(100)
+    expect(useCareerPlaybookStore.getState().generationStatusError).toBe('worker failed')
+  })
+
+  it('does not leave completion review while generation is active', () => {
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000915',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'generating',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000916',
+          question_text: 'Which KPIs define success?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI context.',
+        },
+      ],
+      followupAnswers: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000916',
+          question_text: 'Which KPIs define success?',
+          question_type: 'open',
+          value: 'Win rate',
+          skipped: false,
+        },
+      ],
+    })
+
+    useCareerPlaybookStore.getState().editCareerPlaybookFixedAnswer('position')
+    useCareerPlaybookStore
+      .getState()
+      .editCareerPlaybookFollowupAnswer('00000000-0000-4000-8000-000000000916')
+
+    expect(useCareerPlaybookStore.getState().phase).toBe('completion')
+    expect(useCareerPlaybookStore.getState().status).toBe('generating')
   })
 
   it('keeps completion editable when generation transport rejects', async () => {

@@ -4,6 +4,7 @@ import {
   CareerPlaybookFollowupAnswerSchema,
   CareerPlaybookFollowupResponseSchema,
   CareerPlaybookQADataSchema,
+  JobType,
   type CareerPlaybookAnswerSubmission,
   type CareerPlaybookBlockId,
   type CareerPlaybookBlockState,
@@ -13,10 +14,12 @@ import {
   type CareerPlaybookFollowupQuestion,
   type CareerPlaybookFollowupResponse,
   type CareerPlaybookPlaybookStatus,
+  type CareerPlaybookGeneratePlaybookJobData,
   type Language,
 } from '@megacampus/shared-types';
 import type { Context, UserContext } from '../../trpc';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
+import { addJob, removeTerminalJobById } from '../../../orchestrator/queue';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import {
   freeformDraftFromQAData,
@@ -106,11 +109,7 @@ function mapRowToDraft(row: CareerPlaybookRow): CareerPlaybookDraftResponse {
 }
 
 function assertReadable(row: CareerPlaybookRow, user: UserContext): void {
-  if (
-    user.role === 'superadmin' ||
-    row.user_id === user.id ||
-    row.organization_id === user.organizationId
-  ) {
+  if (user.role === 'superadmin' || row.user_id === user.id) {
     return;
   }
 
@@ -252,6 +251,15 @@ function assertCanRequestFollowups(
   });
 }
 
+function qaDataWithoutGenerationError(qaData: StoredQAData): StoredQAData {
+  const { generation_error: _generationError, ...cleanQAData } = qaData;
+  return cleanQAData;
+}
+
+function errorMessageFrom(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function startCareerPlaybookSession(
   ctx: Context,
   input: { language: Language }
@@ -300,6 +308,12 @@ export async function submitCareerPlaybookAnswer(
 ): Promise<CareerPlaybookDraftResponse> {
   const user = requireUser(ctx);
   const row = await loadPlaybook(input.playbookId, user, 'write');
+  if (row.status === 'generating') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook generation is already in progress',
+    });
+  }
   const qaData = normalizeStoredQAData(row.q_a_data);
   const updatePayload: Partial<CareerPlaybookRow> = {};
 
@@ -442,6 +456,10 @@ export async function approveCareerPlaybookGeneration(
 ): Promise<CareerPlaybookGenerationStatusResponse> {
   const user = requireUser(ctx);
   const row = await loadPlaybook(input.playbookId, user, 'write');
+  if (row.status === 'generating' || row.status === 'completed') {
+    return mapRowToGenerationStatus(row);
+  }
+
   const qaData = normalizeStoredQAData(row.q_a_data);
   if (!isReadyForGeneration(row, qaData)) {
     throw new TRPCError({
@@ -450,15 +468,58 @@ export async function approveCareerPlaybookGeneration(
     });
   }
 
+  const generationJobId = `career-playbook:${input.playbookId}`;
+  await removeTerminalJobById(generationJobId);
+  const qaDataForGeneration = qaDataWithoutGenerationError(qaData);
   const supabase = getCareerPlaybookSupabase();
   const { data, error } = await supabase
     .from('career_playbooks')
-    .update({ status: 'generating' })
+    .update({
+      status: 'generating',
+      q_a_data: toJson(qaDataForGeneration),
+    })
     .eq('id', input.playbookId)
     .select('*')
     .single();
 
   if (error || !data) throwOnDbError(error, 'Failed to start Career Playbook generation');
+
+  const jobData: CareerPlaybookGeneratePlaybookJobData = {
+    jobType: JobType.CAREER_PLAYBOOK,
+    operation: 'GENERATE_PLAYBOOK',
+    playbookId: input.playbookId,
+    userId: user.id,
+    organizationId: user.organizationId,
+    language: row.language,
+    qaData: CareerPlaybookQADataSchema.parse(qaDataForGeneration),
+    createdAt: new Date().toISOString(),
+    locale: row.language === 'en' ? 'en' : 'ru',
+  };
+  try {
+    await addJob(JobType.CAREER_PLAYBOOK, jobData, {
+      jobId: generationJobId,
+    });
+  } catch (enqueueError) {
+    const message = errorMessageFrom(enqueueError);
+    await supabase
+      .from('career_playbooks')
+      .update({
+        status: 'failed',
+        q_a_data: toJson({
+          ...qaDataForGeneration,
+          generation_error: message,
+        }),
+      })
+      .eq('id', input.playbookId)
+      .select('*')
+      .single();
+
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to enqueue Career Playbook generation',
+      cause: enqueueError,
+    });
+  }
 
   return mapRowToGenerationStatus(data);
 }
@@ -494,7 +555,7 @@ function mapRowToGenerationStatus(row: CareerPlaybookRow): CareerPlaybookGenerat
     status: mapped.status,
     phase: phaseFromStatus(mapped.status),
     progress: generationProgress(mapped.status),
-    error: qaData.generation_error,
+    error: mapped.status === 'failed' ? qaData.generation_error : undefined,
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown ?? undefined,
     completedAt: mapped.completed_at ?? undefined,

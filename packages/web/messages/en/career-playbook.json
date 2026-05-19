@@ -44,6 +44,12 @@
     "generateCta": "Generate Role Guide",
     "generationHandoffTitle": "Generation started",
     "generationHandoffDescription": "Backend generation has started.",
+    "generationInProgressTitle": "Generation in progress",
+    "generationInProgressDescription": "The Role Guide is being assembled.",
+    "generationCompletedTitle": "Generation completed",
+    "generationCompletedDescription": "The Role Guide is ready.",
+    "generationFailedTitle": "Generation failed",
+    "generationFailedDescription": "Try again after checking the collected context.",
     "generationStarting": "Starting generation...",
     "generationErrorTitle": "Generation could not start",
     "emptySummary": "No data yet"

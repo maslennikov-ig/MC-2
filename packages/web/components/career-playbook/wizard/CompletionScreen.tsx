@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, Info, Loader2, Pencil, WandSparkles } from '
 import type {
   CareerPlaybookFixedAnswer,
   CareerPlaybookFollowupAnswer,
+  CareerPlaybookPlaybookStatus,
 } from '@megacampus/shared-types'
 
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,12 @@ export interface CompletionScreenCopy {
   generate?: string
   generationHandoffTitle?: string
   generationHandoffDescription?: string
+  generationInProgressTitle?: string
+  generationInProgressDescription?: string
+  generationCompletedTitle?: string
+  generationCompletedDescription?: string
+  generationFailedTitle?: string
+  generationFailedDescription?: string
   generationStarting?: string
   generationErrorTitle?: string
   empty?: string
@@ -32,8 +39,11 @@ interface CompletionScreenProps {
   onEditFollowupAnswer: (questionId: string) => void
   onGenerate: () => void
   generationHandoffVisible?: boolean
+  generationStatus?: CareerPlaybookPlaybookStatus
+  generationProgress?: number | null
   generationError?: string | null
   isGenerationStarting?: boolean
+  isEditingDisabled?: boolean
   copy?: CompletionScreenCopy
 }
 
@@ -49,6 +59,12 @@ const defaultCopy: Required<CompletionScreenCopy> = {
   generationHandoffTitle: 'Черновик готов к генерации',
   generationHandoffDescription:
     'Контекст сохранён. Генерация продолжится после подключения backend-обработчика.',
+  generationInProgressTitle: 'Генерация выполняется',
+  generationInProgressDescription: 'Role Guide собирается из сохранённого контекста.',
+  generationCompletedTitle: 'Генерация завершена',
+  generationCompletedDescription: 'Role Guide готов.',
+  generationFailedTitle: 'Генерация не завершилась',
+  generationFailedDescription: 'Проверьте собранный контекст и попробуйте снова.',
   generationStarting: 'Запускаем генерацию...',
   generationErrorTitle: 'Не удалось запустить генерацию',
   empty: 'Пока нет данных',
@@ -62,11 +78,33 @@ export function CompletionScreen({
   onEditFollowupAnswer,
   onGenerate,
   generationHandoffVisible = false,
+  generationStatus,
+  generationProgress = null,
   generationError = null,
   isGenerationStarting = false,
+  isEditingDisabled = false,
   copy,
 }: CompletionScreenProps) {
   const labels = { ...defaultCopy, ...copy }
+  const isGenerating = generationStatus === 'generating'
+  const isCompleted = generationStatus === 'completed'
+  const isFailed = generationStatus === 'failed'
+  const shouldShowStatus = !isFailed && (generationHandoffVisible || isGenerating || isCompleted)
+  const generationStatusTitle = isCompleted
+    ? labels.generationCompletedTitle
+    : isGenerating
+      ? labels.generationInProgressTitle
+      : labels.generationHandoffTitle
+  const generationStatusDescription = isCompleted
+    ? labels.generationCompletedDescription
+    : isGenerating
+      ? labels.generationInProgressDescription
+      : labels.generationHandoffDescription
+  const generationStatusProgress =
+    typeof generationProgress === 'number' ? `${Math.round(generationProgress)}%` : null
+  const visibleGenerationError =
+    generationError ?? (isFailed ? labels.generationFailedDescription : null)
+  const generationErrorTitle = isFailed ? labels.generationFailedTitle : labels.generationErrorTitle
 
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6">
@@ -79,27 +117,32 @@ export function CompletionScreen({
           <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             {labels.description}
           </p>
-          {generationHandoffVisible ? (
+          {shouldShowStatus ? (
             <div
               role="status"
               className="flex max-w-2xl gap-2 rounded-md border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-100"
             >
               <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
               <div className="space-y-1">
-                <p className="font-semibold">{labels.generationHandoffTitle}</p>
-                <p className="leading-6">{labels.generationHandoffDescription}</p>
+                <p className="font-semibold">
+                  {generationStatusTitle}
+                  {generationStatusProgress ? (
+                    <span className="ml-2 font-medium">{generationStatusProgress}</span>
+                  ) : null}
+                </p>
+                <p className="leading-6">{generationStatusDescription}</p>
               </div>
             </div>
           ) : null}
-          {generationError ? (
+          {visibleGenerationError ? (
             <div
               role="alert"
               className="flex max-w-2xl gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
               <div className="space-y-1">
-                <p className="font-semibold">{labels.generationErrorTitle}</p>
-                <p className="leading-6">{generationError}</p>
+                <p className="font-semibold">{generationErrorTitle}</p>
+                <p className="leading-6">{visibleGenerationError}</p>
               </div>
             </div>
           ) : null}
@@ -107,7 +150,7 @@ export function CompletionScreen({
         <Button
           type="button"
           onClick={onGenerate}
-          disabled={generationHandoffVisible || isGenerationStarting}
+          disabled={isGenerationStarting || isGenerating || isCompleted}
           className="min-w-52"
         >
           {isGenerationStarting ? (
@@ -126,6 +169,7 @@ export function CompletionScreen({
             title={answer.question_key}
             value={formatValue(answer.value)}
             editLabel={`${labels.edit} ${answer.question_key}`}
+            isEditDisabled={isEditingDisabled}
             onEdit={() => onEditFixedAnswer(answer.question_key)}
           />
         ))}
@@ -138,6 +182,7 @@ export function CompletionScreen({
             title={answer.question_text}
             value={answer.skipped ? labels.skipped : formatValue(answer.value)}
             editLabel={`${labels.edit} ${answer.question_text}`}
+            isEditDisabled={isEditingDisabled}
             onEdit={() => onEditFollowupAnswer(answer.question_id)}
           />
         ))}
@@ -184,11 +229,13 @@ function SummaryRow({
   title,
   value,
   editLabel,
+  isEditDisabled,
   onEdit,
 }: {
   title: string
   value: string
   editLabel: string
+  isEditDisabled?: boolean
   onEdit: () => void
 }) {
   return (
@@ -199,7 +246,14 @@ function SummaryRow({
           {value}
         </p>
       </div>
-      <Button type="button" variant="ghost" size="sm" onClick={onEdit} aria-label={editLabel}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onEdit}
+        aria-label={editLabel}
+        disabled={isEditDisabled}
+      >
         <Pencil className="h-4 w-4" aria-hidden />
       </Button>
     </div>

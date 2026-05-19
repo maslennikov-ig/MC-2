@@ -38,6 +38,8 @@ export interface CareerPlaybookDraft {
   dirtyFixedQuestionKeys?: string[]
   dirtyFollowupQuestionIds?: string[]
   dirtyFreeformDraft?: boolean
+  generationProgress?: number | null
+  finalMarkdown?: string | null
 }
 
 export interface CareerPlaybookGenerationStatus {
@@ -46,6 +48,8 @@ export interface CareerPlaybookGenerationStatus {
   phase?: CareerPlaybookWizardPhase
   progress?: number
   error?: string
+  finalMarkdown?: string
+  completedAt?: string
 }
 
 export interface CareerPlaybookClient {
@@ -58,6 +62,7 @@ export interface CareerPlaybookClient {
     contentLanguage: Language
   }) => Promise<CareerPlaybookFollowupResponse>
   approveAndGenerate?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
+  getGenerationStatus?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
   submitAnswer: (input: {
     playbookId: string
     phase: 'fixed' | 'followup' | 'freeform'
@@ -89,6 +94,9 @@ interface CareerPlaybookStoreState {
   followupGenerationLimit: number
   isStartingGeneration: boolean
   generationStartError: string | null
+  generationStatusError: string | null
+  generationProgress: number | null
+  finalMarkdown: string | null
   freeformDraft: string
   isAutosaving: boolean
   autosaveError: string | null
@@ -112,6 +120,7 @@ interface CareerPlaybookStoreState {
   goToPreviousCareerPlaybookFollowup: () => void
   completeCareerPlaybookFollowups: () => void
   approveCareerPlaybookGeneration: () => Promise<CareerPlaybookAutosaveResult>
+  refreshCareerPlaybookGenerationStatus: () => Promise<boolean>
   editCareerPlaybookFixedAnswer: (questionKey: string) => void
   editCareerPlaybookFollowupAnswer: (questionId: string) => void
   saveCareerPlaybookFreeformDraft: (text: string) => void
@@ -363,6 +372,7 @@ function initialState(): Omit<
   | 'goToPreviousCareerPlaybookFollowup'
   | 'completeCareerPlaybookFollowups'
   | 'approveCareerPlaybookGeneration'
+  | 'refreshCareerPlaybookGenerationStatus'
   | 'editCareerPlaybookFixedAnswer'
   | 'editCareerPlaybookFollowupAnswer'
   | 'saveCareerPlaybookFreeformDraft'
@@ -391,6 +401,9 @@ function initialState(): Omit<
     followupGenerationLimit: 2,
     isStartingGeneration: false,
     generationStartError: null,
+    generationStatusError: null,
+    generationProgress: null,
+    finalMarkdown: null,
     freeformDraft: '',
     isAutosaving: false,
     autosaveError: null,
@@ -514,6 +527,10 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.generation.approveAndGenerate.mutate(
         input
       )) as unknown as CareerPlaybookGenerationStatus,
+    getGenerationStatus: async (input) =>
+      (await client.careerPlaybook.generation.getStatus.query(
+        input
+      )) as unknown as CareerPlaybookGenerationStatus,
     submitAnswer: (input) => client.careerPlaybook.session.submitAnswer.mutate(input),
   }
 }
@@ -634,6 +651,9 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.isGeneratingFollowups = false
           state.isStartingGeneration = false
           state.generationStartError = null
+          state.generationStatusError = null
+          state.generationProgress = draft.generationProgress ?? state.generationProgress
+          state.finalMarkdown = draft.finalMarkdown ?? state.finalMarkdown
           state.dirtyFixedQuestionKeys = draft.dirtyFixedQuestionKeys ?? []
           state.dirtyFollowupQuestionIds =
             draft.dirtyFollowupQuestionIds ?? state.dirtyFollowupQuestionIds
@@ -808,6 +828,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           set((state) => {
             state.isStartingGeneration = true
             state.generationStartError = null
+            state.generationStatusError = null
           })
 
           const response = await client.approveAndGenerate({
@@ -817,8 +838,11 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           set((state) => {
             state.status = response.status
             state.phase = response.phase ?? 'completion'
+            state.generationProgress = response.progress ?? state.generationProgress
+            state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
             state.isStartingGeneration = false
             state.generationStartError = response.error ?? null
+            state.generationStatusError = response.error ?? null
           })
 
           return response.error ? { ok: false, error: response.error } : { ok: true }
@@ -832,8 +856,48 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         }
       },
 
+      refreshCareerPlaybookGenerationStatus: async () => {
+        const snapshot = get()
+        if (!snapshot.playbookId) {
+          return false
+        }
+
+        try {
+          const client = getClient()
+          if (!client.getGenerationStatus) {
+            set((state) => {
+              state.generationStatusError = 'Role Guide generation status is unavailable'
+            })
+            return false
+          }
+
+          const response = await client.getGenerationStatus({
+            playbookId: snapshot.playbookId,
+          })
+
+          set((state) => {
+            state.status = response.status
+            state.phase = response.phase ?? 'completion'
+            state.generationProgress = response.progress ?? state.generationProgress
+            state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
+            state.generationStatusError = response.error ?? null
+          })
+
+          return response.status === 'generating'
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Role Guide generation status failed'
+          set((state) => {
+            state.generationStatusError = message
+          })
+          return get().status === 'generating'
+        }
+      },
+
       editCareerPlaybookFixedAnswer: (questionKey) =>
         set((state) => {
+          if (state.status === 'generating') return
+
           const visibleQuestions = visibleQuestionsFromState(state)
           const questionIndex = visibleQuestions.findIndex(
             (question) => question.question_key === questionKey
@@ -846,6 +910,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
 
       editCareerPlaybookFollowupAnswer: (questionId) =>
         set((state) => {
+          if (state.status === 'generating') return
+
           let questionIndex = state.followupQuestions.findIndex(
             (question) => question.question_id === questionId
           )
@@ -916,6 +982,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             dirtyFixedQuestionKeys: mergedDraft.dirtyFixedQuestionKeys,
             dirtyFollowupQuestionIds: mergedDraft.dirtyFollowupQuestionIds,
             dirtyFreeformDraft: mergedDraft.dirtyFreeformDraft,
+            generationProgress: remoteDraft.generationProgress ?? latest.generationProgress,
+            finalMarkdown: remoteDraft.finalMarkdown ?? latest.finalMarkdown,
           })
 
           return { ok: true }
@@ -947,6 +1015,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             dirtyFixedQuestionKeys: mergedDraft.dirtyFixedQuestionKeys,
             dirtyFollowupQuestionIds: mergedDraft.dirtyFollowupQuestionIds,
             dirtyFreeformDraft: mergedDraft.dirtyFreeformDraft,
+            generationProgress: remoteDraft.generationProgress ?? latest.generationProgress,
+            finalMarkdown: remoteDraft.finalMarkdown ?? latest.finalMarkdown,
           })
 
           return { ok: true }
@@ -1087,6 +1157,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         freeformDraft: state.freeformDraft,
         dirtyFixedQuestionKeys: state.dirtyFixedQuestionKeys,
         dirtyFreeformDraft: state.dirtyFreeformDraft,
+        generationProgress: state.generationProgress,
         lastAutosavedAt: state.lastAutosavedAt,
       }),
     }

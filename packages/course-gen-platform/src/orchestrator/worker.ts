@@ -41,6 +41,7 @@ import {
 import { JobCancelledError } from '../server/errors/typed-errors';
 import { costTracker } from '../shared/metrics/cost-tracker';
 import { stageMetricsCollector } from '../shared/metrics/stage-metrics';
+import { getJobCourseId } from './job-data-fields';
 
 /**
  * Get the processor file path for sandboxed processing
@@ -130,6 +131,7 @@ const registeredJobTypes = [
   JobType.STRUCTURE_GENERATION,
   JobType.LESSON_CONTENT,
   JobType.BLOCK_REGENERATION,
+  JobType.CAREER_PLAYBOOK,
 ];
 
 /**
@@ -351,7 +353,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         }
 
         // Clean up in-memory metrics for completed course
-        const courseId = job.data?.courseId;
+        const courseId = getJobCourseId(job.data);
         if (courseId) {
           costTracker.clearCourse(courseId);
           stageMetricsCollector.clearCourse(courseId);
@@ -406,7 +408,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
           }
 
           // Clean up in-memory metrics for cancelled course
-          const cancelledCourseId = job.data?.courseId;
+          const cancelledCourseId = getJobCourseId(job.data);
           if (cancelledCourseId) {
             costTracker.clearCourse(cancelledCourseId);
             stageMetricsCollector.clearCourse(cancelledCourseId);
@@ -431,7 +433,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         // Safety net: update course generation_status when sandbox crashes.
         // BaseJobHandler.process() runs in child thread — if it crashes,
         // generation_status is never updated. This catches that gap.
-        const courseId = job.data?.courseId;
+        const courseId = getJobCourseId(job.data);
         const jobType = job.name as JobType;
         const stepId = JOB_TYPE_TO_STEP[jobType];
 
@@ -537,7 +539,7 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
             jobType: job.name,
             // organizationId may not exist for all job types (e.g., LESSON_CONTENT)
             organizationId: 'organizationId' in job.data ? job.data.organizationId : undefined,
-            courseId: job.data.courseId,
+            courseId: getJobCourseId(job.data),
           },
           'Worker picked up job'
         );

@@ -17,6 +17,7 @@ import { JobData, JobType } from '@megacampus/shared-types';
 import logger, { logPermanentFailure } from '../../shared/logger';
 import { logger as baseLogger } from '@megacampus/shared-logger';
 import { metricsStore } from '../metrics';
+import { getJobCourseId } from '../job-data-fields';
 import {
   PipelineError,
   PipelineInterrupt,
@@ -237,6 +238,7 @@ export function shouldRetryJob(job: Job<JobData>, error: Error | unknown): boole
  */
 export function handleJobFailure(job: Job<JobData>, error: Error | unknown): void {
   const jobData = job.data;
+  const courseId = getJobCourseId(jobData);
   const errorType = classifyError(error);
   const willRetry = shouldRetryJob(job, error);
 
@@ -248,7 +250,7 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
     jobId: job.id,
     jobType: job.name,
     organizationId: jobData.organizationId,
-    courseId: jobData.courseId,
+    courseId,
     userId: jobData.userId,
     attemptsMade: job.attemptsMade,
     attemptsMax: job.opts.attempts || 3,
@@ -313,7 +315,7 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
   logPermanentFailure({
     organization_id: jobData.organizationId,
     user_id: jobData.userId,
-    course_id: jobData.courseId,
+    course_id: courseId,
     // Use job_id as problem_id to group related retry errors together
     problem_id: job.id,
     error_message: error instanceof Error ? error.message : String(error),
@@ -322,7 +324,7 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
     job_id: job.id,
     job_type: job.name,
     metadata: {
-      courseId: jobData.courseId,
+      courseId,
       errorType,
       errorCode: error instanceof PipelineError ? error.code : undefined,
       attemptsMade: job.attemptsMade,

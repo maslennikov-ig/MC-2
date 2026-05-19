@@ -1,7 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import CareerPlaybookNewPageClient from '@/app/[locale]/career-playbook/new/page-client'
 import {
@@ -56,6 +56,12 @@ const messages = {
       generateCta: 'Generate Role Guide',
       generationHandoffTitle: 'Generation started',
       generationHandoffDescription: 'Backend generation has started.',
+      generationInProgressTitle: 'Generation in progress',
+      generationInProgressDescription: 'The Role Guide is being assembled.',
+      generationCompletedTitle: 'Generation completed',
+      generationCompletedDescription: 'The Role Guide is ready.',
+      generationFailedTitle: 'Generation failed',
+      generationFailedDescription: 'Try again after checking the collected context.',
       generationStarting: 'Starting generation...',
       generationErrorTitle: 'Generation could not start',
       emptySummary: 'No data yet',
@@ -67,6 +73,7 @@ let startSession: Mock
 let submitAnswer: Mock
 let requestFollowups: Mock
 let approveAndGenerate: Mock
+let getGenerationStatus: Mock
 
 function renderPage() {
   return render(
@@ -104,13 +111,24 @@ describe('CareerPlaybookNewPageClient', () => {
       phase: 'completion',
       progress: 80,
     })
+    getGenerationStatus = vi.fn().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000000901',
+      status: 'generating',
+      phase: 'completion',
+      progress: 80,
+    })
     setCareerPlaybookClientForTests({
       startSession,
       requestFollowups,
       approveAndGenerate,
+      getGenerationStatus,
       submitAnswer,
     })
     localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('starts a best-effort backend session on mount', async () => {
@@ -247,8 +265,71 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(approveAndGenerate).toHaveBeenCalledWith({
       playbookId: '00000000-0000-4000-8000-000000000901',
     })
-    expect(await screen.findByRole('status')).toHaveTextContent('Generation started')
-    expect(screen.getByText('Backend generation has started.')).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('Generation in progress')
+    expect(screen.getByRole('status')).toHaveTextContent('80%')
+    expect(screen.getByText('The Role Guide is being assembled.')).toBeInTheDocument()
+  })
+
+  it('polls generation status while generating and stops after completion', async () => {
+    vi.useFakeTimers()
+    getGenerationStatus
+      .mockResolvedValueOnce({
+        playbookId: '00000000-0000-4000-8000-000000000904',
+        status: 'generating',
+        phase: 'completion',
+        progress: 85,
+      })
+      .mockResolvedValueOnce({
+        playbookId: '00000000-0000-4000-8000-000000000904',
+        status: 'completed',
+        phase: 'completion',
+        progress: 100,
+        finalMarkdown: '# Product Lead Role Guide',
+      })
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000904',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'generating',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Product Lead',
+        },
+      },
+    })
+
+    renderPage()
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(getGenerationStatus).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('status')).toHaveTextContent('Generation in progress')
+    expect(screen.getByRole('status')).toHaveTextContent('85%')
+    expect(screen.getByRole('button', { name: 'Edit position' })).toBeDisabled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(getGenerationStatus).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('status')).toHaveTextContent('Generation completed')
+    expect(screen.getByText('The Role Guide is ready.')).toBeInTheDocument()
+
+    await act(async () => {
+      vi.advanceTimersByTime(9000)
+      await Promise.resolve()
+    })
+
+    expect(getGenerationStatus).toHaveBeenCalledTimes(2)
   })
 
   it('keeps the generate CTA retryable when backend generation cannot start', async () => {

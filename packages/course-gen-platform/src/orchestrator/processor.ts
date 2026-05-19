@@ -33,7 +33,9 @@ import { stage5GenerationHandler } from '../stages/stage5-generation/handler.js'
 import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/handler.js';
 import type { Stage6JobInput } from '../stages/stage6-lesson-content/types';
 import { blockRegenerationHandler } from './handlers/block-regeneration-handler.js';
+import { careerPlaybookHandler } from './handlers/career-playbook-handler.js';
 import type { JobResult } from './handlers/base-handler.js';
+import { getJobCourseId } from './job-data-fields.js';
 
 /**
  * Track current job reference globally so uncaughtException handler can access it.
@@ -138,7 +140,12 @@ const jobHandlers: Record<string, JobHandler> = {
     },
   }),
   [JobType.BLOCK_REGENERATION]: adaptHandler(blockRegenerationHandler),
+  [JobType.CAREER_PLAYBOOK]: adaptHandler(careerPlaybookHandler),
 };
+
+export function isJobTypeRegistered(jobType: string): boolean {
+  return Boolean(jobHandlers[jobType]);
+}
 
 /**
  * Health check for processor environment
@@ -438,7 +445,7 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
         attemptsMade: job.attemptsMade,
         durationMs,
         // Include job data for debugging (courseId, organizationId, etc.)
-        courseId: job.data?.courseId,
+        courseId: getJobCourseId(job.data),
         organizationId: job.data?.organizationId,
         userId: job.data?.userId,
       },
@@ -466,7 +473,7 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
     captureError(error, {
       tags: { component: 'processor', jobType, jobId: job.id || 'unknown' },
       extra: {
-        courseId: job.data?.courseId,
+        courseId: getJobCourseId(job.data),
         attemptsMade: job.attemptsMade,
         durationMs,
       },
@@ -480,7 +487,7 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
       await logPermanentFailure({
         organization_id: job.data?.organizationId,
         user_id: job.data?.userId,
-        course_id: job.data?.courseId,
+        course_id: getJobCourseId(job.data),
         problem_id: job.id,
         error_message: `[Sandbox] ${errorMessage}`,
         stack_trace: errorStack,
@@ -488,7 +495,7 @@ async function processJob(job: SandboxedJob<JobData>, token?: string): Promise<J
         job_id: job.id,
         job_type: jobType,
         metadata: {
-          courseId: job.data?.courseId,
+          courseId: getJobCourseId(job.data),
           attemptsMade: job.attemptsMade,
           durationMs,
           source: 'sandbox_processor',

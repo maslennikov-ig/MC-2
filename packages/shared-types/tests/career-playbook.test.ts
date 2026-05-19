@@ -9,6 +9,7 @@ import {
   CareerPlaybookRoleProfileSpecSchema,
   SUPPORTED_CAREER_PLAYBOOK_CONTENT_LANGUAGES,
 } from '../src/career-playbook';
+import { JobDataSchema, JobType } from '../src/bullmq-jobs';
 
 const baseRoleProfileSpec = {
   position: {
@@ -135,6 +136,26 @@ describe('Career Playbook shared schemas', () => {
         },
       ],
       completeness_score: 0.82,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('validates Career Playbook queue jobs without requiring a courseId', () => {
+    const result = JobDataSchema.safeParse({
+      jobType: JobType.CAREER_PLAYBOOK,
+      operation: 'GENERATE_PLAYBOOK',
+      playbookId: '00000000-0000-4000-8000-000000000001',
+      userId: '00000000-0000-4000-8000-000000000002',
+      organizationId: '00000000-0000-4000-8000-000000000003',
+      language: 'en',
+      locale: 'en',
+      createdAt: '2026-05-19T00:00:00.000Z',
+      qaData: {
+        fixed: [{ question_key: 'position', value: 'Product Lead' }],
+        followups: [],
+        freeform: [],
+      },
     });
 
     expect(result.success).toBe(true);

@@ -55,6 +55,8 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
         dirtyFixedQuestionKeys: snapshot.dirtyFixedQuestionKeys,
         dirtyFollowupQuestionIds: snapshot.dirtyFollowupQuestionIds,
         dirtyFreeformDraft: snapshot.dirtyFreeformDraft,
+        generationProgress: snapshot.generationProgress,
+        finalMarkdown: snapshot.finalMarkdown,
       })
     }
 
@@ -83,6 +85,42 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
       setGenerationHandoffVisible(false)
     }
   }, [generationHandoffVisible, state.phase])
+
+  useEffect(() => {
+    if (state.phase !== 'completion' || state.status !== 'generating' || !state.playbookId) {
+      return
+    }
+
+    let cancelled = false
+    let inFlight = false
+    let intervalId: number | null = null
+
+    const pollGenerationStatus = async () => {
+      if (cancelled || inFlight) return
+      inFlight = true
+
+      const shouldContinue = await useCareerPlaybookStore
+        .getState()
+        .refreshCareerPlaybookGenerationStatus()
+
+      inFlight = false
+      if (!shouldContinue && intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+
+    void pollGenerationStatus()
+    intervalId = window.setInterval(() => {
+      void pollGenerationStatus()
+    }, 3000)
+
+    return () => {
+      cancelled = true
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [state.phase, state.playbookId, state.status])
 
   const answers = useMemo<Record<string, CareerPlaybookAnswerValue | undefined>>(
     () =>
@@ -163,6 +201,12 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
     generate: t('generateCta'),
     generationHandoffTitle: t('generationHandoffTitle'),
     generationHandoffDescription: t('generationHandoffDescription'),
+    generationInProgressTitle: t('generationInProgressTitle'),
+    generationInProgressDescription: t('generationInProgressDescription'),
+    generationCompletedTitle: t('generationCompletedTitle'),
+    generationCompletedDescription: t('generationCompletedDescription'),
+    generationFailedTitle: t('generationFailedTitle'),
+    generationFailedDescription: t('generationFailedDescription'),
     generationStarting: t('generationStarting'),
     generationErrorTitle: t('generationErrorTitle'),
     empty: t('emptySummary'),
@@ -335,8 +379,11 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
               state.status === 'generating' ||
               state.status === 'completed'
             }
-            generationError={state.generationStartError}
+            generationStatus={state.status}
+            generationProgress={state.generationProgress}
+            generationError={state.generationStatusError ?? state.generationStartError}
             isGenerationStarting={state.isStartingGeneration || state.isAutosaving}
+            isEditingDisabled={state.status === 'generating'}
             copy={completionCopy}
           />
         ) : null}
