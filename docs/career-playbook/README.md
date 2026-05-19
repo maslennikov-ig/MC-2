@@ -1,0 +1,33 @@
+# Career Playbook
+
+Career Playbook is the Role Guide generation track for MC2. The MVP flow is:
+
+1. Authenticated user answers fixed and adaptive wizard questions.
+2. Backend generates the 26-block Role Guide through the Career Playbook LangGraph stage.
+3. User reviews, edits/regenerates blocks, exports PDF, shares a public viewer link, or starts course generation from a completed playbook.
+
+## Verification Entrypoints
+
+Local read-only checks:
+
+```bash
+pnpm --filter @megacampus/web test:e2e:career-playbook -- --list
+pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target local
+```
+
+`blocked` is an expected non-zero preflight outcome when required env or schema is missing; pnpm reports it as a lifecycle failure while preserving the human-readable smoke report.
+
+Targeted unit checks:
+
+```bash
+pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts
+SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts
+```
+
+Mutation smoke is intentionally not part of the default command. It requires explicit approval, disposable staging fixtures, a dedicated queue, cleanup authorization, and cost-aware LLM credentials.
+
+## Current Live Readiness
+
+Supabase MCP read access is available for project `diqooqbuchsliypgwksu`, but the remote database currently does not expose `public.career_playbooks`. Treat this as a staging readiness blocker until the approved migration flow applies the Career Playbook migration.
+
+See [architecture.md](./architecture.md) for the system map and staging smoke plan.

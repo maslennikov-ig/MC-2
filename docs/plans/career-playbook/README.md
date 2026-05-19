@@ -6,6 +6,12 @@
 
 [../quiet-waddling-starfish.md](../quiet-waddling-starfish.md) — утверждённый план со всеми product decisions, архитектурой, файлами, error handling и verification.
 
+## Runtime docs
+
+[../../career-playbook/README.md](../../career-playbook/README.md) — текущие runtime entrypoints и verification команды.
+
+[../../career-playbook/architecture.md](../../career-playbook/architecture.md) — карта web/backend/worker поверхностей, read-only smoke, staging cron план и performance/cost checklist.
+
 ## Детальные документы (этот пакет)
 
 | # | Документ | Для какой фазы |

@@ -19,6 +19,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - `.codex/project-index.md` - this stable navigation map.
 - `docs/plans/quiet-waddling-starfish.md` - Career Playbook product and architecture plan.
 - `docs/plans/career-playbook/` - detailed Career Playbook implementation plans.
+- `docs/career-playbook/` - Career Playbook runtime architecture and verification docs.
 - `scripts/orchestration/run_process_verification.sh` - orchestration contract verification.
 - `scripts/orchestration/run_stage_closeout.py` - canonical stage closeout entrypoint.
 
@@ -38,6 +39,7 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Backend tRPC routers and services: `packages/course-gen-platform/src/server/routers/`.
 - Backend Career Playbook stage: `packages/course-gen-platform/src/stages/stage-career-playbook/`.
 - Backend Career Playbook PDF service: `packages/course-gen-platform/src/services/career-playbook-pdf.ts`.
+- Backend Career Playbook smoke preflight: `packages/course-gen-platform/src/smoke/career-playbook-preflight.ts` and `packages/course-gen-platform/scripts/career-playbook-smoke-preflight.ts`.
 - Backend Supabase migrations: `packages/course-gen-platform/supabase/migrations/`.
 - Shared Career Playbook contracts: `packages/shared-types/src/career-playbook.ts`.
 
@@ -58,6 +60,8 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Backend targeted unit tests: `pnpm --filter @megacampus/course-gen-platform test -- <test-files>`.
 - Web targeted unit tests: `pnpm --filter @megacampus/web exec vitest run <test-files>`.
 - Web targeted e2e: `pnpm --filter @megacampus/web exec playwright test <spec> --project=chromium`.
+- Career Playbook web e2e harness: `pnpm --filter @megacampus/web test:e2e:career-playbook`.
+- Career Playbook backend read-only preflight: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target local`.
 - Artifact validation: `python3 scripts/orchestration/validate_artifact.py <artifact.md>`.
 
 ## Conventions And Boundaries
