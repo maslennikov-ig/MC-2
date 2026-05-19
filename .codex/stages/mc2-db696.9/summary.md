@@ -4,6 +4,8 @@
 
 Implement the MVP bridge on branch `codex/career-playbook-jd-bridge` from `origin/codex/career-playbook-generation-status`.
 
+Delivery: draft PR #36, https://github.com/maslennikov-ig/MC-2/pull/36, targeting `codex/career-playbook-generation-status`.
+
 Accepted scope:
 
 - Backend creates the course from a completed Career Playbook.

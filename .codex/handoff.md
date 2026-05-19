@@ -3,6 +3,7 @@
 Updated: 2026-05-19
 Current working branch: `codex/career-playbook-jd-bridge`
 Base branch: `codex/career-playbook-generation-status` stacked on PR #35
+Current PR: #36 - https://github.com/maslennikov-ig/MC-2/pull/36
 
 ## Current state
 
@@ -22,7 +23,7 @@ Base branch: `codex/career-playbook-generation-status` stacked on PR #35
 
 ## Next recommended
 
-Next delivery action: push `codex/career-playbook-jd-bridge` and open a stacked PR targeting `codex/career-playbook-generation-status`.
+Next delivery action: monitor stacked PR #36 and retarget/rebase if upstream PRs land first.
 
 Next stage id: `mc2-db696.11`
 Recommended action: after the JD bridge PR is open, start Phase 11 live tests/smoke/staging verification only with explicit environment/auth readiness. This is the right place for wizard -> generation -> viewer/PDF/share -> create course E2E.
