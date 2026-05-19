@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:54321'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'test-anon-key'
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'test-service-role-key'
 
 export default defineConfig({
   testDir: './tests',
@@ -127,6 +133,11 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       NEXT_PRIVATE_SKIP_CACHE: '1',
+      SKIP_ENV_VALIDATION: 'true',
+      NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+      SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKey,
     },
   },
 

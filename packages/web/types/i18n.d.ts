@@ -18,6 +18,7 @@ type EnrichmentsMessages = typeof import('../messages/ru/enrichments.json')
 type CourseMessages = typeof import('../messages/ru/course.json')
 type OrganizationsMessages = typeof import('../messages/ru/organizations.json')
 type ProfileMessages = typeof import('../messages/ru/profile.json')
+type CareerPlaybookMessages = typeof import('../messages/ru/career-playbook.json')
 
 // Combined messages type matching the structure returned by request.ts
 type Messages = {
@@ -29,6 +30,7 @@ type Messages = {
   course: CourseMessages
   organizations: OrganizationsMessages
   profile: ProfileMessages
+  'career-playbook': CareerPlaybookMessages
 }
 
 declare global {
