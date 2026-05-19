@@ -104,6 +104,21 @@ Revenue Operations Lead overview.`);
     expect(toc).toContain('Block 1 Title');
     expect(toc).toContain('Block 26 Title');
     expect(toc).toContain('href="#block-26"');
+    expect(toc).not.toContain('>1. Block 1 Title<');
+    expect(toc).not.toContain('>26. Block 26 Title<');
+  });
+
+  it('localizes static PDF chrome for Russian playbooks', () => {
+    const input = createPdfInput();
+    input.language = 'ru';
+
+    const html = buildCareerPlaybookPdfHtml(input);
+
+    expect(html).toContain('<title>Revenue Operations Lead - Career Playbook</title>');
+    expect(html).toContain('Оглавление');
+    expect(html).toContain('Практический Role Guide');
+    expect(html).not.toContain('Table of contents');
+    expect(html).not.toContain('A practical role guide');
   });
 
   it('keeps Mermaid figure markup intact before browser rendering', () => {

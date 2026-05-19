@@ -42,6 +42,29 @@ function stripMarkdownInline(value: string): string {
     .trim();
 }
 
+function stripLeadingHeadingNumber(value: string): string {
+  return value.replace(/^\d+[.)]\s+/, '').trim();
+}
+
+function pdfChrome(language: Language): {
+  tocLabel: string;
+  coverNote: string;
+} {
+  if (language === 'ru') {
+    return {
+      tocLabel: 'Оглавление',
+      coverNote:
+        'Практический Role Guide: ожидания, рабочий ритм, границы решений, онбординг, риски и внедрение.',
+    };
+  }
+
+  return {
+    tocLabel: 'Table of contents',
+    coverNote:
+      'A practical role guide for expectations, operating rhythm, decision boundaries, onboarding, risks, and implementation.',
+  };
+}
+
 function renderInlineMarkdown(value: string): string {
   return escapeHtml(value)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -60,6 +83,8 @@ function extractBlockHeadings(markdown: string): Array<{ id: string; label: stri
   const headings = [...markdown.matchAll(/^##\s+(.+)$/gm)]
     .map(match => stripMarkdownInline(match[1] ?? ''))
     .filter(label => label && !/^header$/i.test(label))
+    .map(stripLeadingHeadingNumber)
+    .filter(Boolean)
     .slice(0, 26);
 
   return headings.map((label, index) => ({ id: `block-${index + 1}`, label }));
@@ -232,8 +257,11 @@ function renderMetadata(input: CareerPlaybookPdfInput): string {
   return parts.map(part => `<span>${escapeHtml(part)}</span>`).join('');
 }
 
-function renderTableOfContents(items: Array<{ id: string; label: string }>): string {
-  return `<nav class="pdf-toc" aria-label="Table of contents"><h2>Table of contents</h2><ol>${items
+function renderTableOfContents(
+  items: Array<{ id: string; label: string }>,
+  chrome: ReturnType<typeof pdfChrome>
+): string {
+  return `<nav class="pdf-toc" aria-label="${escapeAttribute(chrome.tocLabel)}"><h2>${escapeHtml(chrome.tocLabel)}</h2><ol>${items
     .map(item => `<li><a href="#${item.id}">${escapeHtml(item.label)}</a></li>`)
     .join('')}</ol></nav>`;
 }
@@ -339,6 +367,7 @@ export function buildCareerPlaybookPdfHtml(input: CareerPlaybookPdfInput): strin
   const markdown = collectMarkdown(input);
   const title = input.positionTitle ?? 'Career Playbook';
   const body = renderMarkdownBody(markdown);
+  const chrome = pdfChrome(input.language);
 
   return `<!doctype html>
 <html lang="${escapeAttribute(input.language)}">
@@ -354,9 +383,9 @@ export function buildCareerPlaybookPdfHtml(input: CareerPlaybookPdfInput): strin
       <h1>${escapeHtml(title)}</h1>
       <div class="metadata">${renderMetadata(input)}</div>
     </div>
-    <p class="cover-note">A practical role guide for expectations, operating rhythm, decision boundaries, onboarding, risks, and implementation.</p>
+    <p class="cover-note">${escapeHtml(chrome.coverNote)}</p>
   </section>
-  ${renderTableOfContents(extractBlockHeadings(markdown))}
+  ${renderTableOfContents(extractBlockHeadings(markdown), chrome)}
   <main class="pdf-content">${body}</main>
 </body>
 </html>`;
