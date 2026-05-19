@@ -81,3 +81,11 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 - Remote Supabase read probe showed `public.career_playbooks` is absent in project `diqooqbuchsliypgwksu`. The migration was not applied from this stage.
 - Full live mutation smoke requires explicit approval, staging schema, disposable user/org/playbooks, dedicated `BULLMQ_QUEUE_NAME`, cleanup authorization, valid auth token, and accepted API cost budget.
 - Cost dashboard evidence and 10-concurrent load testing remain tracked as open Beads children.
+
+## PR Stack Readiness Pass
+
+- `mc2-db696.11.7` mapped the stacked PR delivery path after #37 was opened.
+- Accepted finding: #37 is safe to wait behind #36, but not merge-ready while upstream PRs are unresolved and GitHub reports no checks/reviews for it.
+- Accepted finding: #36 itself has no visible code-level blocker, but should not be advanced in isolation while #35 and earlier PRs are still draft unless the team explicitly accepts stacked review over draft upstream branches.
+- Accepted finding: the first actionable delivery step is #24; it is not draft, merge-clean, and has successful CI, but no review decision. #25 is not draft but has no GitHub checks. #26-#35 are draft with no checks/reviews.
+- Recommended sequence before #36/#37: #24 -> #25 -> #26 -> #27 -> #28 -> #29 -> #32 -> #33 -> #34 -> #35 -> #36 -> #37. Sibling PRs #30 and #31 should be handled explicitly after #29 if they are part of the delivery path.

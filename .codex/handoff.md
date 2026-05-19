@@ -24,10 +24,10 @@ Current PR: #37 `codex/career-playbook-e2e-smoke` -> `codex/career-playbook-jd-b
 
 ## Next recommended
 
-Next delivery action: finish local closeout, push `codex/career-playbook-e2e-smoke`, and open a stacked PR to `codex/career-playbook-jd-bridge`.
+Next delivery action: resolve the lower Career Playbook PR stack before advancing #36/#37. First actionable PR is #24; #25 lacks GitHub checks, and #26-#35 remain draft.
 
 Next stage id: `mc2-db696.11`
-Recommended action: continue open follow-up children only when staging schema/auth/credentials/queue/cost approval are ready.
+Recommended action: keep #37 open behind the stack; do not start more dependent implementation until #24/#25/#26+ readiness is resolved. Live smoke remains gated on staging schema/auth/queue/cleanup/cost readiness.
 
 - If upstream stacked PRs land first, rebase/retarget before more dependent work.
 
