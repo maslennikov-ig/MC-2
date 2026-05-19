@@ -31,15 +31,39 @@ const messages = {
       questionLabel: 'Question',
       answeredLabel: 'Answered',
       ofLabel: 'of',
-      completionTitle: 'Phase A is ready',
-      completionDescription: 'Adaptive follow-ups will continue in Phase B.',
+      phaseABadge: 'Phase A',
+      phaseBBadge: 'Phase B',
+      reviewBadge: 'Review',
+      completionTitle: 'Ready to create?',
+      completionDescription: 'Review the collected context before generating the Role Guide.',
       completionCta: 'Continue',
+      followupTitle: 'AI follow-up',
+      skipFollowup: 'Skip',
+      enoughGenerate: 'Enough, generate',
+      completeness: 'Completeness',
+      milestone60: 'Enough for a base',
+      milestone80: 'Strong context',
+      milestone100: 'Maximum context',
+      followupsLoadingTitle: 'Preparing follow-ups',
+      followupsLoadingDescription: 'The next questions adapt to your fixed answers.',
+      followupsUnavailableTitle: 'Adaptive follow-ups are unavailable',
+      followupsUnavailableDescription: 'You can still review the collected context and generate.',
+      fixedAnswersTitle: 'Fixed answers',
+      followupAnswersTitle: 'Follow-ups',
+      freeformNotesTitle: 'Free-form notes',
+      skippedLabel: 'Skipped',
+      editLabel: 'Edit',
+      generateCta: 'Generate Role Guide',
+      generationHandoffTitle: 'Generation handoff saved',
+      generationHandoffDescription: 'The draft is saved and ready for backend generation handoff.',
+      emptySummary: 'No data yet',
     },
   },
 }
 
 let startSession: Mock
 let submitAnswer: Mock
+let requestFollowups: Mock
 
 function renderPage() {
   return render(
@@ -58,8 +82,22 @@ describe('CareerPlaybookNewPageClient', () => {
       contentLanguage: 'en',
     })
     submitAnswer = vi.fn().mockResolvedValue({ savedAt: '2026-05-13T00:00:00.000Z' })
+    requestFollowups = vi.fn().mockResolvedValue({
+      questions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000701',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      completeness_score: 0.82,
+      stop_recommendation: 'ready_to_generate',
+    })
     setCareerPlaybookClientForTests({
       startSession,
+      requestFollowups,
       submitAnswer,
     })
     localStorage.clear()
@@ -92,7 +130,7 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(screen.getByText('Draft saved locally')).toBeInTheDocument()
   })
 
-  it('shows the Phase A completion state after the last fixed question', async () => {
+  it('continues from Phase A into adaptive follow-ups and completion review', async () => {
     const user = userEvent.setup()
 
     renderPage()
@@ -115,6 +153,188 @@ describe('CareerPlaybookNewPageClient', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('button', { name: 'Finish Phase A' }))
 
-    expect(await screen.findByRole('heading', { name: 'Phase A is ready' })).toBeInTheDocument()
+    expect(await screen.findByText('AI follow-up 1 of 1')).toBeInTheDocument()
+    expect(requestFollowups).toHaveBeenCalled()
+    expect(screen.getByText('Completeness: 82%')).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Which KPIs define success in this role?'), 'Win rate')
+    await user.click(screen.getByRole('button', { name: 'Enough, generate' }))
+
+    expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
+    expect(screen.getByText('Fixed answers')).toBeInTheDocument()
+    expect(screen.getByText('Follow-ups')).toBeInTheDocument()
+    expect(screen.getByText('Department or functional area')).toBeInTheDocument()
+    expect(screen.getByText('Sales')).toBeInTheDocument()
+    expect(screen.getByText('Win rate')).toBeInTheDocument()
+  })
+
+  it('keeps a persisted Phase B draft when bootstrapping fixed questions after reload', async () => {
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000801',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'followups',
+      status: 'answering_followups',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Head of Sales',
+        },
+      },
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000802',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      followupAnswers: {
+        '00000000-0000-4000-8000-000000000802': {
+          question_id: '00000000-0000-4000-8000-000000000802',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          value: 'Win rate',
+          skipped: false,
+        },
+      },
+      currentFollowupIndex: 0,
+      completenessScore: 0.8,
+      dirtyFollowupQuestionIds: ['00000000-0000-4000-8000-000000000802'],
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('AI follow-up 1 of 1')).toBeInTheDocument()
+    expect(screen.getByLabelText('Which KPIs define success in this role?')).toHaveValue('Win rate')
+    expect(useCareerPlaybookStore.getState().dirtyFollowupQuestionIds).toEqual([
+      '00000000-0000-4000-8000-000000000802',
+    ])
+  })
+
+  it('moves to review when an additional follow-up request says the draft is ready', async () => {
+    const user = userEvent.setup()
+    requestFollowups.mockResolvedValueOnce({
+      questions: [],
+      completeness_score: 0.76,
+      stop_recommendation: 'ready_to_generate',
+    })
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000811',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'followups',
+      status: 'answering_followups',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Head of Sales',
+        },
+      },
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000812',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      currentFollowupIndex: 0,
+      completenessScore: 0.4,
+      followupGenerationCount: 0,
+      followupGenerationLimit: 2,
+    })
+
+    renderPage()
+
+    await user.type(
+      await screen.findByLabelText('Which KPIs define success in this role?'),
+      'Win rate'
+    )
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
+    expect(screen.getByText('Win rate')).toBeInTheDocument()
+  })
+
+  it('opens and edits the saved Phase B free-form draft', async () => {
+    const user = userEvent.setup()
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000821',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'followups',
+      status: 'answering_followups',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Head of Sales',
+        },
+      },
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000822',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      currentFollowupIndex: 0,
+      completenessScore: 0.8,
+      freeformDraft: 'Existing operating context',
+    })
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Free-form' }))
+    const textarea = screen.getByRole('textbox', { name: 'Tell freely' })
+
+    expect(textarea).toHaveValue('Existing operating context')
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Updated operating context')
+    await user.click(screen.getByRole('button', { name: 'Save text' }))
+
+    expect(useCareerPlaybookStore.getState().freeformDraft).toBe('Updated operating context')
+  })
+
+  it('shows a generation handoff state after clicking the generate CTA', async () => {
+    const user = userEvent.setup()
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000901',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'ready_to_generate',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Product Lead',
+        },
+      },
+    })
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Generate Role Guide' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Generation handoff saved')
+    expect(
+      screen.getByText('The draft is saved and ready for backend generation handoff.')
+    ).toBeInTheDocument()
   })
 })
