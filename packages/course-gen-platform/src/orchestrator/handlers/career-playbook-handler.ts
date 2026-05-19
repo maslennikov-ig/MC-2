@@ -1,83 +1,72 @@
 import type { Job } from 'bullmq';
 import { z } from 'zod';
 import {
-  CareerPlaybookBlockIdSchema,
+  CareerPlaybookGenerateFollowupsJobDataSchema,
+  CareerPlaybookGeneratePlaybookJobDataSchema,
+  CareerPlaybookJobDataSchema,
   CareerPlaybookFollowupResponseSchema,
-  CareerPlaybookQADataSchema,
-  languageSchema,
 } from '@megacampus/shared-types';
+import type { CareerPlaybookJobData } from '@megacampus/shared-types';
 import { extractJSON, safeJSONParse } from '@megacampus/shared-utils';
+import { randomUUID } from 'node:crypto';
 import type { JobResult } from './base-handler';
 import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
 import { createCareerPlaybookRuntime } from '@/stages/stage-career-playbook/nodes/runtime';
 
-export const CareerPlaybookJobTypeSchema = z.enum([
-  'GENERATE_FOLLOWUPS',
-  'GENERATE_PLAYBOOK',
-  'REGENERATE_BLOCK',
-]);
-export type CareerPlaybookJobType = z.infer<typeof CareerPlaybookJobTypeSchema>;
+type CareerPlaybookQAJobData =
+  | z.infer<typeof CareerPlaybookGenerateFollowupsJobDataSchema>
+  | z.infer<typeof CareerPlaybookGeneratePlaybookJobDataSchema>;
 
-const CareerPlaybookBaseJobDataSchema = z.object({
-  jobType: CareerPlaybookJobTypeSchema,
-  playbookId: z.string().uuid(),
-  userId: z.string().uuid(),
-  organizationId: z.string().uuid(),
-  language: languageSchema.default('ru'),
-});
-
-export const CareerPlaybookGenerateFollowupsJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
-  jobType: z.literal('GENERATE_FOLLOWUPS'),
-  qaData: CareerPlaybookQADataSchema,
-});
-
-export const CareerPlaybookGeneratePlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
-  jobType: z.literal('GENERATE_PLAYBOOK'),
-  qaData: CareerPlaybookQADataSchema,
-});
-
-export const CareerPlaybookRegenerateBlockJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
-  jobType: z.literal('REGENERATE_BLOCK'),
-  blockId: CareerPlaybookBlockIdSchema,
-  instruction: z.string().min(1).max(1000),
-});
-
-export const CareerPlaybookJobDataSchema = z.discriminatedUnion('jobType', [
-  CareerPlaybookGenerateFollowupsJobDataSchema,
-  CareerPlaybookGeneratePlaybookJobDataSchema,
-  CareerPlaybookRegenerateBlockJobDataSchema,
-]);
-export type CareerPlaybookJobData = z.infer<typeof CareerPlaybookJobDataSchema>;
-
-function getAnswer(qaData: z.infer<typeof CareerPlaybookQADataSchema>, key: string): string {
+function getAnswer(qaData: CareerPlaybookQAJobData['qaData'], key: string): string {
   const answer = qaData.fixed.find(item => item.question_key === key);
   if (!answer) return 'not provided';
   return Array.isArray(answer.value) ? answer.value.join(', ') : answer.value;
 }
 
-function getFreeformText(qaData: z.infer<typeof CareerPlaybookQADataSchema>): string {
+function getFreeformText(qaData: CareerPlaybookQAJobData['qaData']): string {
   return qaData.freeform.map(item => item.text).join('\n\n') || 'none';
+}
+
+const LLMFollowupQuestionSchema = CareerPlaybookFollowupResponseSchema.shape.questions.element
+  .omit({ question_id: true })
+  .extend({
+    question_id: z.string().uuid().optional().catch(undefined),
+  });
+
+const LLMFollowupResponseSchema = CareerPlaybookFollowupResponseSchema.extend({
+  questions: z.array(LLMFollowupQuestionSchema).min(0).max(7),
+});
+
+function parseFollowupResponse(rawContent: string) {
+  const parsed = LLMFollowupResponseSchema.parse(safeJSONParse(extractJSON(rawContent)));
+  return CareerPlaybookFollowupResponseSchema.parse({
+    ...parsed,
+    questions: parsed.questions.map(question => ({
+      ...question,
+      question_id: question.question_id ?? randomUUID(),
+    })),
+  });
 }
 
 export class CareerPlaybookHandler {
   private runtime = createCareerPlaybookRuntime();
 
   async process(job: Job<CareerPlaybookJobData>): Promise<JobResult> {
-    const jobData = CareerPlaybookJobDataSchema.parse(job.data);
+    const parsedJobData = CareerPlaybookJobDataSchema.parse(job.data);
 
-    if (jobData.jobType === 'GENERATE_FOLLOWUPS') {
+    if (parsedJobData.action === 'GENERATE_FOLLOWUPS') {
+      const jobData = CareerPlaybookGenerateFollowupsJobDataSchema.parse(parsedJobData);
       return this.generateFollowups(jobData);
     }
 
-    if (jobData.jobType === 'GENERATE_PLAYBOOK') {
+    if (parsedJobData.action === 'GENERATE_PLAYBOOK') {
+      const jobData = CareerPlaybookGeneratePlaybookJobDataSchema.parse(parsedJobData);
       return this.generatePlaybook(jobData);
     }
 
-    return {
-      success: false,
-      message: 'Career Playbook block regeneration is scheduled for Phase 3',
-      error: `Unsupported in Phase 2: ${jobData.blockId}`,
-    };
+    throw new Error(
+      `Career Playbook block regeneration is scheduled for Phase 3: ${parsedJobData.blockId}`
+    );
   }
 
   private async generateFollowups(
@@ -101,9 +90,7 @@ export class CareerPlaybookHandler {
       temperature: 0.4,
       maxTokens: 4_000,
     });
-    const parsed = CareerPlaybookFollowupResponseSchema.parse(
-      safeJSONParse(extractJSON(result.content))
-    );
+    const parsed = parseFollowupResponse(result.content);
 
     return {
       success: true,
@@ -125,15 +112,14 @@ export class CareerPlaybookHandler {
       currentNode: 'specBuilder',
     });
     const errors = result.errors ?? [];
+    if (errors.length > 0) {
+      throw new Error(`Career Playbook generation failed: ${errors.join('; ')}`);
+    }
 
     return {
-      success: errors.length === 0,
-      message:
-        errors.length === 0
-          ? 'Career Playbook groups 1-2 generated'
-          : `Career Playbook generation failed: ${errors.join('; ')}`,
+      success: true,
+      message: 'Career Playbook groups 1-2 generated',
       data: result,
-      error: errors[0],
     };
   }
 }

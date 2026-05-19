@@ -12,6 +12,17 @@ const contentLanguageVariable = {
   required: true,
 };
 
+const groupHeadingVariables = [
+  { name: 'heading_header', description: 'Localized Header heading', required: true },
+  { name: 'heading_block_1', description: 'Localized Block 1 heading', required: true },
+  { name: 'heading_block_2', description: 'Localized Block 2 heading', required: true },
+  { name: 'heading_block_3', description: 'Localized Block 3 heading', required: true },
+  { name: 'heading_block_4', description: 'Localized Block 4 heading', required: true },
+  { name: 'heading_block_5', description: 'Localized Block 5 heading', required: true },
+  { name: 'heading_block_6', description: 'Localized Block 6 heading', required: true },
+  { name: 'heading_block_8', description: 'Localized Block 8 heading', required: true },
+];
+
 export const careerPlaybookPrompts: HardcodedPrompt[] = [
   {
     stage: 'stage_6',
@@ -128,15 +139,22 @@ Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - Use exactly these top-level headings:
-## Header
-## 1. Миссия и ключевые результаты
-## 2. Анти-цели: что эта роль НЕ делает
-## 5. Матрица решений (Decision Authority)
+{{heading_header}}
+{{heading_block_1}}
+{{heading_block_2}}
+{{heading_block_5}}
 
 USER:
 RoleProfileSpec:
 {{spec_json}}`,
-    variables: [specJsonVariable, contentLanguageVariable],
+    variables: [
+      specJsonVariable,
+      contentLanguageVariable,
+      groupHeadingVariables[0],
+      groupHeadingVariables[1],
+      groupHeadingVariables[2],
+      groupHeadingVariables[5],
+    ],
   },
   {
     stage: 'stage_6',
@@ -156,14 +174,21 @@ Output rules:
 - Markdown only, no HTML.
 - Write all prose in {{content_language}}.
 - Use exactly these top-level headings:
-## 3. Ключевые зоны ответственности
-## 4. Обязанности
-## 6. KPI и метрики
-## 8. Инструменты и технологии
+{{heading_block_3}}
+{{heading_block_4}}
+{{heading_block_6}}
+{{heading_block_8}}
 
 USER:
 RoleProfileSpec:
 {{spec_json}}`,
-    variables: [specJsonVariable, contentLanguageVariable],
+    variables: [
+      specJsonVariable,
+      contentLanguageVariable,
+      groupHeadingVariables[3],
+      groupHeadingVariables[4],
+      groupHeadingVariables[6],
+      groupHeadingVariables[7],
+    ],
   },
 ];

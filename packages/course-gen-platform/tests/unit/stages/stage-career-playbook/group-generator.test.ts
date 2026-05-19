@@ -125,6 +125,50 @@ describe('Career Playbook group generator', () => {
     });
   });
 
+  it('passes localized English heading labels into group prompts', async () => {
+    const renderPrompt = vi.fn().mockResolvedValue('rendered prompt');
+    const invokeLLM = vi.fn().mockResolvedValue({
+      content: `## Header
+
+# B2B Sales Manager
+
+## 1. Mission and key results
+
+Mission text
+
+## 2. Anti-goals: what this role does NOT do
+
+Anti-goals text
+
+## 5. Decision authority matrix
+
+Decision text`,
+      model: 'mock-career-model',
+      inputTokens: 100,
+      outputTokens: 200,
+      costUsd: 0.012,
+    });
+
+    await generateCareerPlaybookGroup(
+      {
+        groupKey: 'group_1_foundation',
+        roleProfileSpec: { ...spec, content_language: 'en' },
+        language: 'en',
+      },
+      { renderPrompt, invokeLLM }
+    );
+
+    expect(renderPrompt).toHaveBeenCalledWith(
+      'career_playbook_group_1_foundation',
+      expect.objectContaining({
+        heading_header: '## Header',
+        heading_block_1: '## 1. Mission and key results',
+        heading_block_2: '## 2. Anti-goals: what this role does NOT do',
+        heading_block_5: '## 5. Decision authority matrix',
+      })
+    );
+  });
+
   it('rejects group markdown that omits required block headings', () => {
     const group = getCareerPlaybookGroupSpec('group_1_foundation');
 
