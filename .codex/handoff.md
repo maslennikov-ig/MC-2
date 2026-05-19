@@ -3,7 +3,7 @@
 Updated: 2026-05-19
 Current working branch: `codex/career-playbook-e2e-smoke`
 Base branch: `codex/career-playbook-jd-bridge` stacked on PR #36
-Current PR: pending for `codex/career-playbook-e2e-smoke` after local closeout
+Current PR: #37 `codex/career-playbook-e2e-smoke` -> `codex/career-playbook-jd-bridge`
 
 ## Current state
 
