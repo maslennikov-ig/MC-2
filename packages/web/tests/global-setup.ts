@@ -65,11 +65,10 @@ async function globalSetup(config: FullConfig) {
     const authCookies = getSupabaseAuthCookieNames()
 
     await context.addCookies(
-      authCookies.map(name => ({
+      authCookies.map((name) => ({
         name,
         value: cookieValue,
         url: baseURL,
-        path: '/',
         sameSite: 'Lax' as const,
         expires: session.expires_at,
       }))
