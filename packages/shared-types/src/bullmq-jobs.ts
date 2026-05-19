@@ -13,7 +13,12 @@ import { z } from 'zod';
 import { languageSchema } from './common-enums';
 import { CourseStyleSchema } from './style-prompts';
 import { courseSizeSchema } from './course-size';
-import { CareerPlaybookBlockIdSchema, CareerPlaybookQADataSchema } from './career-playbook';
+import {
+  CareerPlaybookBlockIdSchema,
+  CareerPlaybookBlockStateSchema,
+  CareerPlaybookQADataSchema,
+  CareerPlaybookRoleProfileSpecSchema,
+} from './career-playbook';
 
 // ============================================================================
 // Job Type Enum
@@ -368,6 +373,9 @@ export const CareerPlaybookRegenerateBlockJobDataSchema = CareerPlaybookBaseJobD
   action: z.literal('REGENERATE_BLOCK'),
   blockId: CareerPlaybookBlockIdSchema,
   instruction: z.string().min(1).max(1000),
+  roleProfileSpec: CareerPlaybookRoleProfileSpecSchema,
+  originalBlock: CareerPlaybookBlockStateSchema,
+  generatedBlocks: z.record(CareerPlaybookBlockStateSchema).optional(),
 });
 
 export const CareerPlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
@@ -375,6 +383,9 @@ export const CareerPlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.exten
   qaData: CareerPlaybookQADataSchema.optional(),
   blockId: CareerPlaybookBlockIdSchema.optional(),
   instruction: z.string().min(1).max(1000).optional(),
+  roleProfileSpec: CareerPlaybookRoleProfileSpecSchema.optional(),
+  originalBlock: CareerPlaybookBlockStateSchema.optional(),
+  generatedBlocks: z.record(CareerPlaybookBlockStateSchema).optional(),
 }).superRefine((data, ctx) => {
   if (
     (data.action === 'GENERATE_FOLLOWUPS' || data.action === 'GENERATE_PLAYBOOK') &&
@@ -400,6 +411,22 @@ export const CareerPlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.exten
       code: z.ZodIssueCode.custom,
       path: ['instruction'],
       message: 'instruction is required for Career Playbook block regeneration',
+    });
+  }
+
+  if (data.action === 'REGENERATE_BLOCK' && !data.roleProfileSpec) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['roleProfileSpec'],
+      message: 'roleProfileSpec is required for Career Playbook block regeneration',
+    });
+  }
+
+  if (data.action === 'REGENERATE_BLOCK' && !data.originalBlock) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['originalBlock'],
+      message: 'originalBlock is required for Career Playbook block regeneration',
     });
   }
 });

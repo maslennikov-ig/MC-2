@@ -92,6 +92,141 @@ const GROUP_SPECS: Record<CareerPlaybookGroupKey, CareerPlaybookGroupSpec> = {
       },
     ],
   },
+  group_3_people: {
+    groupKey: 'group_3_people',
+    promptKey: 'career_playbook_group_3_people',
+    phaseName: 'stage_career_playbook_group_3',
+    node: 'group3Generator',
+    blocks: [
+      {
+        blockId: 'block_7',
+        title: 'Competencies',
+        headingPattern: /^##\s+7\.\s+/im,
+      },
+      {
+        blockId: 'block_9',
+        title: 'Human-AI collaboration',
+        headingPattern: /^##\s+9\.\s+/im,
+      },
+      {
+        blockId: 'block_12',
+        title: 'Candidate profile',
+        headingPattern: /^##\s+12\.\s+/im,
+      },
+      {
+        blockId: 'block_13',
+        title: 'Typical working day',
+        headingPattern: /^##\s+13\.\s+/im,
+      },
+    ],
+  },
+  group_4_growth: {
+    groupKey: 'group_4_growth',
+    promptKey: 'career_playbook_group_4_growth',
+    phaseName: 'stage_career_playbook_group_4',
+    node: 'group4Generator',
+    blocks: [
+      {
+        blockId: 'block_11',
+        title: 'Career growth',
+        headingPattern: /^##\s+11\.\s+/im,
+      },
+      {
+        blockId: 'block_14',
+        title: 'Onboarding',
+        headingPattern: /^##\s+14\.\s+/im,
+      },
+      {
+        blockId: 'block_15',
+        title: 'Motivation system',
+        headingPattern: /^##\s+15\.\s+/im,
+      },
+      {
+        blockId: 'block_17',
+        title: 'Red flags',
+        headingPattern: /^##\s+17\.\s+/im,
+      },
+    ],
+  },
+  group_5_system: {
+    groupKey: 'group_5_system',
+    promptKey: 'career_playbook_group_5_system',
+    phaseName: 'stage_career_playbook_group_5',
+    node: 'group5Generator',
+    blocks: [
+      {
+        blockId: 'block_10',
+        title: 'Dependencies',
+        headingPattern: /^##\s+10\.\s+/im,
+      },
+      {
+        blockId: 'block_16',
+        title: 'Processes',
+        headingPattern: /^##\s+16\.\s+/im,
+      },
+      {
+        blockId: 'block_19',
+        title: 'Industry context',
+        headingPattern: /^##\s+19\.\s+/im,
+      },
+      {
+        blockId: 'block_20',
+        title: 'Business goals',
+        headingPattern: /^##\s+20\.\s+/im,
+      },
+      {
+        blockId: 'block_21',
+        title: 'Failure modes',
+        headingPattern: /^##\s+21\.\s+/im,
+      },
+    ],
+  },
+  group_6_wrap: {
+    groupKey: 'group_6_wrap',
+    promptKey: 'career_playbook_group_6_wrap',
+    phaseName: 'stage_career_playbook_group_6',
+    node: 'group6Generator',
+    blocks: [
+      {
+        blockId: 'block_18',
+        title: 'FAQ',
+        headingPattern: /^##\s+18\.\s+/im,
+      },
+      {
+        blockId: 'block_22',
+        title: 'Working with me README',
+        headingPattern: /^##\s+22\.\s+/im,
+      },
+      {
+        blockId: 'block_23',
+        title: 'Continuity protocol',
+        headingPattern: /^##\s+23\.\s+/im,
+      },
+      {
+        blockId: 'block_24',
+        title: 'Role Canvas',
+        headingPattern: /^##\s+24\.\s+/im,
+      },
+      {
+        blockId: 'block_25',
+        title: 'Footer and revision cadence',
+        headingPattern: /^##\s+25\.\s+/im,
+      },
+      {
+        blockId: 'block_26',
+        title: 'Implementation checklist',
+        headingPattern: /^##\s+26\.\s+/im,
+      },
+    ],
+  },
+};
+
+const NEXT_GROUP_NODE: Partial<Record<CareerPlaybookGroupKey, CareerPlaybookGraphNode>> = {
+  group_1_foundation: 'group2Generator',
+  group_2_operations: 'group3Generator',
+  group_3_people: 'group4Generator',
+  group_4_growth: 'group5Generator',
+  group_5_system: 'group6Generator',
 };
 
 const GROUP_HEADING_LABELS = {
@@ -252,7 +387,7 @@ export function createGroupGeneratorNode(
         generatedGroups: { [groupKey]: result.group },
         generatedBlocks: result.blocks,
         nodeCosts: [result.nodeCost],
-        currentNode: groupSpec.node === 'group1Generator' ? 'group2Generator' : groupSpec.node,
+        currentNode: NEXT_GROUP_NODE[groupKey] ?? groupSpec.node,
       };
     } catch (error) {
       return {

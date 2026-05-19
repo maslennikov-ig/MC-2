@@ -191,4 +191,235 @@ RoleProfileSpec:
       groupHeadingVariables[7],
     ],
   },
+  {
+    stage: 'stage_6',
+    promptKey: 'career_playbook_group_3_people',
+    promptName: 'Career Playbook - Group 3 People',
+    promptDescription:
+      'Generates Competencies, Human-AI collaboration, Candidate Profile, and Typical Day blocks.',
+    promptTemplate: `SYSTEM:
+Generate Role Guide group 3: Block 7 (Competencies), Block 9 (Human-AI collaboration), Block 12 (Candidate Profile), Block 13 (Typical Working Day).
+
+Methodology:
+- Block 7: superpower, hard skills, soft skills with why, and energy map for hiring fit.
+- Block 9: Human Agency Scale and 3-bucket analysis: AI does, human checks, human-only work.
+- Block 12: education, experience, personality profile, and GWC filter (Get it / Want it / Capacity).
+- Block 13: hourly schedule plus cognitive load profile and focus-block recommendations.
+
+Output rules:
+- Markdown only, no HTML.
+- Write all prose in {{content_language}}.
+- Use exactly these top-level headings:
+## 7. Необходимые компетенции
+## 9. Как AI меняет эту роль
+## 12. Профиль кандидата
+## 13. Типичный рабочий день
+
+USER:
+RoleProfileSpec:
+{{spec_json}}`,
+    variables: [specJsonVariable, contentLanguageVariable],
+  },
+  {
+    stage: 'stage_6',
+    promptKey: 'career_playbook_group_4_growth',
+    promptName: 'Career Playbook - Group 4 Growth',
+    promptDescription:
+      'Generates Career Growth, Onboarding, Motivation System, and Red Flags blocks.',
+    promptTemplate: `SYSTEM:
+Generate Role Guide group 4: Block 11 (Career Growth), Block 14 (Onboarding), Block 15 (Motivation System), Block 17 (Red Flags).
+
+Methodology:
+- Block 11: dual IC/management tracks, promotion criteria, timelines, and Mermaid career diagram.
+- Block 14: First 5 Wins, sprint-based 30-60-90 plan, graduation criteria, support triangle, and repeated self-assessment.
+- Block 15: material motivation, AMP levers, career conversations, and job crafting boundaries.
+- Block 17: role-specific red flags, five disengagement stages, stay interview prompts, review criteria, and skill sprints.
+
+Output rules:
+- Markdown only, no HTML.
+- Write all prose in {{content_language}}.
+- Include a Mermaid flowchart TB career diagram in Block 11.
+- Use exactly these top-level headings:
+## 11. Карьерный рост
+## 14. Онбординг: First 5 Wins + План 30-60-90
+## 15. Система мотивации
+## 17. Red Flags и система раннего предупреждения
+
+USER:
+RoleProfileSpec:
+{{spec_json}}`,
+    variables: [specJsonVariable, contentLanguageVariable],
+  },
+  {
+    stage: 'stage_6',
+    promptKey: 'career_playbook_group_5_system',
+    promptName: 'Career Playbook - Group 5 System',
+    promptDescription:
+      'Generates Dependencies, Processes, Industry Context, Business Goals, and Failure Modes blocks.',
+    promptTemplate: `SYSTEM:
+Generate Role Guide group 5: Block 10 (Dependencies), Block 16 (Processes), Block 19 (Industry Context), Block 20 (Business Goals), Block 21 (Failure Modes).
+
+Methodology:
+- Block 10: role dependencies, blast radius, communication charter, and Mermaid dependency diagram.
+- Block 16: primary business process, DO-CONFIRM / READ-DO checklists, SBAR, exception handling, and scripts only for communication roles.
+- Block 19: 3-layer context, durable skills, AI impact, continuous learning, and skill stacking.
+- Block 20: business goals, how this role impacts them, impact metrics, and Netflix Context Over Control paragraph.
+- Block 21: FMEA-style pre-mortem with at least 3 failure modes, early signals, and prevention actions.
+
+Output rules:
+- Markdown only, no HTML.
+- Write all prose in {{content_language}}.
+- Include Mermaid diagrams in Blocks 10 and 16.
+- Use exactly these top-level headings:
+## 10. Взаимодействие и зависимости
+## 16. Регламенты и процессы
+## 19. Отраслевой контекст
+## 20. Связь с бизнес-целями
+## 21. Как люди обычно проваливаются на этой роли
+
+USER:
+RoleProfileSpec:
+{{spec_json}}`,
+    variables: [specJsonVariable, contentLanguageVariable],
+  },
+  {
+    stage: 'stage_6',
+    promptKey: 'career_playbook_group_6_wrap',
+    promptName: 'Career Playbook - Group 6 Wrap',
+    promptDescription:
+      'Generates FAQ, Working With Me README, Continuity Protocol, Role Canvas, Footer, and Implementation Checklist blocks.',
+    promptTemplate: `SYSTEM:
+Generate Role Guide group 6: Block 18 (FAQ), Block 22 (Working with me README), Block 23 (Continuity Protocol), Block 24 (Role Canvas), Block 25 (Footer and revision cadence), Block 26 (Implementation checklist).
+
+Methodology:
+- Block 18: 5-8 FAQ items mixing employee questions and questions about the role.
+- Block 22: template prompts the employee fills in during onboarding Week 2-3; do not pre-fill personal answers.
+- Block 23: continuity checklist, critical knowledge, backups, and last-training dates.
+- Block 24: one-page Role Canvas summarizing mission, metrics, superpower, anti-goals, decisions, dependencies, career path, and first win.
+- Block 25: revision triggers, version/date metadata, and MegaCampus AI CTA.
+- Block 26: implementation checklist for manager, HR, and employee to operationalize the guide.
+
+Output rules:
+- Markdown only, no HTML.
+- Write all prose in {{content_language}}.
+- Use exactly these top-level headings:
+## 18. FAQ
+## 22. "Как со мной работать" (заполняется сотрудником)
+## 23. Протокол непрерывности ("Hit by a Bus")
+## 24. Role Canvas
+## 25. Когда пересматривать эту инструкцию
+## 26. Implementation checklist
+
+USER:
+RoleProfileSpec:
+{{spec_json}}`,
+    variables: [specJsonVariable, contentLanguageVariable],
+  },
+  {
+    stage: 'stage_6',
+    promptKey: 'career_playbook_cross_block_judge',
+    promptName: 'Career Playbook - Cross-block Judge',
+    promptDescription:
+      'Checks consistency, cross-references, minimum item counts, Mermaid coverage, and regeneration needs across generated Role Guide blocks.',
+    promptTemplate: `SYSTEM:
+Review generated Career Playbook blocks for consistency against RoleProfileSpec and previous groups.
+
+Checks:
+- No repetition against RoleProfileSpec.block_boundaries.
+- Cross-references are coherent: competencies with tools, KPIs with responsibilities, anti-goals with duties.
+- Format requirements are satisfied: anti-goals >= 4, decision matrix >= 4, failure modes >= 3, and Mermaid coverage for career path, dependencies, and main process.
+- Output is actionable business-owner language, not generic HR jargon.
+
+Return only valid JSON:
+{
+  "pass": true,
+  "score": 100,
+  "issues": [
+    {
+      "block_id": "block_5",
+      "severity": "critical" | "warning" | "info",
+      "description": "...",
+      "suggestion": "..."
+    }
+  ],
+  "needs_regeneration": ["block_5"]
+}
+
+USER:
+Group id: {{group_id}}
+RoleProfileSpec:
+{{spec_json}}
+
+Previous groups output:
+{{prev_groups_content}}
+
+Current group output:
+{{current_group_content}}`,
+    variables: [
+      { name: 'group_id', description: 'Current group or block ids under review', required: true },
+      specJsonVariable,
+      {
+        name: 'prev_groups_content',
+        description: 'Previously generated group markdown for cross-reference checks',
+        required: true,
+      },
+      {
+        name: 'current_group_content',
+        description: 'Current generated group markdown under review',
+        required: true,
+      },
+    ],
+  },
+  {
+    stage: 'stage_6',
+    promptKey: 'career_playbook_block_regenerator',
+    promptName: 'Career Playbook - Block Regenerator',
+    promptDescription:
+      'Regenerates a single Career Playbook block from judge feedback and optional user instructions.',
+    promptTemplate: `SYSTEM:
+Regenerate exactly one Career Playbook block: {{block_id}} ({{block_name}}).
+Preserve the block format contract and fix the judge issue without repeating unrelated blocks.
+
+Original block content:
+{{original_content}}
+
+Issue from judge:
+{{issue_description}}
+
+Suggestion:
+{{suggestion}}
+
+User edit instruction:
+{{user_instruction}}
+
+Return only markdown for this one block.
+
+USER:
+RoleProfileSpec:
+{{spec_json}}
+
+Other blocks summary:
+{{other_blocks_brief}}
+
+Content language: {{content_language}}`,
+    variables: [
+      { name: 'block_id', description: 'Target block id', required: true },
+      { name: 'block_name', description: 'Human-readable block name', required: true },
+      { name: 'original_content', description: 'Original block markdown', required: true },
+      { name: 'issue_description', description: 'Judge issue description', required: true },
+      { name: 'suggestion', description: 'Judge suggestion or none', required: true },
+      {
+        name: 'user_instruction',
+        description: 'Optional user instruction or none',
+        required: true,
+      },
+      specJsonVariable,
+      {
+        name: 'other_blocks_brief',
+        description: 'Compact summary of other generated blocks',
+        required: true,
+      },
+      contentLanguageVariable,
+    ],
+  },
 ];

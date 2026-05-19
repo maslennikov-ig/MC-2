@@ -1,16 +1,33 @@
+import type { Job } from 'bullmq';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { JobType } from '@megacampus/shared-types';
-import { CareerPlaybookHandler } from '@/orchestrator/handlers/career-playbook-handler';
-import { createCareerPlaybookRuntime } from '@/stages/stage-career-playbook/nodes/runtime';
-import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
+import {
+  JobType,
+  type CareerPlaybookBlockState,
+  type CareerPlaybookJobData,
+  type CareerPlaybookRoleProfileSpec,
+} from '@megacampus/shared-types';
 
-vi.mock('@/stages/stage-career-playbook/nodes/runtime', () => ({
-  createCareerPlaybookRuntime: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  generateCareerPlaybookFollowups: vi.fn(),
+  regenerateCareerPlaybookBlock: vi.fn(),
+}));
+
+vi.mock('@/stages/stage-career-playbook/nodes/followup-questions', () => ({
+  generateCareerPlaybookFollowups: mocks.generateCareerPlaybookFollowups,
+}));
+
+vi.mock('@/stages/stage-career-playbook/nodes/block-regenerator', () => ({
+  regenerateCareerPlaybookBlock: mocks.regenerateCareerPlaybookBlock,
 }));
 
 vi.mock('@/stages/stage-career-playbook/graph', () => ({
   getCareerPlaybookGraph: vi.fn(),
 }));
+
+import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
+import { CareerPlaybookHandler } from '@/orchestrator/handlers/career-playbook-handler';
+
+const getCareerPlaybookGraphMock = vi.mocked(getCareerPlaybookGraph);
 
 const baseJobData = {
   organizationId: '0f9dc5e4-a2f7-4af5-968f-81c8a92b7253',
@@ -25,9 +42,43 @@ const baseJobData = {
     followups: [],
     freeform: [],
   },
+} satisfies Omit<CareerPlaybookJobData, 'action'>;
+
+const roleProfileSpec: CareerPlaybookRoleProfileSpec = {
+  position: {
+    title: 'B2B Sales Manager',
+    slug: 'b2b-sales-manager',
+    department: 'sales',
+    level: 'senior',
+  },
+  context: {
+    company_stage: 'growth',
+    team_size: '51-200',
+    reports_to: 'CRO',
+    has_subordinates: true,
+  },
+  focus_areas: {
+    primary_kpis: ['Qualified pipeline'],
+    key_tools: ['CRM'],
+    critical_competencies: ['Discovery'],
+    anti_goals: ['Own product roadmap'],
+    failure_patterns: ['Poor CRM hygiene'],
+  },
+  research: null,
+  block_boundaries: {},
+  content_language: 'ru',
 };
 
-function createJob(data: unknown) {
+const originalBlock: CareerPlaybookBlockState = {
+  content: '## 6. KPI\n\nOld content',
+  status: 'generated',
+  judge_verdict: null,
+  generated_at: '2026-05-13T00:00:00.000Z',
+  llm_model: 'mock-model',
+  attempt: 1,
+};
+
+function createJob(data: CareerPlaybookJobData): Job<CareerPlaybookJobData> {
   return {
     id: 'job-1',
     name: JobType.CAREER_PLAYBOOK,
@@ -36,7 +87,7 @@ function createJob(data: unknown) {
     opts: {},
     updateProgress: vi.fn(),
     log: vi.fn(),
-  } as never;
+  } as unknown as Job<CareerPlaybookJobData>;
 }
 
 describe('CareerPlaybookHandler', () => {
@@ -44,34 +95,16 @@ describe('CareerPlaybookHandler', () => {
     vi.clearAllMocks();
   });
 
-  it('normalizes missing or invalid LLM follow-up question ids before returning strict data', async () => {
-    vi.mocked(createCareerPlaybookRuntime).mockReturnValue({
-      renderPrompt: vi.fn().mockResolvedValue('rendered prompt'),
-      invokeLLM: vi.fn().mockResolvedValue({
-        content: JSON.stringify({
-          questions: [
-            {
-              question_id: 'not-a-uuid',
-              question_text: 'Which revenue motion matters most?',
-              question_type: 'open',
-              options: null,
-              rationale: 'Needed for role guide focus.',
-            },
-            {
-              question_text: 'Which segment owns the pipeline?',
-              question_type: 'open',
-              options: null,
-              rationale: 'Needed for scope.',
-            },
-          ],
-          completeness_score: 0.7,
-          stop_recommendation: 'ask_more',
-        }),
-        model: 'mock-career-model',
-        inputTokens: 100,
-        outputTokens: 200,
-        costUsd: 0.012,
-      }),
+  it('routes GENERATE_FOLLOWUPS through the follow-up helper', async () => {
+    mocks.generateCareerPlaybookFollowups.mockResolvedValue({
+      response: { questions: [], completeness_score: 1, stop_recommendation: 'ready_to_generate' },
+      nodeCost: {
+        node: 'followupGenerator',
+        model: 'mock-model',
+        input_tokens: 1,
+        output_tokens: 1,
+        cost_usd: 0,
+      },
     });
 
     const result = await new CareerPlaybookHandler().process(
@@ -79,31 +112,92 @@ describe('CareerPlaybookHandler', () => {
     );
 
     expect(result.success).toBe(true);
-    expect(result.data).toMatchObject({
-      completeness_score: 0.7,
-      stop_recommendation: 'ask_more',
+    expect(result.data).toEqual({
+      questions: [],
+      completeness_score: 1,
+      stop_recommendation: 'ready_to_generate',
     });
-    expect((result.data as { questions: Array<{ question_id: string }> }).questions).toHaveLength(
-      2
+    expect(mocks.generateCareerPlaybookFollowups).toHaveBeenCalledWith({
+      qaData: baseJobData.qaData,
+      language: 'en',
+    });
+  });
+
+  it('routes REGENERATE_BLOCK through the block regenerator helper', async () => {
+    mocks.regenerateCareerPlaybookBlock.mockResolvedValue({
+      blockId: 'block_6',
+      block: { ...originalBlock, content: '## 6. KPI\n\nNew content', attempt: 2 },
+      nodeCost: {
+        node: 'blockRegenerator',
+        model: 'mock-model',
+        input_tokens: 1,
+        output_tokens: 1,
+        cost_usd: 0,
+      },
+    });
+
+    const result = await new CareerPlaybookHandler().process(
+      createJob({
+        ...baseJobData,
+        action: 'REGENERATE_BLOCK',
+        blockId: 'block_6',
+        instruction: 'Make metrics concrete',
+        roleProfileSpec,
+        originalBlock,
+        generatedBlocks: { block_6: originalBlock },
+      })
     );
-    for (const question of (result.data as { questions: Array<{ question_id: string }> })
-      .questions) {
-      expect(question.question_id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-      );
-    }
+
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('Regenerated Career Playbook block block_6');
+    expect(mocks.regenerateCareerPlaybookBlock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blockId: 'block_6',
+        roleProfileSpec,
+        originalBlock,
+        userInstruction: 'Make metrics concrete',
+        otherBlocks: { block_6: originalBlock },
+      })
+    );
+  });
+
+  it('does not fail playbook generation only because retained judge verdicts contain warnings', async () => {
+    getCareerPlaybookGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({
+        errors: [],
+        judgeVerdicts: [
+          {
+            pass: false,
+            score: 80,
+            issues: [
+              {
+                block_id: 'block_2',
+                severity: 'warning',
+                description: 'Regeneration budget exhausted; leave as warning.',
+              },
+            ],
+            needs_regeneration: ['block_2'],
+          },
+        ],
+        finalMarkdown: '## Header\n\n# B2B Sales Manager',
+      }),
+    } as ReturnType<typeof getCareerPlaybookGraph>);
+
+    const result = await new CareerPlaybookHandler().process(
+      createJob({ ...baseJobData, action: 'GENERATE_PLAYBOOK' })
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('Career Playbook generated');
+    expect(result.error).toBeUndefined();
   });
 
   it('throws when graph generation returns errors so BullMQ marks the job failed', async () => {
-    vi.mocked(createCareerPlaybookRuntime).mockReturnValue({
-      renderPrompt: vi.fn(),
-      invokeLLM: vi.fn(),
-    });
-    vi.mocked(getCareerPlaybookGraph).mockReturnValue({
+    getCareerPlaybookGraphMock.mockReturnValue({
       invoke: vi.fn().mockResolvedValue({
         errors: ['specBuilder failed: invalid JSON'],
       }),
-    } as never);
+    } as ReturnType<typeof getCareerPlaybookGraph>);
 
     await expect(
       new CareerPlaybookHandler().process(
