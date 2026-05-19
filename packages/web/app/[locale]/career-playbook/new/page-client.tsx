@@ -15,15 +15,20 @@ import {
 
 interface CareerPlaybookNewPageClientProps {
   locale: Locale
+  userId: string
 }
 
-export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNewPageClientProps) {
+export default function CareerPlaybookNewPageClient({
+  locale,
+  userId,
+}: CareerPlaybookNewPageClientProps) {
   const t = useTranslations('career-playbook.wizard')
   const state = useCareerPlaybookStore()
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
   const sessionStartAttemptedRef = useRef(false)
 
   useEffect(() => {
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner(userId)
     const snapshot = useCareerPlaybookStore.getState()
     if (snapshot.fixedQuestions.length === 0) {
       const hasPersistedDraft =
@@ -33,6 +38,7 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
 
       snapshot.hydrateCareerPlaybookDraft({
         playbookId: snapshot.playbookId,
+        ownerUserId: userId,
         uiLanguage: locale,
         contentLanguage: hasPersistedDraft ? snapshot.contentLanguage || locale : locale,
         currentFixedIndex: snapshot.currentFixedIndex,
@@ -55,7 +61,7 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
     }
 
     void current.startCareerPlaybookSession()
-  }, [locale])
+  }, [locale, userId])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -68,7 +74,10 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
   const answers = useMemo<Record<string, CareerPlaybookAnswerValue | undefined>>(
     () =>
       Object.fromEntries(
-        Object.entries(state.fixedAnswers).map(([questionKey, answer]) => [questionKey, answer.value])
+        Object.entries(state.fixedAnswers).map(([questionKey, answer]) => [
+          questionKey,
+          answer.value,
+        ])
       ),
     [state.fixedAnswers]
   )
@@ -114,7 +123,9 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
             <div className="max-w-3xl space-y-3">
               <h1 className="text-3xl font-semibold tracking-normal md:text-4xl">{t('title')}</h1>
-              <p className="text-base leading-7 text-slate-600 dark:text-slate-300">{t('subtitle')}</p>
+              <p className="text-base leading-7 text-slate-600 dark:text-slate-300">
+                {t('subtitle')}
+              </p>
             </div>
             <div className="flex min-h-11 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
               <Clock3 className="h-4 w-4 text-teal-700 dark:text-teal-300" aria-hidden />
@@ -148,6 +159,7 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
               state.goToNextCareerPlaybookQuestion()
             }}
             onPrevious={state.goToPreviousCareerPlaybookQuestion}
+            freeformDraft={state.freeformDraft}
             onFreeformSubmit={state.saveCareerPlaybookFreeformDraft}
             isSaving={state.isAutosaving}
             copy={copy}

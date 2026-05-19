@@ -26,33 +26,25 @@ describe('useCareerPlaybookStore', () => {
       .getState()
       .initializeCareerPlaybookPhaseA({ uiLanguage: 'ru', contentLanguage: 'en' })
 
-    expect(getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(q => q.question_key)).toEqual([
-      'position',
-      'department',
-      'level',
-      'reporting',
-      'team_size',
-      'content_language',
-    ])
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).toEqual(['position', 'department', 'level', 'reporting', 'team_size', 'content_language'])
 
-    useCareerPlaybookStore
-      .getState()
-      .answerCareerPlaybookFixedQuestion('team_size', '201-1000')
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '201-1000')
 
-    expect(getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(q => q.question_key)).toEqual([
-      'position',
-      'department',
-      'level',
-      'reporting',
-      'team_size',
-      'content_language',
-    ])
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).toEqual(['position', 'department', 'level', 'reporting', 'team_size', 'content_language'])
 
     const contentLanguageAnswer = useCareerPlaybookStore.getState().fixedAnswers.content_language
     expect(contentLanguageAnswer?.value).toBe('en')
-    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_text).toContain(
-      'Какую должность'
-    )
+    expect(
+      getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_text
+    ).toContain('Какую должность')
   })
 
   it('uses EN fallback questions and shows company_stage for startup and scale-up company sizes', () => {
@@ -63,8 +55,8 @@ describe('useCareerPlaybookStore', () => {
     useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '51-200')
 
     const visibleQuestions = getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState())
-    expect(visibleQuestions.map(q => q.question_key)).toContain('company_stage')
-    expect(visibleQuestions.find(q => q.question_key === 'department')?.question_text).toBe(
+    expect(visibleQuestions.map((q) => q.question_key)).toContain('company_stage')
+    expect(visibleQuestions.find((q) => q.question_key === 'department')?.question_text).toBe(
       'Department or functional area'
     )
   })
@@ -74,10 +66,14 @@ describe('useCareerPlaybookStore', () => {
       .getState()
       .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
 
-    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'Product Manager')
+    useCareerPlaybookStore
+      .getState()
+      .answerCareerPlaybookFixedQuestion('position', 'Product Manager')
     useCareerPlaybookStore.getState().goToNextCareerPlaybookQuestion()
 
-    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe('department')
+    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
+      'department'
+    )
 
     useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '1000+')
 
@@ -89,7 +85,9 @@ describe('useCareerPlaybookStore', () => {
     })
 
     useCareerPlaybookStore.getState().goToPreviousCareerPlaybookQuestion()
-    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe('position')
+    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
+      'position'
+    )
   })
 
   it('marks Phase A complete once the fixed questions are finished', () => {
@@ -107,6 +105,7 @@ describe('useCareerPlaybookStore', () => {
     useCareerPlaybookStore
       .getState()
       .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-1')
     useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'Sales Manager')
     useCareerPlaybookStore.getState().saveCareerPlaybookFreeformDraft('We sell B2B SaaS.')
 
@@ -118,6 +117,7 @@ describe('useCareerPlaybookStore', () => {
       playbookId: null,
       phase: 'fixed',
       status: 'answering_fixed',
+      ownerUserId: 'user-1',
       uiLanguage: 'en',
       contentLanguage: 'en',
       fixedAnswers: {
@@ -130,20 +130,63 @@ describe('useCareerPlaybookStore', () => {
     expect(persisted.state.isAutosaving).toBeUndefined()
   })
 
-  it('flushes autosave through an injectable client and keeps local draft when remote submit rejects', async () => {
-    const submitAnswer = vi.fn<CareerPlaybookClient['submitAnswer']>().mockRejectedValue(new Error('offline'))
-    setCareerPlaybookClientForTests({ submitAnswer })
-
+  it('invalidates a persisted draft when the browser user changes', () => {
     useCareerPlaybookStore
       .getState()
-      .hydrateCareerPlaybookDraft({
-        playbookId: '00000000-0000-4000-8000-000000000001',
-        uiLanguage: 'en',
-        contentLanguage: 'en',
-        fixedAnswers: [],
-        freeformDraft: '',
-      })
-    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'DevOps Engineer')
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-1')
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'Sales Manager')
+    useCareerPlaybookStore.getState().saveCareerPlaybookFreeformDraft('Private context')
+
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner('user-2')
+
+    expect(useCareerPlaybookStore.getState().ownerUserId).toBe('user-2')
+    expect(useCareerPlaybookStore.getState().playbookId).toBeNull()
+    expect(useCareerPlaybookStore.getState().fixedAnswers.position).toBeUndefined()
+    expect(useCareerPlaybookStore.getState().freeformDraft).toBe('')
+  })
+
+  it('removes answers for questions hidden by a changed branch answer', () => {
+    useCareerPlaybookStore
+      .getState()
+      .initializeCareerPlaybookPhaseA({ uiLanguage: 'en', contentLanguage: 'en' })
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '51-200')
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('company_stage', 'growth')
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.company_stage?.value).toBe('growth')
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).toContain('company_stage')
+
+    useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('team_size', '201-1000')
+
+    expect(useCareerPlaybookStore.getState().fixedAnswers.company_stage).toBeUndefined()
+    expect(useCareerPlaybookStore.getState().dirtyFixedQuestionKeys).not.toContain('company_stage')
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).not.toContain('company_stage')
+  })
+
+  it('flushes autosave through an injectable client and keeps local draft when remote submit rejects', async () => {
+    const submitAnswer = vi
+      .fn<CareerPlaybookClient['submitAnswer']>()
+      .mockRejectedValue(new Error('offline'))
+    setCareerPlaybookClientForTests({ submitAnswer })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000001',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedAnswers: [],
+      freeformDraft: '',
+    })
+    useCareerPlaybookStore
+      .getState()
+      .answerCareerPlaybookFixedQuestion('position', 'DevOps Engineer')
     useCareerPlaybookStore.getState().saveCareerPlaybookFreeformDraft('Kubernetes, SRE, on-call.')
 
     await expect(useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()).resolves.toEqual({
@@ -229,7 +272,7 @@ describe('useCareerPlaybookStore', () => {
     let resolveStart: (draft: CareerPlaybookDraft) => void = () => {}
     const startSession = vi.fn<NonNullable<CareerPlaybookClient['startSession']>>(
       () =>
-        new Promise(resolve => {
+        new Promise((resolve) => {
           resolveStart = resolve
         })
     )
@@ -263,41 +306,37 @@ describe('useCareerPlaybookStore', () => {
   })
 
   it('keeps local dirty answers when resuming an older server draft', async () => {
-    const getDraft = vi
-      .fn<NonNullable<CareerPlaybookClient['getDraft']>>()
-      .mockResolvedValue({
-        playbookId: '00000000-0000-4000-8000-000000000008',
-        uiLanguage: 'en',
-        contentLanguage: 'en',
-        currentFixedIndex: 1,
-        fixedAnswers: [
-          {
-            question_key: 'position',
-            value: 'Server title',
-            answered_at: '2026-05-13T00:00:00.000Z',
-          },
-        ],
-      })
+    const getDraft = vi.fn<NonNullable<CareerPlaybookClient['getDraft']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000000008',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      currentFixedIndex: 1,
+      fixedAnswers: [
+        {
+          question_key: 'position',
+          value: 'Server title',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      ],
+    })
     setCareerPlaybookClientForTests({
       getDraft,
       submitAnswer: vi.fn(),
     })
 
-    useCareerPlaybookStore
-      .getState()
-      .hydrateCareerPlaybookDraft({
-        playbookId: '00000000-0000-4000-8000-000000000008',
-        uiLanguage: 'en',
-        contentLanguage: 'en',
-        fixedAnswers: [
-          {
-            question_key: 'position',
-            value: 'Local title',
-            answered_at: '2026-05-13T00:00:00.000Z',
-          },
-        ],
-        dirtyFixedQuestionKeys: ['position'],
-      })
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000008',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedAnswers: [
+        {
+          question_key: 'position',
+          value: 'Local title',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      ],
+      dirtyFixedQuestionKeys: ['position'],
+    })
 
     await expect(
       useCareerPlaybookStore
@@ -313,20 +352,18 @@ describe('useCareerPlaybookStore', () => {
     let resolveSubmit: (value: unknown) => void = () => {}
     const submitAnswer = vi.fn<CareerPlaybookClient['submitAnswer']>(
       () =>
-        new Promise(resolve => {
+        new Promise((resolve) => {
           resolveSubmit = resolve
         })
     )
     setCareerPlaybookClientForTests({ submitAnswer })
 
-    useCareerPlaybookStore
-      .getState()
-      .hydrateCareerPlaybookDraft({
-        playbookId: '00000000-0000-4000-8000-000000000005',
-        uiLanguage: 'en',
-        contentLanguage: 'en',
-        fixedAnswers: [],
-      })
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000005',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedAnswers: [],
+    })
     useCareerPlaybookStore.getState().answerCareerPlaybookFixedQuestion('position', 'Old title')
 
     const flushPromise = useCareerPlaybookStore.getState().flushCareerPlaybookAutosave()
@@ -340,21 +377,19 @@ describe('useCareerPlaybookStore', () => {
   })
 
   it('resumes a server draft through the injectable client', async () => {
-    const getDraft = vi
-      .fn<NonNullable<CareerPlaybookClient['getDraft']>>()
-      .mockResolvedValue({
-        playbookId: '00000000-0000-4000-8000-000000000003',
-        uiLanguage: 'en',
-        contentLanguage: 'en',
-        currentFixedIndex: 1,
-        fixedAnswers: [
-          {
-            question_key: 'position',
-            value: 'Customer Success Manager',
-            answered_at: '2026-05-13T00:00:00.000Z',
-          },
-        ],
-      })
+    const getDraft = vi.fn<NonNullable<CareerPlaybookClient['getDraft']>>().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000000003',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      currentFixedIndex: 1,
+      fixedAnswers: [
+        {
+          question_key: 'position',
+          value: 'Customer Success Manager',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
+      ],
+    })
     setCareerPlaybookClientForTests({
       getDraft,
       submitAnswer: vi.fn(),
@@ -384,7 +419,11 @@ describe('useCareerPlaybookStore', () => {
       contentLanguage: 'en',
       currentFixedIndex: 3,
       fixedAnswers: [
-        { question_key: 'position', value: 'Head of Sales', answered_at: '2026-05-13T00:00:00.000Z' },
+        {
+          question_key: 'position',
+          value: 'Head of Sales',
+          answered_at: '2026-05-13T00:00:00.000Z',
+        },
         { question_key: 'team_size', value: '11-50', answered_at: '2026-05-13T00:00:00.000Z' },
       ],
       freeformDraft: 'Нужен сильный акцент на enterprise sales.',
@@ -397,9 +436,13 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().freeformDraft).toBe(
       'Нужен сильный акцент на enterprise sales.'
     )
-    expect(getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(q => q.question_key)).toContain(
-      'company_stage'
+    expect(
+      getCareerPlaybookVisibleQuestions(useCareerPlaybookStore.getState()).map(
+        (q) => q.question_key
+      )
+    ).toContain('company_stage')
+    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe(
+      'reporting'
     )
-    expect(getCareerPlaybookCurrentQuestion(useCareerPlaybookStore.getState())?.question_key).toBe('reporting')
   })
 })

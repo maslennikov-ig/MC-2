@@ -44,7 +44,7 @@ let submitAnswer: Mock
 function renderPage() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CareerPlaybookNewPageClient locale="en" />
+      <CareerPlaybookNewPageClient locale="en" userId="user-1" />
     </NextIntlClientProvider>
   )
 }
@@ -68,7 +68,9 @@ describe('CareerPlaybookNewPageClient', () => {
   it('starts a best-effort backend session on mount', async () => {
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Role Guide constructor' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Role Guide constructor' })
+    ).toBeInTheDocument()
     expect(startSession).toHaveBeenCalledWith({ language: 'en' })
   })
 
@@ -77,7 +79,9 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Role Guide constructor' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Role Guide constructor' })
+    ).toBeInTheDocument()
     expect(await screen.findByLabelText('Which role do you want to define?')).toBeInTheDocument()
     expect(screen.getByText('Question 1 of 6')).toBeInTheDocument()
 
@@ -93,7 +97,10 @@ describe('CareerPlaybookNewPageClient', () => {
 
     renderPage()
 
-    await user.type(await screen.findByLabelText('Which role do you want to define?'), 'Head of Sales')
+    await user.type(
+      await screen.findByLabelText('Which role do you want to define?'),
+      'Head of Sales'
+    )
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('radio', { name: 'Sales' }))
     await user.click(screen.getByRole('button', { name: 'Next' }))

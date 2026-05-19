@@ -1,35 +1,38 @@
 # Orchestrator Handoff
 
-Updated: 2026-05-13
+Updated: 2026-05-19
 Current working branch: `feature/career-playbook-frontend-wizard`
-Base branch: `feature/career-playbook-backend-3` stacked on PR #27
+Current PR: #28 `feature/career-playbook-frontend-wizard` -> `develop`
 
 ## Current state
 
-- Repo shape: single pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
-- Delivery truth: `develop` is dev delivery, `master` is staging, and direct pushes to protected branches remain forbidden.
-- Career Playbook PR stack is still open: #24 base orchestration, #25 Phase 1, #26 backend stage, #27 backend stage 3.
-- Phase 4 `mc2-db696.4` is implemented locally on this branch: Phase A wizard route, store, components, i18n, unit tests, and Playwright e2e.
-- No billing or payment scope is part of Career Playbook MVP work.
+- This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
+- `.codex/orchestrator.toml` is the machine-readable contract; `.codex/handoff.md` is current-state only; `.codex/project-index.md` is the navigation map.
+- Delivery truth remains unchanged: `/push-dev` drives Dev through `develop`, `/push` is release/version flow, and `/deploy` targets staging through `master`.
+- Career Playbook PR #24, PR #25, PR #26, and PR #27 have landed in `develop`.
+- Career Playbook Phase 4 is implemented on this branch and is being advanced as PR #28.
+- No billing or payment scope is part of the Career Playbook MVP work in this branch.
 
 ## Latest relevant stage
 
 - Latest relevant Career Playbook stage: `mc2-db696.4` - Frontend wizard Phase A plus draft persistence.
 - Stage summary: [`.codex/stages/mc2-db696.4/summary.md`](./stages/mc2-db696.4/summary.md)
 - Artifacts: store, wizard-ui, and route-i18n-e2e under [`.codex/stages/mc2-db696.4/artifacts`](./stages/mc2-db696.4/artifacts).
+- Key verification for stack advancement: retarget PR #28 to `develop`, merge `origin/develop`, preserve PR #27 backend/orchestration fixes, run frontend/backend local checks, push for GitHub CI, then mark ready and merge only after checks pass.
 
 ## Next recommended
 
-Next stage id: `mc2-db696.5`
-Recommended action: after closing and pushing Phase 4, open a draft PR targeting `feature/career-playbook-backend-3`; then continue the stack with Frontend Phase B only if the PR stack remains intentional and clean.
+Next stage id: `mc2-db696.11.7.7`
+Recommended action: complete PR #28 readiness, then advance PR #29 only after PR #28 lands in `develop`.
 
-- If PR #24/#25/#26/#27 land first, rebase/retarget before more dependent frontend work.
-- Independent marketing/library/share tasks may proceed separately if their base branch decision is explicit.
+- Resolve merge and review findings in PR #28 before marking it ready.
+- After `mc2-db696.4` lands, continue the PR stack sequentially from PR #29.
+- Follow-up adaptive questions, free-form continuation, and generation handoff remain tracked as `mc2-db696.5`.
 
 ## Starter prompt for next orchestrator
 
 ```text
-Use $orchestrator-stage to continue Career Playbook. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth, verify PR #24/#25/#26/#27 status, and avoid dependent work on develop unless the stacked PRs have merged.
+Use $orchestrator-stage to continue Career Playbook PR-stack readiness. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. PR #24, PR #25, PR #26, and PR #27 have landed in develop; continue sequentially from PR #28 and do not advance downstream PRs until their base PR has landed.
 ```
 
 ## Explicit defers

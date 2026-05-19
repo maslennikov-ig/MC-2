@@ -19,6 +19,7 @@ export type CareerPlaybookWizardPhase = 'fixed' | 'followups' | 'completion'
 export type CareerPlaybookAnswerValue = string | string[]
 
 export interface CareerPlaybookDraft {
+  ownerUserId?: string | null
   playbookId?: string | null
   uiLanguage?: CareerPlaybookFixedQuestionLanguage
   contentLanguage?: string
@@ -48,6 +49,7 @@ export interface CareerPlaybookAutosaveResult {
 
 interface CareerPlaybookStoreState {
   playbookId: string | null
+  ownerUserId: string | null
   status: CareerPlaybookPlaybookStatus
   phase: CareerPlaybookWizardPhase
   uiLanguage: CareerPlaybookFixedQuestionLanguage
@@ -62,11 +64,9 @@ interface CareerPlaybookStoreState {
   dirtyFreeformDraft: boolean
   lastAutosavedAt: string | null
 
-  initializeCareerPlaybookPhaseA: (input: {
-    uiLanguage: string
-    contentLanguage: string
-  }) => void
+  initializeCareerPlaybookPhaseA: (input: { uiLanguage: string; contentLanguage: string }) => void
   hydrateCareerPlaybookDraft: (draft: CareerPlaybookDraft) => void
+  setCareerPlaybookDraftOwner: (ownerUserId: string) => void
   answerCareerPlaybookFixedQuestion: (questionKey: string, value: CareerPlaybookAnswerValue) => void
   goToNextCareerPlaybookQuestion: () => void
   goToPreviousCareerPlaybookQuestion: () => void
@@ -123,7 +123,10 @@ const languageOptions = [
   ['it', 'Italiano', 'Italian'],
 ] as const
 
-const fixedQuestionSeed: Record<CareerPlaybookFixedQuestionLanguage, CareerPlaybookFixedQuestion[]> = {
+const fixedQuestionSeed: Record<
+  CareerPlaybookFixedQuestionLanguage,
+  CareerPlaybookFixedQuestion[]
+> = {
   ru: [
     {
       language: 'ru',
@@ -306,6 +309,7 @@ function initialState(): Omit<
   CareerPlaybookStoreState,
   | 'initializeCareerPlaybookPhaseA'
   | 'hydrateCareerPlaybookDraft'
+  | 'setCareerPlaybookDraftOwner'
   | 'answerCareerPlaybookFixedQuestion'
   | 'goToNextCareerPlaybookQuestion'
   | 'goToPreviousCareerPlaybookQuestion'
@@ -318,6 +322,7 @@ function initialState(): Omit<
 > {
   return {
     playbookId: null,
+    ownerUserId: null,
     status: 'draft',
     phase: 'fixed',
     uiLanguage: 'ru',
@@ -350,9 +355,9 @@ function normalizeContentLanguage(language: string): Language {
 }
 
 function fallbackQuestions(language: CareerPlaybookFixedQuestionLanguage) {
-  return fixedQuestionSeed[language].map(question => ({
+  return fixedQuestionSeed[language].map((question) => ({
     ...question,
-    options: question.options?.map(option => ({ ...option })),
+    options: question.options?.map((option) => ({ ...option })),
     branching_rules: question.branching_rules ? { ...question.branching_rules } : undefined,
   }))
 }
@@ -363,7 +368,7 @@ function recordFromFixedAnswers(
   if (!fixedAnswers) return {}
   if (!Array.isArray(fixedAnswers)) return { ...fixedAnswers }
 
-  return Object.fromEntries(fixedAnswers.map(answer => [answer.question_key, answer]))
+  return Object.fromEntries(fixedAnswers.map((answer) => [answer.question_key, answer]))
 }
 
 function mergeRemoteDraftWithDirtyLocal(
@@ -396,7 +401,10 @@ function nowIso() {
   return new Date().toISOString()
 }
 
-function answerValuesEqual(left: CareerPlaybookAnswerValue | undefined, right: CareerPlaybookAnswerValue | undefined) {
+function answerValuesEqual(
+  left: CareerPlaybookAnswerValue | undefined,
+  right: CareerPlaybookAnswerValue | undefined
+) {
   if (Array.isArray(left) || Array.isArray(right)) {
     if (!Array.isArray(left) || !Array.isArray(right)) return false
     if (left.length !== right.length) return false
@@ -411,16 +419,18 @@ function getClient(): CareerPlaybookClient {
 
   const client = getBrowserTrpcClient()
   return {
-    startSession: async input =>
+    startSession: async (input) =>
       (await client.careerPlaybook.session.start.mutate(input)) as unknown as CareerPlaybookDraft,
-    getDraft: async input =>
+    getDraft: async (input) =>
       (await client.careerPlaybook.session.getDraft.query(input)) as unknown as CareerPlaybookDraft,
-    submitAnswer: input => client.careerPlaybook.session.submitAnswer.mutate(input),
+    submitAnswer: (input) => client.careerPlaybook.session.submitAnswer.mutate(input),
   }
 }
 
-function visibleQuestionsFromState(state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers'>) {
-  return state.fixedQuestions.filter(question => {
+function visibleQuestionsFromState(
+  state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers'>
+) {
+  return state.fixedQuestions.filter((question) => {
     const branchingRules = question.branching_rules
     if (!branchingRules) return true
 
@@ -436,7 +446,33 @@ function visibleQuestionsFromState(state: Pick<CareerPlaybookStoreState, 'fixedQ
 
 function clampCurrentFixedIndex(state: CareerPlaybookStoreState) {
   const visibleQuestions = visibleQuestionsFromState(state)
-  state.currentFixedIndex = Math.max(0, Math.min(state.currentFixedIndex, visibleQuestions.length - 1))
+  state.currentFixedIndex = Math.max(
+    0,
+    Math.min(state.currentFixedIndex, visibleQuestions.length - 1)
+  )
+}
+
+function hasLocalDraftData(state: CareerPlaybookStoreState) {
+  return (
+    Boolean(state.playbookId) ||
+    Object.keys(state.fixedAnswers).some((questionKey) => questionKey !== 'content_language') ||
+    Boolean(state.freeformDraft.trim())
+  )
+}
+
+function removeHiddenFixedAnswers(state: CareerPlaybookStoreState) {
+  const visibleQuestionKeys = new Set(
+    visibleQuestionsFromState(state).map((question) => question.question_key)
+  )
+
+  for (const questionKey of Object.keys(state.fixedAnswers)) {
+    if (!visibleQuestionKeys.has(questionKey)) {
+      delete state.fixedAnswers[questionKey]
+      state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter(
+        (key) => key !== questionKey
+      )
+    }
+  }
 }
 
 function markDirtyKey(state: CareerPlaybookStoreState, questionKey: string) {
@@ -451,7 +487,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       ...initialState(),
 
       initializeCareerPlaybookPhaseA: ({ uiLanguage, contentLanguage }) =>
-        set(state => {
+        set((state) => {
           const normalizedUiLanguage = normalizeUiLanguage(uiLanguage)
           state.uiLanguage = normalizedUiLanguage
           state.contentLanguage = contentLanguage
@@ -467,9 +503,10 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           clampCurrentFixedIndex(state)
         }),
 
-      hydrateCareerPlaybookDraft: draft =>
-        set(state => {
+      hydrateCareerPlaybookDraft: (draft) =>
+        set((state) => {
           const normalizedUiLanguage = normalizeUiLanguage(draft.uiLanguage ?? state.uiLanguage)
+          state.ownerUserId = draft.ownerUserId ?? state.ownerUserId
           state.playbookId = draft.playbookId ?? null
           state.uiLanguage = normalizedUiLanguage
           state.contentLanguage = draft.contentLanguage ?? state.contentLanguage
@@ -490,11 +527,25 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.isAutosaving = false
           state.dirtyFixedQuestionKeys = draft.dirtyFixedQuestionKeys ?? []
           state.dirtyFreeformDraft = draft.dirtyFreeformDraft ?? false
+          removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
         }),
 
+      setCareerPlaybookDraftOwner: (ownerUserId) =>
+        set((state) => {
+          const shouldReset =
+            (state.ownerUserId && state.ownerUserId !== ownerUserId) ||
+            (!state.ownerUserId && hasLocalDraftData(state))
+
+          if (shouldReset) {
+            Object.assign(state, initialState())
+          }
+
+          state.ownerUserId = ownerUserId
+        }),
+
       answerCareerPlaybookFixedQuestion: (questionKey, value) =>
-        set(state => {
+        set((state) => {
           state.fixedAnswers[questionKey] = {
             question_key: questionKey,
             value,
@@ -504,28 +555,32 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             state.contentLanguage = value
           }
           markDirtyKey(state, questionKey)
+          removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
         }),
 
       goToNextCareerPlaybookQuestion: () =>
-        set(state => {
+        set((state) => {
           const visibleQuestions = visibleQuestionsFromState(state)
-          state.currentFixedIndex = Math.min(state.currentFixedIndex + 1, visibleQuestions.length - 1)
+          state.currentFixedIndex = Math.min(
+            state.currentFixedIndex + 1,
+            visibleQuestions.length - 1
+          )
         }),
 
       goToPreviousCareerPlaybookQuestion: () =>
-        set(state => {
+        set((state) => {
           state.currentFixedIndex = Math.max(state.currentFixedIndex - 1, 0)
         }),
 
-      saveCareerPlaybookFreeformDraft: text =>
-        set(state => {
+      saveCareerPlaybookFreeformDraft: (text) =>
+        set((state) => {
           state.freeformDraft = text
           state.dirtyFreeformDraft = true
         }),
 
       completeCareerPlaybookFixedPhase: () =>
-        set(state => {
+        set((state) => {
           state.phase = 'completion'
           state.status = 'awaiting_followups'
         }),
@@ -569,14 +624,14 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           return { ok: true }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Session start failed'
-          set(state => {
+          set((state) => {
             state.autosaveError = message
           })
           return { ok: false, error: message }
         }
       },
 
-      resumeCareerPlaybookSession: async playbookId => {
+      resumeCareerPlaybookSession: async (playbookId) => {
         try {
           const client = getClient()
           if (!client.getDraft) {
@@ -598,7 +653,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           return { ok: true }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Draft resume failed'
-          set(state => {
+          set((state) => {
             state.autosaveError = message
           })
           return { ok: false, error: message }
@@ -611,7 +666,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           return { ok: true }
         }
 
-        set(state => {
+        set((state) => {
           state.isAutosaving = true
           state.autosaveError = null
         })
@@ -620,12 +675,10 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           const client = getClient()
           const dirtyFixedQuestionKeys = [...snapshot.dirtyFixedQuestionKeys]
           const submittedFixedValues = new Map(
-            dirtyFixedQuestionKeys.map(questionKey => [
-              questionKey,
-              Array.isArray(snapshot.fixedAnswers[questionKey]?.value)
-                ? [...(snapshot.fixedAnswers[questionKey]?.value as string[])]
-                : snapshot.fixedAnswers[questionKey]?.value,
-            ])
+            dirtyFixedQuestionKeys.map((questionKey) => {
+              const answerValue = snapshot.fixedAnswers[questionKey]?.value
+              return [questionKey, Array.isArray(answerValue) ? [...answerValue] : answerValue]
+            })
           )
 
           for (const questionKey of dirtyFixedQuestionKeys) {
@@ -652,12 +705,15 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             })
           }
 
-          set(state => {
+          set((state) => {
             state.isAutosaving = false
             state.autosaveError = null
-            state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter(key => {
+            state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter((key) => {
               if (!submittedFixedValues.has(key)) return true
-              return !answerValuesEqual(state.fixedAnswers[key]?.value, submittedFixedValues.get(key))
+              return !answerValuesEqual(
+                state.fixedAnswers[key]?.value,
+                submittedFixedValues.get(key)
+              )
             })
             if (snapshot.dirtyFreeformDraft && state.freeformDraft === snapshot.freeformDraft) {
               state.dirtyFreeformDraft = false
@@ -668,7 +724,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           return { ok: true }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Autosave failed'
-          set(state => {
+          set((state) => {
             state.isAutosaving = false
             state.autosaveError = message
           })
@@ -677,15 +733,16 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       },
 
       resetCareerPlaybookWizard: () =>
-        set(state => {
+        set((state) => {
           Object.assign(state, initialState())
         }),
     })),
     {
       name: 'career-playbook-store',
       storage: createJSONStorage(() => localStorage),
-      partialize: state => ({
+      partialize: (state) => ({
         playbookId: state.playbookId,
+        ownerUserId: state.ownerUserId,
         status: state.status,
         phase: state.phase,
         uiLanguage: state.uiLanguage,
@@ -717,7 +774,9 @@ export function getCareerPlaybookProgress(
   state: Pick<CareerPlaybookStoreState, 'fixedQuestions' | 'fixedAnswers' | 'currentFixedIndex'>
 ) {
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
-  const answered = visibleQuestions.filter(question => state.fixedAnswers[question.question_key]?.value).length
+  const answered = visibleQuestions.filter(
+    (question) => state.fixedAnswers[question.question_key]?.value
+  ).length
   const total = visibleQuestions.length
 
   return {

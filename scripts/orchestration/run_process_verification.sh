@@ -30,7 +30,7 @@ import pathlib
 import re
 import tomllib
 
-EXPECTED_PROFILE = "balanced-v2.11"
+EXPECTED_PROFILE = "balanced-v2.12"
 EXPECTED_SOURCE_SKILL = "orchestration-setup"
 
 orchestrator_path = pathlib.Path(".codex/orchestrator.toml")
@@ -98,6 +98,24 @@ if launcher == "manual_user_launch":
         contract.get("manual_prompt_template", ".codex/manual-agent-prompt-template.md")
     )
     required.append(manual_prompt_template)
+
+model_policy = contract.get("subagent_model_policy")
+if launcher == "codex_subagents":
+    if not isinstance(model_policy, dict):
+        raise SystemExit("Missing [subagent_model_policy] section for codex_subagents")
+    required_model_policy = {
+        "default_model": "inherit_orchestrator",
+        "default_reasoning_effort": "inherit_orchestrator",
+        "reasoning_policy": "complexity_based",
+        "model_override_requires_current_user_authorization": True,
+        "record_model_reasoning_rationale": True,
+    }
+    for key, expected in required_model_policy.items():
+        if model_policy.get(key) != expected:
+            raise SystemExit(f"subagent_model_policy.{key} must be {expected!r}")
+    triggers = model_policy.get("high_reasoning_triggers")
+    if not isinstance(triggers, list) or not triggers:
+        raise SystemExit("subagent_model_policy.high_reasoning_triggers must be a non-empty list")
 
 missing = [str(path) for path in required if not path.exists()]
 if missing:

@@ -33,6 +33,7 @@ import { stage5GenerationHandler } from '../stages/stage5-generation/handler.js'
 import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/handler.js';
 import type { Stage6JobInput } from '../stages/stage6-lesson-content/types';
 import { blockRegenerationHandler } from './handlers/block-regeneration-handler.js';
+import { careerPlaybookHandler } from './handlers/career-playbook-handler.js';
 import type { JobResult } from './handlers/base-handler.js';
 
 /**
@@ -137,8 +138,20 @@ const jobHandlers: Record<string, JobHandler> = {
       return processStage6JobAsJobResult(job, token);
     },
   }),
+  [JobType.CAREER_PLAYBOOK]: adaptHandler(careerPlaybookHandler),
   [JobType.BLOCK_REGENERATION]: adaptHandler(blockRegenerationHandler),
 };
+
+const requiredJobHandlerTypes = [
+  JobType.TEST_JOB,
+  JobType.DOCUMENT_PROCESSING,
+  JobType.DOCUMENT_CLASSIFICATION,
+  JobType.STRUCTURE_ANALYSIS,
+  JobType.STRUCTURE_GENERATION,
+  JobType.LESSON_CONTENT,
+  JobType.CAREER_PLAYBOOK,
+  JobType.BLOCK_REGENERATION,
+] as const;
 
 /**
  * Health check for processor environment
@@ -158,6 +171,12 @@ export function healthCheck(): { healthy: boolean; errors: string[] } {
   }
 
   // Validate all handlers are loadable and callable
+  for (const jobType of requiredJobHandlerTypes) {
+    if (!jobHandlers[jobType]) {
+      errors.push(`Handler for ${jobType} is missing from processor registry`);
+    }
+  }
+
   for (const [jobType, handler] of Object.entries(jobHandlers)) {
     if (!handler) {
       errors.push(`Handler for ${jobType} is null/undefined`);

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,6 +42,7 @@ export interface WizardProps {
   onAnswerChange: (questionKey: string, value: CareerPlaybookWizardValue) => void
   onNext: () => void
   onPrevious: () => void
+  freeformDraft?: string
   onFreeformSubmit?: (text: string) => void
   isSaving?: boolean
   copy?: WizardCopy
@@ -71,6 +72,7 @@ export function Wizard({
   onAnswerChange,
   onNext,
   onPrevious,
+  freeformDraft = '',
   onFreeformSubmit,
   isSaving = false,
   copy,
@@ -82,9 +84,19 @@ export function Wizard({
   const currentQuestion = questions[safeIndex]
   const currentQuestionKey = currentQuestion ? getQuestionKey(currentQuestion) : ''
   const currentValue = answers[currentQuestionKey]
-  const answeredCount = questions.filter((question) => hasAnswer(answers[getQuestionKey(question)])).length
-  const canGoNext = hasAnswer(currentValue)
+  const answeredCount = questions.filter((question) =>
+    hasAnswer(answers[getQuestionKey(question)])
+  ).length
+  const canGoNext = currentQuestion
+    ? !isQuestionRequired(currentQuestion) || hasAnswer(currentValue)
+    : false
   const isLastQuestion = safeIndex === questions.length - 1
+
+  useEffect(() => {
+    if (freeformOpen) {
+      setFreeformText(freeformDraft)
+    }
+  }, [freeformDraft, freeformOpen])
 
   if (!currentQuestion) {
     return null
@@ -108,22 +120,22 @@ export function Wizard({
         />
       </div>
 
-      <div className="flex min-h-11 items-center justify-between gap-3">
+      <div className="flex min-h-11 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Button
           type="button"
           variant="outline"
           onClick={onPrevious}
           disabled={safeIndex === 0}
-          className="min-w-28"
+          className="w-full min-w-28 sm:w-auto"
         >
           <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
           {labels.back}
         </Button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
           <Dialog open={freeformOpen} onOpenChange={setFreeformOpen}>
             <DialogTrigger asChild>
-              <Button type="button" variant="outline">
+              <Button type="button" variant="outline" className="w-full sm:w-auto">
                 <FileText className="mr-2 h-4 w-4" aria-hidden />
                 {labels.freeform}
               </Button>
@@ -133,6 +145,7 @@ export function Wizard({
                 <DialogTitle>{labels.freeformTitle}</DialogTitle>
               </DialogHeader>
               <Textarea
+                aria-label={labels.freeformTitle}
                 value={freeformText}
                 onChange={(event) => setFreeformText(event.target.value)}
                 placeholder={labels.freeformPlaceholder}
@@ -144,7 +157,6 @@ export function Wizard({
                   disabled={!freeformText.trim()}
                   onClick={() => {
                     onFreeformSubmit?.(freeformText.trim())
-                    setFreeformText('')
                     setFreeformOpen(false)
                   }}
                 >
@@ -154,7 +166,12 @@ export function Wizard({
             </DialogContent>
           </Dialog>
 
-          <Button type="button" onClick={onNext} disabled={!canGoNext} className="min-w-28">
+          <Button
+            type="button"
+            onClick={onNext}
+            disabled={!canGoNext}
+            className="w-full min-w-28 sm:w-auto"
+          >
             {isLastQuestion ? labels.finish : labels.next}
             <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
           </Button>
@@ -176,4 +193,8 @@ function hasAnswer(value: CareerPlaybookWizardValue | undefined) {
   }
 
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function isQuestionRequired(question: CareerPlaybookWizardQuestion) {
+  return !('is_required' in question) || question.is_required !== false
 }

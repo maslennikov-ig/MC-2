@@ -32,6 +32,14 @@ const fixedSingleChoiceQuestion: CareerPlaybookFixedQuestion = {
   is_required: true,
 }
 
+const optionalSingleChoiceQuestion: CareerPlaybookFixedQuestion = {
+  ...fixedSingleChoiceQuestion,
+  position: 3,
+  question_key: 'company_stage',
+  question_text: 'Какая стадия компании / продукта?',
+  is_required: false,
+}
+
 const followupMultiChoiceQuestion: CareerPlaybookFollowupQuestion = {
   question_id: '0a1fcd0e-c329-4a46-91c6-7bfe881d8f7c',
   question_text: 'Какие зоны ответственности включить?',
@@ -161,5 +169,54 @@ describe('Wizard', () => {
 
     await user.click(screen.getByRole('button', { name: 'Далее' }))
     expect(handleNext).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows optional questions to be skipped without an answer', async () => {
+    const user = userEvent.setup()
+    const handleNext = vi.fn()
+
+    render(
+      <Wizard
+        questions={[optionalSingleChoiceQuestion]}
+        answers={{}}
+        currentIndex={0}
+        onAnswerChange={vi.fn()}
+        onNext={handleNext}
+        onPrevious={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Завершить' }))
+
+    expect(handleNext).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens saved free-form draft for review and resubmits edited text', async () => {
+    const user = userEvent.setup()
+    const handleFreeformSubmit = vi.fn()
+
+    render(
+      <Wizard
+        questions={[fixedOpenQuestion]}
+        answers={{ position: 'CPO' }}
+        currentIndex={0}
+        onAnswerChange={vi.fn()}
+        onNext={vi.fn()}
+        onPrevious={vi.fn()}
+        freeformDraft="Existing context"
+        onFreeformSubmit={handleFreeformSubmit}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Свободный ответ' }))
+    const textarea = screen.getByRole('textbox', { name: 'Расскажите свободно' })
+
+    expect(textarea).toHaveValue('Existing context')
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Edited context')
+    await user.click(screen.getByRole('button', { name: 'Сохранить текст' }))
+
+    expect(handleFreeformSubmit).toHaveBeenCalledWith('Edited context')
   })
 })
