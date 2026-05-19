@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle2, Info, Pencil, WandSparkles } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Info, Loader2, Pencil, WandSparkles } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 
@@ -15,6 +15,8 @@ export interface CompletionScreenCopy {
   generate?: string
   generationHandoffTitle?: string
   generationHandoffDescription?: string
+  generationStarting?: string
+  generationErrorTitle?: string
   empty?: string
 }
 
@@ -26,6 +28,8 @@ interface CompletionScreenProps {
   onEditFollowupAnswer: (questionId: string) => void
   onGenerate: () => void
   generationHandoffVisible?: boolean
+  generationError?: string | null
+  isGenerationStarting?: boolean
   copy?: CompletionScreenCopy
 }
 
@@ -48,6 +52,8 @@ const defaultCopy: Required<CompletionScreenCopy> = {
   generationHandoffTitle: 'Черновик готов к генерации',
   generationHandoffDescription:
     'Контекст сохранён. Генерация продолжится после подключения backend-обработчика.',
+  generationStarting: 'Запускаем генерацию...',
+  generationErrorTitle: 'Не удалось запустить генерацию',
   empty: 'Пока нет данных',
 }
 
@@ -59,6 +65,8 @@ export function CompletionScreen({
   onEditFollowupAnswer,
   onGenerate,
   generationHandoffVisible = false,
+  generationError = null,
+  isGenerationStarting = false,
   copy,
 }: CompletionScreenProps) {
   const labels = { ...defaultCopy, ...copy }
@@ -86,15 +94,31 @@ export function CompletionScreen({
               </div>
             </div>
           ) : null}
+          {generationError ? (
+            <div
+              role="alert"
+              className="flex max-w-2xl gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              <div className="space-y-1">
+                <p className="font-semibold">{labels.generationErrorTitle}</p>
+                <p className="leading-6">{generationError}</p>
+              </div>
+            </div>
+          ) : null}
         </div>
         <Button
           type="button"
           onClick={onGenerate}
-          disabled={generationHandoffVisible}
+          disabled={generationHandoffVisible || isGenerationStarting}
           className="min-w-52"
         >
-          <WandSparkles className="mr-2 h-4 w-4" aria-hidden />
-          {labels.generate}
+          {isGenerationStarting ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <WandSparkles className="mr-2 h-4 w-4" aria-hidden />
+          )}
+          {isGenerationStarting ? labels.generationStarting : labels.generate}
         </Button>
       </div>
 

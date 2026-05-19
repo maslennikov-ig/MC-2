@@ -41,6 +41,14 @@ export interface CareerPlaybookDraft {
   dirtyFreeformDraft?: boolean
 }
 
+export interface CareerPlaybookGenerationStatus {
+  playbookId: string
+  status: CareerPlaybookPlaybookStatus
+  phase?: CareerPlaybookWizardPhase
+  progress?: number
+  error?: string
+}
+
 export interface CareerPlaybookClient {
   startSession?: (input: { language: Language }) => Promise<CareerPlaybookDraft>
   getDraft?: (input: { playbookId: string }) => Promise<CareerPlaybookDraft>
@@ -48,8 +56,9 @@ export interface CareerPlaybookClient {
     playbookId: string
     fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
     followupAnswers: Record<string, CareerPlaybookFollowupAnswer>
-    contentLanguage: string
+    contentLanguage: Language
   }) => Promise<CareerPlaybookFollowupResponse>
+  approveAndGenerate?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
   submitAnswer: (input: {
     playbookId: string
     phase: 'fixed' | 'followup' | 'freeform'
@@ -80,6 +89,8 @@ interface CareerPlaybookStoreState {
   followupGenerationError: string | null
   followupGenerationCount: number
   followupGenerationLimit: number
+  isStartingGeneration: boolean
+  generationStartError: string | null
   freeformDraft: string
   isAutosaving: boolean
   autosaveError: string | null
@@ -103,6 +114,7 @@ interface CareerPlaybookStoreState {
   goToNextCareerPlaybookFollowup: () => void
   goToPreviousCareerPlaybookFollowup: () => void
   completeCareerPlaybookFollowups: () => void
+  approveCareerPlaybookGeneration: () => Promise<CareerPlaybookAutosaveResult>
   editCareerPlaybookFixedAnswer: (questionKey: string) => void
   editCareerPlaybookFollowupAnswer: (questionId: string) => void
   saveCareerPlaybookFreeformDraft: (text: string) => void
@@ -354,6 +366,7 @@ function initialState(): Omit<
   | 'goToNextCareerPlaybookFollowup'
   | 'goToPreviousCareerPlaybookFollowup'
   | 'completeCareerPlaybookFollowups'
+  | 'approveCareerPlaybookGeneration'
   | 'editCareerPlaybookFixedAnswer'
   | 'editCareerPlaybookFollowupAnswer'
   | 'saveCareerPlaybookFreeformDraft'
@@ -381,6 +394,8 @@ function initialState(): Omit<
     followupGenerationError: null,
     followupGenerationCount: 0,
     followupGenerationLimit: 2,
+    isStartingGeneration: false,
+    generationStartError: null,
     freeformDraft: '',
     isAutosaving: false,
     autosaveError: null,
@@ -499,6 +514,11 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.session.start.mutate(input)) as unknown as CareerPlaybookDraft,
     getDraft: async (input) =>
       (await client.careerPlaybook.session.getDraft.query(input)) as unknown as CareerPlaybookDraft,
+    requestFollowups: (input) => client.careerPlaybook.generation.requestFollowups.mutate(input),
+    approveAndGenerate: async (input) =>
+      (await client.careerPlaybook.generation.approveAndGenerate.mutate(
+        input
+      )) as unknown as CareerPlaybookGenerationStatus,
     submitAnswer: (input) => client.careerPlaybook.session.submitAnswer.mutate(input),
   }
 }
@@ -641,6 +661,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.isAutosaving = false
           state.followupGenerationError = null
           state.isGeneratingFollowups = false
+          state.isStartingGeneration = false
+          state.generationStartError = null
           state.dirtyFixedQuestionKeys = draft.dirtyFixedQuestionKeys ?? []
           state.dirtyFollowupQuestionIds =
             draft.dirtyFollowupQuestionIds ?? state.dirtyFollowupQuestionIds
@@ -722,7 +744,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             playbookId: snapshot.playbookId,
             fixedAnswers: snapshot.fixedAnswers,
             followupAnswers: snapshot.followupAnswers,
-            contentLanguage: snapshot.contentLanguage,
+            contentLanguage: normalizeContentLanguage(snapshot.contentLanguage),
           })
 
           set((state) => {
@@ -809,6 +831,50 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.phase = 'completion'
           state.status = 'ready_to_generate'
         }),
+
+      approveCareerPlaybookGeneration: async () => {
+        const snapshot = get()
+        if (!snapshot.playbookId) {
+          return { ok: false, error: 'Playbook session is required before generation' }
+        }
+
+        try {
+          const client = getClient()
+          if (!client.approveAndGenerate) {
+            const message = 'Role Guide generation is unavailable'
+            set((state) => {
+              state.isStartingGeneration = false
+              state.generationStartError = message
+            })
+            return { ok: false, error: message }
+          }
+
+          set((state) => {
+            state.isStartingGeneration = true
+            state.generationStartError = null
+          })
+
+          const response = await client.approveAndGenerate({
+            playbookId: snapshot.playbookId,
+          })
+
+          set((state) => {
+            state.status = response.status
+            state.phase = response.phase ?? 'completion'
+            state.isStartingGeneration = false
+            state.generationStartError = response.error ?? null
+          })
+
+          return response.error ? { ok: false, error: response.error } : { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Role Guide generation failed'
+          set((state) => {
+            state.isStartingGeneration = false
+            state.generationStartError = message
+          })
+          return { ok: false, error: message }
+        }
+      },
 
       editCareerPlaybookFixedAnswer: (questionKey) =>
         set((state) => {

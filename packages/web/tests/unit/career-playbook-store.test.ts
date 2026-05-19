@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const trpcMocks = vi.hoisted(() => ({
+  getBrowserTrpcClient: vi.fn(),
+  requestFollowupsMutate: vi.fn(),
+  approveAndGenerateMutate: vi.fn(),
+  submitAnswerMutate: vi.fn(),
+}))
+
+vi.mock('@/lib/trpc/browser-client', () => ({
+  getBrowserTrpcClient: trpcMocks.getBrowserTrpcClient,
+}))
+
 import {
   getCareerPlaybookCurrentQuestion,
   getCareerPlaybookProgress,
@@ -14,6 +25,23 @@ import {
 function resetStore() {
   useCareerPlaybookStore.getState().resetCareerPlaybookWizard()
   setCareerPlaybookClientForTests(null)
+  trpcMocks.requestFollowupsMutate.mockReset()
+  trpcMocks.approveAndGenerateMutate.mockReset()
+  trpcMocks.submitAnswerMutate.mockReset()
+  trpcMocks.getBrowserTrpcClient.mockReset()
+  trpcMocks.getBrowserTrpcClient.mockReturnValue({
+    careerPlaybook: {
+      session: {
+        start: { mutate: vi.fn() },
+        getDraft: { query: vi.fn() },
+        submitAnswer: { mutate: trpcMocks.submitAnswerMutate },
+      },
+      generation: {
+        requestFollowups: { mutate: trpcMocks.requestFollowupsMutate },
+        approveAndGenerate: { mutate: trpcMocks.approveAndGenerateMutate },
+      },
+    },
+  })
   localStorage.clear()
 }
 
@@ -437,6 +465,126 @@ describe('useCareerPlaybookStore', () => {
     expect(useCareerPlaybookStore.getState().completenessScore).toBe(0.62)
     expect(useCareerPlaybookStore.getState().followupGenerationCount).toBe(1)
     expect(useCareerPlaybookStore.getState().isGeneratingFollowups).toBe(false)
+  })
+
+  it('requests follow-up questions through the production tRPC generation transport', async () => {
+    trpcMocks.requestFollowupsMutate.mockResolvedValue({
+      questions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000901',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      completeness_score: 0.76,
+      stop_recommendation: 'ask_more',
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000900',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+      phase: 'followups',
+      status: 'awaiting_followups',
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().requestCareerPlaybookFollowups()
+    ).resolves.toEqual({ ok: true })
+
+    expect(trpcMocks.requestFollowupsMutate).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000900',
+      fixedAnswers: expect.objectContaining({
+        position: expect.objectContaining({ value: 'Product Lead' }),
+      }),
+      followupAnswers: {},
+      contentLanguage: 'en',
+    })
+    expect(useCareerPlaybookStore.getState().followupQuestions).toHaveLength(1)
+    expect(useCareerPlaybookStore.getState().completenessScore).toBe(0.76)
+  })
+
+  it('approves Role Guide generation through the production tRPC transport', async () => {
+    trpcMocks.approveAndGenerateMutate.mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000000910',
+      status: 'generating',
+      phase: 'completion',
+      progress: 80,
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000910',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'ready_to_generate',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().approveCareerPlaybookGeneration()
+    ).resolves.toEqual({ ok: true })
+
+    expect(trpcMocks.approveAndGenerateMutate).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000910',
+    })
+    expect(useCareerPlaybookStore.getState().status).toBe('generating')
+    expect(useCareerPlaybookStore.getState().phase).toBe('completion')
+    expect(useCareerPlaybookStore.getState().generationStartError).toBeNull()
+  })
+
+  it('keeps completion editable when generation transport rejects', async () => {
+    trpcMocks.approveAndGenerateMutate.mockRejectedValue(new Error('generation unavailable'))
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000911',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'ready_to_generate',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().approveCareerPlaybookGeneration()
+    ).resolves.toEqual({ ok: false, error: 'generation unavailable' })
+
+    expect(useCareerPlaybookStore.getState().status).toBe('ready_to_generate')
+    expect(useCareerPlaybookStore.getState().phase).toBe('completion')
+    expect(useCareerPlaybookStore.getState().generationStartError).toBe('generation unavailable')
+    expect(useCareerPlaybookStore.getState().isStartingGeneration).toBe(false)
+  })
+
+  it('keeps completion editable when generation transport is unavailable', async () => {
+    setCareerPlaybookClientForTests({
+      submitAnswer: vi.fn(),
+    })
+
+    useCareerPlaybookStore.getState().hydrateCareerPlaybookDraft({
+      playbookId: '00000000-0000-4000-8000-000000000912',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'ready_to_generate',
+      fixedAnswers: [{ question_key: 'position', value: 'Product Lead' }],
+    })
+
+    await expect(
+      useCareerPlaybookStore.getState().approveCareerPlaybookGeneration()
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Role Guide generation is unavailable',
+    })
+
+    expect(useCareerPlaybookStore.getState().status).toBe('ready_to_generate')
+    expect(useCareerPlaybookStore.getState().phase).toBe('completion')
+    expect(useCareerPlaybookStore.getState().generationStartError).toBe(
+      'Role Guide generation is unavailable'
+    )
+    expect(useCareerPlaybookStore.getState().isStartingGeneration).toBe(false)
   })
 
   it('keeps earlier follow-up questions when requesting another generation round', async () => {
