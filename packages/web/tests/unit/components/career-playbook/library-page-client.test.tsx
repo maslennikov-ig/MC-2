@@ -7,8 +7,13 @@ import CareerPlaybookLibraryPageClient from '@/app/[locale]/career-playbook/libr
 
 const deleteMany = vi.fn()
 const fetchPage = vi.fn()
+const createCourseFromPlaybook = vi.fn()
 
 vi.mock('@/components/career-playbook/library/client-adapter', () => ({
+  createCourseFromPlaybook: (...args: unknown[]) =>
+    createCourseFromPlaybook(
+      ...(args as [input: { playbookId: string; includeWebResearch: boolean }])
+    ),
   deleteCareerPlaybookMany: (...args: unknown[]) =>
     deleteMany(...(args as [playbookIds: string[], locale: string])),
   fetchCareerPlaybookLibraryPage: (...args: unknown[]) =>
@@ -51,8 +56,20 @@ const messages = {
       loadMore: 'Load more',
       loadingMore: 'Loading...',
       card: {
+        createCourse: 'Create course',
         publicBadge: 'Public',
         privateBadge: 'Private',
+      },
+      createCourseDialog: {
+        title: 'Create course from Role Guide',
+        description:
+          'Start course generation from this completed Role Guide. You can add materials after the course is created.',
+        startWithoutMaterials: 'Start without extra materials',
+        addMaterialsLater: 'Materials can be added after course creation if needed.',
+        secondaryDisabled: 'Add materials before creation',
+        loading: 'Creating course...',
+        errorTitle: 'Course creation failed',
+        genericError: 'Could not create a course from this Role Guide.',
       },
     },
   },
@@ -72,6 +89,7 @@ function renderPage({
 
 describe('CareerPlaybookLibraryPageClient', () => {
   beforeEach(() => {
+    createCourseFromPlaybook.mockReset()
     deleteMany.mockReset()
     fetchPage.mockReset()
   })
@@ -122,6 +140,50 @@ describe('CareerPlaybookLibraryPageClient', () => {
     await user.selectOptions(screen.getByLabelText('All statuses'), 'generating')
     expect(screen.queryByText('Head of Sales')).not.toBeInTheDocument()
     expect(screen.getByText('DevOps Engineer')).toBeInTheDocument()
+  })
+
+  it('shows course creation only for completed role guides', () => {
+    renderPage({
+      initialData: {
+        items: [
+          {
+            id: 'pb-1',
+            title: 'Head of Sales',
+            department: 'sales',
+            level: 'lead',
+            status: 'completed',
+            createdAt: '2026-05-14T10:00:00.000Z',
+            isPublic: true,
+            shareSlug: 'head-of-sales',
+          },
+          {
+            id: 'pb-2',
+            title: 'DevOps Engineer',
+            department: 'engineering',
+            level: 'senior',
+            status: 'generating',
+            createdAt: '2026-05-12T10:00:00.000Z',
+            isPublic: false,
+            shareSlug: null,
+          },
+        ],
+        nextCursor: null,
+        error: null,
+      },
+    })
+
+    const cards = screen.getAllByRole('article')
+    const completedCard = cards.find((card) => within(card).queryByText('Head of Sales'))
+    const generatingCard = cards.find((card) => within(card).queryByText('DevOps Engineer'))
+
+    expect(completedCard).toBeDefined()
+    expect(generatingCard).toBeDefined()
+    expect(
+      within(completedCard as HTMLElement).getByRole('button', { name: 'Create course' })
+    ).toBeInTheDocument()
+    expect(
+      within(generatingCard as HTMLElement).queryByRole('button', { name: 'Create course' })
+    ).toBeNull()
   })
 
   it('supports multi-select and bulk delete', async () => {

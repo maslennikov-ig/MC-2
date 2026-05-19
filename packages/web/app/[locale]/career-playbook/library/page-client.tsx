@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { BookCopy, Plus, Search, Trash2 } from 'lucide-react'
+import { BookCopy, BookOpenCheck, Plus, Search, Trash2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import type {
   CareerPlaybookLibraryData,
   CareerPlaybookLibraryItem,
 } from '@/components/career-playbook/library/types'
+import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
 import type { Locale } from '@/src/i18n/config'
 
 interface CareerPlaybookLibraryPageClientProps {
@@ -288,6 +289,19 @@ export default function CareerPlaybookLibraryPageClient({
                     {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
                     {item.department ? <Badge variant="outline">{item.department}</Badge> : null}
                   </div>
+                  {item.status === 'completed' ? (
+                    <div className="mt-4">
+                      <CreateCourseFromPlaybookDialog
+                        playbookId={item.id}
+                        trigger={
+                          <Button type="button" variant="outline" size="sm" className="rounded-md">
+                            <BookOpenCheck className="h-4 w-4" aria-hidden />
+                            {t('card.createCourse')}
+                          </Button>
+                        }
+                      />
+                    </div>
+                  ) : null}
                 </article>
               )
             })}
