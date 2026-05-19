@@ -1,11 +1,17 @@
 import { router } from '../../trpc';
+import { protectedProcedure } from '../../middleware/auth';
+import { playbookIdInputSchema } from './_shared';
 import { careerPlaybookCourseBridgeRouter } from './course-bridge.router';
 import { careerPlaybookGenerationRouter } from './generation.router';
 import { careerPlaybookLibraryRouter } from './library.router';
 import { careerPlaybookSessionRouter } from './session.router';
 import { careerPlaybookShareRouter } from './share.router';
+import { exportCareerPlaybookPdf } from './library-service';
 
 export const careerPlaybookRouter = router({
+  exportPdf: protectedProcedure.input(playbookIdInputSchema).query(({ ctx, input }) => {
+    return exportCareerPlaybookPdf(ctx, input);
+  }),
   session: careerPlaybookSessionRouter,
   generation: careerPlaybookGenerationRouter,
   library: careerPlaybookLibraryRouter,

@@ -7,6 +7,7 @@ import type {
 } from '@megacampus/shared-types';
 import type { Context, UserContext } from '../../trpc';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
+import { renderCareerPlaybookPdf } from '../../../services/career-playbook-pdf';
 import {
   mapPlaybookRow,
   normalizeGeneratedBlocks,
@@ -48,6 +49,13 @@ export interface CareerPlaybookShareToggleResponse {
   playbookId: string;
   isPublic: boolean;
   shareSlug: string | null;
+}
+
+export interface CareerPlaybookPdfExportResponse {
+  pdfBase64: string;
+  fileName: string;
+  contentType: 'application/pdf';
+  sizeBytes: number;
 }
 
 function getCareerPlaybookSupabase(): CareerPlaybookSupabase {
@@ -257,4 +265,44 @@ export async function getPublicCareerPlaybookBySlug(input: {
   }
 
   return mapRowToLibraryDetail(mapped);
+}
+
+export async function exportCareerPlaybookPdf(
+  ctx: Context,
+  input: { playbookId: string }
+): Promise<CareerPlaybookPdfExportResponse> {
+  const user = requireUser(ctx);
+  const row = await loadOwnedPlaybook(input.playbookId, user);
+  if (row.status !== 'completed') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook must be completed before PDF export',
+    });
+  }
+
+  const generatedBlocks = normalizeGeneratedBlocks(row.generated_blocks);
+  if (!row.final_markdown?.trim() && Object.keys(generatedBlocks).length === 0) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook must contain generated content before PDF export',
+    });
+  }
+
+  const pdf = await renderCareerPlaybookPdf({
+    playbookId: row.id,
+    positionTitle: row.position_title,
+    department: row.department,
+    level: row.level,
+    language: row.language,
+    generatedBlocks,
+    finalMarkdown: row.final_markdown,
+    completedAt: row.completed_at,
+  });
+
+  return {
+    pdfBase64: pdf.buffer.toString('base64'),
+    fileName: pdf.fileName,
+    contentType: pdf.contentType,
+    sizeBytes: pdf.buffer.byteLength,
+  };
 }

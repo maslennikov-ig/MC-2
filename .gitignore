@@ -11,8 +11,12 @@ node_modules/
 !.codex/
 !.codex/orchestrator.toml
 !.codex/handoff.md
+!.codex/project-index.md
 !.codex/report-template.md
 !.codex/stage-artifact-template.md
+!.codex/subagent-task-contract.md
+!.codex/subagent-spawn-template.md
+!.codex/manual-agent-prompt-template.md
 !.codex/stages/
 !.codex/stages/**
 

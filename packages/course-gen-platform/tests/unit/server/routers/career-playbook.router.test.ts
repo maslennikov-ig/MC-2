@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   from: vi.fn(),
   generateCareerPlaybookFollowups: vi.fn(),
   getCareerPlaybookGraph: vi.fn(),
+  renderCareerPlaybookPdf: vi.fn(),
 }));
 
 vi.mock('@/shared/supabase/admin', () => ({
@@ -19,6 +20,10 @@ vi.mock('@/stages/stage-career-playbook/nodes/followup-questions', () => ({
 
 vi.mock('@/stages/stage-career-playbook/graph', () => ({
   getCareerPlaybookGraph: mocks.getCareerPlaybookGraph,
+}));
+
+vi.mock('@/services/career-playbook-pdf', () => ({
+  renderCareerPlaybookPdf: mocks.renderCareerPlaybookPdf,
 }));
 
 import { appRouter } from '@/server/app-router';
@@ -112,6 +117,7 @@ describe('careerPlaybookRouter transport', () => {
   });
 
   it('is wired into the app router under careerPlaybook', () => {
+    expect(appRouter._def.procedures['careerPlaybook.exportPdf']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.session.start']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.requestFollowups']).toBeDefined();
     expect(appRouter._def.procedures['careerPlaybook.generation.approveAndGenerate']).toBeDefined();
@@ -820,5 +826,103 @@ describe('careerPlaybookRouter transport', () => {
     ).rejects.toMatchObject({
       code: 'METHOD_NOT_SUPPORTED',
     });
+  });
+
+  it('exports a completed owned playbook as a base64 PDF payload', async () => {
+    const pdfBuffer = Buffer.from('%PDF mocked career playbook');
+    mocks.renderCareerPlaybookPdf.mockResolvedValue({
+      buffer: pdfBuffer,
+      fileName: 'career-playbook-product-lead.pdf',
+      contentType: 'application/pdf',
+    });
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'completed',
+          position_title: 'Product Lead',
+          final_markdown: '# Product Lead',
+          generated_blocks: {
+            header: {
+              content: '# Product Lead',
+              status: 'generated',
+              attempt: 1,
+            },
+          },
+          completed_at: '2026-05-14T01:00:00.000Z',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.exportPdf({ playbookId });
+
+    expect(mocks.renderCareerPlaybookPdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playbookId,
+        positionTitle: 'Product Lead',
+        finalMarkdown: '# Product Lead',
+      })
+    );
+    expect(result).toEqual({
+      pdfBase64: pdfBuffer.toString('base64'),
+      fileName: 'career-playbook-product-lead.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: pdfBuffer.byteLength,
+    });
+  });
+
+  it('requires authentication for PDF export', async () => {
+    const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
+
+    await expect(caller.exportPdf({ playbookId })).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+    expect(mocks.renderCareerPlaybookPdf).not.toHaveBeenCalled();
+  });
+
+  it('refuses PDF export for same-organization playbooks owned by another user', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          user_id: authenticatedContext.user!.id,
+          organization_id: authenticatedContext.user!.organizationId,
+          status: 'completed',
+          final_markdown: '# Product Lead',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(otherUserContext);
+
+    await expect(caller.exportPdf({ playbookId })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Career Playbook access denied',
+    });
+    expect(mocks.renderCareerPlaybookPdf).not.toHaveBeenCalled();
+  });
+
+  it('refuses PDF export before the playbook is completed', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'generating',
+          final_markdown: '# Product Lead',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(caller.exportPdf({ playbookId })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook must be completed before PDF export',
+    });
+    expect(mocks.renderCareerPlaybookPdf).not.toHaveBeenCalled();
   });
 });
