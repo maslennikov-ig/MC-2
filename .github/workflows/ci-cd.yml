@@ -246,7 +246,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --filter @megacampus/course-gen-platform exec playwright install --with-deps chromium
 
       - name: Build shared packages
         run: |
