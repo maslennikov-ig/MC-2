@@ -42,8 +42,10 @@
     "skippedLabel": "Пропущено",
     "editLabel": "Редактировать",
     "generateCta": "Сгенерировать Role Guide",
-    "generationHandoffTitle": "Черновик готов к генерации",
-    "generationHandoffDescription": "Контекст сохранён. Генерация продолжится после подключения backend-обработчика.",
+    "generationHandoffTitle": "Генерация запущена",
+    "generationHandoffDescription": "Backend начал генерацию Role Guide.",
+    "generationStarting": "Запускаем генерацию...",
+    "generationErrorTitle": "Не удалось запустить генерацию",
     "emptySummary": "Пока нет данных"
   },
   "viewer": {

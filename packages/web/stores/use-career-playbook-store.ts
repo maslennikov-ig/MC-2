@@ -29,6 +29,7 @@ export type CareerPlaybookWizardPhase = 'fixed' | 'followups' | 'completion'
 export type CareerPlaybookAnswerValue = string | string[]
 
 export interface CareerPlaybookDraft {
+  ownerUserId?: string | null
   playbookId?: string | null
   uiLanguage?: CareerPlaybookFixedQuestionLanguage
   contentLanguage?: string
@@ -45,6 +46,14 @@ export interface CareerPlaybookDraft {
   dirtyFixedQuestionKeys?: string[]
   dirtyFollowupQuestionIds?: string[]
   dirtyFreeformDraft?: boolean
+}
+
+export interface CareerPlaybookGenerationStatus {
+  playbookId: string
+  status: CareerPlaybookPlaybookStatus
+  phase?: CareerPlaybookWizardPhase
+  progress?: number
+  error?: string
 }
 
 export interface CareerPlaybookClient {
@@ -66,8 +75,9 @@ export interface CareerPlaybookClient {
     playbookId: string
     fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
     followupAnswers: Record<string, CareerPlaybookFollowupAnswer>
-    contentLanguage: string
+    contentLanguage: Language
   }) => Promise<CareerPlaybookFollowupResponse>
+  approveAndGenerate?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
   submitAnswer: (input: {
     playbookId: string
     phase: 'fixed' | 'followup' | 'freeform'
@@ -87,6 +97,7 @@ export interface CareerPlaybookViewerBlock extends CareerPlaybookBlockCatalogIte
 
 interface CareerPlaybookStoreState {
   playbookId: string | null
+  ownerUserId: string | null
   status: CareerPlaybookPlaybookStatus
   phase: CareerPlaybookWizardPhase
   uiLanguage: CareerPlaybookFixedQuestionLanguage
@@ -102,6 +113,8 @@ interface CareerPlaybookStoreState {
   followupGenerationError: string | null
   followupGenerationCount: number
   followupGenerationLimit: number
+  isStartingGeneration: boolean
+  generationStartError: string | null
   freeformDraft: string
   isAutosaving: boolean
   autosaveError: string | null
@@ -131,6 +144,7 @@ interface CareerPlaybookStoreState {
   ) => Promise<CareerPlaybookAutosaveResult>
   requestCareerPlaybookPdf: () => Promise<CareerPlaybookAutosaveResult>
   toggleCareerPlaybookThinkingStream: () => void
+  setCareerPlaybookDraftOwner: (ownerUserId: string) => void
   answerCareerPlaybookFixedQuestion: (questionKey: string, value: CareerPlaybookAnswerValue) => void
   goToNextCareerPlaybookQuestion: () => void
   goToPreviousCareerPlaybookQuestion: () => void
@@ -143,6 +157,7 @@ interface CareerPlaybookStoreState {
   goToNextCareerPlaybookFollowup: () => void
   goToPreviousCareerPlaybookFollowup: () => void
   completeCareerPlaybookFollowups: () => void
+  approveCareerPlaybookGeneration: () => Promise<CareerPlaybookAutosaveResult>
   editCareerPlaybookFixedAnswer: (questionKey: string) => void
   editCareerPlaybookFollowupAnswer: (questionId: string) => void
   saveCareerPlaybookFreeformDraft: (text: string) => void
@@ -390,6 +405,7 @@ function initialState(): Omit<
   | 'regenerateCareerPlaybookViewerBlock'
   | 'requestCareerPlaybookPdf'
   | 'toggleCareerPlaybookThinkingStream'
+  | 'setCareerPlaybookDraftOwner'
   | 'answerCareerPlaybookFixedQuestion'
   | 'goToNextCareerPlaybookQuestion'
   | 'goToPreviousCareerPlaybookQuestion'
@@ -399,6 +415,7 @@ function initialState(): Omit<
   | 'goToNextCareerPlaybookFollowup'
   | 'goToPreviousCareerPlaybookFollowup'
   | 'completeCareerPlaybookFollowups'
+  | 'approveCareerPlaybookGeneration'
   | 'editCareerPlaybookFixedAnswer'
   | 'editCareerPlaybookFollowupAnswer'
   | 'saveCareerPlaybookFreeformDraft'
@@ -410,6 +427,7 @@ function initialState(): Omit<
 > {
   return {
     playbookId: null,
+    ownerUserId: null,
     status: 'draft',
     phase: 'fixed',
     uiLanguage: 'ru',
@@ -425,6 +443,8 @@ function initialState(): Omit<
     followupGenerationError: null,
     followupGenerationCount: 0,
     followupGenerationLimit: 2,
+    isStartingGeneration: false,
+    generationStartError: null,
     freeformDraft: '',
     isAutosaving: false,
     autosaveError: null,
@@ -593,6 +613,11 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.library.regenerateBlock.mutate(
         input
       )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
+    requestFollowups: (input) => client.careerPlaybook.generation.requestFollowups.mutate(input),
+    approveAndGenerate: async (input) =>
+      (await client.careerPlaybook.generation.approveAndGenerate.mutate(
+        input
+      )) as unknown as CareerPlaybookGenerationStatus,
     submitAnswer: (input) => client.careerPlaybook.session.submitAnswer.mutate(input),
   }
 }
@@ -620,6 +645,29 @@ function clampCurrentFixedIndex(state: CareerPlaybookStoreState) {
     0,
     Math.min(state.currentFixedIndex, visibleQuestions.length - 1)
   )
+}
+
+function hasLocalDraftData(state: CareerPlaybookStoreState) {
+  return (
+    Boolean(state.playbookId) ||
+    Object.keys(state.fixedAnswers).some((questionKey) => questionKey !== 'content_language') ||
+    Boolean(state.freeformDraft.trim())
+  )
+}
+
+function removeHiddenFixedAnswers(state: CareerPlaybookStoreState) {
+  const visibleQuestionKeys = new Set(
+    visibleQuestionsFromState(state).map((question) => question.question_key)
+  )
+
+  for (const questionKey of Object.keys(state.fixedAnswers)) {
+    if (!visibleQuestionKeys.has(questionKey)) {
+      delete state.fixedAnswers[questionKey]
+      state.dirtyFixedQuestionKeys = state.dirtyFixedQuestionKeys.filter(
+        (key) => key !== questionKey
+      )
+    }
+  }
 }
 
 function markDirtyKey(state: CareerPlaybookStoreState, questionKey: string) {
@@ -682,6 +730,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       hydrateCareerPlaybookDraft: (draft) =>
         set((state) => {
           const normalizedUiLanguage = normalizeUiLanguage(draft.uiLanguage ?? state.uiLanguage)
+          state.ownerUserId = draft.ownerUserId ?? state.ownerUserId
           state.playbookId = draft.playbookId ?? null
           state.uiLanguage = normalizedUiLanguage
           state.contentLanguage = draft.contentLanguage ?? state.contentLanguage
@@ -711,10 +760,13 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.isAutosaving = false
           state.followupGenerationError = null
           state.isGeneratingFollowups = false
+          state.isStartingGeneration = false
+          state.generationStartError = null
           state.dirtyFixedQuestionKeys = draft.dirtyFixedQuestionKeys ?? []
           state.dirtyFollowupQuestionIds =
             draft.dirtyFollowupQuestionIds ?? state.dirtyFollowupQuestionIds
           state.dirtyFreeformDraft = draft.dirtyFreeformDraft ?? false
+          removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
           state.currentFollowupIndex = Math.max(
             0,
@@ -725,9 +777,6 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       hydrateCareerPlaybookViewer: (snapshot) =>
         set((state) => {
           const normalizedSnapshot = normalizeViewerSnapshot(snapshot)
-          state.playbookId = normalizedSnapshot.playbookId
-          state.status = normalizedSnapshot.status
-          state.contentLanguage = normalizedSnapshot.contentLanguage
           state.viewer = normalizedSnapshot
           state.viewerBlocks = viewerBlocksFromSnapshot(normalizedSnapshot)
           state.isLoadingViewer = false
@@ -965,6 +1014,19 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.showCareerPlaybookThinkingStream = !state.showCareerPlaybookThinkingStream
         }),
 
+      setCareerPlaybookDraftOwner: (ownerUserId) =>
+        set((state) => {
+          const shouldReset =
+            (state.ownerUserId && state.ownerUserId !== ownerUserId) ||
+            (!state.ownerUserId && hasLocalDraftData(state))
+
+          if (shouldReset) {
+            Object.assign(state, initialState())
+          }
+
+          state.ownerUserId = ownerUserId
+        }),
+
       answerCareerPlaybookFixedQuestion: (questionKey, value) =>
         set((state) => {
           const previousValue = state.fixedAnswers[questionKey]?.value
@@ -982,6 +1044,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             clearDependentFollowupContext(state)
           }
           markDirtyKey(state, questionKey)
+          removeHiddenFixedAnswers(state)
           clampCurrentFixedIndex(state)
         }),
 
@@ -1020,7 +1083,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             playbookId: snapshot.playbookId,
             fixedAnswers: snapshot.fixedAnswers,
             followupAnswers: snapshot.followupAnswers,
-            contentLanguage: snapshot.contentLanguage,
+            contentLanguage: normalizeContentLanguage(snapshot.contentLanguage),
           })
 
           set((state) => {
@@ -1107,6 +1170,50 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.phase = 'completion'
           state.status = 'ready_to_generate'
         }),
+
+      approveCareerPlaybookGeneration: async () => {
+        const snapshot = get()
+        if (!snapshot.playbookId) {
+          return { ok: false, error: 'Playbook session is required before generation' }
+        }
+
+        try {
+          const client = getClient()
+          if (!client.approveAndGenerate) {
+            const message = 'Role Guide generation is unavailable'
+            set((state) => {
+              state.isStartingGeneration = false
+              state.generationStartError = message
+            })
+            return { ok: false, error: message }
+          }
+
+          set((state) => {
+            state.isStartingGeneration = true
+            state.generationStartError = null
+          })
+
+          const response = await client.approveAndGenerate({
+            playbookId: snapshot.playbookId,
+          })
+
+          set((state) => {
+            state.status = response.status
+            state.phase = response.phase ?? 'completion'
+            state.isStartingGeneration = false
+            state.generationStartError = response.error ?? null
+          })
+
+          return response.error ? { ok: false, error: response.error } : { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Role Guide generation failed'
+          set((state) => {
+            state.isStartingGeneration = false
+            state.generationStartError = message
+          })
+          return { ok: false, error: message }
+        }
+      },
 
       editCareerPlaybookFixedAnswer: (questionKey) =>
         set((state) => {
@@ -1348,6 +1455,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         playbookId: state.playbookId,
+        ownerUserId: state.ownerUserId,
         status: state.status,
         phase: state.phase,
         uiLanguage: state.uiLanguage,
