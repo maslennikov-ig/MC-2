@@ -40,6 +40,16 @@ const unauthenticatedContext: Context = {
   req: new Request('http://localhost/trpc'),
 };
 
+const otherUserContext: Context = {
+  user: {
+    id: '77777777-7777-4777-8777-777777777777',
+    email: 'reader@example.com',
+    role: 'student',
+    organizationId: authenticatedContext.user!.organizationId,
+  },
+  req: new Request('http://localhost/trpc'),
+};
+
 const playbookId = '33333333-3333-4333-8333-333333333333';
 
 function playbookRow(overrides: Record<string, unknown> = {}) {
@@ -73,6 +83,7 @@ function createBuilder(singleResults: Array<{ data: unknown; error: unknown }> =
   const builder = {
     insert: vi.fn(() => builder),
     update: vi.fn(() => builder),
+    delete: vi.fn(() => builder),
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     order: vi.fn(() => builder),
@@ -93,12 +104,6 @@ function createListBuilder(data: unknown[], error: unknown = null) {
   };
 
   return builder;
-}
-
-function expectNotImplemented(call: Promise<unknown>) {
-  return expect(call).rejects.toMatchObject({
-    code: 'METHOD_NOT_SUPPORTED',
-  });
 }
 
 describe('careerPlaybookRouter transport', () => {
@@ -535,13 +540,348 @@ describe('careerPlaybookRouter transport', () => {
     });
   });
 
-  it('keeps library, share, and course bridge procedures as skeletons for later tasks', async () => {
+  it('lists only owned playbooks in the personal library', async () => {
+    const ownPlaybook = playbookRow({
+      id: '33333333-3333-4333-8333-333333333334',
+      position_title: 'Own role',
+      created_at: '2026-05-14T03:00:00.000Z',
+    });
+    const sameOrgPlaybook = playbookRow({
+      id: '33333333-3333-4333-8333-333333333335',
+      user_id: '77777777-7777-4777-8777-777777777777',
+      position_title: 'Same-org role',
+      created_at: '2026-05-14T02:00:00.000Z',
+    });
+    const foreignPlaybook = playbookRow({
+      id: '33333333-3333-4333-8333-333333333336',
+      user_id: '88888888-8888-4888-8888-888888888888',
+      organization_id: '99999999-9999-4999-8999-999999999999',
+      position_title: 'Hidden role',
+      created_at: '2026-05-14T01:00:00.000Z',
+    });
+    const builder = createListBuilder([ownPlaybook, sameOrgPlaybook, foreignPlaybook]);
+    mocks.from.mockReturnValue(builder);
+
     const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.library.list({ limit: 20 });
+
+    expect(mocks.from).toHaveBeenCalledWith('career_playbooks');
+    expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
+    expect(result.items).toHaveLength(1);
+    expect(result.items.map(item => item.id)).toEqual([ownPlaybook.id]);
+    expect(result.items.every(item => item.id !== sameOrgPlaybook.id)).toBe(true);
+    expect(result.items.every(item => item.id !== foreignPlaybook.id)).toBe(true);
+  });
+
+  it('returns a readable playbook by id from the library router', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'completed',
+          final_markdown: '# Product Lead',
+          generated_blocks: {
+            header: {
+              content: '# Product Lead',
+              status: 'generated',
+              attempt: 1,
+            },
+          },
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.library.get({ playbookId });
+
+    expect(result).toMatchObject({
+      id: playbookId,
+      status: 'completed',
+      finalMarkdown: '# Product Lead',
+      isPublic: false,
+    });
+  });
+
+  it('refuses same-organization playbooks in the personal library get endpoint', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          user_id: '77777777-7777-4777-8777-777777777777',
+          organization_id: authenticatedContext.user!.organizationId,
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(caller.library.get({ playbookId })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Career Playbook access denied',
+    });
+  });
+
+  it('deletes an owned playbook through the library router', async () => {
+    const builder = createBuilder([
+      { data: playbookRow(), error: null },
+      { data: playbookRow(), error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.library.delete({ playbookId });
+
+    expect(builder.delete).toHaveBeenCalledTimes(1);
+    expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
+    expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
+    expect(result).toEqual({ deleted: true, playbookId });
+  });
+
+  it('refuses to publish incomplete or empty playbooks', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'generating',
+          final_markdown: null,
+          share_slug: null,
+          is_public: false,
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(caller.share.shareToggle({ playbookId, isPublic: true })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook must be completed before sharing',
+    });
+    expect(builder.update).not.toHaveBeenCalled();
+  });
+
+  it('enables public sharing with an unguessable generated share slug', async () => {
+    const predictableSlug = 'cp-33333333333343338333333333333333';
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          share_slug: null,
+          is_public: false,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
+        }),
+        error: null,
+      },
+      {
+        data: playbookRow({
+          share_slug: 'cp-1234567890abcdef12345678',
+          is_public: true,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.share.shareToggle({ playbookId, isPublic: true });
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_public: true,
+        share_slug: expect.stringMatching(/^cp-[a-f0-9]{24}$/),
+      })
+    );
+    expect(builder.update.mock.calls[0][0].share_slug).not.toBe(predictableSlug);
+    expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
+    expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
+    expect(result).toEqual({
+      playbookId,
+      isPublic: true,
+      shareSlug: 'cp-1234567890abcdef12345678',
+    });
+  });
+
+  it('disables public sharing without returning an active share link', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          share_slug: 'existing-share-slug',
+          is_public: true,
+        }),
+        error: null,
+      },
+      {
+        data: playbookRow({
+          share_slug: 'existing-share-slug',
+          is_public: false,
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.share.shareToggle({ playbookId, isPublic: false });
+
+    expect(builder.update).toHaveBeenCalledWith({
+      is_public: false,
+      share_slug: 'existing-share-slug',
+    });
+    expect(result).toEqual({
+      playbookId,
+      isPublic: false,
+      shareSlug: null,
+    });
+  });
+
+  it('uses existing share slug when re-enabling public sharing', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          share_slug: 'existing-share-slug',
+          is_public: false,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
+        }),
+        error: null,
+      },
+      {
+        data: playbookRow({
+          share_slug: 'existing-share-slug',
+          is_public: true,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.share.shareToggle({ playbookId, isPublic: true });
+
+    expect(builder.update).toHaveBeenCalledWith({
+      is_public: true,
+      share_slug: 'existing-share-slug',
+    });
+    expect(result.shareSlug).toBe('existing-share-slug');
+  });
+
+  it('returns a public playbook by share slug without authentication', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          id: '66666666-6666-4666-8666-666666666666',
+          share_slug: 'sales-guide',
+          is_public: true,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
+    const result = await caller.share.getPublicBySlug({ shareSlug: 'sales-guide' });
+
+    expect(builder.select).toHaveBeenCalledWith(expect.not.stringContaining('q_a_data'));
+    expect(builder.select).toHaveBeenCalledWith(expect.not.stringContaining('role_profile_spec'));
+    expect(builder.select).toHaveBeenCalledWith(expect.not.stringContaining('web_research'));
+    expect(builder.select).toHaveBeenCalledWith(expect.not.stringContaining('cost_breakdown'));
+    expect(builder.eq).toHaveBeenCalledWith('status', 'completed');
+    expect(result).toMatchObject({
+      id: '66666666-6666-4666-8666-666666666666',
+      shareSlug: 'sales-guide',
+      isPublic: true,
+      finalMarkdown: '# Sales Manager',
+    });
+    expect(result).not.toHaveProperty('generatedBlocks');
+  });
+
+  it('hides public slugs until the playbook is completed with markdown', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          share_slug: 'draft-guide',
+          is_public: true,
+          status: 'generating',
+          final_markdown: '',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
+
+    await expect(caller.share.getPublicBySlug({ shareSlug: 'draft-guide' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    expect(builder.eq).toHaveBeenCalledWith('status', 'completed');
+  });
+
+  it('hides private playbooks on public share lookup', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          share_slug: 'private-guide',
+          is_public: false,
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
+    await expect(
+      caller.share.getPublicBySlug({ shareSlug: 'private-guide' })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  it('hides another user playbook from library while allowing the public share link', async () => {
+    const publicPlaybook = playbookRow({
+      id: '66666666-6666-4666-8666-666666666666',
+      share_slug: 'public-sales-guide',
+      is_public: true,
+      status: 'completed',
+      final_markdown: '# Sales Manager',
+    });
+    const listBuilder = createListBuilder([publicPlaybook]);
+    const publicShareBuilder = createBuilder([{ data: publicPlaybook, error: null }]);
+    mocks.from.mockReturnValueOnce(listBuilder).mockReturnValueOnce(publicShareBuilder);
+
+    const otherUserCaller = careerPlaybookRouter.createCaller(otherUserContext);
     const publicCaller = careerPlaybookRouter.createCaller(unauthenticatedContext);
 
-    await expectNotImplemented(caller.library.list({ limit: 20 }));
-    await expectNotImplemented(caller.share.shareToggle({ playbookId, isPublic: true }));
-    await expectNotImplemented(publicCaller.share.getPublicBySlug({ shareSlug: 'sales-guide' }));
-    await expectNotImplemented(caller.courseBridge.createCourseFromPlaybook({ playbookId }));
+    const otherUserLibrary = await otherUserCaller.library.list({ limit: 20 });
+    expect(listBuilder.eq).toHaveBeenCalledWith('user_id', otherUserContext.user!.id);
+    expect(otherUserLibrary.items).toEqual([]);
+
+    const sharedPlaybook = await publicCaller.share.getPublicBySlug({
+      shareSlug: 'public-sales-guide',
+    });
+    expect(sharedPlaybook).toMatchObject({
+      id: publicPlaybook.id,
+      shareSlug: 'public-sales-guide',
+      isPublic: true,
+      finalMarkdown: '# Sales Manager',
+    });
+  });
+
+  it('keeps course bridge procedures as skeletons for later tasks', async () => {
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(
+      caller.courseBridge.createCourseFromPlaybook({ playbookId })
+    ).rejects.toMatchObject({
+      code: 'METHOD_NOT_SUPPORTED',
+    });
   });
 });

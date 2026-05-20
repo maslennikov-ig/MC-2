@@ -234,5 +234,58 @@
     "blocksReady": "Готово блоков: {ready} из {total}",
     "thinkingStream": "Показать thinking stream",
     "streamingBlockPending": "Этот блок генерируется."
+  },
+  "library": {
+    "title": "Библиотека руководств ролей",
+    "subtitle": "Ваши сгенерированные и опубликованные руководства ролей",
+    "searchPlaceholder": "Поиск по названию роли",
+    "filters": {
+      "all": "Все статусы",
+      "completed": "Готово",
+      "generating": "Генерируется",
+      "failed": "Ошибка",
+      "department": "Отдел",
+      "departmentAll": "Все отделы",
+      "level": "Уровень",
+      "levelAll": "Все уровни"
+    },
+    "createNew": "Создать новый",
+    "emptyTitle": "Пока нет руководств ролей",
+    "emptyDescription": "Создайте первый Career Playbook, чтобы собрать библиотеку.",
+    "errorTitle": "Библиотека временно недоступна",
+    "errorDescription": "Повторите позже или начните новое руководство.",
+    "selectedCount": "Выбрано: {count}",
+    "bulkDelete": "Удалить выбранные",
+    "deleting": "Удаляем...",
+    "loadMore": "Загрузить ещё",
+    "loadingMore": "Загружаем...",
+    "card": {
+      "publicBadge": "Публичный",
+      "privateBadge": "Приватный",
+      "makePublic": "Опубликовать",
+      "makePrivate": "Сделать приватным",
+      "publicLink": "Публичная ссылка",
+      "open": "Открыть"
+    },
+    "statusLabels": {
+      "draft": "Черновик",
+      "answering_fixed": "Ответы на основные вопросы",
+      "awaiting_followups": "Ожидает уточнений",
+      "answering_followups": "Ответы на уточнения",
+      "ready_to_generate": "Готово к генерации",
+      "generating": "Генерируется",
+      "completed": "Готово",
+      "failed": "Ошибка"
+    },
+    "deleteDialog": {
+      "title": "Удалить выбранные руководства?",
+      "description": "Будет удалено выбранных руководств: {count}.",
+      "cancel": "Отмена",
+      "confirm": "Удалить руководства"
+    }
+  },
+  "share": {
+    "fallbackTitle": "Публичный Career Playbook",
+    "fallbackDescription": "Откройте публичное руководство роли, созданное на MC2."
   }
 }

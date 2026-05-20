@@ -7,18 +7,23 @@ import {
   regenerateBlockInputSchema,
   throwCareerPlaybookNotImplemented,
 } from './_shared';
+import {
+  deleteCareerPlaybookFromLibrary,
+  getCareerPlaybookFromLibrary,
+  listCareerPlaybooks,
+} from './library-service';
 
 export const careerPlaybookLibraryRouter = router({
-  list: protectedProcedure.input(listInputSchema).query(() => {
-    throwCareerPlaybookNotImplemented('library.list');
+  list: protectedProcedure.input(listInputSchema).query(({ ctx, input }) => {
+    return listCareerPlaybooks(ctx, input);
   }),
 
-  get: protectedProcedure.input(playbookIdInputSchema).query(() => {
-    throwCareerPlaybookNotImplemented('library.get');
+  get: protectedProcedure.input(playbookIdInputSchema).query(({ ctx, input }) => {
+    return getCareerPlaybookFromLibrary(ctx, input);
   }),
 
-  delete: protectedProcedure.input(playbookIdInputSchema).mutation(() => {
-    throwCareerPlaybookNotImplemented('library.delete');
+  delete: protectedProcedure.input(playbookIdInputSchema).mutation(({ ctx, input }) => {
+    return deleteCareerPlaybookFromLibrary(ctx, input);
   }),
 
   regenerateBlock: protectedProcedure.input(regenerateBlockInputSchema).mutation(() => {

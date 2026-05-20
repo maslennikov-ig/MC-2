@@ -59,6 +59,7 @@ interface ListQueryResult<T> {
 interface CareerPlaybookQueryBuilder<T> {
   insert: (values: Partial<T> | Partial<T>[]) => CareerPlaybookQueryBuilder<T>;
   update: (values: Partial<T>) => CareerPlaybookQueryBuilder<T>;
+  delete: () => CareerPlaybookQueryBuilder<T>;
   select: (columns?: string) => CareerPlaybookQueryBuilder<T>;
   eq: (column: string, value: unknown) => CareerPlaybookQueryBuilder<T>;
   order: (column: string, options?: { ascending?: boolean }) => Promise<ListQueryResult<T>>;

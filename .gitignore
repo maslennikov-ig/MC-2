@@ -50,6 +50,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # --- Temporary Files ---
+.worktrees/
 .tmp/
 .local/
 tmp/

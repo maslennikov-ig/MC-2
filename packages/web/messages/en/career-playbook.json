@@ -234,5 +234,58 @@
     "blocksReady": "{ready} of {total} blocks ready",
     "thinkingStream": "Show thinking stream",
     "streamingBlockPending": "This block is being generated."
+  },
+  "library": {
+    "title": "Role Guide library",
+    "subtitle": "Your generated and shared role guides",
+    "searchPlaceholder": "Search by role title",
+    "filters": {
+      "all": "All statuses",
+      "completed": "Completed",
+      "generating": "Generating",
+      "failed": "Failed",
+      "department": "Department",
+      "departmentAll": "All departments",
+      "level": "Level",
+      "levelAll": "All levels"
+    },
+    "createNew": "Create new",
+    "emptyTitle": "No role guides yet",
+    "emptyDescription": "Create your first Career Playbook to build your library.",
+    "errorTitle": "Library temporarily unavailable",
+    "errorDescription": "Retry in a minute or create a new guide.",
+    "selectedCount": "{count} selected",
+    "bulkDelete": "Delete selected",
+    "deleting": "Deleting...",
+    "loadMore": "Load more",
+    "loadingMore": "Loading...",
+    "card": {
+      "publicBadge": "Public",
+      "privateBadge": "Private",
+      "makePublic": "Make public",
+      "makePrivate": "Make private",
+      "publicLink": "Public link",
+      "open": "Open"
+    },
+    "statusLabels": {
+      "draft": "Draft",
+      "answering_fixed": "Answering fixed questions",
+      "awaiting_followups": "Awaiting follow-ups",
+      "answering_followups": "Answering follow-ups",
+      "ready_to_generate": "Ready to generate",
+      "generating": "Generating",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "deleteDialog": {
+      "title": "Delete selected guides?",
+      "description": "This will delete {count} selected guides.",
+      "cancel": "Cancel",
+      "confirm": "Delete guides"
+    }
+  },
+  "share": {
+    "fallbackTitle": "Shared Career Playbook",
+    "fallbackDescription": "Open a shared role guide created on MC2."
   }
 }
