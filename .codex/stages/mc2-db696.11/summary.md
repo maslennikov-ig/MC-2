@@ -76,7 +76,7 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 - Full repo lint: `pnpm lint` - passed with existing warnings only.
 - Full repo build: `SUPABASE_SERVICE_ROLE_KEY=test-service-role NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon pnpm build` - passed.
 - Browser smoke: `PLAYWRIGHT_PORT=3101 pnpm --dir packages/web exec playwright test tests/e2e/career-playbook/wizard-phase-a.spec.ts --project=chromium --grep "requires authentication" --reporter=list` - 1 passed.
-- No-env preflight package script: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target local` prints `status: blocked` as expected. pnpm lifecycle exits `1` around the script's internal exit `2`; automation should parse report status for readiness outcomes.
+- No-env preflight package script: `pnpm --dir packages/course-gen-platform smoke:career-playbook:preflight --target staging --json` prints `status: blocked` as expected. pnpm lifecycle exits `1` around the script's internal exit `2`; automation should parse report status for readiness outcomes.
 - Artifact validation: passed for all stage artifacts.
 - Process verification: `scripts/orchestration/run_process_verification.sh` - passed.
 
