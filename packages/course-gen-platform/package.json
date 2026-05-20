@@ -47,7 +47,8 @@
     "lint": "eslint src --max-warnings=95",
     "type-check": "pnpm --filter @megacampus/shared-logger build && pnpm --filter @megacampus/shared-types exec tsc --build --force && pnpm --filter @megacampus/shared-utils build && tsc --noEmit",
     "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts",
-    "benchmark-llm": "tsx scripts/benchmark-llm/index.ts"
+    "benchmark-llm": "tsx scripts/benchmark-llm/index.ts",
+    "smoke:career-playbook:preflight": "TMPDIR=${TMPDIR:-/tmp} tsx scripts/career-playbook-smoke-preflight.ts"
   },
   "dependencies": {
     "@bull-board/api": "^5.14.0",
