@@ -64,6 +64,7 @@ interface CareerPlaybookQueryBuilder<T> {
   eq: (column: string, value: unknown) => CareerPlaybookQueryBuilder<T>;
   order: (column: string, options?: { ascending?: boolean }) => Promise<ListQueryResult<T>>;
   single: () => Promise<QueryResult<T>>;
+  maybeSingle: () => Promise<QueryResult<T>>;
 }
 
 export interface CareerPlaybookSupabase {

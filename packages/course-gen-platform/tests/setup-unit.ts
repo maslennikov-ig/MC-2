@@ -29,6 +29,7 @@ export { mockFetch };
 // Unit tests should not connect to real Redis
 // ============================================================================
 vi.mock('@/shared/cache/redis', () => ({
+  REDIS_UNAVAILABLE_EVENT: 'REDIS_UNAVAILABLE',
   getRedisClient: vi.fn(() => ({
     get: vi.fn().mockResolvedValue(null),
     set: vi.fn().mockResolvedValue('OK'),

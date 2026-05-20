@@ -3,8 +3,28 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { BookCopy, BookOpenCheck, Plus, Search, Trash2 } from 'lucide-react'
+import {
+  BookCopy,
+  BookOpen,
+  BookOpenCheck,
+  Link2,
+  Plus,
+  Search,
+  Share2,
+  Trash2,
+} from 'lucide-react'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -12,6 +32,7 @@ import { Input } from '@/components/ui/input'
 import {
   deleteCareerPlaybookMany,
   fetchCareerPlaybookLibraryPage,
+  toggleCareerPlaybookShare,
 } from '@/components/career-playbook/library/client-adapter'
 import type {
   CareerPlaybookLibraryData,
@@ -26,6 +47,16 @@ interface CareerPlaybookLibraryPageClientProps {
 }
 
 const EMPTY_ITEMS: CareerPlaybookLibraryItem[] = []
+const STATUS_OPTIONS: CareerPlaybookLibraryItem['status'][] = [
+  'draft',
+  'answering_fixed',
+  'awaiting_followups',
+  'answering_followups',
+  'ready_to_generate',
+  'generating',
+  'completed',
+  'failed',
+]
 
 function formatDate(value: string, locale: Locale) {
   return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
@@ -44,6 +75,22 @@ function getStatusTone(status: CareerPlaybookLibraryItem['status']) {
   return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
 }
 
+function readShareToggleResult(value: unknown) {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const playbookId = typeof record.playbookId === 'string' ? record.playbookId : null
+  const isPublic = typeof record.isPublic === 'boolean' ? record.isPublic : null
+  const shareSlug = typeof record.shareSlug === 'string' ? record.shareSlug : null
+
+  if (!playbookId || isPublic === null) return null
+
+  return {
+    playbookId,
+    isPublic,
+    shareSlug,
+  }
+}
+
 export default function CareerPlaybookLibraryPageClient({
   locale,
   initialData,
@@ -57,6 +104,7 @@ export default function CareerPlaybookLibraryPageClient({
   const [levelFilter, setLevelFilter] = useState('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
+  const [sharingIds, setSharingIds] = useState<Set<string>>(new Set())
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
 
@@ -114,6 +162,45 @@ export default function CareerPlaybookLibraryPageClient({
       setSelectedIds(new Set())
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleShareToggle = async (item: CareerPlaybookLibraryItem) => {
+    if (sharingIds.has(item.id)) return
+    const nextIsPublic = !item.isPublic
+
+    setSharingIds((prev) => new Set(prev).add(item.id))
+    setLoadMoreError(null)
+
+    try {
+      const result = readShareToggleResult(
+        await toggleCareerPlaybookShare(item.id, nextIsPublic, locale)
+      )
+
+      if (!result) {
+        setLoadMoreError(t('errorDescription'))
+        return
+      }
+
+      setItems((prev) =>
+        prev.map((current) =>
+          current.id === result.playbookId
+            ? {
+                ...current,
+                isPublic: result.isPublic,
+                shareSlug: result.shareSlug,
+              }
+            : current
+        )
+      )
+    } catch {
+      setLoadMoreError(t('errorDescription'))
+    } finally {
+      setSharingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
     }
   }
 
@@ -192,9 +279,11 @@ export default function CareerPlaybookLibraryPageClient({
               aria-label={t('filters.all')}
             >
               <option value="all">{t('filters.all')}</option>
-              <option value="completed">{t('filters.completed')}</option>
-              <option value="generating">{t('filters.generating')}</option>
-              <option value="failed">{t('filters.failed')}</option>
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {t(`statusLabels.${status}`)}
+                </option>
+              ))}
             </select>
           </label>
           <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
@@ -236,18 +325,41 @@ export default function CareerPlaybookLibraryPageClient({
             <span className="text-sm font-medium">
               {t('selectedCount', { count: selectedIds.size })}
             </span>
-            <Button
-              type="button"
-              variant="destructive"
-              className="rounded-md"
-              onClick={() => {
-                void handleBulkDelete()
-              }}
-              disabled={isDeleting}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden />
-              {isDeleting ? t('deleting') : t('bulkDelete')}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="rounded-md"
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                  {isDeleting ? t('deleting') : t('bulkDelete')}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('deleteDialog.description', { count: selectedIds.size })}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeleting}>
+                    {t('deleteDialog.cancel')}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={isDeleting}
+                    onClick={() => {
+                      void handleBulkDelete()
+                    }}
+                  >
+                    {t('deleteDialog.confirm')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         ) : null}
 
@@ -263,6 +375,11 @@ export default function CareerPlaybookLibraryPageClient({
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredItems.map((item) => {
               const isChecked = selectedIds.has(item.id)
+              const isShareable = item.status === 'completed'
+              const shareHref =
+                item.isPublic && item.shareSlug
+                  ? `/${locale}/share/career-playbook/${item.shareSlug}`
+                  : null
               return (
                 <article
                   key={item.id}
@@ -276,7 +393,9 @@ export default function CareerPlaybookLibraryPageClient({
                       }
                       aria-label={item.title}
                     />
-                    <Badge className={getStatusTone(item.status)}>{item.status}</Badge>
+                    <Badge className={getStatusTone(item.status)}>
+                      {t(`statusLabels.${item.status}`)}
+                    </Badge>
                   </div>
                   <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -289,8 +408,38 @@ export default function CareerPlaybookLibraryPageClient({
                     {item.level ? <Badge variant="outline">{item.level}</Badge> : null}
                     {item.department ? <Badge variant="outline">{item.department}</Badge> : null}
                   </div>
-                  {item.status === 'completed' ? (
-                    <div className="mt-4">
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-md"
+                      disabled={!isShareable || sharingIds.has(item.id)}
+                      onClick={() => {
+                        void handleShareToggle(item)
+                      }}
+                    >
+                      <Share2 className="h-4 w-4" aria-hidden />
+                      {item.isPublic ? t('card.makePrivate') : t('card.makePublic')}
+                    </Button>
+                    {shareHref ? (
+                      <Button asChild variant="ghost" size="sm" className="rounded-md">
+                        <Link href={shareHref}>
+                          <Link2 className="h-4 w-4" aria-hidden />
+                          {t('card.publicLink')}
+                        </Link>
+                      </Button>
+                    ) : null}
+                    <Button asChild variant="ghost" size="sm" className="rounded-md">
+                      <Link
+                        href={`/${locale}/career-playbook/${item.id}`}
+                        aria-label={`${t('card.open')} ${item.title}`}
+                      >
+                        <BookOpen className="h-4 w-4" aria-hidden />
+                        {t('card.open')}
+                      </Link>
+                    </Button>
+                    {item.status === 'completed' ? (
                       <CreateCourseFromPlaybookDialog
                         playbookId={item.id}
                         trigger={
@@ -300,8 +449,8 @@ export default function CareerPlaybookLibraryPageClient({
                           </Button>
                         }
                       />
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </article>
               )
             })}

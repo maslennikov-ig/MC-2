@@ -156,4 +156,40 @@ Revenue Operations Lead overview.`);
     expect(text.text).toContain('Sales');
     expect(text.text).toContain('Finance');
   }, 60_000);
+
+  it('rejects oversized markdown before launching browser rendering', async () => {
+    const input = createPdfInput();
+    input.finalMarkdown = '# Oversized\n\n'.concat('A'.repeat(260_000));
+
+    await expect(renderCareerPlaybookPdf(input)).rejects.toThrow(
+      'Career Playbook PDF source is too large'
+    );
+  });
+
+  it('rejects too many Mermaid diagrams before launching browser rendering', async () => {
+    const input = createPdfInput();
+    input.generatedBlocks.block_1 = blockState(
+      Array.from(
+        { length: 21 },
+        (_, index) => `\`\`\`mermaid\nflowchart LR\n  A${index} --> B${index}\n\`\`\``
+      ).join('\n\n')
+    );
+
+    await expect(renderCareerPlaybookPdf(input)).rejects.toThrow(
+      'Career Playbook PDF contains too many Mermaid diagrams'
+    );
+  });
+
+  it('validates the final markdown only when completed playbooks also keep generated blocks', async () => {
+    const input = createPdfInput();
+    input.finalMarkdown = '# Final Role Guide\n\n## 1. Mission\n\nUse the assembled guide.';
+
+    for (let index = 1; index <= 26; index += 1) {
+      input.generatedBlocks[`block_${index}`] = blockState('A'.repeat(20_000));
+    }
+
+    const result = await renderCareerPlaybookPdf(input);
+
+    expect(result.contentType).toBe('application/pdf');
+  }, 60_000);
 });

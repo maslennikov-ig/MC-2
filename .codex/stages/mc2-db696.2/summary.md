@@ -2,8 +2,8 @@
 
 Stage ID: `mc2-db696.2`
 Status: `completed`
-Updated: 2026-05-13
-Baseline: `feature/career-playbook-backend@7311469c`
+Updated: 2026-05-19
+Baseline: `develop@2df2727e`
 Branch: `feature/career-playbook-backend-2`
 
 ## Outcome
@@ -14,6 +14,7 @@ Branch: `feature/career-playbook-backend-2`
 - Added Career Playbook prompt registry entries for follow-up generation, spec builder, group 1 foundation, and group 2 operations.
 - Added a Career Playbook BullMQ-compatible handler for `GENERATE_FOLLOWUPS`, `GENERATE_PLAYBOOK`, and Phase-3-deferred `REGENERATE_BLOCK`.
 - Added shared follow-up response schemas and focused unit coverage for spec extraction, web-research timeout behavior, and group generation with mock LLM.
+- During PR #26 readiness, retargeted the branch to `develop`, merged the landed PR #24/#25 baseline, registered Career Playbook in the shared BullMQ job contract, processor, and worker, made graph failures throw for BullMQ failed-job semantics, normalized LLM follow-up question IDs on the backend, and localized group heading labels for `ru`/`en`.
 
 ## Linked artifacts
 
@@ -22,10 +23,11 @@ Branch: `feature/career-playbook-backend-2`
 ## Verification
 
 - RED evidence: new Stage 2 tests initially failed on missing implementation; review hardening test initially failed because missing group headings were silently accepted.
-- GREEN evidence: shared-types unit `167 passed`; course-gen-platform unit `4059 passed`.
+- GREEN evidence: shared-types unit `169 passed`; course-gen-platform unit `4062 passed`.
 - Root lint exited 0 with existing warnings outside the new Career Playbook files.
 - Canonical closeout passed: `scripts/orchestration/run_stage_closeout.py --stage mc2-db696.2 --verify-group code_change_commands`.
 - Process verification passed for `mc2-db696.2`.
+- PR #26 readiness evidence: `pnpm type-check` passed, `pnpm lint` passed with existing warnings, `pnpm build` passed with dummy Supabase env, and visible subagent review (`Dirac`) found no must-fix issues after the review-fix pass.
 
 ## Next step
 
