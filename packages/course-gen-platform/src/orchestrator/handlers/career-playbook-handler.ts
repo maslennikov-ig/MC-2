@@ -1,37 +1,70 @@
 import type { Job } from 'bullmq';
-import { z } from 'zod';
 import {
-  CareerPlaybookGenerateFollowupsJobDataSchema,
-  CareerPlaybookGeneratePlaybookJobDataSchema,
-  CareerPlaybookJobDataSchema,
-  CareerPlaybookRegenerateBlockJobDataSchema,
+  CareerPlaybookQADataSchema,
+  CareerPlaybookOperationJobDataSchema,
+  type CareerPlaybookCostBreakdown,
+  type CareerPlaybookGenerateFollowupsJobData,
+  type CareerPlaybookGeneratePlaybookJobData,
+  type CareerPlaybookJobData,
+  type CareerPlaybookRegenerateBlockJobData,
 } from '@megacampus/shared-types';
-import type { CareerPlaybookJobData } from '@megacampus/shared-types';
 import type { JobResult } from './base-handler';
+import { getSupabaseAdmin } from '../../shared/supabase/admin';
+import type {
+  CareerPlaybookRow,
+  CareerPlaybookSupabase,
+} from '../../server/routers/career-playbook/service-mappers';
 import { getCareerPlaybookGraph } from '@/stages/stage-career-playbook/graph';
 import { generateCareerPlaybookFollowups } from '@/stages/stage-career-playbook/nodes/followup-questions';
 import { regenerateCareerPlaybookBlock } from '@/stages/stage-career-playbook/nodes/block-regenerator';
 
+export type { CareerPlaybookJobData };
+
+type CareerPlaybookGraphResult = {
+  errors?: string[];
+  generatedBlocks?: unknown;
+  finalMarkdown?: string | null;
+  roleProfileSpec?: unknown;
+  webResearch?: unknown;
+  costBreakdown?: CareerPlaybookCostBreakdown | null;
+  nodeCosts?: CareerPlaybookCostBreakdown['nodeCosts'];
+};
+
+function toJson(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value)) as unknown;
+}
+
+function buildCostBreakdown(result: CareerPlaybookGraphResult) {
+  if (result.costBreakdown) return result.costBreakdown;
+  if (!Array.isArray(result.nodeCosts)) return undefined;
+
+  return {
+    nodeCosts: result.nodeCosts,
+    total_cost_usd: result.nodeCosts.reduce((sum, item) => sum + item.cost_usd, 0),
+  };
+}
+
+function errorMessageFrom(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export class CareerPlaybookHandler {
   async process(job: Job<CareerPlaybookJobData>): Promise<JobResult> {
-    const parsedJobData = CareerPlaybookJobDataSchema.parse(job.data);
+    const jobData = CareerPlaybookOperationJobDataSchema.parse(job.data);
 
-    if (parsedJobData.action === 'GENERATE_FOLLOWUPS') {
-      const jobData = CareerPlaybookGenerateFollowupsJobDataSchema.parse(parsedJobData);
+    if (jobData.operation === 'GENERATE_FOLLOWUPS') {
       return this.generateFollowups(jobData);
     }
 
-    if (parsedJobData.action === 'GENERATE_PLAYBOOK') {
-      const jobData = CareerPlaybookGeneratePlaybookJobDataSchema.parse(parsedJobData);
-      return this.generatePlaybook(jobData);
+    if (jobData.operation === 'GENERATE_PLAYBOOK') {
+      return this.generatePlaybook(jobData, job);
     }
 
-    const jobData = CareerPlaybookRegenerateBlockJobDataSchema.parse(parsedJobData);
     return this.regenerateBlock(jobData);
   }
 
   private async generateFollowups(
-    jobData: z.infer<typeof CareerPlaybookGenerateFollowupsJobDataSchema>
+    jobData: CareerPlaybookGenerateFollowupsJobData
   ): Promise<JobResult> {
     const result = await generateCareerPlaybookFollowups({
       qaData: jobData.qaData,
@@ -46,21 +79,33 @@ export class CareerPlaybookHandler {
   }
 
   private async generatePlaybook(
-    jobData: z.infer<typeof CareerPlaybookGeneratePlaybookJobDataSchema>
+    jobData: CareerPlaybookGeneratePlaybookJobData,
+    job: Job<CareerPlaybookJobData>
   ): Promise<JobResult> {
     const graph = getCareerPlaybookGraph();
-    const result = await graph.invoke({
-      playbookId: jobData.playbookId,
-      userId: jobData.userId,
-      organizationId: jobData.organizationId,
-      language: jobData.language,
-      qaData: jobData.qaData,
-      currentNode: 'specBuilder',
-    });
+    let result: CareerPlaybookGraphResult;
+
+    try {
+      result = (await graph.invoke({
+        playbookId: jobData.playbookId,
+        userId: jobData.userId,
+        organizationId: jobData.organizationId,
+        language: jobData.language,
+        qaData: jobData.qaData,
+        currentNode: 'specBuilder',
+      })) as CareerPlaybookGraphResult;
+    } catch (error) {
+      await this.throwAfterGenerationFailure(jobData, job, errorMessageFrom(error), error);
+      throw error;
+    }
+
     const errors = result.errors ?? [];
     if (errors.length > 0) {
-      throw new Error(`Career Playbook generation failed: ${errors.join('; ')}`);
+      const message = errors.join('; ') || 'Career Playbook generation failed';
+      await this.throwAfterGenerationFailure(jobData, job, message, new Error(message));
     }
+
+    await this.persistCompleted(jobData, result);
 
     return {
       success: true,
@@ -69,9 +114,7 @@ export class CareerPlaybookHandler {
     };
   }
 
-  private async regenerateBlock(
-    jobData: z.infer<typeof CareerPlaybookRegenerateBlockJobDataSchema>
-  ): Promise<JobResult> {
+  private async regenerateBlock(jobData: CareerPlaybookRegenerateBlockJobData): Promise<JobResult> {
     const result = await regenerateCareerPlaybookBlock({
       blockId: jobData.blockId,
       roleProfileSpec: jobData.roleProfileSpec,
@@ -90,6 +133,110 @@ export class CareerPlaybookHandler {
       message: `Regenerated Career Playbook block ${jobData.blockId}`,
       data: result,
     };
+  }
+
+  private async persistCompleted(
+    jobData: CareerPlaybookGeneratePlaybookJobData,
+    result: CareerPlaybookGraphResult
+  ) {
+    const costBreakdown = buildCostBreakdown(result);
+    const storedQAData = await this.loadStoredQAData(jobData);
+    const { generation_error: _generationError, ...qaDataWithoutGenerationError } = storedQAData;
+    const updatePayload: Partial<CareerPlaybookRow> = {
+      status: 'completed',
+      generated_blocks: toJson(
+        result.generatedBlocks ?? {}
+      ) as CareerPlaybookRow['generated_blocks'],
+      final_markdown: result.finalMarkdown ?? null,
+      q_a_data: toJson(qaDataWithoutGenerationError) as CareerPlaybookRow['q_a_data'],
+      completed_at: new Date().toISOString(),
+    };
+
+    if (result.roleProfileSpec) {
+      updatePayload.role_profile_spec = toJson(
+        result.roleProfileSpec
+      ) as CareerPlaybookRow['role_profile_spec'];
+    }
+    if (result.webResearch) {
+      updatePayload.web_research = toJson(result.webResearch) as CareerPlaybookRow['web_research'];
+    }
+    if (costBreakdown) {
+      updatePayload.cost_breakdown = toJson(costBreakdown) as CareerPlaybookRow['cost_breakdown'];
+    }
+
+    await this.updatePlaybook(jobData.playbookId, updatePayload);
+  }
+
+  private async persistFailed(jobData: CareerPlaybookGeneratePlaybookJobData, error: string) {
+    const storedQAData = await this.loadStoredQAData(jobData);
+
+    await this.updatePlaybook(jobData.playbookId, {
+      status: 'failed',
+      q_a_data: toJson({
+        ...storedQAData,
+        generation_error: error,
+      }) as CareerPlaybookRow['q_a_data'],
+    });
+  }
+
+  private async loadStoredQAData(
+    jobData: CareerPlaybookGeneratePlaybookJobData
+  ): Promise<Record<string, unknown>> {
+    const supabase = this.getCareerPlaybookSupabase();
+    const { data } = await supabase
+      .from('career_playbooks')
+      .select('q_a_data')
+      .eq('id', jobData.playbookId)
+      .single();
+    const rawQAData = data?.q_a_data as unknown;
+    const fallbackQAData = toJson(CareerPlaybookQADataSchema.parse(jobData.qaData)) as Record<
+      string,
+      unknown
+    >;
+    const storedQAData: Record<string, unknown> =
+      rawQAData && typeof rawQAData === 'object' && !Array.isArray(rawQAData)
+        ? (rawQAData as Record<string, unknown>)
+        : fallbackQAData;
+
+    return storedQAData;
+  }
+
+  private async throwAfterGenerationFailure(
+    jobData: CareerPlaybookGeneratePlaybookJobData,
+    job: Job<CareerPlaybookJobData>,
+    message: string,
+    error: unknown
+  ): Promise<never> {
+    if (this.isFinalAttempt(job)) {
+      await this.persistFailed(jobData, message);
+    }
+
+    throw error instanceof Error ? error : new Error(message);
+  }
+
+  private isFinalAttempt(job: Job<CareerPlaybookJobData>): boolean {
+    const maxAttempts = typeof job.opts?.attempts === 'number' ? job.opts.attempts : 1;
+    return job.attemptsMade + 1 >= maxAttempts;
+  }
+
+  private async updatePlaybook(playbookId: string, payload: Partial<CareerPlaybookRow>) {
+    const supabase = this.getCareerPlaybookSupabase();
+    const { error } = await supabase
+      .from('career_playbooks')
+      .update(payload)
+      .eq('id', playbookId)
+      .select('id')
+      .single();
+
+    if (error) {
+      throw new Error(
+        `Failed to persist Career Playbook generation status: ${errorMessageFrom(error)}`
+      );
+    }
+  }
+
+  private getCareerPlaybookSupabase(): CareerPlaybookSupabase {
+    return getSupabaseAdmin() as unknown as CareerPlaybookSupabase;
   }
 }
 

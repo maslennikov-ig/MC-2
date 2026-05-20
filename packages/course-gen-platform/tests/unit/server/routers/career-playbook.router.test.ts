@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   generateCareerPlaybookFollowups: vi.fn(),
   getCareerPlaybookGraph: vi.fn(),
   renderCareerPlaybookPdf: vi.fn(),
+  addJob: vi.fn(),
+  removeTerminalJobById: vi.fn(),
 }));
 
 vi.mock('@/shared/supabase/admin', () => ({
@@ -26,9 +28,19 @@ vi.mock('@/services/career-playbook-pdf', () => ({
   renderCareerPlaybookPdf: mocks.renderCareerPlaybookPdf,
 }));
 
+vi.mock('@/orchestrator/queue', () => ({
+  addJob: mocks.addJob,
+  removeTerminalJobById: mocks.removeTerminalJobById,
+  getQueue: vi.fn(() => ({
+    add: vi.fn(),
+    on: vi.fn(),
+  })),
+}));
+
 import { appRouter } from '@/server/app-router';
 import { careerPlaybookRouter } from '@/server/routers/career-playbook';
 import type { Context } from '@/server/trpc';
+import { JobType } from '@megacampus/shared-types';
 
 const authenticatedContext: Context = {
   user: {
@@ -419,6 +431,8 @@ describe('careerPlaybookRouter transport', () => {
   });
 
   it('starts backend generation handoff and returns generating status', async () => {
+    mocks.addJob.mockResolvedValue({ id: 'career-playbook-job-1' });
+    mocks.removeTerminalJobById.mockResolvedValue(false);
     const builder = createBuilder([
       {
         data: playbookRow({
@@ -434,13 +448,6 @@ describe('careerPlaybookRouter transport', () => {
       { data: playbookRow({ status: 'generating' }), error: null },
     ]);
     mocks.from.mockReturnValue(builder);
-    mocks.getCareerPlaybookGraph.mockReturnValue({
-      invoke: vi.fn().mockResolvedValue({
-        errors: [],
-        generatedBlocks: {},
-        finalMarkdown: '# Product Lead',
-      }),
-    });
 
     const caller = careerPlaybookRouter.createCaller(authenticatedContext);
     const result = await caller.generation.approveAndGenerate({ playbookId });
@@ -450,11 +457,148 @@ describe('careerPlaybookRouter transport', () => {
         status: 'generating',
       })
     );
+    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook:${playbookId}`);
+    expect(mocks.addJob).toHaveBeenCalledWith(
+      JobType.CAREER_PLAYBOOK,
+      expect.not.objectContaining({
+        courseId: expect.any(String),
+      }),
+      expect.objectContaining({
+        jobId: `career-playbook:${playbookId}`,
+      })
+    );
+    expect(mocks.addJob).toHaveBeenCalledWith(
+      JobType.CAREER_PLAYBOOK,
+      expect.objectContaining({
+        jobType: JobType.CAREER_PLAYBOOK,
+        operation: 'GENERATE_PLAYBOOK',
+        playbookId,
+        userId: authenticatedContext.user!.id,
+        organizationId: authenticatedContext.user!.organizationId,
+        language: 'en',
+        locale: 'en',
+        qaData: {
+          fixed: [{ question_key: 'position', value: 'Product Lead' }],
+          followups: [],
+          freeform: [],
+        },
+        createdAt: expect.any(String),
+      }),
+      expect.any(Object)
+    );
     expect(result).toMatchObject({
       playbookId,
       status: 'generating',
       phase: 'completion',
     });
+  });
+
+  it('removes a stale terminal generation job before retrying a failed playbook', async () => {
+    mocks.addJob.mockResolvedValue({ id: 'career-playbook-job-2' });
+    mocks.removeTerminalJobById.mockResolvedValue(true);
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'failed',
+          q_a_data: {
+            fixed: [{ question_key: 'position', value: 'Product Lead' }],
+            followups: [],
+            freeform: [],
+            generation_error: 'Previous worker failure',
+          },
+        }),
+        error: null,
+      },
+      { data: playbookRow({ status: 'generating' }), error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    await expect(caller.generation.approveAndGenerate({ playbookId })).resolves.toMatchObject({
+      playbookId,
+      status: 'generating',
+    });
+
+    expect(mocks.removeTerminalJobById).toHaveBeenCalledWith(`career-playbook:${playbookId}`);
+    expect(mocks.addJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the playbook failed when queue enqueue fails after generation status update', async () => {
+    mocks.addJob.mockRejectedValue(new Error('Redis unavailable'));
+    mocks.removeTerminalJobById.mockResolvedValue(false);
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'ready_to_generate',
+          q_a_data: {
+            fixed: [{ question_key: 'position', value: 'Product Lead' }],
+            followups: [],
+            freeform: [],
+          },
+        }),
+        error: null,
+      },
+      { data: playbookRow({ status: 'generating' }), error: null },
+      { data: playbookRow({ status: 'failed' }), error: null },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(caller.generation.approveAndGenerate({ playbookId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to enqueue Career Playbook generation',
+    });
+    expect(builder.update).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ status: 'generating' })
+    );
+    expect(builder.update).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        status: 'failed',
+        q_a_data: expect.objectContaining({
+          generation_error: 'Redis unavailable',
+        }),
+      })
+    );
+  });
+
+  it('reports when enqueue compensation cannot mark the playbook failed', async () => {
+    mocks.addJob.mockRejectedValue(new Error('Redis unavailable'));
+    mocks.removeTerminalJobById.mockResolvedValue(false);
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'ready_to_generate',
+          q_a_data: {
+            fixed: [{ question_key: 'position', value: 'Product Lead' }],
+            followups: [],
+            freeform: [],
+          },
+        }),
+        error: null,
+      },
+      { data: playbookRow({ status: 'generating' }), error: null },
+      { data: null, error: new Error('permission denied') },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(caller.generation.approveAndGenerate({ playbookId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to enqueue Career Playbook generation and mark playbook failed',
+    });
+    expect(builder.update).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        status: 'failed',
+        q_a_data: expect.objectContaining({
+          generation_error: 'Redis unavailable',
+        }),
+      })
+    );
   });
 
   it('refuses backend generation handoff before the playbook is ready', async () => {
@@ -478,11 +622,45 @@ describe('careerPlaybookRouter transport', () => {
     expect(builder.update).not.toHaveBeenCalled();
   });
 
+  it('does not enqueue another generation job when already generating', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'generating',
+          q_a_data: {
+            fixed: [{ question_key: 'position', value: 'Product Lead' }],
+            followups: [],
+            freeform: [],
+          },
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.generation.approveAndGenerate({ playbookId });
+
+    expect(result).toMatchObject({
+      playbookId,
+      status: 'generating',
+      phase: 'completion',
+    });
+    expect(mocks.addJob).not.toHaveBeenCalled();
+    expect(builder.update).not.toHaveBeenCalled();
+  });
+
   it('returns generation status from the persisted playbook row', async () => {
     const builder = createBuilder([
       {
         data: playbookRow({
           status: 'completed',
+          q_a_data: {
+            fixed: [{ question_key: 'position', value: 'Product Lead' }],
+            followups: [],
+            freeform: [],
+            generation_error: 'Stale worker error',
+          },
           final_markdown: '# Product Lead',
           generated_blocks: {
             header: {
@@ -507,6 +685,51 @@ describe('careerPlaybookRouter transport', () => {
       phase: 'completion',
       finalMarkdown: '# Product Lead',
       completedAt: '2026-05-14T01:00:00.000Z',
+    });
+    expect(result.error).toBeUndefined();
+  });
+
+  it('refuses answer edits while generation is active', async () => {
+    const builder = createBuilder([{ data: playbookRow({ status: 'generating' }), error: null }]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(
+      caller.session.submitAnswer({
+        playbookId,
+        phase: 'fixed',
+        answer: {
+          question_key: 'position',
+          value: 'Edited during generation',
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook generation is already in progress',
+    });
+    expect(builder.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses generation status for same-organization playbooks owned by another user', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          user_id: authenticatedContext.user!.id,
+          organization_id: authenticatedContext.user!.organizationId,
+          status: 'completed',
+          final_markdown: '# Product Lead',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(otherUserContext);
+
+    await expect(caller.generation.getStatus({ playbookId })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Career Playbook access denied',
     });
   });
 

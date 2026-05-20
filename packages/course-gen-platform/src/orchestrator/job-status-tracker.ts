@@ -11,6 +11,7 @@ import { Job } from 'bullmq';
 import { getSupabaseAdmin } from '../shared/supabase/admin';
 import logger from '../shared/logger';
 import { JobData, Database } from '@megacampus/shared-types';
+import { getJobCourseId } from './job-data-fields';
 
 // Re-export mutation functions from extracted module
 export {
@@ -36,13 +37,6 @@ interface LegacyJobDataFields {
  */
 function extractOrganizationId(data: JobData): string | undefined {
   return data.organizationId || (data as unknown as LegacyJobDataFields).organization_id;
-}
-
-/**
- * Extract course_id from job data, handling both camelCase and snake_case variants.
- */
-function extractCourseId(data: JobData): string | null {
-  return data.courseId || (data as unknown as LegacyJobDataFields).course_id || null;
 }
 
 /**
@@ -130,7 +124,7 @@ export async function createJobStatus(job: Job<JobData>): Promise<void> {
           job_id: job.id!,
           job_type: job.name,
           organization_id: organizationId,
-          course_id: extractCourseId(job.data),
+          course_id: getJobCourseId(job.data) ?? null,
           user_id: extractUserId(job.data),
           status: JobStatus.PENDING,
           progress: {},

@@ -464,4 +464,35 @@ describe('CompletionScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Сгенерировать Role Guide' }))
     expect(handleGenerate).toHaveBeenCalledTimes(1)
   })
+
+  it('shows a completed viewer link and wraps long summary text', () => {
+    const longAnswer =
+      'https://example.com/role-guides/product-lead/very-long-reference-without-natural-breaks'
+
+    render(
+      <CompletionScreen
+        fixedAnswers={[
+          {
+            id: 'position',
+            title: 'Role source',
+            value: longAnswer,
+          },
+        ]}
+        followupAnswers={[]}
+        freeformNotes={[longAnswer]}
+        onEditFixedAnswer={vi.fn()}
+        onEditFollowupAnswer={vi.fn()}
+        onGenerate={vi.fn()}
+        generationStatus="completed"
+        viewGeneratedHref="/career-playbook/123"
+        copy={{ viewGenerated: 'Open Role Guide' }}
+      />
+    )
+
+    expect(screen.getByRole('link', { name: 'Open Role Guide' })).toHaveAttribute(
+      'href',
+      '/career-playbook/123'
+    )
+    expect(screen.getAllByText(longAnswer)[0]).toHaveClass('break-words')
+  })
 })

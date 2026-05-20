@@ -56,11 +56,11 @@ export enum JobType {
   // Enrichment generation (Stage 7+)
   ENRICHMENT_GENERATION = 'enrichment_generation',
 
-  // Career Playbook Role Guide generation
-  CAREER_PLAYBOOK = 'career_playbook',
-
   // Block regeneration (cascade dependency update)
   BLOCK_REGENERATION = 'block_regeneration',
+
+  // Career Playbook generation (role guide lead magnet)
+  CAREER_PLAYBOOK = 'career_playbook',
 
   // Finalization (Stage 5+)
   FINALIZATION = 'finalization',
@@ -344,99 +344,6 @@ export const EnrichmentGenerationJobDataSchema = BaseJobDataSchema.extend({
 export type EnrichmentGenerationJobData = z.infer<typeof EnrichmentGenerationJobDataSchema>;
 
 // ============================================================================
-// Career Playbook Job Schema
-// ============================================================================
-
-export const CareerPlaybookJobActionSchema = z.enum([
-  'GENERATE_FOLLOWUPS',
-  'GENERATE_PLAYBOOK',
-  'REGENERATE_BLOCK',
-]);
-
-const CareerPlaybookBaseJobDataSchema = BaseJobDataSchema.extend({
-  jobType: z.literal(JobType.CAREER_PLAYBOOK),
-  playbookId: z.string().uuid(),
-  language: languageSchema.default('ru'),
-});
-
-export const CareerPlaybookGenerateFollowupsJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
-  action: z.literal('GENERATE_FOLLOWUPS'),
-  qaData: CareerPlaybookQADataSchema,
-});
-
-export const CareerPlaybookGeneratePlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
-  action: z.literal('GENERATE_PLAYBOOK'),
-  qaData: CareerPlaybookQADataSchema,
-});
-
-export const CareerPlaybookRegenerateBlockJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
-  action: z.literal('REGENERATE_BLOCK'),
-  blockId: CareerPlaybookBlockIdSchema,
-  instruction: z.string().min(1).max(1000),
-  roleProfileSpec: CareerPlaybookRoleProfileSpecSchema,
-  originalBlock: CareerPlaybookBlockStateSchema,
-  generatedBlocks: z.record(CareerPlaybookBlockStateSchema).optional(),
-});
-
-export const CareerPlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
-  action: CareerPlaybookJobActionSchema,
-  qaData: CareerPlaybookQADataSchema.optional(),
-  blockId: CareerPlaybookBlockIdSchema.optional(),
-  instruction: z.string().min(1).max(1000).optional(),
-  roleProfileSpec: CareerPlaybookRoleProfileSpecSchema.optional(),
-  originalBlock: CareerPlaybookBlockStateSchema.optional(),
-  generatedBlocks: z.record(CareerPlaybookBlockStateSchema).optional(),
-}).superRefine((data, ctx) => {
-  if (
-    (data.action === 'GENERATE_FOLLOWUPS' || data.action === 'GENERATE_PLAYBOOK') &&
-    !data.qaData
-  ) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['qaData'],
-      message: 'qaData is required for Career Playbook generation actions',
-    });
-  }
-
-  if (data.action === 'REGENERATE_BLOCK' && !data.blockId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['blockId'],
-      message: 'blockId is required for Career Playbook block regeneration',
-    });
-  }
-
-  if (data.action === 'REGENERATE_BLOCK' && !data.instruction) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['instruction'],
-      message: 'instruction is required for Career Playbook block regeneration',
-    });
-  }
-
-  if (data.action === 'REGENERATE_BLOCK' && !data.roleProfileSpec) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['roleProfileSpec'],
-      message: 'roleProfileSpec is required for Career Playbook block regeneration',
-    });
-  }
-
-  if (data.action === 'REGENERATE_BLOCK' && !data.originalBlock) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['originalBlock'],
-      message: 'originalBlock is required for Career Playbook block regeneration',
-    });
-  }
-});
-
-export type CareerPlaybookJobData =
-  | z.infer<typeof CareerPlaybookGenerateFollowupsJobDataSchema>
-  | z.infer<typeof CareerPlaybookGeneratePlaybookJobDataSchema>
-  | z.infer<typeof CareerPlaybookRegenerateBlockJobDataSchema>;
-
-// ============================================================================
 // Block Regeneration Job Schema (Cascade Dependency Update)
 // ============================================================================
 
@@ -462,6 +369,67 @@ export const BlockRegenerationJobDataSchema = BaseJobDataSchema.extend({
 export type BlockRegenerationJobData = z.infer<typeof BlockRegenerationJobDataSchema>;
 
 // ============================================================================
+// Career Playbook Job Schema
+// ============================================================================
+
+export const CareerPlaybookJobOperationSchema = z.enum([
+  'GENERATE_FOLLOWUPS',
+  'GENERATE_PLAYBOOK',
+  'REGENERATE_BLOCK',
+]);
+export type CareerPlaybookJobOperation = z.infer<typeof CareerPlaybookJobOperationSchema>;
+
+const CareerPlaybookBaseJobDataSchema = z.object({
+  jobType: z.literal(JobType.CAREER_PLAYBOOK),
+  operation: CareerPlaybookJobOperationSchema,
+  playbookId: z.string().uuid(),
+  userId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  language: languageSchema.default('ru'),
+  locale: z.enum(['ru', 'en']).default('ru'),
+  createdAt: z.string().datetime(),
+});
+
+export const CareerPlaybookGenerateFollowupsJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  operation: z.literal('GENERATE_FOLLOWUPS'),
+  qaData: CareerPlaybookQADataSchema,
+});
+
+export type CareerPlaybookGenerateFollowupsJobData = z.infer<
+  typeof CareerPlaybookGenerateFollowupsJobDataSchema
+>;
+
+export const CareerPlaybookGeneratePlaybookJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  operation: z.literal('GENERATE_PLAYBOOK'),
+  qaData: CareerPlaybookQADataSchema,
+});
+
+export type CareerPlaybookGeneratePlaybookJobData = z.infer<
+  typeof CareerPlaybookGeneratePlaybookJobDataSchema
+>;
+
+export const CareerPlaybookRegenerateBlockJobDataSchema = CareerPlaybookBaseJobDataSchema.extend({
+  operation: z.literal('REGENERATE_BLOCK'),
+  blockId: CareerPlaybookBlockIdSchema,
+  instruction: z.string().min(1).max(1000),
+  roleProfileSpec: CareerPlaybookRoleProfileSpecSchema,
+  originalBlock: CareerPlaybookBlockStateSchema,
+  generatedBlocks: z.record(CareerPlaybookBlockStateSchema).optional(),
+});
+
+export type CareerPlaybookRegenerateBlockJobData = z.infer<
+  typeof CareerPlaybookRegenerateBlockJobDataSchema
+>;
+
+export const CareerPlaybookOperationJobDataSchema = z.discriminatedUnion('operation', [
+  CareerPlaybookGenerateFollowupsJobDataSchema,
+  CareerPlaybookGeneratePlaybookJobDataSchema,
+  CareerPlaybookRegenerateBlockJobDataSchema,
+]);
+
+export type CareerPlaybookJobData = z.infer<typeof CareerPlaybookOperationJobDataSchema>;
+
+// ============================================================================
 // Union Type for All Jobs
 // ============================================================================
 
@@ -478,8 +446,8 @@ export type JobData =
   | TextGenerationJobData
   | LessonContentJobData
   | EnrichmentGenerationJobData
-  | CareerPlaybookJobData
   | BlockRegenerationJobData
+  | CareerPlaybookJobData
   | FinalizationJobData;
 
 /**
@@ -495,8 +463,8 @@ export const JobDataSchema = z.union([
   TextGenerationJobDataSchema,
   LessonContentJobDataSchema,
   EnrichmentGenerationJobDataSchema,
-  CareerPlaybookJobDataSchema,
   BlockRegenerationJobDataSchema,
+  CareerPlaybookOperationJobDataSchema,
   FinalizationJobDataSchema,
 ]);
 
@@ -615,20 +583,20 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     removeOnFail: false,
     priority: 5, // Medium priority
   },
-  [JobType.CAREER_PLAYBOOK]: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 5000 },
-    timeout: 600000, // 10 minutes for multi-call role guide generation
-    removeOnComplete: 100,
-    removeOnFail: false,
-    priority: 5,
-  },
   [JobType.BLOCK_REGENERATION]: {
     attempts: 5,
     backoff: { type: 'exponential', delay: 5000 },
     timeout: 180000, // 3 minutes (LLM calls can be slow)
     removeOnComplete: 100,
     removeOnFail: false,
+  },
+  [JobType.CAREER_PLAYBOOK]: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    timeout: 2700000, // 45 minutes for the full 26-block graph
+    removeOnComplete: 100,
+    removeOnFail: false,
+    priority: 5,
   },
   [JobType.FINALIZATION]: {
     attempts: 3,

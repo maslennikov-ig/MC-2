@@ -11,6 +11,7 @@ import { Queue } from 'bullmq';
 import { getRedisClient } from '../shared/cache/redis';
 import { JobData, JobType, DEFAULT_JOB_OPTIONS } from '@megacampus/shared-types';
 import logger from '../shared/logger';
+import { getJobCourseId } from './job-data-fields';
 
 /**
  * Queue name for all course generation jobs
@@ -112,12 +113,25 @@ export async function addJob(
       jobId: job.id,
       jobType,
       organizationId: jobData.organizationId,
-      courseId: jobData.courseId,
+      courseId: getJobCourseId(jobData),
     },
     'Job added to queue'
   );
 
   return job;
+}
+
+export async function removeTerminalJobById(jobId: string): Promise<boolean> {
+  const queue = getQueue();
+  const job = await queue.getJob(jobId);
+  if (!job) return false;
+
+  const state = await job.getState();
+  if (state !== 'completed' && state !== 'failed') return false;
+
+  await job.remove();
+  logger.info({ jobId, state }, 'Removed stale terminal job before enqueue');
+  return true;
 }
 
 /**
@@ -182,27 +196,26 @@ export async function removeJobsByCourseId(
       // Check if job has no data (orphaned/corrupted) or belongs to our course
       // Support both camelCase and snake_case (some jobs use snake_case internally)
       const jobData = job.data as Record<string, unknown> | undefined;
-      const jobCourseId = (jobData?.courseId || jobData?.course_id) as string | undefined;
-      const isOrphanedJob = !jobData || !jobCourseId;
-      const belongsToCourse = jobCourseId === courseId;
+      const cleanupDecision = shouldRemoveJobForCourseCleanup(jobData, courseId);
 
-      if (isOrphanedJob || belongsToCourse) {
+      if (cleanupDecision.remove) {
         try {
           // For active jobs, we can't remove them directly - they must complete or fail
           const state = await job.getState();
           if (state === 'active') {
             // Move to failed state to stop processing
-            const reason = isOrphanedJob
-              ? 'Orphaned job with missing data'
-              : 'Job cancelled due to course deletion';
+            const reason =
+              cleanupDecision.reason === 'orphaned'
+                ? 'Orphaned job with missing data'
+                : 'Job cancelled due to course deletion';
             await job.moveToFailed(new Error(reason), 'cleanup');
             removed++;
             logger.debug(
               {
                 jobId: job.id,
                 jobType: job.name,
-                courseId: isOrphanedJob ? 'unknown' : courseId,
-                reason: isOrphanedJob ? 'orphaned' : 'course_deletion',
+                courseId: cleanupDecision.reason === 'orphaned' ? 'unknown' : courseId,
+                reason: cleanupDecision.reason,
               },
               'Active job moved to failed for cleanup'
             );
@@ -213,8 +226,8 @@ export async function removeJobsByCourseId(
               {
                 jobId: job.id,
                 jobType: job.name,
-                courseId: isOrphanedJob ? 'unknown' : courseId,
-                reason: isOrphanedJob ? 'orphaned' : 'course_deletion',
+                courseId: cleanupDecision.reason === 'orphaned' ? 'unknown' : courseId,
+                reason: cleanupDecision.reason,
               },
               'Job removed from queue'
             );
@@ -333,6 +346,26 @@ export async function removeJobsByCourseId(
   }
 
   return { removed, errors, orphanedCleaned };
+}
+
+export function shouldRemoveJobForCourseCleanup(
+  jobData: Record<string, unknown> | undefined,
+  courseId: string
+): { remove: boolean; reason: 'course_deletion' | 'orphaned' | 'non_course_job' | 'unrelated' } {
+  if (!jobData) return { remove: true, reason: 'orphaned' };
+
+  const jobCourseId = (jobData.courseId || jobData.course_id) as string | undefined;
+  if (jobCourseId) {
+    return jobCourseId === courseId
+      ? { remove: true, reason: 'course_deletion' }
+      : { remove: false, reason: 'unrelated' };
+  }
+
+  if (jobData.jobType === JobType.CAREER_PLAYBOOK) {
+    return { remove: false, reason: 'non_course_job' };
+  }
+
+  return { remove: true, reason: 'orphaned' };
 }
 
 export default getQueue;

@@ -193,9 +193,16 @@
     "editLabel": "Редактировать",
     "generateCta": "Сгенерировать Role Guide",
     "generationHandoffTitle": "Генерация запущена",
-    "generationHandoffDescription": "Backend начал генерацию Role Guide.",
+    "generationHandoffDescription": "Генерация Role Guide запущена.",
+    "generationInProgressTitle": "Генерация выполняется",
+    "generationInProgressDescription": "Role Guide собирается из сохранённого контекста.",
+    "generationCompletedTitle": "Генерация завершена",
+    "generationCompletedDescription": "Role Guide готов.",
+    "generationFailedTitle": "Генерация не завершилась",
+    "generationFailedDescription": "Проверьте собранный контекст и попробуйте снова.",
     "generationStarting": "Запускаем генерацию...",
     "generationErrorTitle": "Не удалось запустить генерацию",
+    "viewGenerated": "Открыть Role Guide",
     "emptySummary": "Пока нет данных"
   },
   "viewer": {

@@ -46,6 +46,8 @@ export interface CareerPlaybookDraft {
   dirtyFixedQuestionKeys?: string[]
   dirtyFollowupQuestionIds?: string[]
   dirtyFreeformDraft?: boolean
+  generationProgress?: number | null
+  finalMarkdown?: string | null
 }
 
 export interface CareerPlaybookGenerationStatus {
@@ -54,6 +56,8 @@ export interface CareerPlaybookGenerationStatus {
   phase?: CareerPlaybookWizardPhase
   progress?: number
   error?: string
+  finalMarkdown?: string
+  completedAt?: string
 }
 
 interface CareerPlaybookPdfExportResponse {
@@ -85,6 +89,7 @@ export interface CareerPlaybookClient {
     contentLanguage: Language
   }) => Promise<CareerPlaybookFollowupResponse>
   approveAndGenerate?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
+  getGenerationStatus?: (input: { playbookId: string }) => Promise<CareerPlaybookGenerationStatus>
   submitAnswer: (input: {
     playbookId: string
     phase: 'fixed' | 'followup' | 'freeform'
@@ -122,6 +127,9 @@ interface CareerPlaybookStoreState {
   followupGenerationLimit: number
   isStartingGeneration: boolean
   generationStartError: string | null
+  generationStatusError: string | null
+  generationProgress: number | null
+  finalMarkdown: string | null
   freeformDraft: string
   isAutosaving: boolean
   autosaveError: string | null
@@ -131,6 +139,7 @@ interface CareerPlaybookStoreState {
   lastAutosavedAt: string | null
   viewer: CareerPlaybookViewerSnapshot | null
   viewerBlocks: CareerPlaybookViewerBlock[]
+  viewerRequestedPlaybookId: string | null
   isLoadingViewer: boolean
   isUpdatingViewerBlock: boolean
   viewerError: string | null
@@ -165,6 +174,7 @@ interface CareerPlaybookStoreState {
   goToPreviousCareerPlaybookFollowup: () => void
   completeCareerPlaybookFollowups: () => void
   approveCareerPlaybookGeneration: () => Promise<CareerPlaybookAutosaveResult>
+  refreshCareerPlaybookGenerationStatus: () => Promise<boolean>
   editCareerPlaybookFixedAnswer: (questionKey: string) => void
   editCareerPlaybookFollowupAnswer: (questionId: string) => void
   saveCareerPlaybookFreeformDraft: (text: string) => void
@@ -423,6 +433,7 @@ function initialState(): Omit<
   | 'goToPreviousCareerPlaybookFollowup'
   | 'completeCareerPlaybookFollowups'
   | 'approveCareerPlaybookGeneration'
+  | 'refreshCareerPlaybookGenerationStatus'
   | 'editCareerPlaybookFixedAnswer'
   | 'editCareerPlaybookFollowupAnswer'
   | 'saveCareerPlaybookFreeformDraft'
@@ -452,6 +463,9 @@ function initialState(): Omit<
     followupGenerationLimit: 2,
     isStartingGeneration: false,
     generationStartError: null,
+    generationStatusError: null,
+    generationProgress: null,
+    finalMarkdown: null,
     freeformDraft: '',
     isAutosaving: false,
     autosaveError: null,
@@ -461,6 +475,7 @@ function initialState(): Omit<
     lastAutosavedAt: null,
     viewer: null,
     viewerBlocks: [],
+    viewerRequestedPlaybookId: null,
     isLoadingViewer: false,
     isUpdatingViewerBlock: false,
     viewerError: null,
@@ -662,6 +677,10 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.generation.approveAndGenerate.mutate(
         input
       )) as unknown as CareerPlaybookGenerationStatus,
+    getGenerationStatus: async (input) =>
+      (await client.careerPlaybook.generation.getStatus.query(
+        input
+      )) as unknown as CareerPlaybookGenerationStatus,
     submitAnswer: (input) => client.careerPlaybook.session.submitAnswer.mutate(input),
   }
 }
@@ -806,6 +825,9 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           state.isGeneratingFollowups = false
           state.isStartingGeneration = false
           state.generationStartError = null
+          state.generationStatusError = null
+          state.generationProgress = draft.generationProgress ?? state.generationProgress
+          state.finalMarkdown = draft.finalMarkdown ?? state.finalMarkdown
           state.dirtyFixedQuestionKeys = draft.dirtyFixedQuestionKeys ?? []
           state.dirtyFollowupQuestionIds =
             draft.dirtyFollowupQuestionIds ?? state.dirtyFollowupQuestionIds
@@ -823,6 +845,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           const normalizedSnapshot = normalizeViewerSnapshot(snapshot)
           state.viewer = normalizedSnapshot
           state.viewerBlocks = viewerBlocksFromSnapshot(normalizedSnapshot)
+          state.viewerRequestedPlaybookId = null
           state.isLoadingViewer = false
           state.isUpdatingViewerBlock = false
           state.viewerError = null
@@ -832,6 +855,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       loadCareerPlaybookViewer: async (playbookId) => {
         set((state) => {
           state.isLoadingViewer = true
+          state.viewerRequestedPlaybookId = playbookId
           state.viewerError = null
           state.viewerActionMessage = null
           if (state.viewer?.playbookId !== playbookId) {
@@ -846,21 +870,42 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             const message =
               'Career Playbook viewer is unavailable until the backend action is connected'
             set((state) => {
-              state.isLoadingViewer = false
-              state.viewerError = message
+              if (state.viewerRequestedPlaybookId === playbookId) {
+                state.isLoadingViewer = false
+                state.viewerRequestedPlaybookId = null
+                state.viewerError = message
+              }
             })
             return { ok: false, error: message, backendPending: true }
           }
 
           const snapshot = await client.getViewer({ playbookId })
+          if (
+            snapshot.playbookId !== playbookId ||
+            get().viewerRequestedPlaybookId !== playbookId
+          ) {
+            set((state) => {
+              if (state.viewerRequestedPlaybookId === playbookId) {
+                state.isLoadingViewer = false
+                state.viewerRequestedPlaybookId = null
+              }
+            })
+            return {
+              ok: false,
+              error: 'Career Playbook viewer request was superseded',
+            }
+          }
           get().hydrateCareerPlaybookViewer(snapshot)
           return { ok: true }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Career Playbook viewer failed'
           const backendPending = isCareerPlaybookBackendPending(error)
           set((state) => {
-            state.isLoadingViewer = false
-            state.viewerError = message
+            if (state.viewerRequestedPlaybookId === playbookId) {
+              state.isLoadingViewer = false
+              state.viewerRequestedPlaybookId = null
+              state.viewerError = message
+            }
           })
           return { ok: false, error: message, backendPending }
         }
@@ -1233,8 +1278,14 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
       approveCareerPlaybookGeneration: async () => {
         const snapshot = get()
         if (!snapshot.playbookId) {
-          return { ok: false, error: 'Playbook session is required before generation' }
+          const message = 'Playbook session is required before generation'
+          set((state) => {
+            state.isStartingGeneration = false
+            state.generationStartError = message
+          })
+          return { ok: false, error: message }
         }
+        const requestedPlaybookId = snapshot.playbookId
 
         try {
           const client = getClient()
@@ -1250,17 +1301,36 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
           set((state) => {
             state.isStartingGeneration = true
             state.generationStartError = null
+            state.generationStatusError = null
           })
 
           const response = await client.approveAndGenerate({
-            playbookId: snapshot.playbookId,
+            playbookId: requestedPlaybookId,
           })
+
+          if (
+            response.playbookId !== requestedPlaybookId ||
+            get().playbookId !== requestedPlaybookId
+          ) {
+            set((state) => {
+              if (state.playbookId === requestedPlaybookId) {
+                state.isStartingGeneration = false
+              }
+            })
+            return {
+              ok: false,
+              error: 'Stale Career Playbook generation response',
+            }
+          }
 
           set((state) => {
             state.status = response.status
             state.phase = response.phase ?? 'completion'
+            state.generationProgress = response.progress ?? state.generationProgress
+            state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
             state.isStartingGeneration = false
             state.generationStartError = response.error ?? null
+            state.generationStatusError = response.error ?? null
           })
 
           return response.error ? { ok: false, error: response.error } : { ok: true }
@@ -1274,8 +1344,56 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         }
       },
 
+      refreshCareerPlaybookGenerationStatus: async () => {
+        const snapshot = get()
+        if (!snapshot.playbookId) {
+          return false
+        }
+        const requestedPlaybookId = snapshot.playbookId
+
+        try {
+          const client = getClient()
+          if (!client.getGenerationStatus) {
+            set((state) => {
+              state.generationStatusError = 'Role Guide generation status is unavailable'
+            })
+            return false
+          }
+
+          const response = await client.getGenerationStatus({
+            playbookId: requestedPlaybookId,
+          })
+
+          if (
+            response.playbookId !== requestedPlaybookId ||
+            get().playbookId !== requestedPlaybookId
+          ) {
+            return get().playbookId === requestedPlaybookId && get().status === 'generating'
+          }
+
+          set((state) => {
+            state.status = response.status
+            state.phase = response.phase ?? 'completion'
+            state.generationProgress = response.progress ?? state.generationProgress
+            state.finalMarkdown = response.finalMarkdown ?? state.finalMarkdown
+            state.generationStatusError = response.error ?? null
+          })
+
+          return response.status === 'generating'
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Role Guide generation status failed'
+          set((state) => {
+            state.generationStatusError = message
+          })
+          return get().status === 'generating'
+        }
+      },
+
       editCareerPlaybookFixedAnswer: (questionKey) =>
         set((state) => {
+          if (state.status === 'generating') return
+
           const visibleQuestions = visibleQuestionsFromState(state)
           const questionIndex = visibleQuestions.findIndex(
             (question) => question.question_key === questionKey
@@ -1288,6 +1406,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
 
       editCareerPlaybookFollowupAnswer: (questionId) =>
         set((state) => {
+          if (state.status === 'generating') return
+
           let questionIndex = state.followupQuestions.findIndex(
             (question) => question.question_id === questionId
           )
@@ -1358,6 +1478,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             dirtyFixedQuestionKeys: mergedDraft.dirtyFixedQuestionKeys,
             dirtyFollowupQuestionIds: mergedDraft.dirtyFollowupQuestionIds,
             dirtyFreeformDraft: mergedDraft.dirtyFreeformDraft,
+            generationProgress: remoteDraft.generationProgress ?? latest.generationProgress,
+            finalMarkdown: remoteDraft.finalMarkdown ?? latest.finalMarkdown,
           })
 
           return { ok: true }
@@ -1389,6 +1511,8 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
             dirtyFixedQuestionKeys: mergedDraft.dirtyFixedQuestionKeys,
             dirtyFollowupQuestionIds: mergedDraft.dirtyFollowupQuestionIds,
             dirtyFreeformDraft: mergedDraft.dirtyFreeformDraft,
+            generationProgress: remoteDraft.generationProgress ?? latest.generationProgress,
+            finalMarkdown: remoteDraft.finalMarkdown ?? latest.finalMarkdown,
           })
 
           return { ok: true }
@@ -1530,6 +1654,7 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         freeformDraft: state.freeformDraft,
         dirtyFixedQuestionKeys: state.dirtyFixedQuestionKeys,
         dirtyFreeformDraft: state.dirtyFreeformDraft,
+        generationProgress: state.generationProgress,
         lastAutosavedAt: state.lastAutosavedAt,
       }),
     }
