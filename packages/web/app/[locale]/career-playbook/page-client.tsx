@@ -17,17 +17,12 @@ import Header from '@/components/layouts/header'
 import ShaderBackground from '@/components/layouts/shader-background'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import type { Locale } from '@/src/i18n/config'
 import { Link } from '@/src/i18n/navigation'
-
-interface CareerPlaybookLandingPageClientProps {
-  locale: Locale
-}
 
 const methodologyIds = ['netflix', 'amazon', 'toyota', 'spotify', 'bridgewater'] as const
 const blockGroupIds = ['foundation', 'operations', 'people', 'growth', 'system', 'wrap'] as const
 const demoSectionIds = ['decisions', 'mission', 'kpi'] as const
-const faqItemIds = ['0', '1'] as const
+const faqItemIds = ['0', '1', '2'] as const
 
 type MethodologyId = (typeof methodologyIds)[number]
 type BlockGroupId = (typeof blockGroupIds)[number]
@@ -76,9 +71,7 @@ const affectedBlockKeys: Record<MethodologyId, BlockId[]> = {
   bridgewater: ['block7', 'block12', 'block15', 'block17'],
 }
 
-export default function CareerPlaybookLandingPageClient({
-  locale: _locale,
-}: CareerPlaybookLandingPageClientProps) {
+export default function CareerPlaybookLandingPageClient() {
   const t = useTranslations('career-playbook.landing')
   const blockGroups: CareerPlaybookBlockGroup[] = blockGroupIds.map((groupId) => ({
     title: t(`blockMap.groups.${groupId}.title`),
@@ -133,7 +126,7 @@ export default function CareerPlaybookLandingPageClient({
                   variant="outline"
                   className="rounded-md border-white/25 bg-white/10 text-white hover:bg-white/15"
                 >
-                  <a href="#methodology">{t('ctaSecondary')}</a>
+                  <a href="#example">{t('ctaSecondary')}</a>
                 </Button>
               </div>
             </div>
@@ -146,6 +139,14 @@ export default function CareerPlaybookLandingPageClient({
           </div>
         </section>
 
+        <InteractiveDemo
+          eyebrow={t('demoEyebrow')}
+          title={t('demoTitle')}
+          subtitle={t('demoSubtitle')}
+          previewTitle={t('demoPreviewTitle')}
+          sections={demoSections}
+        />
+
         <MethodologySection
           eyebrow={t('methodologyEyebrow')}
           title={t('methodologyTitle')}
@@ -154,14 +155,6 @@ export default function CareerPlaybookLandingPageClient({
           selectedBlocksLabel={t('selectedBlocksLabel')}
           methodologies={methodologies}
           blockGroups={blockGroups}
-        />
-
-        <InteractiveDemo
-          eyebrow={t('demoEyebrow')}
-          title={t('demoTitle')}
-          subtitle={t('demoSubtitle')}
-          previewTitle={t('demoPreviewTitle')}
-          sections={demoSections}
         />
 
         <section className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20">

@@ -1,22 +1,30 @@
 import { router } from '../../trpc';
 import { protectedProcedure } from '../../middleware/auth';
+import { blockInputSchema, playbookIdInputSchema, requestFollowupsInputSchema } from './_shared';
 import {
-  blockInputSchema,
-  playbookIdInputSchema,
-  throwCareerPlaybookNotImplemented,
-} from './_shared';
+  approveCareerPlaybookGeneration,
+  getCareerPlaybookBlock,
+  getCareerPlaybookGenerationStatus,
+  requestCareerPlaybookFollowups,
+} from './service';
 
 export const careerPlaybookGenerationRouter = router({
-  approveAndGenerate: protectedProcedure.input(playbookIdInputSchema).mutation(() => {
-    throwCareerPlaybookNotImplemented('generation.approveAndGenerate');
+  requestFollowups: protectedProcedure
+    .input(requestFollowupsInputSchema)
+    .mutation(({ ctx, input }) => {
+      return requestCareerPlaybookFollowups(ctx, input);
+    }),
+
+  approveAndGenerate: protectedProcedure.input(playbookIdInputSchema).mutation(({ ctx, input }) => {
+    return approveCareerPlaybookGeneration(ctx, input);
   }),
 
-  getStatus: protectedProcedure.input(playbookIdInputSchema).query(() => {
-    throwCareerPlaybookNotImplemented('generation.getStatus');
+  getStatus: protectedProcedure.input(playbookIdInputSchema).query(({ ctx, input }) => {
+    return getCareerPlaybookGenerationStatus(ctx, input);
   }),
 
-  getBlock: protectedProcedure.input(blockInputSchema).query(() => {
-    throwCareerPlaybookNotImplemented('generation.getBlock');
+  getBlock: protectedProcedure.input(blockInputSchema).query(({ ctx, input }) => {
+    return getCareerPlaybookBlock(ctx, input);
   }),
 });
 

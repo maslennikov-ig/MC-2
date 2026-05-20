@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 
-import { defaultLocale, type Locale } from '@/src/i18n/config'
+import { defaultLocale, locales, type Locale } from '@/src/i18n/config'
 import CareerPlaybookLandingPageClient from './page-client'
 
 type Props = {
@@ -28,7 +28,7 @@ export default async function CareerPlaybookLandingPage({ params }: Props) {
 
   return (
     <>
-      <CareerPlaybookLandingPageClient locale={locale} />
+      <CareerPlaybookLandingPageClient />
       <script
         data-testid="career-playbook-jsonld"
         type="application/ld+json"
@@ -50,6 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     alternates: {
       canonical: pagePath,
+      languages: getCareerPlaybookLanguageAlternates(),
     },
     openGraph: {
       title,
@@ -67,6 +68,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 function getCareerPlaybookPagePath(locale: Locale) {
   return locale === defaultLocale ? '/career-playbook' : `/${locale}/career-playbook`
+}
+
+function getCareerPlaybookLanguageAlternates() {
+  return Object.fromEntries(locales.map((locale) => [locale, getCareerPlaybookPagePath(locale)]))
 }
 
 function getCareerPlaybookPageUrl(locale: Locale) {

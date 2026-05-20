@@ -7,11 +7,15 @@ test.describe('Career Playbook Phase A wizard', () => {
     test.use({ storageState: { cookies: [], origins: [] } })
 
     test('requires authentication before showing the wizard', async ({ page }) => {
-      await page.goto('/ru/career-playbook/new')
+      await page.goto('/career-playbook/new')
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByRole('heading', { name: 'Требуется авторизация' })).toBeVisible()
-      await expect(page.getByRole('heading', { name: 'Конструктор Role Guide' })).not.toBeVisible()
+      await expect(
+        page.getByRole('heading', { name: /Authorization Required|Требуется авторизация/ })
+      ).toBeVisible()
+      await expect(
+        page.getByRole('heading', { name: /Role Guide constructor|Конструктор Role Guide/ })
+      ).not.toBeVisible()
     })
   })
 

@@ -3,7 +3,9 @@ import { z } from 'zod';
 import {
   CareerPlaybookAnswerSubmissionSchema,
   CareerPlaybookBlockIdSchema,
+  CareerPlaybookFixedAnswerSchema,
   CareerPlaybookFixedQuestionLanguageSchema,
+  CareerPlaybookFollowupAnswerSchema,
   languageSchema,
 } from '@megacampus/shared-types';
 
@@ -26,6 +28,12 @@ export const startSessionInputSchema = z.object({
 export const submitAnswerInputSchema = playbookIdInputSchema.extend({
   phase: z.enum(['fixed', 'followup', 'freeform']),
   answer: CareerPlaybookAnswerSubmissionSchema,
+});
+
+export const requestFollowupsInputSchema = playbookIdInputSchema.extend({
+  fixedAnswers: z.record(CareerPlaybookFixedAnswerSchema),
+  followupAnswers: z.record(CareerPlaybookFollowupAnswerSchema),
+  contentLanguage: languageSchema,
 });
 
 export const listInputSchema = z.object({

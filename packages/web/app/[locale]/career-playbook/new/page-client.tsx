@@ -11,6 +11,7 @@ import { Wizard, type WizardProps } from '@/components/career-playbook/wizard/Wi
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Locale } from '@/src/i18n/config'
+import type { CareerPlaybookOption } from '@megacampus/shared-types'
 import {
   getCareerPlaybookVisibleQuestions,
   useCareerPlaybookStore,
@@ -19,9 +20,13 @@ import {
 
 interface CareerPlaybookNewPageClientProps {
   locale: Locale
+  userId: string
 }
 
-export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNewPageClientProps) {
+export default function CareerPlaybookNewPageClient({
+  locale,
+  userId,
+}: CareerPlaybookNewPageClientProps) {
   const t = useTranslations('career-playbook.wizard')
   const state = useCareerPlaybookStore()
   const visibleQuestions = getCareerPlaybookVisibleQuestions(state)
@@ -29,6 +34,7 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
   const [generationHandoffVisible, setGenerationHandoffVisible] = useState(false)
 
   useEffect(() => {
+    useCareerPlaybookStore.getState().setCareerPlaybookDraftOwner(userId)
     const snapshot = useCareerPlaybookStore.getState()
     if (snapshot.fixedQuestions.length === 0) {
       const hasPersistedDraft =
@@ -40,6 +46,7 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
 
       snapshot.hydrateCareerPlaybookDraft({
         playbookId: snapshot.playbookId,
+        ownerUserId: userId,
         uiLanguage: locale,
         contentLanguage: hasPersistedDraft ? snapshot.contentLanguage || locale : locale,
         currentFixedIndex: snapshot.currentFixedIndex,
@@ -68,7 +75,7 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
     }
 
     void current.startCareerPlaybookSession()
-  }, [locale])
+  }, [locale, userId])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -104,10 +111,36 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
       ),
     [state.followupAnswers]
   )
-  const fixedAnswerSummary = useMemo(() => Object.values(state.fixedAnswers), [state.fixedAnswers])
+  const fixedAnswerSummary = useMemo(
+    () =>
+      Object.values(state.fixedAnswers).map((answer) => {
+        const question = state.fixedQuestions.find(
+          (candidate) => candidate.question_key === answer.question_key
+        )
+
+        return {
+          id: answer.question_key,
+          title: question?.question_text ?? answer.question_key,
+          value: formatSummaryValue(answer.value, question?.options),
+        }
+      }),
+    [state.fixedAnswers, state.fixedQuestions]
+  )
   const followupAnswerSummary = useMemo(
-    () => Object.values(state.followupAnswers),
-    [state.followupAnswers]
+    () =>
+      Object.values(state.followupAnswers).map((answer) => {
+        const question = state.followupQuestions.find(
+          (candidate) => candidate.question_id === answer.question_id
+        )
+
+        return {
+          id: answer.question_id,
+          title: question?.question_text ?? answer.question_text,
+          value: formatSummaryValue(answer.value, question?.options),
+          skipped: answer.skipped,
+        }
+      }),
+    [state.followupAnswers, state.followupQuestions]
   )
   const freeformNotes = useMemo(
     () => (state.freeformDraft.trim() ? [state.freeformDraft.trim()] : []),
@@ -163,6 +196,8 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
     generate: t('generateCta'),
     generationHandoffTitle: t('generationHandoffTitle'),
     generationHandoffDescription: t('generationHandoffDescription'),
+    generationStarting: t('generationStarting'),
+    generationErrorTitle: t('generationErrorTitle'),
     empty: t('emptySummary'),
   }
 
@@ -193,7 +228,12 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
       snapshot.followupGenerationCount < snapshot.followupGenerationLimit
     ) {
       const result = await snapshot.requestCareerPlaybookFollowups()
-      if (result.ok) return
+      if (result.ok) {
+        if (useCareerPlaybookStore.getState().status === 'ready_to_generate') {
+          useCareerPlaybookStore.getState().completeCareerPlaybookFollowups()
+        }
+        return
+      }
     }
 
     useCareerPlaybookStore.getState().completeCareerPlaybookFollowups()
@@ -212,7 +252,13 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
     void useCareerPlaybookStore
       .getState()
       .flushCareerPlaybookAutosave()
-      .then(() => setGenerationHandoffVisible(true))
+      .then(async (autosaveResult) => {
+        if (!autosaveResult.ok) return
+        const result = await useCareerPlaybookStore.getState().approveCareerPlaybookGeneration()
+        if (result.ok) {
+          setGenerationHandoffVisible(true)
+        }
+      })
   }
 
   return (
@@ -263,6 +309,7 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
               state.goToNextCareerPlaybookQuestion()
             }}
             onPrevious={state.goToPreviousCareerPlaybookQuestion}
+            freeformDraft={state.freeformDraft}
             onFreeformSubmit={state.saveCareerPlaybookFreeformDraft}
             isSaving={state.isAutosaving}
             copy={copy}
@@ -309,7 +356,11 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
               copy={followupCopy}
             />
             <div className="mx-auto w-full max-w-4xl px-4">
-              <FreeFormInput onSubmit={state.saveCareerPlaybookFreeformDraft} copy={freeformCopy} />
+              <FreeFormInput
+                freeformDraft={state.freeformDraft}
+                onSubmit={state.saveCareerPlaybookFreeformDraft}
+                copy={freeformCopy}
+              />
             </div>
           </>
         ) : null}
@@ -322,7 +373,13 @@ export default function CareerPlaybookNewPageClient({ locale }: CareerPlaybookNe
             onEditFixedAnswer={state.editCareerPlaybookFixedAnswer}
             onEditFollowupAnswer={state.editCareerPlaybookFollowupAnswer}
             onGenerate={handleGenerate}
-            generationHandoffVisible={generationHandoffVisible}
+            generationHandoffVisible={
+              generationHandoffVisible ||
+              state.status === 'generating' ||
+              state.status === 'completed'
+            }
+            generationError={state.generationStartError}
+            isGenerationStarting={state.isStartingGeneration || state.isAutosaving}
             copy={completionCopy}
           />
         ) : null}
@@ -347,7 +404,11 @@ function PhaseBStatus({
   const Icon = icon === 'loading' ? Loader2 : AlertCircle
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 px-4 py-14 text-center">
+    <div
+      role={icon === 'loading' ? 'status' : 'alert'}
+      aria-live={icon === 'loading' ? 'polite' : 'assertive'}
+      className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 px-4 py-14 text-center"
+    >
       <Icon
         className={`h-8 w-8 ${icon === 'loading' ? 'animate-spin text-teal-700 dark:text-teal-300' : 'text-amber-600 dark:text-amber-300'}`}
         aria-hidden
@@ -363,4 +424,19 @@ function PhaseBStatus({
       ) : null}
     </div>
   )
+}
+
+function formatSummaryValue(
+  value: CareerPlaybookAnswerValue | undefined,
+  options?: CareerPlaybookOption[] | null
+) {
+  if (Array.isArray(value)) {
+    return value.map((item) => optionLabel(item, options)).join(', ')
+  }
+
+  return typeof value === 'string' ? optionLabel(value, options) : ''
+}
+
+function optionLabel(value: string, options?: CareerPlaybookOption[] | null) {
+  return options?.find((option) => option.value === value)?.label ?? value
 }

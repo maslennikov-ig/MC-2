@@ -1,18 +1,18 @@
 {
   "landing": {
     "metadataTitle": "Career Playbook by MC2",
-    "metadataDescription": "Create a structured operating manual for any role, then reuse it as course-generation context in MC2.",
+    "metadataDescription": "Build a structured role manual for hiring, onboarding, and team review.",
     "heroEyebrow": "Career Playbook",
-    "heroTitle": "Turn a job description into a company operating manual",
-    "heroSubtitle": "Collect role context, generate a 26-block Role Guide, and keep it editable for onboarding, hiring, and course creation.",
+    "heroTitle": "Turn role context into a structured operating manual",
+    "heroSubtitle": "Collect role context, request a 26-block Role Guide, and review an editable draft for hiring and onboarding.",
     "ctaPrimary": "Create your Career Playbook",
-    "ctaSecondary": "See methodology",
+    "ctaSecondary": "View sample guide",
     "heroMetricOneValue": "26",
     "heroMetricOneLabel": "operational blocks",
     "heroMetricTwoValue": "5",
     "heroMetricTwoLabel": "management systems",
     "heroMetricThreeValue": "1",
-    "heroMetricThreeLabel": "course-ready source",
+    "heroMetricThreeLabel": "role clarity draft",
     "methodologyEyebrow": "Methodology",
     "methodologyTitle": "Built from operating systems used by serious teams",
     "methodologySubtitle": "Each source maps to concrete sections of the Role Guide, so the output explains purpose, autonomy, routines, quality bars, and collaboration boundaries.",
@@ -115,19 +115,19 @@
       }
     },
     "valueEyebrow": "Why it works",
-    "valueTitle": "A lead magnet that produces a real work artifact",
+    "valueTitle": "A structured guide built from real role context",
     "valueProps": {
       "0": {
         "title": "Executive-ready output",
-        "description": "The result is a practical operating manual, not a thin job post or prompt demo."
+        "description": "The result is a practical operating manual, not a thin job post or lightweight outline."
       },
       "1": {
-        "title": "Course bridge context",
-        "description": "Competencies, tools, and workflows become source material for the MC2 course pipeline."
+        "title": "Training-ready context",
+        "description": "Competencies, tools, and workflows are captured clearly enough for managers and enablement teams to review."
       },
       "2": {
         "title": "Editable after generation",
-        "description": "Teams can refine individual blocks without starting the entire Role Guide again."
+        "description": "Teams can review and refine individual blocks without restarting the whole role discovery flow."
       }
     },
     "faqTitle": "Questions",
@@ -137,12 +137,16 @@
         "answer": "HR leaders, founders, department heads, and enablement teams that need role clarity before hiring, onboarding, or training."
       },
       "1": {
-        "question": "Can the generated guide be edited?",
-        "answer": "Yes. The Career Playbook flow is designed around block-level review, editing, regeneration, sharing, and course reuse."
+        "question": "Can the generated guide be refined?",
+        "answer": "Yes. The current version supports block-level review and refinement, so a team can tighten specific sections without restarting discovery."
+      },
+      "2": {
+        "question": "What should I prepare before starting?",
+        "answer": "A job description, role notes, team context, or a rough list of responsibilities is enough. The constructor asks follow-up questions where context is thin."
       }
     },
     "finalCtaTitle": "Build the first Role Guide for your team",
-    "finalCtaDescription": "Start with the constructor, answer the role questions, and keep the generated playbook editable as the team learns.",
+    "finalCtaDescription": "Start with the constructor, answer the role questions, and keep the resulting draft useful as the team learns.",
     "finalCtaButton": "Create your Career Playbook"
   },
   "wizard": {
@@ -188,8 +192,47 @@
     "skippedLabel": "Skipped",
     "editLabel": "Edit",
     "generateCta": "Generate Role Guide",
-    "generationHandoffTitle": "Generation handoff saved",
-    "generationHandoffDescription": "The draft is saved and ready for backend generation handoff.",
+    "generationHandoffTitle": "Generation started",
+    "generationHandoffDescription": "Backend generation has started.",
+    "generationStarting": "Starting generation...",
+    "generationErrorTitle": "Generation could not start",
     "emptySummary": "No data yet"
+  },
+  "viewer": {
+    "productLabel": "Career Playbook",
+    "contents": "Contents",
+    "pdf": "PDF",
+    "share": "Share",
+    "createCourse": "Create course",
+    "delete": "Delete",
+    "editBlock": "Edit {title}",
+    "regenerateBlock": "Regenerate {title}",
+    "collapseBlock": "Collapse {title}",
+    "expandBlock": "Expand {title}",
+    "waitingBlock": "This block is waiting for generation.",
+    "editorTitle": "Edit block",
+    "editorDescription": "Edit the markdown directly, or ask the backend regenerator for a focused rewrite.",
+    "blockMarkdown": "Block markdown",
+    "saveChanges": "Save changes",
+    "regenerationInstruction": "Regeneration instruction",
+    "regenerationPlaceholder": "Make this block more specific to enterprise sales.",
+    "regenerateBlockButton": "Regenerate block",
+    "loading": "Loading Career Playbook...",
+    "unavailableTitle": "Career Playbook is unavailable",
+    "unavailableDescription": "The viewer could not be loaded.",
+    "retry": "Retry",
+    "viewerBackendPending": "Viewer backend is unavailable; showing a local preview until integration lands.",
+    "localPreviewTitle": "Role Guide preview",
+    "localPreviewContent": "# Role Guide preview\n\nBackend viewer transport is not connected yet.",
+    "sharePending": "Share links are unavailable until the backend action is connected",
+    "coursePending": "Course creation is unavailable until the backend action is connected",
+    "deletePending": "Delete is unavailable until the backend action is connected",
+    "pdfPending": "PDF export is unavailable until the backend action is connected",
+    "editLocal": "Block edit saved locally until the backend action is connected",
+    "regenerateLocal": "Block regenerated locally until the backend action is connected",
+    "generatingTitle": "Generating {title}",
+    "blocksReady": "{ready} of {total} blocks ready",
+    "thinkingStream": "Show thinking stream",
+    "streamingBlockPending": "This block is being generated."
   }
 }

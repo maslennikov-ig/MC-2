@@ -42,6 +42,7 @@ export function InteractiveDemo({
 
   return (
     <section
+      id="example"
       aria-labelledby="career-playbook-demo-title"
       className="relative z-10 border-t border-white/10 bg-slate-950 px-4 py-16 text-white md:py-20"
     >

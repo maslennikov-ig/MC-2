@@ -85,7 +85,7 @@ describe('CareerPlaybookLandingPage', () => {
     expect(screen.getByTestId('shader-background')).toBeInTheDocument()
     expect(
       screen.getByRole('heading', {
-        name: /turn a job description into a company operating manual/i,
+        name: /turn role context into a structured operating manual/i,
       })
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /create your career playbook/i })).toHaveAttribute(
@@ -101,10 +101,10 @@ describe('CareerPlaybookLandingPage', () => {
     expect(
       JSON.parse(screen.getByTestId('career-playbook-jsonld').textContent ?? '{}')
     ).toMatchObject({
-      description:
-        'Create a structured operating manual for any role, then reuse it as course-generation context in MC2.',
+      description: 'Build a structured role manual for hiring, onboarding, and team review.',
       url: 'http://localhost:3000/en/career-playbook',
     })
+    expect(screen.queryByText(/sharing, and course reuse/i)).not.toBeInTheDocument()
   })
 
   it('generates localized SEO metadata with social tags', async () => {
@@ -112,12 +112,16 @@ describe('CareerPlaybookLandingPage', () => {
 
     expect(metadata.title).toBe('Career Playbook by MC2')
     expect(metadata.description).toBe(
-      'Create a structured operating manual for any role, then reuse it as course-generation context in MC2.'
+      'Build a structured role manual for hiring, onboarding, and team review.'
     )
     expect(metadata.openGraph?.title).toBe('Career Playbook by MC2')
     expect(metadata.openGraph?.url).toBe('/en/career-playbook')
     expect(metadata.twitter?.card).toBe('summary_large_image')
     expect(metadata.alternates?.canonical).toBe('/en/career-playbook')
+    expect(metadata.alternates?.languages).toEqual({
+      ru: '/career-playbook',
+      en: '/en/career-playbook',
+    })
   })
 })
 
@@ -129,7 +133,7 @@ describe('CareerPlaybookLandingPageClient', () => {
   it('shows five methodology cards, a 26-block map, and an interactive demo preview', () => {
     activeLocale = 'en'
 
-    render(<CareerPlaybookLandingPageClient locale="en" />)
+    render(<CareerPlaybookLandingPageClient />)
 
     expect(screen.getAllByTestId('career-playbook-methodology-card')).toHaveLength(5)
     expect(screen.getAllByTestId('career-playbook-block-chip')).toHaveLength(26)
@@ -140,13 +144,16 @@ describe('CareerPlaybookLandingPageClient', () => {
   it('localizes the block map, selected-block label, and demo chrome for Russian', () => {
     activeLocale = 'ru'
 
-    render(<CareerPlaybookLandingPageClient locale="ru" />)
+    render(<CareerPlaybookLandingPageClient />)
 
     expect(screen.getByText('Основа')).toBeInTheDocument()
     expect(screen.getByText('Выбранные блоки')).toBeInTheDocument()
     expect(screen.getAllByText('1. Миссия/KR').length).toBeGreaterThan(0)
     expect(screen.getAllByText('22. README роли').length).toBeGreaterThan(0)
-    expect(screen.getByText('Role Guide: B2B Sales')).toBeInTheDocument()
+    expect(screen.getByText('Руководство роли: B2B-продажи')).toBeInTheDocument()
+    expect(screen.getByText('Превратите контекст роли в рабочее руководство')).toBeInTheDocument()
+    expect(screen.queryByText(/operating manual/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/block-level review/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Foundation')).not.toBeInTheDocument()
     expect(screen.queryByText('Selected blocks')).not.toBeInTheDocument()
     expect(screen.queryByText('B2B Sales Role Guide')).not.toBeInTheDocument()

@@ -54,8 +54,10 @@ const messages = {
       skippedLabel: 'Skipped',
       editLabel: 'Edit',
       generateCta: 'Generate Role Guide',
-      generationHandoffTitle: 'Generation handoff saved',
-      generationHandoffDescription: 'The draft is saved and ready for backend generation handoff.',
+      generationHandoffTitle: 'Generation started',
+      generationHandoffDescription: 'Backend generation has started.',
+      generationStarting: 'Starting generation...',
+      generationErrorTitle: 'Generation could not start',
       emptySummary: 'No data yet',
     },
   },
@@ -64,11 +66,12 @@ const messages = {
 let startSession: Mock
 let submitAnswer: Mock
 let requestFollowups: Mock
+let approveAndGenerate: Mock
 
 function renderPage() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CareerPlaybookNewPageClient locale="en" />
+      <CareerPlaybookNewPageClient locale="en" userId="user-1" />
     </NextIntlClientProvider>
   )
 }
@@ -95,9 +98,16 @@ describe('CareerPlaybookNewPageClient', () => {
       completeness_score: 0.82,
       stop_recommendation: 'ready_to_generate',
     })
+    approveAndGenerate = vi.fn().mockResolvedValue({
+      playbookId: '00000000-0000-4000-8000-000000000901',
+      status: 'generating',
+      phase: 'completion',
+      progress: 80,
+    })
     setCareerPlaybookClientForTests({
       startSession,
       requestFollowups,
+      approveAndGenerate,
       submitAnswer,
     })
     localStorage.clear()
@@ -163,12 +173,15 @@ describe('CareerPlaybookNewPageClient', () => {
     expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
     expect(screen.getByText('Fixed answers')).toBeInTheDocument()
     expect(screen.getByText('Follow-ups')).toBeInTheDocument()
+    expect(screen.getByText('Department or functional area')).toBeInTheDocument()
+    expect(screen.getByText('Sales')).toBeInTheDocument()
     expect(screen.getByText('Win rate')).toBeInTheDocument()
   })
 
   it('keeps a persisted Phase B draft when bootstrapping fixed questions after reload', async () => {
     useCareerPlaybookStore.setState({
       playbookId: '00000000-0000-4000-8000-000000000801',
+      ownerUserId: 'user-1',
       uiLanguage: 'en',
       contentLanguage: 'en',
       phase: 'followups',
@@ -212,11 +225,106 @@ describe('CareerPlaybookNewPageClient', () => {
     ])
   })
 
+  it('moves to review when an additional follow-up request says the draft is ready', async () => {
+    const user = userEvent.setup()
+    requestFollowups.mockResolvedValueOnce({
+      questions: [],
+      completeness_score: 0.76,
+      stop_recommendation: 'ready_to_generate',
+    })
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000811',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'followups',
+      status: 'answering_followups',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Head of Sales',
+        },
+      },
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000812',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      currentFollowupIndex: 0,
+      completenessScore: 0.4,
+      followupGenerationCount: 0,
+      followupGenerationLimit: 2,
+    })
+
+    renderPage()
+
+    await user.type(
+      await screen.findByLabelText('Which KPIs define success in this role?'),
+      'Win rate'
+    )
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(await screen.findByRole('heading', { name: 'Ready to create?' })).toBeInTheDocument()
+    expect(screen.getByText('Win rate')).toBeInTheDocument()
+  })
+
+  it('opens and edits the saved Phase B free-form draft', async () => {
+    const user = userEvent.setup()
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000821',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'followups',
+      status: 'answering_followups',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Head of Sales',
+        },
+      },
+      followupQuestions: [
+        {
+          question_id: '00000000-0000-4000-8000-000000000822',
+          question_text: 'Which KPIs define success in this role?',
+          question_type: 'open',
+          options: null,
+          rationale: 'KPI specificity improves the role guide.',
+        },
+      ],
+      currentFollowupIndex: 0,
+      completenessScore: 0.8,
+      freeformDraft: 'Existing operating context',
+    })
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Free-form' }))
+    const textarea = screen.getByRole('textbox', { name: 'Tell freely' })
+
+    expect(textarea).toHaveValue('Existing operating context')
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Updated operating context')
+    await user.click(screen.getByRole('button', { name: 'Save text' }))
+
+    expect(useCareerPlaybookStore.getState().freeformDraft).toBe('Updated operating context')
+  })
+
   it('shows a generation handoff state after clicking the generate CTA', async () => {
     const user = userEvent.setup()
 
     useCareerPlaybookStore.setState({
       playbookId: '00000000-0000-4000-8000-000000000901',
+      ownerUserId: 'user-1',
       uiLanguage: 'en',
       contentLanguage: 'en',
       phase: 'completion',
@@ -234,9 +342,75 @@ describe('CareerPlaybookNewPageClient', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Generate Role Guide' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Generation handoff saved')
-    expect(
-      screen.getByText('The draft is saved and ready for backend generation handoff.')
-    ).toBeInTheDocument()
+    expect(approveAndGenerate).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000901',
+    })
+    expect(await screen.findByRole('status')).toHaveTextContent('Generation started')
+    expect(screen.getByText('Backend generation has started.')).toBeInTheDocument()
+  })
+
+  it('keeps the generate CTA retryable when backend generation cannot start', async () => {
+    const user = userEvent.setup()
+    approveAndGenerate.mockRejectedValue(new Error('backend offline'))
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000902',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'ready_to_generate',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Product Lead',
+        },
+      },
+    })
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Generate Role Guide' }))
+
+    expect(approveAndGenerate).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000000902',
+    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Generation could not start')
+    expect(screen.getByText('backend offline')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generate Role Guide' })).toBeEnabled()
+  })
+
+  it('shows a retryable error when generation transport is unavailable', async () => {
+    const user = userEvent.setup()
+    setCareerPlaybookClientForTests({
+      startSession,
+      requestFollowups,
+      submitAnswer,
+    })
+
+    useCareerPlaybookStore.setState({
+      playbookId: '00000000-0000-4000-8000-000000000903',
+      ownerUserId: 'user-1',
+      uiLanguage: 'en',
+      contentLanguage: 'en',
+      phase: 'completion',
+      status: 'ready_to_generate',
+      fixedQuestions: [],
+      fixedAnswers: {
+        position: {
+          question_key: 'position',
+          value: 'Product Lead',
+        },
+      },
+    })
+
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Generate Role Guide' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Generation could not start')
+    expect(screen.getByText('Role Guide generation is unavailable')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generate Role Guide' })).toBeEnabled()
   })
 })
