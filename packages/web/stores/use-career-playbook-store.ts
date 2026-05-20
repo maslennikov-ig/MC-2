@@ -56,6 +56,13 @@ export interface CareerPlaybookGenerationStatus {
   error?: string
 }
 
+interface CareerPlaybookPdfExportResponse {
+  pdfBase64: string
+  fileName: string
+  contentType: 'application/pdf'
+  sizeBytes: number
+}
+
 export interface CareerPlaybookClient {
   startSession?: (input: { language: Language }) => Promise<CareerPlaybookDraft>
   getDraft?: (input: { playbookId: string }) => Promise<CareerPlaybookDraft>
@@ -70,7 +77,7 @@ export interface CareerPlaybookClient {
     blockId: CareerPlaybookBlockId
     instruction: string
   }) => Promise<CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId }>
-  requestPdf?: (input: { playbookId: string }) => Promise<unknown>
+  requestPdf?: (input: { playbookId: string }) => Promise<CareerPlaybookPdfExportResponse>
   requestFollowups?: (input: {
     playbookId: string
     fixedAnswers: Record<string, CareerPlaybookFixedAnswer>
@@ -592,6 +599,39 @@ function isCareerPlaybookBackendPending(error: unknown) {
   return message.includes('METHOD_NOT_SUPPORTED') || message.includes('not implemented')
 }
 
+function isPdfExportResponse(value: unknown): value is CareerPlaybookPdfExportResponse {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.pdfBase64 === 'string' &&
+    typeof record.fileName === 'string' &&
+    record.contentType === 'application/pdf' &&
+    typeof record.sizeBytes === 'number'
+  )
+}
+
+function decodeBase64ToBlob(base64: string, contentType: string): Blob {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return new Blob([bytes], { type: contentType })
+}
+
+function downloadPdfExport(response: CareerPlaybookPdfExportResponse): void {
+  const blob = decodeBase64ToBlob(response.pdfBase64, response.contentType)
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = response.fileName
+  anchor.rel = 'noopener'
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+  URL.revokeObjectURL(url)
+}
+
 function getClient(): CareerPlaybookClient {
   if (testClient) return testClient
 
@@ -613,6 +653,10 @@ function getClient(): CareerPlaybookClient {
       (await client.careerPlaybook.library.regenerateBlock.mutate(
         input
       )) as unknown as CareerPlaybookBlockState & { blockId?: CareerPlaybookBlockId },
+    requestPdf: async (input) =>
+      (await client.careerPlaybook.exportPdf.query(
+        input
+      )) as unknown as CareerPlaybookPdfExportResponse,
     requestFollowups: (input) => client.careerPlaybook.generation.requestFollowups.mutate(input),
     approveAndGenerate: async (input) =>
       (await client.careerPlaybook.generation.approveAndGenerate.mutate(
@@ -997,16 +1041,31 @@ export const useCareerPlaybookStore = create<CareerPlaybookStoreState>()(
         }
       },
 
-      requestCareerPlaybookPdf: () => {
+      requestCareerPlaybookPdf: async () => {
         const snapshot = get()
-        const message = 'PDF export is unavailable until the backend action is connected'
         if (!snapshot.viewer?.playbookId) {
           return Promise.resolve({ ok: false, error: 'Career Playbook viewer is not loaded' })
         }
-        set((state) => {
-          state.viewerActionMessage = message
-        })
-        return Promise.resolve({ ok: false, error: message })
+
+        try {
+          const response = await getClient().requestPdf?.({
+            playbookId: snapshot.viewer.playbookId,
+          })
+          if (!isPdfExportResponse(response)) {
+            throw new Error('PDF export returned an invalid response')
+          }
+          downloadPdfExport(response)
+          set((state) => {
+            state.viewerActionMessage = null
+          })
+          return { ok: true }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'PDF export failed'
+          set((state) => {
+            state.viewerActionMessage = message
+          })
+          return { ok: false, error: message }
+        }
       },
 
       toggleCareerPlaybookThinkingStream: () =>

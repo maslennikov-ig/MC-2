@@ -5,6 +5,7 @@ const trpcMocks = vi.hoisted(() => ({
   requestFollowupsMutate: vi.fn(),
   approveAndGenerateMutate: vi.fn(),
   submitAnswerMutate: vi.fn(),
+  exportPdfQuery: vi.fn(),
 }))
 
 vi.mock('@/lib/trpc/browser-client', () => ({
@@ -31,9 +32,11 @@ function resetStore() {
   trpcMocks.requestFollowupsMutate.mockReset()
   trpcMocks.approveAndGenerateMutate.mockReset()
   trpcMocks.submitAnswerMutate.mockReset()
+  trpcMocks.exportPdfQuery.mockReset()
   trpcMocks.getBrowserTrpcClient.mockReset()
   trpcMocks.getBrowserTrpcClient.mockReturnValue({
     careerPlaybook: {
+      exportPdf: { query: trpcMocks.exportPdfQuery },
       session: {
         start: { mutate: vi.fn() },
         getDraft: { query: vi.fn() },
@@ -1166,10 +1169,32 @@ describe('useCareerPlaybookStore', () => {
     )
   })
 
-  it('surfaces pending backend status for viewer actions without mutating data', async () => {
+  it('surfaces missing viewer status for PDF export without mutating data', async () => {
     setCareerPlaybookClientForTests({ submitAnswer: vi.fn() })
+
+    await expect(useCareerPlaybookStore.getState().requestCareerPlaybookPdf()).resolves.toEqual({
+      ok: false,
+      error: 'Career Playbook viewer is not loaded',
+    })
+
+    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBeNull()
+  })
+
+  it('downloads a backend PDF export for the loaded viewer', async () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:career-pdf')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const appendChild = vi.spyOn(document.body, 'appendChild')
+    const removeChild = vi.spyOn(document.body, 'removeChild')
+
+    trpcMocks.exportPdfQuery.mockResolvedValue({
+      pdfBase64: btoa('%PDF mocked career playbook'),
+      fileName: 'career-playbook-product-lead.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 27,
+    })
     useCareerPlaybookStore.getState().hydrateCareerPlaybookViewer({
-      playbookId: '00000000-0000-4000-8000-000000001003',
+      playbookId: '00000000-0000-4000-8000-000000001005',
       title: 'Product Lead',
       department: 'Product',
       level: 'lead',
@@ -1185,16 +1210,26 @@ describe('useCareerPlaybookStore', () => {
     })
 
     await expect(useCareerPlaybookStore.getState().requestCareerPlaybookPdf()).resolves.toEqual({
-      ok: false,
-      error: 'PDF export is unavailable until the backend action is connected',
+      ok: true,
     })
 
-    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBe(
-      'PDF export is unavailable until the backend action is connected'
+    expect(trpcMocks.exportPdfQuery).toHaveBeenCalledWith({
+      playbookId: '00000000-0000-4000-8000-000000001005',
+    })
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(appendChild).toHaveBeenCalledWith(
+      expect.objectContaining({ download: 'career-playbook-product-lead.pdf' })
     )
-    expect(useCareerPlaybookStore.getState().viewer?.blocks.block_1?.content).toBe(
-      'Original mission'
-    )
+    expect(removeChild).toHaveBeenCalled()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:career-pdf')
+    expect(useCareerPlaybookStore.getState().viewerActionMessage).toBeNull()
+
+    createObjectURL.mockRestore()
+    revokeObjectURL.mockRestore()
+    click.mockRestore()
+    appendChild.mockRestore()
+    removeChild.mockRestore()
   })
 
   it('keeps viewer edit and regenerate usable as explicit local fallbacks while backend actions are pending', async () => {

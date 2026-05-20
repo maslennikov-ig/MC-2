@@ -227,7 +227,7 @@
     "sharePending": "Публичные ссылки будут доступны после подключения backend action",
     "coursePending": "Создание курса будет доступно после подключения backend action",
     "deletePending": "Удаление будет доступно после подключения backend action",
-    "pdfPending": "Экспорт PDF будет доступен после подключения backend action",
+    "pdfPending": "Не удалось экспортировать PDF. Повторите попытку.",
     "editLocal": "Изменение блока сохранено локально до подключения backend action",
     "regenerateLocal": "Блок перегенерирован локально до подключения backend action",
     "generatingTitle": "Генерируем {title}",

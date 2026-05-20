@@ -11,8 +11,12 @@ node_modules/
 !.codex/
 !.codex/orchestrator.toml
 !.codex/handoff.md
+!.codex/project-index.md
 !.codex/report-template.md
 !.codex/stage-artifact-template.md
+!.codex/subagent-task-contract.md
+!.codex/subagent-spawn-template.md
+!.codex/manual-agent-prompt-template.md
 !.codex/stages/
 !.codex/stages/**
 
@@ -56,6 +60,7 @@ yarn-error.log*
 tmp/
 coverage/
 .nyc_output/
+packages/web/tests/.auth/
 
 # --- Agent/Tool Configurations ---
 # We WANT to commit agent commands and configs, but not their temp work folders

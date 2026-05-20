@@ -6,7 +6,9 @@ ARG BUILD_DATE
 ARG VCS_REF
 
 # Stage 1: Base image with pnpm
-FROM node:${NODE_VERSION}-alpine AS base
+FROM node:${NODE_VERSION}-bookworm-slim AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install pnpm globally
 RUN corepack enable pnpm
@@ -14,10 +16,10 @@ RUN corepack enable pnpm
 # Set working directory
 WORKDIR /app
 
-# Install security updates and required tools
-RUN apk update && apk upgrade && \
-    apk add --no-cache dumb-init && \
-    rm -rf /var/cache/apk/*
+# Install required runtime tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends dumb-init ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Stage 2: Dependencies
 FROM base AS deps
@@ -73,7 +75,9 @@ RUN pnpm --filter @megacampus/course-gen-platform build
 RUN pnpm --filter @megacampus/course-gen-platform --prod deploy pruned
 
 # Stage 4: Production image
-FROM node:${NODE_VERSION}-alpine AS runner
+FROM node:${NODE_VERSION}-bookworm-slim AS runner
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Metadata labels
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
@@ -85,15 +89,15 @@ LABEL org.opencontainers.image.revision="${VCS_REF}"
 LABEL org.opencontainers.image.title="MegaCampus API Server"
 LABEL org.opencontainers.image.description="Express + tRPC API server for MegaCampusAI platform"
 
-# Install security updates and tsx for ESM module resolution
-RUN apk update && apk upgrade && \
-    apk add --no-cache dumb-init curl && \
-    rm -rf /var/cache/apk/* && \
+# Install tsx for ESM module resolution and runtime tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends dumb-init curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
     npm install -g tsx
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --create-home --shell /usr/sbin/nologin nodejs
 
 # Set working directory
 WORKDIR /app
@@ -102,6 +106,14 @@ WORKDIR /app
 COPY --from=builder --chown=nodejs:nodejs /app/pruned/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/package.json ./package.json
+
+# Playwright-backed PDF export needs a browser and system dependencies at runtime.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN mkdir -p /ms-playwright && \
+    ./node_modules/.bin/playwright install --with-deps chromium && \
+    chown -R nodejs:nodejs /ms-playwright && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy config-seed.json to both paths where it may be resolved:
 # 1. dist/config/ — used by model-config-db.ts loadDefaultPhaseConfigs()
 # 2. config/     — used by model-config-bunker/constants.ts SEED_PATH

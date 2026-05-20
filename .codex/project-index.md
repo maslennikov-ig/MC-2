@@ -29,8 +29,17 @@ Stable navigation map for this repository. Keep stage history and current task s
 - Frontend locale messages: `packages/web/messages/{ru,en}/`.
 - Frontend i18n config/types: `packages/web/src/i18n/config.ts` and `packages/web/types/i18n.d.ts`.
 - Frontend unit/e2e tests: `packages/web/tests/unit/` and `packages/web/tests/e2e/`.
+- Career Playbook wizard route: `packages/web/app/[locale]/career-playbook/new/`.
+- Career Playbook library route: `packages/web/app/[locale]/career-playbook/library/`.
+- Career Playbook public share route: `packages/web/app/[locale]/share/career-playbook/[slug]/`.
+- Career Playbook wizard UI: `packages/web/components/career-playbook/wizard/`.
+- Career Playbook library UI: `packages/web/components/career-playbook/library/`.
+- Career Playbook public viewer UI: `packages/web/components/career-playbook/viewer/`.
 - Backend tRPC routers and services: `packages/course-gen-platform/src/server/routers/`.
+- Backend Career Playbook stage: `packages/course-gen-platform/src/stages/stage-career-playbook/`.
+- Backend Career Playbook PDF service: `packages/course-gen-platform/src/services/career-playbook-pdf.ts`.
 - Backend Supabase migrations: `packages/course-gen-platform/supabase/migrations/`.
+- Shared Career Playbook contracts: `packages/shared-types/src/career-playbook.ts`.
 
 ## Integrations And Sources Of Truth
 

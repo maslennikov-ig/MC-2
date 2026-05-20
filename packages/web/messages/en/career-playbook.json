@@ -227,7 +227,7 @@
     "sharePending": "Share links are unavailable until the backend action is connected",
     "coursePending": "Course creation is unavailable until the backend action is connected",
     "deletePending": "Delete is unavailable until the backend action is connected",
-    "pdfPending": "PDF export is unavailable until the backend action is connected",
+    "pdfPending": "PDF export failed. Try again.",
     "editLocal": "Block edit saved locally until the backend action is connected",
     "regenerateLocal": "Block regenerated locally until the backend action is connected",
     "generatingTitle": "Generating {title}",
