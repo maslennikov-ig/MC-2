@@ -16,6 +16,7 @@
  * - auditLogs: listAuditLogs
  * - generationMonitoring: getGenerationTrace, getCourseGenerationDetails, triggerStage6ForLesson,
  *                         regenerateLessonWithRefinement, getGenerationHistory, exportTraceData, finalizeCourse
+ * - careerPlaybookCosts: getCareerPlaybookCostEvidence
  * - tiers: listTiers, getTier, updateTier, resetTierToDefaults
  * - logs: list, getById, updateStatus, bulkUpdateStatus (error logs and generation traces)
  *
@@ -31,6 +32,7 @@ import { coursesRouter } from './courses';
 import { apiKeysRouter } from './api-keys';
 import { auditLogsRouter } from './audit-logs';
 import { generationMonitoringRouter } from './generation-monitoring';
+import { careerPlaybookCostsRouter } from './career-playbook-costs';
 import { tiersRouter } from './tiers';
 import { logsRouter } from './logs';
 
@@ -64,6 +66,9 @@ export const adminRouter = router({
 
   // Generation Monitoring (7 procedures)
   ...generationMonitoringRouter._def.procedures,
+
+  // Career Playbook costs (1 procedure)
+  ...careerPlaybookCostsRouter._def.procedures,
 
   // Tiers (4 procedures: listTiers, getTier, updateTier, resetTierToDefaults)
   ...tiersRouter._def.procedures,
