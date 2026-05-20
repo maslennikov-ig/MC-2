@@ -2,7 +2,13 @@ import type { RedisOptions } from 'ioredis';
 
 export type CareerPlaybookSmokeEnv = NodeJS.ProcessEnv | Record<string, string | undefined>;
 export type CareerPlaybookSmokeMode = 'read-only' | 'mutation-smoke';
-export type CareerPlaybookTargetEnvironment = 'local' | 'development' | 'dev' | 'staging' | 'production' | 'prod';
+export type CareerPlaybookTargetEnvironment =
+  | 'local'
+  | 'development'
+  | 'dev'
+  | 'staging'
+  | 'production'
+  | 'prod';
 export type CareerPlaybookCheckStatus = 'pass' | 'warn' | 'fail' | 'blocked' | 'skipped';
 export type CareerPlaybookEnvOrigin = 'env:present' | 'missing' | 'web-only';
 
@@ -118,6 +124,25 @@ function hasValue(value: string | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function normalizeQueueName(value: string | undefined): string | undefined {
+  if (!hasValue(value)) return undefined;
+  return value.trim();
+}
+
+function resolveQueueName(env: CareerPlaybookSmokeEnv, probeQueueName?: string): string {
+  return (
+    normalizeQueueName(probeQueueName) ??
+    normalizeQueueName(env?.BULLMQ_QUEUE_NAME) ??
+    DEFAULT_QUEUE_NAME
+  );
+}
+
+function hasDedicatedNonDefaultQueue(env: CareerPlaybookSmokeEnv, queueName: string): boolean {
+  return (
+    normalizeQueueName(env?.BULLMQ_QUEUE_NAME) === queueName && queueName !== DEFAULT_QUEUE_NAME
+  );
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -145,11 +170,11 @@ export function sanitizeSmokeMessage(
     }
   }
 
+  sanitized = sanitized.replace(/([a-z][a-z0-9+.-]*:\/\/)([^@\s]+)@/gi, '$1[redacted]@');
   sanitized = sanitized.replace(
-    /([a-z][a-z0-9+.-]*:\/\/)([^@\s]+)@/gi,
-    '$1[redacted]@'
+    /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+    '[redacted]'
   );
-  sanitized = sanitized.replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted]');
   sanitized = sanitized.replace(/\b(?:sk|pk|sb)_[A-Za-z0-9_-]{12,}\b/g, '[redacted]');
 
   return sanitized;
@@ -265,8 +290,7 @@ function buildMutationChecks(
         status: 'blocked',
         mutates: true,
         origin: 'planner',
-        note:
-          'staging/prod mutation smoke is blocked without explicit current-task approval, disposable fixtures, and cleanup authorization.',
+        note: 'staging/prod mutation smoke is blocked without explicit current-task approval, disposable fixtures, and cleanup authorization.',
       },
     ];
   }
@@ -278,8 +302,7 @@ function buildMutationChecks(
       status: 'blocked',
       mutates: true,
       origin: 'planner',
-      note:
-        'This preflight is read-only. Mutation smoke requires a separate approved command and must not create users, rows, queue jobs, workers, cleanup tasks, or LLM generation here.',
+      note: 'This preflight is read-only. Mutation smoke requires a separate approved command and must not create users, rows, queue jobs, workers, cleanup tasks, or LLM generation here.',
     },
   ];
 }
@@ -369,12 +392,17 @@ export async function runCareerPlaybookSmokePreflight(
   if (redisReady && redisIndex >= 0) {
     const result = await (probes.checkRedisReadiness ?? defaultRedisReadinessProbe)(env);
     const message = sanitizeSmokeMessage(result.message ?? result.status, env);
+    const queueName = resolveQueueName(env, result.queueName);
+    const dedicatedQueueBlocked =
+      result.ok &&
+      isStagingOrProduction(plan.targetEnvironment) &&
+      !hasDedicatedNonDefaultQueue(env, queueName);
     checks[redisIndex] = {
       ...checks[redisIndex],
       status: result.ok ? 'pass' : 'fail',
       origin: 'read-only-probe',
       note: result.ok
-        ? `Redis responded to PING; queue name is ${result.queueName ?? DEFAULT_QUEUE_NAME}.`
+        ? `Redis responded to PING; queue name is ${queueName}.`
         : `Redis read-only readiness failed: ${message}.`,
     };
 
@@ -382,10 +410,12 @@ export async function runCareerPlaybookSmokePreflight(
     if (queueIndex >= 0) {
       checks[queueIndex] = {
         ...checks[queueIndex],
-        status: result.ok ? 'pass' : 'fail',
+        status: result.ok ? (dedicatedQueueBlocked ? 'blocked' : 'pass') : 'fail',
         origin: 'read-only-probe',
         note: result.ok
-          ? `Resolved BullMQ queue name ${result.queueName ?? DEFAULT_QUEUE_NAME}; no jobs were read, added, removed, or retried.`
+          ? dedicatedQueueBlocked
+            ? `Resolved BullMQ queue name ${queueName}, but staging/prod smoke requires a dedicated non-default BULLMQ_QUEUE_NAME before any live mutation. No jobs were read, added, removed, or retried.`
+            : `Resolved BullMQ queue name ${queueName}; no jobs were read, added, removed, or retried.`
           : `Redis read-only readiness failed before queue readiness could be proven: ${message}. No jobs were read, added, removed, or retried.`,
       };
     }
@@ -418,6 +448,7 @@ export async function defaultSupabaseSchemaProbe(
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: {
         autoRefreshToken: false,
+        detectSessionInUrl: false,
         persistSession: false,
       },
     }) as unknown as ReadOnlySupabaseProbeClient;
@@ -456,8 +487,11 @@ export async function defaultRedisReadinessProbe(
   env: CareerPlaybookSmokeEnv = process.env
 ): Promise<RedisReadinessProbeResult> {
   const { redisUrl, queueName, options } = createRedisReadinessProbeConfig(env);
-  let redis: { connect: () => Promise<void>; ping: () => Promise<string>; disconnect: () => void } | null =
-    null;
+  let redis: {
+    connect: () => Promise<void>;
+    ping: () => Promise<string>;
+    disconnect: () => void;
+  } | null = null;
 
   try {
     const { default: Redis } = await import('ioredis');

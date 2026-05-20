@@ -89,6 +89,57 @@ describe('Career Playbook smoke preflight planner', () => {
     );
   });
 
+  it('blocks staging readiness when the queue name is missing or shared default', async () => {
+    const buildReport = (queueName?: string) =>
+      runCareerPlaybookSmokePreflight(
+        {
+          env: {
+            NODE_ENV: 'production',
+            SUPABASE_URL: 'https://project.supabase.co',
+            SUPABASE_SERVICE_KEY: 'service-secret',
+            SUPABASE_ANON_KEY: 'anon-secret',
+            REDIS_URL: 'redis://example.redis:6379',
+            BULLMQ_QUEUE_NAME: queueName,
+          },
+          mode: 'read-only',
+          targetEnvironment: 'staging',
+        },
+        {
+          checkSupabaseSchema: vi.fn(async () => ({ ok: true, status: 'schema-present' })),
+          checkRedisReadiness: vi.fn(async () => ({
+            ok: true,
+            status: 'PONG',
+            queueName: queueName || 'course-generation',
+          })),
+        }
+      );
+
+    for (const queueName of [undefined, 'course-generation']) {
+      const report = await buildReport(queueName);
+
+      expect(report.status).toBe('blocked');
+      expect(report.checks).toContainEqual(
+        expect.objectContaining({
+          id: 'queue-readiness',
+          status: 'blocked',
+          mutates: false,
+          note: expect.stringContaining('dedicated non-default BULLMQ_QUEUE_NAME'),
+        })
+      );
+    }
+
+    const dedicatedQueueReport = await buildReport('career-playbook-smoke');
+
+    expect(dedicatedQueueReport.status).toBe('pass');
+    expect(dedicatedQueueReport.checks).toContainEqual(
+      expect.objectContaining({
+        id: 'queue-readiness',
+        status: 'pass',
+        note: expect.stringContaining('career-playbook-smoke'),
+      })
+    );
+  });
+
   it('uses a short-lived Redis probe config instead of the app worker retry client', () => {
     const config = createRedisReadinessProbeConfig({
       REDIS_URL: 'redis://localhost:6379/2',
@@ -211,7 +262,10 @@ describe('Career Playbook smoke preflight runner', () => {
       ok: true,
       status: 'schema-present',
     }));
-    const checkRedisReadiness = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 'PONG' }));
+    const checkRedisReadiness = vi.fn(async (..._args: unknown[]) => ({
+      ok: true,
+      status: 'PONG',
+    }));
 
     const report = await runCareerPlaybookSmokePreflight(
       {
@@ -285,8 +339,7 @@ describe('Career Playbook smoke preflight runner', () => {
   });
 
   it('redacts known env values, URL credentials, and JWT-like strings from probe messages', async () => {
-    const jwtLikeToken =
-      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYXJlZXItcGxheWJvb2sifQ.signaturePart';
+    const jwtLikeToken = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYXJlZXItcGxheWJvb2sifQ.signaturePart';
     const report = await runCareerPlaybookSmokePreflight(
       {
         env: {
