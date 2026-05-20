@@ -267,6 +267,7 @@
     "loadMore": "Загрузить ещё",
     "loadingMore": "Загружаем...",
     "card": {
+      "createCourse": "Создать курс",
       "publicBadge": "Публичный",
       "privateBadge": "Приватный",
       "makePublic": "Опубликовать",
@@ -289,6 +290,15 @@
       "description": "Будет удалено выбранных руководств: {count}.",
       "cancel": "Отмена",
       "confirm": "Удалить руководства"
+    },
+    "createCourseDialog": {
+      "title": "Создать курс из Role Guide",
+      "description": "Запустите генерацию курса из готового Role Guide. Материалы можно добавить после создания курса.",
+      "startWithoutMaterials": "Начать без дополнительных материалов",
+      "addMaterialsLater": "Дополнительные материалы можно добавить после создания курса, если они понадобятся.",
+      "loading": "Создаём курс...",
+      "errorTitle": "Не удалось создать курс",
+      "genericError": "Не удалось создать курс из этого Role Guide."
     }
   },
   "share": {

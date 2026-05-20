@@ -2,7 +2,11 @@
 
 import { getBrowserTrpcClient } from '@/lib/trpc/browser-client'
 import { normalizeLibraryResponse } from './normalizers'
-import type { CareerPlaybookLibraryData } from './types'
+import type {
+  CareerPlaybookLibraryData,
+  CreateCourseFromPlaybookInput,
+  CreateCourseFromPlaybookResult,
+} from './types'
 
 type BrowserCareerPlaybookClient = {
   careerPlaybook?: {
@@ -17,6 +21,11 @@ type BrowserCareerPlaybookClient = {
     share?: {
       shareToggle?: {
         mutate: (input: { playbookId: string; isPublic: boolean }) => Promise<unknown>
+      }
+    }
+    courseBridge?: {
+      createCourseFromPlaybook?: {
+        mutate: (input: CreateCourseFromPlaybookInput) => Promise<CreateCourseFromPlaybookResult>
       }
     }
   }
@@ -87,4 +96,17 @@ export async function toggleCareerPlaybookShare(
   }
 
   return procedure.mutate({ playbookId, isPublic })
+}
+
+export async function createCourseFromPlaybook(
+  input: CreateCourseFromPlaybookInput
+): Promise<CreateCourseFromPlaybookResult> {
+  const client = getBrowserTrpcClient() as unknown as BrowserCareerPlaybookClient
+  const procedure = client.careerPlaybook?.courseBridge?.createCourseFromPlaybook
+
+  if (!procedure) {
+    throw new Error('careerPlaybook.courseBridge.createCourseFromPlaybook unavailable')
+  }
+
+  return procedure.mutate(input)
 }

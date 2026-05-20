@@ -1,11 +1,20 @@
 import { router } from '../../trpc';
-import { protectedProcedure } from '../../middleware/auth';
-import { playbookIdInputSchema, throwCareerPlaybookNotImplemented } from './_shared';
+import { instructorProcedure } from '../../procedures';
+import { createRateLimiter } from '../../middleware/rate-limit.js';
+import { createCourseFromPlaybookInputSchema } from './_shared';
+import { createCourseFromPlaybook } from './course-bridge.service';
 
 export const careerPlaybookCourseBridgeRouter = router({
-  createCourseFromPlaybook: protectedProcedure.input(playbookIdInputSchema).mutation(() => {
-    throwCareerPlaybookNotImplemented('courseBridge.createCourseFromPlaybook');
-  }),
+  createCourseFromPlaybook: instructorProcedure
+    .use(
+      createRateLimiter({
+        requests: 5,
+        window: 60,
+        keyPrefix: 'career-playbook-course-bridge',
+      })
+    )
+    .input(createCourseFromPlaybookInputSchema)
+    .mutation(({ ctx, input }) => createCourseFromPlaybook(ctx, input)),
 });
 
 export type CareerPlaybookCourseBridgeRouter = typeof careerPlaybookCourseBridgeRouter;

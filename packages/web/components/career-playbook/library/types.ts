@@ -26,6 +26,19 @@ export interface CareerPlaybookLibraryData {
   error: string | null
 }
 
+export interface CreateCourseFromPlaybookInput {
+  playbookId: string
+  includeWebResearch: boolean
+}
+
+export interface CreateCourseFromPlaybookResult {
+  success: true
+  courseId: string
+  redirectUrl: string
+  sourceDocumentIds: string[]
+  generationCode?: string
+}
+
 export interface CareerPlaybookPublicSharePlaybook {
   id: string
   slug: string

@@ -267,6 +267,7 @@
     "loadMore": "Load more",
     "loadingMore": "Loading...",
     "card": {
+      "createCourse": "Create course",
       "publicBadge": "Public",
       "privateBadge": "Private",
       "makePublic": "Make public",
@@ -289,6 +290,15 @@
       "description": "This will delete {count} selected guides.",
       "cancel": "Cancel",
       "confirm": "Delete guides"
+    },
+    "createCourseDialog": {
+      "title": "Create course from Role Guide",
+      "description": "Start course generation from this completed Role Guide. You can add materials after the course is created.",
+      "startWithoutMaterials": "Start without extra materials",
+      "addMaterialsLater": "Materials can be added after course creation if needed.",
+      "loading": "Creating course...",
+      "errorTitle": "Course creation failed",
+      "genericError": "Could not create a course from this Role Guide."
     }
   },
   "share": {

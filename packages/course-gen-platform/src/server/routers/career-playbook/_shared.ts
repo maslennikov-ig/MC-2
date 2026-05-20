@@ -13,6 +13,10 @@ export const playbookIdInputSchema = z.object({
   playbookId: z.string().uuid('Invalid playbook ID'),
 });
 
+export const createCourseFromPlaybookInputSchema = playbookIdInputSchema.extend({
+  includeWebResearch: z.boolean().default(true),
+});
+
 export const blockInputSchema = playbookIdInputSchema.extend({
   blockId: CareerPlaybookBlockIdSchema,
 });

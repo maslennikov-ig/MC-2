@@ -3,7 +3,16 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { BookCopy, BookOpen, Link2, Plus, Search, Share2, Trash2 } from 'lucide-react'
+import {
+  BookCopy,
+  BookOpen,
+  BookOpenCheck,
+  Link2,
+  Plus,
+  Search,
+  Share2,
+  Trash2,
+} from 'lucide-react'
 
 import {
   AlertDialog,
@@ -29,6 +38,7 @@ import type {
   CareerPlaybookLibraryData,
   CareerPlaybookLibraryItem,
 } from '@/components/career-playbook/library/types'
+import { CreateCourseFromPlaybookDialog } from '@/components/career-playbook/viewer/CreateCourseFromPlaybookDialog'
 import type { Locale } from '@/src/i18n/config'
 
 interface CareerPlaybookLibraryPageClientProps {
@@ -429,6 +439,17 @@ export default function CareerPlaybookLibraryPageClient({
                         {t('card.open')}
                       </Link>
                     </Button>
+                    {item.status === 'completed' ? (
+                      <CreateCourseFromPlaybookDialog
+                        playbookId={item.id}
+                        trigger={
+                          <Button type="button" variant="outline" size="sm" className="rounded-md">
+                            <BookOpenCheck className="h-4 w-4" aria-hidden />
+                            {t('card.createCourse')}
+                          </Button>
+                        }
+                      />
+                    ) : null}
                   </div>
                 </article>
               )

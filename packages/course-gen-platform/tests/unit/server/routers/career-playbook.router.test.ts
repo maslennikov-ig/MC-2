@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   generateCareerPlaybookFollowups: vi.fn(),
   getCareerPlaybookGraph: vi.fn(),
   renderCareerPlaybookPdf: vi.fn(),
+  createCourseFromPlaybook: vi.fn(),
   addJob: vi.fn(),
   removeTerminalJobById: vi.fn(),
 }));
@@ -26,6 +27,10 @@ vi.mock('@/stages/stage-career-playbook/graph', () => ({
 
 vi.mock('@/services/career-playbook-pdf', () => ({
   renderCareerPlaybookPdf: mocks.renderCareerPlaybookPdf,
+}));
+
+vi.mock('@/server/routers/career-playbook/course-bridge.service', () => ({
+  createCourseFromPlaybook: mocks.createCourseFromPlaybook,
 }));
 
 vi.mock('@/orchestrator/queue', () => ({
@@ -1104,14 +1109,35 @@ describe('careerPlaybookRouter transport', () => {
     });
   });
 
-  it('keeps course bridge procedures as skeletons for later tasks', async () => {
-    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
-
-    await expect(
-      caller.courseBridge.createCourseFromPlaybook({ playbookId })
-    ).rejects.toMatchObject({
-      code: 'METHOD_NOT_SUPPORTED',
+  it('creates a course from a completed owned playbook', async () => {
+    mocks.createCourseFromPlaybook.mockResolvedValue({
+      success: true,
+      courseId: '44444444-4444-4444-8444-444444444444',
+      redirectUrl: '/courses/acme/product-lead/generating',
+      sourceDocumentIds: ['file-role-guide', 'file-web-kpis'],
+      generationCode: 'GEN-123',
     });
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+    const result = await caller.courseBridge.createCourseFromPlaybook({ playbookId });
+
+    expect(mocks.createCourseFromPlaybook).toHaveBeenCalledWith(authenticatedContext, {
+      playbookId,
+      includeWebResearch: true,
+    });
+    expect(result).toMatchObject({
+      success: true,
+      courseId: '44444444-4444-4444-8444-444444444444',
+      redirectUrl: '/courses/acme/product-lead/generating',
+      sourceDocumentIds: ['file-role-guide', 'file-web-kpis'],
+    });
+  });
+
+  it('rate limits course bridge creation attempts on the server', () => {
+    const procedure = appRouter._def.procedures[
+      'careerPlaybook.courseBridge.createCourseFromPlaybook'
+    ] as { _def?: { middlewares?: unknown[] } };
+
+    expect(procedure._def?.middlewares?.length).toBeGreaterThanOrEqual(5);
   });
 
   it('exports a completed owned playbook as a base64 PDF payload', async () => {
