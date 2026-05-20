@@ -5,7 +5,7 @@ Current working branch: `codex/career-playbook-jd-bridge`
 Base branch: `develop`
 Current PR: #36 - https://github.com/maslennikov-ig/MC-2/pull/36
 
-## Current State
+## Current state
 
 - This repository is a single-repo pnpm monorepo with `packages/web`, `packages/course-gen-platform`, and `packages/shared-types`.
 - `.codex/orchestrator.toml` is the machine-readable contract; `.codex/handoff.md` is current-state only; `.codex/project-index.md` is the navigation map.
@@ -14,7 +14,7 @@ Current PR: #36 - https://github.com/maslennikov-ig/MC-2/pull/36
 - PR #36 contains the `mc2-db696.9` JD to Course bridge and is being retargeted from the old stacked base to `develop`.
 - No billing or payment scope is part of the Career Playbook MVP work in this branch.
 
-## Latest Relevant Stage
+## Latest relevant stage
 
 - Latest relevant Career Playbook stage: `mc2-db696.9` - JD to Course bridge.
 - Stage summary: [`.codex/stages/mc2-db696.9/summary.md`](./stages/mc2-db696.9/summary.md)
@@ -22,20 +22,20 @@ Current PR: #36 - https://github.com/maslennikov-ig/MC-2/pull/36
 - PR #35 generation worker completion and polling transport already landed in `develop`.
 - PDF/export stage landed via PR #34, Library/share via PR #33, Viewer/editor via PR #30, and Marketing landing via PR #31.
 
-## Next Recommended
+## Next recommended
 
 Next stage id: `mc2-db696.11.8`
 Recommended action: finish PR #36 readiness by reviewing the merged diff against `develop`, running focused backend/frontend verification plus repo gates, retargeting PR #36 to `develop`, and only then marking it ready or merging.
 
 After PR #36 lands, continue PR #37 / Phase 11 smoke and verification work, including open live-staging and cost/load evidence tasks.
 
-## Starter Prompt For Next Orchestrator
+## Starter prompt for next orchestrator
 
 ```text
 Use $orchestrator-stage to continue Career Playbook delivery. Read AGENTS.md, .codex/orchestrator.toml, .codex/handoff.md, docs/plans/quiet-waddling-starfish.md, and docs/plans/career-playbook/* first. Use Beads as source of truth. PR #24-#35 and PR #38 have landed in develop; next Beads task is mc2-db696.11.8 for PR #36 JD to Course bridge readiness. Inspect PR #36, verify the branch after merging origin/develop, retarget from the old stacked base to develop only after review and local verification, and do not add billing/payment scope.
 ```
 
-## Explicit Defers
+## Explicit defers
 
 - Real Supabase RLS/staging smoke and authenticated browser e2e share/PDF/worker flow remain tracked under `mc2-db696.11` unless credentials are available.
 - SSE/subscription status streaming remains deferred; PR #35 intentionally uses polling over the existing tRPC/httpBatchLink transport.
