@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FileText } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ export interface FreeFormInputCopy {
 }
 
 interface FreeFormInputProps {
+  freeformDraft?: string
   onSubmit: (text: string) => void
   copy?: FreeFormInputCopy
   className?: string
@@ -38,11 +39,22 @@ const defaultCopy: Required<FreeFormInputCopy> = {
   submit: 'Сохранить текст',
 }
 
-export function FreeFormInput({ onSubmit, copy, className }: FreeFormInputProps) {
+export function FreeFormInput({
+  freeformDraft = '',
+  onSubmit,
+  copy,
+  className,
+}: FreeFormInputProps) {
   const labels = { ...defaultCopy, ...copy }
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const trimmedText = text.trim()
+
+  useEffect(() => {
+    if (open) {
+      setText(freeformDraft)
+    }
+  }, [freeformDraft, open])
 
   return (
     <div className={cn('sticky bottom-4 z-10 flex justify-end', className)}>
@@ -72,7 +84,7 @@ export function FreeFormInput({ onSubmit, copy, className }: FreeFormInputProps)
                 if (!trimmedText) return
 
                 onSubmit(trimmedText)
-                setText('')
+                setText(trimmedText)
                 setOpen(false)
               }}
             >

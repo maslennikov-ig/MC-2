@@ -634,7 +634,32 @@ describe('careerPlaybookRouter transport', () => {
     const result = await caller.library.delete({ playbookId });
 
     expect(builder.delete).toHaveBeenCalledTimes(1);
+    expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
+    expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
     expect(result).toEqual({ deleted: true, playbookId });
+  });
+
+  it('refuses to publish incomplete or empty playbooks', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          status: 'generating',
+          final_markdown: null,
+          share_slug: null,
+          is_public: false,
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(authenticatedContext);
+
+    await expect(caller.share.shareToggle({ playbookId, isPublic: true })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Career Playbook must be completed before sharing',
+    });
+    expect(builder.update).not.toHaveBeenCalled();
   });
 
   it('enables public sharing with an unguessable generated share slug', async () => {
@@ -644,6 +669,8 @@ describe('careerPlaybookRouter transport', () => {
         data: playbookRow({
           share_slug: null,
           is_public: false,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
         }),
         error: null,
       },
@@ -651,6 +678,8 @@ describe('careerPlaybookRouter transport', () => {
         data: playbookRow({
           share_slug: 'cp-1234567890abcdef12345678',
           is_public: true,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
         }),
         error: null,
       },
@@ -667,6 +696,8 @@ describe('careerPlaybookRouter transport', () => {
       })
     );
     expect(builder.update.mock.calls[0][0].share_slug).not.toBe(predictableSlug);
+    expect(builder.eq).toHaveBeenCalledWith('id', playbookId);
+    expect(builder.eq).toHaveBeenCalledWith('user_id', authenticatedContext.user!.id);
     expect(result).toEqual({
       playbookId,
       isPublic: true,
@@ -713,6 +744,8 @@ describe('careerPlaybookRouter transport', () => {
         data: playbookRow({
           share_slug: 'existing-share-slug',
           is_public: false,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
         }),
         error: null,
       },
@@ -720,6 +753,8 @@ describe('careerPlaybookRouter transport', () => {
         data: playbookRow({
           share_slug: 'existing-share-slug',
           is_public: true,
+          status: 'completed',
+          final_markdown: '# Sales Manager',
         }),
         error: null,
       },
@@ -754,12 +789,40 @@ describe('careerPlaybookRouter transport', () => {
     const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
     const result = await caller.share.getPublicBySlug({ shareSlug: 'sales-guide' });
 
+    expect(builder.select).toHaveBeenCalledWith(expect.not.stringContaining('q_a_data'));
+    expect(builder.select).toHaveBeenCalledWith(expect.not.stringContaining('role_profile_spec'));
+    expect(builder.select).toHaveBeenCalledWith(expect.not.stringContaining('web_research'));
+    expect(builder.select).toHaveBeenCalledWith(expect.not.stringContaining('cost_breakdown'));
+    expect(builder.eq).toHaveBeenCalledWith('status', 'completed');
     expect(result).toMatchObject({
       id: '66666666-6666-4666-8666-666666666666',
       shareSlug: 'sales-guide',
       isPublic: true,
       finalMarkdown: '# Sales Manager',
     });
+    expect(result).not.toHaveProperty('generatedBlocks');
+  });
+
+  it('hides public slugs until the playbook is completed with markdown', async () => {
+    const builder = createBuilder([
+      {
+        data: playbookRow({
+          share_slug: 'draft-guide',
+          is_public: true,
+          status: 'generating',
+          final_markdown: '',
+        }),
+        error: null,
+      },
+    ]);
+    mocks.from.mockReturnValue(builder);
+
+    const caller = careerPlaybookRouter.createCaller(unauthenticatedContext);
+
+    await expect(caller.share.getPublicBySlug({ shareSlug: 'draft-guide' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    expect(builder.eq).toHaveBeenCalledWith('status', 'completed');
   });
 
   it('hides private playbooks on public share lookup', async () => {

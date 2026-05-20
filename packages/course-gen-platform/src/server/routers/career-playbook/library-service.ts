@@ -39,6 +39,10 @@ export interface CareerPlaybookLibraryDetailResponse extends CareerPlaybookLibra
   finalMarkdown: string | null;
 }
 
+export interface CareerPlaybookPublicShareResponse extends CareerPlaybookLibraryItem {
+  finalMarkdown: string;
+}
+
 export interface CareerPlaybookDeleteResponse {
   deleted: true;
   playbookId: string;
@@ -82,6 +86,34 @@ function isOwnedByUser(row: CareerPlaybookRow, user: UserContext): boolean {
 
 function buildShareSlug(): string {
   return `cp-${randomUUID().replaceAll('-', '').slice(0, 24)}`;
+}
+
+const PUBLIC_PLAYBOOK_COLUMNS = [
+  'id',
+  'user_id',
+  'organization_id',
+  'status',
+  'language',
+  'slug',
+  'position_title',
+  'department',
+  'specialization',
+  'level',
+  'final_markdown',
+  'share_slug',
+  'is_public',
+  'created_at',
+  'updated_at',
+  'completed_at',
+].join(',');
+
+function assertShareable(row: CareerPlaybookRow): void {
+  if (row.status === 'completed' && row.final_markdown?.trim()) return;
+
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: 'Career Playbook must be completed before sharing',
+  });
 }
 
 async function loadOwnedPlaybook(playbookId: string, user: UserContext) {
@@ -133,6 +165,14 @@ function mapRowToLibraryDetail(row: CareerPlaybookRow): CareerPlaybookLibraryDet
     ...toLibraryItemFromMappedRow(mapped),
     generatedBlocks: normalizeGeneratedBlocks(mapped.generated_blocks),
     finalMarkdown: mapped.final_markdown,
+  };
+}
+
+function mapRowToPublicShare(row: CareerPlaybookRow): CareerPlaybookPublicShareResponse {
+  const mapped = mapPlaybookRow(row);
+  return {
+    ...toLibraryItemFromMappedRow(mapped),
+    finalMarkdown: mapped.final_markdown ?? '',
   };
 }
 
@@ -191,6 +231,7 @@ export async function deleteCareerPlaybookFromLibrary(
     .from('career_playbooks')
     .delete()
     .eq('id', row.id)
+    .eq('user_id', row.user_id)
     .select('*')
     .single();
 
@@ -208,6 +249,7 @@ export async function toggleCareerPlaybookShare(
 ): Promise<CareerPlaybookShareToggleResponse> {
   const user = requireUser(ctx);
   const row = await loadOwnedPlaybook(input.playbookId, user);
+  if (input.isPublic) assertShareable(row);
   const shareSlug = input.isPublic ? (row.share_slug ?? buildShareSlug()) : row.share_slug;
   const supabase = getCareerPlaybookSupabase();
   const { data, error } = await supabase
@@ -217,6 +259,7 @@ export async function toggleCareerPlaybookShare(
       share_slug: shareSlug,
     })
     .eq('id', row.id)
+    .eq('user_id', row.user_id)
     .select('*')
     .single();
 
@@ -232,13 +275,14 @@ export async function toggleCareerPlaybookShare(
 
 export async function getPublicCareerPlaybookBySlug(input: {
   shareSlug: string;
-}): Promise<CareerPlaybookLibraryDetailResponse> {
+}): Promise<CareerPlaybookPublicShareResponse> {
   const supabase = getCareerPlaybookSupabase();
   const { data, error } = await supabase
     .from('career_playbooks')
-    .select('*')
+    .select(PUBLIC_PLAYBOOK_COLUMNS)
     .eq('share_slug', input.shareSlug)
     .eq('is_public', true)
+    .eq('status', 'completed')
     .single();
 
   if (error || !data) {
@@ -249,12 +293,12 @@ export async function getPublicCareerPlaybookBySlug(input: {
   }
 
   const mapped = mapPlaybookRow(data);
-  if (!mapped.is_public) {
+  if (!mapped.is_public || mapped.status !== 'completed' || !mapped.final_markdown?.trim()) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Career Playbook not found',
     });
   }
 
-  return mapRowToLibraryDetail(mapped);
+  return mapRowToPublicShare(mapped);
 }
