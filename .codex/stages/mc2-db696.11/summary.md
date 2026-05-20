@@ -1,9 +1,9 @@
 # Stage mc2-db696.11 Summary
 
-Status: PR #37 readiness after develop retarget
+Status: Phase 11 cost evidence delivered; live smoke still blocked
 Updated: 2026-05-20
-Branch: `codex/career-playbook-e2e-smoke`
-Base: `origin/develop` @ `5a72300dc2d23251c5d0368745a02e3a45f4fecd`
+Branch: `codex/career-playbook-phase11`
+Base: `origin/develop` @ `f72ab3b85da0af454024708fe7bc2c9fb856ed53`
 
 ## Scope Delivered
 
@@ -26,6 +26,13 @@ Base: `origin/develop` @ `5a72300dc2d23251c5d0368745a02e3a45f4fecd`
   - `docs/career-playbook/architecture.md`
   - linked from `docs/plans/career-playbook/README.md`
   - CHANGELOG entry
+- Added Career Playbook admin cost evidence:
+  - backend `admin.getCareerPlaybookCostEvidence`
+  - admin page `/admin/generation/career-playbooks/costs`
+  - link from admin generation history
+  - organization-admin scoping despite service-role reads
+  - page totals plus filtered count semantics
+  - invalid `cost_breakdown` payload marking
 
 ## Routing And Delegation
 
@@ -42,6 +49,9 @@ Base: `origin/develop` @ `5a72300dc2d23251c5d0368745a02e3a45f4fecd`
   - Pauli: final review
   - Euler: PR #37 backend/preflight safety review after develop retarget
   - Schrodinger: PR #37 web/Playwright harness review after develop retarget
+  - Lovelace: Phase 11 cost-surface map for `mc2-db696.11.4`
+  - Helmholtz: Phase 11 live-smoke blocker map for `mc2-db696.11.5`
+  - Schrodinger: Phase 11 admin cost evidence endpoint/UI review
 
 The orchestrator did not accept reports blindly. It found and fixed two backend preflight issues before review, then accepted/fixed all review must-fix findings.
 
@@ -55,11 +65,11 @@ Closed in this delivery:
 - `mc2-db696.11.1` - sanitize smoke probe messages
 - `mc2-db696.11.2` - separate external Playwright baseURL from local dev server
 - `mc2-db696.11.3` - env-scoped smoke probes
+- `mc2-db696.11.4` - Career Playbook cost dashboard evidence
 - `mc2-db696.11.9.1` - require dedicated non-default queue for staging/prod preflight readiness
 
 Still open under `mc2-db696.11`:
 
-- `mc2-db696.11.4` - Career Playbook cost dashboard evidence
 - `mc2-db696.11.5` - live staging Career Playbook mutation smoke
 - `mc2-db696.11.6` - 10-concurrent load test
 
@@ -69,7 +79,9 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 
 - `git diff --check` - passed.
 - Backend smoke unit: `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts` - 13 passed.
+- Backend cost evidence unit: `SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/admin-career-playbook-costs.test.ts` - 5 passed.
 - Web config unit: `pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts` - 6 passed.
+- Web cost evidence unit: `pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/admin-cost-evidence.test.tsx` - 3 passed.
 - Backend type-check: `pnpm --filter @megacampus/course-gen-platform type-check` - passed.
 - Web type-check: `pnpm --filter @megacampus/web type-check` - passed.
 - Full repo type-check: `pnpm type-check` - passed.
@@ -84,7 +96,7 @@ Parent `mc2-db696.11` remains `in_progress` because full live staging verificati
 
 - Remote Supabase read probe showed `public.career_playbooks` is absent in project `diqooqbuchsliypgwksu`. The migration was not applied from this stage.
 - Full live mutation smoke requires explicit approval, staging schema, disposable user/org/playbooks, dedicated `BULLMQ_QUEUE_NAME`, cleanup authorization, valid auth token, and accepted API cost budget.
-- Cost dashboard evidence and 10-concurrent load testing remain tracked as open Beads children.
+- 10-concurrent load testing remains tracked as an open Beads child and depends on successful live single-smoke readiness.
 
 ## PR Readiness Passes
 

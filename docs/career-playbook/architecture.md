@@ -59,7 +59,14 @@ Staging/prod mutation smoke is blocked unless the current task explicitly approv
 
 ## Cost And Performance Checks
 
-Career Playbook generation records per-node cost in `cost_breakdown` on `career_playbooks`. The admin-facing evidence should aggregate this field by playbook, node, model, tokens, and total USD cost. Existing course generation audit UI and logging are reusable patterns, but service-role reads are not RLS proof.
+Career Playbook generation records per-node cost in `cost_breakdown` on `career_playbooks`. The admin evidence surface is:
+
+- Backend: `admin.getCareerPlaybookCostEvidence`
+- Web: `/admin/generation/career-playbooks/costs`
+
+The endpoint validates each `cost_breakdown`, marks invalid cost payloads, aggregates the displayed page by playbook and node, and returns stage, node, model, input tokens, output tokens, total tokens, and total USD cost. `totalCount` is the filtered count; cost and token totals are page totals for the returned playbooks. Superadmins may filter across organizations; organization admins are scoped to their own `organization_id` even though the backend reads through the service role. Service-role reads are not RLS proof, so live evidence still needs a real admin session and disposable staging data before it can be used as a mutation-smoke acceptance artifact.
+
+Operator evidence should include a screenshot or exported trace from `/admin/generation/career-playbooks/costs` showing at least one completed Career Playbook with per-node rows and aggregate totals. If staging does not expose `public.career_playbooks`, record the schema blocker instead of running mutation smoke.
 
 The 10-concurrent-generation load test should run against isolated staging resources:
 

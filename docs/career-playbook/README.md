@@ -22,9 +22,15 @@ Targeted unit checks:
 ```bash
 pnpm --filter @megacampus/web exec vitest run tests/unit/playwright-config.test.ts
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/smoke/career-playbook-preflight.test.ts
+pnpm --filter @megacampus/web exec vitest run tests/unit/components/career-playbook/admin-cost-evidence.test.tsx
+SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_KEY=test-service-key SUPABASE_ANON_KEY=test-anon-key NODE_ENV=test pnpm --filter @megacampus/course-gen-platform exec vitest run --config vitest.config.unit.ts tests/unit/server/routers/admin-career-playbook-costs.test.ts
 ```
 
 Mutation smoke is intentionally not part of the default command. It requires explicit approval, disposable staging fixtures, a dedicated queue, cleanup authorization, and cost-aware LLM credentials.
+
+## Admin Cost Evidence
+
+Career Playbook per-node cost evidence is available to admins at `/admin/generation/career-playbooks/costs`. The page reads `admin.getCareerPlaybookCostEvidence` and shows the filtered playbook count plus page totals and stage/node/model/token/USD rows from `career_playbooks.cost_breakdown`. Invalid cost payloads are marked instead of being treated as verified evidence.
 
 ## Current Live Readiness
 

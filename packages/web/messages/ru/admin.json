@@ -137,7 +137,8 @@
     },
     "actions": {
       "openWorkflow": "Открыть Workflow",
-      "adminPanel": "Панель администратора"
+      "adminPanel": "Панель администратора",
+      "careerPlaybookCosts": "Затраты Career Playbook"
     },
     "empty": {
       "title": "Генерации не найдены",
@@ -147,6 +148,27 @@
       "showing": "Показано {from} - {to} из {total} результатов",
       "previous": "Назад",
       "next": "Вперёд"
+    }
+  },
+  "careerPlaybookCosts": {
+    "title": "Подтверждение затрат Career Playbook",
+    "description": "Просмотр затрат генерации Career Playbook по плейбуку, этапу, узлу, модели, токенам и сумме в USD.",
+    "empty": "Затраты Career Playbook не найдены",
+    "labels": {
+      "playbooks": "Плейбуки",
+      "playbookSingular": "плейбук",
+      "playbookPlural": "плейбуков",
+      "totalCost": "Общие затраты",
+      "tokens": "Токены",
+      "inputOutput": "Вход / выход",
+      "stage": "Этап",
+      "node": "Узел",
+      "model": "Модель",
+      "input": "Вход",
+      "output": "Выход",
+      "cost": "Затраты",
+      "created": "Создан",
+      "invalidCostBreakdown": "Некорректные данные затрат"
     }
   },
   "pipeline": {

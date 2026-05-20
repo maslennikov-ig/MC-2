@@ -137,7 +137,8 @@
     },
     "actions": {
       "openWorkflow": "Open Workflow",
-      "adminPanel": "Admin Panel"
+      "adminPanel": "Admin Panel",
+      "careerPlaybookCosts": "Career Playbook costs"
     },
     "empty": {
       "title": "No generations found",
@@ -147,6 +148,27 @@
       "showing": "Showing {from} to {to} of {total} results",
       "previous": "Previous",
       "next": "Next"
+    }
+  },
+  "careerPlaybookCosts": {
+    "title": "Career Playbook Cost Evidence",
+    "description": "Review Career Playbook generation costs by playbook, stage, node, model, tokens, and USD totals.",
+    "empty": "No Career Playbook costs found",
+    "labels": {
+      "playbooks": "Playbooks",
+      "playbookSingular": "playbook",
+      "playbookPlural": "playbooks",
+      "totalCost": "Total cost",
+      "tokens": "Tokens",
+      "inputOutput": "Input / output",
+      "stage": "Stage",
+      "node": "Node",
+      "model": "Model",
+      "input": "Input",
+      "output": "Output",
+      "cost": "Cost",
+      "created": "Created",
+      "invalidCostBreakdown": "Invalid cost data"
     }
   },
   "pipeline": {
